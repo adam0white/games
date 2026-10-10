@@ -71,6 +71,7 @@ import {
   testRepair,
   verificationMinutes,
 } from './repairs';
+import { nextHolidayStart, playerAge } from './school-calendar';
 import {
   applyServiceWeekAction,
   completeServiceWeekJob,
@@ -376,6 +377,12 @@ function advancePeople(s: GameState) {
             ? 'Busy at home — free after ten'
             : 'At the hardware shop — back at six';
   }
+  const cabinetSlot = s.workshop?.cabinetAppointment;
+  if (
+    cabinetSlot?.status === 'planned' &&
+    s.people.dad?.agenda.commitments.find((c) => c.id === cabinetSlot.dadId)?.status === 'broken'
+  )
+    cabinetSlot.status = 'missed';
   collectWaiting(s);
   for (const item of s.objects.filter(
     (x) => x.completedBy === 'sam' && x.location === 'returned' && !x.awaitingCollection,
@@ -521,6 +528,24 @@ function workshopContext(s: GameState, choices = false): WorkshopContext {
     ownerHere: (id) => isHere(s, id),
     ...(choices
       ? {
+          dadAgreesTime: () => {
+            const player = s.people.player,
+              dad = s.people.dad;
+            return Boolean(
+              player &&
+                dad &&
+                !scheduledAway(s, 'dad', s.now + 2) &&
+                beginSharedWork(player, dad, {
+                  id: 'cabinet-time-agreement',
+                  action: 'talk',
+                  label: 'Agreeing a time for the next cabinet step',
+                  duration: 2,
+                  effort: 0.01,
+                  with: ['player'],
+                  advertises: { belonging: 0.08, autonomy: 0.03 },
+                }),
+            );
+          },
           dadWillWork: (task) => {
             const dad = s.people.dad;
             if (!dad) return false;
@@ -538,7 +563,8 @@ function workshopContext(s: GameState, choices = false): WorkshopContext {
             }
             const agreed = beginSharedWork(player, dad, {
               id: `cabinet-${task}`,
-              action: 'work',
+              action: `cabinet-${task}`,
+              targetId: 'family-cabinet',
               label:
                 task === 'measure'
                   ? 'Measuring the cabinet doors together'
@@ -590,6 +616,13 @@ function workshopContext(s: GameState, choices = false): WorkshopContext {
       : {}),
   };
 }
+function cancelCabinetTime(s: GameState) {
+  const a = s.workshop?.cabinetAppointment;
+  if (!a || !['planned', 'missed'].includes(a.status)) return;
+  if (s.people.dad) releaseCommitment(s.people.dad, a.dadId);
+  if (s.people.player) releaseCommitment(s.people.player, a.playerId);
+  a.status = 'cancelled';
+}
 function knownAppointments(s: GameState) {
   const appointments = Object.entries(s.world?.presence ?? {})
     .filter(([, p]) => p.awayUntil > s.now)
@@ -624,6 +657,14 @@ function knownAppointments(s: GameState) {
       at: personalAt,
       detail: `Saved forty-five minutes · ${Math.floor(personalAt / 1440) === Math.floor(s.now / 1440) ? 'today' : `in ${Math.floor(personalAt / 1440) - Math.floor(s.now / 1440)} ${Math.floor(personalAt / 1440) - Math.floor(s.now / 1440) === 1 ? 'day' : 'days'}`} at ${String(Math.floor((personalAt % 1440) / 60)).padStart(2, '0')}:${String(personalAt % 60).padStart(2, '0')}`,
     });
+  const cabinet = s.workshop?.cabinetAppointment;
+  if (cabinet?.status === 'planned' && cabinet.at > s.now)
+    appointments.push({
+      personId: 'dad',
+      name: 'Dad',
+      at: cabinet.at,
+      detail: `Agreed cabinet ${cabinet.task} · ${Math.floor(cabinet.at / 1440) === Math.floor(s.now / 1440) ? 'today' : 'tomorrow'} at 15:45; ask together when the time comes.`,
+    });
   return appointments.sort((a, b) => a.at - b.at);
 }
 function available(s: GameState): ActionView[] {
@@ -633,9 +674,11 @@ function available(s: GameState): ActionView[] {
     a.push({
       id: 'wait-appointment',
       label:
-        appointment.personId === 'player'
-          ? 'Wait until your saved bench session'
-          : `Leave time for ${appointment.name}’s arranged return`,
+        appointment.personId === 'dad' && appointment.at === s.workshop?.cabinetAppointment?.at
+          ? 'Wait until the agreed cabinet time with Dad'
+          : appointment.personId === 'player'
+            ? 'Wait until your saved bench session'
+            : `Leave time for ${appointment.name}’s arranged return`,
       detail: appointment.detail,
       intent: 'pause',
     });
@@ -679,6 +722,22 @@ function available(s: GameState): ActionView[] {
     return a;
   }
   const o = focused(s);
+  if (
+    s.objects.some(
+      (item) =>
+        item.id === 'personal' &&
+        item.owner === 'You' &&
+        item.location === 'returned' &&
+        item.returnedEarly &&
+        !item.verified,
+    )
+  )
+    add(
+      'bring-back-bedside',
+      'Bring your bedside lamp back for the longer check',
+      'Three minutes to bring the same lamp downstairs. Its repair and notes stay with it; the longer check remains unfinished.',
+      'primary',
+    );
   if (
     s.objects.some((x) => x.awaitingCollection) ||
     !isHere(s, 'sam') ||
@@ -990,7 +1049,15 @@ export function transition(original: GameState, input: GameInput): GameState {
   }
   const id = input.id;
   if (id === 'back-to-school' && s.campaign) {
-    const to = s.now + 365 * 1440;
+    if (['planned', 'missed'].includes(s.workshop?.cabinetAppointment?.status ?? '')) {
+      cancelCabinetTime(s);
+      say(
+        s,
+        'You',
+        'You cancel the saved cabinet time before school resumes. The unfinished doors stay safely in place.',
+      );
+    }
+    const to = nextHolidayStart(s.now);
     for (const person of Object.values(s.people)) {
       const practiced = suspendUnplayedPractice(person);
       skip(person, to - 6 * 60);
@@ -1000,6 +1067,7 @@ export function transition(original: GameState, input: GameInput): GameState {
     for (const item of s.objects) if (item.location === 'bench') item.location = 'shelf';
     s.focusId = null;
     s.now = to;
+    s.campaign.holidayStartedAt = to;
     s.campaign.holiday++;
     s.campaign.lastSchoolRepairs = s.repairs;
     s.campaign.graduated = s.campaign.holiday >= 4;
@@ -1012,6 +1080,42 @@ export function transition(original: GameState, input: GameInput): GameState {
     }
     for (const line of schoolStoryBeat(s.campaign.holiday))
       if (isHere(s, line.speaker.toLowerCase())) say(s, line.speaker, line.text, line.tone);
+    return s;
+  }
+  if (input.type === 'action' && input.id === 'bring-back-bedside') {
+    const item = s.objects.find((x) => x.id === 'personal');
+    const player = s.people.player;
+    if (!item || !player) throw Error('Missing the bedside lamp or player');
+    const offer: Affordance = {
+      id: input.id,
+      action: 'retrieve',
+      label: 'Bring my bedside lamp downstairs for its unfinished check',
+      duration: 3,
+      effort: 0.05,
+      focus: 0.1,
+      advertises: {},
+    };
+    begin(player, offer, decide(player, [offer]));
+    s.now += 3;
+    advanceBenchBeforePlayer(s, s.now);
+    tick(player, s.now);
+    finish(player, {
+      affordanceId: offer.id,
+      action: offer.action,
+      at: s.now,
+      status: 'completed',
+      summary: offer.label,
+    });
+    item.location = 'bench';
+    item.checkStarted = undefined;
+    item.collectedAt = undefined;
+    s.focusId = item.id;
+    advancePeople(s);
+    say(
+      s,
+      'You',
+      'You bring your own lamp down from beside the bed. Its repair and notes stay with it; now you can give it the longer check.',
+    );
     return s;
   }
   const o = focused(s);
@@ -1263,6 +1367,7 @@ export function transition(original: GameState, input: GameInput): GameState {
         finish(s.people.player, {
           affordanceId: shared.affordanceId,
           action: shared.action,
+          targetId: shared.targetId,
           at: s.now,
           status: 'completed',
           summary: shared.affordance.label,
@@ -1270,6 +1375,49 @@ export function transition(original: GameState, input: GameInput): GameState {
         });
     }
     advancePeople(s);
+    if (workshopResult.cancelCabinetTime) cancelCabinetTime(s);
+    if (workshopResult.cabinetTime && s.workshop && s.people.dad && s.people.player) {
+      cancelCabinetTime(s);
+      const { task, at, until } = workshopResult.cabinetTime;
+      const definition = {
+        kind: 'appointment' as const,
+        actions: [`cabinet-${task}`],
+        targetId: 'family-cabinet',
+        from: at,
+        until,
+        importance: 0.6,
+        label: `Cabinet ${task} together`,
+      };
+      const dad = promise(s.people.dad, { ...definition, toId: 'player' });
+      const player = promise(s.people.player, { ...definition, toId: 'dad' });
+      s.workshop.cabinetAppointment = {
+        task,
+        at,
+        until,
+        dadId: dad.id,
+        playerId: player.id,
+        status: 'planned',
+      };
+    } else if (shared?.action.startsWith('cabinet-')) {
+      const appointment = s.workshop?.cabinetAppointment;
+      if (appointment?.status === 'planned' && shared.action === `cabinet-${appointment.task}`) {
+        if (
+          s.people.dad?.agenda.commitments.find((c) => c.id === appointment.dadId)?.status ===
+            'kept' &&
+          s.people.player?.agenda.commitments.find((c) => c.id === appointment.playerId)?.status ===
+            'kept'
+        )
+          appointment.status = 'kept';
+        else {
+          cancelCabinetTime(s);
+          say(
+            s,
+            'You',
+            'You completed this step at another time and remove its saved slot from the notebook.',
+          );
+        }
+      }
+    }
     for (const line of workshopResult.lines) say(s, line.speaker, line.text, line.tone);
     return s;
   }
@@ -1746,6 +1894,14 @@ export function transition(original: GameState, input: GameInput): GameState {
       if (o && id === 'early-return') {
         o.returnedEarly = true;
         o.callbackSeen = false;
+        say(
+          s,
+          'You',
+          isMechanical(o)
+            ? 'It moves now, but I have not completed the repeated-operation check. Tell me if it sticks.'
+            : 'It lights now, but I have not given it the longer check. Tell me if it falters.',
+          'notice',
+        );
         const owner = isHere(s, o.owner.toLowerCase())
           ? s.people[o.owner.toLowerCase()]
           : undefined;
@@ -1776,15 +1932,6 @@ export function transition(original: GameState, input: GameInput): GameState {
           s.repairs++;
           o.returnedEarly = false;
         }
-        if (o.returnedEarly)
-          narrate(
-            s,
-            'You',
-            o && isMechanical(o)
-              ? 'It moves now, but I have not completed the repeated-operation check. Tell me if it sticks.'
-              : 'It lights now, but I have not given it the longer check. Tell me if it falters.',
-            'notice',
-          );
         s.focusId = null;
         o.completedBy = 'player';
         if (o.id === 'family' && !s.objects.some((x) => x.id === 'personal')) {
@@ -1803,7 +1950,7 @@ export function transition(original: GameState, input: GameInput): GameState {
             s,
             'Mum',
             o.returnedEarly
-              ? 'Thank you for saying it has not had the longer check. I’ll keep the other light nearby. Your old bedside lamp is still here too, if you’d like to look.'
+              ? 'Your old bedside lamp is still upstairs, if you’d like to look.'
               : 'That’s much better. I can finish my chapter tonight. Thank you. Your old bedside lamp is still here too, if you’d like to look.',
             'warm',
           );
@@ -2030,8 +2177,8 @@ export function getView(s: GameState): GameView {
     lifeChapter: s.campaign
       ? {
           label: s.campaign.graduated
-            ? `School finished · age ${Math.floor((s.now - (s.people.player?.life.bornAt ?? s.now)) / (365 * 1440))}`
-            : `Summer at home · ${14 + s.campaign.holiday}`,
+            ? `School finished · age ${playerAge(s)}`
+            : `Summer at home · ${playerAge(s)}`,
           detail: s.campaign.graduated
             ? 'A small place in the garage can become your own work.'
             : 'There is time before the next school year.',
@@ -2060,7 +2207,11 @@ export function getView(s: GameState): GameView {
                     ? 'Walking the dog; back afterward'
                     : 'Not available just now'
           : ['mum', 'dad'].includes(id)
-            ? presence.activity
+            ? s.people[id]?.activity
+              ? s.people[id].activity.affordance.label
+              : /cabinet|hinges/.test(presence.activity)
+                ? 'Finished the cabinet step with you'
+                : 'At home; between activities'
             : s.people[id]?.activity?.affordanceId === 'watch-repair'
               ? 'Watching beside the bench'
               : s.apprentice?.arranged && s.now < s.apprentice.visitUntil && id === 'sam'

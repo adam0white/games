@@ -52,7 +52,15 @@ export function earnedHandoff(eagerSchoolRoute = false, seed = 42): GameState {
       if (has(s, 'explain-step')) s = choose(s, 'explain-step');
     }
   }
-  s = choose(arrange(s), 'supervised-intake');
+  s = arrange(s);
+  for (let n = 0; n < 80 && !has(s, 'supervised-intake'); n++)
+    s = has(s, 'arrange-learning')
+      ? choose(s, 'arrange-learning')
+      : choose(s, has(s, 'wait-person') ? 'wait-person' : 'next-day');
+  expect(has(s, 'supervised-intake'), 'Reachable supervised intake after an actual agreement').toBe(
+    true,
+  );
+  s = choose(s, 'supervised-intake');
   for (let n = 0; n < 20 && s.apprentice?.jobId; n++) s = choose(s, 'watch-sam');
   expect(s.apprentice?.supervisedCompleted).toBe(true);
   s = choose(waitFor(arrange(s), 'independent-intake'), 'independent-intake');

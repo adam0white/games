@@ -100,3 +100,35 @@ Both routes exported and restored successfully. The regular reader found Nora's 
 A separate public WebKit run checked the opening in a 390×844 dark, reduced-motion mobile context: visible choices, no horizontal overflow, working optional 3D, no runtime errors, and exact retention of all 91 journal entries in the owner's historical export. Physical Safari and owner acceptance remain unverified.
 
 The continuity correction passed 156 tests and independent actual-export review. Published engine 6 histories replay byte-for-byte before engine 7 continuation. The reviewer caught a remaining demotion after a completed whole job; the established repairer now retains that earned role even without an active job. Five-minute conversations preserve their initial consent across two plus three minutes, while unrelated actions truthfully interrupt them. No extra money, methods or completed repairs are awarded by these narrative corrections.
+
+
+## Imperfect opening exploratory route
+
+An exploratory reader put objects aside, returned both working lamps before finishing their checks, and explored tea and cabinet work. The 120-choice traversal repeated many quiet/time actions, so its repetition frequency is not independent human evidence. Their exact observations:
+
+> “Putting it aside was reassuring: ‘Nothing is lost; you can come back to it.’ Seeing Mum’s lamp return for the promised check made the early handback feel consequential.”
+
+> “The cabinet conversation surprised me in a good way: ‘A little. I still wanted to finish them.’ Dad missing the open shelves is a nicer outcome than another generic thank-you.”
+
+> “I understood the refusal, but not when to come back.”
+
+The actual seed-1701 export exposed a progression dead end: both lamps were repaired but returned unchecked, neither had a pending owner callback, and further friend requests required one checked repair. The player's own bedside lamp needs an explicit physical return to the bench for its unfinished check, without inventing a failed repair or overriding Mum's choice. The same review exposed repeated handback gratitude and a stale observed cabinet-work label after actual HF activities had finished. These concrete corrections are in the unpublished engine 7 pass. No retrospective journal rewriting is proposed.
+
+
+## Fresh wildcard, 81 recorded choices
+
+A new reader used a fresh isolated browser, read no mechanics source or hidden faults, and reached sixteen through careful repairs, tea and cabinet work. Seven household/neighbour objects were completed; the cabinet was hung but still needed alignment. Exact reactions:
+
+> “I want the house to accumulate things we fixed.”
+
+> “I respect that he has his own day, but I want to arrange a time with him.”
+
+> “The year passed, but the afternoon did not.”
+
+> “The sewing box asks me to think again.”
+
+> “Tea is becoming my test timer.”
+
+The reader found the pencil mark, retained donor switch and Nora's reclaimed spoon especially strong. Repeated refusals to cabinet work respected Dad's agency but made availability opaque; proposing a later time and receiving a counterproposal is a bounded planning candidate. School transitions retained the holiday day and minute across years, making the return feel thinner than the handwriting/story changes. The mechanical sewing box offered a more interesting comparison than the timer and bell's single clear repair. Tea was pleasant initially, but repeated generic sitting text became instrumental. An initially missed cabinet answer was recovered in Journal; the reader attributed that to moving too quickly rather than lost content. These findings concern an unpublished development runtime, whose evolving authored text is review evidence rather than a frozen public replay promise.
+
+The final current pass passed 173 tests across 28 files and production build. Independent review verified actual agreed cabinet promises, preserved missed history across rearrangement/cancellation, synchronized school mornings and the exact published engine 6 fixture hash. Journal export/import remain visible before long history; both original owner files import with exactly 8/91 retained entries.

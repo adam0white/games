@@ -49,7 +49,12 @@ it('actual cabinet aftercare starts and finishes joined talk, leaves bench contr
   s = choose(reach(s, 'service-paid-help'), 'service-paid-help');
   s = choose(reach(s, 'service-hear-leila'), 'service-hear-leila');
   s = choose(s, 'service-accept-leila');
-  if (!has(s, 'delegate-repair')) s = choose(reach(s, 'arrange-learning'), 'arrange-learning');
+  for (let n = 0; n < 120 && !has(s, 'delegate-repair'); n++) {
+    s = choose(reach(s, 'arrange-learning'), 'arrange-learning');
+    if (!s.serviceWeek?.paidHelp && has(s, 'service-paid-help')) s = choose(s, 'service-paid-help');
+    if (!has(s, 'delegate-repair')) s = choose(s, 'rest');
+  }
+  expect(has(s, 'delegate-repair'), 'Actual consent makes paid delegation available').toBe(true);
   s = choose(s, 'delegate-repair');
   const samBefore = s.people.sam?.now;
   s = talk(s, 'aftercare-door-start', 'aftercare-cabinet-pending');

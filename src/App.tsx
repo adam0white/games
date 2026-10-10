@@ -11,7 +11,7 @@ import {
 } from './game/engine';
 import { getServiceWeekView } from './game/service-week';
 import type { ActionView, ConversationLine, GameInput, GameState, ObjectView } from './game/types';
-import { getWorkshopView, type LedgerEntry } from './game/workshop';
+import { getWorkshopView, type LedgerEntry, type WorkshopState } from './game/workshop';
 import { Cabinet } from './ui/Cabinet';
 import { createChoiceGate } from './ui/choiceGate';
 import { JournalHistory } from './ui/JournalHistory';
@@ -25,6 +25,13 @@ const ledgerLabels: Record<LedgerEntry['kind'], string> = {
   'repair-fee': 'Repair payment',
   'sam-pay': 'Sam’s pay',
   'checking-place': 'Second checking tray',
+};
+const cabinetStageLabels: Record<WorkshopState['cabinet'], string> = {
+  unnoticed: 'waiting to begin',
+  looked: 'ready to measure',
+  measured: 'measurements saved',
+  hung: 'doors hung',
+  finished: 'finished',
 };
 const ledgerMoney = new Intl.NumberFormat('en-GB', {
   style: 'currency',
@@ -287,12 +294,18 @@ export default function App() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
-    if (file.size > 2_000_000) {
-      setMessage('That file is too large to be a story. Your current story is unchanged.');
+    const revision = ++storyRevision.current;
+    if (file.size > 8_000_000) {
+      setMessage('That file is larger than the 8 MB story limit. Your current story is unchanged.');
       return;
     }
-    const revision = ++storyRevision.current;
+    setMessage('Opening your story…');
     try {
+      // Let the status paint before synchronous replay occupies the main thread.
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+      if (revision !== storyRevision.current) return;
       const text = await file.text();
       if (revision !== storyRevision.current) return;
       const next = replayPlaytest(text);
@@ -388,7 +401,6 @@ export default function App() {
         <section id="journal" className="journal" aria-label="Story journal">
           <h2>Your story</h2>
           <p className="journal-note">The conversations and small discoveries you have kept.</p>
-          <JournalHistory lines={history} />
           <div className="journal-tools">
             <button type="button" onClick={download}>
               Export story
@@ -424,6 +436,12 @@ export default function App() {
               </button>
             </div>
           )}
+          {message && (
+            <p className="message" role="status">
+              {message}
+            </p>
+          )}
+          <JournalHistory lines={history} />
         </section>
       )}
       <input
@@ -433,7 +451,7 @@ export default function App() {
         onChange={importStory}
         hidden
       />
-      {message && (
+      {!journal && message && (
         <p className="message" role="status">
           {message}
         </p>
@@ -533,7 +551,7 @@ export default function App() {
         )}
         {workshop?.cabinet?.open && (
           <details className="cabinet-at-side" open={!view.focus && !game.apprentice?.jobId}>
-            <summary>Dad’s cabinet doors</summary>
+            <summary>Dad’s cabinet doors · {cabinetStageLabels[workshop.cabinet.stage]}</summary>
             <section className="family-project" aria-label="Dad’s cabinet project">
               <Cabinet stage={workshop.cabinet.stage} drawing={workshop.cabinet.drawingDisplayed} />
               <div>

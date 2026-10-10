@@ -49,6 +49,14 @@ export interface WorkshopState {
   referral: 'unasked' | 'offered' | 'permitted' | 'declined';
   paidHelp: boolean;
   cabinet: 'unnoticed' | 'looked' | 'measured' | 'hung' | 'finished';
+  cabinetAppointment?: {
+    task: 'measure' | 'hang' | 'align';
+    at: number;
+    until: number;
+    dadId: string;
+    playerId: string;
+    status: 'planned' | 'kept' | 'cancelled' | 'missed';
+  };
   drawingFound: boolean;
   drawingChoice: 'undecided' | 'displayed' | 'kept';
   projectOpen: boolean;
@@ -73,12 +81,15 @@ export interface WorkshopContext {
   leilaHere?: boolean;
   ownerHere?: (id: string) => boolean;
   samWillAgree?: () => boolean;
+  dadAgreesTime?: (task: 'measure' | 'hang' | 'align') => boolean;
   dadWorkReason?: () => string;
   dadWillWork?: (task: 'measure' | 'hang' | 'align' | 'space') => boolean;
 }
 export interface WorkshopResult {
   lines: StoryLine[];
   minutes: number;
+  cabinetTime?: { task: 'measure' | 'hang' | 'align'; at: number; until: number };
+  cancelCabinetTime?: boolean;
   job?: WorkshopJobSpec;
   personIds?: string[];
   visits?: { personId: string; at: number; activity: string }[];
@@ -206,6 +217,14 @@ export function workshopActions(s: WorkshopGame, ctx: WorkshopContext): ActionVi
       'A family project that can wait between repairs.',
     );
   if (w.projectOpen && ctx.dadHere) {
+    if (['looked', 'measured', 'hung'].includes(w.cabinet))
+      add(
+        'workshop-cabinet-plan',
+        ['planned', 'missed'].includes(w.cabinetAppointment?.status ?? '')
+          ? 'Ask Dad to rearrange the cabinet time'
+          : 'Ask Dad to arrange a cabinet time',
+        'Tomorrow at 15:45, if he agrees. The next step still needs both of you.',
+      );
     if (w.cabinet === 'looked')
       add(
         'workshop-cabinet-measure',
@@ -231,6 +250,12 @@ export function workshopActions(s: WorkshopGame, ctx: WorkshopContext): ActionVi
         'Mum kept your old drawings in a flat box.',
       );
   }
+  if (w.cabinetAppointment?.status === 'planned')
+    add(
+      'workshop-cabinet-cancel',
+      'Cancel the saved cabinet time',
+      'Leave Dad a clear note; the doors can wait.',
+    );
   if (w.projectOpen) {
     if (w.drawingFound && (w.drawingChoice ?? 'undecided') === 'undecided') {
       add('workshop-display-drawing', 'Put the drawing beside the finished cabinet');
@@ -452,6 +477,36 @@ export function applyWorkshopAction(
   const w = state(s);
   const result = (lines: StoryLine[], minutes = 3): WorkshopResult => ({ lines, minutes });
   switch (id) {
+    case 'workshop-cabinet-plan': {
+      const task = w.cabinet === 'looked' ? 'measure' : w.cabinet === 'measured' ? 'hang' : 'align';
+      if (!ctx.dadAgreesTime?.(task))
+        return {
+          minutes: 0,
+          lines: [line('Dad', ctx.dadWorkReason?.() ?? 'I want to keep my own plans for now.')],
+        };
+      const at = (Math.floor(s.now / 1440) + 1) * 1440 + 15 * 60 + 45;
+      return {
+        minutes: 2,
+        cabinetTime: { task, at, until: at + 60 },
+        lines: [
+          line(
+            'Dad',
+            'Let us leave tomorrow at quarter to four for that step. We will still check how we both are when the time comes.',
+          ),
+        ],
+      };
+    }
+    case 'workshop-cabinet-cancel':
+      return {
+        minutes: 1,
+        cancelCabinetTime: true,
+        lines: [
+          line(
+            'You',
+            'You leave a note cancelling the saved cabinet time. The unfinished step stays in the notebook.',
+          ),
+        ],
+      };
     case 'workshop-cabinet-look':
       w.cabinet = 'looked';
       w.projectOpen = true;
@@ -1029,7 +1084,13 @@ export function getWorkshopView(s: WorkshopGame) {
         ? null
         : {
             stage: w.cabinet,
-            description: cabinetDescriptions[w.cabinet],
+            description:
+              cabinetDescriptions[w.cabinet] +
+              (w.cabinetAppointment?.status === 'planned'
+                ? ` The notebook holds an agreed ${w.cabinetAppointment.task} slot at 15:45; ask Dad when you are both available, or rearrange it.`
+                : w.cabinetAppointment?.status === 'missed'
+                  ? ' You missed the saved cabinet time. The step is unfinished; ask Dad to arrange another time.'
+                  : ''),
             open: w.projectOpen,
             drawingFound: w.drawingFound,
             drawingDisplayed: w.drawingChoice === 'displayed',

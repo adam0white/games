@@ -76,7 +76,13 @@ export interface GameState {
   serviceWeek?: ServiceWeekState;
   checkingPlaces?: number;
   workshop?: WorkshopState;
-  campaign?: { holiday: number; lastSchoolRepairs: number; graduated: boolean; startedAt: number };
+  campaign?: {
+    holiday: number;
+    lastSchoolRepairs: number;
+    graduated: boolean;
+    startedAt: number;
+    holidayStartedAt?: number;
+  };
   apprentice?: {
     visitUntil: number;
     arranged: boolean;

@@ -14,10 +14,19 @@ it('eight completed public repairs carry people, unfinished work and exact histo
       const id = nextSchoolAction(s);
       const before = s.now;
       s = choose(s, id);
-      if (id === 'back-to-school') jumps.push(s.now - before);
+      if (id === 'back-to-school') {
+        jumps.push(s.now - before);
+        expect(s.now % 1440).toBe(9 * 60);
+        expect(getView(s).timeLabel).toContain('Summer day 1');
+        for (const person of Object.values(s.people)) expect(person.now).toBe(s.now);
+      }
     }
     expect(s.campaign?.graduated).toBe(true);
-    expect(jumps).toEqual([365 * 1440, 365 * 1440, 365 * 1440, 365 * 1440]);
+    expect(jumps).toHaveLength(4);
+    for (const jump of jumps) {
+      expect(jump).toBeGreaterThanOrEqual(365 * 1440);
+      expect(jump).toBeLessThan(366 * 1440);
+    }
     expect(s.people.player?.life.bornAt).toBe(bornAt);
     expect(s.people.sam?.life.bornAt).toBe(samBornAt);
     expect(Math.floor((s.now - (bornAt ?? s.now)) / (365 * 1440))).toBe(18);

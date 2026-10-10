@@ -196,6 +196,7 @@ export function liveOrdinaryTime(
       finish(person, {
         affordanceId: current.affordanceId,
         action: current.action,
+        targetId: current.targetId,
         at: end,
         status: 'completed',
         summary: label,

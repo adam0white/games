@@ -4,7 +4,7 @@ Updated 2026-10-10 during the authorized five-hour run; deadline 10:59:20 UTC.
 
 ## What remains
 
-The reviewed first service week is public. Engine 7 continuity corrections are reviewed and ready for publication; then continue browser playtesting and polish through the authorized deadline. Two optional object conversations and timestamped journal are integrated; Adam receives a substantial long playthrough. Continue the authorized run through 10:59:20 UTC. Adam accepts the game's feel personally. A technical handoff or published framework does not claim his acceptance. Current plan: docs/superpowers/plans/2026-10-10-first-service-week.md.
+The reviewed first service week is public. Engine 7 is frozen and independently reviewed: 173 tests plus lint, strict types and production build pass. Publish it from the clean reviewed checkout, then continue fresh browser playtesting through the authorized deadline and integrate the owner’s local preview. Two optional object conversations and timestamped journal are integrated; Adam receives a substantial long playthrough. Continue the authorized run through 10:59:20 UTC. Adam accepts the game's feel personally. A technical handoff or published framework does not claim his acceptance. Current plan: docs/superpowers/plans/2026-10-10-first-service-week.md.
 
 ## Reviewed checkpoint
 
@@ -17,7 +17,7 @@ The reviewed first service week is public. Engine 7 continuity corrections are r
 
 ## Review evidence
 
-Independent wildcard browser play reached eighteen and apprenticeship; separate game-design review identified verification repetition and a need for a meaningful first service week. Technical review reproduced falsely credited assisted independence, collection skipped by watch actions and end-of-jump owner timing; fixes were independently rechecked (12 targeted tests). The isolated release checkout passed lint, strict types, 63 tests and production build after the final 3D lifecycle fix. That public checkpoint remains engine 5. The published engine 6 chapter passed 153 tests, including 24 public school-to-independence routes across twelve seeds, service routes, actual joint work, prayer recurrence across school gaps, material compatibility, unfinished-return recovery, actual aftercare conversations and journal timestamps.
+Independent wildcard browser play reached eighteen and apprenticeship; separate game-design review identified verification repetition and a need for a meaningful first service week. Technical review reproduced falsely credited assisted independence, collection skipped by watch actions and end-of-jump owner timing; fixes were independently rechecked (12 targeted tests). The isolated release checkout passed lint, strict types, 63 tests and production build after the final 3D lifecycle fix. That historical checkpoint was engine 5 and remains available for replay. The published engine 6 chapter passed 153 tests, including 24 public school-to-independence routes across twelve seeds, service routes, actual joint work, prayer recurrence across school gaps, material compatibility, unfinished-return recovery, actual aftercare conversations and journal timestamps.
 
 Gemini completed the story review. Its additional HF review failed on quota; Claude failed on expired authentication. Independent delegated framework reviewers completed instead. HF 2.2.0 GitHub/npm provenance and the public framework site are verified (release d673644, docs ea507b1); CI, CodeQL and benchmark workflows passed.
 
@@ -39,10 +39,23 @@ Primary local preview remains http://127.0.0.1:5173/ while isolated development 
 
 ## Limits
 
-No simulated market, multiplayer, servers or offline earnings. Prices and jobs are authored. Body and ordinary activities are bounded engineering models. Engine 6 uses actual sourced HF norms, prayer windows and public decision/activity/commitment APIs. Conviction, availability and competing body needs can change choices; this bounded portrayal does not establish human calibration. Current UI imports are bounded at 2 MB; engine packets at 8 MB/20,000 inputs. Physical-device play and owner taste acceptance remain unverified.
+No simulated market, multiplayer, servers or offline earnings. Prices and jobs are authored. Body and ordinary activities are bounded engineering models. Current and frozen engines use actual sourced HF norms, prayer windows and public decision/activity/commitment APIs. Conviction, availability and competing body needs can change choices; this bounded portrayal does not establish human calibration. Current UI imports are bounded at 8 MB; engine packets at 8 million text characters/20,000 inputs. Physical-device play and owner taste acceptance remain unverified.
 
 Personal context consultation used /Users/abdul/code/pkm. Each project repository remains its own authority.
 
 ## Reviewed continuity correction (engine 7)
 
 The published engine 6 runtime graph is frozen separately and validates actual public exports byte-for-byte before current continuation. Engine 7 preserves an earned repairer role when arranging another afternoon; keeps a consenting five-minute conversation continuous across its two choices; records truthful interruption and resumed consent; describes waiting objects and actual collection schedules without borrowing another request’s purpose; explains Dad’s refusals from current activity, fatigue or plans; and scopes service-week totals separately from household/personal repairs. The gear summary distinguishes stored, installed and checked. The cashbook includes the actual tray expense once. A local SVG favicon avoids the default missing icon request. Full lint/type/test/build check passed 156 tests; independent review reproduced the established-role defect and verified its correction against the actual completed public export.
+
+
+## Reviewed planning and recovery (engine 7)
+
+Returning both first lamps unchecked can no longer strand progression: the player can physically bring the same bedside lamp back in three minutes, then complete the actual timed check. Retrieval grants no repair credit, parts, skill or knowledge. Independent review replayed all 120 recorded exploratory choices and verified real checking is necessary before the first friend request becomes available.
+
+Dad may agree tomorrow's specific cabinet step at 15:45. Both participants hold public HF promises for that exact action/target; unrelated work cannot fulfill them. Explicit waiting advances all actors, genuine joined completion keeps the appointment, and fatigue or other plans can still prevent agreement or attendance. A missed slot is observed as missed, with broken commitment history retained across rearrangement or cancellation. Closing school explicitly releases a pending slot before the unplayed years. This is one authored agreement, not a general planner or forced availability.
+
+School returns begin at the first 09:00 after at least one complete modeled year. A saved holiday origin starts Summer day 1; actual birth dates determine ages. Old journal timestamps remain untouched and old states without the field retain their prior origin until a new transition. Actual integrated controls cover actor synchronization, prayer recurrence and school cancellation.
+
+The Journal offers export/import before its long history; exactly one visible opening/error status appears near those controls. A valid 3.2 MB formatted historical export imported, an oversized replacement preserved the current story, and racing a pending import against a new story retained the chosen story. The opening status visibly painted before a 3.1-second replay under simulated CPU slowdown. Both owner exports still retain precisely 8/91 journal entries. These are isolated browser controls, not physical-device performance measurements.
+
+The final fullcheck passed 173 tests across 28 files. The frozen engine 6 regression pins seed, actual public input history and SHA256 from the original published private-route packet, rather than generating its expectation from the current engine. Independent review passed 27 appointment/calendar/practice/migration controls and reproduced missed→rearranged→cancelled promises without erasing broken history.

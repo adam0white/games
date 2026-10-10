@@ -66,3 +66,13 @@ Keep visible evidence bounded by observation. An uninspected model must not disc
 2026-10-10: original optional 3D inspection is implemented for nine distinct appearances, with observed-parts trays, touch/keyboard rotation and text/SVG fallback. Verification is still a real elapsed check. The published first week supports meaningful parallel activity and fewer repeated wait clicks after the first teaching sequence. Quiet HF practice and collection promises use actual actor state and public HF decisions; their effects are not inferred from dialogue alone.
 
 The broader simulations and additional businesses retain their 2026-11-09 review date. Source visibility, licensing and the final title remain owner decisions; the deployed build is a public static game, not publication of the source repository.
+
+
+## Findings from the extended playthrough, 2026-10-10
+
+- A self-owned item returned unchecked must remain physically recoverable; completing the real check, not waiting or retrieval alone, earns progress. This is implemented and independently reviewed in the current continuity pass.
+- Dad's optional cabinet work needs an actual proposed appointment rather than opaque repeated requests. The bounded current pass uses existing HF decisions and promises; a general calendar/planner remains outside scope.
+- A new school holiday should visibly begin a fresh morning and preserve actual elapsed actor time, rather than retaining the prior afternoon's minute. This is implemented and independently reviewed in the current pass.
+- **Review by 2026-11-09:** show the house accumulating its actual checked repairs. Keep ownership, unfinished work and absent collections honest; do not fabricate a gallery of universally finished objects.
+- **Review by 2026-11-09:** more observed comparisons for mechanical families where a real alternative hypothesis exists. Preserve the small, clear early repair; avoid adding implausible failure options solely to disguise a straightforward mechanism.
+- **Review by 2026-11-09:** make repeated family time less generic through run-dependent ordinary conversation and actually received memories. Tea should not become a required testing currency, a relationship purchase or an invented physiology subsystem.

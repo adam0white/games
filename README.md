@@ -19,7 +19,7 @@ Longer-term ambition: the experience shifts from cozy repair to business managem
 
 The playable story begins at fourteen with a family conversation and a flickering lamp. Distinct household repairs and unfinished personal work carry across explicit school years. After graduation, the player can agree a shared workspace, explain actual methods to Sam, and delegate unfamiliar supported repairs. Sam can refuse, stop for help and preserve his own commitments. Genuine independent completion excludes player-assisted work.
 
-The canonical backstory unfolds through objects and people in a slightly dystopic, repair-dependent world. The Journal keeps conversations and notes. The interface follows the system's light/dark setting; original optional 3D inspection complements distinct illustrations and a text fallback. Growth remains voluntary and personal projects remain worthwhile.
+The canonical backstory unfolds through objects and people in a slightly dystopic, repair-dependent world. The Journal keeps conversations and notes, with export and import beside its heading. New school holidays begin on a fresh morning; Dad’s cabinet work can have an actual agreed time instead of repeated availability guesses. The interface follows the system's light/dark setting; original optional 3D inspection complements distinct illustrations and a text fallback. Growth remains voluntary and personal projects remain worthwhile.
 
 Run locally with Node 24 or newer:
 

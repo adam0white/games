@@ -35,9 +35,13 @@ it('Dad’s real choice starts shared work for the full task duration, while com
   if (!dad || !player) throw Error('Missing partners');
   expect(dad.trace.at(-1)?.chosenAffordanceId).toBe('cabinet-measure');
   expect(dad.trace.at(-1)?.considered.some((c) => c.affordanceId === 'cabinet-measure')).toBe(true);
-  expect(dad.chronicleDay?.actions.some((a) => a.action === 'work')).toBe(true);
-  expect(player.chronicleDay?.actions.some((a) => a.action === 'work')).toBe(true);
-  expect(getView(accepted).whereabouts?.find((p) => p.id === 'dad')?.activity).toContain('cabinet');
+  expect(dad.chronicleDay?.actions.some((a) => a.action === 'cabinet-measure')).toBe(true);
+  expect(player.chronicleDay?.actions.some((a) => a.action === 'cabinet-measure')).toBe(true);
+  expect(dad.activity).toBeNull();
+  expect(player.activity).toBeNull();
+  expect(getView(accepted).whereabouts?.find((p) => p.id === 'dad')?.activity).toBe(
+    'Finished the cabinet step with you',
+  );
   for (const person of Object.values(accepted.people)) expect(person.now).toBe(accepted.now);
   expect(declined.people.dad?.trace.at(-1)?.chosenAffordanceId).not.toBe('cabinet-measure');
 });
