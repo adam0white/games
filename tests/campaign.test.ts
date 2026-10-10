@@ -1,77 +1,8 @@
 import { expect, it } from 'vitest';
-import { createGame, getView, restoreGame, serializeGame, transition } from '../src/game/engine';
-import type { GameState } from '../src/game/types';
+import { getView, restoreGame, serializeGame } from '../src/game/engine';
+import { choose, nextSchoolAction, opening } from './support/school-route';
 
-// A public-input traversal proves the school campaign is reachable and replayable.
-// It chooses from received observations and visible offers, never latent faults.
-function choose(s: GameState, id: string): GameState {
-  expect(
-    getView(s).actions.some((action) => action.id === id),
-    `Visible action ${id}`,
-  ).toBe(true);
-  return transition(s, { type: 'action', id });
-}
-function opening(seed: number): GameState {
-  let s = createGame(seed);
-  for (const id of [
-    'talk-family',
-    'inspect',
-    'test-battery',
-    'clean-contact',
-    'verify',
-    'wait-check',
-    'wait-check',
-    'check-result',
-    'return',
-    'inspect',
-    'shelve',
-    'talk-garage',
-    'search-donor',
-  ])
-    s = choose(s, id);
-  s = transition(s, { type: 'select', id: 'personal' });
-  for (const id of [
-    'fit-holder',
-    'verify',
-    'wait-check',
-    'wait-check',
-    'check-result',
-    'return',
-    'talk-friends',
-  ])
-    s = choose(s, id);
-  return s;
-}
-function nextSchoolAction(s: GameState, eager = false): string {
-  const view = getView(s);
-  const offers = new Set(view.actions.map((action) => action.id));
-  const preferred = [
-    ...(eager ? [] : ['back-to-school']),
-    'return',
-    'check-result',
-    'verify',
-    'wait-check',
-    'inspect',
-    'test-battery',
-    'clear-obstruction',
-    'align-striker',
-    'lubricate-hinge',
-    'search-spring',
-    'replace-spring',
-    'twist-cap',
-  ];
-  for (const id of preferred) if (offers.has(id)) return id;
-  if (
-    offers.has('replace-battery') &&
-    view.focus?.observations.some((observation) => observation.includes('old battery is tired'))
-  )
-    return 'replace-battery';
-  for (const id of ['clean-contact', 'accept-request', 'back-to-school', 'wait-person', 'rest'])
-    if (offers.has(id)) return id;
-  throw Error(`No school continuation: ${view.actions.map((action) => action.id).join(', ')}`);
-}
-
-it('eight distinct public repairs carry people, early work and exact history through four school years', () => {
+it('eight completed public repairs carry people, unfinished work and exact history through four school years', () => {
   for (const seed of [42, 1701]) {
     let s = opening(seed);
     const earlyLamp = structuredClone(s.objects.find((item) => item.id === 'family'));
@@ -96,7 +27,8 @@ it('eight distinct public repairs carry people, early work and exact history thr
       expect(person.now).toBe(s.now);
     }
     expect(s.repairs).toBe(8);
-    expect(new Set(s.objects.map((item) => item.title)).size).toBe(8);
+    expect(s.objects.filter((item) => item.location === 'returned')).toHaveLength(8);
+    expect(new Set(s.objects.map((item) => item.title)).size).toBe(s.objects.length);
     expect(new Set(s.objects.map((item) => item.form)).size).toBeGreaterThanOrEqual(5);
     expect(s.objects.find((item) => item.id === 'family')).toEqual(earlyLamp);
     expect(s.journal?.some((line) => line.text.includes('School'))).toBe(true);

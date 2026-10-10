@@ -1,6 +1,6 @@
 # Game and HF boundary
 
-Updated 2026-10-10. Grounded in the sibling HF architecture and the installed released package. Separate current consumer behavior from the proposed apprenticeship capability.
+Updated 2026-10-10. Grounded in the sibling HF architecture and the installed released package. The game consumes released HF 2.2.0; historical replay engines retain their exact npm dependencies.
 
 ## Ownership
 
@@ -9,14 +9,14 @@ Updated 2026-10-10. Grounded in the sibling HF architecture and the installed re
 | Actual objects, latent faults, part condition, inventories and prices | Received observations, beliefs, learned expectations and uncertainty |
 | Repair actions, their world preconditions and consequences | Choosing among offered actions using capacity, motives, memory and will |
 | World clock, jobs, customer agreements and verification evidence | Understood commitments, experience, relationships and response to advice |
-| Domain-specific methods and observations the world can express | Acquisition, retention and application of a method, if implemented as a generic faculty |
+| Domain-specific methods and observations the world can express | Acquisition, retention and application of explicitly demonstrated conditional methods |
 | UI, player input, object art and business views | Deterministic state and explainable decision records |
 
 A customer's deadline exists in the host world. Each person's understanding of it belongs to that person. Giving every actor the correct answer from the job record would erase the information boundary we intend to prove.
 
 ## What already exists
 
-HF offers practice and skill development, instruction and observation, outcome-based expectations, beliefs and source trust, advice/refusal, commitments, fatigue, relationships, impressions, joint-activity acceptance, snapshots and deterministic replay machinery. Released package 2.1.4 is installed and pinned here.
+HF offers practice and skill development, instruction and observation, outcome-based expectations, beliefs and source trust, advice/refusal, commitments, fatigue, relationships, impressions, joint-activity acceptance, snapshots and deterministic replay machinery. Released package 2.2.0 is installed and pinned here. Its acquired-method faculty was added after a demonstrated gap in the earlier released package, reviewed with domain-neutral controls and published through HF's own release workflow.
 
 The opening uses public person creation, action begin/decide/tick/finish, perceptions and snapshots. Tests show actual skill and memory changes and exact replay. The enriched chapter also uses shared time and real HF relationships/social needs: a matched-duration neutral-rest control gives Mum the same leisure effect and elapsed time, while shared tea changes her tie and social need. Subsequent public `decide()` traces change between helping and reading. This is one bounded causal human response, not evidence of general human realism or apprentice learning.
 
@@ -24,17 +24,17 @@ Manual repair outcomes still depend on host diagnosis/action matching. Optional 
 
 Skill growth is not evidence of learning an arbitrary multi-step policy. Narration describing an apprentice as trained is not evidence either.
 
-## Candidate next faculty
+## Acquired methods and their limits
 
-**Bounded procedural learning:** learn when a demonstrated method applies, which observation matters, which next action follows, and when the method calls for verification, stopping or help. Host actions remain domain-specific; reusable learning and application belong in HF. Reuse the existing faculties rather than introducing a second actor or hidden planner in the game.
+**Implemented:** an attended, explicitly explained demonstration records conditional method evidence in the learner. Received categorical cues activate that evidence in ordinary HF decision terms. Sam's actual learned state changes his choices on unfamiliar supported lamps; withholding teaching, teaching an alternative and scalar skill alone are matched controls. The same mechanism passes a separate domain-neutral parcel scenario in HF. Player-assisted work is useful but cannot earn independent whole-job credit.
 
-Prove need first with the released package. Choose the smallest mechanism that supports two methods and an exception. Reject an approach that can pass only through hardcoded apprentice behavior in this game. Conversely, do not move repair preconditions or object diagnosis tables into HF merely because the apprentice uses them.
+The host supplies domain-specific actions, received observations, repair preconditions and physical outcomes. It does not supply the learner's correct next choice or grant expertise after a training flag. Unknown mechanical work still leads to an ordinary help-seeking fallback, not a demonstrated ability to infer a new procedure. Scope is explicit taught categorical methods; no general planning, inferred cue composition or calibrated human learning is claimed.
 
-Potential later work: communicated experience, revision after repeated failure, consequences for a promisee, continuing mutual participation in joint work, and calibrated confidence. These are not automatically part of this first extension. Existing HF already has partial support for some of them.
+The first service week additionally consumes existing public APIs for ethical convictions, actual daily practices, understood promises, actual joint cabinet work and owner choices about unfinished work. Host business agreements and authored dialogue remain game content. Actual event timestamps preserve timely collection, while broken promises remain in HF history. Further communicated experience, richer mutual participation, revision and calibrated confidence remain candidates rather than automatic scope.
 
 ## External consumer test
 
-The game installs an exact public npm release, with a lockfile. A temporary standalone copy of game source/configuration passed clean installation and all checks, without copying any sibling HF source. There are no sibling imports or aliases. Filesystem access to the sibling was not explicitly denied during that check. Candidate framework versions can be tested as packed artifacts, but the accepted game uses a released dependency.
+The game installs exact public npm releases with a lockfile. An isolated release checkout passed clean installation and all checks without copying sibling HF source. There are no sibling-source imports or aliases; npm package aliases retain historical published releases for replay. Filesystem access to the sibling was not explicitly denied during that check. Candidate framework versions can be tested as packed artifacts, but the delivered game consumes a released dependency.
 
 HF changes are developed, tested, reviewed and released in HF. The game upgrades the dependency afterward. Engine/scenario migrations and changed replay expectations are explicit.
 

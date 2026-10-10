@@ -88,7 +88,7 @@ export default function Inspection3D({ object }: { object: ObjectView }) {
     render.current = draw;
     function size() {
       const width = frame?.clientWidth ?? 320;
-      const height = Math.min(300, Math.max(240, width * 0.88));
+      const height = frame?.clientHeight ?? 300;
       renderer.setSize(width, height, false);
       const ratio = width / height;
       camera.left = -1.45 * ratio;

@@ -30,4 +30,60 @@ Adam's words, verbatim:
 
 > “The back story is that we live in a WALL-E inspired slightly dystopic world that's very slowly revealed. I need the time flow to move realistically too. There's no college, education ends after high school in this world. And our scripted training campaign is the time we get between school, and maybe one holiday. Maybe time progresses a total of a few years despite playing only 5-15 repair tasks because of that, we make it apparent to the player like go back to school. Then once we finish high school we ask to take over the garage or maybe part of a small shop to do more repairs, which is where we eventually find our first apprentice to progress further. At later stages as the story is revealed more, we'll realize that there are a lot of scrap and old intentions in this world, and repairs is almost the most popular thing to do. That'll fuel into the economy sim and multiplayer world where everyone will handle a lot of repairs, with alternate businesses added even later or even after multiplayer. I'm also imagining an Assembly with Care or https://mechanical-pencil.com/ inspired play style where the objects are in 3D.”
 
-This replaces the unreleased adult-visit story with a school-break campaign over several years, followed by regular workshop work and apprenticeship. Frozen prior exports are historical evidence, not text to retroactively rewrite. The three-dimensional object presentation direction is recorded; the story reference does not claim to implement it.
+This replaces the unreleased adult-visit story with a school-break campaign over several years, followed by regular workshop work and apprenticeship. Frozen prior exports are historical evidence, not text to retroactively rewrite. Optional original procedural 3D inspection now presents distinct household objects, with a text/SVG fallback. This is an object-viewing layer, not a completed tactile repair simulation.
+
+## Independent reviews during the five-hour run
+
+These are agent reviews, not Adam's acceptance. The first wildcard browser run reached graduation and a real learned-method handoff. It described the kept switch and cabinet as memorable, and found repetitive waiting, obscure availability and inconsistent spare-lamp text. Distinct object provenance, known schedule hints, explicit drawing choices and completed-work explanation text were corrected. A technical reviewer reproduced player-assisted work falsely earning independent credit and collection skipped by watch actions; sticky assistance provenance and centrally processed actual collection were independently confirmed.
+
+The first-week design review used source plus isolated public-module probes. It reproduced hearing a priced request, switching to favours and accepting a retained £5 fee; spoken “tomorrow” conflicting with a same-day deadline; past introductions after late starts; a moved personal session with no replacement; an insufficiently motivated conflict; and a display label appearing without an encounter. Fixes were independently confirmed in twelve module tests and repeated browser probes. Full integrated consequences remain a separate runtime check.
+
+The practices review reproduced synthetic missed-worship debt during unplayed school years and a lost Fajr recurrence after afternoon initialization. It confirmed actual HF prayer decisions, held-norm veto and competing hunger, without spiritual worth or income rewards. Both timing defects were corrected and covered by recurrence controls before the integrated chapter is published.
+
+A fresh public-build wildcard reported, verbatim: “No explicit hint that his collection was what blocked school. Clock hints make this inferable, but waiting felt mechanical.” Pending collection disclosure and meaningful waiting are being polished. A root public-input traversal also found that returning every Sam object could hide the only teaching invitation permanently; the adult conversation now remains reachable, subject to his actual presence. That route subsequently reached a real eighteen-year-old independent handoff in 157 inputs, without editing saved state or choosing from hidden faults.
+
+## First-week and returning-object review
+
+A separate player reviewed a fresh actual-input history and the private working-week route without reading mechanics source. Verbatim:
+
+> “The returning sewing box makes a worthwhile distinction: a familiar symptom can have a different cause.”
+
+> “The old repair supplied a plausible hypothesis without guaranteeing the answer.”
+
+> “Failed cleaning automatically reported the lid-clear comparison, so selecting that explicit test afterward repeated information already supplied.”
+
+> “Nora’s return response reused the school repair’s spoon-and-needles line. Acknowledging the different fault would strengthen the same-object continuity.”
+
+> “Sam remained at his own shift, which made the favour feel appropriately separate from his apprenticeship.”
+
+> “The direct two-day wait displayed ten repeated prayer announcements and two repeated dog-walk announcements at once.”
+
+> “Evan’s invitation appeared before I understood who he was.”
+
+> “The paper-street model’s measured donor-part comparison and Evan keeping his other components were convincing details.”
+
+The arranged donor visit landed on its stated day and time. These observations prompted a repeat-test label, a different return acknowledgement, quiet aggregation of repeated routine notices and a prior introduction to Evan. The return scene requires the actual original box to have been repaired, checked and collected; the normal eight-repair campaign may leave it unfinished, so its test traversal explicitly completes the ten-repair route rather than inventing history.
+
+Independent technical review found that reserving the player's last battery was insufficient when Sam had already started a replacement. Completion needs conservation across both in-progress actions. The earlier prayer-gap correction also needed a kept recurring commitment case, not only pending windows: a released successor now suspends recurrence through public HF APIs while retaining played history. These are implementation reviews; Adam's acceptance remains pending.
+
+## Fresh school-to-work review and causal corrections
+
+A fresh browser reader played from fourteen to eighteen without inspecting runtime mechanics. The kept family objects and ambiguous sewing-box maintenance were useful discoveries. The reader identified declined tea followed by a false claim of shared company, a childhood drawing line that presumed an earlier question, and Dad apparently eating while narrating cabinet work. The current response now respects Mum's refusal; the drawing retains neutral provenance; cabinet work starts and finishes actual HF joint actions, with fatigue and schedule boundaries affecting Dad's participation. The school button explicitly closes the remaining holiday as well as the school months.
+
+Independent review reproduced an unchecked-return dead end during the first service week. The owner can now choose a no-fee settlement or physically return the object for a fresh check. Neither option manufactures payment, verified work or apprentice credit. A checked late return gives a concrete changed-afternoon response once. Closing the authored trial does not promise a stream of unimplemented future customers.
+
+A public-input compatibility traversal acquired the personal model's donor gear and later encountered an unrelated winding timer. That gear cannot repair the timer: material ownership includes the compatible target, and the part remains available for the model. Independent controls also confirmed that pending Sam work cannot consume a battery already used by the player, and that actual timely apprentice collection keeps its promise before a later player-time jump. Full chapter checks currently cover 112 cases; subsequent optional-conversation integration requires another check before publication.
+
+## Fresh working-week wildcard
+
+A lightly briefed player imported a genuine 150-input earned-handoff history and chose forty further actions without reading mechanics source. They chose regular collections, arranged a later Leila date, declined Nora's rushed request, protected the personal model session and recovered Evan's compatible gear. Their words, verbatim:
+
+> “The strongest surprise was the older torch check: when it occupied the checking place, the game explicitly sent me back to read its result before checking the model. That made shared space consequential.”
+
+> “I assigned Leila’s priced job to Sam before separately agreeing his rate. The pay action was inside collapsed arrangements; Sam subsequently said “Ask me before starting one,” although work had started.”
+
+The rate ambiguity is corrected: a priced whole-job handoff needs actual separately agreed terms first, with the rate conversation visible at that decision. Ordinary family work and favours remain distinct. The reviewer also found an arranged visit's purpose replaced by a routine absence label, repeated unchanged apprentice pauses and singular-day grammar; these were corrected. Their Leila job was still unfinished when the forty-choice session ended; this review does not claim completion of that route.
+
+The fresh mobile review found choices below the screen and prior-object thanks beside the next object. A compact object layout and an explicit “About” response context address those findings. Independent review caught a proposed “Returned” label falsely implying receipt when the owner was absent; the neutral context label preserves that distinction. New journal lines carry their observed clock; the original owner exports retain their untimed history verbatim. Both actual exports were restored directly and through frozen engine 5 with exact current replay.
+
+Current runtime controls pass 153 tests, including 24 actual school-to-independence and private-week routes across twelve seeds. A separate 12,500-choice visible-action exploration found consistent actor clocks, nonnegative material counts and exact sampled replay. These are bounded technical checks, not proof of every possible run or owner acceptance.

@@ -4,7 +4,7 @@ Updated 2026-10-10 during the authorized five-hour run; deadline 10:59:20 UTC.
 
 ## What remains
 
-Continue through the first service week and deeper quiet HF inner lives, then review, deploy and leave a substantial long playthrough. Adam accepts the game's feel personally. A technical handoff or published framework does not claim his acceptance. Current plan: docs/superpowers/plans/2026-10-10-first-service-week.md.
+Publish the reviewed first service week, then continue browser playtesting and polish through the authorized deadline. Two optional object conversations and timestamped journal are integrated; Adam receives a substantial long playthrough. Continue the authorized run through 10:59:20 UTC. Adam accepts the game's feel personally. A technical handoff or published framework does not claim his acceptance. Current plan: docs/superpowers/plans/2026-10-10-first-service-week.md.
 
 ## Reviewed checkpoint
 
@@ -17,18 +17,26 @@ Continue through the first service week and deeper quiet HF inner lives, then re
 
 ## Review evidence
 
-Independent wildcard browser play reached eighteen and apprenticeship; separate game-design review identified verification repetition and a need for a meaningful first service week. Technical review reproduced falsely credited assisted independence, collection skipped by watch actions and end-of-jump owner timing; fixes were independently rechecked (12 targeted tests). The isolated release checkout passed lint, strict types, 63 tests and production build after the final 3D lifecycle fix. Four tests cover a prepared, not yet integrated practices module; actual quiet practice in the game remains next-pass work.
+Independent wildcard browser play reached eighteen and apprenticeship; separate game-design review identified verification repetition and a need for a meaningful first service week. Technical review reproduced falsely credited assisted independence, collection skipped by watch actions and end-of-jump owner timing; fixes were independently rechecked (12 targeted tests). The isolated release checkout passed lint, strict types, 63 tests and production build after the final 3D lifecycle fix. That public checkpoint remains engine 5. The unpublished engine 6 chapter has since passed 153 tests, including 24 public school-to-independence routes across twelve seeds, service routes, actual joint work, prayer recurrence across school gaps, material compatibility, unfinished-return recovery, actual aftercare conversations and journal timestamps.
 
 Gemini completed the story review. Its additional HF review failed on quota; Claude failed on expired authentication. Independent delegated framework reviewers completed instead. HF 2.2.0 GitHub/npm provenance and the public framework site are verified (release d673644, docs ea507b1); CI, CodeQL and benchmark workflows passed.
 
+## Unpublished first service week (engine 6)
+
+Five authored days follow the genuine independent handoff. Regular collections, favours and private work require actual separate agreements. Hearing a request does not accept it; changing the workshop route does not rewrite accepted terms. Leila and Nora own their requests and choose collection or rechecking. Sam's separately agreed pay is deducted from conserved job income; a second checking tray costs real retained cash. Sam can complete work while the player works on the personal model or spends time with family, and his own shift pauses repair rather than disappearing.
+
+The childhood paper street has a measured, compatible donor gear and an explicitly arranged Evan visit. Its discovery and reflection reveal an abandoned optimistic plan without inventing the cause of the world's decline. Nora's original sewing box may return with a different fault only if that actual box was previously checked and collected. Dad's cabinet uses real joint HF actions and respects fatigue and closing time. Unchecked jobs can be settled without a fee or physically recalled for a new check; neither grants verified repair or apprentice credit. The trial has an honest small ending and retains the bench and personal work. Once-only cabinet and display-label conversations use actual joined HF actions and elapsed time; Sam can work during them. New journal timestamps distinguish repeated checks without deleting history. Priced delegation requires the separately agreed rate before work starts.
+
+All named characters have persistent HF profiles. Actual daily practice respects held convictions and competing needs; unplayed school years suspend recurrence without manufacturing missed duties or erasing played history. Frozen published engine 5 remains separate for historical replay. The current and frozen package share browser build resolution only when their pinned published artifact and installed contents are identical. This reduced the measured main bundle by 16.4%; it is a payload measurement, not a real-device speed claim.
+
 ## Deployment and boundaries
 
-Configured static target: https://repair.adamwhite.work. Public static deployment is explicitly authorized; publication of this repository's source, licensing and final public title remain undecided. Only dist is published. The working screen title is A little light. Deployment must use a clean reviewed checkout and verify live release.json against its commit, framework and engine.
+Public checkpoint: https://repair.adamwhite.work, commit b81dbde0e8e16e0fa4fc7be560a9064ec8d759ae, game 0.2.0 / engine home-garage-5 / HF 2.2.0. Cloudflare version 5211eaa7-0304-4ed7-8352-d54079b65f75. Live TLS, release manifest, security headers and mobile browser/3D inspection were verified. New-domain local DNS initially cached NXDOMAIN; authoritative Cloudflare DNS resolved normally, and browser verification used that observed address with the real hostname/TLS. The deployment script initially failed only its post-upload DNS lookup; the actual uploaded version and manifest are verified. Public static deployment is explicitly authorized; publication of this repository's source, licensing and final public title remain undecided. Only dist is published. The working screen title is A little light. Deployment must use a clean reviewed checkout and verify live release.json against its commit, framework and engine.
 
 Primary local preview remains http://127.0.0.1:5173/ while isolated development uses :5178; the owner's live browser/save is preserved until final integration. Main development worktree: .worktrees/full-workshop, codex/full-workshop. Reviewed deployment checkout: .worktrees/reviewed-release. Earlier worktrees are preserved.
 
 ## Limits
 
-No simulated market, multiplayer, servers or offline earnings. Prices and jobs are authored. Body and ordinary activities are bounded engineering models. Spiritual prose alone is not yet claimed as actual practice; the next pass uses existing sourced HF norms/windows. Current UI imports are bounded at 2 MB; engine packets at 8 MB/20,000 inputs. Physical-device play and owner taste acceptance remain unverified.
+No simulated market, multiplayer, servers or offline earnings. Prices and jobs are authored. Body and ordinary activities are bounded engineering models. Engine 6 uses actual sourced HF norms, prayer windows and public decision/activity/commitment APIs. Conviction, availability and competing body needs can change choices; this bounded portrayal does not establish human calibration. Current UI imports are bounded at 2 MB; engine packets at 8 MB/20,000 inputs. Physical-device play and owner taste acceptance remain unverified.
 
 Personal context consultation used /Users/abdul/code/pkm. Each project repository remains its own authority.

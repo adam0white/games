@@ -30,7 +30,7 @@ npm run dev
 
 Open the local address printed by the development server. Progress saves in the browser. The Journal exports a replayable story (seed, inputs and person/object state) and opens an exported story. `npm run check` runs lint, types, behavioral tests and the production build.
 
-The current overnight run continues through a first service week; see HANDOFF.md for verified extent and remaining work. Static deployment on repair.adamwhite.work is authorized, while repository source publication and the final public title remain undecided. The working screen title is **A little light**.
+The first service week offers real collection agreements, separately agreed paid help, a personal model and a returning sewing box with a different cause. Growth is optional: a private bench or occasional favours can also finish the week. See HANDOFF.md for verified extent and remaining work. The public static game is at https://repair.adamwhite.work; repository source publication and the final public title remain undecided. The working screen title is **A little light**.
 
 The game consumes published `@adam0white/human-framework` 2.2.0 through its public API. HF owns people, acquired conditional methods, cognition, perceptions, body, skills, relationships and memory. The host owns object physics, material compatibility, prices and business bookkeeping. Matched learning controls distinguish supported transfer from scalar skill or an authored repair policy; this does not claim universal planning or calibrated human realism.
 

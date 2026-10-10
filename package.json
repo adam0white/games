@@ -1,6 +1,6 @@
 {
   "name": "repair-game",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@adam0white/human-framework": "2.2.0",
+    "@repair/hf-engine5": "npm:@adam0white/human-framework@2.2.0",
     "@repair/hf-legacy": "npm:@adam0white/human-framework@2.1.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",

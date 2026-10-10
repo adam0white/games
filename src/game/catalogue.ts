@@ -16,6 +16,7 @@ export type CatalogueFault =
   | 'jam'
   | 'striker'
   | 'hinge'
+  | 'catch-offset'
   | 'spring'
   | 'gear';
 export interface CatalogueItem {
@@ -223,9 +224,9 @@ export const REPAIR_CATALOGUE: readonly CatalogueItem[] = [
     story:
       'A wooden sewing box with a stiff exterior catch. A strip of blue fabric cushions the contents.',
     inspectText:
-      'The exterior catch barely pivots. Its hinge has a dry, dusty joint; the wood and mounting screws are sound.',
+      'The exterior catch resists opening. Its joint looks dusty, and a polished mark runs along the keeper where the catch meets it. The wood and mounting screws are sound.',
     testText:
-      'The lid opens when the catch is lifted carefully, but the exterior hinge drags. The catch is not meant to be bent.',
+      'With the lid held clear of the keeper, the catch still drags through its travel. The resistance is in the hinge, rather than where the catch meets the keeper.',
     repairText:
       'You clean the accessible hinge and apply the small amount of suitable lubricant Dad keeps for this joint. The catch pivots without forcing the lid.',
     requestLines: [
@@ -425,7 +426,7 @@ export const PERSONAL_PROJECT: CatalogueItem = {
   requestLines: [
     notice(
       'You',
-      'The flat drawing box also holds the little paper street. Dad found the display base in an old store-room clearance; you drew new fronts for its empty buildings.',
+      'The flat drawing box also holds the little paper street. Dad found the display base in an old store-room clearance; you drew new fronts for its empty buildings. A salvage-counter card tucked inside reads “Evan — display stands and clockwork bases”, with a number for asking about spare parts.',
     ),
     warm(
       'Dad',

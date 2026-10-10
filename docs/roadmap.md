@@ -1,6 +1,6 @@
 # Broad roadmap
 
-2026-10-09. The owner authorized autonomous implementation through a meaningful playtesting dependency. M0 planning is delivered. M1 and a bounded portion of M2 are implemented and reviewed for the first playable taste checkpoint; Adam found the start intriguing and diagnosis believable; the enriched chapter now awaits his playtest. M2 promises, commercial time/cost tradeoffs and M3–M4 apprenticeship remain future work. Later stages preserve ambition without scheduling implementation.
+Updated 2026-10-10 during the owner-authorized five-hour run. M0 planning, the school-break home/garage campaign and bounded M3–M4 teaching/independent handoff are implemented and independently reviewed. The public checkpoint is commit b81dbde at https://repair.adamwhite.work, using released HF 2.2.0. Adam's earlier playtest established curiosity and believable diagnosis; acceptance of this substantially expanded chapter remains his decision. A first service week is now in development to turn delegation into real choices about promises, money, personal time and staying small. Tests, technical reviews and deployment do not substitute for that playtest.
 
 ## Near milestones
 
@@ -12,7 +12,7 @@
 | M3: teach one apprentice | Demonstrate, supervise and hand over a complete repair | Does teaching change a person's decisions on unfamiliar variants? | A generic HF control distinguishes learned procedure from skill-only growth and click replay; the game visibly demonstrates it. Framework scope is selected only after checking released HF. |
 | M4: first prestige | The apprentice owns an entire repair while you choose broader work or return to your bench | Does reduced supervision create enjoyable freedom with continuing consequences? | Independent completion on both supported held-out variants, including verification and customer outcomes; appropriate escalation on an out-of-scope variant. Play a two-job post-handoff episode while arranging work or returning to the personal repair. Adam accepts the standalone game. |
 
-The home-to-garage checkpoint includes enough M2 to make shelving, discovery and return to an old object meaningful, without building a business dashboard. Adam's playtest decides whether that opening is enjoyable before M3. Do not complete every possible HF faculty before testing M3. If the opening is dull or delegation is incomprehensible, improve that milestone rather than introducing another business tier.
+The reviewed home-to-garage checkpoint includes persistent partial work, school years, quoted prices, conserved cash and actual acquired-method apprenticeship. The next acceptance boundary is the first authored service week, where independent work must make meaningful room for personal choices. If the opening is dull or delegation is incomprehensible, improve that experience rather than introducing another business tier. The current extent is bounded; do not describe the published checkpoint as a simulated economy.
 
 ## Longer-term stages
 
@@ -59,3 +59,10 @@ Deferred, recorded 2026-10-10: animation that moves a chosen option into the sta
 Target: after the finite school campaign and first workshop handoff are playable, replace or extend flat object inspection with original small 3D objects. Rotate an object, see accessible joins and wear, and deliberately inspect a relevant surface. Start with the lamp, torch and one exposed mechanical assembly before expanding the catalogue. Use original procedural geometry or commissioned assets; reference games inform interaction pacing, not copied art or characters.
 
 Keep visible evidence bounded by observation. An uninspected model must not disclose a hidden fault through a glowing part or fault-specific cutaway. View movement alone does not grant diagnosis or an HF method. Inspection actions, tests, repairs and results remain deterministic and replayable; record camera state only if it changes which evidence the player can acquire. Reduced-motion, touch controls and a clear text equivalent remain available. Full artwork production, unconstrained disassembly and physically simulated every-part repairs remain later decisions.
+
+
+## Reviewed checkpoint and current pass
+
+2026-10-10: original optional 3D inspection is implemented for nine distinct appearances, with observed-parts trays, touch/keyboard rotation and text/SVG fallback. Verification is still a real elapsed check. The current first-week plan targets meaningful parallel activity and fewer repeated wait clicks after the first teaching sequence. Quiet HF practice and collection promises are being integrated and reviewed; their effects are not inferred from dialogue alone.
+
+The broader simulations and additional businesses retain their 2026-11-09 review date. Source visibility, licensing and the final title remain owner decisions; the deployed build is a public static game, not publication of the source repository.

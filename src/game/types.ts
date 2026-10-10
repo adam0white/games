@@ -1,5 +1,6 @@
 import type { Person } from '@adam0white/human-framework';
 import type { RepairCue } from './repairs';
+import type { ServiceWeekState } from './service-week';
 import type { WorkshopState } from './workshop';
 
 export type Fault =
@@ -10,6 +11,7 @@ export type Fault =
   | 'jam'
   | 'striker'
   | 'hinge'
+  | 'catch-offset'
   | 'spring'
   | 'gear';
 export type Chapter = 'family' | 'bench' | 'later' | 'garage';
@@ -50,6 +52,7 @@ export interface RepairObject {
   stepDecisions?: { at: number; action: string | null; methods: string[] }[];
   checkStarted?: number;
   awaitingCollection?: boolean;
+  collectedAt?: number;
   returnedEarly?: boolean;
   callbackAt?: number;
   callbackSeen?: boolean;
@@ -57,6 +60,8 @@ export interface RepairObject {
 
 export interface ConversationLine {
   id: number;
+  at?: number;
+  timeLabel?: string;
   speaker: string;
   text: string;
   tone?: 'warm' | 'notice' | 'mistake';
@@ -68,6 +73,8 @@ export interface LoggedInput {
 }
 
 export interface GameState {
+  serviceWeek?: ServiceWeekState;
+  checkingPlaces?: number;
   workshop?: WorkshopState;
   campaign?: { holiday: number; lastSchoolRepairs: number; graduated: boolean; startedAt: number };
   apprentice?: {
@@ -78,6 +85,8 @@ export interface GameState {
     jobId?: string;
     pending?: { step: string; endsAt: number };
     needsHelp?: string;
+    pauseReason?: string;
+    pausedStep?: { step: string; remaining: number };
     role: 'observer' | 'trainee' | 'repairer';
     completedJobIds: string[];
     supervised?: boolean;
@@ -102,7 +111,13 @@ export interface GameState {
   focusId: string | null;
   objects: RepairObject[];
   people: Record<string, Person>;
-  parts: { batteries: number; holders: number; springs?: number; gears?: number };
+  parts: {
+    batteries: number;
+    holders: number;
+    springs?: number;
+    gears?: number;
+    gearTargets?: string[];
+  };
   unlocked: string[];
   conversation: ConversationLine[];
   inputs: LoggedInput[];
@@ -151,6 +166,8 @@ export interface ObjectView {
 }
 
 export interface GameView {
+  knownAppointments?: { personId: string; name: string; at: number; detail: string }[];
+  collectionPlans?: { objectId: string; title: string; owner: string; detail: string }[];
   lifeChapter?: { label: string; detail?: string };
   apprenticeship?: { name: string; activity: string; responsibility: string };
   timeLabel?: string;

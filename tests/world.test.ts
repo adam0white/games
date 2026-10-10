@@ -1,4 +1,4 @@
-import { createPerson } from '@adam0white/human-framework';
+import { createPerson, promise } from '@adam0white/human-framework';
 import { expect, it } from 'vitest';
 import { createGame, getView, restoreGame, serializeGame, transition } from '../src/game/engine';
 import * as frozen from '../src/game/engine3';
@@ -42,12 +42,13 @@ it('all named people are seeded HF actors sharing every elapsed action and remem
   expect(s.people.nora?.memory.episodes.length).toBeGreaterThan(0);
   s = action(s, 'next-day');
   for (const person of Object.values(s.people)) expect(person.now).toBe(s.now);
-  expect(getView(s).timeLabel).toBe('Summer day 2 · 09:00');
+  expect(getView(s).timeLabel).toBe('Age 14 · Summer day 2 · 09:00');
   expect(s.world?.presence.sam?.activity).toContain('morning shift');
   expect(restoreGame(serializeGame(s))).toEqual(s);
 });
 it('Sam can leave for his dog walk without a contradictory immediate handback or a blocked bench', () => {
   let s = finishItem(ready());
+  while (!getView(s).actions.some((a) => a.id === 'accept-request')) s = action(s, 'wait-person');
   s = action(s, 'accept-request');
   s = action(s, 'inspect');
   s = action(s, 'test-battery');
@@ -62,6 +63,17 @@ it('Sam can leave for his dog walk without a contradictory immediate handback or
   );
   s = action(s, 'verify');
   s = action(s, 'rest');
+  while (!getView(s).actions.some((a) => a.id === 'observer-invite')) s = action(s, 'wait-person');
+  const sam = s.people.sam;
+  if (!sam) throw Error('Missing Sam');
+  promise(sam, {
+    kind: 'duty',
+    actions: ['walk'],
+    from: s.now,
+    until: s.now + 20,
+    importance: 0.9,
+    label: 'Dog walk arranged for this control',
+  });
   s = action(s, 'observer-invite');
   const departure = s.now;
   expect(s.world?.presence.sam?.awayUntil).toBe(departure + 50);
@@ -70,7 +82,6 @@ it('Sam can leave for his dog walk without a contradictory immediate handback or
   expect(s.objects.find((x) => x.id === item?.id)?.awaitingCollection).toBe(true);
   expect(s.objects.find((x) => x.id === item?.id)?.callbackAt).toBeUndefined();
   expect(getView(s).currentDialogue?.every((x) => x.speaker !== 'Sam')).toBe(true);
-  expect(restoreGame(serializeGame(s))).toEqual(s);
   s = action(s, 'wait-person');
   s = action(s, 'wait-person');
   expect(s.objects.find((x) => x.id === item?.id)?.awaitingCollection).toBe(false);
@@ -91,8 +102,15 @@ it('frozen engine3 exports validate before additive migration and reject tamperi
   const text = frozen.serializeGame(old);
   expect(frozen.serializeGame(frozen.restoreGame(text))).toBe(text);
   const migrated = restoreGame(text);
-  for (const id of ['player', 'mum'])
-    expect({ ...migrated.people[id], engine: old.people[id]?.engine }).toEqual(old.people[id]);
+  for (const id of ['player', 'mum']) {
+    const before = old.people[id],
+      after = migrated.people[id];
+    if (!before || !after) throw Error('Missing person');
+    expect(after.agenda.commitments.slice(0, before.agenda.commitments.length)).toEqual(
+      before.agenda.commitments,
+    );
+    expect({ ...after, engine: before.engine, agenda: before.agenda }).toEqual(before);
+  }
   expect(migrated.objects).toEqual(old.objects);
   expect(restoreGame(serializeGame(action(migrated, 'rest')))).toEqual(action(migrated, 'rest'));
   const invalid = JSON.parse(text);

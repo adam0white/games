@@ -16,6 +16,7 @@ import {
 import { liveOrdinaryTime } from './humans';
 import {
   applyRepair,
+  checkingSpaceAvailable,
   cueFor,
   inspectRepair,
   type RepairCue,
@@ -55,8 +56,8 @@ export function apprenticeActions(
   if (a.lastLesson && !a.lastLesson.explained)
     offers.push({
       id: 'explain-step',
-      label: 'Explain what that observation tells you',
-      detail: 'Give Sam the reason for the step you actually demonstrated.',
+      label: `Explain your demonstration on ${s.objects.find((o) => o.id === a.lastLesson?.objectId)?.title ?? 'the earlier object'}`,
+      detail: `Your ${a.lastLesson.step.replaceAll('-', ' ')} step on that object. Explain the observation and result you actually demonstrated.`,
     });
   if (!a.jobId && !item) {
     if (!s.objects.some((x) => x.id === 'lesson-battery'))
@@ -108,7 +109,8 @@ export function apprenticeActions(
     offers.push({
       id: 'watch-sam',
       label: a.needsHelp ? 'Discuss where Sam stopped' : 'Give Sam some room to work',
-      detail: a.needsHelp ?? 'Twenty minutes; you can also work on another object.',
+      detail:
+        a.needsHelp ?? a.pauseReason ?? 'Twenty minutes; you can also work on another object.',
     });
   if (a.needsHelp && a.jobId)
     offers.push({
@@ -286,7 +288,7 @@ export function explainLesson(s: GameState, say: Speak): void {
   );
 }
 export function apprenticeOffers(
-  s: Pick<GameState, 'parts'>,
+  s: Pick<GameState, 'parts' | 'objects' | 'checkingPlaces'>,
   item: RepairObject,
   now: number,
 ): Affordance[] {
@@ -299,7 +301,7 @@ export function apprenticeOffers(
           ? ['check-result', 'return-unchecked']
           : ['wait-check', 'return-unchecked']
         : item.repaired
-          ? ['verify', 'return-unchecked']
+          ? [checkingSpaceAvailable(s, item.id) ? 'verify' : 'wait-check-place', 'return-unchecked']
           : [
               'test-battery',
               'clean-contact',
@@ -316,6 +318,7 @@ export function apprenticeOffers(
     focus: 0.25,
     skill: id === 'request-help' ? undefined : { id: 'repair', difficulty: 0.25 },
     methodContext: item.id,
+    ...(id === 'return' ? { norms: [{ normId: 'lying', relation: 'fulfills' as const }] } : {}),
     advertises: { competence: id === 'request-help' ? 0.035 : 0.002 },
   }));
 }
@@ -384,6 +387,7 @@ export function advanceApprentice(
   until: number,
   say: Speak,
   ownerHere: (id: string, at: number) => boolean,
+  workerHere: (at: number) => boolean = () => true,
 ): void {
   const a = s.apprentice,
     sam = s.people.sam;
@@ -392,14 +396,47 @@ export function advanceApprentice(
   if (!item) return;
   while (sam.now < until && !a.needsHelp && a.jobId) {
     if (item.location === 'returned') {
+      if (item.awaitingCollection) {
+        for (let at = sam.now; at <= until; at++)
+          if (workerHere(at) && ownerHere(item.owner.toLowerCase(), at)) {
+            item.awaitingCollection = false;
+            item.collectedAt = at;
+            break;
+          }
+      }
       liveOrdinaryTime(sam, until);
       if (!item.awaitingCollection) completeApprenticeJob(s, item, say);
       break;
     }
+    if (!workerHere(sam.now)) {
+      if (a.pending) {
+        const prior = sam.activity;
+        a.pausedStep = { step: a.pending.step, remaining: Math.max(1, a.pending.endsAt - sam.now) };
+        if (prior)
+          finish(sam, {
+            affordanceId: prior.affordanceId,
+            action: prior.action,
+            at: sam.now,
+            status: 'interrupted',
+            summary: 'Stopped bench work for my own obligation.',
+          });
+        a.pending = undefined;
+      }
+      if (!a.pauseReason)
+        say(
+          'Sam',
+          'I need to stop for my own plans. Keep it at this step; we can arrange another stretch at the bench.',
+        );
+      a.pauseReason =
+        'Sam’s own plans pause this repair. Its observations and unfinished step are kept.';
+      liveOrdinaryTime(sam, until, (at) => workerHere(at));
+      break;
+    }
     if (!a.pending) {
       if (sam.now >= a.visitUntil || !sam.body.alive || sam.body.downed) {
-        a.needsHelp = 'Sam needs to stop for now. The work and observations are preserved.';
-        say('Sam', a.needsHelp);
+        const reason = 'The agreed afternoon has ended. Arrange another stretch; the work is kept.';
+        if (a.pauseReason !== reason) say('Sam', reason);
+        a.pauseReason = reason;
         break;
       }
       const current = sam.activity;
@@ -413,7 +450,10 @@ export function advanceApprentice(
         });
       const cue = cueFor(item, sam.now);
       receiveMethodCues(sam, { contextId: item.id, cues: [{ cue: 'stage', value: cue }] });
-      const offers = apprenticeOffers(s, item, sam.now);
+      a.pauseReason = undefined;
+      const offers = apprenticeOffers(s, item, sam.now).map((offer) =>
+        a.pausedStep?.step === offer.id ? { ...offer, duration: a.pausedStep.remaining } : offer,
+      );
       const decision = decide(sam, offers);
       const chosen = offers.find((x) => x.id === decision.chosenAffordanceId);
       item.stepDecisions ??= [];
@@ -437,11 +477,46 @@ export function advanceApprentice(
         break;
       }
       a.pending = { step: chosen.id, endsAt: sam.now + chosen.duration };
+      a.pausedStep = undefined;
     }
     const pending = a.pending;
-    const end = Math.min(until, pending.endsAt);
+    let end = Math.min(until, pending.endsAt);
+    for (let at = sam.now + 1; at <= end; at++)
+      if (!workerHere(at)) {
+        end = at;
+        break;
+      }
     tick(sam, end);
-    if (end < pending.endsAt) break;
+    if (end < pending.endsAt) {
+      if (!workerHere(end)) continue;
+      break;
+    }
+    if (!workerHere(end)) continue;
+    const part =
+      pending.step === 'replace-battery'
+        ? 'batteries'
+        : pending.step === 'fit-holder'
+          ? 'holders'
+          : undefined;
+    if (part && (s.parts[part] ?? 0) < 1) {
+      // The shared stock can change while an acquired step is in flight.
+      // Preserve the evidence and stop honestly rather than inventing a part.
+      const text =
+        'The matching spare is being used on the other job. Keep this light at the tested step; I need a part before continuing.';
+      finish(sam, {
+        affordanceId: pending.step,
+        action: pending.step,
+        at: sam.now,
+        status: 'interrupted',
+        summary: text,
+      });
+      a.pending = undefined;
+      a.needsHelp =
+        'Sam needs the matching part; the observed problem and unfinished work are kept.';
+      item.observations.push(text);
+      say('Sam', text);
+      break;
+    }
     let text = '',
       success = true;
     switch (pending.step) {
@@ -464,6 +539,10 @@ export function advanceApprentice(
         item.checkStarted = sam.now;
         text = 'I’m leaving it lit for the longer check.';
         break;
+      case 'wait-check-place':
+        text =
+          'The other checking place is occupied. I’ll keep this light labelled until it is clear.';
+        break;
       case 'wait-check':
         text = 'It is still running. I can give it a little more time.';
         break;
@@ -479,6 +558,7 @@ export function advanceApprentice(
       case 'return':
         item.location = 'returned';
         item.awaitingCollection = !ownerHere(item.owner.toLowerCase(), sam.now);
+        if (!item.awaitingCollection) item.collectedAt = sam.now;
         text = item.awaitingCollection
           ? 'The checked light is labelled for collection.'
           : 'Here it is. I tested the repair for longer and moved it and switched it afterward.';

@@ -62,6 +62,7 @@ export type WorkshopGame = Pick<
 > & {
   workshop?: WorkshopState;
 };
+export const CABINET_MINUTES = { measure: 20, hang: 40, align: 25, space: 8 } as const;
 export interface WorkshopContext {
   graduated: boolean;
   independentRepair: boolean;
@@ -226,7 +227,7 @@ export function workshopActions(s: WorkshopGame, ctx: WorkshopContext): ActionVi
       add(
         'workshop-drawings',
         'Bring down the saved drawing box',
-        'The flat box Mum kept because you asked her to.',
+        'Mum kept your old drawings in a flat box.',
       );
   }
   if (w.projectOpen) {
@@ -524,7 +525,7 @@ export function applyWorkshopAction(
             ),
             line('Dad', 'That gives us something to work from. We do not have to hang them today.'),
           ],
-          20,
+          CABINET_MINUTES.measure,
         );
       }
       if (task === 'hang') {
@@ -538,7 +539,7 @@ export function applyWorkshopAction(
             ),
             line('Dad', 'Leave that last bit for a moment when neither of us is trying to hurry.'),
           ],
-          40,
+          CABINET_MINUTES.hang,
         );
       }
       w.cabinet = 'finished';
@@ -554,7 +555,7 @@ export function applyWorkshopAction(
             'There. The kitchen will still work tomorrow, but I will enjoy looking at those.',
           ),
         ],
-        25,
+        CABINET_MINUTES.align,
       );
     }
     case 'workshop-drawings':

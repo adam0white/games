@@ -24,4 +24,12 @@ Fifteen at the opening, a school friend one year ahead of the player. Has a fema
 
 After the player's graduation Sam is nineteen, has already finished high school and is taking more counter hours. He may prefer understanding objects to wrapping them, but can refuse a proposed job. Paid workshop learning requires an agreed role, hours and payment. Neither an invitation nor affection automatically transfers expertise.
 
+## Leila
+
+Nora can introduce her with the player's permission. Her porch, landing and gate lights serve ordinary household needs; they are separate objects, not an endlessly returning lamp. During the trial week she plans to return a borrowed trolley to the shared store. A borrowed light is an alternative if the repair cannot fit that time. Hearing her request is not accepting it, and the player can offer a later collection or decline. No family, employer or wider biography is established.
+
+## Evan
+
+Leila can separately offer an introduction to her friend Evan. A salvage-counter contact card also identifies him with display stands and clockwork bases, making the personal model a plausible reason to contact him without a customer referral. These are two possible encounters with the same person, not two invented prior friendships. He uses a folding work light and has an incomplete winding timer. He can bring an old shop-display base after an explicit invitation. Its loose gear may suit the player's model, but he retains its spring housing and labelled screws. Comparing measurements and agreeing an exchange precede taking the part. Business ownership, age and a broader history remain unestablished.
+
 Availability belongs to the engine and HF state. These descriptions guide motives and offers; they do not override observed refusal, fatigue, private obligations or acquired knowledge. Authored calendar transitions summarize life between played episodes; they must not claim unearned repair experience or wages.

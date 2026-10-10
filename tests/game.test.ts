@@ -249,8 +249,14 @@ describe('living garage checks', () => {
     const text = old.serializeGame(previous);
     let migrated = restoreGame(text);
     expect(migrated.objects).toEqual(previous.objects);
-    for (const [id, person] of Object.entries(previous.people))
-      expect({ ...migrated.people[id], engine: person.engine }).toEqual(person);
+    for (const [id, person] of Object.entries(previous.people)) {
+      const after = migrated.people[id];
+      if (!after) throw Error('Missing migrated person');
+      expect(after.agenda.commitments.slice(0, person.agenda.commitments.length)).toEqual(
+        person.agenda.commitments,
+      );
+      expect({ ...after, engine: person.engine, agenda: person.agenda }).toEqual(person);
+    }
     expect(migrated.inputs).toEqual(previous.inputs);
     expect(migrated.journal?.map((x) => x.text)).toEqual(previous.conversation.map((x) => x.text));
     migrated = act(migrated, 'rest');
@@ -359,6 +365,8 @@ it('validates an interim engine3 save using its original failure prose and corre
     'talk-friends',
   ].reduce((s, id) => transition(s, { type: 'action', id }), previous);
   for (let n = 0; n < 12; n++) {
+    while (!getView(previous).actions.some((a) => a.id === 'accept-request'))
+      previous = act(previous, 'wait-person');
     previous = act(previous, 'accept-request');
     previous = act(previous, 'inspect');
     previous = act(previous, 'test-battery');

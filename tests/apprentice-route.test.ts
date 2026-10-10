@@ -66,7 +66,7 @@ function teachLight(s: ReturnType<typeof createGame>, repeat = false) {
   if (!repeat) s = act(s, 'explain-step');
   s = act(s, 'wait-check');
   if (!repeat) s = act(s, 'explain-step');
-  s = act(s, 'wait-check');
+  if (getView(s).actions.some((a) => a.id === 'wait-check')) s = act(s, 'wait-check');
   s = act(s, 'check-result');
   if (!repeat) s = act(s, 'explain-step');
   s = act(s, 'return');

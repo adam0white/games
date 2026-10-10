@@ -66,3 +66,14 @@ it('reveals institutional history over school years and reserves regular-work ag
     optionalStoryChoices({ ...early, holiday: 4, graduated: true }).map((c) => c.id),
   ).toContain('after-school-work');
 });
+
+it('keeps an adult teaching invitation reachable after every earlier Sam object has been returned', () => {
+  const adult = { chapter: 'garage', focusId: null, unlocked: [], holiday: 4, graduated: true };
+  expect(optionalStoryChoices(adult).map((c) => c.id)).toContain('observer-invite');
+  expect(
+    optionalStoryChoices({ ...adult, unlocked: ['story:observer-invite'] }).map((c) => c.id),
+  ).not.toContain('observer-invite');
+  expect(optionalStoryChoices({ ...adult, graduated: false }).map((c) => c.id)).not.toContain(
+    'observer-invite',
+  );
+});

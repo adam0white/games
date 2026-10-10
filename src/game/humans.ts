@@ -8,6 +8,7 @@ import {
   type Person,
   tick,
 } from '@adam0white/human-framework';
+import { quietPracticeOffers } from './practices';
 
 export function shareTea(player: Person, mum: Person, until: number): boolean {
   const offer: Affordance = {
@@ -111,7 +112,12 @@ export function askMumToHelp(mum: Person): boolean {
 
 /** Host schedules describe where opportunities exist. HF chooses ordinary activities
  * and owns their bodily, motivational and relationship consequences. */
-export function liveOrdinaryTime(person: Person, until: number, _atHome = true): string {
+export function liveOrdinaryTime(
+  person: Person,
+  until: number,
+  atHome: boolean | ((at: number) => boolean) = true,
+  onStarted?: (offer: Affordance) => void,
+): string {
   let label = person.activity?.affordance.label ?? 'Taking a quiet break';
   while (person.now < until) {
     if (!person.body.alive) {
@@ -156,6 +162,9 @@ export function liveOrdinaryTime(person: Person, until: number, _atHome = true):
           advertises: { competence: 0.04, leisure: 0.04 },
         },
       ];
+      offers.push(
+        ...quietPracticeOffers(person, typeof atHome === 'function' ? atHome(person.now) : atHome),
+      );
       if (night)
         offers.push({
           id: 'ordinary-sleep',
@@ -178,6 +187,7 @@ export function liveOrdinaryTime(person: Person, until: number, _atHome = true):
         tick(person, until);
         return 'Not ready to do anything right now';
       }
+      onStarted?.(chosen);
     }
     const end = Math.min(until, current.endsAt);
     label = current.affordance.label;
@@ -263,4 +273,79 @@ export function chooseSamVisit(person: Person): boolean | null {
   const chosen = offers.find((offer) => offer.id === decision.chosenAffordanceId);
   if (!chosen || !begin(person, chosen, decision)) return null;
   return chosen.id === 'watch-repair';
+}
+
+/** Consent starts a real shared activity; normal HF completion owns its outcome. */
+export function beginSharedWork(player: Person, partner: Person, offer: Affordance): boolean {
+  const personal: Affordance = {
+    id: 'own-tools',
+    action: 'work',
+    label: 'Finish sorting my own tools',
+    duration: 8,
+    effort: 0.03,
+    advertises: { competence: 0.05, autonomy: 0.04 },
+  };
+  const decision = decide(partner, [offer, personal]);
+  if (decision.chosenAffordanceId !== offer.id) return false;
+  const playerOffer = { ...offer, with: [partner.id] };
+  const playerDecision = decide(player, [playerOffer]);
+  if (playerDecision.chosenAffordanceId !== playerOffer.id) return false;
+  for (const person of [player, partner]) {
+    const prior = person.activity;
+    if (prior)
+      finish(person, {
+        affordanceId: prior.affordanceId,
+        action: prior.action,
+        at: person.now,
+        status: 'interrupted',
+        summary: 'Set my ordinary activity aside for agreed shared work.',
+      });
+  }
+  return Boolean(begin(partner, offer, decision) && begin(player, playerOffer, playerDecision));
+}
+
+/** A short, optional conversation competes with the partner's own plans. */
+export function beginSharedConversation(
+  player: Person,
+  partner: Person,
+  id: string,
+  label: string,
+  duration: number,
+): boolean {
+  const offer: Affordance = {
+    id,
+    action: 'talk',
+    label,
+    duration,
+    effort: 0.02,
+    focus: 0.1,
+    with: [player.id],
+    tags: ['social', 'reflection'],
+    advertises: { belonging: 0.07, leisure: 0.06 },
+  };
+  const own: Affordance = {
+    id: 'keep-own-plans',
+    action: 'rest',
+    label: 'Keep my own plans for now',
+    duration,
+    effort: 0,
+    advertises: { leisure: 0.03, autonomy: 0.02 },
+  };
+  const decision = decide(partner, [offer, own]);
+  if (decision.chosenAffordanceId !== offer.id) return false;
+  const playerOffer = { ...offer, with: [partner.id] };
+  const playerDecision = decide(player, [playerOffer]);
+  if (playerDecision.chosenAffordanceId !== id) return false;
+  for (const person of [player, partner]) {
+    const prior = person.activity;
+    if (prior)
+      finish(person, {
+        affordanceId: prior.affordanceId,
+        action: prior.action,
+        at: person.now,
+        status: 'interrupted',
+        summary: 'Paused my own activity for a short agreed conversation.',
+      });
+  }
+  return Boolean(begin(partner, offer, decision) && begin(player, playerOffer, playerDecision));
 }

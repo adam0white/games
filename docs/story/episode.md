@@ -29,3 +29,19 @@ The next meaningful transition is another person owning intake, diagnosis, repai
 ## Later world
 
 Repair's prevalence supports the economy and multiplayer ambition. Scrapping, recovering parts, refurbishment and eventually other businesses can expose different sides of the same material history. Those systems are future scope. Do not expose dashboards, invented economic facts or multiplayer promises merely because their story basis exists.
+
+## First service week
+
+After Sam’s genuine whole-job handoff, the player may try five ordinary working days. Two regular collection afternoons, occasional favours and a private shared bench are reversible arrangements. Hearing a request makes no deadline. Leila’s gate lamp is connected to returning a borrowed trolley; Nora’s cutting-table light is needed for one sewing afternoon. Nora brings the light shortly before Sam’s counter shift; her requested collection can overlap and the player’s explicitly saved model session. Reconsidering future work preserves accepted promises; a later collection requires another explicit agreement.
+
+A second stable checking tray costs £6 from actual recorded repair earnings. It provides another checking place, without completing a test or increasing income by itself. Sam’s £2 whole-job rate for these service repairs is a separate agreement from earlier work. Favours do not promise his unpaid labour.
+
+Evan’s broken shop-display base provides a possible donor for the paper-street model. Its accessible gear must be compared against measurements before it is recovered in exchange for helping sort the stand. Evan keeps the enclosed housing and its labelled screws. A matching part is an opportunity; fitting and testing remain necessary. The display label’s old promise of a better high street survives alongside Evan’s practical parts list. The world’s history remains unresolved.
+
+Both a continuing modest collection routine and choosing to stay small close this authored week. Neither ending decides the player’s whole career. Pending accepted work still needs honest completion before that reflection.
+
+A heard request carries a desired calendar time but no price or promise; the chosen arrangement sets the fee at acceptance. A moved model session has a concrete new slot and remains playable. End-of-week reflection refers to actual returned jobs, independent work, personal time, purchased equipment and donor choice rather than inventing a completed model.
+
+The service-week conversation itself does not arrange visitors. Choosing regular work or occasional favours authorizes Leila’s and Nora’s dated request conversations; a private bench does not. Reconsidering future work preserves already arranged conversations and accepted job terms. Evan’s donor visit needs its own invitation, even on the private route. The invitation is for comparing a possible part, not consenting to transfer it.
+
+If the model has not previously been found, the player can explicitly bring its saved flat box down from the small room. Its paper shopfronts and the old clearance display base become a physical unfinished project before any model session or donor invitation is offered. Discovery supplies no replacement gear or learned method.

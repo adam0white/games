@@ -5,6 +5,8 @@ import type { Fault, GameState, RepairObject } from './types';
 
 export type RepairStep =
   | 'inspect'
+  | 'test-catch'
+  | 'adjust-catch'
   | 'test-battery'
   | 'clean-contact'
   | 'replace-battery'
@@ -26,6 +28,9 @@ export type RepairCue =
   | 'blocked-mechanism'
   | 'binding-striker'
   | 'dirty-hinge'
+  | 'catch-needs-test'
+  | 'hinge-stiff-clear'
+  | 'keeper-rubs'
   | 'missing-spring'
   | 'missing-gear'
   | 'mechanism-working';
@@ -41,7 +46,8 @@ export function inspectRepair(item: RepairObject): string {
   const mechanism: Partial<Record<Fault, RepairCue>> = {
     jam: 'blocked-mechanism',
     striker: 'binding-striker',
-    hinge: 'dirty-hinge',
+    hinge: item.form === 'box' ? 'catch-needs-test' : 'dirty-hinge',
+    'catch-offset': 'catch-needs-test',
     spring: 'missing-spring',
     gear: 'missing-gear',
   };
@@ -54,6 +60,8 @@ export function inspectRepair(item: RepairObject): string {
         : 'needs-test');
   item.evidence ??= [];
   item.evidence.push(evidence);
+  if (item.form === 'box' && ['hinge', 'catch-offset'].includes(item.fault))
+    return 'The exterior catch resists opening. Its joint looks dusty, and a polished mark runs along the keeper where the catch meets it. The wood and mounting screws are sound.';
   if (isMechanical(item))
     return (
       item.inspectText ??
@@ -93,10 +101,13 @@ export function testRepair(item: RepairObject): string {
         : 'With the known-good battery it still flickers when moved. The contact needs attention.';
 }
 export function repairDuration(step: string): number {
+  if (step === 'sewing-box-again') return 5;
   const mechanical: Record<string, number> = {
     'clear-obstruction': 6,
     'align-striker': 10,
     'lubricate-hinge': 8,
+    'adjust-catch': 10,
+    'test-catch': 4,
     'replace-spring': 12,
     'fit-gear': 18,
   };
@@ -106,6 +117,11 @@ export function repairDuration(step: string): number {
     : step === 'wait-check'
       ? 10
       : 4;
+}
+export function compatibleGearAvailable(item: RepairObject, parts: GameState['parts']): boolean {
+  return Boolean(
+    parts.gears && (parts.gearTargets?.includes(item.id) ?? item.id === 'paper-street'),
+  );
 }
 export function applyRepair(
   item: RepairObject,
@@ -120,6 +136,7 @@ export function applyRepair(
     'clear-obstruction': 'jam',
     'align-striker': 'striker',
     'lubricate-hinge': 'hinge',
+    'adjust-catch': 'catch-offset',
     'replace-spring': 'spring',
     'fit-gear': 'gear',
   };
@@ -136,14 +153,20 @@ export function applyRepair(
     parts.springs--;
   }
   if (step === 'fit-gear') {
-    if (!parts.gears) throw Error('No matching gear');
-    parts.gears--;
+    if (!compatibleGearAvailable(item, parts)) throw Error('No matching gear for this object');
+    parts.gears = (parts.gears ?? 0) - 1;
+    const target = parts.gearTargets?.indexOf(item.id) ?? -1;
+    if (target >= 0) parts.gearTargets?.splice(target, 1);
   }
   item.attempted++;
   item.repaired = correct[step] === item.fault;
   if (item.repaired) {
     item.evidence ??= [];
     item.evidence.push(isMechanical(item) ? 'mechanism-working' : 'light-steady');
+  }
+  if (!item.repaired && item.form === 'box' && ['hinge', 'catch-offset'].includes(item.fault)) {
+    const text = testCatch(item);
+    return { succeeded: false, text: `That step did not free the catch. ${text}` };
   }
   return {
     succeeded: item.repaired,
@@ -192,4 +215,54 @@ export function verificationMinutes(item: Pick<RepairObject, 'form'>): number {
         : item.form === 'clip'
           ? 3
           : 20;
+}
+
+/** A clear stable checking surface is a host opportunity, not a person skill. */
+export function checkingSpaceAvailable(
+  s: { objects: RepairObject[]; checkingPlaces?: number },
+  objectId: string,
+): boolean {
+  return (
+    s.objects.filter(
+      (o) =>
+        o.id !== objectId &&
+        o.checkStarted !== undefined &&
+        !o.verified &&
+        o.location !== 'returned',
+    ).length < (s.checkingPlaces ?? 1)
+  );
+}
+
+/** Separates resistance inside the accessible joint from contact at the keeper.
+ * This fictional low-force test supplies observation, not a hidden fault label. */
+export function testCatch(item: RepairObject): string {
+  if (item.form !== 'box' || !['hinge', 'catch-offset'].includes(item.fault))
+    throw Error('This object has no accessible catch test');
+  item.tested = true;
+  item.evidence ??= [];
+  item.evidence.push(item.fault === 'hinge' ? 'hinge-stiff-clear' : 'keeper-rubs');
+  return item.fault === 'hinge'
+    ? 'With the lid held clear of the keeper, the catch still drags through its travel. The resistance is in the hinge, rather than where the catch meets the keeper.'
+    : 'With the lid held clear, the catch pivots freely. It resists only when it meets the keeper: the polished edge rubs before the catch can seat.';
+}
+
+/** Identical visible choices for both causes; choosing a method is player work. */
+export function catchActions(item: RepairObject): readonly [string, string][] {
+  if (
+    item.form !== 'box' ||
+    !['hinge', 'catch-offset'].includes(item.fault) ||
+    !item.inspected ||
+    item.repaired
+  )
+    return [];
+  return [
+    [
+      'test-catch',
+      item.tested
+        ? 'Repeat the lid-clear movement check'
+        : 'Move the catch with the lid clear of the keeper',
+    ],
+    ['lubricate-hinge', 'Clear the external dirt and lubricate the hinge'],
+    ['adjust-catch', 'Adjust the keeper so the catch meets it squarely'],
+  ];
 }

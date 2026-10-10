@@ -316,7 +316,7 @@ export function optionalStoryChoices(context: StoryContext): StoryChoice[] {
       ),
       warm(
         'Mum',
-        'There is a flat box of those drawings under your old bed. I saved the ones you asked me to save, not every scrap.',
+        'There is a flat box of your old drawings under the small-room bed. I kept the ones with the paper roofs, not every scrap.',
       ),
     ]);
   }
@@ -478,7 +478,7 @@ export function optionalStoryChoices(context: StoryContext): StoryChoice[] {
         warm('Mum', 'Then I put it back. The shirts do still need doing.'),
       ]);
     }
-    if (context.focusOwner === 'Sam') {
+    if (context.focusOwner === 'Sam' || context.graduated) {
       add('observer-invite', 'Ask Sam to stay and watch sometime', [
         warm('You', 'You can pull up the other stool next time, if you’re curious.'),
         warm(

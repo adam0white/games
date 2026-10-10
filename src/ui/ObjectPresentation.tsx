@@ -23,7 +23,7 @@ export const ObjectPresentation = memo(
   function ObjectPresentation({ object }: { object: ObjectView }) {
     const [inHand, setInHand] = useState(false);
     return (
-      <div className="object-presentation">
+      <div className={`object-presentation ${inHand ? 'in-hand' : ''}`}>
         {inHand ? (
           <InspectionBoundary object={object}>
             <Suspense fallback={<ObjectIllustration object={object} />}>

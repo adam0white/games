@@ -1,6 +1,6 @@
 # MVP target: home to first handoff
 
-Updated 2026-10-10. The owner authorized autonomous implementation with delegation and reviews. First delivery earned curiosity and believable diagnosis; the next pass enriches story, presentation, time and causal human consequences. The full apprentice-learning target below remains to be demonstrated; no HF release is set by this document.
+Updated 2026-10-10. The owner authorized autonomous implementation with delegation and reviews, including the current five-hour expansion. The school-break campaign and bounded apprentice-learning target are implemented and independently reviewed; released HF 2.2.0 is consumed from npm, with generic and consumer causal controls. The published checkpoint reaches whole-job independence. The first service week is being integrated to establish useful freedom afterward. Adam still accepts the experience personally; technical checks and agent playtests do not claim that acceptance. The original proposal below records intended scope and acceptance criteria rather than an unfinished implementation queue.
 
 ## Promise
 

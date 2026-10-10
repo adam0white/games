@@ -1,7 +1,13 @@
-import { createPerson, demonstrateMethod, receiveMethodCues } from '@adam0white/human-framework';
+import {
+  createPerson,
+  demonstrateMethod,
+  receiveMethodCues,
+  tick,
+} from '@adam0white/human-framework';
 import { expect, it } from 'vitest';
 import { advanceApprentice, freshApprentice, startApprenticeJob } from '../src/game/apprentice';
-import { createGame } from '../src/game/engine';
+import { createGame, transition } from '../src/game/engine';
+import { agreeCheckedCollection } from '../src/game/practices';
 import type { RepairCue } from '../src/game/repairs';
 import type { Fault, GameState, RepairObject } from '../src/game/types';
 
@@ -164,8 +170,139 @@ it('owner presence is queried at the actual Sam handback event, not the outer el
       return at >= 940;
     },
   );
-  expect(times).toHaveLength(1);
+  expect(times[0]).toBe(892);
+  expect(times.at(-1)).toBe(940);
   expect(times[0]).toBeLessThan(940);
-  expect(item.awaitingCollection).toBe(true);
-  expect(s.apprentice?.independentCompleted).toBe(0);
+  expect(item.awaitingCollection).toBe(false);
+  expect(item.collectedAt).toBe(940);
+  expect(s.apprentice?.independentCompleted).toBe(1);
+});
+
+it('a handback inside a watch interval keeps the promise at the real event time', () => {
+  let s = fixture('battery');
+  s.chapter = 'garage';
+  if (s.campaign) s.campaign.graduated = true;
+  s.unlocked.push('story:observer-invite');
+  teach(s);
+  const item = s.objects.at(-1);
+  if (!item) throw Error('Missing item');
+  startApprenticeJob(s, item, false, () => {});
+  const player = s.people.player;
+  if (!player) throw Error('Missing player');
+  agreeCheckedCollection(player, item.id, 'nora', 895);
+  for (let n = 0; n < 3; n++) s = transition(s, { type: 'action', id: 'watch-sam' });
+  const returned = s.objects.find((x) => x.id === item.id);
+  if (!returned) throw Error('Missing returned item');
+  expect(returned.collectedAt).toBeLessThan(895);
+  expect(
+    s.people.player?.agenda.commitments.find((c) => c.label === `Checked collection: ${item.id}`)
+      ?.status,
+  ).toBe('kept');
+});
+it('an actual worker absence pauses the current step and preserves work until return', () => {
+  const s = fixture('battery');
+  teach(s);
+  const item = s.objects.at(-1);
+  if (!item) throw Error('Missing item');
+  startApprenticeJob(s, item, false, () => {});
+  const present = (at: number) => at < 845 || at >= 1020;
+  advanceApprentice(
+    s,
+    900,
+    () => {},
+    () => true,
+    present,
+  );
+  expect(item.inspected).toBe(true);
+  expect(item.tested).toBe(false);
+  expect(item.repaired).toBe(false);
+  expect(s.apprentice?.pausedStep).toBeTruthy();
+  expect(s.apprentice?.completedJobIds).toEqual([]);
+  advanceApprentice(
+    s,
+    1020,
+    () => {},
+    () => true,
+    present,
+  );
+  advanceApprentice(
+    s,
+    1090,
+    () => {},
+    () => true,
+    present,
+  );
+  expect(item.verified).toBe(true);
+  expect(item.completedBy).toBe('sam');
+});
+it('a player taking the last spare reserves it before concurrent Sam work, without crashing a visible action', () => {
+  let s = fixture('battery');
+  s.chapter = 'garage';
+  if (s.campaign) s.campaign.graduated = true;
+  s.unlocked.push('story:observer-invite');
+  teach(s);
+  const job = s.objects.at(-1);
+  if (!job) throw Error('Missing job');
+  job.inspected = true;
+  job.tested = true;
+  job.evidence = ['battery-steady'];
+  startApprenticeJob(s, job, false, () => {});
+  const playerItem: RepairObject = {
+    ...job,
+    id: 'player-spare',
+    assignedTo: undefined,
+    stepDecisions: [],
+    observations: [],
+    evidence: ['battery-steady'],
+  };
+  s.objects.push(playerItem);
+  s.focusId = playerItem.id;
+  s.parts.batteries = 1;
+  s = transition(s, { type: 'action', id: 'replace-battery' });
+  expect(s.parts.batteries).toBe(0);
+  expect(s.objects.find((o) => o.id === playerItem.id)?.repaired).toBe(true);
+  expect(s.objects.find((o) => o.id === job.id)?.repaired).toBe(false);
+});
+
+it('a material disappearing after Sam begins a step causes an honest saved stop, not a crash or invented repair', () => {
+  let s = fixture('battery');
+  s.chapter = 'garage';
+  if (s.campaign) s.campaign.graduated = true;
+  s.unlocked.push('story:observer-invite');
+  teach(s);
+  const job = s.objects.at(-1);
+  if (!job) throw Error('Missing job');
+  job.inspected = true;
+  job.tested = true;
+  job.evidence = ['battery-steady'];
+  startApprenticeJob(s, job, false, () => {});
+  s.parts.batteries = 1;
+  advanceApprentice(
+    s,
+    844,
+    () => {},
+    () => true,
+  );
+  expect(s.apprentice?.pending?.step).toBe('replace-battery');
+  const player = s.people.player;
+  if (!player) throw Error('Missing player');
+  tick(player, 844);
+  s.now = 844;
+  const playerItem: RepairObject = {
+    ...job,
+    id: 'player-in-flight-spare',
+    assignedTo: undefined,
+    stepDecisions: [],
+    observations: [],
+    evidence: ['battery-steady'],
+  };
+  s.objects.push(playerItem);
+  s.focusId = playerItem.id;
+  s = transition(s, { type: 'action', id: 'replace-battery' });
+  expect(s.parts.batteries).toBe(0);
+  expect(s.objects.find((o) => o.id === playerItem.id)?.repaired).toBe(true);
+  expect(s.objects.find((o) => o.id === job.id)?.repaired).toBe(false);
+  expect(s.apprentice?.pending).toBeUndefined();
+  expect(s.apprentice?.needsHelp).toContain('matching part');
+  expect(s.apprentice?.completedJobIds).toEqual([]);
 });
