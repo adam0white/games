@@ -188,8 +188,20 @@ export default function App() {
   const isRequestDecision = (action: ActionView) =>
     /^service-(accept|later|decline)-(leila|nora)$/.test(action.id);
   const decidingRequest = view.actions.some(isRequestDecision);
+  const isEarlierDemonstration = (action: ActionView) =>
+    action.id === 'explain-step' &&
+    Boolean(game.apprentice?.supervisedCompleted && game.apprentice.independentCompleted > 0) &&
+    view.focus?.id !== game.apprentice?.lastLesson?.objectId;
+  const isOptionalAlternative = (action: ActionView) =>
+    (action.id === 'try-case-replacement' &&
+      Boolean(view.focus?.casePresentation?.comparisonKnown)) ||
+    (action.id === 'neighbourhood-tray-consent' &&
+      view.focus?.casePresentation?.mode === 'carrying-case' &&
+      view.focus.progress === 'checked');
   const isMainCandidate = (action: ActionView) =>
     action.kind !== 'quiet' &&
+    !isEarlierDemonstration(action) &&
+    !isOptionalAlternative(action) &&
     !action.id.startsWith('workshop-') &&
     (!action.id.startsWith('service-') || isImmediateWeekAction(action)) &&
     !timeAwayIds.has(action.id);
@@ -225,7 +237,9 @@ export default function App() {
     {
       id: 'case',
       label: 'Nora’s sample case',
-      actions: choicesOutsidePlans.filter((action) => neighbourhoodSubject(action) === 'case'),
+      actions: choicesOutsidePlans.filter(
+        (action) => neighbourhoodSubject(action) === 'case' && !isOptionalAlternative(action),
+      ),
     },
     {
       id: 'light',
@@ -243,6 +257,16 @@ export default function App() {
       actions: choicesOutsidePlans.filter(
         (action) => action.kind === 'quiet' && !neighbourhoodSubject(action),
       ),
+    },
+    {
+      id: 'alternatives',
+      label: 'Other approaches',
+      actions: choicesOutsidePlans.filter(isOptionalAlternative),
+    },
+    {
+      id: 'earlier-learning',
+      label: 'Earlier demonstrations',
+      actions: choicesOutsidePlans.filter(isEarlierDemonstration),
     },
     {
       id: 'project',
@@ -372,6 +396,17 @@ export default function App() {
     }
   }
   function renderAction(action: ActionView) {
+    if (
+      action.id === 'workshop-delay-evan-timer' &&
+      view.actions.some((candidate) => candidate.id === 'workshop-return-unfixed-evan-timer')
+    ) {
+      action = {
+        ...action,
+        label: 'Ask Evan to leave the unsupported timer another day',
+        detail:
+          'The gear is missing and no compatible part is available here. Extra time alone will not make this repair possible.',
+      };
+    }
     return (
       <button
         type="button"
@@ -627,16 +662,23 @@ export default function App() {
             <div className="choice-buttons project-choices">{projectChoices.map(renderAction)}</div>
           </details>
         )}
-        {view.apprenticeship && (
-          <section
-            className="apprentice-presence"
-            aria-label={`${view.apprenticeship.name} at the bench`}
-          >
-            <span className="speaker">{view.apprenticeship.name}</span>
-            <p>{view.apprenticeship.activity}</p>
-            <small>{view.apprenticeship.responsibility}</small>
-          </section>
-        )}
+        {view.apprenticeship &&
+          (game.apprentice?.jobId ? (
+            <section
+              className="apprentice-presence"
+              aria-label={`${view.apprenticeship.name} at the bench`}
+            >
+              <span className="speaker">{view.apprenticeship.name}</span>
+              <p>{view.apprenticeship.activity}</p>
+              <small>{view.apprenticeship.responsibility}</small>
+            </section>
+          ) : (
+            <details className="apprentice-presence choice-more">
+              <summary>{view.apprenticeship.name}</summary>
+              <p>{view.apprenticeship.activity}</p>
+              <small>{view.apprenticeship.responsibility}</small>
+            </details>
+          ))}
         {!attention?.returnedObject && response}
         {dayPlans.length > 0 && (
           <DayPlan entries={dayPlans} actions={view.actions} renderAction={renderAction} />
@@ -651,9 +693,16 @@ export default function App() {
             {actionGroups
               .filter((group) => group.id !== 'project' || !workshop?.cabinet?.open)
               .map((group) =>
-                ['elsewhere', 'window', 'conversation', 'project', 'workshop', 'week'].includes(
-                  group.id,
-                ) ? (
+                [
+                  'elsewhere',
+                  'window',
+                  'alternatives',
+                  'conversation',
+                  'earlier-learning',
+                  'project',
+                  'workshop',
+                  'week',
+                ].includes(group.id) ? (
                   <details className="choice-group choice-more" key={group.id}>
                     <summary>
                       {group.id === 'week'

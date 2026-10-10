@@ -7,7 +7,7 @@ const statusLabels: Record<PlanEntry['status'], string> = {
   invitation: 'Invitation',
   routine: 'Usual hours',
   underway: 'Underway',
-  late: 'Agreed time passed',
+  late: 'Ended agreement',
 };
 
 export function DayPlan({
@@ -29,8 +29,10 @@ export function DayPlan({
       return [action];
     }),
   }));
-  const [next, ...later] = plans;
-  if (!next) return null;
+  const current = plans.filter((entry) => entry.status !== 'late');
+  const ended = plans.filter((entry) => entry.status === 'late');
+  const [next, ...later] = current;
+  if (plans.length === 0) return null;
   function renderEntry(entry: (typeof plans)[number]) {
     return (
       <section className="day-plan-entry" key={entry.id} aria-label={entry.label}>
@@ -48,11 +50,17 @@ export function DayPlan({
   return (
     <aside className="day-plan" aria-label="Plans">
       <h2>Plans</h2>
-      {renderEntry(next)}
+      {next && renderEntry(next)}
       {later.length > 0 && (
         <details className="other-plans">
           <summary>Other known plans · {later.length}</summary>
           {later.map(renderEntry)}
+        </details>
+      )}
+      {ended.length > 0 && (
+        <details className="other-plans">
+          <summary>Previous arrangements · {ended.length}</summary>
+          {ended.map(renderEntry)}
         </details>
       )}
     </aside>

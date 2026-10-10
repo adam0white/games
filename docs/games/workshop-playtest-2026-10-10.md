@@ -288,3 +288,57 @@ An isolated reader imported the actual completed-week story into immutable local
 The first blocked comparison packet, `/tmp/frozen-neighbourhood-player-nora-block.json`, contains 281 inputs and 396 journal entries at Summer day 8, 11:39; SHA256 `755a5d315c5c235f1deacb3fc87227872bc0e3dbedf261a3b138f34ee5131d21`. The actual final packet `/tmp/frozen-neighbourhood-player-final-story.json` retains the later tray request and half-hour wait: 284 inputs, 398 journal entries, ending at 12:09, SHA256 `7fb7ccd6b6ffab7595f570a0567e43798a2e14b46a326c40b257a91e35c6acde`. Source reconstruction found ordinary meal/rest continuation, not a missing invitation button. Correct refusal attribution and exact waiting alone eventually completed comparison after six alternating waits totaling 90 minutes. That technical recovery is not playability acceptance. Current work adds genuinely received purposes through existing HF goals and separate owner disposition decisions; the immutable candidate-12 state and original heard words remain preserved before continuation. The returning reader must test the resulting route before publication.
 
 The fixed-default current control continues that actual final story through five-minute physical comparison, five-minute owner grant, twelve-minute fitting, ten-minute carrying check and three-minute handback: 35 minutes total, without a waiting loop. The carrying outcome is checked, parts remain finite and the native continuation reconstructs exactly. Matched offers differ only in purpose linkage; the received-purpose comparison starts whereas withholding it retains the actual meal. A stronger real HF promise can still make Nora decline with the purpose present. Granting a spare and retaining it have competing received purposes. Neither refusal nor repeated incompatible attempts earns progress. These are technical controls; the returning source-unread player review is still pending.
+
+
+## Returning source-unread player on candidate game 0.4.0
+
+The same reader continued its actual candidate-12 final story through immutable `b155b47dda483e7db52e237e216d38fcaa773f2e`, without source/docs or hidden-state edits. It completed Nora's carrying case, accepted and repaired her separately priced shelf light, arranged real bench time with Sam, delegated Evan's folding light, collected both payments and Sam's wage, then returned Evan's unsupported timer honestly. It played Summer day 8, 12:09 through day 10, 15:04. These are the reader's exact words:
+
+> "The stuck conversation worked immediately this time. Asking Nora about the fitting now does what the words suggest. The catch repair was easy to follow, and her line about not gathering samples off the path made finishing it feel useful."
+
+> "I liked being asked to keep the old fittings. It gave the repair a specific person's priorities, rather than just an object becoming green."
+
+> "The stationary-tray option staying available even after a successful carrying check felt unnecessary. We already had the result she wanted."
+
+> "Sam finally became available while I was repairing the next light. I was pleased to see the option to arrange time, though I still couldn't have predicted when it would appear."
+
+> "Handing Evan's whole light to Sam, finishing Nora's light myself, then having tea while he finished his check was the strongest part of this continuation. It felt like sharing a workshop rather than clicking his individual steps."
+
+> "Sam's panel still said Working on Evan's folding work light after he said it was checked and labelled, and even the next day while the shared stretch had ended. I wasn't sure whether he was physically there or the job was simply still assigned to him."
+
+> "The collection completed without my intervention when I waited until Evan's return, including Sam's wage. That was satisfying. I didn't have to repeat a process he had already carried through."
+
+> "The Plans wording was clearer: tomorrow stayed tomorrow and today's date made sense. But the expired Sam stretch kept taking the first card while the actual next collection was hidden under Other known plans. I'd rather see the next thing I owe someone first."
+
+> "A prominent action kept offering to explain my return demonstration on Nora's sewing box while I was handling completely different objects. I did not know why that old return step was the thing Sam wanted to hear about now."
+
+> "The timer was clearly beyond the available parts. I wanted to tell Evan immediately, but had to wait until tomorrow's collection. Returning it honestly felt like a sensible ending, although the alternative 'repair needs another day' sounded misleading once I knew we had no matching gear."
+
+> "I have enough lamps now. The case and the model had more character, and I would want another personal or shared project rather than another battery/contact diagnosis."
+
+Actual export: `/tmp/frozen-neighbourhood-player-v040-final-story.json`, 315 inputs / 448 journal entries, SHA256 `58ea56b2f15261ca6061a584ed64c012d27e8d7154cb9e56a6a27fb26fad4aa7`. The reader found no repeat of the blocked comparison. It did find misleading completed-Sam status and expired-plan priority; derived-view/UI corrections passed independent source review and the final 240-test check, preserving the actual simulation and native history. Known-incompatible retries and unnecessary adaptation after a carrying check should remain optional rather than dominate the next step. More non-light personal/shared projects are a dated design priority, not a claim that this chapter supplies broad mechanical variety.
+
+
+## Fresh resumed-story wildcard on candidate game 0.4.0
+
+A separate source-unread reader used isolated Chrome and visible Journal import/export, resuming the actual completed week. This was a short natural exploration, not fifteen uninterrupted minutes. It completed the paper street, visited Nora's old frontage, checked and returned her repaired carrying case, collected the separately accepted £5 light, and ended with Evan's picture conversation at Summer day 8, 14:05. Exact reactions:
+
+> “I want to finish my own paper street after everybody else's lamps.”
+
+> “Tea feels useful here, not like taking a break from the game.”
+
+> “Interchangeable is a claim; the holes tell me whether it fits.”
+
+> “Why is trying the wrong replacement still the first action after we know it doesn't fit?”
+
+> “Good. Now do that every time you want a plate is the first line that made me smile.”
+
+> “I like that I repaired a thing Nora wants to carry. I don't want to persuade her to leave it on a table.”
+
+> “The case's carrying check feels more specific than the lamps' longer checks.”
+
+> “I can tell the difference between this being ready and the owner actually having it back.”
+
+> “I'm content to leave the picture facing up and stop here.”
+
+Artifacts: `/tmp/case-wildcard-final-story.json` and `/tmp/case-wildcard-reactions.md`. It independently found known-wrong retries, post-check alternatives and the unassigned Sam panel too prominent; these informed the derived UI corrections. It did not explore rejecting the tray, wrong fitting or Sam work. Routine log phrasing and more evocative model checks remain taste questions, not verified gameplay failures.

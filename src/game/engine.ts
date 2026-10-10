@@ -3063,6 +3063,7 @@ function dayPlan(s: GameState, actions: ActionView[]): GameView['dayPlan'] {
 export function getView(s: GameState): GameView {
   const o = focused(s);
   const actions = available(s);
+  const samJob = s.objects.find((item) => item.id === s.apprentice?.jobId);
   return {
     dayPlan: dayPlan(s, actions),
     knownAppointments: knownAppointments(s),
@@ -3086,11 +3087,13 @@ export function getView(s: GameState): GameView {
           activity:
             s.apprentice.needsHelp ??
             s.apprentice.pauseReason ??
-            (s.apprentice.jobId
-              ? `Working on ${s.objects.find((x) => x.id === s.apprentice?.jobId)?.title ?? 'the agreed light'}`
-              : s.now < s.apprentice.visitUntil && isHere(s, 'sam')
-                ? 'Alongside you at the bench'
-                : 'Away until another arranged afternoon'),
+            (samJob?.verified && samJob.awaitingCollection
+              ? `Checked and labelled for collection: ${samJob.title}`
+              : s.apprentice.jobId
+                ? `Working on ${samJob?.title ?? 'the agreed light'}`
+                : s.now < s.apprentice.visitUntil && isHere(s, 'sam')
+                  ? 'Alongside you at the bench'
+                  : 'Away until another arranged afternoon'),
           responsibility:
             s.apprentice.role === 'repairer'
               ? 'Handles supported light repairs; other promises stay with you.'
