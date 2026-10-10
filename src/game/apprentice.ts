@@ -70,7 +70,7 @@ export function apprenticeActions(
     offers.push({
       id: 'explain-step',
       label: `Explain your demonstration on ${s.objects.find((o) => o.id === a.lastLesson?.objectId)?.title ?? 'the earlier object'}`,
-      detail: `Your ${a.lastLesson.step.replaceAll('-', ' ')} step on that object. Explain the observation and result you actually demonstrated.`,
+      detail: `Explain ${a.lastLesson.step === 'verify' ? 'why you started the longer functional check' : a.lastLesson.step === 'check-result' ? 'what the movement and switching check showed after the longer run' : `the ${a.lastLesson.step.replaceAll('-', ' ')} work`}. Use the observation and result you actually demonstrated.`,
     });
   if (!a.jobId && !item) {
     if (!s.objects.some((x) => x.id === 'lesson-battery'))

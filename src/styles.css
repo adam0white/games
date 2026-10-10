@@ -1557,3 +1557,109 @@ summary:focus-visible {
   font-weight: 400;
   font-size: 1.55rem;
 }
+
+/* Spatial work remains a complete, bounded control surface at narrow widths. */
+.chapter-closure {
+  margin: 1rem 0 1.4rem;
+  padding: 1.2rem;
+  border-block: 3px double var(--accent);
+  background: var(--paper);
+  border-radius: 0.4rem;
+}
+.chapter-closure h2 {
+  margin: 0.2rem 0 0.6rem;
+  font-family: Georgia, serif;
+  font-size: 1.7rem;
+  font-weight: 400;
+}
+.chapter-closure p {
+  line-height: 1.6;
+}
+.chapter-overline {
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+}
+.chapter-record {
+  margin-top: 1rem;
+}
+.chapter-outcome {
+  margin-block: 0.6rem;
+}
+.around-bench {
+  margin: 0.5rem 0 1rem;
+}
+.room-toggle {
+  min-height: 44px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.8rem;
+  border-radius: 0.4rem;
+}
+.workbench:has(.in-hand) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.workbench:has(.in-hand) .object-story {
+  grid-row: 1;
+}
+.inspection-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border: 0;
+  padding: 0.6rem 0;
+  margin: 0;
+  min-inline-size: 0;
+}
+.inspection-tools legend {
+  width: 100%;
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding: 0.3rem 0;
+}
+.inspection-tools button {
+  min-height: 44px;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--paper);
+  color: var(--ink);
+  text-align: left;
+}
+.inspection-tools button[aria-pressed="true"] {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.inspection-tools p {
+  flex-basis: 100%;
+  font-size: 0.85rem;
+  margin: 0.3rem 0;
+  text-align: left;
+  line-height: 1.5;
+}
+.inspection-tools button:disabled {
+  opacity: 0.55;
+}
+.workshop-room {
+  min-width: 0;
+}
+.workshop-room button {
+  min-height: 44px;
+  padding: 0.5rem 0.8rem;
+}
+@media (max-width: 600px) {
+  .in-hand .inspection-frame {
+    height: 270px;
+  }
+  .in-hand .inspection-tools {
+    grid-column: 1 / -1;
+  }
+  .chapter-closure {
+    padding: 0.9rem;
+  }
+  .chapter-closure h2 {
+    font-size: 1.4rem;
+  }
+}

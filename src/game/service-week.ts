@@ -966,3 +966,68 @@ export function getServiceWeekView(s: ServiceWeekGame) {
     part: w.part,
   };
 }
+
+/** A persistent account of completed work, never a grant of repairs or income. */
+export function serviceWeekClosure(
+  s: ServiceWeekGame,
+  model?: { repaired: boolean; installed: boolean },
+) {
+  const w = s.serviceWeek;
+  if (!w || w.conclusion === 'open' || w.startedAt === undefined) return undefined;
+  const outcomes: string[] = [];
+  const route =
+    w.route === 'private'
+      ? 'a private bench'
+      : w.route === 'favours'
+        ? 'occasional favours'
+        : 'two regular collection afternoons';
+  outcomes.push(
+    `You tried ${route}. ${w.conclusion === 'small' ? 'You chose to keep the work small.' : 'You closed the regular-work trial.'}`,
+  );
+  for (const spec of serviceWeekSpecs) {
+    const job = w.jobs.find((j) => j.id === spec.id);
+    outcomes.push(
+      !job
+        ? w.introductionsArranged
+          ? `${spec.owner}’s request was not heard during this trial; no job was accepted.`
+          : `${spec.owner} was not invited to bring a service-week request.`
+        : job.stage === 'declined'
+          ? `${spec.owner}’s request was heard and declined before a promise was made.`
+          : job.stage === 'returned-unchecked'
+            ? `${spec.title} was settled honestly without a full check or repair fee.`
+            : job.stage === 'returned'
+              ? `${spec.title} was checked and collected${job.independent ? ', with the whole repair carried by Sam' : ''}.`
+              : `${spec.title} still has an unresolved agreement.`,
+    );
+  }
+  const ledger = s.workshop?.ledger ?? [];
+  const fees = ledger
+    .filter((e) => w.jobs.some((j) => j.id === e.jobId) && e.kind === 'repair-fee')
+    .reduce((sum, e) => sum + e.amount, 0);
+  const wages = ledger
+    .filter((e) => w.jobs.some((j) => j.id === e.jobId) && e.kind === 'sam-pay')
+    .reduce((sum, e) => sum - e.amount, 0);
+  outcomes.push(
+    `Trial repair fees received: £${(fees / 100).toFixed(2)}. Sam’s recorded pay: £${(wages / 100).toFixed(2)}. Workshop cash now: £${((s.workshop?.cash ?? 0) / 100).toFixed(2)}.`,
+  );
+  outcomes.push(
+    w.personalSession === 'spent'
+      ? 'You used the saved personal-work session.'
+      : 'Personal work remains available; no session is claimed as completed.',
+  );
+  if (w.part === 'recovered')
+    outcomes.push(
+      model?.repaired
+        ? 'The measured donor gear is installed and the model’s movement is checked.'
+        : model?.installed
+          ? 'The measured donor gear is installed; the model still needs checking.'
+          : 'The measured donor gear remains labelled and available.',
+    );
+  return {
+    sourcekey: `service-week:${w.startedAt}`,
+    title: 'The first working week is complete',
+    detail:
+      'This chapter ends here. The shared bench, people, notes and personal work remain available.',
+    outcomes,
+  };
+}

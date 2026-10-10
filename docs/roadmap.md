@@ -126,3 +126,16 @@ Revisit by 2026-10-12: historical runtimes and nested source packets keep actual
 
 
 Revisit by 2026-10-11 alongside the next owner taste pass: remove stale “Your verify step” explanation helper text after a checked return, and make Dad refer to his own sorting lamp naturally. The final source-unread reader found these texture issues after successfully completing supervised work. Keep object identity and historical heard words intact.
+
+
+## V1 closure and V2 interaction selected, 2026-10-10
+
+The owner explicitly requested finite V1 completion followed by a substantial 3D-centered V2, autonomous work, research, reviews and automatic playtests. V1 authored content is complete as a release candidate: school breaks through genuine independent handoff, one service week with regular/favours/private closure, retained personal work and continued bench access. Adam still accepts feel separately. The earlier dated Nora-use and stale helper/copy proposals are resolved in engine 17; the larger variety question remains.
+
+The selected first V2 slice is primary 3D repair input through current exposed tools and examined targets, an original rotatable home/garage room, known waiting objects, and complete labelled/illustrated alternatives. Existing rule state/HF decisions remain authoritative. Cabinet current windows and kept/missed outcomes now remain disclosed. Full disassembly is not implied by schematic target components.
+
+Review by 2026-10-12 after the next owner playthrough: expand three objects into explicit reversible opening and assembly stages, with original model-specific internals and a visible restored-use animation. Prioritize lamp battery enclosure, threaded torch cap and bell striker. Represent any stage that changes available evidence or physical repair in deterministic saved host state, version it and prove canvas/alternative parity; do not grant learning through animation. A detailed mesh catalogue and unrestricted room navigation are not prerequisites for V1 closure.
+
+Review by 2026-10-12: make actual checked repairs and retained drawings inhabit the 3D room, using a public presentation projection for known form/appearance rather than generic tagged shelf objects. Keep ownership, actual location and unfinished work truthful. Do not invent absent people or finished décor.
+
+Review by 2026-10-11: the source-unread mobile reader noticed Mum’s ordinary prayer began during the four-minute approach after her call. Her own schedule is retained; investigate whether the opening needs a clearer conversational handoff without forcing interruption or rewriting old dialogue.

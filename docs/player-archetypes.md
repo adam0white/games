@@ -32,3 +32,19 @@ Owner-story continuation exposed a different candidate: social-first alternated 
 ## Delivered engine-16 checkpoint
 
 The final five fresh and five actual-owner continuations each ran their full 100-input bound and replayed exactly. Reports remain local in `/tmp/repair-player-final-016-fresh/` and `/tmp/repair-player-final-016-owner/`. No run stopped for lack of exposed choices. In skip/impatient/social/completionist/continuation order, repeated-visible-work diagnostic counts were 3/0/0/0/1 for fresh stories and 2/3/4/3/2 for the owner story. These counts flag repeated work/offers even when time or conversation advances; they do not assert completed campaigns or prove dead ends. The separate source-unread long player established an actual supervised completion, rather than this scoring policy being treated as acceptance.
+
+## Final engine-17 V1 candidate
+
+Five fresh policies and five continuations of the actual 327-input owner story each used all 100 additional inputs and stopped at the budget. The local reports are `/tmp/repair-player-v1-rc-fresh/` and `/tmp/repair-player-v1-rc-owner/`; their native-17 final exports passed exact replay in the report-producing checks. These policies observe exposed choices only, and the counts below describe their particular traces.
+
+| Policy | Fresh repeated-work candidates | Owner repeated-work candidates | Fresh endpoint | Owner endpoint |
+| --- | ---: | ---: | --- | --- |
+| Skip-everything | 3 | 2 | Age 16, summer day 3 | After school, summer day 13 |
+| Impatient | 0 | 3 | After school, summer day 5 | After school, summer day 18 |
+| Social-first | 0 | 4 | Age 17, summer day 1 | After school, summer day 15 |
+| Completionist | 0 | 3 | After school, summer day 3 | After school, summer day 16 |
+| Continuation-seeker | 1 | 2 | After school, summer day 2 | After school, summer day 7 |
+
+No report recorded an unchanged-view diagnostic or a late-plan diagnostic; every report's only possible diagnostic kind was repeated-visible-state. Fresh final exports contain 100 total inputs; owner continuations contain 427, preserving the 327-input prefix. Fresh journal counts in the table's order were 99/138/142/139/125, and owner counts were 537/566/573/568/577. No report stopped for lack of exposed choices. This does not prove that every route reaches the ending, that all waits are pleasant, or that the game is enjoyable; the repeated-work candidates remain review prompts.
+
+The separate actual keyboard/3D browser story completed Mum's reading lamp in nine recorded inputs. Its native-17 export is pinned by `tests/engine17-keyboard-ui-story.test.ts`, SHA256 `5170799d439874eeab4caab67d8a7b97d843fb1aca26214deb24191089f20439`. The test reconstructs its exact input times and packet, preserves its checked return, and confirms player-assisted work grants no independent apprentice credit. This records an observed UI route and deterministic replay, not general accessibility or owner taste acceptance.

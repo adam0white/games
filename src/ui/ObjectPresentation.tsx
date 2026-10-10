@@ -1,15 +1,18 @@
-import { Component, lazy, memo, type ReactNode, Suspense, useState } from 'react';
-import type { ObjectView } from '../game/types';
+import { Component, lazy, memo, type ReactNode, Suspense, useEffect, useState } from 'react';
+import type { ActionView, ObjectView } from '../game/types';
 import { ObjectIllustration } from './ObjectIllustration';
 
 const Inspection3D = lazy(() => import('./inspection/Inspection3D'));
 class InspectionBoundary extends Component<
-  { object: ObjectView; children: ReactNode },
+  { object: ObjectView; children: ReactNode; onReady?: (ready: boolean) => void },
   { failed: boolean }
 > {
   state = { failed: false };
   static getDerivedStateFromError() {
     return { failed: true };
+  }
+  componentDidCatch() {
+    this.props.onReady?.(false);
   }
   render() {
     return this.state.failed ? (
@@ -19,30 +22,57 @@ class InspectionBoundary extends Component<
     );
   }
 }
-export const ObjectPresentation = memo(
-  function ObjectPresentation({ object }: { object: ObjectView }) {
-    const [inHand, setInHand] = useState(false);
-    return (
-      <div className={`object-presentation ${inHand ? 'in-hand' : ''}`}>
-        {inHand ? (
-          <InspectionBoundary object={object}>
-            <Suspense fallback={<ObjectIllustration object={object} />}>
-              <Inspection3D object={object} />
-            </Suspense>
-          </InspectionBoundary>
-        ) : (
-          <ObjectIllustration object={object} />
-        )}
-        <button
-          className="inspection-toggle"
-          type="button"
-          onClick={() => setInHand(!inHand)}
-          aria-expanded={inHand}
-        >
-          {inHand ? 'Set it back down' : 'Turn it over'}
-        </button>
-      </div>
-    );
-  },
-  (previous, next) => JSON.stringify(previous.object) === JSON.stringify(next.object),
-);
+export const ObjectPresentation = memo(function ObjectPresentation({
+  object,
+  actions,
+  disabled,
+  onAction,
+  onReady,
+}: {
+  object: ObjectView;
+  actions?: ActionView[];
+  disabled?: boolean;
+  onAction?: (id: string) => void;
+  onReady?: (ready: boolean) => void;
+}) {
+  const [inHand, setInHand] = useState(true);
+  useEffect(() => {
+    if (!inHand) onReady?.(false);
+  }, [inHand, onReady]);
+  return (
+    <div className={`object-presentation ${inHand ? 'in-hand' : ''}`}>
+      {inHand ? (
+        <InspectionBoundary object={object} onReady={onReady}>
+          <Suspense
+            fallback={
+              <>
+                <ObjectIllustration object={object} />
+                <p className="inspection-hint" role="status">
+                  Opening the 3D bench…
+                </p>
+              </>
+            }
+          >
+            <Inspection3D
+              object={object}
+              actions={actions}
+              disabled={disabled}
+              onAction={onAction}
+              onReady={onReady}
+            />
+          </Suspense>
+        </InspectionBoundary>
+      ) : (
+        <ObjectIllustration object={object} />
+      )}
+      <button
+        className="inspection-toggle"
+        type="button"
+        onClick={() => setInHand(!inHand)}
+        aria-expanded={inHand}
+      >
+        {inHand ? 'Use the illustrated bench' : 'Work on the 3D object'}
+      </button>
+    </div>
+  );
+});

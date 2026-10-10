@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import { expect, it } from 'vitest';
-import { restoreGame, serializeGame, transition } from '../src/game/engine';
+import * as current from '../src/game/engine';
 import * as fourteen from '../src/game/engine14';
 import * as fifteen from '../src/game/engine15';
+import { restoreGame, serializeGame, transition } from '../src/game/engine16';
 import type { GameInput } from '../src/game/types';
 import stopped from './fixtures/fifteen-long-workshop-route.json';
 import base from './fixtures/fourteen-long-workshop-route.json';
@@ -30,4 +31,11 @@ it('pins the actual source-unread recovery and subsequent supervised completion 
   expect(s.apprentice?.supervisedCompleted).toBe(true);
   expect(s.apprentice?.independentCompleted).toBe(0);
   expect(restoreGame(raw)).toEqual(s);
+  const migrated = current.restoreGame(raw);
+  expect(migrated.engine3Save).toBe(raw);
+  expect(migrated.inputs).toEqual(s.inputs);
+  expect(migrated.journal).toEqual(s.journal);
+  const continued = current.transition(migrated, { type: 'action', id: 'rest' });
+  expect(continued.engine3Save).toBe(raw);
+  expect(current.restoreGame(current.serializeGame(continued))).toEqual(continued);
 }, 30_000);

@@ -90,6 +90,9 @@ it('a real public arrangement, explicit wait and joined step keep both promises 
   s = choose(s, 'workshop-cabinet-measure');
   expect(s.workshop?.cabinet).toBe('measured');
   expect(s.workshop?.cabinetAppointment?.status).toBe('kept');
+  expect(
+    getView(s).dayPlan?.entries.find((entry) => entry.id === `cabinet-result-${at}`)?.status,
+  ).toBe('kept');
   expect(restoreGame(serializeGame(s))).toEqual(s);
 });
 it('school cancels an agreed slot before compression and returns all actors to the actual next summer morning', () => {
@@ -188,4 +191,59 @@ it('missing the agreed window preserves the actual breach and exposes honest rea
   expect(getWorkshopView(s)?.cabinet?.description).toContain('missed');
   expect(s.workshop?.cabinet).toBe('looked');
   expect(restoreGame(serializeGame(s))).toEqual(s);
+});
+
+it('keeps a received cabinet window visible after other forty-minute work crosses its start, without completing the cabinet', () => {
+  const s = choose(planned(), 'workshop-cabinet-plan');
+  const a = s.workshop?.cabinetAppointment;
+  if (!a) throw Error('Missing slot');
+  expect(s.conversation.map((line) => line.text).join(' ')).toContain('until quarter to five');
+  s.now = a.at - 20;
+  for (const person of Object.values(s.people)) tick(person, s.now);
+  const player = s.people.player;
+  if (!player) throw Error('Missing player');
+  const work = {
+    id: 'sorting-control',
+    action: 'work',
+    label: 'Sorting retained parts',
+    duration: 40,
+    effort: 0,
+    advertises: { competence: 0.1 },
+  };
+  begin(player, work, decide(player, [work]));
+  const activity = player.activity;
+  expect(activity?.affordanceId).toBe(work.id);
+  s.now += 40;
+  for (const person of Object.values(s.people)) tick(person, s.now);
+  const before = structuredClone(s);
+  const view = getView(s);
+  const plan = view.dayPlan?.entries.find((entry) => entry.id === `known-dad-${a.at}`);
+  expect(plan?.detail).toContain('15:45–16:45');
+  expect(plan?.detail).toContain('open now');
+  expect(plan?.actionIds).toContain('workshop-cabinet-measure');
+  expect(plan?.actionIds).not.toContain('wait-appointment');
+  expect(s.workshop?.cabinet).toBe('looked');
+  expect(player.agenda.commitments.find((c) => c.id === a.playerId)?.status).toBe('pending');
+  expect(s.people.dad?.agenda.commitments.find((c) => c.id === a.dadId)?.status).toBe('pending');
+  expect(s).toEqual(before);
+});
+
+it('reports an actually missed shared deadline once, leaving the unfinished work and breach intact', () => {
+  let s = choose(planned(), 'workshop-cabinet-plan');
+  const a = s.workshop?.cabinetAppointment;
+  if (!a) throw Error('Missing slot');
+  while (s.now <= a.until) s = choose(s, 'rest');
+  const marker = `The agreed cabinet ${a.task} window`;
+  expect((s.journal ?? []).filter((line) => line.text.startsWith(marker))).toHaveLength(1);
+  expect(
+    getView(s).dayPlan?.entries.find((entry) => entry.id === `cabinet-result-${a.at}`)?.status,
+  ).toBe('late');
+  const before = s.workshop?.cabinet;
+  s = choose(s, 'rest');
+  expect((s.journal ?? []).filter((line) => line.text.startsWith(marker))).toHaveLength(1);
+  expect(s.workshop?.cabinet).toBe(before);
+  expect(s.people.player?.agenda.commitments.find((c) => c.id === a.playerId)?.status).toBe(
+    'broken',
+  );
+  expect(s.people.dad?.agenda.commitments.find((c) => c.id === a.dadId)?.status).toBe('broken');
 });

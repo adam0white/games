@@ -212,6 +212,8 @@ export function applyRepair(
   };
 }
 export function readLongCheck(item: RepairObject, now: number): string {
+  if (item.id === 'friend-0')
+    throw Error('Nora’s kettle lamp needs its actual shade and position check');
   if (item.id === 'friend-1' && item.form === 'torch')
     throw Error('Sam’s path torch needs an attended grip and movement check');
   if (item.form === 'bell')
@@ -494,4 +496,28 @@ export function performPathTorchUseCheck(
   item.evidence ??= [];
   item.evidence.push('checked');
   return 'For six minutes you change your grip, move the torch and switch it off and on. The beam stays steady without holding the cap in place. Its ordinary handling is checked; this was not a battery-endurance test.';
+}
+
+/** The kettle lamp's requested use is a steady work surface without light up
+ * the stairs. After the electrical run, an attended placement check establishes
+ * that bounded fictional outcome; elapsed time alone does not do this work. */
+export function performKettleLampUseCheck(
+  item: RepairObject,
+  startedAt: number,
+  endedAt: number,
+): string {
+  if (
+    item.id !== 'friend-0' ||
+    !item.repaired ||
+    item.checkStarted === undefined ||
+    startedAt - item.checkStarted < verificationMinutes(item) ||
+    !Number.isFinite(startedAt) ||
+    !Number.isFinite(endedAt) ||
+    endedAt - startedAt < 6
+  )
+    throw Error('The kettle lamp’s attended use check is incomplete');
+  item.verified = true;
+  item.evidence ??= [];
+  item.evidence.push('checked');
+  return 'After the longer electrical run, you spend six minutes positioning the shade beside the kettle, moving and switching the lamp, and checking from the stair doorway. The kettle surface stays lit and the shade keeps the light off the stairs.';
 }

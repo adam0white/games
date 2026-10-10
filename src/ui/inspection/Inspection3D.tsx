@@ -2,33 +2,88 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ACESFilmicToneMapping,
   AmbientLight,
+  Box3,
   CircleGeometry,
   DirectionalLight,
   HemisphereLight,
   Mesh,
   MeshStandardMaterial,
   OrthographicCamera,
+  Raycaster,
   Scene,
   SRGBColorSpace,
+  Vector2,
   Vector3,
   WebGLRenderer,
 } from 'three';
-import type { ObjectView } from '../../game/types';
+import type { ActionView, ObjectView } from '../../game/types';
 import { ObjectIllustration } from '../ObjectIllustration';
+import {
+  getMappedRepairActions,
+  type RepairTarget,
+  repairClickAllowed,
+  repairTargetLabels,
+  repairToolNames,
+  resolveRepairAction,
+  updateRepairGesture,
+} from '../repairBindings';
 import { createObjectModel } from './objectModel';
+import { resolveTouchTarget, type ScreenBounds } from './touchTargets';
 
-export default function Inspection3D({ object }: { object: ObjectView }) {
+export interface Inspection3DProps {
+  object: ObjectView;
+  actions?: ActionView[];
+  disabled?: boolean;
+  onAction?: (id: string) => void;
+  onReady?: (ready: boolean) => void;
+}
+export default function Inspection3D({
+  object,
+  actions = [],
+  disabled = false,
+  onAction,
+  onReady,
+}: Inspection3DProps) {
+  const bindings = getMappedRepairActions(object, actions);
+  const [tool, setTool] = useState<string | null>(null);
+  const [alternativeControls, setAlternativeControls] = useState(false);
+  const [picked, setPicked] = useState<RepairTarget | null>(null);
+  const highlight = useRef<((target: RepairTarget | null) => void) | null>(null);
+  const selectedTarget = bindings.find((b) => b.action.id === tool)?.target ?? null;
+  const selectedTargetRef = useRef(selectedTarget);
+  selectedTargetRef.current = selectedTarget;
+  useEffect(() => {
+    highlight.current?.(selectedTarget);
+  }, [selectedTarget]);
+  const pick = useRef<((x: number, y: number) => RepairTarget | null) | null>(null);
+  const readiness = useRef(onReady);
+  readiness.current = onReady;
+  const [retry, setRetry] = useState(0);
+  const actionAvailable = Boolean(onAction);
+  const objectKey = JSON.stringify(object);
+  const targetsKey = [...new Set(bindings.map((b) => b.target))].sort().join(',');
   const canvas = useRef<HTMLCanvasElement>(null);
   const container = useRef<HTMLDivElement>(null);
   const render = useRef<((x: number, y: number) => void) | null>(null);
   const angle = useRef({ x: 0, y: -0.35 });
-  const dragging = useRef<{ id: number; x: number; y: number } | null>(null);
+  const dragging = useRef<{
+    id: number;
+    x: number;
+    y: number;
+    startX: number;
+    startY: number;
+    moved: boolean;
+  } | null>(null);
   const [failed, setFailed] = useState(false);
   const [showKnownParts, setShowKnownParts] = useState(false);
   useEffect(() => {
+    // Retry replaces the canvas so a lost WebGL context gets a fresh surface.
+    const surfaceGeneration = retry;
+    const presentedObject = JSON.parse(objectKey) as ObjectView;
     const surface = canvas.current;
     const frame = container.current;
-    if (!surface || !frame) return;
+    if (!surface || !frame || surface.dataset.generation !== String(surfaceGeneration)) return;
+    readiness.current?.(false);
     let renderer: WebGLRenderer;
     try {
       if (
@@ -67,7 +122,56 @@ export default function Inspection3D({ object }: { object: ObjectView }) {
     const rimLight = new DirectionalLight('#d4e3dc', 1.3);
     rimLight.position.set(3, 2, -3);
     scene.add(rimLight);
-    const model = createObjectModel(object, showKnownParts);
+    const model = createObjectModel(
+      presentedObject,
+      showKnownParts,
+      targetsKey.split(',').filter(Boolean) as RepairTarget[],
+    );
+    const raycaster = new Raycaster();
+    pick.current = (x, y) => {
+      const bounds = surface.getBoundingClientRect();
+      raycaster.setFromCamera(
+        new Vector2(
+          ((x - bounds.left) / bounds.width) * 2 - 1,
+          (-(y - bounds.top) / bounds.height) * 2 + 1,
+        ),
+        camera,
+      );
+      scene.updateMatrixWorld(true);
+      const actual =
+        (raycaster.intersectObject(model.root, true)[0]?.object.userData.repairTarget as
+          | RepairTarget
+          | undefined) ?? null;
+      const selected = selectedTargetRef.current;
+      let projected: ScreenBounds | null = null;
+      if (!actual && selected) {
+        const assembly = ['shell', 'operation', 'mechanism'].includes(selected);
+        const box = new Box3();
+        if (assembly) box.setFromObject(model.root);
+        else
+          for (const mesh of model.hitRegions) {
+            if (mesh.userData.repairTarget === selected) box.union(new Box3().setFromObject(mesh));
+          }
+        if (!box.isEmpty()) {
+          const xs: number[] = [],
+            ys: number[] = [];
+          for (const bx of [box.min.x, box.max.x])
+            for (const by of [box.min.y, box.max.y])
+              for (const bz of [box.min.z, box.max.z]) {
+                const screen = new Vector3(bx, by, bz).project(camera);
+                xs.push(bounds.left + ((screen.x + 1) * bounds.width) / 2);
+                ys.push(bounds.top + ((1 - screen.y) * bounds.height) / 2);
+              }
+          projected = {
+            left: Math.min(...xs),
+            right: Math.max(...xs),
+            top: Math.min(...ys),
+            bottom: Math.max(...ys),
+          };
+        }
+      }
+      return resolveTouchTarget(actual, selected, x, y, projected);
+    };
     scene.add(model.root);
     const shadowGeometry = new CircleGeometry(0.86, 40);
     const shadowMaterial = new MeshStandardMaterial({
@@ -86,9 +190,14 @@ export default function Inspection3D({ object }: { object: ObjectView }) {
       renderer.render(scene, camera);
     }
     render.current = draw;
+    highlight.current = (target) => {
+      model.highlight(target);
+      draw(angle.current.x, angle.current.y);
+    };
     function size() {
       const width = frame?.clientWidth ?? 320;
       const height = frame?.clientHeight ?? 300;
+      if (width <= 0 || height <= 0) return;
       renderer.setSize(width, height, false);
       const ratio = width / height;
       camera.left = -1.45 * ratio;
@@ -101,22 +210,31 @@ export default function Inspection3D({ object }: { object: ObjectView }) {
     const resize = new ResizeObserver(size);
     resize.observe(frame);
     size();
+    highlight.current?.(selectedTargetRef.current);
+    readiness.current?.(actionAvailable);
     function contextLost(event: Event) {
       event.preventDefault();
       render.current = null;
+      highlight.current = null;
+      pick.current = null;
+      readiness.current?.(false);
       setFailed(true);
     }
     surface.addEventListener('webglcontextlost', contextLost);
     return () => {
       surface.removeEventListener('webglcontextlost', contextLost);
       resize.disconnect();
+      highlight.current = null;
+      pick.current = null;
+      dragging.current = null;
+      readiness.current?.(false);
       render.current = null;
       model.dispose();
       shadowGeometry.dispose();
       shadowMaterial.dispose();
       renderer.dispose();
     };
-  }, [object, showKnownParts]);
+  }, [objectKey, showKnownParts, targetsKey, retry, actionAvailable]);
   function turn(dx: number, dy: number) {
     angle.current = {
       x: Math.max(-0.6, Math.min(0.6, angle.current.x + dx)),
@@ -129,13 +247,34 @@ export default function Inspection3D({ object }: { object: ObjectView }) {
       <div className="inspection-still">
         <ObjectIllustration object={object} />
         <p className="inspection-hint">A still view of this object is available here.</p>
+        <button
+          type="button"
+          onClick={() => {
+            setFailed(false);
+            setRetry((n) => n + 1);
+          }}
+        >
+          Try the 3D view again
+        </button>
+        {!onReady &&
+          bindings.map(({ action }) => (
+            <button
+              type="button"
+              key={action.id}
+              disabled={disabled || !onAction}
+              onClick={() => onAction?.(action.id)}
+            >
+              {action.label}
+            </button>
+          ))}
       </div>
     );
   return (
     <div className="inspection-view">
       <div className="inspection-frame" ref={container}>
         <canvas
-          key={showKnownParts ? 'parts' : 'shell'}
+          key={`${retry}-${showKnownParts ? 'parts' : 'shell'}`}
+          data-generation={retry}
           ref={canvas}
           tabIndex={0}
           role="img"
@@ -154,28 +293,104 @@ export default function Inspection3D({ object }: { object: ObjectView }) {
             }
           }}
           onPointerDown={(event) => {
-            if (event.button !== 0) return;
+            if (event.button !== 0 || dragging.current) return;
             event.currentTarget.setPointerCapture(event.pointerId);
-            dragging.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
+            dragging.current = {
+              id: event.pointerId,
+              x: event.clientX,
+              y: event.clientY,
+              startX: event.clientX,
+              startY: event.clientY,
+              moved: false,
+            };
           }}
           onPointerMove={(event) => {
             const prior = dragging.current;
             if (!prior || event.pointerId !== prior.id) return;
-            turn((event.clientY - prior.y) / 170, (event.clientX - prior.x) / 140);
-            dragging.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
+            const next = updateRepairGesture(prior, event.pointerId, event.clientX, event.clientY);
+            if (next.moved) turn((event.clientY - prior.y) / 170, (event.clientX - prior.x) / 140);
+            dragging.current = next;
           }}
           onPointerUp={(event) => {
+            const prior = dragging.current;
+            if (!prior || prior.id !== event.pointerId) return;
+            if (repairClickAllowed(prior, event.pointerId, event.clientX, event.clientY)) {
+              const target = pick.current?.(event.clientX, event.clientY) ?? null;
+              setPicked(target);
+              const action = resolveRepairAction(bindings, tool, target, disabled);
+              if (action) {
+                onAction?.(action);
+                setTool(null);
+              }
+            }
             dragging.current = null;
             if (event.currentTarget.hasPointerCapture(event.pointerId))
               event.currentTarget.releasePointerCapture(event.pointerId);
           }}
-          onPointerCancel={() => {
-            dragging.current = null;
+          onPointerCancel={(event) => {
+            if (dragging.current?.id === event.pointerId) dragging.current = null;
+          }}
+          onLostPointerCapture={(event) => {
+            if (dragging.current?.id === event.pointerId) dragging.current = null;
           }}
         />
       </div>
       <p className="inspection-hint">Drag to turn it. Arrow keys work too.</p>
-      {object.inspected && object.observations.length > 0 && (
+      {onAction && object.inspected && (
+        <p className="inspection-hint">
+          Work tray:{' '}
+          {[
+            ...new Set(
+              bindings
+                .filter((b) => !['shell', 'operation', 'mechanism'].includes(b.target))
+                .map((b) => b.label),
+            ),
+          ].join(' · ') || 'Use the whole mechanism'}
+        </p>
+      )}
+      {onAction && bindings.length > 0 && (
+        <fieldset className="inspection-tools">
+          <legend>Choose a tool, then touch the object or examined part</legend>
+          {bindings.map(({ action, label }) => (
+            <button
+              type="button"
+              key={action.id}
+              disabled={disabled}
+              data-choice="true"
+              aria-pressed={tool === action.id}
+              onClick={() => setTool(tool === action.id ? null : action.id)}
+            >
+              {repairToolNames[action.id] ?? label}
+            </button>
+          ))}
+          {picked && <p className="inspection-hint">{repairTargetLabels[picked]}</p>}
+          {tool && (
+            <p role="status">
+              {bindings.find((b) => b.action.id === tool)?.action.label} ·{' '}
+              {repairTargetLabels[selectedTarget ?? 'shell']}.{' '}
+              {bindings.find((b) => b.action.id === tool)?.action.detail}
+            </p>
+          )}
+          <details
+            hidden={!tool}
+            open={alternativeControls}
+            onToggle={(event) => setAlternativeControls(event.currentTarget.open)}
+          >
+            <summary>Keyboard and alternative controls</summary>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => {
+                if (tool && bindings.some((b) => b.action.id === tool)) onAction(tool);
+                setTool(null);
+              }}
+            >
+              Do the selected work
+            </button>
+          </details>
+        </fieldset>
+      )}
+      {!onAction && object.inspected && object.observations.length > 0 && (
         <button
           type="button"
           className="known-parts-toggle"

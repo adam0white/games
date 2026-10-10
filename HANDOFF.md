@@ -1,10 +1,22 @@
 # Handoff
 
-Updated 2026-10-10 during Adam's renewed owner-playtest increment. The old overnight deadline does not end this work.
+Updated 2026-10-10 for Adam's authorized V1 closeout and substantial first V2 slice.
 
 ## What remains
 
-The owner-playtest increment is delivered publicly and in the primary local preview: game 0.5.0 / `home-garage-16`, runtime commit `4645bfc0bbd87c8ce086c6151323bb3612463b00`. Adam personally accepts feel through his next playthrough. Greater variety in Nora’s opening lamp and two small dialogue texture issues remain dated taste proposals; economy, multiplayer and prospective HF planning remain unselected. The exact review checkpoints at `52a9a56` (engine 14) and `61a7a45` (engine 15) are frozen separately, including independent players’ actual histories.
+Game 1.0.0-rc.1 / `home-garage-17` is implemented in the existing `codex/full-workshop` worktree. Final whole-build verification, one clean static deployment and primary preview integration remain. Adam personally accepts feel through playtesting; this release candidate does not claim that acceptance. Detailed reversible disassembly, catalogue-specific room assets and later business/economy work remain dated in the roadmap.
+
+V1 has a persistent, truthful service-week ending for regular work, occasional favours or private repairs. It retains actual collections, unchecked settlements, pay, wages, cash and personal work, and keeps the bench playable. Nora's kettle lamp has an attended use check distinct from the electrical run. Dad's full cabinet appointment window remains actionable until its actual deadline; genuinely kept or broken promises remain visible. Parent help uses the actual object verifier and cannot waive use checks.
+
+The first V2 slice makes original 3D objects the normal repair surface: select an offered tool and touch its actual examined target. Known battery/contact/holder/cap components and whole mechanisms use the same validated dispatcher as alternative controls. Rotating an object or the original cutaway room consumes no story time or input. The room exposes only known bench, waiting shelf, parts, cabinet and notebook information. Illustration, keyboard and WebGL-loss alternatives remain complete; room mode hides the close bench. No new framework faculty was added; published HF 2.2.0 remains pinned exactly.
+
+All fourteen published engine-16 runtime modules are frozen separately. The actual native-16 returning-reader packet and owner native-13 packet still validate exactly before current continuation. Native-17 keyboard-play export provides an additional actual UI replay control. Independent technical/game-design review, fresh touch and keyboard readers, a nearly unbriefed wildcard and five bounded fresh/five owner policy runs complement causal checks; they do not establish calibrated human realism or fun. Reports: docs/games/3d-workshop-playtests-2026-10-10.md and docs/player-archetypes.md. Research: docs/research/3d-interaction-prior-art-2026-10-10.md.
+
+Final candidate verification passed lint, strict types, 334 tests across 71 files and production build. All changed relative documentation links resolve. The compressed initial bundle remains approximately 896 kB; archived native runtimes dominate it, and reducing that payload is a dated follow-up rather than a claimed speed improvement.
+
+The public runtime and owner local preview still carry 0.5.0 / engine 16 until the final release-candidate deployment below. Source remains local/private with no remote or source license selected; only the static build may be published.
+
+## Previous delivered owner-playtest checkpoint
 
 Current work preserves the actual owner 327-input engine-13 export at SHA256 `2902cd279f92edd27611e9aacaabf5af154649ad33d56e294419f47ea2cfcbd4` through a fully frozen native runtime before continuation. It adds optional holiday exits, received routine notices, retained childhood measuring/label work, cash and graduation presentation, target-labelled conversations, always-reachable cabinet navigation, actual attended mechanical checks and corrective teaching. Five visible-choice-only simulated player policies provide repeatable diagnostic traces. Fresh source-unread feedback led to an ambiguous path-torch diagnosis with controlled tests and an attended use check; independent review also found and corrected an overwritten corrective lesson. Reviews and traces are recorded locally in `docs/games/independent-reviewer-notes-2026-10-10.md` and `docs/player-archetypes.md`. Earlier development-preview exports are feedback artifacts; actual published-engine packets and the explicitly identified immutable `52a9a56` review checkpoint are asserted as unchanged native histories. Earlier development previews remain feedback artifacts.
 

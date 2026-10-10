@@ -196,6 +196,7 @@ export interface ObjectView {
 }
 
 export interface GameView {
+  chapterClosure?: { sourcekey: string; title: string; detail: string; outcomes: string[] };
   milestone?: { sourcekey: string; title: string; detail: string };
   knownAppointments?: { personId: string; name: string; at: number; detail: string }[];
   collectionPlans?: { objectId: string; title: string; owner: string; detail: string }[];
@@ -206,7 +207,7 @@ export interface GameView {
       id: string;
       label: string;
       detail: string;
-      status: 'agreed' | 'invitation' | 'routine' | 'underway' | 'late';
+      status: 'agreed' | 'invitation' | 'routine' | 'underway' | 'late' | 'kept';
       actionIds?: string[];
     }[];
   };

@@ -23,8 +23,13 @@ import {
   Vector3,
 } from 'three';
 import type { ObjectView } from '../../game/types';
+import type { RepairTarget } from '../repairBindings';
 
-export function createObjectModel(object: ObjectView, showKnownParts = false) {
+export function createObjectModel(
+  object: ObjectView,
+  showKnownParts = false,
+  exposedTargets: readonly RepairTarget[] = [],
+) {
   const root = new Group();
   const geometries: BufferGeometry[] = [];
   const materials: MeshStandardMaterial[] = [];
@@ -380,30 +385,72 @@ export function createObjectModel(object: ObjectView, showKnownParts = false) {
     const key = ring(0.09, 0.018, brass, 1.28, 0.14, 0.35);
     key.rotation.y = Math.PI / 2;
   }
-  // The tray contains only components explicitly named in observed evidence.
-  if (showKnownParts && object.inspected) {
-    const known = object.observations.join(' ').toLowerCase();
+  const hitRegions: Mesh[] = [];
+  const workTargets = new Set(exposedTargets);
+  const attach = (mesh: Mesh, target: RepairTarget) => {
+    const source = mesh.material;
+    if (source instanceof MeshStandardMaterial) {
+      const own = source.clone();
+      materials.push(own);
+      mesh.material = own;
+    }
+    mesh.userData.repairTarget = target;
+    hitRegions.push(mesh);
+    return mesh;
+  };
+  // A schematic work tray represents only components involved in offered work.
+  // It is a diagram of the examined assembly, not a supply of replacement parts.
+  if (object.inspected && (showKnownParts || exposedTargets.length > 0)) {
     const tray = material('#b49a73', 0, 0.92);
-    box(1.12, 0.045, 0.48, tray, -0.63, 0.065, 0.78);
-    if (/battery|cell/.test(known)) {
-      const cell = material('#a77d55', 0.45, 0.45);
-      const battery = cylinder(0.085, 0.45, cell, -0.72, 0.18, 0.78);
-      battery.rotation.z = Math.PI / 2;
-      const terminal = cylinder(0.045, 0.025, steel, -0.48, 0.18, 0.78);
-      terminal.rotation.z = Math.PI / 2;
+    box(1.7, 0.045, 0.55, tray, 0, 0.06, 0.96);
+    if (workTargets.has('battery')) {
+      const cell = attach(
+        cylinder(0.1, 0.44, material('#a77d55', 0.45, 0.45), -0.57, 0.19, 0.96),
+        'battery',
+      );
+      cell.rotation.z = Math.PI / 2;
+      attach(cylinder(0.045, 0.025, steel, -0.34, 0.19, 0.96), 'battery').rotation.z = Math.PI / 2;
     }
-    if (/contact|spring|striker|hinge|catch/.test(known)) {
-      box(0.35, 0.025, 0.1, brass, -0.56, 0.12, 0.78).rotation.z = 0.12;
-      for (const offset of [-0.15, 0.15]) cylinder(0.026, 0.035, steel, -0.56 + offset, 0.16, 0.78);
+    if (workTargets.has('contact')) {
+      attach(box(0.24, 0.045, 0.18, brass, -0.12, 0.13, 0.96), 'contact');
+      attach(ring(0.07, 0.018, steel, -0.12, 0.2, 0.96), 'contact').rotation.x = Math.PI / 2;
     }
-    if (/gear/.test(known)) {
-      // A missing gear is shown as an empty marked place, never as a supplied part.
-      const place = ring(0.13, 0.008, darkMetal, -0.65, 0.095, 0.78);
-      place.rotation.x = Math.PI / 2;
+    if (workTargets.has('holder')) {
+      const polymer = material('#5b6258');
+      attach(box(0.38, 0.05, 0.22, polymer, 0.35, 0.12, 0.96), 'holder');
+      for (const x of [0.17, 0.53]) attach(box(0.035, 0.14, 0.22, polymer, x, 0.2, 0.96), 'holder');
+      attach(box(0.03, 0.12, 0.14, brass, 0.19, 0.2, 0.96), 'holder');
+    }
+    if (workTargets.has('cap')) {
+      const cap = attach(
+        cylinder(0.22, 0.16, material('#ac7449', 0.15, 0.68), 0.63, 0.18, 0.96),
+        'cap',
+      );
+      for (const y of [0.13, 0.18, 0.23])
+        attach(ring(0.224, 0.012, steel, cap.position.x, y, 0.96), 'cap').rotation.x = Math.PI / 2;
     }
   }
+  // The complete mechanism is the honest target when internal geometry is not authored.
+  if (workTargets.has('mechanism'))
+    root.traverse((child) => {
+      if (child instanceof Mesh && !child.userData.repairTarget) attach(child, 'mechanism');
+    });
+  root.traverse((child) => {
+    if (child instanceof Mesh && !child.userData.repairTarget) attach(child, 'shell');
+  });
   return {
     root,
+    hitRegions,
+    highlight(target: RepairTarget | null) {
+      for (const mesh of hitRegions) {
+        const mat = mesh.material;
+        if (mat instanceof MeshStandardMaterial) {
+          const whole = target === 'shell' || target === 'operation' || target === 'mechanism';
+          mat.emissive.set(whole || mesh.userData.repairTarget === target ? '#274a35' : '#000000');
+          mat.emissiveIntensity = 0.65;
+        }
+      }
+    },
     dispose() {
       for (const texture of textures) texture.dispose();
       for (const geometry of geometries) geometry.dispose();

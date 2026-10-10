@@ -8,6 +8,7 @@ const statusLabels: Record<PlanEntry['status'], string> = {
   routine: 'Usual hours',
   underway: 'Underway',
   late: 'Ended agreement',
+  kept: 'Kept',
 };
 
 export function DayPlan({
@@ -29,8 +30,8 @@ export function DayPlan({
       return [action];
     }),
   }));
-  const current = plans.filter((entry) => entry.status !== 'late');
-  const ended = plans.filter((entry) => entry.status === 'late');
+  const current = plans.filter((entry) => !['late', 'kept'].includes(entry.status));
+  const ended = plans.filter((entry) => ['late', 'kept'].includes(entry.status));
   const [next, ...later] = current;
   if (plans.length === 0) return null;
   function renderEntry(entry: (typeof plans)[number]) {

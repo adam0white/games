@@ -269,7 +269,7 @@ export function workshopActions(s: WorkshopGame, ctx: WorkshopContext): ActionVi
         ['planned', 'missed'].includes(w.cabinetAppointment?.status ?? '')
           ? 'Ask Dad to rearrange the cabinet time'
           : 'Ask Dad to arrange a cabinet time',
-        'Tomorrow at 15:45, if he agrees. The next step still needs both of you.',
+        'Tomorrow, 15:45–16:45, if he agrees. The next step still needs both of you.',
       );
     if (w.cabinet === 'looked')
       add(
@@ -582,7 +582,7 @@ export function applyWorkshopAction(
         lines: [
           line(
             'Dad',
-            'Let us leave tomorrow at quarter to four for that step. We will still check how we both are when the time comes.',
+            'Let us keep tomorrow from quarter to four until quarter to five for that step. We will still check how we both are when the time comes.',
           ),
         ],
       };
@@ -1190,7 +1190,7 @@ export function getWorkshopView(s: WorkshopGame) {
             description:
               cabinetDescriptions[w.cabinet] +
               (w.cabinetAppointment?.status === 'planned'
-                ? ` The notebook holds an agreed ${w.cabinetAppointment.task} slot at 15:45; ask Dad when you are both available, or rearrange it.`
+                ? ` The notebook holds an agreed ${w.cabinetAppointment.task} window, 15:45–16:45; ask Dad when you are both available, or rearrange it.`
                 : w.cabinetAppointment?.status === 'missed'
                   ? ' You missed the saved cabinet time. The step is unfinished; ask Dad to arrange another time.'
                   : ''),
