@@ -42,7 +42,7 @@ Independent game-design review caught disconnected-torch beam narration, missing
 
 Root isolated browser check confirmed renderer context calls stay equal through opening, testing, cleaning and refitting; camera/preference changes leave exports byte-identical; illustration preference survives reload; room context loss preserves complete controls and retry recreates the canvas; no horizontal overflow or page errors at 360×780. Candidate screenshots /tmp/repair-ui-browser-check/v2-open-lamp.png and v2-room-first.png.
 
-Final coherent candidate check passed lint, strict types, 361 tests/76 files and production build. Five fresh and five actual-owner policy runs replay exactly; all reach their 100-input budget, with no unchanged-view or late-plan diagnostics. Immutable delivery recheck and deployment remain pending. A finite policy run or native replay does not establish fun.
+Final coherent candidate check passed lint, strict types, 361 tests/76 files and production build. Five fresh and five actual-owner policy runs replay exactly; all reach their 100-input budget, with no unchanged-view or late-plan diagnostics. Clean immutable, public and primary-local delivery checks passed; release manifests match runtime 61d57afbe2cbe00078ed69e98a66da223d4112bd / game 2.0.0-alpha.1 / engine 18 / HF 2.2.0, dirty false. Static deployment repeated the complete 361-test check. A finite policy run or native replay does not establish fun.
 
 
 ## Returning wildcard: candidate engine 18
@@ -83,3 +83,18 @@ Exact reactions:
 > The room’s Notebook leads straight to my story.
 
 The tester found “Retained cover” persisting after refit. Labels now use public assembly kind/state everywhere: retained while open, fitted after closing, including the picked target and selected-tool preview. Eight binding tests include all three piece types. Captions distinguish an open assembly from an assembled object. Screenshots and detailed notes remain /tmp/repair-v2-final-keyboard-notes.md and the matching -refit/-room/-journal.png files.
+
+
+## Immutable returning wildcard and delivery
+
+Fresh isolated Chrome against clean runtime 61d57af at :5186; same minimally briefed player imported its native-17 baseline without reading source or JSON. Actual UI download /tmp/repair-v2-immutable-wildcard-story.json: engine 18, 28 inputs/36 journal entries, SHA256 6cd3a560e167fad6c95b321b4c906958623b5bb4e56af064f910821e1aa43c33. Root subsequently imported and re-exported it through the public UI byte-for-byte. Screenshots /tmp/repair-v2-immutable-wildcard-01.png through -15.png.
+
+Exact words:
+
+> With the paper-street model focused, I opened the garage room, selected Family cabinet, and now saw “See cabinet project details” in the room panel; clicking it returned me to close work with Dad’s cabinet section expanded (screenshots 09–11). That fixes the dead-end feeling I reported.
+
+> After clicking “Wait until the agreed cabinet time with Dad,” the clock reached 15:45 and the primary plan explicitly said “the agreed window is open now. Ask together; neither person is forced to interrupt another activity,” with “Ask Dad to measure the hinges together” directly visible (screenshot 13). This now makes the appointment easy to find.
+
+> I stopped there naturally for this short recheck; no new bug observed.
+
+The clean static upload is Cloudflare 2646259c-35c6-4209-a536-08d17feb706e. Public mobile checks repeated renderer lifetime, fitted cover copy, camera/preference byte equality, preference reload, graphics-loss retry, project navigation and no overflow/page errors. Public and primary :5173 owner imports retain 327 inputs/455 journal entries, £8 and available personal work. Browser/storage belonging to Adam was not operated. These are bounded browser-engine observations, not physical-device acceptance. Adam still accepts feel personally.
