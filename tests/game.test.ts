@@ -9,6 +9,7 @@ import {
   serializeGame,
   transition,
 } from '../src/game/engine';
+import * as three from '../src/game/engine3';
 
 const act = (s: ReturnType<typeof createGame>, id: string) => {
   let next = transition(s, { type: 'action', id });
@@ -325,7 +326,8 @@ it('a torch’s wrong flat-contact repair responds to the completed battery test
     const item = s.objects.find((x) => x.id === s.focusId);
     if (item?.fault === 'cap') {
       s = act(s, 'clean-contact');
-      expect(getView(s).currentDialogue?.at(-1)?.text).toContain('threaded cap');
+      expect(getView(s).currentDialogue?.at(-1)?.text).toContain('control the cap position');
+      expect(getView(s).actions.some((x) => x.id === 'path-torch-test-cap')).toBe(true);
       expect(getView(s).currentDialogue?.at(-1)?.text).not.toContain('Testing the battery');
       expect(getView(s).actions.some((x) => x.id === 'twist-cap')).toBe(true);
       expect(getView(s).actions.some((x) => x.id === 'test-battery')).toBe(false);
@@ -349,7 +351,15 @@ it('an empty bench drops task-specific human wording without changing saved stat
 });
 
 it('validates an interim engine3 save using its original failure prose and corrects only future inputs', () => {
-  let previous = createGame(42);
+  const oldAct = (state: ReturnType<typeof three.createGame>, id: string) => {
+    let next = three.transition(state, { type: 'action', id });
+    if (id === 'verify') {
+      next = three.transition(next, { type: 'action', id: 'rest' });
+      next = three.transition(next, { type: 'action', id: 'check-result' });
+    }
+    return next;
+  };
+  let previous = three.createGame(42);
   previous.feedbackRevisionFrom = 20000;
   previous = [
     'talk-family',
@@ -363,39 +373,46 @@ it('validates an interim engine3 save using its original failure prose and corre
     'shelve',
     'talk-garage',
     'talk-friends',
-  ].reduce((s, id) => transition(s, { type: 'action', id }), previous);
+  ].reduce((s, id) => three.transition(s, { type: 'action', id }), previous);
   for (let n = 0; n < 12; n++) {
-    while (!getView(previous).actions.some((a) => a.id === 'accept-request'))
-      previous = act(previous, 'wait-person');
-    previous = act(previous, 'accept-request');
-    previous = act(previous, 'inspect');
-    previous = act(previous, 'test-battery');
+    while (!three.getView(previous).actions.some((a) => a.id === 'accept-request'))
+      previous = oldAct(previous, 'wait-person');
+    previous = oldAct(previous, 'accept-request');
+    previous = oldAct(previous, 'inspect');
+    previous = oldAct(previous, 'test-battery');
     const item = previous.objects.find((x) => x.id === previous.focusId);
     if (item?.fault === 'cap') {
-      previous = act(previous, 'clean-contact');
+      previous = oldAct(previous, 'clean-contact');
       expect(
         previous.objects.find((x) => x.id === previous.focusId)?.observations.at(-1),
       ).toContain('Testing the battery');
-      const packet = JSON.parse(serializeGame(previous));
+      const packet = JSON.parse(three.serializeGame(previous));
       delete packet.state.feedbackRevisionFrom;
       const oldSave = JSON.stringify(packet);
       let migrated = restoreGame(oldSave);
-      for (const [id, person] of Object.entries(previous.people))
-        expect({ ...migrated.people[id], engine: person.engine }).toEqual(person);
+      const nativeValidated = three.restoreGame(oldSave);
+      expect(nativeValidated.people).toEqual(previous.people);
+      expect(migrated.engine3Save).toBe(oldSave);
+      for (const [id, person] of Object.entries(previous.people)) {
+        expect(migrated.people[id]?.body).toEqual(person.body);
+        expect(migrated.people[id]?.memory).toEqual(person.memory);
+      }
       expect(migrated.objects).toEqual(previous.objects);
       expect(migrated.inputs).toEqual(previous.inputs);
       expect(migrated.feedbackRevisionFrom).toBe(previous.inputs.length);
       migrated = act(migrated, 'clean-contact');
-      expect(getView(migrated).currentDialogue?.at(-1)?.text).toContain('threaded cap');
+      expect(
+        migrated.objects.find((item) => item.id === migrated.focusId)?.observations.at(-1),
+      ).toContain('threaded cap');
       expect(restoreGame(serializeGame(migrated))).toEqual(migrated);
       const invalid = JSON.parse(serializeGame(migrated));
       invalid.state.feedbackRevisionFrom = migrated.inputs.length + 1;
       expect(() => restoreGame(JSON.stringify(invalid))).toThrow('Invalid feedback revision');
       return;
     }
-    previous = act(previous, item?.fault === 'battery' ? 'replace-battery' : 'clean-contact');
-    previous = act(previous, 'verify');
-    previous = act(previous, 'return');
+    previous = oldAct(previous, item?.fault === 'battery' ? 'replace-battery' : 'clean-contact');
+    previous = oldAct(previous, 'verify');
+    previous = oldAct(previous, 'return');
   }
   throw Error('Expected seeded cap case');
 });

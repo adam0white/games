@@ -29,6 +29,8 @@ import {
   arrangeLearning,
   completeApprenticeJob,
   explainLesson,
+  pendingCorrectiveDemonstration,
+  prepareCorrectiveDemonstration,
   recordLesson,
   startApprenticeJob,
 } from './apprentice';
@@ -45,6 +47,7 @@ import { restoreGame as restoreEngine9 } from './engine9';
 import { restoreGame as restoreEngine10 } from './engine10';
 import { restoreGame as restoreEngine11 } from './engine11';
 import { restoreGame as restoreEngine12 } from './engine12';
+import { restoreGame as restoreEngine13 } from './engine13';
 import {
   askMumToHelp,
   beginSharedConversation,
@@ -87,14 +90,18 @@ import {
   inspectRepair,
   isMechanical,
   measureCaseFittings,
+  pathTorchActions,
+  performActiveBellCheck,
+  performPathTorchUseCheck,
   readLongCheck,
   repairDuration,
   restoreCaseUnchanged,
   testCatch,
+  testPathTorchCap,
   testRepair,
   verificationMinutes,
 } from './repairs';
-import { nextHolidayStart, playerAge } from './school-calendar';
+import { nextHolidayStart, nextWakingMorning, playerAge } from './school-calendar';
 import {
   applyServiceWeekAction,
   completeServiceWeekJob,
@@ -118,7 +125,7 @@ import {
   workshopActions,
 } from './workshop';
 
-const ENGINE = 'home-garage-13';
+const ENGINE = 'home-garage-14';
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 const object = (
   id: string,
@@ -769,7 +776,10 @@ function workshopContext(s: GameState, choices = false): WorkshopContext {
             const dad = s.people.dad;
             if (!dad) return false;
             const player = s.people.player;
-            const duration = CABINET_MINUTES[task];
+            const duration =
+              task === 'space' && s.workshop?.childhoodProject?.label === 'ready'
+                ? 5
+                : CABINET_MINUTES[task];
             if (
               !player ||
               Array.from({ length: duration }, (_, i) => s.now + i + 1).some(
@@ -872,6 +882,14 @@ function neighbourhoodContext(s: GameState): NeighbourhoodContext {
 function clockTime(at: number) {
   return `${String(Math.floor((at % 1440) / 60)).padStart(2, '0')}:${String(at % 60).padStart(2, '0')}`;
 }
+function checkWaitMinutes(item: RepairObject | undefined, now: number): number {
+  return item?.checkStarted === undefined
+    ? 10
+    : Math.min(
+        item.id === 'family' ? 10 : verificationMinutes(item),
+        Math.max(1, verificationMinutes(item) - (now - item.checkStarted)),
+      );
+}
 function knownAppointments(s: GameState) {
   const appointments = Object.entries(s.world?.presence ?? {})
     .filter(([, p]) => p.awayUntil > s.now)
@@ -905,7 +923,16 @@ function knownAppointments(s: GameState) {
       detail:
         s.samPlans.availabilityReason ?? 'Sam asked you to try again after his current plans.',
     });
-  if (s.samPlans?.routineShiftKnown && s.now % 1440 >= 9 * 60 && s.now % 1440 < 13 * 60)
+  if (
+    (s.samPlans?.routineShiftKnown ||
+      s.unlocked.includes('sam-afternoon-note') ||
+      s.unlocked.some((flag) => {
+        const request = /^known-request:(\d+)$/.exec(flag);
+        return request && catalogueRequest(Number(request[1]))?.ownerId === 'sam';
+      })) &&
+    s.now % 1440 >= 9 * 60 &&
+    s.now % 1440 < 13 * 60
+  )
     appointments.push({
       personId: 'sam',
       name: 'Sam',
@@ -933,16 +960,24 @@ function knownAppointments(s: GameState) {
       at: cabinet.at,
       detail: `Agreed cabinet ${cabinet.task} · ${Math.floor(cabinet.at / 1440) === Math.floor(s.now / 1440) ? 'today' : 'tomorrow'} at 15:45; ask together when the time comes.`,
     });
-  const next = catalogueRequest(s.requests);
-  if (
-    next &&
-    s.unlocked.includes(`known-request:${s.requests}`) &&
-    scheduledAway(s, next.ownerId) &&
-    (s.world?.presence[next.ownerId]?.awayUntil ?? 0) <= s.now
-  ) {
+  // A received note remains knowledge after its particular repair is over.
+  for (const flag of s.unlocked) {
+    const match = /^known-request:(\d+)$/.exec(flag);
+    const next = match ? catalogueRequest(Number(match[1])) : undefined;
+    if (
+      !next ||
+      !scheduledAway(s, next.ownerId) ||
+      (s.world?.presence[next.ownerId]?.awayUntil ?? 0) > s.now
+    )
+      continue;
     const endHour = next.ownerId === 'sam' ? 13 : next.ownerId === 'nora' ? 10 : 0;
     const at = Math.floor(s.now / 1440) * 1440 + endHour * 60;
-    if (at > s.now)
+    if (
+      at > s.now &&
+      !appointments.some(
+        (appointment) => appointment.personId === next.ownerId && appointment.at === at,
+      )
+    )
       appointments.push({
         personId: next.ownerId,
         name: next.owner,
@@ -1002,7 +1037,10 @@ function available(s: GameState): ActionView[] {
     s.campaign &&
     !s.campaign.graduated &&
     s.repairs - s.campaign.lastSchoolRepairs >= 2 &&
-    !s.objects.some((item) => item.awaitingCollection) &&
+    !s.objects.some(
+      (item) =>
+        item.awaitingCollection || (item.id.startsWith('friend-') && item.location !== 'returned'),
+    ) &&
     !s.objects.some(
       (item) => item.checkStarted !== undefined && !item.verified && item.location !== 'returned',
     )
@@ -1011,6 +1049,23 @@ function available(s: GameState): ActionView[] {
       'back-to-school',
       'Close this summer and return to school',
       'Leave the rest of this holiday and the ordinary school months unplayed. Next summer begins on a fresh morning; your labelled work and notes remain.',
+    );
+  if (
+    s.chapter === 'garage' &&
+    s.campaign &&
+    !s.campaign.graduated &&
+    !a.some((action) => action.id === 'back-to-school') &&
+    !s.objects.some(
+      (item) =>
+        item.awaitingCollection ||
+        (item.owner !== 'You' && item.location !== 'returned' && item.id.startsWith('friend-')) ||
+        (item.checkStarted !== undefined && !item.verified && item.location !== 'returned'),
+    )
+  )
+    add(
+      'leave-school-holiday',
+      'Put optional work aside and return to school',
+      'End this played holiday without doing every repair. Your unfinished personal work, parts and notes stay; no repairs or lessons happen offscreen.',
     );
   if (s.chapter === 'garage')
     add(
@@ -1025,6 +1080,12 @@ function available(s: GameState): ActionView[] {
     return a;
   }
   const o = focused(s);
+  if (s.chapter === 'garage' && !s.objects.some((item) => item.id === 'paper-street'))
+    add(
+      'find-paper-street',
+      'Bring your saved paper-street box to the back bench',
+      'Your own childhood shopfronts and windup base, kept in the small room.',
+    );
   if (
     s.objects.some(
       (item) =>
@@ -1178,7 +1239,8 @@ function available(s: GameState): ActionView[] {
         );
     }
     if (o.inspected && !o.repaired && !isMechanical(o)) {
-      if (o.form === 'torch' && o.fault === 'cap')
+      for (const [id, label] of pathTorchActions(o)) add(id, label);
+      if (o.id !== 'friend-1' && o.form === 'torch' && o.fault === 'cap')
         add(
           'twist-cap',
           'Clean the cap thread and seat it squarely',
@@ -1191,7 +1253,7 @@ function available(s: GameState): ActionView[] {
           'A test: the battery goes back in the tray.',
         );
       if (o.fault !== 'holder' || !o.observations.some((x) => x.includes('holder'))) {
-        add('clean-contact', 'Clean and reseat the contact');
+        if (o.id !== 'friend-1') add('clean-contact', 'Clean and reseat the contact');
         if (s.parts.batteries > 0) add('replace-battery', 'Put in the spare battery');
       }
       if (o.inspected && o.observations.some((x) => x.includes('holder')) && s.parts.holders > 0)
@@ -1201,14 +1263,20 @@ function available(s: GameState): ActionView[] {
       if (o.checkStarted === undefined && checkingSpaceAvailable(s, o.id))
         add(
           'verify',
-          isMechanical(o)
-            ? o.form === 'timer'
-              ? 'Wind it gently and start one full timer cycle'
-              : 'Start a repeated-operation check'
-            : 'Start a longer light check',
-          isMechanical(o)
-            ? `Give it ${verificationMinutes(o)} minutes of gentle operation, then inspect the result.`
-            : 'Leave it shining for twenty minutes; other things can happen meanwhile.',
+          o.id === 'friend-1'
+            ? 'Prepare the torch’s grip and movement check'
+            : isMechanical(o)
+              ? o.form === 'timer'
+                ? 'Wind it gently and start one full timer cycle'
+                : 'Start a repeated-operation check'
+              : 'Start a longer light check',
+          o.id === 'friend-1'
+            ? 'Prepare a six-minute attended check: change grip, move it and switch it. Waiting alone cannot perform it.'
+            : isMechanical(o)
+              ? o.form === 'bell'
+                ? 'Set up an attended ringing and movement test. The bell cannot test itself while you are away.'
+                : `Give it ${verificationMinutes(o)} minutes of gentle operation, then inspect the result.`
+              : 'Leave it shining for twenty minutes; other things can happen meanwhile.',
         );
       else if (
         o.checkStarted === undefined &&
@@ -1242,12 +1310,20 @@ function available(s: GameState): ActionView[] {
           'Give the occupied checking place a little time',
           'Keep this object labelled while the other check runs.',
         );
-      else if (s.now - o.checkStarted >= verificationMinutes(o))
+      else if (
+        o.id === 'friend-1' ||
+        o.form === 'bell' ||
+        s.now - o.checkStarted >= verificationMinutes(o)
+      )
         add(
           'check-result',
-          isMechanical(o)
-            ? 'Repeat the motion and read the check'
-            : 'Move it, switch it, and read the check',
+          o.id === 'friend-1'
+            ? 'Check your grip, movement and switching for six minutes'
+            : isMechanical(o)
+              ? o.form === 'bell'
+                ? 'Ring and move the bell repeatedly for five minutes'
+                : 'Repeat the motion and read the check'
+              : 'Move it, switch it, and read the check',
         );
       else
         add(
@@ -1257,7 +1333,7 @@ function available(s: GameState): ActionView[] {
             : 'Stay with the light a while',
           isMechanical(o)
             ? 'Let the cycle finish; forcing it would change the test.'
-            : 'Ten quiet minutes, watching for a change.',
+            : `${checkWaitMinutes(o, s.now)} quiet ${checkWaitMinutes(o, s.now) === 1 ? 'minute' : 'minutes'}, watching for a change.`,
         );
       add(
         'early-return',
@@ -1283,7 +1359,10 @@ function available(s: GameState): ActionView[] {
     if (o.location === 'bench' && !o.verified) add('shelve', 'Put it aside carefully');
     if (o.location === 'shelf') add('resume', 'Bring it back to the bench');
   }
-  if (s.unlocked.includes('garage-hint') && !s.unlocked.includes('garage'))
+  if (
+    (s.unlocked.includes('garage-hint') || s.chapter === 'later') &&
+    !s.unlocked.includes('garage')
+  )
     add('talk-garage', 'Go and look at the garage bench');
   if (
     s.chapter === 'garage' &&
@@ -1301,8 +1380,40 @@ function available(s: GameState): ActionView[] {
     );
   if (s.unlocked.includes('garage') && !s.unlocked.includes('donor'))
     add('search-donor', 'Look through Dad’s old lamp box');
-  if (s.repairs >= 1 && s.unlocked.includes('garage') && !s.unlocked.includes('friends'))
+  if (
+    s.repairs >= 1 &&
+    s.unlocked.includes('garage') &&
+    !s.unlocked.includes('friends') &&
+    isHere(s, 'mum')
+  )
     add('talk-friends', 'Tell Mum about the garage bench');
+  if (
+    s.chapter === 'garage' &&
+    s.campaign?.graduated &&
+    (s.unlocked.includes('met-sam') || s.unlocked.includes('met:sam')) &&
+    !s.samPlans &&
+    !s.unlocked.includes('sam-afternoon-note')
+  )
+    add(
+      'read-sam-afternoon-note',
+      'Read Sam’s note about an afternoon together',
+      'Your friend has left a note about the counter and learning at the bench. No visit or work agreement has been made.',
+      'primary',
+    );
+  const householdNote = catalogueRequest(s.requests);
+  if (
+    s.chapter === 'garage' &&
+    s.unlocked.includes('friends') &&
+    householdNote &&
+    (s.campaign?.graduated || (s.campaign?.holiday ?? 4) >= Math.floor(s.requests / 2)) &&
+    !s.unlocked.includes(`known-request:${s.requests}`)
+  )
+    add(
+      'read-household-note',
+      'Read the note left for the bench',
+      'A household request and a usual time to call; reading it does not accept the job.',
+      'primary',
+    );
   if (
     s.unlocked.includes('friends') &&
     catalogueRequest(s.requests) &&
@@ -1313,8 +1424,8 @@ function available(s: GameState): ActionView[] {
   )
     add(
       'accept-request',
-      'See who needs a hand',
-      'Room for one on the bench and one waiting safely on the shelf.',
+      `Accept ${householdNote?.title ?? 'the household repair'} for a look`,
+      'Take responsibility for this item now. Reading the household note alone leaves the request open; other work can wait safely on the shelf.',
     );
   add(
     'rest',
@@ -1327,6 +1438,7 @@ function available(s: GameState): ActionView[] {
   );
   if (
     isHere(s, 'mum') &&
+    !(s.apprentice?.arranged && s.now < s.apprentice.visitUntil && isHere(s, 'sam')) &&
     o?.checkStarted !== undefined &&
     !o.verified &&
     !s.unlocked.includes(`help:${o.id}`)
@@ -1346,11 +1458,27 @@ function available(s: GameState): ActionView[] {
     if (choice.lines.every((line) => isHere(s, line.speaker.toLowerCase())))
       add(
         choice.id,
-        choice.label,
+        (() => {
+          const speaker = choice.lines.find((line) => line.speaker !== 'You')?.speaker;
+          return speaker && !choice.label.includes(speaker)
+            ? `${speaker}: ${choice.label}`
+            : choice.label;
+        })(),
         undefined,
         choice.id === 'observer-invite' && s.campaign?.graduated ? 'primary' : 'quiet',
       );
-  return a;
+  const correction = pendingCorrectiveDemonstration(s);
+  const actions = a.some((action) => action.id === 'show-corrective-step')
+    ? a.filter((action) => action.id !== 'reconsider-sam')
+    : a;
+  return correction
+    ? actions.map((action) =>
+        (action.id === 'clean-contact' && o?.id === correction.id && !correction.repaired) ||
+        (action.id === 'explain-step' && s.apprentice?.lastLesson?.objectId === correction.id)
+          ? { ...action, kind: 'primary' as const }
+          : action,
+      )
+    : actions;
 }
 export function transition(original: GameState, input: GameInput): GameState {
   if (
@@ -1423,7 +1551,40 @@ export function transition(original: GameState, input: GameInput): GameState {
     return s;
   }
   const id = input.id;
-  if (id === 'back-to-school' && s.campaign) {
+  if (id === 'read-sam-afternoon-note') {
+    s.unlocked.push('sam-afternoon-note');
+    say(
+      s,
+      'You',
+      'Sam’s note reads: “Now you have finished school too, perhaps we can find an afternoon at the bench. I take more hours at the parts counter, but I would like to understand the things I hand over. My usual morning ends at one. Ask me then; we still need to agree a time, and I have the dog and my other work.” Reading the note does not arrange a visit.',
+      'notice',
+    );
+    return s;
+  }
+  if (id === 'read-household-note') {
+    const next = catalogueRequest(s.requests);
+    if (next) {
+      s.unlocked.push(`known-request:${s.requests}`);
+      say(
+        s,
+        'You',
+        `The note is from ${next.owner}: “I have ${next.title.startsWith(`${next.owner}’s `) ? `my ${next.title.slice(next.owner.length + 3)}` : next.title} for a look, if you have room. ${next.ownerId === 'sam' ? 'I am usually back from the counter after one.' : next.ownerId === 'nora' ? 'Try me after ten; I keep the early morning quiet.' : 'Ask me when we are both at home.'}” Nothing has been accepted yet.`,
+        'notice',
+      );
+    }
+    return s;
+  }
+  if (id === 'talk-friends') {
+    // Receive the conversation before elapsed time can take Mum into another activity.
+    for (const line of storyBeat('talk-friends')) say(s, line.speaker, line.text, line.tone);
+    s.unlocked.push('friends');
+    const until = s.now + 4;
+    advanceBenchBeforePlayer(s, until);
+    s.now = until;
+    advancePeople(s);
+    return s;
+  }
+  if (['back-to-school', 'leave-school-holiday'].includes(id) && s.campaign) {
     if (['planned', 'missed'].includes(s.workshop?.cabinetAppointment?.status ?? '')) {
       cancelCabinetTime(s);
       say(
@@ -2166,6 +2327,7 @@ export function transition(original: GameState, input: GameInput): GameState {
   if (
     [
       'arrange-learning',
+      'show-corrective-step',
       'explain-step',
       'supervised-repair',
       'delegate-repair',
@@ -2253,7 +2415,9 @@ export function transition(original: GameState, input: GameInput): GameState {
       focusWorkbench(s, item);
       speak(
         owner,
-        'Here it is, and a spare cell if it actually needs one. Tell me what you find rather than changing it blindly.',
+        id === 'learning-light' && firstLesson
+          ? 'This is my spare table lamp, different from the torch you fixed. I brought it for the afternoon we agreed: you can show me how you separate a tired battery from a bad contact. Here is a spare cell if the test calls for it.'
+          : 'Here it is, and a spare cell if it actually needs one. Tell me what you find rather than changing it blindly.',
       );
       if (id !== 'learning-light')
         startApprenticeJob(
@@ -2283,6 +2447,7 @@ export function transition(original: GameState, input: GameInput): GameState {
         'Keep the same observation and try deciding again with me nearby. I am taking responsibility for this assisted practice; it will not count as an independent whole job.',
       );
     }
+    if (id === 'show-corrective-step') prepareCorrectiveDemonstration(s, speak);
     if (id === 'arrange-learning') arrangeLearning(s, speak);
     if (id === 'explain-step') explainLesson(s, speak, isHere(s, 'sam'));
     if ((id === 'supervised-repair' || id === 'delegate-repair') && o)
@@ -2444,24 +2609,25 @@ export function transition(original: GameState, input: GameInput): GameState {
   const p = s.people.player;
   if (!p) throw Error('Missing player');
   const duration =
-    id === 'wait-appointment'
-      ? Math.max(1, (knownAppointments(s)[0]?.at ?? s.now + 30) - s.now)
-      : id === 'next-day'
-        ? 1440 - (s.now % 1440) + 9 * 60
-        : ['rest', 'wait-person'].includes(id)
-          ? 30
-          : id === 'wait-check'
-            ? o?.checkStarted !== undefined
-              ? Math.min(
-                  o.id === 'family' ? 10 : verificationMinutes(o),
-                  Math.max(1, verificationMinutes(o) - (s.now - o.checkStarted)),
-                )
-              : 10
-            : ['ask-mum', 'ask-dad'].includes(id)
-              ? 8
-              : ['clean-contact', 'replace-battery', 'fit-holder'].includes(id)
-                ? 12
-                : repairDuration(id);
+    id === 'check-result' && o && (o.form === 'bell' || o.id === 'friend-1')
+      ? o.id === 'friend-1'
+        ? 6
+        : 5
+      : id === 'path-torch-test-cap'
+        ? 4
+        : id === 'wait-appointment'
+          ? Math.max(1, (knownAppointments(s)[0]?.at ?? s.now + 30) - s.now)
+          : id === 'next-day'
+            ? nextWakingMorning(s.now) - s.now
+            : ['rest', 'wait-person'].includes(id)
+              ? 30
+              : id === 'wait-check'
+                ? checkWaitMinutes(o, s.now)
+                : ['ask-mum', 'ask-dad'].includes(id)
+                  ? 8
+                  : ['clean-contact', 'replace-battery', 'fit-holder'].includes(id)
+                    ? 12
+                    : repairDuration(id);
   const aff: Affordance = {
     id,
     action: id === 'next-day' ? 'sleep' : id === 'rest' ? 'rest' : 'repair',
@@ -2584,6 +2750,13 @@ export function transition(original: GameState, input: GameInput): GameState {
         narrate(s, 'You', text);
       }
       break;
+    case 'path-torch-test-cap':
+      if (o) {
+        const text = testPathTorchCap(o);
+        o.observations.push(text);
+        narrate(s, 'You', text);
+      }
+      break;
     case 'clear-obstruction':
     case 'align-striker':
     case 'lubricate-hinge':
@@ -2602,21 +2775,22 @@ export function transition(original: GameState, input: GameInput): GameState {
         );
         const matches = result.succeeded;
         failed = !matches;
-        const text = isMechanical(o)
-          ? result.text
-          : matches
-            ? 'The light comes on steadily. It deserves a longer check before calling it finished.'
-            : o.fault === 'contact'
-              ? 'It still flickers when moved. Changing the battery did not restore the contact.'
-              : s.inputs.length <= (s.feedbackRevisionFrom ?? 0)
-                ? 'That did not help. Testing the battery will separate a weak cell from a contact problem.'
-                : o.fault === 'cap'
-                  ? id === 'replace-battery'
-                    ? 'The spare battery does not straighten this torch’s threaded cap. The cap needs seating squarely so its thread can carry the return contact.'
-                    : 'Cleaning the flat contact did not straighten this torch’s threaded cap. The cap needs seating squarely so its thread can carry the return contact.'
-                  : o.tested
-                    ? 'Cleaning the contact did not restore the old battery. The known-good battery already made it shine steadily; the original cell needs replacing.'
-                    : 'That did not help. Testing the battery will separate a weak cell from a contact problem.';
+        const text =
+          isMechanical(o) || o.id === 'friend-1'
+            ? result.text
+            : matches
+              ? 'The light comes on steadily. It deserves a longer check before calling it finished.'
+              : o.fault === 'contact'
+                ? 'It still flickers when moved. Changing the battery did not restore the contact.'
+                : s.inputs.length <= (s.feedbackRevisionFrom ?? 0)
+                  ? 'That did not help. Testing the battery will separate a weak cell from a contact problem.'
+                  : o.fault === 'cap'
+                    ? id === 'replace-battery'
+                      ? 'The spare battery does not straighten this torch’s threaded cap. The cap needs seating squarely so its thread can carry the return contact.'
+                      : 'Cleaning the flat contact did not straighten this torch’s threaded cap. The cap needs seating squarely so its thread can carry the return contact.'
+                    : o.tested
+                      ? 'Cleaning the contact did not restore the old battery. The known-good battery already made it shine steadily; the original cell needs replacing.'
+                      : 'That did not help. Testing the battery will separate a weak cell from a contact problem.';
         o.observations.push(text);
         narrate(s, 'You', text, matches ? 'notice' : 'mistake');
       }
@@ -2630,9 +2804,13 @@ export function transition(original: GameState, input: GameInput): GameState {
         narrate(
           s,
           'You',
-          o && isMechanical(o)
-            ? 'The mechanism is running gently. One successful motion does not yet establish repeatable operation.'
-            : 'The light is left on. A brief glow is not yet an evening of reliable light.',
+          o.id === 'friend-1'
+            ? 'The torch is ready for six minutes of changing grip, movement and switching with you present. Leaving it shining will not perform that test.'
+            : isMechanical(o)
+              ? o.form === 'bell'
+                ? 'The bell is ready for a five-minute ringing and movement check with you present. Leaving it on the bench does not perform that test.'
+                : 'The mechanism is running gently. One successful motion does not yet establish repeatable operation.'
+              : 'The light is left on. A brief glow is not yet an evening of reliable light.',
         );
       }
       break;
@@ -2647,7 +2825,12 @@ export function transition(original: GameState, input: GameInput): GameState {
       break;
     case 'check-result':
       if (o) {
-        const result = readLongCheck(o, s.now);
+        const result =
+          o.id === 'friend-1'
+            ? performPathTorchUseCheck(o, s.now - duration, s.now)
+            : o.form === 'bell'
+              ? performActiveBellCheck(o, s.now - duration, s.now)
+              : readLongCheck(o, s.now);
         o.observations.push(result);
         narrate(s, 'You', result);
       }
@@ -3003,6 +3186,7 @@ function dayPlan(s: GameState, actions: ActionView[]): GameView['dayPlan'] {
       actionIds: ['wait-conversation-activity'],
     });
   const a = s.apprentice;
+  const correction = pendingCorrectiveDemonstration(s);
   if (a?.arranged && (s.now < a.visitUntil || a.jobId || has('arrange-learning'))) {
     const item = s.objects.find((o) => o.id === a.jobId);
     const active = s.now < a.visitUntil;
@@ -3012,9 +3196,18 @@ function dayPlan(s: GameState, actions: ActionView[]): GameView['dayPlan'] {
         : undefined;
     entries.push({
       id: 'sam-work',
-      label: item ? `Sam’s labelled work: ${item.title}` : 'The bench stretch with Sam',
+      label: correction
+        ? `Your demonstration for Sam: ${correction.title}`
+        : item
+          ? `Sam’s labelled work: ${item.title}`
+          : 'The bench stretch with Sam',
       detail: [
-        a.needsHelp ??
+        (correction
+          ? correction.repaired
+            ? 'The physical repair is done. Explain the observation and result Sam actually watched; offering to show him was only the start.'
+            : 'You offered to show the missing contact step. Perform the repair yourself with Sam watching, then explain its result.'
+          : undefined) ??
+          a.needsHelp ??
           a.pauseReason ??
           (item
             ? 'You can leave this with him and work on something else.'
@@ -3031,7 +3224,14 @@ function dayPlan(s: GameState, actions: ActionView[]): GameView['dayPlan'] {
         .filter(Boolean)
         .join(' '),
       status: active ? 'underway' : 'late',
-      actionIds: ['arrange-learning', 'reconsider-sam', 'take-over-repair'].filter(has),
+      actionIds: [
+        ...(correction?.id === s.focusId && !correction.repaired ? ['clean-contact'] : []),
+        ...(correction && a.lastLesson?.objectId === correction.id ? ['explain-step'] : []),
+        'show-corrective-step',
+        'arrange-learning',
+        ...(has('show-corrective-step') ? [] : ['reconsider-sam']),
+        'take-over-repair',
+      ].filter(has),
     });
   }
   for (const item of s.objects.filter((o) => o.awaitingCollection))
@@ -3064,7 +3264,47 @@ export function getView(s: GameState): GameView {
   const o = focused(s);
   const actions = available(s);
   const samJob = s.objects.find((item) => item.id === s.apprentice?.jobId);
+  const firstFee = s.workshop?.ledger.find((entry) => entry.kind === 'repair-fee');
+  const lastInput = s.inputs.at(-1);
+  const graduatedNow =
+    s.campaign?.graduated &&
+    lastInput?.input.type === 'action' &&
+    ['back-to-school', 'leave-school-holiday'].includes(lastInput.input.id);
+  const firstPaymentNow = firstFee && lastInput && firstFee.at >= lastInput.at;
+  const firstIndependentJob = s.objects.find(
+    (item) => item.id === s.apprentice?.completedJobIds[0],
+  );
+  const independentHandoffNow =
+    firstIndependentJob?.completedBy === 'sam' &&
+    firstIndependentJob.independent &&
+    firstIndependentJob.location === 'returned' &&
+    !firstIndependentJob.awaitingCollection &&
+    firstIndependentJob.collectedAt !== undefined &&
+    lastInput &&
+    firstIndependentJob.collectedAt > lastInput.at &&
+    firstIndependentJob.collectedAt <= s.now;
   return {
+    milestone: independentHandoffNow
+      ? {
+          sourcekey: `independent-handoff:${firstIndependentJob.id}`,
+          title: 'Sam finished the whole repair',
+          detail: `${firstIndependentJob.owner} has collected ${firstIndependentJob.title.toLowerCase()}, checked by Sam. You can take your own work to the other end of the bench; another job is still a choice to discuss together.`,
+        }
+      : graduatedNow
+        ? {
+            sourcekey: `graduation:${s.campaign?.holidayStartedAt ?? s.now}`,
+            title: 'School is finished',
+            detail:
+              'Your exercise books are home for the last time. The family bench, unfinished things and people who taught you are still here. Dad can talk with you about a place for regular work; nothing has been agreed for you.',
+          }
+        : firstPaymentNow
+          ? {
+              sourcekey: `first-payment:${firstFee.id}`,
+              title: `Your first repair fee · £${(firstFee.amount / 100).toFixed(2)}`,
+              detail:
+                'The checked repair has been collected and its agreed fee paid. The cashbook records the real payment and any materials separately. This money is yours to keep or put back into the bench.',
+            }
+          : undefined,
     dayPlan: dayPlan(s, actions),
     knownAppointments: knownAppointments(s),
     collectionPlans: s.objects
@@ -3076,9 +3316,12 @@ export function getView(s: GameState): GameView {
         detail:
           (() => {
             const visit = knownAppointments(s).find((a) => a.personId === item.owner.toLowerCase());
-            return visit
-              ? `${item.title} is ready for ${item.owner}. Their next arranged visit is ${visit.detail.split(' · ').at(-1)}; that visit may concern other work.`
-              : undefined;
+            if (!visit) return undefined;
+            const dayOffset = Math.floor(visit.at / 1440) - Math.floor(s.now / 1440);
+            const when = `${dayOffset === 0 ? 'today' : dayOffset === 1 ? 'tomorrow' : `in ${dayOffset} days`} at ${clockTime(visit.at)}`;
+            return /routine|usually|usual|chance to ask/.test(visit.detail)
+              ? `${item.title} is ready for ${item.owner}. Their usual availability is ${when}; this is not an arranged collection.`
+              : `${item.title} is ready for ${item.owner}. Their next known return is ${when}; it may concern other work.`;
           })() ?? 'Kept safely labelled for collection. A little more time may help.',
       })),
     apprenticeship: s.apprentice
@@ -3105,9 +3348,34 @@ export function getView(s: GameState): GameView {
           label: s.campaign.graduated
             ? `School finished · age ${playerAge(s)}`
             : `Summer at home · ${playerAge(s)}`,
-          detail: s.campaign.graduated
-            ? 'A small place in the garage can become your own work.'
-            : 'There is time before the next school year.',
+          detail:
+            s.chapter !== 'garage'
+              ? s.chapter === 'family'
+                ? 'The school holiday begins at home. Mum is nearby with her reading lamp.'
+                : s.chapter === 'later'
+                  ? 'Your own lamp can wait safely. You can look at the garage bench whenever you are ready.'
+                  : 'Start with the family lamp. Its observations and unfinished work will stay if you put it aside.'
+              : s.campaign.graduated
+                ? s.objects.some(
+                    (item) =>
+                      item.owner === 'Nora' && item.verified && item.location === 'returned',
+                  ) && s.workshop?.referral !== 'permitted'
+                  ? 'Nora knows your checked work; you can ask her about a referral when she is available. You can also keep the bench for your own projects or arrange learning with Sam.'
+                  : 'Keep your own projects at the bench, or ask Sam about an afternoon together when he is available. Regular customer work still needs a separate agreement.'
+                : s.objects.some((item) => item.awaitingCollection)
+                  ? 'Arrange the waiting collection before closing the holiday. Optional projects can stay unfinished.'
+                  : s.objects.some(
+                        (item) => item.id.startsWith('friend-') && item.location !== 'returned',
+                      )
+                    ? 'Finish or honestly return the neighbour’s accepted object before closing this holiday.'
+                    : s.objects.some(
+                          (item) =>
+                            item.checkStarted !== undefined &&
+                            !item.verified &&
+                            item.location !== 'returned',
+                        )
+                      ? 'Read or safely end the current check before closing the holiday. No repair quota is required.'
+                      : 'You may close this holiday when you are ready. Optional repairs and personal projects can wait; school months are left unplayed.',
         }
       : undefined,
     timeLabel: gameTimeLabel(s),
@@ -3153,7 +3421,7 @@ export function getView(s: GameState): GameView {
               ? 'Watching beside the bench'
               : s.apprentice?.arranged && s.now < s.apprentice.visitUntil && id === 'sam'
                 ? 'At the bench for the agreed afternoon'
-                : 'You can ask for time together',
+                : 'At home',
       })),
     title:
       s.chapter === 'family'
@@ -3304,8 +3572,13 @@ export function restoreGame(text: string): GameState {
       'home-garage-10',
       'home-garage-11',
       'home-garage-12',
+      'home-garage-13',
     ].includes(data?.engine)
   ) {
+    if (data.engine === 'home-garage-13') {
+      const validated = restoreEngine13(text);
+      return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };
+    }
     if (data.engine === 'home-garage-12') {
       const validated = restoreEngine12(text);
       return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };

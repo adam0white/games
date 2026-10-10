@@ -99,8 +99,8 @@ export const REPAIR_CATALOGUE: readonly CatalogueItem[] = [
     story:
       'A pocket torch with red parcel string for a strap. Sam takes it along the dog-walking path.',
     inspectText:
-      'The cap sits crookedly on its thread. Pressing it square briefly brings the light back; the flat lamp-contact method will not seat it.',
-    testText: 'A known-good battery still loses its return contact at the crooked cap.',
+      'The torch flickers as you turn it in your hands. The flat contact and threaded cap are accessible; neither has been tested separately.',
+    testText: 'The known-good battery does not stop the flicker as you move the torch.',
     repairText:
       'You clear the cap thread and seat it squarely. The torch shines without pressure on the end.',
     requestLines: [

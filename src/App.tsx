@@ -12,6 +12,7 @@ import {
 import { getServiceWeekView } from './game/service-week';
 import type { ActionView, ConversationLine, GameInput, GameState, ObjectView } from './game/types';
 import { getWorkshopView, type LedgerEntry, type WorkshopState } from './game/workshop';
+import { splitNavigation, uniqueChoiceGroups } from './ui/actionGroups';
 import { Cabinet } from './ui/Cabinet';
 import { createChoiceGate } from './ui/choiceGate';
 import { DayPlan } from './ui/DayPlan';
@@ -132,10 +133,18 @@ export default function App() {
       : workshop?.arrangement;
   const dayPlans = view.scene === 'garage' ? (view.dayPlan?.entries ?? []) : [];
   const planActionIds = new Set(dayPlans.flatMap((entry) => entry.actionIds ?? []));
-  const choicesOutsidePlans = view.actions.filter((action) => !planActionIds.has(action.id));
-  const timeAwayIds = new Set(['next-day', 'back-to-school', 'wait-person']);
+  const { navigation, choices: choicesOutsidePlans } = splitNavigation(
+    view.actions.filter((action) => !planActionIds.has(action.id)),
+  );
+  const timeAwayIds = new Set([
+    'next-day',
+    'back-to-school',
+    'leave-school-holiday',
+    'wait-person',
+  ]);
   const isProjectAction = (action: ActionView) =>
-    /^workshop-(cabinet|drawings|display-drawing|keep-drawing)/.test(action.id);
+    /^workshop-(cabinet|drawings|display-drawing|keep-drawing)/.test(action.id) ||
+    action.id.startsWith('childhood-');
   const immediateWeekIds = new Set([
     'service-begin',
     'service-regular',
@@ -202,6 +211,7 @@ export default function App() {
     action.kind !== 'quiet' &&
     !isEarlierDemonstration(action) &&
     !isOptionalAlternative(action) &&
+    !isProjectAction(action) &&
     !action.id.startsWith('workshop-') &&
     (!action.id.startsWith('service-') || isImmediateWeekAction(action)) &&
     !timeAwayIds.has(action.id);
@@ -215,7 +225,7 @@ export default function App() {
       return 'window';
     return action.id.endsWith('-light') ? 'light' : 'case';
   };
-  const actionGroups = [
+  const actionGroups = uniqueChoiceGroups([
     {
       id: 'here',
       label: '',
@@ -270,7 +280,7 @@ export default function App() {
     },
     {
       id: 'project',
-      label: 'The family project',
+      label: 'Personal and family projects',
       actions: choicesOutsidePlans.filter(isProjectAction),
     },
     {
@@ -292,7 +302,7 @@ export default function App() {
       label: 'Take some time',
       actions: choicesOutsidePlans.filter((action) => timeAwayIds.has(action.id)),
     },
-  ].filter(
+  ]).filter(
     (group) => group.actions.length > 0 || (group.id === 'week' && serviceWeek && !weekConcluded),
   );
   const projectChoices = actionGroups.find((group) => group.id === 'project')?.actions ?? [];
@@ -552,11 +562,31 @@ export default function App() {
         className={`present-story ${view.focus ? 'focused-story' : ''}`}
         ref={actionsRef}
       >
+        {workshop?.notebook && (
+          <p className="workshop-balance">
+            <span>Workshop cash</span> <strong>{workshop.notebook.cash}</strong>
+          </p>
+        )}
         {view.lifeChapter && (
           <div className="life-chapter">
             <span>{view.lifeChapter.label}</span>
             {view.lifeChapter.detail && <p>{view.lifeChapter.detail}</p>}
           </div>
+        )}
+        {view.milestone && (
+          <section
+            className={`story-milestone ${view.milestone.sourcekey.startsWith('graduation:') ? 'graduation-milestone' : 'payment-milestone'}`}
+            key={view.milestone.sourcekey}
+            aria-label="Story milestone"
+          >
+            <span className="milestone-mark" aria-hidden="true">
+              ✦
+            </span>
+            <div>
+              <h2>{view.milestone.title}</h2>
+              <p>{view.milestone.detail}</p>
+            </div>
+          </section>
         )}
         {!view.focus && (
           <section className="story-heading">
@@ -659,10 +689,20 @@ export default function App() {
                 )}
               </div>
             </section>
-            <div className="choice-buttons project-choices">{projectChoices.map(renderAction)}</div>
+            <div className="choice-buttons project-choices">
+              {projectChoices
+                .filter((action) => !action.id.startsWith('childhood-'))
+                .map(renderAction)}
+            </div>
           </details>
         )}
+        {navigation.length > 0 && (
+          <nav className="scene-navigation choice-buttons" aria-label="Return to the bench">
+            {navigation.map(renderAction)}
+          </nav>
+        )}
         {view.apprenticeship &&
+          !dayPlans.some((entry) => entry.id === 'sam-work') &&
           (game.apprentice?.jobId ? (
             <section
               className="apprentice-presence"
@@ -691,7 +731,15 @@ export default function App() {
             aria-label="What to do next"
           >
             {actionGroups
-              .filter((group) => group.id !== 'project' || !workshop?.cabinet?.open)
+              .map((group) =>
+                group.id === 'project' && workshop?.cabinet?.open
+                  ? {
+                      ...group,
+                      actions: group.actions.filter((action) => action.id.startsWith('childhood-')),
+                    }
+                  : group,
+              )
+              .filter((group) => group.actions.length > 0 || group.id === 'week')
               .map((group) =>
                 [
                   'elsewhere',
@@ -703,7 +751,14 @@ export default function App() {
                   'workshop',
                   'week',
                 ].includes(group.id) ? (
-                  <details className="choice-group choice-more" key={group.id}>
+                  <details
+                    className="choice-group choice-more"
+                    key={group.id}
+                    open={
+                      group.id === 'project' &&
+                      group.actions.some((action) => action.id.startsWith('childhood-'))
+                    }
+                  >
                     <summary>
                       {group.id === 'week'
                         ? weekConcluded
@@ -793,7 +848,6 @@ export default function App() {
                     </tbody>
                   </table>
                 </section>
-                <p>{workshop.notebook.cash} kept for the workshop.</p>
               </details>
             )}
             {workshopArrangement && <p className="workshop-arrangement">{workshopArrangement}</p>}

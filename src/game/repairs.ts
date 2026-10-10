@@ -43,6 +43,11 @@ export function cueFor(item: RepairObject, now: number): RepairCue {
 }
 export function inspectRepair(item: RepairObject): string {
   item.inspected = true;
+  if (item.id === 'friend-1' && item.form === 'torch') {
+    item.evidence ??= [];
+    item.evidence.push('needs-test');
+    return 'The torch flickers as you turn it in your hands. The battery sits inside a removable cap; the flat contact and threaded cap are both accessible. Nothing is broken through.';
+  }
   if (item.fault === 'worn-catch')
     return (
       item.inspectText ??
@@ -87,6 +92,14 @@ export function inspectRepair(item: RepairObject): string {
 }
 export function testRepair(item: RepairObject): string {
   item.tested = true;
+  if (item.id === 'friend-1' && item.form === 'torch') {
+    const steady = item.fault === 'battery';
+    item.evidence ??= [];
+    item.evidence.push(steady ? 'battery-steady' : 'still-flickers');
+    return steady
+      ? 'With the known-good battery, the beam stays steady as you move the torch. You return that test cell to its tray.'
+      : 'With the known-good battery, the beam still flickers as you move the torch. You return that test cell to its tray.';
+  }
   const evidence: RepairCue =
     item.fault === 'cap'
       ? 'crooked-cap'
@@ -169,6 +182,13 @@ export function applyRepair(
     item.evidence ??= [];
     item.evidence.push(isMechanical(item) ? 'mechanism-working' : 'light-steady');
   }
+  if (item.id === 'friend-1' && item.form === 'torch')
+    return {
+      succeeded: item.repaired,
+      text: item.repaired
+        ? 'The beam stays on as you move the torch. Try changing your grip and switching it repeatedly before calling the handling fault fixed.'
+        : 'The beam still fails as you move the torch. That adjustment did not restore reliable handling; compare the battery or control the cap position before choosing another step.',
+    };
   if (!item.repaired && item.form === 'box' && ['hinge', 'catch-offset'].includes(item.fault)) {
     const text = testCatch(item);
     return { succeeded: false, text: `That step did not free the catch. ${text}` };
@@ -192,6 +212,10 @@ export function applyRepair(
   };
 }
 export function readLongCheck(item: RepairObject, now: number): string {
+  if (item.id === 'friend-1' && item.form === 'torch')
+    throw Error('Sam’s path torch needs an attended grip and movement check');
+  if (item.form === 'bell')
+    throw Error('The bell needs an attended repeated-ringing and movement check');
   if (item.fault === 'worn-catch')
     throw Error('This case needs its repeated-closure and carrying check');
   if (
@@ -206,6 +230,27 @@ export function readLongCheck(item: RepairObject, now: number): string {
   return isMechanical(item)
     ? 'After a longer run and repeated operation, the mechanism moves correctly without sticking.'
     : 'After a longer run, movement and switching, the light stays steady.';
+}
+
+/** Bells need five actual minutes of repeated ringing and movement. Idle
+ * elapsed time does not establish a physical repeated-use check. */
+export function performActiveBellCheck(
+  item: RepairObject,
+  startedAt: number,
+  endedAt: number,
+): string {
+  if (
+    item.form !== 'bell' ||
+    !item.repaired ||
+    !Number.isFinite(startedAt) ||
+    !Number.isFinite(endedAt) ||
+    endedAt - startedAt < 5
+  )
+    throw Error('The attended bell check is incomplete');
+  item.verified = true;
+  item.evidence ??= [];
+  item.evidence.push('checked');
+  return 'You ring the bell repeatedly for five minutes, moving it between tries. The striker keeps clearing the shell and the ring stays clear.';
 }
 
 export function isMechanical(item: Pick<RepairObject, 'form'>): boolean {
@@ -394,4 +439,59 @@ export function restoreCaseUnchanged(item: RepairObject, fittings: CaseFittings)
   delete item.checkStarted;
   item.repaired = false;
   item.verified = false;
+}
+
+/** The first path torch offers two physical hypotheses without identifying the
+ * stored cause. The player can test or attempt a reversible adjustment. This
+ * finite interaction does not add an apprentice method or repair other torches. */
+export function pathTorchActions(item: RepairObject): readonly [string, string][] {
+  if (item.id !== 'friend-1' || item.form !== 'torch' || !item.inspected || item.repaired)
+    return [];
+  return [
+    ['path-torch-test-cap', 'Hold the cap square and move the torch'],
+    ['twist-cap', 'Clean and reseat the threaded cap'],
+    ['clean-contact', 'Clean and reseat the flat contact'],
+  ];
+}
+
+/** Controls the cap position while moving the same torch, without consuming
+ * parts or silently repairing it. Evidence records the observed response. */
+export function testPathTorchCap(item: RepairObject): string {
+  if (item.id !== 'friend-1' || item.form !== 'torch' || !item.inspected)
+    throw Error('Inspect the path torch before comparing cap positions');
+  item.evidence ??= [];
+  const cue =
+    item.fault === 'cap'
+      ? 'crooked-cap'
+      : item.fault === 'battery'
+        ? 'needs-test'
+        : 'still-flickers';
+  item.evidence.push(cue);
+  return cue === 'crooked-cap'
+    ? 'The beam stays steady only while you hold the cap square. Moving the body does not interrupt it then; releasing the cap lets the flicker return.'
+    : cue === 'needs-test'
+      ? 'Holding the cap square makes no visible difference: the beam remains weak in both positions. Cap position has not changed the weak beam.'
+      : 'The beam still flickers when the body moves, even while the cap is held square. Letting go of the cap does not change that pattern.';
+}
+
+/** Six attended minutes reproduce this torch's ordinary handling: changing
+ * grip, moving and switching. This does not claim a battery endurance test. */
+export function performPathTorchUseCheck(
+  item: RepairObject,
+  startedAt: number,
+  endedAt: number,
+): string {
+  if (
+    item.id !== 'friend-1' ||
+    item.form !== 'torch' ||
+    !item.repaired ||
+    !Number.isFinite(startedAt) ||
+    !Number.isFinite(endedAt) ||
+    endedAt - startedAt < 6
+  )
+    throw Error('The attended path-torch check is incomplete');
+  item.verified = true;
+  item.evidence ??= [];
+  item.evidence.push('checked');
+  return 'For six minutes you change your grip, move the torch and switch it off and on. The beam stays steady without holding the cap in place. Its ordinary handling is checked; this was not a battery-endurance test.';
 }

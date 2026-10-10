@@ -129,9 +129,7 @@ it('nighttime and bodily unavailability suppress conversations without reading p
   if (!dad) throw Error('Missing Dad');
   dad.body.asleep = true;
   expect(getView(s).actions.some((a) => a.id === 'ask-dad-bench')).toBe(false);
-  expect(getView(s).whereabouts?.find((person) => person.id === 'nora')?.activity).toBe(
-    'You can ask for time together',
-  );
+  expect(getView(s).whereabouts?.find((person) => person.id === 'nora')?.activity).toBe('At home');
 });
 
 it('Dad’s voluntary help completes the final shared check, while refusal leaves the same solo route', () => {

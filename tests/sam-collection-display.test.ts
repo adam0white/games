@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import { expect, it } from 'vitest';
-import { getView, restoreGame, serializeGame, transition } from '../src/game/engine';
+import { getView, restoreGame, serializeGame } from '../src/game/engine';
 import * as eight from '../src/game/engine8';
 import * as twelve from '../src/game/engine12';
+import * as thirteen from '../src/game/engine13';
 import type { GameInput } from '../src/game/types';
 import fixture from './fixtures/candidate-thirteen-paid-continuation.json';
 
@@ -13,12 +14,12 @@ it('keeps the real native thirteen paid story exact while distinguishing checked
   old = twelve.restoreGame(eight.serializeGame(old));
   for (const input of fixture.inputs.slice(fixture.baseEightCount, fixture.baseTwelveCount))
     old = twelve.transition(old, input as GameInput);
-  let s = restoreGame(twelve.serializeGame(old));
+  let s = thirteen.restoreGame(twelve.serializeGame(old));
   let seenWorking = false,
     seenChecked = false,
     seenExpired = false;
   for (const input of fixture.inputs.slice(fixture.baseTwelveCount)) {
-    s = transition(s, input as GameInput);
+    s = thirteen.transition(s, input as GameInput);
     const item = s.objects.find((o) => o.id === s.apprentice?.jobId);
     if (item?.id !== 'workshop-evan') continue;
     const before = JSON.stringify(s);
@@ -44,9 +45,13 @@ it('keeps the real native thirteen paid story exact while distinguishing checked
     }
   }
   expect([seenWorking, seenChecked, seenExpired]).toEqual([true, true, true]);
-  const raw = serializeGame(s);
+  const raw = thirteen.serializeGame(s);
   expect(createHash('sha256').update(raw).digest('hex')).toBe(fixture.sha256);
-  expect(serializeGame(restoreGame(raw))).toBe(raw);
+  expect(thirteen.serializeGame(thirteen.restoreGame(raw))).toBe(raw);
+  const current = restoreGame(raw);
+  expect(current.journal).toEqual(s.journal);
+  expect(current.inputs).toEqual(s.inputs);
+  expect(serializeGame(restoreGame(serializeGame(current)))).toBe(serializeGame(current));
   expect(s.apprentice?.jobId).toBeUndefined();
   expect(getView(s).apprenticeship?.activity).not.toContain('Working');
 }, 20_000);

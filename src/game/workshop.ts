@@ -62,6 +62,11 @@ export interface WorkshopState {
   drawingFound: boolean;
   drawingChoice: 'undecided' | 'displayed' | 'kept';
   projectOpen: boolean;
+  childhoodProject?: {
+    measured: boolean;
+    frontage?: 'preserved' | 'rebuilt';
+    label?: 'ready' | 'in-use';
+  };
   jobs: WorkshopJob[];
   cash: number;
   ledger: LedgerEntry[];
@@ -215,6 +220,32 @@ export function workshopActions(s: WorkshopGame, ctx: WorkshopContext): ActionVi
   const actions: ActionView[] = [];
   const add = (id: string, label: string, detail?: string, intent: ActionView['intent'] = 'stay') =>
     actions.push({ id, label, detail, intent });
+  const model = s.objects.find((item) => item.id === 'paper-street');
+  if (model) {
+    if (!w.childhoodProject?.measured)
+      add(
+        'childhood-measure-model',
+        'Measure the paper street’s folded frontage',
+        'Compare the old folds with the base. The missing drive gear remains a separate repair.',
+      );
+    else if (!w.childhoodProject.frontage) {
+      add(
+        'childhood-preserve-frontage',
+        'Patch and keep your original shopfront',
+        'Use a strip from the backing sheet in your own box; retain the pencilled window.',
+      );
+      add(
+        'childhood-rebuild-frontage',
+        'Refold a wider shopfront from the backing sheet',
+        'Use the same saved paper; keep the old frontage flat in the box.',
+      );
+    } else if (!w.childhoodProject.label)
+      add(
+        'childhood-make-label',
+        'Make a reusable work card from the remaining backing',
+        'Record what belongs to the model and what is still missing. Later this card can label your first intake space.',
+      );
+  }
   if (w.cabinet === 'unnoticed')
     add(
       'workshop-cabinet-look',
@@ -224,8 +255,12 @@ export function workshopActions(s: WorkshopGame, ctx: WorkshopContext): ActionVi
   else if (!w.projectOpen)
     add(
       'workshop-cabinet-open',
-      'Return to the cabinet doors',
-      'A family project that can wait between repairs.',
+      w.cabinet === 'finished'
+        ? 'Visit the finished cabinet and saved drawings'
+        : 'Return to the cabinet doors',
+      w.cabinet === 'finished'
+        ? 'Both doors are in the kitchen. The saved drawing is the remaining choice.'
+        : 'A family project that can wait between repairs.',
     );
   if (w.projectOpen && ctx.dadHere) {
     if (['looked', 'measured', 'hung'].includes(w.cabinet))
@@ -308,7 +343,9 @@ export function workshopActions(s: WorkshopGame, ctx: WorkshopContext): ActionVi
     add(
       'workshop-intake-space',
       'Agree a labelled intake corner with Dad',
-      'If he agrees, spend eight minutes clearing and labelling the corner together. His vice and the rest of his work still belong here.',
+      w.childhoodProject?.label === 'ready'
+        ? 'Reuse your saved work card: five minutes clearing and labelling together, if Dad agrees. His own work stays here.'
+        : 'If he agrees, spend eight minutes clearing and labelling the corner together. His vice and the rest of his work still belong here.',
     );
   if (
     w.referral === 'permitted' &&
@@ -495,6 +532,40 @@ export function applyWorkshopAction(
   const w = state(s);
   const result = (lines: StoryLine[], minutes = 3): WorkshopResult => ({ lines, minutes });
   switch (id) {
+    case 'childhood-measure-model': {
+      const model = s.objects.find((item) => item.id === 'paper-street');
+      if (!model) return null;
+      w.childhoodProject = { measured: true };
+      model.observations.push(
+        'The original frontage fits the narrow base; the old backing sheet has room for a wider folded shopfront. Neither supplies the missing drive gear.',
+      );
+      return result([line('You', model.observations.at(-1) ?? '', 'notice')], 10);
+    }
+    case 'childhood-preserve-frontage':
+    case 'childhood-rebuild-frontage': {
+      const model = s.objects.find((item) => item.id === 'paper-street');
+      if (!model || !w.childhoodProject?.measured) return null;
+      w.childhoodProject.frontage = id === 'childhood-preserve-frontage' ? 'preserved' : 'rebuilt';
+      const text =
+        id === 'childhood-preserve-frontage'
+          ? 'You patch the original frontage with a strip of its own backing sheet. The pencilled low window stays visible above the base.'
+          : 'You fold a wider frontage from the saved backing sheet, then keep the original low-window drawing flat in the box. Both belong to your model.';
+      model.observations.push(text);
+      return result([line('You', text, 'notice')], 15);
+    }
+    case 'childhood-make-label':
+      if (!w.childhoodProject?.frontage) return null;
+      w.childhoodProject.label = 'ready';
+      return result(
+        [
+          line(
+            'You',
+            'The remaining stiff paper makes a reusable work card: your name, the saved frontage and the missing drive gear. You keep it beside the model; there is space on the back for a future bench label.',
+            'notice',
+          ),
+        ],
+        8,
+      );
     case 'workshop-cabinet-plan': {
       const task = w.cabinet === 'looked' ? 'measure' : w.cabinet === 'measured' ? 'hang' : 'align';
       if (!ctx.dadAgreesTime?.(task))
@@ -554,7 +625,9 @@ export function applyWorkshopAction(
         [
           line(
             'You',
-            'The cabinet doors and the hinge notebook are where you left them.',
+            w.cabinet === 'finished'
+              ? 'The finished doors are on the kitchen cabinet. They close cleanly; the saved drawings belong here if you want them.'
+              : 'The cabinet doors and the hinge notebook are where you left them.',
             'notice',
           ),
         ],
@@ -740,6 +813,8 @@ export function applyWorkshopAction(
           ],
           2,
         );
+      const reusedCard = w.childhoodProject?.label === 'ready';
+      if (reusedCard && w.childhoodProject) w.childhoodProject.label = 'in-use';
       w.intakeSpace = true;
       const hour = s.now % 1440;
       w.referralAt =
@@ -757,11 +832,11 @@ export function applyWorkshopAction(
             ),
             line(
               'You',
-              `You set aside two spaces with paper labels. Leila's introduction is arranged for ${w.referralAt - s.now < 1440 && Math.floor(w.referralAt / 1440) === Math.floor(s.now / 1440) ? 'half an hour from now' : 'tomorrow afternoon'}.`,
+              `${reusedCard ? 'You turn over the work card you made beside the paper street and use it for the intake space. The model notes stay on its other side.' : 'You set aside two spaces with paper labels.'} Leila's introduction is arranged for ${w.referralAt - s.now < 1440 && Math.floor(w.referralAt / 1440) === Math.floor(s.now / 1440) ? 'half an hour from now' : 'tomorrow afternoon'}.`,
               'notice',
             ),
           ],
-          8,
+          reusedCard ? 5 : 8,
         ),
         visits: [
           { personId: 'leila', at: w.referralAt, activity: 'Coming for the arranged introduction' },

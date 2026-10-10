@@ -22,3 +22,9 @@ export function playerAge(s: {
     ? 14 + (s.campaign?.holiday ?? 0)
     : Math.floor((s.now - bornAt) / MINUTES_PER_YEAR);
 }
+
+/** The first waking morning strictly after now, including this morning after midnight. */
+export function nextWakingMorning(now: number): number {
+  const morning = Math.floor(now / MINUTES_PER_DAY) * MINUTES_PER_DAY + HOLIDAY_MORNING;
+  return morning > now ? morning : morning + MINUTES_PER_DAY;
+}

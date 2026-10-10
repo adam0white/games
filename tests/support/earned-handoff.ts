@@ -13,7 +13,17 @@ function waitFor(s: GameState, id: string): GameState {
   return s;
 }
 function arrange(s: GameState): GameState {
-  return choose(waitFor(s, 'arrange-learning'), 'arrange-learning');
+  for (let n = 0; n < 80; n++) {
+    if (has(s, 'arrange-learning')) s = choose(s, 'arrange-learning');
+    if (
+      s.apprentice?.arranged &&
+      s.now < s.apprentice.visitUntil &&
+      s.people.sam?.activity?.action === 'learn'
+    )
+      return s;
+    s = choose(s, has(s, 'wait-person') ? 'wait-person' : 'next-day');
+  }
+  throw Error('No actual watching agreement reached');
 }
 
 export function earnedHandoff(eagerSchoolRoute = false, seed = 42): GameState {
@@ -31,6 +41,8 @@ export function earnedHandoff(eagerSchoolRoute = false, seed = 42): GameState {
       s = has(s, 'arrange-learning')
         ? choose(s, 'arrange-learning')
         : choose(s, has(s, 'wait-person') ? 'wait-person' : 'next-day');
+    if (s.people.sam?.activity?.action !== 'learn' || (s.apprentice?.visitUntil ?? 0) - s.now < 80)
+      s = arrange(s);
     s = choose(s, 'learning-light');
     for (const id of ['inspect', 'test-battery']) {
       s = choose(s, id);

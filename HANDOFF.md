@@ -1,10 +1,12 @@
 # Handoff
 
-Updated 2026-10-10 after the five-hour checkpoint. Adam renewed autonomous work while still away; the prior deadline no longer ends the task.
+Updated 2026-10-10 during Adam's renewed owner-playtest increment. The old overnight deadline does not end this work.
 
 ## What remains
 
-The renewed iteration is implemented, independently reviewed and public. Adam personally accepts feel through his long playthrough; economy, multiplayer and prospective HF planning remain unselected. No active implementation queue is implied by the future proposals.
+The owner-playtest corrections are in the `codex/full-workshop` worktree, game 0.5.0 / `home-garage-14`; final combined verification, immutable browser review and deployment remain. Adam personally accepts feel through playtesting; economy, multiplayer and prospective HF planning remain unselected.
+
+Current work preserves the actual owner 327-input engine-13 export at SHA256 `2902cd279f92edd27611e9aacaabf5af154649ad33d56e294419f47ea2cfcbd4` through a fully frozen native runtime before continuation. It adds optional holiday exits, received routine notices, retained childhood measuring/label work, cash and graduation presentation, target-labelled conversations, always-reachable cabinet navigation, actual attended mechanical checks and corrective teaching. Five visible-choice-only simulated player policies provide repeatable diagnostic traces. Fresh source-unread feedback led to an ambiguous path-torch diagnosis with controlled tests and an attended use check; independent review also found and corrected an overwritten corrective lesson. Reviews and traces are recorded locally in `docs/games/independent-reviewer-notes-2026-10-10.md` and `docs/player-archetypes.md`. Earlier development-preview exports are feedback artifacts; only actual published-engine packets are asserted as unchanged native histories.
 
 Current public game: https://repair.adamwhite.work, game 0.4.0 / `home-garage-13`, released HF 2.2.0, clean code commit `2159b8c0cd97324aca6a3861daa5a3748eb5994a`; Cloudflare version `a700f004-b364-4d32-a8d2-70db11316934`. Strict live manifest verification and isolated public browser checks passed. The primary local preview at http://127.0.0.1:5173/ carries the same code after stopping the old server, fast-forward and locked installation. The owner's browser/storage was not operated.
 

@@ -196,6 +196,7 @@ export interface ObjectView {
 }
 
 export interface GameView {
+  milestone?: { sourcekey: string; title: string; detail: string };
   knownAppointments?: { personId: string; name: string; at: number; detail: string }[];
   collectionPlans?: { objectId: string; title: string; owner: string; detail: string }[];
   lifeChapter?: { label: string; detail?: string };

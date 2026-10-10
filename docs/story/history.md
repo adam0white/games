@@ -38,3 +38,13 @@ Nora personally owns the sewing-sample case formerly used at that counter. Its w
 Original carrying repair, an owner-approved stationary display tray, and unchanged return are distinct outcomes. A checked tray does not acquire carrying-repair credit by fitting a catch later without a new agreement. Nora’s separately offered sample-shelf light is another object and another acceptance decision. It can use Sam’s acquired lamp methods; the unfamiliar case cannot inherit competence from those methods.
 
 The model’s motion, discovery and shared drawings follow actual history. Nora may see a printed shopfront without seeing the player’s private childhood pages. Neither recognising the window nor hearing a request chooses a business future for the player.
+
+## Childhood work carried forward
+
+The paper-street box can be brought to the garage during a school holiday. Its own backing sheet can patch the original low-window frontage or form a wider replacement; the old frontage remains in the box in the latter case. Measuring and folding do not supply the missing gear or grant a repaired model. The remaining stiff paper can become a reusable work card. If saved, that actual card later labels the first agreed intake corner, reducing the labelling work; it never creates money or a spare mechanical part.
+
+A note left for the bench identifies the next eligible household request and its writer's usual availability. Reading it grants received knowledge only: no job acceptance or guaranteed meeting. Optional holiday work can be left unplayed without a repair quota; accepted objects and active checks must first be settled safely. Graduation preserves unfinished projects and grants neither expertise nor an apprenticeship agreement.
+
+## Sam's path torch
+
+Sam's first torch remains the same finite object with the same retained red string and authored handling fault. Looking at it does not identify the faulty contact. Comparing a known-good battery and holding the cap square while moving the body are separate interventions; their observed responses remain in the notes. A matching adjustment must actually restore the beam. Its final check is six attended minutes of changing grip, movement and switching, matching Sam's ordinary use; it does not certify battery endurance. Later teaching lamps and unsupported torches keep their own methods and learning boundaries.

@@ -23,6 +23,8 @@ The canonical backstory unfolds through objects and people in a slightly dystopi
 
 Helping Sam through an unfamiliar step does not erase the chance to practice later. A stopped job can be reconsidered as supervised work, and one additional household request keeps a rescued training route open. Only a later genuinely unassisted fresh repair earns the handoff. Finished family work changes subsequent recollections rather than reappearing as unfinished.
 
+The owner-playtest increment adds an optional way to close a school holiday without completing every repair, remembered household availability, childhood measuring and label work that remains useful later, and distinct graduation/first-payment presentation. The path torch asks for a controlled diagnosis rather than naming its fault, and both it and the bell require actual attended handling checks. When Sam needs a missing contact method, offering to demonstrate is only preparation: the player performs and explains the actual witnessed repair. Five bounded player stereotypes report repeated-choice candidates alongside independent human-style playthroughs; see [their scope](docs/player-archetypes.md).
+
 Run locally with Node 24 or newer:
 
 ```sh

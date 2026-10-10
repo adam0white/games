@@ -51,7 +51,12 @@ function adultHistory() {
 function arrive(s: ReturnType<typeof createGame>) {
   s = act(s, 'next-day');
   for (let n = 0; n < 8; n++) s = act(s, 'wait-person');
-  return act(s, 'arrange-learning');
+  for (let n = 0; n < 80; n++) {
+    if (getView(s).actions.some((x) => x.id === 'arrange-learning')) s = act(s, 'arrange-learning');
+    if (s.apprentice?.arranged && s.now < s.apprentice.visitUntil) return s;
+    s = act(s, getView(s).actions.some((x) => x.id === 'wait-person') ? 'wait-person' : 'next-day');
+  }
+  throw Error('No genuine learning agreement reached');
 }
 function teachLight(s: ReturnType<typeof createGame>, repeat = false) {
   s = act(s, 'learning-light');

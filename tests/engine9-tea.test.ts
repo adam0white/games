@@ -19,11 +19,10 @@ it('preserves the actual native nine timer checkpoint hash before ten continuati
   expect(restoreGame(serializeGame(s))).toEqual(s);
 });
 it('tea refers to the real timer cycle rather than a light and never awards its check result', () => {
-  let s = createGame(fixture.seed);
-  for (const input of fixture.inputs) {
-    s = transition(s, input as GameInput);
-    if (input.type === 'action' && input.id === 'rest' && s.now > 529000) break;
-  }
+  let old = nine.createGame(fixture.seed);
+  for (const input of fixture.inputs.slice(0, 59)) old = nine.transition(old, input as GameInput);
+  let s = restoreGame(nine.serializeGame(old));
+  s = transition(s, { type: 'action', id: 'rest' });
   expect(s.journal?.at(-1)?.text).toContain('timer had time for its cycle');
   expect(s.journal?.at(-1)?.text).not.toContain('light');
   const timer = s.objects.find((o) => o.id === s.focusId);
@@ -32,8 +31,9 @@ it('tea refers to the real timer cycle rather than a light and never awards its 
   expect(restoreGame(serializeGame(s))).toEqual(s);
 });
 it('company alone does not invent a running test when the timer has not been started', () => {
-  let s = createGame(fixture.seed);
-  for (const input of fixture.inputs.slice(0, 57)) s = transition(s, input as GameInput);
+  let old = nine.createGame(fixture.seed);
+  for (const input of fixture.inputs.slice(0, 57)) old = nine.transition(old, input as GameInput);
+  let s = restoreGame(nine.serializeGame(old));
   expect(s.objects.find((o) => o.id === s.focusId)?.checkStarted).toBeUndefined();
   for (const id of [
     'workshop-cabinet-open',

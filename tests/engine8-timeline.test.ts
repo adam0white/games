@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import { expect, it } from 'vitest';
-import { createGame, restoreGame, serializeGame, transition } from '../src/game/engine';
+import { restoreGame, serializeGame, transition } from '../src/game/engine';
 import * as seven from '../src/game/engine7';
 import * as eight from '../src/game/engine8';
+import * as nine from '../src/game/engine9';
 import type { GameInput } from '../src/game/types';
 import drawings from './fixtures/published-eight-drawings-route.json';
 import fixture from './fixtures/published-eight-route.json';
@@ -28,9 +29,15 @@ it('preserves the actual 259-input published eight export before nine continuati
   expect(restoreGame(serializeGame(current))).toEqual(current);
 }, 20_000);
 it('reports completed quiet routines at their actual start and retrieves drawings without absent Dad speech', () => {
-  let s = createGame(drawings.seed);
+  // Reconstruct the historical route with its quiet-routine correction engine;
+  // only the drawing retrieval is a current continuation.
+  let historical = nine.createGame(drawings.seed);
+  const retrievalIndex = drawings.inputs.findIndex((input) => input.id === 'workshop-drawings');
+  for (const input of drawings.inputs.slice(0, retrievalIndex))
+    historical = nine.transition(historical, input as GameInput);
+  let s = restoreGame(nine.serializeGame(historical));
   let retrievalStart = 0;
-  for (const input of drawings.inputs) {
+  for (const input of drawings.inputs.slice(retrievalIndex)) {
     if (input.type === 'action' && input.id === 'workshop-drawings') retrievalStart = s.now;
     s = transition(s, input as GameInput);
   }

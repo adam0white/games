@@ -102,7 +102,7 @@ it('the next authored visitor’s known routine is heard on school re-entry and 
   expect(s.unlocked).toContain('known-request:1');
   const wait = getView(s).actions.find((a) => a.id === 'wait-appointment');
   expect(wait?.label).toContain('usual free time');
-  expect(wait?.detail).toContain('not an arranged visit');
+  expect(wait?.detail).toMatch(/not an (arranged visit|agreed bench session)/);
   const count = s.objects.length,
     repairs = s.repairs;
   s = choose(s, 'wait-appointment');

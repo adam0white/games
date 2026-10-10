@@ -155,6 +155,10 @@ export function schoolStoryBeat(
         'The last school term ends. You bring the exercise books home and put them beside your repair notebook. There is no next school to apply to; from here, people learn their work by doing it with someone.',
       ),
       warm(
+        'Mum',
+        'No school bag to pack tomorrow. I put your old drawing box by the table; you can choose what comes with you into the next part.',
+      ),
+      warm(
         'Dad',
         'You have finished school. Come and sit down when you are ready. We should talk about what you want to do with this space.',
       ),
@@ -171,7 +175,9 @@ export function schoolStoryBeat(
           ? 'By the next summer, the cabinet doors you finished with Dad still close cleanly. Your labelled work remains on its shelf.'
           : cabinetStage === 'hung'
             ? 'The cabinet doors you hung with Dad still wait for their final alignment. Your labelled work remains on its shelf.'
-            : 'When summer comes, the cabinet doors and hinge notebook are where you left them. Your labelled work remains on its shelf.',
+            : cabinetStage && cabinetStage !== 'unnoticed'
+              ? 'When summer comes, the cabinet doors and hinge notebook are where you left them. Your labelled work remains on its shelf.'
+              : 'When summer comes, Dad still has household work in the garage. Anything you labelled and put aside remains on its shelf.',
       ),
     ];
   if (holiday === 2)
@@ -441,7 +447,10 @@ export function optionalStoryChoices(context: StoryContext): StoryChoice[] {
           'Dad',
           'Then let us talk about keys, space and who answers the door. A corner of a shop might suit you better eventually. We can start with this end if we agree how it works.',
         ),
-        warm('Dad', 'We can try a labelled corner. I am not giving up my own bench.'),
+        warm(
+          'Dad',
+          'We can discuss a labelled corner. I am not giving up my own bench, and we have not agreed regular intake yet. Keep your own projects here while you decide. If Nora refers someone after a repair, we can separately agree the space and whether it is a favour or paid work.',
+        ),
       ]);
       add('sam-next-work', 'Ask Sam what comes after school', [
         warm(
