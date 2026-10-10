@@ -49,6 +49,7 @@ import { restoreGame as restoreEngine11 } from './engine11';
 import { restoreGame as restoreEngine12 } from './engine12';
 import { restoreGame as restoreEngine13 } from './engine13';
 import { restoreGame as restoreEngine14 } from './engine14';
+import { restoreGame as restoreEngine15 } from './engine15';
 import {
   askMumToHelp,
   beginSharedConversation,
@@ -127,7 +128,7 @@ import {
   workshopActions,
 } from './workshop';
 
-const ENGINE = 'home-garage-15';
+const ENGINE = 'home-garage-16';
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 const object = (
   id: string,
@@ -409,15 +410,15 @@ function advancePeople(s: GameState) {
         s.unlocked.includes('met:sam') ||
         s.unlocked.includes('story:observer-invite'))
     ) {
-      const occurred = gameTimeLabel({ ...s, now: latest.from });
+      const occurred = clockTime(latest.from);
       const ongoing = person.activity?.action === latest.action && person.activity.endsAt > s.now;
       const description = latest.action === 'pray' ? 'quiet prayer' : 'taking the dog out';
       sayRoutineOnce(
         s,
         'You',
         ongoing
-          ? `${id === 'mum' ? 'Mum' : 'Sam'} is ${latest.action === 'pray' ? 'praying quietly' : 'taking the dog out'}; this began at ${occurred}.`
-          : `${id === 'mum' ? 'Mum' : 'Sam'} ${latest.action === 'pray' ? 'prayed quietly' : 'took the dog out'} earlier, starting at ${occurred}.${notices.length > 1 ? ` Other ordinary ${description} moments passed during this stretch.` : ''}`,
+          ? `${id === 'mum' ? 'Mum' : 'Sam'} is ${latest.action === 'pray' ? 'praying quietly' : 'taking the dog out'}. ${id === 'mum' ? 'She' : 'He'} stepped away at ${occurred}.`
+          : `${id === 'mum' ? 'Mum' : 'Sam'} ${latest.action === 'pray' ? 'prayed quietly' : 'took the dog out'} earlier.${notices.length > 1 ? ` Other ordinary ${description} moments passed during this stretch.` : ''}`,
       );
     }
     if (presence && isHere(s, id)) presence.activity = activity;
@@ -993,6 +994,7 @@ function available(s: GameState): ActionView[] {
   const a: ActionView[] = [];
   if (
     s.samPlans?.invitation === 'pending' &&
+    !s.apprentice?.jobId &&
     !(s.apprentice?.arranged && s.now < s.apprentice.visitUntil) &&
     (s.samPlans.availableAfter ?? 0) <= s.now &&
     isHere(s, 'sam')
@@ -3077,9 +3079,25 @@ export function transition(original: GameState, input: GameInput): GameState {
         outcome = report;
       });
       const keptActivity = outcome.kind === 'kept-activity';
+      const attendedTorch = o?.id === 'friend-1' && o.form === 'torch';
+      const attendedBell = o?.form === 'bell';
+      const mechanicalCheck = Boolean(o && isMechanical(o));
+      const continuingCheck = attendedTorch
+        ? 'You still need to change grip, move it and switch it repeatedly; leaving it shining does not perform that check.'
+        : attendedBell
+          ? 'You still need to ring it repeatedly and move it between tries; leaving it on the bench does not perform that check.'
+          : mechanicalCheck
+            ? 'Keep it running gently; you still need to repeat its movement before calling it checked.'
+            : 'Leave it on; you can still watch it.';
       s.unlocked.push(`help:${o?.id}`);
       s.humanNote = helps
-        ? 'Mum chooses a little more time together, holding the light while you check.'
+        ? attendedTorch
+          ? 'Mum stays nearby while you change grip, move the torch and switch it repeatedly.'
+          : attendedBell
+            ? 'Mum stays nearby while you ring the bell repeatedly and move it between tries.'
+            : mechanicalCheck
+              ? 'Mum chooses a little more time together, holding the mechanism while you repeat its movement.'
+              : 'Mum chooses a little more time together, holding the light while you check.'
         : keptActivity
           ? `Mum continues ${outcome.activity?.toLowerCase() ?? 'her current activity'}. The check can continue without her.`
           : outcome.kind === 'own-choice'
@@ -3089,11 +3107,17 @@ export function transition(original: GameState, input: GameInput): GameState {
         s,
         'Mum',
         helps
-          ? 'All right. You move the switch; I’ll keep it steady.'
+          ? attendedTorch
+            ? 'All right. Change your grip and move and switch the torch; I’ll stay nearby.'
+            : attendedBell
+              ? 'All right. Ring it repeatedly and move it between tries; I’ll stay nearby.'
+              : mechanicalCheck
+                ? 'All right. You repeat its movement; I’ll keep it steady.'
+                : 'All right. You move the switch; I’ll keep it steady.'
           : keptActivity
-            ? `Let me finish what I am doing${outcome.activity ? ` — ${outcome.activity.toLowerCase()}` : ''}. Leave it on; you can still watch it.`
+            ? `Let me finish what I am doing${outcome.activity ? ` — ${outcome.activity.toLowerCase()}` : ''}. ${continuingCheck}`
             : outcome.kind === 'own-choice'
-              ? 'Let me finish my chapter. Leave it on — you can still watch it.'
+              ? `Let me finish my chapter. ${continuingCheck}`
               : 'I cannot help just now. You can still watch it.',
       );
       break;
@@ -3387,6 +3411,7 @@ function dayPlan(s: GameState, actions: ActionView[]): GameView['dayPlan'] {
   );
   if (
     s.samPlans?.invitation === 'pending' &&
+    !s.apprentice?.jobId &&
     !(s.apprentice?.arranged && s.now < s.apprentice.visitUntil) &&
     !entries.some((entry) => entry.status === 'invitation' && entry.id.startsWith('known-sam-'))
   )
@@ -3449,7 +3474,7 @@ function dayPlan(s: GameState, actions: ActionView[]): GameView['dayPlan'] {
       ]
         .filter(Boolean)
         .join(' '),
-      status: active ? 'underway' : 'late',
+      status: active ? 'underway' : has('arrange-learning') ? 'invitation' : 'late',
       actionIds: [
         ...(correction?.id === s.focusId && !correction.repaired ? ['clean-contact'] : []),
         ...(correction && a.lastLesson?.objectId === correction.id ? ['explain-step'] : []),
@@ -3492,6 +3517,8 @@ export function getView(s: GameState): GameView {
   const o = focused(s);
   const actions = available(s);
   const samJob = s.objects.find((item) => item.id === s.apprentice?.jobId);
+  const receivedPause = conversationWait(s);
+  const receivedSamPause = receivedPause?.participantId === 'sam' ? receivedPause : undefined;
   const firstFee = s.workshop?.ledger.find((entry) => entry.kind === 'repair-fee');
   const lastInput = s.inputs.at(-1);
   const graduatedNow =
@@ -3645,11 +3672,13 @@ export function getView(s: GameState): GameView {
               : /cabinet|hinges/.test(presence.activity)
                 ? 'Finished the cabinet step with you'
                 : 'At home; between activities'
-            : s.people[id]?.activity?.affordanceId === 'watch-repair'
-              ? 'Watching beside the bench'
-              : s.apprentice?.arranged && s.now < s.apprentice.visitUntil && id === 'sam'
-                ? 'At the bench for the agreed afternoon'
-                : 'At home',
+            : id === 'sam' && receivedSamPause
+              ? `Finishing ${receivedSamPause.label.toLowerCase()} until ${clockTime(receivedSamPause.until)}${s.apprentice?.arranged && s.now < s.apprentice.visitUntil ? ' within the agreed afternoon' : ''}`
+              : s.people[id]?.activity?.affordanceId === 'watch-repair'
+                ? 'Watching beside the bench'
+                : s.apprentice?.arranged && s.now < s.apprentice.visitUntil && id === 'sam'
+                  ? 'At the bench for the agreed afternoon'
+                  : 'At home',
       })),
     title:
       s.chapter === 'family'
@@ -3806,8 +3835,13 @@ export function restoreGame(text: string): GameState {
       'home-garage-12',
       'home-garage-13',
       'home-garage-14',
+      'home-garage-15',
     ].includes(data?.engine)
   ) {
+    if (data.engine === 'home-garage-15') {
+      const validated = restoreEngine15(text);
+      return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };
+    }
     if (data.engine === 'home-garage-14') {
       const validated = restoreEngine14(text);
       return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };

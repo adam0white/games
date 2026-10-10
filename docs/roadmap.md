@@ -116,3 +116,10 @@ The renewed source-unread opening player exposed unknown-person notices, opaque 
 **Review by 2026-11-09:** reconcile school-age Sam’s interest with an actionable small observation opportunity or clearly future invitation. Preserve the distinction between friendship, actual acquired methods and an adult paid role; do not promise a fifty-minute follow-up that remains unavailable for years. Use the renewed reader’s verbatim feedback and actual packet in `docs/games/opening-playtest-2026-10-10.md`.
 
 Current case actors acquire only genuinely heard/accepted purposes through released HF goals. A measured comparison differs from permission to consume a retained fitting or change the requested use. Fixed-default matched controls establish purpose causality and a stronger-duty refusal; ordinary time and native histories remain exact. Derived presentation corrections address completed work, expired plans and redundant alternatives; they do not add general prospective planning.
+
+
+## Next taste review after owner-save iteration
+
+Revisit by 2026-10-11, after Adam’s next playthrough: Nora’s early lamp repeats the opening contact sequence closely enough that an almost-unbriefed tester stopped before the different torch. The early personal model now offers measured parts exchange and retained work, but that does not establish that the whole holiday has enough variety. Prefer a distinct owner-use test or another small non-light shared object over adding more ordinary lamps. This is a dated proposal, not an activated economy or content-expansion goal.
+
+Revisit by 2026-10-12: historical runtimes and nested source packets keep actual exports exact, but add download size and save growth. The engine-16 checkpoint build’s main script is about 830 kB compressed; the actual returning engine-15 story is 2.14 MB. Investigate loading historical engines only on import and a bounded provenance representation while preserving the exact historical controls. Do not silently remove supported old histories.

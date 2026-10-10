@@ -85,3 +85,45 @@ The active torch/bell guide now describes attended physical testing rather than 
 Independent source review verified frozen engine-14 modules against the exact `52a9a56` checkpoint, selective received-appointment waiting, aligned actor clocks and actual forty-minute shared donor completion before a single gear transfers. A matched control changed only the action-to-received-purpose links; ordinary HF decisions changed without utility bonuses. A stronger promised delivery continued and retained the part.
 
 Review found the completed sorting purpose still active because the completion record named generic work. The final physical outcome now names the actual sorting action, so both bounded purposes finish through HF. School cancellation and explicit refusal abandon only active purposes, preserving achieved history and measurements. Renewing a previously measured exchange creates a new received purpose. These are technical controls; Adam still accepts the game’s feel.
+
+
+## Actual returning-owner model completion on candidate 15
+
+An isolated rendered-UI reviewer continued the previous exported owner story on candidate `61a7a4568a5d632ecf37f5153d8608994a6d4eb5` (build identity supplied by the parent, not independently read in the UI). The reviewer reached the genuinely checked and shelved model on day four at 17:15 and stopped satisfied. This is candidate feedback, not Adam's acceptance. Raw notes: `/tmp/repair-owner-return-015-notes.md`; actual export: `/tmp/repair-owner-return-015-story.json`; screenshots: `/tmp/repair-owner-return-015-model-checked.png` and `/tmp/repair-owner-return-015-stop.png`. The initial `/tmp/repair-owner-return-015-start.png` may not have been saved, as the raw notes explicitly report.
+
+Verbatim reactions:
+
+- “Contact Evan at the salvage counter about a display base” is immediately visible from the stopping point. That answers precisely what I wanted last time; I do not have to hunt through a notebook.
+- Calling Evan turns directly into tomorrow’s arranged visit. Clear enough, though I expected a little spoken exchange rather than the narrator scheduling it for me.
+- “Leave time for Evan’s arranged return” is a useful deliberate jump. I want the promised visit, and it takes me directly there.
+- Evan keeps the spring housing and screws. I like that recovering my gear is a reciprocal task, not simply taking his object.
+- Comparing diameter, teeth and shaft opening gives the matching part a believable reason. Sorting it for forty minutes then fits naturally.
+- Reopening the put-aside model is obvious. Its card now says one compatible gear is kept and fitting/checking remain. This is clearer than its old patch note.
+- Fitting the gear restores the shop shutters in order. This is the first result I cared about beyond another lamp.
+- I asked Mum to hold it during the running check. Her “Let me finish what I am doing — having something to eat and drink. Leave it on; you can still watch it” makes her refusal legible, though “leave it on” sounds like a lamp rather than a wind-up street.
+- During the model check Sam says “The agreed bench session has ended. Arrange another stretch; the work is kept.” This confuses me. That session ended yesterday, Sam is home, and I have not arranged another one.
+- The running check’s wait and repeat-motion actions are clear. I did not feel stuck.
+- Putting it on its shelf gives a satisfying ending: “The paper shops turn past in the order you drew them. The faded heading on the base still reads: A BETTER HIGH STREET.” I wanted to see the project through, and did.
+- I invited Mum for tea afterward. “It’s nice having you here. Your old drawing is still out where we can see it.” felt like a quiet way to finish the afternoon. I stopped satisfied rather than pushing into customer work.
+
+
+The repeated yesterday-session announcement and lamp-specific mechanical-check refusal are being corrected in current engine 16. Neither correction performs a check or renews an agreement for the player.
+
+
+## Actual apprenticeship continuation on candidate 15
+
+The source-unread long player continued its real engine-14 story through immutable `61a7a45`. Export `/tmp/repair-long-workshop-015-story.json` has 84 inputs/111 journal entries; raw notes `/tmp/repair-long-workshop-015-notes.md` and screenshot `/tmp/repair-long-workshop-015-stopped.png` preserve the refusal after a renewed agreement.
+
+> “He just agreed another two hours, and now he cannot watch? I no longer understand what agreement means here.”
+
+Source-informed replay shows Sam genuinely continued his ordinary meal after the whole-job agreement. Current engine 16 exposes that actual activity and endpoint, without forced watching. A selected complete watching activity can cover a correction within its agreed interval. Independent review additionally reproduced duplicate IDs conflating a selected five-minute current watch with a new thirty-minute offer; distinct fresh consent identities now preserve the short interval or permit only genuinely chosen renewal. Retained stopped-work renewal remains visible outside expired-plan details.
+
+## Fresh almost-unbriefed wildcard on candidate 15
+
+The wildcard explored the first holiday through both family lamps, the model and Evan exchange, Nora’s lamp, then closed the holiday and stopped before taking Sam’s path torch. Raw reactions `/tmp/repair-wildcard-015-reactions.txt` and screenshots `/tmp/repair-wildcard-015-step-*.png` are available. It clicked export but did not retrieve a download, so this is feedback with screenshots rather than an asserted replay fixture.
+
+> The paper street led to a concrete exchange with Evan and a measured gear check, which made the repair feel earned.
+
+> When Sam's torch appeared immediately after Nora's lamp, I felt ready to stop: the neighbor lamp repeated the same battery/contact/long-check sequence as Mum's.
+
+It also disliked a full age/date stamp in ordinary prayer prose. Current routine notices retain whether an activity is ongoing or completed, with a short start clock only for an ongoing activity. Its apparent missing cabinet choice is an unconfirmed availability finding; source-unread confusion does not establish a gate defect. Greater variation in repeated neighbour lamps remains a taste question for the next owner playtest, not an enjoyment claim based on the successful model route.

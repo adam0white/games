@@ -1,0 +1,64 @@
+{
+  "engine": "home-garage-15",
+  "sourceCommit": "61a7a4568a5d632ecf37f5153d8608994a6d4eb5",
+  "seed": 1701,
+  "sourceInputCount": 71,
+  "sourceSha256": "650a84cb355d9420f44c60929402414fcbd98cc6653b3b6a0118014219050c0f",
+  "inputs": [
+    {
+      "type": "action",
+      "id": "show-corrective-step"
+    },
+    {
+      "type": "action",
+      "id": "wait-appointment"
+    },
+    {
+      "type": "action",
+      "id": "workshop-leila-arrival"
+    },
+    {
+      "type": "action",
+      "id": "workshop-quote-leila"
+    },
+    {
+      "type": "action",
+      "id": "workshop-decline-leila"
+    },
+    {
+      "type": "action",
+      "id": "next-day"
+    },
+    {
+      "type": "action",
+      "id": "wait-known-sam-2110380"
+    },
+    {
+      "type": "action",
+      "id": "resume-observer-invite"
+    },
+    {
+      "type": "action",
+      "id": "wait-appointment"
+    },
+    {
+      "type": "action",
+      "id": "resume-observer-invite"
+    },
+    {
+      "type": "action",
+      "id": "wait-appointment"
+    },
+    {
+      "type": "action",
+      "id": "arrange-learning"
+    },
+    {
+      "type": "action",
+      "id": "show-corrective-step"
+    }
+  ],
+  "sha256": "ad075fb4a1dacbc968affb10a50f1aaf9263d595d01145430c2cc90e952d75e9",
+  "inputCount": 84,
+  "journalCount": 111
+}

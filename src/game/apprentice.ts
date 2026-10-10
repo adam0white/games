@@ -196,9 +196,20 @@ export function prepareCorrectiveDemonstration(s: GameState, say: Speak): void {
     cueFor(item, s.now) !== 'still-flickers'
   )
     throw Error('No supported attended correction is available');
+  if (a.visitUntil < s.now + 20) {
+    say(
+      'Sam',
+      'Our agreed stretch is nearly over. The contact repair and its explanation need another stretch; keep the stopped light labelled.',
+    );
+    return;
+  }
+  const newWatchId =
+    sam.activity?.affordanceId === 'watch-corrective-repair'
+      ? 'watch-corrective-renewal'
+      : 'watch-corrective-repair';
   const offers: Affordance[] = [
     {
-      id: 'watch-corrective-repair',
+      id: newWatchId,
       action: 'learn',
       label: 'Watch the real contact correction',
       duration: 30,
@@ -219,25 +230,63 @@ export function prepareCorrectiveDemonstration(s: GameState, say: Speak): void {
   if (sam.activity) offers.push(sam.activity.affordance);
   const decision = decide(sam, offers);
   const chosen = offers.find((x) => x.id === decision.chosenAffordanceId);
-  if (chosen?.id !== 'watch-corrective-repair') {
-    say(
-      'Sam',
-      'I cannot watch that correction now. Keep the light labelled; we can ask again when it fits my plans.',
-    );
+  const current = sam.activity;
+  const alreadyWatching =
+    current &&
+    [
+      'learning-afternoon',
+      'watch-repair',
+      'watch-corrective-repair',
+      'watch-corrective-renewal',
+    ].includes(current.affordanceId) &&
+    current.action === 'learn' &&
+    current.startedAt <= s.now &&
+    current.endsAt >= s.now + 20 &&
+    a.visitUntil >= s.now + 20 &&
+    !sam.body.asleep &&
+    !sam.body.downed &&
+    sam.body.alive &&
+    chosen?.id === current.affordanceId;
+  if (chosen?.id !== newWatchId && !alreadyWatching) {
+    if (current && current.endsAt > s.now && chosen?.id === current.affordanceId) {
+      s.conversationPause = {
+        participantId: 'sam',
+        actionId: 'show-corrective-step',
+        activityId: current.affordanceId,
+        until: current.endsAt,
+        label: current.affordance.label,
+      };
+      const clock = `${String(Math.floor((current.endsAt % 1440) / 60)).padStart(2, '0')}:${String(current.endsAt % 60).padStart(2, '0')}`;
+      say(
+        'Sam',
+        `I am still ${current.affordance.label.toLowerCase()}, until ${clock}. Leave time for that to finish, then ask again; I have not watched the correction yet.`,
+      );
+    } else {
+      s.conversationPause = undefined;
+      say(
+        'Sam',
+        chosen?.id === 'own-correction-time'
+          ? 'I would rather keep my own time now. Leave the stopped light labelled; I have not watched its correction.'
+          : 'I cannot watch that correction now. Keep the light labelled; we can ask again when it fits my plans.',
+      );
+    }
     return;
   }
-  if (sam.activity)
-    finish(sam, {
-      affordanceId: sam.activity.affordanceId,
-      action: sam.activity.action,
-      at: sam.now,
-      status: 'interrupted',
-      summary: 'Chose to watch a real correction to the stopped repair.',
-    });
-  if (!begin(sam, chosen, decision)) {
-    say('Sam', 'I am not ready to watch that correction. Keep it labelled for now.');
-    return;
+  if (!alreadyWatching) {
+    if (sam.activity)
+      finish(sam, {
+        affordanceId: sam.activity.affordanceId,
+        action: sam.activity.action,
+        at: sam.now,
+        status: 'interrupted',
+        summary: 'Chose to watch a real correction to the stopped repair.',
+      });
+    if (!chosen || !begin(sam, chosen, decision)) {
+      say('Sam', 'I am not ready to watch that correction. Keep it labelled for now.');
+      return;
+    }
   }
+  s.conversationPause = undefined;
   const flag = `corrective-demonstration:${item.id}`;
   if (!s.unlocked.includes(flag)) s.unlocked.push(flag);
   item.playerAssisted = true;
@@ -408,9 +457,12 @@ export function recordLesson(
     sam.body.asleep ||
     sam.activity.startedAt > s.now - minutes ||
     sam.activity.endsAt < s.now ||
-    !['learning-afternoon', 'watch-repair', 'watch-corrective-repair'].includes(
-      sam.activity.affordanceId,
-    ) ||
+    ![
+      'learning-afternoon',
+      'watch-repair',
+      'watch-corrective-repair',
+      'watch-corrective-renewal',
+    ].includes(sam.activity.affordanceId) ||
     !a?.arranged ||
     s.now > a.visitUntil ||
     !sam ||
@@ -653,6 +705,7 @@ export function advanceApprentice(
   if (!a?.jobId || !sam) return;
   const item = s.objects.find((x) => x.id === a.jobId);
   if (!item) return;
+  const sessionWasActive = sam.now < a.visitUntil;
   while (sam.now < until && !a.needsHelp && a.jobId) {
     if (item.location === 'returned') {
       if (item.awaitingCollection) {
@@ -710,7 +763,7 @@ export function advanceApprentice(
       if (sam.now >= a.visitUntil || !sam.body.alive || sam.body.downed) {
         const reason =
           'The agreed bench session has ended. Arrange another stretch; the work is kept.';
-        if (a.pauseReason !== reason) say('Sam', reason);
+        if (sessionWasActive && a.pauseReason !== reason) say('Sam', reason);
         a.pauseReason = reason;
         break;
       }

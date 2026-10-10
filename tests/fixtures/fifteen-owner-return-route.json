@@ -1,0 +1,64 @@
+{
+  "engine": "home-garage-15",
+  "sourceCommit": "61a7a4568a5d632ecf37f5153d8608994a6d4eb5",
+  "seed": 1701,
+  "sourceInputCount": 343,
+  "sourceSha256": "382c7cdd3f95b95597b6527ca61a23bbe902fb66928c22f7856fc8277ec7c1d9",
+  "inputs": [
+    {
+      "type": "action",
+      "id": "service-invite-donor"
+    },
+    {
+      "type": "action",
+      "id": "wait-appointment"
+    },
+    {
+      "type": "action",
+      "id": "service-hear-donor"
+    },
+    {
+      "type": "action",
+      "id": "service-measure-donor"
+    },
+    {
+      "type": "action",
+      "id": "service-recover-donor"
+    },
+    {
+      "type": "select",
+      "id": "paper-street"
+    },
+    {
+      "type": "action",
+      "id": "fit-gear"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "ask-mum"
+    },
+    {
+      "type": "action",
+      "id": "wait-check"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "rest"
+    }
+  ],
+  "sha256": "d084681758ffcb11184b5bd755a82dbf0713a05f09623c8093f1119b96c0ed2a",
+  "inputCount": 356,
+  "journalCount": 496
+}

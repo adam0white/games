@@ -135,7 +135,8 @@ it('keeps Sam on a stronger actual promise when he declines watching the correct
   expect(sam.activity).toEqual(prior);
   expect(s.apprentice?.jobId).toBe(job);
   expect(s.apprentice?.needsHelp).toBeTruthy();
-  expect(lines.join(' ')).toContain('cannot watch');
+  expect(lines.join(' ')).toContain('until');
+  expect(s.conversationPause?.activityId).toBe(own.id);
 }, 30_000);
 
 it('spends five active player minutes on a fresh bell after preparation and preserves finished historical bells', () => {

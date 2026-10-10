@@ -14,6 +14,7 @@ import type { ActionView, ConversationLine, GameInput, GameState, ObjectView } f
 import { getWorkshopView, type LedgerEntry, type WorkshopState } from './game/workshop';
 import { splitNavigation, uniqueChoiceGroups } from './ui/actionGroups';
 import { Cabinet } from './ui/Cabinet';
+import { ChoiceDetails } from './ui/ChoiceDetails';
 import { createChoiceGate } from './ui/choiceGate';
 import { DayPlan } from './ui/DayPlan';
 import { JournalHistory } from './ui/JournalHistory';
@@ -752,10 +753,9 @@ export default function App() {
                   'workshop',
                   'week',
                 ].includes(group.id) ? (
-                  <details
-                    className="choice-group choice-more"
+                  <ChoiceDetails
                     key={group.id}
-                    open={
+                    reveal={
                       group.id === 'project' &&
                       group.actions.some((action) => action.id.startsWith('childhood-'))
                     }
@@ -789,7 +789,7 @@ export default function App() {
                       </div>
                     )}
                     <div className="choice-buttons">{group.actions.map(renderAction)}</div>
-                  </details>
+                  </ChoiceDetails>
                 ) : (
                   <div className="choice-group" key={group.id}>
                     {group.label && <h2>{group.label}</h2>}
