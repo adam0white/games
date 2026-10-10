@@ -55,3 +55,16 @@ Verbatim reaction:
 > I would continue for another short session because I like these people and want to see the household change. I am less interested in completing another identical lamp sequence. More consequential choices with the people, or a genuinely uncertain object, would pull me further.
 
 Immediate corrections belong to received information and a self-contained drawing description. The unknown sample-case fitting adds a genuinely different post-week investigation. Tea, visitor-location wording and early observation expectations need a focused character pass; do not infer that a generic rest line proves shared company or that a school-age invitation grants an adult apprenticeship.
+
+## Public engine 20 activity-pause clarity check — e4c059d
+
+Author-informed, bounded UI check of the existing pause card, not an independent taste or owner acceptance claim. Fresh isolated Chrome context on the public site, 390×844 CSS pixels; ordinary visible opening choices only, without restored packets, fabricated state or source-bound UI actions. The player inspected and repaired Mum’s lamp, shared one tea break, left its longer check running, brought down the bedside lamp, visited Dad’s garage and fitted the recovered holder. Returning to Mum’s check and asking her to help naturally received an activity refusal.
+
+At 16:05 the garage bench showed one card: “Mum · Taking a quiet break until 16:08”, with “Let Mum finish: Taking a quiet break”. After that actual wait and a fresh request, the card changed at 16:08 to “You · Taking a quiet break until 16:35”, with “This wait is for you. The conversation still needs a fresh agreement afterward.” The actor and end time make these concurrent activities distinguishable. The opening family chapter earlier offered the explicit Mum wait button without this day-plan card; this check verifies the garage card, not a new opening-wide projection.
+
+Evidence: `/tmp/repair20-public-activity-pause-mum.png` and `/tmp/repair20-public-activity-pause.png`, visually inspected. The UI’s **Export story** produced the untouched native packet `/tmp/repair20-public-activity-pause-export.json`: 20 inputs, 25 journal entries, game time 16:08. No gameplay rules, journal history or release acceptance changed through this check.
+
+
+### Author-informed candidate opening coverage follow-up
+
+Fresh isolated local candidate5214 at390×844, ordinary visible firstnine opening inputs, reached15:31 before entering the garage. One card identified Mum taking a quiet break until15:38, with one offered wait; the wait was not repeated in the separate time lane. Actual screenshot `/tmp/repair20-opening-activity-pause.png` was visually inspected. `/tmp/repair20-opening-activity-pause-state.json` is an actual native autosave, not a claimed Journal download or full playtest packet. This verifies opening card coverage; it does not resolve repeated meal/break pacing or establish fun.

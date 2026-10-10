@@ -58,3 +58,8 @@ After actual-play corrections, the final Node 26 check passed lint, strict types
 ## Delivered chapter and public taste review, 23:30 UTC
 
 Alpha.3 / home-garage20 was published at clean runtime3dc23c6, Cloudflare5a82362b-05ab-4d39-b9b7-89d7c5420152. Public/local manifests match; primary preview was rebuilt without operating the owner's browser. Actual immediate native18/19 imports, public Nora trip/home and fresh solo-maker exports replay exactly against the coherent clean5198 capture. The solo player voluntarily stopped after14 minutes at a useful unfinished cabinet step and preferred distinct physical diagnosis and family work over apprentice management. Meal/break ambiguity and repetitive targeting remain concrete taste findings. A narrow projection correction scopes Sam's missing light-intake hint without denying successful mechanical competence. The next photograph episode remains a reviewed content proposal, not claimed new gameplay.
+
+
+## Public feedback into physical clarity, 23:45 UTC
+
+A curious reader followed Mum’s kitchen memory and wanted to find the childhood shade’s pencil line by rotating the object. The line is now actually visible, personal-only, in3D and illustration. A phone reviewer also found that the activity card omitted the opening chapter: the same current validated cue now appears there, with one wait control and no hidden appointments. Its button explanation is shortened to avoid repeating the card. These presentation changes preserve deterministic engine20 histories; no new method or story fact is created. Finalcheck/deployment and bounded public UI follow, then the run closes at23:59:42.

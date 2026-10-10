@@ -4,11 +4,11 @@ Updated 2026-10-10 for Adam's continued autonomous V2 authorization.
 
 ## What remains
 
-The autonomous run remains active until **2026-10-10 23:59:42 UTC**. Public and stable local preview5173 are the reviewed `2.0.0-alpha.3` / `home-garage-20`, clean runtime commit `3dc23c6922a1c67e0f3b25a263f331cfc40f8234`, Cloudflare `5a82362b-05ab-4d39-b9b7-89d7c5420152`. Primary main was safely fast-forwarded and rebuilt; Adam’s existing browser/storage was untouched. Refresh the existing page to load this release. HF stays published2.2.0.
+The autonomous run remains active until **2026-10-10 23:59:42 UTC**. Public and stable local preview5173 are the reviewed `2.0.0-alpha.3` / `home-garage-20`, clean runtime commit `e4c059dc5243e0f428575278d862ed52075e691c`, Cloudflare `3ebac06e-b049-492a-b444-9b4350053448`. Primary main was safely fast-forwarded and rebuilt; Adam’s existing browser/storage was untouched. Refresh the existing page to load this release. HF stays published2.2.0.
 
 Current source is `.worktrees/full-workshop`, branch `codex/full-workshop`, engine 20 / alpha.3. Frozen 19 and older supported runtimes remain preserved. HF remains the published 2.2.0 package; this increment adds authored game interactions, not a new framework faculty.
 
-**Remaining:** continue useful public play and taste review through the deadline, verify the final display-only update publicly/locally, and record final delivery. The reviewed chapter is publicly and locally playable. Adam’s acceptance remains personal.
+**Remaining:** deliver the final opening pause/pencil-line presentation polish, verify the resulting public/local build and record final delivery before the deadline. The reviewed chapter is publicly and locally playable. Adam’s acceptance remains personal.
 
 The selected chapter adds tactile cabinet alignment with Dad, Sam's loaded stand and independent mechanical repairs, Nora's afternoon window, retained paper-street shadows at the family table, and an optional walk with Sam and his dog. Private adulthood can now retrieve the same unfinished childhood box even if the player skipped its discovery at school. The shadow scene works without repairing its missing gear. An actually checked personal lamp and repaired model add real visual possibilities rather than being prerequisites.
 
@@ -221,3 +221,13 @@ The personal model now has a complete early route: retained measuring/label work
 ## V1/3D documentation closeout
 
 The final documentation closeout full check passed 334 tests across 71 files, lint, strict types and build. An additional attempt run concurrently with HF’s full suite hit game-test timing budgets and was stopped; the isolated repeat passed without source or timing-budget changes. HF’s documentation-only preview update passed 866 tests with 3 skipped before push at 8554c2cc91d0559b0d0498af57b736514b8a7f77. At that checkpoint the runtime remained clean 1e123be; that ledger update was not a second deployment. The owner’s next playthrough accepts feel, not these checks.
+
+
+## Public experience follow-up, 23:39 UTC
+
+Display-only e4c059d is public/local with exact matching clean manifests; deployment repeated570/119 full checks and strict verification. The owner391 route now actually performs a14:00 solo display and returns home14:18 while the separate18:00–18:15 checked lamp remains labelled/accepted/uncollected. Nora’s actual absence is respected; a different genuine19 route received her shared setup and sample memory. These distinct observed routes are not merged into an invented perfect visit. The public curious-reader feedback has two short attempts: driver reset lost the first; only the fresh approximatelytwo-minute second run has a native export. Its interest was family history, not completing repairs. A presentation-only pencil-line fix is underway because turning the childhood shade could not reveal the mark already named in its description.
+
+
+## Final phone presentation, 23:45 UTC
+
+The childhood lamp’s already-established pencil clearance line is now visible in its original3D and illustrated shade; other bedside lamps remain unmarked. The component renders were inspected at390px, not claimed as fresh gameplay. Independent source review cleared surface placement and tracked disposal without state/diagnosis/control changes. An actual fresh isolated local opening also exposed a previous gap: the activity card only appeared after entering the garage. The same validated card now appears in the opening when its real wait is offered, and its overline reads Activity in progress rather than implying every action is blocked. A regression uses the actual public firstnine inputs, checks one card/one owned wait and getter purity, and removes the card after a real wait. Combinedcheck passed571/120 before shortening the duplicate wait-button explanation to Time passes for everyone; that final wording is being checked before deployment.

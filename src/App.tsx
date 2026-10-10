@@ -734,7 +734,7 @@ function PlayableStory({
                 <section className="attention-task" aria-label="Current work needs you">
                   <span className="card-overline">
                     {urgentPlan.actions.some((action) => action.id === 'wait-conversation-activity')
-                      ? 'Before you continue'
+                      ? 'Activity in progress'
                       : 'Current work'}
                   </span>
                   <h2>{urgentPlan.label}</h2>

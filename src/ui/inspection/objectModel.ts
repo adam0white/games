@@ -233,6 +233,19 @@ export function createObjectModel(
       mark.scale.z = 0.98;
     }
     add(new CylinderGeometry(0.43, 0.65, 0.66, 32, 1, true), cream, 0, 1.37);
+    if (object.id === 'personal') {
+      const graphite = material('#625c56', 0, 1);
+      const line = curve(
+        [-0.55, -0.38, -0.21, -0.04, 0.13, 0.29].map((angle, index) => {
+          const y = 1.155 + ([0, 0.003, -0.002, 0.002, -0.001, 0][index] ?? 0);
+          const radius = 0.65 - (y - 1.04) / 3 + 0.009;
+          return new Vector3(Math.sin(angle) * radius, y, Math.cos(angle) * radius);
+        }),
+        0.009,
+        graphite,
+      );
+      line.name = 'personal-pencil-clearance-line';
+    }
     const rim = ring(0.65, 0.021, brass, 0, 1.04);
     rim.rotation.x = Math.PI / 2;
     add(new SphereGeometry(0.12, 16, 12), warmGlass, 0, 1.13);

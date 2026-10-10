@@ -82,6 +82,16 @@ export function ObjectIllustration({ object }: { object: ObjectView }) {
           <>
             <path className="lamp-shade" d="M112 51 Q160 39 208 51 L229 119 Q160 137 91 119 Z" />
             <path className="shade-rim" d="M91 119 Q160 136 229 119" />
+            {object.id === 'personal' && (
+              <path
+                d="M121 108 L130 109 L139 108.5 L149 110 L158 109.5 L166 110"
+                fill="none"
+                stroke="#625c56"
+                strokeWidth="2.1"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
             <path
               className="ceramic-body"
               d="M146 132 L174 132 L176 158 C211 170 205 211 179 217 L141 217 C115 211 109 170 144 158 Z"

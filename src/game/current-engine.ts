@@ -2493,7 +2493,7 @@ function available(s: GameState): ActionView[] {
       conversationWaiting.participantId === 'player'
         ? `Finish your current activity: ${conversationWaiting.label}`
         : `Let ${s.people[conversationWaiting.participantId]?.name ?? 'your visitor'} finish: ${conversationWaiting.label}`,
-      'Leave time for the activity you just heard about, then try the proposed action again. Earlier arrangements remain in place.',
+      'Time passes for everyone.',
       'primary',
     );
   const playerWaiting = playerSpaceWait(s);
@@ -6068,8 +6068,28 @@ export function transition(original: GameState, input: GameInput): GameState {
   return s;
 }
 function dayPlan(s: GameState, actions: ActionView[]): GameView['dayPlan'] {
-  if (s.chapter !== 'garage') return undefined;
   const has = (id: string) => actions.some((a) => a.id === id);
+  const conversationCue = has('wait-conversation-activity') ? conversationWait(s) : undefined;
+  const pauseEntry: NonNullable<GameView['dayPlan']>['entries'][number] | undefined =
+    conversationCue
+      ? {
+          id: 'conversation-pause',
+          label: `${conversationCue.participantId === 'player' ? 'You' : s.people[conversationCue.participantId]?.name} · ${conversationCue.label} until ${clockTime(conversationCue.until)}`,
+          detail:
+            conversationCue.participantId === 'player'
+              ? 'This wait is for you. The conversation still needs a fresh agreement afterward.'
+              : 'They are finishing the activity shown here. You can continue your own work or ask again afterward.',
+          status: 'invitation',
+          actionIds: ['wait-conversation-activity'],
+        }
+      : undefined;
+  if (s.chapter !== 'garage')
+    return pauseEntry
+      ? {
+          summary: 'What you have heard and agreed; people may keep their own plans.',
+          entries: [pauseEntry],
+        }
+      : undefined;
   const entries: NonNullable<GameView['dayPlan']>['entries'] = knownAppointments(s).map(
     (event) => ({
       id: `known-${event.personId}-${event.at}`,
@@ -6135,18 +6155,7 @@ function dayPlan(s: GameState, actions: ActionView[]): GameView['dayPlan'] {
       status: 'invitation',
       actionIds: has('resume-observer-invite') ? ['resume-observer-invite'] : [],
     });
-  const conversationCue = conversationWait(s);
-  if (conversationCue)
-    entries.unshift({
-      id: 'conversation-pause',
-      label: `${conversationCue.participantId === 'player' ? 'You' : s.people[conversationCue.participantId]?.name} · ${conversationCue.label} until ${clockTime(conversationCue.until)}`,
-      detail:
-        conversationCue.participantId === 'player'
-          ? 'This wait is for you. The conversation still needs a fresh agreement afterward.'
-          : 'They are finishing the activity shown here. You can continue your own work or ask again afterward.',
-      status: 'invitation',
-      actionIds: ['wait-conversation-activity'],
-    });
+  if (pauseEntry) entries.unshift(pauseEntry);
   const a = s.apprentice;
   const correction = pendingCorrectiveDemonstration(s);
   if (a?.arranged && (s.now < a.visitUntil || a.jobId || has('arrange-learning'))) {
