@@ -249,3 +249,42 @@ Independent reconstruction found a concrete host reporting defect in the real 09
 ## Actual public engine-11 stalled-story continuation
 
 A separate browser reviewer imported the final fresh native-9 story unchanged on exact public commit `8975c33b41149f267c4bd3e1b1aae4d8cd037b57`. Its visible agreement choice identified the player's ongoing meal, not a Dad refusal. The new visible wait advanced exactly 21 minutes to that actual activity endpoint. A renewed agreement then performed genuine eight-minute joint intake work. The successful story retained every old input and journal prefix and grew to 151 choices/207 journal entries. Export `/tmp/repair-public11-visible-intake-success.json`, SHA256 `437d19070e4a507eda008ba2175a963b9a99807485bb43b0f08b19362dc05cc2`, reopened and exported deep-equal as a whole packet. No hidden state, source or owner browser was modified. This fixes the actual host attribution/waiting defect; it does not promise universal willingness or resolve all Sam/school pacing observations.
+
+
+## Source-unread candidate-12 neighbourhood playtest
+
+An isolated reader imported the actual completed-week story into immutable local candidate `4c4a4c094decf85861fad46364a1990b45f68a49`, without reading source or story documents. It finished the retained paper street, spent time with family, collected Nora's checked lamp, and then explored the old sample window. The following are the reader's exact words, not Adam's acceptance:
+
+> "The model was the thing I wanted to finish. A missing gear with a recovered replacement felt like a loose end I could actually close. The shops turning in the order I drew them was a satisfying reward."
+
+> "Tea being useful while the check ran made sense. Mum mentioning my old drawing made that pause feel connected to the rest of my life."
+
+> "Dad's 'Good. Now do that every time you want a plate' was my favourite line. It sounded like a person responding to my joke."
+
+> "I liked having an actual appointment and leaving a labelled repair overnight. I trusted that I could rest without losing it. The known-good battery test was easy to understand."
+
+> "I didn't know what to make of the week ending and then old-looking introductions starting again. I had just looked at a picture with Evan, then Leila asked whether she could introduce her friend Evan. That made the world feel like it had forgotten what I had just done."
+
+> "The appointment card said Today above a tomorrow appointment, then said 'Coming back for collection tomorrow' on the day of collection. I could work out the actual time, but the words disagreed."
+
+> "Nora referred to Leila collecting hers today, but I had no visible Leila job. I wondered whether I had inherited an unfinished promise from the previous player."
+
+> "I wanted to ask Sam to come back for an afternoon or show him the repaired model. His panel stayed at 'Away until another arranged afternoon', but I couldn't find a way to arrange one."
+
+> "I kept opening the family-project section hoping for another project, but it was the completed cabinet. Visiting something finished is pleasant once; its permanent space started feeling like leftover UI."
+
+> "I wanted to show Mum the completed paper street. Holding it helped with a check, but her line about moving a switch sounded like a lamp rather than the wind-up model I was holding."
+
+> "The next options are readable, but sometimes the screen has a lot of separate little sections and the next interesting thing is hidden in a disclosure. 'The old sample window' meant nothing to me, so I left it alone."
+
+> "I am glad I opened the old sample window. Taking a walk with Nora and hearing one specific memory made me care about her case more than another lamp. The new case is visually and mechanically distinct."
+
+> "Then I got stuck. I compared the holes and wanted to use her old fitting. 'Ask Nora to compare her retained counter catch' said we had not agreed time together. I had just walked there with her, and the People panel said I could ask for time together. The comparison button seemed to be exactly that ask. I couldn't find another way to invite her."
+
+> "I tried proposing the stationary tray, although it sounded worse for carrying her samples. Same response. I waited thirty minutes and tried comparing again. Same response. At this point I would stop or assume the game was broken."
+
+> "The introduction did not resolve the Evan oddness: his first line was 'Leila introduced us.' It didn't acknowledge our picture conversation."
+
+The first blocked comparison packet, `/tmp/frozen-neighbourhood-player-nora-block.json`, contains 281 inputs and 396 journal entries at Summer day 8, 11:39; SHA256 `755a5d315c5c235f1deacb3fc87227872bc0e3dbedf261a3b138f34ee5131d21`. The actual final packet `/tmp/frozen-neighbourhood-player-final-story.json` retains the later tray request and half-hour wait: 284 inputs, 398 journal entries, ending at 12:09, SHA256 `7fb7ccd6b6ffab7595f570a0567e43798a2e14b46a326c40b257a91e35c6acde`. Source reconstruction found ordinary meal/rest continuation, not a missing invitation button. Correct refusal attribution and exact waiting alone eventually completed comparison after six alternating waits totaling 90 minutes. That technical recovery is not playability acceptance. Current work adds genuinely received purposes through existing HF goals and separate owner disposition decisions; the immutable candidate-12 state and original heard words remain preserved before continuation. The returning reader must test the resulting route before publication.
+
+The fixed-default current control continues that actual final story through five-minute physical comparison, five-minute owner grant, twelve-minute fitting, ten-minute carrying check and three-minute handback: 35 minutes total, without a waiting loop. The carrying outcome is checked, parts remain finite and the native continuation reconstructs exactly. Matched offers differ only in purpose linkage; the received-purpose comparison starts whereas withholding it retains the actual meal. A stronger real HF promise can still make Nora decline with the purpose present. Granting a spare and retaining it have competing received purposes. Neither refusal nor repeated incompatible attempts earns progress. These are technical controls; the returning source-unread player review is still pending.

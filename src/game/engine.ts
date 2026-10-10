@@ -7,6 +7,8 @@
  */
 import {
   type Affordance,
+  abandonGoal,
+  adoptGoal,
   begin,
   createPerson,
   decide,
@@ -42,10 +44,12 @@ import { restoreGame as restoreEngine8 } from './engine8';
 import { restoreGame as restoreEngine9 } from './engine9';
 import { restoreGame as restoreEngine10 } from './engine10';
 import { restoreGame as restoreEngine11 } from './engine11';
+import { restoreGame as restoreEngine12 } from './engine12';
 import {
   askMumToHelp,
   beginSharedConversation,
   beginSharedWork,
+  type ConversationRefusal,
   chooseSamVisit,
   chooseUncheckedReturn,
   liveOrdinaryTime,
@@ -114,7 +118,7 @@ import {
   workshopActions,
 } from './workshop';
 
-const ENGINE = 'home-garage-12';
+const ENGINE = 'home-garage-13';
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 const object = (
   id: string,
@@ -554,6 +558,145 @@ function settleReturned(s: GameState) {
       say(s, line.speaker, line.text, line.tone);
   }
 }
+/** A received household request supplies an ordinary HF purpose (importance .5).
+ * Legacy candidate12 already records the heard request/acceptance: recall that
+ * fact only on a current case action. No goals or past progress are fabricated
+ * during restore or view queries; only genuinely completed case work advances. */
+export function receivedCasePurposes(s: GameState) {
+  const n = s.neighbourhood;
+  if (!n || !['offered', 'accepted'].includes(n.caseStage)) return;
+  const nora = s.people.nora,
+    player = s.people.player;
+  if (nora && !n.noraPurposeId)
+    n.noraPurposeId = adoptGoal(
+      nora,
+      {
+        label: 'Keep my samples together when I carry the case',
+        serves: ['autonomy', 'belonging'],
+        advancedBy: [{ action: 'return-case-carrying', amount: 1 }],
+        importance: 0.5,
+      },
+      s.now,
+    ).id;
+  if (nora && n.caseStage === 'accepted' && !n.conservationPurposeId)
+    n.conservationPurposeId = adoptGoal(
+      nora,
+      {
+        label: 'Keep the saved fittings useful',
+        serves: ['autonomy'],
+        advancedBy: [
+          { action: 'return-case-carrying', amount: 1 },
+          { action: 'return-case-tray', amount: 1 },
+          { action: 'return-case-unchanged', amount: 1 },
+        ],
+        importance: 0.5,
+      },
+      s.now,
+    ).id;
+  if (player && n.caseStage === 'accepted' && !n.playerPurposeId)
+    n.playerPurposeId = adoptGoal(
+      player,
+      {
+        label: 'Resolve Nora’s sample case honestly',
+        serves: ['competence', 'belonging'],
+        advancedBy: [
+          { action: 'return-case-carrying', amount: 1 },
+          { action: 'return-case-tray', amount: 1 },
+          { action: 'return-case-unchanged', amount: 1 },
+        ],
+        importance: 0.5,
+      },
+      s.now,
+    ).id;
+}
+export function caseConversationPurpose(s: GameState, id: string) {
+  const n = s.neighbourhood;
+  if (
+    !n ||
+    ![
+      'neighbourhood-compare-source',
+      'neighbourhood-source',
+      'neighbourhood-tray-consent',
+      'neighbourhood-accept-case',
+      'neighbourhood-return-repaired',
+      'neighbourhood-return-tray',
+      'neighbourhood-return-unchanged',
+    ].includes(id)
+  )
+    return undefined;
+  return {
+    physical: id === 'neighbourhood-compare-source',
+    action:
+      id === 'neighbourhood-return-repaired'
+        ? 'return-case-carrying'
+        : id === 'neighbourhood-return-tray'
+          ? 'return-case-tray'
+          : id === 'neighbourhood-return-unchanged'
+            ? 'return-case-unchanged'
+            : id === 'neighbourhood-accept-case'
+              ? 'receive-case-for-repair'
+              : id === 'neighbourhood-source'
+                ? 'grant-case-fitting'
+                : id === 'neighbourhood-tray-consent'
+                  ? 'agree-case-tray'
+                  : 'compare-case-fitting',
+    partnerGoals: id.startsWith('neighbourhood-return-')
+      ? [
+          n.conservationPurposeId,
+          ...(id === 'neighbourhood-return-repaired' ? [n.noraPurposeId] : []),
+        ].filter((id): id is string => !!id)
+      : [
+            'neighbourhood-tray-consent',
+            'neighbourhood-return-tray',
+            'neighbourhood-return-unchanged',
+          ].includes(id)
+        ? []
+        : n.noraPurposeId
+          ? [n.noraPurposeId]
+          : [],
+    playerGoals: n.playerPurposeId ? [n.playerPurposeId] : [],
+    ...(id === 'neighbourhood-source' || id === 'neighbourhood-tray-consent'
+      ? {
+          alternative: {
+            id: id === 'neighbourhood-source' ? 'retain-case-fitting' : 'retain-carrying-use',
+            action: 'keep',
+            ...(id === 'neighbourhood-source' && n.conservationPurposeId
+              ? { advances: [n.conservationPurposeId] }
+              : id === 'neighbourhood-tray-consent' && n.noraPurposeId
+                ? { advances: [n.noraPurposeId] }
+                : {}),
+            label:
+              id === 'neighbourhood-source'
+                ? 'Keep my retained catch as a spare'
+                : 'Keep the original carrying use',
+            duration: 0,
+            effort: 0,
+            advertises: { autonomy: 0.03 },
+          },
+        }
+      : {}),
+  };
+}
+function receivedPresenceActivity(activity: string) {
+  return /collect/i.test(activity) ? 'Coming back for the arranged collection' : activity;
+}
+function conversationWait(s: GameState) {
+  const cue = s.conversationPause;
+  const person = cue ? s.people[cue.participantId] : undefined;
+  const activity = person?.activity;
+  return cue &&
+    person?.body.alive &&
+    !person.body.asleep &&
+    !person.body.downed &&
+    isHere(s, cue.participantId) &&
+    activity?.affordanceId === cue.activityId &&
+    activity.endsAt === cue.until &&
+    Number.isFinite(cue.until) &&
+    cue.until > s.now &&
+    isHere(s, cue.participantId, cue.until)
+    ? cue
+    : undefined;
+}
 function dadSpaceWait(s: GameState) {
   const remembered = s.workshop?.spaceRefusalActivity;
   const current = s.people.dad?.activity;
@@ -736,7 +879,7 @@ function knownAppointments(s: GameState) {
       personId: id,
       name: s.people[id]?.name ?? id,
       at: p.awayUntil,
-      detail: `${p.activity} · ${Math.floor(p.awayUntil / 1440) === Math.floor(s.now / 1440) ? 'today' : Math.floor(p.awayUntil / 1440) === Math.floor(s.now / 1440) + 1 ? 'tomorrow' : `in ${Math.floor(p.awayUntil / 1440) - Math.floor(s.now / 1440)} days`} at ${String(Math.floor((p.awayUntil % 1440) / 60)).padStart(2, '0')}:${String(p.awayUntil % 60).padStart(2, '0')}`,
+      detail: `${receivedPresenceActivity(p.activity)} · ${Math.floor(p.awayUntil / 1440) === Math.floor(s.now / 1440) ? 'today' : Math.floor(p.awayUntil / 1440) === Math.floor(s.now / 1440) + 1 ? 'tomorrow' : `in ${Math.floor(p.awayUntil / 1440) - Math.floor(s.now / 1440)} days`} at ${String(Math.floor((p.awayUntil % 1440) / 60)).padStart(2, '0')}:${String(p.awayUntil % 60).padStart(2, '0')}`,
     }));
   for (const flag of s.unlocked) {
     const shift = /^service-counter:(\d+):(\d+)$/.exec(flag);
@@ -921,6 +1064,16 @@ function available(s: GameState): ActionView[] {
     s.workshop?.jobs.some((job) => job.id === o.id && job.fee > 0) &&
     !s.workshop?.paidHelp
   );
+  const conversationWaiting = conversationWait(s);
+  if (conversationWaiting)
+    add(
+      'wait-conversation-activity',
+      conversationWaiting.participantId === 'player'
+        ? `Finish your current activity: ${conversationWaiting.label}`
+        : `Let ${s.people[conversationWaiting.participantId]?.name ?? 'your visitor'} finish: ${conversationWaiting.label}`,
+      'Leave time for the activity you just heard about. You can ask again afterward; it is not an agreement to talk.',
+      'primary',
+    );
   const playerWaiting = playerSpaceWait(s);
   if (playerWaiting)
     add(
@@ -1432,6 +1585,17 @@ export function transition(original: GameState, input: GameInput): GameState {
     return s;
   }
   if (
+    id.startsWith('neighbourhood-') ||
+    [
+      'measure-case',
+      'try-case-replacement',
+      'fit-case-catch',
+      'check-case-carry',
+      'check-case-tray',
+    ].includes(id)
+  )
+    receivedCasePurposes(s);
+  if (
     [
       'measure-case',
       'try-case-replacement',
@@ -1447,6 +1611,15 @@ export function transition(original: GameState, input: GameInput): GameState {
     const work: Affordance = {
       id,
       action: 'work',
+      advances:
+        s.neighbourhood?.playerPurposeId &&
+        (id === 'measure-case' ||
+          id === 'fit-case-catch' ||
+          (id === 'check-case-carry' && !item.caseFittings.repeatedClosures) ||
+          (id === 'check-case-tray' && !item.caseFittings.trayChecked))
+          ? [s.neighbourhood.playerPurposeId]
+          : [],
+      tags: ['case-work', id],
       label: available(original).find((a) => a.id === id)?.label ?? id,
       duration: minutes,
       effort: 0.05,
@@ -1462,6 +1635,7 @@ export function transition(original: GameState, input: GameInput): GameState {
       );
       return s;
     }
+    s.conversationPause = undefined;
     const until = s.now + minutes;
     advanceBenchBeforePlayer(s, until);
     tick(player, until);
@@ -1474,9 +1648,10 @@ export function transition(original: GameState, input: GameInput): GameState {
     if (player.activity?.affordanceId === id)
       finish(player, {
         affordanceId: id,
-        action: 'work',
+        action: work.action,
         at: until,
         status: completed ? 'completed' : 'interrupted',
+        ...(completed && work.advances ? { advances: work.advances } : {}),
         summary: work.label,
       });
     advancePeople(s);
@@ -1509,6 +1684,7 @@ export function transition(original: GameState, input: GameInput): GameState {
           : 3;
     const player = s.people.player,
       nora = s.people.nora;
+    let refusal: ConversationRefusal | undefined;
     if (
       !player ||
       !nora ||
@@ -1521,12 +1697,41 @@ export function transition(original: GameState, input: GameInput): GameState {
         id,
         available(original).find((a) => a.id === id)?.label ?? id,
         minutes,
+        (report) => {
+          refusal = report;
+        },
+        caseConversationPurpose(s, id),
       )
     ) {
+      s.conversationPause = undefined;
+      const who = refusal?.participant === 'player' ? player : nora;
+      const activity = refusal?.activity;
+      if (refusal && who && activity && Number.isFinite(activity.endsAt) && activity.endsAt > s.now)
+        s.conversationPause = {
+          participantId: who.id,
+          actionId: id,
+          activityId: activity.id,
+          until: activity.endsAt,
+          label: activity.label,
+        };
+      const reason =
+        refusal?.participant === 'player'
+          ? activity
+            ? `You are still ${activity.label.toLowerCase()}.`
+            : 'You leave the conversation for another time.'
+          : refusal
+            ? activity
+              ? `Nora is still ${activity.label.toLowerCase()}.`
+              : refusal.alternativeId === 'retain-case-fitting'
+                ? 'Nora keeps the loose catch as a spare for now.'
+                : refusal.alternativeId === 'retain-carrying-use'
+                  ? 'Nora still wants a case she can carry.'
+                  : 'Nora keeps her own plans for now.'
+            : 'There is not enough shared time for this now.';
       say(
         s,
         'You',
-        'You have not agreed time together for this now. The invitation and the labelled work stay as they are.',
+        `${reason} The case and the invitation stay as they are.${s.conversationPause ? ' You can leave time for that to finish, then ask again.' : ''}`,
       );
       return s;
     }
@@ -1547,9 +1752,15 @@ export function transition(original: GameState, input: GameInput): GameState {
       if (activity?.affordanceId === id)
         finish(person, {
           affordanceId: id,
-          action: activity.action,
+          action:
+            completed && id.startsWith('neighbourhood-return-')
+              ? (caseConversationPurpose(s, id)?.action ?? activity.action)
+              : activity.action,
           at: until,
           status: completed ? 'completed' : 'interrupted',
+          ...(completed && activity.affordance.advances
+            ? { advances: activity.affordance.advances }
+            : {}),
           summary: completed
             ? activity.affordance.label
             : 'The shared conversation stopped before its conclusion.',
@@ -1565,7 +1776,19 @@ export function transition(original: GameState, input: GameInput): GameState {
       );
       return s;
     }
-    const result = applyNeighbourhoodAction(s, id, { ...neighbourhoodCtx, agree: () => true });
+    const ownerPermission =
+      id === 'neighbourhood-source'
+        ? 'source'
+        : id === 'neighbourhood-tray-consent'
+          ? 'tray'
+          : id === 'neighbourhood-frontage'
+            ? 'frontage'
+            : undefined;
+    const result = applyNeighbourhoodAction(s, id, {
+      ...neighbourhoodCtx,
+      agree: (purpose) => purpose === ownerPermission,
+    });
+    receivedCasePurposes(s);
     if (!result) throw Error('Missing neighbourhood action');
     if (result.receiveCase) {
       const spec = neighbourhoodCase;
@@ -1580,6 +1803,8 @@ export function transition(original: GameState, input: GameInput): GameState {
     const item = s.objects.find((o) => o.id === neighbourhoodCase.id);
     if (result.sourceFitting && item?.caseFittings)
       item.caseFittings.compatible = { ...result.sourceFitting, status: 'retained' };
+    if (result.adaptTray && s.neighbourhood?.noraPurposeId)
+      abandonGoal(nora, s.neighbourhood.noraPurposeId);
     if (result.adaptTray && item?.caseFittings) {
       item.observations.push(adaptCaseTray(item, item.caseFittings, true));
       item.requestedUse = 'stationary-tray';
@@ -1792,6 +2017,21 @@ export function transition(original: GameState, input: GameInput): GameState {
       }
     }
     for (const line of serviceResult.lines) say(s, line.speaker, line.text, line.tone);
+    return s;
+  }
+  if (id === 'wait-conversation-activity') {
+    const cue = conversationWait(s);
+    if (!cue) throw Error('That heard activity is no longer current');
+    advanceBenchBeforePlayer(s, cue.until);
+    if (s.people.player) liveOrdinaryTime(s.people.player, cue.until);
+    s.now = cue.until;
+    advancePeople(s);
+    s.conversationPause = undefined;
+    say(
+      s,
+      'You',
+      'You leave time for that activity to finish. The conversation still needs a fresh agreement.',
+    );
     return s;
   }
   if (id === 'wait-dad-activity' || id === 'wait-player-activity') {
@@ -2753,6 +2993,15 @@ function dayPlan(s: GameState, actions: ActionView[]): GameView['dayPlan'] {
       status: 'invitation',
       actionIds: has('resume-observer-invite') ? ['resume-observer-invite'] : [],
     });
+  const conversationCue = conversationWait(s);
+  if (conversationCue)
+    entries.unshift({
+      id: 'conversation-pause',
+      label: `${conversationCue.participantId === 'player' ? 'Your activity' : s.people[conversationCue.participantId]?.name} · ${clockTime(conversationCue.until)}`,
+      detail: `The conversation paused while ${conversationCue.participantId === 'player' ? 'you finish' : 'they finish'} ${conversationCue.label.toLowerCase()}. Ask again afterward; no conversation has been agreed.`,
+      status: 'invitation',
+      actionIds: ['wait-conversation-activity'],
+    });
   const a = s.apprentice;
   if (a?.arranged && (s.now < a.visitUntil || a.jobId || has('arrange-learning'))) {
     const item = s.objects.find((o) => o.id === a.jobId);
@@ -2795,15 +3044,17 @@ function dayPlan(s: GameState, actions: ActionView[]): GameView['dayPlan'] {
       actionIds: [],
     });
   const priority = (entry: (typeof entries)[number]) =>
-    entry.actionIds?.includes('reconsider-sam')
-      ? -4
-      : entry.actionIds?.includes('resume-observer-invite')
-        ? -3
-        : entry.actionIds?.includes('arrange-learning')
-          ? -2
-          : entry.actionIds?.includes('wait-appointment')
-            ? -1
-            : 0;
+    entry.actionIds?.includes('wait-conversation-activity')
+      ? -5
+      : entry.actionIds?.includes('reconsider-sam')
+        ? -4
+        : entry.actionIds?.includes('resume-observer-invite')
+          ? -3
+          : entry.actionIds?.includes('arrange-learning')
+            ? -2
+            : entry.actionIds?.includes('wait-appointment')
+              ? -1
+              : 0;
   entries.sort((a, b) => priority(a) - priority(b));
   return entries.length
     ? { summary: 'What you have heard and agreed; people may keep their own plans.', entries }
@@ -2866,7 +3117,7 @@ export function getView(s: GameState): GameView {
           ? s.now % 1440 < 7 * 60 || s.now % 1440 >= 22 * 60
             ? 'It is late; leave conversation until morning'
             : s.now < presence.awayUntil
-              ? `Expected: ${presence.activity}`
+              ? `Expected: ${receivedPresenceActivity(presence.activity)}`
               : scheduledAway(s, id)
                 ? id === 'sam'
                   ? s.unlocked.some((flag) => {
@@ -3049,8 +3300,13 @@ export function restoreGame(text: string): GameState {
       'home-garage-9',
       'home-garage-10',
       'home-garage-11',
+      'home-garage-12',
     ].includes(data?.engine)
   ) {
+    if (data.engine === 'home-garage-12') {
+      const validated = restoreEngine12(text);
+      return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };
+    }
     if (data.engine === 'home-garage-11') {
       const validated = restoreEngine11(text);
       return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };

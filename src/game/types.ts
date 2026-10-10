@@ -77,6 +77,13 @@ export interface LoggedInput {
 }
 
 export interface GameState {
+  conversationPause?: {
+    participantId: string;
+    actionId: string;
+    activityId: string;
+    until: number;
+    label: string;
+  };
   neighbourhood?: NeighbourhoodState;
   serviceWeek?: ServiceWeekState;
   checkingPlaces?: number;

@@ -225,4 +225,15 @@ it('private household light terms remain an explicitly accepted no-fee favour wi
     ),
   ).toBe(true);
   expect(restoreGame(serializeGame(s))).toEqual(s);
+  s = choose(s, 'next-day');
+  const legacy = structuredClone(s);
+  const presence = legacy.world?.presence.nora;
+  if (!presence) throw Error('Missing arranged Nora collection');
+  presence.activity = 'Coming back for collection tomorrow';
+  const beforeView = JSON.stringify(legacy);
+  const note = getView(legacy).knownAppointments?.find((event) => event.personId === 'nora');
+  expect(note?.detail).toContain('arranged collection');
+  expect(note?.detail).not.toContain('collection tomorrow');
+  expect(JSON.stringify(legacy)).toBe(beforeView);
+  expect(restoreGame(serializeGame(s))).toEqual(s);
 }, 20_000);

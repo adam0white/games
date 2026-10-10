@@ -46,8 +46,8 @@ export function DayPlan({
     );
   }
   return (
-    <aside className="day-plan" aria-label="Today’s known plans">
-      <h2>Today</h2>
+    <aside className="day-plan" aria-label="Plans">
+      <h2>Plans</h2>
       {renderEntry(next)}
       {later.length > 0 && (
         <details className="other-plans">

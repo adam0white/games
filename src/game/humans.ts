@@ -382,23 +382,67 @@ export function beginSharedWork(
 }
 
 /** A short, optional conversation competes with the partner's own plans. */
+export type ConversationRefusal = {
+  participant: 'player' | 'partner';
+  kind: 'declined' | 'begin-failed';
+  alternativeId?: string;
+  activity?: { id: string; label: string; endsAt: number };
+};
+
 export function beginSharedConversation(
   player: Person,
   partner: Person,
   id: string,
   label: string,
   duration: number,
+  onRefusal?: (report: ConversationRefusal) => void,
+  purpose?: {
+    action: string;
+    physical?: boolean;
+    partnerGoals?: string[];
+    playerGoals?: string[];
+    alternative?: Affordance;
+  },
 ): boolean {
+  const refused = (
+    person: Person,
+    participant: ConversationRefusal['participant'],
+    kind: ConversationRefusal['kind'],
+    alternativeId?: string,
+    continued = false,
+  ) => {
+    const activity = continued ? person.activity : undefined;
+    onRefusal?.({
+      participant,
+      kind,
+      ...(alternativeId ? { alternativeId } : {}),
+      ...(activity
+        ? {
+            activity: {
+              id: activity.affordanceId,
+              label: activity.affordance.label,
+              endsAt: activity.endsAt,
+            },
+          }
+        : {}),
+    });
+    return false;
+  };
   const offer: Affordance = {
     id,
-    action: 'talk',
+    action: purpose?.physical ? 'work' : 'talk',
     label,
     duration,
-    effort: 0.02,
-    focus: 0.1,
+    effort: purpose?.physical ? 0.05 : 0.02,
+    focus: purpose?.physical ? 0.15 : 0.1,
     with: [player.id],
-    tags: ['social', 'reflection'],
-    advertises: { belonging: 0.07, leisure: 0.06 },
+    tags: purpose?.physical
+      ? ['case-work', purpose.action]
+      : purpose
+        ? ['social', 'case-work', purpose.action]
+        : ['social', 'reflection'],
+    ...(purpose?.partnerGoals?.length ? { advances: purpose.partnerGoals } : {}),
+    advertises: purpose?.physical ? { competence: 0.08 } : { belonging: 0.07, leisure: 0.06 },
   };
   const own: Affordance = {
     id: 'keep-own-plans',
@@ -408,11 +452,27 @@ export function beginSharedConversation(
     effort: 0,
     advertises: { leisure: 0.03, autonomy: 0.02 },
   };
-  const decision = decide(partner, [offer, own]);
-  if (decision.chosenAffordanceId !== offer.id) return false;
-  const playerOffer = { ...offer, with: [partner.id] };
+  const decision = decide(partner, [offer, purpose?.alternative ?? own]);
+  if (decision.chosenAffordanceId !== offer.id)
+    return refused(
+      partner,
+      'partner',
+      'declined',
+      purpose?.alternative && decision.chosenAffordanceId === purpose.alternative.id
+        ? purpose.alternative.id
+        : undefined,
+      decision.chosenAffordanceId === partner.activity?.affordanceId,
+    );
+  const playerOffer = { ...offer, with: [partner.id], advances: purpose?.playerGoals };
   const playerDecision = decide(player, [playerOffer]);
-  if (playerDecision.chosenAffordanceId !== id) return false;
+  if (playerDecision.chosenAffordanceId !== id)
+    return refused(
+      player,
+      'player',
+      'declined',
+      undefined,
+      playerDecision.chosenAffordanceId === player.activity?.affordanceId,
+    );
   for (const person of [player, partner]) {
     const prior = person.activity;
     if (prior)
@@ -424,5 +484,16 @@ export function beginSharedConversation(
         summary: 'Paused my own activity for a short agreed conversation.',
       });
   }
-  return Boolean(begin(partner, offer, decision) && begin(player, playerOffer, playerDecision));
+  if (!begin(partner, offer, decision)) return refused(partner, 'partner', 'begin-failed');
+  if (!begin(player, playerOffer, playerDecision)) {
+    finish(partner, {
+      affordanceId: id,
+      action: offer.action,
+      at: partner.now,
+      status: 'interrupted',
+      summary: 'The conversation could not begin together.',
+    });
+    return refused(player, 'player', 'begin-failed');
+  }
+  return true;
 }

@@ -68,10 +68,17 @@ export interface WorkshopState {
 }
 export type WorkshopGame = Pick<
   GameState,
-  'now' | 'chapter' | 'focusId' | 'objects' | 'unlocked' | 'parts'
+  'now' | 'chapter' | 'focusId' | 'objects' | 'unlocked' | 'parts' | 'serviceWeek'
 > & {
   workshop?: WorkshopState;
 };
+/** Received donor conversation or shared label, rather than an actor merely existing. */
+function alreadyMetEvan(s: WorkshopGame): boolean {
+  return (
+    (s.serviceWeek !== undefined && s.serviceWeek.part !== 'unknown') ||
+    s.unlocked.includes('aftercare-label-done')
+  );
+}
 export const CABINET_MINUTES = { measure: 20, hang: 40, align: 25, space: 8 } as const;
 export interface WorkshopContext {
   graduated: boolean;
@@ -338,7 +345,7 @@ export function workshopActions(s: WorkshopGame, ctx: WorkshopContext): ActionVi
   if (w.nextBatch === 'offered' && ctx.leilaHere) {
     add(
       'workshop-next-referral-yes',
-      'Agree one introduction to Evan',
+      alreadyMetEvan(s) ? 'Arrange Evan’s folding-light visit' : 'Agree one introduction to Evan',
       'He can bring a folding light. More than that needs a separate conversation.',
     );
     add(
@@ -363,7 +370,9 @@ export function workshopActions(s: WorkshopGame, ctx: WorkshopContext): ActionVi
   )
     add(
       'workshop-evan-arrival',
-      'Meet Evan and hear about his folding light',
+      alreadyMetEvan(s)
+        ? 'Hear Evan’s folding-light request'
+        : 'Meet Evan and hear about his folding light',
       'Leila arranged this visit, and he is here now.',
     );
   if (
@@ -786,10 +795,7 @@ export function applyWorkshopAction(
           'Nora',
           'A different lamp this time, from beside the sewing machine. I want to finish some curtains quietly tomorrow morning.',
         ),
-        line(
-          'Nora',
-          'Leila is hoping to collect hers today. Mine can wait here overnight if that keeps today manageable.',
-        ),
+        line('Nora', 'Mine can wait here overnight if that keeps today manageable.'),
       ]);
     case 'workshop-next-batch':
       w.nextBatch = 'offered';
@@ -801,7 +807,9 @@ export function applyWorkshopAction(
         ),
         line(
           'Leila',
-          'Evan, a friend of mine, uses a folding work light. May I introduce him? You need not take everything he brings.',
+          alreadyMetEvan(s)
+            ? 'You have met Evan over the display stand. His folding work light needs attention too. Shall I ask him to bring it round?'
+            : 'Evan, a friend of mine, uses a folding work light. May I introduce him? You need not take everything he brings.',
         ),
       ]);
     case 'workshop-next-referral-yes': {
@@ -815,7 +823,9 @@ export function applyWorkshopAction(
         ...result([
           line(
             'You',
-            'One introduction is fine. I will agree the work and price with him, and say clearly if something is outside what we can do.',
+            alreadyMetEvan(s)
+              ? 'Ask him to bring the light. I will hear what it needs before agreeing the job.'
+              : 'One introduction is fine. I will agree the work and price with him, and say clearly if something is outside what we can do.',
           ),
           line(
             'Leila',
@@ -827,7 +837,9 @@ export function applyWorkshopAction(
           {
             personId: 'evan',
             at: w.nextReferralAt,
-            activity: 'Coming for Leila’s arranged introduction',
+            activity: alreadyMetEvan(s)
+              ? 'Bringing his folding light for the arranged conversation'
+              : 'Coming for Leila’s arranged introduction',
           },
         ],
       };
@@ -837,7 +849,9 @@ export function applyWorkshopAction(
       return result([
         line(
           'Leila',
-          'Of course. I will not pass your name on. We can still discuss the landing lamp when you have room.',
+          alreadyMetEvan(s)
+            ? 'Of course. I will leave the light with him for now. We can still discuss the landing lamp when you have room.'
+            : 'Of course. I will not pass your name on. We can still discuss the landing lamp when you have room.',
         ),
       ]);
     case 'workshop-nora-stairs-arrival':
@@ -855,7 +869,9 @@ export function applyWorkshopAction(
         ...result([
           line(
             'Evan',
-            'Leila introduced us. This folds down beside my bench; it helps me find the small things that roll underneath.',
+            alreadyMetEvan(s)
+              ? 'Good to see you again. This is the folding light Leila mentioned; it helps me find the small things that roll under my bench.'
+              : 'Leila introduced us. This folds down beside my bench; it helps me find the small things that roll underneath.',
           ),
           line(
             'Evan',
@@ -945,7 +961,7 @@ export function applyWorkshopAction(
         {
           personId: spec.ownerId,
           at: job.collectionAt,
-          activity: 'Collecting the labelled repair tomorrow',
+          activity: 'Collecting the labelled repair at the arranged time',
         },
       ],
     };
@@ -1032,10 +1048,7 @@ export function applyWorkshopAction(
       {
         personId: spec.ownerId,
         at: job.collectionAt,
-        activity:
-          job.due === 'this-evening'
-            ? 'Coming back for collection this evening'
-            : 'Coming back for collection tomorrow',
+        activity: 'Coming back for the arranged collection',
       },
     ],
   };

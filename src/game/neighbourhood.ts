@@ -7,6 +7,9 @@ import type { ActionView, RepairObject } from './types';
 import type { WorkshopJobSpec } from './workshop';
 
 export interface NeighbourhoodState {
+  noraPurposeId?: string;
+  conservationPurposeId?: string;
+  playerPurposeId?: string;
   introduced: boolean;
   frontage: 'unasked' | 'invited' | 'visited' | 'declined';
   frontageObservations: string[];
