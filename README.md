@@ -21,6 +21,8 @@ The playable story begins at fourteen with a family conversation and a flickerin
 
 The canonical backstory unfolds through objects and people in a slightly dystopic, repair-dependent world. The Journal keeps conversations and notes, with export and import beside its heading. New school holidays begin on a fresh morning; Dad’s cabinet work can have an actual agreed time instead of repeated availability guesses. The interface follows the system's light/dark setting; original optional 3D inspection complements distinct illustrations and a text fallback. Growth remains voluntary and personal projects remain worthwhile.
 
+Helping Sam through an unfamiliar step does not erase the chance to practice later. A stopped job can be reconsidered as supervised work, and one additional household request keeps a rescued training route open. Only a later genuinely unassisted fresh repair earns the handoff. Finished family work changes subsequent recollections rather than reappearing as unfinished.
+
 Run locally with Node 24 or newer:
 
 ```sh

@@ -9,5 +9,6 @@ dist/
 .review/
 .wrangler/
 public/release.json
+public/third-party-notices.txt
 
 *.tsbuildinfo

@@ -139,7 +139,7 @@ export default function Inspection3D({ object }: { object: ObjectView }) {
           ref={canvas}
           tabIndex={0}
           role="img"
-          aria-label={`${object.title}. Use arrow keys to turn the object; Home restores the front view.`}
+          aria-label={`${object.title}: ${object.condition}. Use arrow keys to turn the object; Home restores the front view.`}
           onKeyDown={(event) => {
             if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home'].includes(event.key)) {
               event.preventDefault();
@@ -174,7 +174,6 @@ export default function Inspection3D({ object }: { object: ObjectView }) {
           }}
         />
       </div>
-      <span className="object-condition">{object.condition}</span>
       <p className="inspection-hint">Drag to turn it. Arrow keys work too.</p>
       {object.inspected && object.observations.length > 0 && (
         <button

@@ -8,11 +8,11 @@ Fourteen at the first school holiday; eighteen after four authored school-year t
 
 ## Mum
 
-Reads in the front room and sometimes the small former bedroom, which also holds ironing. Warm, lightly teasing, direct when she wants time to herself. Kept selected childhood drawings because the player asked. Enjoys having the player around in the holidays without being permanently available to help. Ordinary prayer is part of her private life; she does not explain a religious ruling or promise supernatural repair outcomes. Nora is a longstanding friend. Tea is company, not a transaction. School preparation, her own reading and household tasks remain real interests.
+Reads in the front room and sometimes the small former bedroom, which also holds ironing. Warm, lightly teasing, direct when she wants time to herself. Kept selected childhood drawings in a flat box. The later choice to display or store them belongs to actual play. Enjoys having the player around in the holidays without being permanently available to help. Ordinary prayer is part of her private life; she does not explain a religious ruling or promise supernatural repair outcomes. Nora is a longstanding friend. Tea is company, not a transaction. School preparation, her own reading and household tasks remain real interests.
 
 ## Dad
 
-Makes and repairs household things at the garage bench. Stores recoverable parts, records some work in a notebook, and has unfinished kitchen cabinet doors. Practical humour and toleration of untidy progress; neither infallible mentor nor incompetent comic foil. His bench stays shared. Holiday tinkering does not authorize a commercial intake desk. After graduation he can discuss a larger workshop arrangement while retaining his own space. He remembers attempted standardization through the parts it left behind, rather than possessing the explanation for the whole world.
+Makes and repairs household things at the garage bench. Stores recoverable parts and records some work in a notebook. At the opening, the kitchen cabinet doors are unfinished; their later stage follows actual shared work, and later recollections acknowledge completion if it happened. Practical humour and toleration of untidy progress; neither infallible mentor nor incompetent comic foil. His bench stays shared. Holiday tinkering does not authorize a commercial intake desk. After graduation he can discuss a larger workshop arrangement while retaining his own space. He remembers attempted standardization through the parts it left behind, rather than possessing the explanation for the whole world.
 
 ## Nora
 

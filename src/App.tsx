@@ -401,6 +401,11 @@ export default function App() {
         <section id="journal" className="journal" aria-label="Story journal">
           <h2>Your story</h2>
           <p className="journal-note">The conversations and small discoveries you have kept.</p>
+          <p className="journal-note">
+            <a href="/third-party-notices.txt" target="_blank" rel="noreferrer">
+              Third-party notices
+            </a>
+          </p>
           <div className="journal-tools">
             <button type="button" onClick={download}>
               Export story

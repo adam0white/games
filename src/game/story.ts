@@ -24,6 +24,7 @@ export interface StoryContext {
   /** Current authored school-break stage, zero through four; old imports may omit it. */
   holiday?: number;
   graduated?: boolean;
+  cabinetStage?: 'unnoticed' | 'looked' | 'measured' | 'hung' | 'finished';
 }
 const warm = (speaker: string, text: string): StoryLine => ({ speaker, text, tone: 'warm' });
 const notice = (speaker: string, text: string): StoryLine => ({ speaker, text, tone: 'notice' });
@@ -143,7 +144,10 @@ export function storyBeat(id: string): readonly StoryLine[] {
   return beats[id] ?? [];
 }
 /** Authored transitions compress unplayed school weeks, not an afternoon of bench work. */
-export function schoolStoryBeat(holiday: number): readonly StoryLine[] {
+export function schoolStoryBeat(
+  holiday: number,
+  cabinetStage?: StoryContext['cabinetStage'],
+): readonly StoryLine[] {
   if (holiday >= 4)
     return [
       notice(
@@ -163,7 +167,11 @@ export function schoolStoryBeat(holiday: number): readonly StoryLine[] {
       ),
       notice(
         'You',
-        'By the next summer, Dad has cleared one cabinet door from the wall. Its outline is still visible in the dust. Your labelled work remains on its shelf.',
+        cabinetStage === 'finished'
+          ? 'By the next summer, the cabinet doors you finished with Dad still close cleanly. Your labelled work remains on its shelf.'
+          : cabinetStage === 'hung'
+            ? 'The cabinet doors you hung with Dad still wait for their final alignment. Your labelled work remains on its shelf.'
+            : 'When summer comes, the cabinet doors and hinge notebook are where you left them. Your labelled work remains on its shelf.',
       ),
     ];
   if (holiday === 2)
@@ -288,7 +296,21 @@ export function optionalStoryChoices(context: StoryContext): StoryChoice[] {
     ]);
   }
   const focused = catalogueItem(context.focusId ?? '');
-  for (const chat of focused?.optionalChats ?? []) add(chat.id, chat.label, chat.lines);
+  for (const chat of focused?.optionalChats ?? [])
+    add(
+      chat.id,
+      chat.label,
+      chat.id === 'sam-school-next' && context.graduated
+        ? chat.lines.map((line) =>
+            line.text.startsWith('I finished this year.')
+              ? {
+                  ...line,
+                  text: 'I finished before you. People still ask what I will do, as if I have already picked a place to stand.',
+                }
+              : line,
+          )
+        : chat.lines,
+    );
   if (context.focusOwner === 'Sam' && (!focused || focused.form === 'torch')) {
     add('ask-sam-string', 'Ask about the red string', [
       warm('Sam', 'Parcel string. I meant to buy a proper strap, but this one hasn’t let go yet.'),
@@ -347,11 +369,15 @@ export function optionalStoryChoices(context: StoryContext): StoryChoice[] {
     add('sam-work', 'Ask what Sam likes making', [
       warm(
         'Sam',
-        'I mend the dog’s lead and tighten things when they rattle. In the holidays I pack orders at the parts counter some mornings. I like seeing what people use them for.',
+        context.graduated || (context.holiday ?? 0) >= 3
+          ? 'I mend the dog’s lead and tighten things when they rattle. I started packing orders in the school holidays; now I take more counter hours. I like seeing what people use the parts for.'
+          : 'I mend the dog’s lead and tighten things when they rattle. In the holidays I pack orders at the parts counter some mornings. I like seeing what people use them for.',
       ),
       warm(
         'Sam',
-        'I still have school as well. We can arrange an afternoon in the holidays; I cannot promise every day.',
+        context.graduated || (context.holiday ?? 0) >= 3
+          ? 'School is finished for me. The counter and the dog still need time; we can arrange an afternoon, but I cannot promise every day.'
+          : 'I still have school as well. We can arrange an afternoon in the holidays; I cannot promise every day.',
       ),
     ]);
   }
@@ -438,16 +464,30 @@ export function optionalStoryChoices(context: StoryContext): StoryChoice[] {
       warm('Dad', 'Make your own marks. Just don’t drill through the good mug.'),
     ]);
     if (heard('ask-dad-bench')) {
-      add('dad-cabinet', 'Ask about the unfinished cabinet', [
-        warm(
-          'Dad',
-          'Those two doors against the wall are for the kitchen. The cabinet is usable without them. That made it very easy to stop.',
-        ),
-        warm(
-          'Dad',
-          'I drew the hinges in this notebook. We can finish it together sometime, if you fancy work that does not fit in a parts tray.',
-        ),
-      ]);
+      add(
+        'dad-cabinet',
+        context.cabinetStage === 'finished'
+          ? 'Talk about the cabinet you finished together'
+          : 'Ask about the cabinet work',
+        [
+          warm(
+            'Dad',
+            context.cabinetStage === 'finished'
+              ? 'We used those shelves without doors for so long. Now I still reach for the shelf before remembering to open what we finished together.'
+              : context.cabinetStage === 'hung'
+                ? 'The doors are hanging now. They still need their final alignment before we call it finished.'
+                : context.cabinetStage === 'measured'
+                  ? 'We have the hinge marks in the notebook. Hanging the doors is the next step.'
+                  : 'Those two doors against the wall are for the kitchen. The cabinet is usable without them. That made it very easy to stop.',
+          ),
+          warm(
+            'Dad',
+            context.cabinetStage === 'finished'
+              ? 'Keep the hinge drawing in the notebook. It records something we actually did together.'
+              : 'I drew the hinges in this notebook. We can pick it up together sometime, if you fancy work that does not fit in a parts tray.',
+          ),
+        ],
+      );
       add('garage-shared', 'Talk about keeping a place at the bench', [
         warm(
           'Dad',
@@ -455,7 +495,9 @@ export function optionalStoryChoices(context: StoryContext): StoryChoice[] {
         ),
         warm(
           'Dad',
-          'For now, this is somewhere to tinker between school terms. If you want regular work after school finishes, we will talk about the space properly. The garage is still where I make things too.',
+          context.graduated
+            ? 'School is finished now. If you want regular work here, we will agree the space properly. The garage is still where I make things too.'
+            : 'For now, this is somewhere to tinker between school terms. If you want regular work after school finishes, we will talk about the space properly. The garage is still where I make things too.',
         ),
       ]);
     }

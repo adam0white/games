@@ -710,7 +710,8 @@ export function applyWorkshopAction(
           [
             line(
               'Dad',
-              'I need to keep that shelf for my cabinet parts today. Let us agree a place when I have cleared them, before anyone leaves a lamp here.',
+              ctx.dadWorkReason?.() ??
+                'I want to keep my own plans for now. Let us agree a place before anyone leaves a lamp here.',
             ),
           ],
           2,
@@ -726,7 +727,9 @@ export function applyWorkshopAction(
           [
             line(
               'Dad',
-              'That shelf by your end can hold labelled work. Leave my vice clear, and do not put an unlabelled job among my cabinet parts.',
+              w.cabinet === 'finished'
+                ? 'That shelf by your end can hold labelled work. Leave my vice clear, and do not put an unlabelled job among my own parts.'
+                : 'That shelf by your end can hold labelled work. Leave my vice clear, and do not put an unlabelled job among my cabinet parts.',
             ),
             line(
               'You',

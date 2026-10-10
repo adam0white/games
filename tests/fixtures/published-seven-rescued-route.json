@@ -1,0 +1,830 @@
+{
+  "seed": 1701,
+  "inputs": [
+    {
+      "type": "action",
+      "id": "talk-family"
+    },
+    {
+      "type": "action",
+      "id": "inspect"
+    },
+    {
+      "type": "action",
+      "id": "test-battery"
+    },
+    {
+      "type": "action",
+      "id": "clean-contact"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "rest"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "inspect"
+    },
+    {
+      "type": "action",
+      "id": "talk-garage"
+    },
+    {
+      "type": "action",
+      "id": "search-donor"
+    },
+    {
+      "type": "action",
+      "id": "fit-holder"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "talk-friends"
+    },
+    {
+      "type": "action",
+      "id": "rest"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "workshop-cabinet-look"
+    },
+    {
+      "type": "action",
+      "id": "workshop-cabinet-measure"
+    },
+    {
+      "type": "action",
+      "id": "workshop-cabinet-plan"
+    },
+    {
+      "type": "action",
+      "id": "wait-appointment"
+    },
+    {
+      "type": "action",
+      "id": "workshop-cabinet-hang"
+    },
+    {
+      "type": "action",
+      "id": "workshop-cabinet-align"
+    },
+    {
+      "type": "action",
+      "id": "workshop-drawings"
+    },
+    {
+      "type": "action",
+      "id": "workshop-display-drawing"
+    },
+    {
+      "type": "action",
+      "id": "accept-request"
+    },
+    {
+      "type": "action",
+      "id": "inspect"
+    },
+    {
+      "type": "action",
+      "id": "test-battery"
+    },
+    {
+      "type": "action",
+      "id": "clean-contact"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "rest"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "back-to-school"
+    },
+    {
+      "type": "action",
+      "id": "workshop-cabinet-close"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "aftercare-door-start"
+    },
+    {
+      "type": "action",
+      "id": "parts-labels"
+    },
+    {
+      "type": "action",
+      "id": "ask-dad-bench"
+    },
+    {
+      "type": "action",
+      "id": "school-holidays"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "accept-request"
+    },
+    {
+      "type": "action",
+      "id": "inspect"
+    },
+    {
+      "type": "action",
+      "id": "ask-sam-string"
+    },
+    {
+      "type": "action",
+      "id": "observer-invite"
+    },
+    {
+      "type": "action",
+      "id": "twist-cap"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "rest"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "accept-request"
+    },
+    {
+      "type": "action",
+      "id": "inspect"
+    },
+    {
+      "type": "action",
+      "id": "clear-obstruction"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "garage-shared"
+    },
+    {
+      "type": "action",
+      "id": "timer-carry"
+    },
+    {
+      "type": "action",
+      "id": "wait-check"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "accept-request"
+    },
+    {
+      "type": "action",
+      "id": "inspect"
+    },
+    {
+      "type": "action",
+      "id": "align-striker"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "bell-bicycle"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "back-to-school"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "accept-request"
+    },
+    {
+      "type": "action",
+      "id": "inspect"
+    },
+    {
+      "type": "action",
+      "id": "test-catch"
+    },
+    {
+      "type": "action",
+      "id": "lubricate-hinge"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "sewing-blue-cloth"
+    },
+    {
+      "type": "action",
+      "id": "nora-repair-street"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "accept-request"
+    },
+    {
+      "type": "action",
+      "id": "inspect"
+    },
+    {
+      "type": "action",
+      "id": "search-spring"
+    },
+    {
+      "type": "action",
+      "id": "replace-spring"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "sam-school-next"
+    },
+    {
+      "type": "action",
+      "id": "sam-work"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "back-to-school"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "accept-request"
+    },
+    {
+      "type": "action",
+      "id": "inspect"
+    },
+    {
+      "type": "action",
+      "id": "test-battery"
+    },
+    {
+      "type": "action",
+      "id": "replace-battery"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "pantry-list"
+    },
+    {
+      "type": "action",
+      "id": "rest"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "accept-request"
+    },
+    {
+      "type": "action",
+      "id": "inspect"
+    },
+    {
+      "type": "action",
+      "id": "test-battery"
+    },
+    {
+      "type": "action",
+      "id": "clean-contact"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "rest"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "back-to-school"
+    },
+    {
+      "type": "action",
+      "id": "after-school-work"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "workshop-referral-ask"
+    },
+    {
+      "type": "action",
+      "id": "workshop-priced"
+    },
+    {
+      "type": "action",
+      "id": "workshop-intake-space"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "workshop-intake-space"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "workshop-intake-space"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "workshop-intake-space"
+    },
+    {
+      "type": "action",
+      "id": "next-day"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "workshop-intake-space"
+    },
+    {
+      "type": "action",
+      "id": "wait-appointment"
+    },
+    {
+      "type": "action",
+      "id": "workshop-leila-arrival"
+    },
+    {
+      "type": "action",
+      "id": "workshop-quote-leila"
+    },
+    {
+      "type": "action",
+      "id": "workshop-accept-leila"
+    },
+    {
+      "type": "action",
+      "id": "inspect"
+    },
+    {
+      "type": "action",
+      "id": "test-battery"
+    },
+    {
+      "type": "action",
+      "id": "replace-battery"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "rest"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "wait-appointment"
+    },
+    {
+      "type": "action",
+      "id": "arrange-learning"
+    },
+    {
+      "type": "action",
+      "id": "learning-light"
+    },
+    {
+      "type": "action",
+      "id": "inspect"
+    },
+    {
+      "type": "action",
+      "id": "explain-step"
+    },
+    {
+      "type": "action",
+      "id": "test-battery"
+    },
+    {
+      "type": "action",
+      "id": "explain-step"
+    },
+    {
+      "type": "action",
+      "id": "replace-battery"
+    },
+    {
+      "type": "action",
+      "id": "explain-step"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "explain-step"
+    },
+    {
+      "type": "action",
+      "id": "rest"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "explain-step"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "explain-step"
+    },
+    {
+      "type": "action",
+      "id": "learning-light"
+    },
+    {
+      "type": "action",
+      "id": "supervised-repair"
+    },
+    {
+      "type": "action",
+      "id": "watch-sam"
+    },
+    {
+      "type": "action",
+      "id": "watch-sam"
+    },
+    {
+      "type": "action",
+      "id": "take-over-repair"
+    },
+    {
+      "type": "action",
+      "id": "clean-contact"
+    },
+    {
+      "type": "action",
+      "id": "explain-step"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "rest"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "next-day"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "arrange-learning"
+    },
+    {
+      "type": "action",
+      "id": "supervised-intake"
+    },
+    {
+      "type": "action",
+      "id": "watch-sam"
+    },
+    {
+      "type": "action",
+      "id": "watch-sam"
+    },
+    {
+      "type": "action",
+      "id": "explain-step"
+    },
+    {
+      "type": "action",
+      "id": "take-over-repair"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "explain-step"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "explain-step"
+    },
+    {
+      "type": "action",
+      "id": "sam-next-work"
+    },
+    {
+      "type": "action",
+      "id": "sam-counter"
+    },
+    {
+      "type": "action",
+      "id": "next-day"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "wait-person"
+    },
+    {
+      "type": "action",
+      "id": "arrange-learning"
+    }
+  ],
+  "sha256": "bdcf1186d336c64820d2dc0457f00fd14ac6b7cf13295a03bcec854f5ee31864"
+}

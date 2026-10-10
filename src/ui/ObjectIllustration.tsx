@@ -146,7 +146,6 @@ export function ObjectIllustration({ object }: { object: ObjectView }) {
           </>
         )}
       </svg>
-      <span className="object-condition">{object.condition}</span>
     </div>
   );
 }

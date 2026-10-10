@@ -1,6 +1,6 @@
 # Broad roadmap
 
-Updated 2026-10-10 during the owner-authorized five-hour run. M0 planning, the school-break home/garage campaign and bounded M3–M4 teaching/independent handoff are implemented and independently reviewed. The public checkpoint is commit e225acd at https://repair.adamwhite.work, using released HF 2.2.0. Adam's earlier playtest established curiosity and believable diagnosis; acceptance of this substantially expanded chapter remains his decision. The published first service week turns delegation into actual choices about promises, money, personal time and staying small. Continuity corrections are under engine 7 review. Tests, technical reviews and deployment do not substitute for that playtest.
+Updated 2026-10-10 during the owner-authorized five-hour run. M0 planning, the school-break home/garage campaign and bounded M3–M4 teaching/independent handoff are implemented and independently reviewed. The public game is at https://repair.adamwhite.work, using released HF 2.2.0; HANDOFF.md records the exact deployed checkpoint. Adam's earlier playtest established curiosity and believable diagnosis; acceptance of this substantially expanded chapter remains his decision. The first service week turns delegation into actual choices about promises, money, personal time and staying small. Engine 8 continuity and honest recovery passed independent review, 184 tests and the full build checks before publication. Tests, technical reviews and deployment do not substitute for that playtest.
 
 ## Near milestones
 

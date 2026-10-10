@@ -23,6 +23,7 @@ import {
   readLongCheck,
   repairDuration,
   testRepair,
+  verificationMinutes,
 } from './repairs';
 import type { ActionView, GameState, RepairObject } from './types';
 
@@ -49,11 +50,12 @@ export function apprenticeActions(
   if ((!a?.arranged || s.now >= a.visitUntil) && samHere)
     offers.push({
       id: 'arrange-learning',
-      label: 'Arrange an afternoon at the bench with Sam',
-      detail: 'After his packing shift, before the dog walk. He can choose whether today works.',
+      label: 'Arrange a stretch at the bench with Sam',
+      detail:
+        'He can choose whether the time fits his own plans; an agreed stretch has an actual end.',
     });
   if (!a?.arranged || s.now >= a.visitUntil) return offers;
-  if (a.lastLesson && !a.lastLesson.explained)
+  if (samHere && a.lastLesson && !a.lastLesson.explained)
     offers.push({
       id: 'explain-step',
       label: `Explain your demonstration on ${s.objects.find((o) => o.id === a.lastLesson?.objectId)?.title ?? 'the earlier object'}`,
@@ -79,6 +81,29 @@ export function apprenticeActions(
         detail: 'Sam takes the steps. You remain responsible while he practices.',
       });
     else if (
+      !a.supervisedCompleted &&
+      s.objects.some(
+        (x) => x.id === 'supervised-light' && x.location === 'returned' && x.playerAssisted,
+      ) &&
+      !s.objects.some((x) => x.id === 'supervised-retry-light') &&
+      ownerHere('dad')
+    ) {
+      offers.push({
+        id: 'supervised-retry-intake',
+        label: s.unlocked.includes('supervised-retry-postponed')
+          ? 'Revisit Dad’s labelled inspection light with Sam'
+          : 'Try Dad’s labelled inspection light with Sam nearby',
+        detail:
+          'One additional real request. The earlier rescued lights keep their history; Sam still chooses every step.',
+        kind: 'primary',
+      });
+      if (!s.unlocked.includes('supervised-retry-postponed'))
+        offers.push({
+          id: 'postpone-supervised-retry',
+          label: 'Leave Dad’s additional light for another day',
+          detail: 'Keep the request available; no repair or teaching is credited.',
+        });
+    } else if (
       a.supervisedCompleted &&
       ownerHere('nora') &&
       !a.completedJobIds.length &&
@@ -112,6 +137,14 @@ export function apprenticeActions(
       detail:
         a.needsHelp ?? a.pauseReason ?? 'Twenty minutes; you can also work on another object.',
     });
+  if (a.needsHelp && a.jobId && samHere)
+    offers.push({
+      id: 'reconsider-sam',
+      label: 'Ask Sam to reconsider the kept observation with you nearby',
+      detail:
+        'He decides again from what he actually knows. This is assisted practice, even if he now knows the missing method.',
+      kind: 'primary',
+    });
   if (a.needsHelp && a.jobId)
     offers.push({
       id: 'take-over-repair',
@@ -131,7 +164,7 @@ export function arrangeLearning(s: GameState, say: Speak): void {
       action: prior.action,
       at: sam.now,
       status: 'interrupted',
-      summary: 'Paused to discuss an afternoon at the bench.',
+      summary: 'Paused to discuss a stretch at the bench.',
     });
   const continuingJob = Boolean(s.apprentice?.jobId);
   const establishedRepairer = Boolean(s.apprentice?.completedJobIds.length);
@@ -142,8 +175,8 @@ export function arrangeLearning(s: GameState, say: Speak): void {
       label: continuingJob
         ? 'Resume responsibility for the agreed whole repair'
         : establishedRepairer
-          ? 'Share another afternoon at the bench'
-          : 'Spend an afternoon learning alongside my friend',
+          ? 'Share another stretch at the bench'
+          : 'Spend a stretch learning alongside my friend',
       duration: 150,
       effort: 0.02,
       focus: 0.15,
@@ -161,7 +194,7 @@ export function arrangeLearning(s: GameState, say: Speak): void {
     {
       id: 'own-afternoon',
       action: 'rest',
-      label: 'Keep my own afternoon',
+      label: 'Keep my own time',
       duration: 30,
       effort: 0,
       advertises: { leisure: 0.12 },
@@ -178,7 +211,7 @@ export function arrangeLearning(s: GameState, say: Speak): void {
       action: chosen.action,
       at: sam.now,
       status: 'completed',
-      summary: 'Agreed a bounded afternoon at the bench.',
+      summary: 'Agreed a bounded stretch at the bench.',
       needs: { belonging: 0.02 },
     });
     s.apprentice.arranged = true;
@@ -191,7 +224,7 @@ export function arrangeLearning(s: GameState, say: Speak): void {
         ? 'I can give this repair another stretch. I will continue from the labelled observations and the step where I stopped; my own plans still matter.'
         : establishedRepairer
           ? 'I can share another stretch at the bench. I know the light work we have tried; unfamiliar observations still deserve a question. My own plans still matter.'
-          : 'I can stay until late afternoon. Show me why you choose a step, not just which bit you touch. The dog still needs me later.',
+          : `I can set aside a stretch, up to ${String(Math.floor((s.apprentice.visitUntil % 1440) / 60)).padStart(2, '0')}:${String(s.apprentice.visitUntil % 60).padStart(2, '0')}. Show me why you choose a step, not just which bit you touch. If my own plans need me sooner, we will keep the notes and stop.`,
     );
   } else {
     if (chosen) begin(sam, chosen, decision);
@@ -208,14 +241,16 @@ export function recordLesson(
   before: RepairCue,
   success: boolean,
   minutes: number,
+  attended: boolean,
 ): void {
   const a = s.apprentice,
     sam = s.people.sam;
   if (
+    !attended ||
     !a?.arranged ||
     s.now > a.visitUntil ||
     !sam ||
-    a.jobId ||
+    (a.jobId && (!a.needsHelp || a.jobId === item.id)) ||
     ![
       'inspect',
       'test-battery',
@@ -252,10 +287,10 @@ export function recordLesson(
     explained: false,
   };
 }
-export function explainLesson(s: GameState, say: Speak): void {
+export function explainLesson(s: GameState, say: Speak, attending: boolean): void {
   const lesson = s.apprentice?.lastLesson,
     sam = s.people.sam;
-  if (!lesson || !sam || lesson.explained) return;
+  if (!attending || !lesson || !sam || lesson.explained) return;
   const contextId = `demonstration:${lesson.objectId}`;
   receiveMethodCues(sam, { contextId, cues: [{ cue: 'stage', value: lesson.cue }] });
   const acquired = demonstrateMethod(sam, {
@@ -268,6 +303,13 @@ export function explainLesson(s: GameState, say: Speak): void {
     outcome: lesson.success ? 'success' : 'failure',
   });
   lesson.explained = acquired;
+  if (acquired && s.apprentice?.jobId) {
+    const assisted = s.objects.find((x) => x.id === s.apprentice?.jobId);
+    if (assisted) {
+      assisted.playerAssisted = true;
+      assisted.independent = false;
+    }
+  }
   const reasons: Partial<Record<RepairCue, string>> = {
     intake: 'Look before replacing anything.',
     'needs-test':
@@ -419,6 +461,21 @@ export function advanceApprentice(
       if (!item.awaitingCollection) completeApprenticeJob(s, item, say);
       break;
     }
+    if (
+      !a.pending &&
+      item.checkStarted !== undefined &&
+      !item.verified &&
+      sam.now < item.checkStarted + verificationMinutes(item)
+    ) {
+      // The selected physical test keeps running; no learned action is needed
+      // merely for its timer. Result-reading remains a later person decision.
+      liveOrdinaryTime(
+        sam,
+        Math.min(until, item.checkStarted + verificationMinutes(item)),
+        workerHere,
+      );
+      continue;
+    }
     if (!workerHere(sam.now)) {
       if (a.pending) {
         const prior = sam.activity;
@@ -445,7 +502,8 @@ export function advanceApprentice(
     }
     if (!a.pending) {
       if (sam.now >= a.visitUntil || !sam.body.alive || sam.body.downed) {
-        const reason = 'The agreed afternoon has ended. Arrange another stretch; the work is kept.';
+        const reason =
+          'The agreed bench session has ended. Arrange another stretch; the work is kept.';
         if (a.pauseReason !== reason) say('Sam', reason);
         a.pauseReason = reason;
         break;

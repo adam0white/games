@@ -132,3 +132,21 @@ A new reader used a fresh isolated browser, read no mechanics source or hidden f
 The reader found the pencil mark, retained donor switch and Nora's reclaimed spoon especially strong. Repeated refusals to cabinet work respected Dad's agency but made availability opaque; proposing a later time and receiving a counterproposal is a bounded planning candidate. School transitions retained the holiday day and minute across years, making the return feel thinner than the handwriting/story changes. The mechanical sewing box offered a more interesting comparison than the timer and bell's single clear repair. Tea was pleasant initially, but repeated generic sitting text became instrumental. An initially missed cabinet answer was recovered in Journal; the reader attributed that to moving too quickly rather than lost content. These findings concern an unpublished development runtime, whose evolving authored text is review evidence rather than a frozen public replay promise.
 
 The final current pass passed 173 tests across 28 files and production build. Independent review verified actual agreed cabinet promises, preserved missed history across rearrangement/cancellation, synchronized school mornings and the exact published engine 6 fixture hash. Journal export/import remain visible before long history; both original owner files import with exactly 8/91 retained entries.
+
+## Fresh public teaching route, final review
+
+A source-unread wildcard continued a fresh story on the published engine 7 build, making 206 recorded choices and reaching eighteen, Summer day 4. Its exported story restored in a separate fresh public browser. This was actual play, not a scripted optimal route. The reader finished Dad's cabinet, displayed the childhood drawing, collected a first paid repair and taught Sam, but did not reach independence or the service week.
+
+Verbatim:
+
+> “He actually learned the test, not the answer.”
+
+> “I taught him what he needed, but apparently used up the things he could learn on.”
+
+The reader responsibly rescued the sorting lamp and unfamiliar folding light after Sam stopped on untaught steps. After teaching the missing steps and returning the repaired objects, another arranged afternoon offered no further practice. Two independent technical reproductions confirmed that the finite supervised-intake gate was exhausted. The bounded engine 8 recovery lets Sam reconsider the kept observation through actual HF decisions and offers one distinct additional supervised household request. Neither resumed work nor a new request manufactures independent credit or acquired methods. Independent actual-export continuation reached 215 inputs, genuine supervised completion, a fresh unassisted Nora handoff and the available service week; the original three rescued objects remain unchanged and the continued export replays exactly.
+
+The same reader found optional cabinet conversation and a later school-year beat describing unfinished doors after their actual completion, an evening visit described as lasting until late afternoon, and a garage refusal mentioning already completed cabinet work. These are concrete continuity findings, not a request for a new world history. Completed-work recollection, state-aware school prose, truthful visit duration and current reasons passed independent review. The published engine 7 graph remains frozen for replay.
+
+Independent interface review also removed repeated diagnostic captions from ordinary illustrations, 3D and fallback inspection. The single current response, physical object description, accessible evidence and saved Notes remain. Actual desktop/mobile and deliberately disabled-WebGL checks verified that repair evidence can still be found after tea changes the current conversation.
+
+The final engine 8 check passed 184 tests across 31 files, lint, strict types and production build. A valid frozen-engine-7 public-action route saved during an unfinished waiting activity confirmed that its original endpoint completes before passive timing takes over. A timed run needs no separately taught waiting step, but elapsed time alone grants no result; withholding the actual result-reading method still makes Sam ask for help. Absent demonstration or explanation cannot teach him, and helping during an existing job preserves assistance provenance.

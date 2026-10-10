@@ -37,6 +37,7 @@ import { restoreGame as restoreEngine3 } from './engine3';
 import { restoreGame as restoreEngine4 } from './engine4';
 import { restoreGame as restoreEngine5 } from './engine5';
 import { restoreGame as restoreEngine6 } from './engine6';
+import { restoreGame as restoreEngine7 } from './engine7';
 import {
   askMumToHelp,
   beginSharedConversation,
@@ -94,7 +95,7 @@ import {
   workshopActions,
 } from './workshop';
 
-const ENGINE = 'home-garage-7';
+const ENGINE = 'home-garage-8';
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 const object = (
   id: string,
@@ -665,6 +666,23 @@ function knownAppointments(s: GameState) {
       at: cabinet.at,
       detail: `Agreed cabinet ${cabinet.task} · ${Math.floor(cabinet.at / 1440) === Math.floor(s.now / 1440) ? 'today' : 'tomorrow'} at 15:45; ask together when the time comes.`,
     });
+  const next = catalogueRequest(s.requests);
+  if (
+    next &&
+    s.unlocked.includes(`known-request:${s.requests}`) &&
+    scheduledAway(s, next.ownerId) &&
+    (s.world?.presence[next.ownerId]?.awayUntil ?? 0) <= s.now
+  ) {
+    const endHour = next.ownerId === 'sam' ? 13 : next.ownerId === 'nora' ? 10 : 0;
+    const at = Math.floor(s.now / 1440) * 1440 + endHour * 60;
+    if (at > s.now)
+      appointments.push({
+        personId: next.ownerId,
+        name: next.owner,
+        at,
+        detail: `Known routine: ${next.owner} is usually reachable after ${endHour}:00; this is not an arranged visit.`,
+      });
+  }
   return appointments.sort((a, b) => a.at - b.at);
 }
 function available(s: GameState): ActionView[] {
@@ -673,8 +691,9 @@ function available(s: GameState): ActionView[] {
   if (appointment)
     a.push({
       id: 'wait-appointment',
-      label:
-        appointment.personId === 'dad' && appointment.at === s.workshop?.cabinetAppointment?.at
+      label: appointment.detail.startsWith('Known routine:')
+        ? `Wait until ${appointment.name}’s usual free time`
+        : appointment.personId === 'dad' && appointment.at === s.workshop?.cabinetAppointment?.at
           ? 'Wait until the agreed cabinet time with Dad'
           : appointment.personId === 'player'
             ? 'Wait until your saved bench session'
@@ -966,6 +985,7 @@ function available(s: GameState): ActionView[] {
       unlocked: s.unlocked,
       holiday: s.campaign?.holiday,
       graduated: s.campaign?.graduated,
+      cabinetStage: s.workshop?.cabinet,
     }),
   ])
     if (choice.lines.every((line) => isHere(s, line.speaker.toLowerCase())))
@@ -1078,8 +1098,25 @@ export function transition(original: GameState, input: GameInput): GameState {
         presence.activity = 'Back for the summer';
       }
     }
-    for (const line of schoolStoryBeat(s.campaign.holiday))
+    for (const line of schoolStoryBeat(s.campaign.holiday, s.workshop?.cabinet))
       if (isHere(s, line.speaker.toLowerCase())) say(s, line.speaker, line.text, line.tone);
+    const next = catalogueRequest(s.requests);
+    if (
+      next &&
+      s.unlocked.includes('friends') &&
+      s.campaign.holiday >= Math.floor(s.requests / 2) &&
+      ['sam', 'nora'].includes(next.ownerId) &&
+      isHere(s, 'mum')
+    ) {
+      say(
+        s,
+        'Mum',
+        next.ownerId === 'sam'
+          ? 'Sam may have the next thing for the bench. His usual counter morning ends at one; you can ask him after that, if he is free.'
+          : 'Nora may have the next thing for the bench. She keeps her quiet morning at home until ten; you can ask her after that, if she is free.',
+      );
+      s.unlocked.push(`known-request:${s.requests}`);
+    }
     return s;
   }
   if (input.type === 'action' && input.id === 'bring-back-bedside') {
@@ -1431,12 +1468,21 @@ export function transition(original: GameState, input: GameInput): GameState {
       'take-over-repair',
       'learning-light',
       'supervised-intake',
+      'supervised-retry-intake',
+      'postpone-supervised-retry',
+      'reconsider-sam',
       'independent-intake',
       'exception-intake',
     ].includes(id)
   ) {
     if (
-      ['learning-light', 'supervised-intake', 'independent-intake', 'exception-intake'].includes(id)
+      [
+        'learning-light',
+        'supervised-intake',
+        'supervised-retry-intake',
+        'independent-intake',
+        'exception-intake',
+      ].includes(id)
     ) {
       const firstLesson = !s.objects.some((x) => x.id === 'lesson-battery');
       const itemId =
@@ -1444,15 +1490,17 @@ export function transition(original: GameState, input: GameInput): GameState {
           ? firstLesson
             ? 'lesson-battery'
             : 'lesson-contact'
-          : id === 'supervised-intake'
-            ? 'supervised-light'
-            : id === 'independent-intake'
-              ? 'independent-light'
-              : 'exception-torch';
+          : id === 'supervised-retry-intake'
+            ? 'supervised-retry-light'
+            : id === 'supervised-intake'
+              ? 'supervised-light'
+              : id === 'independent-intake'
+                ? 'independent-light'
+                : 'exception-torch';
       const owner =
         id === 'independent-intake'
           ? 'Nora'
-          : id === 'learning-light' && !firstLesson
+          : (id === 'learning-light' && !firstLesson) || id === 'supervised-retry-intake'
             ? 'Dad'
             : 'Sam';
       const title =
@@ -1460,17 +1508,19 @@ export function transition(original: GameState, input: GameInput): GameState {
           ? firstLesson
             ? 'Sam’s spare table lamp'
             : 'Dad’s small sorting lamp'
-          : id === 'supervised-intake'
-            ? 'Sam’s unfamiliar folding light'
-            : id === 'independent-intake'
-              ? 'Nora’s shaded porch light'
-              : 'Sam’s short hiking torch';
+          : id === 'supervised-retry-intake'
+            ? 'Dad’s labelled inspection light'
+            : id === 'supervised-intake'
+              ? 'Sam’s unfamiliar folding light'
+              : id === 'independent-intake'
+                ? 'Nora’s shaded porch light'
+                : 'Sam’s short hiking torch';
       const fault: Fault =
         id === 'learning-light'
           ? firstLesson
             ? 'battery'
             : 'contact'
-          : id === 'supervised-intake'
+          : id === 'supervised-intake' || id === 'supervised-retry-intake'
             ? 'contact'
             : id === 'independent-intake'
               ? 'battery'
@@ -1479,15 +1529,17 @@ export function transition(original: GameState, input: GameInput): GameState {
         itemId,
         title,
         owner,
-        firstLesson && id === 'learning-light'
-          ? 'Sam keeps this small table lamp beside a chair. Its original cell has grown tired; he has brought it to the agreed teaching afternoon.'
-          : id === 'learning-light'
-            ? 'Dad uses this small lamp above his sorting tray. Moving it has become unreliable, so he has kept it aside for you and Sam to examine.'
-            : id === 'supervised-intake'
-              ? 'Sam wants this folding lamp usable at the small desk where he sorts his shift notes.'
-              : id === 'independent-intake'
-                ? 'Nora uses this shaded porch lamp while finding her keys after dusk. She has asked for a checked repair.'
-                : 'Sam uses this short torch on the path with the dog. Its screw cap is a different contact arrangement from a table lamp.',
+        id === 'supervised-retry-intake'
+          ? 'Dad kept this distinct labelled light for looking into drawer runners. It still flickers when moved; he can lend it for one more supervised repair, with its own spare cell.'
+          : firstLesson && id === 'learning-light'
+            ? 'Sam keeps this small table lamp beside a chair. Its original cell has grown tired; he has brought it to the agreed teaching afternoon.'
+            : id === 'learning-light'
+              ? 'Dad uses this small lamp above his sorting tray. Moving it has become unreliable, so he has kept it aside for you and Sam to examine.'
+              : id === 'supervised-intake'
+                ? 'Sam wants this folding lamp usable at the small desk where he sorts his shift notes.'
+                : id === 'independent-intake'
+                  ? 'Nora uses this shaded porch lamp while finding her keys after dusk. She has asked for a checked repair.'
+                  : 'Sam uses this short torch on the path with the dog. Its screw cap is a different contact arrangement from a table lamp.',
         fault,
         id === 'exception-intake' ? 'torch' : 'lamp',
       );
@@ -1498,10 +1550,36 @@ export function transition(original: GameState, input: GameInput): GameState {
         owner,
         'Here it is, and a spare cell if it actually needs one. Tell me what you find rather than changing it blindly.',
       );
-      if (id !== 'learning-light') startApprenticeJob(s, item, id === 'supervised-intake', speak);
+      if (id !== 'learning-light')
+        startApprenticeJob(
+          s,
+          item,
+          id === 'supervised-intake' || id === 'supervised-retry-intake',
+          speak,
+        );
+    }
+    if (id === 'postpone-supervised-retry') {
+      s.unlocked.push('supervised-retry-postponed');
+      speak(
+        'You',
+        'You leave Dad’s labelled light for another day. The request stays separate from the lights already rescued; the rest of the bench remains yours to use.',
+      );
+    }
+    if (id === 'reconsider-sam' && s.apprentice?.jobId) {
+      const kept = s.objects.find((x) => x.id === s.apprentice?.jobId);
+      if (kept) {
+        kept.playerAssisted = true;
+        kept.independent = false;
+      }
+      s.apprentice.supervised = true;
+      s.apprentice.needsHelp = undefined;
+      speak(
+        'You',
+        'Keep the same observation and try deciding again with me nearby. I am taking responsibility for this assisted practice; it will not count as an independent whole job.',
+      );
     }
     if (id === 'arrange-learning') arrangeLearning(s, speak);
-    if (id === 'explain-step') explainLesson(s, speak);
+    if (id === 'explain-step') explainLesson(s, speak, isHere(s, 'sam'));
     if ((id === 'supervised-repair' || id === 'delegate-repair') && o)
       startApprenticeJob(s, o, id === 'supervised-repair', speak);
     if (id === 'take-over-repair' && s.apprentice?.jobId) {
@@ -1549,6 +1627,7 @@ export function transition(original: GameState, input: GameInput): GameState {
     advancePeople(s);
     return s;
   }
+  const samSawStart = isHere(s, 'sam');
   const beforeCue = o ? cueFor(o, s.now) : undefined;
   const storyChoice = [
     ...optionalStoryChoices({
@@ -1558,6 +1637,7 @@ export function transition(original: GameState, input: GameInput): GameState {
       unlocked: s.unlocked,
       holiday: s.campaign?.holiday,
       graduated: s.campaign?.graduated,
+      cabinetStage: s.workshop?.cabinet,
     }),
   ].find((x) => x.id === id);
   if (storyChoice) {
@@ -2100,7 +2180,8 @@ export function transition(original: GameState, input: GameInput): GameState {
     ].includes(id)
   )
     o.playerAssisted = true;
-  if (o && beforeCue) recordLesson(s, o, id, beforeCue, !failed, duration);
+  if (o && beforeCue)
+    recordLesson(s, o, id, beforeCue, !failed, duration, samSawStart && isHere(s, 'sam'));
   advancePeople(s);
   if (o?.location === 'returned' && !o.awaitingCollection)
     for (const line of completeWorkshopJob(s, o.id, {
@@ -2339,10 +2420,19 @@ export function restoreGame(text: string): GameState {
   if (typeof text !== 'string' || text.length > 8_000_000) throw Error('Save is too large');
   const data = JSON.parse(text);
   if (
-    ['home-garage-2', 'home-garage-3', 'home-garage-4', 'home-garage-5', 'home-garage-6'].includes(
-      data?.engine,
-    )
+    [
+      'home-garage-2',
+      'home-garage-3',
+      'home-garage-4',
+      'home-garage-5',
+      'home-garage-6',
+      'home-garage-7',
+    ].includes(data?.engine)
   ) {
+    if (data.engine === 'home-garage-7') {
+      const validated = restoreEngine7(text);
+      return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };
+    }
     if (data.engine === 'home-garage-6') {
       const validated = restoreEngine6(text);
       return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };

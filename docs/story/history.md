@@ -6,8 +6,8 @@
 2. In a winter before the opening, kitchen renovation displaced meals into the front room. Mum acquired the reading lamp then. Dad's three-day estimate was optimistic. Nora lent a camping stove; Dad cooked eggs outside in his coat. The kitchen became usable; Friday meals in the front room continued for a while.
 3. Mum helped Nora with curtains that same year. Neither keeps a debt ledger of these favours.
 4. Dad's bench has a plant-pot ring and a glue/clamp mark. The split-shade donor lamp hung above paint tins. Dad retained it partly for its good switch. Taking a sound holder does not make every donor part usable.
-5. The kitchen cabinet functions without its two doors. Hinge drawings are in Dad's notebook. The unfinished doors do not contradict the kitchen being usable. A later school transition can show one door moved from the wall; finishing the remaining work is unresolved.
-6. Sam's torch was unreliable before being dropped on the path last week, as reported at first intake. This report belongs to that episode's date, not every later year. Its missing strap was replaced with red parcel string. The drop is history, not proof of its hidden fault.
+5. The kitchen cabinet functions without its two doors. Hinge drawings are in Dad's notebook. The unfinished doors do not contradict the kitchen being usable. School transitions preserve the actual cabinet stage; they do not move, hang or finish a door offscreen. A completed cabinet remains a shared accomplishment in later memories.
+6. Before its first intake, Sam’s torch was already unreliable when he dropped it on the path, as he reports in that episode. This report belongs to that episode's date, not every later year. Its missing strap was replaced with red parcel string. The drop is history, not proof of its hidden fault.
 
 ## Broad world facts
 
@@ -21,7 +21,7 @@
 
 Repaired, checked, shelved, returned, taught, hired and paid are distinct outcomes. Do not narrate a later episode as if every player completed the same optional repair. School-year transitions preserve labelled objects, received evidence, people and actual accomplishments; they do not silently complete unfinished work.
 
-Nora's pantry lamp and Sam's spare are first repeat requests. Later intake needs different provenance or retained object identity. Object history must not be recycled into an inexhaustible anecdote. Historical engine-3 exports retain adult-visit wording as provenance; that wording is not current canon.
+Nora’s kitchen lamp and Sam’s torch are the first neighbour requests. Later catalogue entries carry their own provenance, including Nora’s pantry lamp and Dad’s salvaged inspection lamp; teaching lamps are separate objects. A revisited sewing box retains its original identity and the earlier hinge repair when a later catch problem appears. Object history must not be recycled into an inexhaustible anecdote. Historical engine-3 exports retain adult-visit wording as provenance; that wording is not current canon.
 
 ## Objects carried forward
 
