@@ -10,3 +10,5 @@ This is the continuity reference for authored fiction, not a universal text stor
 When adding a fact, check these pages and record it in the appropriate place. A planned event is not an event that has happened. A fact known to its speaker is not automatically known to the player or every HF person. Story options do not establish repair competence, a customer contract or apprentice learning.
 
 The finite object catalogue lives in `src/game/catalogue.ts`: eight neighbour/household requests alongside the two opening lamps, with a separate paper-street project waiting for a compatible gear. Runtime text stays beside authored object data; this index records relationships and history rather than duplicating every line.
+
+The optional post-week sample case and separate household light are authored in `src/game/neighbourhood.ts`. They preserve their own acceptance, parts and return histories rather than becoming repeating catalogue stock.

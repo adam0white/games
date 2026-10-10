@@ -130,7 +130,7 @@ it('nighttime and bodily unavailability suppress conversations without reading p
   dad.body.asleep = true;
   expect(getView(s).actions.some((a) => a.id === 'ask-dad-bench')).toBe(false);
   expect(getView(s).whereabouts?.find((person) => person.id === 'nora')?.activity).toBe(
-    'At home; you can arrange a visit',
+    'You can ask for time together',
   );
 });
 

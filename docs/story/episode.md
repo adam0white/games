@@ -45,3 +45,15 @@ A heard request carries a desired calendar time but no price or promise; the cho
 The service-week conversation itself does not arrange visitors. Choosing regular work or occasional favours authorizes Leila’s and Nora’s dated request conversations; a private bench does not. Reconsidering future work preserves already arranged conversations and accepted job terms. Evan’s donor visit needs its own invitation, even on the private route. The invitation is for comparing a possible part, not consenting to transfer it.
 
 If the model has not previously been found, the player can explicitly bring its saved flat box down from the small room. Its paper shopfronts and the old clearance display base become a physical unfinished project before any model session or donor invitation is offered. Discovery supplies no replacement gear or learned method.
+
+## The case from the old window
+
+Either first-week ending permits a small neighbourhood continuation. Nora can discuss one remembered sample window without requiring the player to have repaired or displayed the model. When the model is present, its actual motion and the player's decision about sharing drawings change what they show her. Neither route manufactures a donor part.
+
+An optional thirty-minute accompanied visit compares her partial memory with one surviving frontage. Both people must actually agree and finish the time together before the visit supplies observations. Staying at the bench leaves the unfamiliar case available; the visit is not a hidden progression gate.
+
+Nora first describes the samples she wants to keep together while carrying them. The player can decline, accept an examination, compare the incompatible replacement without drilling, ask about her retained compatible fitting, propose a stationary use, or return the original arrangement unfinished. Measurement, permission, fitting and checking remain separate. The carrying and stationary outcomes have different ordinary consequences and different repair credit.
+
+A separate household light offers supported work for Sam while the player handles the case or another personal object. Its materials, accepted terms, availability and collection follow the normal workshop pipeline. Delegation releases the player's attention only when Sam genuinely owns the job; neither watching nor intervening is required to unlock the case.
+
+This chapter adds a place and an old promise through concrete objects. It leaves the cause of the wider decline, ownership of the former shop and the player's eventual career unresolved.

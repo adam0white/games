@@ -1,5 +1,6 @@
 import type { Person } from '@adam0white/human-framework';
-import type { RepairCue } from './repairs';
+import type { NeighbourhoodState } from './neighbourhood';
+import type { CaseFittings, RepairCue } from './repairs';
 import type { ServiceWeekState } from './service-week';
 import type { WorkshopState } from './workshop';
 
@@ -12,6 +13,7 @@ export type Fault =
   | 'striker'
   | 'hinge'
   | 'catch-offset'
+  | 'worn-catch'
   | 'spring'
   | 'gear';
 export type Chapter = 'family' | 'bench' | 'later' | 'garage';
@@ -24,6 +26,8 @@ export interface RepairObject {
   story: string;
   inspectText?: string;
   repairText?: string;
+  caseFittings?: CaseFittings;
+  requestedUse?: string;
   appearance?:
     | 'reading'
     | 'bedside'
@@ -73,6 +77,7 @@ export interface LoggedInput {
 }
 
 export interface GameState {
+  neighbourhood?: NeighbourhoodState;
   serviceWeek?: ServiceWeekState;
   checkingPlaces?: number;
   workshop?: WorkshopState;
@@ -104,6 +109,13 @@ export interface GameState {
       eventId: string;
       explained: boolean;
     };
+  };
+  samPlans?: {
+    invitation: 'pending' | 'accepted';
+    heardAt: number;
+    routineShiftKnown?: boolean;
+    availableAfter?: number;
+    availabilityReason?: string;
   };
   world?: { presence: Record<string, { awayUntil: number; activity: string }>; day: number };
   engine3Save?: string;
@@ -149,6 +161,11 @@ export interface ActionView {
 }
 
 export interface ObjectView {
+  casePresentation?: {
+    mode: 'carrying-case' | 'stationary-tray';
+    catch: 'original' | 'compatible' | 'none';
+    comparisonKnown: boolean;
+  };
   id: string;
   title: string;
   owner: string;
@@ -175,7 +192,23 @@ export interface GameView {
   knownAppointments?: { personId: string; name: string; at: number; detail: string }[];
   collectionPlans?: { objectId: string; title: string; owner: string; detail: string }[];
   lifeChapter?: { label: string; detail?: string };
-  apprenticeship?: { name: string; activity: string; responsibility: string };
+  dayPlan?: {
+    summary: string;
+    entries: {
+      id: string;
+      label: string;
+      detail: string;
+      status: 'agreed' | 'invitation' | 'routine' | 'underway' | 'late';
+      actionIds?: string[];
+    }[];
+  };
+  apprenticeship?: {
+    name: string;
+    activity: string;
+    responsibility: string;
+    availability?: string;
+    nextEvent?: { at: number; label: string; detail: string };
+  };
   timeLabel?: string;
   whereabouts?: { id: string; name: string; activity: string }[];
   title: string;

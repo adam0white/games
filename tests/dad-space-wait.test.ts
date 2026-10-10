@@ -31,9 +31,10 @@ it('waits only after a real refusal to the actual activity endpoint without gran
     if (!s.workshop?.intakeSpace)
       s = transition(s, {
         type: 'action',
-        id: getView(s).actions.some((a) => a.id === 'wait-dad-activity')
-          ? 'wait-dad-activity'
-          : 'rest',
+        id:
+          getView(s).actions.find((a) =>
+            ['wait-dad-activity', 'wait-player-activity'].includes(a.id),
+          )?.id ?? 'rest',
       });
   }
   expect(s.workshop?.intakeSpace).toBe(true);

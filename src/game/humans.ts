@@ -6,11 +6,26 @@ import {
   decide,
   finish,
   type Person,
+  reviewed,
   tick,
 } from '@adam0white/human-framework';
 import { quietPracticeOffers } from './practices';
 
-export function shareTea(player: Person, mum: Person, until: number): boolean {
+export type TeaReport = {
+  kind: 'joined' | 'refused' | 'shortened';
+  participant?: 'player' | 'mum';
+  elapsed: number;
+};
+
+/** Both people choose company; HF reviews and actual elapsed activity determine
+ * completion. Declining or stopping company leaves the remaining time ordinary. */
+export function shareTea(
+  player: Person,
+  mum: Person,
+  until: number,
+  onResult?: (report: TeaReport) => void,
+): boolean {
+  const startedAt = player.now;
   const offer: Affordance = {
     id: 'tea-together',
     action: 'talk',
@@ -22,49 +37,99 @@ export function shareTea(player: Person, mum: Person, until: number): boolean {
     tags: ['social', 'leisure'],
     advertises: { belonging: 0.15, leisure: 0.1 },
   };
-  const decision = decide(mum, [offer]);
-  if (decision.chosenAffordanceId !== offer.id || !begin(mum, offer, decision)) {
+  const playerOffer = { ...offer, with: [mum.id], duration: until - player.now };
+  const choices = [
+    [mum, offer, 'mum'],
+    [player, playerOffer, 'player'],
+  ] as const;
+  const decisions = choices.map(([person, opportunity]) => decide(person, [opportunity]));
+  const refusal = choices.findIndex(
+    ([, opportunity], i) => decisions[i]?.chosenAffordanceId !== opportunity.id,
+  );
+  const ordinary = () => {
+    liveOrdinaryTime(player, until);
     liveOrdinaryTime(mum, until);
-    const alone: Affordance = {
-      id: 'quiet-break',
-      action: 'rest',
-      label: 'Sit quietly for a while',
-      duration: until - player.now,
-      effort: 0,
-      focus: 0,
-      advertises: { leisure: 0.1 },
-    };
-    const chosen = decide(player, [alone]);
-    if (chosen.chosenAffordanceId === alone.id && begin(player, alone, chosen)) {
-      tick(player, until);
-      finish(player, {
-        affordanceId: alone.id,
-        action: alone.action,
-        at: until,
-        status: 'completed',
-        summary: alone.label,
-        needs: alone.advertises,
-      });
-    } else tick(player, until);
+  };
+  if (refusal >= 0 || until <= startedAt || mum.now !== startedAt) {
+    ordinary();
+    onResult?.({
+      kind: 'refused',
+      participant: choices[refusal >= 0 ? refusal : 0]?.[2],
+      elapsed: 0,
+    });
     return false;
   }
-  for (const [person, other] of [
-    [player, mum],
-    [mum, player],
-  ] as const) {
-    const shared = { ...offer, with: [other.id], duration: until - person.now };
-    if (person === player) begin(person, shared, decide(person, [shared]));
-    tick(person, until);
+  const activities = choices.map(([person, opportunity], i) => {
+    const decision = decisions[i];
+    if (!decision) return null;
+    const prior = person.activity;
+    if (prior)
+      finish(person, {
+        affordanceId: prior.affordanceId,
+        action: prior.action,
+        at: person.now,
+        status: 'interrupted',
+        summary: 'Set my activity aside for agreed company.',
+      });
+    return begin(person, opportunity, decision);
+  });
+  let stopped: 'player' | 'mum' | undefined = activities[0]
+    ? activities[1]
+      ? undefined
+      : 'player'
+    : 'mum';
+  while (player.now < until && !stopped) {
+    // Observe interruptions at minute precision, then retain the remainder as ordinary time.
+    const step = Math.min(until, player.now + 1);
+    for (const [person] of choices) tick(person, step);
+    for (let i = 0; i < choices.length; i++) {
+      const entry = choices[i];
+      const activity = activities[i];
+      if (!entry) continue;
+      const [person, opportunity, who] = entry;
+      if (
+        !activity ||
+        !person.body.alive ||
+        person.body.downed ||
+        person.activity !== activity ||
+        activity.interrupt
+      ) {
+        stopped = who;
+        break;
+      }
+      if (person.now < until && person.now >= activity.reviewAt) {
+        const choice = decide(person, [opportunity]);
+        if (choice.chosenAffordanceId !== opportunity.id) {
+          stopped = who;
+          break;
+        }
+        reviewed(person);
+      }
+    }
+  }
+  const elapsed = Math.max(0, Math.min(player.now, mum.now, until) - startedAt);
+  const completed =
+    !stopped && activities.every((activity) => activity && activity.endsAt <= until);
+  for (let i = 0; i < choices.length; i++) {
+    const entry = choices[i];
+    if (!entry || entry[0].activity !== activities[i]) continue;
+    const [person, opportunity] = entry;
     finish(person, {
-      affordanceId: offer.id,
-      action: offer.action,
-      at: until,
-      status: 'completed',
-      summary: offer.label,
-      needs: offer.advertises,
+      affordanceId: opportunity.id,
+      action: opportunity.action,
+      at: person.now,
+      status: completed ? 'completed' : 'interrupted',
+      summary: completed ? opportunity.label : 'Our time together ended early.',
+      ...(completed ? { needs: opportunity.advertises } : {}),
     });
   }
-  return true;
+  ordinary();
+  onResult?.({
+    kind: completed ? 'joined' : 'shortened',
+    ...(stopped ? { participant: stopped } : {}),
+    elapsed,
+  });
+  return completed;
 }
 export function askMumToHelp(mum: Person): boolean {
   const help: Affordance = {

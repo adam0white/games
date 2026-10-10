@@ -5,6 +5,9 @@ export function ObjectIllustration({ object }: { object: ObjectView }) {
   const titleId = useId();
   const appearance: string =
     object.appearance ?? (object.form === 'lamp' ? 'reading' : object.form);
+  const sampleCase = object.id === 'nora-sample-case';
+  const sampleTray = object.casePresentation?.mode === 'stationary-tray';
+  const sampleCatch = object.casePresentation?.catch ?? 'original';
   return (
     <div
       className={`object-art ${object.visual} ${appearance} ${object.form !== 'lamp' && object.form !== 'torch' ? 'crafted-object' : ''}`}
@@ -97,7 +100,7 @@ export function ObjectIllustration({ object }: { object: ObjectView }) {
             <circle className="bell-screw" cx="156" cy="96" r="5" />
           </>
         )}
-        {appearance === 'box' && (
+        {appearance === 'box' && !sampleCase && (
           <>
             <path className="box-side" d="M63 116 L90 93 L263 100 L259 203 L234 222 L61 213 Z" />
             <path className="box-lid" d="M63 116 L90 93 L263 100 L235 125 Z" />
@@ -107,6 +110,89 @@ export function ObjectIllustration({ object }: { object: ObjectView }) {
             <path className="box-handle" d="M131 106 Q144 89 165 103" />
             <path className="box-thread" d="M86 154 Q105 177 93 195 M100 154 Q120 178 108 197" />
           </>
+        )}
+        {sampleCase && (
+          <g className="sample-case-art">
+            <path
+              fill="#839080"
+              stroke="#535f53"
+              strokeWidth="2"
+              d={
+                sampleTray
+                  ? 'M24 121 L66 84 L277 106 L236 143 Z'
+                  : 'M48 119 L62 48 L279 55 L290 129 Z'
+              }
+            />
+            <path
+              fill="#b4b49b"
+              d={
+                sampleTray
+                  ? 'M39 119 L70 94 L261 112 L234 134 Z'
+                  : 'M64 110 L75 64 L266 70 L276 116 Z'
+              }
+            />
+            <path
+              fill="#737f6c"
+              stroke="#515d50"
+              strokeWidth="2"
+              d="M32 153 L70 117 L288 139 L250 181 Z"
+            />
+            <path
+              fill="#a5ae91"
+              stroke="#535f53"
+              strokeWidth="2"
+              d="M32 153 L250 181 L250 213 L32 183 Z"
+            />
+            <path
+              fill="#67745f"
+              stroke="#535f53"
+              strokeWidth="2"
+              d="M250 181 L288 139 L288 172 L250 213 Z"
+            />
+            <path fill="#e2d7ba" d="M48 153 L77 128 L267 146 L240 172 Z" />
+            <path fill="#b8a271" d="M60 150 L83 132 L114 136 L94 158 Z" />
+            <path fill="#ae8580" d="M103 157 L124 138 L154 141 L132 161 Z" />
+            <path fill="#7b9090" d="M141 162 L163 143 L193 147 L172 167 Z" />
+            <path fill="#80916b" d="M181 167 L204 149 L231 152 L212 172 Z" />
+            <path
+              fill="none"
+              stroke="#828a72"
+              strokeWidth="3"
+              d="M100 129 L74 162 M143 134 L117 168 M184 138 L159 173 M225 143 L200 179"
+            />
+            <g stroke="#706c55" strokeWidth="1.3" opacity="0.7">
+              <path d="M84 145 l12 2 M127 150 l12 2 M168 155 l12 2 M209 160 l12 2" />
+              <path d="M81 148 l9 1 M124 153 l9 1 M165 158 l9 1 M206 163 l9 1" />
+            </g>
+            {sampleCatch !== 'none' && (
+              <>
+                <path
+                  fill={sampleCatch === 'compatible' ? '#c7b58a' : '#b7a478'}
+                  stroke="#787052"
+                  strokeWidth="1.4"
+                  d="M138 170 L153 172 L153 198 L138 196 Z"
+                />
+                {sampleCatch === 'original' && (
+                  <path stroke="#817958" strokeWidth="1.3" d="M142 181 l7 1 M143 188 l5 1" />
+                )}
+              </>
+            )}
+            <path fill="#d2c5a6" opacity="0.7" d="M50 165 L116 174 L115 190 L49 181 Z" />
+            <text fill="#7d7862" fontSize="7" transform="translate(55 174) rotate(7)">
+              SERVICE · COUNTER
+            </text>
+            <path
+              fill="#d0c4a5"
+              stroke="#9a9279"
+              strokeWidth="1"
+              d="M235 152 L261 149 L271 154 L245 158 Z"
+            />
+            {object.inspected && (
+              <text fill="#655e49" fontSize="5.7" transform="translate(237 153) rotate(-5)">
+                INTERCHANGEABLE
+              </text>
+            )}
+          </g>
         )}
         {appearance === 'clip' && (
           <>

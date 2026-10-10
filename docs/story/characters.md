@@ -18,6 +18,8 @@ Makes and repairs household things at the garage bench. Stores recoverable parts
 
 Longstanding family friend from before the kitchen renovation. Lent the camping stove; Mum helped her with curtains that year. Her household includes others whose identities are unestablished. Likes a quiet early cup before they wake. Can suggest customers but asks before sharing the player's name. Wants clear prices and the ability to refuse a favour without damaging a friendship. Remembers shops when they sold new goods; does not nostalgically claim everything used to work perfectly. The cake tin circulates between households; do not repeatedly surrender the same tin.
 
+She personally retains a sewing-sample case from an old shop counter and remembers its low window. Her recollection is incomplete; the case does not establish that she owned the shop or knows why the street changed. She can prefer carrying the samples, consider a stationary display instead, or decline the proposal. Her request, permission to use a retained fitting, accompanied visit and separate household-light job each require their own actual agreement. She does not know Sam’s private wage or schedule unless someone tells her.
+
 ## Sam
 
 Fifteen at the opening, a school friend one year ahead of the player. Has a female dog, an unreliable pocket torch and a spare. Helps pack orders at a parts counter on some holiday mornings; this is not a full-time career or an apprenticeship contract. School and agreed counter hours restrict availability. Red parcel string on the torch is deliberately useful. Curious about diagnosis and willing to arrange an afternoon. A dog-walk commitment takes about fifty simulated minutes; absence governs speech and collection.

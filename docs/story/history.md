@@ -28,3 +28,13 @@ Nora’s kitchen lamp and Sam’s torch are the first neighbour requests. Later 
 Mum’s kitchen timer has an accessible obstruction, not a failed enclosed spring. Dad keeps his bicycle bell after passing an incompatible older frame to someone with the right wheel. Nora’s sewing box carries blue cloth left from her curtains; smaller patches expose gradual material scarcity. Sam’s school timetable remains folded beneath his first parts-counter rota. Nora’s later pantry inventory has become a button drawer, and Dad saves numbered depot returns because the original jobs may still need their parts. These histories do not establish the cause of the wider scarcity.
 
 The player’s paper-street model combines childhood paper shopfronts with a clearance windup base. Its compatible gear is missing; winding it harder cannot repair that. A later donor may make it move again. The printed “A BETTER HIGH STREET” intention remains an ordinary piece of old planning, not proof of a secret scheme.
+
+## The case from the old window
+
+After either first service-week ending, Nora can recognize a low window and sample counter in the paper street. Her memory is partial. An optional accompanied visit can reveal a surviving detail that differs from the printed model; it does not establish why the street changed. An invitation is not a completed visit, and interruptions must remain visible in the run.
+
+Nora personally owns the sewing-sample case formerly used at that counter. Its worn catch no longer reliably holds samples together while carried. The supplied replacement is labelled interchangeable, but its mounting holes measure 30 mm against the case’s 24 mm spacing. That observed mismatch is evidence about these two parts, not an explanation of the world. Nora retains a compatible old counter catch; taking it requires her actual permission. Parts remain finite and case-owned hardware stays with the case.
+
+Original carrying repair, an owner-approved stationary display tray, and unchanged return are distinct outcomes. A checked tray does not acquire carrying-repair credit by fitting a catch later without a new agreement. Nora’s separately offered sample-shelf light is another object and another acceptance decision. It can use Sam’s acquired lamp methods; the unfamiliar case cannot inherit competence from those methods.
+
+The model’s motion, discovery and shared drawings follow actual history. Nora may see a printed shopfront without seeing the player’s private childhood pages. Neither recognising the window nor hearing a request chooses a business future for the player.

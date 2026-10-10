@@ -44,7 +44,10 @@ it('company alone does not invent a running test when the timer has not been sta
     s = transition(s, { type: 'action', id });
   s = transition(s, { type: 'action', id: 'rest' });
   expect(s.journal?.at(-1)?.speaker).toBe('Mum');
-  expect(s.journal?.at(-1)?.text).toBe('It’s nice having you here.');
+  expect(s.journal?.at(-1)?.text).toBe(
+    'It’s nice having you here. Your old drawing is still out where we can see it.',
+  );
+  expect(s.journal?.at(-1)?.text).not.toContain('check');
   expect(restoreGame(serializeGame(s))).toEqual(s);
 });
 it('a real light check keeps its light-specific tea wording', () => {

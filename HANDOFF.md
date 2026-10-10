@@ -1,8 +1,14 @@
 # Handoff
 
-Updated 2026-10-10 during the authorized five-hour run; deadline 10:59:20 UTC.
+Updated 2026-10-10 after the five-hour checkpoint. Adam renewed autonomous work while still away; the prior deadline no longer ends the task.
 
 ## What remains
+
+Renewed active milestone: improve received Sam availability and the postponed watching invitation, clarify the remaining unplayed holiday/school transition, and add one bounded post-week neighbourhood episode linking early personal work to useful delegated work. Delegated runtime/UI work and independent story design are underway in `.worktrees/full-workshop`; public code remains the verified checkpoint below. The stopping artifact is a coherent reviewed local/public build with actual saved-story continuity, followed by Adam's personal playtest acceptance.
+
+Fresh source-unread engine-11 feedback also exposed an unmet-Sam routine notice, opaque drawing terminology and generic tea. Source inspection found the shared-tea helper could ignore an unsuccessful player beginning and still claim company. A separate worker is correcting the real two-person lifecycle before engine 12 is frozen; the reviewed artifact now includes truthful finished/refused/interrupted company. No new generic HF faculty is being added.
+
+Engine-12 / game-0.4.0 candidate now passes lint, strict types, 227 tests across 41 files and production build. Independent technical review reproduced and then cleared premature chapter access, no-op shelving, repair work bypassing HF, missing light payment terms and false tea completion. The actual priced extra-light continuation records £5 income, separately agreed £3 Sam pay and one supplied battery exactly once without watching. All thirteen published-engine-11 modules retain their frozen identity; its actual public intake-success export validates unchanged. UI/content edits are paused. Remaining before publication: immutable candidate playthrough, exact native browser export roundtrip, clean static deployment/live manifest and local integration. Public code still remains the engine-11 checkpoint below.
 
 The reviewed standalone game is public at https://repair.adamwhite.work: game 0.3.5 / engine home-garage-11, clean commit 8975c33b41149f267c4bd3e1b1aae4d8cd037b57, released HF 2.2.0. The owner local preview is integrated at http://127.0.0.1:5173/. All 196 tests, lint, strict types and build passed; actual exports and browser continuations preserve prior stories. Two source-unread public readers completed a first week, and the fresh reader independently recovered its personal model on published engine 9. The final source-unread wildcard reached adulthood and exposed the actual player-side refusal bug. The source correction and exact saved-state continuation passed independent review; the actual public browser continuation passed before the five-hour deadline, 10:59:20 UTC. Adam's long playtest and taste acceptance remain. The broader economy/MMORPG tiers are not an active queue. Current plan provenance: docs/superpowers/plans/2026-10-10-first-service-week.md.
 

@@ -41,6 +41,7 @@ import { restoreGame as restoreEngine7 } from './engine7';
 import { restoreGame as restoreEngine8 } from './engine8';
 import { restoreGame as restoreEngine9 } from './engine9';
 import { restoreGame as restoreEngine10 } from './engine10';
+import { restoreGame as restoreEngine11 } from './engine11';
 import {
   askMumToHelp,
   beginSharedConversation,
@@ -49,7 +50,14 @@ import {
   chooseUncheckedReturn,
   liveOrdinaryTime,
   shareTea,
+  type TeaReport,
 } from './humans';
+import {
+  applyNeighbourhoodAction,
+  type NeighbourhoodContext,
+  neighbourhoodActions,
+  neighbourhoodCase,
+} from './neighbourhood';
 import {
   agreeCheckedCollection,
   attestCheckedCollection,
@@ -62,15 +70,22 @@ import {
   suspendUnplayedPractice,
 } from './practices';
 import {
+  adaptCaseTray,
   applyRepair,
   catchActions,
+  checkCaseCarry,
+  checkCaseTray,
   checkingSpaceAvailable,
   compatibleGearAvailable,
   cueFor,
+  fitCaseCatch,
+  freshCaseFittings,
   inspectRepair,
   isMechanical,
+  measureCaseFittings,
   readLongCheck,
   repairDuration,
+  restoreCaseUnchanged,
   testCatch,
   testRepair,
   verificationMinutes,
@@ -94,11 +109,12 @@ import {
   applyWorkshopAction,
   CABINET_MINUTES,
   completeWorkshopJob,
+  freshWorkshop,
   type WorkshopContext,
   workshopActions,
 } from './workshop';
 
-const ENGINE = 'home-garage-11';
+const ENGINE = 'home-garage-12';
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 const object = (
   id: string,
@@ -374,7 +390,12 @@ function advancePeople(s: GameState) {
       },
     );
     const latest = notices.at(-1);
-    if (latest) {
+    if (
+      latest &&
+      (id !== 'sam' ||
+        s.unlocked.includes('met:sam') ||
+        s.unlocked.includes('story:observer-invite'))
+    ) {
       const occurred = gameTimeLabel({ ...s, now: latest.from });
       const ongoing = person.activity?.action === latest.action && person.activity.endsAt > s.now;
       const description = latest.action === 'pray' ? 'quiet prayer' : 'taking the dog out';
@@ -689,6 +710,25 @@ function cancelCabinetTime(s: GameState) {
   if (s.people.player) releaseCommitment(s.people.player, a.playerId);
   a.status = 'cancelled';
 }
+function neighbourhoodContext(s: GameState): NeighbourhoodContext {
+  const item = s.objects.find((o) => o.id === neighbourhoodCase.id);
+  return {
+    weekConcluded: ['small', 'regular'].includes(s.serviceWeek?.conclusion ?? ''),
+    noraHere: isHere(s, 'nora'),
+    model: s.objects.find((o) => o.id === PERSONAL_PROJECT.id),
+    caseObject: item,
+    fittings: item?.caseFittings,
+    drawingsShared: s.workshop?.drawingChoice === 'displayed',
+    agree: () => false,
+    compatibleSourceKnown: !!s.neighbourhood?.sourceCompared,
+    frontageAvailable: Array.from({ length: 31 }, (_, i) => s.now + i).every((at) =>
+      isHere(s, 'nora', at),
+    ),
+  };
+}
+function clockTime(at: number) {
+  return `${String(Math.floor((at % 1440) / 60)).padStart(2, '0')}:${String(at % 60).padStart(2, '0')}`;
+}
 function knownAppointments(s: GameState) {
   const appointments = Object.entries(s.world?.presence ?? {})
     .filter(([, p]) => p.awayUntil > s.now)
@@ -698,19 +738,38 @@ function knownAppointments(s: GameState) {
       at: p.awayUntil,
       detail: `${p.activity} · ${Math.floor(p.awayUntil / 1440) === Math.floor(s.now / 1440) ? 'today' : Math.floor(p.awayUntil / 1440) === Math.floor(s.now / 1440) + 1 ? 'tomorrow' : `in ${Math.floor(p.awayUntil / 1440) - Math.floor(s.now / 1440)} days`} at ${String(Math.floor((p.awayUntil % 1440) / 60)).padStart(2, '0')}:${String(p.awayUntil % 60).padStart(2, '0')}`,
     }));
-  for (const c of s.people.sam?.agenda.commitments ?? [])
+  for (const flag of s.unlocked) {
+    const shift = /^service-counter:(\d+):(\d+)$/.exec(flag);
     if (
-      c.status === 'pending' &&
-      c.actions.includes('parts-counter') &&
-      c.until > s.now &&
-      c.from <= s.now
+      shift &&
+      s.unlocked.includes(`heard-counter:${shift[1]}:${shift[2]}`) &&
+      Number(shift[2]) > s.now &&
+      Number(shift[1]) <= s.now
     )
       appointments.push({
         personId: 'sam',
         name: 'Sam',
-        at: c.until,
-        detail: `Agreed parts-counter shift ends today at ${String(Math.floor((c.until % 1440) / 60)).padStart(2, '0')}:${String(c.until % 60).padStart(2, '0')}`,
+        at: Number(shift[2]),
+        detail:
+          'Sam told you his agreed parts-counter shift ends at 17:00; bench time still needs his agreement.',
       });
+  }
+  if (s.samPlans?.availableAfter && s.samPlans.availableAfter > s.now)
+    appointments.push({
+      personId: 'sam',
+      name: 'Sam',
+      at: s.samPlans.availableAfter,
+      detail:
+        s.samPlans.availabilityReason ?? 'Sam asked you to try again after his current plans.',
+    });
+  if (s.samPlans?.routineShiftKnown && s.now % 1440 >= 9 * 60 && s.now % 1440 < 13 * 60)
+    appointments.push({
+      personId: 'sam',
+      name: 'Sam',
+      at: Math.floor(s.now / 1440) * 1440 + 13 * 60,
+      detail:
+        'Sam said his usual morning shift ends at 13:00. This is a chance to ask, not an agreed bench session.',
+    });
   const personalAt = s.serviceWeek?.personalAt;
   if (
     personalAt &&
@@ -752,17 +811,34 @@ function knownAppointments(s: GameState) {
 }
 function available(s: GameState): ActionView[] {
   const a: ActionView[] = [];
+  if (
+    s.samPlans?.invitation === 'pending' &&
+    (s.samPlans.availableAfter ?? 0) <= s.now &&
+    isHere(s, 'sam')
+  )
+    a.push({
+      id: 'resume-observer-invite',
+      label: 'Ask Sam again about watching a repair',
+      detail: 'The earlier invitation was left open. He can choose whether now fits his plans.',
+      kind: 'primary',
+    });
   const appointment = knownAppointments(s)[0];
   if (appointment)
     a.push({
       id: 'wait-appointment',
-      label: appointment.detail.startsWith('Known routine:')
-        ? `Wait until ${appointment.name}’s usual free time`
-        : appointment.personId === 'dad' && appointment.at === s.workshop?.cabinetAppointment?.at
-          ? 'Wait until the agreed cabinet time with Dad'
-          : appointment.personId === 'player'
-            ? 'Wait until your saved bench session'
-            : `Leave time for ${appointment.name}’s arranged return`,
+      label:
+        appointment.detail.startsWith('Known routine:') ||
+        appointment.detail.startsWith('Sam said his usual')
+          ? `Wait until ${appointment.name}’s usual free time`
+          : appointment.personId === 'dad' && appointment.at === s.workshop?.cabinetAppointment?.at
+            ? 'Wait until the agreed cabinet time with Dad'
+            : appointment.personId === 'sam' && appointment.detail.includes('shift ends')
+              ? 'Let Sam finish the shift he told you about'
+              : appointment.personId === 'sam' && s.samPlans?.availableAfter === appointment.at
+                ? 'Leave time for the plans Sam mentioned'
+                : appointment.personId === 'player'
+                  ? 'Wait until your saved bench session'
+                  : `Leave time for ${appointment.name}’s arranged return`,
       detail: appointment.detail,
       intent: 'pause',
     });
@@ -791,7 +867,7 @@ function available(s: GameState): ActionView[] {
     add(
       'back-to-school',
       'Close this summer and return to school',
-      'Let the remaining holiday and school months pass. Keep the labelled work for next summer.',
+      'Leave the rest of this holiday and the ordinary school months unplayed. Next summer begins on a fresh morning; your labelled work and notes remain.',
     );
   if (s.chapter === 'garage')
     add(
@@ -839,6 +915,12 @@ function available(s: GameState): ActionView[] {
     !s.serviceWeek?.paidHelp &&
     s.serviceWeek?.jobs.some((job) => job.id === o.id && job.stage === 'accepted' && job.fee > 0)
   );
+  const needsNeighbourRate = !!(
+    o &&
+    o.id === 'workshop-neighbourhood-nora-light' &&
+    s.workshop?.jobs.some((job) => job.id === o.id && job.fee > 0) &&
+    !s.workshop?.paidHelp
+  );
   const playerWaiting = playerSpaceWait(s);
   if (playerWaiting)
     add(
@@ -857,17 +939,56 @@ function available(s: GameState): ActionView[] {
     );
   a.push(
     ...apprenticeActions(s, o, isHere(s, 'sam'), (id) => isHere(s, id)).filter(
-      (action) => !needsServiceRate || action.id !== 'delegate-repair',
+      (action) => (!needsServiceRate && !needsNeighbourRate) || action.id !== 'delegate-repair',
     ),
-    ...workshopActions(s, workshopContext(s)),
+    ...workshopActions(s, workshopContext(s)).map((action) =>
+      needsNeighbourRate && action.id === 'workshop-sam-agreement'
+        ? { ...action, kind: 'primary' as const }
+        : action,
+    ),
     ...serviceWeekActions(s, serviceContext(s)).map((action) =>
       needsServiceRate && action.id === 'service-paid-help'
         ? { ...action, kind: 'primary' as const }
         : action,
     ),
     ...catchReturnActions(s, isHere(s, 'nora')),
+    ...neighbourhoodActions(s, neighbourhoodContext(s))
+      .map((action) =>
+        action.id === 'neighbourhood-accept-light'
+          ? {
+              ...action,
+              label:
+                s.serviceWeek?.route === 'regular'
+                  ? 'Agree £5 for the checked light, collected tomorrow at 14:00'
+                  : 'Accept the light as a favour, collected tomorrow at 14:00',
+              detail:
+                'Nora supplies its battery. Sam’s own help or paid work still needs a separate agreement.',
+            }
+          : action,
+      )
+      .filter(
+        (action) =>
+          !['neighbourhood-accept-case', 'neighbourhood-accept-light'].includes(action.id) ||
+          s.objects.filter(
+            (item) => ['bench', 'shelf'].includes(item.location) && item.assignedTo !== 'sam',
+          ).length < 2,
+      ),
   );
-  if (o && o.assignedTo !== 'sam') {
+  if (o?.caseFittings && o.location !== 'returned') {
+    const f = o.caseFittings;
+    if (!f.measured) add('measure-case', 'Compare the case and replacement mounting holes');
+    if (f.measured && !f.revisedUse && !o.repaired) {
+      add('try-case-replacement', 'Try the labelled replacement against the holes');
+      if (f.compatible?.permission && f.compatible.status === 'retained')
+        add('fit-case-catch', 'Fit Nora’s measured compatible catch');
+    }
+    if (o.repaired && !o.verified && !f.revisedUse)
+      add('check-case-carry', 'Check repeated closure and carrying with the samples');
+    if (f.revisedUse === 'stationary-tray' && !f.trayChecked)
+      add('check-case-tray', 'Check the samples on a level counter');
+    add('shelve', 'Label the case and put it safely aside');
+  }
+  if (o && !o.caseFittings && o.assignedTo !== 'sam') {
     if (!o.inspected) add('inspect', 'Look closely');
     if (o.inspected && !o.repaired && isMechanical(o)) {
       const methods: Partial<Record<Fault, [string, string]>> = {
@@ -1310,6 +1431,213 @@ export function transition(original: GameState, input: GameInput): GameState {
     for (const line of aftercare.lines) say(s, line.speaker, line.text, line.tone);
     return s;
   }
+  if (
+    [
+      'measure-case',
+      'try-case-replacement',
+      'fit-case-catch',
+      'check-case-carry',
+      'check-case-tray',
+    ].includes(id)
+  ) {
+    const item = focused(s),
+      player = s.people.player;
+    if (!item?.caseFittings || !player) throw Error('No case on the bench');
+    const minutes = id === 'fit-case-catch' ? 12 : id === 'check-case-carry' ? 10 : 5;
+    const work: Affordance = {
+      id,
+      action: 'work',
+      label: available(original).find((a) => a.id === id)?.label ?? id,
+      duration: minutes,
+      effort: 0.05,
+      focus: 0.15,
+      advertises: { competence: 0.08 },
+    };
+    const decision = decide(player, [work]);
+    if (decision.chosenAffordanceId !== id || !begin(player, work, decision)) {
+      say(
+        s,
+        'You',
+        `You are still ${player.activity?.affordance.label.toLowerCase() ?? 'pausing before the work'}. The case has not changed.`,
+      );
+      return s;
+    }
+    const until = s.now + minutes;
+    advanceBenchBeforePlayer(s, until);
+    tick(player, until);
+    s.now = until;
+    const completed =
+      player.body.alive &&
+      !player.body.downed &&
+      !player.body.asleep &&
+      player.activity?.affordanceId === id;
+    if (player.activity?.affordanceId === id)
+      finish(player, {
+        affordanceId: id,
+        action: 'work',
+        at: until,
+        status: completed ? 'completed' : 'interrupted',
+        summary: work.label,
+      });
+    advancePeople(s);
+    if (!completed) {
+      say(s, 'You', 'You stop before the case work is complete. Its fittings stay as they were.');
+      return s;
+    }
+    const text =
+      id === 'measure-case'
+        ? measureCaseFittings(item, item.caseFittings)
+        : id === 'try-case-replacement'
+          ? fitCaseCatch(item, item.caseFittings, 'replacement').text
+          : id === 'fit-case-catch'
+            ? fitCaseCatch(item, item.caseFittings, 'compatible').text
+            : id === 'check-case-carry'
+              ? checkCaseCarry(item, item.caseFittings)
+              : checkCaseTray(item, item.caseFittings);
+    item.playerAssisted = true;
+    if (item.observations.at(-1) !== text) item.observations.push(text);
+    say(s, 'You', text, 'notice');
+    return s;
+  }
+  const neighbourhoodCtx = neighbourhoodContext(s);
+  if (neighbourhoodActions(s, neighbourhoodCtx).some((a) => a.id === id)) {
+    const minutes =
+      id === 'neighbourhood-frontage'
+        ? 30
+        : ['neighbourhood-source', 'neighbourhood-compare-source'].includes(id)
+          ? 5
+          : 3;
+    const player = s.people.player,
+      nora = s.people.nora;
+    if (
+      !player ||
+      !nora ||
+      !Array.from({ length: minutes + 1 }, (_, i) => s.now + i).every((at) =>
+        isHere(s, 'nora', at),
+      ) ||
+      !beginSharedConversation(
+        player,
+        nora,
+        id,
+        available(original).find((a) => a.id === id)?.label ?? id,
+        minutes,
+      )
+    ) {
+      say(
+        s,
+        'You',
+        'You have not agreed time together for this now. The invitation and the labelled work stay as they are.',
+      );
+      return s;
+    }
+    const until = s.now + minutes;
+    advanceBenchBeforePlayer(s, until);
+    tick(player, until);
+    tick(nora, until);
+    const completed = [player, nora].every(
+      (person) =>
+        person.body.alive &&
+        !person.body.downed &&
+        !person.body.asleep &&
+        person.activity?.affordanceId === id &&
+        person.activity.endsAt <= until,
+    );
+    for (const person of [player, nora]) {
+      const activity = person.activity;
+      if (activity?.affordanceId === id)
+        finish(person, {
+          affordanceId: id,
+          action: activity.action,
+          at: until,
+          status: completed ? 'completed' : 'interrupted',
+          summary: completed
+            ? activity.affordance.label
+            : 'The shared conversation stopped before its conclusion.',
+        });
+    }
+    s.now = until;
+    advancePeople(s);
+    if (!completed) {
+      say(
+        s,
+        'You',
+        'The time together stopped before you finished. The recollection and the work have not been changed.',
+      );
+      return s;
+    }
+    const result = applyNeighbourhoodAction(s, id, { ...neighbourhoodCtx, agree: () => true });
+    if (!result) throw Error('Missing neighbourhood action');
+    if (result.receiveCase) {
+      const spec = neighbourhoodCase;
+      const item = object(spec.id, spec.title, spec.owner, spec.story, spec.fault, spec.form);
+      item.appearance = spec.appearance;
+      item.inspectText = spec.inspectText;
+      item.caseFittings = freshCaseFittings();
+      item.requestedUse = 'carry-samples';
+      s.objects.push(item);
+      focusWorkbench(s, item);
+    }
+    const item = s.objects.find((o) => o.id === neighbourhoodCase.id);
+    if (result.sourceFitting && item?.caseFittings)
+      item.caseFittings.compatible = { ...result.sourceFitting, status: 'retained' };
+    if (result.adaptTray && item?.caseFittings) {
+      item.observations.push(adaptCaseTray(item, item.caseFittings, true));
+      item.requestedUse = 'stationary-tray';
+    }
+    if (result.returnCase && item?.caseFittings) {
+      if (result.returnCase === 'unchanged') restoreCaseUnchanged(item, item.caseFittings);
+      item.location = 'returned';
+      item.collectedAt = s.now;
+      if (s.focusId === item.id) s.focusId = null;
+      if (result.returnCase === 'original-checked') s.repairs++;
+    }
+    if (result.job) {
+      const spec = result.job;
+      const lamp = object(
+        spec.id,
+        spec.title,
+        spec.owner,
+        spec.story,
+        spec.fault,
+        spec.form ?? 'lamp',
+      );
+      lamp.appearance = spec.appearance;
+      lamp.inspectText = spec.inspectText;
+      s.objects.push(lamp);
+      focusWorkbench(s, lamp);
+      if (spec.materialsBatteryProvided) s.parts.batteries++;
+      s.workshop ??= freshWorkshop();
+      const fee = s.serviceWeek?.route === 'regular' ? 500 : 0;
+      const collectionAt = Math.floor(s.now / 1440) * 1440 + 1440 + 14 * 60;
+      s.workshop.jobs.push({
+        id: spec.id,
+        stage: 'accepted',
+        fee,
+        materialCost: 0,
+        acceptedAt: s.now,
+        due: 'tomorrow',
+        collectionAt,
+        samFee: fee && s.workshop.paidHelp ? 300 : 0,
+      });
+      if (s.people.player) agreeCheckedCollection(s.people.player, spec.id, 'nora', collectionAt);
+      if (s.world)
+        s.world.presence.nora = {
+          awayUntil: collectionAt,
+          activity: 'Collecting the separately agreed sample-shelf light',
+        };
+      result.lines = [
+        {
+          speaker: 'Nora',
+          tone: 'warm',
+          text: fee
+            ? 'Agreed: £5 for the checked light. I have supplied the battery, and I will come tomorrow at two. Tell me if you need longer.'
+            : 'A small favour, then. I have supplied the battery, and I will come tomorrow at two. Tell me if it needs more work.',
+        },
+      ];
+    }
+    for (const line of result.lines) say(s, line.speaker, line.text, line.tone);
+    return s;
+  }
   const serviceResult = applyServiceWeekAction(s, id, serviceContext(s, true));
   if (serviceResult) {
     for (const personId of new Set([
@@ -1362,6 +1690,15 @@ export function transition(original: GameState, input: GameInput): GameState {
           label: obligation.activity,
         });
       s.unlocked.push(`service-counter:${obligation.from}:${obligation.until}`);
+      // The service-week agreement explicitly discloses this duty; no private agenda query is knowledge.
+      if (isHere(s, 'sam')) {
+        s.unlocked.push(`heard-counter:${obligation.from}:${obligation.until}`);
+        say(
+          s,
+          'Sam',
+          'On that third working day I am at the parts counter from one until five. Ask about bench time when I am back; keep any unfinished work labelled.',
+        );
+      }
     }
     if (serviceResult.job) {
       const spec = serviceResult.job;
@@ -1577,6 +1914,12 @@ export function transition(original: GameState, input: GameInput): GameState {
         }
       }
     }
+    if (id === 'workshop-sam-agreement' && s.workshop?.paidHelp) {
+      const job = s.workshop.jobs.find(
+        (job) => job.id === 'workshop-neighbourhood-nora-light' && job.stage === 'accepted',
+      );
+      if (job && job.fee > 0) job.samFee = 300;
+    }
     for (const line of workshopResult.lines) say(s, line.speaker, line.text, line.tone);
     return s;
   }
@@ -1762,9 +2105,9 @@ export function transition(original: GameState, input: GameInput): GameState {
       cabinetStage: s.workshop?.cabinet,
     }),
   ].find((x) => x.id === id);
-  if (storyChoice) {
-    s.unlocked.push(`story:${id}`);
-    for (const line of storyChoice.lines)
+  if (storyChoice || id === 'resume-observer-invite') {
+    if (storyChoice) s.unlocked.push(`story:${id}`);
+    for (const line of storyChoice?.lines ?? [])
       if (!(id === 'observer-invite' && line.text.includes('dog')))
         say(s, line.speaker, line.text, line.tone);
     s.conversation = s.conversation.slice(-8);
@@ -1773,9 +2116,24 @@ export function transition(original: GameState, input: GameInput): GameState {
     if (!player) throw Error('Missing player');
     advanceBenchBeforePlayer(s, s.now);
     tick(player, s.now);
-    if (id === 'observer-invite' && s.world?.presence.sam && s.people.sam) {
+    if (
+      ['observer-invite', 'resume-observer-invite'].includes(id) &&
+      s.world?.presence.sam &&
+      s.people.sam
+    ) {
       liveOrdinaryTime(s.people.sam, s.now, true);
       const stays = chooseSamVisit(s.people.sam);
+      s.samPlans ??= { invitation: 'pending', heardAt: s.now };
+      s.samPlans.invitation = stays === true ? 'accepted' : 'pending';
+      s.samPlans.heardAt = s.now;
+      s.samPlans.availableAfter =
+        stays === false ? s.now + 50 : stays === null ? s.people.sam.activity?.endsAt : undefined;
+      s.samPlans.availabilityReason =
+        stays === false
+          ? 'Sam said the dog walk would take about fifty minutes; ask again when he returns.'
+          : stays === null
+            ? 'Sam asked to finish what he was doing before talking about watching.'
+            : undefined;
       if (stays === false) {
         s.world.presence.sam.awayUntil = s.now + 50;
         s.world.presence.sam.activity = 'Walking the dog — back later this afternoon';
@@ -1784,10 +2142,10 @@ export function transition(original: GameState, input: GameInput): GameState {
         s,
         'Sam',
         stays === null
-          ? 'Let me finish what I’m doing first. We can talk about watching another time.'
+          ? `Let me finish what I’m doing first${s.samPlans.availableAfter ? `, until about ${clockTime(s.samPlans.availableAfter)}` : ''}. We can talk about watching after that; I may still have other plans.`
           : stays
             ? 'I can stay a little while. Show me what you look for before taking it apart.'
-            : 'Today I promised the dog a walk. I’ll be back in about fifty minutes; another afternoon for watching?',
+            : 'Today I promised the dog a walk. I’ll be back in about fifty minutes; ask me about watching when I return.',
         'warm',
       );
     }
@@ -1887,6 +2245,7 @@ export function transition(original: GameState, input: GameInput): GameState {
   const familyMember = s.people.mum;
   if (!familyMember) throw Error('Missing family member');
   let sharedTea = false;
+  let teaReport: TeaReport | undefined;
   // Taking a part for this visible action reserves it before concurrent bench work.
   const requiredPart = (
     {
@@ -1906,7 +2265,9 @@ export function transition(original: GameState, input: GameInput): GameState {
     s.now -= duration;
     liveOrdinaryTime(p, until);
   } else if (id === 'rest' && isHere(s, 'mum'))
-    sharedTea = shareTea(p, familyMember, s.now + duration);
+    sharedTea = shareTea(p, familyMember, s.now + duration, (report) => {
+      teaReport = report;
+    });
   else if (id === 'rest') {
     const rest = { ...aff, action: 'rest', effort: 0, focus: 0, advertises: { leisure: 0.1 } };
     const decision = decide(p, [rest]);
@@ -2252,25 +2613,42 @@ export function transition(original: GameState, input: GameInput): GameState {
         if (isHere(s, line.speaker.toLowerCase())) say(s, line.speaker, line.text, line.tone);
       break;
     }
-    case 'rest':
+    case 'rest': {
+      const shortened = teaReport?.kind === 'shortened' ? teaReport : undefined;
       s.humanNote = sharedTea
-        ? 'You spent an unhurried half-hour together.'
-        : 'You took a quiet break while Mum continued her own afternoon.';
+        ? 'You spent some time together over tea.'
+        : shortened
+          ? `You sat together for ${shortened?.elapsed} minutes before the afternoon drew you apart.`
+          : 'You took a quiet break.';
+      const familyMemory =
+        s.workshop?.drawingChoice === 'displayed'
+          ? ' Your old drawing is still out where we can see it.'
+          : s.objects.some(
+                (item) =>
+                  item.owner === 'Mum' &&
+                  item.form === 'lamp' &&
+                  item.verified &&
+                  item.location === 'returned' &&
+                  !item.awaitingCollection,
+              )
+            ? ' I used the lamp you brought back.'
+            : '';
       say(
         s,
         sharedTea ? 'Mum' : 'You',
         sharedTea
-          ? s.inputs
-              .slice(0, -1)
-              .some((entry) => entry.input.id === 'rest' && s.now - entry.at < 120)
-            ? 'Nice to sit a little longer. No need to keep talking.'
-            : `It’s nice having you here.${teaCheckText}`
-          : s.chapter === 'garage'
-            ? 'You sit on the garage step for a while. The work can wait safely.'
-            : 'The work can wait safely while you sit for a while.',
+          ? `It’s nice having you here.${familyMemory}${teaCheckText}`
+          : shortened
+            ? `You sit together for ${shortened?.elapsed} minutes, then leave the cups while the afternoon takes its own course.`
+            : teaReport?.participant === 'player'
+              ? 'You leave the invitation for another time and take a quiet break.'
+              : s.chapter === 'garage'
+                ? 'You sit on the garage step for a quiet break. The invitation can wait for another time.'
+                : 'You take a quiet break. The invitation can wait for another time.',
         sharedTea ? 'warm' : 'notice',
       );
       break;
+    }
   }
   if (id !== 'rest' && id !== 'next-day')
     finish(p, {
@@ -2342,9 +2720,100 @@ export function transition(original: GameState, input: GameInput): GameState {
   }
   return s;
 }
+function dayPlan(s: GameState, actions: ActionView[]): GameView['dayPlan'] {
+  if (s.chapter !== 'garage') return undefined;
+  const has = (id: string) => actions.some((a) => a.id === id);
+  const entries: NonNullable<GameView['dayPlan']>['entries'] = knownAppointments(s).map(
+    (event, index) => ({
+      id: `known-${event.personId}-${event.at}`,
+      label: `${event.name} · ${clockTime(event.at)}`,
+      detail: event.detail,
+      status:
+        event.personId === 'sam' && s.samPlans?.availableAfter === event.at
+          ? 'invitation'
+          : /routine|usually|usual|chance to ask/.test(event.detail)
+            ? 'routine'
+            : 'agreed',
+      actionIds: index === 0 && has('wait-appointment') ? ['wait-appointment'] : [],
+    }),
+  );
+  if (
+    s.samPlans?.invitation === 'pending' &&
+    !entries.some((entry) => entry.status === 'invitation' && entry.id.startsWith('known-sam-'))
+  )
+    entries.push({
+      id: 'sam-invitation',
+      label: 'The invitation to Sam is still open',
+      detail:
+        (s.samPlans.availableAfter ?? 0) > s.now
+          ? 'He asked to finish his current plans first. No lesson has been agreed.'
+          : isHere(s, 'sam')
+            ? 'He is reachable now; ask whether watching fits his plans.'
+            : 'He asked to keep his own plans first. The invitation has not become an agreed lesson.',
+      status: 'invitation',
+      actionIds: has('resume-observer-invite') ? ['resume-observer-invite'] : [],
+    });
+  const a = s.apprentice;
+  if (a?.arranged && (s.now < a.visitUntil || a.jobId || has('arrange-learning'))) {
+    const item = s.objects.find((o) => o.id === a.jobId);
+    const active = s.now < a.visitUntil;
+    const checkRemaining =
+      item?.checkStarted !== undefined && !item.verified
+        ? Math.max(0, item.checkStarted + verificationMinutes(item) - s.now)
+        : undefined;
+    entries.push({
+      id: 'sam-work',
+      label: item ? `Sam’s labelled work: ${item.title}` : 'The bench stretch with Sam',
+      detail: [
+        a.needsHelp ??
+          a.pauseReason ??
+          (item
+            ? 'You can leave this with him and work on something else.'
+            : 'Choose whether to use the shared bench time.'),
+        checkRemaining !== undefined
+          ? checkRemaining > 0
+            ? `The physical check has ${checkRemaining} minutes left; its result still needs reading.`
+            : 'The physical run has elapsed; its result still needs reading.'
+          : '',
+        active
+          ? `The agreed stretch ends at ${clockTime(a.visitUntil)}; his other commitments still matter.`
+          : 'That agreed stretch has ended; the labelled work is kept.',
+      ]
+        .filter(Boolean)
+        .join(' '),
+      status: active ? 'underway' : 'late',
+      actionIds: ['arrange-learning', 'reconsider-sam', 'take-over-repair'].filter(has),
+    });
+  }
+  for (const item of s.objects.filter((o) => o.awaitingCollection))
+    entries.push({
+      id: `collection-${item.id}`,
+      label: `${item.title} is ready for ${item.owner}`,
+      detail:
+        'Kept safely labelled. A known visit may concern other work; collection still requires the owner to be here.',
+      status: 'agreed',
+      actionIds: [],
+    });
+  const priority = (entry: (typeof entries)[number]) =>
+    entry.actionIds?.includes('reconsider-sam')
+      ? -4
+      : entry.actionIds?.includes('resume-observer-invite')
+        ? -3
+        : entry.actionIds?.includes('arrange-learning')
+          ? -2
+          : entry.actionIds?.includes('wait-appointment')
+            ? -1
+            : 0;
+  entries.sort((a, b) => priority(a) - priority(b));
+  return entries.length
+    ? { summary: 'What you have heard and agreed; people may keep their own plans.', entries }
+    : undefined;
+}
 export function getView(s: GameState): GameView {
   const o = focused(s);
+  const actions = available(s);
   return {
+    dayPlan: dayPlan(s, actions),
     knownAppointments: knownAppointments(s),
     collectionPlans: s.objects
       .filter((item) => item.awaitingCollection)
@@ -2400,7 +2869,18 @@ export function getView(s: GameState): GameView {
               ? `Expected: ${presence.activity}`
               : scheduledAway(s, id)
                 ? id === 'sam'
-                  ? 'At the parts counter; back after the agreed shift'
+                  ? s.unlocked.some((flag) => {
+                      const duty = /^heard-counter:(\d+):(\d+)$/.exec(flag);
+                      return duty && s.now >= Number(duty[1]) && s.now < Number(duty[2]);
+                    })
+                    ? 'At the parts counter for the shift he told you about; back after five'
+                    : s.samPlans?.routineShiftKnown ||
+                        s.unlocked.some((flag) => {
+                          const request = /^known-request:(\d+)$/.exec(flag);
+                          return request && catalogueRequest(Number(request[1]))?.ownerId === 'sam';
+                        })
+                      ? 'Keeping his usual counter morning; usually reachable after one'
+                      : 'Not available just now'
                   : id === 'nora'
                     ? 'Keeping her quiet morning at home; reachable after ten'
                     : 'Out for hardware; back around six'
@@ -2419,7 +2899,7 @@ export function getView(s: GameState): GameView {
               ? 'Watching beside the bench'
               : s.apprentice?.arranged && s.now < s.apprentice.visitUntil && id === 'sam'
                 ? 'At the bench for the agreed afternoon'
-                : 'At home; you can arrange a visit',
+                : 'You can ask for time together',
       })),
     title:
       s.chapter === 'family'
@@ -2432,6 +2912,17 @@ export function getView(s: GameState): GameView {
     scene: s.chapter === 'garage' ? 'garage' : 'home',
     focus: o
       ? {
+          casePresentation: o.caseFittings
+            ? {
+                mode: o.caseFittings.revisedUse ?? 'carrying-case',
+                catch: o.caseFittings.revisedUse
+                  ? 'none'
+                  : o.caseFittings.compatible?.status === 'fitted'
+                    ? 'compatible'
+                    : 'original',
+                comparisonKnown: o.caseFittings.measured,
+              }
+            : undefined,
           inspected: o.inspected,
           progress: o.verified
             ? 'checked'
@@ -2486,7 +2977,7 @@ export function getView(s: GameState): GameView {
                   : 'kitchen'),
         }
       : null,
-    actions: available(s),
+    actions,
     conversation: s.conversation,
     currentDialogue: (s.journal ?? s.conversation).filter(
       (line) => line.id >= (s.eventStartId ?? 0),
@@ -2557,8 +3048,13 @@ export function restoreGame(text: string): GameState {
       'home-garage-8',
       'home-garage-9',
       'home-garage-10',
+      'home-garage-11',
     ].includes(data?.engine)
   ) {
+    if (data.engine === 'home-garage-11') {
+      const validated = restoreEngine11(text);
+      return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };
+    }
     if (data.engine === 'home-garage-10') {
       const validated = restoreEngine10(text);
       return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };

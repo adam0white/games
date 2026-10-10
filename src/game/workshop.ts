@@ -5,6 +5,7 @@
  * the engine. A paid agreement never grants a learned method or starts a job.
  * There is no market simulation, debt, business growth rate or idle income.
  */
+import { neighbourhoodLight } from './neighbourhood';
 import type { StoryLine } from './story';
 import type { ActionView, Fault, GameState } from './types';
 
@@ -196,6 +197,7 @@ export const workshopJobSpecs: readonly WorkshopJobSpec[] = [
     materialsBatteryProvided: false,
     collectionPlan: 'afternoon',
   },
+  neighbourhoodLight,
 ];
 function carefulFriendReturn(s: WorkshopGame) {
   return s.objects.some((o) => o.owner === 'Nora' && o.location === 'returned' && o.verified);
@@ -434,7 +436,12 @@ export function workshopActions(s: WorkshopGame, ctx: WorkshopContext): ActionVi
         'pause',
       );
   }
-  if (ctx.paidHelpEligible && !w.paidHelp && ctx.samHere && w.mode === 'priced')
+  if (
+    ctx.paidHelpEligible &&
+    !w.paidHelp &&
+    ctx.samHere &&
+    (w.mode === 'priced' || w.jobs.some((job) => job.stage === 'accepted' && job.fee > 0))
+  )
     add(
       'workshop-sam-agreement',
       'Discuss paid repair work with Sam',
@@ -628,7 +635,7 @@ export function applyWorkshopAction(
         [
           line(
             'You',
-            'In the flat box is a pencil drawing of a small house, with paper tabs where you meant the roof to fold. The little shade-clearance mark is on the same page.',
+            'In the flat box is a pencil drawing of a small house, with paper tabs where you meant the roof to fold. A pencil height line shows how the folded paper roofs would fit beneath your bedside lamp.',
             'notice',
           ),
           line(

@@ -43,6 +43,11 @@ export function cueFor(item: RepairObject, now: number): RepairCue {
 }
 export function inspectRepair(item: RepairObject): string {
   item.inspected = true;
+  if (item.fault === 'worn-catch')
+    return (
+      item.inspectText ??
+      'The catch is worn. Compare retained hardware with the existing mounting holes before attempting a fitting.'
+    );
   const mechanism: Partial<Record<Fault, RepairCue>> = {
     jam: 'blocked-mechanism',
     striker: 'binding-striker',
@@ -187,6 +192,8 @@ export function applyRepair(
   };
 }
 export function readLongCheck(item: RepairObject, now: number): string {
+  if (item.fault === 'worn-catch')
+    throw Error('This case needs its repeated-closure and carrying check');
   if (
     !item.repaired ||
     item.checkStarted === undefined ||
@@ -265,4 +272,126 @@ export function catchActions(item: RepairObject): readonly [string, string][] {
     ['lubricate-hinge', 'Clear the external dirt and lubricate the hinge'],
     ['adjust-catch', 'Adjust the keeper so the catch meets it squarely'],
   ];
+}
+
+/** Retained hardware belongs to this one case, never to the workshop stock.
+ * This bounded fictional catch comparison covers labelled spacing, reversible
+ * removal and repeated closure; it supplies no general metalworking method. */
+export interface CaseFittings {
+  measured: boolean;
+  original: 'attached-worn' | 'retained';
+  replacement: 'retained' | 'fitted';
+  originalSpacing: 24;
+  replacementSpacing: 30;
+  compatible?: { source: string; permission: boolean; spacing: 24; status: 'retained' | 'fitted' };
+  revisedUse?: 'stationary-tray';
+  repeatedClosures?: boolean;
+  trayChecked?: boolean;
+}
+export function freshCaseFittings(): CaseFittings {
+  return {
+    measured: false,
+    original: 'attached-worn',
+    replacement: 'retained',
+    originalSpacing: 24,
+    replacementSpacing: 30,
+  };
+}
+export function measureCaseFittings(item: RepairObject, fittings: CaseFittings): string {
+  fittings.measured = true;
+  item.inspected = true;
+  item.observations.push(
+    'The retained catch mounts are 24 mm apart; the labelled interchangeable fitting is 30 mm. Its holes do not match.',
+  );
+  return item.observations.at(-1) ?? '';
+}
+export function fitCaseCatch(
+  item: RepairObject,
+  fittings: CaseFittings,
+  candidate: 'replacement' | 'compatible',
+): { succeeded: boolean; text: string } {
+  if (fittings.revisedUse === 'stationary-tray')
+    return {
+      succeeded: false,
+      text: 'Nora agreed to a stationary tray. Fitting a carrying catch would change that agreement.',
+    };
+  if (!fittings.measured)
+    return {
+      succeeded: false,
+      text: 'Compare the existing holes before fitting anything. Nothing has been consumed or drilled.',
+    };
+  if (candidate === 'replacement')
+    return {
+      succeeded: false,
+      text: 'The labelled replacement has different hole spacing. You leave it intact beside the case; no new holes are made.',
+    };
+  if (!fittings.compatible?.permission || fittings.compatible.status !== 'retained')
+    return {
+      succeeded: false,
+      text: 'There is no measured compatible fitting that its owner has agreed you may use.',
+    };
+  fittings.original = 'retained';
+  fittings.compatible.status = 'fitted';
+  item.attempted++;
+  item.repaired = true;
+  item.verified = false;
+  item.completedBy = 'player';
+  item.observations.push(
+    'The measured compatible catch is fitted to the existing holes. The worn catch and labelled replacement are retained in the hardware pocket.',
+  );
+  return {
+    succeeded: true,
+    text: 'You fit the measured catch to the existing holes and retain the worn catch and incompatible replacement with Nora’s case. Repeated closure and a carrying check remain.',
+  };
+}
+export function checkCaseCarry(item: RepairObject, fittings: CaseFittings): string {
+  if (fittings.revisedUse === 'stationary-tray')
+    throw Error('Nora agreed to stationary use, not a carrying repair');
+  if (!item.repaired || fittings.compatible?.status !== 'fitted')
+    throw Error('No fitted compatible catch to check');
+  fittings.repeatedClosures = true;
+  item.verified = true;
+  return 'Repeated opening, closure and a gentle carrying check keep Nora’s samples together. Both removed and unused fittings remain labelled with her case.';
+}
+export function adaptCaseTray(
+  item: RepairObject,
+  fittings: CaseFittings,
+  consent: boolean,
+): string {
+  if (!consent) throw Error('Nora has not agreed to a stationary sample tray');
+  fittings.original = 'retained';
+  if (fittings.compatible) fittings.compatible.status = 'retained';
+  fittings.replacement = 'retained';
+  fittings.revisedUse = 'stationary-tray';
+  fittings.trayChecked = false;
+  item.observations.push(
+    'The worn catch has been removed and retained with the lid and replacement fitting. Nora agreed to use the open compartments as a stationary sample tray.',
+  );
+  item.repaired = false;
+  item.verified = false;
+  delete item.checkStarted;
+  return 'You remove and retain the worn catch. The lid and both fittings stay with Nora; the open case is being prepared for stationary samples, not carrying.';
+}
+export function checkCaseTray(item: RepairObject, fittings: CaseFittings): string {
+  if (fittings.revisedUse !== 'stationary-tray') throw Error('No agreed tray adaptation to check');
+  fittings.trayChecked = true;
+  item.repaired = false;
+  item.verified = false;
+  return 'The samples stay arranged on the level counter and can be taken out without snagging. The tray check passes for stationary use; the original carrying repair remains unfulfilled.';
+}
+
+/** Reversible deferral restores the original hardware; no part enters stock. */
+export function restoreCaseUnchanged(item: RepairObject, fittings: CaseFittings): void {
+  item.observations.push(
+    'The original worn catch is attached again. The unused replacement and any borrowed compatible fitting remain retained with Nora’s case.',
+  );
+  fittings.original = 'attached-worn';
+  fittings.replacement = 'retained';
+  if (fittings.compatible) fittings.compatible.status = 'retained';
+  delete fittings.revisedUse;
+  delete fittings.repeatedClosures;
+  delete fittings.trayChecked;
+  delete item.checkStarted;
+  item.repaired = false;
+  item.verified = false;
 }

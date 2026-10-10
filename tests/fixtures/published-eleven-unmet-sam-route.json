@@ -1,0 +1,146 @@
+{
+  "seed": 1701,
+  "inputs": [
+    {
+      "type": "action",
+      "id": "talk-family"
+    },
+    {
+      "type": "action",
+      "id": "inspect"
+    },
+    {
+      "type": "action",
+      "id": "test-battery"
+    },
+    {
+      "type": "action",
+      "id": "clean-contact"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "rest"
+    },
+    {
+      "type": "action",
+      "id": "ask-mum"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "inspect"
+    },
+    {
+      "type": "action",
+      "id": "talk-garage"
+    },
+    {
+      "type": "action",
+      "id": "search-donor"
+    },
+    {
+      "type": "action",
+      "id": "fit-holder"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "workshop-cabinet-look"
+    },
+    {
+      "type": "action",
+      "id": "talk-friends"
+    },
+    {
+      "type": "action",
+      "id": "rest"
+    },
+    {
+      "type": "action",
+      "id": "check-result"
+    },
+    {
+      "type": "action",
+      "id": "return"
+    },
+    {
+      "type": "action",
+      "id": "workshop-cabinet-measure"
+    },
+    {
+      "type": "action",
+      "id": "workshop-cabinet-hang"
+    },
+    {
+      "type": "action",
+      "id": "workshop-cabinet-plan"
+    },
+    {
+      "type": "action",
+      "id": "wait-appointment"
+    },
+    {
+      "type": "action",
+      "id": "workshop-cabinet-hang"
+    },
+    {
+      "type": "action",
+      "id": "workshop-cabinet-align"
+    },
+    {
+      "type": "action",
+      "id": "workshop-drawings"
+    },
+    {
+      "type": "action",
+      "id": "workshop-display-drawing"
+    },
+    {
+      "type": "action",
+      "id": "accept-request"
+    },
+    {
+      "type": "action",
+      "id": "inspect"
+    },
+    {
+      "type": "action",
+      "id": "test-battery"
+    },
+    {
+      "type": "action",
+      "id": "clean-contact"
+    },
+    {
+      "type": "action",
+      "id": "verify"
+    },
+    {
+      "type": "action",
+      "id": "ask-nora-morning"
+    },
+    {
+      "type": "action",
+      "id": "kettle-shade"
+    },
+    {
+      "type": "action",
+      "id": "nora-boundary"
+    }
+  ],
+  "sha256": "6ee989a2c1da1474012180592738754ac5e2458f1864cb200555211c991ad554"
+}

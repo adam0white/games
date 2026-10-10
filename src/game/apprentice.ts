@@ -165,6 +165,20 @@ export function arrangeLearning(s: GameState, say: Speak): void {
       status: 'interrupted',
       summary: 'Paused to discuss a stretch at the bench.',
     });
+  for (const flag of s.unlocked) {
+    const shift = /^service-counter:(\d+):(\d+)$/.exec(flag);
+    if (
+      shift &&
+      Number(shift[2]) > s.now &&
+      !s.unlocked.includes(`heard-counter:${shift[1]}:${shift[2]}`)
+    ) {
+      s.unlocked.push(`heard-counter:${shift[1]}:${shift[2]}`);
+      say(
+        'Sam',
+        'My agreed parts-counter shift is from one until five on the third working day. I will keep the repair notes if I need to stop for it.',
+      );
+    }
+  }
   const continuingJob = Boolean(s.apprentice?.jobId);
   const establishedRepairer = Boolean(s.apprentice?.completedJobIds.length);
   const offers: Affordance[] = [
@@ -227,9 +241,12 @@ export function arrangeLearning(s: GameState, say: Speak): void {
     );
   } else {
     if (chosen) begin(sam, chosen, decision);
+    s.samPlans ??= { invitation: 'accepted', heardAt: s.now };
+    s.samPlans.routineShiftKnown = true;
+    s.samPlans.heardAt = s.now;
     say(
       'Sam',
-      'Today doesn’t work for me. Try another afternoon after my shift; keep your work where it is.',
+      'Today doesn’t work for me. My usual morning shift ends at one; try me after that another day. Keep your work where it is. I may still have other plans.',
     );
   }
 }

@@ -1238,6 +1238,49 @@ summary:focus-visible {
   font-size: 0.86rem;
   line-height: 1.6;
 }
+
+.day-plan {
+  margin: 20px 0;
+  padding: 14px 0;
+  border-block: 1px solid var(--border);
+}
+.day-plan h2 {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--muted);
+}
+.day-plan-entry p {
+  margin: 4px 0;
+  line-height: 1.5;
+}
+.plan-status {
+  font-size: 0.72rem;
+  color: var(--human);
+}
+.plan-detail {
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+.plan-actions {
+  margin-top: 10px;
+}
+.other-plans {
+  margin-top: 14px;
+  font-size: 0.84rem;
+}
+.other-plans > summary {
+  cursor: pointer;
+  padding: 8px 0;
+  min-height: 44px;
+  display: list-item;
+  box-sizing: border-box;
+}
+.other-plans .day-plan-entry {
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
 .known-arrangements p {
   margin: 0.45rem 0;
 }

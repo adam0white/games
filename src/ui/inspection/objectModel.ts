@@ -4,6 +4,7 @@
 import {
   BoxGeometry,
   type BufferGeometry,
+  CanvasTexture,
   CatmullRomCurve3,
   CircleGeometry,
   CylinderGeometry,
@@ -15,6 +16,7 @@ import {
   MeshStandardMaterial,
   Shape,
   SphereGeometry,
+  SRGBColorSpace,
   TorusGeometry,
   TubeGeometry,
   Vector2,
@@ -26,11 +28,17 @@ export function createObjectModel(object: ObjectView, showKnownParts = false) {
   const root = new Group();
   const geometries: BufferGeometry[] = [];
   const materials: MeshStandardMaterial[] = [];
+  const textures: CanvasTexture[] = [];
   const material = (
     color: string,
     metalness = 0,
     roughness = 0.7,
-    extra: Partial<{ transparent: boolean; opacity: number; side: typeof DoubleSide }> = {},
+    extra: Partial<{
+      transparent: boolean;
+      opacity: number;
+      side: typeof DoubleSide;
+      map: CanvasTexture;
+    }> = {},
   ) => {
     const value = new MeshStandardMaterial({ color, metalness, roughness, ...extra });
     materials.push(value);
@@ -250,6 +258,57 @@ export function createObjectModel(object: ObjectView, showKnownParts = false) {
     rod(new Vector3(0.52, 0.52, 0), new Vector3(0.77, 0.75, 0), 0.037, darkMetal);
     box(0.14, 0.08, 0.12, steel, 0.8, 0.75);
     cylinder(0.05, 0.04, darkMetal, 0, 1.04);
+  } else if (object.id === 'nora-sample-case') {
+    const tray = object.casePresentation?.mode === 'stationary-tray';
+    const fittedCatch = object.casePresentation?.catch ?? 'original';
+    const shell = material('#819079', 0, 0.9);
+    const lining = material('#dfd3b5', 0, 0.96);
+    const edge = material('#5d6b57', 0, 0.86);
+    box(2.35, 0.12, 1.14, shell, 0, 0.17);
+    box(2.35, 0.29, 0.09, shell, 0, 0.35, 0.54);
+    box(2.35, 0.29, 0.09, shell, 0, 0.35, -0.54);
+    for (const x of [-1.13, 1.13]) box(0.09, 0.29, 1.1, edge, x, 0.35);
+    box(2.15, 0.025, 0.93, lining, 0, 0.24);
+    for (const x of [-0.65, -0.18, 0.29, 0.76]) box(0.025, 0.23, 0.98, edge, x, 0.37);
+    for (const [index, color] of ['#b8a271', '#ae8580', '#7b9090', '#80916b'].entries()) {
+      const x = -0.89 + index * 0.47;
+      box(0.36, 0.07, 0.64, material(color, 0, 0.98), x, 0.29, 0.07);
+      box(0.23, 0.016, 0.16, lining, x, 0.34, 0.22).rotation.y = -0.06;
+      for (const offset of [-0.03, 0.03])
+        box(0.15, 0.005, 0.008, darkMetal, x, 0.352, 0.22 + offset);
+    }
+    const lid = box(2.35, 0.065, 0.94, shell, 0, tray ? 0.11 : 0.98, tray ? -0.83 : -0.58);
+    lid.rotation.x = tray ? 0 : -1.1;
+    const lidPanel = box(2.13, 0.02, 0.78, lining, 0, tray ? 0.155 : 0.98, tray ? -0.83 : -0.55);
+    lidPanel.rotation.x = tray ? 0 : -1.1;
+    if (fittedCatch !== 'none') {
+      box(0.19, 0.23, 0.04, brass, -0.02, 0.4, 0.6);
+      if (fittedCatch === 'original') box(0.09, 0.028, 0.013, darkMetal, -0.02, 0.4, 0.625);
+    }
+    box(0.27, 0.11, 0.68, lining, 0.94, 0.31);
+    function label(text: string, x: number, y: number, z: number, width: number) {
+      const surface = document.createElement('canvas');
+      surface.width = 512;
+      surface.height = 96;
+      const context = surface.getContext('2d');
+      if (!context) return;
+      context.fillStyle = '#d1c5a6';
+      context.fillRect(0, 0, surface.width, surface.height);
+      context.fillStyle = '#7d7862';
+      context.font = '28px Georgia';
+      context.textAlign = 'center';
+      context.fillText(text, surface.width / 2, 57);
+      const texture = new CanvasTexture(surface);
+      texture.colorSpace = SRGBColorSpace;
+      textures.push(texture);
+      return box(width, 0.11, 0.012, material('#ffffff', 0, 0.9, { map: texture }), x, y, z);
+    }
+    label('SERVICE · COUNTER', -0.6, 0.36, 0.595, 0.75);
+    if (object.inspected) {
+      box(0.18, 0.04, 0.15, brass, 0.94, 0.4, -0.13);
+      const pocketLabel = label('INTERCHANGEABLE', 0.94, 0.41, 0.21, 0.33);
+      if (pocketLabel) pocketLabel.rotation.x = -Math.PI / 2;
+    }
   } else if (appearance === 'box') {
     const wood = material('#ae8b63', 0, 0.9);
     const lidMat = material('#c5a77e', 0, 0.86);
@@ -346,6 +405,7 @@ export function createObjectModel(object: ObjectView, showKnownParts = false) {
   return {
     root,
     dispose() {
+      for (const texture of textures) texture.dispose();
       for (const geometry of geometries) geometry.dispose();
       for (const mat of materials) mat.dispose();
     },

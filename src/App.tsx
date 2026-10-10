@@ -14,6 +14,7 @@ import type { ActionView, ConversationLine, GameInput, GameState, ObjectView } f
 import { getWorkshopView, type LedgerEntry, type WorkshopState } from './game/workshop';
 import { Cabinet } from './ui/Cabinet';
 import { createChoiceGate } from './ui/choiceGate';
+import { DayPlan } from './ui/DayPlan';
 import { JournalHistory } from './ui/JournalHistory';
 import { ObjectIllustration } from './ui/ObjectIllustration';
 import { ObjectPresentation } from './ui/ObjectPresentation';
@@ -122,8 +123,16 @@ export default function App() {
   const view = getView(game);
   const workshop = getWorkshopView(game);
   const serviceWeek = getServiceWeekView(game);
+  const weekConcluded = Boolean(serviceWeek?.conclusion);
   const workshopArrangement =
-    serviceWeek && serviceWeek.route !== 'undecided' ? serviceWeek.detail : workshop?.arrangement;
+    serviceWeek && serviceWeek.route !== 'undecided'
+      ? weekConcluded
+        ? `Recorded week terms: ${serviceWeek.detail}`
+        : serviceWeek.detail
+      : workshop?.arrangement;
+  const dayPlans = view.scene === 'garage' ? (view.dayPlan?.entries ?? []) : [];
+  const planActionIds = new Set(dayPlans.flatMap((entry) => entry.actionIds ?? []));
+  const choicesOutsidePlans = view.actions.filter((action) => !planActionIds.has(action.id));
   const timeAwayIds = new Set(['next-day', 'back-to-school', 'wait-person']);
   const isProjectAction = (action: ActionView) =>
     /^workshop-(cabinet|drawings|display-drawing|keep-drawing)/.test(action.id);
@@ -184,11 +193,21 @@ export default function App() {
     !action.id.startsWith('workshop-') &&
     (!action.id.startsWith('service-') || isImmediateWeekAction(action)) &&
     !timeAwayIds.has(action.id);
+  const neighbourhoodSubject = (action: ActionView) => {
+    if (!action.id.startsWith('neighbourhood-')) return null;
+    if (
+      ['neighbourhood-remember', 'neighbourhood-frontage', 'neighbourhood-no-visit'].includes(
+        action.id,
+      )
+    )
+      return 'window';
+    return action.id.endsWith('-light') ? 'light' : 'case';
+  };
   const actionGroups = [
     {
       id: 'here',
       label: '',
-      actions: view.actions
+      actions: choicesOutsidePlans
         .filter(
           (action) => isMainCandidate(action) && (!decidingRequest || isRequestDecision(action)),
         )
@@ -198,35 +217,60 @@ export default function App() {
       id: 'elsewhere',
       label: 'Do something else for now',
       actions: decidingRequest
-        ? view.actions.filter((action) => isMainCandidate(action) && !isRequestDecision(action))
+        ? choicesOutsidePlans.filter(
+            (action) => isMainCandidate(action) && !isRequestDecision(action),
+          )
         : [],
+    },
+    {
+      id: 'case',
+      label: 'Nora’s sample case',
+      actions: choicesOutsidePlans.filter((action) => neighbourhoodSubject(action) === 'case'),
+    },
+    {
+      id: 'light',
+      label: 'The separate household light',
+      actions: choicesOutsidePlans.filter((action) => neighbourhoodSubject(action) === 'light'),
+    },
+    {
+      id: 'window',
+      label: 'The old sample window',
+      actions: choicesOutsidePlans.filter((action) => neighbourhoodSubject(action) === 'window'),
     },
     {
       id: 'conversation',
       label: 'Talk for a while',
-      actions: view.actions.filter((action) => action.kind === 'quiet'),
+      actions: choicesOutsidePlans.filter(
+        (action) => action.kind === 'quiet' && !neighbourhoodSubject(action),
+      ),
     },
-    { id: 'project', label: 'The family project', actions: view.actions.filter(isProjectAction) },
+    {
+      id: 'project',
+      label: 'The family project',
+      actions: choicesOutsidePlans.filter(isProjectAction),
+    },
     {
       id: 'workshop',
       label: 'Other repairs and plans',
-      actions: view.actions.filter(
+      actions: choicesOutsidePlans.filter(
         (action) => action.id.startsWith('workshop-') && !isProjectAction(action),
       ),
     },
     {
       id: 'week',
       label: serviceWeek?.label ?? 'A week at the bench',
-      actions: view.actions.filter(
+      actions: choicesOutsidePlans.filter(
         (action) => action.id.startsWith('service-') && !isImmediateWeekAction(action),
       ),
     },
     {
       id: 'time',
       label: 'Take some time',
-      actions: view.actions.filter((action) => timeAwayIds.has(action.id)),
+      actions: choicesOutsidePlans.filter((action) => timeAwayIds.has(action.id)),
     },
-  ].filter((group) => group.actions.length > 0 || (group.id === 'week' && serviceWeek));
+  ].filter(
+    (group) => group.actions.length > 0 || (group.id === 'week' && serviceWeek && !weekConcluded),
+  );
   const projectChoices = actionGroups.find((group) => group.id === 'project')?.actions ?? [];
   const latest = view.conversation.at(-1);
   const dialogue = attention?.lines ?? view.currentDialogue ?? (latest ? [latest] : []);
@@ -538,29 +582,32 @@ export default function App() {
             <ObjectIllustration object={departingObject} />
           </div>
         )}
-        {view.note && !view.collectionPlans?.length && <p className="bench-note">{view.note}</p>}
-        {(Boolean(view.collectionPlans?.length) || Boolean(view.knownAppointments?.length)) && (
-          <aside className="known-arrangements" aria-label="Agreed visits and collections">
-            {view.collectionPlans?.map((plan) => (
-              <p key={plan.objectId}>
-                <strong>{plan.title}</strong> · {plan.detail}
-              </p>
-            ))}
-            {view.knownAppointments
-              ?.filter(
-                (appointment) =>
-                  !view.collectionPlans?.some(
-                    (plan) =>
-                      plan.owner.toLocaleLowerCase() === appointment.name.toLocaleLowerCase(),
-                  ),
-              )
-              .map((appointment) => (
-                <p key={appointment.personId}>
-                  <strong>{appointment.name}</strong> · {appointment.detail}
+        {view.note && !view.collectionPlans?.length && dayPlans.length === 0 && (
+          <p className="bench-note">{view.note}</p>
+        )}
+        {dayPlans.length === 0 &&
+          (Boolean(view.collectionPlans?.length) || Boolean(view.knownAppointments?.length)) && (
+            <aside className="known-arrangements" aria-label="Agreed visits and collections">
+              {view.collectionPlans?.map((plan) => (
+                <p key={plan.objectId}>
+                  <strong>{plan.title}</strong> · {plan.detail}
                 </p>
               ))}
-          </aside>
-        )}
+              {view.knownAppointments
+                ?.filter(
+                  (appointment) =>
+                    !view.collectionPlans?.some(
+                      (plan) =>
+                        plan.owner.toLocaleLowerCase() === appointment.name.toLocaleLowerCase(),
+                    ),
+                )
+                .map((appointment) => (
+                  <p key={appointment.personId}>
+                    <strong>{appointment.name}</strong> · {appointment.detail}
+                  </p>
+                ))}
+            </aside>
+          )}
         {workshop?.cabinet?.open && (
           <details className="cabinet-at-side" open={!view.focus && !game.apprentice?.jobId}>
             <summary>Dad’s cabinet doors · {cabinetStageLabels[workshop.cabinet.stage]}</summary>
@@ -591,7 +638,10 @@ export default function App() {
           </section>
         )}
         {!attention?.returnedObject && response}
-        {serviceWeek && <p className="week-progress">{serviceWeek.label}</p>}
+        {dayPlans.length > 0 && (
+          <DayPlan entries={dayPlans} actions={view.actions} renderAction={renderAction} />
+        )}
+        {serviceWeek && !weekConcluded && <p className="week-progress">{serviceWeek.label}</p>}
         {view.actions.length > 0 && (
           <section
             className={`actions ${settling ? 'settling' : 'ready'}`}
@@ -601,12 +651,18 @@ export default function App() {
             {actionGroups
               .filter((group) => group.id !== 'project' || !workshop?.cabinet?.open)
               .map((group) =>
-                ['elsewhere', 'conversation', 'project', 'workshop', 'week'].includes(group.id) ? (
+                ['elsewhere', 'window', 'conversation', 'project', 'workshop', 'week'].includes(
+                  group.id,
+                ) ? (
                   <details className="choice-group choice-more" key={group.id}>
                     <summary>
-                      {group.id === 'week' ? 'This week’s arrangements' : group.label}
+                      {group.id === 'week'
+                        ? weekConcluded
+                          ? 'Remaining agreements'
+                          : 'This week’s arrangements'
+                        : group.label}
                     </summary>
-                    {group.id === 'week' && serviceWeek && (
+                    {group.id === 'week' && serviceWeek && !weekConcluded && (
                       <div className="week-arrangements">
                         <p>{serviceWeek.detail}</p>
                         {serviceWeek.arrangements.length > 0 && (
