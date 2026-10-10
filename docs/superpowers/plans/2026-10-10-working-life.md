@@ -53,3 +53,8 @@ Current corrections let the private adult discover the same unfinished saved box
 ## Reviewed phase freeze, 23:20 UTC
 
 After actual-play corrections, the final Node 26 check passed lint, strict types, 570 tests across 119 files and the production build. Independent source review cleared the concurrent bedside retrieval guard and Sam's completed-step voice. Captured 5197 packets stay unchanged and exact; corrected rules are about to be committed and delivered as alpha.3 / home-garage-20. Repository source remains private, and only the static build is deployed. Public verification and safe primary integration are the next actions. Adam's feel acceptance and the repeated conversation/repair pacing criticism remain outstanding.
+
+
+## Delivered chapter and public taste review, 23:30 UTC
+
+Alpha.3 / home-garage20 was published at clean runtime3dc23c6, Cloudflare5a82362b-05ab-4d39-b9b7-89d7c5420152. Public/local manifests match; primary preview was rebuilt without operating the owner's browser. Actual immediate native18/19 imports, public Nora trip/home and fresh solo-maker exports replay exactly against the coherent clean5198 capture. The solo player voluntarily stopped after14 minutes at a useful unfinished cabinet step and preferred distinct physical diagnosis and family work over apprentice management. Meal/break ambiguity and repetitive targeting remain concrete taste findings. A narrow projection correction scopes Sam's missing light-intake hint without denying successful mechanical competence. The next photograph episode remains a reviewed content proposal, not claimed new gameplay.

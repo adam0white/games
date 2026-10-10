@@ -6139,11 +6139,11 @@ function dayPlan(s: GameState, actions: ActionView[]): GameView['dayPlan'] {
   if (conversationCue)
     entries.unshift({
       id: 'conversation-pause',
-      label: `${conversationCue.participantId === 'player' ? 'Your activity' : s.people[conversationCue.participantId]?.name} · ${clockTime(conversationCue.until)}`,
+      label: `${conversationCue.participantId === 'player' ? 'You' : s.people[conversationCue.participantId]?.name} · ${conversationCue.label} until ${clockTime(conversationCue.until)}`,
       detail:
         conversationCue.participantId === 'player'
-          ? 'Give your current activity time to finish before trying again.'
-          : 'Leave them time for their current activity, then ask again or continue your own work.',
+          ? 'This wait is for you. The conversation still needs a fresh agreement afterward.'
+          : 'They are finishing the activity shown here. You can continue your own work or ask again afterward.',
       status: 'invitation',
       actionIds: ['wait-conversation-activity'],
     });
@@ -6628,7 +6628,7 @@ export function getView(s: GameState): GameView {
                   ? 'Watching beside you at the bench'
                   : 'Not currently watching; the earlier arrangement stays recorded'),
           responsibility: !hasIntakeMethod(s)
-            ? 'Sam has not learned examining a newly received object. Let him watch an actual first inspection before asking him to start alone. Talking it through is optional. Customer work can stay with you.'
+            ? 'Sam still needs to see you examining a newly received light. Let him watch that first inspection before asking him to start a light repair alone. Talking it through is optional. Customer work can stay with you.'
             : s.apprentice.role === 'repairer'
               ? 'Handles supported light repairs; other promises stay with you.'
               : 'Learning observations and methods, without a guaranteed result.',

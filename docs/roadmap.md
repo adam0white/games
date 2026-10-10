@@ -163,6 +163,8 @@ Review by 2026-10-12: broaden authored object variety after this physical slice 
 
 ## Proposed next chapter: the street in the photograph
 
+Expanded proposal: [The street in the photograph](story/the-street-in-the-photograph.md). The new public solo-maker feedback sharpens its scope: compare a misleading viewpoint, unfold a concealed second doorway, make a reversible divider, and optionally discover Dad at the photograph’s edge. Private display is a complete kept outcome; asking one person later remains optional. All of this is proposed authorship, not delivered story or established past.
+
 Review by 2026-10-12 after the current candidate's owner playtest. This is a content proposal, not part of the delivered rules20 chapter or authorization to extend its release. The candidate now lets an adult private player discover the canonical childhood box and reach the existing solo shadow scene without choosing a business. That repairs access to existing material; it does not supply a new chapter for someone who has already explored it.
 
 The final returning reader wanted another specific scene with the people and model, rather than more light/stand checks. The actual impatient reader stopped after repeated private arrangements without a concrete private project. Build one short optional evening around an old street photograph found among the player's retained drawings. Its contents and provenance would be newly authored, not retroactively claimed memories. The invitation is a thing to examine, not another choice of business arrangement.
