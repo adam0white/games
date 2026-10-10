@@ -63,3 +63,15 @@ Alpha.3 / home-garage20 was published at clean runtime3dc23c6, Cloudflare5a82362
 ## Public feedback into physical clarity, 23:45 UTC
 
 A curious reader followed Mum’s kitchen memory and wanted to find the childhood shade’s pencil line by rotating the object. The line is now actually visible, personal-only, in3D and illustration. A phone reviewer also found that the activity card omitted the opening chapter: the same current validated cue now appears there, with one wait control and no hidden appointments. Its button explanation is shortened to avoid repeating the card. These presentation changes preserve deterministic engine20 histories; no new method or story fact is created. Finalcheck/deployment and bounded public UI follow, then the run closes at23:59:42.
+
+
+## Final delivered experience, 23:54 UTC
+
+Runtime9f0e997 / alpha.3 / home-garage20 / HF2.2.0 is public and in stable primary5173 with identical clean manifests. Cloudflare5e2ba3ba-cd33-45e3-8fb5-54456d35e157. Deployment repeated571/120 fullcheck and strictmanifest verification. Final public UI imported a genuine20-input pause packet, displayed one actor-card/wait, exported unchanged fullstate before any worldinput and showed the childhood mark in3D and diagram. Eight actual public/local packets replay exactly against the final coherent source. Owner browser/storage untouched.
+
+The final taste audit prioritizes one uncertain photograph/physical alteration, Dad's shared-bench arrangement and Sam's own chosen personal alteration, while cutting repeated private/business arrangement frames. These remain dated proposals. A wildcard challenged the photograph's four tidy reveals; the proposed story records the critique and an alternative partial-memory/back-opening project without adding those facts to canon. Repeated repairs and conversation availability still need real player feedback. Technical delivery is achieved; Adam's feel acceptance remains open. Close this bounded run at23:59:42 without starting another unreviewed chapter.
+
+
+## Bounded run closed, 23:59:42 UTC
+
+The five-hour18:59:42–23:59:42UTC run is closed with the reviewed expanded game and final phone presentation delivered publicly/locally. Adam's feel acceptance remains pending; pacing, repetition and touch-target deferrals are dated in the roadmap. This final commit updates documentation only: both served release manifests intentionally retain the clean runtime9f0e997. No new chapter or framework faculty was silently activated. Source stays private, owner browser/storage untouched, and historical/review worktrees and captures remain preserved.

@@ -68,3 +68,11 @@ Evidence: `/tmp/repair20-public-activity-pause-mum.png` and `/tmp/repair20-publi
 ### Author-informed candidate opening coverage follow-up
 
 Fresh isolated local candidate5214 at390×844, ordinary visible firstnine opening inputs, reached15:31 before entering the garage. One card identified Mum taking a quiet break until15:38, with one offered wait; the wait was not repeated in the separate time lane. Actual screenshot `/tmp/repair20-opening-activity-pause.png` was visually inspected. `/tmp/repair20-opening-activity-pause-state.json` is an actual native autosave, not a claimed Journal download or full playtest packet. This verifies opening card coverage; it does not resolve repeated meal/break pacing or establish fun.
+
+## Final public engine 20 display check — 9f0e997
+
+Bounded author-informed check, using an isolated Chrome context at 390×844 CSS pixels. Opened the actual native 20-input pause export through the visible Journal import on the public site. The restored bench showed one “ACTIVITY IN PROGRESS” card: “You · Taking a quiet break until 16:35”, with one actor-specific wait control and the shorter hint “Time passes for everyone.” Screenshot `/tmp/repair20-final-public-activity-pause.png` was visually inspected.
+
+Before any world input, the visible Journal **Export story** produced `/tmp/repair20-final-public-pause-export.json`. Its complete state equals the original native export, including all 20 inputs, all 25 journal entries and the unchanged 16:08 game time. Import, projection and export did not manufacture progress or rewrite history.
+
+Then selected the retained “Your bedside lamp” through **Kept things**. The pencil line is visible on the shade in both the 3D bench and the labelled diagram, with its actual partial repair still retained. Visually inspected screenshots: `/tmp/repair20-final-public-personal-pencil-3d.png` and `/tmp/repair20-final-public-personal-pencil.png`. This confirms a narrow public display and restore path; it is not another fresh-play fun or owner acceptance claim.

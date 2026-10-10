@@ -39,3 +39,16 @@ Do the tactile scene alone. “Save this question for Dad” records the actual 
 An unrepaired model is fully sufficient. Its shutters stay still; no gear, full circuit, competence or repair is awarded. A repaired drive or owned checked bedside lamp may enrich presentation only if actually available. Borrowed samples, absent people and finished cabinet doors do not become decorative props. Retained/rebuilt fronts, spent card, custody away with Nora, and a put-away model keep their real histories. The photo is not accessible while its owning box is away unless it was actually separated beforehand.
 
 Build only this evening if selected. No new light job, stand fault, delivery round, worker role, paid collection or time-passing montage belongs in its length. Before calling it worthwhile, watch a solo maker manipulate the comparison without prompting and a returning player choose to inspect the unfolded edge. Ask what they wanted to find out and whether their final version felt worth keeping. A quick satisfied finish is valid; repeated clicks and elapsed minutes are not substitutes for curiosity.
+
+
+## Wildcard challenge, 2026-10-10
+
+This is a proposal review, not a playtest of this unimplemented scene. The reviewer challenged the fixed discovery order and the 12–20-minute hypothesis: a viewpoint, folded doorway, sign and Dad identification could become another guided answer trail. Treat those as possible interactions, not four required reveals. Voluntary curiosity and a useful early stop are the targets.
+
+Exact reviewer words:
+
+> The wrong doorway is a good hook, but the proposed four reveals and Dad’s answer may feel like a guided sequence. That is a design hypothesis, not a playtest result. Actual players stayed for specific physical discoveries and family history, and resisted repeated tasks.
+
+> A bolder small project: the photograph shows a repair hatch behind the shop. Mum remembers leaving objects there on Thursdays; Dad remembers storage. Let the player build a removable back opening on the model, or leave it as remembered. Neither account needs to be settled. I’d test whether players turn the model around and choose to ask someone, without prompting.
+
+Review by2026-10-12: consider this human difference in use instead of the tidy Dad-identification reveal. The hatch, either person's recollection and any model alteration remain proposed new authorship, not existing canon. Do not use it to retroactively resolve the established crossed-out weekday memory. Keep the physical payoff possible alone; let a genuinely received later exchange add a person's meaning rather than requiring two scheduled conversations to finish.
