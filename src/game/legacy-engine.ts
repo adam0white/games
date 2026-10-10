@@ -15,7 +15,7 @@ import {
   restore,
   snapshot,
   tick,
-} from '@adam0white/human-framework';
+} from '@repair/hf-legacy';
 import type { ActionView, Fault, GameInput, GameState, GameView, RepairObject } from './types';
 
 const ENGINE = 'home-garage-2';

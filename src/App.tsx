@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   createGame,
   exportPlaytest,
@@ -9,8 +9,12 @@ import {
   serializeGame,
   transition,
 } from './game/engine';
-import type { GameInput, GameState, ObjectView } from './game/types';
+import type { ActionView, ConversationLine, GameInput, GameState, ObjectView } from './game/types';
+import { getWorkshopView } from './game/workshop';
+import { Cabinet } from './ui/Cabinet';
 import { createChoiceGate } from './ui/choiceGate';
+import { ObjectIllustration } from './ui/ObjectIllustration';
+import { ObjectPresentation } from './ui/ObjectPresentation';
 import { readStory, writeStory } from './ui/storage';
 
 function initialStory(): { game: GameState; warning: string | null } {
@@ -29,92 +33,100 @@ function initialStory(): { game: GameState; warning: string | null } {
   return { game: createGame(), warning: null };
 }
 
-function Lamp({ object }: { object: ObjectView }) {
-  const titleId = useId();
-  const appearance = object.appearance ?? (object.form === 'torch' ? 'torch' : 'reading');
-  return (
-    <div className={`object-art ${object.visual} ${appearance}`}>
-      <svg viewBox="0 0 320 250" role="img" aria-labelledby={titleId}>
-        <title id={titleId}>
-          {object.title}: {object.condition}
-        </title>
-        <ellipse className="light-pool" cx="160" cy="216" rx="123" ry="23" />
-        {appearance === 'reading' && (
-          <>
-            <path className="lamp-base" d="M106 216 Q149 196 197 212 L197 221 L106 221 Z" />
-            <path className="lamp-stem" d="M151 206 L142 137 L189 88" />
-            <circle className="joint" cx="142" cy="137" r="9" />
-            <path className="lamp-shade" d="M176 65 Q207 66 222 90 L238 115 L172 127 L166 89 Z" />
-            <path className="shade-rim" d="M172 127 L238 115" />
-            <path className="pull" d="M125 216 C80 221 91 238 58 227" />
-          </>
-        )}
-        {appearance === 'bedside' && (
-          <>
-            <path className="lamp-shade" d="M112 51 Q160 39 208 51 L229 119 Q160 137 91 119 Z" />
-            <path className="shade-rim" d="M91 119 Q160 136 229 119" />
-            <path
-              className="ceramic-body"
-              d="M146 132 L174 132 L176 158 C211 170 205 211 179 217 L141 217 C115 211 109 170 144 158 Z"
-            />
-            <path
-              className="ceramic-mark"
-              d="M138 176 Q160 187 181 177 M134 190 Q158 202 185 192"
-            />
-            <path className="pull" d="M195 133 L195 157" />
-            <circle className="pull-tip" cx="195" cy="162" r="4" />
-          </>
-        )}
-        {appearance === 'kitchen' && (
-          <>
-            <path className="handle" d="M132 73 L132 52 Q160 26 188 52 L188 73" />
-            <path className="lamp-base" d="M121 76 L199 76 L210 209 L110 209 Z" />
-            <path className="lamp-shade glass" d="M128 99 L192 99 L199 184 L121 184 Z" />
-            <path className="shade-rim" d="M124 137 L196 137 M160 100 L160 183" />
-            <path className="lamp-base" d="M109 209 L211 209 L211 221 L109 221 Z" />
-            <circle className="pull-tip" cx="160" cy="87" r="5" />
-          </>
-        )}
-        {appearance === 'torch' && (
-          <>
-            <path className="lamp-base" d="M74 144 L186 108 L207 172 L95 207 Q79 190 74 144 Z" />
-            <path
-              className="torch-grip"
-              d="M103 145 L116 187 M120 140 L133 182 M137 135 L150 177"
-            />
-            <path className="lamp-shade" d="M183 105 L220 86 L250 177 L207 175 Z" />
-            <path className="shade-rim" d="M224 97 L246 167" />
-            <path className="pull" d="M79 177 C33 182 52 218 91 203" />
-            <path className="torch-switch" d="M146 122 L167 116 L170 125 L149 131 Z" />
-          </>
-        )}
-      </svg>
-      <span className="object-condition">{object.condition}</span>
-    </div>
-  );
-}
-
 export default function App() {
   const [initial] = useState(initialStory);
   const [game, setGame] = useState(initial.game);
   const [message, setMessage] = useState<string | null>(initial.warning);
   const [journal, setJournal] = useState(false);
+  const [departingObject, setDepartingObject] = useState<ObjectView | null>(null);
+  const departureTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (departureTimer.current) clearTimeout(departureTimer.current);
+    },
+    [],
+  );
   const [confirmReset, setConfirmReset] = useState(false);
   const [settling, setSettling] = useState(false);
-  const [resultText, setResultText] = useState<string | null>(null);
-  const [lastChoice, setLastChoice] = useState<string | null>(null);
+  const [attention, setAttention] = useState<{
+    lines: ConversationLine[];
+    narration: string | null;
+    revision: number;
+    passage?: string;
+  } | null>(null);
   const [previousEvidence, setPreviousEvidence] = useState<{
     id: string;
     observations: string[];
   } | null>(null);
   const [choiceGate] = useState(() => createChoiceGate(() => setSettling(false)));
   useEffect(() => () => choiceGate.cancel(), [choiceGate]);
+  useEffect(() => {
+    function closeJournal(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setJournal(false);
+        setConfirmReset(false);
+      }
+    }
+    window.addEventListener('keydown', closeJournal);
+    return () => window.removeEventListener('keydown', closeJournal);
+  }, []);
   const storyRevision = useRef(0);
   const fileInput = useRef<HTMLInputElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const restoreChoiceFocus = useRef(false);
+  useEffect(() => {
+    if (game.inputs.length > 0 && !settling && restoreChoiceFocus.current) {
+      const visibleChoice = [
+        ...(actionsRef.current?.querySelectorAll<HTMLButtonElement>('[data-choice]') ?? []),
+      ].find((button) => button.getClientRects().length > 0);
+      visibleChoice?.focus({ preventScroll: true });
+      restoreChoiceFocus.current = false;
+    }
+  }, [settling, game.inputs.length]);
   const view = getView(game);
+  const workshop = getWorkshopView(game);
+  const timeAwayIds = new Set(['next-day', 'back-to-school', 'wait-person']);
+  const isProjectAction = (action: ActionView) =>
+    /^workshop-(cabinet|drawings|display-drawing|keep-drawing)/.test(action.id);
+  const actionGroups = [
+    {
+      id: 'here',
+      label: '',
+      actions: view.actions.filter(
+        (action) =>
+          action.kind !== 'quiet' &&
+          !action.id.startsWith('workshop-') &&
+          !timeAwayIds.has(action.id),
+      ),
+    },
+    {
+      id: 'conversation',
+      label: 'Talk for a while',
+      actions: view.actions.filter((action) => action.kind === 'quiet'),
+    },
+    { id: 'project', label: 'The family project', actions: view.actions.filter(isProjectAction) },
+    {
+      id: 'workshop',
+      label: 'Other repairs and plans',
+      actions: view.actions.filter(
+        (action) => action.id.startsWith('workshop-') && !isProjectAction(action),
+      ),
+    },
+    {
+      id: 'time',
+      label: 'Take some time',
+      actions: view.actions.filter((action) => timeAwayIds.has(action.id)),
+    },
+  ].filter((group) => group.actions.length > 0);
+  const projectChoices = actionGroups.find((group) => group.id === 'project')?.actions ?? [];
   const latest = view.conversation.at(-1);
-  const dialogue = view.currentDialogue ?? (latest ? [latest] : []);
+  const dialogue = attention?.lines ?? view.currentDialogue ?? (latest ? [latest] : []);
+  const narration = attention?.narration ?? null;
   const history = view.journal ?? view.conversation;
+  const recordedObservations = [...new Set(view.focus?.observations ?? [])].filter(
+    (observation) =>
+      !dialogue.some((line) => line.text === observation) && observation !== narration,
+  );
   function keep(next: GameState) {
     storyRevision.current++;
     choiceGate.cancel();
@@ -131,24 +143,24 @@ export default function App() {
     const next = transition(game, input);
     if (next === game) return;
     const nextView = getView(next);
-    const reply = nextView.currentDialogue?.at(-1) ?? nextView.conversation.at(-1);
-    const newObservation = nextView.focus?.observations.find(
-      (observation) =>
-        nextView.focus?.id !== view.focus?.id || !view.focus?.observations.includes(observation),
+    const freshLines = (nextView.currentDialogue ?? nextView.conversation).filter(
+      (line) => line.id > (latest?.id ?? -1),
     );
-    setResultText(
-      nextView.moment ??
-        (reply && reply.id !== latest?.id
-          ? `${reply.speaker}: ${reply.text.length > 170 ? `${reply.text.slice(0, 167).replace(/\s+\S*$/, '')}…` : reply.text}`
-          : (newObservation ?? nextView.note ?? nextView.focus?.condition ?? null)),
-    );
+    if (departureTimer.current) clearTimeout(departureTimer.current);
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    if (view.focus && !nextView.focus && !reducedMotion) {
+      setDepartingObject(view.focus);
+      departureTimer.current = setTimeout(() => setDepartingObject(null), 620);
+    } else setDepartingObject(null);
+    setAttention({
+      lines: freshLines,
+      narration: freshLines.length ? null : (nextView.moment ?? null),
+      revision: next.inputs.length,
+      passage:
+        input.type === 'action' && input.id === 'back-to-school' ? 'A year later' : undefined,
+    });
     setPreviousEvidence(
       view.focus ? { id: view.focus.id, observations: view.focus.observations } : null,
-    );
-    setLastChoice(
-      input.type === 'action'
-        ? (view.actions.find((action) => action.id === input.id)?.label ?? null)
-        : `Return to ${view.shelf.find((item) => item.id === input.id)?.title ?? 'the bench'}`,
     );
     keep(next);
     choiceGate.pause(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
@@ -177,8 +189,8 @@ export default function App() {
       const next = replayPlaytest(text);
       keep(next);
       setJournal(false);
-      setLastChoice(null);
-      setResultText(null);
+      setAttention(null);
+      setDepartingObject(null);
       setPreviousEvidence(null);
     } catch {
       if (revision !== storyRevision.current) return;
@@ -187,10 +199,45 @@ export default function App() {
       );
     }
   }
+  function renderAction(action: ActionView) {
+    return (
+      <button
+        type="button"
+        data-choice="true"
+        key={action.id}
+        className={`${action.kind === 'primary' ? 'primary' : ''} intent-${action.intent ?? 'stay'}`}
+        disabled={settling}
+        title={
+          action.intent === 'leave'
+            ? 'Move on from this moment'
+            : action.intent === 'pause'
+              ? 'The work can wait here'
+              : 'Continue here'
+        }
+        onClick={(event) => {
+          restoreChoiceFocus.current = event.detail === 0;
+          act({ type: 'action', id: action.id });
+        }}
+      >
+        <span className="action-label">
+          {action.label}
+          {action.intent === 'leave' && <span className="intent-mark">Move on</span>}
+        </span>
+        {action.id === 'rest' ? (
+          <small>Time together over tea; this work can wait safely.</small>
+        ) : (
+          action.detail && <small>{action.detail}</small>
+        )}
+      </button>
+    );
+  }
   return (
     <main className={`story scene-${view.scene}`}>
       <header className="masthead">
-        <span className="place">{view.scene === 'home' ? 'At home' : 'In the garage'}</span>
+        <div className="place-time">
+          <span className="place">{view.scene === 'home' ? 'At home' : 'In the garage'}</span>
+          {view.timeLabel && <span className="time">{view.timeLabel}</span>}
+        </div>
         <button
           type="button"
           className="journal-toggle"
@@ -201,12 +248,13 @@ export default function App() {
           aria-expanded={journal}
           aria-controls="journal"
         >
-          Journal
+          {journal ? 'Back to the bench' : 'Journal'}
         </button>
       </header>
       {journal && (
         <section id="journal" className="journal" aria-label="Story journal">
           <h2>Your story</h2>
+          <p className="journal-note">The conversations and small discoveries you have kept.</p>
           {history.length > 0 && (
             <ol className="past-conversation">
               {history.map((line) => (
@@ -238,8 +286,8 @@ export default function App() {
                 type="button"
                 onClick={() => {
                   keep(createGame());
-                  setLastChoice(null);
-                  setResultText(null);
+                  setAttention(null);
+                  setDepartingObject(null);
                   setPreviousEvidence(null);
                   setConfirmReset(false);
                   setJournal(false);
@@ -266,126 +314,216 @@ export default function App() {
           {message}
         </p>
       )}
-      <section className="story-heading">
-        <h1>{view.title}</h1>
-        <p>{view.subtitle}</p>
-      </section>
-      {dialogue.length > 0 && (
-        <section
-          key={dialogue.map((line) => line.id).join('-')}
-          className={`conversation ${dialogue.at(-1)?.tone ?? 'warm'}`}
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          {dialogue.map((line) => (
-            <div className="dialogue-line" key={line.id}>
-              <span className="speaker">{line.speaker}</span>
-              <p>{line.text}</p>
-            </div>
-          ))}
-        </section>
-      )}
-      {view.focus && (
-        <section className="workbench" aria-label={view.focus.title}>
-          <Lamp object={view.focus} />
-          <div className="object-story">
-            <h2>{view.focus.title}</h2>
-            <p className="owner">{view.focus.owner}</p>
-            <p>{view.focus.story}</p>
-            {view.focus.observations.length > 0 && (
-              <ul className="observations">
-                {view.focus.observations.map((observation) => (
-                  <li
-                    key={observation}
-                    className={
-                      previousEvidence?.id === view.focus?.id &&
-                      !previousEvidence?.observations.includes(observation)
-                        ? 'new-evidence'
-                        : ''
-                    }
-                  >
-                    {previousEvidence?.id === view.focus?.id &&
-                      !previousEvidence?.observations.includes(observation) && (
-                        <span className="evidence-tag">New</span>
-                      )}
-                    {observation}
-                  </li>
-                ))}
-              </ul>
-            )}
+      <div hidden={journal} className="present-story" ref={actionsRef}>
+        {view.lifeChapter && (
+          <div className="life-chapter">
+            <span>{view.lifeChapter.label}</span>
+            {view.lifeChapter.detail && <p>{view.lifeChapter.detail}</p>}
           </div>
+        )}
+        <section className="story-heading">
+          <h1>{view.title}</h1>
+          <p>{view.subtitle}</p>
         </section>
-      )}
-      {view.note && <p className="bench-note">{view.note}</p>}
-      {view.humanNote && <p className="human-note">{view.humanNote}</p>}
-      {lastChoice && (
-        <section className="action-result" aria-live="polite" aria-atomic="true">
-          <span className="result-choice">You chose: {lastChoice}</span>
-          <p>{resultText}</p>
-        </section>
-      )}
-      {view.actions.length > 0 && (
-        <section
-          className={`actions ${settling ? 'settling' : 'ready'}`}
-          aria-busy={settling}
-          aria-label="What to do next"
-        >
-          {view.actions.map((action) => (
-            <button
-              type="button"
-              key={action.id}
-              className={`${action.kind === 'primary' ? 'primary' : ''} intent-${action.intent ?? 'stay'}`}
-              disabled={settling}
-              onClick={() => act({ type: 'action', id: action.id })}
-            >
-              <span className="action-label">
-                {action.label}
-                {action.intent && action.intent !== 'stay' && (
-                  <span className="intent-mark" aria-hidden="true">
-                    {action.intent === 'pause' ? 'Ⅱ' : '↗'}
-                  </span>
+        {view.focus && (
+          <section className="workbench" aria-label={view.focus.title}>
+            <ObjectPresentation key={view.focus.id} object={view.focus} />
+            <div className="object-story">
+              <h2>{view.focus.title}</h2>
+              {!view.focus.title
+                .toLocaleLowerCase()
+                .includes(view.focus.owner.toLocaleLowerCase()) && (
+                <p className="owner">{view.focus.owner}</p>
+              )}
+              <p>{view.focus.story}</p>
+              {recordedObservations.length > 0 && (
+                <details className="object-notes">
+                  <summary>Notes so far</summary>
+                  <ul className="observations">
+                    {recordedObservations.map((observation) => (
+                      <li
+                        key={observation}
+                        className={
+                          previousEvidence?.id === view.focus?.id &&
+                          !previousEvidence?.observations.includes(observation)
+                            ? 'new-evidence'
+                            : ''
+                        }
+                      >
+                        {previousEvidence?.id === view.focus?.id &&
+                          !previousEvidence?.observations.includes(observation) && (
+                            <span className="evidence-tag">New</span>
+                          )}
+                        {observation}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          </section>
+        )}
+        {!view.focus && departingObject && (
+          <div className="object-departure" aria-hidden="true">
+            <ObjectIllustration object={departingObject} />
+          </div>
+        )}
+        {view.note && <p className="bench-note">{view.note}</p>}
+        {view.humanNote && <p className="human-note">{view.humanNote}</p>}
+        {workshop?.cabinet?.open && (
+          <details className="cabinet-at-side" open={!view.focus}>
+            <summary>Dad’s cabinet doors</summary>
+            <section className="family-project" aria-label="Dad’s cabinet project">
+              <Cabinet stage={workshop.cabinet.stage} drawing={workshop.cabinet.drawingDisplayed} />
+              <div>
+                <p>{workshop.cabinet.description}</p>
+                {workshop.cabinet.drawingFound && (
+                  <p className="project-memory">
+                    {workshop.cabinet.drawingDisplayed
+                      ? 'Your drawing is beside the finished cabinet.'
+                      : 'The saved drawing is in the flat box.'}
+                  </p>
                 )}
-              </span>
-              {action.detail && <small>{action.detail}</small>}
-            </button>
-          ))}
-        </section>
-      )}
-      {(view.shelf.length > 0 || view.parts.length > 0) && (
-        <aside className="belongings">
-          {view.shelf.length > 0 && (
-            <section>
-              <h2>Put aside</h2>
-              <div className="shelf">
-                {view.shelf.map((item) => (
-                  <button
-                    type="button"
-                    key={item.id}
-                    disabled={settling}
-                    onClick={() => act({ type: 'select', id: item.id })}
-                  >
-                    <span>{item.title}</span>
-                    <small>{item.note}</small>
-                  </button>
-                ))}
               </div>
             </section>
-          )}
-          {view.parts.length > 0 && (
-            <section>
-              <h2>Parts tray</h2>
-              <ul className="parts">
-                {view.parts.map((part) => (
-                  <li key={part.id}>
-                    {part.label}
-                    {part.count > 1 ? ` · ${part.count}` : ''}
-                  </li>
-                ))}
-              </ul>
+            <div className="choice-buttons project-choices">{projectChoices.map(renderAction)}</div>
+          </details>
+        )}
+        {view.apprenticeship && (
+          <section
+            className="apprentice-presence"
+            aria-label={`${view.apprenticeship.name} at the bench`}
+          >
+            <span className="speaker">{view.apprenticeship.name}</span>
+            <p>{view.apprenticeship.activity}</p>
+            <small>{view.apprenticeship.responsibility}</small>
+          </section>
+        )}
+        <div className="attention-channel" aria-live="polite" aria-atomic="true">
+          {(dialogue.length > 0 || narration) && (
+            <section
+              key={`${attention?.revision ?? 0}-${dialogue.map((line) => line.id).join('-')}`}
+              className={`conversation ${dialogue.at(-1)?.tone ?? 'warm'} ${attention?.passage ? 'season-turn' : ''}`}
+            >
+              {attention?.passage && <span className="passage-label">{attention.passage}</span>}
+              {narration && <p className="narration">{narration}</p>}
+              {dialogue.map((line) => (
+                <div className="dialogue-line" key={line.id}>
+                  <span className="speaker">{line.speaker}</span>
+                  <p>{line.text}</p>
+                </div>
+              ))}
             </section>
           )}
-        </aside>
-      )}
+        </div>
+        {view.actions.length > 0 && (
+          <section
+            className={`actions ${settling ? 'settling' : 'ready'}`}
+            aria-busy={settling}
+            aria-label="What to do next"
+          >
+            {actionGroups
+              .filter((group) => group.id !== 'project' || !workshop?.cabinet?.open)
+              .map((group) =>
+                ['conversation', 'project', 'workshop'].includes(group.id) ? (
+                  <details
+                    className="choice-group choice-more"
+                    key={group.id}
+                    open={group.id !== 'conversation' && !view.focus}
+                  >
+                    <summary>{group.label}</summary>
+                    <div className="choice-buttons">{group.actions.map(renderAction)}</div>
+                  </details>
+                ) : (
+                  <div className="choice-group" key={group.id}>
+                    {group.label && <h2>{group.label}</h2>}
+                    <div className="choice-buttons">{group.actions.map(renderAction)}</div>
+                  </div>
+                ),
+              )}
+          </section>
+        )}
+        {workshop && (workshop.jobs.length > 0 || workshop.notebook || workshop.arrangement) && (
+          <aside className="workshop-notes" aria-label="Workshop notes">
+            {workshop.jobs.length > 0 && (
+              <details className="job-slips">
+                <summary>Agreed work</summary>
+                <div>
+                  {workshop.jobs.map((job) => (
+                    <article key={job.id}>
+                      <h3>{job.title}</h3>
+                      <p>{job.note}</p>
+                      <small>{job.quote}</small>
+                      {job.stage === 'quoted' && (
+                        <p className="agreement-status">Discussed, not yet accepted.</p>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              </details>
+            )}
+            {workshop.notebook && (
+              <details className="cash-notebook">
+                <summary>Workshop notebook</summary>
+                <p>
+                  {workshop.notebook.received} received for repairs · {workshop.notebook.paid} paid
+                  to Sam.
+                </p>
+                <p>
+                  {workshop.notebook.materials} spent on batteries, covered by customers’ material
+                  advances.
+                </p>
+                <p>{workshop.notebook.cash} kept for the workshop.</p>
+              </details>
+            )}
+            {workshop.arrangement && <p className="workshop-arrangement">{workshop.arrangement}</p>}
+          </aside>
+        )}
+        {view.whereabouts && view.whereabouts.length > 0 && (
+          <aside className="people-nearby" aria-label="People">
+            {view.whereabouts.map((person) => (
+              <p key={person.id}>
+                <strong>{person.name}</strong> · {person.activity}
+              </p>
+            ))}
+          </aside>
+        )}
+        {(view.shelf.length > 0 || view.parts.length > 0) && (
+          <aside className="belongings">
+            {view.shelf.length > 0 && (
+              <section>
+                <h2>Put aside</h2>
+                <div className="shelf">
+                  {view.shelf.map((item) => (
+                    <button
+                      type="button"
+                      key={item.id}
+                      disabled={settling}
+                      onClick={() => act({ type: 'select', id: item.id })}
+                    >
+                      <span>{item.title}</span>
+                      <small>{item.note}</small>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+            {view.parts.length > 0 && (
+              <section>
+                <h2>Parts tray</h2>
+                <ul className="parts">
+                  {view.parts.map((part) => (
+                    <li key={part.id}>
+                      {part.label}
+                      {part.count > 1 ? ` · ${part.count}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </aside>
+        )}
+      </div>
       <footer>A little work, a little patience.</footer>
     </main>
   );

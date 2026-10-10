@@ -17,9 +17,9 @@ Longer-term ambition: the experience shifts from cozy repair to business managem
 
 ## Status
 
-The playable family-and-garage chapter starts with a family conversation and a flickering battery lamp. Optional memories reveal the household gradually. Diagnosis, failed attempts, longer checks, shelving and recovered parts emerge through play. Family friends bring small repairs, including a torch with a different contact mechanism. Objects have distinctive appearances; nearby consequence cues and a brief, reduced-motion-aware reveal help changes stay noticeable.
+The playable story begins at fourteen with a family conversation and a flickering lamp. Distinct household repairs and unfinished personal work carry across explicit school years. After graduation, the player can agree a shared workspace, explain actual methods to Sam, and delegate unfamiliar supported repairs. Sam can refuse, stop for help and preserve his own commitments. Genuine independent completion excludes player-assisted work.
 
-A longer check runs while you wait, share tea or work on something else. You can honestly hand something back before checking; its owner may request that check later. The Journal retains story and consequential repair conversations.
+The canonical backstory unfolds through objects and people in a slightly dystopic, repair-dependent world. The Journal keeps conversations and notes. The interface follows the system's light/dark setting; original optional 3D inspection complements distinct illustrations and a text fallback. Growth remains voluntary and personal projects remain worthwhile.
 
 Run locally with Node 24 or newer:
 
@@ -30,8 +30,8 @@ npm run dev
 
 Open the local address printed by the development server. Progress saves in the browser. The Journal exports a replayable story (seed, inputs and person/object state) and opens an exported story. `npm run check` runs lint, types, behavioral tests and the production build.
 
-This is the enriched chapter after the first playtest, before apprenticeship. There is no remote or deployment yet. The working screen title is **A little light**; the public title is undecided.
+The current overnight run continues through a first service week; see HANDOFF.md for verified extent and remaining work. Static deployment on repair.adamwhite.work is authorized, while repository source publication and the final public title remain undecided. The working screen title is **A little light**.
 
-The game consumes released `@adam0white/human-framework` 2.1.4 through its public API. HF owns person skills, effort, perceptions, relationships and memory. Shared tea changes HF social state, which affects Mum's choice between helping and returning to her book. It does not buy cooperation. Matched elapsed-time tests exercise that bounded consequence. Manual repair outcomes still follow host diagnosis/action matching; independent apprentice learning is not implemented. Framework changes belong in HF and return here as a published dependency upgrade.
+The game consumes published `@adam0white/human-framework` 2.2.0 through its public API. HF owns people, acquired conditional methods, cognition, perceptions, body, skills, relationships and memory. The host owns object physics, material compatibility, prices and business bookkeeping. Matched learning controls distinguish supported transfer from scalar skill or an authored repair policy; this does not claim universal planning or calibrated human realism.
 
-Adam accepts the opening's feel by playing it. The larger MVP finish line remains [the first independent handoff](docs/mvp.md#acceptance).
+Adam accepts game feel by playing it. The first independent handoff and its checks remain documented in [the MVP target](docs/mvp.md#acceptance).

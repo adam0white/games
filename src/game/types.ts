@@ -1,6 +1,17 @@
 import type { Person } from '@adam0white/human-framework';
+import type { RepairCue } from './repairs';
+import type { WorkshopState } from './workshop';
 
-export type Fault = 'contact' | 'battery' | 'holder' | 'cap';
+export type Fault =
+  | 'contact'
+  | 'battery'
+  | 'holder'
+  | 'cap'
+  | 'jam'
+  | 'striker'
+  | 'hinge'
+  | 'spring'
+  | 'gear';
 export type Chapter = 'family' | 'bench' | 'later' | 'garage';
 export type GameInput = { type: 'action'; id: string } | { type: 'select'; id: string };
 
@@ -9,17 +20,36 @@ export interface RepairObject {
   title: string;
   owner: string;
   story: string;
-  form: 'lamp' | 'torch';
+  inspectText?: string;
+  repairText?: string;
+  appearance?:
+    | 'reading'
+    | 'bedside'
+    | 'kitchen'
+    | 'torch'
+    | 'timer'
+    | 'bell'
+    | 'box'
+    | 'clip'
+    | 'model';
+  form: 'lamp' | 'torch' | 'timer' | 'bell' | 'box' | 'clip';
   fault: Fault;
   location: 'bench' | 'shelf' | 'returned';
   observations: string[];
+  evidence?: RepairCue[];
   inspected: boolean;
   tested: boolean;
   attempted: number;
   repaired: boolean;
   verified: boolean;
   discovered: boolean;
+  assignedTo?: 'sam';
+  independent?: boolean;
+  playerAssisted?: boolean;
+  completedBy?: 'player' | 'sam';
+  stepDecisions?: { at: number; action: string | null; methods: string[] }[];
   checkStarted?: number;
+  awaitingCollection?: boolean;
   returnedEarly?: boolean;
   callbackAt?: number;
   callbackSeen?: boolean;
@@ -38,6 +68,31 @@ export interface LoggedInput {
 }
 
 export interface GameState {
+  workshop?: WorkshopState;
+  campaign?: { holiday: number; lastSchoolRepairs: number; graduated: boolean; startedAt: number };
+  apprentice?: {
+    visitUntil: number;
+    arranged: boolean;
+    supervisedCompleted: boolean;
+    independentCompleted: number;
+    jobId?: string;
+    pending?: { step: string; endsAt: number };
+    needsHelp?: string;
+    role: 'observer' | 'trainee' | 'repairer';
+    completedJobIds: string[];
+    supervised?: boolean;
+    lastLesson?: {
+      objectId: string;
+      step: string;
+      cue: RepairCue;
+      success: boolean;
+      eventId: string;
+      explained: boolean;
+    };
+  };
+  world?: { presence: Record<string, { awayUntil: number; activity: string }>; day: number };
+  engine3Save?: string;
+  engine3InputCount?: number;
   schema: 1;
   scenario: 1;
   framework: string;
@@ -47,7 +102,7 @@ export interface GameState {
   focusId: string | null;
   objects: RepairObject[];
   people: Record<string, Person>;
-  parts: { batteries: number; holders: number };
+  parts: { batteries: number; holders: number; springs?: number; gears?: number };
   unlocked: string[];
   conversation: ConversationLine[];
   inputs: LoggedInput[];
@@ -79,12 +134,27 @@ export interface ObjectView {
   story: string;
   condition: string;
   visual: 'flickering' | 'steady' | 'off' | 'broken' | 'warm';
-  form: 'lamp' | 'torch';
+  form: 'lamp' | 'torch' | 'timer' | 'bell' | 'box' | 'clip';
   observations: string[];
-  appearance?: 'reading' | 'bedside' | 'kitchen' | 'torch';
+  inspected?: boolean;
+  progress?: 'closed' | 'inspected' | 'repaired' | 'checked';
+  appearance?:
+    | 'reading'
+    | 'bedside'
+    | 'kitchen'
+    | 'torch'
+    | 'timer'
+    | 'bell'
+    | 'box'
+    | 'clip'
+    | 'model';
 }
 
 export interface GameView {
+  lifeChapter?: { label: string; detail?: string };
+  apprenticeship?: { name: string; activity: string; responsibility: string };
+  timeLabel?: string;
+  whereabouts?: { id: string; name: string; activity: string }[];
   title: string;
   subtitle: string;
   scene: 'home' | 'garage';

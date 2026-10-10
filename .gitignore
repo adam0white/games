@@ -7,3 +7,7 @@ dist/
 .worktrees/
 .superpowers/
 .review/
+.wrangler/
+public/release.json
+
+*.tsbuildinfo

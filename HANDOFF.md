@@ -1,39 +1,34 @@
 # Handoff
 
-Updated 2026-10-10.
+Updated 2026-10-10 during the authorized five-hour run; deadline 10:59:20 UTC.
 
 ## What remains
 
-Adam judges the enriched chapter's feel. The next implementation target is the first observing/assisting friend and then genuine conditional apprentice learning under docs/mvp.md controls. Do not substitute an authored repair policy for learned behavior. No routine design approval is needed; autonomous progression and delegated work remain authorized.
+Continue through the first service week and deeper quiet HF inner lives, then review, deploy and leave a substantial long playthrough. Adam accepts the game's feel personally. A technical handoff or published framework does not claim his acceptance. Current plan: docs/superpowers/plans/2026-10-10-first-service-week.md.
 
-Run `npm ci && npm run dev` with Node ≥24. The retained preview is `http://127.0.0.1:5173/`. Current engine-2 saves migrate through validated legacy replay, preserving objects, people and input history. A fresh story reveals the expanded family conversations; export before reset to keep both.
+## Reviewed checkpoint
 
-## Done and verified
+- School-break opening at fourteen; explicit years pass to graduation at eighteen. Eight to ten distinct household repairs include lamps, a torch cap, timer, bell, sewing box and clip. The unfinished paper-street model preserves a longer personal project. Story authority: docs/story/index.md, overview.md, characters.md, history.md and episode.md. Slowly revealed repair-dependent dystopia, no college, original fiction.
+- All named people are seeded HF actors, with ordinary elapsed activities, schedules and remembered dialogue. Tea is an invitation, not purchased company; absent owners collect later. School transitions wait for pending customer collections. Timed checks and saved notes survive.
+- Published HF 2.2.0 is pinned exactly. Conditional methods acquired from actual explained demonstrations drive Sam's public decisions. Withheld teaching, scalar skill alone, alternative teaching and unknown faults are controlled. Player-assisted/rescued work cannot earn whole-job independence; actual independent intake, diagnosis, repair, check and collection are demonstrated. Scope remains explicit taught categorical methods, not general planning or calibrated human realism.
+- Shared workspace, voluntary referrals, quoted prices/materials, agreed paid help and conserved cash have separate explicit choices. Follow-up customers include a useful unsupported request. Dad's cabinet, saved drawing choice and personal work remain available beside repairs.
+- One current response channel, retained Journal, ceremony on object transitions, automatic dark mode, reduced-motion behavior, collapsed optional conversations/projects/plans. Distinct original illustrations and optional original procedural 3D inspection; text/SVG fallback and keyboard controls. Camera movement grants no diagnosis.
+- Both owner engine-3 exports validate and migrate with objects/inputs intact and 8/91 retained journal lines. Original discarded lines are not reconstructed. Frozen engines 2–4 use their historical package. Current stories replay exactly, including pending apprentice work and delayed collection.
 
-- Distinct reading, bedside, kitchen and torch appearances. A separate torch cap repair changes the interaction. Current exposed diagnosis replaces the earlier uncertain condition; newly received evidence is emphasized.
-- Optional authored family memories and friend conversations, repeating-contact familiarity, and a future invitation to observe. Original speakers remain distinct. These branches have no mechanical rewards or learned-policy effects. Significant and consequential dialogue persists in the Journal rather than disappearing after eight lines.
-- Verification requires twenty simulated minutes and a final check; tea, waiting and other jobs can fill that time. Honest premature return allows a later requested check; repeated returns preserve the same object/fault and remain recoverable.
-- Tea uses actual HF shared-time relationships/social needs. A matched-duration, matched-leisure neutral-rest control changes Mum's subsequent public decision trace between helping and her own reading. This proves one bounded social response; tea does not purchase cooperation or teach repair.
-- Nearby action/result cues, a short response fade and 420 ms choice reveal; reduced-motion users get immediate choices. Async imports cannot overwrite a later action/reset/import.
-- Engine-2 frozen replay is preserved; interim engine-3 replies also replay unchanged, with corrected feedback applying after an explicit saved input cutoff. Current migration, new actions, autosave, reload and exact export/reset/import passed in an actual isolated Chrome browser. Mobile and desktop screenshots checked; no horizontal overflow or browser errors in that verification.
-- Lint, strict types, twenty-four tests and production build pass. Tests cover social causality, elapsed checks, repeated callbacks, retained transcript, actual event speakers, shelf continuity, old-save migration and exact replay.
+## Review evidence
 
-## Reviews and fixes
+Independent wildcard browser play reached eighteen and apprenticeship; separate game-design review identified verification repetition and a need for a meaningful first service week. Technical review reproduced falsely credited assisted independence, collection skipped by watch actions and end-of-jump owner timing; fixes were independently rechecked (12 targeted tests). The isolated release checkout passed lint, strict types, 63 tests and production build after the final 3D lifecycle fix. Four tests cover a prepared, not yet integrated practices module; actual quiet practice in the game remains next-pass work.
 
-Most implementation was delegated to engine, story and interface workers. Independent technical, tiny-brief browser-player and minimally briefed wildcard reviews ran. Fixed reset-variable error, disappearing history, repeated-callback loss, mixed-speaker paragraphs, ambiguous garage movement, repeated intent labels and garage tea location. A fresh final mobile traversal completed both family lamps, Nora’s lamp and Sam’s torch, with optional conversations and Journal; no progression blocks. It exposed contradictory wrong-repair advice and a stale check note, both subsequently fixed and regression-tested.
+Gemini completed the story review. Its additional HF review failed on quota; Claude failed on expired authentication. Independent delegated framework reviewers completed instead. HF 2.2.0 GitHub/npm provenance and the public framework site are verified (release d673644, docs ea507b1); CI, CodeQL and benchmark workflows passed.
 
-An asynchronous Gemini flash design review completed (exit zero/substantive output). It read the earlier/in-progress engine, so its useful warnings about decorative HF state and inert rest/time were assessed against the completed changes. Its claim that misdiagnosis was impossible was false; wrong repairs were already available. Outputs remain local/ignored in `.review/`. No recurring review automation was configured.
+## Deployment and boundaries
 
-## Unchecked, untouched and limits
+Configured static target: https://repair.adamwhite.work. Public static deployment is explicitly authorized; publication of this repository's source, licensing and final public title remain undecided. Only dist is published. The working screen title is A little light. Deployment must use a clean reviewed checkout and verify live release.json against its commit, framework and engine.
 
-- Adam's acceptance of this iteration and physical-device play remain unverified. Reviewers cannot accept his taste.
-- No independent apprentice policy, hiring/payment, commercial promises, richer object families, caffeine/bladder model, day schedules, economy or multiplayer. An observing-friend invitation is story groundwork, not a training achievement. No HF faculty or release changed.
-- Manual repair success still follows the host's diagnosis/action rules. Human causality currently demonstrates the help-versus-reading choice. Do not generalize one matched control into calibrated human realism.
-- Primary preview watching excludes its own nested worktrees so isolated development does not reload a player’s page. Input and transcript history grow. UI import limit is 2 MB; engine limit is 8 MB / 20,000 inputs. Migrated saves retain the validated original legacy packet as provenance. Engine-1 prototypes remain unsupported. Retained engine-2 dialogue migrates; already discarded old lines are not claimed to have been recovered.
-- No remote, publication, deployment, license or final public title. Local integration is authorized; external visibility/licensing still need a decision.
+Primary local preview remains http://127.0.0.1:5173/ while isolated development uses :5178; the owner's live browser/save is preserved until final integration. Main development worktree: .worktrees/full-workshop, codex/full-workshop. Reviewed deployment checkout: .worktrees/reviewed-release. Earlier worktrees are preserved.
 
-## Live pointers
+## Limits
 
-Primary repo `/Users/abdul/code/repair-game`; iteration worktree `.worktrees/living-garage`, branch `codex/living-garage`. Source changes integrate locally into main after checks. Previous opening worktree remains preserved. Implementation plan: docs/superpowers/plans/2026-10-10-living-garage.md. Owner feedback excerpts: docs/games/opening-playtest-2026-10-10.md. Future milestones and deferred animations: docs/roadmap.md.
+No simulated market, multiplayer, servers or offline earnings. Prices and jobs are authored. Body and ordinary activities are bounded engineering models. Spiritual prose alone is not yet claimed as actual practice; the next pass uses existing sourced HF norms/windows. Current UI imports are bounded at 2 MB; engine packets at 8 MB/20,000 inputs. Physical-device play and owner taste acceptance remain unverified.
 
-Personal context consult uses `/Users/abdul/code/pkm`; this project remains authority on its own state. The absent work-PC brain path is not used here.
+Personal context consultation used /Users/abdul/code/pkm. Each project repository remains its own authority.

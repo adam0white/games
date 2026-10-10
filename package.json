@@ -1,9 +1,11 @@
 {
   "name": "repair-game",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
@@ -12,21 +14,28 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check src tests vite.config.ts",
     "format": "biome check --write src tests vite.config.ts",
-    "check": "npm run lint && npm run typecheck && npm test && npm run build"
+    "check": "npm run lint && npm run typecheck && npm test && npm run build",
+    "prebuild": "node scripts/stamp-release.mjs",
+    "deploy": "node scripts/deploy.mjs",
+    "deploy:check": "node scripts/deploy.mjs --dry-run"
   },
   "dependencies": {
-    "@adam0white/human-framework": "2.1.4",
+    "@adam0white/human-framework": "2.2.0",
+    "@repair/hf-legacy": "npm:@adam0white/human-framework@2.1.4",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "three": "0.186.1"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
     "@types/node": "26.6.4",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@types/three": "0.186.0",
     "@vitejs/plugin-react": "6.1.2",
     "typescript": "7.0.2",
     "vite": "8.3.4",
-    "vitest": "5.0.3"
+    "vitest": "5.0.3",
+    "wrangler": "4.149.0"
   }
 }
