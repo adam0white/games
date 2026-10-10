@@ -103,3 +103,122 @@ it('a chapter ceremony follows actual episode and delivery changes, never idle v
   expect(operationsCeremony(before, complete, 4)?.title).toBe('The agreed delivery is complete');
   expect(operationsCeremony(complete, complete, 5)).toBeNull();
 });
+
+it('the companion invitation has one owner beside the work and optional discussion stays with People', () => {
+  const view = getView(createGame());
+  view.actions = [
+    { id: 'arrange-learning', label: 'Join this work' },
+    { id: 'explain-step', label: 'Talk through (optional)', kind: 'quiet' },
+  ];
+  view.dayPlan = {
+    summary: 'Sam',
+    entries: [
+      {
+        id: 'sam-work',
+        label: 'Sam',
+        detail: 'An invitation',
+        status: 'invitation',
+        actionIds: ['arrange-learning', 'explain-step'],
+      },
+    ],
+  };
+  const grouped = projectActions(view, new Set(), new Set(['arrange-learning']));
+  expect(grouped.plans.flatMap((p) => p.actions)).toEqual([]);
+  expect(grouped.people.map((a) => a.id)).toEqual(['explain-step']);
+  expect([...grouped.bench, ...grouped.work, ...grouped.time]).toEqual([]);
+});
+
+it('keeps the focused case discussion and handback beside the case before generic quiet-action routing', () => {
+  const view = getView(createGame());
+  view.focus = {
+    id: 'nora-sample-case',
+    title: 'Nora’s sample case',
+    owner: 'Nora',
+    story: '',
+    condition: 'Examined',
+    visual: 'flickering',
+    form: 'box',
+    appearance: 'box',
+    inspected: true,
+    observations: [],
+    casePresentation: { mode: 'carrying-case', catch: 'original', comparisonKnown: true },
+  };
+  view.actions = [
+    { id: 'neighbourhood-source', label: 'Ask Nora for the measured catch', kind: 'quiet' },
+    { id: 'neighbourhood-return-repaired', label: 'Return the checked case', kind: 'quiet' },
+    { id: 'delegate-repair', label: 'Work together' },
+  ];
+  view.dayPlan = {
+    summary: 'Known work',
+    entries: [
+      {
+        id: 'case',
+        label: 'Case',
+        detail: '',
+        status: 'underway',
+        actionIds: view.actions.map((a) => a.id),
+      },
+    ],
+  };
+  const groups = projectActions(view);
+  expect(groups.bench.map((action) => action.id)).toEqual(view.actions.map((action) => action.id));
+  expect(groups.people).toEqual([]);
+  expect(groups.work).toEqual([]);
+  expect(groups.plans[0]?.actions).toEqual([]);
+});
+it('shows the canonical due cabinet appointment beside current work once, including cancellation', () => {
+  const view = getView(createGame());
+  view.actions = [
+    { id: 'workshop-cabinet-attend', label: 'Go to your agreed time' },
+    { id: 'workshop-cabinet-cancel', label: 'Cancel it' },
+    { id: 'inspect', label: 'Examine the current object' },
+  ];
+  view.dayPlan = {
+    summary: 'Today',
+    entries: [
+      {
+        id: 'known-dad-3825',
+        label: 'Cabinet time',
+        detail: 'Dad may keep his plans.',
+        status: 'agreed',
+        actionIds: ['workshop-cabinet-attend', 'workshop-cabinet-cancel'],
+      },
+    ],
+  };
+  const groups = projectActions(view);
+  expect(groups.benchPlans[0]?.actions.map((action) => action.id)).toEqual([
+    'workshop-cabinet-attend',
+    'workshop-cabinet-cancel',
+  ]);
+  expect(groups.plans).toEqual([]);
+  expect(groups.bench.map((action) => action.id)).toEqual(['inspect']);
+  const inProject = projectActions(
+    view,
+    new Set(['workshop-cabinet-attend', 'workshop-cabinet-cancel']),
+  );
+  expect(inProject.benchPlans).toEqual([]);
+  expect(inProject.plans[0]?.actions).toEqual([]);
+});
+
+it('actual appointment waiting lives once beside ordinary time controls while its promise stays recorded', () => {
+  const view = getView(createGame());
+  view.actions = [
+    { id: 'wait-appointment', label: 'Wait until Evan’s arranged visit', detail: 'Evan ·15:00' },
+  ];
+  view.dayPlan = {
+    summary: 'Today',
+    entries: [
+      {
+        id: 'evan',
+        label: 'Evan ·15:00',
+        detail: 'Agreed visit',
+        status: 'agreed',
+        actionIds: ['wait-appointment'],
+      },
+    ],
+  };
+  const groups = projectActions(view);
+  expect(groups.time.map((a) => a.id)).toEqual(['wait-appointment']);
+  expect(groups.plans[0]?.actions).toEqual([]);
+  expect(groups.plans[0]?.label).toBe('Evan ·15:00');
+});

@@ -22,6 +22,7 @@ import * as engine16 from '../src/game/engine16';
 import * as engine17 from '../src/game/engine17';
 import * as engine18 from '../src/game/engine18';
 import { createGame as oldGame, serializeGame as oldSerialize } from '../src/game/engine18';
+import * as engine19 from '../src/game/engine19';
 import { restoreHistorical } from '../src/game/historical-runtime';
 import * as legacy from '../src/game/legacy-engine';
 
@@ -78,27 +79,36 @@ it('rejects tampering, oversized sources and unsupported packets through unchang
 
 it('all supported historical native packets retain archive identity and async-sync migration parity', async () => {
   const replay = createBrowserReplay(async () => ({ restoreHistorical }));
-  for (const module of [
-    engine3,
-    engine4,
-    engine5,
-    engine6,
-    engine7,
-    engine8,
-    engine9,
-    engine10,
-    engine11,
-    engine12,
-    engine13,
-    engine14,
-    engine15,
-    engine16,
-    engine17,
-    engine18,
-  ]) {
+  function nativePacket<State>(module: {
+    createGame: (seed?: number) => State;
+    serializeGame: (state: State) => string;
+    restoreGame: (raw: string) => State;
+  }): string {
     const original = module.serializeGame(module.createGame());
     expect(module.serializeGame(module.restoreGame(original))).toBe(original);
-    expect(serializeGame(await replay(original))).toBe(serializeGame(restoreGame(original)));
+    return original;
+  }
+  for (const original of [
+    nativePacket(engine3),
+    nativePacket(engine4),
+    nativePacket(engine5),
+    nativePacket(engine6),
+    nativePacket(engine7),
+    nativePacket(engine8),
+    nativePacket(engine9),
+    nativePacket(engine10),
+    nativePacket(engine11),
+    nativePacket(engine12),
+    nativePacket(engine13),
+    nativePacket(engine14),
+    nativePacket(engine15),
+    nativePacket(engine16),
+    nativePacket(engine17),
+    nativePacket(engine18),
+    nativePacket(engine19),
+  ]) {
+    const raw = original;
+    expect(serializeGame(await replay(raw))).toBe(serializeGame(restoreGame(raw)));
   }
 });
 

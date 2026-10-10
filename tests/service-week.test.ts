@@ -353,3 +353,32 @@ it('late personal work uses only remaining time and an elapsed slot can be concr
     duration: 45,
   });
 });
+
+it('offers an actual unchecked collection revisit while its owner is away, without settling it', () => {
+  const s = fixture();
+  action(s, 'service-hear-leila');
+  action(s, 'service-accept-leila');
+  const absent = { ...context, ownerHere: () => false, uncheckedCollections: ['service-leila'] };
+  expect(serviceWeekActions(s, absent).map((a) => a.id)).toContain(
+    'service-revisit-unfinished-leila',
+  );
+  expect(
+    serviceWeekActions(s, { ...absent, uncheckedCollections: [] }).map((a) => a.id),
+  ).not.toContain('service-revisit-unfinished-leila');
+  const before = structuredClone(s);
+  const result = applyServiceWeekAction(s, 'service-revisit-unfinished-leila', absent);
+  expect(result?.visits).toEqual([
+    { personId: 'leila', at: s.now + 30, activity: 'Returning to discuss the unfinished check' },
+  ]);
+  expect(result?.recoverObjectId).toBeUndefined();
+  expect(result?.releaseCollectionId).toBeUndefined();
+  expect(result?.promise).toBeUndefined();
+  expect(s).toEqual(before);
+  const job = s.serviceWeek?.jobs[0];
+  if (!job) throw Error('Missing accepted job');
+  job.stage = 'offered';
+  expect(serviceWeekActions(s, absent).map((a) => a.id)).not.toContain(
+    'service-revisit-unfinished-leila',
+  );
+  expect(serviceWeekActions(s, absent).map((a) => a.id)).not.toContain('service-accept-leila');
+});

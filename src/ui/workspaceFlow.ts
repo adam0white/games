@@ -21,6 +21,8 @@ export function projectChapter(view: GameView): ChapterProjection {
   };
 }
 const benchIds = new Set([
+  'find-paper-street',
+  'evening-bring-model',
   'talk-family',
   'talk-garage',
   'inspect',
@@ -62,7 +64,9 @@ export function actionDestination(action: ActionView, hasObject: boolean): Works
     return 'time';
   if (
     benchIds.has(action.id) ||
+    action.id.startsWith('leave-ready-') ||
     action.id.startsWith('childhood-') ||
+    action.id.startsWith('saturday-') ||
     /^workshop-(cabinet|drawings|display-drawing|keep-drawing)/.test(action.id) ||
     (hasObject &&
       /^(fit-|test-|check-|clear-|adjust-|align-|lubricate-|replace-|open-|refit-)/.test(action.id))
@@ -84,15 +88,37 @@ export interface WorkspaceActions {
   people: ActionView[];
   time: ActionView[];
   plans: (PlanEntry & { actions: ActionView[] })[];
+  benchPlans: (PlanEntry & { actions: ActionView[] })[];
+}
+const focusedWork = new Set([
+  'delegate-repair',
+  'supervised-repair',
+  'take-over-repair',
+  'show-corrective-step',
+  'reconsider-sam',
+  'explain-step',
+]);
+function belongsWithObject(view: GameView, action: ActionView): boolean {
+  return Boolean(
+    view.focus && (focusedWork.has(action.id) || action.id.startsWith('neighbourhood-')),
+  );
 }
 /** Every offered action has exactly one owner. Physical actions belong to the object before plans. */
 export function projectActions(
   view: GameView,
   mappedIds: ReadonlySet<string> = new Set(),
+  companionIds: ReadonlySet<string> = new Set(),
 ): WorkspaceActions {
-  const result: WorkspaceActions = { bench: [], work: [], people: [], time: [], plans: [] };
+  const result: WorkspaceActions = {
+    bench: [],
+    work: [],
+    people: [],
+    time: [],
+    plans: [],
+    benchPlans: [],
+  };
   const actual = new Map(view.actions.map((action) => [action.id, action]));
-  const owned = new Set(mappedIds);
+  const owned = new Set([...mappedIds, ...companionIds]);
   const physical = new Set(
     view.focus
       ? getMappedRepairActions(view.focus, view.actions).map((binding) => binding.action.id)
@@ -102,16 +128,27 @@ export function projectActions(
     const actions: ActionView[] = [];
     for (const id of entry.actionIds ?? []) {
       const action = actual.get(id);
-      if (!action || owned.has(id) || physical.has(id)) continue;
+      if (
+        !action ||
+        owned.has(id) ||
+        physical.has(id) ||
+        belongsWithObject(view, action) ||
+        id === 'explain-step' ||
+        id === 'wait-appointment'
+      )
+        continue;
       owned.add(id);
       actions.push(action);
     }
-    result.plans.push({ ...entry, actions });
+    const localCabinet = actions.some((action) => action.id.startsWith('workshop-cabinet-'));
+    (localCabinet ? result.benchPlans : result.plans).push({ ...entry, actions });
   }
   for (const action of view.actions) {
     if (owned.has(action.id)) continue;
     owned.add(action.id);
-    result[actionDestination(action, Boolean(view.focus))].push(action);
+    result[
+      belongsWithObject(view, action) ? 'bench' : actionDestination(action, Boolean(view.focus))
+    ].push(action);
   }
   return result;
 }

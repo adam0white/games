@@ -12,13 +12,16 @@ import { getServiceWeekView } from './game/service-week';
 import type { ActionView, ConversationLine, GameInput, GameState, ObjectView } from './game/types';
 import { getWorkshopView, type LedgerEntry, type WorkshopState } from './game/workshop';
 import { Cabinet } from './ui/Cabinet';
+import { cabinetTarget } from './ui/cabinetBindings';
 import { createChoiceGate } from './ui/choiceGate';
 import { JournalHistory } from './ui/JournalHistory';
 import { ObjectIllustration } from './ui/ObjectIllustration';
 import { ObjectPresentation } from './ui/ObjectPresentation';
 import { OperationsBoard } from './ui/OperationsBoard';
 import { getMappedRepairActions } from './ui/repairBindings';
+import { SaturdayPreparation, SaturdayWindow } from './ui/SaturdayWindow';
 import { StoryBootstrap } from './ui/StoryBootstrap';
+import { WorkCompanion } from './ui/WorkCompanion';
 import { ActionLane, ChapterCeremony, PromiseCards } from './ui/WorkspaceCards';
 import { WorkspaceNavigation } from './ui/WorkspaceNavigation';
 import {
@@ -30,8 +33,18 @@ import {
 } from './ui/workspaceFlow';
 import './ui/workspace.css';
 import { writeStory } from './ui/storage';
+import { handedBackTitle, selectedObjectEvidence } from './ui/transitionPresentation';
 
 const WorkshopScene3D = lazy(() => import('./ui/workshop/WorkshopScene3D'));
+const GateWalkScene = lazy(() =>
+  import('./ui/GateWalkScene').then((module) => ({ default: module.GateWalkScene })),
+);
+const EveningTable = lazy(() =>
+  import('./ui/EveningTable').then((module) => ({ default: module.EveningTable })),
+);
+const CabinetAlignment3D = lazy(() =>
+  import('./ui/CabinetAlignment3D').then((module) => ({ default: module.CabinetAlignment3D })),
+);
 
 const ledgerLabels: Record<LedgerEntry['kind'], string> = {
   'materials-advance': 'Battery advance',
@@ -102,7 +115,7 @@ function PlayableStory({
   }, [inHand]);
   const [repairSurface, setRepairSurface] = useState<{ id: string; ready: boolean } | null>(null);
   const benchRef = useRef<HTMLElement>(null);
-  const cabinetRef = useRef<HTMLDetailsElement>(null);
+  const cabinetRef = useRef<HTMLElement>(null);
   const [attention, setAttention] = useState<{
     lines: ConversationLine[];
     narration: string | null;
@@ -110,7 +123,15 @@ function PlayableStory({
     passage?: string;
     outcome?: OutcomeCeremony;
     returnedObject?: string;
-  } | null>(null);
+  } | null>(() =>
+    initialGame.inputs.at(-1)?.input.type === 'select'
+      ? {
+          lines: [],
+          narration: selectedObjectEvidence(getView(initialGame).focus),
+          revision: initialGame.inputs.length,
+        }
+      : null,
+  );
   const [previousEvidence, setPreviousEvidence] = useState<{
     id: string;
     observations: string[];
@@ -161,9 +182,51 @@ function PlayableStory({
       : [],
   );
   const workshop = getWorkshopView(game);
+  if (workshop?.cabinet?.open && view.workshopCabinet?.alignment) {
+    for (const id of view.workshopCabinet.alignment.actionIds)
+      if (cabinetTarget(id)) mappedActionIds.add(id);
+  }
   const serviceWeek = getServiceWeekView(game);
   const chapter = projectChapter(view);
-  const groups = projectActions(view, mappedActionIds);
+  const saturdayAfternoon = view.saturdayWindow?.stage === 'afternoon';
+  const gateActive = view.gateWalk?.stage === 'gate';
+  const gateInvitation =
+    view.gateWalk?.stage === 'invitation'
+      ? view.actions.find((action) => action.id === 'gate-walk-join')
+      : undefined;
+  if (gateInvitation) mappedActionIds.add(gateInvitation.id);
+  if (gateActive) for (const id of view.gateWalk?.actionIds ?? []) mappedActionIds.add(id);
+  const eveningActive =
+    !gateActive &&
+    !saturdayAfternoon &&
+    Boolean(view.eveningTable && view.eveningTable.stage === 'table');
+  const eveningActions = view.actions.filter((action) =>
+    view.eveningTable?.actionIds.includes(action.id),
+  );
+  if (eveningActive) for (const action of eveningActions) mappedActionIds.add(action.id);
+  const cabinetActive =
+    !gateActive && !eveningActive && !saturdayAfternoon && Boolean(workshop?.cabinet?.open);
+  const effectiveRoomOpen =
+    roomOpen && !saturdayAfternoon && !cabinetActive && !eveningActive && !gateActive;
+  const cabinetActions = view.actions.filter((action) =>
+    /^workshop-(cabinet|drawings|display-drawing|keep-drawing)/.test(action.id),
+  );
+  const cabinetBack = cabinetActions.find((action) =>
+    ['workshop-cabinet-close', 'workshop-cabinet-leave'].includes(action.id),
+  );
+  if (cabinetActive) for (const action of cabinetActions) mappedActionIds.add(action.id);
+  const saturdayScene = Boolean(
+    view.saturdayWindow && ['afternoon', 'home'].includes(view.saturdayWindow.stage),
+  );
+  const companionJoin =
+    !saturdayAfternoon && view.workCompanion
+      ? view.actions.find((action) => action.id === 'arrange-learning')
+      : undefined;
+  const groups = projectActions(
+    view,
+    mappedActionIds,
+    new Set(companionJoin ? [companionJoin.id] : []),
+  );
   const dayPlans = groups.plans;
   const activePlans = dayPlans.filter(
     (entry) => entry.status !== 'kept' && (entry.status !== 'late' || entry.actions.length > 0),
@@ -180,7 +243,10 @@ function PlayableStory({
     );
   const boardPlans = activePlans.filter((entry) => entry !== urgentPlan);
   const [selectedPanel, setSelectedPanel] = useState<WorkspacePanel | null>(null);
-  const panel = selectedPanel ?? (view.focus || chapter.tutorial ? 'bench' : 'work');
+  const panel =
+    cabinetActive || eveningActive || gateActive
+      ? 'bench'
+      : (selectedPanel ?? (view.focus || chapter.tutorial ? 'bench' : 'work'));
   const [dismissedCeremonies, setDismissedCeremonies] = useState<string[]>([]);
   const latest = view.conversation.at(-1);
   const dialogue = attention?.lines ?? view.currentDialogue ?? (latest ? [latest] : []);
@@ -223,19 +289,20 @@ function PlayableStory({
       departureTimer.current = setTimeout(() => setDepartingObject(null), 620);
     } else setDepartingObject(null);
     setAttention({
-      lines: freshLines,
-      narration: freshLines.length ? null : (nextView.moment ?? null),
+      lines: input.type === 'select' ? [] : freshLines,
+      narration:
+        input.type === 'select'
+          ? selectedObjectEvidence(nextView.focus)
+          : freshLines.length
+            ? null
+            : (nextView.moment ?? null),
       revision: next.inputs.length,
       outcome: operationsCeremony(view, nextView, next.inputs.length) ?? undefined,
-      returnedObject:
-        view.focus &&
-        nextView.focus?.id !== view.focus.id &&
-        input.type === 'action' &&
-        /^(?:(?:Give|Hand)\b.*\bback\b|Return\b)/i.test(
-          view.actions.find((action) => action.id === input.id)?.label ?? '',
-        )
-          ? view.focus.title
-          : undefined,
+      returnedObject: handedBackTitle(
+        view.focus,
+        game.objects.find((item) => item.id === view.focus?.id),
+        next.objects.find((item) => item.id === view.focus?.id),
+      ),
       passage:
         input.type === 'action' && ['back-to-school', 'leave-school-holiday'].includes(input.id)
           ? nextView.lifeChapter?.label.includes('School finished')
@@ -301,6 +368,9 @@ function PlayableStory({
   }
   function renderAction(action: ActionView) {
     if (mappedActionIds.has(action.id)) return null;
+    return renderOfferedAction(action);
+  }
+  function renderOfferedAction(action: ActionView) {
     if (
       action.id === 'workshop-delay-evan-timer' &&
       view.actions.some((candidate) => candidate.id === 'workshop-return-unfixed-evan-timer')
@@ -336,7 +406,7 @@ function PlayableStory({
           {action.label}
           {action.intent === 'leave' && <span className="intent-mark">Move on</span>}
         </span>
-        {action.detail && action.id !== 'wait-appointment' && <small>{action.detail}</small>}
+        {action.detail && <small>{action.detail}</small>}
       </button>
     );
   }
@@ -401,7 +471,33 @@ function PlayableStory({
                 overline: 'A chapter you made your own',
               }
             : null);
-  const ceremonyOpen = ceremony && !dismissedCeremonies.includes(ceremony.key);
+  const ceremonyOpen = !gateActive && ceremony && !dismissedCeremonies.includes(ceremony.key);
+  const localBenchResult =
+    panel === 'bench' &&
+    Boolean(view.focus) &&
+    !cabinetActive &&
+    !eveningActive &&
+    !gateActive &&
+    !saturdayAfternoon &&
+    !ceremonyOpen &&
+    !effectiveRoomOpen;
+  const revealedBench = useRef<string | null>(null);
+  useEffect(() => {
+    if (!localBenchResult || !focusId) {
+      revealedBench.current = null;
+      return;
+    }
+    if (inHand && !(repairSurface?.id === focusId && repairSurface.ready)) return;
+    if (revealedBench.current === focusId) return;
+    const frame = requestAnimationFrame(() => {
+      const surface = benchRef.current;
+      if (!surface) return;
+      revealedBench.current = focusId;
+      // Reveal the whole work surface once; choosing tools and working never scrolls it.
+      surface.scrollIntoView({ block: 'start', behavior: 'instant' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [localBenchResult, focusId, inHand, repairSurface]);
   const selectPanel = (next: WorkspacePanel) => {
     setSelectedPanel(next);
     setRoomOpen(false);
@@ -529,43 +625,55 @@ function PlayableStory({
         <div className="chapter-heading">
           <div>
             <span className="card-overline">
-              {chapter.tutorial
-                ? 'School holidays'
-                : chapter.stage === 'service'
-                  ? 'A working life'
-                  : 'After school'}
+              {gateActive
+                ? 'Outside'
+                : eveningActive
+                  ? 'At home'
+                  : chapter.tutorial
+                    ? 'School holidays'
+                    : chapter.stage === 'service'
+                      ? 'A working life'
+                      : 'After school'}
             </span>
-            <h1>{chapter.title}</h1>
+            <h1>
+              {gateActive ? 'At the gate' : eveningActive ? 'At the family table' : chapter.title}
+            </h1>
           </div>
-          <button
-            type="button"
-            className="room-toggle"
-            aria-expanded={roomOpen}
-            onClick={() => setRoomOpen(!roomOpen)}
-          >
-            {roomOpen ? 'Close room' : 'Look around'} <span aria-hidden="true">↗</span>
-          </button>
+          {!gateActive && !saturdayAfternoon && !cabinetActive && !eveningActive && (
+            <button
+              type="button"
+              className="room-toggle"
+              aria-expanded={roomOpen}
+              onClick={() => setRoomOpen(!roomOpen)}
+            >
+              {roomOpen ? 'Close room' : 'Look around'} <span aria-hidden="true">↗</span>
+            </button>
+          )}
         </div>
-        <WorkspaceNavigation
-          chapter={chapter}
-          selected={panel}
-          onSelect={selectPanel}
-          visiblePanels={
-            chapter.tutorial
-              ? [
-                  'bench',
-                  ...(view.shelf.length || boardPlans.length ? ['work' as const] : []),
-                  ...(groups.people.length || view.whereabouts?.length ? ['people' as const] : []),
-                ]
-              : ['bench', 'work', 'people']
-          }
-          counts={{
-            bench: groups.bench.length,
-            work: groups.work.length + boardPlans.filter((entry) => entry.actions.length).length,
-            people: groups.people.length,
-          }}
-        />
-        {roomOpen && (
+        {!gateActive && !cabinetActive && !eveningActive && (
+          <WorkspaceNavigation
+            chapter={chapter}
+            selected={panel}
+            onSelect={selectPanel}
+            visiblePanels={
+              chapter.tutorial
+                ? [
+                    'bench',
+                    ...(view.shelf.length || boardPlans.length ? ['work' as const] : []),
+                    ...(groups.people.length || view.whereabouts?.length
+                      ? ['people' as const]
+                      : []),
+                  ]
+                : ['bench', 'work', 'people']
+            }
+            counts={{
+              bench: groups.bench.length,
+              work: groups.work.length + boardPlans.filter((entry) => entry.actions.length).length,
+              people: groups.people.length,
+            }}
+          />
+        )}
+        {effectiveRoomOpen && (
           <section className="room-stage" aria-label="Look around your workspace">
             <Suspense fallback={<p className="bench-note">Opening the room…</p>}>
               <WorkshopScene3D
@@ -582,11 +690,10 @@ function PlayableStory({
                 onCabinetFocus={() => {
                   focusBench();
                   requestAnimationFrame(() => {
-                    const details = cabinetRef.current;
-                    if (details) {
-                      details.open = true;
-                      details.querySelector('summary')?.focus({ preventScroll: true });
-                      details.scrollIntoView({ block: 'start', behavior: 'instant' });
+                    const project = cabinetRef.current;
+                    if (project) {
+                      project.focus({ preventScroll: true });
+                      project.scrollIntoView({ block: 'start', behavior: 'instant' });
                     }
                   });
                 }}
@@ -598,7 +705,7 @@ function PlayableStory({
             </Suspense>
           </section>
         )}
-        <div className="workspace-body" hidden={roomOpen}>
+        <div className="workspace-body" hidden={effectiveRoomOpen}>
           {ceremonyOpen && (
             <ChapterCeremony
               title={ceremony.title}
@@ -619,8 +726,11 @@ function PlayableStory({
           )}
           <div hidden={Boolean(ceremonyOpen)}>
             <div className="current-moment">
-              {response}
-              {urgentPlan && (
+              {!localBenchResult && response}
+              {gateInvitation && (
+                <div className="gate-invitation">{renderOfferedAction(gateInvitation)}</div>
+              )}
+              {urgentPlan && !gateActive && (
                 <section className="attention-task" aria-label="Current work needs you">
                   <span className="card-overline">
                     {urgentPlan.actions.some((action) => action.id === 'wait-conversation-activity')
@@ -639,9 +749,31 @@ function PlayableStory({
               hidden={panel !== 'bench'}
               aria-label={chapter.tutorial ? 'At home' : 'Workbench'}
             >
-              <div className={`bench-layout ${!view.focus ? 'empty-bench-layout' : ''}`}>
+              <div
+                hidden={cabinetActive || eveningActive || gateActive}
+                className={`bench-layout ${!view.focus ? 'empty-bench-layout' : ''}`}
+              >
                 <div className="bench-stage">
-                  {view.focus && (
+                  {!saturdayAfternoon && (
+                    <WorkCompanion companion={view.workCompanion}>
+                      {companionJoin && (
+                        <div className="companion-choice">{renderAction(companionJoin)}</div>
+                      )}
+                    </WorkCompanion>
+                  )}
+                  {view.saturdayWindow && !saturdayScene && (
+                    <SaturdayPreparation saturday={view.saturdayWindow} />
+                  )}
+                  {view.saturdayWindow &&
+                    ['afternoon', 'home'].includes(view.saturdayWindow.stage) && (
+                      <SaturdayWindow
+                        scene={view.saturdayWindow.scene}
+                        sampleAccess={
+                          saturdayAfternoon ? view.saturdayWindow.displayAccess : undefined
+                        }
+                      />
+                    )}
+                  {view.focus && !saturdayAfternoon && (
                     <section
                       ref={benchRef}
                       className={`workbench ${attention?.returnedObject ? 'next-object' : ''}`}
@@ -656,6 +788,7 @@ function PlayableStory({
                         disabled={settling}
                         onAction={(id) => act({ type: 'action', id })}
                         onReady={onRepairReady}
+                        result={localBenchResult ? response : undefined}
                       />
                       <div className="object-story">
                         <h1>{view.focus.title}</h1>
@@ -699,12 +832,12 @@ function PlayableStory({
                       </div>
                     </section>
                   )}
-                  {!view.focus && departingObject && (
+                  {!view.focus && !saturdayScene && departingObject && (
                     <div className="object-departure" aria-hidden="true">
                       <ObjectIllustration object={departingObject} />
                     </div>
                   )}
-                  {!view.focus && (
+                  {!view.focus && !saturdayScene && (
                     <section className="empty-bench">
                       <span className="bench-outline" aria-hidden="true">
                         ⌁
@@ -721,10 +854,21 @@ function PlayableStory({
                   )}
                 </div>
                 <aside className="bench-decisions">
+                  {groups.benchPlans.length > 0 && (
+                    <PromiseCards entries={groups.benchPlans} renderAction={renderAction} />
+                  )}
                   <ActionLane
-                    title={view.focus ? 'At this bench' : 'Begin here'}
+                    title={
+                      saturdayAfternoon
+                        ? 'Stay a little while'
+                        : view.focus
+                          ? 'At this bench'
+                          : 'Begin here'
+                    }
                     actions={groups.bench.filter(
                       (action) =>
+                        (!saturdayAfternoon || action.id.startsWith('saturday-')) &&
+                        !action.id.startsWith('neighbourhood-') &&
                         !(
                           workshop?.cabinet?.open &&
                           /^workshop-(cabinet|drawings|display-drawing|keep-drawing)/.test(
@@ -735,6 +879,13 @@ function PlayableStory({
                     )}
                     renderAction={renderAction}
                   />
+                  <ActionLane
+                    title="With Nora"
+                    actions={groups.bench.filter((action) =>
+                      action.id.startsWith('neighbourhood-'),
+                    )}
+                    renderAction={renderAction}
+                  />
                   {chapter.tutorial && (
                     <ActionLane
                       title="Around the house"
@@ -742,7 +893,7 @@ function PlayableStory({
                       renderAction={renderAction}
                     />
                   )}
-                  {view.parts.length > 0 && (
+                  {!saturdayAfternoon && view.parts.length > 0 && (
                     <section className="parts-well">
                       <h2>Parts at hand</h2>
                       <ul className="parts">
@@ -762,22 +913,107 @@ function PlayableStory({
                   )}
                 </aside>
               </div>
-              {workshop?.cabinet?.open && (
-                <details
-                  ref={cabinetRef}
-                  className="cabinet-at-side"
-                  open={!view.focus && !game.apprentice?.jobId}
-                >
-                  <summary>
-                    Dad’s cabinet doors · {cabinetStageLabels[workshop.cabinet.stage]}
-                  </summary>
-                  <section className="family-project" aria-label="Dad’s cabinet project">
-                    <Cabinet
-                      stage={workshop.cabinet.stage}
-                      drawing={workshop.cabinet.drawingDisplayed}
+              {gateActive && view.gateWalk && (
+                <section className="gate-foreground">
+                  <h2>{view.gateWalk.title}</h2>
+                  <Suspense fallback={<p>Stepping outside…</p>}>
+                    <GateWalkScene
+                      view={view.gateWalk}
+                      actions={view.actions}
+                      disabled={settling}
+                      onAction={(id) => {
+                        act({ type: 'action', id });
+                        if (id === 'gate-walk-return') {
+                          setSelectedPanel('bench');
+                          setRoomOpen(false);
+                        }
+                      }}
                     />
+                  </Suspense>
+                </section>
+              )}
+              {eveningActive && view.eveningTable && (
+                <section className="cabinet-foreground" aria-label="Family table">
+                  <div className="cabinet-project-heading">
                     <div>
-                      <p>{workshop.cabinet.description}</p>
+                      <span className="card-overline">At home</span>
+                      <h2>{view.eveningTable.title}</h2>
+                    </div>
+                  </div>
+                  <Suspense fallback={<p>Setting out the street…</p>}>
+                    <EveningTable
+                      view={view.eveningTable}
+                      actions={view.actions}
+                      disabled={settling}
+                      onAction={(id) => {
+                        act({ type: 'action', id });
+                        if (id === 'evening-put-away') {
+                          setSelectedPanel('bench');
+                          setRoomOpen(false);
+                        }
+                      }}
+                    />
+                  </Suspense>
+                </section>
+              )}
+              {cabinetActive && workshop?.cabinet && (
+                <section
+                  ref={cabinetRef}
+                  className="cabinet-foreground"
+                  aria-label="Dad’s cabinet project"
+                  tabIndex={-1}
+                >
+                  <div className="cabinet-project-heading">
+                    <div>
+                      <span className="card-overline">
+                        {['hung', 'finished'].includes(workshop.cabinet.stage)
+                          ? 'In the kitchen'
+                          : 'Family project'}
+                      </span>
+                      <h2>Dad’s cabinet doors</h2>
+                      <p>{cabinetStageLabels[workshop.cabinet.stage]}</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={settling || !cabinetBack}
+                      onClick={() => {
+                        if (cabinetBack) {
+                          act({ type: 'action', id: cabinetBack.id });
+                          setSelectedPanel('bench');
+                          setRoomOpen(false);
+                        }
+                      }}
+                    >
+                      Back to bench
+                    </button>
+                  </div>
+                  <section className="family-project" aria-label="Cabinet doors and notebook">
+                    {view.workshopCabinet?.alignment ? (
+                      <Suspense
+                        fallback={
+                          <Cabinet
+                            stage={workshop.cabinet.stage}
+                            drawing={workshop.cabinet.drawingDisplayed}
+                            alignment={view.workshopCabinet.alignment}
+                          />
+                        }
+                      >
+                        <CabinetAlignment3D
+                          alignment={view.workshopCabinet.alignment}
+                          actions={view.actions}
+                          drawing={workshop.cabinet.drawingDisplayed}
+                          disabled={settling}
+                          onAction={(id) => act({ type: 'action', id })}
+                        />
+                      </Suspense>
+                    ) : (
+                      <Cabinet
+                        stage={workshop.cabinet.stage}
+                        drawing={workshop.cabinet.drawingDisplayed}
+                      />
+                    )}
+                    <div>
+                      {!view.workshopCabinet?.alignment && <p>{workshop.cabinet.description}</p>}
                       {workshop.cabinet.drawingFound && (
                         <p className="project-memory">
                           {workshop.cabinet.drawingDisplayed
@@ -788,16 +1024,15 @@ function PlayableStory({
                     </div>
                   </section>
                   <div className="choice-buttons project-choices">
-                    {groups.bench
+                    {cabinetActions
                       .filter(
                         (action) =>
-                          /^workshop-(cabinet|drawings|display-drawing|keep-drawing)/.test(
-                            action.id,
-                          ) && action.id !== 'workshop-cabinet-close',
+                          !cabinetTarget(action.id) &&
+                          !['workshop-cabinet-close', 'workshop-cabinet-leave'].includes(action.id),
                       )
-                      .map(renderAction)}
+                      .map(renderOfferedAction)}
                   </div>
-                </details>
+                </section>
               )}
             </section>
             <section
@@ -1020,7 +1255,7 @@ function PlayableStory({
                 </p>
               )}
             </section>
-            <section className="time-bar" aria-label="Take some time">
+            <section hidden={gateActive} className="time-bar" aria-label="Take some time">
               <div>
                 <span className="card-overline">Time moves with your choices</span>
                 {view.lifeChapter?.detail && <p>{view.lifeChapter.detail}</p>}

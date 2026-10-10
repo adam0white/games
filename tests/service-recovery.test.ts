@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { getView, restoreGame, serializeGame } from '../src/game/engine';
+import { getView, restoreGame, serializeGame, transition } from '../src/game/engine';
 import type { GameState } from '../src/game/types';
 import { earnedHandoff } from './support/earned-handoff';
 import { choose } from './support/school-route';
@@ -16,17 +16,37 @@ it('an honestly unchecked service return can recover or settle without trapping 
   s = choose(s, 'service-accept-leila');
   for (const id of ['inspect', 'test-battery', 'replace-battery', 'verify', 'early-return'])
     s = choose(s, id);
+  // Leila is out when this route offers the unchecked lamp. Custody changes
+  // only when she actually returns and collects it.
+  expect(s.objects.find((o) => o.id === 'service-leila')).toMatchObject({
+    location: 'shelf',
+    awaitingCollection: true,
+  });
+  for (
+    let n = 0;
+    n < 100 && s.objects.find((o) => o.id === 'service-leila')?.awaitingCollection;
+    n++
+  )
+    s = choose(s, has(s, 'wait-appointment') ? 'wait-appointment' : 'rest');
   const item = s.objects.find((o) => o.id === 'service-leila');
   expect(item?.verified).toBe(false);
   expect(item?.location).toBe('returned');
+  expect(item?.awaitingCollection).toBe(false);
+  expect(item?.collectedAt).toBeDefined();
   expect(s.workshop?.cash ?? 0).toBe(0);
   for (let n = 0; n < 6 && has(s, 'service-next-day'); n++) s = choose(s, 'service-next-day');
   expect(s.objects.find((o) => o.id === 'service-leila')?.location).toBe('returned');
   expect(s.serviceWeek?.jobs.find((j) => j.id === 'service-leila')?.stage).toBe('accepted');
+  s = choose(s, 'rest');
+  if (s.objects.find((o) => o.id === 'service-leila')?.location === 'shelf') {
+    expect(s.objects.find((o) => o.id === 'service-leila')?.callbackSeen).toBe(true);
+    s = transition(s, { type: 'select', id: 'service-leila' });
+  }
   // A non-completed promise must remain honest; either an agreed settlement or
   // a concrete path back to physical checking must remain available.
   expect(
-    has(s, 'service-close-regular') ||
+    has(s, 'verify') ||
+      has(s, 'service-close-regular') ||
       getView(s).actions.some((a) => /revisit|unfinished|withdraw|recover/i.test(a.label)),
   ).toBe(true);
 });

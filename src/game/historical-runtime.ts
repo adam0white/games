@@ -1,3 +1,4 @@
+import { restoreGame as restoreEngine19 } from './engine19';
 /** Frozen synchronous replay graph; browser loads this on demand. */
 
 import type { HistoricalRestorer } from './current-engine';
@@ -35,6 +36,7 @@ runtimes['home-garage-15'] = (_engine, text) => restoreEngine15(text);
 runtimes['home-garage-16'] = (_engine, text) => restoreEngine16(text);
 runtimes['home-garage-17'] = (_engine, text) => restoreEngine17(text);
 runtimes['home-garage-18'] = (_engine, text) => restoreEngine18(text);
+runtimes['home-garage-19'] = (_engine, text) => restoreEngine19(text);
 export const restoreHistorical: HistoricalRestorer = (engine, text) => {
   const restore = runtimes[engine];
   if (!restore) throw Error('Unsupported historical engine');

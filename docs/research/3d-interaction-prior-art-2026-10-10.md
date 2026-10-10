@@ -58,3 +58,7 @@ Prefer roughly 44–48 CSS-pixel interactive regions as a project design target,
 - One novice mobile tester and one keyboard-only pass complete the same repair. Record confusion about selection versus action, camera clashes and missed targets. Adam decides whether the workshop and repair feel good; passing parity tests does not claim that acceptance.
 
 Reject the slice as insufficient if it only supplies a showroom plus the old action panel. Reject it as overbuilt if the player must rotate around the room to discover essential navigation, repeatedly remove cosmetic screws, or fight precision gestures to express a decision already made. The desired gain is spatial understanding and a satisfying visible consequence for meaningful work.
+
+## Shadow experiment reference,21:26 UTC
+
+For the selected personal-table scene, [Triada Studio’s official Shadowmatic page](https://www.triadastudiogames.com/shadowmatic) describes rotating abstract objects in a spotlight to discover recognizable silhouettes, with unexpected silhouettes along the way. This primary promotional description was read; the game itself was not played. The useful principle is an immediately visible transformation that encourages another experiment. Our scene uses the actual retained paper street and available light, with no hidden correct silhouette, abstract replacement object, copied art, or puzzle solution taken from that game. A still street remains playable without supplying a missing drive part.

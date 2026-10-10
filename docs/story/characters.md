@@ -20,11 +20,13 @@ Longstanding family friend from before the kitchen renovation. Lent the camping 
 
 She personally retains a sewing-sample case from an old shop counter and remembers its low window. Her recollection is incomplete; the case does not establish that she owned the shop or knows why the street changed. She can prefer carrying the samples, consider a stationary display instead, or decline the proposal. Her request, permission to use a retained fitting, accompanied visit and separate household-light job each require their own actual agreement. She does not know Sam’s private wage or schedule unless someone tells her.
 
+For the Saturday display she has permission to use the low window for one afternoon. She retains its small folding counter shelf and the samples she brings. This permission does not give either person the shop, a lease, or a business. Seeing the reverse of an old cloth can reveal what ordinary use changed; it does not explain the world's decline.
+
 ## Sam
 
 Fifteen at the opening, a school friend one year ahead of the player. Has a female dog, an unreliable pocket torch and a spare. Helps pack orders at a parts counter on some holiday mornings; this is not a full-time career or an apprenticeship contract. School and agreed counter hours restrict availability. Red parcel string on the torch is deliberately useful. Curious about diagnosis and willing to arrange an afternoon. A dog-walk commitment takes about fifty simulated minutes; absence governs speech and collection.
 
-After the player's graduation Sam is nineteen, has already finished high school and is taking more counter hours. He may prefer understanding objects to wrapping them, but can refuse a proposed job. Paid workshop learning requires an agreed role, hours and payment. Neither an invitation nor affection automatically transfers expertise.
+After the player's graduation Sam is nineteen, has already finished high school and is taking more counter hours. He may prefer understanding objects to wrapping them, but can refuse a proposed job. Paid workshop learning requires an agreed role, hours and payment. Neither an invitation nor affection automatically transfers expertise. The optional short outing to the gate can give him a received preference about watching, bringing something curious, or leaving room for quiet work. He can recall that conversation when actually presenting his label stand; it does not override either person’s later consent.
 
 ## Leila
 

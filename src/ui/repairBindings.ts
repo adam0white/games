@@ -21,6 +21,14 @@ export interface RepairBinding {
 }
 const targets: Record<string, RepairTarget> = {
   inspect: 'shell',
+  'saturday-open-look': 'shell',
+  'saturday-compare-loaded': 'operation',
+  'saturday-look-under': 'cover',
+  'saturday-refit-brace': 'mechanism',
+  'saturday-check-load': 'operation',
+  'saturday-choose-low': 'shell',
+  'test-mechanical-empty': 'operation',
+  'test-mechanical-loaded': 'operation',
   'open-access': 'shell',
   reassemble: 'cover',
   'test-battery': 'battery',
@@ -62,7 +70,7 @@ const targets: Record<string, RepairTarget> = {
 export const repairTargetLabels: Record<RepairTarget, string> = {
   cover: 'Cover',
   shell: 'Object',
-  battery: 'Battery compartment',
+  battery: 'Battery',
   contact: 'Contact',
   cap: 'Threaded cap',
   holder: 'Holder',
@@ -80,10 +88,13 @@ export function getMappedRepairActions(
   actions: readonly ActionView[],
 ): RepairBinding[] {
   return actions.flatMap((action) => {
+    if (action.id.startsWith('saturday-') && object.id !== 'nora-folding-shelf') return [];
     const personal = action.id.startsWith('operations-personal-');
     if (personal && object.id !== 'paper-street') return [];
     const target =
-      action.id === 'open-access' && object.assembly && object.inspected
+      action.id === 'open-access' &&
+      (object.assembly || object.mechanicalPresentation) &&
+      object.inspected
         ? 'cover'
         : targets[action.id];
     if (
@@ -186,12 +197,45 @@ export function resolveRepairAction(
 }
 
 export function getRepairToolName(object: ObjectView, action: ActionView): string {
+  if (object.shelfPresentation) {
+    const names: Record<string, string> = {
+      'saturday-open-look': 'Open and look',
+      'saturday-compare-loaded': 'Compare under load',
+      'saturday-look-under': 'Look underneath',
+      'saturday-refit-brace': 'Seat the retained brace',
+      'saturday-check-load': 'Attend loaded check',
+      'saturday-choose-low': 'Use the low counter',
+    };
+    return names[action.id] ?? action.label;
+  }
+  if (object.mechanicalPresentation) {
+    const names: Record<string, string> = {
+      inspect: 'Examine stand',
+      'test-mechanical-empty': 'Compare empty tray',
+      'test-mechanical-loaded': 'Compare with four cards',
+      'open-access': 'Lift tray',
+      reassemble: 'Refit tray',
+      'clear-obstruction': 'Clear observed scrap',
+      'check-result': 'Attend loaded rotation',
+    };
+    return names[action.id] ?? action.label;
+  }
   if (action.id === 'inspect' && object.assembly)
     return object.assembly.state === 'assembled' ? 'Open & examine' : 'Examine';
   return repairToolNames[action.id] ?? action.label;
 }
 
 export function getRepairTargetLabel(object: ObjectView, target: RepairTarget): string {
+  if (object.shelfPresentation) {
+    if (target === 'cover') return 'Hinged sides and underside';
+    if (target === 'mechanism') return 'Retained cross-brace';
+    if (target === 'operation') return 'Shelf and sample load';
+  }
+  if (object.mechanicalPresentation) {
+    if (target === 'cover') return 'Lift-off card tray';
+    if (target === 'mechanism') return 'Accessible drive rim';
+    if (target === 'operation') return 'Tray and four retained cards';
+  }
   if (target !== 'cover' || !object.assembly) return repairTargetLabels[target];
   const part =
     object.assembly.kind === 'lamp'

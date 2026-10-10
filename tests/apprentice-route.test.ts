@@ -53,40 +53,35 @@ function arrive(s: ReturnType<typeof createGame>) {
   }
   throw Error('No genuine learning agreement reached');
 }
-function teachLight(s: ReturnType<typeof createGame>, repeat = false) {
+function teachLight(s: ReturnType<typeof createGame>) {
   s = act(s, 'learning-light');
   for (const id of ['inspect', 'test-battery']) {
     s = act(s, id);
-    if (!repeat) s = act(s, 'explain-step');
   }
   const tired = getView(s).focus?.observations.some((observation) =>
     observation.includes('old battery is tired'),
   );
   s = act(s, tired ? 'replace-battery' : 'clean-contact');
-  s = act(s, 'explain-step');
   s = act(s, 'reassemble');
+  expect(
+    s.people.sam?.methods?.rules.some((rule) =>
+      ['open-access', 'reassemble'].includes(rule.action),
+    ),
+  ).toBe(false);
   s = act(s, 'verify');
-  if (!repeat) s = act(s, 'explain-step');
   s = act(s, 'wait-check');
-  if (!repeat) s = act(s, 'explain-step');
   if (getView(s).actions.some((a) => a.id === 'wait-check')) s = act(s, 'wait-check');
   s = act(s, 'check-result');
-  if (!repeat) s = act(s, 'explain-step');
   if ((s.apprentice?.visitUntil ?? 0) - s.now < 25 || s.people.sam?.activity?.action !== 'learn')
     s = arrive(s);
   s = act(s, 'return');
-  // Sam is the owner of the first light, so its handover cannot also be his watched demonstration.
-  // Dad's second handover provides the actually witnessed return method.
-  return getView(s).actions.some((action) => action.id === 'explain-step') &&
-    s.apprentice?.lastLesson?.step === 'return'
-    ? act(s, 'explain-step')
-    : s;
+  return s;
 }
-it('the actual explained-manual-input route teaches Sam, saves a pending independent step, and replays its owner outcome', () => {
+it('the actual watched manual-input route teaches Sam, saves a pending independent step, and replays its owner outcome', () => {
   let s = arrive(adultHistory());
   expect(s.apprentice?.arranged).toBe(true);
   s = teachLight(s);
-  s = teachLight(arrive(s), true);
+  s = teachLight(arrive(s));
   expect(s.people.sam?.methods?.rules.length).toBeGreaterThan(5);
   s = arrive(s);
   s = act(s, 'supervised-intake');

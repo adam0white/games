@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import {
   ACESFilmicToneMapping,
   AmbientLight,
@@ -36,6 +36,7 @@ export interface Inspection3DProps {
   disabled?: boolean;
   onAction?: (id: string) => void;
   onReady?: (ready: boolean) => void;
+  result?: ReactNode;
 }
 export default function Inspection3D({
   object,
@@ -43,11 +44,13 @@ export default function Inspection3D({
   disabled = false,
   onAction,
   onReady,
+  result,
 }: Inspection3DProps) {
   const bindings = getMappedRepairActions(object, actions);
   const [tool, setTool] = useState<string | null>(null);
   const [alternativeControls, setAlternativeControls] = useState(false);
   const [picked, setPicked] = useState<RepairTarget | null>(null);
+  const [missedTarget, setMissedTarget] = useState(false);
   const highlight = useRef<((target: RepairTarget | null) => void) | null>(null);
   const selectedTarget = bindings.find((b) => b.action.id === tool)?.target ?? null;
   const selectedTargetRef = useRef(selectedTarget);
@@ -292,6 +295,7 @@ export default function Inspection3D({
     return (
       <div className="inspection-still">
         <ObjectIllustration object={object} />
+        {result}
         <p className="inspection-hint">A still view of this object is available here.</p>
         <button
           type="button"
@@ -363,9 +367,11 @@ export default function Inspection3D({
             if (repairClickAllowed(prior, event.pointerId, event.clientX, event.clientY)) {
               const target = pick.current?.(event.clientX, event.clientY) ?? null;
               setPicked(target);
+              setMissedTarget(Boolean(tool));
               const action = resolveRepairAction(bindings, tool, target, disabled);
               if (action) {
                 onAction?.(action);
+                setMissedTarget(false);
                 setTool(null);
               }
             }
@@ -381,6 +387,7 @@ export default function Inspection3D({
           }}
         />
       </div>
+      {result}
       <p className="inspection-hint">Drag to turn it. Arrow keys work too.</p>
       {onAction && object.inspected && (
         <p className="inspection-hint">
@@ -409,14 +416,26 @@ export default function Inspection3D({
               disabled={disabled}
               data-choice="true"
               aria-pressed={tool === action.id}
-              onClick={() => setTool(tool === action.id ? null : action.id)}
+              onClick={() => {
+                setPicked(null);
+                setMissedTarget(false);
+                setTool(tool === action.id ? null : action.id);
+              }}
             >
               {getRepairToolName(object, action)}
             </button>
           ))}
-          {picked && <p className="inspection-hint">{getRepairTargetLabel(object, picked)}</p>}
+          {picked && !missedTarget && (
+            <p className="inspection-hint">{getRepairTargetLabel(object, picked)}</p>
+          )}
           {tool && (
             <p role="status">
+              {missedTarget &&
+                (picked
+                  ? `That is the ${getRepairTargetLabel(object, picked).toLowerCase()}. `
+                  : 'That touch missed the part. ')}
+              Touch the highlighted{' '}
+              {getRepairTargetLabel(object, selectedTarget ?? 'shell').toLowerCase()}.{' '}
               {bindings.find((b) => b.action.id === tool)?.action.label} ·{' '}
               {getRepairTargetLabel(object, selectedTarget ?? 'shell')}.{' '}
               {bindings.find((b) => b.action.id === tool)?.action.detail}

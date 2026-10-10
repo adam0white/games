@@ -81,6 +81,7 @@ export interface OperationsGame {
   workshop?: WorkshopState;
 }
 export interface OperationsContext {
+  visitAt?: (personId: string, earliest: number) => number;
   graduated: boolean;
   serviceConclusion: 'open' | 'regular' | 'small' | undefined;
   isHere: (id: string) => boolean;
@@ -572,12 +573,13 @@ export function applyOperationsAction(
     const spec = operationsJobSpecs.find((x) => id === `operations-hear-${x.id}`);
     if (!spec) return null;
     w.jobs.push({ id: spec.id, stage: 'invited', fee: 0 });
+    const arrival = ctx.visitAt?.(spec.ownerId, s.now + 20) ?? s.now + 20;
     return {
       ...result(
-        `You invite ${spec.owner} to discuss ${spec.title} in twenty minutes. The request has not been heard or accepted yet.`,
+        `You invite ${spec.owner} to discuss ${spec.title} ${arrival === s.now + 20 ? 'in twenty minutes' : `after their known plans, at ${String(Math.floor((arrival % 1440) / 60)).padStart(2, '0')}:${String(arrival % 60).padStart(2, '0')}`}. The request has not been heard or accepted yet.`,
       ),
       personIds: [spec.ownerId],
-      visits: [{ personId: spec.ownerId, at: s.now + 20, activity: `Discussing ${spec.title}` }],
+      visits: [{ personId: spec.ownerId, at: arrival, activity: `Discussing ${spec.title}` }],
     };
   }
   if (id === 'operations-arrange-crates' || id === 'operations-arrange-delivery') {
@@ -635,7 +637,7 @@ export function applyOperationsAction(
     job.stage = 'offered';
     return {
       lines: [
-        line(spec.owner, spec.story),
+        line('You', spec.story, 'notice'),
         line(
           'You',
           'You record the requested use without accepting it. A later collection or a refusal is still possible.',
@@ -1075,9 +1077,8 @@ export function getOperationsView(s: OperationsGame, ctx?: OperationsContext) {
             'Your model, a month later',
             'Your own bench, the following year',
           ]
-        : ['The collection afternoon', 'Two people working', 'The following year'])[
-        w.episode - 1
-      ] ?? 'The collection round',
+        : ['The collection afternoon', 'Back at the bench', 'The following year'])[w.episode - 1] ??
+      'The collection round',
     episode: w.episode,
     route: w.route,
     conclusion: w.conclusion,

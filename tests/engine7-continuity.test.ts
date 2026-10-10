@@ -5,6 +5,7 @@ import * as seven from '../src/game/engine7';
 import { optionalStoryChoices, schoolStoryBeat } from '../src/game/story';
 import type { GameInput } from '../src/game/types';
 import fixture from './fixtures/published-seven-route.json';
+import { finishCabinetAlignment } from './support/cabinet-route';
 import { completePublicAction } from './support/public-attendance';
 import { choose, nextSchoolAction, opening } from './support/school-route';
 
@@ -28,13 +29,13 @@ it('an actually finished childhood cabinet stays finished through the school yea
   for (const [action, stage] of [
     ['workshop-cabinet-measure', 'measured'],
     ['workshop-cabinet-hang', 'hung'],
-    ['workshop-cabinet-align', 'finished'],
   ] as const) {
     for (let n = 0; n < 100 && s.workshop?.cabinet !== stage; n++) {
       s = getView(s).actions.some((a) => a.id === action) ? choose(s, action) : choose(s, 'rest');
       if (s.workshop?.cabinet !== stage) s = choose(s, 'rest');
     }
   }
+  s = finishCabinetAlignment(s);
   expect(s.workshop?.cabinet).toBe('finished');
   for (let n = 0; n < 150 && (s.campaign?.holiday ?? 0) < 3; n++)
     s = choose(s, nextSchoolAction(s));

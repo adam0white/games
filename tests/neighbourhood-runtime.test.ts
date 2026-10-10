@@ -44,6 +44,16 @@ it('real Nora and player consent creates an optional case, measured replacement 
   s = agree(s, 'neighbourhood-source');
   s = agree(s, 'fit-case-catch');
   s = agree(s, 'check-case-carry');
+  let labelled = agree(structuredClone(s), 'leave-ready-nora-sample-case');
+  const beforeHandover = labelled.nextLineId ?? 0;
+  labelled = agree(labelled, 'neighbourhood-return-repaired');
+  expect(labelled.objects.find((o) => o.id === item?.id)?.location).toBe('returned');
+  expect(labelled.neighbourhood?.caseStage).toBe('returned');
+  expect(
+    labelled.journal
+      ?.filter((line) => line.id >= beforeHandover)
+      .some((line) => line.text.includes('The time together stopped before you finished')),
+  ).toBe(false);
   const count = s.repairs;
   s = agree(s, 'neighbourhood-return-repaired');
   expect(s.repairs).toBe(count + 1);

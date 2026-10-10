@@ -27,7 +27,7 @@ export interface LabelStandView {
  * No hidden fault is accepted. Exposed comparison geometry needs observations. */
 export function createLabelStandModel(
   object: LabelStandView,
-  showKnownParts = false,
+  _showKnownParts = false,
   exposedTargets: readonly RepairTarget[] = [],
 ) {
   const root = new Group(),
@@ -51,7 +51,9 @@ export function createLabelStandModel(
     parent = root,
   ) {
     geometries.push(geometry);
-    const mesh = new Mesh(geometry, material);
+    const ownMaterial = material.clone();
+    materials.push(ownMaterial);
+    const mesh = new Mesh(geometry, ownMaterial);
     mesh.name = name;
     mesh.position.set(...position);
     mesh.castShadow = mesh.receiveShadow = true;
@@ -152,15 +154,14 @@ export function createLabelStandModel(
       [0.88, 0.06, 0.55],
       'mechanism',
     );
-  if (showKnownParts)
-    root.traverse((mesh) => {
-      if (
-        mesh instanceof Mesh &&
-        mesh.userData.repairTarget &&
-        exposedTargets.includes(mesh.userData.repairTarget)
-      )
-        hitRegions.push(mesh);
-    });
+  root.traverse((mesh) => {
+    if (
+      mesh instanceof Mesh &&
+      mesh.userData.repairTarget &&
+      exposedTargets.includes(mesh.userData.repairTarget)
+    )
+      hitRegions.push(mesh);
+  });
   return {
     root,
     hitRegions,
@@ -177,6 +178,15 @@ export function createLabelStandModel(
       const elapsed = Math.max(0, Math.min(1, Number.isFinite(fraction) ? fraction : 1));
       rotor.rotation.y = reducedMotion ? 0 : elapsed * Math.PI * 2;
       return !reducedMotion && elapsed < 1;
+    },
+    highlight(target: RepairTarget | null) {
+      for (const mesh of hitRegions) {
+        const material = mesh.material as MeshStandardMaterial;
+        const selected =
+          target === 'shell' || target === 'operation' || mesh.userData.repairTarget === target;
+        material.emissive.set(selected ? '#86ad83' : '#000000');
+        material.emissiveIntensity = selected ? 0.5 : 0;
+      }
     },
     dispose() {
       for (const geometry of geometries) geometry.dispose();

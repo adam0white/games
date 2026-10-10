@@ -11,9 +11,11 @@ import {
   observeSkill,
   perceive,
   receiveMethodCues,
+  reviewed,
   tick,
 } from '@adam0white/human-framework';
 import { liveOrdinaryTime } from './humans';
+import type { MechanicalStep } from './mechanical-display';
 import {
   ACCESS_MINUTES,
   assertAccessStep,
@@ -25,8 +27,12 @@ import {
 import {
   applyRepair,
   checkingSpaceAvailable,
+  completeDisplayStep,
   cueFor,
   inspectRepair,
+  mechanicalItem,
+  mechanicalMinutes,
+  mechanicalSteps,
   type RepairCue,
   readLongCheck,
   repairDuration,
@@ -73,8 +79,21 @@ export function freshApprentice(): NonNullable<GameState['apprentice']> {
     completedJobIds: [],
   };
 }
-/** A promised watched correction stays player work until its actual result is
- * explained. This flag records the pending episode, never repair or knowledge. */
+/** A promised watched correction remains player work. The flag records the
+ * pending physical episode, never repair or knowledge by itself. */
+/** An untouched intake can be examined; later corrections need observed evidence. */
+export function correctiveRepairStep(
+  item: RepairObject,
+  now: number,
+): 'inspect' | 'clean-contact' | 'replace-battery' | undefined {
+  if (!item.inspected && !item.mechanicalDisplay) return 'inspect';
+  const cue = cueFor(item, now);
+  return cue === 'still-flickers'
+    ? 'clean-contact'
+    : cue === 'battery-steady'
+      ? 'replace-battery'
+      : undefined;
+}
 export function pendingCorrectiveDemonstration(s: GameState): RepairObject | undefined {
   return s.objects.find(
     (item) =>
@@ -90,25 +109,42 @@ export function apprenticeActions(
   const a = s.apprentice;
   const offers: ActionView[] = [];
   if (!s.campaign?.graduated || !s.unlocked.includes('story:observer-invite')) return offers;
-  if ((!a?.arranged || s.now >= a.visitUntil) && samHere)
+  const watching =
+    !!s.people.sam?.activity &&
+    [
+      'learning-afternoon',
+      'watch-repair',
+      'watch-corrective-repair',
+      'watch-corrective-renewal',
+    ].includes(s.people.sam.activity.affordanceId);
+  if ((!a?.arranged || s.now >= a.visitUntil || (!a.jobId && !watching)) && samHere)
     offers.push({
       id: 'arrange-learning',
       label:
         a?.supervisedCompleted && !a.completedJobIds.length
           ? 'Ask Sam about taking a whole repair next'
-          : 'Arrange a stretch at the bench with Sam',
+          : 'Ask Sam to join this work',
       detail:
         'He can choose whether the time fits his own plans; an agreed stretch has an actual end.',
     });
   if (!a?.arranged || s.now >= a.visitUntil) return offers;
-  if (samHere && a.lastLesson && !a.lastLesson.explained)
+  const lesson = a.lastLesson;
+  const lessonObject = s.objects.find((object) => object.id === lesson?.objectId);
+  const justReceived =
+    lesson?.eventId === `${s.seed}:${s.inputs.length}:${lesson?.objectId}:${lesson?.step}`;
+  if (
+    samHere &&
+    lesson &&
+    !lesson.explained &&
+    lessonObject &&
+    (item?.id === lessonObject.id ||
+      (!item && (lessonObject.location !== 'returned' || justReceived)))
+  )
     offers.push({
       id: 'explain-step',
-      label: `Explain your demonstration on ${s.objects.find((o) => o.id === a.lastLesson?.objectId)?.title ?? 'the earlier object'}`,
-      detail: `Explain ${a.lastLesson.step === 'verify' ? 'why you started the longer functional check' : a.lastLesson.step === 'check-result' ? 'what the movement and switching check showed after the longer run' : `the ${a.lastLesson.step.replaceAll('-', ' ')} work`}. Use the observation and result you actually demonstrated.`,
-      ...(a.lastLesson.step === 'inspect' && a.lastLesson.cue === 'intake'
-        ? { kind: 'primary' as const }
-        : {}),
+      label: `To Sam: Talk through ${lessonObject.title} (optional)`,
+      detail: `Discuss the result of ${semanticWork[lesson.step] ?? 'the step'} he actually watched on this object. Talking is optional.`,
+      kind: 'quiet',
     });
   if (
     samHere &&
@@ -123,9 +159,12 @@ export function apprenticeActions(
   )
     offers.push({
       id: 'recovery-learning-intake',
-      label: 'Bring Dad’s retained work light to the bench with Sam',
-      detail:
-        'One distinct light, with its own spare cell. Start by showing and explaining how you examine a newly received object. The earlier rescued jobs stay on their original record.',
+      label: watching
+        ? 'Bring Dad’s retained work light to the bench with Sam'
+        : 'Bring Dad’s retained work light to the bench',
+      detail: watching
+        ? 'Dad’s work light, with its own spare cell. Examine it with Sam watching; he can follow what you do and what happens.'
+        : 'Dad’s work light, with its own spare cell. You can examine it yourself; Sam is not currently watching.',
       kind: 'primary',
     });
   if (!a.jobId && !item) {
@@ -192,15 +231,20 @@ export function apprenticeActions(
     !a.jobId &&
     item &&
     !item.repaired &&
+    (item.inspected || item.mechanicalDisplay || hasIntakeMethod(s)) &&
     item.location !== 'returned' &&
     !s.unlocked.includes(`corrective-demonstration:${item.id}`)
   ) {
     offers.push({
-      id: a.supervisedCompleted ? 'delegate-repair' : 'supervised-repair',
-      label: a.supervisedCompleted
-        ? 'Offer Sam this whole repair'
-        : 'Let Sam try while you stay nearby',
-      detail: 'Sam chooses the steps from what he has learned. He can ask for help.',
+      id: a.supervisedCompleted || item.mechanicalDisplay ? 'delegate-repair' : 'supervised-repair',
+      label: item.mechanicalDisplay
+        ? 'Ask Sam to take this display as a separate unpaid learning favour'
+        : a.supervisedCompleted || item.mechanicalDisplay
+          ? 'Offer Sam this whole repair'
+          : 'Let Sam try while you stay nearby',
+      detail: item.mechanicalDisplay
+        ? 'A separate voluntary learning favour, with no customer fee or wage. Existing paid jobs and reserved wages stay in place. Sam can decline and chooses each step from what he has learned.'
+        : 'Sam chooses the steps from what he has learned. He can ask for help.',
     });
   }
   if (a.jobId)
@@ -209,6 +253,29 @@ export function apprenticeActions(
       label: a.needsHelp ? 'Discuss where Sam stopped' : 'Give Sam some room to work',
       detail:
         a.needsHelp ?? a.pauseReason ?? 'Twenty minutes; you can also work on another object.',
+    });
+  if (
+    a.needsHelp &&
+    a.jobId &&
+    samHere &&
+    s.objects.some((o) => o.id === a.jobId && o.mechanicalDisplay && o.verified)
+  )
+    offers.push({
+      id: 'retry-mechanical-collection',
+      label: 'Ask Sam to offer the checked display to its owner again',
+      detail: 'The completed physical work stays recorded. The owner must attend the handover.',
+    });
+  if (
+    a.needsHelp &&
+    a.jobId &&
+    samHere &&
+    s.objects.some((o) => o.id === a.jobId && o.mechanicalDisplay && !o.verified)
+  )
+    offers.push({
+      id: 'retry-mechanical-work',
+      label: 'Ask Sam to reconsider the kept mechanical step',
+      detail:
+        'His own plans and observed evidence still govern the choice; no work or teaching is granted.',
     });
   if (a.needsHelp && a.jobId && samHere)
     offers.push({
@@ -220,12 +287,18 @@ export function apprenticeActions(
     });
   if (a.needsHelp && a.jobId && samHere && s.now < a.visitUntil) {
     const stopped = s.objects.find((x) => x.id === a.jobId);
-    if (stopped && cueFor(stopped, s.now) === 'still-flickers')
+    const step = stopped ? correctiveRepairStep(stopped, s.now) : undefined;
+    if (stopped && step && (step !== 'replace-battery' || s.parts.batteries > 0))
       offers.push({
         id: 'show-corrective-step',
-        label: 'Show Sam the contact repair on this stopped light',
+        label:
+          step === 'inspect'
+            ? 'Show Sam how you begin looking'
+            : step === 'replace-battery'
+              ? 'Show Sam how to replace the tired battery'
+              : 'Show Sam the contact repair on this stopped light',
         detail:
-          'Take responsibility, restore the observed contact while he watches, then explain the actual result. This remains assisted work.',
+          'Ask him to watch while you take responsibility for the next physical step. If he joins you, he can learn from what actually happens.',
         kind: 'primary',
       });
   }
@@ -243,19 +316,21 @@ export function prepareCorrectiveDemonstration(s: GameState, say: Speak): void {
   const a = s.apprentice;
   const item = s.objects.find((x) => x.id === a?.jobId);
   const sam = s.people.sam;
+  const correction = item ? correctiveRepairStep(item, s.now) : undefined;
   if (
     !a?.needsHelp ||
     !item ||
     !sam ||
     !a.arranged ||
     s.now >= a.visitUntil ||
-    cueFor(item, s.now) !== 'still-flickers'
+    !correction ||
+    (correction === 'replace-battery' && s.parts.batteries <= 0)
   )
     throw Error('No supported attended correction is available');
   if (a.visitUntil < s.now + 20) {
     say(
       'Sam',
-      'Our agreed stretch is nearly over. The contact repair and its explanation need another stretch; keep the stopped light labelled.',
+      'Our afternoon is nearly over. Let’s leave the labelled light here and look at the next step together when we have time.',
     );
     return;
   }
@@ -267,7 +342,12 @@ export function prepareCorrectiveDemonstration(s: GameState, say: Speak): void {
     {
       id: newWatchId,
       action: 'learn',
-      label: 'Watch the real contact correction',
+      label:
+        correction === 'inspect'
+          ? 'Watch the first inspection of the stopped object'
+          : correction === 'replace-battery'
+            ? 'Watch the observed battery change'
+            : 'Watch the real contact correction',
       duration: 30,
       effort: 0.02,
       focus: 0.2,
@@ -356,7 +436,11 @@ export function prepareCorrectiveDemonstration(s: GameState, say: Speak): void {
   a.pauseReason = undefined;
   say(
     'You',
-    'The good cell still flickers when moved. I will restore the contact while you watch, then explain what actually happens. I am responsible for this assisted repair.',
+    correction === 'inspect'
+      ? 'Let’s begin by looking closely. Watch what I check before deciding what needs doing.'
+      : correction === 'replace-battery'
+        ? 'The known-good cell made the light steady. Watch while I fit the matching replacement; we can see whether it stays that way.'
+        : 'The good cell still flickers when moved. Watch the contact while I work on it—we can see whether that changes anything.',
   );
 }
 export function arrangeLearning(s: GameState, say: Speak): void {
@@ -459,6 +543,9 @@ export function arrangeLearning(s: GameState, say: Speak): void {
     }
     s.samPlans ??= { invitation: 'pending', heardAt: s.now };
     s.samPlans.invitation = 'accepted';
+    s.conversationPause = undefined;
+    s.samPlans.availableAfter = undefined;
+    s.samPlans.availabilityReason = undefined;
     s.samPlans.heardAt = s.now;
     s.apprentice.arranged = true;
     s.apprentice.visitUntil = s.now + 150;
@@ -470,7 +557,7 @@ export function arrangeLearning(s: GameState, say: Speak): void {
         ? 'I can give this repair another stretch. I will continue from the labelled observations and the step where I stopped; my own plans still matter.'
         : establishedRepairer
           ? 'I can share another stretch at the bench. I know the light work we have tried; unfamiliar observations still deserve a question. My own plans still matter.'
-          : `I can set aside a stretch, up to ${String(Math.floor((s.apprentice.visitUntil % 1440) / 60)).padStart(2, '0')}:${String(s.apprentice.visitUntil % 60).padStart(2, '0')}. Show me why you choose a step, not just which bit you touch. If my own plans need me sooner, we will keep the notes and stop.`,
+          : `I can set aside a stretch, up to ${String(Math.floor((s.apprentice.visitUntil % 1440) / 60)).padStart(2, '0')}:${String(s.apprentice.visitUntil % 60).padStart(2, '0')}. I’ll watch the steps and their actual results. You can explain a distinction if it would help. If my own plans need me sooner, we will keep the notes and stop.`,
     );
   } else {
     if (chosen && chosen.id !== prior?.affordanceId) {
@@ -485,14 +572,99 @@ export function arrangeLearning(s: GameState, say: Speak): void {
       begin(sam, chosen, decision);
     }
     s.samPlans ??= { invitation: 'pending', heardAt: s.now };
-    s.samPlans.routineShiftKnown = true;
     s.samPlans.heardAt = s.now;
-    say(
-      'Sam',
-      'Today doesn’t work for me. My usual morning shift ends at one; try me after that another day. Keep your work where it is. I may still have other plans.',
-    );
+    const current = sam.activity;
+    if (current && current.endsAt > s.now) {
+      const until = current.endsAt;
+      const time = `${String(Math.floor((until % 1440) / 60)).padStart(2, '0')}:${String(until % 60).padStart(2, '0')}`;
+      const reason =
+        current.action === 'eat'
+          ? 'finish my meal'
+          : current.action === 'walk'
+            ? 'take the dog out'
+            : current.action === 'rest'
+              ? 'have a quiet break'
+              : current.action === 'read'
+                ? 'finish this bit of reading'
+                : 'finish what I’m doing';
+      say(
+        'Sam',
+        `Let me ${reason} first — until about ${time}. You can ask again then; I haven’t agreed to watch yet.`,
+      );
+      s.samPlans.availableAfter = until;
+      s.samPlans.availabilityReason = `Sam asked to ${reason} first, until about ${time}; watching still needs his agreement.`;
+      s.conversationPause = {
+        participantId: 'sam',
+        actionId: 'arrange-learning',
+        activityId: current.affordanceId,
+        until,
+        label: current.affordance.label,
+      };
+    } else {
+      say('Sam', 'Not just now. I’d like some time to myself. Keep your work where it is.');
+      s.samPlans.availableAfter = undefined;
+      s.samPlans.availabilityReason = undefined;
+    }
   }
 }
+/** Advance an agreed observer through real time before accepting its evidence.
+ * HF compares continuing attention with due duties; a stopped watch cannot
+ * certify the whole demonstration merely because its original end was later. */
+export function advanceWatching(s: GameState, until: number, here: (at: number) => boolean): void {
+  const sam = s.people.sam;
+  const watch = sam?.activity;
+  if (
+    !sam ||
+    !watch ||
+    ![
+      'learning-afternoon',
+      'watch-repair',
+      'watch-corrective-repair',
+      'watch-corrective-renewal',
+    ].includes(watch.affordanceId) ||
+    (s.apprentice?.jobId && !s.apprentice.needsHelp)
+  )
+    return;
+  while (sam.now < Math.min(until, watch.endsAt)) {
+    tick(sam, sam.now + 1);
+    if (
+      !here(sam.now) ||
+      !sam.body.alive ||
+      sam.body.downed ||
+      sam.body.asleep ||
+      sam.activity !== watch ||
+      watch.interrupt
+    ) {
+      if (sam.activity === watch)
+        finish(sam, {
+          affordanceId: watch.affordanceId,
+          action: watch.action,
+          at: sam.now,
+          status: 'interrupted',
+          summary: 'Stopped watching before the demonstration finished.',
+        });
+      return;
+    }
+    if (sam.now < watch.endsAt) {
+      const duties = collectionDuties(sam);
+      const choice = decide(sam, [watch.affordance, ...duties]);
+      if (choice.chosenAffordanceId !== watch.affordanceId) {
+        finish(sam, {
+          affordanceId: watch.affordanceId,
+          action: watch.action,
+          at: sam.now,
+          status: 'interrupted',
+          summary: 'Stopped watching for my own plans.',
+        });
+        const duty = duties.find((offer) => offer.id === choice.chosenAffordanceId);
+        if (duty) begin(sam, duty, choice);
+        return;
+      }
+      reviewed(sam);
+    }
+  }
+}
+
 export function recordLesson(
   s: GameState,
   item: RepairObject,
@@ -501,6 +673,7 @@ export function recordLesson(
   success: boolean,
   minutes: number,
   attended: boolean,
+  sharedOwnerHandover = false,
 ): void {
   const a = s.apprentice,
     sam = s.people.sam;
@@ -508,23 +681,35 @@ export function recordLesson(
     s.unlocked = s.unlocked.filter((flag) => flag !== `corrective-demonstration:${item.id}`);
   if (
     !attended ||
-    !sam?.activity ||
+    !sam ||
+    (!sharedOwnerHandover && !sam?.activity) ||
     !sam.body.alive ||
     sam.body.asleep ||
-    sam.activity.startedAt > s.now - minutes ||
-    sam.activity.endsAt < s.now ||
-    ![
-      'learning-afternoon',
-      'watch-repair',
-      'watch-corrective-repair',
-      'watch-corrective-renewal',
-    ].includes(sam.activity.affordanceId) ||
+    sam.body.downed ||
+    (!sharedOwnerHandover && Boolean(sam.activity?.interrupt)) ||
+    (!sharedOwnerHandover && (sam?.activity?.startedAt ?? Infinity) > s.now - minutes) ||
+    (!sharedOwnerHandover && (sam?.activity?.endsAt ?? -Infinity) < s.now) ||
+    (!sharedOwnerHandover &&
+      ![
+        'learning-afternoon',
+        'watch-repair',
+        'watch-corrective-repair',
+        'watch-corrective-renewal',
+      ].includes(sam?.activity?.affordanceId ?? '')) ||
     !a?.arranged ||
-    s.now > a.visitUntil ||
+    (!sharedOwnerHandover && s.now > a.visitUntil) ||
     !sam ||
     (a.jobId && (!a.needsHelp || a.jobId === item.id)) ||
+    // Light access is automatic preparation, not a selectable apprentice method.
+    // Mechanical objects expose these steps as actual conditional choices.
+    (['open-access', 'reassemble'].includes(step) && !item.mechanicalDisplay) ||
     ![
       'inspect',
+      'test-mechanical-empty',
+      'test-mechanical-loaded',
+      'open-access',
+      'reassemble',
+      'clear-obstruction',
       'test-battery',
       'clean-contact',
       'replace-battery',
@@ -536,7 +721,11 @@ export function recordLesson(
   ) {
     // A physical correction outside the witnessed interval closes the invitation,
     // not a lesson. The already-repaired object cannot supply that missed proof.
-    if (step === 'clean-contact' && success && item.repaired)
+    if (
+      success &&
+      ((step === 'inspect' && item.inspected) ||
+        (['clean-contact', 'replace-battery'].includes(step) && item.repaired))
+    )
       s.unlocked = s.unlocked.filter((flag) => flag !== `corrective-demonstration:${item.id}`);
     return;
   }
@@ -555,18 +744,6 @@ export function recordLesson(
     },
   ]);
   observeSkill(sam, 'repair', minutes, s.people.player?.skills.repair?.level ?? 0.12, 'motor');
-  // Keep the exact witnessed corrective result available for explanation even
-  // when the player checks the object before discussing it. Later physical
-  // observations above remain real, but do not replace this pending lesson.
-  if (
-    a.lastLesson &&
-    ((s.unlocked.includes(`corrective-demonstration:${a.lastLesson.objectId}`) &&
-      a.lastLesson.step === 'clean-contact') ||
-      (a.lastLesson.step === 'inspect' && a.lastLesson.cue === 'intake' && !hasIntakeMethod(s))) &&
-    a.lastLesson.success &&
-    !a.lastLesson.explained
-  )
-    return;
   a.lastLesson = {
     objectId: item.id,
     step,
@@ -575,24 +752,39 @@ export function recordLesson(
     eventId: `${s.seed}:${s.inputs.length}:${item.id}:${step}`,
     explained: false,
   };
+  explainLesson(s, () => {}, true, true);
 }
-export function explainLesson(s: GameState, say: Speak, attending: boolean): void {
+export function explainLesson(
+  s: GameState,
+  say: Speak,
+  attending: boolean,
+  automatic = false,
+): void {
   const lesson = s.apprentice?.lastLesson,
     sam = s.people.sam;
   if (!attending || !lesson || !sam || lesson.explained) return;
   const contextId = `demonstration:${lesson.objectId}`;
   receiveMethodCues(sam, { contextId, cues: [{ cue: 'stage', value: lesson.cue }] });
-  const acquired = demonstrateMethod(sam, {
-    id: 'careful-light-repair',
-    demonstrationId: lesson.eventId,
-    contextId,
-    conditions: [{ cue: 'stage', value: lesson.cue }],
-    action: lesson.step,
-    sourceId: 'player',
-    outcome: lesson.success ? 'success' : 'failure',
-  });
-  lesson.explained = acquired;
-  if (acquired && lesson.success && lesson.step === 'clean-contact')
+  const acquired =
+    lesson.learnedAutomatically ||
+    demonstrateMethod(sam, {
+      id: lesson.cue.startsWith('mechanical-')
+        ? 'careful-mechanical-display'
+        : 'careful-light-repair',
+      demonstrationId: lesson.eventId,
+      contextId,
+      conditions: [{ cue: 'stage', value: lesson.cue }],
+      action: lesson.step,
+      sourceId: 'player',
+      outcome: lesson.success ? 'success' : 'failure',
+    });
+  if (automatic) lesson.learnedAutomatically = acquired;
+  else lesson.explained = acquired;
+  if (
+    acquired &&
+    lesson.success &&
+    ['inspect', 'clean-contact', 'replace-battery'].includes(lesson.step)
+  )
     s.unlocked = s.unlocked.filter(
       (flag) => flag !== `corrective-demonstration:${lesson.objectId}`,
     );
@@ -603,7 +795,19 @@ export function explainLesson(s: GameState, say: Speak, attending: boolean): voi
       assisted.independent = false;
     }
   }
+  if (automatic) return;
   const reasons: Partial<Record<RepairCue, string>> = {
+    'mechanical-intake': 'Look at the assembly before choosing work.',
+    'mechanical-empty': 'Compare the empty tray without assuming that establishes loaded motion.',
+    'mechanical-loaded': 'Fit the same four cards and compare the loaded motion.',
+    'mechanical-access':
+      'Both comparisons are recorded. Lift and retain the tray to examine the accessible rim.',
+    'mechanical-obstruction':
+      'The comparisons and exposed rim show card scrap. Remove that observed obstruction, not a guessed part.',
+    'mechanical-refit': 'Retain the same tray and refit it before a loaded circuit check.',
+    'mechanical-circuit': 'Attend a complete loaded circuit; idle time cannot establish movement.',
+    'mechanical-checked': 'Return only what the complete circuit actually established.',
+
     intake: 'Look before replacing anything.',
     'needs-test':
       'Grime and an old cell can both be plausible. A known-good battery separates them.',
@@ -617,6 +821,11 @@ export function explainLesson(s: GameState, say: Speak, attending: boolean): voi
     checked: 'A checked light can go home with an honest account of the work.',
   };
   const demonstratedStep: Record<string, string> = {
+    'test-mechanical-empty': 'comparing the empty tray',
+    'test-mechanical-loaded': 'comparing the same tray with its cards',
+    'open-access': 'lifting and retaining the tray',
+    reassemble: 'refitting the retained tray',
+    'clear-obstruction': 'removing the observed card scrap',
     inspect: 'looking closely before choosing work',
     'test-battery': 'trying a known-good battery',
     'replace-battery': 'replacing the old battery',
@@ -624,13 +833,13 @@ export function explainLesson(s: GameState, say: Speak, attending: boolean): voi
     verify: 'starting the longer light run',
     'wait-check': 'letting the light run long enough',
     'check-result': 'moving and switching the light after its run',
-    return: 'returning the checked light with an honest account',
+    return: 'returning the checked object with an honest account',
   };
   const stepDescription = demonstratedStep[lesson.step] ?? 'the demonstrated work';
   say(
     'You',
     !lesson.success
-      ? `Here, ${stepDescription} did not repair this light. Keep its actual observation; that attempt is not a successful method for it.`
+      ? `Here, ${stepDescription} did not establish a successful result on this object. Keep its actual observation; that attempt is not a successful method for it.`
       : (reasons[lesson.cue] ??
           'Explain the observation and the result, without pretending it covers every kind of fault.'),
   );
@@ -645,7 +854,7 @@ export function explainLesson(s: GameState, say: Speak, attending: boolean): voi
             ? 'The time alone wasn’t the check. You moved it afterward and it stayed steady.'
             : lesson.step === 'return'
               ? 'I can tell the owner what we established, rather than promising more.'
-              : `When I see that observation, I can try ${stepDescription}, as you demonstrated. I’ll keep that connection for another light.`
+              : `When I see that observation, I can try ${stepDescription}, as you demonstrated. I’ll keep that connection for another matching observation.`
       : 'I didn’t take that in properly. Could we look at the observation again?',
   );
 }
@@ -654,23 +863,32 @@ export function apprenticeOffers(
   item: RepairObject,
   now: number,
 ): Affordance[] {
-  const ids = !item.inspected
-    ? ['inspect']
-    : item.verified
-      ? ['return']
-      : item.checkStarted !== undefined
-        ? now - item.checkStarted >= 20
-          ? ['check-result', 'return-unchecked']
-          : ['wait-check', 'return-unchecked']
-        : item.repaired
-          ? [checkingSpaceAvailable(s, item.id) ? 'verify' : 'wait-check-place', 'return-unchecked']
-          : [
-              'test-battery',
-              'clean-contact',
-              ...(s.parts.batteries > 0 ? ['replace-battery'] : []),
-              ...(s.parts.holders > 0 ? ['fit-holder'] : []),
-              ...(item.form === 'torch' ? ['twist-cap'] : []),
-            ];
+  const ids = item.mechanicalDisplay
+    ? !item.inspected
+      ? ['inspect']
+      : item.verified
+        ? ['return']
+        : mechanicalSteps(mechanicalItem(item))
+    : !item.inspected
+      ? ['inspect']
+      : item.verified
+        ? ['return']
+        : item.checkStarted !== undefined
+          ? now - item.checkStarted >= 20
+            ? ['check-result', 'return-unchecked']
+            : ['wait-check', 'return-unchecked']
+          : item.repaired
+            ? [
+                checkingSpaceAvailable(s, item.id) ? 'verify' : 'wait-check-place',
+                'return-unchecked',
+              ]
+            : [
+                'test-battery',
+                'clean-contact',
+                ...(s.parts.batteries > 0 ? ['replace-battery'] : []),
+                ...(s.parts.holders > 0 ? ['fit-holder'] : []),
+                ...(item.form === 'torch' ? ['twist-cap'] : []),
+              ];
   return [...ids, 'request-help'].map((id) => ({
     id,
     action: id,
@@ -678,7 +896,10 @@ export function apprenticeOffers(
       id === 'request-help'
         ? 'Ask for help before guessing'
         : (semanticWork[id] ?? 'The chosen repair step'),
-    duration: physicalStepDuration(item, id, repairDuration(id)),
+    duration:
+      item.mechanicalDisplay && id in mechanicalMinutes
+        ? mechanicalMinutes[id as MechanicalStep]
+        : physicalStepDuration(item, id, repairDuration(id)),
     effort: id === 'request-help' || id === 'wait-check' ? 0 : 0.12,
     focus: 0.25,
     skill: id === 'request-help' ? undefined : { id: 'repair', difficulty: 0.25 },
@@ -744,7 +965,7 @@ export function completeApprenticeJob(s: GameState, item: RepairObject, say: Spe
     a.role = 'repairer';
     say(
       'Sam',
-      'The owner has it back, checked. You didn’t need to choose the steps for me. Do you want to leave another light with me?',
+      'The owner has it back, checked. You didn’t need to choose the steps for me. You can offer me another object when my plans allow.',
     );
   }
   a.jobId = undefined;
@@ -832,6 +1053,19 @@ export function advanceApprentice(
         break;
       }
       const current = sam.activity;
+      if (
+        current &&
+        item.mechanicalDisplay &&
+        !['learning-afternoon', 'watch-repair'].includes(current.affordanceId)
+      ) {
+        const candidates = apprenticeOffers(s, item, sam.now),
+          choice = decide(sam, [...candidates, ...collectionDuties(sam)]);
+        if (choice.chosenAffordanceId === current.affordanceId) {
+          a.needsHelp =
+            'Sam is finishing his own activity before this mechanical step. The work is kept.';
+          break;
+        }
+      }
       if (current)
         finish(sam, {
           affordanceId: current.affordanceId,
@@ -846,7 +1080,8 @@ export function advanceApprentice(
       const offers = apprenticeOffers(s, item, sam.now).map((offer) =>
         a.pausedStep?.step === offer.id ? { ...offer, duration: a.pausedStep.remaining } : offer,
       );
-      const decision = decide(sam, offers);
+      const duties = item.mechanicalDisplay ? collectionDuties(sam) : [];
+      const decision = decide(sam, [...offers, ...duties]);
       const chosen = offers.find((x) => x.id === decision.chosenAffordanceId);
       item.stepDecisions ??= [];
       item.stepDecisions.push({
@@ -859,6 +1094,13 @@ export function advanceApprentice(
             .map((t) => t.source) ?? [],
       });
       if (!chosen || chosen.id === 'request-help') {
+        const duty = duties.find((x) => x.id === decision.chosenAffordanceId);
+        if (duty) {
+          begin(sam, duty, decision);
+          a.needsHelp =
+            'Sam is keeping an agreed appointment. The incomplete mechanical step has not been recorded; ask him to resume later.';
+          break;
+        }
         a.needsHelp =
           'Sam is unsure what the observation supports. He has stopped instead of guessing.';
         say('Sam', 'I don’t know a method for this observation. Will you look with me?');
@@ -877,6 +1119,40 @@ export function advanceApprentice(
             methodContext: undefined,
           }
         : chosen;
+      if (item.mechanicalDisplay && chosen.id === 'return') {
+        const owner = s.people[item.owner.toLowerCase()];
+        const handover: Affordance = {
+          id: `mechanical-collection:${item.id}`,
+          action: 'talk',
+          label: 'Receive my checked display from Sam',
+          advances: s.operationsPurposeIds?.[`mechanical-return:${item.id}`]
+            ? [s.operationsPurposeIds[`mechanical-return:${item.id}`]].filter((id): id is string =>
+                Boolean(id),
+              )
+            : undefined,
+          duration: actualOffer.duration,
+          effort: 0,
+          with: ['sam'],
+          advertises: { autonomy: 0.06, belonging: 0.05 },
+        };
+        if (owner && owner.now < sam.now) liveOrdinaryTime(owner, sam.now);
+        const duties = owner ? collectionDuties(owner) : [];
+        const choice = owner ? decide(owner, [handover, ...duties]) : undefined;
+        if (
+          !owner ||
+          !ownerHere(owner.id, sam.now) ||
+          choice?.chosenAffordanceId !== handover.id ||
+          !begin(owner, handover, choice)
+        ) {
+          a.needsHelp =
+            'The checked display is ready, but its owner has not agreed to this handover. Ask Sam to offer collection again when the owner is available.';
+          say(
+            'Sam',
+            'The check is complete. Its owner cannot take it with me now; I will keep it safely labelled.',
+          );
+          break;
+        }
+      }
       const lastDecision = item.stepDecisions.at(-1);
       if (preparation && lastDecision) lastDecision.hostPreparation = preparation;
       if (!begin(sam, actualOffer, decision)) {
@@ -897,7 +1173,142 @@ export function advanceApprentice(
         end = at;
         break;
       }
-    tick(sam, end);
+    if (item.mechanicalDisplay && pending.step === 'return') {
+      const owner = s.people[item.owner.toLowerCase()];
+      const collectionId = `mechanical-collection:${item.id}`;
+      let attended = !!owner && owner.activity?.affordanceId === collectionId;
+      if (owner)
+        for (let at = sam.now + 1; attended && at <= end; at++) {
+          tick(owner, at);
+          tick(sam, at);
+          const samActivity = sam.activity;
+          if (samActivity && at < pending.endsAt) {
+            const duties = collectionDuties(sam),
+              choice = decide(sam, [samActivity.affordance, ...duties]);
+            if (choice.chosenAffordanceId !== samActivity.affordanceId) {
+              const duty = duties.find((x) => x.id === choice.chosenAffordanceId);
+              finish(sam, {
+                affordanceId: samActivity.affordanceId,
+                action: samActivity.action,
+                at,
+                status: 'interrupted',
+                summary: 'Stopped the handover for my own plans.',
+              });
+              if (duty) begin(sam, duty, choice);
+              attended = false;
+              end = at;
+              break;
+            }
+            reviewed(sam);
+          }
+          if (
+            !sam.activity ||
+            sam.activity.affordanceId !== pending.step ||
+            sam.activity.interrupt ||
+            !sam.body.alive ||
+            sam.body.asleep ||
+            !workerHere(at) ||
+            !ownerHere(owner.id, at) ||
+            !owner.body.alive ||
+            owner.body.asleep ||
+            owner.activity?.affordanceId !== collectionId ||
+            owner.activity.interrupt
+          ) {
+            attended = false;
+            end = at;
+            break;
+          }
+          if (at < pending.endsAt) {
+            const duties = collectionDuties(owner),
+              choice = decide(owner, [owner.activity.affordance, ...duties]);
+            if (choice.chosenAffordanceId !== collectionId) {
+              const duty = duties.find((x) => x.id === choice.chosenAffordanceId);
+              finish(owner, {
+                affordanceId: collectionId,
+                action: 'talk',
+                at,
+                status: 'interrupted',
+                summary: 'The handover stopped for my own plans.',
+              });
+              if (duty) begin(owner, duty, choice);
+              attended = false;
+              end = at;
+              break;
+            }
+            reviewed(owner);
+          }
+        }
+      if (!attended) {
+        if (owner?.activity?.affordanceId === collectionId)
+          finish(owner, {
+            affordanceId: collectionId,
+            action: 'talk',
+            at: end,
+            status: 'interrupted',
+            summary: 'The shared handover stopped before I received the display.',
+          });
+        tick(sam, end);
+        if (sam.activity?.affordanceId === pending.step)
+          finish(sam, {
+            affordanceId: pending.step,
+            action: pending.step,
+            at: end,
+            status: 'interrupted',
+            summary: 'The owner could not complete the handover.',
+          });
+        a.pending = undefined;
+        a.needsHelp =
+          'The owner could not complete the handover. The checked display is still safely held; offer collection again later.';
+        break;
+      }
+    }
+    if (item.mechanicalDisplay) {
+      let interrupted = false;
+      for (let at = sam.now + 1; at <= end; at++) {
+        tick(sam, at);
+        const activity = sam.activity;
+        if (!activity || activity.interrupt || !sam.body.alive || sam.body.asleep) {
+          interrupted = true;
+          break;
+        }
+        if (at < pending.endsAt) {
+          const duties = collectionDuties(sam),
+            choice = decide(sam, [activity.affordance, ...duties]);
+          if (choice.chosenAffordanceId !== activity.affordanceId) {
+            const duty = duties.find((x) => x.id === choice.chosenAffordanceId);
+            finish(sam, {
+              affordanceId: activity.affordanceId,
+              action: activity.action,
+              at,
+              status: 'interrupted',
+              summary: 'Stopped mechanical work for my own plans.',
+            });
+            if (duty) begin(sam, duty, choice);
+            interrupted = true;
+            break;
+          }
+          reviewed(sam);
+        }
+      }
+      if (interrupted) {
+        const owner = s.people[item.owner.toLowerCase()];
+        if (
+          pending.step === 'return' &&
+          owner?.activity?.affordanceId === `mechanical-collection:${item.id}`
+        )
+          finish(owner, {
+            affordanceId: owner.activity.affordanceId,
+            action: 'talk',
+            at: sam.now,
+            status: 'interrupted',
+            summary: 'Sam could not complete our handover; I have not received the display.',
+          });
+        a.pending = undefined;
+        a.needsHelp =
+          'Sam stopped for his own plans before completing this mechanical step. Its evidence and parts remain unchanged.';
+        break;
+      }
+    } else tick(sam, end);
     if (end < pending.endsAt) {
       if (!workerHere(end)) continue;
       break;
@@ -948,52 +1359,72 @@ export function advanceApprentice(
     }
     let text = '',
       success = true;
-    switch (pending.step) {
-      case 'inspect':
-        text = inspectRepair(item, 'sam', sam.now);
-        break;
-      case 'test-battery':
-        text = testRepair(item, 'sam', sam.now);
-        break;
-      case 'clean-contact':
-      case 'replace-battery':
-      case 'fit-holder':
-      case 'twist-cap': {
-        const result = applyRepair(item, pending.step, s.parts);
-        text = result.text;
-        success = result.succeeded;
-        break;
+    if (item.mechanicalDisplay && pending.step in mechanicalMinutes) {
+      const result = completeDisplayStep(item, pending.step as MechanicalStep, 'sam', sam.now);
+      text = result.text.replaceAll('You ', 'I ');
+      success = result.succeeded;
+    } else
+      switch (pending.step) {
+        case 'inspect':
+          text = inspectRepair(item, 'sam', sam.now);
+          break;
+        case 'test-battery':
+          text = testRepair(item, 'sam', sam.now);
+          break;
+        case 'clean-contact':
+        case 'replace-battery':
+        case 'fit-holder':
+        case 'twist-cap': {
+          const result = applyRepair(item, pending.step, s.parts);
+          text = result.text;
+          success = result.succeeded;
+          break;
+        }
+        case 'verify':
+          item.checkStarted = sam.now;
+          text = 'I’m leaving it lit for the longer check.';
+          break;
+        case 'wait-check-place':
+          text =
+            'The other checking place is occupied. I’ll keep this light labelled until it is clear.';
+          break;
+        case 'wait-check':
+          text = 'It is still running. I can give it a little more time.';
+          break;
+        case 'check-result':
+          text = readLongCheck(item, sam.now);
+          break;
+        case 'return-unchecked':
+          item.independent = false;
+          a.needsHelp =
+            'Sam proposed returning before the longer check. The promise remains yours to discuss.';
+          text = 'It lights now, but I have not established the longer check.';
+          break;
+        case 'return':
+          if (item.mechanicalDisplay) {
+            const owner = s.people[item.owner.toLowerCase()];
+            if (owner)
+              finish(owner, {
+                affordanceId: `mechanical-collection:${item.id}`,
+                action: 'talk',
+                at: sam.now,
+                status: 'completed',
+                summary: 'Received my checked display from Sam.',
+              });
+          }
+          item.location = 'returned';
+          item.awaitingCollection = !ownerHere(item.owner.toLowerCase(), sam.now);
+          if (!item.awaitingCollection) item.collectedAt = sam.now;
+          text = item.awaitingCollection
+            ? item.mechanicalDisplay
+              ? 'The checked display is labelled for collection.'
+              : 'The checked light is labelled for collection.'
+            : item.mechanicalDisplay
+              ? 'Here it is. I compared it empty and loaded, cleared the observed rim, refitted the same tray and attended a complete loaded circuit.'
+              : 'Here it is. I tested the repair for longer and moved it and switched it afterward.';
+          s.repairs++;
+          break;
       }
-      case 'verify':
-        item.checkStarted = sam.now;
-        text = 'I’m leaving it lit for the longer check.';
-        break;
-      case 'wait-check-place':
-        text =
-          'The other checking place is occupied. I’ll keep this light labelled until it is clear.';
-        break;
-      case 'wait-check':
-        text = 'It is still running. I can give it a little more time.';
-        break;
-      case 'check-result':
-        text = readLongCheck(item, sam.now);
-        break;
-      case 'return-unchecked':
-        item.independent = false;
-        a.needsHelp =
-          'Sam proposed returning before the longer check. The promise remains yours to discuss.';
-        text = 'It lights now, but I have not established the longer check.';
-        break;
-      case 'return':
-        item.location = 'returned';
-        item.awaitingCollection = !ownerHere(item.owner.toLowerCase(), sam.now);
-        if (!item.awaitingCollection) item.collectedAt = sam.now;
-        text = item.awaitingCollection
-          ? 'The checked light is labelled for collection.'
-          : 'Here it is. I tested the repair for longer and moved it and switched it afterward.';
-        s.repairs++;
-        break;
-    }
     if (text) {
       item.observations.push(text);
       say('Sam', text);
@@ -1017,4 +1448,24 @@ export function advanceApprentice(
       completeApprenticeJob(s, item, say);
   }
   if (sam.now < until) liveOrdinaryTime(sam, until);
+}
+
+function collectionDuties(person: import('@adam0white/human-framework').Person): Affordance[] {
+  return person.agenda.commitments
+    .filter(
+      (c) =>
+        c.status === 'pending' &&
+        c.kind === 'appointment' &&
+        c.from <= person.now &&
+        c.until > person.now,
+    )
+    .map((c) => ({
+      id: `attend-${c.id}`,
+      action: c.actions[0] ?? 'attend',
+      label: c.label ?? 'Attend the agreed appointment',
+      duration: c.until - person.now,
+      effort: 0,
+      advertises: {},
+      fulfills: [c.id],
+    }));
 }

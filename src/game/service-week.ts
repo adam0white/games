@@ -308,8 +308,17 @@ export function serviceWeekActions(s: ServiceWeekGame, ctx: ServiceWeekContext):
     );
   for (const job of w.jobs) {
     const spec = serviceWeekSpecs.find((x) => x.id === job.id);
-    if (!spec || !ctx.ownerHere(spec.ownerId)) continue;
+    if (!spec) continue;
     const key = job.id.slice(8);
+    if (job.stage === 'accepted' && ctx.uncheckedCollections?.includes(job.id))
+      add(
+        `service-revisit-unfinished-${key}`,
+        `Revisit ${spec.owner}’s unfinished collection`,
+        ctx.ownerHere(spec.ownerId)
+          ? 'Agree an honest no-fee settlement or bring the object back for checking. The old promise remains recorded.'
+          : 'Arrange a visit to discuss the unchecked object; no fee or checked result is assumed.',
+      );
+    if (!ctx.ownerHere(spec.ownerId)) continue;
     if (job.stage === 'offered') {
       if (s.now < (job.requestedCollectionAt ?? requestedCollection(s, spec.owner)))
         add(
@@ -330,14 +339,6 @@ export function serviceWeekActions(s: ServiceWeekGame, ctx: ServiceWeekContext):
         'No repair or collection promise is made.',
       );
     }
-    if (job.stage === 'accepted' && ctx.uncheckedCollections?.includes(job.id))
-      add(
-        `service-revisit-unfinished-${key}`,
-        `Revisit ${spec.owner}’s unfinished collection`,
-        ctx.ownerHere(spec.ownerId)
-          ? 'Agree an honest no-fee settlement or bring the object back for checking. The old promise remains recorded.'
-          : 'Arrange a visit to discuss the unchecked object; no fee or checked result is assumed.',
-      );
     if (job.stage === 'accepted' && !job.delayed) {
       add(
         `service-delay-${key}`,

@@ -4,7 +4,7 @@ Selected during the owner's five-hour autonomous expansion, after independent ga
 
 ## Player experience
 
-One small mechanical teaching afternoon earns a lasting change of responsibility. A rotating label stand has an accessible obstructed drive. Compare its motion with and without its removable card tray, observe the obstruction, clear it and attend a complete rotation check. The enclosed spring is outside the repair scope. The player can work alone, genuinely demonstrate and explain to Sam, or keep the unfinished object for later.
+One small mechanical teaching afternoon earns a lasting change of responsibility. A rotating label stand has an accessible obstructed drive. Compare its motion with and without its removable card tray, observe the obstruction, clear it and attend a complete rotation check. The enclosed spring is outside the repair scope. The player can work alone, work with Sam actually watching, discuss useful distinctions if desired, or keep the unfinished object for later.
 
 A later owned display mechanism has the same supported observation with a different appearance. Sam can take its complete repair while the player makes an actual retained alteration to the paper street. A separate missing-drive-part variant must produce appropriate deferral rather than successful clearance. Mechanical expertise is acquired through actual conditional method evidence, not a purchased role, scalar skill or host-selected answer.
 
@@ -20,6 +20,6 @@ A later owned display mechanism has the same supported observation with a differ
 
 ## Acceptance and stopping condition
 
-Deliver this afternoon and its follow-up when fresh touch and keyboard readers can understand the comparison and finish the supported repair; watched-and-explained teaching changes a later trace and independent whole-job outcome; withholding teaching leaves an honest stop; a supported mechanical transfer succeeds while the missing-part variant defers; and the player completes meaningful personal work during actual independent apprentice work. Solo, postponement and refusal remain viable. Exact saves, all supported historical imports and existing game checks remain intact. Independent causal, design and source-unread reviews clear the slice before publication. Adam accepts the game's feel later.
+Deliver this afternoon and its follow-up when fresh touch and keyboard readers can understand the comparison and finish the supported repair; actually witnessed work changes a later trace and independent whole-job outcome; withholding teaching leaves an honest stop; a supported mechanical transfer succeeds while the missing-part variant defers; and the player completes meaningful personal work during actual independent apprentice work. Solo, postponement and refusal remain viable. Exact saves, all supported historical imports and existing game checks remain intact. Independent causal, design and source-unread reviews clear the slice before publication. Adam accepts the game's feel later.
 
 The reviewer recommended this over another overlapping queue or a deeper music box: it connects new space and non-light repair to genuine delegation. Allow about two hours for implementation and one for review/parity/play. Cut a second visual variant before cutting the meaningful comparison or withholding control. The autonomous run still ends at 23:59:42 UTC.

@@ -3,7 +3,7 @@ import { getView, restoreGame, serializeGame, transition } from '../src/game/eng
 import { earnedHandoff } from './support/earned-handoff';
 
 it('waits directly for the actually heard Sam time despite an earlier Nora time, without granting an agreement', () => {
-  let s = earnedHandoff();
+  let s = earnedHandoff(false, 42, true);
   s = transition(s, { type: 'action', id: 'next-day' });
   const view = getView(s);
   const nora = view.knownAppointments?.find((x) => x.personId === 'nora');
@@ -22,7 +22,7 @@ it('waits directly for the actually heard Sam time despite an earlier Nora time,
   expect(restoreGame(serializeGame(s))).toEqual(s);
 }, 30_000);
 it('exposes no targeted wait for a withheld routine or an arbitrary future target', () => {
-  let s = earnedHandoff();
+  let s = earnedHandoff(false, 42, true);
   s = transition(s, { type: 'action', id: 'next-day' });
   s.samPlans = undefined;
   s.unlocked = s.unlocked.filter(

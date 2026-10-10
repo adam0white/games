@@ -1,10 +1,15 @@
 import { useId } from 'react';
 import type { ObjectView } from '../game/types';
+import { describeLabelStand } from './inspection/labelStand';
 
 export function ObjectIllustration({ object }: { object: ObjectView }) {
   const titleId = useId();
   const appearance: string =
-    object.appearance ?? (object.form === 'lamp' ? 'reading' : object.form);
+    object.form === 'trolley'
+      ? 'trolley'
+      : (object.appearance ?? (object.form === 'lamp' ? 'reading' : object.form));
+  const mechanical = object.mechanicalPresentation;
+  const isStand = appearance === 'label-stand' || appearance === 'display-carousel';
   const sampleCase = object.id === 'nora-sample-case';
   const sampleTray = object.casePresentation?.mode === 'stationary-tray';
   const sampleCatch = object.casePresentation?.catch ?? 'original';
@@ -16,6 +21,52 @@ export function ObjectIllustration({ object }: { object: ObjectView }) {
         <title id={titleId}>
           {object.title}: {object.condition}
         </title>
+        {isStand && (
+          <desc>{describeLabelStand({ appearance, mechanicalPresentation: mechanical })}</desc>
+        )}
+        {isStand && (
+          <g stroke="#665d4d" strokeWidth="2">
+            <ellipse
+              cx="126"
+              cy="195"
+              rx="66"
+              ry="18"
+              fill={appearance === 'label-stand' ? '#728776' : '#9b866a'}
+            />
+            <path d="M95 184 L95 152 Q126 134 157 152 L157 184 Q126 203 95 184" fill="#aaa597" />
+            <path d="M126 156 L126 113" strokeWidth="7" />
+            <ellipse cx="126" cy="151" rx="44" ry="11" fill="none" />
+            <g transform={mechanical?.tray === 'removed' ? 'translate(111 76)' : 'translate(0 0)'}>
+              <ellipse cx="126" cy="114" rx="53" ry="15" fill="#9b866a" />
+              {[0, 1, 2, 3].map((i) => (
+                <g key={i} transform={`translate(${87 + i * 22} ${106 - (i % 2) * 11})`}>
+                  <rect width="19" height="5" fill="#aaa597" />
+                  {mechanical?.load === 'loaded' && (
+                    <rect x="1" y="-33" width="17" height="34" rx="1" fill="#e6d6b4" />
+                  )}
+                </g>
+              ))}
+            </g>
+            {mechanical?.load === 'empty' &&
+              [0, 1, 2, 3].map((i) => (
+                <rect
+                  key={i}
+                  x={222 + i * 2}
+                  y={148 + i * 4}
+                  width="35"
+                  height="23"
+                  fill="#e6d6b4"
+                />
+              ))}
+            {mechanical?.tray === 'removed' &&
+              mechanical.observed === 'rim-obstruction' &&
+              !mechanical.cleared && <path d="M157 145 l16 -6 -4 14 -12 -2z" fill="#e6d6b4" />}
+            {mechanical?.tray === 'removed' && mechanical.observed === 'missing-drive-part' && (
+              <circle cx="146" cy="151" r="5" fill="#4e4a42" />
+            )}
+            {mechanical?.cleared && <path d="M183 211 l16 -6 -4 14 -12 -2z" fill="#e6d6b4" />}
+          </g>
+        )}
         <ellipse className="light-pool" cx="160" cy="216" rx="123" ry="23" />
         {appearance === 'reading' && (
           <>
@@ -66,6 +117,100 @@ export function ObjectIllustration({ object }: { object: ObjectView }) {
             <path className="torch-switch" d="M146 122 L167 116 L170 125 L149 131 Z" />
           </>
         )}
+        {appearance === 'folding-shelf' && (
+          <g stroke="#6e5d45" strokeWidth="3" strokeLinejoin="round">
+            <path
+              d={
+                object.shelfPresentation?.position === 'open'
+                  ? 'M75 117 L75 204 L90 204 L92 122 M220 117 L220 204 L235 204 L235 122'
+                  : 'M78 186 L220 186 L230 199 L80 199 Z'
+              }
+              fill="#98794f"
+            />
+            <path
+              d={
+                object.shelfPresentation?.position === 'open'
+                  ? 'M86 163 L225 163'
+                  : 'M96 189 L212 189'
+              }
+              stroke="#bdab86"
+              strokeWidth="8"
+              transform={
+                object.shelfPresentation?.observed === 'brace-high' &&
+                object.shelfPresentation.brace !== 'seated'
+                  ? 'rotate(-5 155 163)'
+                  : undefined
+              }
+            />
+            <path
+              d={
+                object.shelfPresentation?.position === 'open'
+                  ? 'M62 109 L214 100 L250 122 L89 133 Z'
+                  : 'M62 178 L214 168 L250 189 L89 201 Z'
+              }
+              fill="#b39267"
+            />
+            {object.shelfPresentation?.load === 'samples' && (
+              <g
+                transform={
+                  object.shelfPresentation.position === 'open'
+                    ? 'translate(0 0)'
+                    : 'translate(0 68)'
+                }
+              >
+                <path d="M155 101 L207 98 L220 108 L166 114 Z" fill="#789098" />
+                <path d="M156 94 L205 91 L220 102 L168 108 Z" fill="#c0af8b" />
+                <path d="M156 88 L205 85 L220 96 L168 102 Z" fill="#b1957c" />
+              </g>
+            )}
+          </g>
+        )}
+        {appearance === 'trolley' && (
+          <g stroke="#535d51" strokeWidth="4" strokeLinejoin="round">
+            <path d="M107 189 L96 62 Q96 51 107 51 L199 51 Q210 51 211 63 L220 186" fill="none" />
+            <path d="M105 57 L197 57" stroke="#343c35" strokeWidth="10" />
+            <path d="M105 109 L213 109 M111 159 L217 159" fill="none" />
+            <path d="M95 184 L217 175 L247 192 L121 210 Z" fill="#78856c" />
+            <ellipse cx="105" cy="200" rx="15" ry="22" fill="#353b35" />
+            <ellipse
+              cx="226"
+              cy="190"
+              rx={
+                object.trolleyPresentation?.observed === 'wanders' &&
+                object.trolleyPresentation.intervention !== 'wheel-aligned'
+                  ? 10
+                  : 15
+              }
+              ry="22"
+              fill="#353b35"
+            />
+            <circle cx="105" cy="200" r="5" fill="#b29d75" strokeWidth="2" />
+            <circle cx="226" cy="190" r="5" fill="#b29d75" strokeWidth="2" />
+            <path d="M106 129 L214 127" stroke="#ad916a" strokeWidth="9" />
+            <path
+              d={
+                object.trolleyPresentation?.intervention === 'strap-secured'
+                  ? 'M185 128 L172 121 L167 129'
+                  : object.trolleyPresentation?.observed === 'rubs'
+                    ? 'M202 128 Q223 164 225 184'
+                    : 'M198 129 L201 158'
+              }
+              fill="none"
+              stroke="#ad916a"
+              strokeWidth="7"
+            />
+            <rect
+              x="180"
+              y="121"
+              width="13"
+              height="14"
+              rx="2"
+              fill="none"
+              stroke="#b8a579"
+              strokeWidth="3"
+            />
+          </g>
+        )}
         {appearance === 'timer' && (
           <>
             <ellipse className="timer-foot" cx="160" cy="209" rx="67" ry="11" />
@@ -106,7 +251,15 @@ export function ObjectIllustration({ object }: { object: ObjectView }) {
             <path className="box-lid" d="M63 116 L90 93 L263 100 L235 125 Z" />
             <path className="box-front" d="M63 116 L235 125 L234 222 L61 213 Z" />
             <path className="box-panel" d="M74 136 L224 143 L223 207 L73 201 Z" />
-            <path className="box-catch" d="M145 124 L165 125 L165 151 L145 150 Z" />
+            <path className="box-catch" d="M145 124 L165 125 L165 141 L145 140 Z" />
+            <path
+              className="box-catch"
+              data-part="box-keeper"
+              transform={
+                object.catchPresentation?.observed === 'keeper-rubs' ? 'translate(8 0)' : undefined
+              }
+              d="M149 142 L161 143 L161 153 L149 152 Z"
+            />
             <path className="box-handle" d="M131 106 Q144 89 165 103" />
             <path className="box-thread" d="M86 154 Q105 177 93 195 M100 154 Q120 178 108 197" />
           </>
@@ -212,19 +365,54 @@ export function ObjectIllustration({ object }: { object: ObjectView }) {
         {appearance === 'model' && (
           <>
             <path className="model-base" d="M62 180 L119 145 L277 175 L223 220 L62 200 Z" />
-            <path
-              className="model-house"
-              d="M87 127 L125 112 L151 124 L151 182 L111 196 L88 177 Z"
-            />
-            <path className="model-roof" d="M81 126 L106 99 L124 101 L155 120 L125 141 Z" />
-            <path
-              className="model-house"
-              d="M160 116 L196 101 L225 114 L225 184 L183 199 L162 180 Z"
-            />
-            <path className="model-roof" d="M151 113 L179 84 L195 87 L231 112 L193 135 Z" />
-            <g className="model-windows">
-              <path d="M103 147 L114 152 L114 166 L103 161 Z M176 144 L188 150 L188 164 L176 158 Z M199 148 L210 145 L210 159 L199 163 Z" />
-            </g>
+            {object.personalPresentation?.fitted === 'updated' ? (
+              <g data-frontage="updated" stroke="#705e49" strokeWidth="1.5">
+                <path d="M73 116h57v82H73z" fill="#9daa98" />
+                <path d="M138 103h59v95h-59z" fill="#d7baa0" />
+                <path d="M205 118h56v80h-56z" fill="#9ba8ad" />
+                <path d="M70 114h63v7H70z M135 101h65v7h-65z M202 116h62v7h-62z" fill="#a77e6c" />
+                <g data-part="repair-door">
+                  <path d="M80 143h28v53H80z" fill="#65645b" />
+                  <path d="M85 150h18v12H85z" fill="#91a5a4" />
+                  <circle cx="103" cy="174" r="2" fill="#c7ac6e" />
+                </g>
+                <g data-part="sample-window">
+                  <path d="M146 128h43v49h-43z" fill="#859da0" />
+                  <path d="M148 153h11v20h-11z" fill="#bf765e" />
+                  <path d="M161 149h12v24h-12z" fill="#a7b092" />
+                  <path d="M175 156h12v17h-12z" fill="#b29aa6" />
+                  <path d="M144 178h47v5h-47z" fill="#9c8261" />
+                </g>
+                <g data-part="delivery-gate">
+                  <path d="M211 140h43v56h-43z" fill="#5b6058" />
+                  <path d="M211 140l19 4v52l-19-4z M235 144l19-4v52l-19 4z" fill="#9daa9b" />
+                  <path d="M213 155l15 3 M213 173l15 3 M237 158l15-3 M237 176l15-3" fill="none" />
+                </g>
+              </g>
+            ) : (
+              <g data-frontage="remembered">
+                <path
+                  className="model-house"
+                  d="M87 127 L125 112 L151 124 L151 182 L111 196 L88 177 Z"
+                />
+                <path className="model-roof" d="M81 126 L106 99 L124 101 L155 120 L125 141 Z" />
+                <path
+                  className="model-house"
+                  d="M160 116 L196 101 L225 114 L225 184 L183 199 L162 180 Z"
+                />
+                <path className="model-roof" d="M151 113 L179 84 L195 87 L231 112 L193 135 Z" />
+                <g className="model-windows">
+                  <path d="M115 143 L144 132 L144 170 L115 181 Z M186 143 L217 132 L217 169 L186 181 Z" />
+                </g>
+                <g data-part="paper-shutters" fill="#dac8a9" stroke="#876f51" strokeWidth="1.2">
+                  <path d="M109 145l6-2v38l-6 2z M144 132l6-3v38l-6 3z M180 145l6-2v36l-6 2z M217 132l6-3v36l-6 3z" />
+                  <path
+                    d="M110 156l4-1 M110 168l4-1 M145 144l4-1 M145 156l4-1 M181 156l4-1 M181 168l4-1 M218 144l4-1 M218 156l4-1"
+                    fill="none"
+                  />
+                </g>
+              </g>
+            )}
             <path
               className="model-key"
               d="M249 191 L277 184 M270 179 Q288 165 288 181 Q288 198 272 191"

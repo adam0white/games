@@ -4,7 +4,12 @@ import { ObjectIllustration } from './ObjectIllustration';
 
 const Inspection3D = lazy(() => import('./inspection/Inspection3D'));
 class InspectionBoundary extends Component<
-  { object: ObjectView; children: ReactNode; onReady?: (ready: boolean) => void },
+  {
+    object: ObjectView;
+    children: ReactNode;
+    onReady?: (ready: boolean) => void;
+    result?: ReactNode;
+  },
   { failed: boolean }
 > {
   state = { failed: false };
@@ -16,7 +21,10 @@ class InspectionBoundary extends Component<
   }
   render() {
     return this.state.failed ? (
-      <ObjectIllustration object={this.props.object} />
+      <>
+        <ObjectIllustration object={this.props.object} />
+        {this.props.result}
+      </>
     ) : (
       this.props.children
     );
@@ -30,6 +38,7 @@ export const ObjectPresentation = memo(function ObjectPresentation({
   onReady,
   inHand,
   onViewChange,
+  result,
 }: {
   object: ObjectView;
   actions?: ActionView[];
@@ -38,6 +47,7 @@ export const ObjectPresentation = memo(function ObjectPresentation({
   onReady?: (ready: boolean) => void;
   inHand: boolean;
   onViewChange: (inHand: boolean) => void;
+  result?: ReactNode;
 }) {
   useEffect(() => {
     if (!inHand) onReady?.(false);
@@ -45,11 +55,12 @@ export const ObjectPresentation = memo(function ObjectPresentation({
   return (
     <div className={`object-presentation ${inHand ? 'in-hand' : ''}`}>
       {inHand ? (
-        <InspectionBoundary object={object} onReady={onReady}>
+        <InspectionBoundary object={object} onReady={onReady} result={result}>
           <Suspense
             fallback={
               <>
                 <ObjectIllustration object={object} />
+                {result}
                 <p className="inspection-hint" role="status">
                   Opening the 3D bench…
                 </p>
@@ -62,11 +73,15 @@ export const ObjectPresentation = memo(function ObjectPresentation({
               disabled={disabled}
               onAction={onAction}
               onReady={onReady}
+              result={result}
             />
           </Suspense>
         </InspectionBoundary>
       ) : (
-        <ObjectIllustration object={object} />
+        <>
+          <ObjectIllustration object={object} />
+          {result}
+        </>
       )}
       <button
         className="inspection-toggle"
@@ -74,7 +89,7 @@ export const ObjectPresentation = memo(function ObjectPresentation({
         onClick={() => onViewChange(!inHand)}
         aria-expanded={inHand}
       >
-        {inHand ? 'Use the illustrated bench' : 'Work on the 3D object'}
+        {inHand ? 'Use labelled diagram' : 'Use 3D bench'}
       </button>
     </div>
   );

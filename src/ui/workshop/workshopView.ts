@@ -125,6 +125,17 @@ export function workshopPlaces(view: GameView, journal = false): WorkshopPlace[]
       navigation: 'workboard',
       actionLabel: 'See return arrangements',
     });
+  if (view.roomFacts?.mechanicalCorner)
+    places.push({
+      id: 'sam-corner',
+      kind: 'people',
+      label: 'Sam’s corner',
+      detail: view.apprenticeObject
+        ? `Sam’s current work: ${view.apprenticeObject.title}. ${view.apprenticeObject.condition}`
+        : 'The separate work mat is clear.',
+      navigation: 'people',
+      actionLabel: 'See Sam’s agreed work',
+    });
   if (journal)
     places.push({ id: 'journal', kind: 'journal', label: 'Notebook', detail: 'Read your notes.' });
   return places;
@@ -144,6 +155,8 @@ export function isRoomTap(
 
 export interface WorkshopGeometry {
   focus: GameView['focus'];
+  mechanicalCorner: boolean;
+  apprenticeObject?: GameView['apprenticeObject'];
   shelf: (GameView['shelf'][number] & { awaitingCollection: boolean })[];
   showShelf: boolean;
   showParts: boolean;
@@ -167,6 +180,8 @@ function objectGeometry(object: NonNullable<GameView['focus']>): NonNullable<Gam
     casePresentation: object.casePresentation,
     trolleyPresentation: object.trolleyPresentation,
     personalPresentation: object.personalPresentation,
+    mechanicalPresentation: object.mechanicalPresentation,
+    shelfPresentation: object.shelfPresentation,
     title: '',
     owner: '',
     story: '',
@@ -179,6 +194,8 @@ function objectGeometry(object: NonNullable<GameView['focus']>): NonNullable<Gam
 export function workshopGeometry(view: GameView, journal: boolean): WorkshopGeometry {
   const places = workshopPlaces(view, journal);
   return {
+    mechanicalCorner: view.roomFacts?.mechanicalCorner ?? false,
+    apprenticeObject: view.apprenticeObject ? objectGeometry(view.apprenticeObject) : undefined,
     focus: view.focus ? objectGeometry(view.focus) : null,
     shelf: view.shelf.map(({ id, object }) => ({
       id,

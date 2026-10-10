@@ -75,7 +75,7 @@ it('offers adult customer work without a supervised or independent completion', 
   expect(current.getView(next).actions.some((a) => a.id === 'service-regular')).toBe(true);
 });
 
-it('offers a real finite watched intake and preserves its unlearned inspection until explanation', () => {
+it('offers a real finite watched intake and learns the actual inspection without mandatory explanation', () => {
   let s = withSam();
   const cash = s.workshop?.cash;
   const cells = s.parts.batteries;
@@ -98,9 +98,14 @@ it('offers a real finite watched intake and preserves its unlearned inspection u
     cue: 'intake',
     explained: false,
   });
-  expect(current.getView(s).actions.find((a) => a.id === 'explain-step')?.kind).toBe('primary');
+  expect(s.apprentice?.lastLesson?.learnedAutomatically).toBe(true);
+  expect(
+    rules().some((r) => r.action === 'inspect' && r.conditions.some((c) => c.value === 'intake')),
+  ).toBe(true);
+  expect(current.getView(s).actions.find((a) => a.id === 'explain-step')?.kind).toBe('quiet');
   s = act(s, 'test-battery');
-  expect(s.apprentice?.lastLesson?.step).toBe('inspect');
+  expect(s.apprentice?.lastLesson?.step).toBe('test-battery');
+  expect(s.apprentice?.lastLesson?.learnedAutomatically).toBe(true);
   s = act(s, 'explain-step');
   expect(
     rules().some((r) => r.action === 'inspect' && r.conditions.some((c) => c.value === 'intake')),
@@ -111,14 +116,12 @@ it('offers a real finite watched intake and preserves its unlearned inspection u
   expect(current.restoreGame(current.serializeGame(s))).toEqual(s);
 });
 
-it('taking over the recovery repair again neither farms a second intake nor blocks solo adult work', () => {
+it('finishing the recovery repair yourself neither farms a second intake nor blocks solo adult work', () => {
   let s = act(withSam(), 'recovery-learning-intake');
   const cash = s.workshop?.cash;
   const cells = s.parts.batteries;
-  s = act(s, 'supervised-repair');
-  expect(s.apprentice?.needsHelp).toBeTruthy();
+  expect(current.getView(s).actions.some((a) => a.id === 'supervised-repair')).toBe(false);
   expect(s.people.sam?.methods?.rules.some((rule) => rule.action === 'inspect')).toBe(false);
-  s = act(s, 'take-over-repair');
   for (const id of [
     'inspect',
     'clean-contact',
@@ -132,8 +135,8 @@ it('taking over the recovery repair again neither farms a second intake nor bloc
   expect(s.objects.find((o) => o.id === 'recovery-learning-light')).toMatchObject({
     location: 'returned',
     completedBy: 'player',
-    independent: false,
   });
+  expect(s.objects.find((o) => o.id === 'recovery-learning-light')?.independent).not.toBe(true);
   expect(s.apprentice?.supervisedCompleted).toBe(false);
   expect(s.parts.batteries).toBe(cells);
   expect(s.workshop?.cash).toBe(cash);

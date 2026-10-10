@@ -2,7 +2,19 @@ import { useId } from 'react';
 import type { WorkshopState } from '../game/workshop';
 
 /** The project shows only the work already done; no unseen condition is disclosed. */
-export function Cabinet({ stage, drawing }: { stage: WorkshopState['cabinet']; drawing: boolean }) {
+export function Cabinet({
+  stage,
+  drawing,
+  alignment,
+}: {
+  stage: WorkshopState['cabinet'];
+  drawing: boolean;
+  alignment?: {
+    position: 'original' | 'worse' | 'aligned';
+    door: 'open' | 'closed' | 'caught';
+    observation?: 'paper' | 'supported';
+  };
+}) {
   const titleId = useId();
   const hung = stage === 'hung' || stage === 'finished';
   return (
@@ -25,11 +37,23 @@ export function Cabinet({ stage, drawing }: { stage: WorkshopState['cabinet']; d
               <path className="cabinet-panel" d="M81 84 L151 84 L151 183 L81 183 Z" />
               <circle className="cabinet-knob" cx="153" cy="136" r="4" />
             </g>
-            <g className="cabinet-right-door">
+            <g
+              className="cabinet-right-door"
+              style={
+                alignment
+                  ? {
+                      transformOrigin: '260px 73px',
+                      transform: `rotate(${alignment.position === 'worse' ? 2.5 : alignment.position === 'original' ? 1 : 0}deg) scaleX(${alignment.door === 'open' ? 0.6 : alignment.door === 'caught' ? 0.92 : 1})`,
+                    }
+                  : undefined
+              }
+            >
               <path className="cabinet-door" d="M170 73 L260 73 L260 196 L170 196 Z" />
               <path className="cabinet-panel" d="M181 84 L249 84 L249 183 L181 183 Z" />
               <circle className="cabinet-knob" cx="179" cy="136" r="4" />
+              <path d="M251 90h12v10h-12z M251 167h12v10h-12z" fill="#978769" />
             </g>
+            {alignment?.observation === 'paper' && <path d="M166 76h5v42h-5z" fill="#ede2c8" />}
           </>
         ) : (
           <>

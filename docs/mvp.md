@@ -36,7 +36,7 @@ M1 implements only the first object's small diagnostic vocabulary, one repair me
 
 ## Teaching and first prestige
 
-The apprentice initially observes or assists. Demonstrations expose relevant observations and a bounded method, not privileged knowledge of hidden faults. Supervision offers correction and explanation. Existing HF instruction and observation support skill development; conditional method acquisition is a candidate new framework capability.
+The apprentice initially observes or assists. Demonstrations expose relevant observations and a bounded method, not privileged knowledge of hidden faults. Successful and unsuccessful witnessed work supplies outcome-grounded method evidence through released HF 2.2. Supervision offers correction, with optional discussion of useful distinctions. Attendance must cover the actual work; being invited is not observing. There is no mandatory explanation after each step.
 
 Use a small method vocabulary: inspect, test, repair, verify, and seek help or defer when evidence is insufficient. Procedures need conditional choices and termination, but not a universal planner or programming language.
 

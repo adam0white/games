@@ -128,6 +128,24 @@ export function createWorkshopModel(view: WorkshopGeometry) {
     root.add(object.root);
     resources.push({ dispose: object.dispose });
   }
+  if (view.mechanicalCorner) {
+    box(1.15, 0.15, 0.65, palette.wood, 0.25, 1.02, -1.62, 'sam-corner');
+    box(1.04, 0.025, 0.55, '#7b8793', 0.25, 1.11, -1.62, 'sam-corner');
+    for (const x of [-0.25, 0.75]) box(0.1, 1, 0.1, palette.edge, x, 0.5, -1.75, 'sam-corner');
+    label('SAM’S CORNER', 0.25, 1.05, -1.27, 1, 'sam-corner');
+    if (view.apprenticeObject) {
+      const model = createObjectModel(view.apprenticeObject, false);
+      fitWorkshopObject(model.root, new Vector3(0.25, 1.14, -1.62), new Vector3(0.98, 0.75, 0.51));
+      model.root.traverse((node) => {
+        if (node instanceof Mesh) {
+          node.userData.placeId = 'sam-corner';
+          targets.push(node);
+        }
+      });
+      root.add(model.root);
+      resources.push({ dispose: model.dispose });
+    }
+  }
   const unfinished = view.shelf.filter((item) => !item.awaitingCollection);
   const checked = view.shelf.filter((item) => item.awaitingCollection);
   if (view.showShelf) {

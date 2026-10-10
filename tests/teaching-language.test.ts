@@ -6,8 +6,15 @@ it('describes demonstrated work in ordinary language and Sam returns his own lam
   const state = earnedHandoff();
   const words = getView(state).journal ?? getView(state).conversation;
   expect(
-    words.some(
-      (line) => line.speaker === 'Sam' && line.text.includes('trying a known-good battery'),
+    state.objects
+      .find((object) => object.id === 'lesson-battery')
+      ?.observations.some((observation) => observation.includes('known-good battery')),
+  ).toBe(true);
+  expect(
+    state.people.sam?.methods?.rules.some(
+      (rule) =>
+        rule.action === 'test-battery' &&
+        rule.evidence.some((evidence) => evidence.sourceId === 'player'),
     ),
   ).toBe(true);
   expect(
@@ -15,8 +22,7 @@ it('describes demonstrated work in ordinary language and Sam returns his own lam
       (line) =>
         line.speaker === 'Sam' &&
         (line.text.includes('My spare table lamp can go back where I keep it') ||
-          line.text ===
-            'I’m back. Thanks for keeping it safely labelled — I can take it home now.'),
+          (line.text.includes('read your note') && line.text.includes('picked up my lamp'))),
     ),
   ).toBe(true);
   expect(state.objects.find((object) => object.id === 'lesson-battery')?.location).toBe('returned');

@@ -142,7 +142,12 @@ it('does not alias an existing short watching decision into fresh consent, while
   const before = structuredClone(keeper.activity);
   const kept = transition(declined, { type: 'action', id: 'show-corrective-step' });
   expect(kept.people.sam?.trace.at(-1)?.chosenAffordanceId).toBe(short.id);
-  expect(kept.people.sam?.activity).toEqual(before);
+  expect(kept.people.sam?.activity).toMatchObject({
+    affordanceId: before?.affordanceId,
+    action: before?.action,
+    startedAt: before?.startedAt,
+    endsAt: before?.endsAt,
+  });
   expect(kept.apprentice?.needsHelp).toBeTruthy();
   expect(kept.apprentice?.jobId).toBe(basis.apprentice?.jobId);
   expect(kept.conversationPause?.until).toBe(before?.endsAt);

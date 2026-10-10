@@ -1,0 +1,239 @@
+{
+  "seed": 1701,
+  "sha256": "be22b6eca151912f007f96377c0439c648b450530f625b74e4dd219cbbc5124b",
+  "inputCount": 33,
+  "journalCount": 55,
+  "inputs": [
+    {
+      "at": 840,
+      "input": {
+        "type": "action",
+        "id": "talk-family"
+      }
+    },
+    {
+      "at": 844,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 848,
+      "input": {
+        "type": "action",
+        "id": "replace-battery"
+      }
+    },
+    {
+      "at": 860,
+      "input": {
+        "type": "action",
+        "id": "clean-contact"
+      }
+    },
+    {
+      "at": 872,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 875,
+      "input": {
+        "type": "action",
+        "id": "early-return"
+      }
+    },
+    {
+      "at": 879,
+      "input": {
+        "type": "action",
+        "id": "talk-garage"
+      }
+    },
+    {
+      "at": 883,
+      "input": {
+        "type": "action",
+        "id": "leave-school-holiday"
+      }
+    },
+    {
+      "at": 527580,
+      "input": {
+        "type": "action",
+        "id": "leave-school-holiday"
+      }
+    },
+    {
+      "at": 1053180,
+      "input": {
+        "type": "action",
+        "id": "leave-school-holiday"
+      }
+    },
+    {
+      "at": 1578780,
+      "input": {
+        "type": "action",
+        "id": "leave-school-holiday"
+      }
+    },
+    {
+      "at": 2104380,
+      "input": {
+        "type": "action",
+        "id": "service-begin"
+      }
+    },
+    {
+      "at": 2104385,
+      "input": {
+        "type": "action",
+        "id": "service-favours"
+      }
+    },
+    {
+      "at": 2104390,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2104740,
+      "input": {
+        "type": "action",
+        "id": "service-hear-leila"
+      }
+    },
+    {
+      "at": 2104745,
+      "input": {
+        "type": "action",
+        "id": "service-decline-leila"
+      }
+    },
+    {
+      "at": 2104750,
+      "input": {
+        "type": "action",
+        "id": "service-next-day"
+      }
+    },
+    {
+      "at": 2105820,
+      "input": {
+        "type": "action",
+        "id": "service-next-day"
+      }
+    },
+    {
+      "at": 2107260,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2107480,
+      "input": {
+        "type": "action",
+        "id": "service-hear-nora"
+      }
+    },
+    {
+      "at": 2107485,
+      "input": {
+        "type": "action",
+        "id": "service-decline-nora"
+      }
+    },
+    {
+      "at": 2107490,
+      "input": {
+        "type": "action",
+        "id": "service-next-day"
+      }
+    },
+    {
+      "at": 2108700,
+      "input": {
+        "type": "action",
+        "id": "service-next-day"
+      }
+    },
+    {
+      "at": 2110140,
+      "input": {
+        "type": "action",
+        "id": "service-close-small"
+      }
+    },
+    {
+      "at": 2110140,
+      "input": {
+        "type": "action",
+        "id": "wait-conversation-activity"
+      }
+    },
+    {
+      "at": 2110160,
+      "input": {
+        "type": "action",
+        "id": "service-close-small"
+      }
+    },
+    {
+      "at": 2110170,
+      "input": {
+        "type": "action",
+        "id": "operations-begin"
+      }
+    },
+    {
+      "at": 2110175,
+      "input": {
+        "type": "action",
+        "id": "operations-route-private"
+      }
+    },
+    {
+      "at": 2110180,
+      "input": {
+        "type": "action",
+        "id": "operations-close-private-period"
+      }
+    },
+    {
+      "at": 2110185,
+      "input": {
+        "type": "action",
+        "id": "operations-next-period"
+      }
+    },
+    {
+      "at": 2153340,
+      "input": {
+        "type": "action",
+        "id": "operations-route-private"
+      }
+    },
+    {
+      "at": 2153345,
+      "input": {
+        "type": "action",
+        "id": "operations-close-private-period"
+      }
+    },
+    {
+      "at": 2153350,
+      "input": {
+        "type": "action",
+        "id": "operations-next-period"
+      }
+    }
+  ]
+}

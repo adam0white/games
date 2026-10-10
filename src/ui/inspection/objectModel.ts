@@ -24,12 +24,22 @@ import {
 } from 'three';
 import type { ObjectView } from '../../game/types';
 import type { RepairTarget } from '../repairBindings';
+import { createFoldingShelfModel } from './foldingShelf';
+import { createLabelStandModel } from './labelStand';
 
 export function createObjectModel(
   object: ObjectView,
   showKnownParts = false,
   exposedTargets: readonly RepairTarget[] = [],
 ) {
+  if (object.appearance === 'label-stand' || object.appearance === 'display-carousel')
+    return createLabelStandModel(
+      { ...object, appearance: object.appearance },
+      showKnownParts,
+      exposedTargets,
+    );
+  if (object.appearance === 'folding-shelf')
+    return createFoldingShelfModel(object.shelfPresentation, exposedTargets);
   const root = new Group();
   const operatingParts: { mesh: Mesh; x: number }[] = [];
   const assembly = object.assembly;
@@ -123,6 +133,7 @@ export function createObjectModel(
     object.form === 'trolley'
       ? 'trolley'
       : (object.appearance ?? (object.form === 'lamp' ? 'reading' : object.form));
+  const localBoxMechanism = appearance === 'box' && object.id !== 'nora-sample-case';
   const lit =
     !opened &&
     (object.progress === 'repaired' || object.progress === 'checked') &&
@@ -380,7 +391,20 @@ export function createObjectModel(
     const lidMat = material('#c5a77e', 0, 0.86);
     box(1.5, 0.76, 1, wood, 0, 0.46);
     box(1.56, 0.1, 1.06, lidMat, 0, 0.9);
-    box(0.18, 0.2, 0.04, brass, 0, 0.86, 0.535);
+    const catchPlate = box(0.18, 0.13, 0.04, brass, 0, 0.88, 0.555);
+    catchPlate.name = 'box-catch';
+    catchPlate.userData.repairTarget = 'mechanism';
+    const keeper = box(
+      0.12,
+      0.09,
+      0.045,
+      brass,
+      object.catchPresentation?.observed === 'keeper-rubs' ? 0.075 : 0,
+      0.765,
+      0.56,
+    );
+    keeper.name = 'box-keeper';
+    keeper.userData.repairTarget = 'mechanism';
     for (const x of [-0.43, 0.43]) {
       const hinge = cylinder(0.035, 0.2, brass, x, 0.87, -0.52);
       hinge.rotation.z = Math.PI / 2;
@@ -424,59 +448,127 @@ export function createObjectModel(
     const base = box(2.12, 0.11, 1.2, wood, 0, 0.08);
     base.name = 'paper-street-base';
     base.userData.repairTarget = 'support';
-    for (const [x, height] of [
-      [-0.52, 0.65],
-      [0.42, 0.82],
-    ]) {
+    const frontages = updated
+      ? [
+          [-0.68, 0.68],
+          [0, 0.78],
+          [0.68, 0.66],
+        ]
+      : [
+          [-0.52, 0.65],
+          [0.42, 0.82],
+        ];
+    for (const [index, [x, height]] of frontages.entries()) {
       const houseHeight = height ?? 0.65;
       const houseX = x ?? 0;
-      const house = box(0.64, houseHeight, 0.58, paper, houseX, houseHeight / 2 + 0.14);
+      const width = updated ? 0.58 : 0.74;
+      const house = box(width, houseHeight, 0.58, paper, houseX, houseHeight / 2 + 0.14);
       house.userData.repairTarget = 'frontage';
-      const shape = new Shape();
-      shape.moveTo(-0.38, 0);
-      shape.lineTo(0, 0.35);
-      shape.lineTo(0.38, 0);
-      shape.closePath();
-      add(
-        new ExtrudeGeometry(shape, { depth: 0.68, bevelEnabled: false }),
-        roofMat,
-        houseX,
-        houseHeight + 0.14,
-        -0.34,
-      );
-      for (const offset of updated ? [-0.18, 0.18] : [-0.15, 0.15]) {
-        const pane = box(
-          updated ? 0.095 : 0.13,
-          updated ? 0.24 : 0.18,
-          0.015,
-          window,
-          houseX + offset,
-          houseHeight * 0.62 + 0.14,
-          0.3,
+      if (!updated) {
+        const shape = new Shape();
+        shape.moveTo(-0.42, 0);
+        shape.lineTo(0, 0.3);
+        shape.lineTo(0.42, 0);
+        shape.closePath();
+        add(
+          new ExtrudeGeometry(shape, { depth: 0.68, bevelEnabled: false }),
+          roofMat,
+          houseX,
+          houseHeight + 0.14,
+          -0.34,
         );
-        pane.userData.repairTarget = 'frontage';
+      } else {
+        box(width + 0.045, 0.055, 0.68, roofMat, houseX, houseHeight + 0.15, 0);
       }
-      const panel = box(
-        0.62,
-        houseHeight * 0.38,
-        0.023,
-        material(updated ? '#9daf98' : '#c9aa80', 0, 0.94),
+      const front = box(
+        width - 0.015,
+        houseHeight - 0.02,
+        0.025,
+        material(
+          updated ? (['#8e9c89', '#d7baa0', '#8b9ba0'][index] ?? '#d7baa0') : '#c9aa80',
+          0,
+          0.94,
+        ),
         houseX,
-        houseHeight * 0.24 + 0.16,
+        houseHeight / 2 + 0.14,
         0.315,
       );
-      panel.name = updated ? 'updated-removable-front' : 'remembered-original-front';
-      panel.userData.repairTarget = 'frontage';
-      const door = box(
-        updated ? 0.095 : 0.16,
-        houseHeight * 0.3,
-        0.032,
-        darkMetal,
-        houseX + 0.02,
-        houseHeight * 0.21 + 0.15,
-        0.34,
-      );
-      door.userData.repairTarget = 'frontage';
+      front.name = updated ? 'updated-removable-front' : 'remembered-original-front';
+      front.userData.repairTarget = 'frontage';
+      if (!updated) {
+        const pane = box(
+          0.46,
+          houseHeight * 0.48,
+          0.02,
+          window,
+          houseX,
+          houseHeight * 0.52 + 0.14,
+          0.346,
+        );
+        pane.name = 'remembered-wide-shop-window';
+        pane.userData.repairTarget = 'frontage';
+        for (const side of [-1, 1]) {
+          const shutter = box(
+            0.095,
+            houseHeight * 0.52,
+            0.022,
+            paper,
+            houseX + side * 0.285,
+            houseHeight * 0.52 + 0.14,
+            0.385,
+          );
+          shutter.name = 'remembered-paper-shutter';
+          shutter.rotation.y = side * 0.46;
+          shutter.userData.repairTarget = 'operation';
+          for (const y of [-0.09, 0, 0.09])
+            box(
+              0.085,
+              0.009,
+              0.008,
+              wood,
+              houseX + side * 0.285,
+              houseHeight * 0.52 + 0.14 + y,
+              0.402,
+            );
+        }
+        box(0.58, 0.045, 0.11, roofMat, houseX, houseHeight * 0.8 + 0.16, 0.385).rotation.x = 0.13;
+      } else if (index === 0) {
+        const door = box(0.24, 0.5, 0.025, darkMetal, houseX - 0.085, 0.39, 0.345);
+        door.name = 'updated-repair-door';
+        door.userData.repairTarget = 'frontage';
+        box(0.11, 0.1, 0.018, window, houseX - 0.085, 0.52, 0.363);
+        box(0.025, 0.025, 0.03, brass, houseX + 0.005, 0.35, 0.372);
+        box(0.16, 0.09, 0.018, paper, houseX + 0.13, 0.51, 0.354);
+      } else if (index === 1) {
+        const pane = box(0.44, 0.41, 0.02, window, houseX, 0.48, 0.345);
+        pane.name = 'updated-nora-sample-window';
+        pane.userData.repairTarget = 'frontage';
+        for (const [offset, color] of [
+          [-0.14, '#bf765e'],
+          [0, '#a7b092'],
+          [0.14, '#b29aa6'],
+        ] as const)
+          box(0.105, 0.17, 0.02, material(color, 0, 0.98), houseX + offset, 0.38, 0.364);
+        box(0.48, 0.035, 0.07, wood, houseX, 0.265, 0.37);
+      } else {
+        box(0.43, 0.44, 0.02, darkMetal, houseX, 0.37, 0.345);
+        for (const side of [-1, 1]) {
+          const gate = box(
+            0.195,
+            0.43,
+            0.025,
+            material('#9daa9b', 0, 0.94),
+            houseX + side * 0.105,
+            0.375,
+            0.37,
+          );
+          gate.name = 'updated-paper-delivery-gate';
+          gate.rotation.y = side * 0.2;
+          gate.userData.repairTarget = 'operation';
+          for (const y of [0.22, 0.36, 0.5])
+            box(0.18, 0.012, 0.008, wood, houseX + side * 0.105, y, 0.39);
+        }
+      }
     }
     if (personal?.support === 'fitted') {
       for (const x of [-0.73, 0.73]) {
@@ -659,7 +751,7 @@ export function createObjectModel(
     if (workTargets.has('cap')) attach(cylinder(0.22, 0.16, steel, 0.65, 0.16, 0.75), 'cap');
   }
   // The complete mechanism is the honest target when internal geometry is not authored.
-  if (workTargets.has('mechanism'))
+  if (workTargets.has('mechanism') && !localBoxMechanism)
     root.traverse((child) => {
       if (child instanceof Mesh && !child.userData.repairTarget) attach(child, 'mechanism');
     });
@@ -687,7 +779,10 @@ export function createObjectModel(
       for (const mesh of hitRegions) {
         const mat = mesh.material;
         if (mat instanceof MeshStandardMaterial) {
-          const whole = target === 'shell' || target === 'operation' || target === 'mechanism';
+          const whole =
+            target === 'shell' ||
+            target === 'operation' ||
+            (target === 'mechanism' && !localBoxMechanism);
           const selected = whole || mesh.userData.repairTarget === target;
           if (selected) mat.emissive.set('#274a35');
           else mat.emissive.copy(mesh.userData.restingEmissive);

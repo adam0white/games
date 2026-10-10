@@ -78,6 +78,13 @@ it('joint cabinet work respects current refusal, retains each stage, and reveals
   expect(s.workshop?.cabinet).toBe('measured');
   act(s, 'workshop-cabinet-hang');
   act(s, 'workshop-cabinet-align');
+  for (const id of [
+    'workshop-cabinet-try-close',
+    'workshop-cabinet-paper',
+    'workshop-cabinet-upper',
+    'workshop-cabinet-check',
+  ])
+    act(s, id, { ...adult, cabinetSessionActive: true, cabinetCanContinue: () => true });
   const drawings = act(s, 'workshop-drawings');
   expect(drawings?.lines.some((line) => line.text.includes('folded paper roofs'))).toBe(true);
   expect(drawings?.lines.some((line) => line.text.includes('shade-clearance'))).toBe(false);

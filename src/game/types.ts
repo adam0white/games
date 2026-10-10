@@ -1,9 +1,13 @@
 import type { Person } from '@adam0white/human-framework';
+import type { EveningTableState, eveningView } from './evening-table';
+import type { GateWalkState, gateWalkView } from './gate-walk';
+import type { MechanicalDisplay, MechanicalPresentation } from './mechanical-display';
 import type { NeighbourhoodState } from './neighbourhood';
 import type { getOperationsView, OperationsState } from './operations';
 import type { PersonalProjectPresentation } from './personal-project';
 import type { RepairAccess } from './repair-access';
 import type { CaseFittings, RepairCue } from './repairs';
+import type { SaturdayWindowState, saturdayView } from './saturday-window';
 import type { ServiceWeekState } from './service-week';
 import type { WorkshopState } from './workshop';
 
@@ -25,6 +29,7 @@ export type Chapter = 'family' | 'bench' | 'later' | 'garage';
 export type GameInput = { type: 'action'; id: string } | { type: 'select'; id: string };
 
 export interface RepairObject {
+  mechanicalDisplay?: MechanicalDisplay;
   access?: RepairAccess;
   id: string;
   title: string;
@@ -50,10 +55,13 @@ export interface RepairObject {
     | 'bell'
     | 'box'
     | 'clip'
-    | 'model';
+    | 'model'
+    | 'label-stand'
+    | 'display-carousel'
+    | 'folding-shelf';
   form: 'lamp' | 'torch' | 'timer' | 'bell' | 'box' | 'clip' | 'trolley';
   fault: Fault;
-  location: 'bench' | 'shelf' | 'returned';
+  location: 'bench' | 'shelf' | 'returned' | 'saturday-window' | 'home-table' | 'gate-path';
   observations: string[];
   evidence?: RepairCue[];
   inspected: boolean;
@@ -74,6 +82,15 @@ export interface RepairObject {
   }[];
   checkStarted?: number;
   awaitingCollection?: boolean;
+  readyCollection?: {
+    labelledAt: number;
+    ownerId: string;
+    goalId?: string;
+    repairCounted: boolean;
+    /** An owner's actual pickup, never a receipt merely for setting the item aside. */
+    pickupStartedAt?: number;
+    pickupEndsAt?: number;
+  };
   collectedAt?: number;
   returnedEarly?: boolean;
   callbackAt?: number;
@@ -95,6 +112,9 @@ export interface LoggedInput {
 }
 
 export interface GameState {
+  gateWalk?: GateWalkState;
+  eveningTable?: EveningTableState;
+  saturdayWindow?: SaturdayWindowState;
   operationsPurposeIds?: Record<string, string>;
   operations?: OperationsState;
   conversationPause?: {
@@ -135,6 +155,7 @@ export interface GameState {
       success: boolean;
       eventId: string;
       explained: boolean;
+      learnedAutomatically?: boolean;
     };
   };
   samPlans?: {
@@ -188,6 +209,11 @@ export interface ActionView {
 }
 
 export interface ObjectView {
+  catchPresentation?: {
+    observed: 'keeper-rubs' | 'hinge-stiff-clear' | 'mechanism-working';
+  };
+  shelfPresentation?: ReturnType<typeof saturdayView>['shelfObject']['shelfPresentation'];
+  mechanicalPresentation?: MechanicalPresentation;
   personalPresentation?: PersonalProjectPresentation;
   trolleyPresentation?: {
     intervention?: 'wheel-aligned' | 'strap-secured';
@@ -221,11 +247,32 @@ export interface ObjectView {
     | 'bell'
     | 'box'
     | 'clip'
-    | 'model';
+    | 'model'
+    | 'label-stand'
+    | 'display-carousel'
+    | 'folding-shelf';
 }
 
 export interface GameView {
-  roomFacts?: { intakeSpace: boolean; checkingPlaces: number; storeCratesAtBench: boolean };
+  gateWalk?: ReturnType<typeof gateWalkView> & { torchObject?: ObjectView };
+  eveningTable?: ReturnType<typeof eveningView> & {
+    modelObject?: ObjectView;
+    lampObject?: ObjectView;
+  };
+  saturdayWindow?: ReturnType<typeof saturdayView>;
+  workCompanion?: {
+    state: 'watching' | 'away' | 'working' | 'present';
+    name: 'Sam';
+    detail: string;
+    departure?: string;
+  };
+  apprenticeObject?: ObjectView;
+  roomFacts?: {
+    mechanicalCorner?: boolean;
+    intakeSpace: boolean;
+    checkingPlaces: number;
+    storeCratesAtBench: boolean;
+  };
   operations?: ReturnType<typeof getOperationsView>;
   chapterFlow?: {
     stage: 'school' | 'workshop' | 'service';
@@ -233,7 +280,11 @@ export interface GameView {
     period: string;
     tutorial: boolean;
   };
-  workshopCabinet?: { stage: 'looked' | 'measured' | 'hung' | 'finished'; detail: string };
+  workshopCabinet?: {
+    stage: 'looked' | 'measured' | 'hung' | 'finished';
+    detail: string;
+    alignment?: import('./cabinet-alignment').CabinetAlignmentView;
+  };
   chapterClosure?: { sourcekey: string; title: string; detail: string; outcomes: string[] };
   milestone?: { sourcekey: string; title: string; detail: string };
   knownAppointments?: { personId: string; name: string; at: number; detail: string }[];

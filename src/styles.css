@@ -1663,3 +1663,165 @@ summary:focus-visible {
     font-size: 1.4rem;
   }
 }
+
+/* Attendance belongs beside the work, not inside a separate people menu. */
+.work-companion {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line, #c6baa3);
+  border-left: 4px solid #8d877b;
+  border-radius: 0.45rem;
+  background: color-mix(in srgb, var(--paper, #f5efe2) 92%, #8d877b);
+}
+.work-companion--watching {
+  border-left-color: #587355;
+}
+.work-companion--working {
+  border-left-color: #627887;
+}
+.work-companion-mark {
+  line-height: 1.4;
+  color: #657158;
+}
+.work-companion strong {
+  display: block;
+  font-size: 1rem;
+}
+.work-companion p {
+  margin: 0.3rem 0 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.work-companion-departure {
+  font-style: italic;
+}
+
+.saturday-scene {
+  margin: 1rem 0 1.5rem;
+}
+.saturday-view {
+  position: relative;
+  min-height: 230px;
+  padding: 3rem 1.5rem 1rem;
+  overflow: hidden;
+  background: #dfd0b3;
+  border: 1px solid #b9a486;
+  border-radius: 0.4rem;
+}
+.saturday-window-frame {
+  position: absolute;
+  inset: 14px 22px 35px;
+  border: 10px solid #b29a72;
+  background: #f1dfae;
+  box-shadow: inset 0 0 0 2px #8a795c;
+}
+.saturday-window-frame i:first-child {
+  position: absolute;
+  left: 49%;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background: #b29a72;
+}
+.saturday-window-frame i:last-child {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 30%;
+  height: 6px;
+  background: #b29a72;
+}
+.saturday-view--garage .saturday-window-frame {
+  inset: 15px 45% 60px 20px;
+  opacity: 0.55;
+}
+.saturday-display {
+  position: relative;
+  z-index: 1;
+  min-height: 155px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1.5rem;
+  border-bottom: 12px solid #9d7953;
+}
+.saturday-kept {
+  width: min(140px, 35%);
+  text-align: center;
+  padding-bottom: 0.7rem;
+}
+.saturday-kept svg {
+  width: 100%;
+  display: block;
+}
+.saturday-kept span {
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: #453b2c;
+  background: #eee2c8;
+  padding: 0.2rem;
+}
+.saturday-caption {
+  margin: 0.8rem 0 0.3rem;
+  line-height: 1.6;
+}
+.saturday-visitor {
+  margin: 0.4rem 0;
+  font-style: italic;
+}
+
+.companion-choice {
+  margin-top: 0.7rem;
+}
+.companion-choice button {
+  width: auto;
+}
+.saturday-preparation {
+  margin: 0 0 1.25rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--line, #c6baa3);
+  border-radius: 0.5rem;
+}
+.saturday-preparation h2 {
+  margin: 0.3rem 0 0.7rem;
+}
+.saturday-preparation p {
+  line-height: 1.55;
+  margin: 0.5rem 0;
+}
+.saturday-preparation dl {
+  margin: 0.7rem 0 0;
+}
+.saturday-preparation dl > div {
+  display: grid;
+  grid-template-columns: 6rem 1fr;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+.saturday-preparation dt {
+  opacity: 0.7;
+}
+.saturday-preparation dd {
+  margin: 0;
+}
+.saturday-before-leaving {
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--line, #c6baa3);
+}
+.saturday-before-leaving ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.saturday-sample {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.7rem;
+  font-size: 0.85rem;
+}

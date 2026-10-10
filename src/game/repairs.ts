@@ -1,3 +1,10 @@
+import {
+  completeMechanicalWork,
+  type MechanicalItem,
+  type MechanicalStep,
+  mechanicalMinutes,
+  mechanicalSteps,
+} from './mechanical-display';
 /** Fictional low-voltage repair rules owned by the host. Evidence is a visible
  * observation, never a latent fault label. Manual work and apprentice work use
  * these same tests, materials and success rules. */
@@ -13,6 +20,7 @@ import {
 import type { Fault, GameState, RepairObject } from './types';
 
 export type RepairStep =
+  | MechanicalStep
   | 'inspect'
   | 'test-catch'
   | 'adjust-catch'
@@ -29,6 +37,15 @@ export type RepairStep =
   | 'clear-trolley-rub'
   | 'check-trolley-route';
 export type RepairCue =
+  | 'mechanical-intake'
+  | 'mechanical-empty'
+  | 'mechanical-loaded'
+  | 'mechanical-access'
+  | 'mechanical-obstruction'
+  | 'mechanical-missing'
+  | 'mechanical-refit'
+  | 'mechanical-circuit'
+  | 'mechanical-checked'
   | 'intake'
   | 'needs-test'
   | 'battery-steady'
@@ -53,6 +70,26 @@ export type RepairCue =
   | 'trolley-rubs'
   | 'trolley-rolls';
 export function cueFor(item: RepairObject, now: number): RepairCue {
+  if (item.mechanicalDisplay) {
+    const m = item.mechanicalDisplay;
+    return item.verified
+      ? 'mechanical-checked'
+      : !item.inspected
+        ? 'mechanical-intake'
+        : !m.emptyObserved
+          ? 'mechanical-empty'
+          : !m.loadedObserved
+            ? 'mechanical-loaded'
+            : m.tray === 'fitted' && m.observed === 'unknown'
+              ? 'mechanical-access'
+              : m.observed === 'missing-drive-part'
+                ? 'mechanical-missing'
+                : m.tray === 'removed'
+                  ? m.cleared
+                    ? 'mechanical-refit'
+                    : 'mechanical-obstruction'
+                  : 'mechanical-circuit';
+  }
   if (item.verified) return 'checked';
   if (item.checkStarted !== undefined)
     return now - item.checkStarted >= verificationMinutes(item) ? 'check-ready' : 'check-running';
@@ -64,6 +101,12 @@ export function inspectRepair(
   actor: 'player' | 'sam' = 'player',
   at = 0,
 ): string {
+  if (item.mechanicalDisplay) {
+    item.inspected = true;
+    return item.appearance === 'display-carousel'
+      ? 'Evan’s four parts cards face outward. A turn of the removable tray brings each one to the front; there is a narrow gap above the fixed rim. Compare its motion with the cards removed and fitted. The spring casing stays closed.'
+      : 'A removable tray carries the same four cards above an accessible rim. Compare empty and loaded motion before lifting the tray. The enclosed spring stays closed.';
+  }
   const newlyOpened = accessKind(item) && item.access?.state !== 'open';
   if (accessKind(item)) openAccess(item, actor, at, 'inspect', 4);
   const observation = inspectAccessibleRepair(item);
@@ -679,3 +722,38 @@ export function performKettleLampUseCheck(
   item.evidence.push('checked');
   return 'After the longer electrical run, you spend six minutes positioning the shade beside the kettle, moving and switching the lamp, and checking from the stair doorway. The kettle surface stays lit and the shade keeps the light off the stairs.';
 }
+
+export function mechanicalItem(item: RepairObject): MechanicalItem {
+  if (!item.mechanicalDisplay) throw Error('No mechanical display');
+  return {
+    id: item.id,
+    appearance: item.appearance === 'display-carousel' ? 'display-carousel' : 'label-stand',
+    mechanicalCause: item.fault === 'gear' ? 'missing-drive-part' : 'rim-obstruction',
+    mechanicalDisplay: item.mechanicalDisplay,
+  };
+}
+export function completeDisplayStep(
+  item: RepairObject,
+  step: MechanicalStep,
+  actor: 'player' | 'sam',
+  at: number,
+) {
+  const result = completeMechanicalWork(mechanicalItem(item), {
+    objectId: item.id,
+    action: step,
+    actor,
+    at,
+    minutes: mechanicalMinutes[step],
+    completed: true,
+    attended: true,
+  });
+  item.mechanicalDisplay = result.next;
+  item.verified = result.verified;
+  item.repaired = result.next.cleared;
+  if (step === 'clear-obstruction' && result.performed) item.attempted++;
+  return {
+    text: result.lines.join(' '),
+    succeeded: result.performed && !result.deferred && (step !== 'check-result' || result.verified),
+  };
+}
+export { mechanicalMinutes, mechanicalSteps };

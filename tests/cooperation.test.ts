@@ -1,6 +1,7 @@
 import { createPerson } from '@adam0white/human-framework';
 import { expect, it } from 'vitest';
 import { createGame, getView, restoreGame, serializeGame } from '../src/game/engine';
+import { finishCabinetAlignment } from './support/cabinet-route';
 import { earnedHandoff } from './support/earned-handoff';
 import { choose } from './support/school-route';
 
@@ -59,11 +60,7 @@ it('a joint cabinet step cannot silently run through Dad’s known hardware-shop
 it('actual public cabinet work remains replayable after a genuine school-and-apprentice route', () => {
   let s = earnedHandoff();
   s = choose(s, 'workshop-cabinet-look');
-  for (const action of [
-    'workshop-cabinet-measure',
-    'workshop-cabinet-hang',
-    'workshop-cabinet-align',
-  ]) {
+  for (const action of ['workshop-cabinet-measure', 'workshop-cabinet-hang']) {
     for (let n = 0; n < 100; n++) {
       const stage = s.workshop?.cabinet;
       if (!getView(s).actions.some((a) => a.id === action)) s = choose(s, 'rest');
@@ -72,6 +69,7 @@ it('actual public cabinet work remains replayable after a genuine school-and-app
       s = choose(s, s.now % 1440 >= 21 * 60 ? 'next-day' : 'rest');
     }
   }
+  s = finishCabinetAlignment(s);
   expect(s.workshop?.cabinet).toBe('finished');
   expect(restoreGame(serializeGame(s))).toEqual(s);
 });

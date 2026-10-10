@@ -19,7 +19,9 @@ function arrange(s: GameState): GameState {
     if (
       s.apprentice?.arranged &&
       s.now < s.apprentice.visitUntil &&
-      s.people.sam?.activity?.action === 'learn'
+      (s.apprentice.jobId ||
+        s.apprentice.completedJobIds.length ||
+        s.people.sam?.activity?.action === 'learn')
     )
       return s;
     s = positiveAction(s, has(s, 'wait-person') ? 'wait-person' : 'next-day');
@@ -27,12 +29,13 @@ function arrange(s: GameState): GameState {
   throw Error('No actual watching agreement reached');
 }
 
-export function earnedHandoff(eagerSchoolRoute = false, seed = 42): GameState {
+export function earnedHandoff(eagerSchoolRoute = false, seed = 42, readSamNote = false): GameState {
   let s = opening(seed);
   for (let n = 0; n < 150 && !s.campaign?.graduated; n++)
     s = positiveAction(s, nextSchoolAction(s, eagerSchoolRoute));
   expect(s.campaign?.graduated).toBe(true);
   expect(s.unlocked).not.toContain('story:observer-invite');
+  if (readSamNote) s = positiveAction(s, 'read-sam-afternoon-note');
   s = waitFor(s, 'observer-invite');
   expect(getView(s).actions.find((a) => a.id === 'observer-invite')?.kind).toBe('primary');
   s = positiveAction(s, 'observer-invite');
@@ -47,22 +50,17 @@ export function earnedHandoff(eagerSchoolRoute = false, seed = 42): GameState {
     s = positiveAction(s, 'learning-light');
     for (const id of ['inspect', 'test-battery']) {
       s = positiveAction(s, id);
-      if (has(s, 'explain-step')) s = positiveAction(s, 'explain-step');
     }
     const tired = getView(s).focus?.observations.some((text) =>
       text.includes('old battery is tired'),
     );
     s = positiveAction(s, tired ? 'replace-battery' : 'clean-contact');
-    s = positiveAction(s, 'explain-step');
     s = positiveAction(s, 'verify');
-    if (has(s, 'explain-step')) s = positiveAction(s, 'explain-step');
     for (let waits = 0; waits < 80 && has(s, 'wait-check'); waits++) {
       s = positiveAction(s, 'wait-check');
-      if (has(s, 'explain-step')) s = positiveAction(s, 'explain-step');
     }
     for (const id of ['check-result', 'return']) {
       s = positiveAction(s, id);
-      if (has(s, 'explain-step')) s = positiveAction(s, 'explain-step');
     }
   }
   s = arrange(s);
@@ -79,7 +77,7 @@ export function earnedHandoff(eagerSchoolRoute = false, seed = 42): GameState {
     else if (has(s, 'arrange-learning')) s = arrange(s);
     else s = waitForPublicAttendance(s);
   }
-  expect(s.apprentice?.supervisedCompleted).toBe(true);
+  expect(s.apprentice?.supervisedCompleted, getView(s).apprenticeship?.activity).toBe(true);
   s = positiveAction(waitFor(arrange(s), 'independent-intake'), 'independent-intake');
   for (let n = 0; n < 80 && s.apprentice?.jobId; n++) {
     if (has(s, 'watch-sam')) s = positiveAction(s, 'watch-sam');

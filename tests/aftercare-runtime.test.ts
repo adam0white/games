@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { getView, restoreGame, serializeGame } from '../src/game/engine';
 import type { GameState } from '../src/game/types';
+import { finishCabinetAlignment } from './support/cabinet-route';
 import { earnedHandoff } from './support/earned-handoff';
 import { completePublicAction, positiveAction } from './support/public-attendance';
 import { choose } from './support/school-route';
@@ -38,13 +39,13 @@ it('actual cabinet aftercare starts and finishes joined talk, leaves bench contr
   for (const [id, stage] of [
     ['workshop-cabinet-measure', 'measured'],
     ['workshop-cabinet-hang', 'hung'],
-    ['workshop-cabinet-align', 'finished'],
   ] as const) {
     for (let n = 0; n < 120 && s.workshop?.cabinet !== stage; n++) {
       s = has(s, id) ? choose(s, id) : choose(s, 'rest');
       if (s.workshop?.cabinet !== stage) s = choose(s, 'rest');
     }
   }
+  s = finishCabinetAlignment(s);
   expect(s.workshop?.cabinet).toBe('finished');
   for (const id of ['service-begin', 'service-regular']) s = positiveAction(s, id);
   s = positiveAction(reach(s, 'service-paid-help'), 'service-paid-help');

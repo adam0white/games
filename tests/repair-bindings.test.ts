@@ -149,3 +149,9 @@ it('fitted access pieces are never labelled retained after reassembly', async ()
     ).toMatch(/^Fitted /);
   }
 });
+
+it('Saturday shelf intake cannot become a tool on somebody else’s object', () => {
+  const action = { id: 'saturday-open-look', label: 'Look at the shelf with Nora' };
+  expect(getMappedRepairActions(object, [action])).toEqual([]);
+  expect(getMappedRepairActions({ ...object, id: 'nora-folding-shelf' }, [action])).toHaveLength(1);
+});

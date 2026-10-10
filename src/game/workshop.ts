@@ -5,6 +5,14 @@
  * the engine. A paid agreement never grants a learned method or starts a job.
  * There is no market simulation, debt, business growth rate or idle income.
  */
+import {
+  applyCabinetStep,
+  type CabinetAlignment,
+  type CabinetStep,
+  cabinetStepMinutes,
+  cabinetSteps,
+  freshCabinetAlignment,
+} from './cabinet-alignment';
 import { neighbourhoodLight } from './neighbourhood';
 import type { StoryLine } from './story';
 import type { ActionView, Fault, GameState } from './types';
@@ -57,6 +65,7 @@ export interface WorkshopState {
   referral: 'unasked' | 'offered' | 'permitted' | 'declined';
   paidHelp: boolean;
   cabinet: 'unnoticed' | 'looked' | 'measured' | 'hung' | 'finished';
+  cabinetAlignment?: CabinetAlignment;
   cabinetAppointment?: {
     task: 'measure' | 'hang' | 'align';
     at: number;
@@ -97,6 +106,8 @@ export interface WorkshopContext {
   independentRepair: boolean;
   paidHelpEligible: boolean;
   dadHere: boolean;
+  cabinetSessionActive?: boolean;
+  cabinetCanContinue?: (minutes: number) => boolean;
   noraHere: boolean;
   samHere: boolean;
   leilaHere?: boolean;
@@ -270,7 +281,7 @@ export function workshopActions(s: WorkshopGame, ctx: WorkshopContext): ActionVi
         : 'A family project that can wait between repairs.',
     );
   if (w.projectOpen && ctx.dadHere) {
-    if (['looked', 'measured', 'hung'].includes(w.cabinet))
+    if (['looked', 'measured', 'hung'].includes(w.cabinet) && !ctx.cabinetSessionActive)
       add(
         'workshop-cabinet-plan',
         ['planned', 'missed'].includes(w.cabinetAppointment?.status ?? '')
@@ -290,11 +301,11 @@ export function workshopActions(s: WorkshopGame, ctx: WorkshopContext): ActionVi
         'Ask Dad to hang the cabinet doors with you',
         'Forty minutes together. His vice stays clear for this work.',
       );
-    if (w.cabinet === 'hung')
+    if (w.cabinet === 'hung' && !ctx.cabinetSessionActive)
       add(
         'workshop-cabinet-align',
         'Ask Dad to align the doors together',
-        'A final twenty-five minutes; then try how they close.',
+        'Spend a little while finding where the door catches. You can leave it safely between adjustments.',
       );
     if (w.cabinet === 'finished' && !w.drawingFound)
       add(
@@ -303,6 +314,34 @@ export function workshopActions(s: WorkshopGame, ctx: WorkshopContext): ActionVi
         'Mum kept your old drawings in a flat box.',
       );
   }
+  if (w.projectOpen && w.cabinet === 'hung' && w.cabinetAlignment) {
+    const labels: Record<CabinetStep, string> = {
+      'workshop-cabinet-try-close': 'Close the right door slowly',
+      'workshop-cabinet-paper': 'Slide the measurement paper around the edge',
+      'workshop-cabinet-support': 'Sight along the gap while Dad supports the door',
+      'workshop-cabinet-upper': 'Reposition the upper hinge with Dad',
+      'workshop-cabinet-lower': 'Reposition the lower hinge with Dad',
+      'workshop-cabinet-check': 'Try both doors, closing the other one first',
+    };
+    if (ctx.cabinetSessionActive)
+      for (const step of cabinetSteps(w.cabinetAlignment))
+        if (ctx.cabinetCanContinue?.(cabinetStepMinutes[step])) add(step, labels[step]);
+    add(
+      'workshop-cabinet-leave',
+      'Leave the doors safely hung for today',
+      'Keep the observation and hinge marks. The kitchen still works.',
+    );
+  }
+  if (
+    w.cabinetAppointment?.status === 'planned' &&
+    s.now >= w.cabinetAppointment.at &&
+    s.now <= w.cabinetAppointment.until
+  )
+    add(
+      'workshop-cabinet-attend',
+      'Go to the cabinet for your time with Dad',
+      'If either of you cannot start, clear this saved time and keep the work safely for another day.',
+    );
   if (w.cabinetAppointment?.status === 'planned')
     add(
       'workshop-cabinet-cancel',
@@ -314,12 +353,13 @@ export function workshopActions(s: WorkshopGame, ctx: WorkshopContext): ActionVi
       add('workshop-display-drawing', 'Put the drawing beside the finished cabinet');
       add('workshop-keep-drawing', 'Keep the drawing in the flat box');
     }
-    add(
-      'workshop-cabinet-close',
-      w.cabinet === 'finished' ? 'Back to the bench' : 'Leave the cabinet safely for now',
-      undefined,
-      'pause',
-    );
+    if (!(w.cabinet === 'hung' && w.cabinetAlignment))
+      add(
+        'workshop-cabinet-close',
+        w.cabinet === 'finished' ? 'Back to the bench' : 'Leave the cabinet safely for now',
+        undefined,
+        'pause',
+      );
   }
   if (!ctx.graduated) return actions;
   if (w.referral === 'unasked' && carefulFriendReturn(s) && ctx.noraHere)
@@ -538,6 +578,30 @@ export function applyWorkshopAction(
   if (!workshopActions(s, ctx).some((a) => a.id === id)) return null;
   const w = state(s);
   const result = (lines: StoryLine[], minutes = 3): WorkshopResult => ({ lines, minutes });
+  if (id in cabinetStepMinutes && w.cabinetAlignment) {
+    const step = id as CabinetStep;
+    const minutes = cabinetStepMinutes[step];
+    if (!ctx.cabinetSessionActive || !ctx.cabinetCanContinue?.(minutes)) return null;
+    const text = applyCabinetStep(w.cabinetAlignment, step);
+    if (!text) return null;
+    if (w.cabinetAlignment.checked) w.cabinet = 'finished';
+    return result(
+      [
+        line('You', text, 'notice'),
+        ...(w.cabinetAlignment.checked
+          ? [
+              line(
+                'Dad',
+                'I thought the doors would take a Saturday. I did not say which Saturday.',
+              ),
+            ]
+          : step === 'workshop-cabinet-paper' || step === 'workshop-cabinet-support'
+            ? [line('Dad', 'There. Not the whole door. Just that corner.')]
+            : []),
+      ],
+      minutes,
+    );
+  }
   switch (id) {
     case 'childhood-measure-model': {
       const model = s.objects.find((item) => item.id === 'paper-street');
@@ -569,6 +633,24 @@ export function applyWorkshopAction(
         'The remaining stiff paper makes a reusable work card: your name, the saved frontage and the missing drive gear. You keep it beside the model; there is space on the back for a future bench label.';
       model.observations.push(text);
       return result([line('You', text, 'notice')], 8);
+    }
+    case 'workshop-cabinet-attend': {
+      const appointment = w.cabinetAppointment;
+      if (!appointment) return null;
+      w.projectOpen = true;
+      if (!ctx.dadHere)
+        return {
+          minutes: 1,
+          cancelCabinetTime: true,
+          lines: [
+            line(
+              'You',
+              'You come back for the saved cabinet time, but Dad cannot join you now. You leave a note clearing this appointment; the doors and marks can wait. You can agree another time when he is back.',
+              'notice',
+            ),
+          ],
+        };
+      return applyWorkshopAction(s, `workshop-cabinet-${appointment.task}`, ctx);
     }
     case 'workshop-cabinet-plan': {
       const task = w.cabinet === 'looked' ? 'measure' : w.cabinet === 'measured' ? 'hang' : 'align';
@@ -639,6 +721,21 @@ export function applyWorkshopAction(
         ],
         1,
       );
+    case 'workshop-cabinet-leave':
+      w.projectOpen = false;
+      return result(
+        [
+          line(
+            'You',
+            'The doors stay securely hung. You keep the hinge marks and what you found; the bowl is still easy to reach.',
+            'notice',
+          ),
+          ...(ctx.cabinetSessionActive
+            ? [line('Dad', 'That will do for today. We can come back to that corner.')]
+            : []),
+        ],
+        1,
+      );
     case 'workshop-cabinet-close':
       w.projectOpen = false;
       return result(
@@ -664,17 +761,32 @@ export function applyWorkshopAction(
           : id === 'workshop-cabinet-hang'
             ? 'hang'
             : 'align';
-      if (!ctx.dadWillWork?.(task))
-        return result(
-          [
+      if (!ctx.dadWillWork?.(task)) {
+        const due =
+          w.cabinetAppointment?.status === 'planned' &&
+          s.now >= w.cabinetAppointment.at &&
+          s.now <= w.cabinetAppointment.until;
+        return {
+          minutes: 2,
+          ...(due ? { cancelCabinetTime: true } : {}),
+          lines: [
             line(
               ctx.dadDeclinedBy?.() === 'player' ? 'You' : 'Dad',
               ctx.dadWorkReason?.() ??
                 'I want to keep my own plans for now. Leave the notebook there; we can ask again another time.',
             ),
+            ...(due
+              ? [
+                  line(
+                    'You',
+                    'You came back for the cabinet time, but the shared work could not start. You clear this appointment rather than keep each other waiting. The doors and marks stay ready for another day.',
+                    'notice',
+                  ),
+                ]
+              : []),
           ],
-          2,
-        );
+        };
+      }
       if (task === 'measure') {
         w.cabinet = 'measured';
         return result(
@@ -703,22 +815,20 @@ export function applyWorkshopAction(
           CABINET_MINUTES.hang,
         );
       }
-      w.cabinet = 'finished';
+      w.cabinetAlignment ??= freshCabinetAlignment();
       return result(
         [
           line(
-            'You',
-            'You adjust the hinges together. Both doors close without catching, and the gap between them stays even.',
-            'notice',
-          ),
-          line(
             'Dad',
-            'There. The kitchen will still work tomorrow, but I will enjoy looking at those.',
+            w.cabinetAlignment.observedContact
+              ? 'We still have the marks. Let us try that corner again.'
+              : 'Go on. Close it. I was hoping you would not notice that last bit.',
           ),
         ],
-        CABINET_MINUTES.align,
+        2,
       );
     }
+
     case 'workshop-drawings':
       w.drawingFound = true;
       return result(
