@@ -340,3 +340,183 @@ footer {
     opacity: 0.25;
   }
 }
+/* Materials and silhouettes belong to the visible object, never its hidden fault. */
+.reading {
+  --metal: #657467;
+  --edge: #435346;
+}
+.bedside {
+  --metal: #b88869;
+  --edge: #826049;
+}
+.kitchen {
+  --metal: #6f8990;
+  --edge: #4a656d;
+}
+.torch {
+  --metal: #b97848;
+  --edge: #825332;
+}
+.object-art .lamp-base {
+  fill: var(--metal);
+  stroke: var(--edge);
+}
+.object-art .lamp-stem {
+  stroke: var(--metal);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+.reading .lamp-shade {
+  fill: #809184;
+  stroke: #435346;
+}
+.kitchen .lamp-shade {
+  fill: #dbcba3;
+  stroke: #4a656d;
+}
+.torch .lamp-shade {
+  fill: #d4a766;
+  stroke: #825332;
+}
+.joint {
+  fill: #b6b198;
+  stroke: #435346;
+  stroke-width: 3;
+}
+.ceramic-body {
+  fill: #bb846e;
+  stroke: #826049;
+  stroke-width: 3;
+}
+.ceramic-mark {
+  fill: none;
+  stroke: #ecd4b7;
+  stroke-width: 4;
+}
+.handle {
+  fill: none;
+  stroke: #4a656d;
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+.torch-grip {
+  fill: none;
+  stroke: #825332;
+  stroke-width: 5;
+  opacity: 0.65;
+}
+.torch-switch {
+  fill: #4d4c44;
+}
+.object-art.steady .lamp-shade,
+.object-art.warm .lamp-shade {
+  fill: #ffe0a0;
+}
+.object-art.off .lamp-shade,
+.object-art.broken .lamp-shade {
+  fill: #c6b8a0;
+}
+.conversation {
+  animation: arrive 360ms ease-out;
+}
+.action-result {
+  margin: 22px 0 12px;
+  padding: 12px 16px;
+  background: #ebe4d5;
+  border-radius: 9px;
+  animation: arrive 360ms ease-out;
+}
+.result-choice {
+  display: block;
+  color: #786955;
+  font-size: 0.76rem;
+}
+.action-result p {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.human-note {
+  border-left: 2px solid #91a18d;
+  padding-left: 13px;
+  color: #5a6954;
+  font-size: 0.9rem;
+}
+.actions {
+  transition: opacity 180ms ease;
+}
+.actions.settling {
+  opacity: 0.25;
+}
+.actions.ready {
+  opacity: 1;
+}
+button:disabled {
+  cursor: default;
+}
+button:disabled:hover {
+  background: revert;
+}
+.intent-mark {
+  display: inline-block;
+  color: #80735e;
+  font-size: 0.68rem;
+  margin-left: 9px;
+  vertical-align: 0.08em;
+  opacity: 0.65;
+}
+.primary .intent-mark {
+  color: #f1e6d4;
+}
+.intent-pause {
+  border-style: dashed;
+}
+.intent-leave {
+  border-color: #a6b2a0;
+  background: #f0f2e8;
+}
+.evidence-tag {
+  display: inline-block;
+  margin-right: 7px;
+  color: #5c7652;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 650;
+}
+.new-evidence {
+  animation: evidence-arrive 700ms ease-out;
+}
+@keyframes arrive {
+  from {
+    opacity: 0.3;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes evidence-arrive {
+  from {
+    background: #e4ead8;
+  }
+  to {
+    background: transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .conversation,
+  .action-result,
+  .new-evidence {
+    animation: none;
+  }
+  .actions {
+    transition: none;
+  }
+}
+
+.dialogue-line + .dialogue-line {
+  margin-top: 16px;
+}

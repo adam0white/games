@@ -6,7 +6,7 @@ Read README.md, HANDOFF.md, docs/vision.md and docs/mvp.md before resuming. This
 
 The owner authorized autonomous implementation on 2026-10-09: own a substantial portion or finish the proposed work until real playtesting and feedback are needed; delegate bounded work and always get reviews, including asynchronous Gemini when available. Do not stop for routine design or implementation approvals. Preserve ambitions without silently activating the economy/MMORPG roadmap.
 
-Current milestone: a playable home-to-garage opening with progressive disclosure, meaningful repair choices, failure, shelving/resumption, reuse, save/replay and bounded free play. Adam accepts its feel by playing it. This is the first taste-dependent checkpoint; the full apprenticeship MVP remains the next target once this experience earns it.
+Current milestone (2026-10-10): deepen the positively received curious opening into a living family-and-garage chapter. Implement optional unfolding story, distinctive objects/methods, noticeable state changes, time-based verification and causal HF human consequences. Delegate most implementation and get lightly briefed playtesters plus a wildcard; polish before the next owner playtest. Adam accepts the feel by playing it. Full independent apprenticeship still requires the separate learning controls in docs/mvp.md.
 
 ## Product direction
 

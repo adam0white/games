@@ -10,7 +10,14 @@ import {
   transition,
 } from '../src/game/engine';
 
-const act = (s: ReturnType<typeof createGame>, id: string) => transition(s, { type: 'action', id });
+const act = (s: ReturnType<typeof createGame>, id: string) => {
+  let next = transition(s, { type: 'action', id });
+  if (id === 'verify') {
+    next = transition(next, { type: 'action', id: 'rest' });
+    next = transition(next, { type: 'action', id: 'check-result' });
+  }
+  return next;
+};
 const first = () =>
   ['talk-family', 'inspect', 'test-battery', 'clean-contact', 'verify', 'return'].reduce(
     act,
@@ -84,11 +91,14 @@ describe('home and garage', () => {
       const fault = s.objects.find((x) => x.id === s.focusId)?.fault;
       if (!fault) throw Error('Missing request');
       faults.add(fault);
-      s = act(s, fault === 'battery' ? 'replace-battery' : 'clean-contact');
+      s = act(
+        s,
+        fault === 'battery' ? 'replace-battery' : fault === 'cap' ? 'twist-cap' : 'clean-contact',
+      );
       s = act(s, 'verify');
       s = act(s, 'return');
     }
-    expect(faults.size).toBe(2);
+    expect(faults.size).toBe(3);
     expect(s.objects.length).toBe(3);
     expect(s.conversation.length).toBeLessThanOrEqual(8);
     expect(restoreGame(serializeGame(s))).toEqual(s);
@@ -125,7 +135,10 @@ describe('home and garage', () => {
     s = act(s, 'inspect');
     s = act(s, 'test-battery');
     const fault = s.objects.find((x) => x.id === s.focusId)?.fault;
-    s = act(s, fault === 'battery' ? 'replace-battery' : 'clean-contact');
+    s = act(
+      s,
+      fault === 'battery' ? 'replace-battery' : fault === 'cap' ? 'twist-cap' : 'clean-contact',
+    );
     s = act(s, 'verify');
     s = act(s, 'return');
     expect(s.objects.find((x) => x.id === 'personal')?.location).toBe('shelf');
@@ -148,10 +161,107 @@ describe('home and garage', () => {
       owners.set(item.owner, faults);
       s = act(s, 'inspect');
       s = act(s, 'test-battery');
-      s = act(s, item.fault === 'battery' ? 'replace-battery' : 'clean-contact');
+      s = act(
+        s,
+        item.fault === 'battery'
+          ? 'replace-battery'
+          : item.fault === 'cap'
+            ? 'twist-cap'
+            : 'clean-contact',
+      );
       s = act(s, 'verify');
       s = act(s, 'return');
     }
     expect([...owners.values()].map((x) => x.size)).toEqual([2, 2]);
   });
+});
+
+describe('living garage checks', () => {
+  it('a check takes real elapsed time while tea and shelf work remain possible', () => {
+    let s = ['talk-family', 'inspect', 'clean-contact'].reduce(act, createGame(42));
+    s = transition(s, { type: 'action', id: 'verify' });
+    expect(s.objects[0]?.verified).toBe(false);
+    expect(() => transition(s, { type: 'action', id: 'check-result' })).toThrow();
+    const start = s.now;
+    s = transition(s, { type: 'action', id: 'rest' });
+    expect(s.now - start).toBe(30);
+    expect(s.objects[0]?.verified).toBe(false);
+    expect(getView(s).actions.some((x) => x.id === 'check-result')).toBe(true);
+    s = transition(s, { type: 'action', id: 'check-result' });
+    expect(s.objects[0]?.verified).toBe(true);
+    expect(restoreGame(serializeGame(s))).toEqual(s);
+  });
+  it('honest premature handover returns for a check, without inventing a new physical fault', () => {
+    let s = ['talk-family', 'inspect', 'clean-contact', 'early-return'].reduce(act, createGame(42));
+    expect(s.repairs).toBe(0);
+    expect(s.objects.find((x) => x.id === 'family')?.location).toBe('returned');
+    s = act(s, 'rest');
+    const lamp = s.objects.find((x) => x.id === 'family');
+    expect(lamp?.location).toBe('shelf');
+    expect(lamp?.repaired).toBe(true);
+    expect(lamp?.fault).toBe('contact');
+    expect(s.conversation.at(-1)?.text).toContain('longer check');
+    s = transition(s, { type: 'select', id: 'family' });
+    s = act(s, 'verify');
+    s = act(s, 'return');
+    expect(s.repairs).toBe(1);
+    expect(s.objects.filter((x) => x.id === 'personal')).toHaveLength(1);
+    expect(restoreGame(serializeGame(s))).toEqual(s);
+  });
+  it('frozen legacy replay migrates exact existing progress then preserves new inputs', async () => {
+    const old = await import('../src/game/legacy-engine');
+    let previous = old.createGame(42);
+    for (const id of ['talk-family', 'inspect', 'clean-contact', 'verify', 'return', 'inspect'])
+      previous = old.transition(previous, { type: 'action', id });
+    const text = old.serializeGame(previous);
+    let migrated = restoreGame(text);
+    expect(migrated.objects).toEqual(previous.objects);
+    expect(migrated.people).toEqual(previous.people);
+    expect(migrated.inputs).toEqual(previous.inputs);
+    expect(migrated.journal?.map((x) => x.text)).toEqual(previous.conversation.map((x) => x.text));
+    migrated = act(migrated, 'rest');
+    expect(restoreGame(serializeGame(migrated))).toEqual(migrated);
+  });
+});
+
+it('a second honest premature return schedules another callback and preserves its actual words in the journal', () => {
+  let s = ['talk-family', 'inspect', 'clean-contact', 'early-return', 'rest'].reduce(
+    act,
+    createGame(42),
+  );
+  s = transition(s, { type: 'select', id: 'family' });
+  s = act(s, 'early-return');
+  expect(s.objects.find((x) => x.id === 'family')?.callbackSeen).toBe(false);
+  s = act(s, 'rest');
+  expect(s.objects.find((x) => x.id === 'family')?.location).toBe('shelf');
+  for (let n = 0; n < 10; n++) s = act(s, 'rest');
+  expect(s.conversation.some((x) => x.text.includes('Could we do that longer check'))).toBe(false);
+  expect(getView(s).journal?.[0]?.text).toContain('little lamp beside my chair');
+  expect(
+    getView(s).journal?.filter((x) => x.text.includes('Could we do that longer check')),
+  ).toHaveLength(2);
+  expect(getView(s).journal?.some((x) => x.text.includes('grime on the contact'))).toBe(true);
+  const journal = getView(s).journal ?? [];
+  expect(new Set(journal.map((x) => x.id)).size).toBe(journal.length);
+  expect(restoreGame(serializeGame(s))).toEqual(s);
+});
+
+it('the current garage event keeps Dad and You as separate speakers and clears on selection', () => {
+  let s = ['inspect', 'shelve'].reduce(act, first());
+  expect(getView(s).actions.find((x) => x.id === 'talk-garage')?.label).toBe(
+    'Go and look at the garage bench',
+  );
+  s = act(s, 'talk-garage');
+  expect(getView(s).scene).toBe('garage');
+  expect(getView(s).currentDialogue?.map((x) => x.speaker)).toEqual(['Dad', 'You']);
+  expect(getView(s).currentDialogue?.some((x) => x.text.includes('You:'))).toBe(false);
+  s = act(s, 'search-donor');
+  expect(getView(s).currentDialogue?.map((x) => x.speaker)).toEqual(['You', 'Dad']);
+  expect(getView(s).actions.find((x) => x.id === 'rest')?.label).toContain('garage step');
+  s = act(s, 'rest');
+  expect(getView(s).scene).toBe('garage');
+  expect(getView(s).currentDialogue?.[0]?.text).toContain('garage step');
+  s = transition(s, { type: 'select', id: 'personal' });
+  expect(getView(s).currentDialogue).toEqual([]);
+  expect(restoreGame(serializeGame(s))).toEqual(s);
 });

@@ -1,6 +1,6 @@
 # Broad roadmap
 
-2026-10-09. The owner authorized autonomous implementation through a meaningful playtesting dependency. M0 planning is delivered. M1 and a bounded portion of M2 are implemented and reviewed for the first playable taste checkpoint; Adam's acceptance is pending. M2 promises, commercial time/cost tradeoffs and M3–M4 apprenticeship remain future work. Later stages preserve ambition without scheduling implementation.
+2026-10-09. The owner authorized autonomous implementation through a meaningful playtesting dependency. M0 planning is delivered. M1 and a bounded portion of M2 are implemented and reviewed for the first playable taste checkpoint; Adam found the start intriguing and diagnosis believable; the enriched chapter now awaits his playtest. M2 promises, commercial time/cost tradeoffs and M3–M4 apprenticeship remain future work. Later stages preserve ambition without scheduling implementation.
 
 ## Near milestones
 
@@ -47,3 +47,9 @@ No implementation date is assigned to these stages. Review the deferred ambition
 ## Unresolved decisions
 
 Public title and repository visibility; eventual license; exact opening object art and input style; how the player character expresses fatigue and learning; elapsed playtime target after a first prototype; longer-run simulation fidelity. Resolve only when the next milestone needs the answer.
+
+## Iteration after the first playtest, 2026-10-10
+
+The opening earned curiosity and plausible diagnostic choice. The active pass deepens the chapter before the next playtest: optional family memories, distinctive silhouettes and a separate torch method, time-based verification with parallel activity, retained story history and at least one causal HF social response. Independent tiny-brief game testers and a wildcard review precede delivery. This is authorized implementation, not another design-approval stop.
+
+Deferred, recorded 2026-10-10: animation that moves a chosen option into the status area and fuller scene/object choreography. Revisit after this chapter's next playtest; current work uses a short fade, changed-evidence emphasis and delayed choice reveal with reduced-motion support. Bodily effects of drinking, broader schedules and more object families are later candidates, not silently simulated in narration now.

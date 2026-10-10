@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react';
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
   createGame,
   exportPlaytest,
@@ -10,6 +10,7 @@ import {
   transition,
 } from './game/engine';
 import type { GameInput, GameState, ObjectView } from './game/types';
+import { createChoiceGate } from './ui/choiceGate';
 import { readStory, writeStory } from './ui/storage';
 
 function initialStory(): { game: GameState; warning: string | null } {
@@ -30,27 +31,61 @@ function initialStory(): { game: GameState; warning: string | null } {
 
 function Lamp({ object }: { object: ObjectView }) {
   const titleId = useId();
+  const appearance = object.appearance ?? (object.form === 'torch' ? 'torch' : 'reading');
   return (
-    <div className={`object-art ${object.visual} ${object.form}`}>
+    <div className={`object-art ${object.visual} ${appearance}`}>
       <svg viewBox="0 0 320 250" role="img" aria-labelledby={titleId}>
         <title id={titleId}>
           {object.title}: {object.condition}
         </title>
         <ellipse className="light-pool" cx="160" cy="216" rx="123" ry="23" />
-        {object.form === 'lamp' ? (
+        {appearance === 'reading' && (
           <>
-            <path className="lamp-shade" d="M111 48 Q160 33 209 48 L238 121 Q160 144 82 121 Z" />
-            <path className="shade-rim" d="M82 121 Q160 141 238 121" />
-            <path className="lamp-stem" d="M160 135 L160 206" />
-            <path className="lamp-base" d="M116 211 Q160 192 204 211 L204 221 L116 221 Z" />
-            <path className="pull" d="M196 135 L196 164" />
-            <circle className="pull-tip" cx="196" cy="169" r="4" />
+            <path className="lamp-base" d="M106 216 Q149 196 197 212 L197 221 L106 221 Z" />
+            <path className="lamp-stem" d="M151 206 L142 137 L189 88" />
+            <circle className="joint" cx="142" cy="137" r="9" />
+            <path className="lamp-shade" d="M176 65 Q207 66 222 90 L238 115 L172 127 L166 89 Z" />
+            <path className="shade-rim" d="M172 127 L238 115" />
+            <path className="pull" d="M125 216 C80 221 91 238 58 227" />
           </>
-        ) : (
+        )}
+        {appearance === 'bedside' && (
           <>
-            <path className="lamp-base" d="M109 97 L205 123 L188 184 L92 158 Z" />
-            <path className="lamp-shade" d="M203 107 L237 122 L218 193 L186 185 Z" />
-            <path className="shade-rim" d="M222 125 L207 181" />
+            <path className="lamp-shade" d="M112 51 Q160 39 208 51 L229 119 Q160 137 91 119 Z" />
+            <path className="shade-rim" d="M91 119 Q160 136 229 119" />
+            <path
+              className="ceramic-body"
+              d="M146 132 L174 132 L176 158 C211 170 205 211 179 217 L141 217 C115 211 109 170 144 158 Z"
+            />
+            <path
+              className="ceramic-mark"
+              d="M138 176 Q160 187 181 177 M134 190 Q158 202 185 192"
+            />
+            <path className="pull" d="M195 133 L195 157" />
+            <circle className="pull-tip" cx="195" cy="162" r="4" />
+          </>
+        )}
+        {appearance === 'kitchen' && (
+          <>
+            <path className="handle" d="M132 73 L132 52 Q160 26 188 52 L188 73" />
+            <path className="lamp-base" d="M121 76 L199 76 L210 209 L110 209 Z" />
+            <path className="lamp-shade glass" d="M128 99 L192 99 L199 184 L121 184 Z" />
+            <path className="shade-rim" d="M124 137 L196 137 M160 100 L160 183" />
+            <path className="lamp-base" d="M109 209 L211 209 L211 221 L109 221 Z" />
+            <circle className="pull-tip" cx="160" cy="87" r="5" />
+          </>
+        )}
+        {appearance === 'torch' && (
+          <>
+            <path className="lamp-base" d="M74 144 L186 108 L207 172 L95 207 Q79 190 74 144 Z" />
+            <path
+              className="torch-grip"
+              d="M103 145 L116 187 M120 140 L133 182 M137 135 L150 177"
+            />
+            <path className="lamp-shade" d="M183 105 L220 86 L250 177 L207 175 Z" />
+            <path className="shade-rim" d="M224 97 L246 167" />
+            <path className="pull" d="M79 177 C33 182 52 218 91 203" />
+            <path className="torch-switch" d="M146 122 L167 116 L170 125 L149 131 Z" />
           </>
         )}
       </svg>
@@ -65,10 +100,25 @@ export default function App() {
   const [message, setMessage] = useState<string | null>(initial.warning);
   const [journal, setJournal] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [settling, setSettling] = useState(false);
+  const [resultText, setResultText] = useState<string | null>(null);
+  const [lastChoice, setLastChoice] = useState<string | null>(null);
+  const [previousEvidence, setPreviousEvidence] = useState<{
+    id: string;
+    observations: string[];
+  } | null>(null);
+  const [choiceGate] = useState(() => createChoiceGate(() => setSettling(false)));
+  useEffect(() => () => choiceGate.cancel(), [choiceGate]);
+  const storyRevision = useRef(0);
   const fileInput = useRef<HTMLInputElement>(null);
   const view = getView(game);
   const latest = view.conversation.at(-1);
+  const dialogue = view.currentDialogue ?? (latest ? [latest] : []);
+  const history = view.journal ?? view.conversation;
   function keep(next: GameState) {
+    storyRevision.current++;
+    choiceGate.cancel();
+    setSettling(false);
     setGame(next);
     setMessage(
       writeStory(serializeGame(next))
@@ -77,7 +127,32 @@ export default function App() {
     );
   }
   function act(input: GameInput) {
-    keep(transition(game, input));
+    if (choiceGate.locked) return;
+    const next = transition(game, input);
+    if (next === game) return;
+    const nextView = getView(next);
+    const reply = nextView.currentDialogue?.at(-1) ?? nextView.conversation.at(-1);
+    const newObservation = nextView.focus?.observations.find(
+      (observation) =>
+        nextView.focus?.id !== view.focus?.id || !view.focus?.observations.includes(observation),
+    );
+    setResultText(
+      nextView.moment ??
+        (reply && reply.id !== latest?.id
+          ? `${reply.speaker}: ${reply.text.length > 170 ? `${reply.text.slice(0, 167).replace(/\s+\S*$/, '')}…` : reply.text}`
+          : (newObservation ?? nextView.note ?? nextView.focus?.condition ?? null)),
+    );
+    setPreviousEvidence(
+      view.focus ? { id: view.focus.id, observations: view.focus.observations } : null,
+    );
+    setLastChoice(
+      input.type === 'action'
+        ? (view.actions.find((action) => action.id === input.id)?.label ?? null)
+        : `Return to ${view.shelf.find((item) => item.id === input.id)?.title ?? 'the bench'}`,
+    );
+    keep(next);
+    choiceGate.pause(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+    setSettling(choiceGate.locked);
   }
   function download() {
     const url = URL.createObjectURL(new Blob([exportPlaytest(game)], { type: 'application/json' }));
@@ -95,11 +170,18 @@ export default function App() {
       setMessage('That file is too large to be a story. Your current story is unchanged.');
       return;
     }
+    const revision = ++storyRevision.current;
     try {
-      const next = replayPlaytest(await file.text());
+      const text = await file.text();
+      if (revision !== storyRevision.current) return;
+      const next = replayPlaytest(text);
       keep(next);
       setJournal(false);
+      setLastChoice(null);
+      setResultText(null);
+      setPreviousEvidence(null);
     } catch {
+      if (revision !== storyRevision.current) return;
       setMessage(
         'That story could not be replayed. Please choose an exported repair story. Your current story is unchanged.',
       );
@@ -125,9 +207,9 @@ export default function App() {
       {journal && (
         <section id="journal" className="journal" aria-label="Story journal">
           <h2>Your story</h2>
-          {view.conversation.length > 1 && (
+          {history.length > 0 && (
             <ol className="past-conversation">
-              {view.conversation.slice(0, -1).map((line) => (
+              {history.map((line) => (
                 <li key={line.id}>
                   <strong>{line.speaker}</strong>
                   <p>{line.text}</p>
@@ -156,6 +238,9 @@ export default function App() {
                 type="button"
                 onClick={() => {
                   keep(createGame());
+                  setLastChoice(null);
+                  setResultText(null);
+                  setPreviousEvidence(null);
                   setConfirmReset(false);
                   setJournal(false);
                 }}
@@ -185,14 +270,19 @@ export default function App() {
         <h1>{view.title}</h1>
         <p>{view.subtitle}</p>
       </section>
-      {latest && (
+      {dialogue.length > 0 && (
         <section
-          className={`conversation ${latest.tone ?? 'warm'}`}
+          key={dialogue.map((line) => line.id).join('-')}
+          className={`conversation ${dialogue.at(-1)?.tone ?? 'warm'}`}
           aria-live="polite"
           aria-atomic="true"
         >
-          <span className="speaker">{latest.speaker}</span>
-          <p>{latest.text}</p>
+          {dialogue.map((line) => (
+            <div className="dialogue-line" key={line.id}>
+              <span className="speaker">{line.speaker}</span>
+              <p>{line.text}</p>
+            </div>
+          ))}
         </section>
       )}
       {view.focus && (
@@ -205,7 +295,21 @@ export default function App() {
             {view.focus.observations.length > 0 && (
               <ul className="observations">
                 {view.focus.observations.map((observation) => (
-                  <li key={observation}>{observation}</li>
+                  <li
+                    key={observation}
+                    className={
+                      previousEvidence?.id === view.focus?.id &&
+                      !previousEvidence?.observations.includes(observation)
+                        ? 'new-evidence'
+                        : ''
+                    }
+                  >
+                    {previousEvidence?.id === view.focus?.id &&
+                      !previousEvidence?.observations.includes(observation) && (
+                        <span className="evidence-tag">New</span>
+                      )}
+                    {observation}
+                  </li>
                 ))}
               </ul>
             )}
@@ -213,16 +317,35 @@ export default function App() {
         </section>
       )}
       {view.note && <p className="bench-note">{view.note}</p>}
+      {view.humanNote && <p className="human-note">{view.humanNote}</p>}
+      {lastChoice && (
+        <section className="action-result" aria-live="polite" aria-atomic="true">
+          <span className="result-choice">You chose: {lastChoice}</span>
+          <p>{resultText}</p>
+        </section>
+      )}
       {view.actions.length > 0 && (
-        <section className="actions" aria-label="What to do next">
+        <section
+          className={`actions ${settling ? 'settling' : 'ready'}`}
+          aria-busy={settling}
+          aria-label="What to do next"
+        >
           {view.actions.map((action) => (
             <button
               type="button"
               key={action.id}
-              className={action.kind === 'primary' ? 'primary' : ''}
+              className={`${action.kind === 'primary' ? 'primary' : ''} intent-${action.intent ?? 'stay'}`}
+              disabled={settling}
               onClick={() => act({ type: 'action', id: action.id })}
             >
-              <span>{action.label}</span>
+              <span className="action-label">
+                {action.label}
+                {action.intent && action.intent !== 'stay' && (
+                  <span className="intent-mark" aria-hidden="true">
+                    {action.intent === 'pause' ? 'Ⅱ' : '↗'}
+                  </span>
+                )}
+              </span>
               {action.detail && <small>{action.detail}</small>}
             </button>
           ))}
@@ -238,6 +361,7 @@ export default function App() {
                   <button
                     type="button"
                     key={item.id}
+                    disabled={settling}
                     onClick={() => act({ type: 'select', id: item.id })}
                   >
                     <span>{item.title}</span>

@@ -16,9 +16,13 @@ import {
   snapshot,
   tick,
 } from '@adam0white/human-framework';
+import { askMumToHelp, shareTea } from './humans';
+
+import { restoreGame as restoreLegacy } from './legacy-engine';
+import { itemStory, optionalStoryChoices, storyBeat } from './story';
 import type { ActionView, Fault, GameInput, GameState, GameView, RepairObject } from './types';
 
-const ENGINE = 'home-garage-2';
+const ENGINE = 'home-garage-3';
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 const object = (
   id: string,
@@ -51,7 +55,11 @@ function say(
   text: string,
   tone: 'warm' | 'notice' | 'mistake' = 'notice',
 ) {
-  s.conversation.push({ id: s.now, speaker, text, tone });
+  s.nextLineId ??= (s.conversation.at(-1)?.id ?? -1) + 1;
+  const entry = { id: s.nextLineId++, speaker, text, tone };
+  s.conversation.push(entry);
+  s.journal ??= [];
+  s.journal.push(entry);
   s.conversation = s.conversation.slice(-8);
   const p = s.people.player;
   if (p)
@@ -87,6 +95,7 @@ export function createGame(seed = 1701): GameState {
         bornAt: -25 * 365 * 1440,
         sex: 'male',
         skills: { repair: 0.12 },
+        relationships: [{ otherId: 'mum', roles: ['parent'] }],
         retention: { trace: 12, chronicleDays: 31 },
       }),
       mum: createPerson({
@@ -96,12 +105,21 @@ export function createGame(seed = 1701): GameState {
         now: 0,
         bornAt: -52 * 365 * 1440,
         sex: 'female',
+        relationships: [{ otherId: 'player', roles: ['child'] }],
         retention: { trace: 8, chronicleDays: 31 },
       }),
     },
     parts: { batteries: 1, holders: 0 },
     unlocked: [],
     conversation: [
+      {
+        id: 0,
+        speaker: 'Mum',
+        text: 'Could you come over here a moment? The little lamp beside my chair keeps flickering.',
+        tone: 'warm',
+      },
+    ],
+    journal: [
       {
         id: 0,
         speaker: 'Mum',
@@ -118,7 +136,17 @@ export function createGame(seed = 1701): GameState {
 }
 function available(s: GameState): ActionView[] {
   const a: ActionView[] = [];
-  const add = (id: string, label: string, detail?: string) => a.push({ id, label, detail });
+  const add = (id: string, label: string, detail?: string) =>
+    a.push({
+      id,
+      label,
+      detail,
+      intent: ['early-return', 'return', 'talk-garage'].includes(id)
+        ? 'leave'
+        : ['rest', 'shelve'].includes(id)
+          ? 'pause'
+          : 'stay',
+    });
   if (s.chapter === 'family') {
     add('talk-family', 'Sit with Mum');
     return a;
@@ -127,6 +155,12 @@ function available(s: GameState): ActionView[] {
   if (o) {
     if (!o.inspected) add('inspect', 'Look closely');
     if (o.inspected && !o.repaired) {
+      if (o.form === 'torch' && o.fault === 'cap')
+        add(
+          'twist-cap',
+          'Clean the cap thread and seat it squarely',
+          'The cap carries the return contact; the flat lamp contact is a different part.',
+        );
       if (!o.tested)
         add(
           'test-battery',
@@ -140,13 +174,35 @@ function available(s: GameState): ActionView[] {
       if (o.inspected && o.observations.some((x) => x.includes('holder')) && s.parts.holders > 0)
         add('fit-holder', 'Fit the recovered holder');
     }
-    if (o.repaired && !o.verified) add('verify', 'Leave it on and check');
+    if (o.repaired && !o.verified) {
+      if (o.checkStarted === undefined)
+        add(
+          'verify',
+          'Start a longer light check',
+          'Leave it shining for twenty minutes; other things can happen meanwhile.',
+        );
+      else if (s.now - o.checkStarted >= 20)
+        add('check-result', 'Move it, switch it, and read the check');
+      else
+        add(
+          'wait-check',
+          'Stay with the light a while',
+          'Ten quiet minutes, watching for a change.',
+        );
+      add(
+        'early-return',
+        o.owner === 'You'
+          ? 'Put it beside the bed before the longer check'
+          : 'Give it back before the longer check',
+        'Say plainly that it lights now but has not been checked for long.',
+      );
+    }
     if (o.verified) add('return', o.owner === 'You' ? 'Set it beside your bed' : 'Give it back');
     if (o.location === 'bench' && !o.verified) add('shelve', 'Put it aside carefully');
     if (o.location === 'shelf') add('resume', 'Bring it back to the bench');
   }
   if (s.unlocked.includes('garage-hint') && !s.unlocked.includes('garage'))
-    add('talk-garage', 'Ask about the garage');
+    add('talk-garage', 'Go and look at the garage bench');
   if (s.unlocked.includes('garage') && !s.unlocked.includes('donor'))
     add('search-donor', 'Look through Dad’s old lamp box');
   if (s.repairs >= 1 && s.unlocked.includes('garage') && !s.unlocked.includes('friends'))
@@ -161,7 +217,20 @@ function available(s: GameState): ActionView[] {
       'See who needs a hand',
       'Room for one on the bench and one waiting safely on the shelf.',
     );
-  if (s.unlocked.includes('garage')) add('rest', 'Take a break with some tea');
+  add(
+    'rest',
+    s.chapter === 'garage' ? 'Join Mum for tea on the garage step' : 'Sit with Mum over tea',
+    'Leave the work safely on the bench for a while.',
+  );
+  if (o?.checkStarted !== undefined && !o.verified && !s.unlocked.includes(`help:${o.id}`))
+    add('ask-mum', 'Ask Mum to hold it while you check');
+  for (const choice of optionalStoryChoices({
+    focusId: s.focusId,
+    focusOwner: o?.owner,
+    chapter: s.chapter,
+    unlocked: s.unlocked,
+  }))
+    add(choice.id, choice.label);
   return a;
 }
 export function transition(original: GameState, input: GameInput): GameState {
@@ -181,6 +250,7 @@ export function transition(original: GameState, input: GameInput): GameState {
     throw Error('Unknown object');
   const s = clone(original);
   s.inputs.push({ at: s.now, input: clone(input) });
+  s.eventStartId = s.nextLineId ?? (s.conversation.at(-1)?.id ?? -1) + 1;
   if (input.type === 'select') {
     const previous = focused(s);
     if (previous && previous.id !== input.id) previous.location = 'shelf';
@@ -191,10 +261,51 @@ export function transition(original: GameState, input: GameInput): GameState {
   }
   const id = input.id;
   const o = focused(s);
+  const storyChoice = optionalStoryChoices({
+    focusId: s.focusId,
+    focusOwner: o?.owner,
+    chapter: s.chapter,
+    unlocked: s.unlocked,
+  }).find((x) => x.id === id);
+  if (storyChoice) {
+    s.unlocked.push(`story:${id}`);
+    for (const line of storyChoice.lines) {
+      s.nextLineId ??= (s.conversation.at(-1)?.id ?? -1) + 1;
+      const entry = { id: s.nextLineId, ...line };
+      s.nextLineId++;
+      s.conversation.push(entry);
+      s.journal ??= [];
+      s.journal.push(entry);
+    }
+    s.conversation = s.conversation.slice(-8);
+    return s;
+  }
+  const contactName = id === 'accept-request' ? (s.requests % 2 === 0 ? 'nora' : 'sam') : undefined;
+  const beat =
+    id === 'return' || id === 'early-return'
+      ? `${id === 'early-return' ? 'return-early' : 'return'}-${o?.id === 'family' || o?.id === 'personal' ? o.id : o?.owner.toLowerCase()}`
+      : contactName
+        ? `request-${contactName}`
+        : id === 'rest' && s.chapter === 'garage'
+          ? 'rest-garage'
+          : id;
+  const repeatedContact = contactName && s.unlocked.includes(`met:${contactName}`);
+  const lines = storyBeat(repeatedContact ? `callback-${contactName}` : beat);
+  const narrate: typeof say = (...args) => {
+    if (!lines.length) say(...args);
+  };
   const p = s.people.player;
   if (!p) throw Error('Missing player');
   const duration =
-    id === 'rest' ? 30 : ['clean-contact', 'replace-battery', 'fit-holder'].includes(id) ? 12 : 4;
+    id === 'rest'
+      ? 30
+      : id === 'wait-check'
+        ? 10
+        : id === 'ask-mum'
+          ? 8
+          : ['clean-contact', 'replace-battery', 'fit-holder'].includes(id)
+            ? 12
+            : 4;
   const aff: Affordance = {
     id,
     action: id === 'rest' ? 'rest' : 'repair',
@@ -214,9 +325,14 @@ export function transition(original: GameState, input: GameInput): GameState {
       ? { skill: { id: 'repair', difficulty: 0.25 } }
       : {}),
   };
-  begin(p, aff, decide(p, [aff]));
+  const familyMember = s.people.mum;
+  if (!familyMember) throw Error('Missing family member');
+  if (id === 'rest') shareTea(p, familyMember, s.now + duration);
+  else {
+    begin(p, aff, decide(p, [aff]));
+    tick(p, s.now + duration);
+  }
   s.now += duration;
-  tick(p, s.now);
   let failed = false;
   switch (id) {
     case 'talk-family':
@@ -231,7 +347,7 @@ export function transition(original: GameState, input: GameInput): GameState {
         ),
       );
       s.focusId = 'family';
-      say(
+      narrate(
         s,
         'Mum',
         'It brightens if I hold it still. There’s a spare battery in the drawer if you want to compare.',
@@ -242,14 +358,16 @@ export function transition(original: GameState, input: GameInput): GameState {
       if (o) {
         o.inspected = true;
         const text =
-          o.fault === 'holder'
-            ? 'The battery holder is cracked through. It needs a matching holder, not a stronger battery.'
-            : 'The switch moves freely. There’s a little grime on the contact; the battery could also be tired.';
+          o.form === 'torch' && o.fault === 'cap'
+            ? 'The torch’s cap sits crooked. Its metal thread completes the circuit; pressure on the cap makes the beam return.'
+            : o.fault === 'holder'
+              ? 'The battery holder is cracked through. It needs a matching holder, not a stronger battery.'
+              : 'The switch moves freely. There’s a little grime on the contact; the battery could also be tired.';
         o.observations.push(text);
-        say(s, 'You', text);
+        narrate(s, 'You', text);
         if (o.id === 'personal' && !s.unlocked.includes('garage-hint')) {
           s.unlocked.push('garage-hint');
-          say(
+          narrate(
             s,
             'Mum',
             'Dad kept a box of old lamps in the garage. You could look for a matching part when you feel like it.',
@@ -261,21 +379,25 @@ export function transition(original: GameState, input: GameInput): GameState {
       if (o) {
         o.tested = true;
         const text =
-          o.fault === 'battery'
-            ? 'With the known-good battery it shines steadily. The old battery is tired.'
-            : o.fault === 'holder'
-              ? 'The crack prevents the battery sitting firmly. A test battery cannot bridge it.'
-              : 'With the known-good battery it still flickers when moved. The contact needs attention.';
+          o.fault === 'cap'
+            ? 'The fresh battery makes no difference. The beam returns only while the cap is held straight.'
+            : o.fault === 'battery'
+              ? 'With the known-good battery it shines steadily. The old battery is tired.'
+              : o.fault === 'holder'
+                ? 'The crack prevents the battery sitting firmly. A test battery cannot bridge it.'
+                : 'With the known-good battery it still flickers when moved. The contact needs attention.';
         o.observations.push(text);
-        say(s, 'You', text);
+        narrate(s, 'You', text);
       }
       break;
+    case 'twist-cap':
     case 'clean-contact':
     case 'replace-battery':
     case 'fit-holder':
       if (o) {
         o.attempted++;
         const matches =
+          (id === 'twist-cap' && o.fault === 'cap') ||
           (id === 'clean-contact' && o.fault === 'contact') ||
           (id === 'replace-battery' && o.fault === 'battery') ||
           (id === 'fit-holder' && o.fault === 'holder');
@@ -289,22 +411,70 @@ export function transition(original: GameState, input: GameInput): GameState {
             ? 'It still flickers when moved. Changing the battery did not restore the contact.'
             : 'That did not help. Testing the battery will separate a weak cell from a contact problem.';
         o.observations.push(text);
-        say(s, 'You', text, matches ? 'notice' : 'mistake');
+        narrate(s, 'You', text, matches ? 'notice' : 'mistake');
       }
       break;
     case 'verify':
       if (o) {
-        o.verified = o.repaired;
-        say(s, 'You', 'Left on, moved gently, switched off and on: the light stays steady.');
+        o.checkStarted = s.now;
+        narrate(
+          s,
+          'You',
+          'The light is left on. A brief glow is not yet an evening of reliable light.',
+        );
       }
       break;
+    case 'wait-check':
+      narrate(s, 'You', 'You watch the light for a while. It keeps shining.');
+      break;
+    case 'check-result':
+      if (o) {
+        o.verified = true;
+        o.observations.push('After a longer run, movement and switching, the light stays steady.');
+        narrate(s, 'You', 'After a longer run, movement and switching, the light stays steady.');
+      }
+      break;
+    case 'ask-mum': {
+      const mum = familyMember;
+      tick(mum, s.now - duration);
+      const helps = askMumToHelp(mum);
+      s.unlocked.push(`help:${o?.id}`);
+      s.humanNote = helps
+        ? 'Mum chooses a little more time together, holding the light while you check.'
+        : 'Mum has had some company and chooses her own chapter. The check can continue without her.';
+      narrate(
+        s,
+        'Mum',
+        helps
+          ? 'All right. You move the switch; I’ll keep it steady.'
+          : 'That was nice, sitting together. I’m going back to my chapter. Leave it on — you can still watch it.',
+      );
+      break;
+    }
+    case 'early-return':
     case 'return':
+      if (o && id === 'early-return') {
+        o.returnedEarly = true;
+        o.callbackSeen = false;
+        o.callbackAt = s.now + 25;
+        delete o.checkStarted;
+      }
       if (o) {
         o.location = 'returned';
-        s.repairs++;
+        if (o.verified) {
+          s.repairs++;
+          o.returnedEarly = false;
+        }
+        if (o.returnedEarly)
+          narrate(
+            s,
+            'You',
+            'It lights now, but I have not given it the longer check. Tell me if it falters.',
+            'notice',
+          );
         s.focusId = null;
         s.parts.batteries = 1;
-        if (o.id === 'family') {
+        if (o.id === 'family' && !s.objects.some((x) => x.id === 'personal')) {
           s.objects.push(
             object(
               'personal',
@@ -316,27 +486,30 @@ export function transition(original: GameState, input: GameInput): GameState {
           );
           s.focusId = 'personal';
           s.chapter = 'later';
-          say(
+          narrate(
             s,
             'Mum',
-            'That’s much better. I can finish my chapter tonight. Thank you. Your old bedside lamp is still here too, if you’d like to look.',
+            o.returnedEarly
+              ? 'Thank you for saying it has not had the longer check. I’ll keep the other light nearby. Your old bedside lamp is still here too, if you’d like to look.'
+              : 'That’s much better. I can finish my chapter tonight. Thank you. Your old bedside lamp is still here too, if you’d like to look.',
             'warm',
           );
-        } else if (o.id === 'personal')
-          say(
+        } else if (o.id === 'personal' && !o.returnedEarly)
+          narrate(
             s,
             'You',
             'Back beside the bed, with a part that would have been thrown away.',
             'warm',
           );
-        else say(s, o.owner, 'I’m glad you checked it before giving it back. Thank you.', 'warm');
+        else if (!o.returnedEarly)
+          narrate(s, o.owner, 'I’m glad you checked it before giving it back. Thank you.', 'warm');
       }
       break;
     case 'shelve':
       if (o) {
         o.location = 'shelf';
         s.focusId = null;
-        say(s, 'You', 'Put aside with its notes. Nothing is lost; you can come back to it.');
+        narrate(s, 'You', 'Put aside with its notes. Nothing is lost; you can come back to it.');
       }
       break;
     case 'resume':
@@ -345,7 +518,7 @@ export function transition(original: GameState, input: GameInput): GameState {
     case 'talk-garage':
       s.unlocked.push('garage');
       s.chapter = 'garage';
-      say(
+      narrate(
         s,
         'Mum',
         'There’s room on Dad’s bench. The old lamp box is under it; he said we could use anything in there.',
@@ -356,7 +529,7 @@ export function transition(original: GameState, input: GameInput): GameState {
       s.unlocked.push('donor');
       s.discoveries++;
       s.parts.holders++;
-      say(
+      narrate(
         s,
         'You',
         'One discarded lamp has a sound holder of the same size. The rest goes in the recycling box.',
@@ -364,7 +537,7 @@ export function transition(original: GameState, input: GameInput): GameState {
       break;
     case 'talk-friends':
       s.unlocked.push('friends');
-      say(
+      narrate(
         s,
         'Mum',
         'I told our friends Nora and Sam about your careful checks. They sometimes have a little lamp or torch that needs attention. We can keep one on the bench and one waiting safely on the shelf. No rush.',
@@ -375,9 +548,20 @@ export function transition(original: GameState, input: GameInput): GameState {
       const n = s.requests++;
       // Game-owned LCG: job draws never depend on the actors’ RNG consumption.
       s.worldRng = (Math.imul(s.worldRng, 1664525) + 1013904223) >>> 0;
-      const fault: Fault = s.worldRng < 0x80000000 ? 'battery' : 'contact';
-      s.objects = s.objects.filter((x) => !x.id.startsWith('friend-') || x.location !== 'returned');
+      const fault: Fault =
+        n % 2 === 1 && s.worldRng >= 0x80000000
+          ? 'cap'
+          : s.worldRng < 0x80000000
+            ? 'battery'
+            : 'contact';
+      s.objects = s.objects.filter(
+        (x) =>
+          !x.id.startsWith('friend-') ||
+          x.location !== 'returned' ||
+          (x.returnedEarly && !x.callbackSeen),
+      );
       const person = n % 2 === 0 ? 'Nora' : 'Sam';
+      if (person === 'Sam' && !s.unlocked.includes('met-sam')) s.unlocked.push('met-sam');
       const item = object(
         `friend-${n}`,
         person === 'Nora' ? 'Nora’s kitchen lamp' : 'Sam’s pocket torch',
@@ -391,7 +575,7 @@ export function transition(original: GameState, input: GameInput): GameState {
       s.objects.push(item);
       s.focusId = item.id;
       s.parts.batteries = 1;
-      say(
+      narrate(
         s,
         person,
         'It’s unreliable lately. Could you see what’s happening when you have a moment?',
@@ -400,20 +584,44 @@ export function transition(original: GameState, input: GameInput): GameState {
       break;
     }
     case 'rest':
-      say(s, 'Mum', 'Tea’s ready. The bench can wait.', 'warm');
+      s.humanNote =
+        'The cups are empty. Mum seems content to settle back into her book for a while.';
       break;
   }
-  finish(p, {
-    affordanceId: id,
-    action: aff.action,
-    at: s.now,
-    status: failed ? 'failed' : 'completed',
-    summary: failed ? 'An attempted repair revealed the remaining problem.' : aff.label,
-    needs: id === 'rest' ? { leisure: 0.1 } : { competence: failed ? 0 : 0.03 },
-  });
+  if (id !== 'rest')
+    finish(p, {
+      affordanceId: id,
+      action: aff.action,
+      at: s.now,
+      status: failed ? 'failed' : 'completed',
+      summary: failed ? 'An attempted repair revealed the remaining problem.' : aff.label,
+      needs: id === 'rest' ? { leisure: 0.1 } : { competence: failed ? 0 : 0.03 },
+    });
+  if (contactName && !repeatedContact) s.unlocked.push(`met:${contactName}`);
+  for (const line of lines) say(s, line.speaker, line.text, line.tone);
   const mum = s.people.mum;
   if (!mum) throw Error('Missing family member');
   tick(mum, s.now);
+  for (const returned of s.objects) {
+    if (
+      returned.returnedEarly &&
+      !returned.callbackSeen &&
+      s.now >= (returned.callbackAt ?? Infinity)
+    ) {
+      returned.callbackSeen = true;
+      returned.location = 'shelf';
+      returned.verified = false;
+      say(
+        s,
+        returned.owner,
+        'It worked for a little while, but I kept wondering whether it would flicker again. Could we do that longer check after all? You said it had not been checked.',
+        'notice',
+      );
+      returned.observations.push(
+        'Returned for the promised longer check; the repair itself remains intact.',
+      );
+    }
+  }
   return s;
 }
 export function getView(s: GameState): GameView {
@@ -433,7 +641,7 @@ export function getView(s: GameState): GameView {
           id: o.id,
           title: o.title,
           owner: o.owner,
-          story: o.story,
+          story: itemStory(o.id, o.owner) ?? o.story,
           form: o.form,
           condition: o.verified
             ? 'Checked and ready'
@@ -441,9 +649,13 @@ export function getView(s: GameState): GameView {
               ? 'It lights up — still needs checking'
               : o.inspected && o.fault === 'holder'
                 ? 'A broken holder'
-                : o.tested && o.fault === 'battery'
-                  ? 'A tired battery'
-                  : 'An unreliable light',
+                : o.inspected && o.fault === 'cap'
+                  ? 'A loose cap contact'
+                  : o.tested && o.fault === 'contact'
+                    ? 'The contact needs attention'
+                    : o.tested && o.fault === 'battery'
+                      ? 'A tired battery'
+                      : 'An unreliable light',
           visual: o.repaired
             ? 'steady'
             : o.fault === 'holder'
@@ -452,10 +664,25 @@ export function getView(s: GameState): GameView {
                 ? 'off'
                 : 'flickering',
           observations: [...o.observations],
+          appearance:
+            o.form === 'torch'
+              ? 'torch'
+              : o.id === 'family'
+                ? 'reading'
+                : o.id === 'personal'
+                  ? 'bedside'
+                  : 'kitchen',
         }
       : null,
     actions: available(s),
     conversation: s.conversation,
+    currentDialogue: (s.journal ?? s.conversation).filter(
+      (line) => line.id >= (s.eventStartId ?? 0),
+    ),
+    journal: [
+      ...(s.journal ?? []),
+      ...s.conversation.filter((line) => !s.journal?.some((entry) => entry.id === line.id)),
+    ].sort((a, b) => a.id - b.id),
     shelf: s.objects
       .filter((x) => x.discovered && x.location === 'shelf')
       .map((x) => ({
@@ -467,7 +694,13 @@ export function getView(s: GameState): GameView {
       s.unlocked.includes('donor') && s.parts.holders > 0
         ? [{ id: 'holders', label: 'Matching recovered holder', count: s.parts.holders }]
         : [],
-    note: null,
+    note:
+      o?.checkStarted !== undefined && !o.verified
+        ? s.now - o.checkStarted >= 20
+          ? 'The longer run is ready to read.'
+          : 'The light is still running. Tea, waiting, or another repair can fill the time.'
+        : null,
+    humanNote: s.humanNote ?? null,
   };
 }
 function packet(s: GameState) {
@@ -486,6 +719,18 @@ export const exportPlaytest = serializeGame;
 export function restoreGame(text: string): GameState {
   if (typeof text !== 'string' || text.length > 8_000_000) throw Error('Save is too large');
   const data = JSON.parse(text);
+  if (data?.engine === 'home-garage-2') {
+    const legacy = restoreLegacy(text);
+    const conversation = legacy.conversation.map((line, id) => ({ ...line, id }));
+    return {
+      ...legacy,
+      conversation,
+      journal: [...conversation],
+      nextLineId: conversation.length,
+      legacySave: text,
+      legacyInputCount: legacy.inputs.length,
+    };
+  }
   if (
     !data ||
     data.engine !== ENGINE ||
@@ -496,8 +741,15 @@ export function restoreGame(text: string): GameState {
     data.state.inputs.length > 20000
   )
     throw Error('Unsupported save');
-  let s = createGame(data.state.seed);
-  for (const entry of data.state.inputs) {
+  if (
+    data.state.legacySave &&
+    (typeof data.state.legacySave !== 'string' ||
+      JSON.parse(data.state.legacySave)?.engine !== 'home-garage-2')
+  )
+    throw Error('Invalid legacy save');
+  let s = data.state.legacySave ? restoreGame(data.state.legacySave) : createGame(data.state.seed);
+  if (data.state.legacyInputCount !== s.legacyInputCount) throw Error('Invalid migration history');
+  for (const entry of data.state.inputs.slice(s.legacyInputCount ?? 0)) {
     if (!entry || entry.at !== s.now) throw Error('Invalid input history');
     s = transition(s, entry.input);
   }

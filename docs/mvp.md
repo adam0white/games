@@ -1,6 +1,6 @@
 # MVP target: home to first handoff
 
-2026-10-09. The owner authorized autonomous implementation with bounded delegation and reviews, through a meaningful playtesting dependency. First delivery is the home-to-garage opening. The full apprentice-learning target below remains to be demonstrated; no HF release is set by this document.
+Updated 2026-10-10. The owner authorized autonomous implementation with delegation and reviews. First delivery earned curiosity and believable diagnosis; the next pass enriches story, presentation, time and causal human consequences. The full apprentice-learning target below remains to be demonstrated; no HF release is set by this document.
 
 ## Promise
 

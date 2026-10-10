@@ -1,6 +1,6 @@
 import type { Person } from '@adam0white/human-framework';
 
-export type Fault = 'contact' | 'battery' | 'holder';
+export type Fault = 'contact' | 'battery' | 'holder' | 'cap';
 export type Chapter = 'family' | 'bench' | 'later' | 'garage';
 export type GameInput = { type: 'action'; id: string } | { type: 'select'; id: string };
 
@@ -19,6 +19,10 @@ export interface RepairObject {
   repaired: boolean;
   verified: boolean;
   discovered: boolean;
+  checkStarted?: number;
+  returnedEarly?: boolean;
+  callbackAt?: number;
+  callbackSeen?: boolean;
 }
 
 export interface ConversationLine {
@@ -51,6 +55,12 @@ export interface GameState {
   repairs: number;
   requests: number;
   worldRng: number;
+  legacySave?: string;
+  legacyInputCount?: number;
+  humanNote?: string | null;
+  journal?: ConversationLine[];
+  nextLineId?: number;
+  eventStartId?: number;
 }
 
 export interface ActionView {
@@ -58,6 +68,7 @@ export interface ActionView {
   label: string;
   detail?: string;
   kind?: 'primary' | 'quiet';
+  intent?: 'stay' | 'pause' | 'leave';
 }
 
 export interface ObjectView {
@@ -69,6 +80,7 @@ export interface ObjectView {
   visual: 'flickering' | 'steady' | 'off' | 'broken' | 'warm';
   form: 'lamp' | 'torch';
   observations: string[];
+  appearance?: 'reading' | 'bedside' | 'kitchen' | 'torch';
 }
 
 export interface GameView {
@@ -81,4 +93,8 @@ export interface GameView {
   shelf: { id: string; title: string; note: string }[];
   parts: { id: string; label: string; count: number }[];
   note: string | null;
+  humanNote?: string | null;
+  moment?: string;
+  currentDialogue?: ConversationLine[];
+  journal?: ConversationLine[];
 }

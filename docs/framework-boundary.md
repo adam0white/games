@@ -1,6 +1,6 @@
 # Game and HF boundary
 
-Updated 2026-10-09. Grounded in the sibling HF architecture and the installed released package. Separate current consumer behavior from the proposed apprenticeship capability.
+Updated 2026-10-10. Grounded in the sibling HF architecture and the installed released package. Separate current consumer behavior from the proposed apprenticeship capability.
 
 ## Ownership
 
@@ -18,7 +18,9 @@ A customer's deadline exists in the host world. Each person's understanding of i
 
 HF offers practice and skill development, instruction and observation, outcome-based expectations, beliefs and source trust, advice/refusal, commitments, fatigue, relationships, impressions, joint-activity acceptance, snapshots and deterministic replay machinery. Released package 2.1.4 is installed and pinned here.
 
-The opening uses public person creation, action begin/decide/tick/finish, perceptions and snapshots. Tests show actual skill and memory changes and exact replay. Manual repair outcomes currently depend on host diagnosis/action matching; person state does not yet change those outcomes. This verifies consumption and persistence, not causal human behavior or apprentice learning.
+The opening uses public person creation, action begin/decide/tick/finish, perceptions and snapshots. Tests show actual skill and memory changes and exact replay. The enriched chapter also uses shared time and real HF relationships/social needs: a matched-duration neutral-rest control gives Mum the same leisure effect and elapsed time, while shared tea changes her tie and social need. Subsequent public `decide()` traces change between helping and reading. This is one bounded causal human response, not evidence of general human realism or apprentice learning.
+
+Manual repair outcomes still depend on host diagnosis/action matching. Optional authored conversation has no mechanical reward; it enriches the player's understanding rather than secretly teaching a task policy. No physiological claim about caffeine or bladder effects is made.
 
 Skill growth is not evidence of learning an arbitrary multi-step policy. Narration describing an apprentice as trained is not evidence either.
 

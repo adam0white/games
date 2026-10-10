@@ -17,7 +17,9 @@ Longer-term ambition: the experience shifts from cozy repair to business managem
 
 ## Status
 
-The playable home-to-garage opening is implemented. It starts with a family conversation and a flickering battery lamp, then introduces diagnosis, failed attempts, verification, shelving and recovered parts. Family friends introduce repeatable small repairs. Controls and objects appear through discovery.
+The playable family-and-garage chapter starts with a family conversation and a flickering battery lamp. Optional memories reveal the household gradually. Diagnosis, failed attempts, longer checks, shelving and recovered parts emerge through play. Family friends bring small repairs, including a torch with a different contact mechanism. Objects have distinctive appearances; nearby consequence cues and a brief, reduced-motion-aware reveal help changes stay noticeable.
+
+A longer check runs while you wait, share tea or work on something else. You can honestly hand something back before checking; its owner may request that check later. The Journal retains story and consequential repair conversations.
 
 Run locally with Node 24 or newer:
 
@@ -28,8 +30,8 @@ npm run dev
 
 Open the local address printed by the development server. Progress saves in the browser. The Journal exports a replayable story (seed, inputs and person/object state) and opens an exported story. `npm run check` runs lint, types, behavioral tests and the production build.
 
-This is the first taste checkpoint, before apprenticeship. There is no remote or deployment yet. The working screen title is **A little light**; the public title is undecided.
+This is the enriched chapter after the first playtest, before apprenticeship. There is no remote or deployment yet. The working screen title is **A little light**; the public title is undecided.
 
-The game consumes released `@adam0white/human-framework` 2.1.4 through its public API. HF owns person skills, effort, perceptions and memory. The current manual opening records these changes; they do not yet drive independent repair decisions. Framework changes belong in HF and return here as a published dependency upgrade.
+The game consumes released `@adam0white/human-framework` 2.1.4 through its public API. HF owns person skills, effort, perceptions, relationships and memory. Shared tea changes HF social state, which affects Mum's choice between helping and returning to her book. It does not buy cooperation. Matched elapsed-time tests exercise that bounded consequence. Manual repair outcomes still follow host diagnosis/action matching; independent apprentice learning is not implemented. Framework changes belong in HF and return here as a published dependency upgrade.
 
 Adam accepts the opening's feel by playing it. The larger MVP finish line remains [the first independent handoff](docs/mvp.md#acceptance).

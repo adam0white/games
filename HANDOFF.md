@@ -1,35 +1,39 @@
 # Handoff
 
-Updated 2026-10-09 (local evening).
+Updated 2026-10-10.
 
 ## What remains
 
-Adam plays the opening and judges whether its diagnosis, family tone and gradual discovery are appealing. Next action: `npm ci && npm run dev`, open the printed local address, play from the family conversation through a friend repair, and export the story from Journal with feedback. No routine design approval is needed. Autonomous implementation is authorized; this stop is the agreed taste checkpoint before substantial apprentice work.
+Adam judges the enriched chapter's feel. The next implementation target is the first observing/assisting friend and then genuine conditional apprentice learning under docs/mvp.md controls. Do not substitute an authored repair policy for learned behavior. No routine design approval is needed; autonomous progression and delegated work remain authorized.
+
+Run `npm ci && npm run dev` with Node ≥24. The retained preview is `http://127.0.0.1:5173/`. Current engine-2 saves migrate through validated legacy replay, preserving objects, people and input history. A fresh story reveals the expanded family conversations; export before reset to keep both.
 
 ## Done and verified
 
-- Home-to-garage opening: flickering family battery lamp, diagnosis, informative wrong attempt, verification, personal cracked-holder project, voluntary shelving, donor reuse and discovered friend repairs. Unfinished personal work can wait while another repair is completed. Shelf switching preserves prior work. Small lamp/torch visuals change with repair state; future business controls are absent.
-- Browser autosave, confirmed reset, replay export/import. Twelve behavioral/storage tests pass. `npm run check` passes lint, strict types, tests and production build.
-- Clean lockfile installation and all checks passed in a temporary standalone consumer copy, with no sibling HF source copied/imported. Released HF 2.1.4 is pinned. Its person skill, effort, observations and memory really change; they do not yet drive manual repair outcomes or autonomous policies.
-- Desktop and 390×844 browser inspection; no horizontal overflow. Real walkthrough included a failed battery replacement, shelf/resume, completing a friend's lamp before the personal project, recovered holder consumption and reload persistence. Reset cancellation and malformed import preserve the exact save; export/reset/import restores it exactly.
-- Independent game/technical review found and fixed ineffective shelving, owner-predictable faults, consumed holder display and hidden first-repair thanks. Re-review accepts implementation for playtesting. It does not accept Adam's taste.
-- Gemini asynchronous read-only design review completed using gemini-2.5-flash (exit zero, substantive output). Applied concerns about forced shelving and discovery pacing through the actual source review/fixes. Raw outputs stay ignored in `.review/`.
+- Distinct reading, bedside, kitchen and torch appearances. A separate torch cap repair changes the interaction. Current exposed diagnosis replaces the earlier uncertain condition; newly received evidence is emphasized.
+- Optional authored family memories and friend conversations, repeating-contact familiarity, and a future invitation to observe. Original speakers remain distinct. These branches have no mechanical rewards or learned-policy effects. Significant and consequential dialogue persists in the Journal rather than disappearing after eight lines.
+- Verification requires twenty simulated minutes and a final check; tea, waiting and other jobs can fill that time. Honest premature return allows a later requested check; repeated returns preserve the same object/fault and remain recoverable.
+- Tea uses actual HF shared-time relationships/social needs. A matched-duration, matched-leisure neutral-rest control changes Mum's subsequent public decision trace between helping and her own reading. This proves one bounded social response; tea does not purchase cooperation or teach repair.
+- Nearby action/result cues, a short response fade and 420 ms choice reveal; reduced-motion users get immediate choices. Async imports cannot overwrite a later action/reset/import.
+- Engine-2 frozen replay is preserved. Current migration, new actions, autosave, reload and exact export/reset/import passed in an actual isolated Chrome browser. Mobile and desktop screenshots checked; no horizontal overflow or browser errors in that verification.
+- Lint, strict types, twenty-one tests and production build pass. Tests cover social causality, elapsed checks, repeated callbacks, retained transcript, actual event speakers, shelf continuity, old-save migration and exact replay.
 
-## Done but unchecked
+## Reviews and fixes
 
-- Adam's experience and real physical phone testing. Browser checks are not owner acceptance.
+Most implementation was delegated to engine, story and interface workers. Independent technical, tiny-brief browser-player and minimally briefed wildcard reviews ran. Fixed reset-variable error, disappearing history, repeated-callback loss, mixed-speaker paragraphs, ambiguous garage movement, repeated intent labels and garage tea location. Fresh final browser traversal checks the integrated result before delivery.
 
-## Untouched and limits
+An asynchronous Gemini flash design review completed (exit zero/substantive output). It read the earlier/in-progress engine, so its useful warnings about decorative HF state and inert rest/time were assessed against the completed changes. Its claim that misdiagnosis was impossible was false; wrong repairs were already available. Outputs remain local/ignored in `.review/`. No recurring review automation was configured.
 
-- Apprentice hiring/teaching/independent handoff, causal HF learning controls, paid business promises, wider object families, economy and multiplayer. No new HF faculty/release was made.
-- HF state currently records the manual opening; gameplay does not yet depend on its learning/capacity. Full input history grows; imports are bounded (UI 2 MB, engine 8 MB / 20,000 inputs). Replays are engine-specific (`home-garage-2`); prototype engine-1 saves are rejected without silently overwriting until an action occurs.
-- No GitHub remote, deployment, license or final public title. Do not publish until visibility/licensing are decided. Working screen title: A little light.
+## Unchecked, untouched and limits
 
-## Failed attempts and live pointers
+- Adam's acceptance of this iteration and physical-device play remain unverified. Reviewers cannot accept his taste.
+- No independent apprentice policy, hiring/payment, commercial promises, richer object families, caffeine/bladder model, day schedules, economy or multiplayer. An observing-friend invitation is story groundwork, not a training achievement. No HF faculty or release changed.
+- Manual repair success still follows the host's diagnosis/action rules. Human causality currently demonstrates the help-versus-reading choice. Do not generalize one matched control into calibrated human realism.
+- Input and transcript history grow. UI import limit is 2 MB; engine limit is 8 MB / 20,000 inputs. Migrated saves retain the validated original legacy packet as provenance. Engine-1 prototypes remain unsupported. Retained engine-2 dialogue migrates; already discarded old lines are not claimed to have been recovered.
+- No remote, publication, deployment, license or final public title. Local integration is authorized; external visibility/licensing still need a decision.
 
-- Default Gemini review failed with zero quota for gemini-3.1-pro. Flash design review succeeded; a separate flash code review failed with an incomplete streaming JSON error, so it is not counted as completed. Independent source review completed instead.
-- Primary repository: `/Users/abdul/code/repair-game`. Implementation branch `codex/home-garage`, worktree `.worktrees/opening`; local integration into main is authorized. The review workspace is `.superpowers/sdd/2026-10-09-home-garage/` (ignored); durable directions are in docs/vision.md, roadmap.md, mvp.md and framework-boundary.md.
-- Personal context consult uses `/Users/abdul/code/pkm`, replacing the absent work-PC brain path. Current project state belongs here.
-- Local preview server is retained for playtesting at `http://127.0.0.1:5173/`; no recurring automation or external publication was configured.
+## Live pointers
 
-Earlier planning reviews reduced the object family, required meaningful diagnostic and shelving choices, bounded future procedural learning, and set changed/withheld teaching controls. Those future acceptance requirements remain in docs/mvp.md; passing the opening tests does not satisfy them.
+Primary repo `/Users/abdul/code/repair-game`; iteration worktree `.worktrees/living-garage`, branch `codex/living-garage`. Source changes integrate locally into main after checks. Previous opening worktree remains preserved. Implementation plan: docs/superpowers/plans/2026-10-10-living-garage.md. Owner feedback excerpts: docs/games/opening-playtest-2026-10-10.md. Future milestones and deferred animations: docs/roadmap.md.
+
+Personal context consult uses `/Users/abdul/code/pkm`; this project remains authority on its own state. The absent work-PC brain path is not used here.

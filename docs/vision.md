@@ -55,3 +55,11 @@ Always review game work. Use asynchronous Gemini review as an additional indepen
 ## Personal sources (continued)
 
 Earlier ideas are in the private PKM at ../pkm/00-inbox/ideas.md: procedural adaptation (line 37), micro-to-macro agent training (line 195), and small simulated-NPC games (line 51). The current conversation supplies the more specific repair-game direction. Those notes contain later AI elaboration; the quoted original wording is the authority on the earlier idea. Do not publish private PKM content or paths as part of a public site.
+
+## First playtest direction, 2026-10-10
+
+Adam found the curious start intriguing and the first diagnostic choices believable. He wants a larger, reviewed iteration before the next delivery: optional backstory and ordinary conversation choices; distinctive objects and repair methods; light previews of whether actions continue work, put it aside or leave the scene; clearer changed/revised evidence; and dialogue feedback noticeable from the buttons. A short fade and delay before fresh choices can help process consequences, with reduced-motion support. More elaborate animations remain deferred.
+
+Tea and time together should affect real HF people, such as relationships and willingness. Verification can take time while the player does something else, with an option to hand an item back prematurely and understand the consequences. These suggestions are direction for an integrated design, not a requirement to simulate caffeine or urination immediately.
+
+The controller should stay focused on overview and taste, delegate almost all implementation, and let workers contribute interpretations and nuances. Review includes small unbiased tester briefs and an almost unbriefed wildcard. Owner attention goes to meaningful playtesting rather than repeated design gates. Exact feedback excerpts are retained in docs/games/opening-playtest-2026-10-10.md.
