@@ -6,6 +6,7 @@ import * as fifteen from '../src/game/engine15';
 import type { GameInput } from '../src/game/types';
 import continued from './fixtures/fifteen-long-workshop-route.json';
 import base from './fixtures/fourteen-long-workshop-route.json';
+import { positiveAction } from './support/public-attendance';
 
 function actual(count = continued.inputs.length) {
   let old = fourteen.createGame(base.seed);
@@ -31,7 +32,7 @@ it('recovers the actual engine15 stopped story through the disclosed meal endpoi
   s = transition(s, { type: 'action', id: 'show-corrective-step' });
   expect(s.apprentice?.needsHelp).toBeUndefined();
   const withheld = structuredClone(s);
-  s = transition(s, { type: 'action', id: 'clean-contact' });
+  s = positiveAction(s, 'clean-contact');
   s = transition(s, { type: 'action', id: 'explain-step' });
   expect(s.apprentice?.lastLesson?.step).toBe('clean-contact');
   expect(s.apprentice?.lastLesson?.explained).toBe(true);

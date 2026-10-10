@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { getView, restoreGame, serializeGame } from '../src/game/engine';
-import { choose, nextSchoolAction, opening } from './support/school-route';
+import { positiveAction } from './support/public-attendance';
+import { nextSchoolAction, opening } from './support/school-route';
 
 it('eight completed public repairs carry people, unfinished work and exact history through four school years', () => {
   for (const seed of [42, 1701]) {
@@ -11,9 +12,15 @@ it('eight completed public repairs carry people, unfinished work and exact histo
     const jumps: number[] = [];
     for (let step = 0; step < 150 && !s.campaign?.graduated; step++) {
       expect(getView(s).actions.some((action) => action.id === 'workshop-priced')).toBe(false);
-      const id = nextSchoolAction(s);
+      const proposed = nextSchoolAction(s);
+      // This route closes each holiday at its first opportunity. Wait for
+      // actual collection instead of accepting an extra job while an owner is away.
+      const id =
+        proposed === 'accept-request' && s.objects.some((item) => item.awaitingCollection)
+          ? 'wait-person'
+          : proposed;
       const before = s.now;
-      s = choose(s, id);
+      s = positiveAction(s, id);
       if (id === 'back-to-school') {
         jumps.push(s.now - before);
         expect(s.now % 1440).toBe(9 * 60);
@@ -54,7 +61,7 @@ it('an eager player cannot exhaust future school work and strand later graduatio
       expect(s.objects.some((item) => item.awaitingCollection)).toBe(false);
       requestsBySummer.push(s.requests);
     }
-    s = choose(s, id);
+    s = positiveAction(s, id);
   }
   expect(s.campaign?.graduated).toBe(true);
   expect(requestsBySummer).toEqual([2, 4, 6, 8]);

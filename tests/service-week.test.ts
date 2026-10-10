@@ -34,13 +34,36 @@ function action(s: ServiceWeekGame, id: string) {
   expect(r).not.toBeNull();
   return r;
 }
-it('does not offer a service trial before a real whole-job handoff', () => {
+it('offers solo adult work without an apprentice handoff, but keeps school separate', () => {
   expect(
     serviceWeekActions({ now: 840 }, { ...context, independentHandoff: false }).map((a) => a.id),
-  ).toEqual(['service-invite-donor']);
+  ).toEqual(['service-invite-donor', 'service-begin']);
   expect(
     serviceWeekActions({ now: 840 }, { ...context, graduated: false }).map((a) => a.id),
   ).toEqual(['service-invite-donor']);
+});
+it('offers one deliberate quiet-week passage only when the private bench has no outstanding work', () => {
+  const s = fixture('private');
+  const permitted = { ...context, safeToPassQuietWeek: true };
+  const before = structuredClone(s);
+  const passage = applyServiceWeekAction(s, 'service-quiet-week', permitted);
+  expect(passage?.nextDayAt).toBe(4 * 1440 + 540);
+  expect(s).toEqual(before);
+  expect(
+    serviceWeekActions(s, { ...permitted, safeToPassQuietWeek: false }).map((a) => a.id),
+  ).not.toContain('service-quiet-week');
+  expect(serviceWeekActions(fixture('regular'), permitted).map((a) => a.id)).not.toContain(
+    'service-quiet-week',
+  );
+  s.serviceWeek?.jobs.push({
+    id: 'service-leila',
+    stage: 'accepted',
+    collectionAt: 2000,
+    fee: 500,
+    samFee: 0,
+    delayed: false,
+  });
+  expect(serviceWeekActions(s, permitted).map((a) => a.id)).not.toContain('service-quiet-week');
 });
 it('a heard request makes neither a promise nor an object; acceptance uses an absolute deadline', () => {
   const s = fixture();
@@ -52,13 +75,13 @@ it('a heard request makes neither a promise nor an object; acceptance uses an ab
   expect(accepted?.promise).toEqual({
     ownerId: 'leila',
     objectId: 'service-leila',
-    collectionAt: 1440 + 1080,
+    collectionAt: 1440 + 1080 + 15,
   });
   expect(s.workshop?.cash).toBe(0);
-  s.now = 1440 + 1081;
+  s.now = 1440 + 1080 + 16;
   expect(getServiceWeekView(s)?.arrangements[0]).toContain('agreed time has passed');
   const later = action(s, 'service-delay-leila');
-  expect(later?.promise?.collectionAt).toBe(3 * 1440 + 1080);
+  expect(later?.promise?.collectionAt).toBe(3 * 1440 + 1080 + 15);
   expect(later?.job).toBeUndefined();
 });
 it('the same request can be declined or agreed later without an invented overdue promise', () => {
@@ -72,7 +95,7 @@ it('the same request can be declined or agreed later without an invented overdue
   expect(serviceWeekActions(later, context).some((a) => a.id === 'service-accept-leila')).toBe(
     false,
   );
-  expect(action(later, 'service-later-leila')?.promise?.collectionAt).toBe(3 * 1440 + 1080);
+  expect(action(later, 'service-later-leila')?.promise?.collectionAt).toBe(3 * 1440 + 1080 + 15);
 });
 it('a paid checked return conserves cash and pays only actually agreed whole-job work, once', () => {
   const s = fixture();

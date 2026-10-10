@@ -14,9 +14,13 @@ it('describes demonstrated work in ordinary language and Sam returns his own lam
     words.some(
       (line) =>
         line.speaker === 'Sam' &&
-        line.text.includes('My spare table lamp can go back where I keep it'),
+        (line.text.includes('My spare table lamp can go back where I keep it') ||
+          line.text ===
+            'I’m back. Thanks for keeping it safely labelled — I can take it home now.'),
     ),
   ).toBe(true);
+  expect(state.objects.find((object) => object.id === 'lesson-battery')?.location).toBe('returned');
+  expect(state.objects.find((object) => object.id === 'lesson-battery')?.collectedAt).toBeDefined();
   expect(
     words.some((line) => line.speaker === 'Sam' && line.text.includes('test battery is the step')),
   ).toBe(false);

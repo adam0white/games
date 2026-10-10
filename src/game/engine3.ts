@@ -20,7 +20,7 @@ import { askMumToHelp, shareTea } from './humans3';
 
 import { restoreGame as restoreLegacy } from './legacy-engine';
 import { itemStory, optionalStoryChoices, storyBeat } from './story3';
-import type { ActionView, Fault, GameInput, GameState, GameView, RepairObject } from './types';
+import type { ActionView, Fault, GameInput, GameState, GameView, RepairObject } from './types18';
 
 const ENGINE = 'home-garage-3';
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));

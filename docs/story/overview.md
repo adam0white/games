@@ -13,3 +13,13 @@ After school, the player can ask to use more of the garage or eventually part of
 As the world is revealed, repair proves to be one of its most common occupations. That supplies a coherent setting for the later repair economy and multiplayer ambition. Other business types come later, possibly after multiplayer. Those systems remain future scope; story canon does not implement markets, servers or offline income.
 
 Practical unresolved threads connect the small opening to that future: the saved drawings; Dad's cabinet; Nora's possible referral; Sam's choice of work; the workshop's place in a repair-dependent street; and what happened to the optimistic standardization schemes. Do not replace these with a secret inheritance, concealed villain, supernatural object or family catastrophe. The institutions and causes of decline are not yet settled facts.
+
+## Selected working-life chapter
+
+After the first working week, three authored episodes follow a collection afternoon, another period a month later, and the following year. These are explicit windows in a continuing life, not uninterrupted daily grinding. The player chooses priced requests, occasional favours or personal bench work in each period. A future collection day is an arrangement, not an automatic income stream.
+
+The shared store's borrowed trolley connects repair with transport. Empty movement and an agreed load can reveal different problems; the same trolley family can have a later, genuinely different complaint. Leila can convey limited written permission from the unnamed store keeper, but cannot give away the store's property. Safe smaller trips and collection at the bench offer alternatives to forcing an unsuitable load.
+
+Sam's genuinely learned repairs can free the player for unfamiliar work. Leila may separately agree to a paid delivery stretch; carrying something does not make her a trained repairer. Their time, refusals and other obligations remain consequential. The player's original model, saved measurements and Nora's actual case outcome shape later presentation and packing, with viable alternatives for a player who left them unfinished.
+
+Unplayed months preserve accomplishments, unfinished objects and actual knowledge. They grant no repairs, wages, new skills or retroactive relationships. Regular work is one possible continuing life; a smaller or private bench is also a meaningful ending.

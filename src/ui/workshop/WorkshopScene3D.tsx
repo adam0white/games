@@ -27,6 +27,8 @@ export interface WorkshopScene3DProps {
   view: GameView;
   disabled?: boolean;
   onInput: (input: GameInput) => void;
+  onWorkboard?: () => void;
+  onPeople?: () => void;
   onFocus?: () => void;
   onCabinetFocus?: () => void;
   onOpenJournal?: () => void;
@@ -37,6 +39,8 @@ export default function WorkshopScene3D({
   disabled = false,
   onInput,
   onFocus,
+  onWorkboard,
+  onPeople,
   onCabinetFocus,
   onOpenJournal,
 }: WorkshopScene3DProps) {
@@ -160,6 +164,14 @@ export default function WorkshopScene3D({
   }
   function activate() {
     if (!place || disabled) return;
+    if (place.navigation === 'workboard') {
+      onWorkboard?.();
+      return;
+    }
+    if (place.navigation === 'people') {
+      onPeople?.();
+      return;
+    }
     if (place.navigation === 'focus') {
       onFocus?.();
       return;
@@ -323,6 +335,8 @@ export default function WorkshopScene3D({
             <strong>{place.label}</strong>
             <p>{place.detail}</p>
             {(place.input ||
+              (place.navigation === 'workboard' && onWorkboard) ||
+              (place.navigation === 'people' && onPeople) ||
               (place.navigation === 'focus' && onFocus) ||
               (place.navigation === 'cabinet' && onCabinetFocus) ||
               place.kind === 'journal') && (

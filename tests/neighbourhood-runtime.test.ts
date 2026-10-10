@@ -5,15 +5,12 @@ import * as six from '../src/game/engine6';
 import type { GameInput, GameState } from '../src/game/types';
 import regular from './fixtures/published-six-regular-route.json';
 import { earnedHandoff } from './support/earned-handoff';
+import { beginPrivateWeek } from './support/public-attendance';
 import { choose } from './support/school-route';
 
 const has = (s: GameState, id: string) => getView(s).actions.some((a) => a.id === id);
 function privateWeek() {
-  let s = earnedHandoff();
-  s = choose(s, 'service-begin');
-  s = choose(s, 'service-private');
-  while (!has(s, 'service-close-small')) s = choose(s, 'service-next-day');
-  return choose(s, 'service-close-small');
+  return beginPrivateWeek(earnedHandoff());
 }
 function agree(s: GameState, id: string) {
   const original = s.inputs.length;
@@ -103,9 +100,7 @@ it('the open first week has no later episode and case shelving preserves actual 
   s = choose(s, 'service-begin');
   expect(s.serviceWeek?.conclusion).toBe('open');
   expect(getView(s).actions.some((a) => a.id.startsWith('neighbourhood-'))).toBe(false);
-  s = choose(s, 'service-private');
-  while (!has(s, 'service-close-small')) s = choose(s, 'service-next-day');
-  s = choose(s, 'service-close-small');
+  s = beginPrivateWeek(s);
   s = agree(s, 'neighbourhood-remember');
   s = agree(s, 'neighbourhood-hear-case');
   s = agree(s, 'neighbourhood-accept-case');

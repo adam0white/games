@@ -60,6 +60,43 @@ describe('workshop geometry projection', () => {
         .shelf[0]?.object,
     ).toBeUndefined();
   });
+  it('changes room geometry when the actual trolley work changes its known appearance', () => {
+    const trolley: ObjectView = {
+      ...lamp,
+      id: 'borrowed-trolley',
+      form: 'trolley',
+      trolleyPresentation: {
+        comparison: 'unexamined',
+        observed: 'unknown',
+        loadMode: 'full',
+        routeChecked: false,
+      },
+    };
+    const before = { ...base(), focus: trolley };
+    const after = {
+      ...before,
+      focus: {
+        ...trolley,
+        trolleyPresentation: {
+          comparison: 'compared' as const,
+          observed: 'rolls' as const,
+          loadMode: 'full' as const,
+          routeChecked: true,
+        },
+      },
+    };
+    expect(workshopGeometry(before, false)).not.toEqual(workshopGeometry(after, false));
+    expect(
+      workshopGeometry(
+        {
+          ...after,
+          focus: null,
+          shelf: [{ id: trolley.id, title: 'Trolley', note: 'Checked', object: after.focus }],
+        },
+        false,
+      ).shelf[0]?.object?.trolleyPresentation,
+    ).toEqual(after.focus.trolleyPresentation);
+  });
   it('uses the exposed cabinet entry when present and focuses details for an already-open project', () => {
     const cabinet = { stage: 'measured' as const, detail: 'Hinge marks are ready.' };
     const closed = {

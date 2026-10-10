@@ -1,0 +1,2745 @@
+{
+  "seed": 1701,
+  "sha256": "12e00e71399823c7ed739bb5cf5e9d5fc43353d229bdba9336abf681a6fc49b2",
+  "inputCount": 391,
+  "journalCount": 517,
+  "inputs": [
+    {
+      "at": 840,
+      "input": {
+        "type": "action",
+        "id": "talk-family"
+      }
+    },
+    {
+      "at": 844,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 848,
+      "input": {
+        "type": "action",
+        "id": "test-battery"
+      }
+    },
+    {
+      "at": 852,
+      "input": {
+        "type": "action",
+        "id": "clean-contact"
+      }
+    },
+    {
+      "at": 864,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 867,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 871,
+      "input": {
+        "type": "action",
+        "id": "ask-family-lamp"
+      }
+    },
+    {
+      "at": 877,
+      "input": {
+        "type": "action",
+        "id": "tease-book"
+      }
+    },
+    {
+      "at": 883,
+      "input": {
+        "type": "action",
+        "id": "kitchen-winter"
+      }
+    },
+    {
+      "at": 889,
+      "input": {
+        "type": "action",
+        "id": "ask-mum"
+      }
+    },
+    {
+      "at": 897,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 901,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 905,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 909,
+      "input": {
+        "type": "action",
+        "id": "test-battery"
+      }
+    },
+    {
+      "at": 913,
+      "input": {
+        "type": "action",
+        "id": "talk-garage"
+      }
+    },
+    {
+      "at": 917,
+      "input": {
+        "type": "action",
+        "id": "find-paper-street"
+      }
+    },
+    {
+      "at": 921,
+      "input": {
+        "type": "action",
+        "id": "search-donor"
+      }
+    },
+    {
+      "at": 925,
+      "input": {
+        "type": "action",
+        "id": "talk-friends"
+      }
+    },
+    {
+      "at": 929,
+      "input": {
+        "type": "action",
+        "id": "read-household-note"
+      }
+    },
+    {
+      "at": 929,
+      "input": {
+        "type": "action",
+        "id": "service-invite-donor"
+      }
+    },
+    {
+      "at": 934,
+      "input": {
+        "type": "action",
+        "id": "paper-street-sign"
+      }
+    },
+    {
+      "at": 940,
+      "input": {
+        "type": "action",
+        "id": "school-holidays"
+      }
+    },
+    {
+      "at": 946,
+      "input": {
+        "type": "action",
+        "id": "ask-dad-bench"
+      }
+    },
+    {
+      "at": 952,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 982,
+      "input": {
+        "type": "action",
+        "id": "dad-cabinet"
+      }
+    },
+    {
+      "at": 988,
+      "input": {
+        "type": "action",
+        "id": "garage-shared"
+      }
+    },
+    {
+      "at": 994,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-look"
+      }
+    },
+    {
+      "at": 997,
+      "input": {
+        "type": "action",
+        "id": "childhood-measure-model"
+      }
+    },
+    {
+      "at": 1007,
+      "input": {
+        "type": "action",
+        "id": "childhood-preserve-frontage"
+      }
+    },
+    {
+      "at": 1022,
+      "input": {
+        "type": "action",
+        "id": "childhood-make-label"
+      }
+    },
+    {
+      "at": 1030,
+      "input": {
+        "type": "select",
+        "id": "personal"
+      }
+    },
+    {
+      "at": 1030,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 1033,
+      "input": {
+        "type": "action",
+        "id": "open-access"
+      }
+    },
+    {
+      "at": 1036,
+      "input": {
+        "type": "action",
+        "id": "fit-holder"
+      }
+    },
+    {
+      "at": 1048,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 1051,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 1055,
+      "input": {
+        "type": "action",
+        "id": "remember-pencil"
+      }
+    },
+    {
+      "at": 1061,
+      "input": {
+        "type": "action",
+        "id": "ask-old-room"
+      }
+    },
+    {
+      "at": 1067,
+      "input": {
+        "type": "action",
+        "id": "lamp-drawing"
+      }
+    },
+    {
+      "at": 1073,
+      "input": {
+        "type": "action",
+        "id": "mum-own-time"
+      }
+    },
+    {
+      "at": 1079,
+      "input": {
+        "type": "action",
+        "id": "quiet-practice"
+      }
+    },
+    {
+      "at": 1085,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 1089,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 1093,
+      "input": {
+        "type": "action",
+        "id": "accept-request"
+      }
+    },
+    {
+      "at": 1097,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 1101,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 1104,
+      "input": {
+        "type": "action",
+        "id": "open-access"
+      }
+    },
+    {
+      "at": 1107,
+      "input": {
+        "type": "action",
+        "id": "test-battery"
+      }
+    },
+    {
+      "at": 1111,
+      "input": {
+        "type": "action",
+        "id": "clean-contact"
+      }
+    },
+    {
+      "at": 1123,
+      "input": {
+        "type": "action",
+        "id": "read-household-note"
+      }
+    },
+    {
+      "at": 1123,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 1126,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 1130,
+      "input": {
+        "type": "action",
+        "id": "ask-nora-morning"
+      }
+    },
+    {
+      "at": 1136,
+      "input": {
+        "type": "action",
+        "id": "kettle-shade"
+      }
+    },
+    {
+      "at": 1142,
+      "input": {
+        "type": "action",
+        "id": "nora-stove"
+      }
+    },
+    {
+      "at": 1148,
+      "input": {
+        "type": "action",
+        "id": "nora-boundary"
+      }
+    },
+    {
+      "at": 1154,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 1160,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 1164,
+      "input": {
+        "type": "action",
+        "id": "accept-request"
+      }
+    },
+    {
+      "at": 1168,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 1172,
+      "input": {
+        "type": "action",
+        "id": "path-torch-test-cap"
+      }
+    },
+    {
+      "at": 1182,
+      "input": {
+        "type": "action",
+        "id": "twist-cap"
+      }
+    },
+    {
+      "at": 1194,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 1197,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 1201,
+      "input": {
+        "type": "action",
+        "id": "sam-path"
+      }
+    },
+    {
+      "at": 1207,
+      "input": {
+        "type": "action",
+        "id": "ask-sam-string"
+      }
+    },
+    {
+      "at": 1213,
+      "input": {
+        "type": "action",
+        "id": "sam-work"
+      }
+    },
+    {
+      "at": 1219,
+      "input": {
+        "type": "action",
+        "id": "observer-invite"
+      }
+    },
+    {
+      "at": 1225,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 1231,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 1235,
+      "input": {
+        "type": "action",
+        "id": "resume-observer-invite"
+      }
+    },
+    {
+      "at": 1241,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1271,
+      "input": {
+        "type": "action",
+        "id": "resume-observer-invite"
+      }
+    },
+    {
+      "at": 1277,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-plan"
+      }
+    },
+    {
+      "at": 1279,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-measure"
+      }
+    },
+    {
+      "at": 1299,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-plan"
+      }
+    },
+    {
+      "at": 1301,
+      "input": {
+        "type": "action",
+        "id": "resume-observer-invite"
+      }
+    },
+    {
+      "at": 1307,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-close"
+      }
+    },
+    {
+      "at": 1308,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 1320,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-open"
+      }
+    },
+    {
+      "at": 1321,
+      "input": {
+        "type": "select",
+        "id": "paper-street"
+      }
+    },
+    {
+      "at": 1321,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 1325,
+      "input": {
+        "type": "action",
+        "id": "shelve"
+      }
+    },
+    {
+      "at": 1329,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2340,
+      "input": {
+        "type": "action",
+        "id": "service-hear-donor"
+      }
+    },
+    {
+      "at": 2345,
+      "input": {
+        "type": "action",
+        "id": "service-measure-donor"
+      }
+    },
+    {
+      "at": 2365,
+      "input": {
+        "type": "action",
+        "id": "service-recover-donor"
+      }
+    },
+    {
+      "at": 2405,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-hang"
+      }
+    },
+    {
+      "at": 2445,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-align"
+      }
+    },
+    {
+      "at": 2447,
+      "input": {
+        "type": "action",
+        "id": "resume-observer-invite"
+      }
+    },
+    {
+      "at": 2453,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-align"
+      }
+    },
+    {
+      "at": 2455,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-plan"
+      }
+    },
+    {
+      "at": 2455,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-align"
+      }
+    },
+    {
+      "at": 2457,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-plan"
+      }
+    },
+    {
+      "at": 2457,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2460,
+      "input": {
+        "type": "action",
+        "id": "resume-observer-invite"
+      }
+    },
+    {
+      "at": 2466,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 2496,
+      "input": {
+        "type": "action",
+        "id": "resume-observer-invite"
+      }
+    },
+    {
+      "at": 2502,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2520,
+      "input": {
+        "type": "action",
+        "id": "resume-observer-invite"
+      }
+    },
+    {
+      "at": 2526,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2550,
+      "input": {
+        "type": "action",
+        "id": "resume-observer-invite"
+      }
+    },
+    {
+      "at": 2556,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-align"
+      }
+    },
+    {
+      "at": 2558,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-plan"
+      }
+    },
+    {
+      "at": 2560,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2580,
+      "input": {
+        "type": "action",
+        "id": "resume-observer-invite"
+      }
+    },
+    {
+      "at": 2586,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-align"
+      }
+    },
+    {
+      "at": 2588,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2610,
+      "input": {
+        "type": "action",
+        "id": "resume-observer-invite"
+      }
+    },
+    {
+      "at": 2616,
+      "input": {
+        "type": "select",
+        "id": "paper-street"
+      }
+    },
+    {
+      "at": 2616,
+      "input": {
+        "type": "action",
+        "id": "fit-gear"
+      }
+    },
+    {
+      "at": 2634,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 2638,
+      "input": {
+        "type": "action",
+        "id": "wait-check"
+      }
+    },
+    {
+      "at": 2648,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 2652,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 2656,
+      "input": {
+        "type": "action",
+        "id": "resume-observer-invite"
+      }
+    },
+    {
+      "at": 2662,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 2692,
+      "input": {
+        "type": "action",
+        "id": "resume-observer-invite"
+      }
+    },
+    {
+      "at": 2698,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-plan"
+      }
+    },
+    {
+      "at": 2698,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-align"
+      }
+    },
+    {
+      "at": 2700,
+      "input": {
+        "type": "action",
+        "id": "resume-observer-invite"
+      }
+    },
+    {
+      "at": 2706,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 2736,
+      "input": {
+        "type": "action",
+        "id": "resume-observer-invite"
+      }
+    },
+    {
+      "at": 2742,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2760,
+      "input": {
+        "type": "action",
+        "id": "next-day"
+      }
+    },
+    {
+      "at": 3420,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 3480,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 3660,
+      "input": {
+        "type": "action",
+        "id": "resume-observer-invite"
+      }
+    },
+    {
+      "at": 3666,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-close"
+      }
+    },
+    {
+      "at": 3667,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 3825,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-open"
+      }
+    },
+    {
+      "at": 3826,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-align"
+      }
+    },
+    {
+      "at": 3851,
+      "input": {
+        "type": "action",
+        "id": "aftercare-door-start"
+      }
+    },
+    {
+      "at": 3853,
+      "input": {
+        "type": "action",
+        "id": "aftercare-door-question"
+      }
+    },
+    {
+      "at": 3856,
+      "input": {
+        "type": "action",
+        "id": "workshop-drawings"
+      }
+    },
+    {
+      "at": 3866,
+      "input": {
+        "type": "action",
+        "id": "workshop-display-drawing"
+      }
+    },
+    {
+      "at": 3867,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-close"
+      }
+    },
+    {
+      "at": 3868,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 3898,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 3928,
+      "input": {
+        "type": "action",
+        "id": "next-day"
+      }
+    },
+    {
+      "at": 4860,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-open"
+      }
+    },
+    {
+      "at": 4861,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-close"
+      }
+    },
+    {
+      "at": 4862,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 4920,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 4950,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 5100,
+      "input": {
+        "type": "action",
+        "id": "back-to-school"
+      }
+    },
+    {
+      "at": 531900,
+      "input": {
+        "type": "action",
+        "id": "read-household-note"
+      }
+    },
+    {
+      "at": 531900,
+      "input": {
+        "type": "action",
+        "id": "accept-request"
+      }
+    },
+    {
+      "at": 531904,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 531908,
+      "input": {
+        "type": "action",
+        "id": "clear-obstruction"
+      }
+    },
+    {
+      "at": 531914,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 531918,
+      "input": {
+        "type": "action",
+        "id": "read-household-note"
+      }
+    },
+    {
+      "at": 531918,
+      "input": {
+        "type": "action",
+        "id": "ask-mum"
+      }
+    },
+    {
+      "at": 531926,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 531956,
+      "input": {
+        "type": "action",
+        "id": "ask-mum"
+      }
+    },
+    {
+      "at": 531964,
+      "input": {
+        "type": "action",
+        "id": "timer-carry"
+      }
+    },
+    {
+      "at": 531970,
+      "input": {
+        "type": "action",
+        "id": "parts-labels"
+      }
+    },
+    {
+      "at": 531976,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 531980,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 531984,
+      "input": {
+        "type": "action",
+        "id": "accept-request"
+      }
+    },
+    {
+      "at": 531988,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 531992,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 531995,
+      "input": {
+        "type": "action",
+        "id": "open-access"
+      }
+    },
+    {
+      "at": 531998,
+      "input": {
+        "type": "action",
+        "id": "align-striker"
+      }
+    },
+    {
+      "at": 532008,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 532011,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 532015,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 532020,
+      "input": {
+        "type": "action",
+        "id": "bell-bicycle"
+      }
+    },
+    {
+      "at": 532026,
+      "input": {
+        "type": "action",
+        "id": "open-access"
+      }
+    },
+    {
+      "at": 532029,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 532032,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 532036,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 532041,
+      "input": {
+        "type": "action",
+        "id": "open-access"
+      }
+    },
+    {
+      "at": 532044,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 532047,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 532051,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 532056,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 532060,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 532140,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-open"
+      }
+    },
+    {
+      "at": 532141,
+      "input": {
+        "type": "action",
+        "id": "back-to-school"
+      }
+    },
+    {
+      "at": 1058940,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-close"
+      }
+    },
+    {
+      "at": 1058941,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1058971,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1059001,
+      "input": {
+        "type": "action",
+        "id": "accept-request"
+      }
+    },
+    {
+      "at": 1059005,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 1059009,
+      "input": {
+        "type": "action",
+        "id": "test-catch"
+      }
+    },
+    {
+      "at": 1059013,
+      "input": {
+        "type": "action",
+        "id": "lubricate-hinge"
+      }
+    },
+    {
+      "at": 1059021,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 1059025,
+      "input": {
+        "type": "action",
+        "id": "sewing-blue-cloth"
+      }
+    },
+    {
+      "at": 1059031,
+      "input": {
+        "type": "action",
+        "id": "nora-repair-street"
+      }
+    },
+    {
+      "at": 1059037,
+      "input": {
+        "type": "action",
+        "id": "read-household-note"
+      }
+    },
+    {
+      "at": 1059037,
+      "input": {
+        "type": "action",
+        "id": "ask-mum"
+      }
+    },
+    {
+      "at": 1059045,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 1059049,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 1059053,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1059083,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 1059180,
+      "input": {
+        "type": "action",
+        "id": "accept-request"
+      }
+    },
+    {
+      "at": 1059184,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 1059188,
+      "input": {
+        "type": "action",
+        "id": "search-spring"
+      }
+    },
+    {
+      "at": 1059192,
+      "input": {
+        "type": "action",
+        "id": "replace-spring"
+      }
+    },
+    {
+      "at": 1059204,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 1059208,
+      "input": {
+        "type": "action",
+        "id": "sam-school-next"
+      }
+    },
+    {
+      "at": 1059214,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 1059218,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 1059222,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-open"
+      }
+    },
+    {
+      "at": 1059223,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-close"
+      }
+    },
+    {
+      "at": 1059224,
+      "input": {
+        "type": "action",
+        "id": "next-day"
+      }
+    },
+    {
+      "at": 1060380,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 1060440,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 1060620,
+      "input": {
+        "type": "action",
+        "id": "back-to-school"
+      }
+    },
+    {
+      "at": 1587420,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 1587480,
+      "input": {
+        "type": "action",
+        "id": "accept-request"
+      }
+    },
+    {
+      "at": 1587484,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 1587488,
+      "input": {
+        "type": "action",
+        "id": "test-battery"
+      }
+    },
+    {
+      "at": 1587492,
+      "input": {
+        "type": "action",
+        "id": "clean-contact"
+      }
+    },
+    {
+      "at": 1587504,
+      "input": {
+        "type": "action",
+        "id": "replace-battery"
+      }
+    },
+    {
+      "at": 1587516,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 1587519,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 1587523,
+      "input": {
+        "type": "action",
+        "id": "read-household-note"
+      }
+    },
+    {
+      "at": 1587523,
+      "input": {
+        "type": "action",
+        "id": "ask-mum"
+      }
+    },
+    {
+      "at": 1587531,
+      "input": {
+        "type": "action",
+        "id": "pantry-list"
+      }
+    },
+    {
+      "at": 1587537,
+      "input": {
+        "type": "action",
+        "id": "wait-check"
+      }
+    },
+    {
+      "at": 1587543,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 1587547,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 1587551,
+      "input": {
+        "type": "action",
+        "id": "accept-request"
+      }
+    },
+    {
+      "at": 1587555,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 1587559,
+      "input": {
+        "type": "action",
+        "id": "test-battery"
+      }
+    },
+    {
+      "at": 1587563,
+      "input": {
+        "type": "action",
+        "id": "clean-contact"
+      }
+    },
+    {
+      "at": 1587575,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 1587578,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 1587582,
+      "input": {
+        "type": "action",
+        "id": "returns-crate"
+      }
+    },
+    {
+      "at": 1587588,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1587618,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 1587622,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 1587626,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-open"
+      }
+    },
+    {
+      "at": 1587627,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-close"
+      }
+    },
+    {
+      "at": 1587628,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 1587660,
+      "input": {
+        "type": "action",
+        "id": "sam-counter"
+      }
+    },
+    {
+      "at": 1587666,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1587696,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1587726,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1587756,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1587786,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1587816,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1587846,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1587876,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1587906,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1587936,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1587966,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1587996,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1588026,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1588056,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1588086,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1588116,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 1588146,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-open"
+      }
+    },
+    {
+      "at": 1588147,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-close"
+      }
+    },
+    {
+      "at": 1588148,
+      "input": {
+        "type": "action",
+        "id": "next-day"
+      }
+    },
+    {
+      "at": 1588860,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 1588920,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 1589100,
+      "input": {
+        "type": "action",
+        "id": "back-to-school"
+      }
+    },
+    {
+      "at": 2115900,
+      "input": {
+        "type": "action",
+        "id": "after-school-work"
+      }
+    },
+    {
+      "at": 2115906,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2115960,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2116140,
+      "input": {
+        "type": "action",
+        "id": "arrange-learning"
+      }
+    },
+    {
+      "at": 2116144,
+      "input": {
+        "type": "action",
+        "id": "learning-light"
+      }
+    },
+    {
+      "at": 2116148,
+      "input": {
+        "type": "action",
+        "id": "supervised-repair"
+      }
+    },
+    {
+      "at": 2116152,
+      "input": {
+        "type": "action",
+        "id": "reconsider-sam"
+      }
+    },
+    {
+      "at": 2116156,
+      "input": {
+        "type": "action",
+        "id": "watch-sam"
+      }
+    },
+    {
+      "at": 2116160,
+      "input": {
+        "type": "action",
+        "id": "watch-sam"
+      }
+    },
+    {
+      "at": 2116164,
+      "input": {
+        "type": "action",
+        "id": "reconsider-sam"
+      }
+    },
+    {
+      "at": 2116168,
+      "input": {
+        "type": "action",
+        "id": "watch-sam"
+      }
+    },
+    {
+      "at": 2116172,
+      "input": {
+        "type": "action",
+        "id": "reconsider-sam"
+      }
+    },
+    {
+      "at": 2116176,
+      "input": {
+        "type": "action",
+        "id": "watch-sam"
+      }
+    },
+    {
+      "at": 2116180,
+      "input": {
+        "type": "action",
+        "id": "sam-next-work"
+      }
+    },
+    {
+      "at": 2116186,
+      "input": {
+        "type": "action",
+        "id": "workshop-referral-ask"
+      }
+    },
+    {
+      "at": 2116189,
+      "input": {
+        "type": "action",
+        "id": "workshop-priced"
+      }
+    },
+    {
+      "at": 2116192,
+      "input": {
+        "type": "action",
+        "id": "workshop-intake-space"
+      }
+    },
+    {
+      "at": 2116197,
+      "input": {
+        "type": "action",
+        "id": "take-over-repair"
+      }
+    },
+    {
+      "at": 2116201,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 2116205,
+      "input": {
+        "type": "action",
+        "id": "test-battery"
+      }
+    },
+    {
+      "at": 2116209,
+      "input": {
+        "type": "action",
+        "id": "clean-contact"
+      }
+    },
+    {
+      "at": 2116221,
+      "input": {
+        "type": "action",
+        "id": "replace-battery"
+      }
+    },
+    {
+      "at": 2116233,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 2116236,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 2116240,
+      "input": {
+        "type": "action",
+        "id": "workshop-leila-arrival"
+      }
+    },
+    {
+      "at": 2116243,
+      "input": {
+        "type": "action",
+        "id": "workshop-quote-leila"
+      }
+    },
+    {
+      "at": 2116246,
+      "input": {
+        "type": "action",
+        "id": "workshop-defer-leila"
+      }
+    },
+    {
+      "at": 2116247,
+      "input": {
+        "type": "action",
+        "id": "wait-check"
+      }
+    },
+    {
+      "at": 2116260,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 2116264,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 2116268,
+      "input": {
+        "type": "action",
+        "id": "workshop-accept-leila"
+      }
+    },
+    {
+      "at": 2116273,
+      "input": {
+        "type": "action",
+        "id": "supervised-repair"
+      }
+    },
+    {
+      "at": 2116277,
+      "input": {
+        "type": "action",
+        "id": "watch-sam"
+      }
+    },
+    {
+      "at": 2116281,
+      "input": {
+        "type": "action",
+        "id": "watch-sam"
+      }
+    },
+    {
+      "at": 2116285,
+      "input": {
+        "type": "action",
+        "id": "watch-sam"
+      }
+    },
+    {
+      "at": 2116289,
+      "input": {
+        "type": "action",
+        "id": "watch-sam"
+      }
+    },
+    {
+      "at": 2116293,
+      "input": {
+        "type": "action",
+        "id": "arrange-learning"
+      }
+    },
+    {
+      "at": 2116297,
+      "input": {
+        "type": "action",
+        "id": "reconsider-sam"
+      }
+    },
+    {
+      "at": 2116301,
+      "input": {
+        "type": "action",
+        "id": "take-over-repair"
+      }
+    },
+    {
+      "at": 2116305,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 2116309,
+      "input": {
+        "type": "action",
+        "id": "supervised-repair"
+      }
+    },
+    {
+      "at": 2116313,
+      "input": {
+        "type": "action",
+        "id": "take-over-repair"
+      }
+    },
+    {
+      "at": 2116317,
+      "input": {
+        "type": "action",
+        "id": "test-battery"
+      }
+    },
+    {
+      "at": 2116321,
+      "input": {
+        "type": "action",
+        "id": "clean-contact"
+      }
+    },
+    {
+      "at": 2116333,
+      "input": {
+        "type": "action",
+        "id": "replace-battery"
+      }
+    },
+    {
+      "at": 2116345,
+      "input": {
+        "type": "action",
+        "id": "shelve"
+      }
+    },
+    {
+      "at": 2116349,
+      "input": {
+        "type": "action",
+        "id": "supervised-intake"
+      }
+    },
+    {
+      "at": 2116353,
+      "input": {
+        "type": "action",
+        "id": "watch-sam"
+      }
+    },
+    {
+      "at": 2116357,
+      "input": {
+        "type": "action",
+        "id": "take-over-repair"
+      }
+    },
+    {
+      "at": 2116361,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 2116365,
+      "input": {
+        "type": "action",
+        "id": "test-battery"
+      }
+    },
+    {
+      "at": 2116369,
+      "input": {
+        "type": "action",
+        "id": "clean-contact"
+      }
+    },
+    {
+      "at": 2116381,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 2116384,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 2116388,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 2116418,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 2116422,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 2116426,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2116440,
+      "input": {
+        "type": "action",
+        "id": "workshop-delay-leila"
+      }
+    },
+    {
+      "at": 2116443,
+      "input": {
+        "type": "action",
+        "id": "arrange-learning"
+      }
+    },
+    {
+      "at": 2116447,
+      "input": {
+        "type": "select",
+        "id": "workshop-leila"
+      }
+    },
+    {
+      "at": 2116447,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 2116450,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 2116454,
+      "input": {
+        "type": "action",
+        "id": "explain-step"
+      }
+    },
+    {
+      "at": 2116458,
+      "input": {
+        "type": "action",
+        "id": "wait-check"
+      }
+    },
+    {
+      "at": 2116474,
+      "input": {
+        "type": "action",
+        "id": "explain-step"
+      }
+    },
+    {
+      "at": 2116478,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 2116482,
+      "input": {
+        "type": "action",
+        "id": "explain-step"
+      }
+    },
+    {
+      "at": 2116486,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 2116490,
+      "input": {
+        "type": "action",
+        "id": "explain-step"
+      }
+    },
+    {
+      "at": 2116494,
+      "input": {
+        "type": "action",
+        "id": "learning-light"
+      }
+    },
+    {
+      "at": 2116498,
+      "input": {
+        "type": "action",
+        "id": "supervised-repair"
+      }
+    },
+    {
+      "at": 2116502,
+      "input": {
+        "type": "action",
+        "id": "watch-sam"
+      }
+    },
+    {
+      "at": 2116506,
+      "input": {
+        "type": "action",
+        "id": "reconsider-sam"
+      }
+    },
+    {
+      "at": 2116510,
+      "input": {
+        "type": "action",
+        "id": "take-over-repair"
+      }
+    },
+    {
+      "at": 2116514,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 2116518,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 2116521,
+      "input": {
+        "type": "action",
+        "id": "open-access"
+      }
+    },
+    {
+      "at": 2116524,
+      "input": {
+        "type": "action",
+        "id": "test-battery"
+      }
+    },
+    {
+      "at": 2116528,
+      "input": {
+        "type": "action",
+        "id": "clean-contact"
+      }
+    },
+    {
+      "at": 2116540,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 2116543,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 2116547,
+      "input": {
+        "type": "action",
+        "id": "wait-check"
+      }
+    },
+    {
+      "at": 2116567,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 2116571,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 2116575,
+      "input": {
+        "type": "action",
+        "id": "supervised-retry-intake"
+      }
+    },
+    {
+      "at": 2116579,
+      "input": {
+        "type": "action",
+        "id": "reconsider-sam"
+      }
+    },
+    {
+      "at": 2116583,
+      "input": {
+        "type": "action",
+        "id": "watch-sam"
+      }
+    },
+    {
+      "at": 2116587,
+      "input": {
+        "type": "action",
+        "id": "take-over-repair"
+      }
+    },
+    {
+      "at": 2116591,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 2116595,
+      "input": {
+        "type": "action",
+        "id": "arrange-learning"
+      }
+    },
+    {
+      "at": 2116599,
+      "input": {
+        "type": "action",
+        "id": "shelve"
+      }
+    },
+    {
+      "at": 2116603,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-open"
+      }
+    },
+    {
+      "at": 2116604,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-close"
+      }
+    },
+    {
+      "at": 2116605,
+      "input": {
+        "type": "action",
+        "id": "arrange-learning"
+      }
+    },
+    {
+      "at": 2116609,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 2116639,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 2116669,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 2116699,
+      "input": {
+        "type": "action",
+        "id": "next-day"
+      }
+    },
+    {
+      "at": 2117340,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 2117370,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 2117400,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2117580,
+      "input": {
+        "type": "action",
+        "id": "arrange-learning"
+      }
+    },
+    {
+      "at": 2117584,
+      "input": {
+        "type": "select",
+        "id": "supervised-retry-light"
+      }
+    },
+    {
+      "at": 2117584,
+      "input": {
+        "type": "action",
+        "id": "test-battery"
+      }
+    },
+    {
+      "at": 2117588,
+      "input": {
+        "type": "action",
+        "id": "explain-step"
+      }
+    },
+    {
+      "at": 2117592,
+      "input": {
+        "type": "action",
+        "id": "clean-contact"
+      }
+    },
+    {
+      "at": 2117604,
+      "input": {
+        "type": "action",
+        "id": "explain-step"
+      }
+    },
+    {
+      "at": 2117608,
+      "input": {
+        "type": "action",
+        "id": "reassemble"
+      }
+    },
+    {
+      "at": 2117611,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 2117615,
+      "input": {
+        "type": "action",
+        "id": "explain-step"
+      }
+    },
+    {
+      "at": 2117619,
+      "input": {
+        "type": "action",
+        "id": "wait-check"
+      }
+    },
+    {
+      "at": 2117635,
+      "input": {
+        "type": "action",
+        "id": "explain-step"
+      }
+    },
+    {
+      "at": 2117639,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 2117643,
+      "input": {
+        "type": "action",
+        "id": "explain-step"
+      }
+    },
+    {
+      "at": 2117647,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 2117651,
+      "input": {
+        "type": "action",
+        "id": "explain-step"
+      }
+    },
+    {
+      "at": 2117655,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 2117685,
+      "input": {
+        "type": "action",
+        "id": "next-day"
+      }
+    },
+    {
+      "at": 2118780,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2118840,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2119020,
+      "input": {
+        "type": "action",
+        "id": "arrange-learning"
+      }
+    },
+    {
+      "at": 2119024,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 2119054,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-open"
+      }
+    },
+    {
+      "at": 2119055,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-close"
+      }
+    },
+    {
+      "at": 2119056,
+      "input": {
+        "type": "action",
+        "id": "rest"
+      }
+    },
+    {
+      "at": 2119086,
+      "input": {
+        "type": "action",
+        "id": "next-day"
+      }
+    },
+    {
+      "at": 2120220,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2120280,
+      "input": {
+        "type": "action",
+        "id": "wait-appointment"
+      }
+    },
+    {
+      "at": 2120460,
+      "input": {
+        "type": "action",
+        "id": "arrange-learning"
+      }
+    },
+    {
+      "at": 2120464,
+      "input": {
+        "type": "action",
+        "id": "next-day"
+      }
+    }
+  ]
+}

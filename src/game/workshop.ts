@@ -17,7 +17,8 @@ export interface WorkshopJobSpec {
   story: string;
   fault: Fault;
   appearance: 'kitchen' | 'reading' | 'bedside' | 'timer';
-  form?: 'lamp' | 'timer';
+  form?: 'lamp' | 'timer' | 'trolley' | 'bell' | 'box';
+  trolley?: import('./types').RepairObject['trolley'];
   inspectText?: string;
   collectionPlan?: 'evening' | 'morning' | 'afternoon';
   materialsBatteryProvided: boolean;
@@ -38,7 +39,13 @@ export interface LedgerEntry {
   id: string;
   at: number;
   amount: number;
-  kind: 'materials-advance' | 'materials' | 'repair-fee' | 'sam-pay' | 'checking-place';
+  kind:
+    | 'materials-advance'
+    | 'materials'
+    | 'repair-fee'
+    | 'sam-pay'
+    | 'checking-place'
+    | 'delivery-pay';
   jobId: string;
 }
 export interface WorkshopState {

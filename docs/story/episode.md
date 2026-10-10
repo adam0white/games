@@ -6,7 +6,7 @@ The first holiday begins at fourteen with one family request. Optional lamp ques
 
 The garage is shared space. Bench marks lead to the unfinished cabinet; Mum's old-room answer allows her book and quiet practice. During school, Sam can discuss a future afternoon together while remaining a friend with other obligations. Arranged observation and whole-job teaching become playable after the player graduates; an invitation does not establish that learning has already happened. No paid apprenticeship or business ownership is established during school.
 
-School transitions explicitly summarize the unplayed weeks and months. The current authored pacing uses two careful returns before a return-to-school opportunity, repeated across four years; this is a playable pacing choice, not a claim that each summer contains exactly two repairs or two afternoons. Names, objects and notes remain recognizable when another summer starts. Household members also have lives between episodes, without silently manufacturing player expertise.
+School transitions explicitly summarize the unplayed weeks and months. Holiday repairs are optional; accepted property and active checks need safe settlement before leaving. Graduation ends the tutorial even when optional projects remain unfinished. Names, objects and notes remain recognizable when another summer starts. Household members also have lives between episodes, without silently manufacturing player expertise.
 
 Suggested/current disclosure stages:
 
@@ -32,7 +32,7 @@ Repair's prevalence supports the economy and multiplayer ambition. Scrapping, re
 
 ## First service week
 
-After Sam’s genuine whole-job handoff, the player may try five ordinary working days. Two regular collection afternoons, occasional favours and a private shared bench are reversible arrangements. Hearing a request makes no deadline. Leila’s gate lamp is connected to returning a borrowed trolley; Nora’s cutting-table light is needed for one sewing afternoon. Nora brings the light shortly before Sam’s counter shift; her requested collection can overlap and the player’s explicitly saved model session. Reconsidering future work preserves accepted promises; a later collection requires another explicit agreement.
+After graduation, the player may try five ordinary working days. Sam’s genuine whole-job handoff changes capacity but is not required to begin adult customer work. Two regular collection afternoons, occasional favours and a private shared bench are reversible arrangements. Hearing a request makes no deadline. Leila’s gate lamp is connected to returning a borrowed trolley; Nora’s cutting-table light is needed for one sewing afternoon. Nora brings the light shortly before Sam’s counter shift; her requested collection can overlap and the player’s explicitly saved model session. Reconsidering future work preserves accepted promises; a later collection requires another explicit agreement.
 
 A second stable checking tray costs £6 from actual recorded repair earnings. It provides another checking place, without completing a test or increasing income by itself. Sam’s £2 whole-job rate for these service repairs is a separate agreement from earlier work. Favours do not promise his unpaid labour.
 
@@ -57,3 +57,14 @@ Nora first describes the samples she wants to keep together while carrying them.
 A separate household light offers supported work for Sam while the player handles the case or another personal object. Its materials, accepted terms, availability and collection follow the normal workshop pipeline. Delegation releases the player's attention only when Sam genuinely owns the job; neither watching nor intervening is required to unlock the case.
 
 This chapter adds a place and an old promise through concrete objects. It leaves the cause of the wider decline, ownership of the former shop and the player's eventual career unresolved.
+
+
+## Selected collection and following-year episodes
+
+After the first-week ending, the collection page opens without requiring every optional neighbourhood thread. Each episode separates an invitation, actually hearing a request, accepting terms, physical work, checking and returning property. A month and then a year passage happen only after accepted obligations are settled or explicitly released. The public clock identifies the new period and actual age instead of calling every later month another summer day.
+
+Requests include an empty-versus-loaded trolley comparison, Nora's exposed timer obstruction, a familiar counter light that may suit Sam's methods, a later load-induced strap complaint, a supplied-cell shelf light and an offset exterior box catch. The different trolley complaint needs new evidence; an earlier repair is not proof of the new cause.
+
+Transport involves finite shared-store property. A checked trolley, lighter hand-carried trips and attended pickup can support different arrangements. Paid help requires real agreement, elapsed work, continued participation and a receipt; interrupted transport must leave custody and payment honest. A private period should offer meaningful personal work rather than require customer errands under a private label.
+
+The final shape is an agreed collection afternoon, occasional favours or a private bench. It closes an authored chapter without assigning offscreen earnings or deciding the player's entire future.

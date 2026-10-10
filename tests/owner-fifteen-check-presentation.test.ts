@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { advanceApprentice } from '../src/game/apprentice';
-import { getView, restoreGame, transition } from '../src/game/engine';
+import { getView, restoreGame } from '../src/game/engine';
 import * as thirteen from '../src/game/engine13';
 import * as fourteen from '../src/game/engine14';
 import * as fifteen from '../src/game/engine15';
@@ -8,6 +8,7 @@ import type { GameInput } from '../src/game/types';
 import route from './fixtures/fifteen-owner-return-route.json';
 import base from './fixtures/fourteen-owner-return-route.json';
 import source from './fixtures/owner-thirteen-school-apprentice-route.json';
+import { positiveAction } from './support/public-attendance';
 
 it('describes the actual owner model check without announcing yesterday’s session or granting passive verification', () => {
   let historical = thirteen.createGame(source.seed);
@@ -24,21 +25,23 @@ it('describes the actual owner model check without announcing yesterday’s sess
   let current = restoreGame(fifteen.serializeGame(modelRun));
   const model = () => current.objects.find((item) => item.id === 'paper-street');
   const priorLine = current.nextLineId ?? 0;
-  current = transition(current, { type: 'action', id: 'ask-mum' });
+  current = positiveAction(current, 'ask-mum');
   const reply = (getView(current).journal ?? []).filter((line) => line.id >= priorLine);
   expect(
     reply.some((line) => line.speaker === 'Mum' && line.text.includes('repeat its movement')),
   ).toBe(true);
   expect(reply.some((line) => line.text.includes('Leave it on'))).toBe(false);
   expect(model()?.verified).toBe(false);
-  current = transition(current, { type: 'action', id: 'wait-check' });
+  // Waiting for Mum may already finish elapsed time; it never performs the circuit.
+  if (getView(current).actions.some((action) => action.id === 'wait-check'))
+    current = positiveAction(current, 'wait-check');
   expect(model()?.verified).toBe(false);
   expect(
     (getView(current).journal ?? [])
       .filter((line) => line.id >= priorLine)
       .some((line) => line.text.includes('The agreed bench session has ended.')),
   ).toBe(false);
-  current = transition(current, { type: 'action', id: 'check-result' });
+  current = positiveAction(current, 'check-result');
   expect(model()?.verified).toBe(true);
 }, 30_000);
 

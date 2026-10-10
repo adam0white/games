@@ -1,5 +1,13 @@
 # Broad roadmap
 
+## Active working-life expansion, 2026-10-10
+
+The owner's new five-hour authorization selects a larger increment beyond the opening and first service week. School ends the tutorial. The fresh interface separates home learning, workshop work and the service workboard, with explicit deliveries, graduation and year passages. Adult work does not require an independent apprentice: delegation changes capacity rather than admission to the game.
+
+Selected chapter: a collection afternoon, two people working, and the following year. Finite transport repairs introduce empty-versus-loaded evidence and attended route checks. Leila may agree to bounded paid delivery work; Sam's actual acquired methods determine supported repairs. Solo, occasional-favour and private-work paths remain viable. Retained childhood work and Nora's actual case outcome affect later packing and presentation without becoming mandatory prerequisites. Economy and multiplayer remain future scope.
+
+The run is active until **2026-10-10 23:59:42 UTC**. [Execution ledger](superpowers/plans/2026-10-10-working-life.md), [design](superpowers/specs/2026-10-10-working-life-design.md), and [owner/independent play evidence](games/working-life-playtests-2026-10-10.md) define this increment. Implementation and technical delivery do not claim Adam's personal acceptance.
+
 Updated 2026-10-10 during the owner-authorized five-hour run. M0 planning, the school-break home/garage campaign and bounded M3–M4 teaching/independent handoff are implemented and independently reviewed. The public game is at https://repair.adamwhite.work, using released HF 2.2.0; HANDOFF.md records the exact deployed checkpoint. Adam's earlier playtest established curiosity and believable diagnosis; acceptance of this substantially expanded chapter remains his decision. The first service week turns delegation into actual choices about promises, money, personal time and staying small. Engine 9 timeline and personal-work recovery passed independent review, 188 tests and the full build checks before publication. Tests, technical reviews and deployment do not substitute for that playtest.
 
 ## Near milestones

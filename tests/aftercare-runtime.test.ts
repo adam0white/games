@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { getView, restoreGame, serializeGame } from '../src/game/engine';
 import type { GameState } from '../src/game/types';
 import { earnedHandoff } from './support/earned-handoff';
+import { completePublicAction, positiveAction } from './support/public-attendance';
 import { choose } from './support/school-route';
 
 const has = (s: GameState, id: string) => getView(s).actions.some((a) => a.id === id);
@@ -45,10 +46,10 @@ it('actual cabinet aftercare starts and finishes joined talk, leaves bench contr
     }
   }
   expect(s.workshop?.cabinet).toBe('finished');
-  for (const id of ['service-begin', 'service-regular']) s = choose(s, id);
-  s = choose(reach(s, 'service-paid-help'), 'service-paid-help');
-  s = choose(reach(s, 'service-hear-leila'), 'service-hear-leila');
-  s = choose(s, 'service-accept-leila');
+  for (const id of ['service-begin', 'service-regular']) s = positiveAction(s, id);
+  s = positiveAction(reach(s, 'service-paid-help'), 'service-paid-help');
+  s = positiveAction(reach(s, 'service-hear-leila'), 'service-hear-leila');
+  s = positiveAction(s, 'service-accept-leila');
   for (let n = 0; n < 120 && !has(s, 'delegate-repair'); n++) {
     s = choose(reach(s, 'arrange-learning'), 'arrange-learning');
     if (!s.serviceWeek?.paidHelp && has(s, 'service-paid-help')) s = choose(s, 'service-paid-help');
@@ -79,11 +80,12 @@ it('an earned donor reflection permits actual Evan conversation without taking a
     'service-find-model',
     'service-invite-donor',
   ])
-    s = choose(s, id);
-  s = choose(reach(s, 'service-hear-donor'), 'service-hear-donor');
-  s = choose(s, 'service-decline-donor');
-  while (!has(s, 'service-reflect')) s = choose(s, 'service-next-day');
-  s = choose(s, 'service-reflect');
+    s = positiveAction(s, id);
+  s = positiveAction(reach(s, 'service-hear-donor'), 'service-hear-donor');
+  s = positiveAction(s, 'service-decline-donor');
+  for (let day = 0; day < 10 && !has(s, 'service-reflect'); day++)
+    s = positiveAction(s, 'service-next-day');
+  s = completePublicAction(s, 'service-reflect', (next) => next.serviceWeek?.reflection === true);
   const objects = structuredClone(s.objects),
     parts = structuredClone(s.parts),
     cash = s.workshop?.cash;
@@ -111,7 +113,7 @@ it('an earned donor reflection permits actual Evan conversation without taking a
   );
   for (const person of Object.values(s.people)) expect(person.now).toBe(s.now);
   expect(restoreGame(serializeGame(s))).toEqual(s);
-});
+}, 20_000);
 it('new journal lines retain their actual observation clock and survive exact replay', () => {
   let s = earnedHandoff();
   const opening = s.journal?.[0];

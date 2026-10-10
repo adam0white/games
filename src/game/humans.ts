@@ -412,6 +412,7 @@ export function beginSharedConversation(
   purpose?: {
     action: string;
     physical?: boolean;
+    partnerOffer?: Partial<Affordance>;
     partnerGoals?: string[];
     playerGoals?: string[];
     alternative?: Affordance;
@@ -456,6 +457,7 @@ export function beginSharedConversation(
         : ['social', 'reflection'],
     ...(purpose?.partnerGoals?.length ? { advances: purpose.partnerGoals } : {}),
     advertises: purpose?.physical ? { competence: 0.08 } : { belonging: 0.07, leisure: 0.06 },
+    ...purpose?.partnerOffer,
   };
   const own: Affordance = {
     id: 'keep-own-plans',

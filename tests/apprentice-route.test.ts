@@ -1,14 +1,9 @@
 import { expect, it } from 'vitest';
-import {
-  type createGame,
-  getView,
-  restoreGame,
-  serializeGame,
-  transition,
-} from '../src/game/engine';
+import { type createGame, getView, restoreGame, serializeGame } from '../src/game/engine';
 import * as old from '../src/game/engine3';
+import { positiveAction } from './support/public-attendance';
 
-const act = (s: ReturnType<typeof createGame>, id: string) => transition(s, { type: 'action', id });
+const act = positiveAction;
 function adultHistory() {
   let s = old.createGame(42);
   const action = (id: string) => {
@@ -64,8 +59,10 @@ function teachLight(s: ReturnType<typeof createGame>, repeat = false) {
     s = act(s, id);
     if (!repeat) s = act(s, 'explain-step');
   }
-  const item = s.objects.find((x) => x.id === s.focusId);
-  s = act(s, item?.fault === 'battery' ? 'replace-battery' : 'clean-contact');
+  const tired = getView(s).focus?.observations.some((observation) =>
+    observation.includes('old battery is tired'),
+  );
+  s = act(s, tired ? 'replace-battery' : 'clean-contact');
   s = act(s, 'explain-step');
   s = act(s, 'reassemble');
   s = act(s, 'verify');
@@ -75,14 +72,21 @@ function teachLight(s: ReturnType<typeof createGame>, repeat = false) {
   if (getView(s).actions.some((a) => a.id === 'wait-check')) s = act(s, 'wait-check');
   s = act(s, 'check-result');
   if (!repeat) s = act(s, 'explain-step');
+  if ((s.apprentice?.visitUntil ?? 0) - s.now < 25 || s.people.sam?.activity?.action !== 'learn')
+    s = arrive(s);
   s = act(s, 'return');
-  return repeat ? s : act(s, 'explain-step');
+  // Sam is the owner of the first light, so its handover cannot also be his watched demonstration.
+  // Dad's second handover provides the actually witnessed return method.
+  return getView(s).actions.some((action) => action.id === 'explain-step') &&
+    s.apprentice?.lastLesson?.step === 'return'
+    ? act(s, 'explain-step')
+    : s;
 }
 it('the actual explained-manual-input route teaches Sam, saves a pending independent step, and replays its owner outcome', () => {
   let s = arrive(adultHistory());
   expect(s.apprentice?.arranged).toBe(true);
   s = teachLight(s);
-  s = teachLight(s, true);
+  s = teachLight(arrive(s), true);
   expect(s.people.sam?.methods?.rules.length).toBeGreaterThan(5);
   s = arrive(s);
   s = act(s, 'supervised-intake');
@@ -113,7 +117,8 @@ it('the actual explained-manual-input route teaches Sam, saves a pending indepen
   )
     delayed = act(delayed, 'watch-sam');
   expect(delayed.objects.find((x) => x.id === 'independent-light')?.awaitingCollection).toBe(true);
-  while (delayed.apprentice?.jobId) delayed = act(delayed, 'watch-sam');
+  for (let waits = 0; waits < 80 && delayed.apprentice?.jobId; waits++)
+    delayed = act(delayed, 'watch-sam');
   expect(delayed.objects.find((x) => x.id === 'independent-light')?.awaitingCollection).toBe(false);
   expect(delayed.apprentice?.completedJobIds).toEqual(['independent-light']);
   for (let n = 0; n < 8 && s.apprentice?.jobId; n++) s = act(s, 'watch-sam');

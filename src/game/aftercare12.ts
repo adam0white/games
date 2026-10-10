@@ -7,7 +7,7 @@
  */
 import type { ServiceWeekState } from './service-week12';
 import type { StoryLine } from './story12';
-import type { ActionView } from './types';
+import type { ActionView } from './types18';
 import type { WorkshopState } from './workshop12';
 
 export interface AftercareGame {

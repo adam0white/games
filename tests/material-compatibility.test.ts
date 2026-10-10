@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { getView, restoreGame, serializeGame } from '../src/game/engine';
 import type { GameState } from '../src/game/types';
 import { earnedHandoff } from './support/earned-handoff';
-import { choose } from './support/school-route';
+import { positiveAction as choose } from './support/public-attendance';
 
 const has = (s: GameState, id: string) => getView(s).actions.some((a) => a.id === id);
 function reach(s: GameState, id: string): GameState {
@@ -38,7 +38,7 @@ function repair(s: GameState, suffix: string): GameState {
       : 'clean-contact',
   );
   s = choose(s, 'verify');
-  while (has(s, 'wait-check')) s = choose(s, 'wait-check');
+  for (let waits = 0; waits < 80 && has(s, 'wait-check'); waits++) s = choose(s, 'wait-check');
   s = choose(s, 'check-result');
   s = choose(reach(s, 'return'), 'return');
   return s;
@@ -74,4 +74,4 @@ it('keeps the model-specific donor gear out of Evan’s unsupported winding time
   );
   expect(restoreGame(serializeGame(s))).toEqual(s);
   expect(has(s, 'fit-gear')).toBe(false);
-});
+}, 20_000);

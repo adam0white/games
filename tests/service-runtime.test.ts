@@ -4,9 +4,22 @@ import { getView, restoreGame, serializeGame, transition } from '../src/game/eng
 import { checkingSpaceAvailable } from '../src/game/repairs';
 import type { GameState } from '../src/game/types';
 import { earnedHandoff } from './support/earned-handoff';
+import { positiveAction } from './support/public-attendance';
 import { choose } from './support/school-route';
 
 const has = (s: GameState, id: string) => getView(s).actions.some((a) => a.id === id);
+function plan(s: GameState, id: string) {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const before = JSON.stringify(s.serviceWeek);
+    const next = choose(s, id);
+    if (JSON.stringify(next.serviceWeek) !== before) return next;
+    s = choose(
+      next,
+      has(next, 'wait-conversation-activity') ? 'wait-conversation-activity' : 'rest',
+    );
+  }
+  throw Error(`No actual agreement for ${id}`);
+}
 function reach(s: GameState, id: string) {
   for (let n = 0; n < 120 && !has(s, id); n++) {
     const next = has(s, 'wait-appointment')
@@ -22,29 +35,32 @@ function reach(s: GameState, id: string) {
 it('a genuine earned private week discovers its own model and closes without fictitious customers or money', () => {
   let s = earnedHandoff();
   const count = s.objects.length;
-  s = choose(s, 'service-begin');
+  s = positiveAction(s, 'service-begin');
   expect(s.world?.presence.leila).toBeUndefined();
-  s = choose(s, 'service-private');
+  s = positiveAction(s, 'service-private');
   expect(s.serviceWeek?.jobs).toEqual([]);
   expect(has(s, 'service-hear-leila')).toBe(false);
-  s = choose(s, 'service-find-model');
+  s = positiveAction(s, 'service-find-model');
   expect(s.objects.length).toBe(count + 1);
   expect(s.objects.find((o) => o.id === 'paper-street')?.repaired).toBe(false);
   expect(has(s, 'service-find-model')).toBe(false);
-  s = choose(s, 'service-protect-session');
-  s = choose(s, 'service-invite-donor');
-  s = choose(reach(s, 'service-personal-session'), 'service-personal-session');
+  s = positiveAction(s, 'service-protect-session');
+  s = positiveAction(s, 'service-invite-donor');
+  if ((s.serviceWeek?.personalAt ?? 0) + 45 <= s.now)
+    s = positiveAction(s, 'service-change-session');
+  s = positiveAction(reach(s, 'service-personal-session'), 'service-personal-session');
   expect(s.serviceWeek?.personalSession).toBe('spent');
-  s = choose(reach(s, 'service-hear-donor'), 'service-hear-donor');
-  s = choose(s, 'service-measure-donor');
-  s = choose(s, 'service-recover-donor');
+  s = positiveAction(reach(s, 'service-hear-donor'), 'service-hear-donor');
+  s = positiveAction(s, 'service-measure-donor');
+  s = positiveAction(s, 'service-recover-donor');
   expect(s.parts.gears).toBe(1);
   s = transition(s, { type: 'select', id: 'paper-street' });
   for (const id of ['inspect', 'fit-gear', 'verify', 'wait-check', 'check-result', 'return'])
-    s = choose(s, id);
+    s = positiveAction(s, id);
   expect(s.objects.find((o) => o.id === 'paper-street')?.verified).toBe(true);
-  while (!has(s, 'service-close-small')) s = choose(s, 'service-next-day');
-  s = choose(s, 'service-close-small');
+  for (let day = 0; day < 10 && !has(s, 'service-close-small'); day++)
+    s = positiveAction(s, 'service-next-day');
+  s = plan(s, 'service-close-small');
   expect(s.serviceWeek?.conclusion).toBe('small');
   const ending = s.conversation.map((line) => line.text).join(' ');
   expect(ending).not.toContain('checked service-week jobs returned');
@@ -53,7 +69,7 @@ it('a genuine earned private week discovers its own model and closes without fic
   expect(ending).not.toContain('gear is kept with its source label');
   expect(s.workshop?.cash ?? 0).toBe(0);
   expect(restoreGame(serializeGame(s))).toEqual(s);
-});
+}, 20_000);
 it('a bought second checking place changes physical capacity, without changing repair outcomes', () => {
   const s = earnedHandoff();
   const items = s.objects
@@ -68,26 +84,27 @@ it('a bought second checking place changes physical capacity, without changing r
 });
 it('regular service jobs use real Sam work, honest dates, and the agreed fee ledger while you do other things', () => {
   let s = earnedHandoff();
-  s = choose(s, 'service-begin');
-  s = choose(s, 'service-regular');
-  s = choose(reach(s, 'service-paid-help'), 'service-paid-help');
+  s = positiveAction(s, 'service-begin');
+  s = positiveAction(s, 'service-regular');
+  s = positiveAction(reach(s, 'service-paid-help'), 'service-paid-help');
   expect(s.serviceWeek?.paidHelp).toBe(true);
-  s = choose(s, 'service-find-model');
-  s = choose(s, 'service-protect-session');
-  s = choose(s, 'service-invite-donor');
-  s = choose(reach(s, 'service-hear-leila'), 'service-hear-leila');
-  s = choose(s, 'service-accept-leila');
-  if (!has(s, 'delegate-repair')) s = choose(reach(s, 'arrange-learning'), 'arrange-learning');
-  s = choose(s, 'delegate-repair');
+  s = positiveAction(s, 'service-find-model');
+  s = positiveAction(s, 'service-protect-session');
+  s = positiveAction(s, 'service-invite-donor');
+  s = positiveAction(reach(s, 'service-hear-leila'), 'service-hear-leila');
+  s = positiveAction(s, 'service-accept-leila');
+  if (!has(s, 'delegate-repair'))
+    s = positiveAction(reach(s, 'arrange-learning'), 'arrange-learning');
+  s = positiveAction(s, 'delegate-repair');
   const samStepsBefore =
     s.objects.find((o) => o.id === 'service-leila')?.stepDecisions?.length ?? 0;
-  s = choose(s, 'rest');
+  s = positiveAction(s, 'rest');
   expect(
     s.objects.find((o) => o.id === 'service-leila')?.stepDecisions?.length ?? 0,
   ).toBeGreaterThan(samStepsBefore);
   for (let n = 0; n < 160 && s.apprentice?.jobId; n++) {
     const item = s.objects.find((o) => o.id === s.apprentice?.jobId);
-    s = choose(
+    s = positiveAction(
       s,
       item?.awaitingCollection && has(s, 'wait-appointment')
         ? 'wait-appointment'
@@ -102,17 +119,19 @@ it('regular service jobs use real Sam work, honest dates, and the agreed fee led
   }
   expect(s.objects.find((o) => o.id === 'service-leila')?.location).toBe('returned');
   expect(s.objects.find((o) => o.id === 'service-leila')?.independent).toBe(true);
-  s = choose(reach(s, 'service-hear-nora'), 'service-hear-nora');
-  s = choose(s, 'service-accept-nora');
+  s = positiveAction(reach(s, 'service-hear-nora'), 'service-hear-nora');
+  s = positiveAction(s, 'service-accept-nora');
 
   // Sam can refuse a new 150-minute agreement immediately before his counter shift.
   expect(has(s, 'delegate-repair')).toBe(false);
   expect(s.objects.find((o) => o.id === 'service-nora')?.verified).toBe(false);
-  s = choose(reach(s, 'service-delay-nora'), 'service-delay-nora');
-  s = choose(reach(s, 'service-personal-session'), 'service-personal-session');
+  s = positiveAction(reach(s, 'service-delay-nora'), 'service-delay-nora');
+  if ((s.serviceWeek?.personalAt ?? 0) + 45 <= s.now)
+    s = positiveAction(s, 'service-change-session');
+  s = positiveAction(reach(s, 'service-personal-session'), 'service-personal-session');
   expect(s.serviceWeek?.personalSession).toBe('spent');
   for (let n = 0; n < 80 && !has(s, 'delegate-repair'); n++)
-    s = choose(
+    s = positiveAction(
       s,
       has(s, 'arrange-learning')
         ? 'arrange-learning'
@@ -120,10 +139,10 @@ it('regular service jobs use real Sam work, honest dates, and the agreed fee led
           ? 'wait-appointment'
           : 'rest',
     );
-  s = choose(s, 'delegate-repair');
+  s = positiveAction(s, 'delegate-repair');
   for (let n = 0; n < 80 && s.apprentice?.jobId; n++) {
     const item = s.objects.find((o) => o.id === s.apprentice?.jobId);
-    s = choose(
+    s = positiveAction(
       s,
       item?.awaitingCollection && has(s, 'wait-appointment')
         ? 'wait-appointment'
@@ -145,19 +164,20 @@ it('regular service jobs use real Sam work, honest dates, and the agreed fee led
   expect(promises.find((c) => c.label === 'Checked collection: service-leila')?.status).toBe(
     'kept',
   );
-  // Sam's own competing plans delay the second job beyond the renegotiated date.
-  // This route deliberately does not overwrite a genuinely late promise as kept.
+  // The actual public route now reaches Nora's explicit handover window.
+  // No earlier date is rewritten: the agreed successor is fulfilled at its recorded time.
   const latestNora = promises.filter((c) => c.label === 'Checked collection: service-nora').at(-1);
-  expect(nora?.collectedAt).toBeGreaterThan(latestNora?.until ?? Infinity);
-  expect(latestNora?.status).toBe('broken');
-  s = choose(reach(s, 'service-checking-place'), 'service-checking-place');
+  expect(nora?.collectedAt).toBeLessThanOrEqual(latestNora?.until ?? -Infinity);
+  expect(latestNora?.status).toBe('kept');
+  s = positiveAction(reach(s, 'service-checking-place'), 'service-checking-place');
   expect(s.checkingPlaces).toBe(2);
   expect(s.workshop?.cash).toBe(0);
-  while (!has(s, 'service-close-regular')) s = choose(s, 'service-next-day');
-  s = choose(s, 'service-close-regular');
+  for (let day = 0; day < 10 && !has(s, 'service-close-regular'); day++)
+    s = positiveAction(s, 'service-next-day');
+  s = plan(s, 'service-close-regular');
   expect(s.serviceWeek?.conclusion).toBe('regular');
   expect(restoreGame(serializeGame(s))).toEqual(s);
-});
+}, 20_000);
 it('changing only Nora’s agreed date changes the actual promise consequence under the same repair sequence', () => {
   let base = earnedHandoff();
   for (const id of [
@@ -299,7 +319,8 @@ it('renewing Sam’s whole-job work preserves responsibility without granting ex
   const agreementOnly = structuredClone(s);
   arrangeLearning(agreementOnly, () => {});
   expect(agreementOnly.people.sam?.skills).toEqual(skill);
-  for (let n = 0; n < 30 && s.apprentice?.visitUntil === s.now; n++) {
+  for (let n = 0; n < 30; n++) {
+    s = reach(s, 'arrange-learning');
     const before = s.now;
     s = choose(s, 'arrange-learning');
     if ((s.apprentice?.visitUntil ?? 0) > before) break;

@@ -7,7 +7,7 @@
  */
 import { neighbourhoodLight } from './neighbourhood13';
 import type { StoryLine } from './story13';
-import type { ActionView, Fault, GameState } from './types';
+import type { ActionView, Fault, GameState } from './types18';
 
 export interface WorkshopJobSpec {
   id: string;

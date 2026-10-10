@@ -3,7 +3,7 @@
  * No world explanation, automatic competence, payment or public advertising. */
 import type { CaseFittings } from './repairs12';
 import type { StoryLine } from './story12';
-import type { ActionView, RepairObject } from './types';
+import type { ActionView, RepairObject } from './types18';
 import type { WorkshopJobSpec } from './workshop12';
 
 export interface NeighbourhoodState {

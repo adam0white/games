@@ -65,4 +65,27 @@ describe('school calendar', () => {
     ).toBe(16);
     expect(playerAge({ now: 840, campaign: { holiday: 0 } })).toBe(14);
   });
+
+  it('labels working-life episodes from their actual morning and keeps the passing age visible', () => {
+    const started = 4 * year + 540;
+    const shared = {
+      campaign: { startedAt: 840, holiday: 4, graduated: true },
+      people: { player: { life: { bornAt: -14 * year } } },
+    };
+    const first = {
+      ...shared,
+      now: started,
+      operations: { episode: 1 as const, episodeAt: started },
+    };
+    const recorded = gameTimeLabel(first);
+    expect(recorded).toBe('Age 18 · Collection afternoon · Day 1 · 09:00');
+    expect(gameTimeLabel({ ...first, now: started + 1440 + 15 })).toBe(
+      'Age 18 · Collection afternoon · Day 2 · 09:15',
+    );
+    const later = started + year;
+    expect(
+      gameTimeLabel({ ...shared, now: later, operations: { episode: 3, episodeAt: later } }),
+    ).toBe('Age 19 · The following year · Day 1 · 09:00');
+    expect(recorded).toBe('Age 18 · Collection afternoon · Day 1 · 09:00');
+  });
 });

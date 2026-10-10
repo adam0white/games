@@ -25,7 +25,7 @@ import {
   shareTea,
 } from './humans4';
 import { itemStory, optionalStoryChoices, requestStoryBeat, storyBeat } from './story4';
-import type { ActionView, Fault, GameInput, GameState, GameView, RepairObject } from './types';
+import type { ActionView, Fault, GameInput, GameState, GameView, RepairObject } from './types18';
 
 const ENGINE = 'home-garage-4';
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));

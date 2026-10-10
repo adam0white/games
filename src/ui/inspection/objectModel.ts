@@ -119,7 +119,10 @@ export function createObjectModel(
     z = 0,
     parent = root,
   ) => add(new TorusGeometry(radius, tube, 10, 40), mat, x, y, z, parent);
-  const appearance = object.appearance ?? (object.form === 'lamp' ? 'reading' : object.form);
+  const appearance =
+    object.form === 'trolley'
+      ? 'trolley'
+      : (object.appearance ?? (object.form === 'lamp' ? 'reading' : object.form));
   const lit =
     !opened &&
     (object.progress === 'repaired' || object.progress === 'checked') &&
@@ -134,7 +137,46 @@ export function createObjectModel(
     warmGlass.emissiveIntensity = 0.8;
   }
   const green = material('#718371', 0.3, 0.56, { side: DoubleSide });
-  if (appearance === 'reading') {
+  if (appearance === 'trolley') {
+    const known = object.trolleyPresentation;
+    const wheelWanders = known?.observed === 'wanders' && known.intervention !== 'wheel-aligned';
+    const strapRubs = known?.observed === 'rubs' && known.intervention !== 'strap-secured';
+    const tyre = material('#353b35', 0, 0.9);
+    const deck = box(1.22, 0.09, 0.9, green, 0, 0.31, 0.18);
+    deck.name = 'trolley-loading-deck';
+    for (const x of [-0.5, 0.5]) {
+      rod(new Vector3(x, 0.31, -0.2), new Vector3(x, 1.63, -0.34), 0.045, steel);
+      const wheel = cylinder(0.23, 0.11, tyre, x * 1.3, 0.24, -0.08);
+      wheel.rotation.z = Math.PI / 2;
+      if (x > 0 && wheelWanders) wheel.rotation.y = 0.18;
+      wheel.name = 'trolley-wheel';
+      wheel.userData.repairTarget = 'wheel';
+      const hub = cylinder(0.07, 0.14, brass, x * 1.3, 0.24, -0.08);
+      hub.rotation.z = Math.PI / 2;
+      if (x > 0 && wheelWanders) hub.rotation.y = 0.18;
+      hub.userData.repairTarget = 'wheel';
+      const bracket = box(0.09, 0.21, 0.2, darkMetal, x, 0.29, -0.08);
+      bracket.userData.repairTarget = 'wheel';
+    }
+    rod(new Vector3(-0.5, 1.63, -0.34), new Vector3(0.5, 1.63, -0.34), 0.06, darkMetal);
+    rod(new Vector3(-0.5, 0.75, -0.24), new Vector3(0.5, 0.75, -0.24), 0.03, steel);
+    const strapMat = material('#ac9270', 0, 0.96);
+    const strap = box(1.05, 0.065, 0.025, strapMat, 0, 0.68, -0.16);
+    strap.name = 'trolley-load-strap';
+    strap.userData.repairTarget = 'strap';
+    const buckle = box(0.13, 0.085, 0.05, brass, 0.3, 0.68, -0.13);
+    buckle.userData.repairTarget = 'strap';
+    const tail = box(0.06, 0.36, 0.025, strapMat, 0.45, 0.52, -0.13);
+    tail.name = 'trolley-retained-strap-tail';
+    tail.userData.repairTarget = 'strap';
+    if (strapRubs) tail.position.set(0.63, 0.29, -0.08);
+    if (known?.intervention === 'strap-secured') {
+      tail.position.set(0.32, 0.7, -0.12);
+      tail.rotation.z = Math.PI / 2;
+    }
+    // The same intact assembly appears before either diagnostic comparison.
+    // Geometry cannot expose which condition the loaded control will reveal.
+  } else if (appearance === 'reading') {
     const base = cylinder(0.48, 0.13, green, 0, 0.12);
     base.scale.z = 0.75;
     rod(new Vector3(0, 0.2, 0), new Vector3(-0.13, 1.0, 0), 0.055, green);
@@ -373,18 +415,23 @@ export function createObjectModel(
     for (const y of [0.3, 0.48, 0.66, 0.84, 1.02, 1.2]) box(0.67, 0.009, 0.005, ink, 0, y, 0.032);
     for (const x of [-0.12, 0.15]) box(0.008, 1.06, 0.005, ink, x, 0.72, 0.032);
   } else if (appearance === 'model') {
+    const personal = object.personalPresentation;
+    const updated = personal?.fitted === 'updated';
     const wood = material('#9c8261', 0, 0.9);
     const paper = material('#dac8a9', 0, 0.92);
     const roofMat = material('#a77e6c', 0, 0.89);
     const window = material('#859da0', 0, 0.8);
-    box(2.12, 0.11, 1.2, wood, 0, 0.08);
+    const base = box(2.12, 0.11, 1.2, wood, 0, 0.08);
+    base.name = 'paper-street-base';
+    base.userData.repairTarget = 'support';
     for (const [x, height] of [
       [-0.52, 0.65],
       [0.42, 0.82],
     ]) {
       const houseHeight = height ?? 0.65;
       const houseX = x ?? 0;
-      box(0.64, houseHeight, 0.58, paper, houseX, houseHeight / 2 + 0.14);
+      const house = box(0.64, houseHeight, 0.58, paper, houseX, houseHeight / 2 + 0.14);
+      house.userData.repairTarget = 'frontage';
       const shape = new Shape();
       shape.moveTo(-0.38, 0);
       shape.lineTo(0, 0.35);
@@ -397,8 +444,68 @@ export function createObjectModel(
         houseHeight + 0.14,
         -0.34,
       );
-      for (const offset of [-0.15, 0.15])
-        box(0.13, 0.18, 0.015, window, houseX + offset, houseHeight * 0.62 + 0.14, 0.3);
+      for (const offset of updated ? [-0.18, 0.18] : [-0.15, 0.15]) {
+        const pane = box(
+          updated ? 0.095 : 0.13,
+          updated ? 0.24 : 0.18,
+          0.015,
+          window,
+          houseX + offset,
+          houseHeight * 0.62 + 0.14,
+          0.3,
+        );
+        pane.userData.repairTarget = 'frontage';
+      }
+      const panel = box(
+        0.62,
+        houseHeight * 0.38,
+        0.023,
+        material(updated ? '#9daf98' : '#c9aa80', 0, 0.94),
+        houseX,
+        houseHeight * 0.24 + 0.16,
+        0.315,
+      );
+      panel.name = updated ? 'updated-removable-front' : 'remembered-original-front';
+      panel.userData.repairTarget = 'frontage';
+      const door = box(
+        updated ? 0.095 : 0.16,
+        houseHeight * 0.3,
+        0.032,
+        darkMetal,
+        houseX + 0.02,
+        houseHeight * 0.21 + 0.15,
+        0.34,
+      );
+      door.userData.repairTarget = 'frontage';
+    }
+    if (personal?.support === 'fitted') {
+      for (const x of [-0.73, 0.73]) {
+        const foot = box(0.46, 0.055, 1.42, material('#aa9674', 0, 0.96), x, 0.015, 0.02);
+        foot.name = 'fitted-removable-support';
+        foot.userData.repairTarget = 'support';
+      }
+    } else if (personal?.support === 'retained') {
+      const foot = box(0.52, 0.045, 0.7, paper, -1.28, 0.045, 0.1);
+      foot.name = 'retained-removable-support';
+      foot.userData.repairTarget = 'support';
+    }
+    if (personal) {
+      const storedBox = box(0.87, 0.08, 0.55, material('#b89f7b', 0, 0.98), 0.4, 0.07, 0.96);
+      storedBox.name = 'retained-model-box';
+      storedBox.userData.repairTarget = 'packing';
+      if (personal.originalFronts === 'retained-envelope' || personal.insert === 'retained') {
+        const envelope = box(0.76, 0.028, 0.38, cream, 0.4, 0.13, 0.95);
+        envelope.name =
+          personal.originalFronts === 'retained-envelope'
+            ? 'retained-original-front-envelope'
+            : 'retained-updated-insert';
+        envelope.userData.repairTarget = 'frontage';
+      }
+      if (personal.sleeve === 'retained') {
+        const sleeve = box(0.9, 0.024, 0.58, material('#9b8c70', 0, 0.99), 0.4, 0.17, 0.96);
+        sleeve.name = 'retained-protective-sleeve';
+        sleeve.userData.repairTarget = 'packing';
+      }
     }
     rod(new Vector3(0.96, 0.14, 0.35), new Vector3(1.27, 0.14, 0.35), 0.018, brass);
     const key = ring(0.09, 0.018, brass, 1.28, 0.14, 0.35);

@@ -14,6 +14,9 @@ import { choose, opening } from './support/school-route';
 function planned() {
   let s = opening(42);
   s = choose(s, 'workshop-cabinet-look');
+  // The real opening now ends at 16:59; Dad cannot promise two minutes
+  // across his 17:00 departure. These matched controls begin after his return.
+  for (let waits = 0; waits < 6 && s.now % 1440 < 18 * 60; waits++) s = choose(s, 'rest');
   // Matched actor profile: only bodily competition differs in the refusal control.
   s.people.dad = createPerson({
     id: 'dad',
@@ -86,7 +89,7 @@ it('a real public arrangement, explicit wait and joined step keep both promises 
   }
   expect(s.workshop?.cabinetAppointment?.status).toBe('planned');
   const at = s.workshop?.cabinetAppointment?.at ?? 0;
-  while (s.now < at) s = choose(s, 'wait-appointment');
+  for (let waits = 0; waits < 80 && s.now < at; waits++) s = choose(s, 'wait-appointment');
   s = choose(s, 'workshop-cabinet-measure');
   expect(s.workshop?.cabinet).toBe('measured');
   expect(s.workshop?.cabinetAppointment?.status).toBe('kept');
@@ -185,7 +188,7 @@ it('missing the agreed window preserves the actual breach and exposes honest rea
   }
   const a = s.workshop?.cabinetAppointment;
   if (!a) throw Error('Missing slot');
-  while (s.now <= a.until) s = choose(s, 'rest');
+  for (let waits = 0; waits < 80 && s.now <= a.until; waits++) s = choose(s, 'rest');
   expect(s.workshop?.cabinetAppointment?.status).toBe('missed');
   expect(s.people.dad?.agenda.commitments.find((c) => c.id === a.dadId)?.status).toBe('broken');
   expect(getWorkshopView(s)?.cabinet?.description).toContain('missed');
@@ -232,7 +235,7 @@ it('reports an actually missed shared deadline once, leaving the unfinished work
   let s = choose(planned(), 'workshop-cabinet-plan');
   const a = s.workshop?.cabinetAppointment;
   if (!a) throw Error('Missing slot');
-  while (s.now <= a.until) s = choose(s, 'rest');
+  for (let waits = 0; waits < 80 && s.now <= a.until; waits++) s = choose(s, 'rest');
   const marker = `The agreed cabinet ${a.task} window`;
   expect((s.journal ?? []).filter((line) => line.text.startsWith(marker))).toHaveLength(1);
   expect(

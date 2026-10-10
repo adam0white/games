@@ -5,6 +5,7 @@ import * as seven from '../src/game/engine7';
 import { optionalStoryChoices, schoolStoryBeat } from '../src/game/story';
 import type { GameInput } from '../src/game/types';
 import fixture from './fixtures/published-seven-route.json';
+import { completePublicAction } from './support/public-attendance';
 import { choose, nextSchoolAction, opening } from './support/school-route';
 
 it('the actual live published-seven export matches its fixed hash before unchanged eight migration', () => {
@@ -92,7 +93,11 @@ it('the next authored visitor’s known routine is heard on school re-entry and 
   s = choose(s, 'accept-request');
   for (const action of ['inspect', 'test-battery', 'clean-contact', 'verify'])
     s = choose(s, action);
-  while (getView(s).actions.some((a) => a.id === 'wait-check')) s = choose(s, 'wait-check');
+  s = completePublicAction(
+    s,
+    'wait-check',
+    (state) => !getView(state).actions.some((a) => a.id === 'wait-check'),
+  );
   s = choose(s, 'check-result');
   s = choose(s, 'return');
   expect(s.requests).toBe(1);

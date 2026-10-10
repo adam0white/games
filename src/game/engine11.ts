@@ -89,7 +89,7 @@ import {
   schoolStoryBeat,
   storyBeat,
 } from './story11';
-import type { ActionView, Fault, GameInput, GameState, GameView, RepairObject } from './types';
+import type { ActionView, Fault, GameInput, GameState, GameView, RepairObject } from './types18';
 import {
   applyWorkshopAction,
   CABINET_MINUTES,

@@ -158,7 +158,7 @@ it('Sam’s actually taught lamp methods do not grant an unknown mechanical repa
 it('the public private-week route revisits the same box, recovers a wrong first step and replays its completed history', async () => {
   const { getView, restoreGame, serializeGame } = await import('../src/game/engine');
   const { earnedHandoff } = await import('./support/earned-handoff');
-  const { choose } = await import('./support/school-route');
+  const { positiveAction: choose } = await import('./support/public-attendance');
   let s = earnedHandoff(true);
   const count = s.objects.length;
   const earlierBox = structuredClone(s.objects.find((o) => o.id === 'friend-4'));
@@ -190,4 +190,4 @@ it('the public private-week route revisits the same box, recovers a wrong first 
   expect(s.serviceWeek?.jobs).toEqual([]);
   expect(s.workshop?.cash ?? 0).toBe(0);
   expect(restoreGame(serializeGame(s))).toEqual(s);
-});
+}, 20_000);

@@ -1,6 +1,7 @@
 import { expect } from 'vitest';
 import { createGame, getView, transition } from '../../src/game/engine';
 import type { GameState } from '../../src/game/types';
+import { positiveAction } from './public-attendance';
 
 // A public-input traversal proves the school campaign is reachable and replayable.
 // It chooses from received observations and visible offers, never latent faults.
@@ -51,18 +52,20 @@ export function opening(seed: number): GameState {
     'talk-garage',
     'search-donor',
   ])
-    s = choose(s, id);
+    s = positiveAction(s, id);
   s = transition(s, { type: 'select', id: 'personal' });
-  s = choose(s, 'fit-holder');
-  s = choose(s, 'verify');
-  while (getView(s).actions.some((action) => action.id === 'wait-check'))
-    s = choose(s, 'wait-check');
-  for (const id of ['check-result', 'return', 'talk-friends']) s = choose(s, id);
+  s = positiveAction(s, 'fit-holder');
+  s = positiveAction(s, 'verify');
+  for (let n = 0; n < 20 && getView(s).actions.some((action) => action.id === 'wait-check'); n++)
+    s = positiveAction(s, 'wait-check');
+  for (const id of ['check-result', 'return', 'talk-friends']) s = positiveAction(s, id);
   return s;
 }
 export function nextSchoolAction(s: GameState, eager = false): string {
   const view = getView(s);
   const offers = new Set(view.actions.map((action) => action.id));
+  for (const id of ['wait-conversation-activity', 'wait-player-activity', 'wait-dad-activity'])
+    if (offers.has(id)) return id;
   if (offers.has('reassemble') && view.focus?.progress === 'repaired') return 'reassemble';
   if (offers.has('open-access') && view.focus?.progress === 'inspected') return 'open-access';
   const catchMotion = view.focus?.observations.findLast(

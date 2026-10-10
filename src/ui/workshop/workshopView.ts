@@ -4,10 +4,22 @@ export interface WorkshopPlace {
   id: string;
   label: string;
   detail: string;
-  kind: 'bench' | 'shelf' | 'object' | 'parts' | 'cabinet' | 'journal';
+  kind:
+    | 'bench'
+    | 'shelf'
+    | 'object'
+    | 'parts'
+    | 'cabinet'
+    | 'journal'
+    | 'intake'
+    | 'checking'
+    | 'collection'
+    | 'people'
+    | 'crates'
+    | 'display';
   input?: GameInput;
   actionLabel?: string;
-  navigation?: 'focus' | 'cabinet';
+  navigation?: 'focus' | 'cabinet' | 'workboard' | 'people';
 }
 
 /** Presentation derived exclusively from discovered, player-facing information.
@@ -68,6 +80,51 @@ export function workshopPlaces(view: GameView, journal = false): WorkshopPlace[]
         : { navigation: 'cabinet' as const, actionLabel: 'See cabinet project details' }),
     });
   }
+  if (view.roomFacts?.intakeSpace) {
+    places.push({
+      id: 'intake',
+      kind: 'intake',
+      label: 'Intake workbook',
+      detail: 'The agreed intake space keeps work and collection arrangements together.',
+      navigation: 'workboard',
+      actionLabel: 'Open workboard',
+    });
+    places.push({
+      id: 'people',
+      kind: 'people',
+      label: 'People and arrangements',
+      detail: 'Read received availability and agreed work.',
+      navigation: 'people',
+      actionLabel: 'See people',
+    });
+  }
+  if (view.scene === 'garage' && view.roomFacts?.checkingPlaces)
+    places.push({
+      id: 'checking',
+      kind: 'checking',
+      label: 'Checking trays',
+      detail: `${view.roomFacts.checkingPlaces} checking place${view.roomFacts.checkingPlaces === 1 ? '' : 's'} available.`,
+      navigation: 'workboard',
+      actionLabel: 'See workboard',
+    });
+  if (view.shelf.some((item) => item.object?.progress === 'checked' && item.object.owner !== 'You'))
+    places.push({
+      id: 'collection',
+      kind: 'collection',
+      label: 'Checked work',
+      detail: 'Checked objects remain here until their actual handover.',
+      navigation: 'workboard',
+      actionLabel: 'See collection arrangements',
+    });
+  if (view.roomFacts?.storeCratesAtBench)
+    places.push({
+      id: 'crates',
+      kind: 'crates',
+      label: 'Borrowed store crates',
+      detail: 'The two labelled store-owned crates are here on loan.',
+      navigation: 'workboard',
+      actionLabel: 'See return arrangements',
+    });
   if (journal)
     places.push({ id: 'journal', kind: 'journal', label: 'Notebook', detail: 'Read your notes.' });
   return places;
@@ -87,12 +144,15 @@ export function isRoomTap(
 
 export interface WorkshopGeometry {
   focus: GameView['focus'];
-  shelf: GameView['shelf'];
+  shelf: (GameView['shelf'][number] & { awaitingCollection: boolean })[];
   showShelf: boolean;
   showParts: boolean;
   showCabinet: boolean;
   cabinetStage?: NonNullable<GameView['workshopCabinet']>['stage'];
   journal: boolean;
+  intakeSpace: boolean;
+  checkingPlaces: number;
+  storeCratesAtBench: boolean;
 }
 
 function objectGeometry(object: NonNullable<GameView['focus']>): NonNullable<GameView['focus']> {
@@ -105,6 +165,8 @@ function objectGeometry(object: NonNullable<GameView['focus']>): NonNullable<Gam
     progress: object.progress,
     assembly: object.assembly,
     casePresentation: object.casePresentation,
+    trolleyPresentation: object.trolleyPresentation,
+    personalPresentation: object.personalPresentation,
     title: '',
     owner: '',
     story: '',
@@ -122,6 +184,7 @@ export function workshopGeometry(view: GameView, journal: boolean): WorkshopGeom
       id,
       title: '',
       note: '',
+      awaitingCollection: object?.progress === 'checked' && object.owner !== 'You',
       ...(object ? { object: objectGeometry(object) } : {}),
     })),
     showShelf: places.some((place) => place.kind === 'shelf'),
@@ -129,6 +192,9 @@ export function workshopGeometry(view: GameView, journal: boolean): WorkshopGeom
     showCabinet: places.some((place) => place.kind === 'cabinet'),
     cabinetStage: view.workshopCabinet?.stage,
     journal,
+    intakeSpace: view.roomFacts?.intakeSpace ?? false,
+    checkingPlaces: view.scene === 'garage' ? (view.roomFacts?.checkingPlaces ?? 0) : 0,
+    storeCratesAtBench: view.roomFacts?.storeCratesAtBench ?? false,
   };
 }
 

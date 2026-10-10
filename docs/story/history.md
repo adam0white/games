@@ -48,3 +48,11 @@ A note left for the bench identifies the next eligible household request and its
 ## Sam's path torch
 
 Sam's first torch remains the same finite object with the same retained red string and authored handling fault. Looking at it does not identify the faulty contact. Comparing a known-good battery and holding the cap square while moving the body are separate interventions; their observed responses remain in the notes. A matching adjustment must actually restore the beam. Its final check is six attended minutes of changing grip, movement and switching, matching Sam's ordinary use; it does not certify battery endurance. Later teaching lamps and unsupported torches keep their own methods and learning boundaries.
+
+## Selected working-life episodes
+
+The store's trolley and its two identified display crates remain borrowed property. Leila conveys the storekeeper's bounded permission; she is not thereby established as the store owner. Empty rolling and loaded rolling answer different questions. A route check is attended use, not a timer that certifies work while everyone is elsewhere. A later strap complaint has its own observed cause rather than changing the earlier wheel fault retroactively.
+
+The player's paper street can receive a removable view of the present street while retaining the original fronts in an envelope. Two spare packaging cards in its own box can become an insert, a table support or a protective sleeve; there is no infinite replacement supply. These alterations do not repair its drive. A complete circuit depends on the actual gear repair, and an unfinished model can remain a personal project without blocking adult work.
+
+Nora's later display occasion is optional and requires a new agreement. Showing it at the player's bench and lending the protected model are different outcomes. A loan transfers custody of that same model until an actual return; it does not make a copy or give Nora the player's property. Her earlier stationary-case outcome remains relevant to carrying choices.

@@ -128,15 +128,17 @@ export function createWorkshopModel(view: WorkshopGeometry) {
     root.add(object.root);
     resources.push({ dispose: object.dispose });
   }
+  const unfinished = view.shelf.filter((item) => !item.awaitingCollection);
+  const checked = view.shelf.filter((item) => item.awaitingCollection);
   if (view.showShelf) {
-    const rows = Math.max(2, Math.ceil(view.shelf.length / 3));
+    const rows = Math.max(2, Math.ceil(unfinished.length / 3));
     const step = 1.85 / rows;
     for (let row = 0; row < rows; row++)
       box(1.9, 0.07, 0.84, palette.wood, 2.1, 0.3 + row * step, -1.24, 'shelf');
     for (const x of [1.18, 3.02]) box(0.11, 2.1, 0.8, palette.edge, x, 1.08, -1.24, 'shelf');
     label('WAITING SHELF', 2.1, 2.18, -0.79, 1.65, 'shelf');
-    view.shelf.forEach((item, index) => {
-      const bay = shelfBay(index, view.shelf.length);
+    unfinished.forEach((item, index) => {
+      const bay = shelfBay(index, unfinished.length);
       if (item.object) {
         const model = createObjectModel(item.object, false);
         fitWorkshopObject(model.root, bay.centre, bay.size);
@@ -171,6 +173,72 @@ export function createWorkshopModel(view: WorkshopGeometry) {
         Math.min(0.12, bay.size.y * 0.3),
       );
     });
+  }
+
+  // A lower collection rack is physically separate from unfinished shelf bays.
+  if (checked.length) {
+    box(1.85, 0.1, 0.8, '#728c84', 2.1, 0.73, 0.16, 'collection');
+    for (const x of [1.28, 2.92]) box(0.09, 0.7, 0.09, palette.edge, x, 0.35, 0.16, 'collection');
+    label('CHECKED · HANDOVER', 2.1, 0.65, 0.59, 1.65, 'collection');
+    checked.forEach((item, index) => {
+      if (!item.object) return;
+      const model = createObjectModel(item.object, false);
+      const columns = Math.max(3, checked.length);
+      fitWorkshopObject(
+        model.root,
+        new Vector3(1.3 + (index * 1.6) / columns, 0.79, 0.16),
+        new Vector3(1.5 / columns, 0.64, 0.6),
+      );
+      model.root.traverse((node) => {
+        if (node instanceof Mesh) {
+          node.userData.placeId = `object:${item.id}`;
+          targets.push(node);
+        }
+      });
+      root.add(model.root);
+      resources.push({ dispose: model.dispose });
+    });
+  }
+  if (view.intakeSpace) {
+    // Agreed space adds a real writing surface, a pinned workboard and an open book.
+    box(1.35, 0.12, 0.75, palette.wood, -2.6, 0.79, 1.29, 'intake');
+    for (const x of [-3.14, -2.06]) box(0.09, 0.74, 0.09, palette.edge, x, 0.37, 1.29, 'intake');
+    box(0.63, 0.045, 0.43, '#425d70', -2.6, 0.89, 1.25, 'intake');
+    for (const x of [-2.75, -2.45]) box(0.27, 0.014, 0.36, palette.paper, x, 0.922, 1.25, 'intake');
+    for (let i = 0; i < 4; i++)
+      box(0.22, 0.005, 0.008, '#baae91', -2.45, 0.932, 1.12 + i * 0.075, 'intake');
+    label('INTAKE WORKBOOK', -2.6, 0.74, 1.7, 1.18, 'intake');
+    box(0.08, 0.95, 1.05, '#726956', -3.4, 1.7, 0.65, 'people');
+    const board = box(0.095, 0.8, 0.91, '#d6c3a1', -3.34, 1.7, 0.65, 'people');
+    board.userData.station = 'received-arrangements';
+    for (const z of [0.37, 0.72]) box(0.015, 0.29, 0.25, palette.paper, -3.28, 1.74, z, 'people');
+  }
+  if (view.checkingPlaces > 0) {
+    box(1.64, 0.12, 0.74, palette.wood, 0.64, 0.76, 1.25, 'checking');
+    for (const x of [-0.07, 1.35]) box(0.09, 0.7, 0.09, palette.edge, x, 0.35, 1.25, 'checking');
+    for (let i = 0; i < Math.min(2, view.checkingPlaces); i++) {
+      const x = view.checkingPlaces === 1 ? 0.64 : 0.24 + i * 0.8;
+      box(0.63, 0.028, 0.54, '#8d9b97', x, 0.84, 1.25, 'checking').userData.station =
+        'checking-tray';
+      for (const z of [1, 1.5]) box(0.66, 0.07, 0.035, '#526b69', x, 0.875, z, 'checking');
+      for (const side of [-1, 1])
+        box(0.035, 0.07, 0.54, '#526b69', x + side * 0.315, 0.875, 1.25, 'checking');
+    }
+    label('ATTENDED CHECKING', 0.64, 0.69, 1.67, 1.44, 'checking');
+  }
+  if (view.storeCratesAtBench) {
+    for (let i = 0; i < 2; i++) {
+      const x = -1.4 + i * 0.75;
+      const color = i ? '#557e71' : '#526f88';
+      box(0.63, 0.055, 0.54, color, x, 0.07, 1.28, 'crates');
+      for (let row = 0; row < 3; row++) {
+        for (const z of [1.03, 1.53])
+          box(0.66, 0.09, 0.035, color, x, 0.14 + row * 0.12, z, 'crates');
+        for (const side of [-1, 1])
+          box(0.035, 0.09, 0.54, color, x + side * 0.315, 0.14 + row * 0.12, 1.28, 'crates');
+      }
+      label('STORE LOAN', x, 0.28, 1.56, 0.51, 'crates', 0.1);
+    }
   }
 
   if (view.showParts) {

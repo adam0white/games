@@ -7,7 +7,7 @@ import type { GameInput, GameState } from '../src/game/types';
 import golden from './fixtures/published-eleven-route.json';
 import unmet from './fixtures/published-eleven-unmet-sam-route.json';
 import { earnedHandoff } from './support/earned-handoff';
-import { choose, nextSchoolAction, opening } from './support/school-route';
+import { choose } from './support/school-route';
 
 const has = (s: GameState, id: string) => getView(s).actions.some((a) => a.id === id);
 function oldPublic() {
@@ -33,10 +33,13 @@ it('pins the real public eleven export and leaves its stalled nine history and a
   expect(restoreGame(serializeGame(s))).toEqual(s);
 }, 20_000);
 it('keeps a genuinely postponed invitation open and advances everyone to the received return cue', () => {
-  let s = opening(42);
-  for (let n = 0; n < 150 && !s.campaign?.graduated; n++) s = choose(s, nextSchoolAction(s, false));
-  for (let n = 0; n < 60 && !has(s, 'observer-invite'); n++)
-    s = choose(s, has(s, 'wait-person') ? 'wait-person' : 'next-day');
+  // Use the actual published pre-invitation clock and actor history for this first-attempt refusal control.
+  let prior = nine.createGame(golden.seed);
+  for (const input of golden.inputs.slice(0, golden.baseCount)) {
+    if (input.id === 'observer-invite') break;
+    prior = nine.transition(prior, input as GameInput);
+  }
+  let s = restoreGame(nine.serializeGame(prior));
   s = choose(s, 'observer-invite');
   expect(s.samPlans?.invitation).toBe('pending');
   const until = s.samPlans?.availableAfter;

@@ -49,6 +49,20 @@ const semanticWork: Record<string, string> = {
 };
 
 type Speak = (speaker: string, text: string) => void;
+/** Public teaching guidance derived from actually acquired rules, not latent faults.
+ * A missing rule identifies a useful demonstration; it does not predict a choice. */
+export function hasIntakeMethod(s: GameState): boolean {
+  return Boolean(
+    s.people.sam?.methods?.rules.some(
+      (rule) =>
+        rule.action === 'inspect' &&
+        rule.conditions.some(
+          (condition) => condition.cue === 'stage' && condition.value === 'intake',
+        ) &&
+        rule.evidence.some((evidence) => evidence.outcome === 'success'),
+    ),
+  );
+}
 export function freshApprentice(): NonNullable<GameState['apprentice']> {
   return {
     visitUntil: 0,
@@ -92,6 +106,27 @@ export function apprenticeActions(
       id: 'explain-step',
       label: `Explain your demonstration on ${s.objects.find((o) => o.id === a.lastLesson?.objectId)?.title ?? 'the earlier object'}`,
       detail: `Explain ${a.lastLesson.step === 'verify' ? 'why you started the longer functional check' : a.lastLesson.step === 'check-result' ? 'what the movement and switching check showed after the longer run' : `the ${a.lastLesson.step.replaceAll('-', ' ')} work`}. Use the observation and result you actually demonstrated.`,
+      ...(a.lastLesson.step === 'inspect' && a.lastLesson.cue === 'intake'
+        ? { kind: 'primary' as const }
+        : {}),
+    });
+  if (
+    samHere &&
+    !a.jobId &&
+    !item &&
+    ownerHere('dad') &&
+    !s.objects.some((object) => object.id === 'recovery-learning-light') &&
+    s.objects.some(
+      (object) => object.id === 'supervised-retry-light' && object.location === 'returned',
+    ) &&
+    !a.supervisedCompleted
+  )
+    offers.push({
+      id: 'recovery-learning-intake',
+      label: 'Bring Dad’s retained work light to the bench with Sam',
+      detail:
+        'One distinct light, with its own spare cell. Start by showing and explaining how you examine a newly received object. The earlier rescued jobs stay on their original record.',
+      kind: 'primary',
     });
   if (!a.jobId && !item) {
     if (!s.objects.some((x) => x.id === 'lesson-battery'))
@@ -525,8 +560,9 @@ export function recordLesson(
   // observations above remain real, but do not replace this pending lesson.
   if (
     a.lastLesson &&
-    s.unlocked.includes(`corrective-demonstration:${a.lastLesson.objectId}`) &&
-    a.lastLesson.step === 'clean-contact' &&
+    ((s.unlocked.includes(`corrective-demonstration:${a.lastLesson.objectId}`) &&
+      a.lastLesson.step === 'clean-contact') ||
+      (a.lastLesson.step === 'inspect' && a.lastLesson.cue === 'intake' && !hasIntakeMethod(s))) &&
     a.lastLesson.success &&
     !a.lastLesson.explained
   )

@@ -1,6 +1,6 @@
 /** Optional household favour for the same returned sewing box. The original
  * repair remains part of its history; a new fault is never retroactive teaching. */
-import type { ActionView, GameState } from './types';
+import type { ActionView, GameState } from './types18';
 
 const KEY = 'sewing-box-returned-again';
 export function catchReturnActions(s: GameState, noraHere: boolean): ActionView[] {

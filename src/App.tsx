@@ -1,27 +1,35 @@
 import type { ChangeEvent } from 'react';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { HistoricalRuntimeLoadError, restoreBrowserStory } from './game/browser-replay';
 import {
   createGame,
   exportPlaytest,
   getView,
-  replayPlaytest,
-  restoreGame,
   serializeGame,
   transition,
-} from './game/engine';
+} from './game/current-engine';
 import { getServiceWeekView } from './game/service-week';
 import type { ActionView, ConversationLine, GameInput, GameState, ObjectView } from './game/types';
 import { getWorkshopView, type LedgerEntry, type WorkshopState } from './game/workshop';
-import { splitNavigation, uniqueChoiceGroups } from './ui/actionGroups';
 import { Cabinet } from './ui/Cabinet';
-import { ChoiceDetails } from './ui/ChoiceDetails';
 import { createChoiceGate } from './ui/choiceGate';
-import { DayPlan } from './ui/DayPlan';
 import { JournalHistory } from './ui/JournalHistory';
 import { ObjectIllustration } from './ui/ObjectIllustration';
 import { ObjectPresentation } from './ui/ObjectPresentation';
+import { OperationsBoard } from './ui/OperationsBoard';
 import { getMappedRepairActions } from './ui/repairBindings';
-import { readStory, writeStory } from './ui/storage';
+import { StoryBootstrap } from './ui/StoryBootstrap';
+import { ActionLane, ChapterCeremony, PromiseCards } from './ui/WorkspaceCards';
+import { WorkspaceNavigation } from './ui/WorkspaceNavigation';
+import {
+  type OutcomeCeremony,
+  operationsCeremony,
+  projectActions,
+  projectChapter,
+  type WorkspacePanel,
+} from './ui/workspaceFlow';
+import './ui/workspace.css';
+import { writeStory } from './ui/storage';
 
 const WorkshopScene3D = lazy(() => import('./ui/workshop/WorkshopScene3D'));
 
@@ -30,6 +38,7 @@ const ledgerLabels: Record<LedgerEntry['kind'], string> = {
   materials: 'Battery bought',
   'repair-fee': 'Repair payment',
   'sam-pay': 'Sam’s pay',
+  'delivery-pay': 'Delivery pay',
   'checking-place': 'Second checking tray',
 };
 const cabinetStageLabels: Record<WorkshopState['cabinet'], string> = {
@@ -46,30 +55,6 @@ const ledgerMoney = new Intl.NumberFormat('en-GB', {
   maximumFractionDigits: 2,
 });
 
-function headerClock(label: string, chapterVisible: boolean): string {
-  if (!chapterVisible) return label;
-  const [prefix, ...clock] = label.split(' · ');
-  return clock.length > 0 && (/^Age \d+$/.test(prefix ?? '') || prefix === 'After school')
-    ? clock.join(' · ')
-    : label;
-}
-
-function initialStory(): { game: GameState; warning: string | null } {
-  const saved = readStory();
-  if (saved) {
-    try {
-      return { game: restoreGame(saved), warning: null };
-    } catch {
-      return {
-        game: createGame(),
-        warning:
-          'The saved story could not be read. A fresh story is open; your old save will remain until you take an action.',
-      };
-    }
-  }
-  return { game: createGame(), warning: null };
-}
-
 function preferredObjectView(): boolean {
   try {
     return localStorage.getItem('repair-game.object-view') !== 'illustrated';
@@ -79,9 +64,22 @@ function preferredObjectView(): boolean {
 }
 
 export default function App() {
-  const [initial] = useState(initialStory);
-  const [game, setGame] = useState(initial.game);
-  const [message, setMessage] = useState<string | null>(initial.warning);
+  return (
+    <StoryBootstrap
+      render={(game, warning) => <PlayableStory initialGame={game} initialWarning={warning} />}
+    />
+  );
+}
+function PlayableStory({
+  initialGame,
+  initialWarning,
+}: {
+  initialGame: GameState;
+  initialWarning?: string | null;
+}) {
+  const [game, setGame] = useState(initialGame);
+  const [message, setMessage] = useState<string | null>(initialWarning ?? null);
+  const [runtimeLoadFailed, setRuntimeLoadFailed] = useState(false);
   const [journal, setJournal] = useState(false);
   const [departingObject, setDepartingObject] = useState<ObjectView | null>(null);
   const departureTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -110,6 +108,7 @@ export default function App() {
     narration: string | null;
     revision: number;
     passage?: string;
+    outcome?: OutcomeCeremony;
     returnedObject?: string;
   } | null>(null);
   const [previousEvidence, setPreviousEvidence] = useState<{
@@ -157,199 +156,40 @@ export default function App() {
     [focusId],
   );
   const mappedActionIds = new Set(
-    inHand && view.focus && (repairSurface?.id !== focusId || repairSurface?.ready === true)
+    inHand && view.focus && repairSurface?.id === focusId && repairSurface?.ready === true
       ? getMappedRepairActions(view.focus, view.actions).map((binding) => binding.action.id)
       : [],
   );
   const workshop = getWorkshopView(game);
   const serviceWeek = getServiceWeekView(game);
-  const weekConcluded = Boolean(serviceWeek?.conclusion);
-  const workshopArrangement =
-    serviceWeek && serviceWeek.route !== 'undecided'
-      ? weekConcluded
-        ? `Recorded week terms: ${serviceWeek.detail}`
-        : serviceWeek.detail
-      : workshop?.arrangement;
-  const dayPlans = view.scene === 'garage' ? (view.dayPlan?.entries ?? []) : [];
-  const planActionIds = new Set(dayPlans.flatMap((entry) => entry.actionIds ?? []));
-  const { navigation, choices: choicesOutsidePlans } = splitNavigation(
-    view.actions.filter(
-      (action) => !planActionIds.has(action.id) && !mappedActionIds.has(action.id),
-    ),
+  const chapter = projectChapter(view);
+  const groups = projectActions(view, mappedActionIds);
+  const dayPlans = groups.plans;
+  const activePlans = dayPlans.filter(
+    (entry) => entry.status !== 'kept' && (entry.status !== 'late' || entry.actions.length > 0),
   );
-  const timeAwayIds = new Set([
-    'next-day',
-    'back-to-school',
-    'leave-school-holiday',
-    'wait-person',
-  ]);
-  const isProjectAction = (action: ActionView) =>
-    /^workshop-(cabinet|drawings|display-drawing|keep-drawing)/.test(action.id) ||
-    action.id.startsWith('childhood-');
-  const immediateWeekIds = new Set([
-    'service-begin',
-    'service-regular',
-    'service-favours',
-    'service-private',
-    'service-find-model',
-    'service-personal-session',
-    'service-reflect',
-    'service-close-small',
-    'service-close-regular',
-    'service-measure-donor',
-    'service-recover-donor',
-    'service-decline-donor',
-  ]);
-  const isImmediateWeekAction = (action: ActionView) => {
-    if (action.id === 'service-paid-help') return action.kind === 'primary';
-    if (
-      immediateWeekIds.has(action.id) ||
-      /^service-(hear|accept|later|decline)-/.test(action.id) ||
-      action.id.startsWith('service-revisit-unfinished-')
-    )
-      return true;
-    if (action.id === 'service-invite-donor')
-      return game.objects.some((item) => item.id === 'paper-street' && item.discovered);
-    if (action.id.startsWith('service-delay-')) {
-      const objectId = action.id.replace('service-delay-', 'service-');
-      return (
-        view.focus?.id === objectId ||
-        Boolean(
-          game.serviceWeek?.jobs.some(
-            (job) =>
-              job.id === objectId && job.collectionAt !== undefined && job.collectionAt <= game.now,
-          ),
-        )
-      );
-    }
-    return false;
-  };
-  const mainChoiceOrder = (action: ActionView) =>
-    action.id === 'wait-appointment'
-      ? 3
-      : action.id === 'rest'
-        ? 2
-        : isImmediateWeekAction(action)
-          ? view.focus
-            ? 1
-            : 0
-          : view.focus
-            ? 0
-            : 1;
-  const isRequestDecision = (action: ActionView) =>
-    /^service-(accept|later|decline)-(leila|nora)$/.test(action.id);
-  const decidingRequest = view.actions.some(isRequestDecision);
-  const isEarlierDemonstration = (action: ActionView) =>
-    action.id === 'explain-step' &&
-    Boolean(game.apprentice?.supervisedCompleted && game.apprentice.independentCompleted > 0) &&
-    view.focus?.id !== game.apprentice?.lastLesson?.objectId;
-  const isOptionalAlternative = (action: ActionView) =>
-    (action.id === 'try-case-replacement' &&
-      Boolean(view.focus?.casePresentation?.comparisonKnown)) ||
-    (action.id === 'neighbourhood-tray-consent' &&
-      view.focus?.casePresentation?.mode === 'carrying-case' &&
-      view.focus.progress === 'checked');
-  const isMainCandidate = (action: ActionView) =>
-    action.kind !== 'quiet' &&
-    !isEarlierDemonstration(action) &&
-    !isOptionalAlternative(action) &&
-    !isProjectAction(action) &&
-    !action.id.startsWith('workshop-') &&
-    (!action.id.startsWith('service-') || isImmediateWeekAction(action)) &&
-    !timeAwayIds.has(action.id);
-  const neighbourhoodSubject = (action: ActionView) => {
-    if (!action.id.startsWith('neighbourhood-')) return null;
-    if (
-      ['neighbourhood-remember', 'neighbourhood-frontage', 'neighbourhood-no-visit'].includes(
-        action.id,
-      )
-    )
-      return 'window';
-    return action.id.endsWith('-light') ? 'light' : 'case';
-  };
-  const actionGroups = uniqueChoiceGroups([
-    {
-      id: 'here',
-      label: '',
-      actions: choicesOutsidePlans
-        .filter(
-          (action) => isMainCandidate(action) && (!decidingRequest || isRequestDecision(action)),
-        )
-        .sort((left, right) => mainChoiceOrder(left) - mainChoiceOrder(right)),
-    },
-    {
-      id: 'elsewhere',
-      label: 'Do something else for now',
-      actions: decidingRequest
-        ? choicesOutsidePlans.filter(
-            (action) => isMainCandidate(action) && !isRequestDecision(action),
-          )
-        : [],
-    },
-    {
-      id: 'case',
-      label: 'Nora’s sample case',
-      actions: choicesOutsidePlans.filter(
-        (action) => neighbourhoodSubject(action) === 'case' && !isOptionalAlternative(action),
-      ),
-    },
-    {
-      id: 'light',
-      label: 'The separate household light',
-      actions: choicesOutsidePlans.filter((action) => neighbourhoodSubject(action) === 'light'),
-    },
-    {
-      id: 'window',
-      label: 'The old sample window',
-      actions: choicesOutsidePlans.filter((action) => neighbourhoodSubject(action) === 'window'),
-    },
-    {
-      id: 'conversation',
-      label: 'Talk for a while',
-      actions: choicesOutsidePlans.filter(
-        (action) => action.kind === 'quiet' && !neighbourhoodSubject(action),
-      ),
-    },
-    {
-      id: 'alternatives',
-      label: 'Other approaches',
-      actions: choicesOutsidePlans.filter(isOptionalAlternative),
-    },
-    {
-      id: 'earlier-learning',
-      label: 'Earlier demonstrations',
-      actions: choicesOutsidePlans.filter(isEarlierDemonstration),
-    },
-    {
-      id: 'project',
-      label: 'Personal and family projects',
-      actions: choicesOutsidePlans.filter(isProjectAction),
-    },
-    {
-      id: 'workshop',
-      label: 'Other repairs and plans',
-      actions: choicesOutsidePlans.filter(
-        (action) => action.id.startsWith('workshop-') && !isProjectAction(action),
-      ),
-    },
-    {
-      id: 'week',
-      label: serviceWeek?.label ?? 'A week at the bench',
-      actions: choicesOutsidePlans.filter(
-        (action) => action.id.startsWith('service-') && !isImmediateWeekAction(action),
-      ),
-    },
-    {
-      id: 'time',
-      label: 'Take some time',
-      actions: choicesOutsidePlans.filter((action) => timeAwayIds.has(action.id)),
-    },
-  ]).filter(
-    (group) => group.actions.length > 0 || (group.id === 'week' && serviceWeek && !weekConcluded),
+  const previousPlans = dayPlans.filter(
+    (entry) => entry.status === 'kept' || (entry.status === 'late' && entry.actions.length === 0),
   );
-  const projectChoices = actionGroups.find((group) => group.id === 'project')?.actions ?? [];
+  const urgentPlan =
+    activePlans.find((entry) =>
+      entry.actions.some((action) => action.id === 'wait-conversation-activity'),
+    ) ??
+    activePlans.find(
+      (entry) => ['underway', 'late'].includes(entry.status) && entry.actions.length > 0,
+    );
+  const boardPlans = activePlans.filter((entry) => entry !== urgentPlan);
+  const [selectedPanel, setSelectedPanel] = useState<WorkspacePanel | null>(null);
+  const panel = selectedPanel ?? (view.focus || chapter.tutorial ? 'bench' : 'work');
+  const [dismissedCeremonies, setDismissedCeremonies] = useState<string[]>([]);
   const latest = view.conversation.at(-1);
   const dialogue = attention?.lines ?? view.currentDialogue ?? (latest ? [latest] : []);
+  const earlierNotices =
+    dialogue.length > 1 &&
+    dialogue.every((line) => line.speaker === 'You' && line.tone === 'notice')
+      ? dialogue.slice(0, -1)
+      : [];
+  const visibleDialogue = earlierNotices.length ? dialogue.slice(-1) : dialogue;
   const narration = attention?.narration ?? null;
   const history = view.journal ?? view.conversation;
   const recordedObservations = [...new Set(view.focus?.observations ?? [])].filter(
@@ -358,6 +198,7 @@ export default function App() {
   );
   function keep(next: GameState) {
     storyRevision.current++;
+    setRuntimeLoadFailed(false);
     choiceGate.cancel();
     setSettling(false);
     setGame(next);
@@ -385,6 +226,7 @@ export default function App() {
       lines: freshLines,
       narration: freshLines.length ? null : (nextView.moment ?? null),
       revision: next.inputs.length,
+      outcome: operationsCeremony(view, nextView, next.inputs.length) ?? undefined,
       returnedObject:
         view.focus &&
         nextView.focus?.id !== view.focus.id &&
@@ -395,12 +237,15 @@ export default function App() {
           ? view.focus.title
           : undefined,
       passage:
-        input.type === 'action' && input.id === 'back-to-school'
+        input.type === 'action' && ['back-to-school', 'leave-school-holiday'].includes(input.id)
           ? nextView.lifeChapter?.label.includes('School finished')
             ? 'After the final school year'
             : 'A year later'
-          : undefined,
+          : input.type === 'action' && input.id === 'service-quiet-week'
+            ? 'After a quiet week'
+            : undefined,
     });
+    if (nextView.focus?.id !== view.focus?.id) setSelectedPanel(nextView.focus ? 'bench' : null);
     setPreviousEvidence(
       view.focus ? { id: view.focus.id, observations: view.focus.observations } : null,
     );
@@ -425,6 +270,7 @@ export default function App() {
       setMessage('That file is larger than the 8 MB story limit. Your current story is unchanged.');
       return;
     }
+    setRuntimeLoadFailed(false);
     setMessage('Opening your story…');
     try {
       // Let the status paint before synchronous replay occupies the main thread.
@@ -434,16 +280,22 @@ export default function App() {
       if (revision !== storyRevision.current) return;
       const text = await file.text();
       if (revision !== storyRevision.current) return;
-      const next = replayPlaytest(text);
+      const next = await restoreBrowserStory(text);
+      if (revision !== storyRevision.current) return;
       keep(next);
       setJournal(false);
       setAttention(null);
+      setSelectedPanel(null);
+      setDismissedCeremonies([]);
       setDepartingObject(null);
       setPreviousEvidence(null);
-    } catch {
+    } catch (error) {
       if (revision !== storyRevision.current) return;
+      setRuntimeLoadFailed(error instanceof HistoricalRuntimeLoadError);
       setMessage(
-        'That story could not be replayed. Please choose an exported repair story. Your current story is unchanged.',
+        error instanceof HistoricalRuntimeLoadError
+          ? 'The saved-story runtime could not be loaded. Check your connection, reload this page, then open the file again. Your current story is unchanged.'
+          : 'That story could not be replayed. Please choose an exported repair story. Your current story is unchanged.',
       );
     }
   }
@@ -464,6 +316,7 @@ export default function App() {
       <button
         type="button"
         data-choice="true"
+        data-action-id={action.id}
         key={action.id}
         className={`${action.kind === 'primary' ? 'primary' : ''} intent-${action.intent ?? 'stay'}`}
         disabled={settling}
@@ -494,43 +347,107 @@ export default function App() {
           key={`${attention?.revision ?? 0}-${dialogue.map((line) => line.id).join('-')}`}
           className={`conversation ${dialogue.at(-1)?.tone ?? 'warm'} ${attention?.passage ? 'season-turn' : ''} ${attention?.returnedObject ? 'return-response' : ''}`}
         >
-          {attention?.returnedObject && (
-            <span className="return-label">About: {attention.returnedObject}</span>
-          )}
-          {attention?.passage && <span className="passage-label">{attention.passage}</span>}
           {narration && <p className="narration">{narration}</p>}
-          {dialogue.map((line) => (
+          {visibleDialogue.map((line) => (
             <div className="dialogue-line" key={line.id}>
-              <span className="speaker">{line.speaker}</span>
+              {!(line.speaker === 'You' && line.tone === 'notice') && (
+                <span className="speaker">{line.speaker}</span>
+              )}
               <p>{line.text}</p>
             </div>
           ))}
+          {earlierNotices.length > 0 && (
+            <details className="earlier-notices">
+              <summary>Earlier in this moment · {earlierNotices.length}</summary>
+              {earlierNotices.map((line) => (
+                <p key={line.id}>{line.text}</p>
+              ))}
+            </details>
+          )}
         </section>
       )}
     </div>
   );
+  const ceremony =
+    attention?.outcome ??
+    (view.milestone
+      ? {
+          key: view.milestone.sourcekey,
+          title: view.milestone.title,
+          detail: view.milestone.detail,
+          overline: view.milestone.sourcekey.startsWith('graduation:')
+            ? 'A new chapter'
+            : 'Something earned',
+        }
+      : attention?.passage
+        ? {
+            key: `passage:${attention.revision}`,
+            title: attention.passage,
+            detail: view.lifeChapter?.detail,
+            overline: view.lifeChapter?.label ?? 'Time passes',
+          }
+        : attention?.returnedObject
+          ? {
+              key: `returned:${attention.revision}`,
+              title: attention.returnedObject,
+              detail: undefined,
+              overline: 'Back with its owner',
+            }
+          : view.chapterClosure && !view.operations
+            ? {
+                key: view.chapterClosure.sourcekey,
+                title: view.chapterClosure.title,
+                detail: view.chapterClosure.detail,
+                overline: 'A chapter you made your own',
+              }
+            : null);
+  const ceremonyOpen = ceremony && !dismissedCeremonies.includes(ceremony.key);
+  const selectPanel = (next: WorkspacePanel) => {
+    setSelectedPanel(next);
+    setRoomOpen(false);
+  };
+  const focusBench = () => {
+    selectPanel('bench');
+    requestAnimationFrame(() =>
+      benchRef.current?.scrollIntoView({ block: 'start', behavior: 'instant' }),
+    );
+  };
   return (
-    <main className={`story scene-${view.scene}`}>
-      <header className="masthead">
-        <div className="place-time">
-          <span className="place">{view.scene === 'home' ? 'At home' : 'In the garage'}</span>
-          {view.timeLabel && (
-            <span className="time">{headerClock(view.timeLabel, Boolean(view.lifeChapter))}</span>
-          )}
+    <main className={`story workspace-shell phase-${chapter.stage} scene-${view.scene}`}>
+      <header className="masthead workspace-masthead">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            a.
+          </span>
+          <div>
+            <span className="brand-name">A little light</span>
+            {chapter.period !== view.timeLabel && (
+              <span className="brand-period">{chapter.period}</span>
+            )}
+          </div>
         </div>
-        <button
-          type="button"
-          className="journal-toggle"
-          ref={journalToggle}
-          onClick={() => {
-            setJournal(!journal);
-            setConfirmReset(false);
-          }}
-          aria-expanded={journal}
-          aria-controls="journal"
-        >
-          {journal ? 'Back to the bench' : 'Journal'}
-        </button>
+        <div className="header-tools">
+          {view.timeLabel && <span className="time workspace-clock">{view.timeLabel}</span>}
+          {workshop?.notebook && (
+            <span className="header-cash">
+              <small>Cash</small>
+              <strong>{workshop.notebook.cash}</strong>
+            </span>
+          )}
+          <button
+            type="button"
+            className="journal-toggle"
+            ref={journalToggle}
+            onClick={() => {
+              setJournal(!journal);
+              setConfirmReset(false);
+            }}
+            aria-expanded={journal}
+            aria-controls="journal"
+          >
+            {journal ? 'Close journal' : 'Journal'}
+          </button>
+        </div>
       </header>
       {journal && (
         <section id="journal" className="journal" aria-label="Story journal">
@@ -562,6 +479,9 @@ export default function App() {
                 type="button"
                 onClick={() => {
                   keep(createGame());
+                  setSelectedPanel(null);
+                  setDismissedCeremonies([]);
+                  setRoomOpen(false);
                   setAttention(null);
                   setDepartingObject(null);
                   setPreviousEvidence(null);
@@ -580,6 +500,11 @@ export default function App() {
             <p className="message" role="status">
               {message}
             </p>
+          )}
+          {runtimeLoadFailed && (
+            <button type="button" onClick={() => window.location.reload()}>
+              Reload story code
+            </button>
           )}
           <JournalHistory lines={history} />
         </section>
@@ -601,48 +526,47 @@ export default function App() {
         className={`present-story ${view.focus ? 'focused-story' : ''}`}
         ref={actionsRef}
       >
-        {workshop?.notebook && (
-          <p className="workshop-balance">
-            <span>Workshop cash</span> <strong>{workshop.notebook.cash}</strong>
-          </p>
-        )}
-        {view.lifeChapter && (
-          <div className="life-chapter">
-            <span>{view.lifeChapter.label}</span>
-            {view.lifeChapter.detail && <p>{view.lifeChapter.detail}</p>}
+        <div className="chapter-heading">
+          <div>
+            <span className="card-overline">
+              {chapter.tutorial
+                ? 'School holidays'
+                : chapter.stage === 'service'
+                  ? 'A working life'
+                  : 'After school'}
+            </span>
+            <h1>{chapter.title}</h1>
           </div>
-        )}
-        {view.chapterClosure && (
-          <section className="chapter-closure" aria-label="Completed chapter">
-            <p className="chapter-overline">A week you made your own</p>
-            <h2>{view.chapterClosure.title}</h2>
-            <p>{view.chapterClosure.detail}</p>
-            <details className="chapter-record">
-              <summary>What you kept from this week</summary>
-              <ul>
-                {view.chapterClosure.outcomes.map((outcome) => (
-                  <li className="chapter-outcome" key={outcome}>
-                    {outcome}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          </section>
-        )}
-        <section className="around-bench" aria-label="Look around your workspace">
           <button
             type="button"
             className="room-toggle"
             aria-expanded={roomOpen}
             onClick={() => setRoomOpen(!roomOpen)}
           >
-            {roomOpen
-              ? 'Return to close work'
-              : view.scene === 'garage'
-                ? 'Look around the garage'
-                : 'Look around the family bench'}
+            {roomOpen ? 'Close room' : 'Look around'} <span aria-hidden="true">↗</span>
           </button>
-          {roomOpen && (
+        </div>
+        <WorkspaceNavigation
+          chapter={chapter}
+          selected={panel}
+          onSelect={selectPanel}
+          visiblePanels={
+            chapter.tutorial
+              ? [
+                  'bench',
+                  ...(view.shelf.length || boardPlans.length ? ['work' as const] : []),
+                  ...(groups.people.length || view.whereabouts?.length ? ['people' as const] : []),
+                ]
+              : ['bench', 'work', 'people']
+          }
+          counts={{
+            bench: groups.bench.length,
+            work: groups.work.length + boardPlans.filter((entry) => entry.actions.length).length,
+            people: groups.people.length,
+          }}
+        />
+        {roomOpen && (
+          <section className="room-stage" aria-label="Look around your workspace">
             <Suspense fallback={<p className="bench-note">Opening the room…</p>}>
               <WorkshopScene3D
                 view={view}
@@ -650,25 +574,20 @@ export default function App() {
                 onInput={(input) => {
                   restoreChoiceFocus.current = true;
                   act(input);
-                  setRoomOpen(false);
-                  requestAnimationFrame(() =>
-                    benchRef.current?.scrollIntoView({ block: 'start', behavior: 'instant' }),
-                  );
+                  focusBench();
                 }}
-                onFocus={() => {
-                  setRoomOpen(false);
-                  requestAnimationFrame(() =>
-                    benchRef.current?.scrollIntoView({ block: 'start', behavior: 'instant' }),
-                  );
-                }}
+                onFocus={focusBench}
+                onWorkboard={() => selectPanel('work')}
+                onPeople={() => selectPanel('people')}
                 onCabinetFocus={() => {
-                  setRoomOpen(false);
+                  focusBench();
                   requestAnimationFrame(() => {
                     const details = cabinetRef.current;
-                    if (!details) return;
-                    details.open = true;
-                    details.querySelector('summary')?.focus({ preventScroll: true });
-                    details.scrollIntoView({ block: 'start', behavior: 'instant' });
+                    if (details) {
+                      details.open = true;
+                      details.querySelector('summary')?.focus({ preventScroll: true });
+                      details.scrollIntoView({ block: 'start', behavior: 'instant' });
+                    }
                   });
                 }}
                 onOpenJournal={() => {
@@ -677,276 +596,333 @@ export default function App() {
                 }}
               />
             </Suspense>
-          )}
-        </section>
-        <div className="bench-content" hidden={roomOpen}>
-          {view.milestone && (
-            <section
-              className={`story-milestone ${view.milestone.sourcekey.startsWith('graduation:') ? 'graduation-milestone' : 'payment-milestone'}`}
-              key={view.milestone.sourcekey}
-              aria-label="Story milestone"
+          </section>
+        )}
+        <div className="workspace-body" hidden={roomOpen}>
+          {ceremonyOpen && (
+            <ChapterCeremony
+              title={ceremony.title}
+              detail={ceremony.detail}
+              overline={ceremony.overline}
+              onContinue={() => {
+                setDismissedCeremonies((prior) => [...prior, ceremony.key]);
+                requestAnimationFrame(() => {
+                  document
+                    .getElementById(`workspace-${panel}`)
+                    ?.querySelector<HTMLButtonElement>('button:not([disabled])')
+                    ?.focus({ preventScroll: true });
+                });
+              }}
             >
-              <span className="milestone-mark" aria-hidden="true">
-                ✦
-              </span>
-              <div>
-                <h2>{view.milestone.title}</h2>
-                <p>{view.milestone.detail}</p>
-              </div>
-            </section>
+              {response}
+            </ChapterCeremony>
           )}
-          {!view.focus && (
-            <section className="story-heading">
-              <h1>{view.title}</h1>
-              <p>{view.subtitle}</p>
-            </section>
-          )}
-          {attention?.returnedObject && response}
-          {view.focus && (
-            <section
-              ref={benchRef}
-              className={`workbench ${attention?.returnedObject ? 'next-object' : ''}`}
-              aria-label={view.focus.title}
-            >
-              <ObjectPresentation
-                key={view.focus.id}
-                object={view.focus}
-                inHand={inHand}
-                onViewChange={setInHand}
-                actions={view.actions}
-                disabled={settling}
-                onAction={(id) => act({ type: 'action', id })}
-                onReady={onRepairReady}
-              />
-              <div className="object-story">
-                <h1>{view.focus.title}</h1>
-                {!view.focus.title
-                  .toLocaleLowerCase()
-                  .includes(view.focus.owner.toLocaleLowerCase()) && (
-                  <p className="owner">{view.focus.owner}</p>
-                )}
-                <p>{view.focus.story}</p>
-                {recordedObservations.length > 0 && (
-                  <details className="object-notes">
-                    <summary>
-                      Notes so far · {recordedObservations.length}
-                      {previousEvidence?.id === view.focus.id &&
-                        recordedObservations.some(
-                          (observation) => !previousEvidence.observations.includes(observation),
-                        ) && <span className="notes-update">New discovery</span>}
-                    </summary>
-                    <ul className="observations">
-                      {recordedObservations.map((observation) => (
-                        <li
-                          key={observation}
-                          className={
-                            previousEvidence?.id === view.focus?.id &&
-                            !previousEvidence?.observations.includes(observation)
-                              ? 'new-evidence'
-                              : ''
-                          }
-                        >
-                          {previousEvidence?.id === view.focus?.id &&
-                            !previousEvidence?.observations.includes(observation) && (
-                              <span className="evidence-tag">New</span>
-                            )}
-                          {observation}
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
-              </div>
-            </section>
-          )}
-          {!view.focus && departingObject && (
-            <div className="object-departure" aria-hidden="true">
-              <ObjectIllustration object={departingObject} />
+          <div hidden={Boolean(ceremonyOpen)}>
+            <div className="current-moment">
+              {response}
+              {urgentPlan && (
+                <section className="attention-task" aria-label="Current work needs you">
+                  <span className="card-overline">
+                    {urgentPlan.actions.some((action) => action.id === 'wait-conversation-activity')
+                      ? 'Before you continue'
+                      : 'Current work'}
+                  </span>
+                  <h2>{urgentPlan.label}</h2>
+                  <p>{urgentPlan.detail}</p>
+                  <div className="choice-buttons">{urgentPlan.actions.map(renderAction)}</div>
+                </section>
+              )}
             </div>
-          )}
-          {view.note && !view.collectionPlans?.length && dayPlans.length === 0 && (
-            <p className="bench-note">{view.note}</p>
-          )}
-          {dayPlans.length === 0 &&
-            (Boolean(view.collectionPlans?.length) || Boolean(view.knownAppointments?.length)) && (
-              <aside className="known-arrangements" aria-label="Agreed visits and collections">
-                {view.collectionPlans?.map((plan) => (
-                  <p key={plan.objectId}>
-                    <strong>{plan.title}</strong> · {plan.detail}
-                  </p>
-                ))}
-                {view.knownAppointments
-                  ?.filter(
-                    (appointment) =>
-                      !view.collectionPlans?.some(
-                        (plan) =>
-                          plan.owner.toLocaleLowerCase() === appointment.name.toLocaleLowerCase(),
-                      ),
-                  )
-                  .map((appointment) => (
-                    <p key={appointment.personId}>
-                      <strong>{appointment.name}</strong> · {appointment.detail}
-                    </p>
-                  ))}
-              </aside>
-            )}
-          {workshop?.cabinet?.open && (
-            <details
-              ref={cabinetRef}
-              className="cabinet-at-side"
-              open={!view.focus && !game.apprentice?.jobId}
-            >
-              <summary>Dad’s cabinet doors · {cabinetStageLabels[workshop.cabinet.stage]}</summary>
-              <section className="family-project" aria-label="Dad’s cabinet project">
-                <Cabinet
-                  stage={workshop.cabinet.stage}
-                  drawing={workshop.cabinet.drawingDisplayed}
-                />
-                <div>
-                  <p>{workshop.cabinet.description}</p>
-                  {workshop.cabinet.drawingFound && (
-                    <p className="project-memory">
-                      {workshop.cabinet.drawingDisplayed
-                        ? 'Your drawing is beside the finished cabinet.'
-                        : 'The saved drawing is in the flat box.'}
-                    </p>
-                  )}
-                </div>
-              </section>
-              <div className="choice-buttons project-choices">
-                {projectChoices
-                  .filter((action) => !action.id.startsWith('childhood-'))
-                  .map(renderAction)}
-              </div>
-            </details>
-          )}
-          {navigation.length > 0 && (
-            <nav className="scene-navigation choice-buttons" aria-label="Return to the bench">
-              {navigation.map(renderAction)}
-            </nav>
-          )}
-          {view.apprenticeship &&
-            !dayPlans.some((entry) => entry.id === 'sam-work') &&
-            (game.apprentice?.jobId ? (
-              <section
-                className="apprentice-presence"
-                aria-label={`${view.apprenticeship.name} at the bench`}
-              >
-                <span className="speaker">{view.apprenticeship.name}</span>
-                <p>{view.apprenticeship.activity}</p>
-                <small>{view.apprenticeship.responsibility}</small>
-              </section>
-            ) : (
-              <details className="apprentice-presence choice-more">
-                <summary>{view.apprenticeship.name}</summary>
-                <p>{view.apprenticeship.activity}</p>
-                <small>{view.apprenticeship.responsibility}</small>
-              </details>
-            ))}
-          {!attention?.returnedObject && response}
-          {dayPlans.length > 0 && (
-            <DayPlan entries={dayPlans} actions={view.actions} renderAction={renderAction} />
-          )}
-          {serviceWeek && !weekConcluded && <p className="week-progress">{serviceWeek.label}</p>}
-          {view.actions.length > 0 && (
             <section
-              className={`actions ${settling ? 'settling' : 'ready'}`}
-              aria-busy={settling}
-              aria-label="What to do next"
+              id="workspace-bench"
+              className="workspace-panel"
+              hidden={panel !== 'bench'}
+              aria-label={chapter.tutorial ? 'At home' : 'Workbench'}
             >
-              {actionGroups
-                .map((group) =>
-                  group.id === 'project' && workshop?.cabinet?.open
-                    ? {
-                        ...group,
-                        actions: group.actions.filter((action) =>
-                          action.id.startsWith('childhood-'),
-                        ),
-                      }
-                    : group,
-                )
-                .filter((group) => group.actions.length > 0 || group.id === 'week')
-                .map((group) =>
-                  [
-                    'elsewhere',
-                    'window',
-                    'alternatives',
-                    'conversation',
-                    'earlier-learning',
-                    'project',
-                    'workshop',
-                    'week',
-                  ].includes(group.id) ? (
-                    <ChoiceDetails
-                      key={group.id}
-                      reveal={
-                        group.id === 'project' &&
-                        group.actions.some((action) => action.id.startsWith('childhood-'))
-                      }
+              <div className={`bench-layout ${!view.focus ? 'empty-bench-layout' : ''}`}>
+                <div className="bench-stage">
+                  {view.focus && (
+                    <section
+                      ref={benchRef}
+                      className={`workbench ${attention?.returnedObject ? 'next-object' : ''}`}
+                      aria-label={view.focus.title}
                     >
-                      <summary>
-                        {group.id === 'week'
-                          ? weekConcluded
-                            ? 'Remaining agreements'
-                            : 'This week’s arrangements'
-                          : group.label}
-                      </summary>
-                      {group.id === 'week' && serviceWeek && !weekConcluded && (
-                        <div className="week-arrangements">
-                          <p>{serviceWeek.detail}</p>
-                          {serviceWeek.arrangements.length > 0 && (
-                            <ul>
-                              {serviceWeek.arrangements.map((arrangement) => (
-                                <li key={arrangement}>
-                                  {serviceWeek.checkingPlace === 'second' &&
-                                  arrangement ===
-                                    'Two stable labelled checking places, bought for £6.'
-                                    ? 'The second checking tray is in use.'
-                                    : arrangement}
+                      <ObjectPresentation
+                        key={view.focus.id}
+                        object={view.focus}
+                        inHand={inHand}
+                        onViewChange={setInHand}
+                        actions={view.actions}
+                        disabled={settling}
+                        onAction={(id) => act({ type: 'action', id })}
+                        onReady={onRepairReady}
+                      />
+                      <div className="object-story">
+                        <h1>{view.focus.title}</h1>
+                        {!view.focus.title
+                          .toLocaleLowerCase()
+                          .includes(view.focus.owner.toLocaleLowerCase()) && (
+                          <p className="owner">{view.focus.owner}</p>
+                        )}
+                        <p>{view.focus.story}</p>
+                        {recordedObservations.length > 0 && (
+                          <details className="object-notes">
+                            <summary>
+                              Notes so far · {recordedObservations.length}
+                              {previousEvidence?.id === view.focus.id &&
+                                recordedObservations.some(
+                                  (observation) =>
+                                    !previousEvidence.observations.includes(observation),
+                                ) && <span className="notes-update">New discovery</span>}
+                            </summary>
+                            <ul className="observations">
+                              {recordedObservations.map((observation) => (
+                                <li
+                                  key={observation}
+                                  className={
+                                    previousEvidence?.id === view.focus?.id &&
+                                    !previousEvidence?.observations.includes(observation)
+                                      ? 'new-evidence'
+                                      : ''
+                                  }
+                                >
+                                  {previousEvidence?.id === view.focus?.id &&
+                                    !previousEvidence?.observations.includes(observation) && (
+                                      <span className="evidence-tag">New</span>
+                                    )}
+                                  {observation}
                                 </li>
                               ))}
                             </ul>
-                          )}
-                          {serviceWeek.conclusion && (
-                            <p>
-                              {serviceWeek.conclusion.replace('This authored week', 'This week')}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                      <div className="choice-buttons">{group.actions.map(renderAction)}</div>
-                    </ChoiceDetails>
-                  ) : (
-                    <div className="choice-group" key={group.id}>
-                      {group.label && <h2>{group.label}</h2>}
-                      <div className="choice-buttons">{group.actions.map(renderAction)}</div>
-                    </div>
-                  ),
-                )}
-            </section>
-          )}
-          {workshop && (workshop.jobs.length > 0 || workshop.notebook || workshop.arrangement) && (
-            <aside className="workshop-notes" aria-label="Workshop notes">
-              {workshop.jobs.length > 0 && (
-                <details className="job-slips">
-                  <summary>Agreed work</summary>
-                  <div>
-                    {workshop.jobs.map((job) => (
-                      <article key={job.id}>
-                        <h3>{job.title}</h3>
-                        <p>{job.note}</p>
-                        <small>{job.quote}</small>
-                        {job.stage === 'quoted' && (
-                          <p className="agreement-status">Discussed, not yet accepted.</p>
+                          </details>
                         )}
-                      </article>
-                    ))}
+                      </div>
+                    </section>
+                  )}
+                  {!view.focus && departingObject && (
+                    <div className="object-departure" aria-hidden="true">
+                      <ObjectIllustration object={departingObject} />
+                    </div>
+                  )}
+                  {!view.focus && (
+                    <section className="empty-bench">
+                      <span className="bench-outline" aria-hidden="true">
+                        ⌁
+                      </span>
+                      <h2>{view.title}</h2>
+                      <p>{view.subtitle}</p>
+                      {view.note && <p className="bench-note">{view.note}</p>}
+                      {!chapter.tutorial && (
+                        <button type="button" onClick={() => selectPanel('work')}>
+                          See work & promises <span aria-hidden="true">→</span>
+                        </button>
+                      )}
+                    </section>
+                  )}
+                </div>
+                <aside className="bench-decisions">
+                  <ActionLane
+                    title={view.focus ? 'At this bench' : 'Begin here'}
+                    actions={groups.bench.filter(
+                      (action) =>
+                        !(
+                          workshop?.cabinet?.open &&
+                          /^workshop-(cabinet|drawings|display-drawing|keep-drawing)/.test(
+                            action.id,
+                          ) &&
+                          action.id !== 'workshop-cabinet-close'
+                        ),
+                    )}
+                    renderAction={renderAction}
+                  />
+                  {chapter.tutorial && (
+                    <ActionLane
+                      title="Around the house"
+                      actions={groups.work}
+                      renderAction={renderAction}
+                    />
+                  )}
+                  {view.parts.length > 0 && (
+                    <section className="parts-well">
+                      <h2>Parts at hand</h2>
+                      <ul className="parts">
+                        {view.parts.map((part) => (
+                          <li key={part.id}>
+                            {part.label}
+                            {part.count > 1 ? ` · ${part.count}` : ''}
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  )}
+                  {view.focus && (
+                    <p className="bench-quiet-note">
+                      Your observations stay with this object when you put it aside.
+                    </p>
+                  )}
+                </aside>
+              </div>
+              {workshop?.cabinet?.open && (
+                <details
+                  ref={cabinetRef}
+                  className="cabinet-at-side"
+                  open={!view.focus && !game.apprentice?.jobId}
+                >
+                  <summary>
+                    Dad’s cabinet doors · {cabinetStageLabels[workshop.cabinet.stage]}
+                  </summary>
+                  <section className="family-project" aria-label="Dad’s cabinet project">
+                    <Cabinet
+                      stage={workshop.cabinet.stage}
+                      drawing={workshop.cabinet.drawingDisplayed}
+                    />
+                    <div>
+                      <p>{workshop.cabinet.description}</p>
+                      {workshop.cabinet.drawingFound && (
+                        <p className="project-memory">
+                          {workshop.cabinet.drawingDisplayed
+                            ? 'Your drawing is beside the finished cabinet.'
+                            : 'The saved drawing is in the flat box.'}
+                        </p>
+                      )}
+                    </div>
+                  </section>
+                  <div className="choice-buttons project-choices">
+                    {groups.bench
+                      .filter(
+                        (action) =>
+                          /^workshop-(cabinet|drawings|display-drawing|keep-drawing)/.test(
+                            action.id,
+                          ) && action.id !== 'workshop-cabinet-close',
+                      )
+                      .map(renderAction)}
                   </div>
                 </details>
               )}
-              {workshop.notebook && (
+            </section>
+            <section
+              id="workspace-work"
+              className="workspace-panel"
+              hidden={panel !== 'work'}
+              aria-label={chapter.tutorial ? 'Kept things' : 'Work and promises'}
+            >
+              <div className="panel-heading">
+                <div>
+                  <span className="card-overline">
+                    {chapter.tutorial ? 'Nothing lost' : 'Your workboard'}
+                  </span>
+                  <h2>{chapter.tutorial ? 'Things worth keeping' : 'Work & promises'}</h2>
+                </div>
+                <span className="panel-caption">
+                  {chapter.tutorial
+                    ? 'Unfinished work can wait.'
+                    : 'One place for the work you have agreed.'}
+                </span>
+              </div>
+              {serviceWeek && !view.chapterClosure && (
+                <section className="chapter-strip">
+                  <h3>{serviceWeek.label}</h3>
+                  <p>{serviceWeek.detail}</p>
+                </section>
+              )}
+              {view.operations && (
+                <OperationsBoard
+                  operations={view.operations}
+                  actions={groups.work.filter((action) => action.id.startsWith('operations-'))}
+                  renderAction={renderAction}
+                />
+              )}
+              {!chapter.tutorial && (
+                <ActionLane
+                  title="Next decisions"
+                  actions={groups.work.filter(
+                    (action) => !view.operations || !action.id.startsWith('operations-'),
+                  )}
+                  renderAction={renderAction}
+                />
+              )}
+              <PromiseCards entries={boardPlans} renderAction={renderAction} />
+              {dayPlans.length === 0 &&
+                (Boolean(view.collectionPlans?.length) ||
+                  Boolean(view.knownAppointments?.length)) && (
+                  <section className="promise-grid" aria-label="Known visits and collections">
+                    {view.collectionPlans?.map((plan) => (
+                      <article className="promise-card" key={plan.objectId}>
+                        <span className="card-overline">Collection</span>
+                        <h3>{plan.title}</h3>
+                        <p>{plan.detail}</p>
+                      </article>
+                    ))}
+                    {view.knownAppointments
+                      ?.filter(
+                        (appointment) =>
+                          !view.collectionPlans?.some(
+                            (plan) => plan.owner.toLowerCase() === appointment.name.toLowerCase(),
+                          ),
+                      )
+                      .map((appointment) => (
+                        <article className="promise-card" key={appointment.personId}>
+                          <span className="card-overline">Known availability</span>
+                          <h3>{appointment.name}</h3>
+                          <p>{appointment.detail}</p>
+                        </article>
+                      ))}
+                  </section>
+                )}
+
+              <section className="kept-work">
+                <h2>
+                  {chapter.tutorial ? 'The waiting shelf' : 'Waiting work & personal projects'}
+                </h2>
+                {view.shelf.length > 0 ? (
+                  <div className="shelf work-shelf">
+                    {view.shelf.map((item) => (
+                      <button
+                        type="button"
+                        key={item.id}
+                        disabled={settling}
+                        onClick={() => {
+                          act({ type: 'select', id: item.id });
+                          selectPanel('bench');
+                        }}
+                      >
+                        <span className="shelf-object-mark" aria-hidden="true">
+                          ◇
+                        </span>
+                        <span>
+                          <strong>{item.title}</strong>
+                          <small>{item.note}</small>
+                        </span>
+                        <span aria-hidden="true">→</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="empty-note">Nothing is put aside here.</p>
+                )}
+              </section>
+              {workshop?.jobs && workshop.jobs.length > 0 && (
+                <section className="recorded-work">
+                  <h2>Agreed work</h2>
+                  <div className="job-grid">
+                    {workshop.jobs.map((job) => (
+                      <article key={job.id}>
+                        <span className="card-overline">
+                          {job.stage === 'quoted'
+                            ? 'Discussed · not accepted'
+                            : 'Recorded agreement'}
+                        </span>
+                        <h3>{job.title}</h3>
+                        <p>{job.note}</p>
+                        <small>{job.quote}</small>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {workshop?.notebook && (
                 <details className="cash-notebook">
-                  <summary>Workshop notebook</summary>
+                  <summary>Cash notebook · {workshop.notebook.cash}</summary>
                   <section className="cash-ledger-scroll" aria-label="Workshop transactions">
                     <table className="cash-ledger">
                       <caption>Recorded transactions</caption>
@@ -977,58 +953,87 @@ export default function App() {
                   </section>
                 </details>
               )}
-              {workshopArrangement && !view.chapterClosure && (
-                <p className="workshop-arrangement">{workshopArrangement}</p>
-              )}
-            </aside>
-          )}
-          {view.whereabouts && view.whereabouts.length > 0 && (
-            <aside className="people-nearby" aria-label="People">
-              {view.whereabouts.map((person) => (
-                <p key={person.id}>
-                  <strong>{person.name}</strong> · {person.activity}
-                </p>
-              ))}
-            </aside>
-          )}
-          {(view.shelf.length > 0 || view.parts.length > 0) && (
-            <aside className="belongings">
-              {view.shelf.length > 0 && (
-                <section>
-                  <h2>Put aside</h2>
-                  <div className="shelf">
-                    {view.shelf.map((item) => (
-                      <button
-                        type="button"
-                        key={item.id}
-                        disabled={settling}
-                        onClick={() => act({ type: 'select', id: item.id })}
-                      >
-                        <span>{item.title}</span>
-                        <small>{item.note}</small>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              )}
-              {view.parts.length > 0 && (
-                <section>
-                  <h2>Parts tray</h2>
-                  <ul className="parts">
-                    {view.parts.map((part) => (
-                      <li key={part.id}>
-                        {part.label}
-                        {part.count > 1 ? ` · ${part.count}` : ''}
-                      </li>
+              {view.chapterClosure && (
+                <details className="chapter-record">
+                  <summary>{view.chapterClosure.title}</summary>
+                  <p>{view.chapterClosure.detail}</p>
+                  <ul>
+                    {view.chapterClosure.outcomes.map((outcome) => (
+                      <li key={outcome}>{outcome}</li>
                     ))}
                   </ul>
-                </section>
+                </details>
               )}
-            </aside>
-          )}
+              {previousPlans.length > 0 && (
+                <details className="past-promises">
+                  <summary>Previous arrangements</summary>
+                  <PromiseCards entries={previousPlans} renderAction={renderAction} />
+                </details>
+              )}
+            </section>
+            <section
+              id="workspace-people"
+              className="workspace-panel"
+              hidden={panel !== 'people'}
+              aria-label="People"
+            >
+              <div className="panel-heading">
+                <div>
+                  <span className="card-overline">Their own lives, too</span>
+                  <h2>People around you</h2>
+                </div>
+              </div>
+              {view.apprenticeship && !dayPlans.some((entry) => entry.id === 'sam-work') && (
+                <article className="person-card apprentice-card">
+                  <span className="card-overline">At the bench</span>
+                  <h3>{view.apprenticeship.name}</h3>
+                  <p>{view.apprenticeship.activity}</p>
+                  <p>{view.apprenticeship.responsibility}</p>
+                </article>
+              )}
+              {view.whereabouts && (
+                <div className="people-grid">
+                  {view.whereabouts
+                    .filter((person) => !(person.id === 'sam' && view.apprenticeship))
+                    .map((person) => (
+                      <article className="person-card" key={person.id}>
+                        <span className="person-initial" aria-hidden="true">
+                          {person.name.charAt(0)}
+                        </span>
+                        <div>
+                          <h3>{person.name}</h3>
+                          <p>{person.activity}</p>
+                        </div>
+                      </article>
+                    ))}
+                </div>
+              )}
+              <ActionLane
+                title="Conversations & shared work"
+                actions={groups.people}
+                renderAction={renderAction}
+              />
+              {groups.people.length === 0 && (
+                <p className="empty-note">
+                  There is no new conversation offered just now. Known arrangements are on your
+                  workboard.
+                </p>
+              )}
+            </section>
+            <section className="time-bar" aria-label="Take some time">
+              <div>
+                <span className="card-overline">Time moves with your choices</span>
+                {view.lifeChapter?.detail && <p>{view.lifeChapter.detail}</p>}
+              </div>
+              <div className="choice-buttons">{groups.time.map(renderAction)}</div>
+            </section>
+          </div>
         </div>
       </div>
-      <footer>A little work, a little patience.</footer>
+      <footer>
+        <span>A little light</span>
+        <span>Keep what matters.</span>
+      </footer>
     </main>
   );
 }

@@ -66,5 +66,10 @@ export default defineConfig({
       : [],
   },
   server: { watch: { ignored: [resolve(process.cwd(), '.worktrees/**')] } },
-  test: { include: ['tests/**/*.test.ts'] },
+  test: {
+    include: ['tests/**/*.test.ts'],
+    // Full public stories include four school years of actual actor work and
+    // exact replay. Measured runs take 5–9 seconds; their assertions stay intact.
+    testTimeout: 20_000,
+  },
 });

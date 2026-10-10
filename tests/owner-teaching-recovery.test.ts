@@ -15,6 +15,7 @@ import * as thirteen from '../src/game/engine13';
 import { inspectRepair, performActiveBellCheck, readLongCheck } from '../src/game/repairs';
 import type { GameInput, RepairObject } from '../src/game/types';
 import fixture from './fixtures/owner-thirteen-school-apprentice-route.json';
+import { positiveAction } from './support/public-attendance';
 
 function actualOwner() {
   let s = thirteen.createGame(fixture.seed);
@@ -290,8 +291,8 @@ it('retains the actually witnessed corrective contact result when checking comes
   expect(pendingCorrectiveDemonstration(s)).toBeUndefined();
   const priorRules = structuredClone(withheld.people.sam?.methods);
   let returned = withheld;
-  while (getView(returned).actions.some((x) => x.id === 'wait-check'))
-    returned = transition(returned, { type: 'action', id: 'wait-check' });
+  for (let n = 0; n < 20 && getView(returned).actions.some((x) => x.id === 'wait-check'); n++)
+    returned = positiveAction(returned, 'wait-check');
   returned = transition(returned, { type: 'action', id: 'check-result' });
   returned = transition(returned, { type: 'action', id: 'return' });
   expect(pendingCorrectiveDemonstration(returned)).toBeUndefined();
@@ -348,8 +349,8 @@ it('explains the actual start-of-run demonstration in past tense when the repair
     s = transition(s, { type: 'action', id });
   const start = s.apprentice?.lastLesson;
   expect(start?.step).toBe('verify');
-  while (getView(s).actions.some((x) => x.id === 'wait-check'))
-    s = transition(s, { type: 'action', id: 'wait-check' });
+  for (let n = 0; n < 20 && getView(s).actions.some((x) => x.id === 'wait-check'); n++)
+    s = positiveAction(s, 'wait-check');
   s = transition(s, { type: 'action', id: 'check-result' });
   expect(s.objects.find((x) => x.id === s.focusId)?.verified).toBe(true);
   s = transition(s, { type: 'action', id: 'explain-step' });

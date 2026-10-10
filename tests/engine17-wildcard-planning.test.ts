@@ -4,6 +4,7 @@ import { getView, restoreGame, serializeGame, transition } from '../src/game/eng
 import * as seventeen from '../src/game/engine17';
 import type { GameInput } from '../src/game/types';
 import route from './fixtures/wildcard-seventeen-route.json';
+import { positiveAction } from './support/public-attendance';
 
 it('preserves the actual native17 wildcard route and distinguishes planning from completed cabinet work in current projection', () => {
   let old = seventeen.createGame(route.seed);
@@ -46,7 +47,10 @@ it('the actual wildcard cabinet route keeps hung doors in place and promotes the
       'wait-appointment',
     ].map((id): GameInput => ({ type: 'action', id })),
   ];
-  for (const input of continuation) s = transition(s, input);
+  // The preserved actor may still be finishing its heard morning break.
+  // Complete only the positive new work; the frozen prefix stays unchanged.
+  for (const input of continuation)
+    s = input.type === 'action' ? positiveAction(s, input.id) : transition(s, input);
   expect(s.now).toBe(2385);
   expect(s.workshop?.cabinet).toBe('looked');
   expect(s.workshop?.cabinetAppointment?.status).toBe('planned');

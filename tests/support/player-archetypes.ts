@@ -7,6 +7,8 @@ export const archetypes = [
   'social-first',
   'completionist',
   'continuation-seeker',
+  'capacity-builder',
+  'private-tinkerer',
 ] as const;
 export type Archetype = (typeof archetypes)[number];
 export interface Diagnostic {
@@ -64,6 +66,24 @@ export function chooseVisible(
       } else if (archetype === 'impatient') {
         if (/wait/.test(words)) score -= /\d+\s*minutes?|until|finishes|ends/.test(words) ? 15 : 90;
         if (/next|continue|return|finish|begin/.test(words)) score += 25;
+      } else if (archetype === 'capacity-builder') {
+        if (/collection|service|priced|regular|customer|workshop|workboard/.test(words))
+          score += 45;
+        if (
+          /offer.*£|independent|teach|explain|show.*sam|delivery stretch|arrange.*sam/.test(words)
+        )
+          score += 65;
+        if (/hear|accept|request|next period|month later|following year/.test(words)) score += 35;
+        if (/private|decline|return.*unfinished/.test(words)) score -= 45;
+        if (/wait/.test(words)) score -= /until|finishes|ends|agreed/.test(words) ? 5 : 40;
+      } else if (archetype === 'private-tinkerer') {
+        if (/private|personal|childhood|drawing|paper.street|model|family|cabinet/.test(words))
+          score += 65;
+        if (/inspect|test|check|read|measure|compare|repair|fit/.test(words)) score += 25;
+        if (/decline.*request|keep.*private|following year|return to school|graduat/.test(words))
+          score += 35;
+        if (/priced|offer.*£|employee|collection repair|accept.*request/.test(words)) score -= 60;
+        if (/wait/.test(words)) score -= 25;
       } else if (archetype === 'social-first') {
         if (/talk|ask|tea|listen|conversation|invite|together|watch|tell/.test(words)) score += 60;
         if (/wait/.test(words)) score -= 20;
@@ -97,6 +117,7 @@ function visibleWork(view: GameView): string {
     shelf: view.shelf,
     parts: view.parts,
     apprenticeship: view.apprenticeship?.responsibility,
+    operations: view.operations,
     actions: view.actions.map((a) => a.id),
   });
 }

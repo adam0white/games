@@ -24,7 +24,7 @@ import {
   repairDuration,
   testRepair,
 } from './repairs6';
-import type { ActionView, GameState, RepairObject } from './types';
+import type { ActionView, GameState, RepairObject } from './types18';
 
 type Speak = (speaker: string, text: string) => void;
 export function freshApprentice(): NonNullable<GameState['apprentice']> {

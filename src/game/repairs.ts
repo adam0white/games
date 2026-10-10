@@ -22,7 +22,12 @@ export type RepairStep =
   | 'fit-holder'
   | 'twist-cap'
   | 'verify'
-  | 'check-result';
+  | 'check-result'
+  | 'test-trolley-unloaded'
+  | 'test-trolley-loaded'
+  | 'align-trolley-wheel'
+  | 'clear-trolley-rub'
+  | 'check-trolley-route';
 export type RepairCue =
   | 'intake'
   | 'needs-test'
@@ -42,7 +47,11 @@ export type RepairCue =
   | 'keeper-rubs'
   | 'missing-spring'
   | 'missing-gear'
-  | 'mechanism-working';
+  | 'mechanism-working'
+  | 'trolley-needs-comparison'
+  | 'trolley-wanders'
+  | 'trolley-rubs'
+  | 'trolley-rolls';
 export function cueFor(item: RepairObject, now: number): RepairCue {
   if (item.verified) return 'checked';
   if (item.checkStarted !== undefined)
@@ -64,6 +73,11 @@ export function inspectRepair(
 }
 function inspectAccessibleRepair(item: RepairObject): string {
   item.inspected = true;
+  if (item.form === 'trolley') {
+    item.evidence ??= [];
+    item.evidence.push('trolley-needs-comparison');
+    return 'The trolley frame and handle are sound. One wheel has a polished rim and a little sideways movement; a loose strap lies near it. Compare rolling empty and with the agreed parcels before deciding what matters under load.';
+  }
   if (item.id === 'friend-1' && item.form === 'torch') {
     item.evidence ??= [];
     item.evidence.push('needs-test');
@@ -158,6 +172,11 @@ export function repairDuration(step: string): number {
     'test-catch': 4,
     'replace-spring': 12,
     'fit-gear': 18,
+    'test-trolley-unloaded': 6,
+    'test-trolley-loaded': 8,
+    'align-trolley-wheel': 12,
+    'clear-trolley-rub': 8,
+    'check-trolley-route': 12,
   };
   if (mechanical[step]) return mechanical[step];
   return ['clean-contact', 'replace-battery', 'fit-holder', 'twist-cap'].includes(step)
@@ -176,6 +195,7 @@ export function applyRepair(
   step: string,
   parts: GameState['parts'],
 ): { succeeded: boolean; text: string } {
+  if (item.form === 'trolley') return repairTrolley(item, step);
   assertAccessStep(item, step);
   markPerformedWork(item, step);
   const correct: Record<string, Fault> = {
@@ -250,8 +270,93 @@ export function applyRepair(
               : 'That did not help. Testing the battery will separate a weak cell from a contact problem.',
   };
 }
+
+/** A bounded hand trolley comparison. Empty rolling is a control, not a
+ * diagnosis; the agreed parcel load reveals the consequential difference.
+ * No frame, bearing replacement or powered transport work is modelled. */
+export function testTrolley(item: RepairObject, loaded: boolean): string {
+  if (item.form !== 'trolley' || !item.inspected || !item.trolley)
+    throw Error('Examine the trolley before comparing it');
+  if (loaded && !item.trolley.permission) throw Error('The owner must agree the test load');
+  item.evidence ??= [];
+  if (!loaded) {
+    item.trolley.unloaded = true;
+    item.evidence.push('trolley-needs-comparison');
+    return 'Empty, the trolley rolls across the level floor. The wheel can move sideways a little, but it neither drags nor pulls enough to explain the reported loaded difficulty. This empty run does not establish loaded use.';
+  }
+  item.trolley.loaded = true;
+  item.tested = Boolean(item.trolley.unloaded);
+  const cue = item.repaired
+    ? 'trolley-rolls'
+    : item.fault === 'trolley-alignment'
+      ? 'trolley-wanders'
+      : 'trolley-rubs';
+  item.evidence.push(cue);
+  return cue === 'trolley-rolls'
+    ? 'With the same agreed parcels, the trolley rolls straight and the rim clears the strap. The short comparison is promising; its real route still needs an attended check.'
+    : cue === 'trolley-wanders'
+      ? 'With the parcels loaded, the wheel leans sideways and the trolley pulls toward the gate. Holding the loose strap clear makes no difference. Empty rolling had hidden the effect of the wheel mounting under load.'
+      : 'With the parcels loaded, the low strap presses against the turning wheel and makes it drag. Holding that strap clear removes the drag; the small sideways wheel movement does not change. Empty rolling had left enough clearance.';
+}
+export function repairTrolley(
+  item: RepairObject,
+  step: string,
+): { succeeded: boolean; text: string } {
+  if (item.form !== 'trolley' || !item.trolley?.permission)
+    throw Error('This borrowed trolley needs permission before work');
+  if (!item.trolley.unloaded || !item.trolley.loaded)
+    throw Error('Compare empty and loaded rolling before work');
+  if (!['align-trolley-wheel', 'clear-trolley-rub'].includes(step))
+    throw Error('This step does not belong to the trolley');
+  item.attempted++;
+  item.verified = false;
+  item.trolley.routeChecked = false;
+  delete item.checkStarted;
+  item.repaired =
+    (step === 'align-trolley-wheel' && item.fault === 'trolley-alignment') ||
+    (step === 'clear-trolley-rub' && item.fault === 'trolley-rub');
+  item.evidence ??= [];
+  item.evidence.push(
+    item.repaired
+      ? 'trolley-rolls'
+      : item.fault === 'trolley-alignment'
+        ? 'trolley-wanders'
+        : 'trolley-rubs',
+  );
+  return {
+    succeeded: item.repaired,
+    text: item.repaired
+      ? step === 'align-trolley-wheel'
+        ? 'With the borrowed trolley’s owner permission recorded, you seat and secure the accessible wheel mounting. It rolls straight with the agreed parcels. No part has been replaced; check the actual route before returning it.'
+        : 'You secure the loose strap above the turning wheel, leaving the borrowed frame and wheel alone. The parcels no longer press it into the rim. Check the actual route before returning it.'
+      : 'That change does not resolve the loaded difficulty. Repeat the controlled comparison rather than assuming the empty roll was enough.',
+  };
+}
+export function performTrolleyRouteCheck(
+  item: RepairObject,
+  startedAt: number,
+  endedAt: number,
+): string {
+  if (
+    item.form !== 'trolley' ||
+    !item.trolley?.permission ||
+    !item.repaired ||
+    !item.trolley.unloaded ||
+    !item.trolley.loaded ||
+    !Number.isFinite(startedAt) ||
+    !Number.isFinite(endedAt) ||
+    endedAt - startedAt < 12
+  )
+    throw Error('The attended trolley route check is incomplete');
+  item.verified = true;
+  item.trolley.routeChecked = true;
+  item.evidence ??= [];
+  item.evidence.push('checked');
+  return 'You load the agreed parcels and attend the twelve-minute route through the gate and back, stopping and turning with the load. The wheel stays straight and clear, the parcels remain secure, and the handle stays sound. The requested route is checked; waiting beside an empty trolley would not have checked it.';
+}
 export function readLongCheck(item: RepairObject, now: number): string {
   assertAccessStep(item, 'check-result');
+  if (item.form === 'trolley') throw Error('The trolley needs its attended loaded route check');
   if (item.id === 'friend-0')
     throw Error('Nora’s kettle lamp needs its actual shade and position check');
   if (item.id === 'friend-1' && item.form === 'torch')

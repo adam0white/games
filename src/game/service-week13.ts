@@ -6,7 +6,7 @@
  * grants competence, consent, a repaired object or an automatic deadline.
  */
 import type { StoryLine } from './story13';
-import type { ActionView } from './types';
+import type { ActionView } from './types18';
 import {
   freshWorkshop,
   recordWorkshopEntry,

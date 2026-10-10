@@ -1,7 +1,7 @@
 /** Fictional low-voltage repair rules owned by the host. Evidence is a visible
  * observation, never a latent fault label. Manual work and apprentice work use
  * these same tests, materials and success rules. */
-import type { Fault, GameState, RepairObject } from './types';
+import type { Fault, GameState, RepairObject } from './types18';
 
 export type RepairStep =
   | 'inspect'

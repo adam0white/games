@@ -16,7 +16,7 @@ import {
   snapshot,
   tick,
 } from '@repair/hf-legacy';
-import type { ActionView, Fault, GameInput, GameState, GameView, RepairObject } from './types';
+import type { ActionView, Fault, GameInput, GameState, GameView, RepairObject } from './types18';
 
 const ENGINE = 'home-garage-2';
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));

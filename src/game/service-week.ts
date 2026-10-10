@@ -18,6 +18,8 @@ export interface ServiceWeekJob {
   id: string;
   stage: 'offered' | 'accepted' | 'declined' | 'returned' | 'returned-unchecked';
   collectionAt?: number;
+  /** Explicitly agreed handover end; absent historical promises keep their original deadline. */
+  collectionUntil?: number;
   requestedCollectionAt?: number;
   fee: number;
   samFee: number;
@@ -61,6 +63,7 @@ export interface ServiceWeekContext {
   paperStreetRepaired?: boolean;
   paperStreetInstalled?: boolean;
   checkedHouseholdAndPersonal?: number;
+  safeToPassQuietWeek?: boolean;
 }
 export interface ServiceWeekResult {
   lines: StoryLine[];
@@ -80,6 +83,13 @@ export interface ServiceWeekResult {
 }
 const DAY = 1440;
 const CHECKING_PRICE = 600;
+export const SERVICE_HANDOVER_MINUTES = 15;
+export function serviceCollectionDeadline(job: ServiceWeekJob): number {
+  return job.collectionUntil ?? job.collectionAt ?? Infinity;
+}
+function handoverWords(s: ServiceWeekGame, start: number, end: number): string {
+  return `${collectionWords(s, start)}–${Math.floor((end % DAY) / 60)}:${String(end % 60).padStart(2, '0')}`;
+}
 const line = (speaker: string, text: string, tone: StoryLine['tone'] = 'warm'): StoryLine => ({
   speaker,
   text,
@@ -149,7 +159,7 @@ function requestedCollection(s: ServiceWeekGame, owner: string): number {
   return owner === 'Leila' ? at(s, 2, 18) : at(s, 3, 14);
 }
 function isUnlocked(ctx: ServiceWeekContext) {
-  return ctx.graduated && ctx.independentHandoff;
+  return ctx.graduated;
 }
 /** Personal donor work uses the same finite part record before or after a
  * working week. Finding a contact card does not create customers or a business. */
@@ -229,12 +239,11 @@ export function serviceWeekActions(s: ServiceWeekGame, ctx: ServiceWeekContext):
   const add = (id: string, label: string, detail?: string) =>
     actions.push({ id, label, detail, intent: 'stay' });
   if (w.startedAt === undefined) {
-    if (ctx.dadHere)
-      add(
-        'service-begin',
-        'Talk about a first working week',
-        'Five ordinary days to try a shape for the bench. Nothing accepted yet.',
-      );
+    add(
+      'service-begin',
+      'Plan your first working week',
+      'Set aside time to plan five ordinary days at the bench. Nothing accepted yet.',
+    );
     return actions;
   }
   if (w.route === 'undecided') {
@@ -384,6 +393,17 @@ export function serviceWeekActions(s: ServiceWeekGame, ctx: ServiceWeekContext):
       'Finish this working day',
       'Continue tomorrow at 09:00. Accepted collection times still pass.',
     );
+  if (
+    day(s) < 5 &&
+    w.route === 'private' &&
+    ctx.safeToPassQuietWeek &&
+    w.jobs.every((job) => job.stage !== 'accepted' && job.stage !== 'offered')
+  )
+    add(
+      'service-quiet-week',
+      'Keep the remaining week for your own bench',
+      `Pass ${5 - day(s)} quiet ${5 - day(s) === 1 ? 'day' : 'days'} and return on the fifth morning. Nothing is repaired, paid or taught by this passage.`,
+    );
   if (day(s) >= 5 && w.jobs.every((j) => j.stage !== 'accepted' && j.stage !== 'offered')) {
     add(
       'service-close-small',
@@ -412,8 +432,10 @@ export function applyServiceWeekAction(
     return {
       ...result([
         line(
-          'Dad',
-          'Sam has carried a job without you taking it back. That gives you some room. What do you want that room for?',
+          'You',
+          ctx.independentHandoff
+            ? 'Sam has carried a job without you taking it back. You can share supported work, or keep the bench to yourself. What do you want this first working week to look like?'
+            : 'School is finished. You can take responsibility for customer work yourself; Sam’s learning can continue alongside it. What do you want this first working week to look like?',
         ),
         line(
           'You',
@@ -489,8 +511,8 @@ export function applyServiceWeekAction(
               : 'I want to keep this as our shared bench for now.',
         ),
         line(
-          'Dad',
-          'Then that is what we try. The rest of the garage is still in use; a plan for one week does not have to decide your life.',
+          'You',
+          'The rest of the garage is still in use. You choose a plan for one week; it does not have to decide your life.',
         ),
         ...visits.map((v) =>
           line(
@@ -652,6 +674,8 @@ export function applyServiceWeekAction(
     if (job.stage === 'offered') job.fee = w.route === 'regular' ? 500 : 0;
     job.stage = 'accepted';
     job.collectionAt = collectionAt;
+    job.collectionUntil = collectionAt + SERVICE_HANDOVER_MINUTES;
+    const handover = handoverWords(s, collectionAt, job.collectionUntil);
     job.delayed = later;
     // Optional paid work is offered to Sam separately by the runtime, never inferred here.
     return {
@@ -659,8 +683,8 @@ export function applyServiceWeekAction(
         line(
           'You',
           later
-            ? `Could we arrange collection ${collectionWords(s, collectionAt)}? I want to leave enough room to check it.`
-            : `I can agree collection ${collectionWords(s, collectionAt)}. I will tell you if the checked result needs longer.`,
+            ? `Could we arrange collection ${handover}? The checked handover will be finished within that window.`
+            : `I can agree collection ${handover}. The checked handover will be finished within that window; I will tell you if it needs longer.`,
         ),
         line(
           spec.owner,
@@ -678,7 +702,7 @@ export function applyServiceWeekAction(
       ]),
       job: match[1] === 'delay' ? undefined : spec,
       personIds: [spec.ownerId],
-      promise: { ownerId: spec.ownerId, objectId: spec.id, collectionAt },
+      promise: { ownerId: spec.ownerId, objectId: spec.id, collectionAt: job.collectionUntil },
       visits: [
         { personId: spec.ownerId, at: collectionAt, activity: 'Coming for the agreed collection' },
       ],
@@ -825,6 +849,20 @@ export function applyServiceWeekAction(
       10,
     );
   }
+  if (id === 'service-quiet-week')
+    return {
+      ...result(
+        [
+          line(
+            'You',
+            'The remaining days stay quiet: ordinary family time, your own work when you want it, and no new customer promises. On the fifth morning you can decide what follows. Your unfinished objects and actual earnings stay as you left them.',
+            'notice',
+          ),
+        ],
+        0,
+      ),
+      nextDayAt: Math.floor((w.startedAt ?? s.now) / DAY) * DAY + 4 * DAY + 9 * 60,
+    };
   if (id === 'service-next-day')
     return {
       ...result(
@@ -911,8 +949,8 @@ export function completeServiceWeekJob(
   return [
     line(
       serviceWeekSpecs.find((x) => x.id === id)?.owner ?? 'Owner',
-      outcome.at > (job.collectionAt ?? Infinity)
-        ? 'I used the borrowed light for the afternoon we first agreed. Thank you for saying what was delayed; I can take the checked light now.'
+      outcome.at > serviceCollectionDeadline(job)
+        ? 'I can take the checked light now. Thank you for showing me what was checked.'
         : 'Thank you. I can use it now, and I know what was checked.',
     ),
     line(
@@ -934,7 +972,12 @@ export function getServiceWeekView(s: ServiceWeekGame) {
       const owner = serviceWeekSpecs.find((x) => x.id === j.id)?.owner ?? 'Owner';
       const relativeDay = Math.floor((j.collectionAt ?? s.now) / DAY) - origin + 1;
       const hour = Math.floor(((j.collectionAt ?? 0) % DAY) / 60);
-      return `${owner}: collection day ${relativeDay}, ${hour}:00${s.now > (j.collectionAt ?? Infinity) ? ' — the agreed time has passed' : ''}.`;
+      const end = j.collectionUntil;
+      const window =
+        end === undefined
+          ? ''
+          : `–${Math.floor((end % DAY) / 60)}:${String(end % 60).padStart(2, '0')}`;
+      return `${owner}: collection day ${relativeDay}, ${hour}:00${window}${s.now > serviceCollectionDeadline(j) ? ' — the agreed time has passed' : ''}.`;
     });
   if (w.personalSession === 'protected' || w.personalSession === 'changed')
     arrangements.push(

@@ -3,6 +3,7 @@ import { createGame, getView, restoreGame, serializeGame, transition } from '../
 import * as seventeen from '../src/game/engine17';
 import { reassemble } from '../src/game/repair-access';
 import { applyRepair, performActiveBellCheck } from '../src/game/repairs';
+import { completePublicAction } from './support/public-attendance';
 
 function act(s: ReturnType<typeof createGame>, id: string) {
   return transition(s, { type: 'action', id });
@@ -73,7 +74,11 @@ it('reopening cancels a running or completed check while preserving repaired wor
   for (const complete of [false, true]) {
     let s = act(act(act(inspected(), 'clean-contact'), 'reassemble'), 'verify');
     if (complete) {
-      while (getView(s).actions.some((a) => a.id === 'wait-check')) s = act(s, 'wait-check');
+      s = completePublicAction(
+        s,
+        'wait-check',
+        (state) => !getView(state).actions.some((a) => a.id === 'wait-check'),
+      );
       s = act(s, 'check-result');
       expect(lamp(s).verified).toBe(true);
     }

@@ -48,7 +48,12 @@ it('all named people are seeded HF actors sharing every elapsed action and remem
 });
 it('Sam can leave for his dog walk without a contradictory immediate handback or a blocked bench', () => {
   let s = finishItem(ready());
-  while (!getView(s).actions.some((a) => a.id === 'accept-request')) s = action(s, 'wait-person');
+  for (
+    let waits = 0;
+    waits < 80 && !getView(s).actions.some((a) => a.id === 'accept-request');
+    waits++
+  )
+    s = action(s, 'wait-person');
   s = action(s, 'accept-request');
   s = action(s, 'inspect');
   s = action(s, 'test-battery');
@@ -63,7 +68,12 @@ it('Sam can leave for his dog walk without a contradictory immediate handback or
   );
   s = action(s, 'verify');
   s = action(s, 'rest');
-  while (!getView(s).actions.some((a) => a.id === 'observer-invite')) s = action(s, 'wait-person');
+  for (
+    let waits = 0;
+    waits < 80 && !getView(s).actions.some((a) => a.id === 'observer-invite');
+    waits++
+  )
+    s = action(s, 'wait-person');
   const sam = s.people.sam;
   if (!sam) throw Error('Missing Sam');
   promise(sam, {
@@ -157,5 +167,7 @@ it('Dad’s voluntary help completes the final shared check, while refusal leave
   expect(helped.objects.find((x) => x.id === item?.id)?.verified).toBe(true);
   expect(declined.objects.find((x) => x.id === item?.id)?.verified).toBe(false);
   expect(getView(declined).actions.some((a) => a.id === 'check-result')).toBe(true);
-  expect(helped.now).toBe(declined.now);
+  // Consent completes eight real minutes; refusal preserves the earlier time.
+  expect(helped.now - s.now).toBe(8);
+  expect(declined.now).toBe(s.now);
 });

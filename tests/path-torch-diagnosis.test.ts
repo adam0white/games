@@ -11,6 +11,7 @@ import {
   testRepair,
 } from '../src/game/repairs';
 import type { Fault, RepairObject } from '../src/game/types';
+import { completePublicAction } from './support/public-attendance';
 import { choose, opening } from './support/school-route';
 
 function torch(fault: Fault = 'cap'): RepairObject {
@@ -98,7 +99,11 @@ it('public play retains selected cap-test evidence and spends six actual minutes
   };
   accept();
   for (const id of ['inspect', 'test-battery', 'clean-contact', 'verify']) s = choose(s, id);
-  while (getView(s).actions.some((a) => a.id === 'wait-check')) s = choose(s, 'wait-check');
+  s = completePublicAction(
+    s,
+    'wait-check',
+    (state) => !getView(state).actions.some((a) => a.id === 'wait-check'),
+  );
   s = choose(s, 'check-result');
   s = choose(s, 'return');
   accept();

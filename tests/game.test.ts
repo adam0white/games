@@ -10,16 +10,52 @@ import {
   transition,
 } from '../src/game/engine';
 import * as three from '../src/game/engine3';
+import { positiveAction, waitForPublicAttendance } from './support/public-attendance';
 import { choose } from './support/school-route';
 
 const act = (s: ReturnType<typeof createGame>, id: string) => {
   let next = choose(s, id);
+  if (next.now === s.now && getView(next).actions.some((action) => action.id === id))
+    next = positiveAction(next, id);
   if (id === 'verify') {
     next = transition(next, { type: 'action', id: 'rest' });
-    next = transition(next, { type: 'action', id: 'check-result' });
+    next = positiveAction(next, 'check-result');
   }
   return next;
 };
+
+function waitForRequest(initial: ReturnType<typeof createGame>) {
+  let s = initial;
+  for (let attempt = 0; attempt < 120; attempt++) {
+    const actions = getView(s).actions;
+    if (actions.some((action) => action.id === 'accept-request')) return s;
+    s = actions.some((action) => action.id === 'back-to-school')
+      ? act(s, 'back-to-school')
+      : waitForPublicAttendance(s);
+  }
+  throw Error(
+    `No request after 120 public waits at ${s.now}; focus ${s.focusId}; offers ${getView(s)
+      .actions.map((action) => action.id)
+      .join(', ')}`,
+  );
+}
+
+function waitForCallback(initial: ReturnType<typeof createGame>) {
+  let s = initial;
+  for (let attempt = 0; attempt < 120; attempt++) {
+    if (s.objects.find((item) => item.id === 'family')?.location === 'shelf') return s;
+    s = waitForPublicAttendance(s);
+  }
+  throw Error(`The genuine unchecked callback did not arrive after 120 public waits at ${s.now}`);
+}
+
+function eveningUncheckedReturn() {
+  let s = ['talk-family', 'inspect', 'clean-contact', 'reassemble'].reduce(act, createGame(42));
+  // Mum's actual evening choice requests a check; the earlier afternoon
+  // handover legitimately chooses to try the disclosed unchecked lamp.
+  for (let wait = 0; wait < 9; wait++) s = act(s, 'rest');
+  return act(s, 'early-return');
+}
 
 const finishFocused = (original: ReturnType<typeof createGame>) => {
   let s = act(original, 'inspect');
@@ -109,13 +145,7 @@ describe('home and garage', () => {
     s = act(s, 'talk-friends');
     const faults = new Set<string>();
     for (let n = 0; n < 8; n++) {
-      while (!getView(s).actions.some((a) => a.id === 'accept-request'))
-        s = act(
-          s,
-          getView(s).actions.some((a) => a.id === 'back-to-school')
-            ? 'back-to-school'
-            : 'wait-person',
-        );
+      s = waitForRequest(s);
       s = act(s, 'accept-request');
       const item = s.objects.find((x) => x.id === s.focusId);
       if (item) faults.add(item.fault);
@@ -143,24 +173,12 @@ describe('home and garage', () => {
   });
   it('allows friend work while the personal lamp waits, and a second shelved request', () => {
     let s = ['inspect', 'shelve', 'talk-garage', 'talk-friends'].reduce(act, first());
-    while (!getView(s).actions.some((a) => a.id === 'accept-request'))
-      s = act(
-        s,
-        getView(s).actions.some((a) => a.id === 'back-to-school')
-          ? 'back-to-school'
-          : 'wait-person',
-      );
+    s = waitForRequest(s);
     s = act(s, 'accept-request');
     const firstId = s.focusId;
     s = act(s, 'inspect');
     s = act(s, 'shelve');
-    while (!getView(s).actions.some((a) => a.id === 'accept-request'))
-      s = act(
-        s,
-        getView(s).actions.some((a) => a.id === 'back-to-school')
-          ? 'back-to-school'
-          : 'wait-person',
-      );
+    s = waitForRequest(s);
     s = act(s, 'accept-request');
     expect(s.focusId).not.toBe(firstId);
     const secondId = s.focusId;
@@ -191,13 +209,7 @@ describe('home and garage', () => {
     let s = ['inspect', 'shelve', 'talk-garage', 'talk-friends'].reduce(act, first());
     const owners = new Map<string, Set<string>>();
     for (let n = 0; n < 8; n++) {
-      while (!getView(s).actions.some((a) => a.id === 'accept-request'))
-        s = act(
-          s,
-          getView(s).actions.some((a) => a.id === 'back-to-school')
-            ? 'back-to-school'
-            : 'wait-person',
-        );
+      s = waitForRequest(s);
       s = act(s, 'accept-request');
       const item = s.objects.find((x) => x.id === s.focusId);
       if (!item) throw Error('Missing request');
@@ -228,10 +240,10 @@ describe('living garage checks', () => {
     expect(restoreGame(serializeGame(s))).toEqual(s);
   });
   it('honest premature handover returns for a check, without inventing a new physical fault', () => {
-    let s = ['talk-family', 'inspect', 'clean-contact', 'early-return'].reduce(act, createGame(42));
+    let s = eveningUncheckedReturn();
     expect(s.repairs).toBe(0);
     expect(s.objects.find((x) => x.id === 'family')?.location).toBe('returned');
-    s = act(s, 'rest');
+    s = waitForCallback(s);
     const lamp = s.objects.find((x) => x.id === 'family');
     expect(lamp?.location).toBe('shelf');
     expect(lamp?.repaired).toBe(true);
@@ -268,10 +280,8 @@ describe('living garage checks', () => {
 });
 
 it('a second honest premature return retains the real callback and permits the owner’s changed choice', () => {
-  let s = ['talk-family', 'inspect', 'clean-contact', 'early-return', 'rest'].reduce(
-    act,
-    createGame(42),
-  );
+  let s = eveningUncheckedReturn();
+  s = waitForCallback(s);
   s = transition(s, { type: 'select', id: 'family' });
   s = act(s, 'early-return');
   expect(s.objects.find((x) => x.id === 'family')?.callbackSeen).toBe(false);
@@ -317,13 +327,7 @@ it('the current garage event keeps Dad and You as separate speakers and clears o
 it('a torch’s wrong flat-contact repair responds to the completed battery test with an available next step', () => {
   let s = ['inspect', 'shelve', 'talk-garage', 'talk-friends'].reduce(act, first());
   for (let n = 0; n < 12; n++) {
-    while (!getView(s).actions.some((a) => a.id === 'accept-request'))
-      s = act(
-        s,
-        getView(s).actions.some((a) => a.id === 'back-to-school')
-          ? 'back-to-school'
-          : 'wait-person',
-      );
+    s = waitForRequest(s);
     s = act(s, 'accept-request');
     s = act(s, 'inspect');
     s = act(s, 'test-battery');
@@ -379,8 +383,16 @@ it('validates an interim engine3 save using its original failure prose and corre
     'talk-friends',
   ].reduce((s, id) => three.transition(s, { type: 'action', id }), previous);
   for (let n = 0; n < 12; n++) {
-    while (!three.getView(previous).actions.some((a) => a.id === 'accept-request'))
+    for (
+      let wait = 0;
+      wait < 120 && !three.getView(previous).actions.some((a) => a.id === 'accept-request');
+      wait++
+    )
       previous = oldAct(previous, 'wait-person');
+    expect(
+      three.getView(previous).actions.some((a) => a.id === 'accept-request'),
+      'Historical request must arrive within 120 waits',
+    ).toBe(true);
     previous = oldAct(previous, 'accept-request');
     previous = oldAct(previous, 'inspect');
     previous = oldAct(previous, 'test-battery');

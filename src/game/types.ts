@@ -1,5 +1,7 @@
 import type { Person } from '@adam0white/human-framework';
 import type { NeighbourhoodState } from './neighbourhood';
+import type { getOperationsView, OperationsState } from './operations';
+import type { PersonalProjectPresentation } from './personal-project';
 import type { RepairAccess } from './repair-access';
 import type { CaseFittings, RepairCue } from './repairs';
 import type { ServiceWeekState } from './service-week';
@@ -16,7 +18,9 @@ export type Fault =
   | 'catch-offset'
   | 'worn-catch'
   | 'spring'
-  | 'gear';
+  | 'gear'
+  | 'trolley-alignment'
+  | 'trolley-rub';
 export type Chapter = 'family' | 'bench' | 'later' | 'garage';
 export type GameInput = { type: 'action'; id: string } | { type: 'select'; id: string };
 
@@ -29,6 +33,13 @@ export interface RepairObject {
   inspectText?: string;
   repairText?: string;
   caseFittings?: CaseFittings;
+  trolley?: {
+    permission: boolean;
+    unloaded?: boolean;
+    loaded?: boolean;
+    loadMode?: 'full' | 'split';
+    routeChecked?: boolean;
+  };
   requestedUse?: string;
   appearance?:
     | 'reading'
@@ -40,7 +51,7 @@ export interface RepairObject {
     | 'box'
     | 'clip'
     | 'model';
-  form: 'lamp' | 'torch' | 'timer' | 'bell' | 'box' | 'clip';
+  form: 'lamp' | 'torch' | 'timer' | 'bell' | 'box' | 'clip' | 'trolley';
   fault: Fault;
   location: 'bench' | 'shelf' | 'returned';
   observations: string[];
@@ -84,6 +95,8 @@ export interface LoggedInput {
 }
 
 export interface GameState {
+  operationsPurposeIds?: Record<string, string>;
+  operations?: OperationsState;
   conversationPause?: {
     participantId: string;
     actionId: string;
@@ -175,6 +188,14 @@ export interface ActionView {
 }
 
 export interface ObjectView {
+  personalPresentation?: PersonalProjectPresentation;
+  trolleyPresentation?: {
+    intervention?: 'wheel-aligned' | 'strap-secured';
+    comparison: 'unexamined' | 'empty-only' | 'loaded-only' | 'compared';
+    observed: 'unknown' | 'wanders' | 'rubs' | 'rolls';
+    loadMode: 'full' | 'split';
+    routeChecked: boolean;
+  };
   assembly?: Pick<RepairAccess, 'kind' | 'state' | 'revision' | 'retainedPieceIds' | 'workMarkers'>;
   casePresentation?: {
     mode: 'carrying-case' | 'stationary-tray';
@@ -187,7 +208,7 @@ export interface ObjectView {
   story: string;
   condition: string;
   visual: 'flickering' | 'steady' | 'off' | 'broken' | 'warm';
-  form: 'lamp' | 'torch' | 'timer' | 'bell' | 'box' | 'clip';
+  form: 'lamp' | 'torch' | 'timer' | 'bell' | 'box' | 'clip' | 'trolley';
   observations: string[];
   inspected?: boolean;
   progress?: 'closed' | 'inspected' | 'repaired' | 'checked';
@@ -204,6 +225,14 @@ export interface ObjectView {
 }
 
 export interface GameView {
+  roomFacts?: { intakeSpace: boolean; checkingPlaces: number; storeCratesAtBench: boolean };
+  operations?: ReturnType<typeof getOperationsView>;
+  chapterFlow?: {
+    stage: 'school' | 'workshop' | 'service';
+    title: string;
+    period: string;
+    tutorial: boolean;
+  };
   workshopCabinet?: { stage: 'looked' | 'measured' | 'hung' | 'finished'; detail: string };
   chapterClosure?: { sourcekey: string; title: string; detail: string; outcomes: string[] };
   milestone?: { sourcekey: string; title: string; detail: string };

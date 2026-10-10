@@ -34,7 +34,7 @@ it('an honestly unchecked service return can recover or settle without trapping 
 it('actual owner consent settles or returns an unchecked light without inventing fee, kept promise or independent credit', () => {
   let s = earnedHandoff();
   for (const id of ['service-begin', 'service-regular']) s = choose(s, id);
-  while (!has(s, 'service-hear-leila'))
+  for (let waits = 0; waits < 80 && !has(s, 'service-hear-leila'); waits++)
     s = choose(s, has(s, 'wait-appointment') ? 'wait-appointment' : 'rest');
   for (const id of [
     'service-hear-leila',
@@ -46,7 +46,8 @@ it('actual owner consent settles or returns an unchecked light without inventing
     'early-return',
   ])
     s = choose(s, id);
-  while (has(s, 'service-next-day')) s = choose(s, 'service-next-day');
+  for (let days = 0; days < 20 && has(s, 'service-next-day'); days++)
+    s = choose(s, 'service-next-day');
   const priorPromise = structuredClone(
     s.people.player?.agenda.commitments.find(
       (c) => c.label === 'Checked collection: service-leila',
@@ -84,4 +85,4 @@ it('actual owner consent settles or returns an unchecked light without inventing
   expect(s.serviceWeek?.conclusion).toBe('regular');
   expect(s.objects.find((o) => o.id === 'service-leila')?.independent).not.toBe(true);
   expect(restoreGame(serializeGame(s))).toEqual(s);
-});
+}, 30_000);

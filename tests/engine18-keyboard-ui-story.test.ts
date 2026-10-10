@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { expect, it } from 'vitest';
-import { createGame, getView, restoreGame, serializeGame, transition } from '../src/game/engine';
+import { createGame, getView, restoreGame, serializeGame, transition } from '../src/game/engine18';
 
 // Actual fresh keyboard UI download, 2026-10-10; room/camera navigation adds no input.
 const sourceSha256 = 'c5439f2628f85da3f0bb278a7b618ed332aa8ee4b97b9ed05fea861cb78626ea';

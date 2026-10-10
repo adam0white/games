@@ -6,7 +6,7 @@
  * There is no market simulation, debt, business growth rate or idle income.
  */
 import type { StoryLine } from './story9';
-import type { ActionView, Fault, GameState } from './types';
+import type { ActionView, Fault, GameState } from './types18';
 
 export interface WorkshopJobSpec {
   id: string;

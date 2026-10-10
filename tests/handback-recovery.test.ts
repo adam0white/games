@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { createGame, getView, restoreGame, serializeGame, transition } from '../src/game/engine';
+import { completePublicAction } from './support/public-attendance';
 import { choose, nextSchoolAction } from './support/school-route';
 
 it('unchecked opening handbacks remain honest and the self-owned lamp can earn a real check before school progress', () => {
@@ -35,7 +36,11 @@ it('unchecked opening handbacks remain honest and the self-owned lamp can earn a
   expect(s.objects.find((o) => o.id === 'personal')?.verified).toBe(false);
   expect(s.objects.find((o) => o.id === 'personal')?.repaired).toBe(true);
   s = choose(s, 'verify');
-  while (getView(s).actions.some((a) => a.id === 'wait-check')) s = choose(s, 'wait-check');
+  s = completePublicAction(
+    s,
+    'wait-check',
+    (state) => !getView(state).actions.some((a) => a.id === 'wait-check'),
+  );
   s = choose(s, 'check-result');
   s = choose(s, 'return');
   expect(s.repairs).toBe(repairs + 1);

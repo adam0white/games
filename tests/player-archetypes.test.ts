@@ -45,14 +45,42 @@ describe('exposed-choice simulated player policies', () => {
     expect(() => runPlayer('impatient', 17, 2001)).toThrow();
     expect(runPlayer('impatient', 17, 0).actions).toEqual([]);
   });
+  it('distinguishes growing capacity from retaining a private bench using visible language', () => {
+    const view = getView(createGame());
+    view.shelf = [];
+    view.actions = [
+      { id: 'unrelated-a', label: 'Offer Leila £2 for this delivery stretch' },
+      { id: 'unrelated-b', label: 'Keep this period for a private bench' },
+      { id: 'unrelated-c', label: 'Wait a little while' },
+    ];
+    expect(chooseVisible(view, 'capacity-builder', new Map())).toEqual({
+      type: 'action',
+      id: 'unrelated-a',
+    });
+    expect(chooseVisible(view, 'private-tinkerer', new Map())).toEqual({
+      type: 'action',
+      id: 'unrelated-b',
+    });
+    view.actions = view.actions.map((action, index) => ({ ...action, id: `changed-${index}` }));
+    expect(chooseVisible(view, 'capacity-builder', new Map())).toEqual({
+      type: 'action',
+      id: 'changed-0',
+    });
+    expect(chooseVisible(view, 'private-tinkerer', new Map())).toEqual({
+      type: 'action',
+      id: 'changed-1',
+    });
+  });
   for (const archetype of archetypes) {
     it(`replays actual visible inputs deterministically: ${archetype}`, () => {
       const seed = 1701;
+      const budget =
+        process.env.PLAYER_BUDGET === undefined ? 100 : Number(process.env.PLAYER_BUDGET);
       const initial = process.env.PLAYER_STORY
         ? restoreGame(readFileSync(process.env.PLAYER_STORY, 'utf8'))
         : undefined;
-      const run = runPlayer(archetype, seed, 100, initial);
-      expect(run).toEqual(runPlayer(archetype, seed, 100, initial));
+      const run = runPlayer(archetype, seed, budget, initial);
+      expect(run).toEqual(runPlayer(archetype, seed, budget, initial));
       let state = initial ?? createGame(seed);
       for (const action of run.actions) {
         const view = getView(state);
