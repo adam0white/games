@@ -126,4 +126,33 @@ The wildcard explored the first holiday through both family lamps, the model and
 
 > When Sam's torch appeared immediately after Nora's lamp, I felt ready to stop: the neighbor lamp repeated the same battery/contact/long-check sequence as Mum's.
 
-It also disliked a full age/date stamp in ordinary prayer prose. Current routine notices retain whether an activity is ongoing or completed, with a short start clock only for an ongoing activity. Its apparent missing cabinet choice is an unconfirmed availability finding; source-unread confusion does not establish a gate defect. Greater variation in repeated neighbour lamps remains a taste question for the next owner playtest, not an enjoyment claim based on the successful model route.
+It also disliked a full age/date stamp in ordinary prayer prose. Current routine notices retain whether an activity is ongoing or completed, with a short start clock only for an ongoing activity. Investigation traced its apparent missing cabinet choice to automatic folding after completing the work card. Current engine 16 keeps useful project choices open through completion, while preserving a player’s manual fold; an isolated browser traversal checked both cases. Greater variation in repeated neighbour lamps remains a taste question for the next owner playtest, not an enjoyment claim based on the successful model route.
+
+
+## Actual final apprenticeship continuation on candidate 16
+
+Immutable runtime `4645bfc`, actual source-unread export: 97 inputs / 131 journal entries. The native fixture pins the export and explicitly rejects independent credit for this supervised job.
+
+# Natural continuation, fixed candidate 4645bfc
+
+Fresh isolated headless Chrome at http://127.0.0.1:5184; actual prior story imported via UI. No source, docs, hidden state/storage or export contents read. Started day2 14:10; finished16:28. Browser closed after actual UI export.
+
+## Route
+
+Retried contact demonstration. Sam said eating until14:32, with explicit wait and matching status. Waited, retried, took responsibility for the assisted demonstration. Cleaned contact and explained actual result. Ran longer light check, read movement/switching result, returned Dad's lamp. Chose unfamiliar folding lamp practice. Gave Sam room three times: he diagnosed contact, repaired, ran longer check, then checked movement and returned it. He said whole job completed with me nearby and proposed future responsibility for familiar light. Stopped at this satisfactory completion, before accepting that further job.
+
+## Exact reactions
+
+- "Now I understand: he is eating. I can let him finish and come back."
+- "It is a little formal to call every conversation a fresh agreement, but at least the next action is clear."
+- "Good, I can actually show the missing step, and he says what he learned from it."
+- "That is satisfying. Last time he stopped at the contact; this time he carried the repair through."
+- "I am happy to stop here today. Next time I would like to give him the familiar light and do something of my own beside him."
+
+Meal versus bench agreement is understandable now: shared afternoon can contain a meal, and the screen gives both its end and a direct wait. I did not need to guess or repeatedly renew the bench arrangement.
+
+Residual texture issues: 'Your verify step' still appeared as explanation helper text even after checked return, and Dad's return speech names 'Dad’s small sorting lamp' rather than 'my lamp'. These are less human than the actual teaching exchange. At final16:28 Sam is walking dog while bench agreement ends16:32; I understood that his commitments can interrupt, though I did not test another action then.
+
+Observed supervised unfamiliar-light completion only, not full later independent intake/collection. This is simulated player feedback, not Adam's acceptance.
+
+Artifacts: /tmp/repair-long-workshop-016-story.json; /tmp/repair-long-workshop-016-finish.png.

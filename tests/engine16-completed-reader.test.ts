@@ -1,0 +1,33 @@
+import { createHash } from 'node:crypto';
+import { expect, it } from 'vitest';
+import { restoreGame, serializeGame, transition } from '../src/game/engine';
+import * as fourteen from '../src/game/engine14';
+import * as fifteen from '../src/game/engine15';
+import type { GameInput } from '../src/game/types';
+import stopped from './fixtures/fifteen-long-workshop-route.json';
+import base from './fixtures/fourteen-long-workshop-route.json';
+import completed from './fixtures/sixteen-long-workshop-route.json';
+
+it('pins the actual source-unread recovery and subsequent supervised completion without independent credit', () => {
+  let early = fourteen.createGame(base.seed);
+  for (const input of base.inputs) early = fourteen.transition(early, input as GameInput);
+  let old = fifteen.restoreGame(fourteen.serializeGame(early));
+  for (const input of stopped.inputs) old = fifteen.transition(old, input as GameInput);
+  const source = fifteen.serializeGame(old);
+  expect(createHash('sha256').update(source).digest('hex')).toBe(completed.sourceSha256);
+  let s = restoreGame(source);
+  for (const input of completed.inputs) s = transition(s, input as GameInput);
+  const raw = serializeGame(s);
+  expect(createHash('sha256').update(raw).digest('hex')).toBe(completed.sha256);
+  expect(s.inputs).toHaveLength(completed.inputCount);
+  expect(s.journal).toHaveLength(completed.journalCount);
+  const work = s.objects.find((item) => item.id === 'supervised-light');
+  expect(work?.completedBy).toBe('sam');
+  expect(work?.verified).toBe(true);
+  expect(work?.location).toBe('returned');
+  expect(work?.playerAssisted).toBe(true);
+  expect(work?.independent).toBe(false);
+  expect(s.apprentice?.supervisedCompleted).toBe(true);
+  expect(s.apprentice?.independentCompleted).toBe(0);
+  expect(restoreGame(raw)).toEqual(s);
+}, 30_000);
