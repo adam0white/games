@@ -36,6 +36,7 @@ import { gameTimeLabel } from './clock';
 import { restoreGame as restoreEngine3 } from './engine3';
 import { restoreGame as restoreEngine4 } from './engine4';
 import { restoreGame as restoreEngine5 } from './engine5';
+import { restoreGame as restoreEngine6 } from './engine6';
 import {
   askMumToHelp,
   beginSharedConversation,
@@ -92,7 +93,7 @@ import {
   workshopActions,
 } from './workshop';
 
-const ENGINE = 'home-garage-6';
+const ENGINE = 'home-garage-7';
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 const object = (
   id: string,
@@ -447,6 +448,10 @@ function serviceContext(s: GameState, choices = false): ServiceWeekContext {
     paperStreetPresent: s.objects.some((x) => x.id === 'paper-street'),
     paperStreetWaiting: Boolean(s.objects.find((x) => x.id === 'paper-street' && !x.repaired)),
     paperStreetRepaired: Boolean(s.objects.find((x) => x.id === 'paper-street' && x.verified)),
+    paperStreetInstalled: Boolean(s.objects.find((x) => x.id === 'paper-street' && x.repaired)),
+    checkedHouseholdAndPersonal: s.objects.filter(
+      (x) => x.verified && !x.id.startsWith('service-') && !x.id.startsWith('workshop-'),
+    ).length,
     ...(choices
       ? {
           settleUnfinished: (ownerId) =>
@@ -502,7 +507,10 @@ function settleReturned(s: GameState) {
   }
 }
 function workshopContext(s: GameState, choices = false): WorkshopContext {
+  let dadReason =
+    'I want to keep my own plans for now. Leave the notebook there; we can ask again another time.';
   return {
+    dadWorkReason: () => dadReason,
     graduated: s.campaign?.graduated ?? true,
     independentRepair: Boolean(s.apprentice?.completedJobIds.length),
     paidHelpEligible: Boolean(s.campaign?.graduated && s.apprentice?.completedJobIds.length),
@@ -523,9 +531,12 @@ function workshopContext(s: GameState, choices = false): WorkshopContext {
               Array.from({ length: duration }, (_, i) => s.now + i + 1).some(
                 (at) => scheduledAway(s, 'dad', at) || at % 1440 >= 22 * 60 || at % 1440 < 7 * 60,
               )
-            )
+            ) {
+              dadReason =
+                'I need to leave for my own plans before we could finish that step. Let us keep the marks and try another time.';
               return false;
-            return beginSharedWork(player, dad, {
+            }
+            const agreed = beginSharedWork(player, dad, {
               id: `cabinet-${task}`,
               action: 'work',
               label:
@@ -542,6 +553,14 @@ function workshopContext(s: GameState, choices = false): WorkshopContext {
               with: ['player'],
               advertises: { competence: 0.06, belonging: 0.05 },
             });
+            if (!agreed)
+              dadReason =
+                dad.body.sleepPressure > 0.8 || dad.body.exertion > 0.8
+                  ? 'I am too tired to give those hinges careful attention now. Keep the marks; the work can wait.'
+                  : dad.activity
+                    ? `I am in the middle of my own activity: ${dad.activity.affordance.label.toLowerCase()}. Keep the notebook there; ask again another time.`
+                    : 'I want to keep my own plans for now. Leave the notebook there; we can ask again another time.';
+            return agreed;
           },
           samWillAgree: () => {
             const sam = s.people.sam;
@@ -918,6 +937,25 @@ export function transition(original: GameState, input: GameInput): GameState {
   s.inputs.push({ at: s.now, input: clone(input) });
   s.humanNote = null;
   s.eventStartId = s.nextLineId ?? (s.conversation.at(-1)?.id ?? -1) + 1;
+  const joined = s.people.player?.activity;
+  if (joined?.affordanceId.startsWith('aftercare-') && joined.affordanceId.endsWith('-start')) {
+    const prefix = joined.affordanceId.replace(/start$/, '');
+    if (input.type !== 'action' || !input.id.startsWith(prefix) || input.id.endsWith('-start')) {
+      const partnerId = prefix.includes('door') ? 'dad' : 'evan';
+      for (const person of [s.people.player, s.people[partnerId]]) {
+        const activity = person?.activity;
+        if (person && activity?.affordanceId === joined.affordanceId)
+          finish(person, {
+            affordanceId: activity.affordanceId,
+            action: activity.action,
+            at: person.now,
+            status: 'interrupted',
+            summary: 'Set the unfinished conversation aside for other plans.',
+          });
+      }
+    }
+  }
+
   if (input.type === 'action' && input.id === 'read-other-check') {
     const previous = focused(s);
     const ready = s.objects.find(
@@ -984,7 +1022,20 @@ export function transition(original: GameState, input: GameInput): GameState {
     wantsConversation: (personId) => {
       const person = s.people[personId],
         player = s.people.player;
-      const duration = id.endsWith('-start') ? 2 : 3;
+      const starting = id.endsWith('-start');
+      const duration = starting ? 5 : 3;
+      const startId = id.startsWith('aftercare-door-')
+        ? 'aftercare-door-start'
+        : 'aftercare-label-start';
+      if (
+        !starting &&
+        player?.activity?.affordanceId === startId &&
+        person?.activity?.affordanceId === startId &&
+        player.activity.endsAt >= s.now + 3 &&
+        person.activity.endsAt >= s.now + 3 &&
+        isHere(s, personId)
+      )
+        return true;
       if (
         !person ||
         !player ||
@@ -996,7 +1047,7 @@ export function transition(original: GameState, input: GameInput): GameState {
       return beginSharedConversation(
         player,
         person,
-        id,
+        starting ? id : `${startId}:resumed`,
         personId === 'dad'
           ? 'Talking together about the finished cabinet doors'
           : 'Looking together at the display label and its parts list',
@@ -1012,14 +1063,15 @@ export function transition(original: GameState, input: GameInput): GameState {
       const player = s.people.player;
       if (player) {
         tick(player, s.now);
-        finish(player, {
-          affordanceId: activity.affordanceId,
-          action: activity.action,
-          at: s.now,
-          status: 'completed',
-          summary: activity.affordance.label,
-          needs: activity.affordance.advertises,
-        });
+        if (s.now >= activity.endsAt)
+          finish(player, {
+            affordanceId: activity.affordanceId,
+            action: activity.action,
+            at: s.now,
+            status: 'completed',
+            summary: activity.affordance.label,
+            needs: activity.affordance.advertises,
+          });
       }
       advancePeople(s);
     }
@@ -1717,7 +1769,7 @@ export function transition(original: GameState, input: GameInput): GameState {
           say(
             s,
             'You',
-            `${o.owner} is out. The finished light stays safely labelled here for collection.`,
+            `${o.owner} is out. The finished item stays safely labelled here for collection.`,
           );
         }
         if (o.verified) {
@@ -1951,8 +2003,12 @@ export function getView(s: GameState): GameView {
         title: item.title,
         owner: item.owner,
         detail:
-          knownAppointments(s).find((a) => a.personId === item.owner.toLowerCase())?.detail ??
-          'Kept safely labelled for collection. A little more time may help.',
+          (() => {
+            const visit = knownAppointments(s).find((a) => a.personId === item.owner.toLowerCase());
+            return visit
+              ? `${item.title} is ready for ${item.owner}. Their next arranged visit is ${visit.detail.split(' · ').at(-1)}; that visit may concern other work.`
+              : undefined;
+          })() ?? 'Kept safely labelled for collection. A little more time may help.',
       })),
     apprenticeship: s.apprentice
       ? {
@@ -2131,7 +2187,15 @@ export const exportPlaytest = serializeGame;
 export function restoreGame(text: string): GameState {
   if (typeof text !== 'string' || text.length > 8_000_000) throw Error('Save is too large');
   const data = JSON.parse(text);
-  if (['home-garage-2', 'home-garage-3', 'home-garage-4', 'home-garage-5'].includes(data?.engine)) {
+  if (
+    ['home-garage-2', 'home-garage-3', 'home-garage-4', 'home-garage-5', 'home-garage-6'].includes(
+      data?.engine,
+    )
+  ) {
+    if (data.engine === 'home-garage-6') {
+      const validated = restoreEngine6(text);
+      return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };
+    }
     const validated =
       data.engine === 'home-garage-5'
         ? restoreEngine5(text)

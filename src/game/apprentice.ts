@@ -133,11 +133,17 @@ export function arrangeLearning(s: GameState, say: Speak): void {
       status: 'interrupted',
       summary: 'Paused to discuss an afternoon at the bench.',
     });
+  const continuingJob = Boolean(s.apprentice?.jobId);
+  const establishedRepairer = Boolean(s.apprentice?.completedJobIds.length);
   const offers: Affordance[] = [
     {
       id: 'learning-afternoon',
-      action: 'learn',
-      label: 'Spend an afternoon learning alongside my friend',
+      action: continuingJob || establishedRepairer ? 'work' : 'learn',
+      label: continuingJob
+        ? 'Resume responsibility for the agreed whole repair'
+        : establishedRepairer
+          ? 'Share another afternoon at the bench'
+          : 'Spend an afternoon learning alongside my friend',
       duration: 150,
       effort: 0.02,
       focus: 0.15,
@@ -177,10 +183,15 @@ export function arrangeLearning(s: GameState, say: Speak): void {
     });
     s.apprentice.arranged = true;
     s.apprentice.visitUntil = s.now + 150;
-    s.apprentice.role = 'trainee';
+    s.apprentice.role =
+      (continuingJob && !s.apprentice.supervised) || establishedRepairer ? 'repairer' : 'trainee';
     say(
       'Sam',
-      'I can stay until late afternoon. Show me why you choose a step, not just which bit you touch. The dog still needs me later.',
+      continuingJob
+        ? 'I can give this repair another stretch. I will continue from the labelled observations and the step where I stopped; my own plans still matter.'
+        : establishedRepairer
+          ? 'I can share another stretch at the bench. I know the light work we have tried; unfamiliar observations still deserve a question. My own plans still matter.'
+          : 'I can stay until late afternoon. Show me why you choose a step, not just which bit you touch. The dog still needs me later.',
     );
   } else {
     if (chosen) begin(sam, chosen, decision);

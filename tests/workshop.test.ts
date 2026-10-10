@@ -70,7 +70,7 @@ it('joint cabinet work respects current refusal, retains each stage, and reveals
   const s = ready();
   act(s, 'workshop-cabinet-look');
   const declined = act(s, 'workshop-cabinet-measure', { ...adult, dadWillWork: () => false });
-  expect(declined?.lines.some((l) => l.text.includes('Not right now'))).toBe(true);
+  expect(declined?.lines.some((l) => l.text.includes('keep my own plans'))).toBe(true);
   expect(s.workshop?.cabinet).toBe('looked');
   act(s, 'workshop-cabinet-measure');
   act(s, 'workshop-cabinet-close');

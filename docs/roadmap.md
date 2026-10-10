@@ -1,6 +1,6 @@
 # Broad roadmap
 
-Updated 2026-10-10 during the owner-authorized five-hour run. M0 planning, the school-break home/garage campaign and bounded M3–M4 teaching/independent handoff are implemented and independently reviewed. The public checkpoint is commit b81dbde at https://repair.adamwhite.work, using released HF 2.2.0. Adam's earlier playtest established curiosity and believable diagnosis; acceptance of this substantially expanded chapter remains his decision. A first service week is now in development to turn delegation into real choices about promises, money, personal time and staying small. Tests, technical reviews and deployment do not substitute for that playtest.
+Updated 2026-10-10 during the owner-authorized five-hour run. M0 planning, the school-break home/garage campaign and bounded M3–M4 teaching/independent handoff are implemented and independently reviewed. The public checkpoint is commit e225acd at https://repair.adamwhite.work, using released HF 2.2.0. Adam's earlier playtest established curiosity and believable diagnosis; acceptance of this substantially expanded chapter remains his decision. The published first service week turns delegation into actual choices about promises, money, personal time and staying small. Continuity corrections are under engine 7 review. Tests, technical reviews and deployment do not substitute for that playtest.
 
 ## Near milestones
 
@@ -63,6 +63,6 @@ Keep visible evidence bounded by observation. An uninspected model must not disc
 
 ## Reviewed checkpoint and current pass
 
-2026-10-10: original optional 3D inspection is implemented for nine distinct appearances, with observed-parts trays, touch/keyboard rotation and text/SVG fallback. Verification is still a real elapsed check. The current first-week plan targets meaningful parallel activity and fewer repeated wait clicks after the first teaching sequence. Quiet HF practice and collection promises are being integrated and reviewed; their effects are not inferred from dialogue alone.
+2026-10-10: original optional 3D inspection is implemented for nine distinct appearances, with observed-parts trays, touch/keyboard rotation and text/SVG fallback. Verification is still a real elapsed check. The published first week supports meaningful parallel activity and fewer repeated wait clicks after the first teaching sequence. Quiet HF practice and collection promises use actual actor state and public HF decisions; their effects are not inferred from dialogue alone.
 
 The broader simulations and additional businesses retain their 2026-11-09 review date. Source visibility, licensing and the final title remain owner decisions; the deployed build is a public static game, not publication of the source repository.

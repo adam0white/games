@@ -87,3 +87,16 @@ The rate ambiguity is corrected: a priced whole-job handoff needs actual separat
 The fresh mobile review found choices below the screen and prior-object thanks beside the next object. A compact object layout and an explicit “About” response context address those findings. Independent review caught a proposed “Returned” label falsely implying receipt when the owner was absent; the neutral context label preserves that distinction. New journal lines carry their observed clock; the original owner exports retain their untimed history verbatim. Both actual exports were restored directly and through frozen engine 5 with exact current replay.
 
 Current runtime controls pass 153 tests, including 24 actual school-to-independence and private-week routes across twelve seeds. A separate 12,500-choice visible-action exploration found consistent actor clocks, nonnegative material counts and exact sampled replay. These are bounded technical checks, not proof of every possible run or owner acceptance.
+
+
+## Completed public working-week routes
+
+Two independent lightly briefed readers played the actual public engine 6 build without inspecting mechanics source. The regular route finished in 218 total inputs: two checked paid jobs, one entirely handled by Sam, £10 earned, £2 paid to Sam, £6 spent on a second tray and £2 retained. The player also kept the full personal-project session and repaired household objects. The private route finished in 230 inputs with the model and returning sewing box, without starting a paid business. The private reader singled out this authored line, verbatim:
+
+> “There is nothing to grow simply because there is room.”
+
+Both routes exported and restored successfully. The regular reader found Nora's returned sewing box described as a light, a collection caption borrowing a different visit's purpose, Sam briefly described as a learner during an ongoing whole job, and the tray expense missing from the cashbook. The private reader found the closing report's unqualified zero-repair count misleading because it counted only paid jobs, a recovered gear described as kept after installation, repeated unexplained refusals from Dad, and Evan declining the second half of a conversation he had just agreed to. These are concrete continuity corrections under independent engine 7 review, with frozen engine 6 replay preserved.
+
+A separate public WebKit run checked the opening in a 390×844 dark, reduced-motion mobile context: visible choices, no horizontal overflow, working optional 3D, no runtime errors, and exact retention of all 91 journal entries in the owner's historical export. Physical Safari and owner acceptance remain unverified.
+
+The continuity correction passed 156 tests and independent actual-export review. Published engine 6 histories replay byte-for-byte before engine 7 continuation. The reviewer caught a remaining demotion after a completed whole job; the established repairer now retains that earned role even without an active job. Five-minute conversations preserve their initial consent across two plus three minutes, while unrelated actions truthfully interrupt them. No extra money, methods or completed repairs are awarded by these narrative corrections.

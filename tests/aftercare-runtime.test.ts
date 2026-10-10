@@ -61,7 +61,7 @@ it('actual cabinet aftercare starts and finishes joined talk, leaves bench contr
     expect(s.people[id]?.chronicleDay?.actions.some((a) => a.action === 'talk')).toBe(true);
     expect(s.people[id]?.now).toBe(s.now);
   }
-  expect(s.people.dad?.trace.some((t) => t.chosenAffordanceId === 'aftercare-door-question')).toBe(
+  expect(s.people.dad?.trace.some((t) => t.chosenAffordanceId === 'aftercare-door-start')).toBe(
     true,
   );
   expect(restoreGame(serializeGame(s))).toEqual(s);
@@ -83,11 +83,25 @@ it('an earned donor reflection permits actual Evan conversation without taking a
     parts = structuredClone(s.parts),
     cash = s.workshop?.cash;
   s = talk(s, 'aftercare-label-start', 'aftercare-label-pending');
-  s = talk(s, 'aftercare-label-picture', 'aftercare-label-done');
+  const agreedAt = s.now - 2;
+  expect(s.people.evan?.activity?.endsAt).toBe(agreedAt + 5);
+  expect(s.people.player?.activity?.endsAt).toBe(agreedAt + 5);
+  const decisions = structuredClone(s.people.evan?.trace);
+  const pending = s;
+  s = choose(s, 'aftercare-label-picture');
+  expect(s.now).toBe(agreedAt + 5);
+  expect(s.people.evan?.trace).toEqual(decisions);
+  expect(s.people.evan?.activity).toBeNull();
+  expect(s.people.player?.activity).toBeNull();
+  let interrupted = choose(pending, 'rest');
+  expect(interrupted.unlocked).toContain('aftercare-label-pending');
+  expect(interrupted.people.evan?.activity?.affordanceId).not.toBe('aftercare-label-start');
+  interrupted = talk(interrupted, 'aftercare-label-list', 'aftercare-label-done');
+  expect(restoreGame(serializeGame(interrupted))).toEqual(interrupted);
   expect(s.objects).toEqual(objects);
   expect(s.parts).toEqual(parts);
   expect(s.workshop?.cash).toBe(cash);
-  expect(s.people.evan?.trace.some((t) => t.chosenAffordanceId === 'aftercare-label-picture')).toBe(
+  expect(s.people.evan?.trace.some((t) => t.chosenAffordanceId === 'aftercare-label-start')).toBe(
     true,
   );
   for (const person of Object.values(s.people)) expect(person.now).toBe(s.now);

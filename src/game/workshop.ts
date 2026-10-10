@@ -73,6 +73,7 @@ export interface WorkshopContext {
   leilaHere?: boolean;
   ownerHere?: (id: string) => boolean;
   samWillAgree?: () => boolean;
+  dadWorkReason?: () => string;
   dadWillWork?: (task: 'measure' | 'hang' | 'align' | 'space') => boolean;
 }
 export interface WorkshopResult {
@@ -509,7 +510,8 @@ export function applyWorkshopAction(
           [
             line(
               'Dad',
-              'Not right now. Leave the notebook there; I want to come back to it with you when I can give it my attention.',
+              ctx.dadWorkReason?.() ??
+                'I want to keep my own plans for now. Leave the notebook there; we can ask again another time.',
             ),
           ],
           2,

@@ -57,6 +57,8 @@ export interface ServiceWeekContext {
   paperStreetPresent?: boolean;
   paperStreetWaiting?: boolean;
   paperStreetRepaired?: boolean;
+  paperStreetInstalled?: boolean;
+  checkedHouseholdAndPersonal?: number;
 }
 export interface ServiceWeekResult {
   lines: StoryLine[];
@@ -818,7 +820,7 @@ export function applyServiceWeekAction(
         ),
         line(
           'You',
-          `${w.jobs.filter((j) => j.stage === 'returned').length} checked repairs returned;${w.jobs.some((j) => j.stage === 'returned-unchecked') ? ` ${w.jobs.filter((j) => j.stage === 'returned-unchecked').length} unchecked collections settled without fees;` : ''} ${w.jobs.filter((j) => j.independent).length} carried independently by Sam. ${w.personalSession === 'spent' ? `You spent ${w.personalMinutes ?? 45} minutes in the saved model session.` : w.personalSession === 'changed' ? 'The model session has a new place in the notebook.' : 'The personal work remains available when you choose it.'} ${w.checkingPlace === 'second' ? 'The second checking tray is paid for.' : 'The shared checking place stays clear.'} ${w.part === 'recovered' ? 'Evan’s measured donor gear is kept with its source label.' : 'You have not taken a donor gear.'}`,
+          `${w.jobs.filter((j) => j.stage === 'returned').length} checked service-week jobs returned;${w.jobs.some((j) => j.stage === 'returned-unchecked') ? ` ${w.jobs.filter((j) => j.stage === 'returned-unchecked').length} unchecked collections settled without fees;` : ''} ${w.jobs.filter((j) => j.independent).length} carried independently by Sam. ${w.personalSession === 'spent' ? `You spent ${w.personalMinutes ?? 45} minutes in the saved model session.` : w.personalSession === 'changed' ? 'The model session has a new place in the notebook.' : 'The personal work remains available when you choose it.'} ${w.checkingPlace === 'second' ? 'The second checking tray is paid for.' : 'The shared checking place stays clear.'} ${ctx.checkedHouseholdAndPersonal !== undefined ? `${ctx.checkedHouseholdAndPersonal} household and personal items are also checked; their history remains at the bench. ` : ''}${w.part === 'recovered' ? (ctx.paperStreetRepaired ? 'Evan’s measured donor gear is installed in the model, whose movement has been checked; its source stays in the notebook.' : ctx.paperStreetInstalled ? 'Evan’s measured donor gear is installed in the model; its movement still needs checking.' : 'Evan’s measured donor gear is kept with its source label.') : 'You have not taken a donor gear.'}`,
           'notice',
         ),
         line(

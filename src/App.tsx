@@ -11,13 +11,27 @@ import {
 } from './game/engine';
 import { getServiceWeekView } from './game/service-week';
 import type { ActionView, ConversationLine, GameInput, GameState, ObjectView } from './game/types';
-import { getWorkshopView } from './game/workshop';
+import { getWorkshopView, type LedgerEntry } from './game/workshop';
 import { Cabinet } from './ui/Cabinet';
 import { createChoiceGate } from './ui/choiceGate';
 import { JournalHistory } from './ui/JournalHistory';
 import { ObjectIllustration } from './ui/ObjectIllustration';
 import { ObjectPresentation } from './ui/ObjectPresentation';
 import { readStory, writeStory } from './ui/storage';
+
+const ledgerLabels: Record<LedgerEntry['kind'], string> = {
+  'materials-advance': 'Battery advance',
+  materials: 'Battery bought',
+  'repair-fee': 'Repair payment',
+  'sam-pay': 'Sam’s pay',
+  'checking-place': 'Second checking tray',
+};
+const ledgerMoney = new Intl.NumberFormat('en-GB', {
+  style: 'currency',
+  currency: 'GBP',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
 
 function headerClock(label: string, chapterVisible: boolean): string {
   if (!chapterVisible) return label;
@@ -568,7 +582,13 @@ export default function App() {
                         {serviceWeek.arrangements.length > 0 && (
                           <ul>
                             {serviceWeek.arrangements.map((arrangement) => (
-                              <li key={arrangement}>{arrangement}</li>
+                              <li key={arrangement}>
+                                {serviceWeek.checkingPlace === 'second' &&
+                                arrangement ===
+                                  'Two stable labelled checking places, bought for £6.'
+                                  ? 'The second checking tray is in use.'
+                                  : arrangement}
+                              </li>
                             ))}
                           </ul>
                         )}
@@ -610,14 +630,34 @@ export default function App() {
             {workshop.notebook && (
               <details className="cash-notebook">
                 <summary>Workshop notebook</summary>
-                <p>
-                  {workshop.notebook.received} received for repairs · {workshop.notebook.paid} paid
-                  to Sam.
-                </p>
-                <p>
-                  {workshop.notebook.materials} spent on batteries, covered by customers’ material
-                  advances.
-                </p>
+                <section className="cash-ledger-scroll" aria-label="Workshop transactions">
+                  <table className="cash-ledger">
+                    <caption>Recorded transactions</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">For</th>
+                        <th scope="col">In / out</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {game.workshop?.ledger.map((entry) => {
+                        const object = game.objects.find((item) => item.id === entry.jobId);
+                        return (
+                          <tr key={entry.id}>
+                            <th scope="row">
+                              {object?.title ?? ledgerLabels[entry.kind]}
+                              {object && <small>{ledgerLabels[entry.kind]}</small>}
+                            </th>
+                            <td className={entry.amount > 0 ? 'ledger-income' : undefined}>
+                              {entry.amount > 0 ? '+' : entry.amount < 0 ? '−' : ''}
+                              {ledgerMoney.format(Math.abs(entry.amount) / 100)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </section>
                 <p>{workshop.notebook.cash} kept for the workshop.</p>
               </details>
             )}

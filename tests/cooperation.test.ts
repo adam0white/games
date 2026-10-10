@@ -27,6 +27,7 @@ it('Dad’s real choice starts shared work for the full task duration, while com
   const declined = choose(tired, 'workshop-cabinet-measure');
   expect(accepted.workshop?.cabinet).toBe('measured');
   expect(declined.workshop?.cabinet).toBe('looked');
+  expect(declined.conversation.map((line) => line.text).join(' ')).toContain('too tired');
   expect(accepted.now - base.now).toBe(20);
   expect(declined.now - tired.now).toBe(2);
   const dad = accepted.people.dad,

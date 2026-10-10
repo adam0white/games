@@ -854,6 +854,49 @@ summary:focus-visible {
 .cash-notebook p {
   margin: 8px 0;
 }
+.cash-ledger-scroll {
+  max-height: 360px;
+  overflow: auto;
+  margin-top: 12px;
+}
+.cash-ledger-scroll:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+.cash-ledger {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.85rem;
+}
+.cash-ledger caption {
+  text-align: left;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.cash-ledger th,
+.cash-ledger td {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.cash-ledger th {
+  font-weight: 500;
+  padding-right: 14px;
+}
+.cash-ledger small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.cash-ledger td {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.cash-ledger .ledger-income {
+  color: var(--human);
+}
 .workshop-arrangement {
   font-size: 0.78rem;
   margin-bottom: 0;

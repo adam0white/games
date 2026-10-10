@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { arrangeLearning } from '../src/game/apprentice';
 import { getView, restoreGame, serializeGame, transition } from '../src/game/engine';
 import { checkingSpaceAvailable } from '../src/game/repairs';
 import type { GameState } from '../src/game/types';
@@ -45,6 +46,11 @@ it('a genuine earned private week discovers its own model and closes without fic
   while (!has(s, 'service-close-small')) s = choose(s, 'service-next-day');
   s = choose(s, 'service-close-small');
   expect(s.serviceWeek?.conclusion).toBe('small');
+  const ending = s.conversation.map((line) => line.text).join(' ');
+  expect(ending).toContain('0 checked service-week jobs returned');
+  expect(ending).toContain('household and personal items are also checked');
+  expect(ending).toContain('installed in the model, whose movement has been checked');
+  expect(ending).not.toContain('gear is kept with its source label');
   expect(s.workshop?.cash ?? 0).toBe(0);
   expect(restoreGame(serializeGame(s))).toEqual(s);
 });
@@ -273,5 +279,56 @@ it('a future agreed Nora visit keeps its known purpose through her intervening o
   expect(after?.detail).toContain('cutting-table');
   expect(after?.detail).not.toContain('Busy at home');
   expect(after?.detail).not.toContain('in 1 days');
+  expect(restoreGame(serializeGame(s))).toEqual(s);
+});
+
+it('renewing Sam’s whole-job work preserves responsibility without granting extra learning', () => {
+  let s = earnedHandoff();
+  for (const id of ['service-begin', 'service-regular']) s = choose(s, id);
+  s = choose(reach(s, 'service-paid-help'), 'service-paid-help');
+  s = choose(reach(s, 'service-hear-leila'), 'service-hear-leila');
+  s = choose(s, 'service-accept-leila');
+  if (!has(s, 'delegate-repair')) s = choose(reach(s, 'arrange-learning'), 'arrange-learning');
+  s = choose(s, 'delegate-repair');
+  // A matched state immediately at the end of this agreement: actual saved
+  // repair and learned rules remain unchanged; the next agreement is voluntary.
+  if (!s.apprentice) throw Error('Missing actual Sam assignment');
+  s.apprentice.visitUntil = s.now;
+  const methods = structuredClone(s.people.sam?.methods),
+    skill = structuredClone(s.people.sam?.skills);
+  const agreementOnly = structuredClone(s);
+  arrangeLearning(agreementOnly, () => {});
+  expect(agreementOnly.people.sam?.skills).toEqual(skill);
+  for (let n = 0; n < 30 && s.apprentice?.visitUntil === s.now; n++) {
+    const before = s.now;
+    s = choose(s, 'arrange-learning');
+    if ((s.apprentice?.visitUntil ?? 0) > before) break;
+    s = choose(s, 'rest');
+  }
+  expect(s.apprentice?.jobId).toBe('service-leila');
+  expect(s.apprentice?.role).toBe('repairer');
+  expect(s.people.sam?.methods?.rules).toEqual(methods?.rules);
+  expect(s.people.sam?.methods?.recentDemonstrations).toEqual(methods?.recentDemonstrations);
+  // The public action also gives the real repair four elapsed minutes. Its
+  // ordinary HF practice is permitted; the agreement itself grants none.
+  expect(
+    (s.people.sam?.skills.repair?.practice ?? 0) - (skill?.repair?.practice ?? 0),
+  ).toBeLessThanOrEqual(4);
+  expect(s.conversation.map((line) => line.text).join(' ')).toContain(
+    'continue from the labelled observations',
+  );
+});
+
+it('a new bench agreement also preserves an established independent repairer without an active job', () => {
+  let s = earnedHandoff();
+  const completed = structuredClone(s.apprentice?.completedJobIds);
+  for (let n = 0; n < 30; n++) {
+    s = choose(reach(s, 'arrange-learning'), 'arrange-learning');
+    if ((s.apprentice?.visitUntil ?? 0) > s.now) break;
+    s = choose(s, 'rest');
+  }
+  expect(s.apprentice?.jobId).toBeUndefined();
+  expect(s.apprentice?.role).toBe('repairer');
+  expect(s.apprentice?.completedJobIds).toEqual(completed);
   expect(restoreGame(serializeGame(s))).toEqual(s);
 });
