@@ -68,7 +68,7 @@ export function aftercareActions(s: AftercareGame, ctx: AftercareContext): Actio
           'aftercare-door-start',
           'Try the finished cabinet doors with Dad',
           ctx.dadHere
-            ? 'A little conversation; no further repair.'
+            ? 'Ask for a little conversation; Dad may keep his own plans.'
             : 'Dad is away. Try when he is back.',
         ),
       );

@@ -92,16 +92,20 @@ export default function App() {
   } | null>(null);
   const [choiceGate] = useState(() => createChoiceGate(() => setSettling(false)));
   useEffect(() => () => choiceGate.cancel(), [choiceGate]);
+  const journalToggle = useRef<HTMLButtonElement>(null);
   useEffect(() => {
+    if (!journal) return;
     function closeJournal(event: KeyboardEvent) {
       if (event.key === 'Escape') {
+        event.preventDefault();
         setJournal(false);
         setConfirmReset(false);
+        journalToggle.current?.focus({ preventScroll: true });
       }
     }
     window.addEventListener('keydown', closeJournal);
     return () => window.removeEventListener('keydown', closeJournal);
-  }, []);
+  }, [journal]);
   const storyRevision = useRef(0);
   const fileInput = useRef<HTMLInputElement>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -389,6 +393,7 @@ export default function App() {
         <button
           type="button"
           className="journal-toggle"
+          ref={journalToggle}
           onClick={() => {
             setJournal(!journal);
             setConfirmReset(false);

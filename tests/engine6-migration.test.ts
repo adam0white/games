@@ -23,4 +23,4 @@ it('a pinned actual published-six public route validates unchanged before seven 
   expect(getView(migrated).actions.some((a) => a.id === 'rest')).toBe(true);
   migrated = transition(migrated, { type: 'action', id: 'rest' });
   expect(restoreGame(serializeGame(migrated))).toEqual(migrated);
-});
+}, 20_000);

@@ -92,3 +92,8 @@ Leave the cause of changing standards unresolved: deliberate control, commercial
 
 - **Review by 2026-11-09:** explicit received availability cues for Sam after evenings and in later school holidays. Current known visit and routine hints require actual disclosure; do not silently teleport him or promise attendance from a schedule alone.
 - **Review by 2026-11-09:** broaden Sam's explicitly demonstrated methods beyond battery/contact lamps, starting with an observed torch-cap or sewing-box comparison. Unknown mechanisms must remain honest help-seeking until actually taught; scalar skill alone is not a new method.
+
+- **Review by 2026-11-09:** reduce later-summer diagnostic repetition with genuinely different observed mechanisms, rather than disguising the same battery action under new object names. The object stories and consequential teaching carried the fresh long playthrough; new mechanisms should preserve realistic comparison and uncertainty.
+
+
+- By 2026-11-09, review Sam's received shift-end information and school-break pacing using the native engine-9 wildcard. After age-sixteen sewing-box work it waited five half-hour steps without knowing whether a request or the school return was next. Preserve actual HF autonomy; communicate schedules only through information the player could know. This is a proposal, not an active queue.

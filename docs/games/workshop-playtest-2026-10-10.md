@@ -188,3 +188,30 @@ Together with the returning wildcard's ending observation, this prompted a bound
 
 
 The fresh public reader reached the working week and verified actual paid delegation: Leila's £5 collection, Sam's £2 payment and £11 conserved workshop cash after £8 from earlier work. It chose Nora's later collection to preserve personal model time. Accepting Nora's lamp replaced the active model without putting it on the visible shelf. The saved model was still present, but the UI offered no way to reach it, even after recovering Evan's matching gear. Actual checkpoint: `/tmp/repair-fresh-player-missing-model.json`, age eighteen, Summer day 5 at 17:43, service week day 3. The reader did not inspect raw state or source. This is a blocking return-to-personal-work defect, not a new content request; the final current-engine correction must preserve and expose the existing object, never invent a replacement or grant a repair.
+
+
+## Actual public engine 9 personal-model continuation
+
+The fresh reader imported its actual completed engine-8 week through Journal into a clean public browser. The earlier model appeared under Put aside with its diagnostic note. Through visible choices it fitted the existing measured gear, completed the repeated-operation check and put the model away working. It exported `/tmp/repair-fresh-player-public9-model-complete.json`, then imported that continuation in a second clean public browser and recovered the same model scene at age eighteen, Summer day 7, 09:50. The original browser-control process was unavailable, so this was an import of the preserved actual checkpoint, not an unbroken browser session.
+
+> “The paper shops turn past in the order you drew them.”
+
+> “Returning to something I wanted to repair made Sam’s independent work feel useful.”
+
+The reader reported no remaining blocker in this continuation. It explicitly did not replay the earlier timing complaints; those remain independently covered by timeline and activity-end controls rather than being attributed to this public follow-up. The root also completed the same affected 247-input export through the current local UI to a checked 252-input model, with no runtime error or mobile overflow.
+
+
+## Final public interface audit
+
+A separate isolated public engine-9 audit verified touch and keyboard 3D controls, reduced-motion behavior, actual dark/light system changes, no-WebGL accessible fallback, a single current-response channel, no repeated condition captions and no mobile horizontal overflow. The old completed-week model appeared as an enabled descriptive shelf control. Escape from an exported-story Journal control closed the panel but dropped focus to the page body; a bounded UI-only correction is being applied. This changes no engine rule, received method, world time or historical packet.
+
+
+## Final source-unread native engine-9 wildcard
+
+A new reader began on the actual public engine 9 with only a request to play and report what it felt. It reached fifteen through household and neighbour work and chose Dad's cabinet and the saved drawing.
+
+> “I want to finish this because Dad put it off, not because I need another repair.”
+
+During the pear-shaped mechanical timer's real timed check, tea with Mum incorrectly said to leave the light on. Its actual exported checkpoint is `/tmp/repair-fresh-wildcard-native9-timer-checkpoint.json`, SHA256 `0c5803a8dd777b946a6e7f504390b7aa673164dfb615cb91e8bff831d5bb334b`. The correction must freeze and validate this published history before continuation, then distinguish a running mechanical check, running light check and company with no active check. Old words already heard remain in the journal.
+
+The reader also found Sam's accepted watching invitation followed by “Let me finish” confusing, and returning to school after two played holiday days felt abrupt. These are taste findings: the explicit remaining unplayed holiday and Sam's actual HF choices are retained. Broader observation/availability presentation belongs to the dated deferred work rather than a last-minute change of decision rules.

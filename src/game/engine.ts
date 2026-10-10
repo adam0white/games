@@ -39,6 +39,7 @@ import { restoreGame as restoreEngine5 } from './engine5';
 import { restoreGame as restoreEngine6 } from './engine6';
 import { restoreGame as restoreEngine7 } from './engine7';
 import { restoreGame as restoreEngine8 } from './engine8';
+import { restoreGame as restoreEngine9 } from './engine9';
 import {
   askMumToHelp,
   beginSharedConversation,
@@ -96,7 +97,7 @@ import {
   workshopActions,
 } from './workshop';
 
-const ENGINE = 'home-garage-9';
+const ENGINE = 'home-garage-10';
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 const object = (
   id: string,
@@ -1198,6 +1199,16 @@ export function transition(original: GameState, input: GameInput): GameState {
     return s;
   }
   const o = focused(s);
+  const teaRunningCheck =
+    o?.checkStarted !== undefined && !o.verified && s.now - o.checkStarted < verificationMinutes(o);
+  const teaCheckText = !teaRunningCheck
+    ? ''
+    : o?.form === 'timer'
+      ? ' The timer had time for its cycle while we sat.'
+      : o && isMechanical(o)
+        ? ' The mechanism had time for its check while we sat.'
+        : ' The light had time for its check while we sat.';
+
   const speak = (speaker: string, text: string) => say(s, speaker, text, 'notice');
   const aftercare = applyAftercareAction(s, id, {
     dadHere: isHere(s, 'dad'),
@@ -2206,7 +2217,7 @@ export function transition(original: GameState, input: GameInput): GameState {
               .slice(0, -1)
               .some((entry) => entry.input.id === 'rest' && s.now - entry.at < 120)
             ? 'Nice to sit a little longer. No need to keep talking.'
-            : 'It’s nice having you here. Leave the light on; it can have its check while we sit.'
+            : `It’s nice having you here.${teaCheckText}`
           : s.chapter === 'garage'
             ? 'You sit on the garage step for a while. The work can wait safely.'
             : 'The work can wait safely while you sit for a while.',
@@ -2497,8 +2508,13 @@ export function restoreGame(text: string): GameState {
       'home-garage-6',
       'home-garage-7',
       'home-garage-8',
+      'home-garage-9',
     ].includes(data?.engine)
   ) {
+    if (data.engine === 'home-garage-9') {
+      const validated = restoreEngine9(text);
+      return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };
+    }
     if (data.engine === 'home-garage-8') {
       const validated = restoreEngine8(text);
       return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };
