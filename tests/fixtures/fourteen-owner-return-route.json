@@ -1,0 +1,29 @@
+{
+  "engine": "home-garage-14",
+  "sourceCommit": "52a9",
+  "seed": 1701,
+  "inputs": [
+    { "type": "action", "id": "show-corrective-step" },
+    { "type": "action", "id": "clean-contact" },
+    { "type": "action", "id": "explain-step" },
+    { "type": "action", "id": "verify" },
+    { "type": "action", "id": "rest" },
+    { "type": "action", "id": "check-result" },
+    { "type": "action", "id": "explain-step" },
+    { "type": "action", "id": "return" },
+    { "type": "action", "id": "supervised-retry-intake" },
+    { "type": "action", "id": "watch-sam" },
+    { "type": "action", "id": "find-paper-street" },
+    { "type": "action", "id": "inspect" },
+    { "type": "action", "id": "childhood-measure-model" },
+    { "type": "action", "id": "childhood-preserve-frontage" },
+    { "type": "action", "id": "childhood-make-label" },
+    { "type": "action", "id": "shelve" }
+  ],
+  "sha256": "382c7cdd3f95b95597b6527ca61a23bbe902fb66928c22f7856fc8277ec7c1d9",
+  "inputCount": 343,
+  "journalCount": 480,
+  "sourceFixture": "owner-thirteen-school-apprentice-route.json",
+  "sourceSha256": "2902cd279f92edd27611e9aacaabf5af154649ad33d56e294419f47ea2cfcbd4",
+  "sourceInputCount": 327
+}

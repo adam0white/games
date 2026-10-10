@@ -41,3 +41,47 @@ Its initial apparent disabled-Dad finding was withdrawn after a focused UI inspe
 > I initially reported that Dad conversation and cabinet choices appeared visible but unavailable. That inference was wrong. The options were inside closed native `<details>` sections, “Talk for a while” and “Personal and family projects.”
 
 The reviewer opened both sections, observed enabled buttons and successfully entered Dad's cabinet. Hidden descendants in a text listing caused the mistaken report; no actor or UI gate was changed to satisfy it.
+
+
+## Long workshop and returning-owner candidate reviews
+
+Both reviewers used isolated headless Chrome and rendered UI only on candidate commit `52a9a56caa149abfd234cd21929c4f8aa13414b1`. They did not read source, hidden state or the owner's browser storage. Their opinions do not substitute for Adam's acceptance. The long run reached eighteen and a stopped supervised contact repair; the returning run imported the actual supplied owner export and reached the stopped afternoon after correcting and teaching the contact repair. These were candidate results before the following polish.
+
+Exact raw records are `/tmp/repair-long-workshop-player-notes.md` and `/tmp/repair-owner-return-player-notes.md`. Actual exported stories are `/tmp/repair-long-workshop-player-story.json` and `/tmp/repair-owner-return-player-story.json`. Screenshots are `/tmp/repair-long-workshop-player-stopped.png`, `/tmp/repair-long-workshop-player-final.png`, `/tmp/repair-owner-return-start.png`, `/tmp/repair-owner-return-after-sam.png` and `/tmp/repair-owner-return-stop.png`.
+
+The long reviewer’s verbatim reactions:
+
+- "Dad joining the longer check felt like the first clear shared-work moment."
+- "The lamp with the pencil mark is a nice reason to care about a repair."
+- "I can skip whole summers after an afternoon. The wording makes it clear, but growing up feels very compressed."
+- "Nora's lamp is basically Mum's lamp again. Sam's cap problem finally made me read the observation carefully."
+- "Why do I have to wait for Nora before I can wait for Sam? I'm interested in Sam."
+- "I waited for Sam at seventeen, but there wasn't anything to ask him. I ended that summer because I couldn't see another route toward working together."
+- "Teaching him, then seeing him stop at the method I hadn't taught, was the best moment. I understood what my teaching had and hadn't done."
+- "He's already here working with me. Why is the big highlighted invitation still asking whether he can come watch?"
+- "I can take responsibility, apparently, but I can't find that button. Discuss where Sam stopped just leaves me with the same situation."
+- "I nearly missed the conversation with Dad because Talk for a while looked like optional chatter. That is where the workshop decision was."
+- "Agreeing one introduction, then a price, then space with Dad makes the workshop feel like something people are actually agreeing to."
+- "By this point I'm interested in Sam's learning, but tired of reading the same labels and warnings. I would stop for now rather than take on another lamp immediately."
+
+
+The returning reviewer’s verbatim reactions:
+
+- “Show Sam the contact repair on this stopped light” immediately answers what I wanted: he is stuck and I want to help him learn, not retry the same discussion.
+- The physical repair and explanation are separate actions. I understand why, and the explanatory copy keeps the responsibility clear.
+- After the longer check, explaining the demonstration says “A steady glow after work is a result, not yet a long check.” That sounds stale because I have already completed the longer run, movement and switching. It taught verify, but I expected acknowledgment of the complete check I just performed.
+- I invited Mum for tea while waiting. “The invitation can wait for another time” felt like a mild rejection, though I could not tell whether Mum actually declined or I only took a break alone.
+- I tried Dad’s additional inspection light because I wanted to see whether Sam could use the contact method. He did, while I worked on the paper model. That is a satisfying concrete consequence of teaching.
+- Sam finished reading the check then left at the end of the agreed afternoon. His own plans matter in a way I can see.
+- I wanted to repair the childhood paper model. The missing gear and Evan’s card make me expect a way to measure or contact Evan. I could patch the frontage and make a work card, but after putting it aside I found no visible gear or Evan action, even with personal projects and workshop notebook expanded. I stopped rather than continue randomly.
+- The last paper-model note shown after putting it aside is the frontage patch, although making the work card was my last project action. I would expect its label to retain the new work-card information.
+
+
+The active torch/bell guide now describes attended physical testing rather than suggesting idle time completes it. Sam describes his own returned lamp in first person; demonstrated methods use ordinary descriptions while retaining the same learned method IDs. Other reported progression and availability issues are reviewed separately; these narrow corrections do not claim the entire playthrough is accepted.
+
+
+## Engine-15 technical follow-through
+
+Independent source review verified frozen engine-14 modules against the exact `52a9a56` checkpoint, selective received-appointment waiting, aligned actor clocks and actual forty-minute shared donor completion before a single gear transfers. A matched control changed only the action-to-received-purpose links; ordinary HF decisions changed without utility bonuses. A stronger promised delivery continued and retained the part.
+
+Review found the completed sorting purpose still active because the completion record named generic work. The final physical outcome now names the actual sorting action, so both bounded purposes finish through HF. School cancellation and explicit refusal abandon only active purposes, preserving achieved history and measurements. Renewing a previously measured exchange creates a new received purpose. These are technical controls; Adam still accepts the game’s feel.

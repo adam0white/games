@@ -553,19 +553,16 @@ export function applyWorkshopAction(
       model.observations.push(text);
       return result([line('You', text, 'notice')], 15);
     }
-    case 'childhood-make-label':
+    case 'childhood-make-label': {
       if (!w.childhoodProject?.frontage) return null;
+      const model = s.objects.find((item) => item.id === 'paper-street');
+      if (!model) return null;
       w.childhoodProject.label = 'ready';
-      return result(
-        [
-          line(
-            'You',
-            'The remaining stiff paper makes a reusable work card: your name, the saved frontage and the missing drive gear. You keep it beside the model; there is space on the back for a future bench label.',
-            'notice',
-          ),
-        ],
-        8,
-      );
+      const text =
+        'The remaining stiff paper makes a reusable work card: your name, the saved frontage and the missing drive gear. You keep it beside the model; there is space on the back for a future bench label.';
+      model.observations.push(text);
+      return result([line('You', text, 'notice')], 8);
+    }
     case 'workshop-cabinet-plan': {
       const task = w.cabinet === 'looked' ? 'measure' : w.cabinet === 'measured' ? 'hang' : 'align';
       if (!ctx.dadAgreesTime?.(task))

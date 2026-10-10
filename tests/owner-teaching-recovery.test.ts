@@ -2,6 +2,7 @@ import { begin, createPerson, decide, finish, promise, tick } from '@adam0white/
 import { expect, it } from 'vitest';
 import {
   advanceApprentice,
+  arrangeLearning,
   explainLesson,
   freshApprentice,
   pendingCorrectiveDemonstration,
@@ -77,7 +78,7 @@ it('describes the actually failed replacement without asserting successful conta
   lesson.explained = false;
   const words: string[] = [];
   explainLesson(s, (_speaker, text) => words.push(text), true);
-  expect(words.join(' ')).toContain('replace battery attempt did not repair');
+  expect(words.join(' ')).toContain('replacing the old battery did not repair');
   expect(words.join(' ')).not.toContain('Restore the contact instead');
 }, 30_000);
 it('requires active five-minute ringing rather than idle elapsed time', () => {
@@ -295,4 +296,80 @@ it('retains the actually witnessed corrective contact result when checking comes
   expect(pendingCorrectiveDemonstration(returned)).toBeUndefined();
   expect(returned.unlocked).not.toContain(`corrective-demonstration:${witnessed?.objectId}`);
   expect(returned.people.sam?.methods).toEqual(priorRules);
+}, 30_000);
+
+it('closes a pending watching invitation only after a genuinely accepted renewed stretch', () => {
+  const s = actualOwner();
+  s.samPlans = { invitation: 'pending', heardAt: s.now };
+  const prior = s.apprentice?.visitUntil ?? 0;
+  arrangeLearning(s, () => {});
+  expect(s.apprentice?.visitUntil).toBeGreaterThan(prior);
+  expect(s.samPlans.invitation).toBe('accepted');
+  const sam = s.people.sam;
+  if (!sam) throw Error('Missing Sam');
+  if (sam.activity)
+    finish(sam, {
+      affordanceId: sam.activity.affordanceId,
+      action: sam.activity.action,
+      at: sam.now,
+      status: 'interrupted',
+      summary: 'Control starts an actual promise',
+    });
+  const duty = promise(sam, {
+    kind: 'promise',
+    toId: 'mum',
+    actions: ['check-in'],
+    from: sam.now,
+    until: sam.now + 30,
+    importance: 1,
+  });
+  const own = {
+    id: 'promised-check-in',
+    action: 'check-in',
+    label: 'Keeping the promised check-in',
+    duration: 30,
+    effort: 0,
+    fulfills: [duty.id],
+    with: ['mum'],
+    advertises: { belonging: 0.1 },
+  };
+  begin(sam, own, decide(sam, [own]));
+  const deadline = s.apprentice?.visitUntil;
+  s.samPlans.invitation = 'pending';
+  arrangeLearning(s, () => {});
+  expect(s.samPlans.invitation).toBe('pending');
+  expect(s.apprentice?.visitUntil).toBe(deadline);
+  expect(sam.activity?.affordanceId).toBe(own.id);
+}, 30_000);
+it('explains the actual start-of-run demonstration in past tense when the repair check has since finished', () => {
+  let s = actualOwner();
+  for (const id of ['show-corrective-step', 'clean-contact', 'explain-step', 'verify'])
+    s = transition(s, { type: 'action', id });
+  const start = s.apprentice?.lastLesson;
+  expect(start?.step).toBe('verify');
+  while (getView(s).actions.some((x) => x.id === 'wait-check'))
+    s = transition(s, { type: 'action', id: 'wait-check' });
+  s = transition(s, { type: 'action', id: 'check-result' });
+  expect(s.objects.find((x) => x.id === s.focusId)?.verified).toBe(true);
+  s = transition(s, { type: 'action', id: 'explain-step' });
+  expect(s.apprentice?.lastLesson?.eventId).toBe(start?.eventId);
+  const words =
+    s.journal
+      ?.slice(-2)
+      .map((x) => x.text)
+      .join(' ') ?? '';
+  expect(words).toContain('At that step');
+  expect(words).toContain('You started its longer run');
+  expect(words).not.toContain('not yet a long check');
+}, 30_000);
+
+it('keeps real stopped work prominent instead of repeating an already agreed invitation', () => {
+  const s = actualOwner();
+  s.samPlans = { invitation: 'pending', heardAt: s.now - 60 };
+  const view = getView(s);
+  expect(view.actions.some((a) => a.id === 'show-corrective-step')).toBe(true);
+  expect(view.actions.some((a) => a.id === 'resume-observer-invite')).toBe(false);
+  expect(view.dayPlan?.entries.some((e) => e.id === 'sam-invitation')).toBe(false);
+  expect(view.dayPlan?.entries[0]?.id).toBe('sam-work');
+  expect(view.dayPlan?.entries[0]?.actionIds).toContain('show-corrective-step');
 }, 30_000);

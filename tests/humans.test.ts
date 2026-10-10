@@ -152,3 +152,29 @@ it('ordinary routines preserve need gains, decisions and RNG when elapsed time i
     expect(pieces.body[key]).toBeCloseTo(whole.body[key], 8);
   expect(rounded(pieces.activity)).toEqual(rounded(whole.activity));
 });
+
+it('reports Mum’s actual retained meal rather than inventing a chapter when helping cannot begin', () => {
+  const mum = createPerson({
+    id: 'mum',
+    name: 'Mum',
+    seed: 42,
+    now: 840,
+    bornAt: -52 * 365 * 1440,
+    sex: 'female',
+  });
+  const meal = {
+    id: 'ordinary-meal',
+    action: 'eat',
+    label: 'Having something to eat and drink',
+    duration: 30,
+    effort: 0,
+    advertises: { food: 0.2, water: 0.2 },
+  };
+  begin(mum, meal, decide(mum, [meal]));
+  const before = structuredClone(mum.activity);
+  const reports: { kind: string; activity?: string }[] = [];
+  expect(askMumToHelp(mum, (report) => reports.push(report))).toBe(false);
+  expect(reports).toEqual([{ kind: 'kept-activity', activity: meal.label }]);
+  expect(mum.activity).toEqual(before);
+  expect(mum.now).toBe(848);
+});

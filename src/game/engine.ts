@@ -48,6 +48,7 @@ import { restoreGame as restoreEngine10 } from './engine10';
 import { restoreGame as restoreEngine11 } from './engine11';
 import { restoreGame as restoreEngine12 } from './engine12';
 import { restoreGame as restoreEngine13 } from './engine13';
+import { restoreGame as restoreEngine14 } from './engine14';
 import {
   askMumToHelp,
   beginSharedConversation,
@@ -104,6 +105,7 @@ import {
 import { nextHolidayStart, nextWakingMorning, playerAge } from './school-calendar';
 import {
   applyServiceWeekAction,
+  cancelPersonalDonorForSchool,
   completeServiceWeekJob,
   type ServiceWeekContext,
   serviceWeekActions,
@@ -125,7 +127,7 @@ import {
   workshopActions,
 } from './workshop';
 
-const ENGINE = 'home-garage-14';
+const ENGINE = 'home-garage-15';
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 const object = (
   id: string,
@@ -991,6 +993,7 @@ function available(s: GameState): ActionView[] {
   const a: ActionView[] = [];
   if (
     s.samPlans?.invitation === 'pending' &&
+    !(s.apprentice?.arranged && s.now < s.apprentice.visitUntil) &&
     (s.samPlans.availableAfter ?? 0) <= s.now &&
     isHere(s, 'sam')
   )
@@ -1000,10 +1003,10 @@ function available(s: GameState): ActionView[] {
       detail: 'The earlier invitation was left open. He can choose whether now fits his plans.',
       kind: 'primary',
     });
-  const appointment = knownAppointments(s)[0];
-  if (appointment)
+  const appointments = knownAppointments(s);
+  for (const [index, appointment] of appointments.entries())
     a.push({
-      id: 'wait-appointment',
+      id: index === 0 ? 'wait-appointment' : `wait-known-${appointment.personId}-${appointment.at}`,
       label:
         appointment.detail.startsWith('Known routine:') ||
         appointment.detail.startsWith('Sam said his usual')
@@ -1465,7 +1468,10 @@ function available(s: GameState): ActionView[] {
             : choice.label;
         })(),
         undefined,
-        choice.id === 'observer-invite' && s.campaign?.graduated ? 'primary' : 'quiet',
+        (choice.id === 'observer-invite' || choice.id === 'after-school-work') &&
+          s.campaign?.graduated
+          ? 'primary'
+          : 'quiet',
       );
   const correction = pendingCorrectiveDemonstration(s);
   const actions = a.some((action) => action.id === 'show-corrective-step')
@@ -1585,6 +1591,37 @@ export function transition(original: GameState, input: GameInput): GameState {
     return s;
   }
   if (['back-to-school', 'leave-school-holiday'].includes(id) && s.campaign) {
+    const donorAt = s.serviceWeek?.donorAt;
+    const cancelledDonor = cancelPersonalDonorForSchool(s);
+    if (cancelledDonor.length) {
+      for (const [personId, goalId] of [
+        ['evan', s.serviceWeek?.donorPurposeId],
+        ['player', s.serviceWeek?.donorPlayerPurposeId],
+      ] as const) {
+        const person = s.people[personId];
+        if (
+          person &&
+          goalId &&
+          person.agenda?.goals.some((goal) => goal.id === goalId && goal.status === 'active')
+        )
+          abandonGoal(person, goalId);
+      }
+      if (s.serviceWeek) {
+        delete s.serviceWeek.donorPurposeId;
+        delete s.serviceWeek.donorPlayerPurposeId;
+      }
+      const presence = s.world?.presence.evan;
+      if (
+        presence &&
+        presence.awayUntil === donorAt &&
+        presence.activity === 'Bringing the invited display base'
+      ) {
+        presence.awayUntil = 0;
+        presence.activity = 'The personal donor visit was cancelled before school';
+      }
+      for (const line of cancelledDonor) say(s, line.speaker, line.text, line.tone);
+    }
+
     if (['planned', 'missed'].includes(s.workshop?.cabinetAppointment?.status ?? '')) {
       cancelCabinetTime(s);
       say(
@@ -2024,8 +2061,175 @@ export function transition(original: GameState, input: GameInput): GameState {
     for (const line of result.lines) say(s, line.speaker, line.text, line.tone);
     return s;
   }
+  if (id === 'service-recover-donor') {
+    const player = s.people.player,
+      evan = s.people.evan;
+    const minutes = 40;
+    const donor = s.serviceWeek;
+    // These purposes come from Evan's received offer and the player's selected exchange.
+    // They provide ordinary HF goal evidence; competing commitments still decide consent.
+    // Older published saves retain the actually heard measured exchange, but no goal pointer.
+    // Resume that received purpose only on this selected action, never during restore or view.
+    if (
+      donor?.part === 'measured' &&
+      donor.donorInvited &&
+      evan &&
+      isHere(s, 'evan') &&
+      !donor.donorPurposeId
+    )
+      donor.donorPurposeId = adoptGoal(
+        evan,
+        {
+          label: 'Keep my stand housing and marked screws together',
+          serves: ['autonomy'],
+          advancedBy: [{ action: 'sort-donor-parts', amount: 1 }],
+          importance: 0.5,
+        },
+        s.now,
+      ).id;
+    if (donor?.part === 'measured' && player && !donor.donorPlayerPurposeId)
+      donor.donorPlayerPurposeId = adoptGoal(
+        player,
+        {
+          label: 'Sort the retained stand parts for the matching model gear',
+          serves: ['competence'],
+          advancedBy: [{ action: 'sort-donor-parts', amount: 1 }],
+          importance: 0.5,
+        },
+        s.now,
+      ).id;
+    let refusal: ConversationRefusal | undefined;
+    if (
+      !player ||
+      !evan ||
+      !Array.from({ length: minutes + 1 }, (_, i) => s.now + i).every((at) =>
+        isHere(s, 'evan', at),
+      ) ||
+      !beginSharedConversation(
+        player,
+        evan,
+        id,
+        'Sorting Evan’s retained stand parts together',
+        minutes,
+        (report) => {
+          refusal = report;
+        },
+        {
+          physical: true,
+          action: 'sort-donor-parts',
+          partnerGoals: donor?.donorPurposeId ? [donor.donorPurposeId] : [],
+          playerGoals: donor?.donorPlayerPurposeId ? [donor.donorPlayerPurposeId] : [],
+        },
+      )
+    ) {
+      const who = refusal?.participant === 'player' ? player : evan;
+      const activity = refusal?.activity;
+      if (who && activity && activity.endsAt > s.now)
+        s.conversationPause = {
+          participantId: who.id,
+          actionId: id,
+          activityId: activity.id,
+          until: activity.endsAt,
+          label: activity.label,
+        };
+      say(
+        s,
+        'You',
+        `${refusal?.participant === 'player' ? 'You' : 'Evan'} ${activity ? `${refusal?.participant === 'player' ? 'are' : 'is'} still ${activity.label.toLowerCase()}` : refusal?.participant === 'player' ? 'leave the shared work for another time' : 'leaves the shared work for another time'}. The measured gear remains with Evan; no part has changed hands.`,
+        'notice',
+      );
+      return s;
+    }
+    s.conversationPause = undefined;
+    const until = s.now + minutes;
+    advanceBenchBeforePlayer(s, until);
+    tick(player, until);
+    tick(evan, until);
+    const completed = [player, evan].every(
+      (person) =>
+        person.body.alive &&
+        !person.body.downed &&
+        !person.body.asleep &&
+        person.activity?.affordanceId === id &&
+        person.activity.endsAt <= until,
+    );
+    for (const person of [player, evan]) {
+      const activity = person.activity;
+      if (activity?.affordanceId === id)
+        finish(person, {
+          affordanceId: id,
+          action: completed ? 'sort-donor-parts' : activity.action,
+          at: until,
+          status: completed ? 'completed' : 'interrupted',
+          summary: completed
+            ? activity.affordance.label
+            : 'The donor sorting stopped before it was complete.',
+        });
+    }
+    s.now = until;
+    if (!completed) {
+      advancePeople(s);
+      say(
+        s,
+        'You',
+        'The shared sorting stopped before completion. Evan keeps the measured gear and the remaining stand parts.',
+        'notice',
+      );
+      return s;
+    }
+    const recovered = applyServiceWeekAction(s, id, serviceContext(s, true));
+    if (!recovered?.recoveredPart)
+      throw Error('Completed donor work has no agreed measured transfer');
+    s.parts.gears = (s.parts.gears ?? 0) + recovered.recoveredPart.count;
+    s.parts.gearTargets ??= [];
+    s.parts.gearTargets.push('paper-street');
+    const model = s.objects.find((item) => item.id === 'paper-street');
+    model?.observations.push(
+      'One compatible gear from Evan’s measured shop-display base is kept for this model. Its fitting and a real movement check remain.',
+    );
+    advancePeople(s);
+    for (const line of recovered.lines) say(s, line.speaker, line.text, line.tone);
+    return s;
+  }
   const serviceResult = applyServiceWeekAction(s, id, serviceContext(s, true));
   if (serviceResult) {
+    if (id === 'service-decline-donor') {
+      for (const [personId, goalId] of [
+        ['evan', s.serviceWeek?.donorPurposeId],
+        ['player', s.serviceWeek?.donorPlayerPurposeId],
+      ] as const) {
+        const person = s.people[personId];
+        if (
+          person &&
+          goalId &&
+          person.agenda?.goals.some((goal) => goal.id === goalId && goal.status === 'active')
+        )
+          abandonGoal(person, goalId);
+      }
+    }
+    if (
+      id === 'service-hear-donor' ||
+      (id === 'service-invite-donor' && s.serviceWeek?.part === 'measured')
+    ) {
+      const donor = s.serviceWeek,
+        evan = s.people.evan;
+      if (donor && ['offered', 'measured'].includes(donor.part) && evan && !donor.donorPurposeId)
+        donor.donorPurposeId = adoptGoal(
+          evan,
+          {
+            label: 'Keep my stand housing and marked screws together',
+            serves: ['autonomy'],
+            advancedBy: [{ action: 'sort-donor-parts', amount: 1 }],
+            importance: 0.5,
+          },
+          s.now,
+        ).id;
+    }
+    if (id === 'service-measure-donor') {
+      const model = s.objects.find((item) => item.id === 'paper-street');
+      for (const line of serviceResult.lines)
+        if (line.speaker === 'You') model?.observations.push(line.text);
+    }
     for (const personId of new Set([
       ...(serviceResult.personIds ?? []),
       ...(serviceResult.visits ?? []).map((v) => v.personId),
@@ -2581,7 +2785,9 @@ export function transition(original: GameState, input: GameInput): GameState {
             speaker: o.owner,
             text:
               id === 'return'
-                ? `Thanks. ${o.title} can go back where it belongs, with the checked work written on its label.`
+                ? o.owner === 'Sam'
+                  ? `Thanks. ${o.title.replace(/^Sam[’']s /, 'My ')} can go back where I keep it, with the checked work on its label.`
+                  : `Thanks. ${o.title} can go back where it belongs, with the checked work written on its label.`
                 : `Keep ${o.title} labelled honestly: it works now, but the longer check is still unfinished.`,
             tone: 'warm' as const,
           },
@@ -2608,6 +2814,11 @@ export function transition(original: GameState, input: GameInput): GameState {
   };
   const p = s.people.player;
   if (!p) throw Error('Missing player');
+  const appointmentWait = id === 'wait-appointment' || id.startsWith('wait-known-');
+  const waitingFor = knownAppointments(s).find(
+    (event, index) =>
+      (index === 0 ? 'wait-appointment' : `wait-known-${event.personId}-${event.at}`) === id,
+  );
   const duration =
     id === 'check-result' && o && (o.form === 'bell' || o.id === 'friend-1')
       ? o.id === 'friend-1'
@@ -2615,8 +2826,8 @@ export function transition(original: GameState, input: GameInput): GameState {
         : 5
       : id === 'path-torch-test-cap'
         ? 4
-        : id === 'wait-appointment'
-          ? Math.max(1, (knownAppointments(s)[0]?.at ?? s.now + 30) - s.now)
+        : appointmentWait
+          ? Math.max(1, (waitingFor?.at ?? s.now + 30) - s.now)
           : id === 'next-day'
             ? nextWakingMorning(s.now) - s.now
             : ['rest', 'wait-person'].includes(id)
@@ -2664,7 +2875,7 @@ export function transition(original: GameState, input: GameInput): GameState {
   const reservedPart = requiredPart && (s.parts[requiredPart] ?? 0) > 0 ? requiredPart : undefined;
   if (reservedPart) s.parts[reservedPart] = (s.parts[reservedPart] ?? 0) - 1;
   advanceBenchBeforePlayer(s, s.now + duration);
-  if (id === 'next-day' || id === 'wait-appointment') {
+  if (id === 'next-day' || appointmentWait) {
     const until = s.now + duration;
     s.now = until;
     advancePeople(s);
@@ -2861,17 +3072,29 @@ export function transition(original: GameState, input: GameInput): GameState {
     case 'ask-mum': {
       const mum = familyMember;
       tick(mum, s.now - duration);
-      const helps = askMumToHelp(mum);
+      let outcome: { kind: string; activity?: string } = { kind: 'unavailable' };
+      const helps = askMumToHelp(mum, (report) => {
+        outcome = report;
+      });
+      const keptActivity = outcome.kind === 'kept-activity';
       s.unlocked.push(`help:${o?.id}`);
       s.humanNote = helps
         ? 'Mum chooses a little more time together, holding the light while you check.'
-        : 'Mum chooses her own chapter. The check can continue without her.';
+        : keptActivity
+          ? `Mum continues ${outcome.activity?.toLowerCase() ?? 'her current activity'}. The check can continue without her.`
+          : outcome.kind === 'own-choice'
+            ? 'Mum chooses her own chapter. The check can continue without her.'
+            : 'Mum is not ready to help. The check can continue without her.';
       narrate(
         s,
         'Mum',
         helps
           ? 'All right. You move the switch; I’ll keep it steady.'
-          : 'Let me finish my chapter. Leave it on — you can still watch it.',
+          : keptActivity
+            ? `Let me finish what I am doing${outcome.activity ? ` — ${outcome.activity.toLowerCase()}` : ''}. Leave it on; you can still watch it.`
+            : outcome.kind === 'own-choice'
+              ? 'Let me finish my chapter. Leave it on — you can still watch it.'
+              : 'I cannot help just now. You can still watch it.',
       );
       break;
     }
@@ -3157,11 +3380,14 @@ function dayPlan(s: GameState, actions: ActionView[]): GameView['dayPlan'] {
           : /routine|usually|usual|chance to ask/.test(event.detail)
             ? 'routine'
             : 'agreed',
-      actionIds: index === 0 && has('wait-appointment') ? ['wait-appointment'] : [],
+      actionIds: [
+        index === 0 ? 'wait-appointment' : `wait-known-${event.personId}-${event.at}`,
+      ].filter(has),
     }),
   );
   if (
     s.samPlans?.invitation === 'pending' &&
+    !(s.apprentice?.arranged && s.now < s.apprentice.visitUntil) &&
     !entries.some((entry) => entry.status === 'invitation' && entry.id.startsWith('known-sam-'))
   )
     entries.push({
@@ -3246,7 +3472,9 @@ function dayPlan(s: GameState, actions: ActionView[]): GameView['dayPlan'] {
   const priority = (entry: (typeof entries)[number]) =>
     entry.actionIds?.includes('wait-conversation-activity')
       ? -5
-      : entry.actionIds?.includes('reconsider-sam')
+      : entry.actionIds?.some((id) =>
+            ['reconsider-sam', 'show-corrective-step', 'take-over-repair'].includes(id),
+          )
         ? -4
         : entry.actionIds?.includes('resume-observer-invite')
           ? -3
@@ -3526,9 +3754,13 @@ export function getView(s: GameState): GameView {
         : [],
     note:
       o?.checkStarted !== undefined && !o.verified
-        ? s.now - o.checkStarted >= verificationMinutes(o)
-          ? 'The longer run is ready to read.'
-          : 'The longer check is still running. Tea, waiting, or another repair can fill the time.'
+        ? o.id === 'friend-1' && o.form === 'torch'
+          ? 'The torch still needs six minutes of changing grip, movement and switching with you present. Waiting or tea does not perform that check.'
+          : o.form === 'bell'
+            ? 'The bell still needs five minutes of repeated ringing and movement with you present. Waiting alone does not perform that check.'
+            : s.now - o.checkStarted >= verificationMinutes(o)
+              ? 'The longer run is ready to read.'
+              : 'The longer check is still running. Tea, waiting, or another repair can fill the time.'
         : s.objects.some((x) => x.awaitingCollection)
           ? 'Finished work is safely labelled here, waiting for its owner to collect it.'
           : null,
@@ -3573,8 +3805,13 @@ export function restoreGame(text: string): GameState {
       'home-garage-11',
       'home-garage-12',
       'home-garage-13',
+      'home-garage-14',
     ].includes(data?.engine)
   ) {
+    if (data.engine === 'home-garage-14') {
+      const validated = restoreEngine14(text);
+      return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };
+    }
     if (data.engine === 'home-garage-13') {
       const validated = restoreEngine13(text);
       return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };

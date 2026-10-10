@@ -38,6 +38,8 @@ export interface ServiceWeekState {
   introductionsArranged: boolean;
   donorInvited: boolean;
   donorAt?: number;
+  donorPurposeId?: string;
+  donorPlayerPurposeId?: string;
   conclusion: 'open' | 'regular' | 'small';
 }
 export interface ServiceWeekGame {
@@ -149,11 +151,81 @@ function requestedCollection(s: ServiceWeekGame, owner: string): number {
 function isUnlocked(ctx: ServiceWeekContext) {
   return ctx.graduated && ctx.independentHandoff;
 }
-export function serviceWeekActions(s: ServiceWeekGame, ctx: ServiceWeekContext): ActionView[] {
-  if (!isUnlocked(ctx)) return [];
+/** Personal donor work uses the same finite part record before or after a
+ * working week. Finding a contact card does not create customers or a business. */
+function personalDonorActions(s: ServiceWeekGame, ctx: ServiceWeekContext): ActionView[] {
+  const modelPresent =
+    ctx.paperStreetPresent ?? Boolean(ctx.paperStreetWaiting || ctx.paperStreetRepaired);
+  if (!modelPresent) return [];
   const w = s.serviceWeek ?? freshServiceWeek();
-  if (w.conclusion !== 'open') return [];
   const actions: ActionView[] = [];
+  const add = (id: string, label: string, detail: string) =>
+    actions.push({ id, label, detail, intent: 'stay' });
+  if (!w.donorInvited && ['unknown', 'measured'].includes(w.part))
+    add(
+      'service-invite-donor',
+      w.part === 'measured'
+        ? 'Contact Evan again about the measured gear'
+        : 'Contact Evan at the salvage counter about a display base',
+      'The card in your model box lists display stands and clockwork bases. Ask about a possible part; no gear is promised.',
+    );
+  const donorPresent = w.donorInvited && s.now >= (w.donorAt ?? Infinity) && ctx.ownerHere('evan');
+  if (w.part === 'unknown' && donorPresent && ctx.paperStreetWaiting)
+    add(
+      'service-hear-donor',
+      'Ask Evan about his spare display base',
+      'He brought an old demonstration stand with an accessible gear; compatibility is untested.',
+    );
+  if (w.part === 'offered' && donorPresent) {
+    add(
+      'service-measure-donor',
+      'Compare the accessible gear with your model',
+      'Twenty minutes: compare diameter, teeth and shaft opening. Leave the enclosed spring alone.',
+    );
+    add(
+      'service-decline-donor',
+      'Leave Evan’s base with him',
+      'Nothing has been taken apart or promised.',
+    );
+  }
+  if (w.part === 'measured' && donorPresent) {
+    add(
+      'service-recover-donor',
+      'Help Evan sort the stand, then recover the matching gear',
+      'Forty minutes together, if he agrees. He keeps the housing and the labelled parts he needs.',
+    );
+    add(
+      'service-decline-donor',
+      'Leave the matching gear with Evan',
+      'You can keep the measurements for another time.',
+    );
+  }
+  return actions;
+}
+
+/** A played holiday cannot carry an uncompleted visit across an unplayed year.
+ * Measurements persist; renewed contact is required before any later transfer. */
+export function cancelPersonalDonorForSchool(s: ServiceWeekGame): StoryLine[] {
+  const w = s.serviceWeek;
+  if (!w?.donorInvited || !['unknown', 'offered', 'measured'].includes(w.part)) return [];
+  w.donorInvited = false;
+  delete w.donorAt;
+  if (w.part === 'offered') w.part = 'unknown';
+  return [
+    line(
+      'You',
+      'You cancel the unfinished donor visit before school resumes and leave Evan’s base with him. Your model and any measurements stay labelled; another summer will need a new invitation. No gear has changed hands.',
+      'notice',
+    ),
+  ];
+}
+
+export function serviceWeekActions(s: ServiceWeekGame, ctx: ServiceWeekContext): ActionView[] {
+  const personal = personalDonorActions(s, ctx);
+  if (!isUnlocked(ctx)) return personal;
+  const w = s.serviceWeek ?? freshServiceWeek();
+  if (w.conclusion !== 'open') return personal;
+  const actions: ActionView[] = [...personal];
   const add = (id: string, label: string, detail?: string) =>
     actions.push({ id, label, detail, intent: 'stay' });
   if (w.startedAt === undefined) {
@@ -273,12 +345,6 @@ export function serviceWeekActions(s: ServiceWeekGame, ctx: ServiceWeekContext):
       'Bring down the saved paper-street box',
       'Your paper roofs and shopfronts, stored in the small room. Look at what is still there.',
     );
-  if (modelPresent && !w.donorInvited && w.part === 'unknown')
-    add(
-      'service-invite-donor',
-      'Contact Evan at the salvage counter about a display base',
-      'Evan’s contact card lists display stands and clockwork bases. Ask about a possible part; no gear is promised.',
-    );
   if (modelPresent && w.personalSession === 'unplanned' && s.now < at(s, 3, 14))
     add(
       'service-protect-session',
@@ -306,43 +372,6 @@ export function serviceWeekActions(s: ServiceWeekGame, ctx: ServiceWeekContext):
       'Buy a second safe checking tray for £6',
       'Separate stable surface and labels. Paid from the existing repair notebook; no profit bonus.',
     );
-  if (
-    day(s) >= 3 &&
-    w.part === 'unknown' &&
-    w.donorInvited &&
-    s.now >= (w.donorAt ?? Infinity) &&
-    ctx.ownerHere('evan') &&
-    ctx.paperStreetWaiting
-  )
-    add(
-      'service-hear-donor',
-      'Ask Evan about his spare display base',
-      'He brought an old demonstration stand with an accessible gear; compatibility is untested.',
-    );
-  if (w.part === 'offered') {
-    add(
-      'service-measure-donor',
-      'Compare the accessible gear with your measurements',
-      'Twenty minutes: diameter, teeth and shaft opening. Leave the enclosed spring alone.',
-    );
-    add(
-      'service-decline-donor',
-      'Leave Evan’s base with him',
-      'Nothing has been taken apart or promised.',
-    );
-  }
-  if (w.part === 'measured' && ctx.ownerHere('evan')) {
-    add(
-      'service-recover-donor',
-      'Help Evan sort the stand, then recover the matching gear',
-      'Forty minutes together. He keeps the housing and the labelled parts he needs.',
-    );
-    add(
-      'service-decline-donor',
-      'Leave the matching gear with Evan',
-      'You can keep the measurements for another time.',
-    );
-  }
   if (day(s) >= 4 && w.part !== 'unknown' && !w.reflection)
     add(
       'service-reflect',
@@ -565,7 +594,10 @@ export function applyServiceWeekAction(
     };
   if (id === 'service-invite-donor') {
     w.donorInvited = true;
-    const visitAt = Math.max(s.now + 60, at(s, 3, 16));
+    const visitAt =
+      w.startedAt === undefined
+        ? (Math.floor(s.now / DAY) + 1) * DAY + 15 * 60
+        : Math.max(s.now + 60, at(s, 3, 16));
     w.donorAt = visitAt;
     return {
       ...result([

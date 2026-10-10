@@ -167,7 +167,8 @@ export default function App() {
       action.id.startsWith('service-revisit-unfinished-')
     )
       return true;
-    if (action.id === 'service-invite-donor') return view.focus?.appearance === 'model';
+    if (action.id === 'service-invite-donor')
+      return game.objects.some((item) => item.id === 'paper-street' && item.discovered);
     if (action.id.startsWith('service-delay-')) {
       const objectId = action.id.replace('service-delay-', 'service-');
       return (

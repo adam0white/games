@@ -131,7 +131,13 @@ export function shareTea(
   });
   return completed;
 }
-export function askMumToHelp(mum: Person): boolean {
+export interface HoldingHelpReport {
+  kind: 'helped' | 'own-choice' | 'kept-activity' | 'unavailable';
+  activity?: string;
+}
+export function askMumToHelp(mum: Person, report?: (result: HoldingHelpReport) => void): boolean {
+  const prior = mum.activity;
+
   const help: Affordance = {
     id: 'hold-light',
     action: 'help',
@@ -155,11 +161,13 @@ export function askMumToHelp(mum: Person): boolean {
   const decision = decide(mum, [help, read]);
   const chosen = [help, read].find((offer) => offer.id === decision.chosenAffordanceId);
   if (!chosen) {
+    report?.({ kind: prior ? 'kept-activity' : 'unavailable', activity: prior?.affordance.label });
     tick(mum, mum.now + 8);
     return false;
   }
   const started = begin(mum, chosen, decision);
   if (!started) {
+    report?.({ kind: prior ? 'kept-activity' : 'unavailable', activity: prior?.affordance.label });
     tick(mum, mum.now + 8);
     return false;
   }
@@ -172,6 +180,7 @@ export function askMumToHelp(mum: Person): boolean {
     summary: chosen.label,
     needs: chosen.advertises,
   });
+  report?.({ kind: chosen.id === help.id ? 'helped' : 'own-choice', activity: chosen.label });
   return chosen.id === help.id;
 }
 

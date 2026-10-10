@@ -322,7 +322,10 @@ export function arrangeLearning(s: GameState, say: Speak): void {
       });
     if (continuingJob) {
       // Existing physical repair activities own this visit's time.
-      begin(sam, { ...chosen, duration: 0 }, decision);
+      if (!begin(sam, { ...chosen, duration: 0 }, decision)) {
+        say('Sam', 'I cannot begin that stretch now. Keep the work labelled for another time.');
+        return;
+      }
       finish(sam, {
         affordanceId: chosen.id,
         action: chosen.action,
@@ -333,7 +336,7 @@ export function arrangeLearning(s: GameState, say: Speak): void {
       });
     } else {
       // Watching occupies real time; only actual observed actions acquire methods.
-      begin(
+      const started = begin(
         sam,
         {
           ...chosen,
@@ -344,7 +347,14 @@ export function arrangeLearning(s: GameState, say: Speak): void {
         },
         decision,
       );
+      if (!started) {
+        say('Sam', 'I cannot begin watching now. Keep the work labelled for another time.');
+        return;
+      }
     }
+    s.samPlans ??= { invitation: 'pending', heardAt: s.now };
+    s.samPlans.invitation = 'accepted';
+    s.samPlans.heardAt = s.now;
     s.apprentice.arranged = true;
     s.apprentice.visitUntil = s.now + 150;
     s.apprentice.role =
@@ -369,7 +379,7 @@ export function arrangeLearning(s: GameState, say: Speak): void {
         });
       begin(sam, chosen, decision);
     }
-    s.samPlans ??= { invitation: 'accepted', heardAt: s.now };
+    s.samPlans ??= { invitation: 'pending', heardAt: s.now };
     s.samPlans.routineShiftKnown = true;
     s.samPlans.heardAt = s.now;
     say(
@@ -491,15 +501,27 @@ export function explainLesson(s: GameState, say: Speak, attending: boolean): voi
     'battery-steady':
       'The same lamp becomes steady with the test cell. Replace the original battery.',
     'still-flickers': 'A good cell still flickers when moved. Restore the contact instead.',
-    'light-steady': 'A steady glow after work is a result, not yet a long check.',
+    'light-steady':
+      'At that step, the repaired light gave a steady glow. You started its longer run; the movement and switching check still lay ahead of that demonstration.',
     'check-ready':
       'The timed run had finished. You then moved and switched it; it stayed steady, completing the check.',
     checked: 'A checked light can go home with an honest account of the work.',
   };
+  const demonstratedStep: Record<string, string> = {
+    inspect: 'looking closely before choosing work',
+    'test-battery': 'trying a known-good battery',
+    'replace-battery': 'replacing the old battery',
+    'clean-contact': 'cleaning and reseating the contact',
+    verify: 'starting the longer light run',
+    'wait-check': 'letting the light run long enough',
+    'check-result': 'moving and switching the light after its run',
+    return: 'returning the checked light with an honest account',
+  };
+  const stepDescription = demonstratedStep[lesson.step] ?? 'the demonstrated work';
   say(
     'You',
     !lesson.success
-      ? `The ${lesson.step.replaceAll('-', ' ')} attempt did not repair this light. Keep its actual observation; that attempt is not a successful method for it.`
+      ? `Here, ${stepDescription} did not repair this light. Keep its actual observation; that attempt is not a successful method for it.`
       : (reasons[lesson.cue] ??
           'Explain the observation and the result, without pretending it covers every kind of fault.'),
   );
@@ -507,14 +529,14 @@ export function explainLesson(s: GameState, say: Speak, attending: boolean): voi
     'Sam',
     acquired
       ? !lesson.success
-        ? `I saw ${lesson.step.replaceAll('-', ' ')} fail here. I will keep that failure separate from a demonstrated repair.`
+        ? `I saw that ${stepDescription} did not restore it here. I will keep that failure separate from a demonstrated repair.`
         : lesson.step === 'inspect'
           ? 'Start with what I can actually see. I’ll keep that distinction.'
           : lesson.step === 'check-result'
             ? 'The time alone wasn’t the check. You moved it afterward and it stayed steady.'
             : lesson.step === 'return'
               ? 'I can tell the owner what we established, rather than promising more.'
-              : `When I see that observation, ${lesson.step.replaceAll('-', ' ')} is the step you demonstrated. I’ll try that connection on another light.`
+              : `When I see that observation, I can try ${stepDescription}, as you demonstrated. I’ll keep that connection for another light.`
       : 'I didn’t take that in properly. Could we look at the observation again?',
   );
 }

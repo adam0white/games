@@ -35,8 +35,12 @@ function action(s: ServiceWeekGame, id: string) {
   return r;
 }
 it('does not offer a service trial before a real whole-job handoff', () => {
-  expect(serviceWeekActions({ now: 840 }, { ...context, independentHandoff: false })).toEqual([]);
-  expect(serviceWeekActions({ now: 840 }, { ...context, graduated: false })).toEqual([]);
+  expect(
+    serviceWeekActions({ now: 840 }, { ...context, independentHandoff: false }).map((a) => a.id),
+  ).toEqual(['service-invite-donor']);
+  expect(
+    serviceWeekActions({ now: 840 }, { ...context, graduated: false }).map((a) => a.id),
+  ).toEqual(['service-invite-donor']);
 });
 it('a heard request makes neither a promise nor an object; acceptance uses an absolute deadline', () => {
   const s = fixture();
@@ -176,7 +180,7 @@ it('paid and staying-small routes both close after five days without requiring a
     const id = route === 'regular' ? 'service-close-regular' : 'service-close-small';
     expect(action(s, id)?.lines.length).toBeGreaterThan(0);
     expect(getServiceWeekView(s)?.conclusion).toContain('week is complete');
-    expect(serviceWeekActions(s, context)).toEqual([]);
+    expect(serviceWeekActions(s, context).map((a) => a.id)).toEqual(['service-invite-donor']);
   }
   const unresolved = fixture();
   action(unresolved, 'service-hear-leila');

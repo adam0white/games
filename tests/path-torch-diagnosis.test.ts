@@ -115,8 +115,13 @@ it('public play retains selected cap-test evidence and spends six actual minutes
   s = choose(s, 'verify');
   expect(getView(s).actions.some((a) => a.id === 'check-result')).toBe(true);
   expect(getView(s).actions.some((a) => a.id === 'wait-check')).toBe(false);
+  expect(getView(s).note).toContain('six minutes');
+  expect(getView(s).note).toContain('with you present');
+  expect(getView(s).note).not.toContain('Tea, waiting');
   s = transition(s, { type: 'action', id: 'rest' });
   expect(s.objects.find((o) => o.id === 'friend-1')?.verified).toBe(false);
+  expect(getView(s).note).toContain('still needs six minutes');
+  expect(getView(s).note).not.toContain('ready to read');
   const beforeCheck = s.now;
   s = choose(s, 'check-result');
   expect(s.now - beforeCheck).toBe(6);
