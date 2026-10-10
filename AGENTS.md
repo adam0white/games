@@ -4,7 +4,9 @@ Read README.md, HANDOFF.md, docs/vision.md and docs/mvp.md before resuming. This
 
 ## Current authorization
 
-The owner authorized repository creation, broad roadmap drafting, research and reviews on 2026-10-09. Gameplay implementation is not yet authorized. The proposed MVP is awaiting review. Preserve ambitions without silently activating them.
+The owner authorized autonomous implementation on 2026-10-09: own a substantial portion or finish the proposed work until real playtesting and feedback are needed; delegate bounded work and always get reviews, including asynchronous Gemini when available. Do not stop for routine design or implementation approvals. Preserve ambitions without silently activating the economy/MMORPG roadmap.
+
+Current milestone: a playable home-to-garage opening with progressive disclosure, meaningful repair choices, failure, shelving/resumption, reuse, save/replay and bounded free play. Adam accepts its feel by playing it. This is the first taste-dependent checkpoint; the full apprenticeship MVP remains the next target once this experience earns it.
 
 ## Product direction
 
@@ -29,6 +31,6 @@ The owner authorized repository creation, broad roadmap drafting, research and r
 - Use bounded subagents, explicitly selecting model and effort. Include a game-design expert and independent critical reviewer for substantive game work.
 - Owner directions take precedence over skills. Do not turn planning into an indefinite sequence of small approval steps; complete the authorized stage and present a concrete result.
 - For gameplay implementation, define one milestone's missing capability, causal check and stopping condition. Do not activate the whole roadmap.
-- Adam is the MVP acceptor. The completion artifact is a playable standalone build plus its HF release if a framework change is needed, with acceptance evidence described in docs/mvp.md. This is a proposed goal until Adam accepts it.
+- Adam is the MVP acceptor. Deliver a runnable local build at the first real playtesting dependency. Tests and reviewer opinions cannot accept the player's experience for him. Any later generic HF extension follows HF's own release workflow.
 - Validate documentation links before a documentation commit. Once code exists, establish and run the appropriate lint, typecheck, tests and build before every code commit. Do not claim tests or deployment that have not run.
-- Do not publish this repository or its documents externally until repository visibility and licensing have been decided. Local commits are allowed for the authorized planning work. Do not modify or commit HF as part of this documentation pass.
+- Do not publish this repository or its documents externally until repository visibility and licensing have been decided. Local commits and integration are authorized for this work. HF changes require a demonstrated generic capability need, not repair-game convenience.

@@ -42,4 +42,18 @@ In this game, meaningful work, relationships, service, financial ambition, spiri
 
 ## Personal sources
 
+## Implementation direction, 2026-10-09
+
+The owner authorized autonomous implementation and delegated execution after reviewing the proposal. Start as little as possible. Use **progressive disclosure**: reveal an action when a story or observation makes it meaningful, rather than showing disabled future business controls or a tutorial checklist. Minimal visuals still need a tangible object and visible state changes.
+
+Opening sequence: cozy fictional family conversation → flickering lamp → small repairs discovered naturally during conversation → an object that cannot be solved now → voluntary shelving → garage discoveries → bounded free play. Failure is another discovery, not an instruction to repeat a hidden roll. Do not force shelving as a tutorial gate if the player finds a valid alternative.
+
+Objects, friends' requests and future business contacts have discoverable provenance. A household does not immediately become a company; an unknown attic machine does not appear in an omniscient catalog, and enterprise contracts do not arrive before capability, trust and contacts justify them.
+
+> “I need this thing to keep moving forward, and my limited time and attention to be spent on meaningful input; hence I'm delegating this to you and you should do onto your subagents”
+
+Always review game work. Use asynchronous Gemini review as an additional independent perspective when its local CLI and authentication work; record real completion or failure, not just dispatch. Keep progressing while reviews run. Stop at a genuinely useful playtest, not a plan approval.
+
+## Personal sources (continued)
+
 Earlier ideas are in the private PKM at ../pkm/00-inbox/ideas.md: procedural adaptation (line 37), micro-to-macro agent training (line 195), and small simulated-NPC games (line 51). The current conversation supplies the more specific repair-game direction. Those notes contain later AI elaboration; the quoted original wording is the authority on the earlier idea. Do not publish private PKM content or paths as part of a public site.
