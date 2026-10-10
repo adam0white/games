@@ -57,11 +57,18 @@ it('a real light check keeps its light-specific tea wording', () => {
     'inspect',
     'test-battery',
     'clean-contact',
+    'reassemble',
+    'ask-family-lamp',
     'verify',
-    'wait-check',
-    'rest',
   ])
     s = transition(s, { type: 'action', id });
+  const before = s.objects.find((o) => o.id === s.focusId);
+  expect(before?.access?.state).toBe('assembled');
+  expect(before?.checkStarted).toBe(s.now);
+  expect(before?.verified).toBe(false);
+  const invitedAt = s.now;
+  s = transition(s, { type: 'action', id: 'rest' });
+  expect(s.now - invitedAt).toBe(30);
   expect(s.journal?.at(-1)?.speaker).toBe('Mum');
   expect(s.journal?.at(-1)?.text).toContain('light had time for its check');
   expect(s.objects.find((o) => o.id === s.focusId)?.verified).toBe(false);

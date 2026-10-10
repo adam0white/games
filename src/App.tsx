@@ -70,6 +70,14 @@ function initialStory(): { game: GameState; warning: string | null } {
   return { game: createGame(), warning: null };
 }
 
+function preferredObjectView(): boolean {
+  try {
+    return localStorage.getItem('repair-game.object-view') !== 'illustrated';
+  } catch {
+    return true;
+  }
+}
+
 export default function App() {
   const [initial] = useState(initialStory);
   const [game, setGame] = useState(initial.game);
@@ -86,8 +94,17 @@ export default function App() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [settling, setSettling] = useState(false);
   const [roomOpen, setRoomOpen] = useState(false);
+  const [inHand, setInHand] = useState(preferredObjectView);
+  useEffect(() => {
+    try {
+      localStorage.setItem('repair-game.object-view', inHand ? '3d' : 'illustrated');
+    } catch {
+      // A view preference remains usable when browser storage is unavailable.
+    }
+  }, [inHand]);
   const [repairSurface, setRepairSurface] = useState<{ id: string; ready: boolean } | null>(null);
   const benchRef = useRef<HTMLElement>(null);
+  const cabinetRef = useRef<HTMLDetailsElement>(null);
   const [attention, setAttention] = useState<{
     lines: ConversationLine[];
     narration: string | null;
@@ -140,7 +157,7 @@ export default function App() {
     [focusId],
   );
   const mappedActionIds = new Set(
-    view.focus && (repairSurface?.id !== focusId || repairSurface?.ready === true)
+    inHand && view.focus && (repairSurface?.id !== focusId || repairSurface?.ready === true)
       ? getMappedRepairActions(view.focus, view.actions).map((binding) => binding.action.id)
       : [],
   );
@@ -466,11 +483,7 @@ export default function App() {
           {action.label}
           {action.intent === 'leave' && <span className="intent-mark">Move on</span>}
         </span>
-        {action.id === 'rest' ? (
-          <small>Offer company over tea; they may keep their own plans.</small>
-        ) : (
-          action.detail && action.id !== 'wait-appointment' && <small>{action.detail}</small>
-        )}
+        {action.detail && action.id !== 'wait-appointment' && <small>{action.detail}</small>}
       </button>
     );
   }
@@ -648,6 +661,16 @@ export default function App() {
                     benchRef.current?.scrollIntoView({ block: 'start', behavior: 'instant' }),
                   );
                 }}
+                onCabinetFocus={() => {
+                  setRoomOpen(false);
+                  requestAnimationFrame(() => {
+                    const details = cabinetRef.current;
+                    if (!details) return;
+                    details.open = true;
+                    details.querySelector('summary')?.focus({ preventScroll: true });
+                    details.scrollIntoView({ block: 'start', behavior: 'instant' });
+                  });
+                }}
                 onOpenJournal={() => {
                   setJournal(true);
                   setConfirmReset(false);
@@ -688,6 +711,8 @@ export default function App() {
               <ObjectPresentation
                 key={view.focus.id}
                 object={view.focus}
+                inHand={inHand}
+                onViewChange={setInHand}
                 actions={view.actions}
                 disabled={settling}
                 onAction={(id) => act({ type: 'action', id })}
@@ -766,7 +791,11 @@ export default function App() {
               </aside>
             )}
           {workshop?.cabinet?.open && (
-            <details className="cabinet-at-side" open={!view.focus && !game.apprentice?.jobId}>
+            <details
+              ref={cabinetRef}
+              className="cabinet-at-side"
+              open={!view.focus && !game.apprentice?.jobId}
+            >
               <summary>Dad’s cabinet doors · {cabinetStageLabels[workshop.cabinet.stage]}</summary>
               <section className="family-project" aria-label="Dad’s cabinet project">
                 <Cabinet

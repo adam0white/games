@@ -5,6 +5,29 @@ import type { GameState } from '../../src/game/types';
 // A public-input traversal proves the school campaign is reachable and replayable.
 // It chooses from received observations and visible offers, never latent faults.
 export function choose(s: GameState, id: string): GameState {
+  // This shared traversal performs visible physical prerequisites. Boundary
+  // tests use raw transition/getView to prove they cannot be skipped.
+  const before = getView(s);
+  if (
+    !before.actions.some((action) => action.id === id) &&
+    before.actions.some((action) => action.id === 'reassemble') &&
+    ['verify', 'check-result', 'return', 'early-return', 'ask-mum', 'ask-dad'].includes(id)
+  )
+    s = transition(s, { type: 'action', id: 'reassemble' });
+  if (
+    !getView(s).actions.some((action) => action.id === id) &&
+    getView(s).actions.some((action) => action.id === 'open-access') &&
+    [
+      'test-battery',
+      'clean-contact',
+      'replace-battery',
+      'fit-holder',
+      'twist-cap',
+      'align-striker',
+      'path-torch-test-cap',
+    ].includes(id)
+  )
+    s = transition(s, { type: 'action', id: 'open-access' });
   expect(
     getView(s).actions.some((action) => action.id === id),
     `Visible action ${id}`,
@@ -40,6 +63,8 @@ export function opening(seed: number): GameState {
 export function nextSchoolAction(s: GameState, eager = false): string {
   const view = getView(s);
   const offers = new Set(view.actions.map((action) => action.id));
+  if (offers.has('reassemble') && view.focus?.progress === 'repaired') return 'reassemble';
+  if (offers.has('open-access') && view.focus?.progress === 'inspected') return 'open-access';
   const catchMotion = view.focus?.observations.findLast(
     (text) => text.includes('still drags') || text.includes('pivots freely'),
   );

@@ -104,3 +104,48 @@ it('canvas target dispatch and accessible control yield equal serialized public 
   expect(resolveRepairAction(bindings, 'clean-contact', 'battery', false)).toBeNull();
   expect(resolveRepairAction([], 'clean-contact', 'contact', false)).toBeNull();
 });
+
+it('names physical disassembly literally and targets the actual cover when reopening', async () => {
+  const { getRepairToolName } = await import('../src/ui/repairBindings');
+  const inspect = { id: 'inspect', label: 'Look closely' };
+  const physical = {
+    ...object,
+    assembly: {
+      kind: 'torch' as const,
+      state: 'assembled' as const,
+      revision: 0,
+      retainedPieceIds: [],
+      workMarkers: [],
+    },
+  };
+  expect(getRepairToolName(physical, inspect)).toBe('Open & examine');
+  expect(
+    getRepairToolName({ ...physical, assembly: { ...physical.assembly, state: 'open' } }, inspect),
+  ).toBe('Examine');
+  expect(getRepairToolName(object, inspect)).toBe('Look');
+  expect(
+    getMappedRepairActions(physical, [{ id: 'open-access', label: 'Open the cap' }])[0]?.target,
+  ).toBe('cover');
+});
+
+it('fitted access pieces are never labelled retained after reassembly', async () => {
+  const { getRepairTargetLabel } = await import('../src/ui/repairBindings');
+  for (const kind of ['lamp', 'torch', 'bell'] as const) {
+    const closed = {
+      ...object,
+      assembly: {
+        kind,
+        state: 'assembled' as const,
+        revision: 2,
+        retainedPieceIds: [],
+        workMarkers: [],
+      },
+    };
+    expect(getRepairTargetLabel(closed, 'cover')).toMatch(/^Fitted /);
+    const open = { ...closed, assembly: { ...closed.assembly, state: 'open' as const } };
+    expect(getRepairTargetLabel(open, 'cover')).toMatch(/^Retained /);
+    expect(
+      getMappedRepairActions(closed, [{ id: 'open-access', label: 'Open' }])[0]?.label,
+    ).toMatch(/^Fitted /);
+  }
+});

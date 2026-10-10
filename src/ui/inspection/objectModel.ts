@@ -1,4 +1,4 @@
-/** Original procedural shells for optional inspection. This module receives
+/** Original procedural assemblies for hands-on inspection. This module receives
  * only the player's ObjectView: rotating a model cannot disclose a latent fault,
  * teach a method, consume time or change a repair. No downloaded assets. */
 import {
@@ -31,6 +31,10 @@ export function createObjectModel(
   exposedTargets: readonly RepairTarget[] = [],
 ) {
   const root = new Group();
+  const operatingParts: { mesh: Mesh; x: number }[] = [];
+  const assembly = object.assembly;
+  const opened = assembly?.state === 'open';
+  const performed = new Set(assembly?.workMarkers ?? []);
   const geometries: BufferGeometry[] = [];
   const materials: MeshStandardMaterial[] = [];
   const textures: CanvasTexture[] = [];
@@ -116,12 +120,19 @@ export function createObjectModel(
     parent = root,
   ) => add(new TorusGeometry(radius, tube, 10, 40), mat, x, y, z, parent);
   const appearance = object.appearance ?? (object.form === 'lamp' ? 'reading' : object.form);
-  const lit = object.visual === 'steady' || object.visual === 'warm';
+  const lit =
+    !opened &&
+    (object.progress === 'repaired' || object.progress === 'checked') &&
+    (object.visual === 'steady' || object.visual === 'warm');
   const brass = material('#a7976d', 0.55, 0.4);
   const steel = material('#92978c', 0.55, 0.38);
   const darkMetal = material('#4f5c51', 0.4, 0.5);
   const cream = material('#e7d8b6', 0, 0.83);
   const warmGlass = material(lit ? '#ffe5a9' : '#c5b99e', 0.05, 0.2);
+  if (lit) {
+    warmGlass.emissive.set('#ffd078');
+    warmGlass.emissiveIntensity = 0.8;
+  }
   const green = material('#718371', 0.3, 0.56, { side: DoubleSide });
   if (appearance === 'reading') {
     const base = cylinder(0.48, 0.13, green, 0, 0.12);
@@ -248,7 +259,7 @@ export function createObjectModel(
     pointer.rotation.z = 0.48;
     const knob = cylinder(0.105, 0.08, brass, 0, 0.78, 0.51);
     knob.rotation.x = Math.PI / 2;
-    for (const x of [-0.31, 0.31]) box(0.2, 0.1, 0.35, darkMetal, x, 0.09);
+    for (const x of [-0.42, 0.42]) box(0.2, 0.1, 0.35, darkMetal, x, 0.09);
   } else if (appearance === 'bell') {
     const dome = add(
       new SphereGeometry(0.6, 32, 20, 0, Math.PI * 2, 0, Math.PI / 2),
@@ -257,11 +268,19 @@ export function createObjectModel(
       0.5,
     );
     dome.scale.y = 0.85;
+    dome.name = 'bell-dome';
+    dome.userData.repairTarget = 'cover';
+    if (opened) {
+      dome.position.set(-0.98, 0.35, 0.72);
+      dome.rotation.x = Math.PI / 2;
+    }
     cylinder(0.61, 0.07, steel, 0, 0.48);
     const clamp = ring(0.23, 0.05, steel, 0, 0.2);
     clamp.rotation.y = Math.PI / 2;
-    rod(new Vector3(0.52, 0.52, 0), new Vector3(0.77, 0.75, 0), 0.037, darkMetal);
-    box(0.14, 0.08, 0.12, steel, 0.8, 0.75);
+    const lever = rod(new Vector3(0.52, 0.52, 0), new Vector3(0.77, 0.75, 0), 0.037, darkMetal);
+    const tip = box(0.14, 0.08, 0.12, steel, 0.8, 0.75);
+    lever.name = 'operating-striker';
+    operatingParts.push({ mesh: lever, x: lever.position.x }, { mesh: tip, x: tip.position.x });
     cylinder(0.05, 0.04, darkMetal, 0, 1.04);
   } else if (object.id === 'nora-sample-case') {
     const tray = object.casePresentation?.mode === 'stationary-tray';
@@ -393,42 +412,144 @@ export function createObjectModel(
       const own = source.clone();
       materials.push(own);
       mesh.material = own;
+      mesh.userData.restingEmissive = own.emissive.clone();
+      mesh.userData.restingEmissiveIntensity = own.emissiveIntensity;
     }
     mesh.userData.repairTarget = target;
     hitRegions.push(mesh);
     return mesh;
   };
-  // A schematic work tray represents only components involved in offered work.
-  // It is a diagram of the examined assembly, not a supply of replacement parts.
-  if (object.inspected && (showKnownParts || exposedTargets.length > 0)) {
-    const tray = material('#b49a73', 0, 0.92);
-    box(1.7, 0.045, 0.55, tray, 0, 0.06, 0.96);
-    if (workTargets.has('battery')) {
+  if (assembly?.kind === 'lamp') {
+    // The base service hatch is part of this lamp; removed pieces stay beside it.
+    const cover = box(
+      0.92,
+      0.25,
+      0.08,
+      green,
+      opened ? -1.02 : 0,
+      opened ? 0.12 : 0.26,
+      opened ? 0.7 : 0.52,
+    );
+    cover.name = 'lamp-base-cover';
+    attach(cover, 'cover');
+    if (opened) {
+      const holder = material(performed.has('fit-holder') ? '#718371' : '#454c43');
+      const recess = attach(box(0.84, 0.19, 0.15, holder, 0, 0.27, 0.48), 'holder');
+      recess.name = 'battery-holder';
+      for (const x of [-0.42, 0.42]) attach(box(0.04, 0.23, 0.18, holder, x, 0.29, 0.57), 'holder');
       const cell = attach(
-        cylinder(0.1, 0.44, material('#a77d55', 0.45, 0.45), -0.57, 0.19, 0.96),
+        cylinder(
+          0.09,
+          0.44,
+          material(performed.has('replace-battery') ? '#758568' : '#a77d55', 0.4, 0.45),
+          0,
+          0.29,
+          0.63,
+        ),
         'battery',
       );
       cell.rotation.z = Math.PI / 2;
-      attach(cylinder(0.045, 0.025, steel, -0.34, 0.19, 0.96), 'battery').rotation.z = Math.PI / 2;
-    }
-    if (workTargets.has('contact')) {
-      attach(box(0.24, 0.045, 0.18, brass, -0.12, 0.13, 0.96), 'contact');
-      attach(ring(0.07, 0.018, steel, -0.12, 0.2, 0.96), 'contact').rotation.x = Math.PI / 2;
-    }
-    if (workTargets.has('holder')) {
-      const polymer = material('#5b6258');
-      attach(box(0.38, 0.05, 0.22, polymer, 0.35, 0.12, 0.96), 'holder');
-      for (const x of [0.17, 0.53]) attach(box(0.035, 0.14, 0.22, polymer, x, 0.2, 0.96), 'holder');
-      attach(box(0.03, 0.12, 0.14, brass, 0.19, 0.2, 0.96), 'holder');
-    }
-    if (workTargets.has('cap')) {
-      const cap = attach(
-        cylinder(0.22, 0.16, material('#ac7449', 0.15, 0.68), 0.63, 0.18, 0.96),
-        'cap',
+      cell.name = 'fitted-battery';
+      const contact = attach(
+        box(
+          0.11,
+          0.23,
+          0.13,
+          performed.has('clean-contact') ? brass : material('#ad825c', 0.4, 0.65),
+          -0.31,
+          0.32,
+          0.69,
+        ),
+        'contact',
       );
-      for (const y of [0.13, 0.18, 0.23])
-        attach(ring(0.224, 0.012, steel, cap.position.x, y, 0.96), 'cap').rotation.x = Math.PI / 2;
+      contact.name = 'battery-contact';
+      for (const x of [-0.3, -0.27, -0.24])
+        attach(
+          ring(
+            0.072,
+            0.014,
+            performed.has('clean-contact') ? brass : material('#ad825c', 0.4, 0.65),
+            x,
+            0.32,
+            0.72,
+          ),
+          'contact',
+        ).rotation.y = Math.PI / 2;
+      attach(cylinder(0.045, 0.025, steel, 0.23, 0.29, 0.63), 'battery').rotation.z = Math.PI / 2;
     }
+  } else if (assembly?.kind === 'torch') {
+    const cap = attach(
+      cylinder(
+        0.215,
+        0.2,
+        material('#ac7449', 0.15, 0.68),
+        opened ? -1.0 : performed.has('twist-cap') ? -0.69 : -0.73,
+        opened ? 0.2 : 0.64,
+        opened ? 0.65 : 0,
+      ),
+      'cover',
+    );
+    cap.name = 'torch-cap';
+    cap.rotation.z = Math.PI / 2;
+    if (opened) {
+      for (const x of [-0.63, -0.59, -0.55])
+        attach(
+          ring(0.212, 0.011, performed.has('twist-cap') ? brass : steel, x, 0.64, 0),
+          'cap',
+        ).rotation.y = Math.PI / 2;
+      const cell = attach(
+        cylinder(
+          0.135,
+          0.45,
+          material(performed.has('replace-battery') ? '#758568' : '#a77d55', 0.4, 0.5),
+          -0.64,
+          0.64,
+          0,
+        ),
+        'battery',
+      );
+      cell.rotation.z = Math.PI / 2;
+      cell.name = 'fitted-battery';
+      const contact = attach(
+        box(
+          0.04,
+          0.19,
+          0.18,
+          performed.has('clean-contact') ? brass : darkMetal,
+          -0.43,
+          0.64,
+          0.15,
+        ),
+        'contact',
+      );
+      contact.name = 'battery-contact';
+      attach(ring(0.17, 0.025, brass, -0.88, 0.64, 0), 'cap').rotation.y = Math.PI / 2;
+      // The cap's return-contact remains with its retained cap.
+      attach(box(0.04, 0.18, 0.13, brass, -0.91, 0.2, 0.65), 'cap');
+    }
+  } else if (assembly?.kind === 'bell' && opened) {
+    const plate = attach(box(0.55, 0.06, 0.24, steel, 0, 0.54, 0), 'mechanism');
+    plate.name = 'striker-mount';
+    const striker = attach(
+      rod(
+        new Vector3(0, 0.59, 0),
+        new Vector3(performed.has('align-striker') ? 0.4 : 0.36, 0.75, 0.12),
+        0.037,
+        darkMetal,
+      ),
+      'mechanism',
+    );
+    striker.name = 'bell-striker';
+    attach(box(0.16, 0.08, 0.16, brass, 0.4, 0.75, 0.12), 'mechanism');
+  } else if (!assembly && object.inspected && (showKnownParts || exposedTargets.length > 0)) {
+    // Older saves retain their bounded schematic presentation without physical access state.
+    if (workTargets.has('battery'))
+      attach(cylinder(0.1, 0.44, steel, -0.65, 0.16, 0.75), 'battery').rotation.z = Math.PI / 2;
+    if (workTargets.has('contact'))
+      attach(box(0.25, 0.04, 0.14, brass, -0.15, 0.1, 0.75), 'contact');
+    if (workTargets.has('holder'))
+      attach(box(0.35, 0.09, 0.22, darkMetal, 0.3, 0.1, 0.75), 'holder');
+    if (workTargets.has('cap')) attach(cylinder(0.22, 0.16, steel, 0.65, 0.16, 0.75), 'cap');
   }
   // The complete mechanism is the honest target when internal geometry is not authored.
   if (workTargets.has('mechanism'))
@@ -436,18 +557,34 @@ export function createObjectModel(
       if (child instanceof Mesh && !child.userData.repairTarget) attach(child, 'mechanism');
     });
   root.traverse((child) => {
-    if (child instanceof Mesh && !child.userData.repairTarget) attach(child, 'shell');
+    if (child instanceof Mesh && !hitRegions.includes(child))
+      attach(child, (child.userData.repairTarget as RepairTarget | undefined) ?? 'shell');
   });
   return {
     root,
     hitRegions,
+    animateOperation(fraction: number) {
+      const supported =
+        assembly?.kind === 'bell' &&
+        !opened &&
+        (object.progress === 'repaired' || object.progress === 'checked');
+      if (!supported) return false;
+      const offset =
+        fraction > 0 && fraction < 1
+          ? Math.sin(fraction * Math.PI * 6) * 0.055 * Math.sin(fraction * Math.PI)
+          : 0;
+      for (const part of operatingParts) part.mesh.position.x = part.x + offset;
+      return true;
+    },
     highlight(target: RepairTarget | null) {
       for (const mesh of hitRegions) {
         const mat = mesh.material;
         if (mat instanceof MeshStandardMaterial) {
           const whole = target === 'shell' || target === 'operation' || target === 'mechanism';
-          mat.emissive.set(whole || mesh.userData.repairTarget === target ? '#274a35' : '#000000');
-          mat.emissiveIntensity = 0.65;
+          const selected = whole || mesh.userData.repairTarget === target;
+          if (selected) mat.emissive.set('#274a35');
+          else mat.emissive.copy(mesh.userData.restingEmissive);
+          mat.emissiveIntensity = selected ? 0.65 : mesh.userData.restingEmissiveIntensity;
         }
       }
     },

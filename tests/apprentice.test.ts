@@ -101,6 +101,20 @@ it('HF-acquired methods complete two unfamiliar supported faults through indepen
     expect(item.completedBy).toBe('sam');
     expect(s.apprentice?.completedJobIds).toEqual([item.id]);
     expect(item.stepDecisions?.every((d) => d.methods.length > 0)).toBe(true);
+    expect(item.access?.state).toBe('assembled');
+    expect(item.access?.events.find((event) => event.action === 'reassemble')).toMatchObject({
+      actor: 'sam',
+      minutes: 3,
+      triggeredBy: 'verify',
+    });
+    expect(
+      item.stepDecisions?.filter((decision) => decision.hostPreparation === 'reassemble'),
+    ).toHaveLength(1);
+    expect(
+      s.people.sam?.methods?.rules.some((rule) =>
+        ['open-access', 'reassemble'].includes(rule.action),
+      ),
+    ).toBe(false);
   }
 });
 it('withheld and skill-only controls keep identical offers and fail to establish the same independent repair', () => {
@@ -170,7 +184,8 @@ it('owner presence is queried at the actual Sam handback event, not the outer el
       return at >= 940;
     },
   );
-  expect(times[0]).toBe(892);
+  // The required three-minute refit happens before the same semantic verification.
+  expect(times[0]).toBe(895);
   expect(times.at(-1)).toBe(940);
   expect(times[0]).toBeLessThan(940);
   expect(item.awaitingCollection).toBe(false);
@@ -189,11 +204,11 @@ it('a handback inside a watch interval keeps the promise at the real event time'
   startApprenticeJob(s, item, false, () => {});
   const player = s.people.player;
   if (!player) throw Error('Missing player');
-  agreeCheckedCollection(player, item.id, 'nora', 895);
+  agreeCheckedCollection(player, item.id, 'nora', 898);
   for (let n = 0; n < 3; n++) s = transition(s, { type: 'action', id: 'watch-sam' });
   const returned = s.objects.find((x) => x.id === item.id);
   if (!returned) throw Error('Missing returned item');
-  expect(returned.collectedAt).toBeLessThan(895);
+  expect(returned.collectedAt).toBeLessThan(898);
   expect(
     s.people.player?.agenda.commitments.find((c) => c.label === `Checked collection: ${item.id}`)
       ?.status,

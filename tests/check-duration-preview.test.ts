@@ -3,7 +3,15 @@ import { createGame, getView, restoreGame, serializeGame, transition } from '../
 
 it('the light-wait preview uses its actual remaining time and still requires reading the result', () => {
   let s = createGame(42);
-  for (const id of ['talk-family', 'inspect', 'clean-contact', 'verify', 'wait-check', 'ask-mum'])
+  for (const id of [
+    'talk-family',
+    'inspect',
+    'clean-contact',
+    'reassemble',
+    'verify',
+    'wait-check',
+    'ask-mum',
+  ])
     s = transition(s, { type: 'action', id });
   expect(getView(s).actions.find((action) => action.id === 'wait-check')?.detail).toContain(
     '2 quiet minutes',

@@ -624,7 +624,9 @@ export function applyWorkshopAction(
             'You',
             w.cabinet === 'finished'
               ? 'The finished doors are on the kitchen cabinet. They close cleanly; the saved drawings belong here if you want them.'
-              : 'The cabinet doors and the hinge notebook are where you left them.',
+              : w.cabinet === 'hung'
+                ? 'The doors remain hung on the kitchen cabinet. Their final alignment is still unfinished; the hinge notebook is kept beside the project.'
+                : 'The cabinet doors and the hinge notebook are where you left them.',
             'notice',
           ),
         ],
@@ -638,7 +640,9 @@ export function applyWorkshopAction(
             'You',
             w.cabinet === 'finished'
               ? 'The finished cabinet stays in the kitchen. There is room to return to the other work.'
-              : 'The doors are set safely against the wall. The measurements stay in the notebook.',
+              : w.cabinet === 'hung'
+                ? 'The doors stay hung on the kitchen cabinet. Final alignment can wait safely; the measurements stay in the notebook.'
+                : 'The doors are set safely against the wall. The measurements stay in the notebook.',
             'notice',
           ),
         ],

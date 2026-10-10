@@ -33,7 +33,9 @@ for (const participant of ['mum', 'player'] as const) {
     const before = relationshipWith(mum, player.id).affection;
     const reports: TeaReport[] = [];
     expect(shareTea(player, mum, 870, (r) => reports.push(r))).toBe(false);
-    expect(reports).toEqual([{ kind: 'refused', participant, elapsed: 0 }]);
+    expect(reports).toEqual([
+      { kind: 'refused', participant, activity: 'Keep resting', elapsed: 0 },
+    ]);
     expect(player.now).toBe(870);
     expect(mum.now).toBe(870);
     expect(relationshipWith(mum, player.id).affection).toBe(before);

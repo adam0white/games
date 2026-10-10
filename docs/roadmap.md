@@ -139,3 +139,10 @@ Review by 2026-10-12 after the next owner playthrough: expand three objects into
 Review by 2026-10-12: make actual checked repairs and retained drawings inhabit the 3D room, using a public presentation projection for known form/appearance rather than generic tagged shelf objects. Keep ownership, actual location and unfinished work truthful. Do not invent absent people or finished décor.
 
 Review by 2026-10-11: the source-unread mobile reader noticed Mum’s ordinary prayer began during the four-minute approach after her call. Her own schedule is retained; investigate whether the opening needs a clearer conversational handoff without forcing interruption or rewriting old dialogue.
+
+
+## Continued V2 selected, 2026-10-10
+
+Adam renewed autonomous V2 work. Reversible lamp enclosure, torch cap and bell dome access, visible restored use, actual shelf forms and stable renderer updates are selected and implemented in the engine-18 candidate. Initial examination includes opening; later opening/reassembly changes actual saved access and invalidates earlier checking. Sam handles physical preparation without acquiring an invented learned method. Native engine 17 remains frozen. The initial V2 room remains a cutaway with complete controls rather than unrestricted walking. Candidate checks and deployment status are in HANDOFF.md.
+
+Review by 2026-10-12: broaden authored object variety after this physical slice is played, prioritizing a non-light personal or shared project over more lamps. Optional exploded detail, more individual fasteners and unrestricted room navigation remain proposals; every added operation should change evidence or work readiness rather than add compulsory clicking. Archived-runtime loading remains separately dated above.

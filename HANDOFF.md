@@ -1,8 +1,18 @@
 # Handoff
 
-Updated 2026-10-10 for Adam's authorized V1 closeout and substantial first V2 slice.
+Updated 2026-10-10 for Adam's continued autonomous V2 authorization.
 
 ## What remains
+
+V2 physical-workshop candidate is implemented and independently reviewed in codex/full-workshop. Full lint, strict types, 361 tests across 76 files and production build passed. Final fresh/five-owner policy reports replay exactly; actual native-17 and native-18 UI histories are pinned, and owner native-13 import retains 327 inputs/455 journal entries and £8. What remains: clean immutable browser recheck, static deployment/live manifest verification, primary local integration and delivery record. Adam accepts feel later. Economy, multiplayer and broader HF faculties remain unselected.
+
+The engine-18 candidate saves lamp enclosure, torch cap and bell dome access/reassembly. Internal work requires opening; functional checks/returns require fitting; reopening cancels earlier checks without undoing repair. Torch diagnosis temporarily refits/test/removes the cap in ten actual minutes. Sam records physical handling before his semantic learned step; handling teaches no invented method and grants no independent repair credit. All fourteen native-17 modules remain frozen.
+
+Original fitted internals, retained pieces and performed-work appearance replace schematic floating parts for these objects; restored lights and bounded bell motion remain presentation. The room shows known shelf forms, and finished cabinet work is correctly located in the kitchen. Stable renderer/model updates preserve camera; complete alternatives, graphics-loss retry and persistent illustrated preference remain available. Tea reports actual refusal/context and a half-hour preview. Wildcard fixes preserve hung doors when paused, prioritize current agreed work, and open actual cabinet details from the room. Review and exact words: docs/games/v2-physical-workshop-playtests-2026-10-10.md.
+
+Root isolated 360×780 browser checks passed renderer lifetime, byte-identical camera/preferences/navigation exports, preference reload, graphics-loss retry, known project navigation, no overflow/runtime errors, and exact owner import. Independent fresh touch and keyboard play completed Mum’s lamp; the returning wildcard completed the paper street and attended cabinet work. These bounded checks do not prove uninterrupted Tab-only play or calibrated humans. Current initial script is about 963 kB compressed; lazy historical-runtime loading remains a dated roadmap followup.
+
+## Delivered V1 and first V2 slice
 
 Game 1.0.0-rc.1 / `home-garage-17` is delivered publicly and in the primary local preview. Clean runtime commit: `1e123bec5c36a9bbe0375035fd96e984ab9d539b`; Cloudflare version: `7140887d-5510-4b52-8c28-c75c2e5e8490`. The selected V1 closure and first V2 interaction slice are technically complete. Adam personally accepts feel through playtesting; this release candidate does not claim that acceptance. Detailed reversible disassembly, catalogue-specific room assets and later business/economy work remain dated in the roadmap.
 

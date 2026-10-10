@@ -1,5 +1,6 @@
 import type { Person } from '@adam0white/human-framework';
 import type { NeighbourhoodState } from './neighbourhood';
+import type { RepairAccess } from './repair-access';
 import type { CaseFittings, RepairCue } from './repairs';
 import type { ServiceWeekState } from './service-week';
 import type { WorkshopState } from './workshop';
@@ -20,6 +21,7 @@ export type Chapter = 'family' | 'bench' | 'later' | 'garage';
 export type GameInput = { type: 'action'; id: string } | { type: 'select'; id: string };
 
 export interface RepairObject {
+  access?: RepairAccess;
   id: string;
   title: string;
   owner: string;
@@ -53,7 +55,12 @@ export interface RepairObject {
   independent?: boolean;
   playerAssisted?: boolean;
   completedBy?: 'player' | 'sam';
-  stepDecisions?: { at: number; action: string | null; methods: string[] }[];
+  stepDecisions?: {
+    at: number;
+    action: string | null;
+    methods: string[];
+    hostPreparation?: 'open-access' | 'reassemble';
+  }[];
   checkStarted?: number;
   awaitingCollection?: boolean;
   collectedAt?: number;
@@ -101,10 +108,10 @@ export interface GameState {
     supervisedCompleted: boolean;
     independentCompleted: number;
     jobId?: string;
-    pending?: { step: string; endsAt: number };
+    pending?: { step: string; endsAt: number; preparation?: 'open-access' | 'reassemble' };
     needsHelp?: string;
     pauseReason?: string;
-    pausedStep?: { step: string; remaining: number };
+    pausedStep?: { step: string; remaining: number; preparation?: 'open-access' | 'reassemble' };
     role: 'observer' | 'trainee' | 'repairer';
     completedJobIds: string[];
     supervised?: boolean;
@@ -168,6 +175,7 @@ export interface ActionView {
 }
 
 export interface ObjectView {
+  assembly?: Pick<RepairAccess, 'kind' | 'state' | 'revision' | 'retainedPieceIds' | 'workMarkers'>;
   casePresentation?: {
     mode: 'carrying-case' | 'stationary-tray';
     catch: 'original' | 'compatible' | 'none';
@@ -196,6 +204,7 @@ export interface ObjectView {
 }
 
 export interface GameView {
+  workshopCabinet?: { stage: 'looked' | 'measured' | 'hung' | 'finished'; detail: string };
   chapterClosure?: { sourcekey: string; title: string; detail: string; outcomes: string[] };
   milestone?: { sourcekey: string; title: string; detail: string };
   knownAppointments?: { personId: string; name: string; at: number; detail: string }[];
@@ -226,7 +235,7 @@ export interface GameView {
   focus: ObjectView | null;
   actions: ActionView[];
   conversation: ConversationLine[];
-  shelf: { id: string; title: string; note: string }[];
+  shelf: { id: string; title: string; note: string; object?: ObjectView }[];
   parts: { id: string; label: string; count: number }[];
   note: string | null;
   humanNote?: string | null;

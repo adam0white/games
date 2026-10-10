@@ -1,6 +1,15 @@
 /** Fictional low-voltage repair rules owned by the host. Evidence is a visible
  * observation, never a latent fault label. Manual work and apprentice work use
  * these same tests, materials and success rules. */
+import {
+  ACCESS_MINUTES,
+  accessKind,
+  accessLabel,
+  assertAccessStep,
+  markPerformedWork,
+  openAccess,
+  temporaryTorchTest,
+} from './repair-access';
 import type { Fault, GameState, RepairObject } from './types';
 
 export type RepairStep =
@@ -41,12 +50,24 @@ export function cueFor(item: RepairObject, now: number): RepairCue {
   if (item.repaired) return isMechanical(item) ? 'mechanism-working' : 'light-steady';
   return item.evidence?.at(-1) ?? 'intake';
 }
-export function inspectRepair(item: RepairObject): string {
+export function inspectRepair(
+  item: RepairObject,
+  actor: 'player' | 'sam' = 'player',
+  at = 0,
+): string {
+  const newlyOpened = accessKind(item) && item.access?.state !== 'open';
+  if (accessKind(item)) openAccess(item, actor, at, 'inspect', 4);
+  const observation = inspectAccessibleRepair(item);
+  return newlyOpened
+    ? `The ${accessLabel(item)} is open and retained beside the object. ${observation}`
+    : observation;
+}
+function inspectAccessibleRepair(item: RepairObject): string {
   item.inspected = true;
   if (item.id === 'friend-1' && item.form === 'torch') {
     item.evidence ??= [];
     item.evidence.push('needs-test');
-    return 'The torch flickers as you turn it in your hands. The battery sits inside a removable cap; the flat contact and threaded cap are both accessible. Nothing is broken through.';
+    return 'The reported symptom was flickering when the torch moved. With the cap retained beside it, the battery, flat contact and cap threads are accessible. The disconnected torch is not producing a beam during this inspection. Nothing is broken through.';
   }
   if (item.fault === 'worn-catch')
     return (
@@ -90,7 +111,15 @@ export function inspectRepair(item: RepairObject): string {
       ? 'The battery holder is cracked through. It needs a matching holder, not a stronger battery.'
       : 'The switch moves freely. There’s a little grime on the contact; the battery could also be tired.';
 }
-export function testRepair(item: RepairObject): string {
+export function testRepair(
+  item: RepairObject,
+  actor: 'player' | 'sam' = 'player',
+  at = (item.access?.events.at(-1)?.at ?? 0) + 10,
+): string {
+  assertAccessStep(item, 'test-battery');
+  return temporaryTorchTest(item, actor, at, 'test-battery', () => testAccessibleRepair(item));
+}
+function testAccessibleRepair(item: RepairObject): string {
   item.tested = true;
   if (item.id === 'friend-1' && item.form === 'torch') {
     const steady = item.fault === 'battery';
@@ -119,6 +148,7 @@ export function testRepair(item: RepairObject): string {
         : 'With the known-good battery it still flickers when moved. The contact needs attention.';
 }
 export function repairDuration(step: string): number {
+  if (['open-access', 'reassemble'].includes(step)) return ACCESS_MINUTES;
   if (step === 'sewing-box-again') return 5;
   const mechanical: Record<string, number> = {
     'clear-obstruction': 6,
@@ -146,6 +176,8 @@ export function applyRepair(
   step: string,
   parts: GameState['parts'],
 ): { succeeded: boolean; text: string } {
+  assertAccessStep(item, step);
+  markPerformedWork(item, step);
   const correct: Record<string, Fault> = {
     'clean-contact': 'contact',
     'replace-battery': 'battery',
@@ -182,6 +214,13 @@ export function applyRepair(
     item.evidence ??= [];
     item.evidence.push(isMechanical(item) ? 'mechanism-working' : 'light-steady');
   }
+  if (item.form === 'torch' && item.access?.state === 'open')
+    return {
+      succeeded: item.repaired,
+      text: item.repaired
+        ? 'The accessible repair step is complete. The cap remains retained beside the torch; refit it before checking whether the beam stays steady in ordinary use.'
+        : 'That work did not restore the supported fault. The cap remains retained beside the torch; use a temporary refit and control the cap position for another diagnostic comparison.',
+    };
   if (item.id === 'friend-1' && item.form === 'torch')
     return {
       succeeded: item.repaired,
@@ -212,6 +251,7 @@ export function applyRepair(
   };
 }
 export function readLongCheck(item: RepairObject, now: number): string {
+  assertAccessStep(item, 'check-result');
   if (item.id === 'friend-0')
     throw Error('Nora’s kettle lamp needs its actual shade and position check');
   if (item.id === 'friend-1' && item.form === 'torch')
@@ -241,6 +281,7 @@ export function performActiveBellCheck(
   startedAt: number,
   endedAt: number,
 ): string {
+  assertAccessStep(item, 'check-result');
   if (
     item.form !== 'bell' ||
     !item.repaired ||
@@ -458,7 +499,17 @@ export function pathTorchActions(item: RepairObject): readonly [string, string][
 
 /** Controls the cap position while moving the same torch, without consuming
  * parts or silently repairing it. Evidence records the observed response. */
-export function testPathTorchCap(item: RepairObject): string {
+export function testPathTorchCap(
+  item: RepairObject,
+  actor: 'player' | 'sam' = 'player',
+  at = (item.access?.events.at(-1)?.at ?? 0) + 10,
+): string {
+  assertAccessStep(item, 'path-torch-test-cap');
+  return temporaryTorchTest(item, actor, at, 'path-torch-test-cap', () =>
+    testRefittedTorchCap(item),
+  );
+}
+function testRefittedTorchCap(item: RepairObject): string {
   if (item.id !== 'friend-1' || item.form !== 'torch' || !item.inspected)
     throw Error('Inspect the path torch before comparing cap positions');
   item.evidence ??= [];
@@ -483,6 +534,7 @@ export function performPathTorchUseCheck(
   startedAt: number,
   endedAt: number,
 ): string {
+  assertAccessStep(item, 'check-result');
   if (
     item.id !== 'friend-1' ||
     item.form !== 'torch' ||
@@ -506,6 +558,7 @@ export function performKettleLampUseCheck(
   startedAt: number,
   endedAt: number,
 ): string {
+  assertAccessStep(item, 'check-result');
   if (
     item.id !== 'friend-0' ||
     !item.repaired ||

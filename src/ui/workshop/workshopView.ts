@@ -7,6 +7,7 @@ export interface WorkshopPlace {
   kind: 'bench' | 'shelf' | 'object' | 'parts' | 'cabinet' | 'journal';
   input?: GameInput;
   actionLabel?: string;
+  navigation?: 'focus' | 'cabinet';
 }
 
 /** Presentation derived exclusively from discovered, player-facing information.
@@ -16,6 +17,7 @@ export function workshopPlaces(view: GameView, journal = false): WorkshopPlace[]
     {
       id: 'bench',
       kind: 'bench',
+      navigation: 'focus',
       label: 'Work bench',
       detail: view.focus ? view.focus.title : 'The bench is clear.',
     },
@@ -55,14 +57,15 @@ export function workshopPlaces(view: GameView, journal = false): WorkshopPlace[]
   const cabinet: ActionView | undefined = view.actions.find((action) =>
     ['workshop-cabinet-look', 'workshop-cabinet-open'].includes(action.id),
   );
-  if (cabinet) {
+  if (cabinet || view.workshopCabinet) {
     places.push({
       id: 'cabinet',
       kind: 'cabinet',
       label: 'Family cabinet',
-      detail: cabinet.detail ?? cabinet.label,
-      input: { type: 'action', id: cabinet.id },
-      actionLabel: cabinet.label,
+      detail: view.workshopCabinet?.detail ?? cabinet?.detail ?? cabinet?.label ?? '',
+      ...(cabinet
+        ? { input: { type: 'action' as const, id: cabinet.id }, actionLabel: cabinet.label }
+        : { navigation: 'cabinet' as const, actionLabel: 'See cabinet project details' }),
     });
   }
   if (journal)
@@ -80,4 +83,66 @@ export function isRoomTap(
   cancelled = false,
 ) {
   return !cancelled && Math.hypot(end.x - start.x, end.y - start.y) <= 7;
+}
+
+export interface WorkshopGeometry {
+  focus: GameView['focus'];
+  shelf: GameView['shelf'];
+  showShelf: boolean;
+  showParts: boolean;
+  showCabinet: boolean;
+  cabinetStage?: NonNullable<GameView['workshopCabinet']>['stage'];
+  journal: boolean;
+}
+
+function objectGeometry(object: NonNullable<GameView['focus']>): NonNullable<GameView['focus']> {
+  return {
+    id: object.id,
+    form: object.form,
+    visual: object.visual,
+    appearance: object.appearance,
+    inspected: object.inspected,
+    progress: object.progress,
+    assembly: object.assembly,
+    casePresentation: object.casePresentation,
+    title: '',
+    owner: '',
+    story: '',
+    condition: '',
+    observations: [],
+  };
+}
+
+/** Keep conversation, clock and action prose out of renderer/model lifetime. */
+export function workshopGeometry(view: GameView, journal: boolean): WorkshopGeometry {
+  const places = workshopPlaces(view, journal);
+  return {
+    focus: view.focus ? objectGeometry(view.focus) : null,
+    shelf: view.shelf.map(({ id, object }) => ({
+      id,
+      title: '',
+      note: '',
+      ...(object ? { object: objectGeometry(object) } : {}),
+    })),
+    showShelf: places.some((place) => place.kind === 'shelf'),
+    showParts: places.some((place) => place.kind === 'parts'),
+    showCabinet: places.some((place) => place.kind === 'cabinet'),
+    cabinetStage: view.workshopCabinet?.stage,
+    journal,
+  };
+}
+
+export interface RoomGesture {
+  id: number;
+  x: number;
+  y: number;
+  lastX: number;
+  moved: boolean;
+}
+export function moveRoomGesture(prior: RoomGesture, id: number, x: number, y: number): RoomGesture {
+  if (prior.id !== id) return prior;
+  return { ...prior, lastX: x, moved: prior.moved || !isRoomTap(prior, { x, y }) };
+}
+export function roomSelectionAllowed(prior: RoomGesture | null, id: number, x: number, y: number) {
+  return !!prior && prior.id === id && !prior.moved && isRoomTap(prior, { x, y });
 }

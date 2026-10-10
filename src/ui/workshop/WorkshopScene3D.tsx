@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AmbientLight,
   Color,
@@ -13,13 +13,22 @@ import {
 } from 'three';
 import type { GameInput, GameView } from '../../game/types';
 import { createWorkshopModel } from './workshopModel';
-import { isRoomTap, validPlaceInput, workshopPlaces } from './workshopView';
+import {
+  moveRoomGesture,
+  type RoomGesture,
+  roomSelectionAllowed,
+  validPlaceInput,
+  type WorkshopGeometry,
+  workshopGeometry,
+  workshopPlaces,
+} from './workshopView';
 
 export interface WorkshopScene3DProps {
   view: GameView;
   disabled?: boolean;
   onInput: (input: GameInput) => void;
   onFocus?: () => void;
+  onCabinetFocus?: () => void;
   onOpenJournal?: () => void;
 }
 
@@ -28,30 +37,28 @@ export default function WorkshopScene3D({
   disabled = false,
   onInput,
   onFocus,
+  onCabinetFocus,
   onOpenJournal,
 }: WorkshopScene3DProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const draw = useRef<(() => void) | null>(null);
   const hit = useRef<((x: number, y: number) => string | null) | null>(null);
   const yaw = useRef(-0.12);
-  const pointer = useRef<{
-    id: number;
-    x: number;
-    y: number;
-    lastX: number;
-    moved: boolean;
-  } | null>(null);
+  const pointer = useRef<RoomGesture | null>(null);
+  const updateModel = useRef<((geometry: WorkshopGeometry) => void) | null>(null);
+  const [retry, setRetry] = useState(0);
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<string>('bench');
   const [hovered, setHovered] = useState<string | null>(null);
   const places = workshopPlaces(view, !!onOpenJournal);
   const place = places.find((item) => item.id === selected);
   const hover = places.find((item) => item.id === hovered);
-  const journal = !!onOpenJournal;
+  const geometryKey = JSON.stringify(workshopGeometry(view, !!onOpenJournal));
+  const geometry = useMemo(() => JSON.parse(geometryKey) as WorkshopGeometry, [geometryKey]);
 
   useEffect(() => {
     const surface = canvas.current;
-    if (!surface) return;
+    if (!surface || failed) return;
     let renderer: WebGLRenderer;
     try {
       renderer = new WebGLRenderer({
@@ -72,19 +79,28 @@ export default function WorkshopScene3D({
     const sun = new DirectionalLight('#fff2d3', 2.4);
     sun.position.set(-3, 6, 4);
     scene.add(sun);
-    const model = createWorkshopModel(view, journal);
-    scene.add(model.root);
+    let model: ReturnType<typeof createWorkshopModel> | null = null;
     const camera = new OrthographicCamera(-4.6, 4.6, 3.1, -3.1, 0.1, 40);
     camera.position.set(5.4, 5.2, 8.4);
     camera.lookAt(0, 0.85, 0);
     const raycaster = new Raycaster();
     const point = new Vector2();
     function render() {
-      model.root.rotation.y = yaw.current;
+      if (model) model.root.rotation.y = yaw.current;
       renderer.render(scene, camera);
     }
     draw.current = render;
+    updateModel.current = (projection) => {
+      if (model) {
+        scene.remove(model.root);
+        model.dispose();
+      }
+      model = createWorkshopModel(projection);
+      scene.add(model.root);
+      render();
+    };
     hit.current = (x, y) => {
+      if (!model) return null;
       const bounds = surface?.getBoundingClientRect();
       if (!bounds?.width || !bounds.height) return null;
       point.set(
@@ -127,10 +143,16 @@ export default function WorkshopScene3D({
       surface.removeEventListener('webglcontextlost', lost);
       draw.current = null;
       hit.current = null;
-      model.dispose();
+      model?.dispose();
+      updateModel.current = null;
+      pointer.current = null;
       renderer.dispose();
     };
-  }, [view, journal]);
+  }, [failed]);
+
+  useEffect(() => {
+    if (!failed) updateModel.current?.(geometry);
+  }, [geometry, failed]);
 
   function turn(delta: number) {
     yaw.current = Math.max(-0.52, Math.min(0.36, yaw.current + delta));
@@ -138,8 +160,12 @@ export default function WorkshopScene3D({
   }
   function activate() {
     if (!place || disabled) return;
-    if (place.kind === 'bench') {
+    if (place.navigation === 'focus') {
       onFocus?.();
+      return;
+    }
+    if (place.navigation === 'cabinet') {
+      onCabinetFocus?.();
       return;
     }
     if (place.kind === 'journal') {
@@ -167,6 +193,7 @@ export default function WorkshopScene3D({
       </div>
       {!failed ? (
         <canvas
+          key={retry}
           ref={canvas}
           role="img"
           aria-label="A cutaway workshop. Drag to turn the room, or use the turn controls. Choose places using the buttons below."
@@ -179,10 +206,7 @@ export default function WorkshopScene3D({
             cursor: hovered ? 'pointer' : 'grab',
           }}
           onPointerDown={(event) => {
-            if (event.button !== 0 || !event.isPrimary) {
-              pointer.current = null;
-              return;
-            }
+            if (event.button !== 0 || !event.isPrimary || pointer.current) return;
             event.currentTarget.setPointerCapture(event.pointerId);
             pointer.current = {
               id: event.pointerId,
@@ -195,36 +219,44 @@ export default function WorkshopScene3D({
           onPointerMove={(event) => {
             const active = pointer.current;
             if (active?.id === event.pointerId) {
-              active.moved ||= !isRoomTap(active, { x: event.clientX, y: event.clientY });
-              if (active.moved) turn((event.clientX - active.lastX) / 330);
-              active.lastX = event.clientX;
+              const next = moveRoomGesture(active, event.pointerId, event.clientX, event.clientY);
+              if (next.moved) turn((event.clientX - active.lastX) / 330);
+              pointer.current = next;
             } else if (event.pointerType === 'mouse')
               setHovered(hit.current?.(event.clientX, event.clientY) ?? null);
           }}
           onPointerUp={(event) => {
             const active = pointer.current;
+            if (active?.id !== event.pointerId) return;
             pointer.current = null;
             if (event.currentTarget.hasPointerCapture(event.pointerId))
               event.currentTarget.releasePointerCapture(event.pointerId);
-            if (
-              active?.id !== event.pointerId ||
-              active.moved ||
-              !isRoomTap(active, { x: event.clientX, y: event.clientY })
-            )
+            if (!roomSelectionAllowed(active, event.pointerId, event.clientX, event.clientY))
               return;
             const id = hit.current?.(event.clientX, event.clientY);
             if (id) setSelected(id);
           }}
-          onPointerCancel={() => {
-            pointer.current = null;
+          onPointerCancel={(event) => {
+            if (pointer.current?.id === event.pointerId) pointer.current = null;
           }}
-          onLostPointerCapture={() => {
-            pointer.current = null;
+          onLostPointerCapture={(event) => {
+            if (pointer.current?.id === event.pointerId) pointer.current = null;
           }}
           onPointerLeave={() => setHovered(null)}
         />
       ) : (
-        <p>The room view is unavailable. Every place and operation is available below.</p>
+        <div>
+          <p>The room view is unavailable. Every place and operation is available below.</p>
+          <button
+            type="button"
+            onClick={() => {
+              setFailed(false);
+              setRetry((value) => value + 1);
+            }}
+          >
+            Try the room view again
+          </button>
+        </div>
       )}
       <div
         style={{
@@ -290,7 +322,10 @@ export default function WorkshopScene3D({
           <>
             <strong>{place.label}</strong>
             <p>{place.detail}</p>
-            {(place.input || (place.kind === 'bench' && onFocus) || place.kind === 'journal') && (
+            {(place.input ||
+              (place.navigation === 'focus' && onFocus) ||
+              (place.navigation === 'cabinet' && onCabinetFocus) ||
+              place.kind === 'journal') && (
               <button type="button" disabled={disabled} onClick={activate}>
                 {place.actionLabel ??
                   (place.kind === 'journal' ? 'Open notebook' : 'Work at the bench')}

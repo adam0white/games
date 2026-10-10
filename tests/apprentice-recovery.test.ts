@@ -100,7 +100,9 @@ it('postponing and rescuing the additional request cannot fabricate supervision 
   s = choose(s, 'take-over-repair');
   expect(s.apprentice?.supervisedCompleted).toBe(false);
   expect(s.apprentice?.completedJobIds).toEqual([]);
-  expect(has(s, 'inspect') || has(s, 'test-battery') || has(s, 'verify')).toBe(true);
+  expect(
+    has(s, 'inspect') || has(s, 'test-battery') || has(s, 'verify') || has(s, 'reassemble'),
+  ).toBe(true);
   expect(has(s, 'rest')).toBe(true);
 });
 it('absent demonstration and absent explanation do not grant receipt, skill or methods; explaining into an active job is sticky assistance', () => {

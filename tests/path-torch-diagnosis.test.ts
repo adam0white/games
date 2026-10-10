@@ -107,7 +107,8 @@ it('public play retains selected cap-test evidence and spends six actual minutes
   s = choose(s, 'test-battery');
   const beforeTest = s.now;
   s = choose(s, 'path-torch-test-cap');
-  expect(s.now - beforeTest).toBe(4);
+  // Three minutes to fit, four to compare, three to retain the cap again.
+  expect(s.now - beforeTest).toBe(10);
   expect(s.objects.find((o) => o.id === 'friend-1')?.observations.at(-1)).toContain('only while');
   expect(s.objects.find((o) => o.id === 'friend-1')?.evidence?.at(-1)).toBe('crooked-cap');
   expect(restoreGame(serializeGame(s))).toEqual(s);

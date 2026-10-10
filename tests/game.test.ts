@@ -10,9 +10,10 @@ import {
   transition,
 } from '../src/game/engine';
 import * as three from '../src/game/engine3';
+import { choose } from './support/school-route';
 
 const act = (s: ReturnType<typeof createGame>, id: string) => {
-  let next = transition(s, { type: 'action', id });
+  let next = choose(s, id);
   if (id === 'verify') {
     next = transition(next, { type: 'action', id: 'rest' });
     next = transition(next, { type: 'action', id: 'check-result' });
@@ -213,6 +214,7 @@ describe('home and garage', () => {
 describe('living garage checks', () => {
   it('a check takes real elapsed time while tea and shelf work remain possible', () => {
     let s = ['talk-family', 'inspect', 'clean-contact'].reduce(act, createGame(42));
+    s = transition(s, { type: 'action', id: 'reassemble' });
     s = transition(s, { type: 'action', id: 'verify' });
     expect(s.objects[0]?.verified).toBe(false);
     expect(() => transition(s, { type: 'action', id: 'check-result' })).toThrow();
@@ -304,7 +306,9 @@ it('the current garage event keeps Dad and You as separate speakers and clears o
   expect(getView(s).actions.find((x) => x.id === 'rest')?.label).toContain('garage step');
   s = act(s, 'rest');
   expect(getView(s).scene).toBe('garage');
-  expect(getView(s).currentDialogue?.[0]?.text).toContain('garage step');
+  expect(getView(s).currentDialogue?.[0]?.speaker).toBe('You');
+  expect(getView(s).currentDialogue?.[0]?.text).toContain('You take a quiet break.');
+  expect(getView(s).currentDialogue?.[0]?.text).toContain('Mum keeps her own plans');
   s = transition(s, { type: 'select', id: 'personal' });
   expect(getView(s).currentDialogue).toEqual([]);
   expect(restoreGame(serializeGame(s))).toEqual(s);

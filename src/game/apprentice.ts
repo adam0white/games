@@ -15,6 +15,14 @@ import {
 } from '@adam0white/human-framework';
 import { liveOrdinaryTime } from './humans';
 import {
+  ACCESS_MINUTES,
+  assertAccessStep,
+  hostPreparation,
+  openAccess,
+  physicalStepDuration,
+  reassemble,
+} from './repair-access';
+import {
   applyRepair,
   checkingSpaceAvailable,
   cueFor,
@@ -26,6 +34,19 @@ import {
   verificationMinutes,
 } from './repairs';
 import type { ActionView, GameState, RepairObject } from './types';
+
+const semanticWork: Record<string, string> = {
+  inspect: 'examining the object',
+  'test-battery': 'testing the battery',
+  'clean-contact': 'cleaning the contact',
+  'replace-battery': 'replacing the battery',
+  'fit-holder': 'fitting the holder',
+  'twist-cap': 'restoring the cap contact',
+  verify: 'starting the longer check',
+  'check-result': 'reading the functional check',
+  return: 'returning the checked repair',
+  'return-unchecked': 'discussing the unfinished check',
+};
 
 type Speak = (speaker: string, text: string) => void;
 export function freshApprentice(): NonNullable<GameState['apprentice']> {
@@ -494,7 +515,7 @@ export function recordLesson(
       channel: 'saw',
       actorId: 'player',
       kind: 'repair-demonstration',
-      summary: `I saw ${step}: ${item.observations.at(-1) ?? 'the checked light going back to its owner'}.`,
+      summary: `I saw ${semanticWork[step] ?? 'the performed work'}: ${item.observations.at(-1) ?? 'the checked light going back to its owner'}.`,
       salience: 0.9,
     },
   ]);
@@ -617,8 +638,11 @@ export function apprenticeOffers(
   return [...ids, 'request-help'].map((id) => ({
     id,
     action: id,
-    label: id === 'request-help' ? 'Ask for help before guessing' : id,
-    duration: repairDuration(id),
+    label:
+      id === 'request-help'
+        ? 'Ask for help before guessing'
+        : (semanticWork[id] ?? 'The chosen repair step'),
+    duration: physicalStepDuration(item, id, repairDuration(id)),
     effort: id === 'request-help' || id === 'wait-check' ? 0 : 0.12,
     focus: 0.25,
     skill: id === 'request-help' ? undefined : { id: 'repair', difficulty: 0.25 },
@@ -738,7 +762,11 @@ export function advanceApprentice(
     if (!workerHere(sam.now)) {
       if (a.pending) {
         const prior = sam.activity;
-        a.pausedStep = { step: a.pending.step, remaining: Math.max(1, a.pending.endsAt - sam.now) };
+        a.pausedStep = {
+          step: a.pending.step,
+          remaining: Math.max(1, a.pending.endsAt - sam.now),
+          ...(a.pending.preparation ? { preparation: a.pending.preparation } : {}),
+        };
         if (prior)
           finish(sam, {
             affordanceId: prior.affordanceId,
@@ -800,11 +828,30 @@ export function advanceApprentice(
         say('Sam', 'I don’t know a method for this observation. Will you look with me?');
         break;
       }
-      if (!begin(sam, chosen, decision)) {
+      const preparation = a.pausedStep?.preparation ?? hostPreparation(item, chosen.id);
+      // The learned choice remains semantic. Its compulsory physical prerequisite
+      // is a separate unskilled handling activity, not an acquired access method.
+      const actualOffer = preparation
+        ? {
+            ...chosen,
+            action: 'handle',
+            label: `${preparation === 'reassemble' ? 'Refit the retained cover' : 'Open the retained access'} before ${semanticWork[chosen.id] ?? 'the chosen repair step'}`,
+            duration: a.pausedStep?.preparation ? a.pausedStep.remaining : ACCESS_MINUTES,
+            skill: undefined,
+            methodContext: undefined,
+          }
+        : chosen;
+      const lastDecision = item.stepDecisions.at(-1);
+      if (preparation && lastDecision) lastDecision.hostPreparation = preparation;
+      if (!begin(sam, actualOffer, decision)) {
         a.needsHelp = 'Sam cannot do that step right now.';
         break;
       }
-      a.pending = { step: chosen.id, endsAt: sam.now + chosen.duration };
+      a.pending = {
+        step: chosen.id,
+        endsAt: sam.now + actualOffer.duration,
+        ...(preparation ? { preparation } : {}),
+      };
       a.pausedStep = undefined;
     }
     const pending = a.pending;
@@ -820,6 +867,24 @@ export function advanceApprentice(
       break;
     }
     if (!workerHere(end)) continue;
+    if (pending.preparation) {
+      const text =
+        pending.preparation === 'reassemble'
+          ? reassemble(item, 'sam', sam.now, pending.step)
+          : openAccess(item, 'sam', sam.now, pending.step);
+      item.observations.push(text.replaceAll('You ', 'I '));
+      say('Sam', text.replaceAll('You ', 'I '));
+      finish(sam, {
+        affordanceId: pending.step,
+        action: 'handle',
+        at: sam.now,
+        status: 'completed',
+        summary: `Physical access prepared before ${semanticWork[pending.step] ?? 'the chosen repair step'}`,
+      });
+      a.pending = undefined;
+      continue;
+    }
+    assertAccessStep(item, pending.step);
     const part =
       pending.step === 'replace-battery'
         ? 'batteries'
@@ -849,10 +914,10 @@ export function advanceApprentice(
       success = true;
     switch (pending.step) {
       case 'inspect':
-        text = inspectRepair(item);
+        text = inspectRepair(item, 'sam', sam.now);
         break;
       case 'test-battery':
-        text = testRepair(item);
+        text = testRepair(item, 'sam', sam.now);
         break;
       case 'clean-contact':
       case 'replace-battery':

@@ -6,6 +6,7 @@ import type { GameInput } from '../src/game/types';
 import { applyWorkshopAction, freshWorkshop, workshopActions } from '../src/game/workshop';
 import freshRoute from './fixtures/fresh-fourteen-school-route.json';
 import fixture from './fixtures/owner-thirteen-school-apprentice-route.json';
+import { choose } from './support/school-route';
 
 // This route was played in an unreleased development preview. Rebuild its
 // choices with the revised attended torch check; it is not a frozen raw replay.
@@ -22,7 +23,7 @@ function rebuildFreshDevelopmentRoute() {
       if (!item.verified) s = transition(s, { type: 'action', id: 'check-result' });
       continue;
     }
-    s = transition(s, input);
+    s = input.type === 'action' ? choose(s, input.id) : transition(s, input);
   }
   return s;
 }
@@ -111,7 +112,7 @@ it('graduating without optional repairs grants no expertise and gives a visible 
     'shelve',
     'talk-garage',
   ])
-    s = transition(s, { type: 'action', id });
+    s = choose(s, id);
   for (let year = 0; year < 4; year++)
     s = transition(s, { type: 'action', id: 'leave-school-holiday' });
   expect(s.repairs).toBe(0);
@@ -184,7 +185,7 @@ it('putting the unexamined childhood lamp aside leaves a visible route to the ga
   let s = createGame(1701);
   expect(getView(s).lifeChapter?.detail).not.toContain('close this holiday');
   for (const id of ['talk-family', 'inspect', 'clean-contact', 'early-return', 'shelve'])
-    s = transition(s, { type: 'action', id });
+    s = choose(s, id);
   expect(s.chapter).toBe('later');
   expect(getView(s).lifeChapter?.detail).not.toContain('close this holiday');
   expect(getView(s).actions.some((a) => a.id === 'talk-garage')).toBe(true);

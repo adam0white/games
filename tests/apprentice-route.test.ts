@@ -67,6 +67,7 @@ function teachLight(s: ReturnType<typeof createGame>, repeat = false) {
   const item = s.objects.find((x) => x.id === s.focusId);
   s = act(s, item?.fault === 'battery' ? 'replace-battery' : 'clean-contact');
   s = act(s, 'explain-step');
+  s = act(s, 'reassemble');
   s = act(s, 'verify');
   if (!repeat) s = act(s, 'explain-step');
   s = act(s, 'wait-check');
@@ -89,7 +90,13 @@ it('the actual explained-manual-input route teaches Sam, saves a pending indepen
   expect(s.apprentice?.supervisedCompleted).toBe(true);
   s = arrive(s);
   s = act(s, 'independent-intake');
-  s = act(s, 'watch-sam');
+  // The separate physical refit adds three real minutes before verification.
+  for (
+    let n = 0;
+    n < 3 && s.objects.find((item) => item.id === 'independent-light')?.checkStarted === undefined;
+    n++
+  )
+    s = act(s, 'watch-sam');
   expect(s.apprentice?.needsHelp, JSON.stringify(s.apprentice)).toBeUndefined();
   expect(s.apprentice?.jobId).toBe('independent-light');
   expect(s.objects.find((x) => x.id === 'independent-light')?.checkStarted).toBeDefined();

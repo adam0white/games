@@ -1,6 +1,7 @@
 import type { ActionView, ObjectView } from '../game/types';
 
 export type RepairTarget =
+  | 'cover'
   | 'shell'
   | 'battery'
   | 'contact'
@@ -15,6 +16,8 @@ export interface RepairBinding {
 }
 const targets: Record<string, RepairTarget> = {
   inspect: 'shell',
+  'open-access': 'shell',
+  reassemble: 'cover',
   'test-battery': 'battery',
   'replace-battery': 'battery',
   'clean-contact': 'contact',
@@ -35,6 +38,7 @@ const targets: Record<string, RepairTarget> = {
   'check-result': 'operation',
 };
 export const repairTargetLabels: Record<RepairTarget, string> = {
+  cover: 'Cover',
   shell: 'Object',
   battery: 'Battery compartment',
   contact: 'Contact',
@@ -49,9 +53,12 @@ export function getMappedRepairActions(
   actions: readonly ActionView[],
 ): RepairBinding[] {
   return actions.flatMap((action) => {
-    const target = targets[action.id];
+    const target =
+      action.id === 'open-access' && object.assembly && object.inspected
+        ? 'cover'
+        : targets[action.id];
     if (!target || (target !== 'shell' && !object.inspected)) return [];
-    return [{ action, target, label: repairTargetLabels[target] }];
+    return [{ action, target, label: getRepairTargetLabel(object, target) }];
   });
 }
 export function pointerWasDrag(start: { x: number; y: number }, end: { x: number; y: number }) {
@@ -59,6 +66,8 @@ export function pointerWasDrag(start: { x: number; y: number }, end: { x: number
 }
 export const repairToolNames: Record<string, string> = {
   inspect: 'Look',
+  'open-access': 'Open',
+  reassemble: 'Refit cover',
   'test-battery': 'Test battery',
   'replace-battery': 'Fit battery',
   'clean-contact': 'Clean contact',
@@ -124,4 +133,21 @@ export function resolveRepairAction(
     (binding.target === target || binding.target === 'shell' || binding.target === 'operation')
     ? binding.action.id
     : null;
+}
+
+export function getRepairToolName(object: ObjectView, action: ActionView): string {
+  if (action.id === 'inspect' && object.assembly)
+    return object.assembly.state === 'assembled' ? 'Open & examine' : 'Examine';
+  return repairToolNames[action.id] ?? action.label;
+}
+
+export function getRepairTargetLabel(object: ObjectView, target: RepairTarget): string {
+  if (target !== 'cover' || !object.assembly) return repairTargetLabels[target];
+  const part =
+    object.assembly.kind === 'lamp'
+      ? 'base cover'
+      : object.assembly.kind === 'torch'
+        ? 'threaded cap'
+        : 'bell dome';
+  return `${object.assembly.state === 'open' ? 'Retained' : 'Fitted'} ${part}`;
 }

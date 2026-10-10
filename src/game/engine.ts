@@ -51,6 +51,7 @@ import { restoreGame as restoreEngine13 } from './engine13';
 import { restoreGame as restoreEngine14 } from './engine14';
 import { restoreGame as restoreEngine15 } from './engine15';
 import { restoreGame as restoreEngine16 } from './engine16';
+import { restoreGame as restoreEngine17 } from './engine17';
 import {
   askMumToHelp,
   beginSharedConversation,
@@ -79,6 +80,15 @@ import {
   resumePlayedPractice,
   suspendUnplayedPractice,
 } from './practices';
+import {
+  accessKind,
+  accessLabel,
+  assemblyView,
+  canPerformAccessStep,
+  openAccess,
+  physicalStepDuration,
+  reassemble,
+} from './repair-access';
 import {
   adaptCaseTray,
   applyRepair,
@@ -121,7 +131,15 @@ import {
   schoolStoryBeat,
   storyBeat,
 } from './story';
-import type { ActionView, Fault, GameInput, GameState, GameView, RepairObject } from './types';
+import type {
+  ActionView,
+  Fault,
+  GameInput,
+  GameState,
+  GameView,
+  ObjectView,
+  RepairObject,
+} from './types';
 import {
   applyWorkshopAction,
   CABINET_MINUTES,
@@ -131,7 +149,7 @@ import {
   workshopActions,
 } from './workshop';
 
-const ENGINE = 'home-garage-17';
+const ENGINE = 'home-garage-18';
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 const object = (
   id: string,
@@ -1206,6 +1224,28 @@ function available(s: GameState): ActionView[] {
           ).length < 2,
       ),
   );
+  if (o && o.location !== 'returned' && !o.assignedTo) {
+    if (o.access?.state === 'open')
+      add(
+        'reassemble',
+        `Refit the retained ${accessLabel(o)}`,
+        o.repaired
+          ? 'Three minutes. Restore the real cover so the completed repair can be checked in ordinary use; refitting alone is not verification.'
+          : 'Three minutes. Restore the real cover before checking or returning; the unresolved fault remains.',
+      );
+    else if (o.access)
+      add(
+        'open-access',
+        `Open the ${accessLabel(o)} again`,
+        'Three minutes. Keep the removed piece; reopening cancels a running or completed check without undoing the repair.',
+      );
+    else if (o.inspected && accessKind(o))
+      add(
+        'inspect',
+        `Open the ${accessLabel(o)} and examine it again`,
+        'A new physical inspection adopts retained-piece access for this object; the old observations remain.',
+      );
+  }
   if (o?.caseFittings && o.location !== 'returned') {
     const f = o.caseFittings;
     if (!f.measured) add('measure-case', 'Compare the case and replacement mounting holes');
@@ -1221,7 +1261,11 @@ function available(s: GameState): ActionView[] {
     add('shelve', 'Label the case and put it safely aside');
   }
   if (o && !o.caseFittings && o.assignedTo !== 'sam') {
-    if (!o.inspected) add('inspect', 'Look closely');
+    if (!o.inspected)
+      add(
+        'inspect',
+        accessKind(o) ? `Open the ${accessLabel(o)} and look closely` : 'Look closely',
+      );
     if (o.inspected && !o.repaired && isMechanical(o)) {
       const methods: Partial<Record<Fault, [string, string]>> = {
         jam: ['clear-obstruction', 'Lift the crumb out and free the winding lever'],
@@ -1456,9 +1500,11 @@ function available(s: GameState): ActionView[] {
     isHere(s, 'mum')
       ? s.chapter === 'garage'
         ? 'Invite Mum for tea on the garage step'
-        : 'Ask Mum about tea'
+        : 'Invite Mum to share your tea break'
       : 'Take a quiet break',
-    'Leave the work safely on the bench for a while.',
+    isHere(s, 'mum')
+      ? 'Take a half-hour break with the work safely on the bench. Mum may join you or keep her own plans.'
+      : 'Take a half-hour break with the work safely on the bench.',
   );
   if (
     isHere(s, 'mum') &&
@@ -1496,9 +1542,10 @@ function available(s: GameState): ActionView[] {
           : 'quiet',
       );
   const correction = pendingCorrectiveDemonstration(s);
-  const actions = a.some((action) => action.id === 'show-corrective-step')
-    ? a.filter((action) => action.id !== 'reconsider-sam')
-    : a;
+  const physicalActions = o ? a.filter((action) => canPerformAccessStep(o, action.id)) : a;
+  const actions = physicalActions.some((action) => action.id === 'show-corrective-step')
+    ? physicalActions.filter((action) => action.id !== 'reconsider-sam')
+    : physicalActions;
   return correction
     ? actions.map((action) =>
         (action.id === 'clean-contact' && o?.id === correction.id && !correction.repaired) ||
@@ -2842,34 +2889,50 @@ export function transition(original: GameState, input: GameInput): GameState {
         (index === 0 ? 'wait-appointment' : `wait-known-${event.personId}-${event.at}`) === id,
     );
   const duration =
-    id === 'check-result' && o && (o.form === 'bell' || ['friend-0', 'friend-1'].includes(o.id))
-      ? ['friend-0', 'friend-1'].includes(o.id)
-        ? 6
-        : 5
-      : id === 'path-torch-test-cap'
-        ? 4
-        : appointmentWait
-          ? Math.max(1, (waitingFor?.at ?? s.now + 30) - s.now)
-          : id === 'next-day'
-            ? nextWakingMorning(s.now) - s.now
-            : ['rest', 'wait-person'].includes(id)
-              ? 30
-              : id === 'wait-check'
-                ? checkWaitMinutes(o, s.now)
-                : ['ask-mum', 'ask-dad'].includes(id)
-                  ? 8
-                  : ['clean-contact', 'replace-battery', 'fit-holder'].includes(id)
-                    ? 12
-                    : repairDuration(id);
+    o?.form === 'torch' &&
+    o.access?.state === 'open' &&
+    ['test-battery', 'path-torch-test-cap'].includes(id)
+      ? physicalStepDuration(o, id, 4)
+      : id === 'check-result' && o && (o.form === 'bell' || ['friend-0', 'friend-1'].includes(o.id))
+        ? ['friend-0', 'friend-1'].includes(o.id)
+          ? 6
+          : 5
+        : id === 'path-torch-test-cap'
+          ? 4
+          : appointmentWait
+            ? Math.max(1, (waitingFor?.at ?? s.now + 30) - s.now)
+            : id === 'next-day'
+              ? nextWakingMorning(s.now) - s.now
+              : ['rest', 'wait-person'].includes(id)
+                ? 30
+                : id === 'wait-check'
+                  ? checkWaitMinutes(o, s.now)
+                  : ['ask-mum', 'ask-dad'].includes(id)
+                    ? 8
+                    : ['clean-contact', 'replace-battery', 'fit-holder'].includes(id)
+                      ? 12
+                      : repairDuration(id);
   const aff: Affordance = {
     id,
-    action: id === 'next-day' ? 'sleep' : id === 'rest' ? 'rest' : 'repair',
+    action:
+      id === 'next-day'
+        ? 'sleep'
+        : id === 'rest'
+          ? 'rest'
+          : ['open-access', 'reassemble'].includes(id)
+            ? 'handle'
+            : 'repair',
     ...(id === 'next-day' ? { mode: 'sleep' as const } : {}),
     label: available(s).find((a) => a.id === id)?.label ?? id,
     duration,
     effort: ['rest', 'next-day', 'wait-person'].includes(id) ? 0 : 0.15,
     focus: id === 'rest' ? 0 : 0.4,
-    advertises: id === 'rest' ? { leisure: 0.1 } : { competence: 0.03 },
+    advertises:
+      id === 'rest'
+        ? { leisure: 0.1 }
+        : ['open-access', 'reassemble'].includes(id)
+          ? {}
+          : { competence: 0.03 },
     ...([
       'inspect',
       'test-battery',
@@ -2949,10 +3012,19 @@ export function transition(original: GameState, input: GameInput): GameState {
         'warm',
       );
       break;
+    case 'open-access':
+    case 'reassemble':
+      if (o) {
+        const text =
+          id === 'open-access' ? openAccess(o, 'player', s.now) : reassemble(o, 'player', s.now);
+        o.observations.push(text);
+        narrate(s, 'You', text);
+      }
+      break;
     case 'inspect':
       if (o) {
         o.inspected = true;
-        const text = inspectRepair(o);
+        const text = inspectRepair(o, 'player', s.now);
         o.observations.push(text);
         narrate(s, 'You', text);
         if (o.id === 'personal' && !s.unlocked.includes('garage-hint')) {
@@ -2978,14 +3050,14 @@ export function transition(original: GameState, input: GameInput): GameState {
     case 'test-battery':
       if (o) {
         o.tested = true;
-        const text = testRepair(o);
+        const text = testRepair(o, 'player', s.now);
         o.observations.push(text);
         narrate(s, 'You', text);
       }
       break;
     case 'path-torch-test-cap':
       if (o) {
-        const text = testPathTorchCap(o);
+        const text = testPathTorchCap(o, 'player', s.now);
         o.observations.push(text);
         narrate(s, 'You', text);
       }
@@ -3340,10 +3412,12 @@ export function transition(original: GameState, input: GameInput): GameState {
           : shortened
             ? `You sit together for ${shortened?.elapsed} minutes, then leave the cups while the afternoon takes its own course.`
             : teaReport?.participant === 'player'
-              ? 'You leave the invitation for another time and take a quiet break.'
-              : s.chapter === 'garage'
-                ? 'You sit on the garage step for a quiet break. The invitation can wait for another time.'
-                : 'You take a quiet break. The invitation can wait for another time.',
+              ? `You leave the invitation for another time and take a quiet break.${teaReport.activity ? ` You had “${teaReport.activity}” underway when you asked.` : ''}`
+              : teaReport?.participant === 'mum'
+                ? `Mum keeps her own plans this time.${teaReport.activity ? ` She had “${teaReport.activity}” underway when you asked.` : ''} You take a quiet break.`
+                : s.chapter === 'garage'
+                  ? 'You sit on the garage step for a quiet break.'
+                  : 'You take a quiet break.',
         sharedTea ? 'warm' : 'notice',
       );
       break;
@@ -3356,11 +3430,18 @@ export function transition(original: GameState, input: GameInput): GameState {
       at: s.now,
       status: failed ? 'failed' : 'completed',
       summary: failed ? 'An attempted repair revealed the remaining problem.' : aff.label,
-      needs: id === 'rest' ? { leisure: 0.1 } : { competence: failed ? 0 : 0.03 },
+      needs:
+        id === 'rest'
+          ? { leisure: 0.1 }
+          : ['open-access', 'reassemble'].includes(id)
+            ? {}
+            : { competence: failed ? 0 : 0.03 },
     });
   if (
     o &&
     [
+      'open-access',
+      'reassemble',
       'inspect',
       'test-battery',
       'clean-contact',
@@ -3564,13 +3645,99 @@ function dayPlan(s: GameState, actions: ActionView[]): GameView['dayPlan'] {
           ? -3
           : entry.actionIds?.includes('arrange-learning')
             ? -2
-            : entry.actionIds?.includes('wait-appointment')
-              ? -1
-              : 0;
+            : entry.id === `known-dad-${s.workshop?.cabinetAppointment?.at}` &&
+                (s.workshop?.cabinetAppointment?.at ?? Infinity) <= s.now &&
+                entry.actionIds?.some((id) =>
+                  [
+                    'workshop-cabinet-measure',
+                    'workshop-cabinet-hang',
+                    'workshop-cabinet-align',
+                  ].includes(id),
+                )
+              ? -1.5
+              : entry.actionIds?.includes('wait-appointment')
+                ? -1
+                : 0;
   entries.sort((a, b) => priority(a) - priority(b));
   return entries.length
     ? { summary: 'What you have heard and agreed; people may keep their own plans.', entries }
     : undefined;
+}
+function objectView(o: RepairObject): ObjectView {
+  return {
+    assembly: assemblyView(o),
+    casePresentation: o.caseFittings
+      ? {
+          mode: o.caseFittings.revisedUse ?? 'carrying-case',
+          catch: o.caseFittings.revisedUse
+            ? 'none'
+            : o.caseFittings.compatible?.status === 'fitted'
+              ? 'compatible'
+              : 'original',
+          comparisonKnown: o.caseFittings.measured,
+        }
+      : undefined,
+    inspected: o.inspected,
+    progress: o.verified
+      ? 'checked'
+      : o.repaired
+        ? 'repaired'
+        : o.inspected
+          ? 'inspected'
+          : 'closed',
+    id: o.id,
+    title: o.title,
+    owner: o.owner,
+    story:
+      !['family', 'personal'].includes(o.id) && !o.id.startsWith('request-')
+        ? o.story
+        : (itemStory(o.id, o.owner) ?? o.story),
+    form: o.form,
+    condition:
+      o.access?.state === 'open'
+        ? o.repaired
+          ? `Repair work completed; refit the retained ${accessLabel(o)} before checking ordinary use`
+          : `The ${accessLabel(o)} is open; its retained piece stays beside the unfinished work`
+        : o.verified
+          ? 'Checked and ready'
+          : o.repaired
+            ? isMechanical(o)
+              ? 'It moves correctly — still needs checking'
+              : 'It lights up — still needs checking'
+            : isMechanical(o)
+              ? o.inspected
+                ? (o.observations.at(-1) ?? 'The mechanism needs attention')
+                : 'A mechanism that isn’t working properly'
+              : o.evidence?.includes('broken-holder')
+                ? 'A broken holder'
+                : o.evidence?.includes('crooked-cap')
+                  ? 'A loose cap contact'
+                  : o.evidence?.includes('still-flickers')
+                    ? 'The contact needs attention'
+                    : o.evidence?.includes('battery-steady')
+                      ? 'A tired battery'
+                      : 'An unreliable light',
+    visual:
+      o.form === 'torch' && o.access?.state === 'open'
+        ? 'off'
+        : o.repaired
+          ? 'steady'
+          : o.evidence?.includes('broken-holder')
+            ? 'broken'
+            : o.evidence?.includes('battery-steady')
+              ? 'off'
+              : 'flickering',
+    observations: [...o.observations],
+    appearance:
+      o.appearance ??
+      (o.form === 'torch'
+        ? 'torch'
+        : o.id === 'family'
+          ? 'reading'
+          : o.id === 'personal'
+            ? 'bedside'
+            : 'kitchen'),
+  };
 }
 export function getView(s: GameState): GameView {
   const o = focused(s);
@@ -3598,6 +3765,20 @@ export function getView(s: GameState): GameView {
     firstIndependentJob.collectedAt > lastInput.at &&
     firstIndependentJob.collectedAt <= s.now;
   return {
+    workshopCabinet:
+      s.workshop && s.workshop.cabinet !== 'unnoticed'
+        ? {
+            stage: s.workshop.cabinet,
+            detail:
+              s.workshop.cabinet === 'looked'
+                ? 'The cabinet is still waiting for measured hinge positions.'
+                : s.workshop.cabinet === 'measured'
+                  ? 'The hinge marks are recorded; the doors still need hanging.'
+                  : s.workshop.cabinet === 'hung'
+                    ? 'The doors are hung and still need final alignment.'
+                    : 'The doors were aligned and their closure checked together.',
+          }
+        : undefined,
     chapterClosure: serviceWeekClosure(s, {
       repaired: Boolean(s.objects.find((item) => item.id === 'paper-street')?.verified),
       installed: Boolean(s.objects.find((item) => item.id === 'paper-street')?.repaired),
@@ -3732,9 +3913,11 @@ export function getView(s: GameState): GameView {
           : ['mum', 'dad'].includes(id)
             ? s.people[id]?.activity
               ? s.people[id].activity.affordance.label
-              : /cabinet|hinges/.test(presence.activity)
-                ? 'Finished the cabinet step with you'
-                : 'At home; between activities'
+              : presence.activity === 'Agreeing a time for the next cabinet step'
+                ? 'Finished agreeing a cabinet time with you'
+                : /cabinet|hinges/.test(presence.activity)
+                  ? 'Finished the cabinet step with you'
+                  : 'At home; between activities'
             : id === 'sam' && receivedSamPause
               ? `Finishing ${receivedSamPause.label.toLowerCase()} until ${clockTime(receivedSamPause.until)}${s.apprentice?.arranged && s.now < s.apprentice.visitUntil ? ' within the agreed afternoon' : ''}`
               : s.people[id]?.activity?.affordanceId === 'watch-repair'
@@ -3752,73 +3935,7 @@ export function getView(s: GameState): GameView {
     subtitle:
       s.chapter === 'garage' ? 'Familiar things, a place to work.' : 'An afternoon at home.',
     scene: s.chapter === 'garage' ? 'garage' : 'home',
-    focus: o
-      ? {
-          casePresentation: o.caseFittings
-            ? {
-                mode: o.caseFittings.revisedUse ?? 'carrying-case',
-                catch: o.caseFittings.revisedUse
-                  ? 'none'
-                  : o.caseFittings.compatible?.status === 'fitted'
-                    ? 'compatible'
-                    : 'original',
-                comparisonKnown: o.caseFittings.measured,
-              }
-            : undefined,
-          inspected: o.inspected,
-          progress: o.verified
-            ? 'checked'
-            : o.repaired
-              ? 'repaired'
-              : o.inspected
-                ? 'inspected'
-                : 'closed',
-          id: o.id,
-          title: o.title,
-          owner: o.owner,
-          story:
-            !['family', 'personal'].includes(o.id) && !o.id.startsWith('request-')
-              ? o.story
-              : (itemStory(o.id, o.owner) ?? o.story),
-          form: o.form,
-          condition: o.verified
-            ? 'Checked and ready'
-            : o.repaired
-              ? isMechanical(o)
-                ? 'It moves correctly — still needs checking'
-                : 'It lights up — still needs checking'
-              : isMechanical(o)
-                ? o.inspected
-                  ? (o.observations.at(-1) ?? 'The mechanism needs attention')
-                  : 'A mechanism that isn’t working properly'
-                : o.inspected && o.fault === 'holder'
-                  ? 'A broken holder'
-                  : o.inspected && o.fault === 'cap'
-                    ? 'A loose cap contact'
-                    : o.tested && o.fault === 'contact'
-                      ? 'The contact needs attention'
-                      : o.tested && o.fault === 'battery'
-                        ? 'A tired battery'
-                        : 'An unreliable light',
-          visual: o.repaired
-            ? 'steady'
-            : o.fault === 'holder'
-              ? 'broken'
-              : o.fault === 'battery'
-                ? 'off'
-                : 'flickering',
-          observations: [...o.observations],
-          appearance:
-            o.appearance ??
-            (o.form === 'torch'
-              ? 'torch'
-              : o.id === 'family'
-                ? 'reading'
-                : o.id === 'personal'
-                  ? 'bedside'
-                  : 'kitchen'),
-        }
-      : null,
+    focus: o ? objectView(o) : null,
     actions,
     conversation: s.conversation,
     currentDialogue: (s.journal ?? s.conversation).filter(
@@ -3838,6 +3955,7 @@ export function getView(s: GameState): GameView {
       .map((x) => ({
         id: x.id,
         title: x.title,
+        object: objectView(x),
         note: x.observations.at(-1) ?? 'Waiting for another look.',
       })),
     parts:
@@ -3902,8 +4020,13 @@ export function restoreGame(text: string): GameState {
       'home-garage-14',
       'home-garage-15',
       'home-garage-16',
+      'home-garage-17',
     ].includes(data?.engine)
   ) {
+    if (data.engine === 'home-garage-17') {
+      const validated = restoreEngine17(text);
+      return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };
+    }
     if (data.engine === 'home-garage-16') {
       const validated = restoreEngine16(text);
       return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };

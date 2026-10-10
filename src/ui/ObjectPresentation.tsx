@@ -1,4 +1,4 @@
-import { Component, lazy, memo, type ReactNode, Suspense, useEffect, useState } from 'react';
+import { Component, lazy, memo, type ReactNode, Suspense, useEffect } from 'react';
 import type { ActionView, ObjectView } from '../game/types';
 import { ObjectIllustration } from './ObjectIllustration';
 
@@ -28,14 +28,17 @@ export const ObjectPresentation = memo(function ObjectPresentation({
   disabled,
   onAction,
   onReady,
+  inHand,
+  onViewChange,
 }: {
   object: ObjectView;
   actions?: ActionView[];
   disabled?: boolean;
   onAction?: (id: string) => void;
   onReady?: (ready: boolean) => void;
+  inHand: boolean;
+  onViewChange: (inHand: boolean) => void;
 }) {
-  const [inHand, setInHand] = useState(true);
   useEffect(() => {
     if (!inHand) onReady?.(false);
   }, [inHand, onReady]);
@@ -68,7 +71,7 @@ export const ObjectPresentation = memo(function ObjectPresentation({
       <button
         className="inspection-toggle"
         type="button"
-        onClick={() => setInHand(!inHand)}
+        onClick={() => onViewChange(!inHand)}
         aria-expanded={inHand}
       >
         {inHand ? 'Use the illustrated bench' : 'Work on the 3D object'}

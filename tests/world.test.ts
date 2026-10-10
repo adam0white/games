@@ -1,10 +1,10 @@
 import { createPerson, promise } from '@adam0white/human-framework';
 import { expect, it } from 'vitest';
-import { createGame, getView, restoreGame, serializeGame, transition } from '../src/game/engine';
+import { createGame, getView, restoreGame, serializeGame } from '../src/game/engine';
 import * as frozen from '../src/game/engine3';
+import { choose } from './support/school-route';
 
-const action = (s: ReturnType<typeof createGame>, id: string) =>
-  transition(s, { type: 'action', id });
+const action = (s: ReturnType<typeof createGame>, id: string) => choose(s, id);
 const ready = () =>
   [
     'talk-family',

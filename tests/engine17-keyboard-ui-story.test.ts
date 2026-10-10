@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { expect, it } from 'vitest';
-import { createGame, getView, restoreGame, serializeGame, transition } from '../src/game/engine';
+import * as current from '../src/game/engine';
+import { createGame, getView, restoreGame, serializeGame, transition } from '../src/game/engine17';
 
 // Actual native-17 keyboard/3D browser export, 2026-10-10. The nine input
 // records reconstruct its exact bytes; keep the observed times as provenance.
@@ -43,4 +44,10 @@ it('replays the actual native-17 keyboard repair, retaining its checked result w
   expect(s.objects.find((item) => item.id === 'personal')?.repaired).toBe(false);
   expect(restoreGame(raw)).toEqual(s);
   expect(serializeGame(restoreGame(raw))).toBe(raw);
+  const migrated = current.restoreGame(raw);
+  expect(migrated.engine3Save).toBe(raw);
+  expect(migrated.inputs).toEqual(s.inputs);
+  const continued = current.transition(migrated, { type: 'action', id: 'rest' });
+  expect(continued.engine3Save).toBe(raw);
+  expect(current.restoreGame(current.serializeGame(continued))).toEqual(continued);
 });

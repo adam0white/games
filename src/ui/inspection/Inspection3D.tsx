@@ -20,10 +20,10 @@ import type { ActionView, ObjectView } from '../../game/types';
 import { ObjectIllustration } from '../ObjectIllustration';
 import {
   getMappedRepairActions,
+  getRepairTargetLabel,
+  getRepairToolName,
   type RepairTarget,
   repairClickAllowed,
-  repairTargetLabels,
-  repairToolNames,
   resolveRepairAction,
   updateRepairGesture,
 } from '../repairBindings';
@@ -62,6 +62,10 @@ export default function Inspection3D({
   const actionAvailable = Boolean(onAction);
   const objectKey = JSON.stringify(object);
   const targetsKey = [...new Set(bindings.map((b) => b.target))].sort().join(',');
+  const projection = useRef({ objectKey, showKnownParts: false, targetsKey });
+  const replaceModel = useRef<
+    ((object: ObjectView, known: boolean, targets: RepairTarget[]) => void) | null
+  >(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const container = useRef<HTMLDivElement>(null);
   const render = useRef<((x: number, y: number) => void) | null>(null);
@@ -76,10 +80,11 @@ export default function Inspection3D({
   } | null>(null);
   const [failed, setFailed] = useState(false);
   const [showKnownParts, setShowKnownParts] = useState(false);
+  projection.current = { objectKey, showKnownParts, targetsKey };
   useEffect(() => {
     // Retry replaces the canvas so a lost WebGL context gets a fresh surface.
     const surfaceGeneration = retry;
-    const presentedObject = JSON.parse(objectKey) as ObjectView;
+    const presentedObject = JSON.parse(projection.current.objectKey) as ObjectView;
     const surface = canvas.current;
     const frame = container.current;
     if (!surface || !frame || surface.dataset.generation !== String(surfaceGeneration)) return;
@@ -122,10 +127,10 @@ export default function Inspection3D({
     const rimLight = new DirectionalLight('#d4e3dc', 1.3);
     rimLight.position.set(3, 2, -3);
     scene.add(rimLight);
-    const model = createObjectModel(
+    let model = createObjectModel(
       presentedObject,
-      showKnownParts,
-      targetsKey.split(',').filter(Boolean) as RepairTarget[],
+      projection.current.showKnownParts,
+      projection.current.targetsKey.split(',').filter(Boolean) as RepairTarget[],
     );
     const raycaster = new Raycaster();
     pick.current = (x, y) => {
@@ -185,6 +190,7 @@ export default function Inspection3D({
     shadow.position.y = -0.025;
     shadow.scale.set(1.25, 0.65, 1);
     scene.add(shadow);
+    let animationFrame = 0;
     function draw(x: number, y: number) {
       model.root.rotation.set(x, y, 0);
       renderer.render(scene, camera);
@@ -193,6 +199,35 @@ export default function Inspection3D({
     highlight.current = (target) => {
       model.highlight(target);
       draw(angle.current.x, angle.current.y);
+    };
+    function animatePreview() {
+      cancelAnimationFrame(animationFrame);
+      if (
+        !model.animateOperation(0) ||
+        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      ) {
+        model.animateOperation(1);
+        draw(angle.current.x, angle.current.y);
+        return;
+      }
+      let start: number | null = null;
+      function frame(now: number) {
+        start ??= now;
+        const fraction = Math.min(1, (now - start) / 720);
+        model.animateOperation(fraction);
+        draw(angle.current.x, angle.current.y);
+        if (fraction < 1) animationFrame = requestAnimationFrame(frame);
+      }
+      animationFrame = requestAnimationFrame(frame);
+    }
+    replaceModel.current = (nextObject, known, targets) => {
+      scene.remove(model.root);
+      model.dispose();
+      model = createObjectModel(nextObject, known, targets);
+      scene.add(model.root);
+      model.highlight(selectedTargetRef.current);
+      draw(angle.current.x, angle.current.y);
+      animatePreview();
     };
     function size() {
       const width = frame?.clientWidth ?? 320;
@@ -214,14 +249,17 @@ export default function Inspection3D({
     readiness.current?.(actionAvailable);
     function contextLost(event: Event) {
       event.preventDefault();
+      cancelAnimationFrame(animationFrame);
       render.current = null;
       highlight.current = null;
       pick.current = null;
       readiness.current?.(false);
+      replaceModel.current = null;
       setFailed(true);
     }
     surface.addEventListener('webglcontextlost', contextLost);
     return () => {
+      cancelAnimationFrame(animationFrame);
       surface.removeEventListener('webglcontextlost', contextLost);
       resize.disconnect();
       highlight.current = null;
@@ -232,9 +270,17 @@ export default function Inspection3D({
       model.dispose();
       shadowGeometry.dispose();
       shadowMaterial.dispose();
+      replaceModel.current = null;
       renderer.dispose();
     };
-  }, [objectKey, showKnownParts, targetsKey, retry, actionAvailable]);
+  }, [retry, actionAvailable]);
+  useEffect(() => {
+    replaceModel.current?.(
+      JSON.parse(objectKey) as ObjectView,
+      showKnownParts,
+      targetsKey.split(',').filter(Boolean) as RepairTarget[],
+    );
+  }, [objectKey, showKnownParts, targetsKey]);
   function turn(dx: number, dy: number) {
     angle.current = {
       x: Math.max(-0.6, Math.min(0.6, angle.current.x + dx)),
@@ -273,7 +319,7 @@ export default function Inspection3D({
     <div className="inspection-view">
       <div className="inspection-frame" ref={container}>
         <canvas
-          key={`${retry}-${showKnownParts ? 'parts' : 'shell'}`}
+          key={retry}
           data-generation={retry}
           ref={canvas}
           tabIndex={0}
@@ -338,20 +384,25 @@ export default function Inspection3D({
       <p className="inspection-hint">Drag to turn it. Arrow keys work too.</p>
       {onAction && object.inspected && (
         <p className="inspection-hint">
-          Work tray:{' '}
+          {object.assembly
+            ? object.assembly.state === 'open'
+              ? 'Open assembly: '
+              : 'Assembled object: '
+            : 'Examined parts: '}
           {[
             ...new Set(
               bindings
                 .filter((b) => !['shell', 'operation', 'mechanism'].includes(b.target))
                 .map((b) => b.label),
             ),
-          ].join(' · ') || 'Use the whole mechanism'}
+          ].join(' · ') ||
+            (object.assembly ? getRepairTargetLabel(object, 'cover') : 'Use the whole mechanism')}
         </p>
       )}
       {onAction && bindings.length > 0 && (
         <fieldset className="inspection-tools">
           <legend>Choose a tool, then touch the object or examined part</legend>
-          {bindings.map(({ action, label }) => (
+          {bindings.map(({ action }) => (
             <button
               type="button"
               key={action.id}
@@ -360,14 +411,14 @@ export default function Inspection3D({
               aria-pressed={tool === action.id}
               onClick={() => setTool(tool === action.id ? null : action.id)}
             >
-              {repairToolNames[action.id] ?? label}
+              {getRepairToolName(object, action)}
             </button>
           ))}
-          {picked && <p className="inspection-hint">{repairTargetLabels[picked]}</p>}
+          {picked && <p className="inspection-hint">{getRepairTargetLabel(object, picked)}</p>}
           {tool && (
             <p role="status">
               {bindings.find((b) => b.action.id === tool)?.action.label} ·{' '}
-              {repairTargetLabels[selectedTarget ?? 'shell']}.{' '}
+              {getRepairTargetLabel(object, selectedTarget ?? 'shell')}.{' '}
               {bindings.find((b) => b.action.id === tool)?.action.detail}
             </p>
           )}

@@ -1,0 +1,181 @@
+{
+  "seed": 1701,
+  "sha256": "685bbfe4af51aadd0660c889d5d346570d616cf55501e297bc06edf3d857a201",
+  "inputs": [
+    {
+      "at": 840,
+      "input": {
+        "type": "action",
+        "id": "talk-family"
+      }
+    },
+    {
+      "at": 844,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 848,
+      "input": {
+        "type": "action",
+        "id": "test-battery"
+      }
+    },
+    {
+      "at": 852,
+      "input": {
+        "type": "action",
+        "id": "clean-contact"
+      }
+    },
+    {
+      "at": 864,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 868,
+      "input": {
+        "type": "action",
+        "id": "wait-check"
+      }
+    },
+    {
+      "at": 878,
+      "input": {
+        "type": "action",
+        "id": "wait-check"
+      }
+    },
+    {
+      "at": 888,
+      "input": {
+        "type": "action",
+        "id": "shelve"
+      }
+    },
+    {
+      "at": 892,
+      "input": {
+        "type": "select",
+        "id": "family"
+      }
+    },
+    {
+      "at": 892,
+      "input": {
+        "type": "action",
+        "id": "check-result"
+      }
+    },
+    {
+      "at": 896,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 900,
+      "input": {
+        "type": "action",
+        "id": "inspect"
+      }
+    },
+    {
+      "at": 904,
+      "input": {
+        "type": "action",
+        "id": "talk-garage"
+      }
+    },
+    {
+      "at": 908,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-look"
+      }
+    },
+    {
+      "at": 911,
+      "input": {
+        "type": "action",
+        "id": "workshop-cabinet-plan"
+      }
+    },
+    {
+      "at": 913,
+      "input": {
+        "type": "action",
+        "id": "search-donor"
+      }
+    },
+    {
+      "at": 917,
+      "input": {
+        "type": "action",
+        "id": "fit-holder"
+      }
+    },
+    {
+      "at": 929,
+      "input": {
+        "type": "action",
+        "id": "verify"
+      }
+    },
+    {
+      "at": 933,
+      "input": {
+        "type": "action",
+        "id": "find-paper-street"
+      }
+    },
+    {
+      "at": 937,
+      "input": {
+        "type": "action",
+        "id": "paper-street-sign"
+      }
+    },
+    {
+      "at": 943,
+      "input": {
+        "type": "action",
+        "id": "childhood-measure-model"
+      }
+    },
+    {
+      "at": 953,
+      "input": {
+        "type": "select",
+        "id": "personal"
+      }
+    },
+    {
+      "at": 953,
+      "input": {
+        "type": "action",
+        "id": "ask-dad"
+      }
+    },
+    {
+      "at": 961,
+      "input": {
+        "type": "action",
+        "id": "return"
+      }
+    },
+    {
+      "at": 965,
+      "input": {
+        "type": "action",
+        "id": "next-day"
+      }
+    }
+  ]
+}

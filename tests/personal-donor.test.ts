@@ -101,6 +101,7 @@ it('making a work card keeps its text on the actual model when the model is shel
     'talk-family',
     'inspect',
     'clean-contact',
+    'reassemble',
     'early-return',
     'shelve',
     'talk-garage',

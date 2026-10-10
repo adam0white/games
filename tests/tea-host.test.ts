@@ -51,8 +51,9 @@ for (const participant of ['player', 'mum'] as const)
     const { line, next } = response(s);
     expect(line?.speaker).toBe('You');
     expect(line?.text).toContain(
-      participant === 'player' ? 'You leave the invitation' : 'invitation can wait',
+      participant === 'player' ? 'You leave the invitation' : 'Mum keeps her own plans',
     );
+    expect(line?.text).toContain('“Keep resting” underway when you asked.');
     expect(line?.text).not.toContain('It’s nice');
     expect(next.humanNote).toBe('You took a quiet break.');
   });

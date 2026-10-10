@@ -14,6 +14,7 @@ import { quietPracticeOffers } from './practices';
 export type TeaReport = {
   kind: 'joined' | 'refused' | 'shortened';
   participant?: 'player' | 'mum';
+  activity?: string;
   elapsed: number;
 };
 
@@ -51,10 +52,13 @@ export function shareTea(
     liveOrdinaryTime(mum, until);
   };
   if (refusal >= 0 || until <= startedAt || mum.now !== startedAt) {
+    const who = choices[refusal >= 0 ? refusal : 0];
+    const activity = who?.[0].activity?.affordance.label;
     ordinary();
     onResult?.({
       kind: 'refused',
-      participant: choices[refusal >= 0 ? refusal : 0]?.[2],
+      participant: who?.[2],
+      ...(activity ? { activity } : {}),
       elapsed: 0,
     });
     return false;
