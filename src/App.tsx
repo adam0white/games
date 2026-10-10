@@ -118,6 +118,8 @@ export default function App() {
   const view = getView(game);
   const workshop = getWorkshopView(game);
   const serviceWeek = getServiceWeekView(game);
+  const workshopArrangement =
+    serviceWeek && serviceWeek.route !== 'undecided' ? serviceWeek.detail : workshop?.arrangement;
   const timeAwayIds = new Set(['next-day', 'back-to-school', 'wait-person']);
   const isProjectAction = (action: ActionView) =>
     /^workshop-(cabinet|drawings|display-drawing|keep-drawing)/.test(action.id);
@@ -684,7 +686,7 @@ export default function App() {
                 <p>{workshop.notebook.cash} kept for the workshop.</p>
               </details>
             )}
-            {workshop.arrangement && <p className="workshop-arrangement">{workshop.arrangement}</p>}
+            {workshopArrangement && <p className="workshop-arrangement">{workshopArrangement}</p>}
           </aside>
         )}
         {view.whereabouts && view.whereabouts.length > 0 && (

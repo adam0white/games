@@ -820,12 +820,21 @@ export function applyServiceWeekAction(
         ),
         line(
           'You',
-          `${w.jobs.filter((j) => j.stage === 'returned').length} checked service-week jobs returned;${w.jobs.some((j) => j.stage === 'returned-unchecked') ? ` ${w.jobs.filter((j) => j.stage === 'returned-unchecked').length} unchecked collections settled without fees;` : ''} ${w.jobs.filter((j) => j.independent).length} carried independently by Sam. ${w.personalSession === 'spent' ? `You spent ${w.personalMinutes ?? 45} minutes in the saved model session.` : w.personalSession === 'changed' ? 'The model session has a new place in the notebook.' : 'The personal work remains available when you choose it.'} ${w.checkingPlace === 'second' ? 'The second checking tray is paid for.' : 'The shared checking place stays clear.'} ${ctx.checkedHouseholdAndPersonal !== undefined ? `${ctx.checkedHouseholdAndPersonal} household and personal items are also checked; their history remains at the bench. ` : ''}${w.part === 'recovered' ? (ctx.paperStreetRepaired ? 'Evan’s measured donor gear is installed in the model, whose movement has been checked; its source stays in the notebook.' : ctx.paperStreetInstalled ? 'Evan’s measured donor gear is installed in the model; its movement still needs checking.' : 'Evan’s measured donor gear is kept with its source label.') : 'You have not taken a donor gear.'}`,
+          `${w.jobs
+            .filter((j) => j.stage === 'returned')
+            .map(
+              (j) =>
+                `${serviceWeekSpecs.find((spec) => spec.id === j.id)?.title ?? 'The lamp'} is back with its owner, checked.`,
+            )
+            .join(
+              ' ',
+            )} ${w.jobs.some((j) => j.stage === 'returned-unchecked') ? 'The lamps collected without a full check were settled honestly, without a repair fee.' : ''} ${w.jobs.some((j) => j.independent) ? 'Sam carried his agreed work through to collection while you had room for something else.' : ''} ${w.personalSession === 'spent' ? 'You kept the saved model session for your own work.' : w.personalSession === 'changed' ? 'The model session has a new place in the notebook.' : 'The personal work remains available when you choose it.'} ${w.checkingPlace === 'second' ? 'The second checking tray is ready beside the first.' : ''} ${(ctx.checkedHouseholdAndPersonal ?? 0) > 0 ? 'The earlier household and personal repairs still have their place in the notebook. ' : ''}${w.part === 'recovered' ? (ctx.paperStreetRepaired ? 'Evan’s measured donor gear is installed in the model, whose movement has been checked; its source stays in the notebook.' : ctx.paperStreetInstalled ? 'Evan’s measured donor gear is installed in the model; its movement still needs checking.' : 'Evan’s measured donor gear is kept with its source label.') : ''}`,
           'notice',
         ),
         line(
-          'Dad',
-          'Keep the notebook. It tells you what you agreed, and what you decided to leave room for.',
+          'You',
+          'The notebook keeps what you agreed, and what you decided to leave room for.',
+          'notice',
         ),
       ],
       10,

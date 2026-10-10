@@ -150,3 +150,41 @@ The same reader found optional cabinet conversation and a later school-year beat
 Independent interface review also removed repeated diagnostic captions from ordinary illustrations, 3D and fallback inspection. The single current response, physical object description, accessible evidence and saved Notes remain. Actual desktop/mobile and deliberately disabled-WebGL checks verified that repair evidence can still be found after tea changes the current conversation.
 
 The final engine 8 check passed 184 tests across 31 files, lint, strict types and production build. A valid frozen-engine-7 public-action route saved during an unfinished waiting activity confirmed that its original endpoint completes before passive timing takes over. A timed run needs no separately taught waiting step, but elapsed time alone grants no result; withholding the actual result-reading method still makes Sam ask for help. Absent demonstration or explanation cannot teach him, and helping during an existing job preserves assistance provenance.
+
+
+## Actual public engine 8 returning player
+
+The same source-unread wildcard continued its real 206-input published-engine-7 story on the public engine-8 site. It made 53 further visible choices, exported 259 total inputs to `/tmp/public8-wildcard-small-ending.json`, and imported that export in a fresh public browser with its completed week restored. This is an independent agent playtest, not Adam's acceptance.
+
+> “The earlier lessons were still worth something.”
+
+> “I can keep helping without making this my whole job.”
+
+Sam completed Dad's additional inspection light and then Nora's porch light without a player rescue. The reader chose occasional favours, offered Nora a later collection, kept its reserved model session, helped Evan sort his donor stand, installed the matching gear and checked the model. Two service-week jobs returned; the player chose not to delegate those jobs, then chose to keep the work small. The reviewer considered that a meaningful alternative to growing a shop, with Sam's earned competence available even when unused.
+
+Remaining observations: the imported scene initially looked unchanged until a wait exposed the additional request; a footer retained the earlier priced-work wording despite the current favours agreement; and numerical final counts sounded more like a test report than the surrounding personal story. The footer is being corrected at the presentation layer. The finished model and Dad's “Keep the notebook” were the stronger ending. No blocker was encountered in this continuation.
+
+
+## Actual public engine 8 fresh player — mid-run observations
+
+A separate tiny-brief reader started at fourteen on the actual public build without reading source or hidden faults. It completed four repairs, taught Sam through his own torch, finished the cabinet with Dad over an agreed next-day appointment, saved the drawing and progressed through school to eighteen. Checkpoints are `/tmp/repair-fresh-player-checkpoint-day2.json` and `/tmp/repair-fresh-player-age18-intake-block.json`.
+
+> “Strongest moments are Nora protecting the quiet morning and setting boundaries around referrals, Mum declining help to finish her chapter, and returning childhood lamp.”
+
+> “Unlike cabinet scheduling, no visible way to book this conversation or learn when he'll be receptive.”
+
+The reader noticed late prayer announcements and Dad's drawing remark at his departure. Independent reconstruction showed distinct actual eight-minute prayers being reported at the player's action end, rather than repeated prayer; the drawing retrieval crossed Dad's scheduled departure without being a shared HF conversation. The current timeline correction preserves those historical exports, words already heard and actual durations while reporting subsequent routines honestly and removing absent-speaker narration.
+
+At eighteen it received five intake-discussion refusals on the first day and one next morning, despite Dad answering optional remarks. The seventh attempt, at the next morning's 09:32 quiet break, succeeded. This is a progression-friction finding rather than a hard lock; its underlying HF decision and available explanation are under independent review. The reader continues organically rather than receiving a solution from the developers.
+
+
+The fresh reader then explained inspection, battery comparison, battery replacement and a longer check. Sam stopped at the sorting lamp's untaught contact fault, received an explanation after the player took responsibility, completed the unfamiliar folding lamp while supervised and then carried Nora's shaded porch light independently through return.
+
+> “This is the strongest new game moment.”
+
+> “Wording such as 'A rescued job is not an independent completion' feels like framework evidence commentary rather than a teenager's world; behavior itself carries the point.”
+
+Together with the returning wildcard's ending observation, this prompted a bounded current-story wording pass. Shared repairs remain assisted in actual state; their explanation should describe working together rather than present acceptance terminology. The concluding scene should reflect actual kept work and personal objects while counts remain notebook information.
+
+
+The fresh public reader reached the working week and verified actual paid delegation: Leila's £5 collection, Sam's £2 payment and £11 conserved workshop cash after £8 from earlier work. It chose Nora's later collection to preserve personal model time. Accepting Nora's lamp replaced the active model without putting it on the visible shelf. The saved model was still present, but the UI offered no way to reach it, even after recovering Evan's matching gear. Actual checkpoint: `/tmp/repair-fresh-player-missing-model.json`, age eighteen, Summer day 5 at 17:43, service week day 3. The reader did not inspect raw state or source. This is a blocking return-to-personal-work defect, not a new content request; the final current-engine correction must preserve and expose the existing object, never invent a replacement or grant a repair.

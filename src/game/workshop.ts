@@ -57,6 +57,7 @@ export interface WorkshopState {
     playerId: string;
     status: 'planned' | 'kept' | 'cancelled' | 'missed';
   };
+  spaceRefusalActivity?: { id: string; endsAt: number };
   drawingFound: boolean;
   drawingChoice: 'undecided' | 'displayed' | 'kept';
   projectOpen: boolean;
@@ -297,7 +298,7 @@ export function workshopActions(s: WorkshopGame, ctx: WorkshopContext): ActionVi
     add(
       'workshop-intake-space',
       'Agree a labelled intake corner with Dad',
-      'His vice and the rest of his work still belong here.',
+      'If he agrees, spend eight minutes clearing and labelling the corner together. His vice and the rest of his work still belong here.',
     );
   if (
     w.referral === 'permitted' &&
@@ -625,8 +626,9 @@ export function applyWorkshopAction(
             'notice',
           ),
           line(
-            'Dad',
-            'You had a reason for every bit of tape on those roofs. We can put this one by the finished cabinet, if you like.',
+            'You',
+            'The tape follows the roof folds you drew. You can put this one beside the finished cabinet, or keep it in the flat box.',
+            'notice',
           ),
         ],
         10,

@@ -141,15 +141,14 @@ export function apprenticeActions(
     offers.push({
       id: 'reconsider-sam',
       label: 'Ask Sam to reconsider the kept observation with you nearby',
-      detail:
-        'He decides again from what he actually knows. This is assisted practice, even if he now knows the missing method.',
+      detail: 'You stay beside him while he tries the next step.',
       kind: 'primary',
     });
   if (a.needsHelp && a.jobId)
     offers.push({
       id: 'take-over-repair',
       label: 'Take responsibility for the stopped repair',
-      detail: 'Preserve his observations. A rescued job is not an independent completion.',
+      detail: 'You’ll finish this one; Sam’s observations stay with it.',
     });
   return offers;
 }

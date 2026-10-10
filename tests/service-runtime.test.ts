@@ -47,8 +47,8 @@ it('a genuine earned private week discovers its own model and closes without fic
   s = choose(s, 'service-close-small');
   expect(s.serviceWeek?.conclusion).toBe('small');
   const ending = s.conversation.map((line) => line.text).join(' ');
-  expect(ending).toContain('0 checked service-week jobs returned');
-  expect(ending).toContain('household and personal items are also checked');
+  expect(ending).not.toContain('checked service-week jobs returned');
+  expect(ending).toContain('earlier household and personal repairs still have their place');
   expect(ending).toContain('installed in the model, whose movement has been checked');
   expect(ending).not.toContain('gear is kept with its source label');
   expect(s.workshop?.cash ?? 0).toBe(0);

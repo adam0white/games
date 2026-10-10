@@ -1,6 +1,6 @@
 # Broad roadmap
 
-Updated 2026-10-10 during the owner-authorized five-hour run. M0 planning, the school-break home/garage campaign and bounded M3–M4 teaching/independent handoff are implemented and independently reviewed. The public game is at https://repair.adamwhite.work, using released HF 2.2.0; HANDOFF.md records the exact deployed checkpoint. Adam's earlier playtest established curiosity and believable diagnosis; acceptance of this substantially expanded chapter remains his decision. The first service week turns delegation into actual choices about promises, money, personal time and staying small. Engine 8 continuity and honest recovery passed independent review, 184 tests and the full build checks before publication. Tests, technical reviews and deployment do not substitute for that playtest.
+Updated 2026-10-10 during the owner-authorized five-hour run. M0 planning, the school-break home/garage campaign and bounded M3–M4 teaching/independent handoff are implemented and independently reviewed. The public game is at https://repair.adamwhite.work, using released HF 2.2.0; HANDOFF.md records the exact deployed checkpoint. Adam's earlier playtest established curiosity and believable diagnosis; acceptance of this substantially expanded chapter remains his decision. The first service week turns delegation into actual choices about promises, money, personal time and staying small. Engine 9 timeline and personal-work recovery passed independent review, 188 tests and the full build checks before publication. Tests, technical reviews and deployment do not substitute for that playtest.
 
 ## Near milestones
 
@@ -76,3 +76,19 @@ The broader simulations and additional businesses retain their 2026-11-09 review
 - **Review by 2026-11-09:** show the house accumulating its actual checked repairs. Keep ownership, unfinished work and absent collections honest; do not fabricate a gallery of universally finished objects.
 - **Review by 2026-11-09:** more observed comparisons for mechanical families where a real alternative hypothesis exists. Preserve the small, clear early repair; avoid adding implausible failure options solely to disguise a straightforward mechanism.
 - **Review by 2026-11-09:** make repeated family time less generic through run-dependent ordinary conversation and actually received memories. Tea should not become a required testing currency, a relationship purchase or an invented physiology subsystem.
+
+
+## Story proposals from the returning public player
+
+Review by 2026-11-09 after Adam's expanded-chapter playtest; these are proposals, not established canon or an active implementation queue.
+
+- A neighbour's object carries older repair labels and incompatible replacement standards. Observed measurements and the owner's partial memory can expose a gap between the old “KEEP IN SERVICE” promise and what actually remains possible. Repair, adaptation and refusal should all remain honest options.
+- A competent Sam proposes his own small project. His parts-counter experience can motivate it, but independence must change his relationship with the player as well as repair throughput. Offering time or a method is separate from owning his choices.
+- Someone recognises a shopfront in the repaired paper street and later brings an object associated with it. Their memory is partial, not an authoritative explanation of the world. The personal project becomes a reason for a future encounter.
+- Displaying the childhood drawing beside the cabinet can invite a later conversation; keeping it boxed allows a private version. Neither choice should become a hidden progression penalty.
+- A future small ending should foreground the actual shutters, drawing, collected objects and evening at home. Move repair counts to optional notebook reference rather than making the final personal scene sound like an acceptance report.
+
+Leave the cause of changing standards unresolved: deliberate control, commercial incentives and ordinary institutional failure remain competing interpretations. No single villain or definitive cause has been established.
+
+- **Review by 2026-11-09:** explicit received availability cues for Sam after evenings and in later school holidays. Current known visit and routine hints require actual disclosure; do not silently teleport him or promise attendance from a schedule alone.
+- **Review by 2026-11-09:** broaden Sam's explicitly demonstrated methods beyond battery/contact lamps, starting with an observed torch-cap or sewing-box comparison. Unknown mechanisms must remain honest help-seeking until actually taught; scalar skill alone is not a new method.

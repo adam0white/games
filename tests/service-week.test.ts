@@ -253,7 +253,7 @@ it('a moved personal session remains concretely playable and reflection requires
   s.now = 4 * 1440 + 540;
   expect(
     action(s, 'service-close-small')?.lines.some((l) =>
-      l.text.includes('minutes in the saved model session'),
+      l.text.includes('kept the saved model session'),
     ),
   ).toBe(true);
 });

@@ -38,6 +38,7 @@ import { restoreGame as restoreEngine4 } from './engine4';
 import { restoreGame as restoreEngine5 } from './engine5';
 import { restoreGame as restoreEngine6 } from './engine6';
 import { restoreGame as restoreEngine7 } from './engine7';
+import { restoreGame as restoreEngine8 } from './engine8';
 import {
   askMumToHelp,
   beginSharedConversation,
@@ -95,7 +96,7 @@ import {
   workshopActions,
 } from './workshop';
 
-const ENGINE = 'home-garage-8';
+const ENGINE = 'home-garage-9';
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 const object = (
   id: string,
@@ -122,6 +123,14 @@ const object = (
 });
 const focused = (s: GameState) =>
   s.objects.find((o) => o.id === s.focusId && o.discovered && o.location !== 'returned');
+/** A newly accepted object takes the player's place; other unfinished work stays reachable. */
+function focusWorkbench(s: GameState, item: RepairObject) {
+  for (const previous of s.objects)
+    if (previous.id !== item.id && previous.location === 'bench' && previous.assignedTo !== 'sam')
+      previous.location = 'shelf';
+  if (item.assignedTo !== 'sam') item.location = 'bench';
+  s.focusId = item.id;
+}
 function say(
   s: GameState,
   speaker: string,
@@ -348,25 +357,33 @@ function advancePeople(s: GameState) {
   for (const [id, person] of Object.entries(s.people)) {
     if (id === 'player') continue;
     const presence = s.world?.presence[id];
+    const notices: { action: string; from: number; until: number }[] = [];
     const activity = liveOrdinaryTime(
       person,
       s.now,
       (at) => at >= (presence?.awayUntil ?? 0) && !scheduledAway(s, id, at),
       (offer) => {
-        if (id === 'sam' && offer.action === 'walk')
-          sayRoutineOnce(
-            s,
-            'Sam',
-            'I’m taking the dog out now. Keep the work labelled; I’ll come back afterward.',
-          );
-        if (id === 'mum' && offer.action === 'pray')
-          sayRoutineOnce(
-            s,
-            'Mum',
-            'I’m going to pray quietly for a few minutes. I’ll leave my book here.',
-          );
+        if ((id === 'sam' && offer.action === 'walk') || (id === 'mum' && offer.action === 'pray'))
+          notices.push({
+            action: offer.action,
+            from: person.now,
+            until: person.activity?.endsAt ?? person.now,
+          });
       },
     );
+    const latest = notices.at(-1);
+    if (latest) {
+      const occurred = gameTimeLabel({ ...s, now: latest.from });
+      const ongoing = person.activity?.action === latest.action && person.activity.endsAt > s.now;
+      const description = latest.action === 'pray' ? 'quiet prayer' : 'taking the dog out';
+      sayRoutineOnce(
+        s,
+        'You',
+        ongoing
+          ? `${id === 'mum' ? 'Mum' : 'Sam'} is ${latest.action === 'pray' ? 'praying quietly' : 'taking the dog out'}; this began at ${occurred}.`
+          : `${id === 'mum' ? 'Mum' : 'Sam'} ${latest.action === 'pray' ? 'prayed quietly' : 'took the dog out'} earlier, starting at ${occurred}.${notices.length > 1 ? ` Other ordinary ${description} moments passed during this stretch.` : ''}`,
+      );
+    }
     if (presence && isHere(s, id)) presence.activity = activity;
     else if (presence && s.now >= presence.awayUntil && scheduledAway(s, id))
       presence.activity =
@@ -514,6 +531,21 @@ function settleReturned(s: GameState) {
       say(s, line.speaker, line.text, line.tone);
   }
 }
+function dadSpaceWait(s: GameState) {
+  const remembered = s.workshop?.spaceRefusalActivity;
+  const current = s.people.dad?.activity;
+  return !s.workshop?.intakeSpace &&
+    remembered &&
+    current &&
+    isHere(s, 'dad') &&
+    current.affordanceId === remembered.id &&
+    current.endsAt === remembered.endsAt &&
+    Number.isFinite(current.endsAt) &&
+    current.endsAt > s.now &&
+    !scheduledAway(s, 'dad', current.endsAt)
+    ? current
+    : undefined;
+}
 function workshopContext(s: GameState, choices = false): WorkshopContext {
   let dadReason =
     'I want to keep my own plans for now. Leave the notebook there; we can ask again another time.';
@@ -583,7 +615,9 @@ function workshopContext(s: GameState, choices = false): WorkshopContext {
             if (!agreed)
               dadReason =
                 dad.body.sleepPressure > 0.8 || dad.body.exertion > 0.8
-                  ? 'I am too tired to give those hinges careful attention now. Keep the marks; the work can wait.'
+                  ? task === 'space'
+                    ? 'I am too tired to clear and label incoming work carefully now. The arrangement can wait.'
+                    : 'I am too tired to give those hinges careful attention now. Keep the marks; the work can wait.'
                   : dad.activity
                     ? `I am in the middle of my own activity: ${dad.activity.affordance.label.toLowerCase()}. Keep the notebook there; ask again another time.`
                     : 'I want to keep my own plans for now. Leave the notebook there; we can ask again another time.';
@@ -774,6 +808,14 @@ function available(s: GameState): ActionView[] {
     !s.serviceWeek?.paidHelp &&
     s.serviceWeek?.jobs.some((job) => job.id === o.id && job.stage === 'accepted' && job.fee > 0)
   );
+  const dadWaiting = dadSpaceWait(s);
+  if (dadWaiting)
+    add(
+      'wait-dad-activity',
+      `Let Dad finish: ${dadWaiting.affordance.label}`,
+      'Wait to the end of what he is doing. He may still keep his own plans.',
+      'primary',
+    );
   a.push(
     ...apprenticeActions(s, o, isHere(s, 'sam'), (id) => isHere(s, id)).filter(
       (action) => !needsServiceRate || action.id !== 'delegate-repair',
@@ -1049,7 +1091,7 @@ export function transition(original: GameState, input: GameInput): GameState {
     if (!ready) throw Error('No earlier check is ready');
     if (previous) previous.location = 'shelf';
     ready.location = 'bench';
-    s.focusId = ready.id;
+    focusWorkbench(s, ready);
     say(
       s,
       'You',
@@ -1146,7 +1188,7 @@ export function transition(original: GameState, input: GameInput): GameState {
     item.location = 'bench';
     item.checkStarted = undefined;
     item.collectedAt = undefined;
-    s.focusId = item.id;
+    focusWorkbench(s, item);
     advancePeople(s);
     say(
       s,
@@ -1285,7 +1327,7 @@ export function transition(original: GameState, input: GameInput): GameState {
       item.appearance = spec.appearance;
       item.inspectText = spec.inspectText;
       s.objects.push(item);
-      s.focusId = item.id;
+      focusWorkbench(s, item);
       if (spec.materialsBatteryProvided) s.parts.batteries++;
     }
     if (serviceResult.promise && s.people.player) {
@@ -1305,7 +1347,7 @@ export function transition(original: GameState, input: GameInput): GameState {
         item.awaitingCollection = false;
         item.collectedAt = undefined;
         item.callbackAt = undefined;
-        s.focusId = item.id;
+        focusWorkbench(s, item);
       }
     }
     if (
@@ -1366,8 +1408,30 @@ export function transition(original: GameState, input: GameInput): GameState {
     for (const line of serviceResult.lines) say(s, line.speaker, line.text, line.tone);
     return s;
   }
+  if (id === 'wait-dad-activity') {
+    const current = dadSpaceWait(s);
+    if (!current) throw Error('Dad is no longer doing that activity');
+    const until = current.endsAt;
+    advanceBenchBeforePlayer(s, until);
+    if (s.people.player) liveOrdinaryTime(s.people.player, until);
+    s.now = until;
+    advancePeople(s);
+    say(
+      s,
+      'You',
+      'You leave Dad time to finish what he was doing. The place on the bench is still a conversation to have.',
+    );
+    return s;
+  }
   const workshopResult = applyWorkshopAction(s, id, workshopContext(s, true));
   if (workshopResult) {
+    if (id === 'workshop-intake-space' && s.workshop) {
+      const current = s.people.dad?.activity;
+      s.workshop.spaceRefusalActivity =
+        !s.workshop.intakeSpace && current
+          ? { id: current.affordanceId, endsAt: current.endsAt }
+          : undefined;
+    }
     for (const personId of workshopResult.personIds ?? []) {
       if (!s.people[personId])
         s.people[personId] = createPerson({
@@ -1391,7 +1455,7 @@ export function transition(original: GameState, input: GameInput): GameState {
       item.appearance = job.appearance;
       item.inspectText = job.inspectText;
       s.objects.push(item);
-      s.focusId = item.id;
+      focusWorkbench(s, item);
     }
     const shared = s.people.player?.activity?.affordanceId.startsWith('cabinet-')
       ? s.people.player.activity
@@ -1545,7 +1609,7 @@ export function transition(original: GameState, input: GameInput): GameState {
       );
       s.objects.push(item);
       s.parts.batteries++;
-      s.focusId = item.id;
+      focusWorkbench(s, item);
       speak(
         owner,
         'Here it is, and a spare cell if it actually needs one. Tell me what you find rather than changing it blindly.',
@@ -1598,7 +1662,7 @@ export function transition(original: GameState, input: GameInput): GameState {
         item.playerAssisted = true;
         item.assignedTo = undefined;
         item.location = 'bench';
-        s.focusId = item.id;
+        focusWorkbench(s, item);
       }
       s.apprentice.jobId = undefined;
       s.apprentice.pending = undefined;
@@ -2113,7 +2177,7 @@ export function transition(original: GameState, input: GameInput): GameState {
       item.appearance =
         spec.form === 'lamp' ? (spec.owner === 'Dad' ? 'reading' : 'kitchen') : spec.form;
       s.objects.push(item);
-      s.focusId = item.id;
+      focusWorkbench(s, item);
       if (!isMechanical(item)) s.parts.batteries++;
       if (spec.owner === 'Sam' && !s.unlocked.includes('met-sam')) s.unlocked.push('met-sam');
       break;
@@ -2125,7 +2189,7 @@ export function transition(original: GameState, input: GameInput): GameState {
       item.repairText = spec.repairText;
       item.appearance = 'model';
       s.objects.push(item);
-      s.focusId = item.id;
+      focusWorkbench(s, item);
       for (const line of spec.requestLines)
         if (isHere(s, line.speaker.toLowerCase())) say(s, line.speaker, line.text, line.tone);
       break;
@@ -2374,7 +2438,12 @@ export function getView(s: GameState): GameView {
       ...s.conversation.filter((line) => !s.journal?.some((entry) => entry.id === line.id)),
     ].sort((a, b) => a.id - b.id),
     shelf: s.objects
-      .filter((x) => x.discovered && x.location === 'shelf')
+      .filter(
+        (x) =>
+          x.discovered &&
+          (x.location === 'shelf' ||
+            (x.location === 'bench' && x.id !== s.focusId && x.assignedTo !== 'sam')),
+      )
       .map((x) => ({
         id: x.id,
         title: x.title,
@@ -2427,8 +2496,13 @@ export function restoreGame(text: string): GameState {
       'home-garage-5',
       'home-garage-6',
       'home-garage-7',
+      'home-garage-8',
     ].includes(data?.engine)
   ) {
+    if (data.engine === 'home-garage-8') {
+      const validated = restoreEngine8(text);
+      return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };
+    }
     if (data.engine === 'home-garage-7') {
       const validated = restoreEngine7(text);
       return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };
