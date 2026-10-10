@@ -1,18 +1,18 @@
 # Broad roadmap
 
-2026-10-09. Only planning is authorized. M0 is the current delivery; M1–M4 are the proposed standalone MVP. Later stages preserve ambition without scheduling implementation.
+2026-10-09. The owner authorized autonomous implementation through a meaningful playtesting dependency. M0 planning is delivered. M1 and a bounded portion of M2 are implemented and reviewed for the first playable taste checkpoint; Adam's acceptance is pending. M2 promises, commercial time/cost tradeoffs and M3–M4 apprenticeship remain future work. Later stages preserve ambition without scheduling implementation.
 
 ## Near milestones
 
 | Milestone | Player experience | Capability / question | Stop when |
 |---|---|---|---|
-| M0: establish the project | A concrete proposal to review | Can the opening and first handoff support the larger ambition? | Local repository, owner directions, researched references, reviewed roadmap and MVP draft exist. Adam reviews the MVP before code starts. |
+| M0: establish the project | A concrete proposal to review | Can the opening and first handoff support the larger ambition? | Delivered: local repository, owner directions, researched references, reviewed roadmap and MVP draft. Autonomous implementation authorized by the owner's subsequent direction. |
 | M1: family tinkering | Fix one meaningful object at home; discover a second object you cannot yet finish | Is repair itself interesting, with informative tests and understandable consequences? | One short playable episode supports repair, putting work aside and later resumption. Adam enjoys the core decisions without hiring. |
 | M2: friends in the garage | Handle a small queue, recover useful parts, keep or renegotiate a promise | Can parts, partial work and customer relationships make a small business feel real? | A compact garage episode has understandable quality, time and cost tradeoffs, and persistent repairs. No simulated market is needed. |
 | M3: teach one apprentice | Demonstrate, supervise and hand over a complete repair | Does teaching change a person's decisions on unfamiliar variants? | A generic HF control distinguishes learned procedure from skill-only growth and click replay; the game visibly demonstrates it. Framework scope is selected only after checking released HF. |
 | M4: first prestige | The apprentice owns an entire repair while you choose broader work or return to your bench | Does reduced supervision create enjoyable freedom with continuing consequences? | Independent completion on both supported held-out variants, including verification and customer outcomes; appropriate escalation on an out-of-scope variant. Play a two-job post-handoff episode while arranging work or returning to the personal repair. Adam accepts the standalone game. |
 
-Do not begin M2 until M1 is enjoyable. Do not complete every possible HF faculty before testing M3. If the opening is dull or delegation is incomprehensible, improve that milestone rather than introducing another business tier.
+The home-to-garage checkpoint includes enough M2 to make shelving, discovery and return to an old object meaningful, without building a business dashboard. Adam's playtest decides whether that opening is enjoyable before M3. Do not complete every possible HF faculty before testing M3. If the opening is dull or delegation is incomprehensible, improve that milestone rather than introducing another business tier.
 
 ## Longer-term stages
 

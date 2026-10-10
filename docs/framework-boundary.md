@@ -1,6 +1,6 @@
 # Game and HF boundary
 
-2026-10-09. Grounded in the sibling HF architecture, package source and roadmap read during this conversation. This is a proposal to verify against the installed release before implementation.
+Updated 2026-10-09. Grounded in the sibling HF architecture and the installed released package. Separate current consumer behavior from the proposed apprenticeship capability.
 
 ## Ownership
 
@@ -16,7 +16,9 @@ A customer's deadline exists in the host world. Each person's understanding of i
 
 ## What already exists
 
-HF offers practice and skill development, instruction and observation, outcome-based expectations, beliefs and source trust, advice/refusal, commitments, fatigue, relationships, impressions, joint-activity acceptance, snapshots and deterministic replay machinery. The package records version 2.1.4; no package is installed here yet.
+HF offers practice and skill development, instruction and observation, outcome-based expectations, beliefs and source trust, advice/refusal, commitments, fatigue, relationships, impressions, joint-activity acceptance, snapshots and deterministic replay machinery. Released package 2.1.4 is installed and pinned here.
+
+The opening uses public person creation, action begin/decide/tick/finish, perceptions and snapshots. Tests show actual skill and memory changes and exact replay. Manual repair outcomes currently depend on host diagnosis/action matching; person state does not yet change those outcomes. This verifies consumption and persistence, not causal human behavior or apprentice learning.
 
 Skill growth is not evidence of learning an arbitrary multi-step policy. Narration describing an apprentice as trained is not evidence either.
 
@@ -30,7 +32,7 @@ Potential later work: communicated experience, revision after repeated failure, 
 
 ## External consumer test
 
-The game installs an exact public npm release, with a lockfile. A clean installation/build must work without access to the sibling HF checkout. Candidate framework versions can be tested as packed artifacts, but the accepted game uses a released dependency. No symlink, workspace alias or copied framework implementation substitutes for that test.
+The game installs an exact public npm release, with a lockfile. A temporary standalone copy of game source/configuration passed clean installation and all checks, without copying any sibling HF source. There are no sibling imports or aliases. Filesystem access to the sibling was not explicitly denied during that check. Candidate framework versions can be tested as packed artifacts, but the accepted game uses a released dependency.
 
 HF changes are developed, tested, reviewed and released in HF. The game upgrades the dependency afterward. Engine/scenario migrations and changed replay expectations are explicit.
 

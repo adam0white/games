@@ -1,6 +1,6 @@
-# Proposed MVP: home to first handoff
+# MVP target: home to first handoff
 
-Draft 2026-10-09; awaiting Adam's review. This is a standalone game proposal, not an implementation plan or an accepted HF goal.
+2026-10-09. The owner authorized autonomous implementation with bounded delegation and reviews, through a meaningful playtesting dependency. First delivery is the home-to-garage opening. The full apprentice-learning target below remains to be demonstrated; no HF release is set by this document.
 
 ## Promise
 
@@ -72,6 +72,6 @@ Acceptance has three distinct requirements:
 
 If a new faculty is added, the generic control belongs in HF. If the released package already supports the same conditional learning and transfer, retain the same controls in the game's consumer test suite and document the existing API/state that produces the effect; no new HF release is necessary. A fun game that fails this learning test is useful prototype evidence, but is not acceptance of the proposed apprentice-learning goal. If the probe cannot meet the test within bounded scope, return to Adam with the demonstrated limit and a narrower recommendation.
 
-## First probe after approval
+## First playable checkpoint
 
-Build only the M1 home episode first. Check whether inspecting, discovering and repairing one object feels good. Then decide which candidate objects deserve expansion. The full MVP is the target; every roadmap tier is not a prerequisite.
+Build the smallest family opening and its transition into bounded garage free play. Reveal controls through received observations and conversation rather than future menus or checklist instructions. Unknown objects and business contacts are undiscovered, not merely disabled. Include enough garage work for shelving/resumption and reuse to become meaningful. Stop for Adam's reaction to this playable experience before implementing conditional apprenticeship. The full MVP is the target; every roadmap tier is not a prerequisite.

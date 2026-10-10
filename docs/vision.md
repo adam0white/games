@@ -40,8 +40,6 @@ In this game, meaningful work, relationships, service, financial ambition, spiri
 6. Reuse is both a material decision and a possible source of meaning, with suitability and quality tradeoffs.
 7. A standalone small game comes before an endlessly expanding one.
 
-## Personal sources
-
 ## Implementation direction, 2026-10-09
 
 The owner authorized autonomous implementation and delegated execution after reviewing the proposal. Start as little as possible. Use **progressive disclosure**: reveal an action when a story or observation makes it meaningful, rather than showing disabled future business controls or a tutorial checklist. Minimal visuals still need a tangible object and visible state changes.
