@@ -132,6 +132,7 @@ export function createGame(seed = 1701): GameState {
     repairs: 0,
     requests: 0,
     worldRng: (seed ^ 0x9e3779b9) >>> 0,
+    feedbackRevisionFrom: 0,
   };
 }
 function available(s: GameState): ActionView[] {
@@ -409,7 +410,15 @@ export function transition(original: GameState, input: GameInput): GameState {
           ? 'The light comes on steadily. It deserves a longer check before calling it finished.'
           : o.fault === 'contact'
             ? 'It still flickers when moved. Changing the battery did not restore the contact.'
-            : 'That did not help. Testing the battery will separate a weak cell from a contact problem.';
+            : s.inputs.length <= (s.feedbackRevisionFrom ?? 0)
+              ? 'That did not help. Testing the battery will separate a weak cell from a contact problem.'
+              : o.fault === 'cap'
+                ? id === 'replace-battery'
+                  ? 'The spare battery does not straighten this torch’s threaded cap. The cap needs seating squarely so its thread can carry the return contact.'
+                  : 'Cleaning the flat contact did not straighten this torch’s threaded cap. The cap needs seating squarely so its thread can carry the return contact.'
+                : o.tested
+                  ? 'Cleaning the contact did not restore the old battery. The known-good battery already made it shine steadily; the original cell needs replacing.'
+                  : 'That did not help. Testing the battery will separate a weak cell from a contact problem.';
         o.observations.push(text);
         narrate(s, 'You', text, matches ? 'notice' : 'mistake');
       }
@@ -700,7 +709,15 @@ export function getView(s: GameState): GameView {
           ? 'The longer run is ready to read.'
           : 'The light is still running. Tea, waiting, or another repair can fill the time.'
         : null,
-    humanNote: s.humanNote ?? null,
+    humanNote:
+      o?.checkStarted !== undefined && !o.verified
+        ? (s.humanNote ?? null)
+        : (s.humanNote
+            ?.replace(' The check can continue without her.', '')
+            .replace(
+              'Mum chooses a little more time together, holding the light while you check.',
+              'Mum spends a little more time nearby.',
+            ) ?? null),
   };
 }
 function packet(s: GameState) {
@@ -729,6 +746,7 @@ export function restoreGame(text: string): GameState {
       nextLineId: conversation.length,
       legacySave: text,
       legacyInputCount: legacy.inputs.length,
+      feedbackRevisionFrom: 0,
     };
   }
   if (
@@ -748,13 +766,24 @@ export function restoreGame(text: string): GameState {
   )
     throw Error('Invalid legacy save');
   let s = data.state.legacySave ? restoreGame(data.state.legacySave) : createGame(data.state.seed);
+  const feedbackCutoff = data.state.feedbackRevisionFrom;
+  if (
+    feedbackCutoff !== undefined &&
+    (!Number.isInteger(feedbackCutoff) ||
+      feedbackCutoff < 0 ||
+      feedbackCutoff > data.state.inputs.length)
+  )
+    throw Error('Invalid feedback revision');
+  s.feedbackRevisionFrom = feedbackCutoff ?? data.state.inputs.length;
   if (data.state.legacyInputCount !== s.legacyInputCount) throw Error('Invalid migration history');
   for (const entry of data.state.inputs.slice(s.legacyInputCount ?? 0)) {
     if (!entry || entry.at !== s.now) throw Error('Invalid input history');
     s = transition(s, entry.input);
   }
   for (const p of Object.values(data.state.people ?? {})) restore(p);
-  if (JSON.stringify(packet(s)) !== JSON.stringify(data))
+  const replayed = packet(s);
+  if (feedbackCutoff === undefined) delete replayed.state.feedbackRevisionFrom;
+  if (JSON.stringify(replayed) !== JSON.stringify(data))
     throw Error('Save does not match its history');
   return s;
 }

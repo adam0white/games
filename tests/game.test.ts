@@ -265,3 +265,84 @@ it('the current garage event keeps Dad and You as separate speakers and clears o
   expect(getView(s).currentDialogue).toEqual([]);
   expect(restoreGame(serializeGame(s))).toEqual(s);
 });
+
+it('a torch’s wrong flat-contact repair responds to the completed battery test with an available next step', () => {
+  let s = ['inspect', 'shelve', 'talk-garage', 'talk-friends'].reduce(act, first());
+  for (let n = 0; n < 12; n++) {
+    s = act(s, 'accept-request');
+    s = act(s, 'inspect');
+    s = act(s, 'test-battery');
+    const item = s.objects.find((x) => x.id === s.focusId);
+    if (item?.fault === 'cap') {
+      s = act(s, 'clean-contact');
+      expect(getView(s).currentDialogue?.at(-1)?.text).toContain('threaded cap');
+      expect(getView(s).currentDialogue?.at(-1)?.text).not.toContain('Testing the battery');
+      expect(getView(s).actions.some((x) => x.id === 'twist-cap')).toBe(true);
+      expect(getView(s).actions.some((x) => x.id === 'test-battery')).toBe(false);
+      expect(restoreGame(serializeGame(s))).toEqual(s);
+      return;
+    }
+    s = act(s, item?.fault === 'battery' ? 'replace-battery' : 'clean-contact');
+    s = act(s, 'verify');
+    s = act(s, 'return');
+  }
+  throw Error('Expected seeded torch cap case');
+});
+
+it('an empty bench drops task-specific human wording without changing saved state', () => {
+  const s = createGame(42);
+  s.humanNote =
+    'Mum has had some company and chooses her own chapter. The check can continue without her.';
+  const saved = serializeGame(s);
+  expect(getView(s).humanNote).toBe('Mum has had some company and chooses her own chapter.');
+  expect(serializeGame(s)).toBe(saved);
+});
+
+it('validates an interim engine3 save using its original failure prose and corrects only future inputs', () => {
+  let previous = createGame(42);
+  previous.feedbackRevisionFrom = 20000;
+  previous = [
+    'talk-family',
+    'inspect',
+    'clean-contact',
+    'verify',
+    'rest',
+    'check-result',
+    'return',
+    'inspect',
+    'shelve',
+    'talk-garage',
+    'talk-friends',
+  ].reduce((s, id) => transition(s, { type: 'action', id }), previous);
+  for (let n = 0; n < 12; n++) {
+    previous = act(previous, 'accept-request');
+    previous = act(previous, 'inspect');
+    previous = act(previous, 'test-battery');
+    const item = previous.objects.find((x) => x.id === previous.focusId);
+    if (item?.fault === 'cap') {
+      previous = act(previous, 'clean-contact');
+      expect(
+        previous.objects.find((x) => x.id === previous.focusId)?.observations.at(-1),
+      ).toContain('Testing the battery');
+      const packet = JSON.parse(serializeGame(previous));
+      delete packet.state.feedbackRevisionFrom;
+      const oldSave = JSON.stringify(packet);
+      let migrated = restoreGame(oldSave);
+      expect(migrated.people).toEqual(previous.people);
+      expect(migrated.objects).toEqual(previous.objects);
+      expect(migrated.inputs).toEqual(previous.inputs);
+      expect(migrated.feedbackRevisionFrom).toBe(previous.inputs.length);
+      migrated = act(migrated, 'clean-contact');
+      expect(getView(migrated).currentDialogue?.at(-1)?.text).toContain('threaded cap');
+      expect(restoreGame(serializeGame(migrated))).toEqual(migrated);
+      const invalid = JSON.parse(serializeGame(migrated));
+      invalid.state.feedbackRevisionFrom = migrated.inputs.length + 1;
+      expect(() => restoreGame(JSON.stringify(invalid))).toThrow('Invalid feedback revision');
+      return;
+    }
+    previous = act(previous, item?.fault === 'battery' ? 'replace-battery' : 'clean-contact');
+    previous = act(previous, 'verify');
+    previous = act(previous, 'return');
+  }
+  throw Error('Expected seeded cap case');
+});

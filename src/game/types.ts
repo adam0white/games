@@ -61,6 +61,7 @@ export interface GameState {
   journal?: ConversationLine[];
   nextLineId?: number;
   eventStartId?: number;
+  feedbackRevisionFrom?: number;
 }
 
 export interface ActionView {
