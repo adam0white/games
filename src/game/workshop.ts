@@ -57,7 +57,7 @@ export interface WorkshopState {
     playerId: string;
     status: 'planned' | 'kept' | 'cancelled' | 'missed';
   };
-  spaceRefusalActivity?: { id: string; endsAt: number };
+  spaceRefusalActivity?: { id: string; endsAt: number; ownerId?: string };
   drawingFound: boolean;
   drawingChoice: 'undecided' | 'displayed' | 'kept';
   projectOpen: boolean;
@@ -84,6 +84,7 @@ export interface WorkshopContext {
   samWillAgree?: () => boolean;
   dadAgreesTime?: (task: 'measure' | 'hang' | 'align') => boolean;
   dadWorkReason?: () => string;
+  dadDeclinedBy?: () => string | undefined;
   dadWillWork?: (task: 'measure' | 'hang' | 'align' | 'space') => boolean;
 }
 export interface WorkshopResult {
@@ -483,7 +484,12 @@ export function applyWorkshopAction(
       if (!ctx.dadAgreesTime?.(task))
         return {
           minutes: 0,
-          lines: [line('Dad', ctx.dadWorkReason?.() ?? 'I want to keep my own plans for now.')],
+          lines: [
+            line(
+              ctx.dadDeclinedBy?.() === 'player' ? 'You' : 'Dad',
+              ctx.dadWorkReason?.() ?? 'I want to keep my own plans for now.',
+            ),
+          ],
         };
       const at = (Math.floor(s.now / 1440) + 1) * 1440 + 15 * 60 + 45;
       return {
@@ -565,7 +571,7 @@ export function applyWorkshopAction(
         return result(
           [
             line(
-              'Dad',
+              ctx.dadDeclinedBy?.() === 'player' ? 'You' : 'Dad',
               ctx.dadWorkReason?.() ??
                 'I want to keep my own plans for now. Leave the notebook there; we can ask again another time.',
             ),
@@ -711,7 +717,7 @@ export function applyWorkshopAction(
         return result(
           [
             line(
-              'Dad',
+              ctx.dadDeclinedBy?.() === 'player' ? 'You' : 'Dad',
               ctx.dadWorkReason?.() ??
                 'I want to keep my own plans for now. Let us agree a place before anyone leaves a lamp here.',
             ),

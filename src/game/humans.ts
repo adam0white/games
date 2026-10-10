@@ -277,7 +277,12 @@ export function chooseSamVisit(person: Person): boolean | null {
 }
 
 /** Consent starts a real shared activity; normal HF completion owns its outcome. */
-export function beginSharedWork(player: Person, partner: Person, offer: Affordance): boolean {
+export function beginSharedWork(
+  player: Person,
+  partner: Person,
+  offer: Affordance,
+  onDeclined?: (id: string) => void,
+): boolean {
   const personal: Affordance = {
     id: 'own-tools',
     action: 'work',
@@ -287,10 +292,16 @@ export function beginSharedWork(player: Person, partner: Person, offer: Affordan
     advertises: { competence: 0.05, autonomy: 0.04 },
   };
   const decision = decide(partner, [offer, personal]);
-  if (decision.chosenAffordanceId !== offer.id) return false;
+  if (decision.chosenAffordanceId !== offer.id) {
+    onDeclined?.(partner.id);
+    return false;
+  }
   const playerOffer = { ...offer, with: [partner.id] };
   const playerDecision = decide(player, [playerOffer]);
-  if (playerDecision.chosenAffordanceId !== playerOffer.id) return false;
+  if (playerDecision.chosenAffordanceId !== playerOffer.id) {
+    onDeclined?.(player.id);
+    return false;
+  }
   for (const person of [player, partner]) {
     const prior = person.activity;
     if (prior)

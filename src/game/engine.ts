@@ -40,6 +40,7 @@ import { restoreGame as restoreEngine6 } from './engine6';
 import { restoreGame as restoreEngine7 } from './engine7';
 import { restoreGame as restoreEngine8 } from './engine8';
 import { restoreGame as restoreEngine9 } from './engine9';
+import { restoreGame as restoreEngine10 } from './engine10';
 import {
   askMumToHelp,
   beginSharedConversation,
@@ -97,7 +98,7 @@ import {
   workshopActions,
 } from './workshop';
 
-const ENGINE = 'home-garage-10';
+const ENGINE = 'home-garage-11';
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 const object = (
   id: string,
@@ -537,6 +538,7 @@ function dadSpaceWait(s: GameState) {
   const current = s.people.dad?.activity;
   return !s.workshop?.intakeSpace &&
     remembered &&
+    (remembered.ownerId ?? 'dad') === 'dad' &&
     current &&
     isHere(s, 'dad') &&
     current.affordanceId === remembered.id &&
@@ -547,10 +549,29 @@ function dadSpaceWait(s: GameState) {
     ? current
     : undefined;
 }
+function playerSpaceWait(s: GameState) {
+  const remembered = s.workshop?.spaceRefusalActivity;
+  const player = s.people.player,
+    current = player?.activity;
+  return !s.workshop?.intakeSpace &&
+    remembered?.ownerId === 'player' &&
+    current &&
+    player?.body.alive &&
+    !player.body.asleep &&
+    !player.body.downed &&
+    current.affordanceId === remembered.id &&
+    current.endsAt === remembered.endsAt &&
+    Number.isFinite(current.endsAt) &&
+    current.endsAt > s.now
+    ? current
+    : undefined;
+}
 function workshopContext(s: GameState, choices = false): WorkshopContext {
   let dadReason =
     'I want to keep my own plans for now. Leave the notebook there; we can ask again another time.';
+  let declinedBy: string | undefined;
   return {
+    dadDeclinedBy: () => declinedBy,
     dadWorkReason: () => dadReason,
     graduated: s.campaign?.graduated ?? true,
     independentRepair: Boolean(s.apprentice?.completedJobIds.length),
@@ -595,33 +616,42 @@ function workshopContext(s: GameState, choices = false): WorkshopContext {
                 'I need to leave for my own plans before we could finish that step. Let us keep the marks and try another time.';
               return false;
             }
-            const agreed = beginSharedWork(player, dad, {
-              id: `cabinet-${task}`,
-              action: `cabinet-${task}`,
-              targetId: 'family-cabinet',
-              label:
-                task === 'measure'
-                  ? 'Measuring the cabinet doors together'
-                  : task === 'hang'
-                    ? 'Hanging the cabinet doors together'
-                    : task === 'align'
-                      ? 'Adjusting the cabinet hinges together'
-                      : 'Making a labelled place for incoming work together',
-              duration,
-              effort: 0.1,
-              focus: 0.2,
-              with: ['player'],
-              advertises: { competence: 0.06, belonging: 0.05 },
-            });
+            const agreed = beginSharedWork(
+              player,
+              dad,
+              {
+                id: `cabinet-${task}`,
+                action: `cabinet-${task}`,
+                targetId: 'family-cabinet',
+                label:
+                  task === 'measure'
+                    ? 'Measuring the cabinet doors together'
+                    : task === 'hang'
+                      ? 'Hanging the cabinet doors together'
+                      : task === 'align'
+                        ? 'Adjusting the cabinet hinges together'
+                        : 'Making a labelled place for incoming work together',
+                duration,
+                effort: 0.1,
+                focus: 0.2,
+                with: ['player'],
+                advertises: { competence: 0.06, belonging: 0.05 },
+              },
+              (id) => {
+                declinedBy = id;
+              },
+            );
             if (!agreed)
               dadReason =
-                dad.body.sleepPressure > 0.8 || dad.body.exertion > 0.8
-                  ? task === 'space'
-                    ? 'I am too tired to clear and label incoming work carefully now. The arrangement can wait.'
-                    : 'I am too tired to give those hinges careful attention now. Keep the marks; the work can wait.'
-                  : dad.activity
-                    ? `I am in the middle of my own activity: ${dad.activity.affordance.label.toLowerCase()}. Keep the notebook there; ask again another time.`
-                    : 'I want to keep my own plans for now. Leave the notebook there; we can ask again another time.';
+                declinedBy === 'player'
+                  ? `Dad was ready for the shared work, but you are still ${player.activity?.affordance.label.toLowerCase() ?? 'pausing before beginning'}. The shared work has not started.`
+                  : dad.body.sleepPressure > 0.8 || dad.body.exertion > 0.8
+                    ? task === 'space'
+                      ? 'I am too tired to clear and label incoming work carefully now. The arrangement can wait.'
+                      : 'I am too tired to give those hinges careful attention now. Keep the marks; the work can wait.'
+                    : dad.activity
+                      ? `I am in the middle of my own activity: ${dad.activity.affordance.label.toLowerCase()}. Keep the notebook there; ask again another time.`
+                      : 'I want to keep my own plans for now. Leave the notebook there; we can ask again another time.';
             return agreed;
           },
           samWillAgree: () => {
@@ -809,6 +839,14 @@ function available(s: GameState): ActionView[] {
     !s.serviceWeek?.paidHelp &&
     s.serviceWeek?.jobs.some((job) => job.id === o.id && job.stage === 'accepted' && job.fee > 0)
   );
+  const playerWaiting = playerSpaceWait(s);
+  if (playerWaiting)
+    add(
+      'wait-player-activity',
+      `Finish your current activity: ${playerWaiting.affordance.label}`,
+      'Wait until what you are doing ends. Dad may still keep his own plans.',
+      'primary',
+    );
   const dadWaiting = dadSpaceWait(s);
   if (dadWaiting)
     add(
@@ -1419,9 +1457,14 @@ export function transition(original: GameState, input: GameInput): GameState {
     for (const line of serviceResult.lines) say(s, line.speaker, line.text, line.tone);
     return s;
   }
-  if (id === 'wait-dad-activity') {
-    const current = dadSpaceWait(s);
-    if (!current) throw Error('Dad is no longer doing that activity');
+  if (id === 'wait-dad-activity' || id === 'wait-player-activity') {
+    const current = id === 'wait-player-activity' ? playerSpaceWait(s) : dadSpaceWait(s);
+    if (!current)
+      throw Error(
+        id === 'wait-player-activity'
+          ? 'You are no longer doing that activity'
+          : 'Dad is no longer doing that activity',
+      );
     const until = current.endsAt;
     advanceBenchBeforePlayer(s, until);
     if (s.people.player) liveOrdinaryTime(s.people.player, until);
@@ -1430,17 +1473,21 @@ export function transition(original: GameState, input: GameInput): GameState {
     say(
       s,
       'You',
-      'You leave Dad time to finish what he was doing. The place on the bench is still a conversation to have.',
+      id === 'wait-player-activity'
+        ? 'You finish what you were doing. The place on the bench still needs a shared agreement.'
+        : 'You leave Dad time to finish what he was doing. The place on the bench is still a conversation to have.',
     );
     return s;
   }
-  const workshopResult = applyWorkshopAction(s, id, workshopContext(s, true));
+  const workContext = workshopContext(s, true);
+  const workshopResult = applyWorkshopAction(s, id, workContext);
   if (workshopResult) {
     if (id === 'workshop-intake-space' && s.workshop) {
-      const current = s.people.dad?.activity;
+      const ownerId = workContext.dadDeclinedBy?.() ?? 'dad';
+      const current = s.people[ownerId]?.activity;
       s.workshop.spaceRefusalActivity =
         !s.workshop.intakeSpace && current
-          ? { id: current.affordanceId, endsAt: current.endsAt }
+          ? { id: current.affordanceId, endsAt: current.endsAt, ownerId }
           : undefined;
     }
     for (const personId of workshopResult.personIds ?? []) {
@@ -2509,8 +2556,13 @@ export function restoreGame(text: string): GameState {
       'home-garage-7',
       'home-garage-8',
       'home-garage-9',
+      'home-garage-10',
     ].includes(data?.engine)
   ) {
+    if (data.engine === 'home-garage-10') {
+      const validated = restoreEngine10(text);
+      return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };
+    }
     if (data.engine === 'home-garage-9') {
       const validated = restoreEngine9(text);
       return { ...validated, engine3Save: text, engine3InputCount: validated.inputs.length };

@@ -24,7 +24,7 @@ The phase-gated questions and `schoolStoryBeat` provide authored material. The e
 
 After school completion, Dad and the player can agree use of the garage; a small shop remains another possible later location. Nora asks permission for a referral. Sam discusses what the work would involve, hours and payment. The first apprentice is found and taught here, not automatically awarded by finishing high school.
 
-The next meaningful transition is another person owning intake, diagnosis, repair, verification and a customer outcome without the player's expertise. That still requires the MVP's real HF acquisition controls. The growing workshop should retain the personal lamp, saved drawings, bench notebook, unfinished cabinet and early customer histories. A drawing or household project can become worthwhile hands-on work while someone else carries a supported repair.
+The next meaningful transition is another person owning intake, diagnosis, repair, verification and a customer outcome without the player's expertise. That still requires the MVP's real HF acquisition controls. The growing workshop should retain the personal lamp, saved drawings, bench notebook, cabinet project history and early customer histories. A drawing or household project can become worthwhile hands-on work while someone else carries a supported repair.
 
 ## Later world
 

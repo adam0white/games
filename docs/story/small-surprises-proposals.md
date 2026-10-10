@@ -1,10 +1,10 @@
 # Small surprises — selection and deferred proposals
 
-These are optional authored beats for the existing opening and working chapter. The cabinet-door and Evan-label beats are selected and implemented in `src/game/aftercare.ts`; host integration is pending, so this document does not claim they are playable or that their events happened. The other three remain unselected proposals, with review on 2026-11-09. Conditions refer to actual run outcomes. Each selected beat fires once; none grants knowledge, wages, company, religious merit or a completed repair. Character presence and willingness still govern conversation.
+These are optional authored beats for the existing opening and working chapter. The cabinet-door and Evan-label beats are selected and implemented in `src/game/aftercare.ts`; host integration and public engine-10 controls are complete. Their events occur only when their actual conditions and invitations succeed in a particular story. The other three remain unselected proposals, with review on 2026-11-09. Conditions refer to actual run outcomes. Each selected beat fires once; none grants knowledge, wages, company, religious merit or a completed repair. Character presence and willingness still govern conversation.
 
 ## The door that was easier without a door
 
-**Status:** selected; module implemented and tested; host integration pending.
+**Status:** selected; integrated and tested; available when actual conditions and consent allow.
 
 **Only after:** the player and Dad actually finish both cabinet doors, and Dad is available. Offer **Try the finished doors again** after returning to the kitchen.
 
@@ -16,7 +16,7 @@ Choices: **Open it ceremoniously** / **Ask whether he misses the open shelves** 
 
 For the ceremony: Dad: “Good. Now do that every time you want a plate.” For the question: “A little. I still wanted to finish them.”
 
-A finished object changes an ordinary movement rather than merely adding a success message. Do not imply the cabinet was completed during school or that every useful repair improves every convenience.
+A finished object changes an ordinary movement rather than merely adding a success message. Do not imply the cabinet was completed during unplayed school time or that every useful repair improves every convenience.
 
 ## A spoon with no further qualifications
 
@@ -50,7 +50,7 @@ The intended emotional detail is that independence briefly feels awkward for bot
 
 ## The part of the promise that still works
 
-**Status:** selected; module implemented and tested; host integration pending.
+**Status:** selected; integrated and tested; available when actual conditions and consent allow.
 
 **Only after:** Evan's explicit donor visit and existing display-label reflection. Evan is present and the label remains with his base. Offer **Turn the label back over**.
 

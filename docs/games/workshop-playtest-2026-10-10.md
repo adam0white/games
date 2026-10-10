@@ -203,7 +203,7 @@ The reader reported no remaining blocker in this continuation. It explicitly did
 
 ## Final public interface audit
 
-A separate isolated public engine-9 audit verified touch and keyboard 3D controls, reduced-motion behavior, actual dark/light system changes, no-WebGL accessible fallback, a single current-response channel, no repeated condition captions and no mobile horizontal overflow. The old completed-week model appeared as an enabled descriptive shelf control. Escape from an exported-story Journal control closed the panel but dropped focus to the page body; a bounded UI-only correction is being applied. This changes no engine rule, received method, world time or historical packet.
+A separate isolated public engine-9 audit verified touch and keyboard 3D controls, reduced-motion behavior, actual dark/light system changes, no-WebGL accessible fallback, a single current-response channel, no repeated condition captions and no mobile horizontal overflow. The old completed-week model appeared as an enabled descriptive shelf control. Escape from an exported-story Journal control closed the panel but dropped focus to the page body; a bounded UI-only correction was independently verified locally and on public engine 10. This changes no engine rule, received method, world time or historical packet.
 
 
 ## Final source-unread native engine-9 wildcard
@@ -215,3 +215,32 @@ A new reader began on the actual public engine 9 with only a request to play and
 During the pear-shaped mechanical timer's real timed check, tea with Mum incorrectly said to leave the light on. Its actual exported checkpoint is `/tmp/repair-fresh-wildcard-native9-timer-checkpoint.json`, SHA256 `0c5803a8dd777b946a6e7f504390b7aa673164dfb615cb91e8bff831d5bb334b`. The correction must freeze and validate this published history before continuation, then distinguish a running mechanical check, running light check and company with no active check. Old words already heard remain in the journal.
 
 The reader also found Sam's accepted watching invitation followed by “Let me finish” confusing, and returning to school after two played holiday days felt abrupt. These are taste findings: the explicit remaining unplayed holiday and Sam's actual HF choices are retained. Broader observation/availability presentation belongs to the dated deferred work rather than a last-minute change of decision rules.
+
+
+The final public engine-10 audit imported and exported the actual native-9 timer packet, retaining all 64 choices, 99 journal entries, five objects and its clock exactly. Its historical tea wording remains as originally heard; new tea reflects the actual focused running object. Mobile dark mode, reduced motion, Journal Escape focus, 3D canvas Escape and the single-response layout passed with zero browser errors. The owner-derived local export separately retained all 71 choices and 91 journal lines through the final local preview update. The owner browser was not modified by these isolated checks.
+
+
+The final fresh reader reached eighteen and chose priced work. Its favourite household moment was Dad's cabinet-door joke, “Good. Now do that every time you want a plate.” It described the saved drawing beside the cabinet and ceremonially opening the doors next summer as meaningful personal continuity; by later holidays, character talk carried more interest than familiar repair steps.
+
+At sixteen it waited five half-hour steps for Sam's shift without a clear return time:
+
+> “Am I waiting for Sam, or have I finished this summer? I wish I knew when his shift ends.”
+
+At adulthood it reproduced repeated intake-corner refusals, even after waiting for Dad's exact meal endpoint:
+
+> “I did the considerate thing and waited, but now I feel like I’m guessing the one minute the game will let me ask.”
+
+The actual checkpoint `/tmp/repair-final-wildcard-native9-intake.json` has SHA256 `3bf1fc43f7f84553b46c6af5bb2c706b984b280cc8235f4fa7cfbd648d18cee8`. Overnight followed by the next meal endpoint still produced refusal and a quiet break. This is retained progression friction; the exact-end cue does not promise consent. A bounded causal diagnosis is pending rather than declaring this solved or a hard lock.
+
+
+## Final native-9 reader result and causal intake finding
+
+The fresh source-unread reader finished its bounded run at eighteen, Summer day 3, 09:30 without gaining intake-corner agreement, after waits, tea, cabinet conversation and two overnight rests. It exported `/tmp/repair-final-wildcard-native9-final.json`, SHA256 `d034373db27cbe495631150307e71e95c0f850e9f7257b32d5ee166526906752`. It never reloaded into a changing development engine or inspected hidden state.
+
+> “The family scenes gave me a reason to continue. The final consent loop made me want to stop.”
+
+> “Taking this with me works better than promising to be a different person”
+
+The second quotation is the Mum line the reader singled out as perceptive and natural. It also described some summer returns as choosing a chapter transition rather than living a holiday.
+
+Independent reconstruction found a concrete host reporting defect in the real 09:18 intake attempt: Dad's HF decision chose the shared work, but the player's actor continued resting. The boolean helper collapsed both outcomes, and host dialogue incorrectly blamed Dad. Actual earlier Dad activity-continuation refusals remain genuine. The bounded correction must identify the participant who did not start and offer waiting for the player's own finite activity when that is the cause; it must not force consent or alter utilities. The implementation preserves both HF decisions and exposes the player’s actual finite activity endpoint. Targeted reconstruction of the real day-three checkpoint reaches a genuine joint intake agreement through visible waits and renewed requests; waiting itself grants no consent. Final combined check and public continuation are pending. This replaces the earlier interpretation that all repeated refusals were Dad's choice.

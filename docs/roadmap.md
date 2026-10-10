@@ -97,3 +97,12 @@ Leave the cause of changing standards unresolved: deliberate control, commercial
 
 
 - By 2026-11-09, review Sam's received shift-end information and school-break pacing using the native engine-9 wildcard. After age-sixteen sewing-box work it waited five half-hour steps without knowing whether a request or the school return was next. Preserve actual HF autonomy; communicate schedules only through information the player could know. This is a proposal, not an active queue.
+
+
+## Post-playtest proposals from the final independent analysis
+
+Review by 2026-11-09; none is an active goal.
+
+1. Make delegation easier to read. The paid week completed two Sam jobs, but its reader used six watch actions. A workday view could show received availability, agreed work and the next known event using existing HF. Acceptance: finish both delegated jobs while doing real personal work with no required watching, preserving actual refusals, interruptions, materials, promises and exact replay.
+2. Probe prospective multi-step planning in HF separately. Bound it to one known repair and one competing obligation. Require a domain-neutral matched control showing a useful plan, an alternative and revision after an obligation changes; withholding the faculty must change behavior without a game-specific policy providing the answer. Existing appointments and taught methods do not establish this faculty.
+3. Connect the repaired paper street to the actual neighbourhood. One person recognises a shopfront and brings an object with older labels or incompatible standards. Keep their memory partial and the world's decline unresolved. Checked, unfinished and privately stored model histories must produce truthful variants, with repair, adaptation and honest refusal viable. This is authored content using existing HF, not an economy milestone.
