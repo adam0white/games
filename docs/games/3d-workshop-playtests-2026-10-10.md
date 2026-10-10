@@ -98,3 +98,7 @@ A rapid sequence of focus/Enter for two wait actions did not advance time; indiv
 The keyboard alternative now retains its open/closed choice between tools on the same object, addressing repeated reopening. A continuous Tab-only journey remains a separate accessibility test; the reader used ordinary DOM focus for some controls.
 
 The final independent 360×780 recheck initially disproved the keyboard persistence refinement: recreated details elements collapsed again. Keeping the same panel mounted between tools corrected it. The reader then confirmed: “Expanded controls once for Look; after executing it, Test battery displayed ‘Do the selected work’ immediately. After executing Test battery, Clean contact also kept the controls expanded.” Screenshot: /tmp/repair-keyboard-persistence-corrected.png.
+
+## Immutable and public release checks
+
+Clean commit 1e123be was built and independently played at port 5185. The fresh reader found no blocking issue at 360×780: tools worked, alternative controls remained expanded and room mode hid close work. Importing the actual completed-week native-8 export through the UI showed a persistent chapter recap after reload and the waiting paper-street shelf. Root public owner import retained 327 choices, 455 entries and £8; root public canvas/camera/WebGL-loss checks also passed. The deployed manifest matches the clean commit, game 1.0.0-rc.1, engine 17 and HF 2.2.0. No owner storage was operated.

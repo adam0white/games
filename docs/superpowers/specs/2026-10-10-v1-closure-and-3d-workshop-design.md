@@ -10,7 +10,7 @@ V2 makes the existing repair state machine spatial: choose an exposed tool/opera
 
 A small original cutaway home/garage places the current bench, known waiting objects and known family project in context. Select stations before explicitly performing an engine operation. Unknown jobs and business machinery remain absent. Keep conversation and consent in clear text; forcing social choices onto tiny character meshes would weaken them. Object work is primary, room movement bounded and optional.
 
-Direct manipulation is the normal visual route, but retain a complete labelled alternative for touch ambiguity, keyboard/screen reader access, WebGL failure and a player preferring the illustration. Hide duplicate mapped action controls only while the working 3D surface is ready. Demand rendering, bounded DPR, visible rotation/reset controls, reduced-motion behavior, pointer cancellation and resource cleanup are required. Assets remain original procedural geometry.
+Direct manipulation is the normal visual route, but retain a complete labelled alternative for touch ambiguity, keyboard/screen reader access, WebGL failure and a player preferring the illustration. Mapped action controls have one home: the pending 3D surface shows an explicit loading notice; a ready surface offers tools; failure or chosen illustration restores the ordinary controls. Demand rendering, bounded DPR, visible rotation/reset controls, reduced-motion behavior, pointer cancellation and resource cleanup are required. Assets remain original procedural geometry.
 
 ## Alternatives considered
 
