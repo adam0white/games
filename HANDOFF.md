@@ -1,6 +1,10 @@
 # Handoff
 
-Updated 2026-10-10 for Adam's five-hour autonomous V2 expansion.
+Updated 2026-10-12 for private GitHub hosting; game delivery below remains the 2026-10-10 build.
+
+## Repository hosting
+
+Adam authorized and created private repository https://github.com/adam0white/repair-game on 2026-10-12. This checkout is separate from Human Framework and consumes its published npm package. The origin remote is git@github.com:adam0white/repair-game.git, with main tracking origin/main. Source stays private; public static game hosting is unchanged. Earlier no-remote statements below describe historical checkpoints.
 
 ## What remains
 
