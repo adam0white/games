@@ -1,6 +1,6 @@
 # Focused external consultations
 
-Current status: engine 4 is integrated and publicly verified. Two actual candidate-4 play records are complete. Later UI presentation verification remains required. Earlier sections below retain their original review scope and checkpoint claims; later dated resolution notes update them.
+Current status: engine 4 is integrated and publicly verified. Two actual candidate-4 play records are complete. The final public presentation and paired mentoring follow-up pass; Adam accepts feel later. Earlier sections below retain their original review scope and checkpoint claims; later dated resolution notes update them.
 
 2026-10-14. Adam explicitly requested Claude Fable consultation and focused Opus reviews. Initial CLI attempts failed because authentication expired and returned no opinion. Adam signed in; subsequent bounded requests completed. Packets contained fictional game implementation, design and the requested UI screenshot. They contained no PKM or private personal source notes.
 
@@ -70,4 +70,4 @@ The reviewer found promise renewal, personal completion ownership, donor guards,
 
 The earlier Fable critique inferred that advertised competence payoff made help dominate repairs. Actual decision traces showed **zero contribution** from that advertised competence payoff. It therefore does not explain the observed choice by itself. Goal terms and a released delivery promise were the actual confirmed issue. Renewal and actor-knowledge corrections are implemented and checked; courier cooperation still earns no whole independent credit. Do not treat Fable's source inference as a reproduced scorer effect.
 
-HF 2.2.1 is now published, exactly installed and consumed through public APIs. Earlier ‘release in progress’ statements above describe their original checkpoint. The live game is alpha.4/engine 4 at clean `38cbae0`. Actual candidate-4 play is now recorded: general play secured no export, while focused mentoring replayed 48 inputs. Neither established a whole independent repair or owner feel acceptance.
+HF 2.2.1 is now published, exactly installed and consumed through public APIs. Earlier ‘release in progress’ statements above describe their original checkpoint. The live game is alpha.4/engine 4 at clean UI `0e80d89` (gameplay core `38cbae0`). Actual candidate-4 play is now recorded: general play secured no export, while focused mentoring replayed 48 inputs. Neither established a whole independent repair or owner feel acceptance.

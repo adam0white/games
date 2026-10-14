@@ -14,4 +14,12 @@ At 15:12 Sam declined theatre work because of his sister commitment before 17:00
 
 ## Subsequent presentation work
 
-UI-only changes after the freeze name Sam's actual contributions and courier completion in the first-week account. Pending baseline instructions stay visible, contradictory notices are suppressed, and method captions distinguish observed conditions from outcomes. The focused player did not test these later changes. Their source review, full check and public verification remain separate work.
+UI-only changes after the freeze name Sam's actual contributions and courier completion in the first-week account. Pending baseline instructions stay visible, contradictory notices are suppressed, and method captions distinguish observed conditions from outcomes. The original focused sequence did not test these later changes. The paired public follow-up below checks their presentation separately.
+
+## Paired public presentation follow-up
+
+The same mentor tester returned **14:05:29–14:06:15 UTC**, 46 seconds, on published UI `0e80d89`, engine 4 and HF 2.2.1. It imported actual prefix and ending packets. This is replay-based paired usability, not a fresh story or a new whole independent repair.
+
+Without opening history, it saw the required load condition. Selecting Contact produced no false warning. Running the required load check restored 96% and retained one new method, making the pending step clearer. Sam's account matched its own shared work and courier experience, with zero independent credit. Paused export succeeded with a 15-second allowance at `/tmp/smallworks-mentor-ui-public-paused.json`. The original 48-input evidence packet remains unchanged.
+
+Root's separate public presentation check legally continued that original packet through seven next-day commands to Day 8 and 55 inputs. Raw and UI replay were exact. It checked the actual 40-input pending prefix, a 390-width ending, pause/export and return to workshop with zero errors. No saved facts were edited to create the account.

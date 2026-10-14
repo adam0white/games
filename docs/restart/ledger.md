@@ -4,13 +4,15 @@ Start: **2026-10-14 09:21:55 UTC**. Target finish: **14:21:55 UTC**.
 
 ## What remains
 
-Assess the completed candidate-4 play findings, verify the latest UI presentation publicly and write the final ledger at 14:21:55 UTC. Engine 4 is integrated, checked and publicly verified. Continue useful review and correction through the deadline. Adam accepts feel; neither technical checks nor reviewer opinions establish his acceptance.
+The authorized technical stage is reviewed, verified and delivered locally and publicly. Record the actual run ending at 14:21:55 UTC when it occurs. Adam's feel acceptance remains. The known gap is natural whole-handoff usability and teaching administration; no further implementation queue is selected.
 
 ## Authority
 
 Adam rejected the old UI, shallow gameplay and meaningless progression. He authorized deletion and rewrite, including abandoning old saves. Preserve the vision, meaningful HF people, private source and published dependency boundary. Main driver chooses design and delegates. Consult Astra at concept, playable and final critique. No routine approval stops.
 
-The active branch is `codex/workshop-restart`. The earlier implementation remains in Git. [Current design](design.md) and [MVP checks](../mvp.md) define the selected increment. Old dated campaign documents are provenance, not the active queue.
+The active branch is `main`; `codex/workshop-restart` was the development branch. The earlier implementation remains in Git. [Current design](design.md) and [MVP checks](../mvp.md) define the selected increment. Old dated campaign documents are provenance, not the active queue.
+
+Dated entries below preserve their checkpoint status. Their remaining-work statements are historical; the current status above and final delivery entry govern.
 
 ## Concept and first implementation
 
@@ -68,7 +70,7 @@ The UI is adding concrete return receipts, a completed afternoon scene and an op
 
 ## Immutable candidate play, 11:38–11:48 UTC
 
-Actual source-unread UI play lasted approximately **10 minutes 11 seconds**, from 11:38:27 to 11:48:39 UTC, then stopped naturally. The immutable candidate `/tmp/small-works-candidate-1138` was created at 11:36:28.822 UTC with source hash `e62541533fcd82e4dcb1913f822fca55b0965f76d208cbcf188b0ce98e52f6b4`. Root reported exact UI replay of its 123 recorded actions. The [unchanged export and play record](playtest-4.md) preserve HF 2.2.0 provenance.
+Actual source-unread UI play lasted approximately **10 minutes 11 seconds**, from 11:38:27 to 11:48:39 UTC, then stopped naturally. The immutable candidate `/tmp/small-works-candidate-1138` was created at 11:36:28.822 UTC with source hash `e62541533fcd82e4dcb1913f822fca55b0965f76d208cbcf188b0ce98e52f6b4`. The tester reported exact UI replay of its 123 recorded actions; root relayed the report. The [unchanged export and play record](playtest-4.md) preserve HF 2.2.0 provenance.
 
 The retained personal theatre at the community gathering was strongest. Sam completed zero independent repairs. Mum's lantern replacement was unwitnessed. Community fan selection and return caused confusion. The early stop does not satisfy the requested longer session or establish handoff.
 
@@ -94,7 +96,7 @@ HF's site was separately verified at clean commit `e5b6cb1` with 2.2.1. [Issue 5
 
 [Playtest 4](playtest-4.md) is corrected: Mum, Nora and Evan completed Paper theatre; Sam completed Have food and water. The earlier all-four theatre summary belonged to playtest 3. No export bytes were changed for this correction.
 
-[Playtest 5](playtest-5.md) ran source-unread in fresh isolated Chrome, seed 42, **12:14:29–12:21:48 UTC**: 7 minutes 19 seconds including approximately one minute of setup and control-name errors. Root verified exact UI replay of 65 actions. Three customer returns and a ready personal theatre ended on Day 2 at 12:21, £68 and reputation 3. Sam completed zero independent whole repairs. The player stopped frustrated by unclear teaching gaps, despite wanting to delegate. This is not a completed 20-minute run or Adam's acceptance.
+[Playtest 5](playtest-5.md) ran source-unread in fresh isolated Chrome, seed 42, **12:14:29–12:21:48 UTC**: 7 minutes 19 seconds including approximately one minute of setup and control-name errors. The tester reported exact UI replay of 65 actions; root relayed the report. Three customer returns and a ready personal theatre ended on Day 2 at 12:21, £68 and reputation 3. Sam completed zero independent whole repairs. The player stopped frustrated by unclear teaching gaps, despite wanting to delegate. This is not a completed 20-minute run or Adam's acceptance.
 
 ## Corrections after the immutable freeze
 
@@ -169,3 +171,23 @@ Root's actual public bench checks at widths **390, 768 and 1024** found no horiz
 [Focused mentoring play](playtest-8.md) ran 13:39:28–13:46:15 UTC, 6 minutes 47 seconds. Its unchanged 48-input packet replayed exactly. Actual teaching led Sam to inspect and measure Nora's contact, ask for an unknown next step, then courier a player-repaired object for £18. It earned zero independent whole repairs. A 15:12 family refusal was understandable.
 
 Later UI-only work names recorded Sam contributions and courier completion, keeps baseline instructions visible, suppresses contradictory notices and distinguishes method conditions from outcomes. Neither tester played that later presentation. Root's `/tmp/smallworks-final-ui-check.log` is running and read-only review is underway. Public remains clean `38cbae0` until a later commit/deployment is verified. Final public presentation checks and the ending ledger at 14:21:55 UTC remain required. Adam accepts feel later.
+
+## Final presentation delivery before the run deadline
+
+The latest UI code is privately pushed on main at **0e80d89be803a9625dcd07974ed6c85396fa71ec**; the checked gameplay core remains `38cbae0`. [CI 38576890933](https://github.com/adam0white/repair-game/actions/runs/38576890933) passed. Deployment reran lint, types, **233 tests** and build. Cloudflare **6c8c45de-c057-4223-aed7-fe3a47afb86b** serves the exact clean UI manifest: `0e80d89`, alpha.4, engine 4, HF 2.2.1. Subsequent documentation-only commits may change the repository tip without changing this published UI code.
+
+Root legally continued the actual 48-input mentor save through seven next-day commands to Day 8, preserving its facts and producing 55 inputs. Raw and UI replay were exact. The public account records Nora's object received, Contact inspected, Contact measured under movement and the object returned. It reports zero independent repairs. An actual 40-input prefix exposed pending instructions with history closed and no false baseline warning. The 390-width ending fits; paused export and return to workshop work with zero errors. This is replay-based presentation verification, not a new natural whole-handoff run.
+
+The mentor's paired public follow-up ran **14:05:29–14:06:15 UTC**, 46 seconds. It found the visible load-condition requirement clearer, selected Contact without a false warning, ran the required 96% load check and retained one new method. The account matched its shared/courier experience; independent credit stayed zero. Paused export succeeded with a 15-second allowance. See [the appended play record](playtest-8.md). General public smoke also passed keyboard/accessibility, width 390, one-input replay and self-hosted font checks with zero errors.
+
+Technical delivery is complete; Adam accepts feel later. On **2026-10-15**, contingent on Adam playing, review natural whole-handoff usability and teaching burden before selecting more world scope. This is a dated review priority, not a promise of unattended future implementation. The five-hour deadline has not been claimed elapsed in this entry.
+
+Root also visually inspected the public narrow mechanical bench and final contribution account. The only temporary HF worktree created for this run was removed after its clean status and published commit/tag were verified. Existing unrelated worktrees were retained. HF main remains clean at `b16fbb3`; npm reports published 2.2.1, and issue 5 is closed. HF CI, CodeQL and benchmark runs passed.
+
+Final package audit verified 85 registry signatures and 49 attestations. The compiled final UI distribution secret scan covered approximately 632 KB and found no leaks. Node 26.11.1 was used locally. The reviewed code remains unchanged since `0e80d89`; remaining writes are documentation only.
+
+Documentation links were checked again after the final handoff edits: 38 local links resolve. No gameplay source changed after the reviewed UI commit. Final publication will rebuild its manifest from the clean documentation tip, preserving the same alpha.4/engine-4 behavior.
+
+## Five-hour checkpoint
+
+The authorized development window reached **2026-10-14 14:21:55 UTC**, five hours after 09:21:55. Root recorded this checkpoint at **2026-10-14 14:22:26 UTC**. Reviewed game/UI source is delivered and publicly verified. Final documentation publication and manifest reconciliation follow; they do not add gameplay changes. Adam's feel acceptance and the documented natural whole-handoff limitation remain open.

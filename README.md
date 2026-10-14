@@ -6,7 +6,7 @@ A single-player repair strategy game. Investigate familiar electrical and mechan
 
 The 2026-10-14 restart replaces the earlier campaign and interface. The working candidate includes a diagnostic bench, shared workshop clock, retained paper theatre, customer promises, parts recovery and purchases, and Sam's attended learning through published Human Framework APIs. A community gathering offers three timed formats; preparation time permits at most two. The first-week account offers an ending and a choice to continue.
 
-The current local engine-4 integration passed lint, types, 233 tests and production build. The public build is verified at clean commit `38cbae0`, game `3.0.0-alpha.4`, engine `small-works@4` and HF 2.2.1. Candidate-4 play is recorded in the handoff; later UI presentation checks remain. Adam accepts feel later. [HANDOFF.md](HANDOFF.md) records what remains. Adam accepts game feel through play.
+The current local engine-4 integration passed lint, types, 233 tests and production build. The public build is verified at clean UI commit `0e80d89` (gameplay core `38cbae0`), game `3.0.0-alpha.4`, engine `small-works@4` and HF 2.2.1. Candidate-4 play is recorded in the handoff; final public presentation checks pass. [HANDOFF.md](HANDOFF.md) records the limits and what remains. Adam accepts game feel through play.
 
 The current local candidate is `3.0.0-alpha.4`, with schema and engine `small-works@4` and strict HF 2.2.1 provenance. Autosaves use `small-works-save-v4`, leaving the earlier key untouched. Earlier campaign saves and Small Works engine-1, engine-2 and engine-3 candidate exports are intentionally incompatible. Their evidence remains pinned to its original behavior version. The earlier implementation remains in Git; dated campaign documents describe history, not the active work queue. Repository source remains private. Static public deployment is authorized; the existing address is [repair.adamwhite.work](https://repair.adamwhite.work), whose exact engine-4 manifest and basic UI checks are verified.
 
@@ -27,7 +27,8 @@ Open the address printed by the development server. Browser saves retain worksho
 - [Run ledger](docs/restart/ledger.md): decisions, evidence and remaining verification.
 - [MVP checks](docs/mvp.md): gameplay and causal acceptance.
 - [Vision](docs/vision.md): owner direction and its history.
-- [Fresh playtest](docs/restart/playtest-2.md): actual source-unread play and limitations.
+- [Latest general play](docs/restart/playtest-7.md): actual source-unread play and limitations.
+- [Mentoring and public follow-up](docs/restart/playtest-8.md): attended learning, courier work and revised teaching instructions.
 - [External reviews](docs/restart/external-reviews.md): returned consultations and selected corrections.
 
 The dependency is exactly `@adam0white/human-framework` 2.2.1. The game owns physics, stock, prices, promises and presentation. HF owns people's acquired conditional methods, decisions, activities and snapshots. The simulation uses public package APIs, without sibling-source imports or LLMs. Bounded controls can establish conditional transfer; they cannot establish general human realism or enjoyment.

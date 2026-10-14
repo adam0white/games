@@ -38,3 +38,7 @@
 The latest 117-test run passed before subsequent source-review findings. Review found that multiple pending interventions could all receive success credit from one passing check, and stale ready status could permit delivery after a failed check. The engine worker is correcting both; no resolution is claimed yet. Model review also found a generated governor condition/setting mismatch and contradictions in owner reports. Those fixes are underway.
 
 Comparison and direct probe controls are integrated. Browser checks at widths 1440 and 390 found no overflow. A source-unread 20–30-minute handoff playtest and an external Opus lifecycle review are underway. Final integrated checks and deployment remain outstanding.
+
+## Completed technical stage, 2026-10-14
+
+The initial plan's HF 2.2.0 dependency is historical; current exact published dependency is HF 2.2.1. Local/public alpha.4 engine 4 is reviewed and checked with 233 tests. Main is integrated; published UI is `0e80d89`, with gameplay core `38cbae0`. Actual play and replay-based presentation evidence are in [the current handoff](../../../HANDOFF.md). Adam's feel acceptance remains. Earlier pending status in this plan describes intermediate checkpoints, not an active implementation queue.
