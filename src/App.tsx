@@ -7,6 +7,7 @@ import { ReadingComparison } from './components/ReadingComparison';
 import { ReturnedHistory } from './components/ReturnedHistory';
 import { ReturnReceipt } from './components/ReturnReceipt';
 import { SamRequest } from './components/SamRequest';
+import { SamWorkAccount } from './components/SamWorkAccount';
 import { TeachingRecord } from './components/TeachingRecord';
 import { WorkshopPause } from './components/WorkshopPause';
 import { eventOptions } from './game/community';
@@ -441,6 +442,12 @@ export default function App() {
   const hasCalibrationBaseline =
     part?.kind === 'governor' &&
     samBaseline.some((e) => e.kind === 'measurement' && e.request?.mode === 'motion');
+  const hasPendingPartLesson = Boolean(
+    part &&
+      job?.pendingLessons.some(
+        (lesson) => lesson.observerId === 'sam' && lesson.action.split(':')[1] === part.id,
+      ),
+  );
   const gatheringOptions = state.community ? eventOptions(state, state.community) : [];
   const terminals = [...new Set(job?.model.components.flatMap((c) => c.terminals) ?? [])];
   useEffect(() => {
@@ -876,13 +883,19 @@ export default function App() {
                 onTerminal={chooseTerminal}
                 activeProbe={activeProbe}
               />
-              {state.watching && part && !jobLocked && !hasComponentBaseline && (
-                <p className="baseline-notice">
-                  {hasCalibrationBaseline
-                    ? 'Sam has an observed motion baseline for calibration only. Cleaning or replacing still needs a relevant component reading or use test.'
-                    : 'Sam has no relevant baseline observation after the last intervention. Let him observe a relevant measurement or use test before this work.'}
-                </p>
-              )}
+              {state.watching &&
+                part &&
+                !jobLocked &&
+                !hasComponentBaseline &&
+                !hasPendingPartLesson && (
+                  <p className="baseline-notice">
+                    {hasCalibrationBaseline
+                      ? 'Sam has an observed motion baseline for calibration only. Cleaning or replacing still needs a relevant component reading or use test.'
+                      : lastWorkId > 0
+                        ? 'Before another intervention on this part, let Sam observe a new relevant measurement or use test.'
+                        : 'Before cleaning, adjusting or replacing this part, let Sam observe a relevant measurement or use test.'}
+                  </p>
+                )}
               <div className="intervention" id="repair-controls">
                 <div>
                   <p className="eyebrow">Selected component</p>
@@ -1549,6 +1562,9 @@ export default function App() {
                           Attended demonstrations. Independent whole repairs:{' '}
                           {state.independentRepairs}.
                         </p>
+                        <p className="knowledge-note">
+                          Conditions observed when taught; not an outcome or a guarantee.
+                        </p>
                         <div className="knowledge-list">
                           {person.methods?.rules.length ? (
                             person.methods.rules.map((rule) => {
@@ -1834,6 +1850,7 @@ export default function App() {
           <button type="button" className="primary-action" onClick={() => setPaused(true)}>
             Close the workshop for now<small>Saved here · time waits</small>
           </button>
+          <SamWorkAccount jobs={state.jobs} />
           <dl className="week-account">
             <div>
               <dt>Checked returns</dt>

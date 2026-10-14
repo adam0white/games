@@ -42,8 +42,12 @@ HF 2.2.1 corrects acquired-method evidence: another independently successful act
 
 ## Integrated engine-4 checkpoint
 
-The current local game is `3.0.0-alpha.4`, schema/engine `small-works@4`, autosave key `small-works-save-v4`, with exact published HF 2.2.1. The integrated check passed lint, types, **233 tests across 23 files** and production build. The public build remains engine 3 at clean `7570eea`; engine 4 is not yet deployed.
+The current local game is `3.0.0-alpha.4`, schema/engine `small-works@4`, autosave key `small-works-save-v4`, with exact published HF 2.2.1. The integrated check passed lint, types, **233 tests across 23 files** and production build. The public build is now verified as engine 4 at clean `38cbae0`. The engine-3 publication at `7570eea` remains historical.
 
 Sam's delivery options require actor-received checks. Ordinary diagnostic and part methods transfer across requested paces; calibration retains the exact requested pace. Matching-condition intervention safeguards prevent a check under another condition from proving the intervention. Actual native goal withdrawal releases responsibility and survives save/restore in a regression. Self-hosted licensed fonts replace Google imports blocked by live CSP.
 
-These are technical checks. Source-unread play has not established a whole independent mechanical repair, and Adam has not accepted feel. Freeze, fresh play and public verification of this exact integration remain required.
+These are technical checks. Source-unread play has not established a whole independent mechanical repair, and Adam has not accepted feel. The exact integration is frozen and publicly verified. Fresh candidate-4 play remains required.
+
+## Verified engine-4 publication
+
+Main is integrated and privately pushed at `38cbae0694006cd5157add4e144b35cea686aa61`. Branch and main CI passed. Deployment reran 233 tests, build and dry-run checks. The live [game](https://repair.adamwhite.work) matches clean source, alpha.4, engine 4 and HF 2.2.1. Public basic UI, save/replay, accessibility exposure, narrow layout and same-domain fonts pass smoke checks. Candidate 4 is frozen at hash `a26396d98b27966f098f4a36b1427cd4b73516f79a826420108d12de88904ada`. Two actual candidate-4 play records are complete. Later UI presentation verification remains required. Technical delivery does not establish enjoyment, whole independent repair in natural play or Adam's acceptance.

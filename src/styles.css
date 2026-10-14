@@ -3764,3 +3764,79 @@ footer > div {
   background: #4a5144;
   cursor: not-allowed;
 }
+.sam-work-account {
+  margin: 23px 0;
+  padding: 17px 20px;
+  border-top: 1px solid #829662;
+  background: #2c412b;
+}
+.sam-work-account h3 {
+  font-family: "Libre Baskerville", serif;
+  font-size: 18px;
+  font-weight: 400;
+  color: #dce2bd;
+}
+.sam-work-account > p {
+  font-size: 12px;
+  color: #b2c59f;
+  margin-top: 12px;
+  line-height: 1.8;
+}
+.sam-work-account ul {
+  list-style: none;
+  padding: 0;
+  margin: 15px 0 0;
+}
+.sam-work-account li {
+  padding: 10px 0;
+  border-top: 1px solid #4d653e;
+  line-height: 1.8;
+}
+.sam-work-account li > strong {
+  font-size: 12px;
+  font-weight: 500;
+  color: #dae2bb;
+}
+.sam-work-account li > span {
+  display: block;
+  font-size: 11px;
+  color: #b1c69e;
+  margin-top: 5px;
+}
+@media (max-width: 620px) {
+  .sam-work-account {
+    padding: 15px;
+  }
+  .sam-work-account h3 {
+    font-size: 17px;
+  }
+  .sam-work-account li > span {
+    font-size: 11px;
+  }
+}
+.teaching-surface > .teaching-pending {
+  margin-top: 16px;
+  padding: 12px;
+  border-left: 3px solid #8f925a;
+  background: #dad8b6;
+  color: #50633a;
+}
+.teaching-surface > .teaching-pending > strong {
+  font:
+    10px "IBM Plex Mono",
+    monospace;
+  color: #607344;
+}
+.teaching-surface > .teaching-pending p {
+  margin-top: 10px;
+  font-size: 10px;
+  line-height: 1.8;
+}
+.teaching-surface > .teaching-pending p > span {
+  font-size: 10px;
+  line-height: 1.8;
+  color: #586943;
+}
+.teaching-surface > .teaching-record {
+  margin-top: 13px;
+}

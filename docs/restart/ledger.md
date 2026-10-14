@@ -4,7 +4,7 @@ Start: **2026-10-14 09:21:55 UTC**. Target finish: **14:21:55 UTC**.
 
 ## What remains
 
-Integrate the current Sam lifecycle and UI corrections. Review the integrated candidate, run the complete checks, obtain fresh actual play and revise the findings. Verify local and public builds separately. Continue useful work through the five-hour deadline. Adam accepts feel; neither technical checks nor reviewer opinions establish his acceptance.
+Assess the completed candidate-4 play findings, verify the latest UI presentation publicly and write the final ledger at 14:21:55 UTC. Engine 4 is integrated, checked and publicly verified. Continue useful review and correction through the deadline. Adam accepts feel; neither technical checks nor reviewer opinions establish his acceptance.
 
 ## Authority
 
@@ -149,3 +149,23 @@ The latest `/tmp/smallworks-alpha4-final-check.log` completes lint, types, **233
 The additional regression covers a terminal historical responsibility handle whose closed goal was removed by HF's capacity pruning. Missing-goal cleanup now releases that stale handle; an existing achieved goal is retained. The fixture uses official public adopt/abandon actions after a legal courier return to exercise history capacity. It is an isolated control, not a claim that the finite episode naturally reaches the capacity limit.
 
 Root's local engine-4 UI smoke checked keyboard component selection, export/import/replay, width 390 without overflow, an exposed Chrome accessibility button, local-only font requests and zero runtime errors. Screenshots were visually inspected. The smoke log records local alpha.4/engine 4 on dirty source; it does not establish a clean freeze or public release.
+
+## Engine-4 main integration and public verification, 13:36 UTC
+
+Main was integrated and privately pushed at **38cbae0694006cd5157add4e144b35cea686aa61**. Branch CI [38573311512](https://github.com/adam0white/repair-game/actions/runs/38573311512) and main CI [38573313495](https://github.com/adam0white/repair-game/actions/runs/38573313495) passed. Deployment reran **233 tests**, build, dry-run and deployment. Cloudflare version **6be98973-b6d4-4336-a136-60e4402bf81b** serves the exact clean manifest: alpha.4, engine 4, HF 2.2.1, `38cbae0`, dirty false. Earlier public-engine-3 statements above are historical checkpoints.
+
+Actual public UI smoke at `/tmp/smallworks-alpha4-public-smoke.log` found zero runtime errors and no overflow at width 390. Chrome exposed Select Switch as a non-ignored button. Keyboard Enter and Inspect worked. One input replayed exactly through export/import; invalid JSON did not change the clock. All seven WOFF2 requests used the repair domain, with no CSP error. Secret scans found staged 471 KB and distribution 629 KB clean.
+
+Candidate-4 freeze `/tmp/smallworks-candidate4-freeze.json` records creation at **13:36:23.824 UTC**, hash **a26396d98b27966f098f4a36b1427cd4b73516f79a826420108d12de88904ada**, and clean `38cbae0` manifest. Two fresh source-unread UI testers are playing this immutable candidate. No completed result or owner feel acceptance is claimed yet. Preserve all earlier exports and manifests unchanged.
+
+## Public responsive bench follow-up
+
+Root's actual public bench checks at widths **390, 768 and 1024** found no horizontal overflow. Narrow direct probes and Take Reading worked; mechanical selection reached the retained paper theatre. `/tmp/smallworks-responsive-bench.log` records zero runtime errors. Screenshot visual inspection remains pending at this checkpoint.
+
+## Candidate-4 actual play records
+
+[General play](playtest-7.md) ran 13:37:03–13:53:40 UTC including setup and failed export recovery, stopping naturally at Day 4 15:30. Six checked customer returns, a second bench and the 12-rpm retained theatre reached a meaningful public performance. Mum, Nora and Evan completed theatre; reading had no participants; Sam completed food and water. Diagnosis and resource consequences were enjoyable to the tester. Teaching administration remained tiring and Sam's untouched assignments were unhelpfully blocked. Whole independent repairs remained zero. **No export or replay was secured:** an unhandled harness download-wait timeout killed the browser after Close workshop. This is not a game crash claim.
+
+[Focused mentoring play](playtest-8.md) ran 13:39:28–13:46:15 UTC, 6 minutes 47 seconds. Its unchanged 48-input packet replayed exactly. Actual teaching led Sam to inspect and measure Nora's contact, ask for an unknown next step, then courier a player-repaired object for £18. It earned zero independent whole repairs. A 15:12 family refusal was understandable.
+
+Later UI-only work names recorded Sam contributions and courier completion, keeps baseline instructions visible, suppresses contradictory notices and distinguishes method conditions from outcomes. Neither tester played that later presentation. Root's `/tmp/smallworks-final-ui-check.log` is running and read-only review is underway. Public remains clean `38cbae0` until a later commit/deployment is verified. Final public presentation checks and the ending ledger at 14:21:55 UTC remain required. Adam accepts feel later.

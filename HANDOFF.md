@@ -4,7 +4,9 @@ Updated 2026-10-14 during the active restart.
 
 ## What remains
 
-Freeze and play the integrated engine-4 candidate, review remaining findings, then verify its public deployment. The integrated local check passed lint, types, **233 tests across 23 files** and production build. The public static build remains clean `7570eea`, game `3.0.0-alpha.3`, engine `small-works@3` and HF `2.2.1`. Engine 4 is not yet deployed. The five-hour run continues until **2026-10-14 14:21:55 UTC**. Adam accepts feel later.
+Verify the latest UI presentation publicly, resolve required findings and write the ending ledger at 14:21:55 UTC. The local/public engine-4 build is reviewed, checked and deployed; this does not establish Adam's feel acceptance. The five-hour run continues until **2026-10-14 14:21:55 UTC**.
+
+Main is privately pushed at `38cbae0694006cd5157add4e144b35cea686aa61`. The live manifest matches clean source, game `3.0.0-alpha.4`, engine `small-works@4` and HF `2.2.1`. Deployment reran the **233-test** check and build. Public UI smoke passed. Candidate-4 actual play is recorded; later UI presentation verification remains pending.
 
 ## Current direction
 
@@ -42,6 +44,12 @@ The [HF release](https://github.com/adam0white/human-framework/releases/tag/v2.2
 
 The integrated engine-4 check passed lint, types, **233 tests across 23 files** and production build. Sam's courier menu now requires his own received checks. Ordinary diagnostic and part procedures transfer across requested paces; calibration retains the exact requested pace. Intervention success requires the matching condition and relevant physical revision, with calibration checked against owner use. A native goal-withdrawal regression verifies release and save/restore. Licensed fonts are bundled locally after live CSP blocked Google imports.
 
-The [clean engine-3 playtest](docs/restart/playtest-6.md) lasted 13 minutes 6 seconds. It reached the gathering with useful courier help but zero whole independent repairs. Its 104 inputs replayed exactly according to the tester. This is historical play evidence, not proof of engine-4 behavior. New candidate play, freeze and deployment verification remain required.
+The [clean engine-3 playtest](docs/restart/playtest-6.md) lasted 13 minutes 6 seconds. It reached the gathering with useful courier help but zero whole independent repairs. Its 104 inputs replayed exactly according to the tester. This is historical play evidence, not proof of engine-4 behavior. Fresh candidate-4 play remains required.
 
-The final pre-freeze check now passes **233 tests across 23 files**. A history-capacity regression verifies stale missing-goal handle cleanup while retaining an existing achieved goal. This uses official public goal actions after a legal courier return; it is an isolated capacity control. Local keyboard, save/import/replay, accessibility exposure, 390-width layout and local-font smoke checks pass with zero runtime errors. Clean freeze, fresh play and engine-4 public verification remain outstanding.
+The final pre-freeze check now passes **233 tests across 23 files**. A history-capacity regression verifies stale missing-goal handle cleanup while retaining an existing achieved goal. This uses official public goal actions after a legal courier return; it is an isolated capacity control. Local keyboard, save/import/replay, accessibility exposure, 390-width layout and local-font smoke checks pass with zero runtime errors. Candidate 4 is frozen and public engine 4 is verified. Fresh play remains outstanding.
+
+## Engine-4 publication and immutable candidate
+
+Cloudflare version `6be98973-b6d4-4336-a136-60e4402bf81b` serves clean `38cbae0`. Branch CI [38573311512](https://github.com/adam0white/repair-game/actions/runs/38573311512) and main CI [38573313495](https://github.com/adam0white/repair-game/actions/runs/38573313495) passed. Public smoke checked keyboard selection and inspection, accessible component buttons, 390-width layout, exact one-input replay/export/import and rejected invalid JSON without changing the clock. Seven font requests used the game domain; runtime and CSP errors were absent.
+
+Immutable candidate 4 was created at **13:36:23.824 UTC**, hash `a26396d98b27966f098f4a36b1427cd4b73516f79a826420108d12de88904ada`, with the same clean manifest. Two actual UI play records are now available: [general episode](docs/restart/playtest-7.md) and [focused mentoring](docs/restart/playtest-8.md). General play secured no export after a harness timeout; mentoring retained 48 exact-replay inputs. Both recorded zero whole independent repairs. Earlier playtests and engine-3 deployment records remain historical evidence.

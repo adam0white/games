@@ -1,5 +1,7 @@
 # Focused external consultations
 
+Current status: engine 4 is integrated and publicly verified. Two actual candidate-4 play records are complete. Later UI presentation verification remains required. Earlier sections below retain their original review scope and checkpoint claims; later dated resolution notes update them.
+
 2026-10-14. Adam explicitly requested Claude Fable consultation and focused Opus reviews. Initial CLI attempts failed because authentication expired and returned no opinion. Adam signed in; subsequent bounded requests completed. Packets contained fictional game implementation, design and the requested UI screenshot. They contained no PKM or private personal source notes.
 
 ## Fable design consultation
@@ -26,9 +28,11 @@ Priorities: a comparison readings matrix and recorded SVG tags; direct terminal 
 
 Comparison and direct probe controls are integrated. Browser checks at widths 1440 and 390 found no overflow. Fresh play verification remains underway. These checks do not certify enjoyment, a full independent handoff or final delivery.
 
-## Additional review in progress
+## Opus lifecycle review: completed historical consultation
 
-A focused external Opus lifecycle review is running. No returned opinion is claimed for that review yet.
+Result: `/tmp/small-works-opus-lifecycle-result.json`. The review actually returned; it traced supplied source by hand and ran nothing. It identified lesson promise completion, a second consent decision at lesson start, queued retry cancellation and reporting concerns. It also listed hypothetical adapter and event-boundary risks whose reachability it could not establish.
+
+Current lifecycle controls distinguish readiness from actual attendance, expire readiness, release canceled agreements, preserve accepted work through self-care and sleep, and record actually attended observations. A second consent decision remains intentional: readiness reserves a chance to start, while start receives actual consent under current needs. A refused lesson must not claim witnessed learning. The completed review is historical evidence; it is not a currently running dependency or a claim that every hypothetical path was reproduced.
 
 ## Fable immutable-candidate critique
 
@@ -61,3 +65,9 @@ Result: `/tmp/smallworks-opus-delta-review.json`. The reviewer read supplied sou
 Finding 2 concerns failed personal completion retaining verified status or repeating with an inactive goal. The reviewer could not reproduce a reachable path. It remains a targeted reproduction question, not a confirmed bug. The minor replay schema concern is not a defect in the current contract: schema and engine both match `small-works@4`, with passing controls.
 
 The reviewer found promise renewal, personal completion ownership, donor guards, received-evidence help feedback and diagnostic verification procedure credit consistent with the stated rules. Astra's later scoped correction removes an irrelevant numerical pace condition from ordinary learned diagnostic and part procedures. Calibration retains requested pace. Public received cues remain unchanged. Nine focused actual-attendance checks cover cross-pace first tests, probes and inspection versus withheld teaching; they do not prove an independent whole mechanical repair.
+
+## Resolution note after engine-4 publication, 2026-10-14
+
+The earlier Fable critique inferred that advertised competence payoff made help dominate repairs. Actual decision traces showed **zero contribution** from that advertised competence payoff. It therefore does not explain the observed choice by itself. Goal terms and a released delivery promise were the actual confirmed issue. Renewal and actor-knowledge corrections are implemented and checked; courier cooperation still earns no whole independent credit. Do not treat Fable's source inference as a reproduced scorer effect.
+
+HF 2.2.1 is now published, exactly installed and consumed through public APIs. Earlier ‘release in progress’ statements above describe their original checkpoint. The live game is alpha.4/engine 4 at clean `38cbae0`. Actual candidate-4 play is now recorded: general play secured no export, while focused mentoring replayed 48 inputs. Neither established a whole independent repair or owner feel acceptance.
