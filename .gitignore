@@ -12,3 +12,5 @@ public/release.json
 public/third-party-notices.txt
 
 *.tsbuildinfo
+
+.playwright-mcp/

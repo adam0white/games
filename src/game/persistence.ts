@@ -1,0 +1,577 @@
+import { restore, snapshot } from '@adam0white/human-framework';
+import { compatiblePart, createModel } from './model';
+import { isInputRecording, isSupportedProvenance, SAVE_PROVENANCE } from './recording';
+import {
+  aspirationAdvances,
+  responsibilityAdvances,
+  responsibilityCompletionAction,
+} from './responsibility';
+import type { Evidence, GameState, Job, TestCondition } from './types';
+
+const DAY = 1440;
+const OPEN = 540;
+const CLOSE = 1020;
+const CONDITIONS: TestCondition[] = ['bench', 'movement', 'load'];
+const UPGRADE_IDS = ['second-bench', 'precision-meter'];
+
+export function saveGame(state: GameState): string {
+  return JSON.stringify({
+    ...state,
+    provenance: { ...SAVE_PROVENANCE },
+    people: Object.fromEntries(
+      Object.entries(state.people).map(([id, person]) => [id, snapshot(person)]),
+    ),
+  });
+}
+export function loadGame(text: string): GameState {
+  if (text.length > 2_000_000) throw new Error('This save exceeds the supported size.');
+  const value = JSON.parse(text) as GameState;
+  const invalid = () => {
+    throw new Error('This Small Works save is incomplete or invalid.');
+  };
+  const object = (v: unknown): v is Record<string, unknown> =>
+    !!v && typeof v === 'object' && !Array.isArray(v);
+  const num = (v: unknown, min = 0, max = 100_000_000): v is number =>
+    typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
+  const integer = (v: unknown, min = 0, max = 100_000_000): v is number =>
+    num(v, min, max) && Number.isInteger(v);
+  const str = (v: unknown): v is string => typeof v === 'string' && v.length <= 10_000;
+  const strings = (v: unknown): v is string[] =>
+    Array.isArray(v) && v.length <= 1000 && v.every(str);
+  const cues = (v: unknown) =>
+    object(v) && Object.keys(v).length <= 8 && Object.values(v).every(str);
+  const parts = [
+    'cell',
+    'switch',
+    'contact',
+    'bulb',
+    'motor',
+    'spring',
+    'gear',
+    'governor',
+    'drum',
+  ];
+  const ids = new Set<string>();
+  const actors = ['player', 'sam', 'mum', 'nora', 'evan'];
+  const conditions = ['good', 'weak', 'dirty', 'open', 'worn', 'jammed', 'misaligned'];
+  const requestValid = (v: unknown) =>
+    object(v) &&
+    ['voltage', 'continuity', 'motion'].includes(String(v.mode)) &&
+    str(v.a) &&
+    str(v.b) &&
+    CONDITIONS.includes(v.condition as TestCondition);
+  const evidenceValid = (e: Evidence, job: Job) =>
+    object(e) &&
+    integer(e.id, 1) &&
+    integer(e.at) &&
+    e.at <= value.now &&
+    ['inspection', 'measurement', 'use', 'work'].includes(e.kind) &&
+    str(e.summary) &&
+    cues(e.cues) &&
+    (e.componentId === undefined || job.model.components.some((c) => c.id === e.componentId)) &&
+    (e.request === undefined || requestValid(e.request)) &&
+    (e.value === undefined || e.value === null || num(e.value, -100_000_000)) &&
+    (e.unit === undefined || str(e.unit)) &&
+    (e.condition === undefined || (e.kind === 'use' && CONDITIONS.includes(e.condition))) &&
+    (e.actorId === undefined || actors.includes(e.actorId)) &&
+    (e.witnessedBy === undefined ||
+      (strings(e.witnessedBy) && e.witnessedBy.every((id) => actors.includes(id))));
+  if (
+    !object(value) ||
+    value.schema !== 'small-works@3' ||
+    (value.provenance !== undefined && !isSupportedProvenance(value.provenance)) ||
+    (value.inputs !== undefined &&
+      (!isInputRecording(value.inputs) || value.provenance === undefined)) ||
+    !integer(value.seed, 0, 0xffffffff) ||
+    !integer(value.rng, 1, 0xffffffff) ||
+    !integer(value.now) ||
+    !integer(value.day, 1) ||
+    value.day !== Math.floor(value.now / DAY) + 1 ||
+    value.now % DAY < OPEN ||
+    value.now % DAY > CLOSE ||
+    !num(value.cash) ||
+    !integer(value.reputation, -100_000_000) ||
+    !integer(value.nextId, 1) ||
+    !integer(value.independentRepairs) ||
+    !num(value.dailyCostsPaid) ||
+    typeof value.watching !== 'boolean' ||
+    (value.watchUntil !== undefined && !integer(value.watchUntil)) ||
+    typeof value.weekReviewed !== 'boolean' ||
+    typeof value.ended !== 'boolean' ||
+    !Array.isArray(value.jobs) ||
+    value.jobs.length < 1 ||
+    value.jobs.length > 10000 ||
+    !Array.isArray(value.npcWork) ||
+    value.npcWork.length > 4 ||
+    !Array.isArray(value.log) ||
+    value.log.length > 160 ||
+    !object(value.people) ||
+    !object(value.stock) ||
+    !strings(value.upgrades) ||
+    value.upgrades.some((id) => !UPGRADE_IDS.includes(id)) ||
+    Object.entries(value.stock).some(([kind, count]) => !parts.includes(kind) || !integer(count))
+  )
+    invalid();
+  for (const job of value.jobs) {
+    if (
+      !object(job) ||
+      !str(job.id) ||
+      !job.id ||
+      ids.has(job.id) ||
+      !actors.includes(job.ownerId) ||
+      !str(job.title) ||
+      !str(job.description) ||
+      !str(job.importance) ||
+      !num(job.reward) ||
+      !integer(job.due) ||
+      !['offer', 'active', 'ready', 'delivered', 'declined', 'salvaged'].includes(job.status) ||
+      !['lantern', 'fan', 'music-box'].includes(job.kind) ||
+      !object(job.model) ||
+      job.model.kind !== job.kind ||
+      !num(job.model.sourceVolts, 0.01) ||
+      typeof job.model.power !== 'boolean' ||
+      !Array.isArray(job.model.components) ||
+      job.model.components.length !== 4 ||
+      !Array.isArray(job.evidence) ||
+      job.evidence.length > 80 ||
+      !strings(job.inspected) ||
+      !strings(job.verified) ||
+      !Array.isArray(job.contributions) ||
+      job.contributions.length > 10000 ||
+      !Array.isArray(job.pendingLessons) ||
+      job.pendingLessons.length > 4
+    )
+      invalid();
+    ids.add(job.id);
+    const template = createModel(job.kind, 1);
+    job.model.components.forEach((c, index) => {
+      const expected = template.components[index];
+      if (
+        !object(c) ||
+        c.id !== expected?.id ||
+        c.kind !== expected.kind ||
+        !str(c.label) ||
+        !Array.isArray(c.terminals) ||
+        JSON.stringify(c.terminals) !== JSON.stringify(expected.terminals) ||
+        !num(c.x, -1000, 1000) ||
+        !num(c.y, -1000, 1000) ||
+        !conditions.includes(c.condition) ||
+        (c.setting !== undefined && (c.kind !== 'governor' || !integer(c.setting, 0, 4)))
+      )
+        invalid();
+    });
+    if (
+      (job.requiredConditions !== undefined &&
+        (!Array.isArray(job.requiredConditions) ||
+          job.requiredConditions.length < 1 ||
+          job.requiredConditions.length > 3 ||
+          new Set(job.requiredConditions).size !== job.requiredConditions.length ||
+          job.requiredConditions.some((condition) => !CONDITIONS.includes(condition)))) ||
+      (job.model.desiredRPM !== undefined && !num(job.model.desiredRPM, 0.01, 100_000)) ||
+      (job.model.tolerance !== undefined && !num(job.model.tolerance, 0.01, 100_000)) ||
+      (job.model.ratedDrive !== undefined && !num(job.model.ratedDrive, 0.01, 100_000)) ||
+      (job.model.gearRatio !== undefined && !num(job.model.gearRatio, 0.01, 100_000)) ||
+      job.inspected.some((id) => !job.model.components.some((c) => c.id === id)) ||
+      job.verified.some((c) => !CONDITIONS.includes(c)) ||
+      job.evidence.some((e) => !evidenceValid(e, job)) ||
+      job.contributions.some(
+        (c) =>
+          !object(c) ||
+          !actors.includes(c.actorId) ||
+          !str(c.action) ||
+          !integer(c.at) ||
+          c.at > value.now,
+      ) ||
+      job.pendingLessons.some(
+        (l) =>
+          !object(l) ||
+          l.observerId !== 'sam' ||
+          !str(l.action) ||
+          !/^(clean|adjust|replace|calibrate):/.test(l.action) ||
+          !cues(l.cues) ||
+          !str(l.demonstrationId) ||
+          (l.baseline !== undefined && !evidenceValid(l.baseline, job)),
+      ) ||
+      (job.assignedTo !== undefined && job.assignedTo !== 'sam') ||
+      (job.assignedTo !== undefined && !['active', 'ready'].includes(job.status)) ||
+      (job.blocked !== undefined &&
+        (!object(job.blocked) ||
+          job.assignedTo !== 'sam' ||
+          !integer(job.blocked.at) ||
+          job.blocked.at > value.now ||
+          !['help', 'unavailable'].includes(job.blocked.kind) ||
+          !str(job.blocked.reason) ||
+          !job.blocked.reason)) ||
+      ['acceptedAt', 'deliveredAt'].some(
+        (key) => job[key as 'acceptedAt'] !== undefined && !integer(job[key as 'acceptedAt']),
+      ) ||
+      ['isPersonal', 'isDonor', 'returnedUnfinished'].some(
+        (key) =>
+          job[key as 'isPersonal'] !== undefined && typeof job[key as 'isPersonal'] !== 'boolean',
+      ) ||
+      (job.completedBy !== undefined && !actors.includes(job.completedBy)) ||
+      (job.quote !== undefined && !str(job.quote))
+    )
+      invalid();
+  }
+  if (
+    !ids.has(value.selectedJobId) ||
+    value.log.some(
+      (e) =>
+        !object(e) ||
+        !integer(e.id, 1) ||
+        !integer(e.at) ||
+        e.at > value.now ||
+        !str(e.speaker) ||
+        !str(e.text) ||
+        !['ordinary', 'good', 'warning'].includes(e.tone),
+    )
+  )
+    invalid();
+  const request = value.pendingRequest;
+  if (request !== undefined) {
+    const offered = object(request) ? value.jobs.find((j) => j.id === request.jobId) : undefined;
+    if (
+      !object(request) ||
+      !['lesson', 'repair'].includes(request.kind) ||
+      Object.keys(request).some(
+        (key) => !['kind', 'status', 'requestedAt', 'readyUntil', 'jobId'].includes(key),
+      ) ||
+      !['requested', 'ready'].includes(request.status) ||
+      !integer(request.requestedAt) ||
+      request.requestedAt > value.now ||
+      request.requestedAt < Math.floor(value.now / DAY) * DAY + OPEN ||
+      value.watching ||
+      (request.status === 'requested' && request.readyUntil !== undefined) ||
+      (request.status === 'ready' &&
+        (request.kind !== 'lesson' ||
+          !integer(request.readyUntil) ||
+          request.readyUntil <= value.now ||
+          request.readyUntil > value.now + 20 ||
+          request.readyUntil > Math.floor(value.now / DAY) * DAY + CLOSE)) ||
+      (request.kind === 'lesson' && request.jobId !== undefined) ||
+      (request.kind === 'repair' &&
+        (!offered ||
+          !['active', 'ready'].includes(offered.status) ||
+          value.jobs.some((j) => j.assignedTo && j.id !== offered.id)))
+    )
+      invalid();
+  }
+  if (value.jobs.filter((j) => j.assignedTo === 'sam').length > 1) invalid();
+  if (value.community !== undefined) {
+    const event = value.community;
+    const formats = ['garden', 'reading', 'theatre'];
+    const unique = (items: unknown): items is string[] =>
+      strings(items) && new Set(items).size === items.length;
+    const knownJobs = (items: unknown) => unique(items) && items.every((id) => ids.has(id));
+    if (
+      !object(event) ||
+      !['announced', 'setting-up', 'completed'].includes(event.phase) ||
+      !integer(event.announcedAt) ||
+      event.announcedAt > value.now ||
+      !integer(event.opensAt) ||
+      event.opensAt < event.announcedAt ||
+      !integer(event.deadline) ||
+      event.deadline < event.opensAt ||
+      !integer(event.finishesAt) ||
+      event.finishesAt < event.deadline ||
+      !unique(event.invitedPersonIds) ||
+      event.invitedPersonIds.length > 4 ||
+      event.invitedPersonIds.some((id) => !['sam', 'mum', 'nora', 'evan'].includes(id)) ||
+      !unique(event.preparedFormats) ||
+      event.preparedFormats.length > 3 ||
+      event.preparedFormats.some((format) => !formats.includes(format)) ||
+      !knownJobs(event.reservedJobIds) ||
+      event.reservedJobIds.length > 3 ||
+      !knownJobs(event.ownerConsentJobIds) ||
+      !Array.isArray(event.preparations) ||
+      event.preparations.length > 3 ||
+      !Array.isArray(event.decisions) ||
+      event.decisions.length > 4 ||
+      !str(event.outcome) ||
+      (event.resolvedAt !== undefined &&
+        (!integer(event.resolvedAt) ||
+          event.resolvedAt < event.deadline ||
+          event.resolvedAt > value.now ||
+          event.finishesAt !== event.resolvedAt + 30)) ||
+      (event.phase === 'completed' &&
+        (event.resolvedAt === undefined ||
+          value.now < event.finishesAt ||
+          event.reservedJobIds.length !== 0)) ||
+      (event.phase === 'announced' && event.preparations.length !== 0) ||
+      (event.resolvedAt === undefined && event.decisions.length !== 0)
+    )
+      invalid();
+    const preparationFormats = new Set<string>();
+    const preparationJobs = new Set<string>();
+    for (const prep of event.preparations) {
+      if (
+        !object(prep) ||
+        !formats.includes(prep.format) ||
+        !ids.has(prep.jobId) ||
+        preparationFormats.has(prep.format) ||
+        preparationJobs.has(prep.jobId) ||
+        !integer(prep.startedAt) ||
+        prep.startedAt < event.opensAt ||
+        prep.startedAt > value.now ||
+        prep.startedAt + 90 > event.deadline ||
+        (prep.completedAt !== undefined &&
+          (!integer(prep.completedAt) ||
+            prep.completedAt < prep.startedAt + 90 ||
+            prep.completedAt > event.deadline ||
+            prep.completedAt > value.now)) ||
+        event.preparedFormats.includes(prep.format) !== (prep.completedAt !== undefined) ||
+        (event.phase !== 'completed' && !event.reservedJobIds.includes(prep.jobId))
+      )
+        invalid();
+      preparationFormats.add(prep.format);
+      preparationJobs.add(prep.jobId);
+    }
+    if (
+      event.preparedFormats.some((format) => !preparationFormats.has(format)) ||
+      event.reservedJobIds.some((id) => !preparationJobs.has(id)) ||
+      event.preparations.filter((prep) => prep.completedAt === undefined).length > 1
+    )
+      invalid();
+    const decided = new Set<string>();
+    for (const decision of event.decisions) {
+      if (
+        !object(decision) ||
+        !event.invitedPersonIds.includes(decision.personId) ||
+        decided.has(decision.personId) ||
+        !str(decision.activityLabel) ||
+        !str(decision.speech) ||
+        typeof decision.completed !== 'boolean' ||
+        (decision.format !== undefined &&
+          (!formats.includes(decision.format) ||
+            !event.preparedFormats.includes(decision.format))) ||
+        (decision.activityId === undefined &&
+          (decision.startedAt !== undefined ||
+            decision.endsAt !== undefined ||
+            decision.format !== undefined ||
+            decision.completed)) ||
+        (decision.activityId !== undefined &&
+          (!str(decision.activityId) ||
+            ![
+              'personal',
+              'eat',
+              'rest',
+              'postpone',
+              'community:garden',
+              'community:reading',
+              'community:theatre',
+            ].includes(decision.activityId) ||
+            !integer(decision.startedAt) ||
+            decision.startedAt !== event.resolvedAt ||
+            !integer(decision.endsAt) ||
+            decision.endsAt !== decision.startedAt + 30 ||
+            (decision.format !== undefined &&
+              decision.activityId !== `community:${decision.format}`))) ||
+        (decision.completed &&
+          (event.phase !== 'completed' || value.now < (decision.endsAt ?? Infinity)))
+      )
+        invalid();
+      decided.add(decision.personId);
+    }
+  }
+  // HF owns validation of its slices. Refuse saves it would sanitize instead of silently changing acquired state.
+  const canonical = (v: unknown): string =>
+    JSON.stringify(v, (_key, item) =>
+      object(item)
+        ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
+        : item,
+    );
+  if (Object.keys(value.people).sort().join(',') !== 'evan,mum,nora,sam') invalid();
+  value.people = Object.fromEntries(
+    Object.entries(value.people).map(([id, saved]) => {
+      const person = restore(saved);
+      if (person.id !== id || person.now !== value.now || canonical(person) !== canonical(saved))
+        invalid();
+      return [id, person];
+    }),
+  );
+  const responsibilityGoals = new Set<string>();
+  for (const job of value.jobs) {
+    const handle = job.responsibility;
+    if (handle === undefined) continue;
+    if (!object(handle)) invalid();
+    const goal = value.people.sam?.agenda.goals.find((g) => g.id === handle.goalId);
+    if (
+      !object(handle) ||
+      handle.jobId !== job.id ||
+      !str(handle.goalId) ||
+      responsibilityGoals.has(handle.goalId) ||
+      !goal ||
+      (handle.lastHelpEvidenceRevision !== undefined &&
+        (!integer(handle.lastHelpEvidenceRevision) ||
+          handle.lastHelpEvidenceRevision >
+            Math.max(
+              0,
+              ...job.evidence
+                .filter((e) => e.actorId === 'sam' || e.witnessedBy?.includes('sam'))
+                .map((e) => e.id),
+            ))) ||
+      goal.label !== `Resolve accepted repair ${job.id}` ||
+      goal.baseImportance !== 0.2 ||
+      JSON.stringify(goal.serves) !== '["achievement"]' ||
+      goal.advancedBy.length !== 1 ||
+      goal.advancedBy[0]?.action !== responsibilityCompletionAction(handle) ||
+      goal.advancedBy[0]?.amount !== 1 ||
+      (goal.status === 'active' &&
+        (job.assignedTo !== 'sam' ||
+          !['active', 'ready'].includes(job.status) ||
+          goal.progress > 0.2 + Number.EPSILON)) ||
+      (goal.status === 'achieved' &&
+        (job.status !== 'delivered' || job.returnedUnfinished || goal.progress !== 1)) ||
+      goal.status === 'abandoned'
+    )
+      invalid();
+    responsibilityGoals.add(handle.goalId);
+  }
+  for (const [id, person] of Object.entries(value.people))
+    for (const goal of person.agenda.goals)
+      if (
+        goal.status === 'active' &&
+        goal.label.startsWith('Resolve accepted repair ') &&
+        (id !== 'sam' || !responsibilityGoals.has(goal.id))
+      )
+        invalid();
+  const working = new Set<string>();
+  for (const w of value.npcWork) {
+    const job = value.jobs.find((j) => j.id === w.jobId);
+    const person = value.people[w.personId];
+    if (
+      !object(w) ||
+      !['sam', 'mum', 'nora', 'evan'].includes(w.personId) ||
+      working.has(w.personId) ||
+      (w.jobId !== undefined && (!job || job.assignedTo !== w.personId)) ||
+      job?.blocked !== undefined ||
+      (w.jobId === undefined &&
+        !['eat', 'drink', 'rest', 'personal', 'leisure'].includes(w.option?.action)) ||
+      !object(w.option) ||
+      !str(w.option.id) ||
+      !str(w.option.action) ||
+      !str(w.option.label) ||
+      !integer(w.option.duration, 1, 480) ||
+      !num(w.option.effort, 0, 1) ||
+      (w.option.advances !== undefined &&
+        (!strings(w.option.advances) ||
+          JSON.stringify(w.option.advances) !==
+            JSON.stringify(
+              job
+                ? responsibilityAdvances(
+                    person as import('@adam0white/human-framework').Person,
+                    job.responsibility,
+                    job.id,
+                    w.option.action,
+                  )
+                : [],
+            ))) ||
+      !integer(w.startedAt) ||
+      w.startedAt > value.now ||
+      !integer(w.endsAt) ||
+      w.endsAt <= value.now ||
+      w.endsAt !== w.startedAt + w.option.duration ||
+      w.endsAt > Math.floor(value.now / DAY) * DAY + CLOSE ||
+      value.people[w.personId]?.activity?.affordance.id !== w.option.id ||
+      value.people[w.personId]?.activity?.startedAt !== w.startedAt ||
+      value.people[w.personId]?.activity?.endsAt !== w.endsAt ||
+      value.people[w.personId]?.activity?.action !== w.option.action ||
+      value.people[w.personId]?.activity?.affordance.duration !== w.option.duration ||
+      JSON.stringify(person?.activity?.affordance.advances ?? []) !==
+        JSON.stringify([
+          ...(w.option.advances ?? []),
+          ...(person ? aspirationAdvances(person, w.option.action) : []),
+        ]) ||
+      (job !== undefined &&
+        value.people[w.personId]?.activity?.targetId !==
+          (w.option.action === 'accept-repair' ? 'ordinary-day' : job.id)) ||
+      (w.reservedPart !== undefined &&
+        (!job ||
+          job.assignedTo !== w.personId ||
+          !parts.includes(w.reservedPart) ||
+          !w.option.action.startsWith('replace:') ||
+          compatiblePart(
+            job?.model as import('./types').DeviceModel,
+            w.option.action.split(':')[1] ?? '',
+          ) !== w.reservedPart))
+    )
+      invalid();
+    working.add(w.personId);
+  }
+  for (const decision of value.community?.decisions ?? []) {
+    if (decision.activityId && !decision.completed && value.now < (decision.endsAt ?? 0)) {
+      const activity = value.people[decision.personId]?.activity;
+      if (
+        !activity ||
+        activity.affordanceId !== decision.activityId ||
+        activity.startedAt !== decision.startedAt ||
+        activity.endsAt !== decision.endsAt ||
+        working.has(decision.personId)
+      )
+        invalid();
+    }
+  }
+  for (const job of value.jobs) {
+    if (!job.assignedTo || job.blocked || value.npcWork.some((w) => w.jobId === job.id)) continue;
+    // A continuing responsibility can wait through sleep, a gathering, or an explicit retry request.
+    if (value.pendingRequest?.kind === 'repair' && value.pendingRequest.jobId === job.id) continue;
+    if (value.now % DAY === OPEN || value.now % DAY > CLOSE - 5) continue;
+    if (
+      value.community?.decisions.some(
+        (d) =>
+          d.personId === job.assignedTo &&
+          d.activityId &&
+          !d.completed &&
+          (d.endsAt ?? 0) > value.now,
+      )
+    )
+      continue;
+    invalid();
+  }
+  for (const [id, person] of Object.entries(value.people)) {
+    if (!person.activity || working.has(id)) continue;
+    if (
+      value.community?.decisions.some(
+        (d) =>
+          d.personId === id &&
+          !d.completed &&
+          d.activityId === person.activity?.affordanceId &&
+          d.endsAt === person.activity?.endsAt,
+      )
+    )
+      continue;
+    invalid();
+  }
+  if (
+    request?.status === 'ready' &&
+    (!value.people.sam?.agenda.commitments.some(
+      (c) =>
+        c.status === 'pending' &&
+        c.targetId === 'workshop-lesson' &&
+        c.actions.includes('complete-lesson') &&
+        c.until === request.readyUntil,
+    ) ||
+      value.people.sam.activity)
+  )
+    invalid();
+  if (request?.status === 'requested' && !value.people.sam?.activity) invalid();
+  if (request?.kind === 'lesson' && value.jobs.some((j) => j.assignedTo === 'sam' && !j.blocked))
+    invalid();
+  if (
+    value.watching &&
+    (!integer(value.watchUntil) ||
+      value.watchUntil <= value.now ||
+      value.watchUntil > Math.floor(value.now / DAY) * DAY + CLOSE ||
+      !value.people.sam?.agenda.commitments.some(
+        (c) =>
+          c.status === 'pending' &&
+          c.targetId === 'workshop-lesson' &&
+          c.actions.includes('complete-lesson') &&
+          c.until === value.watchUntil,
+      ) ||
+      value.jobs.some((j) => j.assignedTo === 'sam' && !j.blocked))
+  )
+    invalid();
+  return value;
+}

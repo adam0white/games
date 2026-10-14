@@ -63,3 +63,11 @@ Adam found the curious start intriguing and the first diagnostic choices believa
 Tea and time together should affect real HF people, such as relationships and willingness. Verification can take time while the player does something else, with an option to hand an item back prematurely and understand the consequences. These suggestions are direction for an integrated design, not a requirement to simulate caffeine or urination immediately.
 
 The controller should stay focused on overview and taste, delegate almost all implementation, and let workers contribute interpretations and nuances. Review includes small unbiased tester briefs and an almost unbriefed wildcard. Owner attention goes to meaningful playtesting rather than repeated design gates. Exact feedback excerpts are retained in docs/games/opening-playtest-2026-10-10.md.
+
+## Restart direction, 2026-10-14
+
+Adam rejected the earlier UI, shallow gameplay and progression without meaningful decisions. He authorized a broad rewrite, deletion of the old implementation and abandonment of old-save compatibility. Git retains the earlier work. The broad micro-to-macro ambition remains direction; the old campaign and dated task lists are no longer the active queue.
+
+The selected game is **Small Works**: a physical diagnostic workshop with chosen measurements, shared time, finite stock and cash, visible owner-use goals, retained personal theatre work and a timed community gathering. Sam's learning requires actual attendance and acquired conditional HF methods. His needs, commitments and decisions must change what he does. The host owns physical and economic consequences; released HF 2.2.0 owns people through public APIs.
+
+The owner authorized five actual hours of delegated progress and revision, 09:21:55–14:21:55 UTC on October 14. Technical done means a reviewed, verified local/public playable build with actual independent play. Adam accepts feel himself. Source remains private; static deployment and private pushes remain authorized. See [the restart design](restart/design.md), [ledger](restart/ledger.md) and [current MVP](mvp.md).

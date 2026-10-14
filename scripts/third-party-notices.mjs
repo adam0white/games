@@ -1,14 +1,11 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
-// These are the runtime packages in the browser build, including frozen replay aliases.
+// These are the runtime packages in the browser build, installed for this restart.
 const installedPackages = [
   'react',
   'react-dom',
   'scheduler',
-  'three',
   '@adam0white/human-framework',
-  '@repair/hf-engine5',
-  '@repair/hf-legacy',
 ];
 const groups = new Map();
 for (const installedName of installedPackages) {

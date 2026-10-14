@@ -1,79 +1,32 @@
-# MVP target: home to first handoff
+# Current MVP: Small Works
 
-Updated 2026-10-10. The V1 authored scope is now a release candidate: home-to-independent-handoff plus one first service week, a persistent completed-chapter account and continued personal work. The owner’s new authorization proceeds into V2 without waiting for another routine approval: direct 3D object operations, a rotatable workshop, and saved lamp/torch/bell opening and reassembly form the current playable V2 slice. Sam handles real preparation before applying his acquired methods; opening invalidates earlier checking. This does not claim that every object has detailed disassembly or that Adam has accepted feel. The complete labelled alternative remains available. Current design: [V2 physical workshop](superpowers/specs/2026-10-10-v2-physical-workshop-design.md).
+The 2026-10-14 restart supersedes the earlier campaign's MVP and historical-save requirements. [The current design](restart/design.md) defines the selected increment. Earlier implementation remains in Git. Adam accepts enjoyment through play; technical verification does not replace that judgment.
 
-Previous bounded milestone status, retained provenance: The owner authorized autonomous implementation with delegation and reviews, including the current five-hour expansion. The school-break campaign and bounded apprentice-learning target are implemented and independently reviewed; released HF 2.2.0 is consumed from npm, with generic and consumer causal controls. The published checkpoint reaches whole-job independence. The published first service week establishes useful freedom afterward through separately agreed work, personal projects and the choice to stay small. Adam still accepts the experience personally; technical checks and agent playtests do not claim that acceptance. The original proposal below records intended scope and acceptance criteria rather than an unfinished implementation queue.
+## Selected capability
 
-## Promise
+A player can diagnose and restore several familiar objects using discriminating measurements, finite parts and a shared day. The player can retain personal work, choose achievable customer promises and teach Sam through actual attended work. Sam's acquired conditional methods and competing activities must affect later autonomous repair choices. The workshop has a first-week account and can continue afterward.
 
-Start by tinkering with a family object at home. Repair a few friends' objects in the parents' garage. Teach one apprentice, then experience the first prestige: they complete an entire repair without your expertise, leaving you free to take on broader work or return to a personal project.
+Electrical and mechanical models provide observable consequences. Inspection need not reveal the repair. Measurement locations and conditions matter. Calibration uses a chosen setting and a public requested pace. Verification checks the owner's relevant use, rather than requiring every available test without reason. Returning work honestly unfinished remains possible.
 
-## Proposed content budget
+The paper theatre supplies retained personal work and one possible community contribution. Garden, reading and theatre preparations require actual suitable equipment and time. At most two formats can be prepared. Completed activities and actual company determine memories and social outcomes; a reservation or button press alone does not establish attendance.
 
-- Two modest spaces: the home bench and the garage, introduced sequentially.
-- One main object family with bounded fault variations: battery-powered lamps are the proposed first choice. One donor and one put-aside personal object use the same parts and actions. Music boxes and mechanical toys are future candidates, not MVP obligations. These are fictionalized repair models, not technical tutorials. Final choice depends on the opening prototype's appeal.
-- One player character, one apprentice and two recurring family/friend customers. The proposed apprentice is a friend who starts learning alongside you, then agrees paid work once the garage has a small flow of jobs. Specific biographies remain undecided and fictional; do not import the owner's family as characters by default.
-- A small parts tray with condition and compatibility. One donor object demonstrates recovery and reuse. A waiting shelf holds unfinished work.
-- A compact sequence of jobs followed by a continuing garage period after the first handoff. No fixed real-time duration until the opening is tested.
+## Acceptance checks
 
-## Play loop
+1. **Diagnostic choices:** different causes can share a symptom. Tests distinguish them. Blind replacement consumes resources without granting progress. Valid alternative repairs remain possible within the model.
+2. **Conservation and time:** stock cannot be spent twice. Recovery sacrifices a real donor component. Concurrent work cannot own the same object or bench. Work, travel, preparation and promises share one saved clock.
+3. **Learning and agency:** actual attended observations change acquired HF state and later choices. Withheld, alternative and unsupported teaching controls produce different appropriate behavior. Knowledge does not come from a host training flag or scalar skill alone. Rest and commitments can interrupt actual work. Assistance does not receive whole-repair independence credit.
+4. **Persistence:** the exact published HF 2.2.1 package is used through public APIs. Schema and engine `small-works@3` exports strictly require HF 2.2.1 provenance and preserve physical state, people, clock and seeded state. Identical inputs and save/resume produce identical rule state. Old campaign and Small Works engine-1 and engine-2 packets are intentionally incompatible. Historical packets stay unchanged; autosaves use a new v3 key without deleting the older key.
+5. **Playable delivery:** integrated lint, typecheck, tests and build pass. Independent critical review and actual source-unread play examine the same candidate. Desktop, narrow-screen and keyboard controls remain usable. The public static build and local build are verified separately.
+6. **Owner judgment:** Adam can play the reviewed build, understands at least one repair and consequential workshop choice, and judges whether direct work and delegation feel worthwhile. Record actual feedback; no test score or reviewer substitutes for his acceptance.
 
-Examine the object and what its owner says → choose an informative test → form or revise a diagnosis → choose repair, reuse, defer or return → perform work over simulated time → verify the result → return the object and experience the consequence.
+## Evidence and limits
 
-Successful tests narrow hidden fault possibilities. Faults and latent properties are drawn when a job is created and persisted; they are not rerolled after every inspection. Work quality can vary with skill, method, part condition and circumstance, with seeded outcomes and visible reasons. The host must offer an understandable route to verification; repeated random clicking is not the intended strategy.
+The [fresh prototype playtest](restart/playtest-2.md) lasted 6 minutes 42 seconds and solved five customer repairs. It did not establish a full independent handoff. The [first consultation](restart/playtest-1.md) contains a contaminated initial diagnosis, explicitly excluded. [External consultations](restart/external-reviews.md) returned concrete findings; integrated verification and subsequent play remain required.
 
-A failed attempt must reveal actionable evidence or have a bounded, understandable cost; endlessly repeating the same action until a hidden success roll wins is not a repair loop. Verification checks actual function against the owner's requested outcome.
+The deliverable is a reviewed local/public playable build, save export and candid evidence record. The authorized run lasts 09:21:55–14:21:55 UTC on 2026-10-14. Economy simulation, multiplayer, servers and broader HF faculties remain deferred. A generic HF limitation requires demonstrated evidence and HF's own release process; game convenience alone does not justify a framework change.
 
-Putting an object aside preserves its parts, evidence and repair stage. Save and reload preserve that state. Returning it unfinished ends the present customer promise honestly but need not erase the object or prevent a later return.
+## Current focused evidence
 
-## Concrete opening proposed for M1
+The earlier `3.0.0-alpha.2` candidate installed exact published HF 2.2.1. Sixteen focused learning-breadth, replay and availability checks passed, including genuine uncontrolled attended teaching versus withheld teaching. This establishes bounded evidence within the supported methods, not universal planning or spontaneous player handoff. Full integrated checks, independent review and new actual play are still required.
 
-A family lamp flickers when moved. A weak battery and an intermittent contact are plausible explanations in the game's model. The player can test with a known-good battery or inspect the holder and switch; the observations distinguish the causes. Restoring a steady pool of light is the visible payoff, and the family member's response establishes why this particular object mattered.
-
-A second personal lamp has a visibly broken holder. Its compatible replacement is missing, so the player labels and shelves it instead of forcing a repair. A donor object introduced later supplies a suitable part. This makes the return to an early object mechanically useful, not just a sentimental caption.
-
-M1 implements only the first object's small diagnostic vocabulary, one repair method, and preserving the second object's unfinished state. Additional fault methods arrive only when teaching needs them. The opening should permit experimenting without a ticking commercial deadline.
-
-## Teaching and first prestige
-
-The apprentice initially observes or assists. Demonstrations expose relevant observations and a bounded method, not privileged knowledge of hidden faults. Successful and unsuccessful witnessed work supplies outcome-grounded method evidence through released HF 2.2. Supervision offers correction, with optional discussion of useful distinctions. Attendance must cover the actual work; being invited is not observing. There is no mandatory explanation after each step.
-
-Use a small method vocabulary: inspect, test, repair, verify, and seek help or defer when evidence is insufficient. Procedures need conditional choices and termination, but not a universal planner or programming language.
-
-The capability probe is bounded to two authored methods and one exception. Fix its observation vocabulary and procedure-size budget before tuning. Transfer means unfamiliar appearances or parameter combinations inside a learned diagnostic structure, not inventing a wholly unseen procedure.
-
-Proposed teaching beat: the friend wants to replace a battery because the previous lamp needed one. You demonstrate a test that shows why this lamp needs a different repair. Later, the friend uses that distinction without your prompting. Correction should communicate a reason; repeated demonstrations solely to fill a training bar are not the intended experience.
-
-The first prestige is evidenced by an apprentice owning intake through diagnosis, repair, verification and the customer's outcome on a supported job. The player does not choose the diagnosis, supply a hidden answer, finish the job, or silently grant an expertise bonus. Tools and parts previously provided remain legitimate resources. Asking for help is valid on an unfamiliar exception, but a rescued repair does not count as the independent completion.
-
-After the handoff, the player can accept and organize the next work while the apprentice handles a familiar job, or resume the put-aside personal project. Delegation remains reversible. The business does not turn into an unexplained passive-income multiplier.
-
-The post-handoff episode offers two overlapping supported jobs: choose their order and agree achievable return times, then return to the personal lamp using the recovered part. The apprentice diagnoses, repairs, verifies and reports both jobs without routine bench intervention. Customer promises permit this choice without an artificial emergency punishing hands-on play. The resulting question for the player is whether they want to delegate another job, not merely whether they can.
-
-## People and agency
-
-Workers are HF people. Knowledge, learning, fatigue, willingness and understood commitments affect their choices. Reports are based on what they know. The player is represented as a person too; manual input is a host control channel whose exact coupling to HF capacity needs a bounded decision before implementation. Avoid double-counting real player knowledge as automatically learned simulated knowledge.
-
-The apprentice's availability is agreed and communicated, so a refusal or departure is understandable. Warmth and ordinary obligations can establish character without building a general dialogue engine. Spiritual life can influence motives and commitments naturally; broader faith systems are not a new MVP subsystem.
-
-## Business scope
-
-Track quoted fees, material costs, cash and an agreed apprentice payment. Authored customer jobs and stable prices are enough. Preserve ownership and quantities of parts; recovered parts cannot be spent twice. Reuse offers a suitability/quality/time choice, not universally free profit.
-
-No endogenous market, multiple branches, debt system, online economy, employee marketplace, server, multiplayer, general LLM dialogue or offline-income system. Those ideas stay in the roadmap.
-
-## Acceptance
-
-Adam is the acceptor. The proposed completion artifact is a playable standalone build that reaches first prestige and remains playable afterward, with save/load, replay and playtest export. If a generic HF extension is required, it must be released and consumed through the published package; HF's existing games are upgraded and checked under its own release workflow.
-
-Acceptance has three distinct requirements:
-
-1. **Enjoyable opening and transition:** Adam enjoys at least one repair before delegation, understands why work was put aside, and feels that the independent apprentice creates useful freedom. After playing the scheduling/personal-repair episode, he wants to use delegation again. Record playtester words verbatim; do not substitute a headless score for this judgment.
-2. **Causal framework evidence:** a domain-neutral headless control shows learned conditional behavior transferring to an unfamiliar variation; a skill-only control and an ablation lack the corresponding learned behavior. Hold host offers and fault rules identical across controls. Withhold or change teaching, including demonstrating a valid alternative method: acquired person state and subsequent choices must change accordingly. Decision traces must read that acquired state, rather than activate a fixed host policy after a training flag. Relevant observations, learned state, decision traces and actual outcomes establish the chain. Compare external events with keyed seeded draws; report null and adverse results. One successful game job alone does not prove learning or reliability.
-3. **Technical coherence:** installed released HF works through public APIs without sibling-source access; partial repairs and independent activity survive save/load; exports replay to the same rule state. Two independently held-out supported fault variations exercise delegation, and one out-of-scope variation exercises appropriate help-seeking or deferral. Persist scenario and engine provenance.
-
-If a new faculty is added, the generic control belongs in HF. If the released package already supports the same conditional learning and transfer, retain the same controls in the game's consumer test suite and document the existing API/state that produces the effect; no new HF release is necessary. A fun game that fails this learning test is useful prototype evidence, but is not acceptance of the proposed apprentice-learning goal. If the probe cannot meet the test within bounded scope, return to Adam with the demonstrated limit and a narrower recommendation.
-
-## First playable checkpoint
-
-Build the smallest family opening and its transition into bounded garage free play. Reveal controls through received observations and conversation rather than future menus or checklist instructions. Unknown objects and business contacts are undiscovered, not merely disabled. Include enough garage work for shelving/resumption and reuse to become meaningful. Stop for Adam's reaction to this playable experience before implementing conditional apprenticeship. The full MVP is the target; every roadmap tier is not a prerequisite.
+The [HF release](https://github.com/adam0white/human-framework/releases/tag/v2.2.1) grades successful alternative actions independently. Missing or mismatching required cues still do not match a method. Hidden exceptions outside received cues remain unsupported. See [the current ledger](restart/ledger.md) for provenance and consumer corrections.

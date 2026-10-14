@@ -1,45 +1,33 @@
-# Repair game
+# Small Works
 
-Working repository name; the game's public title is undecided.
+A single-player repair strategy game. Investigate familiar electrical and mechanical objects at a home bench. Choose measurements, compare results, repair actual components and check the object under its owner's use. Time, stock and cash limit what the workshop can promise.
 
-A single-player game about repairing familiar objects, teaching another person, and gradually taking responsibility for a larger business. Start with your family's things at home. Progress to friends' repairs in the parents' garage. The first prestige is an apprentice completing an entire repair without your expertise.
+## Current status
 
-Longer-term ambition: the experience shifts from cozy repair to business management to an idle conglomerate, while the people, objects, methods and relationships from the beginning continue to affect play. You can return to hands-on repair. A simulated economy and an MMORPG are eventual possibilities, not MVP requirements.
+The 2026-10-14 restart replaces the earlier campaign and interface. The working candidate includes a diagnostic bench, shared workshop clock, retained paper theatre, customer promises, parts recovery and purchases, and Sam's attended learning through published Human Framework APIs. A community gathering offers three timed formats; preparation time permits at most two. The first-week account offers an ending and a choice to continue.
 
-## Start here
+Implementation and independent review are ongoing. This README does not certify the final candidate or public deployment. [HANDOFF.md](HANDOFF.md) records what remains. Adam accepts game feel through play.
 
-- [Vision and owner directions](docs/vision.md): the ambition and its provenance.
-- [Broad roadmap](docs/roadmap.md): milestones, future ideas and stopping conditions.
-- [MVP target](docs/mvp.md): the complete first handoff and its acceptance checks.
-- [Human Framework boundary](docs/framework-boundary.md): what the game owns, what HF already offers, and what still needs proving.
-- [Relevant games](docs/inspirations.md): researched design references, with lessons and limits.
-- [Handoff](HANDOFF.md): current state and next action.
+The current local candidate is `3.0.0-alpha.3`, with schema and engine `small-works@3` and strict HF 2.2.1 provenance. Autosaves use `small-works-save-v3`, leaving the earlier key untouched. Earlier campaign saves and Small Works engine-1 and engine-2 candidate exports are intentionally incompatible. Their evidence remains pinned to its original behavior version. The earlier implementation remains in Git; dated campaign documents describe history, not the active work queue. Repository source remains private. Static public deployment is authorized; the existing address is [repair.adamwhite.work](https://repair.adamwhite.work), whose served version must be verified separately.
 
-## Status
+## Run locally
 
-V1 release candidate content reaches a persistent first-week ending and keeps the bench playable. V2 adds saved physical access to the primary 3D object surface: open the lamp enclosure, threaded torch cap or bell dome, work on exposed internals, and refit before checking. Opening cancels a previous check; ordinary cap refitting cannot fix a cap fault. Sam prepares the object physically before using his learned methods. Known waiting objects retain their own forms in the room, and a chosen illustrated alternative persists across objects and reload. To work, select a currently offered tool and touch the examined part or assembly to do the actual work. A small original room locates the bench, known waiting items and family project. Illustration, keyboard controls and WebGL fallback provide the same repair decisions. See [prior-art research](docs/research/3d-interaction-prior-art-2026-10-10.md) and [the current design](docs/superpowers/specs/2026-10-10-v2-physical-workshop-design.md).
-
-The playable story begins at fourteen with a family conversation and a flickering lamp. Distinct household repairs and unfinished personal work carry across explicit school years. After graduation, the player can agree a shared workspace, let Sam learn from work he actually watches, and delegate unfamiliar supported repairs. Sam can refuse, stop for help and preserve his own commitments. Genuine independent completion excludes player-assisted work.
-
-The current V2 candidate adds physical cabinet alignment with Dad, Sam's loaded display stand, Nora's afternoon window and a family-table scene where the retained paper street casts real changing shadows. An optional walk to the gate introduces Sam as a friend beside his later apprenticeship. The same small objects can matter years later without requiring a business. These scenes are under independent play review; HANDOFF.md identifies the deployed version separately.
-
-The canonical backstory unfolds through objects and people in a slightly dystopic, repair-dependent world. The Journal keeps conversations and notes, with export and import beside its heading. New school holidays begin on a fresh morning; Dad’s cabinet work can have an actual agreed time instead of repeated availability guesses. The interface follows the system's light/dark setting; original optional 3D inspection complements distinct illustrations and a text fallback. Growth remains voluntary and personal projects remain worthwhile. New customer work puts existing player work safely aside; older stranded bench objects remain reachable after import. Routine notices identify when the activity actually happened.
-
-Helping Sam through an unfamiliar step does not erase the chance to practice later. A stopped job can be reconsidered as supervised work, and one additional household request keeps a rescued training route open. Only a later genuinely unassisted fresh repair earns the handoff. Finished family work changes subsequent recollections rather than reappearing as unfinished.
-
-The owner-playtest increment adds an optional way to close a school holiday without completing every repair, remembered household availability, childhood measuring and label work that remains useful later, and distinct graduation/first-payment presentation. The path torch asks for a controlled diagnosis rather than naming its fault, and both it and the bell require actual attended handling checks. When Sam needs a missing contact method, offering to demonstrate is only preparation: the player performs the repair while Sam actually watches. Discussion is optional; an invitation or later explanation cannot replace missed observation. Five bounded player stereotypes report repeated-choice candidates alongside independent human-style playthroughs; see [their scope](docs/player-archetypes.md).
-
-Run locally with Node 24 or newer:
+Use Node 24 or newer.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open the local address printed by the development server. Progress saves in the browser. The Journal exports a replayable story (seed, inputs and person/object state) and opens an exported story. `npm run check` runs lint, types, behavioral tests and the production build.
+Open the address printed by the development server. Browser saves retain workshop and HF person state. Export a save before reporting a playtest. `npm run check` runs lint, types, tests and the production build.
 
-The first service week offers real collection agreements, separately agreed paid help, a personal model and a returning sewing box with a different cause. Growth is optional: a private bench or occasional favours can also finish the week. See HANDOFF.md for verified extent and remaining work. The public static game is at https://repair.adamwhite.work; repository source publication and the final public title remain undecided. The working screen title is **A little light**.
+## Project authority
 
-The game consumes published `@adam0white/human-framework` 2.2.0 through its public API. HF owns people, acquired conditional methods, cognition, perceptions, body, skills, relationships and memory. The host owns object physics, material compatibility, prices and business bookkeeping. Matched learning controls distinguish supported transfer from scalar skill or an authored repair policy; this does not claim universal planning or calibrated human realism.
+- [Current design](docs/restart/design.md): selected restart and completion conditions.
+- [Run ledger](docs/restart/ledger.md): decisions, evidence and remaining verification.
+- [MVP checks](docs/mvp.md): gameplay and causal acceptance.
+- [Vision](docs/vision.md): owner direction and its history.
+- [Fresh playtest](docs/restart/playtest-2.md): actual source-unread play and limitations.
+- [External reviews](docs/restart/external-reviews.md): returned consultations and selected corrections.
 
-Adam accepts game feel by playing it. The first independent handoff and its checks remain documented in [the MVP target](docs/mvp.md#acceptance).
+The dependency is exactly `@adam0white/human-framework` 2.2.1. The game owns physics, stock, prices, promises and presentation. HF owns people's acquired conditional methods, decisions, activities and snapshots. The simulation uses public package APIs, without sibling-source imports or LLMs. Bounded controls can establish conditional transfer; they cannot establish general human realism or enjoyment.
