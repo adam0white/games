@@ -103,3 +103,49 @@ Root and independent review confirmed a donor repair-assignment bypass; the main
 Astra's actual prefix counterfactual found a released delivery promise suppressing renewed responsibility. The corrected 63-input continuation reached Sam's courier return with zero independent credit and exact save/replay. Actor checks no longer suppress renewed work globally. Help feedback now uses actual received evidence and matching rules. Sam's retained-project completion correction remains underway; no completed result is claimed.
 
 Final integration is planned for game `3.0.0-alpha.3`, engine and schema `small-works@3`, and autosave key v3 to separate changed behavior. No such final delivery is certified here. New full checks, a new immutable candidate, fresh source-unread play and game deployment remain outstanding.
+
+## Clean engine-3 candidate and deployment, 12:47 UTC
+
+Current source uses game `3.0.0-alpha.3`, engine/schema `small-works@3`, exact published HF 2.2.1 and autosave key v3. Engine-1 and engine-2 packets remain unsupported and unchanged as historical evidence. The complete check passed lint, types, **214 tests** and production build. Package verification found 82 valid registry signatures and 46 attestations. Staged and compiled-asset secret scans found no leaks; 39 current documentation links resolve.
+
+The checked-task menu uses Sam’s actual received passing checks. Globally checked but unobserved objects still permit his own known check. Once he knows the requested checks passed, completion or return competes with real food, water, rest and personal plans. Personal completion resolves accepted responsibility and keeps the checked theatre available at the workshop and gathering. It grants no money, reputation, neighbour unlock or independent/mastery credit. Unchanged completion cannot be repeated.
+
+Help feedback separates missing observations, unsupported next steps, available acquired methods and checked returns. The UI warns before an intervention lacking an observed baseline and does not claim that a later result can teach that step. Rejected actions clear old teaching feedback. Public-input and controlled policy tests remain distinct; neither establishes enjoyment.
+
+The selected blind-policy experiment ran twelve seeds per policy. Random actions returned no checked customer objects in those runs. Replacing every component returned one per run and exhausted cash, leaving seven unfinished. This is bounded resource evidence, not proof against every click strategy or evidence of fun.
+
+The source commit is `7570eea77ddb3fe66049ed4204cc1a8c23460617`, privately pushed on `codex/workshop-restart`. CI run 38566385977 passed. Immutable candidate `/tmp/small-works-candidate-1246` was created at 12:44:53.643 UTC with source hash `4e288c3346d67216e50b6583002fce9889914870445a4283600b738180154f9d` and clean manifest. Fresh source-unread play runs at port 5183.
+
+Public deployment completed at [repair.adamwhite.work](https://repair.adamwhite.work), with matching clean manifest and Cloudflare version `b71eef3c-b451-4eeb-ad0e-9fac646ff049`. Public usability verification and fresh play remain in progress.
+
+## Clean engine-3 episode play, 12:45–12:58 UTC
+
+[Playtest 6](playtest-6.md) used immutable candidate `/tmp/small-works-candidate-1246`, created at **12:44:53.643 UTC**, hash `4e288c3346d67216e50b6583002fce9889914870445a4283600b738180154f9d`, clean commit `7570eea`, game alpha.3, HF 2.2.1 and engine 3. Source-unread seed-42 play lasted **13 minutes 6 seconds**, including setup. The tester reported exact replay of 104 UI inputs.
+
+Five checked customer returns, retained theatre at 12 rpm and garden plus theatre preparation reached Day 4 at 15:30. Mum, Nora and Evan completed garden; Sam completed food and water. No one attended the theatre. Sam's useful courier return followed actual observed repair and earned zero independent whole repairs. The player would return for a short diagnostic episode, but found the emotional payoff modest and teaching gaps unclear. It stopped at the gathering rather than filling the workboard.
+
+## Engine-4 corrections before final publish
+
+The current local version is **3.0.0-alpha.4**, engine/schema **small-works@4**, autosave key **small-works-save-v4**. Engine-1, engine-2 and engine-3 exports are unsupported by this changed behavior version and remain unchanged as historical evidence. The deployed engine-3 build remains clean `7570eea`; no engine-4 deployment is claimed.
+
+The actual CSP blocked Google font imports. Fonts are now bundled from OFL-licensed Fontsource 5.3.0. Opus's actor-knowledge courier finding received a red regression and guard: Sam must have received the relevant checks. Cross-condition intervention teaching now requires matching conditions; calibration requires owner-use evidence. Pending captions, personal reservations and expired Accept controls are corrected in the working tree.
+
+Astra's scoped correction removes irrelevant numeric pace conditions from ordinary learned diagnostic and part procedures; calibration retains pace. All public received cues remain unchanged. Nine focused actual-attendance checks cover cross-pace first test, probe and inspection versus withheld teaching. This does not establish an independent whole mechanical repair.
+
+A complete **229-test** check passed before the latest UI integration. Root is running the final integrated check next. [Opus's delta record](external-reviews.md) distinguishes the fixed courier finding from an unconfirmed personal-completion reproduction concern. Schema and engine agree on version 4; the review's replay concern is not a defect under that contract.
+
+HF's homepage was separately verified at clean 2.2.1 deployment `b16fbb32`, linking Small Works, on desktop width 1280 and narrow width 360. Its three accepted games remain available. CI status still requires root's check. Final engine-4 freeze, actual play and public game verification remain outstanding.
+
+## Integrated engine-4 check completed
+
+Root's `/tmp/smallworks-alpha4-integrated-check.log` completed successfully. The log confirms **232 tests across 23 files**, with lint, typecheck and production build passing. Current local source is alpha.4, engine/schema `small-works@4`, exact HF 2.2.1 and save key v4. Public remains alpha.3 at clean `7570eea`; engine 4 is not deployed yet.
+
+The checked integration includes actor-known delivery gates, cross-pace ordinary diagnostic and part transfer while calibration retains exact requested pace, cross-condition intervention outcome safeguards, actual native goal-withdrawal release/save regression and locally bundled licensed fonts replacing CSP-blocked Google imports. Preserve historical manifests and exports exactly. A new immutable freeze, source-unread play and public engine-4 verification remain required. No whole independent mechanical repair or owner feel acceptance is inferred from this check.
+
+## Final pre-freeze check and local UI smoke
+
+The latest `/tmp/smallworks-alpha4-final-check.log` completes lint, types, **233 tests across 23 files** and production build. This supersedes the 232-test integrated count above. Public remains engine 3 until an actual verified engine-4 deployment.
+
+The additional regression covers a terminal historical responsibility handle whose closed goal was removed by HF's capacity pruning. Missing-goal cleanup now releases that stale handle; an existing achieved goal is retained. The fixture uses official public adopt/abandon actions after a legal courier return to exercise history capacity. It is an isolated control, not a claim that the finite episode naturally reaches the capacity limit.
+
+Root's local engine-4 UI smoke checked keyboard component selection, export/import/replay, width 390 without overflow, an exposed Chrome accessibility button, local-only font requests and zero runtime errors. Screenshots were visually inspected. The smoke log records local alpha.4/engine 4 on dirty source; it does not establish a clean freeze or public release.

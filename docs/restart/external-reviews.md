@@ -53,3 +53,11 @@ A failed device check remains a valid diagnostic procedure. This is intentional:
 Replay now checks strict behavior provenance, and recorded replay steps must succeed. Those boundaries keep version mismatch separate from nondeterminism. Donor assignment was initially a review hypothesis; root found and independently confirmed a repair-route bypass, then added the guard after the freeze.
 
 The reviewer found held-request consent, accepted-responsibility retry and the bounded whole-repair credit chain correct in its packet. It could not confirm hypothetical malformed-probe attribution or receipt divergence from the supplied files. Do not present those hypotheses as reproduced defects. New integrated checks and actual play remain required.
+
+## Opus engine-3 delta review
+
+Result: `/tmp/smallworks-opus-delta-review.json`. The reviewer read supplied source and ran nothing. Finding 1 was confirmed: customer courier Return depended on global ready status without requiring Sam's received checks. The engine-4 worker added the actor-evidence guard after a red regression demonstrated the defect. This correction does not alter the engine-3 play record.
+
+Finding 2 concerns failed personal completion retaining verified status or repeating with an inactive goal. The reviewer could not reproduce a reachable path. It remains a targeted reproduction question, not a confirmed bug. The minor replay schema concern is not a defect in the current contract: schema and engine both match `small-works@4`, with passing controls.
+
+The reviewer found promise renewal, personal completion ownership, donor guards, received-evidence help feedback and diagnostic verification procedure credit consistent with the stated rules. Astra's later scoped correction removes an irrelevant numerical pace condition from ordinary learned diagnostic and part procedures. Calibration retains requested pace. Public received cues remain unchanged. Nine focused actual-attendance checks cover cross-pace first tests, probes and inspection versus withheld teaching; they do not prove an independent whole mechanical repair.

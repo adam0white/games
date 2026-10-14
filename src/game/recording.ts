@@ -2,10 +2,10 @@ import type { Command } from './types';
 
 export const MAX_RECORDED_INPUTS = 10_000;
 export const SAVE_PROVENANCE = {
-  engine: 'small-works@3',
+  engine: 'small-works@4',
   scenario: 'first-week@1',
   framework: '2.2.1',
-  game: '3.0.0-alpha.3',
+  game: '3.0.0-alpha.4',
 } as const;
 
 const object = (value: unknown): value is Record<string, unknown> =>

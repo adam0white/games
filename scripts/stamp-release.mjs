@@ -5,7 +5,7 @@ import './third-party-notices.mjs';
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 const packageInfo = JSON.parse(readFileSync('package.json', 'utf8'));
 const human = JSON.parse(readFileSync('node_modules/@adam0white/human-framework/package.json', 'utf8'));
-const engine = 'small-works@3';
+const engine = 'small-works@4';
 if (!engine) throw Error('Missing game engine version');
 mkdirSync('public', { recursive: true });
 writeFileSync('public/release.json', JSON.stringify({

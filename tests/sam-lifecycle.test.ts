@@ -279,7 +279,7 @@ describe('Sam responsibility and requests', () => {
     ]);
     expect(saveGame(loadGame(saveGame(state)))).toBe(saveGame(state));
   });
-  it('requires a new observation for a different requested mechanical pace', () => {
+  it('transfers an observed probe across requested paces but still asks for unknown next steps', () => {
     let state = createGame(416);
     const theatre = state.jobs.find((j) => j.isPersonal);
     if (!theatre) throw new Error('Missing theatre');
@@ -290,7 +290,7 @@ describe('Sam responsibility and requests', () => {
       request: { mode: 'motion', a: '0', b: 'C', condition: 'load' },
     }).state;
     const rule = state.people.sam?.methods?.rules.find((r) => r.action === 'probe:motion:0:C:load');
-    expect(rule?.conditions).toContainEqual({ cue: 'requested-pace', value: '12' });
+    expect(rule?.conditions).not.toContainEqual({ cue: 'requested-pace', value: '12' });
     state = dispatch(state, { type: 'next-day' }).state;
     const other = state.jobs.find((j) => j.status === 'offer' && j.kind === 'music-box');
     if (!other) throw new Error('Missing unfamiliar mechanical object');
@@ -301,8 +301,8 @@ describe('Sam responsibility and requests', () => {
     expect(
       state.jobs
         .find((j) => j.id === other.id)
-        ?.contributions.some((c) => c.action === 'probe:motion:0:C:load'),
-    ).toBe(false);
+        ?.contributions.some((c) => c.actorId === 'sam' && c.action === 'probe:motion:0:C:load'),
+    ).toBe(true);
     expect(state.jobs.find((j) => j.id === other.id)?.blocked?.kind).toBe('help');
   });
   it('learns an attended diagnostic use check even when it reveals failed function', () => {

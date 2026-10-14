@@ -1,4 +1,11 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Libre+Baskerville:wght@400;700&display=swap");
+@import "@fontsource/dm-sans/latin-400.css";
+@import "@fontsource/dm-sans/latin-500.css";
+@import "@fontsource/dm-sans/latin-600.css";
+@import "@fontsource/dm-sans/latin-700.css";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-500.css";
+@import "@fontsource/libre-baskerville/latin-400.css";
+@import "@fontsource/libre-baskerville/latin-700.css";
 :root {
   font-family: "DM Sans", sans-serif;
   color: #e2dfd2;
@@ -3737,4 +3744,23 @@ footer > div {
   background: #cdd8ad;
   color: #4c6738;
   border-color: #81995d;
+}
+.teaching-pending p > strong {
+  display: block;
+  font-weight: 500;
+  font-size: 10px;
+  color: #4b6138;
+}
+.teaching-pending p > span {
+  display: block;
+  margin-top: 6px;
+  font-size: 10px;
+  line-height: 1.8;
+  color: #68714b;
+}
+.paper-actions button:disabled {
+  opacity: 0.75;
+  color: #acae97;
+  background: #4a5144;
+  cursor: not-allowed;
 }

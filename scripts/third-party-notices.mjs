@@ -6,6 +6,9 @@ const installedPackages = [
   'react-dom',
   'scheduler',
   '@adam0white/human-framework',
+  '@fontsource/dm-sans',
+  '@fontsource/ibm-plex-mono',
+  '@fontsource/libre-baskerville',
 ];
 const groups = new Map();
 for (const installedName of installedPackages) {

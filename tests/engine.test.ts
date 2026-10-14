@@ -129,8 +129,8 @@ describe('the deliberate workshop', () => {
 });
 
 describe('reviewed ownership and observation regressions', () => {
-  it('does not count courier delivery as an independent repair', () => {
-    let state = createGame(42);
+  it('does not count a witnessed checked courier return as an independent repair', () => {
+    let state = startLesson(createGame(42));
     const jobId = state.selectedJobId;
     state = dispatch(state, {
       type: 'work',
@@ -138,13 +138,12 @@ describe('reviewed ownership and observation regressions', () => {
       componentId: 'switch',
       intervention: 'replace',
     }).state;
-    for (const condition of ['bench', 'movement', 'load'] as const)
-      state = dispatch(state, { type: 'verify', jobId, condition }).state;
-    state = dispatch(state, { type: 'assign', jobId, personId: 'sam' }).state;
-    if (state.pendingRequest) {
-      const endsAt = required(state.npcWork.find((w) => w.personId === 'sam')).endsAt;
-      state = dispatch(state, { type: 'wait', minutes: endsAt - state.now }).state;
-    }
+    const checked = dispatch(state, { type: 'verify', jobId, condition: 'movement' });
+    expect(checked.ok, checked.message).toBe(true);
+    state = checked.state;
+    expect(state.jobs[0]?.evidence.at(-1)?.witnessedBy).toContain('sam');
+    state = dispatch(state, { type: 'watch', enabled: false }).state;
+    state = acceptRepairOffer(state, jobId);
     state = dispatch(state, { type: 'wait', minutes: 11 }).state;
     expect(state.jobs[0]?.status).toBe('delivered');
     expect(state.independentRepairs).toBe(0);

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
+import { evidenceContext } from '../src/game/evidence-context';
 import { helpFeedback } from '../src/game/help-feedback';
 import { teachObserved } from '../src/game/people';
 import type { Command, GameState } from '../src/game/types';
+import { acceptRepairOffer } from './repair-offer';
 
 function act(state: GameState, command: Command): GameState {
   const result = dispatch(state, command);
@@ -11,6 +13,24 @@ function act(state: GameState, command: Command): GameState {
 }
 
 describe('received evidence and legal checks', () => {
+  it('does not offer a customer return when only the player has received passing checks', () => {
+    let state = createGame(42);
+    const jobId = state.selectedJobId;
+    state = act(state, { type: 'work', jobId, componentId: 'switch', intervention: 'replace' });
+    state = act(state, { type: 'verify', jobId, condition: 'movement' });
+    state = acceptRepairOffer(state, jobId);
+    const job = state.jobs.find((candidate) => candidate.id === jobId);
+    if (!job) throw new Error('Missing object');
+    expect(job.status).toBe('ready');
+    expect(evidenceContext(job, 'sam').stage).not.toBe('ready');
+    state = act(state, { type: 'wait', minutes: 1 });
+    const choice = state.people.sam?.trace.at(-1);
+    expect(choice?.considered.some((candidate) => candidate.affordanceId === 'deliver')).toBe(
+      false,
+    );
+    expect(state.jobs.find((candidate) => candidate.id === jobId)?.status).toBe('ready');
+  });
+
   it('lets a learner perform a known check even when someone else already checked the object', () => {
     let state = createGame(42);
     const jobId = state.selectedJobId;

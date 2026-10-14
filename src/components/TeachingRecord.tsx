@@ -1,6 +1,26 @@
-import { dayTime } from '../game/engine';
+import { dayTime, requiredChecks } from '../game/engine';
 import type { Job } from '../game/types';
 
+function nextObservation(job: Job, lesson: Job['pendingLessons'][number]): string {
+  if (lesson.action.startsWith('calibrate:'))
+    return `Have Sam observe the requested ${requiredChecks(job).join(' or ')} use check at ${job.model.desiredRPM ?? 15} ± ${job.model.tolerance ?? 3} rpm.`;
+  const baseline = lesson.baseline;
+  if (baseline?.request) {
+    const r = baseline.request;
+    const abnormal = [
+      'high-drop',
+      'low-source',
+      'resistance',
+      'open-path',
+      'slow-drive',
+      'blocked-drive',
+    ].includes(baseline.cues.signal ?? '');
+    return `Repeat ${r.mode} from ${r.a} to ${r.b} under ${r.condition} with Sam. ${abnormal ? `A successful use check under ${r.condition} can also establish the result.` : 'This baseline did not record an abnormal reading; use the probe pair to compare what changed.'} A failed use check cannot isolate this component change; repeat the recorded probe pair.`;
+  }
+  if (baseline?.kind === 'use')
+    return `Have Sam observe the same ${baseline.condition ?? 'recorded'} use condition again. Compare it with the recorded baseline; a different condition does not establish this change.`;
+  return 'No named baseline is recorded here. Review the observation before claiming a learned repair method.';
+}
 export function TeachingRecord({ job }: { job: Job }) {
   const attended = job.evidence.filter((step) => step.witnessedBy?.includes('sam'));
   const pending = job.pendingLessons.filter((lesson) => lesson.observerId === 'sam');
@@ -19,8 +39,8 @@ export function TeachingRecord({ job }: { job: Job }) {
           <strong>Outcome evidence still needed</strong>
           {pending.map((lesson) => (
             <p key={lesson.demonstrationId}>
-              {lesson.action.replaceAll(':', ' ').replaceAll('-', ' ')} · run and observe the
-              relevant use check with Sam.
+              <strong>{lesson.action.replaceAll(':', ' ').replaceAll('-', ' ')}</strong>
+              <span>{nextObservation(job, lesson)}</span>
             </p>
           ))}
         </div>

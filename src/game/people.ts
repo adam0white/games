@@ -93,7 +93,12 @@ export function teachObserved(
     id: `observed:${action}`,
     demonstrationId,
     contextId,
-    conditions: cueList(cues),
+    // A fixed collar setting depends on the requested pace. Diagnostic and
+    // component procedures retain their sensory conditions across numeric goals.
+    // The full public brief remains received above, including requested pace.
+    conditions: cueList(cues).filter(
+      ({ cue }) => cue !== 'requested-pace' || action.startsWith('calibrate:'),
+    ),
     action,
     sourceId: 'player',
     attention: 1,

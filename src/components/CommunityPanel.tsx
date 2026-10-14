@@ -153,19 +153,24 @@ export function CommunityPanel({
                 <p className="equipment-selection">
                   <strong>Selected equipment: {job.title}</strong>
                   <span>
-                    {job.status === 'delivered'
-                      ? 'Returned object, available for this loan'
-                      : job.status === 'offer'
-                        ? 'Offer not yet accepted'
-                        : job.status === 'ready'
-                          ? 'Accepted and checked; its return is a separate promise'
-                          : 'Accepted favour at the workshop; still needs its use check'}
+                    {job.isPersonal
+                      ? option?.prepared || event.reservedJobIds.includes(job.id)
+                        ? 'Your retained project · reserved for this activity and returned to the workshop, with no customer promise'
+                        : 'Your retained project · available to prepare for this activity, with no customer promise'
+                      : job.status === 'delivered'
+                        ? 'Returned object, available for this loan'
+                        : job.status === 'offer'
+                          ? 'Offer not yet accepted'
+                          : job.status === 'ready'
+                            ? 'Accepted and checked; its return is a separate promise'
+                            : 'Accepted favour at the workshop; still needs its use check'}
                   </span>
                 </p>
               )}
               <p className="separate-promises">
-                Preparing this plan is a loan. Other accepted objects keep their separate return
-                promises.
+                {job?.isPersonal
+                  ? 'Preparing reserves your retained project for this activity. It stays yours and comes back to the workshop.'
+                  : 'Preparing this plan borrows the selected object. Other accepted objects keep their separate return promises.'}
               </p>
               {job && (
                 <button type="button" className="text-button" onClick={() => onOpenJob(job.id)}>
@@ -202,7 +207,9 @@ export function CommunityPanel({
                       ? 'Preparation time has ended'
                       : `Prepare ${option?.label.toLowerCase()}`}
                   <small>
-                    {COMMUNITY_PREPARATION_MINUTES} min · on loan until {dayTime(event.finishesAt)}
+                    {COMMUNITY_PREPARATION_MINUTES} min ·{' '}
+                    {job?.isPersonal ? 'project reserved until' : 'borrowed object returns at'}{' '}
+                    {dayTime(event.finishesAt)}
                   </small>
                 </button>
               )}

@@ -169,10 +169,24 @@ describe('actual player checked-object cooperation regression', () => {
   it.each(['pending', 'released', 'broken'] as const)(
     'retrying ongoing responsibility leaves its %s promise unchanged',
     (status) => {
-      const before = apply(createGame(42), playerInputs.slice(0, 45));
+      let before = apply(createGame(42), playerInputs.slice(0, 45));
+      // A learned initial diagnostic can now run across requested paces. Wait
+      // for an actual help boundary before isolating promise renewal policy.
+      for (let step = 0; step < 12; step++) {
+        if (before.jobs.find((j) => j.id === 'object-29')?.blocked) break;
+        const activity = before.npcWork.find((work) => work.personId === 'sam');
+        if (!activity) break;
+        before = apply(before, [{ type: 'wait', minutes: activity.endsAt - before.now }]);
+      }
       const job = required(before.jobs.find((j) => j.id === 'object-29'));
       expect(job.assignedTo).toBe('sam');
-      expect(job.blocked).toBeDefined();
+      expect(job.blocked?.kind).toBe('help');
+      expect(
+        job.contributions.some(
+          (entry) => entry.actorId === 'sam' && entry.action === 'verify:load',
+        ),
+      ).toBe(true);
+      expect(before.independentRepairs).toBe(0);
       required(deliveryPromises(before)[0]).status = status;
       const result = apply(before, [
         { type: 'retry-sam', jobId: job.id },

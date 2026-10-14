@@ -216,7 +216,7 @@ function reportedSymptoms(job: Job, stakes: string): string {
 export function createGame(seed = 416): GameState {
   const now = OPEN;
   const s: GameState = {
-    schema: 'small-works@3',
+    schema: 'small-works@4',
     provenance: { ...SAVE_PROVENANCE },
     inputs: [],
     seed: seed >>> 0,
@@ -597,7 +597,7 @@ function activityOptions(s: GameState, job: Job): WorkOption[] {
   if (
     job.status === 'ready' &&
     !job.isDonor &&
-    (!job.isPersonal || evidenceContext(job, job.assignedTo).stage === 'ready')
+    evidenceContext(job, job.assignedTo).stage === 'ready'
   )
     options.push({
       id: job.isPersonal ? 'complete-project' : 'deliver',
@@ -868,6 +868,41 @@ function releaseJob(s: GameState, job: Job): void {
   job.blocked = undefined;
   if (s.pendingRequest?.jobId === job.id) s.pendingRequest = undefined;
 }
+
+/** HF can withdraw a neglected purpose. Host ownership must follow that actual decision. */
+function reconcileResponsibilities(s: GameState): void {
+  for (const job of s.jobs) {
+    if (
+      job.responsibility &&
+      terminalStates.has(job.status) &&
+      !s.people.sam?.agenda.goals.some((goal) => goal.id === job.responsibility?.goalId)
+    )
+      job.responsibility = undefined;
+    // Ownership alone does not establish an adopted native purpose.
+    if (!job.assignedTo || !job.responsibility || !['active', 'ready'].includes(job.status))
+      continue;
+    const person = s.people[job.assignedTo];
+    const goal = person?.agenda.goals.find(
+      (candidate) => candidate.id === job.responsibility?.goalId,
+    );
+    if (goal?.status === 'active') continue;
+    const cancelled = s.npcWork.filter(
+      (work) => work.jobId === job.id && work.personId === job.assignedTo,
+    );
+    for (const work of cancelled) {
+      if (work.reservedPart) s.stock[work.reservedPart] = (s.stock[work.reservedPart] ?? 0) + 1;
+      if (person) finishActivity(person, work.option, false, s.now);
+    }
+    s.npcWork = s.npcWork.filter((work) => !cancelled.includes(work));
+    releaseJob(s, job);
+    log(
+      s,
+      person?.name ?? 'Workshop',
+      `My repair purpose for ${job.title.toLowerCase()} has ended. The object is back on the bench for you to decide what happens next.`,
+      'warning',
+    );
+  }
+}
 function finishNpc(s: GameState, work: NpcWork): void {
   const person = s.people[work.personId];
   const job = s.jobs.find((j) => j.id === work.jobId);
@@ -929,7 +964,7 @@ function finishNpc(s: GameState, work: NpcWork): void {
         log(
           s,
           'Workshop',
-          'The object changed again before the previous intervention was checked. A later result cannot identify which intervention caused it.',
+          'The object changed again before the previous intervention’s outcome was established. A later result cannot identify which intervention caused it.',
         );
       }
       const priorEvidenceId = job.evidence.at(-1)?.id ?? 0;
@@ -1257,12 +1292,7 @@ function advance(s: GameState, minutes: number): void {
     if (next < s.now) throw new Error('A workshop activity ended before the current clock.');
     s.now = next;
     tickPeople(s.people, next);
-    for (const job of s.jobs)
-      if (
-        job.responsibility &&
-        !s.people.sam?.agenda.goals.some((g) => g.id === job.responsibility?.goalId)
-      )
-        job.responsibility = undefined;
+    reconcileResponsibilities(s);
     const completed = s.npcWork.filter((w) => w.endsAt <= next);
     s.npcWork = s.npcWork.filter((w) => w.endsAt > next);
     for (const work of completed) finishNpc(s, work);
@@ -1321,6 +1351,7 @@ function advance(s: GameState, minutes: number): void {
   }
   s.now = target;
   tickPeople(s.people, target);
+  reconcileResponsibilities(s);
 }
 function watcherStart(s: GameState, job: Job, duration: number): WorkOption | undefined {
   if (
@@ -1369,7 +1400,7 @@ function playerWork(
     log(
       s,
       'Workshop',
-      'The object changed again before the previous intervention was checked. A later result cannot identify which intervention caused it.',
+      'The object changed again before the previous intervention’s outcome was established. A later result cannot identify which intervention caused it.',
     );
   }
   const watcher = action === 'deliver' ? undefined : watcherStart(s, job, duration);
@@ -1470,9 +1501,16 @@ function playerWork(
                 'slow-drive',
                 'blocked-drive',
               ].includes(baseline.cues.signal ?? '');
+            const baselineCondition =
+              baseline?.kind === 'use' ? baseline.condition : baseline?.request?.condition;
+            const useConditionMatches = isCalibration
+              ? observation.condition !== undefined &&
+                requiredChecks(job).includes(observation.condition)
+              : baselineCondition !== undefined && observation.condition === baselineCondition;
             const observedUse =
               observation.kind === 'use' &&
               baseline !== undefined &&
+              useConditionMatches &&
               (isCalibration || (success && abnormalReading) || baseline.kind === 'use');
             if (isCalibration && !observedUse) return true;
             if (!matching && !observedUse) return true;
@@ -1565,6 +1603,7 @@ function sleepToMorning(s: GameState): void {
   }
   s.now = morning;
   s.day = Math.floor(morning / DAY) + 1;
+  reconcileResponsibilities(s);
   for (const job of s.jobs) if (job.blocked?.kind === 'unavailable') job.blocked = undefined;
   s.watching = false;
   for (const job of s.jobs) if (job.status === 'offer' && job.due < s.now) job.status = 'declined';

@@ -141,7 +141,7 @@ export interface PendingRequest {
   jobId?: string;
 }
 export interface GameState {
-  schema: 'small-works@3';
+  schema: 'small-works@4';
   provenance?: typeof import('./recording').SAVE_PROVENANCE;
   inputs?: Command[];
   community?: import('./community').CommunityState;

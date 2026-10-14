@@ -35,7 +35,7 @@ import type {
 } from './game/types';
 import './styles.css';
 
-const SAVE_KEY = 'small-works-save-v3';
+const SAVE_KEY = 'small-works-save-v4';
 const conditions: TestCondition[] = ['bench', 'movement', 'load'];
 const money = (n: number) => `£${n.toFixed(0)}`;
 function checkPurpose(job: Job): string {
@@ -1366,15 +1366,16 @@ export default function App() {
                             <>
                               <button
                                 type="button"
+                                disabled={j.due < state.now}
                                 onClick={() => act({ type: 'accept', jobId: j.id })}
                               >
-                                Accept promise
+                                {j.due < state.now ? 'Requested time passed' : 'Accept promise'}
                               </button>
                               <button
                                 type="button"
                                 onClick={() => act({ type: 'decline', jobId: j.id })}
                               >
-                                Decline
+                                {j.due < state.now ? 'Clear expired request' : 'Decline'}
                               </button>
                             </>
                           ) : ['active', 'ready'].includes(j.status) ? (

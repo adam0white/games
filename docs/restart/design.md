@@ -18,7 +18,7 @@ Sam can watch real tests and interventions. Only actual attended observation tea
 
 ## Interfaces and ownership
 
-`model.ts` owns physical truth and measurements. `people.ts` owns the public-HF adapter and learned action choices. `engine.ts` owns jobs, clock, parts, economic consequences and saves. `App.tsx` and components own pure presentation and player input. Simulation never imports UI. Models and HF snapshots save together under schema and engine `small-works@3`, with strict HF 2.2.1 provenance. The local game version is `3.0.0-alpha.3`. Earlier campaign and Small Works engine-1 and engine-2 packets are intentionally unsupported. Autosaves use `small-works-save-v3` and leave the earlier key untouched.
+`model.ts` owns physical truth and measurements. `people.ts` owns the public-HF adapter and learned action choices. `engine.ts` owns jobs, clock, parts, economic consequences and saves. `App.tsx` and components own pure presentation and player input. Simulation never imports UI. Models and HF snapshots save together under schema and engine `small-works@4`, with strict HF 2.2.1 provenance. The local game version is `3.0.0-alpha.4`. Earlier campaign and Small Works engine-1, engine-2 and engine-3 packets are intentionally unsupported. Autosaves use `small-works-save-v4` and leave the earlier key untouched.
 
 ## Checks
 
@@ -39,3 +39,11 @@ Astra recommends diagnostic workshop strategy over a room simulator or a managem
 ## Published dependency correction
 
 HF 2.2.1 corrects acquired-method evidence: another independently successful action is no longer counted as failure of an earlier action. Same-action failure and bounds on attention, trust, decay and restore remain. Required cues still must match; unobserved hidden exceptions are not detected. The [release](https://github.com/adam0white/human-framework/releases/tag/v2.2.1) is consumed as an exact npm dependency. Sixteen focused consumer checks pass, including uncontrolled teaching versus withheld teaching; final integrated review and actual play remain required.
+
+## Integrated engine-4 checkpoint
+
+The current local game is `3.0.0-alpha.4`, schema/engine `small-works@4`, autosave key `small-works-save-v4`, with exact published HF 2.2.1. The integrated check passed lint, types, **233 tests across 23 files** and production build. The public build remains engine 3 at clean `7570eea`; engine 4 is not yet deployed.
+
+Sam's delivery options require actor-received checks. Ordinary diagnostic and part methods transfer across requested paces; calibration retains the exact requested pace. Matching-condition intervention safeguards prevent a check under another condition from proving the intervention. Actual native goal withdrawal releases responsibility and survives save/restore in a regression. Self-hosted licensed fonts replace Google imports blocked by live CSP.
+
+These are technical checks. Source-unread play has not established a whole independent mechanical repair, and Adam has not accepted feel. Freeze, fresh play and public verification of this exact integration remain required.

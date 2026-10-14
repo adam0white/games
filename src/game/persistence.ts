@@ -78,7 +78,7 @@ export function loadGame(text: string): GameState {
       (strings(e.witnessedBy) && e.witnessedBy.every((id) => actors.includes(id))));
   if (
     !object(value) ||
-    value.schema !== 'small-works@3' ||
+    value.schema !== 'small-works@4' ||
     (value.provenance !== undefined && !isSupportedProvenance(value.provenance)) ||
     (value.inputs !== undefined &&
       (!isInputRecording(value.inputs) || value.provenance === undefined)) ||

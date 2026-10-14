@@ -4,9 +4,7 @@ Updated 2026-10-14 during the active restart.
 
 ## What remains
 
-Review and play the integrated HF 2.2.1 candidate, then rerun the complete checks. Obtain independent source review and actual source-unread play, revise their findings, then verify both the local build and the public static deployment. The five-hour run continues until **2026-10-14 14:21:55 UTC**, from 09:21:55 UTC. Do useful implementation and review through that deadline. Adam accepts feel later.
-
-Do not inherit the previous campaign's test count or deployment claims. Current focused tests and reviews are intermediate evidence. No final restart deployment is certified here.
+Freeze and play the integrated engine-4 candidate, review remaining findings, then verify its public deployment. The integrated local check passed lint, types, **233 tests across 23 files** and production build. The public static build remains clean `7570eea`, game `3.0.0-alpha.3`, engine `small-works@3` and HF `2.2.1`. Engine 4 is not yet deployed. The five-hour run continues until **2026-10-14 14:21:55 UTC**. Adam accepts feel later.
 
 ## Current direction
 
@@ -36,10 +34,14 @@ Read this file, README.md, [vision](docs/vision.md), [MVP](docs/mvp.md), then th
 
 ## Current dependency and behavior version
 
-The local game is `3.0.0-alpha.3`, schema and engine `small-works@3`, with exact installed published HF **2.2.1**. Strict provenance rejects earlier Small Works candidate packets. Autosaves use `small-works-save-v3` and preserve the older key. Historical playtest exports remain unchanged: engines 1 and 2 used HF 2.2.0 and 2.2.1 respectively. They do not prove engine-3 behavior.
+The local game is `3.0.0-alpha.4`, schema and engine `small-works@4`, with exact installed published HF **2.2.1**. Strict provenance rejects engine-1, engine-2 and engine-3 candidate packets. Autosaves use `small-works-save-v4` and preserve older keys. Historical exports and manifests remain unchanged at their original versions.
 
-The [HF release](https://github.com/adam0white/human-framework/releases/tag/v2.2.1) corrects acquired support for independently successful alternative methods. Source is `2dd03df`; the [GitHub npm publishing run](https://github.com/adam0white/human-framework/actions/runs/38561537798) completed successfully. [Issue 5](https://github.com/adam0white/human-framework/issues/5#issuecomment-6168092827) records the defect and was closed after published-package consumer checks.
+The [HF release](https://github.com/adam0white/human-framework/releases/tag/v2.2.1) corrects acquired support for independently successful alternative methods. Source is `2dd03df`; [publishing run 38561537798](https://github.com/adam0white/human-framework/actions/runs/38561537798) succeeded. [Issue 5](https://github.com/adam0white/human-framework/issues/5#issuecomment-6168092827) closed after published-package consumer checks.
 
-Sixteen focused learning-breadth, replay and availability tests passed with the published package, including uncontrolled attended teaching versus withheld teaching. Teaching-window and missed-step feedback, renewed consent, gathering fan return coupling, integer waits and late unfinished outcomes are implemented with focused checks. Full integrated verification and new source-unread play remain required. No game commit or restart deployment is recorded yet.
+## Latest checks and limits
 
-The intermediate engine-2 freeze passed lint, types, 185 tests and build. Its [fresh source-unread play](docs/restart/playtest-5.md) stopped after 7 minutes 19 seconds with zero independent repairs. Further working corrections are recorded in the ledger. Final integration is planned for a separate engine-3 behavior version; new checks, play and deployment remain outstanding.
+The integrated engine-4 check passed lint, types, **233 tests across 23 files** and production build. Sam's courier menu now requires his own received checks. Ordinary diagnostic and part procedures transfer across requested paces; calibration retains the exact requested pace. Intervention success requires the matching condition and relevant physical revision, with calibration checked against owner use. A native goal-withdrawal regression verifies release and save/restore. Licensed fonts are bundled locally after live CSP blocked Google imports.
+
+The [clean engine-3 playtest](docs/restart/playtest-6.md) lasted 13 minutes 6 seconds. It reached the gathering with useful courier help but zero whole independent repairs. Its 104 inputs replayed exactly according to the tester. This is historical play evidence, not proof of engine-4 behavior. New candidate play, freeze and deployment verification remain required.
+
+The final pre-freeze check now passes **233 tests across 23 files**. A history-capacity regression verifies stale missing-goal handle cleanup while retaining an existing achieved goal. This uses official public goal actions after a legal courier return; it is an isolated capacity control. Local keyboard, save/import/replay, accessibility exposure, 390-width layout and local-font smoke checks pass with zero runtime errors. Clean freeze, fresh play and engine-4 public verification remain outstanding.
