@@ -4,13 +4,13 @@ Updated 2026-10-14 for the focused first-repair UX renewal. Earlier delivery evi
 
 ## What remains
 
-The focused first-repair UX renewal is **in progress** on `codex/focused-first-repair`. Adam rejected the opening's overload, unclear first action and early Sam introduction. Build and review the physical guided opening, then check fresh source-unread first-visitor play, progressed saves/replay, desktop/mobile/keyboard interaction and public delivery. Adam accepts feel personally.
+Adam accepts feel personally. The focused first-repair UX renewal is delivered locally and publicly at clean `39793cd92dcea494a3bf64df8098aeb19cf0a6b9`, privately pushed on main. Deployment repeated lint, types, **241 tests across 25 files** and build. [CI 38679966443](https://github.com/adam0white/repair-game/actions/runs/38679966443) passed. Cloudflare version is `cdf74c5d-0a25-49e1-9b31-07756effb16f`; the exact clean live manifest was verified. Later documentation-only commits do not change this published UI.
 
-[First-visitor play](docs/restart/playtest-9.md) completed the guided repair and two later player repairs with 48 exact-replay inputs. Setup resets and remaining confusion are disclosed. Independent review corrections are integrated. The full local check passed lint, types, **241 tests across 25 files** and build, with 151 CSS warnings and a chunk-size warning. Fresh mobile play and renewed public verification remain pending.
+[Desktop and mobile first-visitor evidence](docs/restart/playtest-9.md) supports a purposeful opening and completed guided repair. Desktop retained 48 exact-replay inputs; mobile retained 14. Existing mentor and visitor 48-input saves also replay exactly. Public desktop keyboard tabs and 390-width layout/switch checks pass without runtime errors. These guided runs do not prove independent diagnosis. Small meter terminals, meter scrolling and the electrical reason for measuring across the switch remain limits. No additional implementation queue is selected.
 
-[The focused UX spec](docs/restart/first-repair-ux.md) is the active increment. This does not renew the earlier five-hour window. The delivery and play evidence below describe the prior build; they do not certify this new work.
+[The focused UX spec](docs/restart/first-repair-ux.md) records the scope. The earlier five-hour delivery below is historical.
 
-## Delivered build
+## Earlier five-hour delivered build
 
 Play [Small Works](https://repair.adamwhite.work). Published UI code is clean `0e80d89be803a9625dcd07974ed6c85396fa71ec`; gameplay core is `38cbae0`. The game is `3.0.0-alpha.4`, engine/schema `small-works@4`, with exactly published HF `2.2.1`. Main is privately pushed. [CI 38576890933](https://github.com/adam0white/repair-game/actions/runs/38576890933) passed. Deployment repeated lint, types, **233 tests across 23 files** and build; Cloudflare version is `6c8c45de-c057-4223-aed7-fe3a47afb86b`. The exact clean public manifest was verified. Later documentation-only commits need not change this UI code hash.
 

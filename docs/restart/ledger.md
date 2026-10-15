@@ -4,7 +4,7 @@ Start: **2026-10-14 09:21:55 UTC**. Target finish: **14:21:55 UTC**.
 
 ## What remains
 
-The focused first-repair UX renewal is active. The integrated local check passed 241 tests across 25 files, lint, types and build. Fresh mobile play and renewed public verification remain pending. Adam accepts feel. Earlier entries retain the prior five-hour run's checkpoints and delivery, not this renewal's completion.
+Adam accepts feel personally. The focused first-repair renewal is reviewed, checked and delivered locally and publicly at clean `39793cd`. Fresh desktop and mobile guided repairs completed with exact replay. Guided diagnosis remains distinct from independent diagnosis; mobile meter density and electrical explanation remain limitations. No further implementation queue is selected. Earlier pending entries below are historical checkpoints.
 
 ## Authority
 
@@ -199,3 +199,13 @@ Adam renewed UX work after finding the prior screen overloaded and Sam introduce
 [First-visitor play](playtest-9.md) completed the guided repair and two later player repairs with 48 exact-replay inputs after disclosed setup resets. Independent review corrections are integrated. The full check passed lint, types, **241 tests across 25 files** and build; 151 CSS warnings and a chunk-size warning remain reported.
 
 Fresh mobile play is underway on immutable assets: JS `192ceeb71bb78d03ac7739329a1e4b1d5f60cb05b280d71d153c1cbe163a81e1`, CSS `3f193e99ed930f4ca6e8337092d08bc4f66cde31ca7b10465951cb7b76d2700c`. No completed mobile result or renewed public release is claimed. Prior delivery records remain historical.
+
+## Focused renewal public delivery and mobile evidence, 2026-10-15
+
+Clean source **39793cd92dcea494a3bf64df8098aeb19cf0a6b9** is privately pushed on main. Deployment repeated lint, types, **241 tests across 25 files**, build and dry-run. CI [38679966443](https://github.com/adam0white/repair-game/actions/runs/38679966443) passed. Cloudflare **cdf74c5d-0a25-49e1-9b31-07756effb16f** serves the exact clean manifest. Final assets retain the recorded JS/CSS hashes. No code or further deployment remains selected.
+
+Public desktop replayed the visitor's 48 inputs exactly, checked End/Home keyboard tabs, and found no overflow or runtime errors. Root's width-390 public check verified actual switch Off/On. Both prior mentor and visitor 48-input packets replay exactly on the frozen candidate.
+
+Source-unread mobile play at 390 × 844 ran **04:08:22.874–04:11:23.248 UTC**, approximately 3 minutes including about 68 seconds of locator delay. The player completed the guided switch repair and 96% Carry check, returned at 10:50, then accepted Nora's work. Tools remained stable; switch state controlled voltage testing. Width 390 had no overflow. Fourteen inputs exported and replayed exactly; the unchanged packet and screenshot are linked in [playtest 9](playtest-9.md).
+
+Guidance supplied measurement pairs; independent diagnosis is not proven. The tester still did not understand why voltage across the switch matters. Meter scrolling and small SVG terminals remain usability limits, with named controls usable. Adam accepts feel personally.

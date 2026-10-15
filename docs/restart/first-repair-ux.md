@@ -43,3 +43,11 @@ Reference principles: [Nielsen Norman Group on progressive disclosure](https://w
 The full check passed lint, typecheck, **241 tests across 25 files** and production build. Lint reported 151 CSS warnings; build reported a chunk-size warning. This supersedes the earlier focused counts without rewriting their checkpoint evidence.
 
 A fresh mobile tester is playing immutable candidate assets on port 5185: JS SHA256 `192ceeb71bb78d03ac7739329a1e4b1d5f60cb05b280d71d153c1cbe163a81e1`, CSS SHA256 `3f193e99ed930f4ca6e8337092d08bc4f66cde31ca7b10465951cb7b76d2700c`. No completed mobile result or renewed public deployment is claimed yet.
+
+## Delivered renewal, 2026-10-15
+
+Clean source **39793cd** is privately pushed on main and publicly verified. Deployment repeated lint, types, **241 tests across 25 files** and build; CI 38679966443 passed. Cloudflare version: `cdf74c5d-0a25-49e1-9b31-07756effb16f`. Earlier pending statements above are checkpoint history.
+
+[Desktop and mobile play](playtest-9.md) completed the guided repair. Their 48- and 14-input packets replay exactly; the older mentor packet also remains exact. Public keyboard tabs, 390-width layout and physical switch checks pass without runtime errors. Guided probe pairs do not establish independent diagnosis. Mobile meter scrolling, small terminals and the reason for measuring across the switch remain limitations. Adam accepts feel personally.
+
+Opening screenshots: [desktop](evidence/ui/focused-opening-desktop.png), [mobile](evidence/ui/focused-opening-mobile.png). [The mobile meter](evidence/ui/focused-mobile-meter.png) shows the remaining density.
