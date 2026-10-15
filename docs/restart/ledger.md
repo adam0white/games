@@ -4,7 +4,7 @@ Start: **2026-10-14 09:21:55 UTC**. Target finish: **14:21:55 UTC**.
 
 ## What remains
 
-The authorized technical stage is reviewed, verified and delivered locally and publicly. The five-hour checkpoint was reached and recorded below. Adam's feel acceptance remains. The known gap is natural whole-handoff usability and teaching administration; no further implementation queue is selected.
+The focused first-repair UX renewal is active. The integrated local check passed 241 tests across 25 files, lint, types and build. Fresh mobile play and renewed public verification remain pending. Adam accepts feel. Earlier entries retain the prior five-hour run's checkpoints and delivery, not this renewal's completion.
 
 ## Authority
 
@@ -191,3 +191,11 @@ Documentation links were checked again after the final handoff edits: 38 local l
 ## Five-hour checkpoint
 
 The authorized development window reached **2026-10-14 14:21:55 UTC**, five hours after 09:21:55. Root recorded this checkpoint at **2026-10-14 14:22:26 UTC**. Reviewed game/UI source is delivered and publicly verified. Final documentation publication and manifest reconciliation follow; they do not add gameplay changes. Adam's feel acceptance and the documented natural whole-handoff limitation remain open.
+
+## Focused first-repair renewal, 2026-10-15
+
+Adam renewed UX work after finding the prior screen overloaded and Sam introduced too early. [The focused spec](first-repair-ux.md) selects a physical guided first repair, one active tool and stable milestone disclosure. This does not restart the five-hour window.
+
+[First-visitor play](playtest-9.md) completed the guided repair and two later player repairs with 48 exact-replay inputs after disclosed setup resets. Independent review corrections are integrated. The full check passed lint, types, **241 tests across 25 files** and build; 151 CSS warnings and a chunk-size warning remain reported.
+
+Fresh mobile play is underway on immutable assets: JS `192ceeb71bb78d03ac7739329a1e4b1d5f60cb05b280d71d153c1cbe163a81e1`, CSS `3f193e99ed930f4ca6e8337092d08bc4f66cde31ca7b10465951cb7b76d2700c`. No completed mobile result or renewed public release is claimed. Prior delivery records remain historical.

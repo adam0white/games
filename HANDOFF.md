@@ -1,10 +1,14 @@
 # Handoff
 
-Updated 2026-10-14 14:22:26 UTC, after the five-hour development window.
+Updated 2026-10-14 for the focused first-repair UX renewal. Earlier delivery evidence remains below.
 
 ## What remains
 
-Adam accepts game feel through play. The authorized technical stage is reviewed, verified and delivered locally and publicly. Natural whole-handoff usability and teaching administration remain the principal limitations. No further implementation queue is selected. The five-hour window ran 09:21:55–14:21:55 UTC on 2026-10-14. Final documentation publication followed.
+The focused first-repair UX renewal is **in progress** on `codex/focused-first-repair`. Adam rejected the opening's overload, unclear first action and early Sam introduction. Build and review the physical guided opening, then check fresh source-unread first-visitor play, progressed saves/replay, desktop/mobile/keyboard interaction and public delivery. Adam accepts feel personally.
+
+[First-visitor play](docs/restart/playtest-9.md) completed the guided repair and two later player repairs with 48 exact-replay inputs. Setup resets and remaining confusion are disclosed. Independent review corrections are integrated. The full local check passed lint, types, **241 tests across 25 files** and build, with 151 CSS warnings and a chunk-size warning. Fresh mobile play and renewed public verification remain pending.
+
+[The focused UX spec](docs/restart/first-repair-ux.md) is the active increment. This does not renew the earlier five-hour window. The delivery and play evidence below describe the prior build; they do not certify this new work.
 
 ## Delivered build
 

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { BenchHistory } from './components/BenchHistory';
 import { CommunityPanel } from './components/CommunityPanel';
 import { CommunityScene } from './components/CommunityScene';
+import { FirstRepairGuide } from './components/FirstRepairGuide';
 import { LessonControl } from './components/LessonControl';
+import { PhysicalObjectScene } from './components/PhysicalObjectScene';
 import { ReadingComparison } from './components/ReadingComparison';
 import { ReturnedHistory } from './components/ReturnedHistory';
 import { ReturnReceipt } from './components/ReturnReceipt';
@@ -10,7 +11,6 @@ import { SamRequest } from './components/SamRequest';
 import { SamWorkAccount } from './components/SamWorkAccount';
 import { TeachingRecord } from './components/TeachingRecord';
 import { WorkshopPause } from './components/WorkshopPause';
-import { eventOptions } from './game/community';
 import {
   createGame,
   dayRemaining,
@@ -24,6 +24,7 @@ import {
   UPGRADE_CATALOG,
 } from './game/engine';
 import { evidenceContext } from './game/evidence-context';
+import { governorMultipliers } from './game/model';
 import { describePerson } from './game/people';
 import { replayRecordedRun } from './game/replay';
 import type {
@@ -34,7 +35,9 @@ import type {
   MeterMode,
   TestCondition,
 } from './game/types';
+import { firstRepairProgress } from './ui/first-repair';
 import './styles.css';
+import './focused-layout.css';
 
 const SAVE_KEY = 'small-works-save-v4';
 const conditions: TestCondition[] = ['bench', 'movement', 'load'];
@@ -47,16 +50,6 @@ function checkPurpose(job: Job): string {
       : 'Check sustained light under demand for the owner’s reading.';
   if (job.kind === 'fan') return 'Check airflow under the resistance of the fitted filter.';
   return `Check the drive at the owner’s requested ${job.model.desiredRPM ?? 15} ± ${job.model.tolerance ?? 3} rpm under load.`;
-}
-function checkLabel(job: Job): string {
-  if (job.kind === 'lantern')
-    return requiredChecks(job).includes('movement') ? 'Carry the light' : 'Run the reading light';
-  if (job.kind === 'fan') return 'Test with filter';
-  return job.isPersonal
-    ? 'Run the paper figures'
-    : job.ownerId === 'sam'
-      ? 'Run Sam’s toy'
-      : 'Check requested pace';
 }
 function samFinishedPersonal(job: Job): boolean {
   if (!job.isPersonal || job.completedBy !== 'sam') return false;
@@ -85,6 +78,8 @@ function Device({
   collarPreview,
   onTerminal,
   activeProbe,
+  suggestedTerminal,
+  suggestedPart,
 }: {
   probeA: string;
   probeB: string;
@@ -92,6 +87,8 @@ function Device({
   collarPreview?: number;
   onTerminal: (terminal: string) => void;
   activeProbe: string;
+  suggestedTerminal?: string;
+  suggestedPart?: string;
   job: Job;
   selected: string;
   onSelect: (id: string) => void;
@@ -241,7 +238,7 @@ function Device({
             <g
               key={c.id}
               transform={`translate(${x},${y})`}
-              className={selected === c.id ? 'component selected' : 'component'}
+              className={`${selected === c.id ? 'component selected' : 'component'} ${suggestedPart === c.id ? 'guide-component' : ''}`}
             >
               <path d="M-35 0 H35" />
               {/* biome-ignore lint/a11y/useSemanticElements: This is the component target in an SVG diagram. */}
@@ -267,7 +264,11 @@ function Device({
                 // biome-ignore lint/a11y/useSemanticElements: SVG terminals have native HTML keyboard equivalents in the meter.
                 <g
                   key={terminal}
-                  className="terminal-hit"
+                  className={
+                    terminal === suggestedTerminal
+                      ? 'terminal-hit suggested-terminal'
+                      : 'terminal-hit'
+                  }
                   role="button"
                   tabIndex={0}
                   aria-label={`Place probe ${activeProbe.toUpperCase()} at terminal ${terminal}`}
@@ -279,6 +280,13 @@ function Device({
                     }
                   }}
                 >
+                  {terminal === suggestedTerminal && (
+                    <circle
+                      className="probe-hint-ring"
+                      cx={terminalIndex === 0 ? -35 : 35}
+                      r="14"
+                    />
+                  )}
                   <circle
                     cx={terminalIndex === 0 ? -35 : 35}
                     r="22"
@@ -334,70 +342,26 @@ function Device({
             </g>
           );
         })}
-        {(() => {
-          const reading = [...job.evidence]
-            .reverse()
-            .find((e) => e.kind === 'measurement' && e.request);
-          if (!reading?.request) return null;
-          const component = job.model.components.find(
-            (c) =>
-              c.terminals.includes(reading.request?.a ?? '') &&
-              c.terminals.includes(reading.request?.b ?? ''),
-          );
-          const stale = job.evidence.some((e) => e.kind === 'work' && e.id > reading.id);
-          return (
-            <g
-              className="diagram-reading"
-              transform={`translate(${component ? component.x * 6 : 310} ${component ? component.y * 4 + 66 : 53})`}
-            >
-              <rect
-                x="-94"
-                y="-12"
-                width="188"
-                height="37"
-                rx="3"
-                fill="#1d2b22"
-                stroke="#6b8056"
-              />
-              <text textAnchor="middle" fill="#e4d4a5" fontSize="10">
-                {reading.value === null
-                  ? '—'
-                  : `${reading.value?.toFixed(2) ?? '—'} ${reading.unit ?? ''}`}{' '}
-                · {reading.request.condition}
-                {stale ? ' · recorded' : ''}
-              </text>
-              <text y="15" textAnchor="middle" fill="#9db78b" fontSize="8">
-                {reading.request.a} → {reading.request.b} · {dayTime(reading.at)}
-              </text>
-            </g>
-          );
-        })()}
         <text x="20" y="24" className="diagram-caption">
           {`FUNCTIONAL LAYOUT · ${condition.toUpperCase()} CONDITION`}
         </text>
       </svg>
-      {lastUse && (
-        <p className="observed-use">
-          <span>Last observed use</span>
-          {job.kind === 'music-box'
-            ? lastUse.summary.replaceAll('melody', 'drive')
-            : lastUse.summary}
-          <small>{dayTime(lastUse.at)} · retained observation</small>
-        </p>
-      )}
-      <div className="component-picker">
-        {job.model.components.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            aria-pressed={selected === c.id}
-            onClick={() => onSelect(c.id)}
-          >
-            {c.label}
-            <span>{c.kind}</span>
-          </button>
-        ))}
-      </div>
+      <details className="alternative-parts">
+        <summary>Choose a component by name</summary>
+        <div className="component-picker">
+          {job.model.components.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              aria-pressed={selected === c.id}
+              onClick={() => onSelect(c.id)}
+            >
+              {c.label}
+              <span>{c.kind}</span>
+            </button>
+          ))}
+        </div>
+      </details>
     </div>
   );
 }
@@ -405,6 +369,18 @@ export default function App() {
   const [state, setState] = useState(initial);
   const [view, setView] = useState('bench');
   const [paused, setPaused] = useState(false);
+  const [pane, setPane] = useState<'object' | 'meter' | 'repair' | 'notes'>('object');
+  const [opened, setOpened] = useState(false);
+  const [introSkipped, setIntroSkipped] = useState(
+    () => localStorage.getItem(`small-works-intro-${state.seed}`) === 'skipped',
+  );
+  const progress = firstRepairProgress(state);
+  const guided = !introSkipped && !progress.workshopAvailable;
+  const skipIntro = () => {
+    localStorage.setItem(`small-works-intro-${state.seed}`, 'skipped');
+    setIntroSkipped(true);
+  };
+
   const [replayChecking, setReplayChecking] = useState(false);
   const [replayStatus, setReplayStatus] = useState('');
   const stateRef = useRef(state);
@@ -412,14 +388,15 @@ export default function App() {
   const [selected, setSelected] = useState('');
   const [mode, setMode] = useState<MeterMode>('voltage');
   const [condition, setCondition] = useState<TestCondition>('bench');
+  const [useCondition, setUseCondition] = useState<TestCondition>('movement');
   const [a, setA] = useState('');
   const [b, setB] = useState('');
   const [activeProbe, setActiveProbe] = useState<'a' | 'b'>('a');
   const [status, setStatus] = useState('');
-  const [lastAction, setLastAction] = useState('');
   const [teachingFeedback, setTeachingFeedback] = useState('');
   const [collarPreview, setCollarPreview] = useState<number | undefined>(undefined);
   const input = useRef<HTMLInputElement>(null);
+  const menu = useRef<HTMLDetailsElement>(null);
   const job = state.jobs.find((j) => j.id === state.selectedJobId) ?? state.jobs[0];
   const jobLocked = Boolean(
     job &&
@@ -448,7 +425,6 @@ export default function App() {
         (lesson) => lesson.observerId === 'sam' && lesson.action.split(':')[1] === part.id,
       ),
   );
-  const gatheringOptions = state.community ? eventOptions(state, state.community) : [];
   const terminals = [...new Set(job?.model.components.flatMap((c) => c.terminals) ?? [])];
   useEffect(() => {
     localStorage.setItem(SAVE_KEY, saveGame(state));
@@ -459,6 +435,20 @@ export default function App() {
     setCollarPreview(undefined);
     setA('');
     setB('');
+    const current = stateRef.current.jobs.find((j) => j.id === job?.id);
+    setOpened(
+      Boolean(
+        current?.evidence.some((e) => ['inspection', 'measurement', 'work'].includes(e.kind)),
+      ),
+    );
+    setPane('object');
+    setMode(current?.kind === 'music-box' ? 'motion' : 'voltage');
+    if (current)
+      setUseCondition(
+        requiredChecks(current).find((c) => !current.verified.includes(c)) ??
+          requiredChecks(current)[0] ??
+          'bench',
+      );
   }, [job?.id]);
   const chooseTerminal = (terminal: string) => {
     if (activeProbe === 'a') {
@@ -470,7 +460,6 @@ export default function App() {
     }
   };
   const actSequence = (commands: Command[]) => {
-    setLastAction(commands.at(-1)?.type ?? '');
     setTeachingFeedback('');
     setReplayStatus('');
     let next = state;
@@ -521,7 +510,26 @@ export default function App() {
           }
         }
 
-        messages.push(result.message);
+        if (command.type === 'measure' && result.ok) {
+          const reading = next.jobs
+            .find((j) => j.id === command.jobId)
+            ?.evidence.findLast((e) => e.kind === 'measurement');
+          const interpretations: Record<string, string> = {
+            'high-drop': 'Large voltage drop across this measured span.',
+            'low-source': 'Source voltage is below the normal source reference.',
+            voltage: 'Voltage recorded for this probe pair and condition.',
+            'open-path': 'No conducting path between these terminals.',
+            resistance: 'Resistance is above the conducting-link reference.',
+            connected: 'A conducting path is present between these terminals.',
+            rotation: 'Shaft motion recorded. Compare with the drive reference in Notes.',
+            'slow-drive': 'The observed shaft turns slowly.',
+            'blocked-drive': 'No motion at the observed shaft.',
+            'power-off': 'The object is switched off.',
+          };
+          messages.push(
+            interpretations[reading?.cues.signal ?? ''] ?? reading?.summary ?? result.message,
+          );
+        } else messages.push(result.message);
         if (!result.ok) break;
       }
       setState(next);
@@ -578,707 +586,752 @@ export default function App() {
     act({ type: 'select', jobId: j.id });
     setView('bench');
   };
+  const resetPresentation = (next: GameState, fresh = false) => {
+    if (menu.current) menu.current.open = false;
+    setState(next);
+    setView('bench');
+    setPane('object');
+    const selectedJob = next.jobs.find((j) => j.id === next.selectedJobId);
+    setOpened(
+      Boolean(
+        selectedJob?.evidence.some((e) => ['inspection', 'measurement', 'work'].includes(e.kind)),
+      ),
+    );
+    setMode(selectedJob?.kind === 'music-box' ? 'motion' : 'voltage');
+    if (selectedJob)
+      setUseCondition(
+        requiredChecks(selectedJob).find((c) => !selectedJob.verified.includes(c)) ??
+          requiredChecks(selectedJob)[0] ??
+          'bench',
+      );
+    setA('');
+    setB('');
+    setCollarPreview(undefined);
+    setSelected('');
+    setStatus('');
+    setTeachingFeedback('');
+    setIntroSkipped(!fresh && localStorage.getItem(`small-works-intro-${next.seed}`) === 'skipped');
+    if (fresh) localStorage.removeItem(`small-works-intro-${next.seed}`);
+  };
+  const samPresent =
+    state.watching || Boolean(state.pendingRequest) || Boolean(job?.assignedTo === 'sam');
+  const hasSamObservation = Boolean(job?.evidence.some((e) => e.witnessedBy?.includes('sam')));
+  const powerConflict =
+    job &&
+    ((mode === 'continuity' && job.model.power) || (mode !== 'continuity' && !job.model.power));
+  const showTools = opened || !guided;
+  const result = status && (
+    <div className="focused-result" role="status">
+      <p>{status}</p>
+      {teachingFeedback && (state.watching || hasSamObservation) && (
+        <small>{teachingFeedback}</small>
+      )}
+    </div>
+  );
+  const navigatePane = (next: 'object' | 'meter' | 'repair' | 'notes') => {
+    setPane(next);
+    if (
+      guided &&
+      (progress.phase === 'inspect' || progress.phase === 'repair') &&
+      next === 'repair' &&
+      progress.suggestedPart
+    )
+      setSelected(progress.suggestedPart);
+    if (next === 'meter' && guided && progress.suggestedPair) {
+      setCondition(progress.suggestedPair.condition);
+      setMode(progress.suggestedPair.mode);
+      setActiveProbe(a !== progress.suggestedPair.a ? 'a' : 'b');
+    }
+  };
+  const suggestedTerminal =
+    guided && pane === 'meter' && progress.suggestedPair
+      ? activeProbe === 'a'
+        ? a !== progress.suggestedPair.a
+          ? progress.suggestedPair.a
+          : undefined
+        : b !== progress.suggestedPair.b
+          ? progress.suggestedPair.b
+          : undefined
+      : undefined;
+  const diagram = job && (
+    <Device
+      job={job}
+      selected={selected}
+      onSelect={setSelected}
+      probeA={a}
+      probeB={b}
+      condition={condition}
+      collarPreview={collarPreview}
+      onTerminal={chooseTerminal}
+      activeProbe={activeProbe}
+      suggestedTerminal={suggestedTerminal}
+      suggestedPart={guided ? progress.suggestedPart : undefined}
+    />
+  );
   if (paused)
     return <WorkshopPause state={state} onReturn={() => setPaused(false)} onExport={exportSave} />;
   return (
-    <div className="workshop">
-      <header className="masthead">
-        <div className="brand">
-          <span className="brand-mark">sw</span>
-          <span>
-            Small Works<small>A neighbourhood repair workshop</small>
-          </span>
-        </div>
-        <div className="day-clock">
-          <span>
-            DAY {state.day} / {state.day <= 7 ? 'FIRST WEEK' : 'CONTINUING WORK'}
-          </span>
-          <strong>{dayTime(state.now)}</strong>
-          <small>{dayRemaining(state)} min until 17:00 closing</small>
-        </div>
-        <div className="resources">
-          <span>
-            Workshop cash<strong>{money(state.cash)}</strong>
-          </span>
-          <span>
-            Reputation<strong>{state.reputation}</strong>
-          </span>
-        </div>
-      </header>
-      <div className="toolbar">
-        <nav aria-label="Workshop">
-          <button
-            type="button"
-            className={view === 'bench' ? 'active' : ''}
-            onClick={() => setView('bench')}
-          >
-            01 <span>Workbench</span>
-          </button>
-          <button
-            type="button"
-            className={view === 'board' ? 'active' : ''}
-            onClick={() => setView('board')}
-          >
-            02 <span>Workboard</span>
-            <i>{state.jobs.filter((j) => j.status === 'offer').length}</i>
-          </button>
-          <button
-            type="button"
-            className={view === 'people' ? 'active' : ''}
-            onClick={() => setView('people')}
-          >
-            03 <span>People & supplies</span>
-          </button>
-        </nav>
-        <div className="time-actions">
-          <button type="button" onClick={() => act({ type: 'wait', minutes: 30 })}>
-            Wait 30 min
-          </button>
-          <button type="button" className="end-day" onClick={() => act({ type: 'next-day' })}>
-            Close workshop →
-          </button>
-        </div>
-      </div>
-      <p
-        className="status"
-        role={
-          view === 'bench' &&
-          ['inspect', 'work', 'calibrate', 'verify', 'measure', 'power'].includes(lastAction)
-            ? undefined
-            : 'status'
-        }
-      >
-        {status || 'Every test and repair uses workshop time. Your people work while you do.'}
-        {status &&
-        state.pendingRequest?.status === 'ready' &&
-        state.pendingRequest.readyUntil !== undefined
-          ? ` Start before ${dayTime(state.pendingRequest.readyUntil)}.`
-          : ''}
-      </p>
-      {view === 'bench' && (
-        <nav className="mobile-bench-nav" aria-label="Bench shortcuts">
-          <a href="#object-bench">Object</a>
-          <a href="#repair-controls">Repair</a>
-          <a href="#meter-panel">Meter</a>
-          <a href="#evidence-panel">Notes</a>
-        </nav>
-      )}
-      {view === 'bench' && job && (
-        <main className="bench-layout">
-          <aside className="job-shelf">
-            <p className="eyebrow">On the shelf</p>
-            {state.jobs
-              .filter((j) => ['active', 'ready'].includes(j.status))
-              .map((j) => (
-                <button
-                  type="button"
-                  key={j.id}
-                  className={j.id === job.id ? 'shelf-item active' : 'shelf-item'}
-                  onClick={() => chooseJob(j)}
-                >
-                  <span className="object-glyph">
-                    {j.kind === 'lantern' ? '◈' : j.kind === 'fan' ? '✳' : '▧'}
-                  </span>
-                  <strong>{j.title}</strong>
-                  <small>{j.assignedTo ? `With ${j.assignedTo}` : jobReadiness(j)}</small>
-                  {gatheringOptions
-                    .filter((o) => o.jobId === j.id)
-                    .map((o) => (
-                      <span className="use-badge" key={o.format}>
-                        Gathering · {o.format}
-                        {o.prepared ? ' prepared' : o.ready ? ' ready' : ' needs check'}
-                      </span>
-                    ))}
-                </button>
-              ))}
-            {state.jobs
-              .filter(
-                (j) => j.status === 'delivered' && !j.returnedUnfinished && j.ownerId === 'mum',
-              )
-              .map((j) => (
-                <div className="keepsake" key={j.id}>
-                  <span className="keepsake-object">◈</span>
-                  <strong>{j.title}</strong>
-                  <small>Back in family use</small>
-                  <button type="button" onClick={() => chooseJob(j)}>
-                    Read its notebook
-                  </button>
-                </div>
-              ))}
-            <button type="button" className="text-button" onClick={() => setView('board')}>
-              View incoming work →
-            </button>
-            {state.independentRepairs > 0 && (
-              <div className="capacity-note">
-                <p className="eyebrow">A responsibility changed</p>
-                <p>
-                  {state.jobs
-                    .filter(
-                      (j) =>
-                        j.status === 'delivered' &&
-                        j.completedBy === 'sam' &&
-                        !j.returnedUnfinished,
-                    )
-                    .slice(-1)
-                    .map((j) => `Sam handled ${j.title.toLowerCase()} through its return.`)
-                    .join(' ')}
-                </p>
-                <small>You can choose another object while he handles a familiar repair.</small>
-              </div>
-            )}
-            <div className="bench-note">
-              <span>THE WORKSHOP RULE</span>
-              <p>A light on the bench is a start. Check how the owner will use it.</p>
-            </div>
-          </aside>
-          <section className="bench-main" id="object-bench">
-            <div className="object-heading">
-              <div>
-                <p className="eyebrow">
-                  {job.isPersonal
-                    ? 'Personal work'
-                    : job.isDonor
-                      ? 'Donor object'
-                      : `For ${job.ownerId}`}{' '}
-                  · {job.kind.replace('-', ' ')}
-                </p>
-                <h1>{job.title}</h1>
-              </div>
-              <button
-                type="button"
-                className={job.model.power ? 'power on' : 'power'}
-                disabled={jobLocked}
-                onClick={() => act({ type: 'power', jobId: job.id, on: !job.model.power })}
-              >
-                <span /> Power {job.model.power ? 'on' : 'off'}
-              </button>
-            </div>
-            <p className="owner-request">{job.description}</p>
-            {samFinishedPersonal(job) && (
-              <p className="personal-completion">
-                Sam finished this piece of work; the project stays here.
-              </p>
-            )}
-            {job.assignedTo && (
-              <p className="loan-notice">
-                Sam has responsibility for this object. Choose another object while he works, or
-                take it back from the workboard.
-              </p>
-            )}
-            {['delivered', 'salvaged', 'declined'].includes(job.status) && (
-              <p className="loan-notice">
-                Retained notebook. This object is no longer on your bench.
-              </p>
-            )}
-            {gatheringOptions
-              .filter((o) => o.jobId === job.id)
-              .map((o) => (
-                <p className="object-event-use" key={o.format}>
-                  <strong>{o.label}</strong> · {o.reason}
-                </p>
-              ))}{' '}
-            <div className="verification required-verification">
-              <div>
-                <p className="eyebrow">
-                  {job.isDonor ? 'Donor function test' : 'Required use check'}
-                </p>
-                <span>
-                  {job.isDonor
-                    ? 'This object is for parts. Function tests are optional and do not create a return promise.'
-                    : checkPurpose(job)}
-                </span>
-              </div>
-              {requiredChecks(job).map((c) => (
-                <button
-                  type="button"
-                  key={c}
-                  className={job.verified.includes(c) ? 'verified' : ''}
-                  disabled={jobLocked}
-                  onClick={() => act({ type: 'verify', jobId: job.id, condition: c })}
-                >
-                  {job.verified.includes(c) ? '✓ Checked' : checkLabel(job)}
-                  <small>15 min · {c}</small>
-                  {state.watching &&
-                    state.watchUntil !== undefined &&
-                    state.now + 15 > state.watchUntil && (
-                      <em className="lesson-overrun">Sam will not observe this check</em>
-                    )}
-                </button>
-              ))}
-            </div>
-            {job.status === 'ready' && !job.isDonor && !job.isPersonal && (
-              <button
-                type="button"
-                className="bench-return"
-                disabled={jobLocked}
-                onClick={() => act({ type: 'deliver', jobId: job.id })}
-              >
-                Return to {state.people[job.ownerId]?.name ?? job.ownerId}
-                <small>10 min · checked for the owner’s use</small>
-              </button>
-            )}
-            {job.status === 'delivered' && (
-              <ReturnReceipt job={job} people={state.people} onNext={() => setView('board')} />
-            )}
-            {state.community?.reservedJobIds.includes(job.id) && (
-              <p className="loan-notice">
-                On loan at the community site until {dayTime(state.community.finishesAt)}. Repair
-                and assignment wait until the object returns.
-              </p>
-            )}
-            <div className="bench-companion">
-              <div>
-                <span className="companion-dot" />
-                <strong>Sam</strong>
-                <span>
-                  {state.npcWork.find((w) => w.personId === 'sam')?.option.label ??
-                    (state.people.sam ? describePerson(state.people.sam).state : 'Away')}
-                </span>
-              </div>
-              {state.pendingRequest ? (
-                <SamRequest state={state} act={act} compact />
-              ) : (
-                <LessonControl
-                  state={state}
-                  act={act}
-                  onRequestMore={() =>
-                    actSequence([{ type: 'watch', enabled: false }, { type: 'request-lesson' }])
-                  }
-                />
-              )}
-              {state.people.sam?.agenda.commitments
-                .filter(
-                  (c) =>
-                    c.status === 'pending' &&
-                    c.actions.includes('personal') &&
-                    c.until >= state.now,
-                )
-                .map((c) => (
-                  <p key={`${c.label}-${c.from}`}>
-                    <strong>{c.label}</strong> · {dayTime(c.from)} – {dayTime(c.until)}
-                  </p>
-                ))}
-              {state.log.filter((l) => l.speaker === 'Sam').at(-1) && (
-                <details className="companion-report">
-                  <summary>Sam’s latest report</summary>
-                  <p>{state.log.filter((l) => l.speaker === 'Sam').at(-1)?.text}</p>
-                </details>
-              )}
-            </div>
-            <BenchHistory
-              archived={['delivered', 'salvaged', 'declined'].includes(job.status)}
-              title="Retained device diagram and repair controls"
+    <div className={`workshop focused-workshop ${guided ? 'is-guided' : ''}`}>
+      <header className="focused-header">
+        {!guided && (
+          <nav aria-label="Workshop">
+            <button
+              type="button"
+              aria-current={view === 'bench' ? 'page' : undefined}
+              onClick={() => setView('bench')}
             >
-              <Device
+              Workbench
+            </button>
+            <button
+              type="button"
+              aria-current={view === 'board' ? 'page' : undefined}
+              onClick={() => setView('board')}
+            >
+              Workboard
+            </button>
+            <button
+              type="button"
+              aria-current={view === 'people' ? 'page' : undefined}
+              onClick={() => setView('people')}
+            >
+              People & supplies
+            </button>
+          </nav>
+        )}
+        <details ref={menu} className="workshop-menu">
+          <summary>
+            Workshop <span aria-hidden="true">☰</span>
+          </summary>
+          <div className="workshop-menu-content">
+            <p>
+              {dayTime(state.now)} · {dayRemaining(state)} min until closing
+            </p>
+            <p>
+              {money(state.cash)} available · seed {state.seed}
+            </p>
+            {guided && (
+              <button type="button" onClick={skipIntro}>
+                Put this aside · explore workshop
+              </button>
+            )}
+            <button type="button" onClick={() => act({ type: 'wait', minutes: 30 })}>
+              Wait 30 min
+            </button>
+            <button type="button" onClick={() => act({ type: 'next-day' })}>
+              Close for the day
+            </button>
+            <button type="button" onClick={exportSave}>
+              Export workshop
+            </button>
+            <button type="button" onClick={() => input.current?.click()}>
+              Import workshop
+            </button>
+            <button type="button" disabled={replayChecking} onClick={verifyReplay}>
+              {replayChecking ? 'Verifying replay…' : 'Verify recorded replay'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const seed = window.prompt('New workshop seed:', String(state.seed + 1));
+                if (seed !== null && Number.isFinite(Number(seed)))
+                  resetPresentation(createGame(Number(seed)), true);
+              }}
+            >
+              New workshop
+            </button>
+            <small>Saved automatically on this device. Time waits while you are away.</small>
+            {replayStatus && <p role="status">{replayStatus}</p>}
+            <details>
+              <summary>History</summary>
+              {[...state.log].reverse().map((l) => (
+                <p key={l.id}>
+                  <time>{dayTime(l.at)}</time> <strong>{l.speaker}</strong> {l.text}
+                </p>
+              ))}
+            </details>
+          </div>
+        </details>
+        <input
+          ref={input}
+          hidden
+          type="file"
+          accept="application/json,.json"
+          onChange={async (e) => {
+            try {
+              const file = e.target.files?.[0];
+              if (file) resetPresentation(loadGame(await file.text()));
+            } catch (error) {
+              setStatus(
+                error instanceof Error ? error.message : 'This save could not be imported.',
+              );
+            }
+            e.target.value = '';
+          }}
+        />
+      </header>
+      {view === 'bench' && job && (
+        <main className={`focused-bench ${showTools ? 'tools-visible' : ''}`}>
+          <div className="focused-owner">
+            <p className="eyebrow">{state.people[job.ownerId]?.name ?? job.ownerId}</p>
+            <h1>{job.title}</h1>
+            <p>{job.description}</p>
+          </div>
+          {guided && (
+            <FirstRepairGuide
+              state={state}
+              job={job}
+              pane={pane}
+              opened={opened}
+              onOpen={() => setOpened(true)}
+              onPane={navigatePane}
+              onSkip={skipIntro}
+            />
+          )}
+          {!guided && (
+            <div className="focused-shelf">
+              <label>
+                On the bench{' '}
+                <select
+                  value={job.id}
+                  onChange={(e) => {
+                    const next = state.jobs.find((j) => j.id === e.target.value);
+                    if (next) chooseJob(next);
+                  }}
+                >
+                  {state.jobs
+                    .filter((j) => j.status !== 'declined')
+                    .map((j) => (
+                      <option key={j.id} value={j.id}>
+                        {j.title}
+                        {j.assignedTo ? ' · with Sam' : ''}
+                        {j.status === 'delivered' ? ' · returned' : ''}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <span>
+                {dayTime(state.now)} · {money(state.cash)}
+              </span>
+            </div>
+          )}
+          <div
+            className={`focused-workspace ${showTools ? 'tools-open' : 'object-only'} ${showTools && pane !== 'object' ? 'instrument-focused' : ''}`}
+          >
+            <section className="focused-object" aria-label="Physical object">
+              <PhysicalObjectScene
                 job={job}
-                selected={selected}
-                onSelect={(id) => {
-                  setSelected(id);
-                  setCollarPreview(undefined);
+                disabled={jobLocked}
+                testCondition={guided ? undefined : useCondition}
+                onPower={() => act({ type: 'power', jobId: job.id, on: !job.model.power })}
+                onTry={(condition) => act({ type: 'verify', jobId: job.id, condition })}
+                onOpen={() => {
+                  setOpened(true);
+                  setPane('object');
                 }}
-                probeA={a}
-                probeB={b}
-                condition={condition}
-                collarPreview={collarPreview}
-                onTerminal={chooseTerminal}
-                activeProbe={activeProbe}
+                opened={opened}
+                allowOpen={!guided || progress.phase !== 'try'}
               />
-              {state.watching &&
-                part &&
-                !jobLocked &&
-                !hasComponentBaseline &&
-                !hasPendingPartLesson && (
-                  <p className="baseline-notice">
-                    {hasCalibrationBaseline
-                      ? 'Sam has an observed motion baseline for calibration only. Cleaning or replacing still needs a relevant component reading or use test.'
-                      : lastWorkId > 0
-                        ? 'Before another intervention on this part, let Sam observe a new relevant measurement or use test.'
-                        : 'Before cleaning, adjusting or replacing this part, let Sam observe a relevant measurement or use test.'}
-                  </p>
-                )}
-              <div className="intervention" id="repair-controls">
-                <div>
-                  <p className="eyebrow">Selected component</p>
-                  <h2>{part?.label ?? 'Choose a component'}</h2>
-                  <p>
-                    {part
-                      ? 'Compare observations, then choose what the evidence supports.'
-                      : 'The diagram shows the structure, not the hidden fault.'}
-                  </p>
-                </div>
-                <div className="intervention-actions">
-                  <button
-                    type="button"
-                    disabled={!part || jobLocked}
-                    onClick={() =>
-                      part && act({ type: 'inspect', jobId: job.id, componentId: part.id })
+              {!showTools && result}
+              {job.status === 'ready' && !job.isDonor && !job.isPersonal && (
+                <button
+                  type="button"
+                  className="primary-action focused-return"
+                  disabled={jobLocked}
+                  onClick={() => act({ type: 'deliver', jobId: job.id })}
+                >
+                  Return to {state.people[job.ownerId]?.name ?? job.ownerId}
+                  <small>10 min</small>
+                </button>
+              )}
+              {job.status === 'delivered' && (
+                <ReturnReceipt job={job} people={state.people} onNext={() => setView('board')} />
+              )}
+              {jobLocked && job.status !== 'delivered' && (
+                <p className="focused-lock">
+                  {job.assignedTo
+                    ? 'Sam has this object.'
+                    : state.community?.reservedJobIds.includes(job.id)
+                      ? 'Reserved for the gathering.'
+                      : 'This object is read-only.'}
+                </p>
+              )}
+            </section>
+            {showTools && (
+              <section className="focused-tools" aria-label="Bench tools">
+                <div
+                  className="focused-tabs"
+                  role="tablist"
+                  aria-label="Bench tool"
+                  onKeyDown={(e) => {
+                    const keys = ['object', 'meter', 'repair', 'notes'] as const;
+                    const i = keys.indexOf(pane);
+                    const next =
+                      e.key === 'ArrowRight'
+                        ? keys[(i + 1) % 4]
+                        : e.key === 'ArrowLeft'
+                          ? keys[(i + 3) % 4]
+                          : e.key === 'Home'
+                            ? keys[0]
+                            : e.key === 'End'
+                              ? keys[3]
+                              : undefined;
+                    if (next) {
+                      e.preventDefault();
+                      navigatePane(next);
+                      document.getElementById(`tab-${next}`)?.focus();
                     }
-                  >
-                    Inspect <small>10 min</small>
-                    {state.watching &&
-                      state.watchUntil !== undefined &&
-                      state.now + 10 > state.watchUntil && (
-                        <em className="lesson-overrun">After Sam’s agreed time</em>
-                      )}
-                  </button>
-                  {(['clean', 'adjust', 'replace'] as const)
-                    .filter((action) => !(action === 'adjust' && part?.kind === 'governor'))
-                    .map((action) => (
+                  }}
+                >
+                  {(['object', 'meter', 'repair', 'notes'] as const).map((tab, i) => (
+                    <button
+                      type="button"
+                      key={tab}
+                      role="tab"
+                      id={`tab-${tab}`}
+                      aria-selected={pane === tab}
+                      aria-controls={`pane-${tab}`}
+                      tabIndex={pane === tab ? 0 : -1}
+                      onClick={() => navigatePane(tab)}
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        aria-hidden="true"
+                      >
+                        {i === 0 ? (
+                          <>
+                            <path d="m12 2 9 5v10l-9 5-9-5V7Z" />
+                            <path d="m3 7 9 5 9-5M12 12v10" />
+                          </>
+                        ) : i === 1 ? (
+                          <>
+                            <rect x="4" y="2" width="16" height="20" rx="2" />
+                            <path d="M7 6h10v5H7zM8 16h2m4 0h2M8 19h2m4 0h2" />
+                          </>
+                        ) : i === 2 ? (
+                          <path d="M14 3a6 6 0 0 0-7 7L2 17a3 3 0 0 0 5 4l7-8a6 6 0 0 0 7-7l-4 4-4-3 1-4Z" />
+                        ) : (
+                          <path d="M5 2h14v20H5zM8 7h8M8 12h8M8 17h5" />
+                        )}
+                      </svg>
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+                <div
+                  role="tabpanel"
+                  id={`pane-${pane}`}
+                  aria-labelledby={`tab-${pane}`}
+                  className={`focused-pane pane-${pane}`}
+                >
+                  {(pane === 'object' || pane === 'meter' || pane === 'repair') && diagram}
+                  {pane === 'object' && !guided && (
+                    <fieldset className="use-conditions">
+                      <legend>Try the object</legend>
+                      <div>
+                        {conditions.map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            disabled={jobLocked}
+                            aria-pressed={useCondition === c}
+                            onClick={() => setUseCondition(c)}
+                          >
+                            {c === 'bench'
+                              ? '▱ On table'
+                              : c === 'movement'
+                                ? '↝ Carry'
+                                : '◉ Under load'}
+                            <small>
+                              {job.verified.includes(c)
+                                ? 'Passed'
+                                : requiredChecks(job).includes(c) && !job.isDonor
+                                  ? 'Required'
+                                  : 'Optional'}
+                            </small>
+                          </button>
+                        ))}
+                      </div>
+                      <p>
+                        Use the{' '}
+                        {useCondition === 'movement'
+                          ? 'Carry'
+                          : useCondition === 'load' && job.kind === 'lantern'
+                            ? 'Read'
+                            : useCondition === 'bench'
+                              ? 'Try'
+                              : job.kind === 'music-box'
+                                ? 'Play'
+                                : 'Try'}{' '}
+                        button on the object. {checkPurpose(job)}
+                      </p>
+                    </fieldset>
+                  )}
+                  {pane === 'object' && (
+                    <div className="focused-action">
+                      <h2>{part?.label ?? 'Choose a component'}</h2>
                       <button
                         type="button"
-                        disabled={
-                          jobLocked ||
-                          !part ||
-                          (action === 'replace' && !(state.stock[part.kind] ?? 0))
-                        }
-                        key={action}
+                        disabled={!part || jobLocked}
                         onClick={() =>
-                          part &&
+                          part && act({ type: 'inspect', jobId: job.id, componentId: part.id })
+                        }
+                      >
+                        Look closely <small>10 min</small>
+                      </button>
+                    </div>
+                  )}
+                  {pane === 'meter' && (
+                    <div className="meter-controls">
+                      <div className="meter-screen">
+                        <span>
+                          {lastReading?.request
+                            ? `${lastReading.request.mode} · ${lastReading.request.condition}`
+                            : 'No reading yet'}
+                        </span>
+                        <strong>
+                          {lastReading?.value === undefined || lastReading.value === null
+                            ? '—'
+                            : lastReading.value.toFixed(2)}
+                          <small>{lastReading?.unit}</small>
+                        </strong>
+                        <small>
+                          {lastReading?.request
+                            ? `${lastReading.request.a} → ${lastReading.request.b} · ${dayTime(lastReading.at)}`
+                            : 'Place both probes on terminals'}
+                          {lastReading && lastWorkId > lastReading.id
+                            ? ' · recorded before later work'
+                            : ''}
+                        </small>
+                      </div>
+                      <div className="segmented">
+                        {(job.kind === 'music-box'
+                          ? (['motion'] as const)
+                          : (['voltage', 'continuity'] as const)
+                        ).map((m) => (
+                          <button
+                            type="button"
+                            key={m}
+                            aria-pressed={mode === m}
+                            onClick={() => setMode(m)}
+                          >
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="focused-conditions">
+                        {conditions.map((c) => (
+                          <button
+                            type="button"
+                            key={c}
+                            aria-pressed={condition === c}
+                            onClick={() => setCondition(c)}
+                          >
+                            {c === 'bench'
+                              ? '▱ On table'
+                              : c === 'movement'
+                                ? '↝ Carry'
+                                : '◉ Under load'}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="probe-tabs">
+                        <button
+                          type="button"
+                          aria-pressed={activeProbe === 'a'}
+                          onClick={() => setActiveProbe('a')}
+                        >
+                          Red probe · {a || 'place'}
+                        </button>
+                        <button
+                          type="button"
+                          aria-pressed={activeProbe === 'b'}
+                          onClick={() => setActiveProbe('b')}
+                        >
+                          Black probe · {b || 'place'}
+                        </button>
+                      </div>
+                      <div className="terminal-strip">
+                        {terminals.map((t) => (
+                          <button
+                            type="button"
+                            key={t}
+                            disabled={jobLocked}
+                            onClick={() => chooseTerminal(t)}
+                            aria-label={`Place ${activeProbe === 'a' ? 'red' : 'black'} probe on terminal ${t}`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                      {powerConflict && (
+                        <p className="power-hint">
+                          ↖ Use the switch on the object: power{' '}
+                          {mode === 'continuity' ? 'off' : 'on'} for {mode}.
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        className="measure-button"
+                        disabled={jobLocked || !a || !b || Boolean(powerConflict)}
+                        onClick={() =>
                           act({
-                            type: 'work',
+                            type: 'measure',
                             jobId: job.id,
-                            componentId: part.id,
-                            intervention: action,
+                            request: { mode, a, b, condition },
                           })
                         }
                       >
-                        {action}
-                        {state.watching &&
-                          state.watchUntil !== undefined &&
-                          state.now + (action === 'replace' ? 30 : 20) > state.watchUntil && (
-                            <em className="lesson-overrun">Sam will not observe this step</em>
-                          )}
-                        <small>
-                          {action === 'replace'
-                            ? part
-                              ? (state.stock[part.kind] ?? 0) > 0
-                                ? `30 min · 1 ${part.kind} (${state.stock[part.kind]} stocked)`
-                                : `No ${part.kind} stocked · buy or recover one`
-                              : 'Choose a component'
-                            : '20 min'}
-                        </small>
+                        Read meter <small>10 min</small>
                       </button>
-                    ))}
-                  {job.isDonor && (
-                    <button
-                      type="button"
-                      disabled={!part || jobLocked}
-                      onClick={() =>
-                        part && act({ type: 'salvage', jobId: job.id, componentId: part.id })
-                      }
-                    >
-                      Recover part<small>25 min · sacrifices object</small>
-                    </button>
+                    </div>
                   )}
-                </div>
-              </div>
-              {['inspect', 'work', 'calibrate', 'verify'].includes(lastAction) && status && (
-                <p className="local-status bench-action-status" role="status">
-                  {status}
-                  {teachingFeedback && (
-                    <small className="step-observation">{teachingFeedback}</small>
-                  )}
-                </p>
-              )}
-              {part?.kind === 'governor' && (
-                <div className="governor-control">
-                  <p>
-                    <strong>Governor collar · current setting {part.setting ?? 2}</strong>
-                    <br />
-                    Choose a setting to preview the collar. Applying it uses 20 minutes. Measure the
-                    resulting motion before judging the change.
-                  </p>
-                  <div>
-                    {[0, 1, 2, 3, 4].map((setting) => (
+                  {pane === 'repair' && (
+                    <>
                       <button
                         type="button"
-                        key={setting}
-                        aria-pressed={(collarPreview ?? part.setting ?? 2) === setting}
-                        onClick={() => setCollarPreview(setting)}
-                      >
-                        {setting}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      className="apply-collar"
-                      disabled={jobLocked}
-                      onClick={() =>
-                        act({
-                          type: 'calibrate',
-                          jobId: job.id,
-                          componentId: part.id,
-                          setting: collarPreview ?? part.setting ?? 2,
-                        })
-                      }
-                    >
-                      Set collar<small>20 min</small>
-                      {state.watching &&
-                        state.watchUntil !== undefined &&
-                        state.now + 20 > state.watchUntil && (
-                          <em className="lesson-overrun">After Sam’s agreed time</em>
-                        )}
-                    </button>
-                  </div>
-                </div>
-              )}
-              <details className="bench-reference">
-                <summary>Device reference · structure and test conditions</summary>
-                <p>
-                  {job.kind === 'music-box'
-                    ? `The spring is rated at ${job.model.ratedDrive ?? 120} rpm. The gear reduction is ${job.model.gearRatio ?? 4}:1. The owner requests ${job.model.desiredRPM ?? 15} ± ${job.model.tolerance ?? 3} rpm under load. Collar settings 0–4 multiply the governor shaft by 0.4, 0.8, 1.0, 1.2 and 1.6; the drum turns at half that shaft speed. Compare shaft motion on the bench and under load. Choose a setting, then measure again.`
-                    : 'The nominal supply is 6 V. A and B share the supply wire. Measure a point against 0 for its voltage level; measure across a component for its drop. A healthy conducting switch or contact usually drops less than 0.2 V. Compare the same probe pair on the bench and under load. Power off before continuity tests. Movement checks handling; load checks performance under demand.'}
-                </p>
-                <ul>
-                  {job.model.components.map((c) => (
-                    <li key={c.id}>
-                      {c.label}: {c.terminals.join(' → ')}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-              <details className="optional-checks">
-                <summary>Optional diagnostic use tests</summary>
-                <p>
-                  These observations may help diagnosis. They do not replace the owner’s required
-                  use check.
-                </p>
-                <div>
-                  {conditions
-                    .filter((c) => !requiredChecks(job).includes(c))
-                    .map((c) => (
-                      <button
-                        type="button"
-                        key={c}
-                        disabled={jobLocked}
-                        onClick={() => act({ type: 'verify', jobId: job.id, condition: c })}
-                      >
-                        {c === 'bench'
-                          ? 'Try basic operation'
-                          : c === 'movement'
-                            ? 'Test while handling'
-                            : 'Test under demand'}
-                        <small>15 min · {c}</small>
-                      </button>
-                    ))}
-                </div>
-              </details>
-            </BenchHistory>
-          </section>
-          <aside className="instruments">
-            <section className="meter" id="meter-panel">
-              <div className="instrument-heading">
-                <span>WORKSHOP METER</span>
-                <small>SW—01</small>
-              </div>
-              <div className="meter-screen">
-                <span>
-                  {lastReading?.request?.mode.toUpperCase() ?? 'NO READING'} ·{' '}
-                  {lastReading?.request?.condition.toUpperCase() ?? 'READY'}
-                </span>
-                <strong>
-                  {(() => {
-                    const reading = [...job.evidence]
-                      .reverse()
-                      .find((e) => e.kind === 'measurement');
-                    return reading?.value === null
-                      ? '—'
-                      : reading?.value === undefined
-                        ? '—'
-                        : reading.value.toFixed(2);
-                  })()}
-                  <small>
-                    {[...job.evidence].reverse().find((e) => e.kind === 'measurement')?.unit ?? ' '}
-                  </small>
-                </strong>
-                <small>
-                  {lastReading?.request
-                    ? `${lastReading.request.a} → ${lastReading.request.b} · ${dayTime(lastReading.at)}`
-                    : 'Choose two terminals to begin'}
-                  {lastReading &&
-                  job.evidence.some((e) => e.kind === 'work' && e.id > lastReading.id)
-                    ? ' · before later work'
-                    : ''}
-                </small>
-              </div>
-              <BenchHistory
-                archived={['delivered', 'salvaged', 'declined'].includes(job.status)}
-                title="Retained meter settings · read-only"
-              >
-                <div className="segmented">
-                  {(['voltage', 'continuity', 'motion'] as const).map((m) => (
-                    <button
-                      type="button"
-                      key={m}
-                      aria-pressed={mode === m}
-                      onClick={() => setMode(m)}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-                <label className="field-label">
-                  Test condition
-                  <select
-                    value={condition}
-                    onChange={(e) => setCondition(e.target.value as TestCondition)}
-                  >
-                    {conditions.map((c) => (
-                      <option key={c}>{c}</option>
-                    ))}
-                  </select>
-                </label>
-                <div className="probe-tabs">
-                  <button
-                    type="button"
-                    aria-pressed={activeProbe === 'a'}
-                    onClick={() => setActiveProbe('a')}
-                  >
-                    Place probe A
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={activeProbe === 'b'}
-                    onClick={() => setActiveProbe('b')}
-                  >
-                    Place probe B
-                  </button>
-                </div>
-                <div className="terminal-buttons">
-                  {terminals.map((t) => (
-                    <button
-                      type="button"
-                      key={t}
-                      className={(a === t ? 'probe-a ' : '') + (b === t ? 'probe-b' : '')}
-                      onClick={() => {
-                        if (activeProbe === 'a') {
-                          setA(t);
-                          setActiveProbe('b');
-                        } else {
-                          setB(t);
-                          setActiveProbe('a');
+                        disabled={!part || jobLocked}
+                        onClick={() =>
+                          part && act({ type: 'inspect', jobId: job.id, componentId: part.id })
                         }
-                      }}
-                    >
-                      {t}
-                      <small>
-                        {a === t ? 'A' : ''}
-                        {b === t ? ' B' : ''}
-                      </small>
-                    </button>
-                  ))}
-                </div>
-                <p className="probe-pair">
-                  Probe A: <strong>{a || 'not placed'}</strong> · Probe B:{' '}
-                  <strong>{b || 'not placed'}</strong>
-                  <small>Click a diagram terminal or use the terminal buttons.</small>
-                </p>
-                {(mode === 'continuity' && job.model.power) ||
-                (mode !== 'continuity' && !job.model.power) ? (
-                  <button
-                    type="button"
-                    className="meter-power"
-                    disabled={jobLocked}
-                    onClick={() => act({ type: 'power', jobId: job.id, on: mode !== 'continuity' })}
-                  >
-                    {mode === 'continuity' ? 'Power off first' : 'Turn power on first'}
-                    <small>Required for {mode} · no time cost</small>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="meter-power quiet"
-                    disabled={jobLocked}
-                    onClick={() => act({ type: 'power', jobId: job.id, on: !job.model.power })}
-                  >
-                    Power {job.model.power ? 'on' : 'off'} · toggle
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="measure-button"
-                  disabled={
-                    jobLocked ||
-                    !a ||
-                    !b ||
-                    (mode === 'continuity' && job.model.power) ||
-                    (mode !== 'continuity' && !job.model.power)
-                  }
-                  onClick={() =>
-                    act({ type: 'measure', jobId: job.id, request: { mode, a, b, condition } })
-                  }
-                >
-                  Take reading <span>10 min →</span>
+                      >
+                        Look closely <small>10 min</small>
+                      </button>
+                      <h2>{part?.label ?? 'Choose a component'}</h2>
+                      {state.watching &&
+                        part &&
+                        !hasPendingPartLesson &&
+                        !hasComponentBaseline &&
+                        !hasCalibrationBaseline && (
+                          <p className="teaching-baseline-notice">
+                            Before another intervention on this part, let Sam watch a relevant test.
+                            That gives him an observation to compare with the outcome.
+                          </p>
+                        )}
+                      <div className="focused-repairs">
+                        {(['clean', 'adjust', 'replace'] as const)
+                          .filter((action) => !(action === 'adjust' && part?.kind === 'governor'))
+                          .map((action) => (
+                            <button
+                              type="button"
+                              key={action}
+                              className={
+                                guided && progress.phase === 'repair' && action === 'replace'
+                                  ? 'guided-replace'
+                                  : ''
+                              }
+                              disabled={
+                                jobLocked ||
+                                !part ||
+                                (action === 'replace' && !(state.stock[part.kind] ?? 0))
+                              }
+                              onClick={() =>
+                                part &&
+                                act({
+                                  type: 'work',
+                                  jobId: job.id,
+                                  componentId: part.id,
+                                  intervention: action,
+                                })
+                              }
+                            >
+                              {action}
+                              <small>
+                                {action === 'replace'
+                                  ? part
+                                    ? (state.stock[part.kind] ?? 0) > 0
+                                      ? `30 min · 1 ${part.kind} (${state.stock[part.kind]} stocked)`
+                                      : `No ${part.kind} stocked`
+                                    : 'Choose a component'
+                                  : '20 min'}
+                              </small>
+                              {state.watching &&
+                                state.watchUntil !== undefined &&
+                                state.now + (action === 'replace' ? 30 : 20) > state.watchUntil && (
+                                  <em>After Sam’s agreed time</em>
+                                )}
+                            </button>
+                          ))}
+                      </div>
+                      {part?.kind === 'governor' && (
+                        <div className="governor-control">
+                          <p>Collar setting {part.setting ?? 2}</p>
+                          <div>
+                            {[0, 1, 2, 3, 4].map((setting) => (
+                              <button
+                                type="button"
+                                key={setting}
+                                aria-pressed={(collarPreview ?? part.setting ?? 2) === setting}
+                                onClick={() => setCollarPreview(setting)}
+                              >
+                                {setting}
+                              </button>
+                            ))}
+                            <button
+                              type="button"
+                              disabled={jobLocked}
+                              onClick={() =>
+                                act({
+                                  type: 'calibrate',
+                                  jobId: job.id,
+                                  componentId: part.id,
+                                  setting: collarPreview ?? part.setting ?? 2,
+                                })
+                              }
+                            >
+                              Apply setting · 20 min
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {job.isDonor && (
+                        <button
+                          type="button"
+                          disabled={!part || jobLocked}
+                          onClick={() =>
+                            part && act({ type: 'salvage', jobId: job.id, componentId: part.id })
+                          }
+                        >
+                          Recover part · 25 min
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {pane === 'notes' && (
+                    <>
+                      <ReadingComparison job={job} />
+                      <details>
+                        <summary>Recorded observations · {job.evidence.length}</summary>
+                        {[...job.evidence].reverse().map((e) => (
+                          <p key={e.id}>
+                            <time>{dayTime(e.at)}</time> {e.summary}
+                          </p>
+                        ))}
+                      </details>
+                      <details>
+                        <summary>Reference</summary>
+                        <p>{checkPurpose(job)}</p>
+                        {job.kind === 'music-box' ? (
+                          <div className="drive-reference">
+                            <p>
+                              Nominal motion path. Probe a shaft against the stationary frame,
+                              terminal 0.
+                            </p>
+                            <ol>
+                              <li>
+                                <strong>Spring · A</strong>
+                                <span>Rated drive {job.model.ratedDrive ?? 120} rpm</span>
+                              </li>
+                              <li>
+                                <strong>Gear · B</strong>
+                                <span>Divide input by {job.model.gearRatio ?? 4}</span>
+                              </li>
+                              <li>
+                                <strong>Governor · C</strong>
+                                <span>Multiply by the collar factor</span>
+                              </li>
+                              <li>
+                                <strong>Drum · D</strong>
+                                <span>Divide governor output by 2</span>
+                              </li>
+                            </ol>
+                            <table>
+                              <caption>Governor collar reference</caption>
+                              <thead>
+                                <tr>
+                                  <th scope="col">Setting</th>
+                                  {governorMultipliers.map((factor, i) => (
+                                    <th scope="col" key={factor}>
+                                      {i}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr>
+                                  <th scope="row">Factor</th>
+                                  {governorMultipliers.map((factor) => (
+                                    <td key={factor}>×{factor}</td>
+                                  ))}
+                                </tr>
+                              </tbody>
+                            </table>
+                            <p>
+                              Owner’s requested drum output:{' '}
+                              <strong>
+                                {job.model.desiredRPM ?? 15} ± {job.model.tolerance ?? 3} rpm
+                              </strong>
+                              . These ratios describe the mechanism; compare actual readings across
+                              the path and under the requested condition.
+                            </p>
+                          </div>
+                        ) : (
+                          <p>
+                            A nominal source supplies {job.model.sourceVolts} V. Healthy conducting
+                            links usually drop less than 0.2 V. Compare the same probe pair on the
+                            table and under the condition that caused trouble.
+                          </p>
+                        )}
+                      </details>
+                      {hasSamObservation && <TeachingRecord job={job} />}
+                    </>
+                  )}
                   {state.watching &&
                     state.watchUntil !== undefined &&
+                    (pane === 'object' || pane === 'meter') &&
                     state.now + 10 > state.watchUntil && (
-                      <em className="lesson-overrun">After Sam’s agreed time</em>
+                      <p className="lesson-overrun">
+                        This 10-minute step would finish after Sam’s agreed time.
+                      </p>
                     )}
-                </button>
-                {['measure', 'power'].includes(lastAction) && status && (
-                  <p className="local-status" role="status">
-                    {status}
-                    {lastAction === 'measure' && teachingFeedback && (
-                      <small className="step-observation">{teachingFeedback}</small>
+                  {state.watching &&
+                    state.watchUntil !== undefined &&
+                    pane === 'repair' &&
+                    part?.kind === 'governor' &&
+                    state.now + 20 > state.watchUntil && (
+                      <p className="lesson-overrun">
+                        Applying the collar would finish after Sam’s agreed time.
+                      </p>
                     )}
-                  </p>
-                )}
-                <p className="meter-help">
-                  Voltage compares two points with power on. Continuity checks a path with power
-                  off. Motion checks the mechanical drive.
-                </p>
-              </BenchHistory>
-            </section>
-            <section className="evidence-ledger" id="evidence-panel">
-              <p className="eyebrow">Evidence notebook</p>
-              <h2>What you know</h2>
-              <ReadingComparison job={job} />
-              <TeachingRecord job={job} />
-              {job.evidence.length === 0 ? (
-                <p className="empty">
-                  No observations yet.
-                  <br />A useful test rules something out.
-                </p>
-              ) : (
-                <>
-                  <ol>
-                    {job.evidence
-                      .slice(-3)
-                      .reverse()
-                      .map((e) => (
-                        <li key={e.id}>
-                          <time>{dayTime(e.at)}</time>
-                          <p>{e.summary}</p>
-                        </li>
-                      ))}
-                  </ol>
-                  <details>
-                    <summary>All {job.evidence.length} observations</summary>
-                    <ol>
-                      {job.evidence.map((e) => (
-                        <li key={e.id}>
-                          <time>
-                            {dayTime(e.at)} · {e.kind}
-                          </time>
-                          <p>{e.summary}</p>
-                          {e.request && (
-                            <small>
-                              {e.request.a} → {e.request.b} · {e.request.condition}
-                            </small>
-                          )}
-                        </li>
-                      ))}
-                    </ol>
-                  </details>
-                </>
-              )}
-            </section>
-          </aside>
+                  {result}
+                  {pane !== 'notes' && state.watching && job.pendingLessons.length > 0 && (
+                    <TeachingRecord job={job} />
+                  )}
+                </div>
+              </section>
+            )}
+          </div>
+          {samPresent && (
+            <details className="focused-sam">
+              <summary>
+                Sam ·{' '}
+                {state.people.sam ? describePerson(state.people.sam).state : 'Not at the bench'}
+                {state.watching
+                  ? ` · ${Math.max(0, (state.watchUntil ?? state.now) - state.now)} min agreed time`
+                  : ''}
+              </summary>
+              {progress.apprenticeshipAvailable && <SamRequest state={state} act={act} />}
+              <LessonControl
+                state={state}
+                act={act}
+                onRequestMore={() =>
+                  actSequence([{ type: 'watch', enabled: false }, { type: 'request-lesson' }])
+                }
+              />
+            </details>
+          )}
         </main>
+      )}
+      {view !== 'bench' && status && (
+        <p className="focused-result" role="status">
+          {status}
+        </p>
       )}
       {view === 'board' && (
         <main className="board-page">
-          <SamRequest state={state} act={act} />
+          {progress.apprenticeshipAvailable && <SamRequest state={state} act={act} />}
           <CommunityPanel
             state={state}
             act={act}
@@ -1318,17 +1371,24 @@ export default function App() {
                     ) : (
                       <article className="job-paper" key={j.id}>
                         <p className="eyebrow">
-                          {j.ownerId} · {j.kind}
+                          <span aria-hidden="true">
+                            {j.kind === 'lantern' ? '◈' : j.kind === 'fan' ? '✳' : '♫'}
+                          </span>{' '}
+                          {state.people[j.ownerId]?.name ??
+                            (j.ownerId === 'player' ? 'Your project' : j.ownerId)}
                         </p>
                         <h3>{j.title}</h3>
                         <p>{j.description}</p>
                         {!j.isPersonal && !j.isDonor ? (
                           <div className="promise">
                             <span>
-                              Return by <strong>{dayTime(j.due)}</strong>
+                              <span aria-hidden="true">◷</span>
+                              <span className="screen-reader-only">Return by </span>{' '}
+                              <strong>{dayTime(j.due)}</strong>
                             </span>
                             <span>
-                              Payment <strong>{money(j.reward)}</strong>
+                              <span className="screen-reader-only">Payment </span>
+                              <strong>{money(j.reward)}</strong>
                             </span>
                           </div>
                         ) : (
@@ -1344,13 +1404,17 @@ export default function App() {
                             Sam finished this piece of work; the project stays here.
                           </p>
                         )}
-                        {j.status === 'ready' && !j.isDonor && !j.isPersonal && !j.assignedTo && (
-                          <p className="handoff-knowledge">
-                            {evidenceContext(j, 'sam').stage === 'ready'
-                              ? 'You repaired and checked it. Sam may choose to handle the return; this is cooperation, not an independent repair.'
-                              : 'Your use check is recorded. Sam has not received all required passed checks; he may need to recheck or ask for help.'}
-                          </p>
-                        )}
+                        {progress.apprenticeshipAvailable &&
+                          j.status === 'ready' &&
+                          !j.isDonor &&
+                          !j.isPersonal &&
+                          !j.assignedTo && (
+                            <p className="handoff-knowledge">
+                              {evidenceContext(j, 'sam').stage === 'ready'
+                                ? 'Checked by you; Sam has received the checks.'
+                                : 'Checked by you; Sam may need to recheck.'}
+                            </p>
+                          )}
                         {j.kind === 'lantern' &&
                           j.ownerId === 'evan' &&
                           requiredChecks(j).includes('movement') &&
@@ -1368,10 +1432,6 @@ export default function App() {
                           <div className="blocked-responsibility">
                             <strong>Sam has put this repair aside</strong>
                             <p>{j.blocked.reason}</p>
-                            <small>
-                              Still Sam’s responsibility. No repeated work time is spent while
-                              blocked.
-                            </small>
                           </div>
                         )}
                         <div className="paper-actions">
@@ -1422,7 +1482,9 @@ export default function App() {
                                     Take over / cancel responsibility
                                   </button>
                                 </>
-                              ) : j.isDonor || samFinishedPersonal(j) ? null : (
+                              ) : !progress.apprenticeshipAvailable ||
+                                j.isDonor ||
+                                samFinishedPersonal(j) ? null : (
                                 <button
                                   type="button"
                                   onClick={() =>
@@ -1484,7 +1546,7 @@ export default function App() {
       )}
       {view === 'people' && (
         <main className="people-page">
-          <SamRequest state={state} act={act} />
+          {progress.apprenticeshipAvailable && <SamRequest state={state} act={act} />}
           <div className="page-heading">
             <p className="eyebrow">A shared workshop day</p>
             <h1>People & supplies</h1>
@@ -1512,7 +1574,7 @@ export default function App() {
                   </small>
                 </div>
               )}
-              {!state.pendingRequest && (
+              {progress.apprenticeshipAvailable && !state.pendingRequest && (
                 <LessonControl
                   state={state}
                   act={act}
@@ -1526,7 +1588,7 @@ export default function App() {
                   <span className="avatar">{id.slice(0, 1).toUpperCase()}</span>
                   <div>
                     <h3>{person.name}</h3>
-                    {id === 'sam' ? (
+                    {id === 'sam' && progress.apprenticeshipAvailable ? (
                       <>
                         <p>
                           {state.npcWork.find((w) => w.personId === id)?.option.label ??
@@ -1729,79 +1791,6 @@ export default function App() {
             </section>
           </div>
         </main>
-      )}
-      <section className="workshop-feed">
-        <p className="eyebrow">Around the workshop</p>
-        {state.log
-          .filter((l) => view !== 'bench' || l.speaker !== 'Sam')
-          .slice(-3)
-          .reverse()
-          .map((l) => (
-            <p key={l.id}>
-              <time>{dayTime(l.at)}</time>
-              <strong>{l.speaker}</strong>
-              <span>{l.text}</span>
-            </p>
-          ))}
-      </section>
-      <footer>
-        <span>Saved automatically on this device · Seed {state.seed}</span>
-        <div>
-          <button type="button" onClick={exportSave}>
-            Export workshop
-          </button>
-          <button
-            type="button"
-            disabled={replayChecking}
-            aria-busy={replayChecking}
-            onClick={verifyReplay}
-          >
-            {replayChecking ? 'Verifying replay…' : 'Verify recorded replay'}
-          </button>
-          <button type="button" onClick={() => input.current?.click()}>
-            Import workshop
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const seed = window.prompt(
-                'Start a new workshop. Enter a seed number:',
-                String(state.seed + 1),
-              );
-              if (seed !== null && Number.isFinite(Number(seed))) {
-                setState(createGame(Number(seed)));
-                setStatus('A new workshop day begins.');
-              }
-            }}
-          >
-            New workshop
-          </button>
-          <input
-            ref={input}
-            hidden
-            type="file"
-            accept="application/json,.json"
-            onChange={async (e) => {
-              try {
-                const file = e.target.files?.[0];
-                if (file) {
-                  setState(loadGame(await file.text()));
-                  setStatus('Workshop imported.');
-                }
-              } catch (error) {
-                setStatus(
-                  error instanceof Error ? error.message : 'This save is not a Small Works save.',
-                );
-              }
-              e.target.value = '';
-            }}
-          />
-        </div>
-      </footer>
-      {replayStatus && (
-        <p className="replay-status" role="status">
-          {replayStatus}
-        </p>
       )}
       {state.ended && (
         <div className="ending-banner">
