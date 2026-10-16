@@ -8,7 +8,7 @@ Adam chooses the next experience: play inside a world, occasionally intervene, o
 
 [Recovered original ideas](docs/research/original-game-ideas-2026-10-16.md) distinguish Adam's originals from assistant suggestions and include private provenance. Keep research documents outside public site assets. Astra and two independent research reviewers contributed; both technical causality and experience value remain future acceptance gates.
 
-The two repair versions are preserved on private archive branches and at public paths. [Archive delivery](docs/research/archives-2026-10-16.md) records source commits, build adaptations and actual checks. Source remains private. Root current game remains available; no current save is automatically moved or deleted.
+The two repair versions are preserved on private archive branches and at public paths. Clean public source `f44f651` passed CI 38860955111; live root/archive manifests, launch, separate progress and reload checks passed. [Archive delivery](docs/research/archives-2026-10-16.md) records source commits, build adaptations and actual checks. Source remains private. Root current game remains available; no current save is automatically moved or deleted.
 
 ## Previous focused UX delivery
 
