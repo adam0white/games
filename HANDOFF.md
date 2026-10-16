@@ -1,8 +1,16 @@
 # Handoff
 
-Updated 2026-10-14 for the focused first-repair UX renewal. Earlier delivery evidence remains below.
+Updated 2026-10-16 for archived experiments and new-host research. Earlier delivery evidence remains below.
 
 ## What remains
+
+Adam chooses the next experience: play inside a world, occasionally intervene, or mainly observe it. Do not continue the repair roadmap by default. [The reviewed host comparison](docs/research/open-source-hosts-2026-10-16.md) recommends Endless Sky as the provisional game-first lead and AI Town as the visible social-simulation lead, with Veloren as a wildcard. Naev deserves a nearby comparison before an Endless Sky engine fork. These are research judgments; no candidate was built or played in this pass and no new game is selected.
+
+[Recovered original ideas](docs/research/original-game-ideas-2026-10-16.md) distinguish Adam's originals from assistant suggestions and include private provenance. Keep research documents outside public site assets. Astra and two independent research reviewers contributed; both technical causality and experience value remain future acceptance gates.
+
+The two repair versions are preserved on private archive branches and at public paths. [Archive delivery](docs/research/archives-2026-10-16.md) records source commits, build adaptations and actual checks. Source remains private. Root current game remains available; no current save is automatically moved or deleted.
+
+## Previous focused UX delivery
 
 Adam accepts feel personally. The focused first-repair UX renewal is delivered locally and publicly at clean `39793cd92dcea494a3bf64df8098aeb19cf0a6b9`, privately pushed on main. Deployment repeated lint, types, **241 tests across 25 files** and build. [CI 38679966443](https://github.com/adam0white/repair-game/actions/runs/38679966443) passed. Cloudflare version is `cdf74c5d-0a25-49e1-9b31-07756effb16f`; the exact clean live manifest was verified. Later documentation-only commits do not change this published UI.
 

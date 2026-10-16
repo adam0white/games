@@ -739,6 +739,7 @@ export default function App() {
             >
               New workshop
             </button>
+            <a href="/experiments/">Earlier experiments</a>
             <small>Saved automatically on this device. Time waits while you are away.</small>
             {replayStatus && <p role="status">{replayStatus}</p>}
             <details>

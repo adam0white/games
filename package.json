@@ -10,6 +10,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
+    "build:archives": "node scripts/build-archives.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src tests vite.config.ts",
