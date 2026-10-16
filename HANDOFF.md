@@ -4,7 +4,9 @@ Updated 2026-10-16 for archived experiments and new-host research. Earlier deliv
 
 ## What remains
 
-Adam chooses the next experience: play inside a world, occasionally intervene, or mainly observe it. Do not continue the repair roadmap by default. [The reviewed host comparison](docs/research/open-source-hosts-2026-10-16.md) recommends Endless Sky as the provisional game-first lead and AI Town as the visible social-simulation lead, with Veloren as a wildcard. Naev deserves a nearby comparison before an Endless Sky engine fork. These are research judgments; no candidate was built or played in this pass and no new game is selected.
+The latest request prioritizes autonomous coding/testability and HF evidence over theme. [The reviewed full-list assessment](docs/research/autonomous-coding-fit-2026-10-16.md) supersedes the previous theme-first shortlist: Concordia is the provisional first research choice; Wesnoth is the first game harness to validate locally, with FreeCol second. AI Town/Smallville and 3D are lower priority. No new host, comparison study or adapter is selected for implementation. Adam chooses the next increment and accepts game feel.
+
+Actual feasibility evidence: upstream Concordia `6fbfbc5` installed in isolated Python 3.12.13; 19 engine/action-spec/sequential/simultaneous/checkpoint tests passed without model calls. This is neither an HF adapter nor an HF-versus-LLM result. Other hosts received source/test-harness inspection only. A later game spike must run an unchanged test and a deliberately failing scenario before integrating HF. The proposed study requires a simple table-learner baseline and equal information, not just HF versus random or a weak LLM prompt.
 
 [Recovered original ideas](docs/research/original-game-ideas-2026-10-16.md) distinguish Adam's originals from assistant suggestions and include private provenance. Keep research documents outside public site assets. Astra and two independent research reviewers contributed; both technical causality and experience value remain future acceptance gates.
 

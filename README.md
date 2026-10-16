@@ -4,7 +4,7 @@ A single-player repair strategy game. Investigate familiar electrical and mechan
 
 ## Current direction
 
-Adam requested a new direction on 2026-10-16. The workshop is preserved rather than extended by default. [Open-source host research](docs/research/open-source-hosts-2026-10-16.md) compares existing games and living-agent simulations. It includes an Astra consultation, independent reviews and recovered original ideas. No new host is selected.
+Adam requested a new direction on 2026-10-16. The workshop is preserved rather than extended by default. [Open-source host research](docs/research/open-source-hosts-2026-10-16.md) compares existing games and living-agent simulations. It includes an Astra consultation, independent reviews and recovered original ideas. No new host is selected. [The later autonomous-coding assessment](docs/research/autonomous-coding-fit-2026-10-16.md) re-ranks the full list for executable tests, integration burden and bounded HF evidence; Concordia is the research lead and Wesnoth is the first game harness to validate.
 
 [Earlier experiments](https://repair.adamwhite.work/experiments/) preserves Small Works and the earlier home/garage campaign at separate paths. Their exact source snapshots are also private archive branches. Autosaves are isolated from the main game and each other; import a compatible export to carry historical progress into its archive. See [archive delivery](docs/research/archives-2026-10-16.md).
 
