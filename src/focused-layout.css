@@ -757,3 +757,30 @@
   font-weight: 600;
   opacity: 1;
 }
+.hf-mark,
+.hf-notebooks a {
+  color: inherit;
+  opacity: 0.6;
+  text-decoration: none;
+  font-size: 0.8rem;
+}
+.hf-mark {
+  white-space: nowrap;
+}
+.hf-mark:hover,
+.hf-notebooks a:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+.hf-notebooks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  justify-content: center;
+  padding: 14px 8px;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+.hf-notebooks span {
+  opacity: 0.5;
+}

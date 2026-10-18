@@ -673,6 +673,9 @@ export default function App() {
   return (
     <div className={`workshop focused-workshop ${guided ? 'is-guided' : ''}`}>
       <header className="focused-header">
+        <a className="hf-mark" href="https://human.adamwhite.work">
+          ◇ human framework
+        </a>
         {!guided && (
           <nav aria-label="Workshop">
             <button
@@ -1898,6 +1901,12 @@ export default function App() {
           </button>
         </div>
       )}
+      <footer className="hf-notebooks">
+        <span>other notebooks</span>
+        <a href="https://rope.adamwhite.work">The Rope</a>
+        <a href="https://neighbours.adamwhite.work">Neighbours</a>
+        <a href="https://human.adamwhite.work">human framework</a>
+      </footer>
     </div>
   );
 }
