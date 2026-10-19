@@ -1905,6 +1905,7 @@ export default function App() {
         <span>other notebooks</span>
         <a href="https://rope.adamwhite.work">The Rope</a>
         <a href="https://neighbours.adamwhite.work">Neighbours</a>
+        <a href="https://pass.adamwhite.work">The Pass</a>
         <a href="https://human.adamwhite.work">human framework</a>
       </footer>
     </div>
