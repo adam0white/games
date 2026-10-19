@@ -9,10 +9,12 @@ import {
   enableFatigueStore,
   enableFullness,
   finish,
+  noteVoicePromise,
   type Person,
   perceive,
   promise,
   receiveMethodCues,
+  type Suggestion,
   socialEvent,
   tick,
 } from '@adam0white/human-framework';
@@ -185,20 +187,52 @@ export function chooseActivity(
   cues: Record<string, string>,
   options: WorkOption[],
   now: number,
+  ask?: Suggestion,
 ): PersonChoice {
   tick(person, now);
   if (Object.keys(cues).length) receiveMethodCues(person, { contextId, cues: cueList(cues) });
   else clearMethodContext(person);
   const offers = options.map((option) => offer(person, option, contextId));
-  const record = decide(person, offers, { now });
+  const record = decide(person, offers, ask ? { now, suggestion: ask } : { now });
   pending.set(person, { record, offers });
   const chosen = record.considered.find((c) => c.affordanceId === record.chosenAffordanceId);
+  const answer = ask ? record.suggestion : undefined;
   return {
     chosenId: record.chosenAffordanceId ?? undefined,
     narration: record.narration,
     reason: record.intention,
     terms: Object.fromEntries((chosen?.terms ?? []).map((t) => [t.source, t.value])),
+    ...(answer
+      ? { answer: { verdict: answer.verdict, says: answer.says, reason: answer.reason } }
+      : {}),
   };
+}
+
+/** The player's own ask, carried in the player's voice (engine 5). Trust in that voice weighs it. */
+export function playerAsk(affordanceId: string, strength = 0.5): Suggestion {
+  return { voiceId: 'player', affordanceId, strength };
+}
+
+/**
+ * Engine 5: the player asked Sam to set time aside and then started (kept) or let it lapse (broken). HF moves his
+ * trust in the player's voice, which weighs the player's next asks.
+ */
+export function notePlayerWord(person: Person, kept: boolean, action: string, now: number): void {
+  tick(person, now);
+  noteVoicePromise(person, 'player', { kept, at: now, action });
+}
+
+/** How readily Sam takes the player's word, in words, never a number (engine 5 presentation). */
+export function playerWordReading(person: Person): string | undefined {
+  const voice = person.will.voices.find((v) => v.voiceId === 'player');
+  if (!voice) return undefined;
+  return voice.trust >= 0.8
+    ? 'takes your word readily'
+    : voice.trust >= 0.6
+      ? 'takes your word, with a little caution'
+      : voice.trust >= 0.4
+        ? 'waits to see whether you mean it'
+        : 'no longer counts on what you say';
 }
 
 export function startActivity(person: Person, option: WorkOption, now: number): boolean {
@@ -278,6 +312,7 @@ export function agreeLearningSession(
   contextId: string,
   minutes: number,
   now: number,
+  ask?: Suggestion,
 ): { accepted: boolean; says: string; until: number; instead?: WorkOption } {
   const until = now + Math.max(1, minutes);
   const existing = person.agenda.commitments.find(
@@ -308,7 +343,7 @@ export function agreeLearningSession(
       effort: 0.02,
     },
   ];
-  const choice = chooseActivity(person, contextId, {}, options, now);
+  const choice = chooseActivity(person, contextId, {}, options, now, ask);
   if (choice.chosenId !== 'observe')
     return {
       accepted: false,
@@ -359,6 +394,8 @@ export function choiceSpeech(person: Person, choice: PersonChoice): string {
   )
     return 'I am tired. I need a break before I carry on.';
   if (choice.chosenId === 'personal') return 'I want some time for my own plans.';
+  if (choice.answer?.says && !['assented', 'complied'].includes(choice.answer.verdict))
+    return choice.answer.says;
   return choice.narration;
 }
 

@@ -54,7 +54,11 @@ describe('gathering honours agreed lesson availability', () => {
     const before = acceptedWindow();
     const expired = dispatch(before, { type: 'wait', minutes: 20 }).state;
     expect(expired.pendingRequest).toBeUndefined();
-    expect(expired.log.some((entry) => entry.text.includes('time I set aside'))).toBe(true);
+    // Engine 5: Sam says the player let the time he kept free lapse (the player's broken word).
+    expect(expired.log.some((entry) => entry.text.includes('I kept that time free'))).toBe(true);
+    expect(expired.people.sam?.will.voices.find((v) => v.voiceId === 'player')?.trust).toBeLessThan(
+      before.people.sam?.will.voices.find((v) => v.voiceId === 'player')?.trust ?? 0,
+    );
     expect(
       expired.community?.decisions.find((decision) => decision.personId === 'sam')?.completed,
     ).toBe(false);

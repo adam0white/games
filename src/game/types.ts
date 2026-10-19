@@ -103,6 +103,10 @@ export interface Job {
   isPersonal?: boolean;
   isDonor?: boolean;
   quote?: string;
+  /** Engine 5: the owner has noticed the promised return time pass. */
+  overdueNoted?: boolean;
+  /** Engine 5: this late return already sent its owner's next request elsewhere once. */
+  wentElsewhere?: boolean;
 }
 export interface WorkOption {
   id: string;
@@ -117,6 +121,8 @@ export interface PersonChoice {
   narration: string;
   reason: string;
   terms: Record<string, number>;
+  /** Engine 5: how Sam answered the player's own ask, in his words, when the player asked. */
+  answer?: { verdict: string; says: string; reason: string };
 }
 export interface NpcWork {
   personId: string;

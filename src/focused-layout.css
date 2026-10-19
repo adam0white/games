@@ -781,3 +781,30 @@
   font-size: 0.8rem;
   opacity: 0.85;
 }
+.workshop-crises {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.workshop-crises button {
+  border: 1px solid #dcb46e66;
+  border-radius: 6px;
+  background: #2d2a2280;
+  color: #eedab4;
+  padding: 8px 12px;
+  text-align: left;
+  font: inherit;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+.workshop-crises .is-urgent button {
+  border-color: #e08a6a;
+  color: #f4c7b4;
+}
+.word-reading {
+  font-style: italic;
+  opacity: 0.85;
+}

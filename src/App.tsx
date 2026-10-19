@@ -26,7 +26,7 @@ import {
 } from './game/engine';
 import { evidenceContext } from './game/evidence-context';
 import { governorMultipliers } from './game/model';
-import { describePerson } from './game/people';
+import { describePerson, playerWordReading } from './game/people';
 import { replayRecordedRun } from './game/replay';
 import type {
   Command,
@@ -36,6 +36,7 @@ import type {
   MeterMode,
   TestCondition,
 } from './game/types';
+import { workshopCrises } from './ui/crises';
 import { firstRepairProgress } from './ui/first-repair';
 import './styles.css';
 import './focused-layout.css';
@@ -787,6 +788,22 @@ export default function App() {
           }}
         />
       </header>
+      {!guided && workshopCrises(state).length > 0 && (
+        <ul className="workshop-crises" aria-label="Needs attention">
+          {workshopCrises(state)
+            .slice(0, 3)
+            .map((c) => {
+              const target = state.jobs.find((j) => j.id === c.jobId);
+              return (
+                <li key={`${c.jobId}-${c.text}`} className={c.urgent ? 'is-urgent' : undefined}>
+                  <button type="button" onClick={() => target && chooseJob(target)}>
+                    {c.text}
+                  </button>
+                </li>
+              );
+            })}
+        </ul>
+      )}
       {view === 'bench' && job && (
         <main className={`focused-bench ${showTools ? 'tools-visible' : ''}`}>
           <div className="focused-owner">
@@ -1619,6 +1636,11 @@ export default function App() {
                               state.npcWork.find((w) => w.personId === id)?.endsAt ?? state.now,
                             )}
                           </small>
+                        )}
+                        {playerWordReading(person) && (
+                          <p className="word-reading">
+                            {person.name} {playerWordReading(person)}.
+                          </p>
                         )}
                         <div className="commitment-list">
                           {person.agenda.commitments

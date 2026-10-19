@@ -26,6 +26,8 @@ import {
   createPeople,
   enableCurrentPeople,
   finishActivity,
+  notePlayerWord,
+  playerAsk,
   prepareMorning,
   promiseJob,
   reportDelivery,
@@ -120,6 +122,10 @@ export function jobReadiness(job: Job): string {
     : job.evidence.length
       ? 'Evidence retained; not fully checked'
       : 'Not yet investigated';
+}
+function required<T>(value: T | undefined): T {
+  if (value === undefined) throw new Error('A required workshop record is missing.');
+  return value;
 }
 function random(s: GameState): number {
   let value = s.rng | 0;
@@ -403,6 +409,43 @@ function neighbourOffers(s: GameState, initial = false): void {
           (j.deliveredAt !== undefined && s.now - j.deliveredAt < 2 * DAY),
       );
     });
+  // Engine 5: a neighbour whose last object came back late, or who is still waiting past the promised time,
+  // takes this round's request elsewhere and says why. Each late return costs one round, not the friendship.
+  if (currentRules(s) && !initial) {
+    const elsewhere = new Map<string, string>();
+    for (const owner of ['nora', 'evan', 'mum']) {
+      const waiting = s.jobs.find(
+        (j) =>
+          j.ownerId === owner &&
+          ['active', 'ready'].includes(j.status) &&
+          !j.isPersonal &&
+          j.due < s.now,
+      );
+      const late = s.jobs
+        .filter(
+          (j) => j.ownerId === owner && j.status === 'delivered' && j.deliveredAt !== undefined,
+        )
+        .sort((a, b) => (b.deliveredAt ?? 0) - (a.deliveredAt ?? 0))[0];
+      if (waiting)
+        elsewhere.set(
+          owner,
+          `I’ll bring you something new once ${waiting.title.toLowerCase()} is back.`,
+        );
+      else if (late && (late.deliveredAt ?? 0) > late.due && !late.wentElsewhere) {
+        late.wentElsewhere = true;
+        elsewhere.set(
+          owner,
+          `I took this one to the shop in town. ${late.title} came back after the time you gave me.`,
+        );
+      }
+    }
+    for (const [owner, says] of elsewhere) {
+      const before = candidates.length;
+      for (let i = candidates.length - 1; i >= 0; i--)
+        if (templates[candidates[i] ?? -1]?.[2] === owner) candidates.splice(i, 1);
+      if (candidates.length < before) log(s, s.people[owner]?.name ?? owner, says, 'warning');
+    }
+  }
   const count = Math.min(initial ? 3 : 2, candidates.length);
   for (let i = 0; i < count; i++) {
     const selected = initial ? 0 : Math.floor(random(s) * candidates.length);
@@ -667,12 +710,20 @@ function beginNpc(s: GameState, job: Job): void {
   const choice = chooseActivity(person, job.id, cuesFor(job, person.id), options, s.now);
   const option = options.find((o) => o.id === choice.chosenId);
   if (!option || !startActivity(person, option, s.now)) {
+    const why = currentRules(s) ? choiceSpeech(person, choice) : '';
     job.blocked = {
       at: s.now,
       kind: 'unavailable',
-      reason: 'I cannot start this work now. Ask me to reconsider when circumstances change.',
+      reason: why
+        ? `I cannot start this work now. ${why} Ask me to reconsider when that changes.`
+        : 'I cannot start this work now. Ask me to reconsider when circumstances change.',
     };
-    log(s, person.name, 'I cannot start this work now.', 'warning');
+    log(
+      s,
+      person.name,
+      why ? `I cannot start this work now. ${why}` : 'I cannot start this work now.',
+      'warning',
+    );
     return;
   }
   let reservedPart: ComponentKind | undefined;
@@ -887,7 +938,7 @@ function releaseJob(s: GameState, job: Job): void {
       )
         releaseCommitment(person, commitment.id);
   job.assignedTo = undefined;
-  job.blocked = undefined;
+  delete job.blocked;
   if (s.pendingRequest?.jobId === job.id) s.pendingRequest = undefined;
 }
 
@@ -952,7 +1003,7 @@ function finishNpc(s: GameState, work: NpcWork): void {
           job.completedBy = person.id;
           job.assignedTo = undefined;
           job.responsibility = undefined;
-          job.blocked = undefined;
+          delete job.blocked;
           log(
             s,
             person.name,
@@ -1108,7 +1159,14 @@ function acceptResponsibility(s: GameState, job: Job): boolean {
         effort: 0,
       },
     ];
-    const choice = chooseActivity(sam, 'ordinary-day', {}, options, s.now);
+    const choice = chooseActivity(
+      sam,
+      'ordinary-day',
+      {},
+      options,
+      s.now,
+      currentRules(s) ? playerAsk('accept-repair', 0.25) : undefined,
+    );
     const option = options.find((candidate) => candidate.id === choice.chosenId);
     if (!option || !startActivity(sam, option, s.now)) return false;
     if (option.action !== 'accept-repair') {
@@ -1136,7 +1194,7 @@ function acceptResponsibility(s: GameState, job: Job): boolean {
   }
   job.assignedTo = 'sam';
   job.responsibility ??= adoptResponsibility(sam, job.id, s.now);
-  job.blocked = undefined;
+  delete job.blocked;
   // Fresh consent can replace a released promise before its original deadline.
   // Continuing responsibility cannot renew a promise or erase a missed return.
   if (
@@ -1158,10 +1216,15 @@ function handlePendingRequest(s: GameState): void {
     if (s.now >= (request.readyUntil ?? 0)) {
       releaseLesson(s);
       s.pendingRequest = undefined;
+      const sam = s.people.sam;
+      if (currentRules(s) && sam) notePlayerWord(sam, false, 'start-lesson', s.now);
       log(
         s,
         'Sam',
-        'The time I set aside to start a lesson has passed. Ask again when you are ready.',
+        currentRules(s)
+          ? 'I kept that time free and you didn’t start. I’ll still come when you ask, but I’ll want to see you begin.'
+          : 'The time I set aside to start a lesson has passed. Ask again when you are ready.',
+        currentRules(s) ? 'warning' : 'ordinary',
       );
     }
     return;
@@ -1186,7 +1249,13 @@ function handlePendingRequest(s: GameState): void {
     log(s, 'Sam', 'There is no useful time left to start a lesson today.');
     return;
   }
-  const agreement = agreeLearningSession(sam, 'workshop-lesson', available, s.now);
+  const agreement = agreeLearningSession(
+    sam,
+    'workshop-lesson',
+    available,
+    s.now,
+    currentRules(s) ? playerAsk('observe', 0.4) : undefined,
+  );
   // Engine 5: a refusal is followed through. Sam actually goes to eat or rest, and says when to ask again.
   const instead =
     !agreement.accepted &&
@@ -1306,6 +1375,31 @@ function beginBackground(s: GameState): void {
       s.npcWork.push({ personId: id, option, startedAt: s.now, endsAt: s.now + option.duration });
   }
 }
+/** Engine 5: when a promised return time passes, the owner notices and says so where the player will see it. */
+function noteOverdue(s: GameState): void {
+  if (!currentRules(s)) return;
+  for (const job of s.jobs) {
+    if (
+      job.overdueNoted ||
+      job.isPersonal ||
+      job.isDonor ||
+      job.ownerId === 'player' ||
+      !['active', 'ready'].includes(job.status) ||
+      job.due >= s.now
+    )
+      continue;
+    job.overdueNoted = true;
+    const owner = s.people[job.ownerId];
+    log(
+      s,
+      owner?.name ?? 'Workshop',
+      job.assignedTo
+        ? `You said ${dayTime(job.due)} for ${job.title.toLowerCase()}. Sam has it, I know. I’m still waiting.`
+        : `You said ${dayTime(job.due)} for ${job.title.toLowerCase()}. I’m still waiting. If it can’t be done, tell me and give it back.`,
+      'warning',
+    );
+  }
+}
 function advance(s: GameState, minutes: number): void {
   const target = s.now + minutes;
   let guard = 0;
@@ -1392,6 +1486,7 @@ function advance(s: GameState, minutes: number): void {
   s.now = target;
   tickPeople(s.people, target);
   reconcileResponsibilities(s);
+  noteOverdue(s);
 }
 function watcherStart(s: GameState, job: Job, duration: number): WorkOption | undefined {
   if (
@@ -1644,7 +1739,7 @@ function sleepToMorning(s: GameState): void {
   s.now = morning;
   s.day = Math.floor(morning / DAY) + 1;
   reconcileResponsibilities(s);
-  for (const job of s.jobs) if (job.blocked?.kind === 'unavailable') job.blocked = undefined;
+  for (const job of s.jobs) if (job.blocked?.kind === 'unavailable') delete job.blocked;
   s.watching = false;
   for (const job of s.jobs) if (job.status === 'offer' && job.due < s.now) job.status = 'declined';
   if (
@@ -1675,10 +1770,11 @@ function sleepToMorning(s: GameState): void {
     log(
       s,
       'Mum',
-      'We can use the room and garden tomorrow. The site opens at noon; people arrive at15:00. We have time to prepare two formats, at most. Your paper theatre could be one of them.',
+      `We can use the room and garden tomorrow. The site opens at noon; people arrive at${currentRules(s) ? ' ' : ''}15:00. We have time to prepare two formats, at most. Your paper theatre could be one of them.`,
     );
   }
   log(s, 'Sam', 'I’m back this morning. I have my own afternoon promise again.');
+  noteOverdue(s);
   if (s.day === 8 && !s.weekReviewed) {
     s.weekReviewed = true;
     s.ended = true;
@@ -1720,7 +1816,9 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       const result = beginPreparation(s, event, command.format, s.now);
       if (!result.ok) return fail(result.message);
       advance(s, result.cost);
-      return done('The format is prepared. The organisers will choose what they can join at15:00.');
+      return done(
+        `The format is prepared. The organisers will choose what they can join at${currentRules(s) ? ' ' : ''}15:00.`,
+      );
     }
     case 'wait-for-site': {
       const event = s.community;
@@ -1988,11 +2086,14 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       if (sam.activity || s.npcWork.some((w) => w.personId === 'sam'))
         return fail('Sam is still occupied.');
       releaseLesson(s);
+      // Engine 5: starting inside the time Sam set aside keeps the player's word.
+      if (currentRules(s)) notePlayerWord(sam, true, 'start-lesson', s.now);
       const agreement = agreeLearningSession(
         sam,
         'workshop-lesson',
         Math.min(90, dayRemaining(s)),
         s.now,
+        currentRules(s) ? playerAsk('observe', 0.4) : undefined,
       );
       s.pendingRequest = undefined;
       s.watching = agreement.accepted;
@@ -2043,7 +2144,7 @@ export function dispatch(state: GameState, command: Command): CommandResult {
           jobId: job.id,
         };
       else {
-        job.blocked = undefined;
+        delete job.blocked;
         beginNpc(s, job);
       }
       return done('Sam will reconsider his accepted repair from the evidence he has.');
@@ -2051,6 +2152,18 @@ export function dispatch(state: GameState, command: Command): CommandResult {
     case 'recall': {
       if (!job?.assignedTo) return fail('This object is not delegated.');
       const current = s.npcWork.find((w) => w.jobId === job.id);
+      // Engine 5: taking back work Sam accepted and is doing, not work he set aside for help, goes back on the
+      // player's word. A blocked repair can be taken back freely.
+      const midWork = Boolean(current && !job.blocked && current.option.action !== 'accept-repair');
+      if (currentRules(s) && midWork && s.people[job.assignedTo]) {
+        notePlayerWord(required(s.people[job.assignedTo]), false, 'recall', s.now);
+        log(
+          s,
+          s.people[job.assignedTo]?.name ?? 'Sam',
+          `You handed me ${job.title.toLowerCase()} and I was in the middle of it. Fine. Next time, tell me first if you might want it back.`,
+          'warning',
+        );
+      }
       if (current) {
         if (current.reservedPart)
           s.stock[current.reservedPart] = (s.stock[current.reservedPart] ?? 0) + 1;

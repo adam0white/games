@@ -13,6 +13,32 @@ interface Props {
   onSkip: () => void;
 }
 
+/**
+ * The first real choice, said only as far as the player knows it: a spare part from stock is known to work,
+ * the donor's part has never been tested, and stock is not endless.
+ */
+function repairCue(state: GameState, part: Job['model']['components'][number] | undefined): string {
+  if (!part) return 'Replace the part you found failing. Then carry the lantern again.';
+  const name = part.label.toLowerCase();
+  const inStock = state.stock[part.kind] ?? 0;
+  const donor = state.jobs.find(
+    (j) =>
+      j.isDonor &&
+      !['delivered', 'declined', 'salvaged'].includes(j.status) &&
+      j.model.components.some((c) => c.kind === part.kind),
+  );
+  const stock =
+    inStock === 1
+      ? `You have one new ${name} in stock, and it is your only one.`
+      : inStock > 1
+        ? `You have new ${name}s in stock.`
+        : `You have no new ${name} in stock; the shop sells them.`;
+  const fromDonor = donor
+    ? ` ${donor.title} has one too. Taking it costs nothing, but nobody has tested it.`
+    : '';
+  return `${stock}${fromDonor} Fit one, then carry the lantern again.`;
+}
+
 /** One next operation, not a second copy of the bench controls. */
 export function FirstRepairGuide({ state, job, pane, opened, onPane, onSkip }: Props) {
   const progress = firstRepairProgress(state);
@@ -39,7 +65,7 @@ export function FirstRepairGuide({ state, job, pane, opened, onPane, onSkip }: P
             : phase === 'inspect'
               ? `The reading points to the ${part?.label.toLowerCase() ?? 'connection'}. Examine it before changing anything.`
               : phase === 'repair'
-                ? 'Replace the failing part with a spare. Then try carrying the lantern again.'
+                ? repairCue(state, part)
                 : phase === 'check'
                   ? 'The part has changed. Carry the lantern again to see what changed.'
                   : 'It stays lit when carried. Give it back to Mum.';

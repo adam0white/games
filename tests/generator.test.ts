@@ -52,9 +52,10 @@ describe('later owner requests', () => {
       expect(runUseTest(path.model, 'movement').passes).toBe(false);
     }
   });
+  // Recorded under engine-4 rules, where a neighbour still waiting on an overdue object keeps bringing more.
   it('offers each named first-week object only once and never duplicates a day', () => {
     for (const seed of [2, 4, 69, 416]) {
-      let state = createGame(seed);
+      let state = createGame(seed, 'legacy');
       while (state.day < 8) state = dispatch(state, { type: 'next-day' }).state;
       const requests = state.jobs.filter((j) => j.reward > 0);
       expect(requests).toHaveLength(6);
@@ -202,5 +203,18 @@ describe('later owner requests', () => {
     expect(state.jobs.find((j) => j.title === 'Nora’s keepsake music box')?.description).toContain(
       'The melody sounds wrong. This was my grandmother’s.',
     );
+  });
+  it('under engine 5, a neighbour still waiting past the promised time says so and brings nothing new', () => {
+    for (const seed of [2, 4, 69, 416]) {
+      let state = createGame(seed);
+      while (state.day < 8) state = dispatch(state, { type: 'next-day' }).state;
+      const requests = state.jobs.filter((j) => j.reward > 0);
+      expect(new Set(requests.map((j) => `${j.ownerId}:${j.title}`)).size).toBe(requests.length);
+      expect(requests.length).toBeLessThanOrEqual(6);
+      expect(state.log.some((e) => e.tone === 'warning' && e.text.startsWith('You said '))).toBe(
+        true,
+      );
+      expect(saveGame(loadGame(saveGame(state)))).toBe(saveGame(state));
+    }
   });
 });
