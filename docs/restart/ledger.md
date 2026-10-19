@@ -222,4 +222,4 @@ Guidance supplied measurement pairs; independent diagnosis is not proven. The te
 - **Round 2:** four testers played a frozen build. All four exports replay exactly at `ce71918`.
 - **HF-character harness:** 8 personas × 2 seeds at `ce71918`, exit 0.
 - **Not acted on:** listed in playtest 10. The main item is natural difficulty.
-
+- **Published:** `5623597` passed [CI 39320840965](https://github.com/adam0white/repair-game/actions/runs/39320840965) and was deployed as Cloudflare `cdda086b-e9e0-44b2-afbf-adf84b2d97e5`. The live manifest shows that commit, dirty false, framework 2.8.0, engine `small-works@5`.

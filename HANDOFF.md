@@ -20,6 +20,13 @@ Updated 2026-10-19 for the HF 2.8.0 / engine 5 level-up (game 3.1.0-alpha.3). Ea
 
 ## HF 2.8.0 and engine 5 (2026-10-19)
 
+- **Delivered:** clean `5623597aba2310112c2294cfff9c686404e95f59`, pushed on main.
+- **CI:** [CI 39320840965](https://github.com/adam0white/repair-game/actions/runs/39320840965) passed.
+- **Deploy:** repeated lint, types, **259 tests across 29 files** and build. Cloudflare version `cdda086b-e9e0-44b2-afbf-adf84b2d97e5`.
+- **Live `/release.json`:** commit `5623597…`, dirty false, game 3.1.0-alpha.3, framework 2.8.0, engine `small-works@5`.
+- **Live smoke:** a driver smoke on the live site clicked "Ask Sam to watch" and opened the Workboard, with no page errors. It is not a playtest.
+- Later documentation-only commits do not change the published UI.
+
 - **Framework:** HF bumped to exactly 2.8.0. Registry integrity and provenance checked.
 - **Saves:** new worlds are `small-works@5`. Engine-4 saves and exports load as engine-4 worlds and replay exactly under engine-4 rules; only HF's per-person engine stamp differs. The app then continues them under engine 5 (`upgradeRules`), recording the input index where it switched. The real-export tests are in `tests/legacy-v4.test.ts`.
 - **People are truer:**
