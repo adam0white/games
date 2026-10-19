@@ -383,3 +383,29 @@ No round-3 retest of alpha.3 by source-unread testers was run. The changes above
 | returner | agenda, 10 min, 3 returns | agenda, 8 min, 2 returns |
 
 Readings, confirmed from the runs: the ordinary personas return 2 to 5 objects; most quit near the 20-minute mark on distress, driven by failed re-checks after an intervention that misses the fault (worn and misaligned parts read alike). Mischief and exploiter runs reach the first-week account by returning work unfinished. Assumed, per the adapter's author: pacing (click seconds, reading speed) and promise weights are hand-set, so the time split (about 0.68 watch / 0.32 input) is not a persona finding. Framework findings from the adapter are in the HF requests.
+
+### Harness rerun at alpha.3 (2026-10-19, later)
+
+The harness was rerun at game `3bac17c` (alpha.3), output in `evidence/hf-playtester-smallworks-alpha3-2026-10-19.txt`. Exit 0, 8 personas × 2 seeds.
+
+The playtester package had changed in the HF working tree since the first run. Those changes are another agent's, uncommitted. So the same harness was also rerun against `ce71918`, output in `evidence/hf-playtester-smallworks-ce71918-rerun-2026-10-19.txt`.
+
+**Confirmed: most of the shift from the table above comes from the harness, not the game.** With the same harness, `ce71918` and alpha.3 give identical stops for 13 of 16 runs. Mischief and exploiter seed 2 differ by 0.1 minute. The game changes show up in three runs:
+- **Completionist seed 1:** 21 min, Day 3, quit on joy:novel → 57 min, Day 11, first-week account seen, 7 returns, quit on distress:rest.
+- **Completionist seed 2:** 51 min, Day 10 → 38 min, Day 6, 6 returns, quit on distress:rest.
+- **Unwinder seed 2:** stops at the same minute, ten game-minutes earlier.
+
+Assumed, not tested: the completionist responds to the felt music-box gradient and the lateness-aware replies, the only alpha.3 changes the adapter can read.
+
+Current harness, alpha.3:
+
+| Persona | Seed 1 | Seed 2 |
+|---|---|---|
+| commuter | quit (joy:novel) 14 min | agenda 14 min |
+| unwinder | quit (joy:novel) 22 min | quit (joy:novel) 21 min |
+| completionist | quit (distress:rest) 57 min, Day 11 | quit (distress:rest) 38 min, Day 6 |
+| restless | quit (boredom) 5 min | quit (boredom) 6 min |
+| mischief | game over Day 8 | game over Day 8 |
+| exploiter | quit (boredom) 10 min | game over Day 8 |
+| rulesLawyer | quit (distress:rest) 10 min | quit (distress:rest) 15 min, Day 10 |
+| returner | agenda 13 min | agenda 14 min |
