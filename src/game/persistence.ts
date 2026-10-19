@@ -1,6 +1,13 @@
 import { restore, snapshot } from '@adam0white/human-framework';
 import { compatiblePart, createModel } from './model';
-import { isInputRecording, isSupportedProvenance, SAVE_PROVENANCE } from './recording';
+import {
+  isCurrentProvenance,
+  isInputRecording,
+  isLegacyProvenance,
+  isMigratedFrom,
+  LEGACY_PROVENANCE,
+  SAVE_PROVENANCE,
+} from './recording';
 import {
   aspirationAdvances,
   responsibilityAdvances,
@@ -17,7 +24,7 @@ const UPGRADE_IDS = ['second-bench', 'precision-meter'];
 export function saveGame(state: GameState): string {
   return JSON.stringify({
     ...state,
-    provenance: { ...SAVE_PROVENANCE },
+    provenance: { ...(state.schema === 'small-works@4' ? LEGACY_PROVENANCE : SAVE_PROVENANCE) },
     people: Object.fromEntries(
       Object.entries(state.people).map(([id, person]) => [id, snapshot(person)]),
     ),
@@ -78,8 +85,15 @@ export function loadGame(text: string): GameState {
       (strings(e.witnessedBy) && e.witnessedBy.every((id) => actors.includes(id))));
   if (
     !object(value) ||
-    value.schema !== 'small-works@4' ||
-    (value.provenance !== undefined && !isSupportedProvenance(value.provenance)) ||
+    !['small-works@4', 'small-works@5'].includes(value.schema) ||
+    (value.provenance !== undefined &&
+      !(value.schema === 'small-works@4'
+        ? isLegacyProvenance(value.provenance)
+        : isCurrentProvenance(value.provenance))) ||
+    (value.migratedFrom !== undefined &&
+      (value.schema !== 'small-works@5' ||
+        !isMigratedFrom(value.migratedFrom) ||
+        (value.inputs !== undefined && value.migratedFrom.atInput > value.inputs.length))) ||
     (value.inputs !== undefined &&
       (!isInputRecording(value.inputs) || value.provenance === undefined)) ||
     !integer(value.seed, 0, 0xffffffff) ||
@@ -385,7 +399,9 @@ export function loadGame(text: string): GameState {
   value.people = Object.fromEntries(
     Object.entries(value.people).map(([id, saved]) => {
       const person = restore(saved);
-      if (person.id !== id || person.now !== value.now || canonical(person) !== canonical(saved))
+      // HF restore stamps its own engine version on older snapshots; nothing else may change.
+      const stamped = object(saved) ? { ...saved, engine: person.engine } : saved;
+      if (person.id !== id || person.now !== value.now || canonical(person) !== canonical(stamped))
         invalid();
       return [id, person];
     }),

@@ -8,6 +8,7 @@ import type { Command, GameState } from '../src/game/types';
 // player export (seed 42). The historical export is unchanged. The final recall
 // and player delivery are excluded because the corrected Sam returns it first.
 // These inputs preserve the player's choices; they do not establish new live play.
+// They were recorded under engine-4 rules, so they replay under those rules (engine 5 changes Sam's choices).
 const playerInputs: Command[] = [
   { type: 'request-lesson' },
   { type: 'start-lesson' },
@@ -113,7 +114,7 @@ function required<T>(value: T | undefined): T {
   if (value === undefined) throw new Error('Missing regression fixture value');
   return value;
 }
-const beforeReassignment = () => apply(createGame(42), playerInputs.slice(0, 61));
+const beforeReassignment = () => apply(createGame(42, 'legacy'), playerInputs.slice(0, 61));
 const deliveryPromises = (state: GameState) =>
   required(state.people.sam).agenda.commitments.filter(
     (c) => c.targetId === 'object-29' && c.actions.includes('deliver'),
@@ -141,7 +142,12 @@ describe('actual player checked-object cooperation regression', () => {
     const direct = apply(before, playerInputs.slice(61));
     const resumed = apply(loadGame(saveGame(before)), playerInputs.slice(61));
     expect(saveGame(resumed)).toBe(saveGame(direct));
-    expect(replayRecordedRun({ seed: 42, inputs: playerInputs }, saveGame(direct)).ok).toBe(true);
+    expect(
+      replayRecordedRun(
+        { seed: 42, inputs: playerInputs, provenance: direct.provenance },
+        saveGame(direct),
+      ).ok,
+    ).toBe(true);
   });
 
   // Policy controls below deliberately alter promise/deadline state. They are
@@ -169,7 +175,7 @@ describe('actual player checked-object cooperation regression', () => {
   it.each(['pending', 'released', 'broken'] as const)(
     'retrying ongoing responsibility leaves its %s promise unchanged',
     (status) => {
-      let before = apply(createGame(42), playerInputs.slice(0, 45));
+      let before = apply(createGame(42, 'legacy'), playerInputs.slice(0, 45));
       // A learned initial diagnostic can now run across requested paces. Wait
       // for an actual help boundary before isolating promise renewal policy.
       for (let step = 0; step < 12; step++) {

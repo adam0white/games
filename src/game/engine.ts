@@ -24,6 +24,7 @@ import {
   choiceSpeech,
   chooseActivity,
   createPeople,
+  enableCurrentPeople,
   finishActivity,
   prepareMorning,
   promiseJob,
@@ -32,7 +33,7 @@ import {
   teachObserved,
   tickPeople,
 } from './people';
-import { MAX_RECORDED_INPUTS, SAVE_PROVENANCE } from './recording';
+import { LEGACY_PROVENANCE, MAX_RECORDED_INPUTS, SAVE_PROVENANCE } from './recording';
 import {
   abandonResponsibility,
   adoptResponsibility,
@@ -213,11 +214,31 @@ function reportedSymptoms(job: Job, stakes: string): string {
           : 'the melody runs too fast';
   return `“On the bench, ${pace(bench)}; while driving the figures, ${pace(load)}. ${stakes}”`;
 }
-export function createGame(seed = 416): GameState {
+/** Engine-5 rules: the HF 2.8 opt-ins and the 2026-10-19 lessons. Engine-4 worlds keep engine-4 behaviour. */
+export const currentRules = (s: Pick<GameState, 'schema'>): boolean => s.schema === 'small-works@5';
+/**
+ * Move an engine-4 world to the current rules, recording the input index so a replay applies the old rules before
+ * it and the new rules after it. Idempotent for a current world.
+ */
+export function upgradeRules(s: GameState): GameState {
+  if (currentRules(s)) return s;
+  s.schema = 'small-works@5';
+  s.provenance = { ...SAVE_PROVENANCE };
+  s.migratedFrom = { engine: 'small-works@4', atInput: s.inputs?.length ?? 0 };
+  enableCurrentPeople(s.people, s.now);
+  log(
+    s,
+    'Workshop',
+    'This workshop continues under the current rules. Everything you did so far stays as it was.',
+  );
+  return s;
+}
+export function createGame(seed = 416, rules: 'current' | 'legacy' = 'current'): GameState {
   const now = OPEN;
+  const legacy = rules === 'legacy';
   const s: GameState = {
-    schema: 'small-works@4',
-    provenance: { ...SAVE_PROVENANCE },
+    schema: legacy ? 'small-works@4' : 'small-works@5',
+    provenance: { ...(legacy ? LEGACY_PROVENANCE : SAVE_PROVENANCE) },
     inputs: [],
     seed: seed >>> 0,
     rng: seed >>> 0 || 1,
@@ -239,6 +260,7 @@ export function createGame(seed = 416): GameState {
     ended: false,
     dailyCostsPaid: 0,
   };
+  if (!legacy) enableCurrentPeople(s.people, now);
   for (const person of Object.values(s.people)) prepareMorning(person, 0);
   log(
     s,
@@ -1165,12 +1187,30 @@ function handlePendingRequest(s: GameState): void {
     return;
   }
   const agreement = agreeLearningSession(sam, 'workshop-lesson', available, s.now);
+  // Engine 5: a refusal is followed through. Sam actually goes to eat or rest, and says when to ask again.
+  const instead =
+    !agreement.accepted &&
+    currentRules(s) &&
+    agreement.instead &&
+    agreement.instead.id !== 'observe'
+      ? { ...agreement.instead, duration: Math.min(agreement.instead.duration, dayRemaining(s)) }
+      : undefined;
+  const followed = instead && instead.duration > 0 && startActivity(sam, instead, s.now);
+  if (followed && instead)
+    s.npcWork.push({
+      personId: sam.id,
+      option: instead,
+      startedAt: s.now,
+      endsAt: s.now + instead.duration,
+    });
   log(
     s,
     'Sam',
     agreement.accepted
       ? `I can start a lesson with you before ${dayTime(agreement.until)}. Start it when you are ready.`
-      : agreement.says,
+      : followed && instead
+        ? `${agreement.says} Ask me again after ${dayTime(s.now + instead.duration)}.`
+        : agreement.says,
   );
   if (agreement.accepted) {
     request.status = 'ready';

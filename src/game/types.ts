@@ -141,8 +141,10 @@ export interface PendingRequest {
   jobId?: string;
 }
 export interface GameState {
-  schema: 'small-works@4';
-  provenance?: typeof import('./recording').SAVE_PROVENANCE;
+  schema: 'small-works@4' | 'small-works@5';
+  provenance?: import('./recording').Provenance;
+  /** Present when an engine-4 world continued under engine 5 (see `upgradeRules`). */
+  migratedFrom?: import('./recording').MigratedFrom;
   inputs?: Command[];
   community?: import('./community').CommunityState;
   seed: number;

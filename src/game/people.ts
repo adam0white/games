@@ -6,6 +6,8 @@ import {
   type DecisionRecord,
   decide,
   demonstrateMethod,
+  enableFatigueStore,
+  enableFullness,
   finish,
   type Person,
   perceive,
@@ -71,6 +73,17 @@ export function createPeople(seed: number, now: number): Record<string, Person> 
   );
   if (people.sam) adoptRepairAspiration(people.sam, now);
   return people;
+}
+
+/**
+ * Engine-5 people (HF 2.8): a slow fatigue store, so a long day at the bench tires a person and a night's sleep
+ * restores them, and fullness, so an idle person stops looping on drinks and snacks they no longer need.
+ */
+export function enableCurrentPeople(people: Record<string, Person>, _now: number): void {
+  for (const person of Object.values(people)) {
+    enableFatigueStore(person);
+    enableFullness(person);
+  }
 }
 
 export function tickPeople(people: Record<string, Person>, now: number): void {
@@ -265,7 +278,7 @@ export function agreeLearningSession(
   contextId: string,
   minutes: number,
   now: number,
-): { accepted: boolean; says: string; until: number } {
+): { accepted: boolean; says: string; until: number; instead?: WorkOption } {
   const until = now + Math.max(1, minutes);
   const existing = person.agenda.commitments.find(
     (c) =>
@@ -277,32 +290,32 @@ export function agreeLearningSession(
       says: `I agreed to watch until ${clock(existing.until)}.`,
       until: existing.until,
     };
-  const choice = chooseActivity(
-    person,
-    contextId,
-    {},
-    [
-      {
-        id: 'observe',
-        action: 'observe',
-        label: 'Watch the repair lesson',
-        duration: minutes,
-        effort: 0.005,
-      },
-      { id: 'eat', action: 'eat', label: 'Have food and water', duration: 15, effort: 0 },
-      { id: 'rest', action: 'rest', label: 'Take a break', duration: 15, effort: 0 },
-      {
-        id: 'personal',
-        action: 'personal',
-        label: 'Attend to my own plans',
-        duration: 20,
-        effort: 0.02,
-      },
-    ],
-    now,
-  );
+  const options: WorkOption[] = [
+    {
+      id: 'observe',
+      action: 'observe',
+      label: 'Watch the repair lesson',
+      duration: minutes,
+      effort: 0.005,
+    },
+    { id: 'eat', action: 'eat', label: 'Have food and water', duration: 15, effort: 0 },
+    { id: 'rest', action: 'rest', label: 'Take a break', duration: 15, effort: 0 },
+    {
+      id: 'personal',
+      action: 'personal',
+      label: 'Attend to my own plans',
+      duration: 20,
+      effort: 0.02,
+    },
+  ];
+  const choice = chooseActivity(person, contextId, {}, options, now);
   if (choice.chosenId !== 'observe')
-    return { accepted: false, says: choiceSpeech(person, choice), until: now };
+    return {
+      accepted: false,
+      says: choiceSpeech(person, choice),
+      until: now,
+      instead: options.find((o) => o.id === choice.chosenId),
+    };
   promise(person, {
     kind: 'promise',
     targetId: contextId,

@@ -21,8 +21,12 @@ describe('independent availability and return review', () => {
     expect(state.pendingRequest?.status).toBe('ready');
     const markup = renderToStaticMarkup(createElement(SamRequest, { state, act: () => {} }));
     const started = dispatch(state, { type: 'start-lesson' }).state;
-    expect(required(started.watchUntil) - started.now).toBe(55);
-    expect(markup).toContain('55');
+    // Engine 4 gave 55 minutes here; engine 5's fuller, tireable Sam spends the afternoon differently. The
+    // property is that the offer shows the window that actually fits before closing.
+    const window = required(started.watchUntil) - started.now;
+    expect(window).toBeGreaterThan(0);
+    expect(started.now + window).toBeLessThanOrEqual(Math.floor(started.now / 1440) * 1440 + 1020);
+    expect(markup).toContain(String(window));
     expect(markup).not.toContain('90-minute');
   });
 

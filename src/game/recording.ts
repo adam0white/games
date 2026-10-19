@@ -2,11 +2,27 @@ import type { Command } from './types';
 
 export const MAX_RECORDED_INPUTS = 10_000;
 export const SAVE_PROVENANCE = {
+  engine: 'small-works@5',
+  scenario: 'first-week@2',
+  framework: '2.8.0',
+  game: '3.1.0-alpha.1',
+} as const;
+/**
+ * Engine-4 behaviour, kept so historical exports and old autosaves restore and replay exactly. A legacy world keeps
+ * these rules until `upgradeRules` moves it to the current engine at a recorded input index.
+ */
+export const LEGACY_PROVENANCE = {
   engine: 'small-works@4',
   scenario: 'first-week@1',
   framework: '2.2.1',
   game: '3.0.0-alpha.4',
 } as const;
+export type Provenance = { engine: string; scenario: string; framework: string; game: string };
+/** A world that began under engine 4 and continued under the current rules from input `atInput`. */
+export interface MigratedFrom {
+  engine: 'small-works@4';
+  atInput: number;
+}
 
 const object = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -120,10 +136,21 @@ export function isInputRecording(value: unknown): value is Command[] {
   );
 }
 
+const matches = (value: unknown, expected: Provenance): boolean =>
+  object(value) &&
+  keys(value, Object.keys(expected)) &&
+  Object.entries(expected).every(([key, version]) => value[key] === version);
+export const isCurrentProvenance = (value: unknown): boolean => matches(value, SAVE_PROVENANCE);
+export const isLegacyProvenance = (value: unknown): boolean => matches(value, LEGACY_PROVENANCE);
 export function isSupportedProvenance(value: unknown): boolean {
+  return isCurrentProvenance(value) || isLegacyProvenance(value);
+}
+export function isMigratedFrom(value: unknown): value is MigratedFrom {
   return (
     object(value) &&
-    keys(value, Object.keys(SAVE_PROVENANCE)) &&
-    Object.entries(SAVE_PROVENANCE).every(([key, version]) => value[key] === version)
+    keys(value, ['engine', 'atInput']) &&
+    value.engine === 'small-works@4' &&
+    finite(value.atInput, 0, MAX_RECORDED_INPUTS) &&
+    Number.isInteger(value.atInput)
   );
 }

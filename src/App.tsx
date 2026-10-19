@@ -22,6 +22,7 @@ import {
   requiredChecks,
   saveGame,
   UPGRADE_CATALOG,
+  upgradeRules,
 } from './game/engine';
 import { evidenceContext } from './game/evidence-context';
 import { governorMultipliers } from './game/model';
@@ -39,7 +40,9 @@ import { firstRepairProgress } from './ui/first-repair';
 import './styles.css';
 import './focused-layout.css';
 
-const SAVE_KEY = 'small-works-save-v4';
+const SAVE_KEY = 'small-works-save-v5';
+/** Engine-4 autosaves are read once, upgraded and written to the v5 key; the v4 key itself is never changed. */
+const LEGACY_SAVE_KEY = 'small-works-save-v4';
 const conditions: TestCondition[] = ['bench', 'movement', 'load'];
 const money = (n: number) => `£${n.toFixed(0)}`;
 function checkPurpose(job: Job): string {
@@ -62,9 +65,15 @@ function samFinishedPersonal(job: Job): boolean {
 function initial(): GameState {
   try {
     const saved = localStorage.getItem(SAVE_KEY);
-    if (saved) return loadGame(saved);
+    if (saved) return upgradeRules(loadGame(saved));
   } catch {
     /* A damaged save does not overwrite historical saves. */
+  }
+  try {
+    const legacy = localStorage.getItem(LEGACY_SAVE_KEY);
+    if (legacy) return upgradeRules(loadGame(legacy));
+  } catch {
+    /* An engine-4 save that no longer loads stays untouched under its own key. */
   }
   return createGame(42);
 }
@@ -564,7 +573,12 @@ export default function App() {
     );
     try {
       const result = replayRecordedRun(
-        { seed: snapshot.seed, inputs: snapshot.inputs, provenance: snapshot.provenance },
+        {
+          seed: snapshot.seed,
+          inputs: snapshot.inputs,
+          provenance: snapshot.provenance,
+          migratedFrom: snapshot.migratedFrom,
+        },
         expected,
       );
       setReplayStatus(
@@ -763,7 +777,7 @@ export default function App() {
           onChange={async (e) => {
             try {
               const file = e.target.files?.[0];
-              if (file) resetPresentation(loadGame(await file.text()));
+              if (file) resetPresentation(upgradeRules(loadGame(await file.text())));
             } catch (error) {
               setStatus(
                 error instanceof Error ? error.message : 'This save could not be imported.',
