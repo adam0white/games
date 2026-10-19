@@ -812,6 +812,14 @@ export default function App() {
           {todaysWords(state).map((line) => (
             <p key={line.id} className={line.tone === 'warning' ? 'is-warning' : undefined}>
               <strong>{line.speaker}</strong> {line.text} <time>{dayTime(line.at)}</time>
+              {line.speaker === 'Sam' &&
+                line.text.includes('see how you find the fault') &&
+                !state.pendingRequest &&
+                !state.watching && (
+                  <button type="button" onClick={() => act({ type: 'request-lesson' })}>
+                    Ask Sam to watch
+                  </button>
+                )}
             </p>
           ))}
         </section>

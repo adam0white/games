@@ -27,6 +27,10 @@ describe('engine 5: surfaced promises', () => {
     for (let d = 0; d < 6; d++) state = dispatch(state, { type: 'next-day' }).state;
     expect(lines(state, 'I’m still waiting')).toHaveLength(1);
     expect(lines(state, 'a day past what you said')).toHaveLength(1);
+    expect(lines(state, 'bring you something new').length).toBeLessThanOrEqual(1);
+    expect(
+      lines(state, 'past your time for this').length + lines(state, 'stopped expecting').length,
+    ).toBe(1);
     expect(lines(state, 'came back after the time you gave me').length).toBeLessThanOrEqual(1);
     expect(saveGame(loadGame(saveGame(state)))).toBe(saveGame(state));
   });

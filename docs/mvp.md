@@ -37,7 +37,7 @@ The complete check passed lint, strict types, **214 tests** and production build
 
 ## Integrated engine-4 checkpoint
 
-The current local game is `3.0.0-alpha.4`, schema/engine `small-works@4`, autosave key `small-works-save-v4`, with exact published HF 2.2.1. The integrated check passed lint, types, **233 tests across 23 files** and production build. The public build is now verified as engine 4 at clean UI `0e80d89` (gameplay core `38cbae0`). The engine-3 publication at `7570eea` remains historical.
+The current game is `3.1.0-alpha.3`, schema/engine `small-works@5`, autosave key `small-works-save-v5`, with exact published HF 2.8.0. Engine-4 saves and exports (`3.0.0-alpha.4`, HF 2.2.1) replay exactly under engine-4 rules in tests; the app continues them under engine 5 with the switch point recorded. The engine-4 paragraph in item 4 is historical.
 
 Sam's delivery options require actor-received checks. Ordinary diagnostic and part methods transfer across requested paces; calibration retains the exact requested pace. Matching-condition intervention safeguards prevent a check under another condition from proving the intervention. Actual native goal withdrawal releases responsibility and survives save/restore in a regression. Self-hosted licensed fonts replace Google imports blocked by live CSP.
 

@@ -41,7 +41,12 @@ describe('independent availability and return review', () => {
     );
     expect(reports?.some((episode) => episode.summary.includes('unfinished'))).toBe(true);
     expect(reports?.some((episode) => episode.summary.includes('promised time'))).toBe(true);
-    expect(state.log.some((entry) => entry.text.includes('later than promised'))).toBe(true);
+    // Engine 5 words lateness by how late it is; engine 4 said 'later than promised'.
+    expect(
+      state.log.some((entry) =>
+        /later than (promised|you said)|past your time|stopped expecting/.test(entry.text),
+      ),
+    ).toBe(true);
   });
 
   it('keeps on-time honesty distinct from lateness without doubling the old late-return effect', () => {

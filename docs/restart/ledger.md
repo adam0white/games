@@ -4,7 +4,7 @@ Start: **2026-10-14 09:21:55 UTC**. Target finish: **14:21:55 UTC**.
 
 ## What remains
 
-Adam accepts feel personally. The focused first-repair renewal is reviewed, checked and delivered locally and publicly at clean `39793cd`. Fresh desktop and mobile guided repairs completed with exact replay. Guided diagnosis remains distinct from independent diagnosis; mobile meter density and electrical explanation remain limitations. No further implementation queue is selected. Earlier pending entries below are historical checkpoints.
+See [HANDOFF](../../HANDOFF.md#what-remains). The 2026-10-19 engine-5 entry below is current. Natural difficulty (colliding commitments) is the main open design gap. The playtest-10 findings not acted on are listed in [playtest 10](playtest-10.md). Adam accepts feel personally.
 
 ## Authority
 
@@ -209,3 +209,17 @@ Public desktop replayed the visitor's 48 inputs exactly, checked End/Home keyboa
 Source-unread mobile play at 390 × 844 ran **04:08:22.874–04:11:23.248 UTC**, approximately 3 minutes including about 68 seconds of locator delay. The player completed the guided switch repair and 96% Carry check, returned at 10:50, then accepted Nora's work. Tools remained stable; switch state controlled voltage testing. Width 390 had no overflow. Fourteen inputs exported and replayed exactly; the unchanged packet and screenshot are linked in [playtest 9](playtest-9.md).
 
 Guidance supplied measurement pairs; independent diagnosis is not proven. The tester still did not understand why voltage across the switch matters. Meter scrolling and small SVG terminals remain usability limits, with named controls usable. Adam accepts feel personally.
+
+## HF 2.8.0, engine 5, playtest 10 — 2026-10-19
+
+- **Framework and saves:** HF bumped to 2.8.0 (`d32a4bb`), with an explicit `small-works@5` migration that keeps the engine-4 load and replay path.
+- **Engine-5 people changes:**
+  - `7dcdf3a`: people answer the player's word, promises surface, honest first choice.
+  - `0713305`: round-1 fixes.
+  - `ce71918`: truthful donor cue, Sam's window on screen.
+  - Round-2 fixes followed as game 3.1.0-alpha.3.
+- **Round 1:** five source-unread testers played. It was a moving target: `dist` was rebuilt mid-play, which is disclosed.
+- **Round 2:** four testers played a frozen build. All four exports replay exactly at `ce71918`.
+- **HF-character harness:** 8 personas × 2 seeds at `ce71918`, exit 0.
+- **Not acted on:** listed in playtest 10. The main item is natural difficulty.
+

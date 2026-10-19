@@ -309,13 +309,19 @@ export function feltUse(model: DeviceModel, condition: TestCondition, use: UseRe
       ? `The drum does not turn ${where}; the melody stops.`
       : use.passes
         ? `The melody keeps its pace ${where}.`
-        : ratio < 0.5
-          ? `The drum crawls ${where}; the melody drags badly.`
-          : ratio < 1
-            ? `The melody drags a little ${where}.`
-            : ratio > 2
-              ? `The drum races ${where}; the melody gallops.`
-              : `The melody hurries a little ${where}.`;
+        : ratio < 0.3
+          ? `The drum barely turns ${where}; the tune is hard to recognise.`
+          : ratio < 0.55
+            ? `The drum crawls ${where}; the melody drags badly.`
+            : ratio < 0.8
+              ? `The melody drags ${where}.`
+              : ratio < 1
+                ? `The melody drags a little ${where}.`
+                : ratio > 2
+                  ? `The drum races ${where}; the melody gallops.`
+                  : ratio > 1.4
+                    ? `The melody hurries ${where}.`
+                    : `The melody hurries a little ${where}.`;
   }
   const fan = model.kind === 'fan';
   const o = use.output;

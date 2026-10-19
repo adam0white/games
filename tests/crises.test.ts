@@ -19,3 +19,11 @@ describe('surfaced workshop problems', () => {
     expect(first?.text).toContain('You said');
   });
 });
+
+describe('names inside sentences', () => {
+  it('keeps a person’s name and lowers the rest', async () => {
+    const { inSentence } = await import('../src/ui/crises');
+    expect(inSentence('Nora’s keepsake music box')).toBe('Nora’s keepsake music box');
+    expect(inSentence('The community room fan')).toBe('the community room fan');
+  });
+});

@@ -138,6 +138,16 @@ function own(title: string): string {
   return /[’']s$/.test(first) ? `my ${rest.join(' ').toLowerCase()}` : title.toLowerCase();
 }
 const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+/** Engine 5: an owner's answer to an honest unfinished return depends on how long they waited. */
+function unfinishedReply(s: GameState, job: Job, onTime: boolean): string {
+  if (onTime) return 'Thank you for telling me in time. I’ll make another plan.';
+  const days = Math.floor((s.now - job.due) / DAY);
+  return days < 1
+    ? 'Thank you for telling me what remains. It came back later than you said, but not by much.'
+    : days < 3
+      ? `I waited ${days === 1 ? 'a day' : 'two days'} past your time for this. I’ll make another plan.`
+      : 'I stopped expecting it some days ago. I’ve made other plans.';
+}
 function required<T>(value: T | undefined): T {
   if (value === undefined) throw new Error('A required workshop record is missing.');
   return value;
@@ -428,6 +438,7 @@ function neighbourOffers(s: GameState, initial = false): void {
   // takes this round's request elsewhere and says why. Each late return costs one round, not the friendship.
   if (currentRules(s) && !initial) {
     const elsewhere = new Map<string, string>();
+    const said = new Map<string, Job>();
     for (const owner of ['nora', 'evan', 'mum']) {
       const waiting = s.jobs.find(
         (j) =>
@@ -441,9 +452,16 @@ function neighbourOffers(s: GameState, initial = false): void {
           (j) => j.ownerId === owner && j.status === 'delivered' && j.deliveredAt !== undefined,
         )
         .sort((a, b) => (b.deliveredAt ?? 0) - (a.deliveredAt ?? 0))[0];
-      if (waiting)
-        elsewhere.set(owner, `I’ll bring you something new once ${own(waiting.title)} is back.`);
-      else if (late && (late.deliveredAt ?? 0) > late.due && !late.wentElsewhere) {
+      if (waiting) {
+        // Said once; afterwards the owner simply brings nothing new.
+        elsewhere.set(
+          owner,
+          waiting.withheldNoted
+            ? ''
+            : `I’ll bring you something new once ${own(waiting.title)} is back.`,
+        );
+        if (!waiting.withheldNoted) said.set(owner, waiting);
+      } else if (late && (late.deliveredAt ?? 0) > late.due && !late.wentElsewhere) {
         late.wentElsewhere = true;
         elsewhere.set(
           owner,
@@ -455,7 +473,11 @@ function neighbourOffers(s: GameState, initial = false): void {
       const before = candidates.length;
       for (let i = candidates.length - 1; i >= 0; i--)
         if (templates[candidates[i] ?? -1]?.[2] === owner) candidates.splice(i, 1);
-      if (candidates.length < before) log(s, s.people[owner]?.name ?? owner, says, 'warning');
+      if (candidates.length < before && says) {
+        log(s, s.people[owner]?.name ?? owner, says, 'warning');
+        const job = said.get(owner);
+        if (job) job.withheldNoted = true;
+      }
     }
   }
   const count = Math.min(initial ? 3 : 2, candidates.length);
@@ -524,6 +546,12 @@ function neighbourOffers(s: GameState, initial = false): void {
     job.requiredConditions =
       choice === 0 ? ['load'] : job.kind === 'lantern' ? ['movement'] : ['load'];
     job.quote = `£${job.reward} if restored and checked. Return by ${dayTime(job.due)}.`;
+    // Engine 5: the music box has no motor; Nora says what she means.
+    if (currentRules(s))
+      job.description = job.description.replace(
+        'A new motor would miss the point',
+        'New parts would miss the point',
+      );
     s.jobs.push(job);
   }
   log(
@@ -845,8 +873,24 @@ function resolvePhysical(s: GameState, job: Job, action: string): boolean {
   }
   if (verb === 'verify') {
     const tried = runUseTest(job.model, (id ?? 'bench') as TestCondition);
+    const condition = (id ?? 'bench') as TestCondition;
+    // Engine 5: the ear and eye compare with the last try under the same condition, not with a number.
+    const before = (
+      job.evidence.findLast((e) => e.kind === 'use' && e.condition === condition) as
+        | { output?: number }
+        | undefined
+    )?.output;
+    const change =
+      before === undefined || tried.passes || tried.output === 0
+        ? ''
+        : tried.output > before * 1.05
+          ? ' Faster than the last try.'
+          : tried.output < before * 0.95
+            ? ' Slower than the last try.'
+            : ' About the same as the last try.';
+    const felt = feltUse(job.model, condition, tried);
     const use = currentRules(s)
-      ? { ...tried, summary: feltUse(job.model, (id ?? 'bench') as TestCondition, tried) }
+      ? { ...tried, summary: job.model.kind === 'music-box' ? `${felt}${change}` : felt }
       : tried;
     addEvidence(s, job, use, 'use', { condition: (id ?? 'bench') as TestCondition });
     if (use.passes && !job.verified.includes(id as TestCondition))
@@ -917,13 +961,25 @@ function deliver(s: GameState, job: Job, unfinished: boolean, who = 'player'): v
       `${job.title} is back in use.${payment ? ` Received £${payment}.` : ''}${onTime ? '' : ' It came back later than promised.'}${independent ? ' Sam handled the whole repair.' : who !== 'player' ? ' Sam returned the object after shared work.' : ''}`,
       'good',
     );
+    const replaced = job.contributions
+      .filter((c) => c.action.startsWith('replace:'))
+      .map((c) => c.action.slice('replace:'.length));
+    if (currentRules(s) && replaced.length && job.description.includes('miss the point'))
+      log(
+        s,
+        owner?.name ?? 'Workshop',
+        `It plays, and I’m glad. You put in a new ${[...new Set(replaced)].join(' and a new ')}, though. It isn’t quite her box any more.`,
+        'warning',
+      );
   } else {
     s.reputation -= unfinished ? 0 : 2;
     log(
       s,
       owner?.name ?? 'Workshop',
       unfinished
-        ? `Thank you for telling me what remains. I’ll make another plan.${onTime ? '' : ' It came back later than promised.'}`
+        ? currentRules(s)
+          ? unfinishedReply(s, job, onTime)
+          : `Thank you for telling me what remains. I’ll make another plan.${onTime ? '' : ' It came back later than promised.'}`
         : `The unchecked ${named(s, job.title)} is not reliable in use. No payment is due.${onTime ? '' : ' It came back later than promised.'}`,
       'warning',
     );

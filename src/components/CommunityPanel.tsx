@@ -6,6 +6,7 @@ import {
 } from '../game/community';
 import { dayTime } from '../game/engine';
 import type { Command, GameState } from '../game/types';
+import { inSentence } from '../ui/crises';
 import { CommunityScene } from './CommunityScene';
 
 export function CommunityPanel({
@@ -174,7 +175,7 @@ export function CommunityPanel({
               </p>
               {job && (
                 <button type="button" className="text-button" onClick={() => onOpenJob(job.id)}>
-                  View {job.title.toLowerCase()} and its checks →
+                  View {inSentence(job.title)} and its checks →
                 </button>
               )}
             </div>

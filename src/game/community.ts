@@ -478,7 +478,7 @@ export function finalizeCommunityEvent(state: GameState, event: CommunityState, 
       ? `Nobody used what you prepared. ${event.decisions
           .map(
             (d) =>
-              `${state.people[d.personId]?.name ?? d.personId}: ${d.activityLabel.toLowerCase()} instead.`,
+              `${state.people[d.personId]?.name ?? d.personId}: ${d.activityLabel.replace(/^spend \d+ minutes on: /i, '').toLowerCase()} instead.`,
           )
           .join(' ')}`
       : 'No prepared activity was completed. People kept other plans, were occupied, or stopped before completion.';

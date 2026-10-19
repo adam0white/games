@@ -225,6 +225,7 @@ export function loadGame(text: string): GameState {
         'returnedUnfinished',
         'overdueNoted',
         'overdueAgain',
+        'withheldNoted',
         'wentElsewhere',
       ].some(
         (key) =>

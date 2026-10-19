@@ -1,6 +1,15 @@
 import { dayTime } from '../game/engine';
 import type { GameState } from '../game/types';
 
+/** A title inside a sentence, keeping a person's name: "Nora’s reading light". */
+export function inSentence(title: string): string {
+  const [first = '', ...rest] = title.split(' ');
+  return [
+    /[’']s$/.test(first) ? first : first.toLowerCase(),
+    ...rest.map((w) => w.toLowerCase()),
+  ].join(' ');
+}
+
 export interface Crisis {
   jobId: string;
   text: string;
@@ -22,19 +31,19 @@ export function workshopCrises(state: GameState): Crisis[] {
       out.push({
         jobId: job.id,
         urgent: true,
-        text: `${owner} is waiting for ${job.title.toLowerCase()}. You said ${dayTime(job.due)}.`,
+        text: `${owner} is waiting for ${inSentence(job.title)}. You said ${dayTime(job.due)}.`,
       });
-    else if (job.due - state.now <= 60)
+    else if (job.due < state.now - (state.now % 1440) + 1440)
       out.push({
         jobId: job.id,
         urgent: false,
-        text: `${job.title} is due back at ${dayTime(job.due)}.`,
+        text: `${job.title} is due back today, at ${dayTime(job.due)}.`,
       });
     if (job.assignedTo === 'sam' && job.blocked)
       out.push({
         jobId: job.id,
         urgent: false,
-        text: `Sam has stopped on ${job.title.toLowerCase()}: ${job.blocked.reason}`,
+        text: `Sam has stopped on ${inSentence(job.title)}: ${job.blocked.reason}`,
       });
   }
   const request = state.pendingRequest;
@@ -61,14 +70,15 @@ export interface SpokenLine {
 }
 
 /**
- * Presentation only. What people said today, newest first, so speech reaches the bench instead of History.
+ * Presentation only. What people said in the last two hours of today, newest first, so speech reaches the bench instead of History.
  * Only lines a person said; the workshop's own notes and the player's lines stay in History.
  */
 export function todaysWords(state: GameState, limit = 3): SpokenLine[] {
   const names = new Set(Object.values(state.people).map((p) => p.name));
-  const dayStart = state.now - (state.now % 1440);
+  // Two hours: long enough to come back to, short enough that a morning offer does not linger all day.
+  const since = Math.max(state.now - (state.now % 1440), state.now - 120);
   return state.log
-    .filter((e) => e.at >= dayStart && names.has(e.speaker))
+    .filter((e) => e.at >= since && names.has(e.speaker))
     .slice(-limit)
     .reverse();
 }

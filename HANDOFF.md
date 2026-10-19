@@ -1,16 +1,39 @@
 # Handoff
 
-Updated 2026-10-16 for archived experiments and new-host research. Earlier delivery evidence remains below.
+Updated 2026-10-19 for the HF 2.8.0 / engine 5 level-up (game 3.1.0-alpha.3). Earlier sections are historical.
 
 ## What remains
 
-The latest request prioritizes autonomous coding/testability and HF evidence over theme. [The reviewed full-list assessment](docs/research/autonomous-coding-fit-2026-10-16.md) supersedes the previous theme-first shortlist: Concordia is the provisional first research choice; Wesnoth is the first game harness to validate locally, with FreeCol second. AI Town/Smallville and 3D are lower priority. No new host, comparison study or adapter is selected for implementation. Adam chooses the next increment and accepts game feel.
+- **Natural difficulty is not there yet.** The game-design expert's main finding stands after two rounds: three accepted jobs fit in half a day, and a broken promise costs a sentence and some trust in the player's word. Promises do not compete for the bench, Sam's hours or stock. This needs a scenario redesign (overlapping deadlines, owners who remember a broken promise in later requests), not a patch. Target: the next Small Works increment, when the owner sets one.
+- **Open findings from [playtest 10](docs/restart/playtest-10.md):**
+  - owners accept a return during their listed outing;
+  - an honest late return and plain neglect read the same in trust;
+  - recovered parts pool with new stock;
+  - repeated request text and duplicate fan jobs;
+  - fixed seed 42, so a remembered answer replays the game;
+  - "Look inside" toggles the cover closed;
+  - the first-week panel blocks the workboard;
+  - Notes contrast.
+- **No retest of alpha.3 by source-unread testers.** The round-2 fixes are covered by unit tests only.
+- **HF requests SW-1 and SW-2** are in [the framework boundary](docs/framework-boundary.md) and were returned to the HF coordinator. They are not implemented here.
+- Adam accepts feel personally.
 
-Actual feasibility evidence: upstream Concordia `6fbfbc5` installed in isolated Python 3.12.13; 19 engine/action-spec/sequential/simultaneous/checkpoint tests passed without model calls. This is neither an HF adapter nor an HF-versus-LLM result. Other hosts received source/test-harness inspection only. A later game spike must run an unchanged test and a deliberately failing scenario before integrating HF. The proposed study requires a simple table-learner baseline and equal information, not just HF versus random or a weak LLM prompt.
+## HF 2.8.0 and engine 5 (2026-10-19)
 
-[Recovered original ideas](docs/research/original-game-ideas-2026-10-16.md) distinguish Adam's originals from assistant suggestions and include private provenance. Keep research documents outside public site assets. Astra and two independent research reviewers contributed; both technical causality and experience value remain future acceptance gates.
-
-The two repair versions are preserved on private archive branches and at public paths. Clean public source `f44f651` passed CI 38860955111; live root/archive manifests, launch, separate progress and reload checks passed. [Archive delivery](docs/research/archives-2026-10-16.md) records source commits, build adaptations and actual checks. Source remains private. Root current game remains available; no current save is automatically moved or deleted.
+- **Framework:** HF bumped to exactly 2.8.0. Registry integrity and provenance checked.
+- **Saves:** new worlds are `small-works@5`. Engine-4 saves and exports load as engine-4 worlds and replay exactly under engine-4 rules; only HF's per-person engine stamp differs. The app then continues them under engine 5 (`upgradeRules`), recording the input index where it switched. The real-export tests are in `tests/legacy-v4.test.ts`.
+- **People are truer:**
+  - People answer the player's word through HF's voice trust. Broken promises lower it and kept ones raise it.
+  - Each owner speaks again a day after an overdue notice.
+  - An unfinished return gets a reply that depends on how late it is.
+  - A keepsake owner minds new parts.
+  - Sam's lesson ready window and today's spoken lines are on screen.
+- **Use checks:** they report felt use instead of percentages, and the music box compares each try with the last one.
+- **Recovery:** recovering a hidden-open part costs the attempt.
+- **Fatigue:** HF's fatigue store and fullness are enabled. Faith stays background.
+- **Playtests:**
+  - [Playtest 10](docs/restart/playtest-10.md) records two rounds of source-unread testers (speedrunner haiku, edge sonnet, cozy fable, sceptic opus; the codex wildcard was blocked by its sandbox) and a game-design expert (opus). Their reports are verbatim, with exports.
+  - It also has the HF-character harness run: 8 personas × 2 seeds, exit 0.
 
 ## Previous focused UX delivery
 
