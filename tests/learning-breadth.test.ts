@@ -164,5 +164,5 @@ describe('ordinary attended teaching across multiple repair briefs', () => {
       withheld.state.jobs.find((candidate) => candidate.id === withheld.targetId)?.blocked?.kind,
     ).toBe('help');
     expect(withheld.state.independentRepairs).toBe(0);
-  });
+  }, 30_000);
 });

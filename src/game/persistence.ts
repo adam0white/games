@@ -219,7 +219,14 @@ export function loadGame(text: string): GameState {
       ['acceptedAt', 'deliveredAt'].some(
         (key) => job[key as 'acceptedAt'] !== undefined && !integer(job[key as 'acceptedAt']),
       ) ||
-      ['isPersonal', 'isDonor', 'returnedUnfinished', 'overdueNoted', 'wentElsewhere'].some(
+      [
+        'isPersonal',
+        'isDonor',
+        'returnedUnfinished',
+        'overdueNoted',
+        'overdueAgain',
+        'wentElsewhere',
+      ].some(
         (key) =>
           job[key as 'isPersonal'] !== undefined && typeof job[key as 'isPersonal'] !== 'boolean',
       ) ||

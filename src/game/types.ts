@@ -105,6 +105,7 @@ export interface Job {
   quote?: string;
   /** Engine 5: the owner has noticed the promised return time pass. */
   overdueNoted?: boolean;
+  overdueAgain?: boolean;
   /** Engine 5: this late return already sent its owner's next request elsewhere once. */
   wentElsewhere?: boolean;
 }

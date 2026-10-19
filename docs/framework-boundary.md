@@ -41,3 +41,24 @@ HF changes are developed, tested, reviewed and released in HF. The game upgrades
 ## Future scaling
 
 The long-term vision needs people and early work to matter at large scale. It does not yet establish that every action by every employee can be simulated at the original temporal detail. Before an idle conglomerate, measure runtime, save size and the consequences of any aggregation or coarse stepping. Record where approximation changes outcomes. Do not build distributed infrastructure to anticipate an unmeasured problem.
+
+## HF 2.8.0 fit and requests (2026-10-19)
+
+Engine `small-works@5` consumes HF 2.8.0. Engine-4 worlds keep engine-4 rules until the player continues them, and replay switches rules at the recorded input (`migratedFrom.atInput`).
+
+| HF 2.8.0 feature | Use here | Reason |
+|---|---|---|
+| `enableFatigueStore` | on for every person | Harmless, but it never fills: bench efforts are 0.03 to 0.08, below `depletionFloor` 0.3 (request SW-1). |
+| `enableFullness` | on for every person | Changes meal timing, so historical scripted tests run under engine-4 rules. |
+| `decide(..., { suggestion })` and `noteVoicePromise` | player asks and Sam's trust in the player's word | The player is a voice, not a tie. Broken word: a lapsed lesson time, a recall mid-work. |
+| `decide(..., { reconsider: true })` | not used | The game never decides while an activity runs; a retry waits for the activity to end. Host reason, not a request. |
+| `Affordance.alongside` | not used | People have no ties to each other here, and the player is a voice (request SW-2). |
+| `Affordance.followedBy` (bodily forecast) | not used | Bench work is light; there is no follow-on exertion to forecast. |
+| promptings | not used | No natural temptation in a repair day; forcing one would make faith or vice a mechanic. |
+| muhasaba / evening review | not used | It reads chronicle day records; the workshop day closes at 17:00 and the game does not live evenings. |
+
+Requests returned to HF (text as filed):
+
+- **SW-1, mental effort fills the slow fatigue store.** Confirmed in the 2.8.0 dist: the store fills only from physical effort above `BODY_DEFAULTS.depletionFloor` (0.3), and `body` ignores an affordance's `focus`. Careful bench work (effort 0.03 to 0.08, high focus) never tires anyone across a week. Assumed: other desk, craft or study games hit the same gap. Proposal: an optional focus term in the store's fill (for example `focus × duration` above a focus floor), off by default. Workaround: none honest; the game leaves fatigue to sleep pressure.
+- **SW-2, a voice as a companion for `alongside`.** Confirmed in the 2.8.0 types: `alongside` takes `PersonId`s and weighs a `together:<id>` term from closeness to that person; the player in a host game is a voice (`voiceId`), not a person with closeness. Assumed: games where the player works beside a person (lessons, shared repairs) want the same pull. Proposal: let `alongside` name a voice, weighted by that voice's trust. Workaround: none; lessons use a player suggestion instead.
+- **Supports Valley 5 (a canonical saved person).** Confirmed: `restore` stamps the current engine on each person, so a host that checks `restore(saved)` against `saved` rejects every older save after an HF upgrade. The game now normalises `engine` before that check; before the fix, a v4 autosave would have been silently replaced. Proposal as Valley 5, plus a note in the upgrade docs.

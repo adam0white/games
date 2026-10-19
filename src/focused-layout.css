@@ -808,3 +808,28 @@
   font-style: italic;
   opacity: 0.85;
 }
+.todays-words {
+  margin: 10px 0 0;
+  display: grid;
+  gap: 4px;
+  font-size: 0.92rem;
+}
+.todays-words p {
+  margin: 0;
+  opacity: 0.9;
+}
+.todays-words p:first-child {
+  opacity: 1;
+}
+.todays-words strong {
+  color: #eedab4;
+  margin-right: 4px;
+}
+.todays-words time {
+  opacity: 0.6;
+  font-size: 0.8rem;
+  margin-left: 6px;
+}
+.todays-words .is-warning {
+  color: #f4c7b4;
+}

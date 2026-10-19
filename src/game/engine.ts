@@ -12,6 +12,7 @@ import {
   calibrate,
   compatiblePart,
   createModel,
+  feltUse,
   inspectComponent,
   intervene,
   measure,
@@ -114,7 +115,8 @@ export function requiredChecks(job: Job): TestCondition[] {
 }
 export function jobReadiness(job: Job): string {
   if (job.returnedUnfinished) return 'Returned honestly, unfinished';
-  if (job.status === 'delivered') return `Back with ${job.ownerId === 'mum' ? 'Mum' : job.ownerId}`;
+  if (job.status === 'delivered')
+    return `Back with ${job.ownerId.charAt(0).toUpperCase()}${job.ownerId.slice(1)}`;
   if (job.status === 'ready') return `Checked for ${requiredChecks(job).join(', ')}`;
   if (job.assignedTo) return 'Sam has responsibility';
   return job.verified.length
@@ -123,6 +125,19 @@ export function jobReadiness(job: Job): string {
       ? 'Evidence retained; not fully checked'
       : 'Not yet investigated';
 }
+/** A title inside a sentence. Engine 5 keeps a person's name capitalised ("Nora’s reading light"). */
+function named(s: GameState, title: string): string {
+  if (!currentRules(s)) return title.toLowerCase();
+  const [first = '', ...rest] = title.split(' ');
+  const keep = /[’']s$/.test(first);
+  return [keep ? first : first.toLowerCase(), ...rest.map((w) => w.toLowerCase())].join(' ');
+}
+/** The owner speaking of their own object: "my reading light". */
+function own(title: string): string {
+  const [first = '', ...rest] = title.split(' ');
+  return /[’']s$/.test(first) ? `my ${rest.join(' ').toLowerCase()}` : title.toLowerCase();
+}
+const cap = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 function required<T>(value: T | undefined): T {
   if (value === undefined) throw new Error('A required workshop record is missing.');
   return value;
@@ -427,15 +442,12 @@ function neighbourOffers(s: GameState, initial = false): void {
         )
         .sort((a, b) => (b.deliveredAt ?? 0) - (a.deliveredAt ?? 0))[0];
       if (waiting)
-        elsewhere.set(
-          owner,
-          `I’ll bring you something new once ${waiting.title.toLowerCase()} is back.`,
-        );
+        elsewhere.set(owner, `I’ll bring you something new once ${own(waiting.title)} is back.`);
       else if (late && (late.deliveredAt ?? 0) > late.due && !late.wentElsewhere) {
         late.wentElsewhere = true;
         elsewhere.set(
           owner,
-          `I took this one to the shop in town. ${late.title} came back after the time you gave me.`,
+          `I took this one to the shop in town. ${cap(own(late.title))} came back after the time you gave me.`,
         );
       }
     }
@@ -832,7 +844,10 @@ function resolvePhysical(s: GameState, job: Job, action: string): boolean {
     return result.ok;
   }
   if (verb === 'verify') {
-    const use = runUseTest(job.model, (id ?? 'bench') as TestCondition);
+    const tried = runUseTest(job.model, (id ?? 'bench') as TestCondition);
+    const use = currentRules(s)
+      ? { ...tried, summary: feltUse(job.model, (id ?? 'bench') as TestCondition, tried) }
+      : tried;
     addEvidence(s, job, use, 'use', { condition: (id ?? 'bench') as TestCondition });
     if (use.passes && !job.verified.includes(id as TestCondition))
       job.verified.push(id as TestCondition);
@@ -909,7 +924,7 @@ function deliver(s: GameState, job: Job, unfinished: boolean, who = 'player'): v
       owner?.name ?? 'Workshop',
       unfinished
         ? `Thank you for telling me what remains. I’ll make another plan.${onTime ? '' : ' It came back later than promised.'}`
-        : `The unchecked ${job.title.toLowerCase()} is not reliable in use. No payment is due.${onTime ? '' : ' It came back later than promised.'}`,
+        : `The unchecked ${named(s, job.title)} is not reliable in use. No payment is due.${onTime ? '' : ' It came back later than promised.'}`,
       'warning',
     );
   }
@@ -971,7 +986,7 @@ function reconcileResponsibilities(s: GameState): void {
     log(
       s,
       person?.name ?? 'Workshop',
-      `My repair purpose for ${job.title.toLowerCase()} has ended. The object is back on the bench for you to decide what happens next.`,
+      `My repair purpose for ${named(s, job.title)} has ended. The object is back on the bench for you to decide what happens next.`,
       'warning',
     );
   }
@@ -1007,7 +1022,7 @@ function finishNpc(s: GameState, work: NpcWork): void {
           log(
             s,
             person.name,
-            `I have finished the checked work on ${job.title.toLowerCase()}. It stays here for us to use.`,
+            `I have finished the checked work on ${named(s, job.title)}. It stays here for us to use.`,
             'good',
           );
         }
@@ -1025,7 +1040,7 @@ function finishNpc(s: GameState, work: NpcWork): void {
       log(
         s,
         person.name,
-        `I have put ${job.title.toLowerCase()} safely aside. I still have responsibility. ${job.blocked.reason}`,
+        `I have put ${named(s, job.title)} safely aside. I still have responsibility. ${job.blocked.reason}`,
         'warning',
       );
     } else if (!['rest', 'eat', 'drink', 'personal'].includes(work.option.action)) {
@@ -1176,11 +1191,7 @@ function acceptResponsibility(s: GameState, job: Job): boolean {
         startedAt: s.now,
         endsAt: s.now + option.duration,
       });
-      log(
-        s,
-        sam.name,
-        `I have not accepted ${job.title.toLowerCase()}. ${choiceSpeech(sam, choice)}`,
-      );
+      log(s, sam.name, `I have not accepted ${named(s, job.title)}. ${choiceSpeech(sam, choice)}`);
       return false;
     }
     s.npcWork.push({
@@ -1190,7 +1201,7 @@ function acceptResponsibility(s: GameState, job: Job): boolean {
       startedAt: s.now,
       endsAt: s.now + 1,
     });
-    log(s, sam.name, `I accept responsibility for ${job.title.toLowerCase()}.`);
+    log(s, sam.name, `I accept responsibility for ${named(s, job.title)}.`);
   }
   job.assignedTo = 'sam';
   job.responsibility ??= adoptResponsibility(sam, job.id, s.now);
@@ -1380,7 +1391,6 @@ function noteOverdue(s: GameState): void {
   if (!currentRules(s)) return;
   for (const job of s.jobs) {
     if (
-      job.overdueNoted ||
       job.isPersonal ||
       job.isDonor ||
       job.ownerId === 'player' ||
@@ -1388,14 +1398,26 @@ function noteOverdue(s: GameState): void {
       job.due >= s.now
     )
       continue;
-    job.overdueNoted = true;
     const owner = s.people[job.ownerId];
+    if (job.overdueNoted) {
+      if (job.overdueAgain || s.now - job.due < DAY) continue;
+      job.overdueAgain = true;
+      log(
+        s,
+        owner?.name ?? 'Workshop',
+        `${cap(own(job.title))} is a day past what you said. I’ll take it back as it is whenever you like. I won’t plan around your times so readily now.`,
+        'warning',
+      );
+      continue;
+    }
+    job.overdueNoted = true;
+    if (owner) notePlayerWord(owner, false, 'deliver', s.now);
     log(
       s,
       owner?.name ?? 'Workshop',
       job.assignedTo
-        ? `You said ${dayTime(job.due)} for ${job.title.toLowerCase()}. Sam has it, I know. I’m still waiting.`
-        : `You said ${dayTime(job.due)} for ${job.title.toLowerCase()}. I’m still waiting. If it can’t be done, tell me and give it back.`,
+        ? `You said ${dayTime(job.due)} for ${own(job.title)}. Sam has it, I know. I’m still waiting.`
+        : `You said ${dayTime(job.due)} for ${own(job.title)}. I’m still waiting. If it can’t be done, tell me and give it back.`,
       'warning',
     );
   }
@@ -1837,18 +1859,14 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       if (job.due < s.now) return fail('The requested return time has passed.');
       job.status = 'active';
       job.acceptedAt = s.now;
-      log(
-        s,
-        'You',
-        `I’ll take responsibility for ${job.title.toLowerCase()} by ${dayTime(job.due)}.`,
-      );
+      log(s, 'You', `I’ll take responsibility for ${named(s, job.title)} by ${dayTime(job.due)}.`);
       s.selectedJobId = job.id;
       return done('Promise accepted. You can put the object aside without losing evidence.');
     }
     case 'decline':
       if (job?.status !== 'offer') return fail('Only an unaccepted offer can be declined.');
       job.status = 'declined';
-      log(s, 'You', `I cannot promise ${job.title.toLowerCase()} this time.`);
+      log(s, 'You', `I cannot promise ${named(s, job.title)} this time.`);
       return done('Request declined honestly.');
     case 'power':
       if (!job || terminalStates.has(job.status))
@@ -1974,6 +1992,9 @@ export function dispatch(state: GameState, command: Command): CommandResult {
         return fail('There is not enough workshop time left today.');
       playerWork(s, job, COSTS.deliver, 'deliver', () => {
         deliver(s, job, Boolean(command.unfinished));
+        const owner = s.people[job.ownerId];
+        if (currentRules(s) && owner && !job.overdueNoted && !job.isPersonal && s.now <= job.due)
+          notePlayerWord(owner, true, 'deliver', s.now);
         return job.status === 'delivered' && !job.returnedUnfinished;
       });
       return done(job.returnedUnfinished ? 'Returned unfinished.' : 'Returned to use.');
@@ -1985,12 +2006,16 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       if (blocked) return fail(blocked);
       const component = job.model.components.find((c) => c.id === command.componentId);
       if (!component) return fail('Choose a component.');
-      if (component.condition === 'open')
+      // Engine 5: a part that looks present costs the attempt to find it unusable; the screen cannot tell.
+      const tried = job.contributions.some((c) => c.action === `salvage:${component.id}`);
+      if (component.condition === 'open' && (!currentRules(s) || tried))
         return fail('That component is absent or unusable; there is nothing to recover.');
       if (!canSpendTime(s, COSTS.salvage))
         return fail('There is not enough workshop time left today.');
       // Recovery requires actual visible/tested suitability; hidden truth only resolves yield.
       advance(s, COSTS.salvage);
+      if (currentRules(s))
+        job.contributions.push({ actorId: 'player', action: `salvage:${component.id}`, at: s.now });
       if (component.condition === 'good') {
         s.stock[component.kind] = (s.stock[component.kind] ?? 0) + 1;
         log(
@@ -2121,7 +2146,7 @@ export function dispatch(state: GameState, command: Command): CommandResult {
           requestedAt: s.now,
           jobId: job.id,
         };
-        log(s, 'Sam', `I’ll consider ${job.title.toLowerCase()} after my current activity.`);
+        log(s, 'Sam', `I’ll consider ${named(s, job.title)} after my current activity.`);
         return done('Repair offer held until Sam finishes his current activity.');
       }
       const accepted = acceptResponsibility(s, job);
@@ -2160,7 +2185,7 @@ export function dispatch(state: GameState, command: Command): CommandResult {
         log(
           s,
           s.people[job.assignedTo]?.name ?? 'Sam',
-          `You handed me ${job.title.toLowerCase()} and I was in the middle of it. Fine. Next time, tell me first if you might want it back.`,
+          `You handed me ${named(s, job.title)} and I was in the middle of it. Fine. Next time, tell me first if you might want it back.`,
           'warning',
         );
       }
@@ -2172,11 +2197,7 @@ export function dispatch(state: GameState, command: Command): CommandResult {
         s.npcWork = s.npcWork.filter((w) => w !== current);
       }
       releaseJob(s, job);
-      log(
-        s,
-        'You',
-        `I’ll take ${job.title.toLowerCase()} back. Sam’s acquired knowledge remains his.`,
-      );
+      log(s, 'You', `I’ll take ${named(s, job.title)} back. Sam’s acquired knowledge remains his.`);
       return done('Responsibility recalled.');
     }
     case 'wait':

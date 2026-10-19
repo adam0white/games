@@ -222,7 +222,7 @@ export function notePlayerWord(person: Person, kept: boolean, action: string, no
   noteVoicePromise(person, 'player', { kept, at: now, action });
 }
 
-/** How readily Sam takes the player's word, in words, never a number (engine 5 presentation). */
+/** How readily a person takes the player's word, in words, never a number (engine 5 presentation). */
 export function playerWordReading(person: Person): string | undefined {
   const voice = person.will.voices.find((v) => v.voiceId === 'player');
   if (!voice) return undefined;

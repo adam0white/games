@@ -39,6 +39,14 @@ function repairCue(state: GameState, part: Job['model']['components'][number] | 
   return `${stock}${fromDonor} Fit one, then carry the lantern again.`;
 }
 
+/** Readings exist, but all of them predate the latest work on the object. */
+function staleReadings(job: Job): boolean {
+  const lastWork = job.evidence.findLast((e) => e.kind === 'work');
+  return Boolean(
+    lastWork && job.evidence.some((e) => e.kind === 'measurement' && e.id < lastWork.id),
+  );
+}
+
 /** One next operation, not a second copy of the bench controls. */
 export function FirstRepairGuide({ state, job, pane, opened, onPane, onSkip }: Props) {
   const progress = firstRepairProgress(state);
@@ -59,7 +67,9 @@ export function FirstRepairGuide({ state, job, pane, opened, onPane, onSkip }: P
           ? 'Choose a part inside, then examine it.'
           : 'Open the cover to look inside.'
         : phase === 'measure-source'
-          ? 'Start at the battery. Put a probe on each marked connection.'
+          ? staleReadings(job)
+            ? 'Your earlier readings were taken before that change, so they no longer hold. Measure again from the battery.'
+            : 'Start at the battery. Put a probe on each marked connection.'
           : phase === 'measure-path'
             ? `Now compare both sides of the ${part?.label.toLowerCase() ?? 'next part'} while it moves.`
             : phase === 'inspect'

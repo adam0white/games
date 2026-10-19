@@ -5,7 +5,7 @@ export const SAVE_PROVENANCE = {
   engine: 'small-works@5',
   scenario: 'first-week@2',
   framework: '2.8.0',
-  game: '3.1.0-alpha.1',
+  game: '3.1.0-alpha.2',
 } as const;
 /**
  * Engine-4 behaviour, kept so historical exports and old autosaves restore and replay exactly. A legacy world keeps

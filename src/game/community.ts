@@ -474,7 +474,14 @@ export function finalizeCommunityEvent(state: GameState, event: CommunityState, 
     ? participants
         .map((d) => `${state.people[d.personId]?.name ?? d.personId}: ${d.activityLabel}.`)
         .join(' ')
-    : 'No prepared activity was completed. People kept other plans, were occupied, or stopped before completion.';
+    : state.schema === 'small-works@5' && event.decisions.length
+      ? `Nobody used what you prepared. ${event.decisions
+          .map(
+            (d) =>
+              `${state.people[d.personId]?.name ?? d.personId}: ${d.activityLabel.toLowerCase()} instead.`,
+          )
+          .join(' ')}`
+      : 'No prepared activity was completed. People kept other plans, were occupied, or stopped before completion.';
   event.reservedJobIds = [];
   event.phase = 'completed';
 }

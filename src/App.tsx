@@ -36,7 +36,7 @@ import type {
   MeterMode,
   TestCondition,
 } from './game/types';
-import { workshopCrises } from './ui/crises';
+import { todaysWords, workshopCrises } from './ui/crises';
 import { firstRepairProgress } from './ui/first-repair';
 import './styles.css';
 import './focused-layout.css';
@@ -803,6 +803,15 @@ export default function App() {
               );
             })}
         </ul>
+      )}
+      {todaysWords(state).length > 0 && (
+        <section className="todays-words" aria-label="What people said today">
+          {todaysWords(state).map((line) => (
+            <p key={line.id} className={line.tone === 'warning' ? 'is-warning' : undefined}>
+              <strong>{line.speaker}</strong> {line.text} <time>{dayTime(line.at)}</time>
+            </p>
+          ))}
+        </section>
       )}
       {view === 'bench' && job && (
         <main className={`focused-bench ${showTools ? 'tools-visible' : ''}`}>
@@ -1709,6 +1718,11 @@ export default function App() {
                                 state.npcWork.find((w) => w.personId === id)?.endsAt ?? state.now,
                               )}
                             </small>
+                          </p>
+                        )}
+                        {playerWordReading(person) && (
+                          <p className="word-reading">
+                            {person.name} {playerWordReading(person)}.
                           </p>
                         )}
                         <p className="person-role">

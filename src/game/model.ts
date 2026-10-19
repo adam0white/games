@@ -289,6 +289,56 @@ export function measure(model: DeviceModel, request: MeasurementRequest): Measur
     cues: { part: c?.kind ?? 'path', signal },
   };
 }
+/**
+ * Engine 5: what a person trying the object would notice, without numbers the player never measured.
+ * The meter still gives exact readings; trying the object gives the felt result.
+ */
+export function feltUse(model: DeviceModel, condition: TestCondition, use: UseResult): string {
+  if (!model.power) return use.summary;
+  const where =
+    condition === 'bench'
+      ? 'on the table'
+      : condition === 'movement'
+        ? 'while carried'
+        : 'under load';
+  if (model.kind === 'music-box') {
+    const specification = model as DeviceModel & { desiredRPM?: number; tolerance?: number };
+    const desired = specification.desiredRPM ?? 15;
+    const ratio = use.output / desired;
+    return use.output === 0
+      ? `The drum does not turn ${where}; the melody stops.`
+      : use.passes
+        ? `The melody keeps its pace ${where}.`
+        : ratio < 0.5
+          ? `The drum crawls ${where}; the melody drags badly.`
+          : ratio < 1
+            ? `The melody drags a little ${where}.`
+            : ratio > 2
+              ? `The drum races ${where}; the melody gallops.`
+              : `The melody hurries a little ${where}.`;
+  }
+  const fan = model.kind === 'fan';
+  const o = use.output;
+  return o === 0
+    ? fan
+      ? `No air moves ${where}.`
+      : `The light goes out ${where}.`
+    : o < 0.4
+      ? fan
+        ? `Barely a breath of air ${where}; not enough.`
+        : `Only a faint glow ${where}; not enough.`
+      : !use.passes
+        ? fan
+          ? `Air moves, but weakly, ${where}; not enough.`
+          : `It lights, but dimly, ${where}; not enough.`
+        : o >= 0.9
+          ? fan
+            ? `A strong, steady breeze ${where}.`
+            : `Bright and steady ${where}.`
+          : fan
+            ? `A steady breeze ${where}.`
+            : `Steady light ${where}.`;
+}
 export function runUseTest(model: DeviceModel, condition: TestCondition): UseResult {
   if (!model.power)
     return {
