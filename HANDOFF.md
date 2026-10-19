@@ -4,7 +4,9 @@ Updated 2026-10-19 for the HF 2.8.0 / engine 5 level-up (game 3.1.0-alpha.3). Ea
 
 ## What remains
 
-- **Natural difficulty is not there yet.** The game-design expert's main finding stands after two rounds: three accepted jobs fit in half a day, and a broken promise costs a sentence and some trust in the player's word. Promises do not compete for the bench, Sam's hours or stock. This needs a scenario redesign (overlapping deadlines, owners who remember a broken promise in later requests), not a patch. Target: the next Small Works increment, when the owner sets one.
+Deferred 2026-10-19 under the owner's soft stop. Each item below is deferred to **2026-10-26** for the owner to choose from; none is started unasked.
+
+- **Natural difficulty is not there yet.** The game-design expert's main finding stands after two rounds: three accepted jobs fit in half a day, and a broken promise costs a sentence and some trust in the player's word. Promises do not compete for the bench, Sam's hours or stock. This needs a scenario redesign (overlapping deadlines, owners who remember a broken promise in later requests), not a patch. Deferred to 2026-10-26, or the next Small Works increment the owner sets.
 - **Open findings from [playtest 10](docs/restart/playtest-10.md):**
   - owners accept a return during their listed outing;
   - an honest late return and plain neglect read the same in trust;
