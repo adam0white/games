@@ -14,8 +14,8 @@ interface Props {
 }
 
 /**
- * The first real choice, said only as far as the player knows it: a spare part from stock is known to work,
- * the donor's part has never been tested, and stock is not endless.
+ * The first real choice, said only as far as the player knows it: a new part from stock is known to work,
+ * recovering the donor's part costs time and the donor and may yield nothing, and stock is not endless.
  */
 function repairCue(state: GameState, part: Job['model']['components'][number] | undefined): string {
   if (!part) return 'Replace the part you found failing. Then carry the lantern again.';
@@ -34,7 +34,7 @@ function repairCue(state: GameState, part: Job['model']['components'][number] | 
         ? `You have new ${name}s in stock.`
         : `You have no new ${name} in stock; the shop sells them.`;
   const fromDonor = donor
-    ? ` ${donor.title} has one too. Taking it costs nothing, but nobody has tested it.`
+    ? ` ${donor.title} has one too. Taking it out costs workshop time, commits the spare to parts, and the part may turn out unusable.`
     : '';
   return `${stock}${fromDonor} Fit one, then carry the lantern again.`;
 }

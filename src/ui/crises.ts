@@ -5,6 +5,8 @@ export interface Crisis {
   jobId: string;
   text: string;
   urgent: boolean;
+  /** Where the answer lives, when it is not the object's bench. */
+  people?: boolean;
 }
 
 /**
@@ -35,6 +37,18 @@ export function workshopCrises(state: GameState): Crisis[] {
         text: `Sam has stopped on ${job.title.toLowerCase()}: ${job.blocked.reason}`,
       });
   }
+  const request = state.pendingRequest;
+  if (
+    request?.status === 'ready' &&
+    request.readyUntil !== undefined &&
+    request.readyUntil >= state.now
+  )
+    out.push({
+      jobId: request.jobId ?? state.selectedJobId,
+      urgent: false,
+      people: true,
+      text: `Sam is ready for the ${request.kind === 'lesson' ? 'lesson' : 'repair'} until ${dayTime(request.readyUntil)}.`,
+    });
   return out.sort((a, b) => Number(b.urgent) - Number(a.urgent));
 }
 

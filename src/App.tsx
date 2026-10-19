@@ -796,7 +796,10 @@ export default function App() {
               const target = state.jobs.find((j) => j.id === c.jobId);
               return (
                 <li key={`${c.jobId}-${c.text}`} className={c.urgent ? 'is-urgent' : undefined}>
-                  <button type="button" onClick={() => target && chooseJob(target)}>
+                  <button
+                    type="button"
+                    onClick={() => (c.people ? setView('people') : target && chooseJob(target))}
+                  >
                     {c.text}
                   </button>
                 </li>
