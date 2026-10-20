@@ -53,21 +53,8 @@
       <noscript>This replay viewer needs JavaScript enabled.</noscript>
       <footer><a href="https://human.adamwhite.work/games/">◇ all notebooks</a></footer>
     </main>
-    <script type="module">
-      // Local file URLs block module imports and fetch. The same dependency-free module also
-      // loads as a classic script there; JSON files enter only through the local file picker.
-      if (location.protocol === 'file:') {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = './viewer.js';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.append(script);
-        });
-      } else {
-        await import('./viewer.js');
-      }
-      globalThis.IslandReplay.mount(document);
-    </script>
+    <!-- No inline script: the lab site's CSP allows only same-origin script files. Classic scripts also run from file://. -->
+    <script src="./viewer.js"></script>
+    <script src="./boot.js"></script>
   </body>
 </html>

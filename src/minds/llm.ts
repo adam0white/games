@@ -65,6 +65,11 @@ const createMind = ((options): LlmMind => {
   const backend = createBackend(options);
   const maxCalls = limit(options.maxCalls, 40, true);
   const maxUsd = limit(options.maxUsd, 0.15);
+  // Optional even share per episode (one call of it kept for the end-of-episode notes), so a small total budget
+  // reaches the task episode instead of running out in free time.
+  const perEpisode =
+    options.maxCallsPerEpisode === undefined ? Infinity : limit(options.maxCallsPerEpisode, 0, true);
+  let episodeCalls = 0;
   const totals: LlmCost = { calls: 0, inputTokens: 0, outputTokens: 0, usd: 0, invalid: 0 };
   let notes = '';
   let plan: string[] = [];
@@ -93,6 +98,7 @@ const createMind = ((options): LlmMind => {
   async function call(prompt: string): Promise<BackendResponse | undefined> {
     if (cap(prompt)) return undefined;
     totals.calls++;
+    episodeCalls++;
     let response: BackendResponse;
     try {
       response = await backend.complete(prompt);
@@ -113,6 +119,7 @@ const createMind = ((options): LlmMind => {
     async step(obs): Promise<MindStep> {
       if (episode !== obs.episode) {
         episode = obs.episode;
+        episodeCalls = 0;
         plan = [];
         history = [];
       }
@@ -124,8 +131,11 @@ const createMind = ((options): LlmMind => {
       const reason = cap();
       if (reason) return rest(reason);
 
-      if (obs.events.length || !plan.length || !obs.actions.some((action) => action.id === plan[0])) {
+      // Replan on news, not on the echo of the mind's own routine step ("You walk north.").
+      const news = obs.events.some((e) => !/^You (walk|jump|rest|look|pick up|place)\b/.test(e));
+      if (news || !plan.length || !obs.actions.some((action) => action.id === plan[0])) {
         plan = [];
+        if (episodeCalls >= perEpisode - 1) return rest('episode call share used, resting');
         const prompt = `${prefix()}\n\n${describe(obs)}
 Answer only JSON: {"plan":["<action id>","..."],"why":"<one sentence>"}.
 Plan from one to eight actions. Return action ids, not the list numbers.

@@ -103,7 +103,8 @@ async function main(args: string[]) {
           : true;
   }
   const name = String(flags.mind ?? 'hf');
-  if (!['random', 'hf', 'hf-no-boredom', 'llm'].includes(name)) throw new Error(`Unknown mind: ${name}`);
+  if (!['random', 'hf', 'hf-no-boredom', 'llm', 'scripted'].includes(name))
+    throw new Error(`Unknown mind: ${name}`);
   const seed = Number(flags.seed ?? 1);
   if (!Number.isSafeInteger(seed)) throw new Error('seed must be an integer.');
   const options: MindOptions = { ...flags, seed, persona: PERSONA };

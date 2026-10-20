@@ -167,7 +167,7 @@ function claudeBackend(options: MindOptions): LlmBackend {
               '--restricted',
               '--strict-mcp-config',
               '--mcp-config',
-              '{}',
+              '{"mcpServers":{}}',
               '--disable-slash-commands',
               '--no-session-persistence',
               '--setting-sources',

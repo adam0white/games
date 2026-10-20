@@ -214,17 +214,14 @@ export function observe(state: WorldState, task = ''): Observation {
       level: thing.level,
       inRing: thing.kind !== 'ring' && ring?.at != null && thing.at !== null && sameCell(thing.at, ring.at),
     }));
-  const spire =
-    distance(state.me, state.spire) <= radius
-      ? { dx: state.spire.x - state.me.x, dy: state.spire.y - state.me.y }
-      : null;
+  // The Spire is the island's tallest point, a landmark visible from anywhere (lead, 2026-10-20: the task must be
+  // reachable by every mind without a map).
+  const spire = { dx: state.spire.x - state.me.x, dy: state.spire.y - state.me.y };
   const lines = [`You stand on ${terrain}, at terrain height ${hereHeight}.`];
   lines.push(
-    spire === null
-      ? 'The Spire is out of sight.'
-      : onSpire
-        ? 'You are on the Spire.'
-        : `The Spire is ${offset(spire.dx, spire.dy)}, ${distance(state.me, state.spire)} cells away.`,
+    onSpire
+      ? 'You are on the Spire.'
+      : `The Spire is ${offset(spire.dx, spire.dy)}, ${distance(state.me, state.spire)} cells away.`,
   );
   for (const thing of things) {
     const cell = { x: state.me.x + thing.dx, y: state.me.y + thing.dy };
