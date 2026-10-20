@@ -70,13 +70,31 @@ export interface Observation {
   };
 }
 
+/** HF2 goal audit. HF proposals adopt immediately in the public API. */
+export interface GoalReading {
+  id: string;
+  label: string;
+  minute: number;
+  status: 'active' | 'achieved' | 'abandoned';
+  source: 'hf' | 'task';
+  proposed: boolean;
+  adopted: boolean;
+}
+export interface Inner {
+  [key: string]: number | GoalReading[] | undefined;
+  boredom?: number;
+  engagement?: number;
+  rememberedTargetMove?: number;
+  goals?: GoalReading[];
+}
+
 /** A mind chooses one action id from `obs.actions`, may keep notes, and may report itself. */
 export interface MindStep {
   action: string;
   /** Text minds: their short reason, as given. HF minds: the top scored terms. */
   why?: string;
-  /** HF minds: computed inner readings (boredom etc., 0..1). Text minds: omitted. */
-  inner?: Record<string, number>;
+  /** HF readings and, for HF2, goal audit records. Text minds: omitted. */
+  inner?: Inner;
 }
 
 export interface Mind {
@@ -85,6 +103,8 @@ export interface Mind {
   step(obs: Observation): MindStep | Promise<MindStep>;
   /** Called at each reset, before the world resets. Text minds return notes they keep; HF minds may return a gist. */
   endEpisode(obs: Observation): string | Promise<string>;
+  /** Optional final outcome readings, merged into the last frame of the episode. */
+  closingInner?(): Inner;
   /** LLM minds: a self-report of boredom/interest, in its own words plus a 0..10 number. HF minds: none. */
   selfReport?(): Promise<{ text: string; boredom: number } | undefined>;
 }
@@ -99,7 +119,7 @@ export interface Frame {
   action: string;
   events: string[];
   why?: string;
-  inner?: Record<string, number>;
+  inner?: Inner;
 }
 
 export interface Recording {

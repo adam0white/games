@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { measureRecording } from '../src/measures.ts';
 import type { Frame, Recording } from '../src/types.ts';
@@ -23,8 +24,17 @@ function recording(frames: Frame[], freeEpisodes = 2): Recording {
 }
 
 describe('measureRecording', () => {
+  it('preserves every legacy field value in all recorded arms', () => {
+    for (const file of readdirSync('viewer/runs').filter(
+      (f) => f.endsWith('.json') && f !== 'index.json' && !f.startsWith('hf2'),
+    )) {
+      const run = JSON.parse(readFileSync(`viewer/runs/${file}`, 'utf8'));
+      expect(measureRecording(run), file).toMatchObject(run.measures);
+    }
+  });
+
   it('returns finite zero metrics for an empty recording', () => {
-    expect(measureRecording(recording([]))).toEqual({
+    expect(measureRecording(recording([]), true)).toEqual({
       cellsVisited: 0,
       distinctActs: 0,
       kindEntropy: 0,
@@ -36,6 +46,49 @@ describe('measureRecording', () => {
       freeSpireObjects: 0,
       taskScore: 0,
     });
+  });
+
+  it('adds manipulation, pursuit, free stacks and task boredom without changing legacy values', () => {
+    const source = recording([
+      frame('pick cube-1', { carrying: 'cube-1' }),
+      frame('move N', {
+        carrying: 'cube-1',
+        me: { x: 2, y: 1 },
+        inner: { rememberedTargetMove: 1, boredom: 0.2 },
+      }),
+      frame('move N', { carrying: 'cube-1', me: { x: 2, y: 2 }, inner: { boredom: 0.7 } }),
+      frame('rest', { e: 2, inner: { boredom: 0.5 } }),
+    ]);
+    const old = measureRecording(source, true);
+    const added = measureRecording(source);
+    expect(added).toMatchObject(old);
+    expect(added.manipulationShare).toBe(1 / 3);
+    expect(added.rememberedTargetMoves).toBe(1);
+    expect(added.boredomMin0).toBe(0.2);
+    expect(added.boredomMax0).toBe(0.7);
+    expect(added.boredomMin2).toBe(0.5);
+  });
+
+  it('counts transport toward one endpoint without joining episodes or counting losses', () => {
+    const carried = (action: string, x: number, y: number, e = 0) =>
+      frame(action, { me: { x, y }, carrying: 'cube-1', e });
+    const bout = [carried('pick cube-1', 1, 1), carried('move E', 2, 1), carried('move S', 2, 2)];
+    expect(
+      measureRecording(
+        recording([...bout, frame('place here', { objects: [{ id: 'cube-1', x: 2, y: 2, level: 0 }] })]),
+      ).repeatedPursuit,
+    ).toBe(1);
+    expect(measureRecording(recording([...bout, frame('throw E hard')])).repeatedPursuit).toBe(0);
+    expect(
+      measureRecording(
+        recording([
+          carried('pick cube-1', 1, 1),
+          carried('move E', 2, 1),
+          carried('pick cube-1', 1, 1, 1),
+          carried('move E', 2, 1, 1),
+        ]),
+      ).repeatedPursuit,
+    ).toBe(0);
   });
 
   it('counts free action ids and cells, maps jump to climb, and keeps rest and look separate', () => {
@@ -118,7 +171,7 @@ describe('measureRecording', () => {
     );
     expect(measures.boredomMean0).toBeCloseTo(0.4);
     expect(measures).not.toHaveProperty('boredomMean1');
-    expect(measures).not.toHaveProperty('boredomMean2');
+    expect(measures.boredomMean2).toBe(1);
   });
 
   it('counts canonical hidden-rule events in free and task frames', () => {

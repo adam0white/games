@@ -8,7 +8,7 @@ import { type Mind, type Observation, PERSONA } from '../src/types.ts';
 import { apply, createWorld } from '../src/world.ts';
 
 async function scratchDirectory() {
-  const root = '/Users/abdul/code/human-framework/scratch/island';
+  const root = '/Users/abdul/code/human-framework/scratch/island2';
   await mkdir(root, { recursive: true });
   return mkdtemp(join(root, 'runner-test-'));
 }
@@ -114,6 +114,22 @@ describe('runner', () => {
       await rm(directory, { recursive: true, force: true });
     }
   });
+
+  it('loads all four HF2 arms through the CLI', async () => {
+    const directory = await scratchDirectory();
+    try {
+      for (const arm of ['hf2', 'hf2-no-boredom', 'hf2-no-memory', 'hf2-no-goals']) {
+        const out = join(directory, `${arm}-1.json`);
+        execFileSync(process.execPath, ['src/run.ts', `--mind=${arm}`, '--seed=1', `--out=${out}`]);
+        const run = JSON.parse(await readFile(out, 'utf8'));
+        expect(run.mind).toBe(arm);
+        expect(run.frames).toHaveLength(240);
+        expect(run.cost.calls).toBe(0);
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 15000);
 
   it('preserves the complete inline output path when it contains equals signs', async () => {
     const directory = await scratchDirectory();

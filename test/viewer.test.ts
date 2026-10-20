@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Frame, Recording } from '../src/types.ts';
 import '../viewer/viewer.js';
@@ -6,6 +7,7 @@ const { buildTimeline, frameAt, indexPaths, sparklinePoints, trailAt } = Reflect
   globalThis,
   'IslandReplay',
 ) as {
+  validateRecording: (run: Recording) => Recording;
   buildTimeline: (runs: Recording[]) => { e: number; s: number }[];
   frameAt: (run: Recording, point: { e: number; s: number }) => Frame | null;
   trailAt: (run: Recording, point: { e: number; s: number }) => { x: number; y: number }[];
@@ -48,6 +50,17 @@ describe('replay alignment', () => {
 });
 
 describe('recording loading and charts', () => {
+  it('accepts every generated recording, including structured HF2 goal audits', () => {
+    const validate = Reflect.get(globalThis, 'IslandReplay').validateRecording;
+    for (const file of readdirSync('viewer/runs').filter((f) => f.endsWith('.json') && f !== 'index.json')) {
+      const run = JSON.parse(readFileSync(`viewer/runs/${file}`, 'utf8'));
+      expect(() => validate(run), file).not.toThrow();
+    }
+    const run = JSON.parse(readFileSync('viewer/runs/hf2-1.json', 'utf8'));
+    run.frames[0].inner.goals = [{ label: 'malformed' }];
+    expect(() => validate(run)).toThrow();
+  });
+
   it('reads simple and metadata indexes without accepting unrelated entries', () => {
     expect(indexPaths(['hf-1.json', 'llm-1.json'])).toEqual(['hf-1.json', 'llm-1.json']);
     expect(indexPaths([{ file: 'hf-1.json', mind: 'hf', seed: 1 }])).toEqual(['hf-1.json']);

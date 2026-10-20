@@ -6,7 +6,7 @@ function actionKind(action: string): string {
 }
 
 /** Derive metrics from post-action frames; never modify the recording. */
-export function measureRecording(recording: Recording): Record<string, number> {
+export function measureRecording(recording: Recording, legacy = false): Record<string, number> {
   const free = recording.frames.filter((frame) => frame.e < recording.config.freeEpisodes);
   const kinds = new Map<string, number>();
   const episodes = new Map<number, Frame[]>();
@@ -107,5 +107,68 @@ export function measureRecording(recording: Recording): Record<string, number> {
   // boredomMeanN is the mean of available inner.boredom readings in free episode N; absent if none.
   for (const [episode, aggregate] of boredom)
     measures[`boredomMean${episode}`] = aggregate.sum / aggregate.count;
+  if (legacy) return measures;
+  // Additive metrics. Legacy serialization opts out so committed pilot hashes remain reproducible.
+  measures.manipulationShare = free.length
+    ? free.filter((f) => ['pick', 'place', 'throw'].includes(actionKind(f.action))).length / free.length
+    : 0;
+  measures.freeMaxStack = Math.max(0, ...free.flatMap((f) => f.objects.map((o) => o.level + 1)));
+  measures.rememberedTargetMoves = recording.frames.reduce(
+    (n, f) => n + (f.inner?.rememberedTargetMove ?? 0),
+    0,
+  );
+  measures.freeRememberedTargetMoves = free.reduce((n, f) => n + (f.inner?.rememberedTargetMove ?? 0), 0);
+  const goals = new Map(
+    recording.frames.flatMap((f) => (f.inner?.goals ?? []).map((g) => [g.id, g] as const)),
+  );
+  measures.goalsProposed = [...goals.values()].filter((g) => g.proposed).length;
+  measures.goalsAdopted = [...goals.values()].filter((g) => g.adopted).length;
+  const freeGoalIds = new Set(
+    free.flatMap((f) => (f.inner?.goals ?? []).filter((g) => g.source === 'hf').map((g) => g.id)),
+  );
+  measures.freeGoalsProposed = [...goals.values()].filter((g) => g.proposed && freeGoalIds.has(g.id)).length;
+  measures.freeGoalsAdopted = [...goals.values()].filter((g) => g.adopted && freeGoalIds.has(g.id)).length;
+  for (const e of new Set(recording.frames.map((f) => f.e))) {
+    const values = recording.frames
+      .filter((f) => f.e === e)
+      .flatMap((f) => (f.inner?.boredom === undefined ? [] : [f.inner.boredom]));
+    if (!values.length) continue;
+    measures[`boredomMin${e}`] = Math.min(...values);
+    measures[`boredomMax${e}`] = Math.max(...values);
+    if (e >= recording.config.freeEpisodes)
+      measures[`boredomMean${e}`] = values.reduce((n, v) => n + v, 0) / values.length;
+  }
+  // An episode-local carrying bout pursues its eventual destination if 2+ carried moves reduce the
+  // Manhattan distance to it. Count each bout once. A dropped/lost object has no inferred destination.
+  // This is behavioral evidence only: random transport also qualifies. No mind's internal tags are used.
+  let pursuit = 0;
+  for (const frames of episodes.values()) {
+    let bout: Frame[] = [];
+    let carried: string | null = null;
+    const close = (destination: { x: number; y: number } | undefined) => {
+      if (destination && bout.length > 1) {
+        let toward = 0;
+        const d = (f: Frame) => Math.abs(f.me.x - destination.x) + Math.abs(f.me.y - destination.y);
+        for (let i = 1; i < bout.length; i++) {
+          const before = bout[i - 1];
+          const after = bout[i];
+          if (before && after && ['move', 'climb'].includes(actionKind(after.action)) && d(after) < d(before))
+            toward++;
+        }
+        if (toward >= 2) pursuit++;
+      }
+      bout = [];
+      carried = null;
+    };
+    for (const f of frames) {
+      if (carried && f.carrying !== carried) close(f.objects.find((o) => o.id === carried));
+      if (f.carrying) {
+        carried = f.carrying;
+        bout.push(f);
+      }
+    }
+    close(bout.at(-1)?.me);
+  }
+  measures.repeatedPursuit = pursuit;
   return measures;
 }
