@@ -10,6 +10,8 @@ describe('meter control grouping', () => {
     const probeControls = app.indexOf('className="probe-tabs"', meterStart);
     const reading = app.indexOf('Read meter <small>', meterStart);
     expect(meterStart).toBeGreaterThan(-1);
+    expect(probeControls).toBeGreaterThan(meterStart);
+    expect(reading).toBeGreaterThan(probeControls);
     expect(diagramAfterControls).toBeGreaterThan(reading);
     expect(probeControls).toBeLessThan(reading);
     expect(app).not.toContain(

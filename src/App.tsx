@@ -5,6 +5,7 @@ import { FirstRepairGuide } from './components/FirstRepairGuide';
 import { LessonControl } from './components/LessonControl';
 import { PhysicalObjectScene } from './components/PhysicalObjectScene';
 import { ReadingComparison } from './components/ReadingComparison';
+import { RecentConversation } from './components/RecentConversation';
 import { ReturnedHistory } from './components/ReturnedHistory';
 import { ReturnReceipt } from './components/ReturnReceipt';
 import { SamRequest } from './components/SamRequest';
@@ -394,6 +395,7 @@ export default function App() {
       document.removeEventListener('change', sync);
     };
   }, []);
+  const [conversationSession, setConversationSession] = useState(0);
   const [view, setView] = useState('bench');
   const [paused, setPaused] = useState(false);
   const [pane, setPane] = useState<'object' | 'meter' | 'repair' | 'notes'>('object');
@@ -619,6 +621,7 @@ export default function App() {
     setView('bench');
   };
   const resetPresentation = (next: GameState, fresh = false) => {
+    setConversationSession((session) => session + 1);
     if (menu.current) menu.current.open = false;
     setState(next);
     setView('bench');
@@ -842,26 +845,12 @@ export default function App() {
             })}
         </ul>
       )}
-      {todaysWords(state).length > 0 && (
-        <details className="recent-conversation">
-          <summary>Recent conversation</summary>
-          <section className="todays-words" aria-label="What people said today">
-            {todaysWords(state).map((line) => (
-              <p key={line.id} className={line.tone === 'warning' ? 'is-warning' : undefined}>
-                <strong>{line.speaker}</strong> {line.text} <time>{dayTime(line.at)}</time>
-                {line.speaker === 'Sam' &&
-                  line.text.includes('see how you find the fault') &&
-                  !state.pendingRequest &&
-                  !state.watching && (
-                    <button type="button" onClick={() => act({ type: 'request-lesson' })}>
-                      Ask Sam to watch
-                    </button>
-                  )}
-              </p>
-            ))}
-          </section>
-        </details>
-      )}
+      <RecentConversation
+        key={conversationSession}
+        lines={todaysWords(state)}
+        canAskSam={!state.pendingRequest && !state.watching}
+        onAskSam={() => act({ type: 'request-lesson' })}
+      />
       {view === 'bench' && job && (
         <main className={`focused-bench ${showTools ? 'tools-visible' : ''} active-${pane}`}>
           <div className="focused-owner">
