@@ -26,7 +26,8 @@
     "@fontsource/ibm-plex-mono": "5.3.0",
     "@fontsource/libre-baskerville": "5.3.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.1.1/adam0white-lab-client-0.1.1.tgz"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

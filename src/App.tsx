@@ -36,6 +36,7 @@ import type {
   MeterMode,
   TestCondition,
 } from './game/types';
+import { lab } from './lab';
 import { todaysWords, workshopCrises } from './ui/crises';
 import { firstRepairProgress } from './ui/first-repair';
 import './styles.css';
@@ -377,6 +378,20 @@ function Device({
 }
 export default function App() {
   const [state, setState] = useState(initial);
+  const [eventsOn, setEventsOn] = useState(lab.eventsOn);
+  useEffect(() => {
+    lab.screen('play');
+    lab.milestone('run started');
+    const sync = () => setEventsOn(lab.eventsOn);
+    window.addEventListener('storage', sync);
+    window.addEventListener('focus', sync);
+    document.addEventListener('change', sync);
+    return () => {
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('focus', sync);
+      document.removeEventListener('change', sync);
+    };
+  }, []);
   const [view, setView] = useState('bench');
   const [paused, setPaused] = useState(false);
   const [pane, setPane] = useState<'object' | 'meter' | 'repair' | 'notes'>('object');
@@ -741,6 +756,24 @@ export default function App() {
             <button type="button" onClick={exportSave}>
               Export workshop
             </button>
+            <button
+              type="button"
+              onClick={() => lab.openSendDialog({ getRun: () => JSON.parse(saveGame(state)) })}
+            >
+              Send this run to the notebook
+            </button>
+            <label>
+              <input
+                type="checkbox"
+                checked={eventsOn}
+                onChange={(e) => {
+                  lab.setEventsOff(!e.target.checked);
+                  setEventsOn(lab.eventsOn);
+                }}
+              />{' '}
+              Anonymous play events
+            </label>
+            <a href="https://human.adamwhite.work/lab/privacy/">Privacy</a>
             <button type="button" onClick={() => input.current?.click()}>
               Import workshop
             </button>
