@@ -1,6 +1,16 @@
 # Handoff
 
-Updated 2026-10-19 for the HF 2.8.0 / engine 5 level-up (game 3.1.0-alpha.3). Earlier sections are historical.
+Updated 2026-10-20 for the F-231 clarity follow-up. Earlier sections are historical.
+
+## Clarity follow-up, 2026-10-20
+
+What remains: Adam accepts feel personally. No fresh source-unread retest of these fixes is claimed.
+
+- A failed Carry keeps the lantern dark after the animation and reload. An adjacent last-test sentence explains the drawing. Repair work invalidates the old result; a new test supplies the next result.
+- On phones, Look inside compacts the exterior and scrolls the opening cue into view with the component diagram and named-part selector. It does not select a component.
+- The guide's **Test the lantern** performs one Carry and shows **15 min · carry** before the tap. After a passed test, **Back to lantern** only navigates.
+- Focused regressions: [physical output](tests/physical-preview.test.ts) and [guide actions](tests/first-repair-action.test.ts). Chromium checks cover 360×690 touch, 1280×800 and keyboard access. The implementation report, screenshots and full-check output are in the HF checkout's `scratch/followups/repair*` paths.
+- The simulation, save format and exact HF 2.8.0 pin are unchanged. The existing historical-export replay controls still govern compatibility.
 
 ## What remains
 

@@ -10,6 +10,8 @@ interface Props {
   opened: boolean;
   onOpen: () => void;
   onPane: (pane: Pane) => void;
+  onTest: () => void;
+  disabled: boolean;
   onSkip: () => void;
 }
 
@@ -48,7 +50,16 @@ function staleReadings(job: Job): boolean {
 }
 
 /** One next operation, not a second copy of the bench controls. */
-export function FirstRepairGuide({ state, job, pane, opened, onPane, onSkip }: Props) {
+export function FirstRepairGuide({
+  state,
+  job,
+  pane,
+  opened,
+  onPane,
+  onTest,
+  disabled,
+  onSkip,
+}: Props) {
   const progress = firstRepairProgress(state);
   if (progress.openingJobId !== job.id || progress.phase === 'complete') return null;
   const part = job.model.components.find((c) => c.id === progress.suggestedPart);
@@ -82,7 +93,7 @@ export function FirstRepairGuide({ state, job, pane, opened, onPane, onSkip }: P
   const pair = progress.suggestedPair;
   const showPair = pair && (phase === 'measure-source' || phase === 'measure-path');
   return (
-    <section className="first-repair-guide" aria-label="First repair guide">
+    <section className="first-repair-guide" data-phase={phase} aria-label="First repair guide">
       <div className="guide-cue">
         <svg
           viewBox="0 0 24 24"
@@ -128,12 +139,23 @@ export function FirstRepairGuide({ state, job, pane, opened, onPane, onSkip }: P
         </div>
       )}
       {target !== pane && phase !== 'try' && phase !== 'open' && (
-        <button type="button" className="guide-next" onClick={() => onPane(target)}>
+        <button
+          type="button"
+          className="guide-next"
+          disabled={target === 'object' && phase === 'check' && disabled}
+          onClick={() => {
+            onPane(target);
+            if (target === 'object' && phase === 'check') onTest();
+          }}
+        >
           {target === 'meter'
             ? 'Pick up the meter'
             : target === 'repair'
               ? 'Work on the part'
-              : 'Try the lantern'}{' '}
+              : phase === 'check'
+                ? 'Test the lantern'
+                : 'Back to lantern'}{' '}
+          {target === 'object' && phase === 'check' && <small>15 min · carry</small>}
           <span aria-hidden="true">→</span>
         </button>
       )}

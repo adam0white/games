@@ -1,4 +1,62 @@
 /* F-210: optional conversation and reachable repair controls. */
+.physical-observation {
+  min-height: 2.8em;
+  margin: 8px 0 0;
+  color: #f0e4c6;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  text-align: center;
+}
+.guide-next small {
+  display: block;
+  font-weight: normal;
+}
+@media (max-width: 900px) {
+  .instrument-focused .physical-scene {
+    flex-wrap: wrap;
+  }
+  .instrument-focused .physical-observation {
+    flex-basis: 100%;
+  }
+  /* An opened cover reveals the parts, with the exterior still available beside Carry. */
+  .tools-visible.active-object .physical-scene {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0 8px;
+  }
+  .tools-visible.active-object .physical-stage {
+    height: 90px;
+    width: 100%;
+  }
+  .tools-visible.active-object .physical-power-switch {
+    top: 50%;
+  }
+  .tools-visible.active-object .physical-cover-latch {
+    display: none;
+  }
+  .tools-visible.active-object .physical-use-action {
+    min-width: 105px;
+    margin: 0;
+  }
+  .tools-visible.active-object .physical-observation {
+    grid-column: 1 / -1;
+    min-height: 1.4em;
+  }
+  .tools-visible.active-object .first-repair-guide[data-phase="open"] {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+  }
+  .tools-visible.active-object .first-repair-guide[data-phase="open"] .guide-dismiss {
+    flex: 0 0 82px;
+    padding: 4px;
+  }
+  .active-object .focused-pane .device-stage > svg {
+    max-height: 180px;
+  }
+}
 .focused-workshop.focused-workshop button,
 .focused-workshop.focused-workshop summary {
   min-width: 44px;

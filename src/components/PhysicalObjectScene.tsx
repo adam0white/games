@@ -36,27 +36,25 @@ function ActionIcon({ action }: { action: 'Carry' | 'Read' | 'Try' | 'Play' | 'A
   );
 }
 
-/** Looking reveals bench output only; a recorded test briefly shows its actual observed condition. */
-export function physicalSceneOutput(job: Job, testing = false): { output: number; signal: string } {
+/** Keep the latest observed use visible until work invalidates it; animation does not change evidence. */
+export function physicalSceneOutput(job: Job): { output: number; signal: string } {
   if (!job.model.power) return { output: 0, signal: 'power-off' };
-  if (testing) {
-    const revision = job.evidence.findLast((entry) => entry.kind === 'work')?.id ?? 0;
-    const observed = job.evidence.findLast((entry) => entry.kind === 'use' && entry.id > revision);
-    if (observed) {
-      const signal = observed.cues.signal ?? 'no-output';
-      const percent = observed.summary.match(/reaches (\d+(?:\.\d+)?)%/);
-      const rpm = observed.summary.match(/turns at (\d+(?:\.\d+)?) rpm/);
-      const recorded = (observed as Evidence & Partial<UseResult>).output;
-      const output =
-        typeof recorded === 'number' && Number.isFinite(recorded)
-          ? recorded
-          : percent
-            ? Number(percent[1]) / 100
-            : rpm
-              ? Number(rpm[1])
-              : 0;
-      return { output, signal };
-    }
+  const revision = job.evidence.findLast((entry) => entry.kind === 'work')?.id ?? 0;
+  const observed = job.evidence.findLast((entry) => entry.kind === 'use' && entry.id > revision);
+  if (observed) {
+    const signal = observed.cues.signal ?? 'no-output';
+    const percent = observed.summary.match(/reaches (\d+(?:\.\d+)?)%/);
+    const rpm = observed.summary.match(/turns at (\d+(?:\.\d+)?) rpm/);
+    const recorded = (observed as Evidence & Partial<UseResult>).output;
+    const output =
+      typeof recorded === 'number' && Number.isFinite(recorded)
+        ? recorded
+        : percent
+          ? Number(percent[1]) / 100
+          : rpm
+            ? Number(rpm[1])
+            : 0;
+    return { output, signal };
   }
   const bench = runUseTest(job.model, 'bench');
   return { output: bench.output, signal: bench.cues.signal ?? 'no-output' };
@@ -88,7 +86,7 @@ export function PhysicalObjectScene({
     const timer = window.setTimeout(() => setMoving(false), 600);
     return () => window.clearTimeout(timer);
   }, [useId]);
-  const { output, signal } = physicalSceneOutput(job, moving);
+  const { output, signal } = physicalSceneOutput(job);
   const working = output > 0;
   const steady = signal === 'steady-output';
   const condition =
@@ -227,6 +225,7 @@ export function PhysicalObjectScene({
         <span>{action}</span>
         <small>15 min</small>
       </button>
+      <p className="physical-observation">{lastUse ? `Last test: ${lastUse.summary}` : ''}</p>
     </div>
   );
 }

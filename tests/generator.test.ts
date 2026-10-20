@@ -111,8 +111,9 @@ describe('later owner requests', () => {
     expect(state.jobs.filter((j) => j.title.startsWith('Nora’s reading light'))).toHaveLength(1);
     expect(saveGame(loadGame(saveGame(state)))).toBe(saveGame(state));
   });
-  it('keeps a generated governor fault physically meaningful and clears an old setting with its old fault', () => {
-    for (const seed of [2, 4, 69, 72, 416]) {
+  it.each([2, 4, 69, 72, 416])(
+    'keeps seed %s governor faults physically meaningful and clears an old setting with its old fault',
+    (seed) => {
       for (const job of [
         ...laterOffers(seed, 3),
         ...laterOffers(seed, 4),
@@ -143,8 +144,8 @@ describe('later owner requests', () => {
           ).toBe(true);
         }
       }
-    }
-  });
+    },
+  );
   it.each([2, 4, 69])('reports what seed %s actually does under each use condition', (seed) => {
     const jobs = [...laterOffers(seed, 3), ...laterOffers(seed, 4), ...laterOffers(seed, 9)];
     expect(jobs.length).toBeGreaterThan(0);

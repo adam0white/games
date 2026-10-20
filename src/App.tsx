@@ -866,6 +866,8 @@ export default function App() {
               opened={opened}
               onOpen={() => setOpened(true)}
               onPane={navigatePane}
+              onTest={() => act({ type: 'verify', jobId: job.id, condition: 'movement' })}
+              disabled={jobLocked}
               onSkip={skipIntro}
             />
           )}
@@ -909,6 +911,13 @@ export default function App() {
                 onOpen={() => {
                   setOpened(true);
                   setPane('object');
+                  // This explicit reveal keeps the cue and parts together on a phone.
+                  if (window.matchMedia('(max-width: 900px)').matches)
+                    requestAnimationFrame(() =>
+                      document
+                        .querySelector('.first-repair-guide')
+                        ?.scrollIntoView({ block: 'start' }),
+                    );
                 }}
                 opened={opened}
                 allowOpen={!guided || progress.phase !== 'try'}
