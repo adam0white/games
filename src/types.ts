@@ -58,6 +58,16 @@ export interface Observation {
   actions: Action[];
   /** Set during the later task episode only; empty during free time. */
   task: string;
+  /**
+   * The same facts as `text`, machine-readable, for minds that do not read prose (HF, random). It never holds more
+   * than `text` says: anything here must also be in `text`, and the reverse.
+   */
+  seen: {
+    here: { height: number; onSpire: boolean; terrain: string };
+    spire: { dx: number; dy: number } | null; // null when out of sight
+    things: { id: string; kind: ObjectKind; dx: number; dy: number; level: number; inRing: boolean }[];
+    carrying: string | null;
+  };
 }
 
 /** A mind chooses one action id from `obs.actions`, may keep notes, and may report itself. */
@@ -106,3 +116,18 @@ export interface Recording {
   /** Text minds: calls made and list-price cost; HF and random: zero. */
   cost: { calls: number; inputTokens: number; outputTokens: number; usd: number };
 }
+
+/**
+ * Every mind module in src/minds/<name>.ts default-exports a factory. The runner picks the module by name:
+ * `random`, `hf` (options.boredom false gives the `hf-no-boredom` arm), `llm` (options.backend picks the model).
+ */
+export interface MindOptions {
+  seed: number;
+  /** Plain-words persona every mind shares: HF reads it as temperament, LLMs read it as text. */
+  persona: string;
+  [key: string]: unknown;
+}
+export type MindFactory = (options: MindOptions) => Mind;
+
+/** The persona all minds share (Eko's SOUL.md described its agent as curious and easily bored). */
+export const PERSONA = 'You are curious and easily bored. Nobody has given you a task.';
