@@ -3,7 +3,7 @@
  * here is unpaired. Exploratory p values include Holm correction within the stated comparison families;
  * families are not jointly corrected, and a large p does not establish equivalence.
  */
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { measureRecording } from './measures.ts';
@@ -56,7 +56,8 @@ export function holmAdjust(pValues: number[]): number[] {
 }
 
 export async function compare(directory = 'viewer/runs'): Promise<string> {
-  const names = ['hf', 'random', 'hf2', 'hf2-no-boredom', 'hf2-no-memory', 'hf2-no-goals'];
+  const names = ['hf', 'random', 'hf2', 'hf2-no-boredom', 'hf2-no-memory', 'hf2-no-goals', 'hf3'];
+  const recordings: Recording[] = [];
   const samples = new Map<string, Record<string, number>[]>();
   for (const name of names) {
     const records = [];
@@ -73,11 +74,12 @@ export async function compare(directory = 'viewer/runs'): Promise<string> {
       )
         throw new Error(`Unexpected run ${name}-${seed}`);
       records.push(measureRecording(r));
+      recordings.push(r);
     }
     samples.set(name, records);
   }
   const rows = [
-    'Exact unpaired permutation tests of absolute mean differences, including ties. Medians describe samples. Holm correction uses one eight-test family per arm vs random (seven free-time metrics plus task score), one singleton family per task-score comparison vs hf, and one two-test family per hf2 ablation comparison. Families are exploratory and are not jointly corrected; large p values do not establish equivalence. The hf baseline has no task comparison with itself.',
+    'Exact unpaired permutation tests of absolute mean differences, including ties. Medians describe samples. Holm correction uses one eight-test family per arm vs random (seven free-time metrics plus task score), one singleton family per task-score comparison vs hf or hf2, and one two-test family per hf2 ablation comparison. Families are exploratory and are not jointly corrected; large p values do not establish equivalence. The hf baseline has no task comparison with itself.',
     '',
     '| Comparison | Measure | Median A | Median B | Exact p | Holm p |',
     '|---|---|---:|---:|---:|---:|',
@@ -104,15 +106,52 @@ export async function compare(directory = 'viewer/runs'): Promise<string> {
       );
     });
   }
-  for (const arm of ['hf', 'hf2', 'hf2-no-memory', 'hf2-no-boredom'])
+  for (const arm of ['hf', 'hf2', 'hf2-no-memory', 'hf2-no-boredom', 'hf3'])
     append(arm, 'random', [...metrics, ['taskScore', 'Task score']]);
-  for (const arm of ['hf2', 'hf2-no-memory', 'hf2-no-boredom'])
+  for (const arm of ['hf2', 'hf2-no-memory', 'hf2-no-boredom', 'hf3'])
     append(arm, 'hf', [['taskScore', 'Task score']]);
-  for (const arm of names.slice(3))
+  append('hf3', 'hf2', [['taskScore', 'Task score']]);
+  for (const arm of ['hf2-no-boredom', 'hf2-no-memory', 'hf2-no-goals'])
     append('hf2', arm, [
       ['taskScore', 'Task score'],
       ['rememberedTargetMoves', 'Remembered-target moves (all)'],
     ]);
+  // Descriptive coverage includes every saved HF arm, including the three-seed pilot ablation.
+  for (const file of (await readdir(directory)).sort()) {
+    if (!/^hf.*-\d+\.json$/.test(file)) continue;
+    const run = JSON.parse(await readFile(resolve(directory, file), 'utf8')) as Recording;
+    if (!names.includes(run.mind)) recordings.push(run);
+  }
+  rows.push(
+    '',
+    'Per-seed values (vectors follow the listed seed order). Spire objects, tallest stack and repeated pursuit use free time; task score is final task cubes on the Spire.',
+    '',
+    '| Arm | Seeds | Spire objects | Tallest stack | Repeated pursuit | Task score |',
+    '|---|---|---|---|---|---|',
+  );
+  const arms = [...new Set(recordings.map((r) => r.mind))].sort();
+  for (const arm of arms) {
+    const runs = recordings.filter((r) => r.mind === arm).sort((a, b) => a.seed - b.seed);
+    const measures = runs.map((r) => measureRecording(r));
+    rows.push(
+      `| ${arm} | ${runs.map((r) => r.seed).join(', ')} | ${['freeSpireObjects', 'freeMaxStack', 'repeatedPursuit', 'taskScore'].map((key) => measures.map((m) => m[key]).join(', ')).join(' | ')} |`,
+    );
+  }
+  rows.push(
+    '',
+    'Free-time action-kind composition (pooled action shares; jump is the input verb, recorded as climb in the entropy metric).',
+    '',
+    '| Arm | move | jump | look | rest | pick | place | throw |',
+    '|---|---:|---:|---:|---:|---:|---:|---:|',
+  );
+  for (const arm of arms) {
+    const frames = recordings
+      .filter((r) => r.mind === arm)
+      .flatMap((r) => r.frames.filter((f) => f.e < r.config.freeEpisodes));
+    rows.push(
+      `| ${arm} | ${['move', 'jump', 'look', 'rest', 'pick', 'place', 'throw'].map((kind) => (frames.filter((f) => f.action.split(' ')[0] === kind).length / frames.length).toFixed(4)).join(' | ')} |`,
+    );
+  }
   return rows.join('\n');
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

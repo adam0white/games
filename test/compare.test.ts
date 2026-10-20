@@ -34,7 +34,7 @@ describe('Holm adjustment', () => {
 describe('comparison report', () => {
   it('covers all requested blocks and adjusts each random comparison as one eight-test family', async () => {
     const report = await compare();
-    const rows = report
+    const rows = (report.split('\n\nPer-seed')[0] ?? '')
       .split('\n')
       .filter((line) => line.startsWith('| ') && !line.startsWith('| Comparison'))
       .map((line) =>
@@ -52,7 +52,7 @@ describe('comparison report', () => {
       'Tallest stack',
       'Repeated pursuit',
     ];
-    for (const arm of ['hf', 'hf2', 'hf2-no-memory', 'hf2-no-boredom']) {
+    for (const arm of ['hf', 'hf2', 'hf2-no-memory', 'hf2-no-boredom', 'hf3']) {
       const block = rows.filter(([comparison]) => comparison === `${arm} vs random`);
       expect(block.map((row) => row[1])).toEqual([...freeLabels, 'Task score']);
       const expected = holmAdjust(block.map((row) => Number(row[4])));
@@ -61,7 +61,7 @@ describe('comparison report', () => {
         expect(Number(row[5])).toBeCloseTo(expected[index] as number, 4);
       });
     }
-    for (const arm of ['hf2', 'hf2-no-memory', 'hf2-no-boredom']) {
+    for (const arm of ['hf2', 'hf2-no-memory', 'hf2-no-boredom', 'hf3']) {
       const block = rows.filter(([comparison]) => comparison === `${arm} vs hf`);
       expect(block).toHaveLength(1);
       expect(block[0]?.[1]).toBe('Task score');
@@ -75,9 +75,13 @@ describe('comparison report', () => {
         expect(Number(row[5])).toBeCloseTo(expected[index] as number, 4);
       });
     }
-    expect(rows).toHaveLength(41);
+    expect(rows.filter(([c]) => c === 'hf3 vs hf2').map((r) => r[1])).toEqual(['Task score']);
+    expect(rows).toHaveLength(51);
+    expect(report).toContain('Per-seed values');
+    expect(report).toContain('| hf-no-boredom |');
+    expect(report).toContain('| Arm | move | jump | look | rest | pick | place | throw |');
     expect(report).toContain('one eight-test family per arm vs random');
-    expect(report).toContain('one singleton family per task-score comparison vs hf');
+    expect(report).toContain('one singleton family per task-score comparison vs hf or hf2');
     expect(report).toContain('one two-test family per hf2 ablation comparison');
     expect(report).toContain('| Exact p | Holm p |');
   });

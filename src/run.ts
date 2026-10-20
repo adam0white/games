@@ -75,7 +75,7 @@ export async function runIsland(
   }
   const cost = (mind as Mind & { cost?: () => Recording['cost'] }).cost?.();
   if (cost) recording.cost = { ...cost };
-  recording.measures = measureRecording(recording, !mind.name.startsWith('hf2'));
+  recording.measures = measureRecording(recording, !/^hf[23]/.test(mind.name));
   return recording;
 }
 
@@ -113,6 +113,7 @@ async function main(args: string[]) {
       'llm',
       'scripted',
       'hf2',
+      'hf3',
       'hf2-no-boredom',
       'hf2-no-memory',
       'hf2-no-goals',
@@ -127,9 +128,10 @@ async function main(args: string[]) {
   if (name === 'hf-no-boredom') options.boredom = false;
   if (name === 'hf2-no-boredom') options.boredom = false;
   if (name === 'hf2-no-memory') options.memory = false;
+  if (name === 'hf3') options.consequences = true;
   if (name === 'hf2-no-goals') options.goals = false;
   const module = (await import(
-    `./minds/${name.startsWith('hf2') ? 'hf2' : name === 'hf-no-boredom' ? 'hf' : name}.ts`
+    `./minds/${name.startsWith('hf2') || name === 'hf3' ? 'hf2' : name === 'hf-no-boredom' ? 'hf' : name}.ts`
   )) as {
     default: MindFactory;
   };

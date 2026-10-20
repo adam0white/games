@@ -17,6 +17,7 @@
  * API LIMIT: Affordance has no serves/spatial goal predicate. Host declarations below bind advertised need
  * effects to generic need goals. The stated task binds ONLY the concrete cube-placement action name at the
  * observed Spire cell; no task-specific pickup/movement links. HF cannot infer those means from placeId.
+ * hf3 adds attended world-semantic trigger → placement claims and temporal task valuation (60-minute half-life).
  * no-goals leaves tick's proposals intact but omits all goal links, including the adopted task's action match.
  * no-memory encodes no placeId and offers object-directed movement only from current sight.
  */
@@ -36,6 +37,7 @@ import {
   type Person,
   perceive,
   proposeGoals,
+  type ReceivedConsequence,
   random,
   readPerson,
   recall,
@@ -106,6 +108,7 @@ export class Hf2Mind implements Mind {
   readonly name: string;
   readonly person: Person;
   engagement = 0.6;
+  private readonly consequences: boolean;
   private readonly memory: boolean;
   private readonly goals: boolean;
   private readonly boredom: boolean;
@@ -118,16 +121,19 @@ export class Hf2Mind implements Mind {
   private goalHistory = new Map<string, GoalReading>();
 
   constructor(options: MindOptions) {
+    this.consequences = options.consequences === true;
     this.memory = options.memory !== false;
     this.goals = options.goals !== false;
     this.boredom = options.boredom !== false;
-    this.name = !this.memory
-      ? 'hf2-no-memory'
-      : !this.goals
-        ? 'hf2-no-goals'
-        : !this.boredom
-          ? 'hf2-no-boredom'
-          : 'hf2';
+    this.name = this.consequences
+      ? 'hf3'
+      : !this.memory
+        ? 'hf2-no-memory'
+        : !this.goals
+          ? 'hf2-no-goals'
+          : !this.boredom
+            ? 'hf2-no-boredom'
+            : 'hf2';
     this.person = createPerson({
       id: 'islander',
       name: 'the curious islander',
@@ -272,18 +278,99 @@ export class Hf2Mind implements Mind {
       objects.push({ id: 'Spire', cell: add(this.here, { x: obs.seen.spire.dx, y: obs.seen.spire.dy }) });
     if (obs.seen.carrying) objects.push({ id: obs.seen.carrying, cell: this.here });
     this.encode(
-      objects.map((o) => ({
-        at: p.now,
-        channel: 'saw',
-        kind: 'island-object',
-        targetId: o.id,
-        ...(this.memory ? { placeId: place(o.cell) } : {}),
-        salience: 0.5,
-        valence: 0,
-        summary: `${o.id} observed${this.memory ? ` at ${place(o.cell)}` : ''}`,
-      })),
+      [
+        ...objects.map(
+          (o): Percept => ({
+            at: p.now,
+            channel: 'saw',
+            kind: 'island-object',
+            targetId: o.id,
+            ...(this.memory ? { placeId: place(o.cell) } : {}),
+            salience: 0.5,
+            valence: 0,
+            summary: `${o.id} observed${this.memory ? ` at ${place(o.cell)}` : ''}`,
+          }),
+        ),
+        ...this.consequencePercepts(obs),
+      ],
       'island-object',
     );
+  }
+
+  /** World semantics only: one legal trigger followed by one immediately reachable placement.
+   * No task/goal input, route search, hidden terrain or forced attention. */
+  private consequencePercepts(obs: Observation): Percept[] {
+    if (!this.consequences) return [];
+    const p = this.person;
+    const land = new Map<string, Cell>([[place(this.here), this.here]]);
+    for (const a of obs.actions) {
+      const [verb, arg = ''] = a.id.split(' ');
+      if (['move', 'jump', 'place'].includes(verb ?? '') && delta[arg]) {
+        const cell = add(this.here, delta[arg]);
+        land.set(place(cell), cell);
+      }
+    }
+    for (const thing of obs.seen.things) {
+      const cell = add(this.here, { x: thing.dx, y: thing.dy });
+      land.set(place(cell), cell);
+    }
+    const spire = obs.seen.spire ? add(this.here, { x: obs.seen.spire.dx, y: obs.seen.spire.dy }) : null;
+    if (spire) land.set(place(spire), spire);
+    const claims: ReceivedConsequence[] = [];
+    const offers = this.offers(obs);
+    const described = new Set<string>();
+    for (const offer of offers) {
+      const [verb, arg = ''] = offer.input.split(' ');
+      if (verb !== 'pick' && !(verb === 'move' && obs.seen.carrying)) continue;
+      const identity = JSON.stringify([offer.action, offer.targetId, offer.placeId]);
+      if (described.has(identity)) continue;
+      described.add(identity);
+      // HF trigger matching excludes affordance id. If several inputs share an identity,
+      // claim only placements reachable after EVERY matching input.
+      const bodies = offers
+        .filter(
+          (o) => o.action === offer.action && o.targetId === offer.targetId && o.placeId === offer.placeId,
+        )
+        .map((o) => {
+          const [v, d = ''] = o.input.split(' ');
+          return v === 'move' && delta[d] ? add(this.here, delta[d]) : this.here;
+        });
+      const carried = verb === 'pick' ? arg : obs.seen.carrying;
+      if (!carried) continue;
+      for (const cell of land.values()) {
+        if (bodies.some((body) => distance(body, cell) > 1)) continue;
+        claims.push({
+          // Reuse bounded slots; each observation supersedes its old revision.
+          id: `placement-${claims.length}`,
+          revision: p.now,
+          trigger: { action: offer.action, targetId: offer.targetId, placeId: offer.placeId },
+          successor: {
+            action: `island:place:${carried.startsWith('cube-') ? 'cube' : carried}${spire && distance(cell, spire) === 0 ? '@Spire' : ''}`,
+            targetId: carried,
+            placeId: place(cell),
+            duration: 1,
+            effort: 0.08,
+            focus: 0.03,
+          },
+          availableFrom: p.now + 1,
+          availableUntil: p.now + 2,
+          expiresAt: p.now + 2,
+          chance: 1,
+          confidence: 1,
+        });
+      }
+    }
+    return claims.map((claim) => ({
+      at: p.now,
+      channel: 'told',
+      actorId: 'island',
+      targetId: p.id,
+      kind: 'island-consequence',
+      salience: 0.5,
+      valence: 0,
+      summary: `${claim.trigger.action} (${claim.trigger.targetId}, ${claim.trigger.placeId}) permits ${claim.successor.action} (${claim.successor.targetId}) at ${claim.successor.placeId} immediately next.`,
+      consequences: [claim],
+    }));
   }
 
   offers(obs: Observation): Offer[] {
@@ -415,6 +502,7 @@ export class Hf2Mind implements Mind {
           serves: ['competence'],
           importance: 0.5,
           deadline: p.now + obs.stepsLeft,
+          ...(this.consequences ? { temporal: { halfLifeMinutes: 60 } } : {}),
           advancedBy: this.goals && spire ? [{ action: 'island:place:cube@Spire', amount: 0.1 }] : [],
         },
         p.now,
