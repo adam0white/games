@@ -11,6 +11,7 @@ What remains: Adam accepts feel personally. No fresh source-unread retest of the
 - The guide's **Test the lantern** performs one Carry and shows **15 min · carry** before the tap. After a passed test, **Back to lantern** only navigates.
 - Focused regressions: [physical output](tests/physical-preview.test.ts) and [guide actions](tests/first-repair-action.test.ts). Chromium checks cover 360×690 touch, 1280×800 and keyboard access. The implementation report, screenshots and full-check output are in the HF checkout's `scratch/followups/repair*` paths.
 - The simulation, save format and exact HF 2.8.0 pin are unchanged. The existing historical-export replay controls still govern compatibility.
+- Verification uses two Vitest workers on the shared machine. Campaign controls run per seed, and the harness allows 30 seconds per test; all behavioral assertions remain unchanged.
 
 ## What remains
 
