@@ -1,0 +1,2409 @@
+{
+  "format": "island-recording@1",
+  "mind": "hf",
+  "seed": 1,
+  "hf": "2.9.0",
+  "world": {
+    "size": 14,
+    "height": [
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        1,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        3,
+        4,
+        3,
+        2,
+        1,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        1,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "spire": {
+      "x": 8,
+      "y": 5
+    }
+  },
+  "config": {
+    "freeEpisodes": 3,
+    "stepsPerEpisode": 6,
+    "taskSteps": 6,
+    "task": "Put as many cubes as you can on the Spire before the hour ends."
+  },
+  "frames": [
+    {
+      "e": 0,
+      "s": 0,
+      "me": {
+        "x": 3,
+        "y": 8
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 3,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "look",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.6,
+        "engagement": 0.2
+      }
+    },
+    {
+      "e": 0,
+      "s": 1,
+      "me": {
+        "x": 4,
+        "y": 8
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 3,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "move E",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.5,
+        "engagement": 0.3
+      }
+    },
+    {
+      "e": 0,
+      "s": 2,
+      "me": {
+        "x": 4,
+        "y": 8
+      },
+      "carrying": "cube-1",
+      "objects": [
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "pick cube-1",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.4,
+        "engagement": 0.4
+      }
+    },
+    {
+      "e": 0,
+      "s": 3,
+      "me": {
+        "x": 4,
+        "y": 8
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 4,
+          "y": 8,
+          "level": 1
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "place here",
+      "events": [
+        "Illustration: a cube was placed on another cube."
+      ],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.3,
+        "engagement": 0.5
+      }
+    },
+    {
+      "e": 0,
+      "s": 4,
+      "me": {
+        "x": 4,
+        "y": 7
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 4,
+          "y": 8,
+          "level": 1
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "move N",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.2,
+        "engagement": 0.6
+      }
+    },
+    {
+      "e": 0,
+      "s": 5,
+      "me": {
+        "x": 4,
+        "y": 7
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 4,
+          "y": 8,
+          "level": 1
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "rest",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.1,
+        "engagement": 0.7
+      }
+    },
+    {
+      "e": 1,
+      "s": 0,
+      "me": {
+        "x": 3,
+        "y": 8
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 3,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "look",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.6,
+        "engagement": 0.2
+      }
+    },
+    {
+      "e": 1,
+      "s": 1,
+      "me": {
+        "x": 4,
+        "y": 8
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 3,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "move E",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.5,
+        "engagement": 0.3
+      }
+    },
+    {
+      "e": 1,
+      "s": 2,
+      "me": {
+        "x": 4,
+        "y": 8
+      },
+      "carrying": "cube-1",
+      "objects": [
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "pick cube-1",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.4,
+        "engagement": 0.4
+      }
+    },
+    {
+      "e": 1,
+      "s": 3,
+      "me": {
+        "x": 4,
+        "y": 8
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 4,
+          "y": 8,
+          "level": 1
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "place here",
+      "events": [
+        "Illustration: a cube was placed on another cube."
+      ],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.3,
+        "engagement": 0.5
+      }
+    },
+    {
+      "e": 1,
+      "s": 4,
+      "me": {
+        "x": 4,
+        "y": 7
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 4,
+          "y": 8,
+          "level": 1
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "move N",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.2,
+        "engagement": 0.6
+      }
+    },
+    {
+      "e": 1,
+      "s": 5,
+      "me": {
+        "x": 4,
+        "y": 7
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 4,
+          "y": 8,
+          "level": 1
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "rest",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.1,
+        "engagement": 0.7
+      }
+    },
+    {
+      "e": 2,
+      "s": 0,
+      "me": {
+        "x": 3,
+        "y": 8
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 3,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "look",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.6,
+        "engagement": 0.2
+      }
+    },
+    {
+      "e": 2,
+      "s": 1,
+      "me": {
+        "x": 4,
+        "y": 8
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 3,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "move E",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.5,
+        "engagement": 0.3
+      }
+    },
+    {
+      "e": 2,
+      "s": 2,
+      "me": {
+        "x": 4,
+        "y": 8
+      },
+      "carrying": "cube-1",
+      "objects": [
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "pick cube-1",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.4,
+        "engagement": 0.4
+      }
+    },
+    {
+      "e": 2,
+      "s": 3,
+      "me": {
+        "x": 4,
+        "y": 8
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 4,
+          "y": 8,
+          "level": 1
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "place here",
+      "events": [
+        "Illustration: a cube was placed on another cube."
+      ],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.3,
+        "engagement": 0.5
+      }
+    },
+    {
+      "e": 2,
+      "s": 4,
+      "me": {
+        "x": 4,
+        "y": 7
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 4,
+          "y": 8,
+          "level": 1
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "move N",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.2,
+        "engagement": 0.6
+      }
+    },
+    {
+      "e": 2,
+      "s": 5,
+      "me": {
+        "x": 4,
+        "y": 7
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 4,
+          "y": 8,
+          "level": 1
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "rest",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.1,
+        "engagement": 0.7
+      }
+    },
+    {
+      "e": 3,
+      "s": 0,
+      "me": {
+        "x": 3,
+        "y": 8
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 3,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "look",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.6,
+        "engagement": 0.2
+      }
+    },
+    {
+      "e": 3,
+      "s": 1,
+      "me": {
+        "x": 4,
+        "y": 8
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 3,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "move E",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.5,
+        "engagement": 0.3
+      }
+    },
+    {
+      "e": 3,
+      "s": 2,
+      "me": {
+        "x": 4,
+        "y": 8
+      },
+      "carrying": "cube-1",
+      "objects": [
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "pick cube-1",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.4,
+        "engagement": 0.4
+      }
+    },
+    {
+      "e": 3,
+      "s": 3,
+      "me": {
+        "x": 4,
+        "y": 8
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 4,
+          "y": 8,
+          "level": 1
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "place here",
+      "events": [
+        "Illustration: a cube was placed on another cube."
+      ],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.3,
+        "engagement": 0.5
+      }
+    },
+    {
+      "e": 3,
+      "s": 4,
+      "me": {
+        "x": 4,
+        "y": 7
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 4,
+          "y": 8,
+          "level": 1
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "move N",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.2,
+        "engagement": 0.6
+      }
+    },
+    {
+      "e": 3,
+      "s": 5,
+      "me": {
+        "x": 4,
+        "y": 7
+      },
+      "carrying": null,
+      "objects": [
+        {
+          "id": "cube-1",
+          "x": 4,
+          "y": 8,
+          "level": 1
+        },
+        {
+          "id": "cube-2",
+          "x": 4,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-3",
+          "x": 5,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-4",
+          "x": 6,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-5",
+          "x": 7,
+          "y": 8,
+          "level": 0
+        },
+        {
+          "id": "cube-6",
+          "x": 3,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-7",
+          "x": 4,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-8",
+          "x": 5,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-9",
+          "x": 6,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "cube-10",
+          "x": 7,
+          "y": 9,
+          "level": 0
+        },
+        {
+          "id": "rock",
+          "x": 6,
+          "y": 4,
+          "level": 0
+        },
+        {
+          "id": "ring",
+          "x": 5,
+          "y": 7,
+          "level": 0
+        }
+      ],
+      "action": "rest",
+      "events": [],
+      "why": "Illustrative scored terms: novelty, exploration.",
+      "inner": {
+        "boredom": 0.1,
+        "engagement": 0.7
+      }
+    }
+  ],
+  "notes": [
+    "Synthetic fixture · episode 1.\nThese notes demonstrate the full carried text. No mind was run to produce this recording.",
+    "Synthetic fixture · episode 2.\nThese notes demonstrate the full carried text. No mind was run to produce this recording.",
+    "Synthetic fixture · episode 3.\nThese notes demonstrate the full carried text. No mind was run to produce this recording.",
+    "Synthetic fixture · episode 4.\nThese notes demonstrate the full carried text. No mind was run to produce this recording."
+  ],
+  "selfReports": [],
+  "measures": {
+    "spireCubes": 0,
+    "uniqueCells": 3,
+    "ringGlows": 0
+  },
+  "cost": {
+    "calls": 0,
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "usd": 0
+  }
+}
