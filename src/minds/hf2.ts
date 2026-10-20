@@ -366,20 +366,24 @@ export class Hf2Mind implements Mind {
         tags: [...(novel > 0.65 ? ['novel'] : []), ...(verb === 'rest' || verb === 'look' ? ['rest'] : [])],
         advances,
       };
-      out.push(base);
-      if (movement) {
-        for (const target of targets) {
-          if (distance(cell, target.cell) >= distance(this.here, target.cell)) continue;
-          out.push({
-            ...base,
-            id: `${input.id}>${target.id}@${place(target.cell)}`,
-            targetId: target.id,
-            placeId: this.memory ? place(target.cell) : undefined,
-            fromMemory: target.fromMemory,
-            label: `${input.label} Toward ${target.id}.`,
-          });
-        }
-      }
+      // One scored offer per legal input. Current sight has priority; unseen targets follow in
+      // most-recent recall order. Merge the other targets into the label without adding lottery weight.
+      const toward = movement
+        ? targets.filter((target) => distance(cell, target.cell) < distance(this.here, target.cell))
+        : [];
+      const target = toward[0];
+      out.push(
+        target
+          ? {
+              ...base,
+              id: `${input.id}>${target.id}@${place(target.cell)}`,
+              targetId: target.id,
+              placeId: this.memory ? place(target.cell) : undefined,
+              fromMemory: target.fromMemory,
+              label: `${input.label} Toward ${toward.map((t) => t.id).join(', ')}.`,
+            }
+          : base,
+      );
     }
     return out;
   }

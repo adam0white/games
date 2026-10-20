@@ -12,6 +12,42 @@ const options = { seed: 1, persona: PERSONA };
 const hash = (text: string) => createHash('sha256').update(text).digest('hex');
 
 describe('HF2 experiment', () => {
+  it.each([{}, { boredom: false }, { memory: false }, { goals: false }])(
+    'offers every legal input exactly once despite multiple targets: %j',
+    (ablation) => {
+      const mind = new Hf2Mind({ ...options, ...ablation });
+      const state = createWorld(1);
+      state.objects = [
+        { id: 'cube-1', kind: 'cube', at: { x: 3, y: 12 }, level: 0 },
+        { id: 'cube-2', kind: 'cube', at: { x: 4, y: 12 }, level: 0 },
+      ];
+      const obs = observe(state);
+      const offers = mind.offers(obs);
+      expect(offers.map((o) => o.input).sort()).toEqual(obs.actions.map((a) => a.id).sort());
+      expect(new Set(offers.map((o) => o.input)).size).toBe(offers.length);
+      const east = offers.find((o) => o.input === 'move E');
+      expect(east?.targetId).toBe('cube-1');
+      expect(east?.label).toContain('cube-1');
+      expect(east?.label).toContain('cube-2');
+
+      // Recalled targets must merge too, after both objects leave current sight.
+      obs.actions = obs.actions.filter((a) => a.id === 'look');
+      mind.step(obs);
+      const unseen = observe(state);
+      unseen.seen.things = [];
+      unseen.seen.spire = null;
+      const recalled = mind.offers(unseen);
+      expect(recalled.map((o) => o.input).sort()).toEqual(unseen.actions.map((a) => a.id).sort());
+      expect(new Set(recalled.map((o) => o.input)).size).toBe(recalled.length);
+      if (ablation.memory !== false) {
+        const toward = recalled.find((o) => o.input === 'move E');
+        expect(toward?.fromMemory).toBe(true);
+        expect(toward?.label).toContain('cube-1');
+        expect(toward?.label).toContain('cube-2');
+      }
+    },
+  );
+
   it('reproduces the committed legacy HF seed 1 hash', async () => {
     const expected = '4e4826d03a20956f54b581eedea3777e551c595837867ec67855ab4186af924d';
     expect(hash(readFileSync('viewer/runs/hf-1.json', 'utf8'))).toBe(expected);
@@ -26,9 +62,8 @@ describe('HF2 experiment', () => {
     expect(recall(mind.person, { targetId: 'cube-1', placeId: 'cell:2,0' }).length).toBeGreaterThan(0);
     const unseen = observe(state);
     unseen.seen.things = [];
-    expect(
-      mind.offers(unseen).some((o) => o.fromMemory && o.targetId === 'cube-1' && o.placeId === 'cell:2,0'),
-    ).toBe(true);
+    unseen.seen.spire = null;
+    expect(mind.offers(unseen).some((o) => o.fromMemory && o.label.includes('cube-1'))).toBe(true);
     const ablation = new Hf2Mind({ ...options, memory: false });
     ablation.step(observe(state));
     expect(ablation.offers(unseen).some((o) => o.fromMemory)).toBe(false);
