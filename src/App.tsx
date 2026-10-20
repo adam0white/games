@@ -41,6 +41,8 @@ import { todaysWords, workshopCrises } from './ui/crises';
 import { firstRepairProgress } from './ui/first-repair';
 import './styles.css';
 import './focused-layout.css';
+import './meter-layout.css';
+import './clarity.css';
 
 const SAVE_KEY = 'small-works-save-v5';
 /** Engine-4 autosaves are read once, upgraded and written to the v5 key; the v4 key itself is never changed. */
@@ -841,24 +843,27 @@ export default function App() {
         </ul>
       )}
       {todaysWords(state).length > 0 && (
-        <section className="todays-words" aria-label="What people said today">
-          {todaysWords(state).map((line) => (
-            <p key={line.id} className={line.tone === 'warning' ? 'is-warning' : undefined}>
-              <strong>{line.speaker}</strong> {line.text} <time>{dayTime(line.at)}</time>
-              {line.speaker === 'Sam' &&
-                line.text.includes('see how you find the fault') &&
-                !state.pendingRequest &&
-                !state.watching && (
-                  <button type="button" onClick={() => act({ type: 'request-lesson' })}>
-                    Ask Sam to watch
-                  </button>
-                )}
-            </p>
-          ))}
-        </section>
+        <details className="recent-conversation">
+          <summary>Recent conversation</summary>
+          <section className="todays-words" aria-label="What people said today">
+            {todaysWords(state).map((line) => (
+              <p key={line.id} className={line.tone === 'warning' ? 'is-warning' : undefined}>
+                <strong>{line.speaker}</strong> {line.text} <time>{dayTime(line.at)}</time>
+                {line.speaker === 'Sam' &&
+                  line.text.includes('see how you find the fault') &&
+                  !state.pendingRequest &&
+                  !state.watching && (
+                    <button type="button" onClick={() => act({ type: 'request-lesson' })}>
+                      Ask Sam to watch
+                    </button>
+                  )}
+              </p>
+            ))}
+          </section>
+        </details>
       )}
       {view === 'bench' && job && (
-        <main className={`focused-bench ${showTools ? 'tools-visible' : ''}`}>
+        <main className={`focused-bench ${showTools ? 'tools-visible' : ''} active-${pane}`}>
           <div className="focused-owner">
             <p className="eyebrow">{state.people[job.ownerId]?.name ?? job.ownerId}</p>
             <h1>{job.title}</h1>
@@ -1014,7 +1019,7 @@ export default function App() {
                   aria-labelledby={`tab-${pane}`}
                   className={`focused-pane pane-${pane}`}
                 >
-                  {(pane === 'object' || pane === 'meter' || pane === 'repair') && diagram}
+                  {(pane === 'object' || pane === 'repair') && diagram}
                   {pane === 'object' && !guided && (
                     <fieldset className="use-conditions">
                       <legend>Try the object</legend>
@@ -1094,20 +1099,33 @@ export default function App() {
                             : ''}
                         </small>
                       </div>
-                      <div className="segmented">
-                        {(job.kind === 'music-box'
-                          ? (['motion'] as const)
-                          : (['voltage', 'continuity'] as const)
-                        ).map((m) => (
-                          <button
-                            type="button"
-                            key={m}
-                            aria-pressed={mode === m}
-                            onClick={() => setMode(m)}
-                          >
-                            {m}
-                          </button>
-                        ))}
+                      <div className="meter-settings">
+                        <div className="segmented">
+                          {(job.kind === 'music-box'
+                            ? (['motion'] as const)
+                            : (['voltage', 'continuity'] as const)
+                          ).map((m) => (
+                            <button
+                              type="button"
+                              key={m}
+                              aria-pressed={mode === m}
+                              onClick={() => setMode(m)}
+                            >
+                              {m}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          className="meter-power-toggle"
+                          disabled={jobLocked}
+                          aria-pressed={job.model.power}
+                          onClick={() =>
+                            act({ type: 'power', jobId: job.id, on: !job.model.power })
+                          }
+                        >
+                          Power {job.model.power ? 'on' : 'off'}
+                        </button>
                       </div>
                       <div className="focused-conditions">
                         {conditions.map((c) => (
@@ -1156,8 +1174,7 @@ export default function App() {
                       </div>
                       {powerConflict && (
                         <p className="power-hint">
-                          ↖ Use the switch on the object: power{' '}
-                          {mode === 'continuity' ? 'off' : 'on'} for {mode}.
+                          Switch power {mode === 'continuity' ? 'off' : 'on'} for {mode}.
                         </p>
                       )}
                       <button
@@ -1176,6 +1193,7 @@ export default function App() {
                       </button>
                     </div>
                   )}
+                  {pane === 'meter' && diagram}
                   {pane === 'repair' && (
                     <>
                       <button

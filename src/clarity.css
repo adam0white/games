@@ -1,0 +1,88 @@
+/* F-210: optional conversation and reachable repair controls. */
+.focused-workshop.focused-workshop button,
+.focused-workshop.focused-workshop summary {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: max(15px, 0.9375rem);
+}
+.focused-workshop summary {
+  cursor: pointer;
+  align-content: center;
+}
+.recent-conversation {
+  margin: 4px 0;
+}
+.recent-conversation > summary {
+  width: fit-content;
+  padding: 10px 12px;
+  border: 1px solid #53635a;
+  border-radius: 4px;
+  color: #c4c9bd;
+}
+.recent-conversation .todays-words {
+  margin: 12px 0;
+}
+.focused-workshop .guide-dismiss {
+  margin-top: 0;
+  padding: 8px;
+}
+.focused-workshop .physical-cover-latch {
+  padding: 8px;
+}
+.focused-workshop .physical-power-switch {
+  scale: 1;
+}
+/* Selection uses an outline; the repair action keeps the warm fill. */
+.focused-workshop button[aria-pressed="true"],
+.focused-workshop button[aria-selected="true"] {
+  background: transparent;
+  color: inherit;
+  outline: 2px solid #b8c4b7;
+  outline-offset: -3px;
+  box-shadow: none;
+}
+@media (max-width: 900px) {
+  .is-guided .physical-stage {
+    height: 230px;
+  }
+  .is-guided .focused-owner {
+    margin: 12px auto;
+  }
+  .is-guided .first-repair-guide {
+    margin-bottom: 10px;
+  }
+  .active-meter .focused-owner > p {
+    display: none;
+  }
+  .active-meter .focused-owner h1 {
+    margin-bottom: 0;
+    font-size: 1.3rem;
+  }
+  .active-meter .focused-owner {
+    margin: 8px auto;
+  }
+}
+@media (max-width: 900px) {
+  /* Explore is also available in Workshop; leave the measurement cue beside its response. */
+  .active-meter .guide-dismiss {
+    display: none;
+  }
+  .active-meter .first-repair-guide {
+    padding: 8px 12px;
+  }
+  .active-meter .guide-probes {
+    padding: 4px 0 0;
+  }
+  .active-meter .meter-screen {
+    min-height: 78px;
+  }
+  .active-meter .terminal-strip {
+    margin-bottom: 0;
+  }
+}
+
+.focused-workshop button[aria-pressed="true"]:focus-visible,
+.focused-workshop button[aria-selected="true"]:focus-visible {
+  outline: 3px solid #fff3c9;
+  outline-offset: 2px;
+}

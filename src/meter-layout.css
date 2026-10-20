@@ -1,0 +1,79 @@
+/* Keep the measurement controls together before the optional circuit illustration. */
+.meter-controls button {
+  min-height: 44px;
+}
+.meter-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+.meter-controls .meter-settings .segmented {
+  margin: 0;
+}
+.meter-controls .meter-power-toggle {
+  font-size: 15px;
+  padding: 6px;
+}
+.meter-controls .terminal-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+  gap: 4px;
+}
+.meter-controls .terminal-strip button {
+  padding: 6px 2px;
+  min-width: 44px;
+}
+.meter-controls .power-hint {
+  margin: 4px 0;
+}
+@media (max-width: 1100px) {
+  .pane-meter {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pane-meter .meter-controls {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .pane-meter > .device-stage {
+    grid-column: 1;
+    grid-row: 2;
+    margin-top: 8px;
+  }
+}
+@media (max-width: 900px) {
+  /* The same switch is available in the meter controls; the scene remains on Object. */
+  .focused-workspace:has(.pane-meter) > .focused-object {
+    display: none;
+  }
+  .pane-meter {
+    gap: 4px;
+    padding: 10px;
+  }
+  .pane-meter .meter-controls {
+    display: grid;
+    gap: 2px;
+  }
+  .meter-controls .meter-screen {
+    margin: 0;
+    padding: 6px 10px;
+  }
+  .meter-controls .meter-screen strong {
+    font-size: 1.5rem;
+  }
+  .meter-controls .segmented,
+  .meter-controls .probe-tabs {
+    margin: 0;
+  }
+  .meter-controls .segmented button,
+  .meter-controls .focused-conditions button,
+  .meter-controls .probe-tabs button {
+    font-size: 15px;
+    padding: 4px 2px;
+  }
+  .meter-controls .measure-button {
+    margin: 0;
+    padding: 6px;
+  }
+}
