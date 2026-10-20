@@ -1,0 +1,53 @@
+[
+  {
+    "file": "random-1.json",
+    "mind": "random",
+    "seed": 1,
+    "measures": {
+      "cellsVisited": 37,
+      "distinctActs": 15,
+      "kindEntropy": 1.929838449595446,
+      "repeatWithVariation": 0.6842105263157895,
+      "maxStack": 1,
+      "ringGlows": 0,
+      "rockCubes": 0,
+      "idleShare": 0.2,
+      "freeSpireObjects": 0,
+      "taskScore": 0
+    }
+  },
+  {
+    "file": "random-2.json",
+    "mind": "random",
+    "seed": 2,
+    "measures": {
+      "cellsVisited": 24,
+      "distinctActs": 12,
+      "kindEntropy": 1.8940891107926552,
+      "repeatWithVariation": 0.5614035087719298,
+      "maxStack": 1,
+      "ringGlows": 0,
+      "rockCubes": 0,
+      "idleShare": 0.25555555555555554,
+      "freeSpireObjects": 0,
+      "taskScore": 0
+    }
+  },
+  {
+    "file": "random-3.json",
+    "mind": "random",
+    "seed": 3,
+    "measures": {
+      "cellsVisited": 42,
+      "distinctActs": 19,
+      "kindEntropy": 2.0371168600440623,
+      "repeatWithVariation": 0.6081871345029239,
+      "maxStack": 1,
+      "ringGlows": 0,
+      "rockCubes": 0,
+      "idleShare": 0.2111111111111111,
+      "freeSpireObjects": 0,
+      "taskScore": 0
+    }
+  }
+]
