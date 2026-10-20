@@ -278,7 +278,7 @@ describe('Claude transport (mocked, no model calls)', () => {
 describe('Workers AI transport (mocked, no model calls)', () => {
   it('sends the bounded JSON request and accounts at model list price', async () => {
     vi.stubEnv('CLOUDFLARE_ACCOUNT_ID', '0123456789abcdef0123456789abcdef');
-    vi.mocked(execFileSync).mockReturnValue('private-test-token\n');
+    vi.mocked(execFileSync).mockReturnValue('banner\n{"token":"private-test-token"}\n');
     const requests: { url: string; init: RequestInit | undefined }[] = [];
     vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
       requests.push({ url, init });
@@ -311,7 +311,7 @@ describe('Workers AI transport (mocked, no model calls)', () => {
     ['@cf/qwen/qwen3-30b-a3b-fp8', 0.00002184],
   ])('handles the choices response and list price for %s', async (model, usd) => {
     vi.stubEnv('CLOUDFLARE_ACCOUNT_ID', '0123456789abcdef0123456789abcdef');
-    vi.mocked(execFileSync).mockReturnValue('test-token');
+    vi.mocked(execFileSync).mockReturnValue('{"token":"test-token"}');
     vi.stubGlobal(
       'fetch',
       async () =>
@@ -339,7 +339,7 @@ describe('Workers AI transport (mocked, no model calls)', () => {
       authCommands.push([...(args ?? [])]);
       return args?.includes('whoami')
         ? '│ Example account │ 0123456789abcdef0123456789abcdef │'
-        : 'test-token';
+        : '{"token":"test-token"}';
     });
     vi.stubGlobal(
       'fetch',
@@ -355,7 +355,7 @@ describe('Workers AI transport (mocked, no model calls)', () => {
     expect((await backend.complete('first')).text).toBe(plan(['rest']));
     expect((await backend.complete('second')).text).toBe(plan(['rest']));
     expect(authCommands).toEqual([
-      ['wrangler', 'auth', 'token'],
+      ['wrangler', 'auth', 'token', '--json'],
       ['wrangler', 'whoami'],
     ]);
   });
@@ -364,7 +364,7 @@ describe('Workers AI transport (mocked, no model calls)', () => {
     'rejects missing or invalid usage instead of reporting a free call',
     async (usage) => {
       vi.stubEnv('CLOUDFLARE_ACCOUNT_ID', '0123456789abcdef0123456789abcdef');
-      vi.mocked(execFileSync).mockReturnValue('test-token');
+      vi.mocked(execFileSync).mockReturnValue('{"token":"test-token"}');
       vi.stubGlobal(
         'fetch',
         async () =>
@@ -381,7 +381,7 @@ describe('Workers AI transport (mocked, no model calls)', () => {
     vi.stubEnv('CLOUDFLARE_ACCOUNT_ID', '0123456789abcdef0123456789abcdef');
     vi.mocked(execFileSync).mockImplementation(() => {
       if (failure === 'auth') throw new Error(`auth failed ${token}`);
-      return token;
+      return JSON.stringify({ token });
     });
     vi.stubGlobal('fetch', async () => {
       if (failure === 'fetch') throw new Error(`request failed ${token}`);

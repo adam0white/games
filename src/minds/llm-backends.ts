@@ -70,7 +70,8 @@ function workersBackend(options: MindOptions): LlmBackend {
         env: { ...process.env, PATH },
         stdio: ['ignore', 'pipe', 'pipe'] as ['ignore', 'pipe', 'pipe'],
       };
-      const token = execFileSync('npx', ['wrangler', 'auth', 'token'], settings).trim();
+      const raw = execFileSync('npx', ['wrangler', 'auth', 'token', '--json'], settings);
+      const token = String((JSON.parse(raw.slice(raw.indexOf('{'))) as { token?: unknown }).token ?? '');
       const account =
         process.env.CLOUDFLARE_ACCOUNT_ID ||
         execFileSync('npx', ['wrangler', 'whoami'], settings).match(/\b[a-f\d]{32}\b/i)?.[0];
@@ -99,6 +100,8 @@ function workersBackend(options: MindOptions): LlmBackend {
               temperature: 0,
               max_tokens: 300,
               ...(options.responseFormat === false ? {} : { response_format: { type: 'json_object' } }),
+              // Reasoning models answer in one short completion, as in the triage bake-off.
+              ...(/qwen3|gemma-4/.test(model) ? { chat_template_kwargs: { enable_thinking: false } } : {}),
             }),
             signal: AbortSignal.timeout(TIMEOUT),
           },

@@ -67,7 +67,14 @@ const directions: Record<string, { dx: number; dy: number }> = {
 export function taskAdvances(obs: Observation, action: Action): boolean {
   if (!obs.task) return false;
   const [verb, target] = action.id.split(' ');
-  if (verb === 'pick') return obs.seen.things.some((thing) => thing.id === target && thing.kind === 'cube');
+  if (verb === 'pick') {
+    // A cube already on the Spire is not progress to pick up again.
+    const onSpire = (t: { dx: number; dy: number }) =>
+      obs.seen.here.onSpire
+        ? t.dx === 0 && t.dy === 0
+        : t.dx === obs.seen.spire?.dx && t.dy === obs.seen.spire?.dy;
+    return obs.seen.things.some((thing) => thing.id === target && thing.kind === 'cube' && !onSpire(thing));
+  }
   if (!obs.seen.carrying?.startsWith('cube-')) return false;
   if (verb === 'place' && target === 'here') return obs.seen.here.onSpire;
   const delta = target ? directions[target] : undefined;
