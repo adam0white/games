@@ -20,8 +20,8 @@ export function WorkshopTally({ state, enabled }: { state: GameState; enabled: b
         ).
       </p>
       <p>
-        This game’s own reckoning: checked work counts twice, an unfinished return once, and
-        an open promise takes one away. It is not a measure of people.
+        This game’s own reckoning: checked work counts twice, an unfinished return once, and an open
+        promise takes one away. It is not a measure of people.
       </p>
     </section>
   );
