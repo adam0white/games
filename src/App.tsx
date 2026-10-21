@@ -12,6 +12,7 @@ import { SamRequest } from './components/SamRequest';
 import { SamWorkAccount } from './components/SamWorkAccount';
 import { TeachingRecord } from './components/TeachingRecord';
 import { WorkshopPause } from './components/WorkshopPause';
+import { WorkshopTally } from './components/WorkshopTally';
 import {
   createGame,
   dayRemaining,
@@ -410,6 +411,7 @@ export default function App() {
     setIntroSkipped(true);
   };
 
+  const [tallyOn, setTallyOn] = useState(false);
   const [replayChecking, setReplayChecking] = useState(false);
   const [replayStatus, setReplayStatus] = useState('');
   const stateRef = useRef(state);
@@ -795,6 +797,15 @@ export default function App() {
             >
               New workshop
             </button>
+            <label>
+              <input
+                type="checkbox"
+                checked={tallyOn}
+                onChange={(e) => setTallyOn(e.target.checked)}
+              />{' '}
+              Keep a workshop tally
+            </label>
+            <small>Shown at the first-week account. This visit only.</small>
             <a href="/experiments/">Earlier experiments</a>
             <small>Saved automatically on this device. Time waits while you are away.</small>
             {replayStatus && <p role="status">{replayStatus}</p>}
@@ -1911,6 +1922,7 @@ export default function App() {
           <p className="eyebrow">First week complete</p>
           <h2>Your first week, recorded.</h2>
           <p>The calendar closes this chapter. These are the outcomes of your choices.</p>
+          <WorkshopTally state={state} enabled={tallyOn} />
           {state.community?.phase === 'completed' && (
             <>
               <CommunityScene
