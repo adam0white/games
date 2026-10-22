@@ -18,16 +18,18 @@
     "check": "npm run lint && npm run typecheck && npm test && npm run build",
     "prebuild": "node scripts/stamp-release.mjs",
     "deploy": "node scripts/deploy.mjs",
-    "deploy:check": "node scripts/deploy.mjs --dry-run"
+    "deploy:check": "node scripts/deploy.mjs --dry-run",
+    "check:lane": "npm run check"
   },
   "dependencies": {
     "@adam0white/human-framework": "2.8.0",
-    "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.1.2/adam0white-lab-client-0.1.2.tgz",
+    "@adam0white/lab-client": "file:vendor/adam0white-lab-client-0.2.0.tgz",
     "@fontsource/dm-sans": "5.3.0",
     "@fontsource/ibm-plex-mono": "5.3.0",
     "@fontsource/libre-baskerville": "5.3.0",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "@adam0white/lab-kit": "file:vendor/adam0white-lab-kit-0.3.0.tgz"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

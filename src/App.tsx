@@ -382,15 +382,17 @@ function Device({
 }
 export default function App() {
   const [state, setState] = useState(initial);
-  const [eventsOn, setEventsOn] = useState(lab.eventsOn);
+  const [eventsOn, setEventsOn] = useState(lab.telemetryOn);
   useEffect(() => {
     lab.screen('play');
     lab.milestone('run started');
-    const sync = () => setEventsOn(lab.eventsOn);
+    const sync = () => setEventsOn(lab.telemetryOn);
+    window.addEventListener('hf-lab-preference', sync);
     window.addEventListener('storage', sync);
     window.addEventListener('focus', sync);
     document.addEventListener('change', sync);
     return () => {
+      window.removeEventListener('hf-lab-preference', sync);
       window.removeEventListener('storage', sync);
       window.removeEventListener('focus', sync);
       document.removeEventListener('change', sync);
@@ -416,6 +418,15 @@ export default function App() {
   const [replayStatus, setReplayStatus] = useState('');
   const stateRef = useRef(state);
   stateRef.current = state;
+  useEffect(() => {
+    const stop = lab.trackRun(() => JSON.parse(saveGame(stateRef.current)), {
+      runKey: () => stateRef.current.seed,
+      getLogs: () => stateRef.current.log.slice(-40).map((line) => line.text),
+    });
+    return () => {
+      stop();
+    };
+  }, []);
   const [selected, setSelected] = useState('');
   const [mode, setMode] = useState<MeterMode>('voltage');
   const [condition, setCondition] = useState<TestCondition>('bench');
@@ -458,7 +469,9 @@ export default function App() {
   );
   const terminals = [...new Set(job?.model.components.flatMap((c) => c.terminals) ?? [])];
   useEffect(() => {
-    localStorage.setItem(SAVE_KEY, saveGame(state));
+    const text = saveGame(state);
+    localStorage.setItem(SAVE_KEY, text);
+    lab.captureSave(JSON.parse(text));
   }, [state]);
   useEffect(() => {
     if (!job?.id) return;
@@ -774,11 +787,11 @@ export default function App() {
                 type="checkbox"
                 checked={eventsOn}
                 onChange={(e) => {
-                  lab.setEventsOff(!e.target.checked);
-                  setEventsOn(lab.eventsOn);
+                  lab.setTelemetryOff(!e.target.checked);
+                  setEventsOn(lab.telemetryOn);
                 }}
               />{' '}
-              Anonymous play events
+              Record play for the lab
             </label>
             <a href="https://human.adamwhite.work/lab/privacy/">Privacy</a>
             <button type="button" onClick={() => input.current?.click()}>
