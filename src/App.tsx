@@ -419,10 +419,21 @@ export default function App() {
   const stateRef = useRef(state);
   stateRef.current = state;
   useEffect(() => {
-    const stop = lab.trackRun(() => JSON.parse(saveGame(stateRef.current)), {
-      runKey: () => stateRef.current.seed,
-      getLogs: () => stateRef.current.log.slice(-40).map((line) => line.text),
-    });
+    const stop = lab.trackRun(
+      () => {
+        // The first autosave can precede the shared identity bridge. Recapture
+        // the actual stored save after identity settles, without blocking runs.
+        try {
+          const saved = localStorage.getItem(SAVE_KEY);
+          if (saved) lab.captureSave(JSON.parse(saved));
+        } catch {}
+        return JSON.parse(saveGame(stateRef.current));
+      },
+      {
+        runKey: () => stateRef.current.seed,
+        getLogs: () => stateRef.current.log.slice(-40).map((line) => line.text),
+      },
+    );
     return () => {
       stop();
     };
