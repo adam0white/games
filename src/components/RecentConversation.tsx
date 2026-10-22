@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { dayTime } from '../game/engine';
 import type { SpokenLine } from '../ui/crises';
 
@@ -32,13 +32,32 @@ export function RecentConversation({
   lines,
   canAskSam,
   onAskSam,
+  overlay = false,
 }: {
   lines: SpokenLine[];
+  overlay?: boolean;
   canAskSam: boolean;
   onAskSam: () => void;
 }) {
   const [conversation, setConversation] = useState(() => initialConversation(lines));
+  const [visible, setVisible] = useState(true);
+  const newest = lines.reduce<SpokenLine | undefined>(
+    (latest, line) => (!latest || line.id > latest.id ? line : latest),
+    undefined,
+  );
+  useEffect(() => {
+    if (!overlay || newest?.id === undefined) return;
+    setVisible(true);
+    const timeout = window.setTimeout(() => setVisible(false), 8000);
+    return () => window.clearTimeout(timeout);
+  }, [overlay, newest?.id]);
   if (!lines.length) return null;
+  if (overlay)
+    return visible && newest ? (
+      <p className="speech-line">
+        <strong>{newest.speaker}:</strong> {newest.text}
+      </p>
+    ) : null;
   return (
     <details
       className="recent-conversation"

@@ -13,12 +13,11 @@ export function CommunityPanel({
   state,
   act,
   onOpenJob,
-  onPause,
 }: {
   state: GameState;
   act: (command: Command) => void;
   onOpenJob: (jobId: string) => void;
-  onPause: () => void;
+  onPause?: () => void;
 }) {
   const [selected, setSelected] = useState<CommunityFormat>('garden');
   const [recordStage, setRecordStage] = useState<'prepared' | 'activity' | 'returned'>('activity');
@@ -315,14 +314,6 @@ export function CommunityPanel({
               </li>
             ))}
           </ol>
-          {event.phase === 'completed' && (
-            <div className="afternoon-pause">
-              <p>This afternoon can be a stopping point. Open promises remain saved.</p>
-              <button type="button" className="primary-action" onClick={onPause}>
-                Close the workshop for now<small>Pause here · no time passes</small>
-              </button>
-            </div>
-          )}
         </div>
       )}
     </section>

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 
 describe('meter control grouping', () => {
-  it('puts probes and the reading action before the optional object diagram in document order', () => {
+  it('keeps probe controls before the diagram and pins the reading action after it', () => {
     const meterStart = app.indexOf("{pane === 'meter' && (");
     const diagramAfterControls = app.indexOf("{pane === 'meter' && diagram}", meterStart);
     const probeControls = app.indexOf('className="probe-tabs"', meterStart);
@@ -12,7 +12,9 @@ describe('meter control grouping', () => {
     expect(meterStart).toBeGreaterThan(-1);
     expect(probeControls).toBeGreaterThan(meterStart);
     expect(reading).toBeGreaterThan(probeControls);
-    expect(diagramAfterControls).toBeGreaterThan(reading);
+    expect(diagramAfterControls).toBeGreaterThan(probeControls);
+    expect(reading).toBeGreaterThan(diagramAfterControls);
+    expect(reading).toBeGreaterThan(app.indexOf('className={`bench-action-bar'));
     expect(probeControls).toBeLessThan(reading);
     expect(app).not.toContain(
       "(pane === 'object' || pane === 'meter' || pane === 'repair') && diagram",

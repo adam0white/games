@@ -26,6 +26,25 @@ const warning: SpokenLine = {
 };
 
 describe('recent conversation acknowledgment', () => {
+  it('shows only the newest speech in the scene regardless of array order', () => {
+    for (const lines of [
+      [warning, opening],
+      [opening, warning],
+    ]) {
+      const markup = renderToStaticMarkup(
+        createElement(RecentConversation, {
+          lines,
+          canAskSam: false,
+          onAskSam: () => {},
+          overlay: true,
+        }),
+      );
+      expect(markup).toContain('Nora');
+      expect(markup).toContain(warning.text);
+      expect(markup).not.toContain(opening.text);
+    }
+  });
+
   it('keeps opening speech collapsed without adding an unread cue or words', () => {
     const lines = todaysWords(createGame(42));
     expect(conversationCue(initialConversation(lines), lines)).toBe('');

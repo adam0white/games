@@ -10,12 +10,11 @@ import { ReturnedHistory } from './components/ReturnedHistory';
 import { ReturnReceipt } from './components/ReturnReceipt';
 import { SamRequest } from './components/SamRequest';
 import { SamWorkAccount } from './components/SamWorkAccount';
+import { SendWord } from './components/SendWord';
 import { TeachingRecord } from './components/TeachingRecord';
-import { WorkshopPause } from './components/WorkshopPause';
 import { WorkshopTally } from './components/WorkshopTally';
 import {
   createGame,
-  dayRemaining,
   dayTime,
   dispatch,
   jobReadiness,
@@ -45,6 +44,7 @@ import './styles.css';
 import './focused-layout.css';
 import './meter-layout.css';
 import './clarity.css';
+import './workshop-shell.css';
 
 const SAVE_KEY = 'small-works-save-v5';
 /** Engine-4 autosaves are read once, upgraded and written to the v5 key; the v4 key itself is never changed. */
@@ -361,8 +361,7 @@ function Device({
           {`FUNCTIONAL LAYOUT · ${condition.toUpperCase()} CONDITION`}
         </text>
       </svg>
-      <details className="alternative-parts">
-        <summary>Choose a component by name</summary>
+      <div className="alternative-parts">
         <div className="component-picker">
           {job.model.components.map((c) => (
             <button
@@ -376,7 +375,7 @@ function Device({
             </button>
           ))}
         </div>
-      </details>
+      </div>
     </div>
   );
 }
@@ -400,7 +399,73 @@ export default function App() {
   }, []);
   const [conversationSession, setConversationSession] = useState(0);
   const [view, setView] = useState('bench');
-  const [paused, setPaused] = useState(false);
+  const [screen, setScreen] = useState<'title' | 'play' | 'feedback'>('title');
+  const [sheet, setSheet] = useState<
+    'menu' | 'ways' | 'day' | 'job' | 'job-actions' | 'history' | null
+  >(null);
+  const [actionJobId, setActionJobId] = useState('');
+  const sheetRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const modal = sheetRef.current;
+    if (!sheet || !modal) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const background = Array.from(modal.parentElement?.parentElement?.children ?? []).filter(
+      (element): element is HTMLElement =>
+        element instanceof HTMLElement && !element.contains(modal),
+    );
+    const wasInert = background.map((element) => element.inert);
+    for (const element of background) element.inert = true;
+    const controls = () =>
+      Array.from(
+        modal.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), a[href], input:not(:disabled), summary, textarea, [tabindex="0"]',
+        ),
+      ).filter((element) => element.getClientRects().length > 0);
+    controls()[0]?.focus();
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const available = controls();
+      const first = available[0];
+      const last = available.at(-1);
+      if (
+        event.shiftKey &&
+        (document.activeElement === first || !modal.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        last?.focus();
+      } else if (
+        !event.shiftKey &&
+        (document.activeElement === last || !modal.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    modal.addEventListener('keydown', trap);
+    return () => {
+      modal.removeEventListener('keydown', trap);
+      background.forEach((element, index) => {
+        element.inert = wasInert[index] ?? false;
+      });
+      if (previous?.isConnected) previous.focus();
+    };
+  }, [sheet]);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [newConfirmed, setNewConfirmed] = useState(false);
+  const [seedText, setSeedText] = useState(String(state.seed + 1));
+  const [hasSave, setHasSave] = useState(() =>
+    Boolean(localStorage.getItem(SAVE_KEY) || localStorage.getItem(LEGACY_SAVE_KEY)),
+  );
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setInfoOpen(false);
+        setSheet(null);
+      }
+    };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, []);
   const [pane, setPane] = useState<'object' | 'meter' | 'repair' | 'notes'>('object');
   const [opened, setOpened] = useState(false);
   const [introSkipped, setIntroSkipped] = useState(
@@ -413,7 +478,6 @@ export default function App() {
     setIntroSkipped(true);
   };
 
-  const [tallyOn, setTallyOn] = useState(false);
   const [replayChecking, setReplayChecking] = useState(false);
   const [replayStatus, setReplayStatus] = useState('');
   const stateRef = useRef(state);
@@ -449,7 +513,6 @@ export default function App() {
   const [teachingFeedback, setTeachingFeedback] = useState('');
   const [collarPreview, setCollarPreview] = useState<number | undefined>(undefined);
   const input = useRef<HTMLInputElement>(null);
-  const menu = useRef<HTMLDetailsElement>(null);
   const job = state.jobs.find((j) => j.id === state.selectedJobId) ?? state.jobs[0];
   const jobLocked = Boolean(
     job &&
@@ -648,7 +711,9 @@ export default function App() {
   };
   const resetPresentation = (next: GameState, fresh = false) => {
     setConversationSession((session) => session + 1);
-    if (menu.current) menu.current.open = false;
+    setSheet(null);
+    setScreen('play');
+    setHasSave(true);
     setState(next);
     setView('bench');
     setPane('object');
@@ -729,1327 +794,1773 @@ export default function App() {
       suggestedPart={guided ? progress.suggestedPart : undefined}
     />
   );
-  if (paused)
-    return <WorkshopPause state={state} onReturn={() => setPaused(false)} onExport={exportSave} />;
-  return (
-    <div className={`workshop focused-workshop ${guided ? 'is-guided' : ''}`}>
-      <header className="focused-header">
-        <a className="hf-mark" href="https://human.adamwhite.work">
-          ◇ human framework
-        </a>
-        {!guided && (
-          <nav aria-label="Workshop">
-            <button
-              type="button"
-              aria-current={view === 'bench' ? 'page' : undefined}
-              onClick={() => setView('bench')}
-            >
-              Workbench
-            </button>
-            <button
-              type="button"
-              aria-current={view === 'board' ? 'page' : undefined}
-              onClick={() => setView('board')}
-            >
-              Workboard
-            </button>
-            <button
-              type="button"
-              aria-current={view === 'people' ? 'page' : undefined}
-              onClick={() => setView('people')}
-            >
-              People & supplies
-            </button>
-          </nav>
-        )}
-        <details ref={menu} className="workshop-menu">
-          <summary>
-            Workshop <span aria-hidden="true">☰</span>
-          </summary>
-          <div className="workshop-menu-content">
-            <p>
-              {dayTime(state.now)} · {dayRemaining(state)} min until closing
-            </p>
-            <p>
-              {money(state.cash)} available · seed {state.seed}
-            </p>
-            {guided && (
-              <button type="button" onClick={skipIntro}>
-                Put this aside · explore workshop
-              </button>
-            )}
-            <button type="button" onClick={() => act({ type: 'wait', minutes: 30 })}>
-              Wait 30 min
-            </button>
-            <button type="button" onClick={() => act({ type: 'next-day' })}>
-              Close for the day
-            </button>
-            <button type="button" onClick={exportSave}>
-              Export workshop
-            </button>
-            <button
-              type="button"
-              onClick={() => lab.openSendDialog({ getRun: () => JSON.parse(saveGame(state)) })}
-            >
-              Send this run to the notebook
-            </button>
-            <label>
-              <input
-                type="checkbox"
-                checked={eventsOn}
-                onChange={(e) => {
-                  lab.setTelemetryOff(!e.target.checked);
-                  setEventsOn(lab.telemetryOn);
-                }}
-              />{' '}
-              Record play for the lab
-            </label>
-            <a href="https://human.adamwhite.work/lab/privacy/">Privacy</a>
-            <button type="button" onClick={() => input.current?.click()}>
-              Import workshop
-            </button>
-            <button type="button" disabled={replayChecking} onClick={verifyReplay}>
-              {replayChecking ? 'Verifying replay…' : 'Verify recorded replay'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const seed = window.prompt('New workshop seed:', String(state.seed + 1));
-                if (seed !== null && Number.isFinite(Number(seed)))
-                  resetPresentation(createGame(Number(seed)), true);
-              }}
-            >
-              New workshop
-            </button>
-            <label>
-              <input
-                type="checkbox"
-                checked={tallyOn}
-                onChange={(e) => setTallyOn(e.target.checked)}
-              />{' '}
-              Keep a workshop tally
-            </label>
-            <small>Shown at the first-week account. This visit only.</small>
-            <a href="/experiments/">Earlier experiments</a>
-            <small>Saved automatically on this device. Time waits while you are away.</small>
-            {replayStatus && <p role="status">{replayStatus}</p>}
-            <details>
-              <summary>History</summary>
-              {[...state.log].reverse().map((l) => (
-                <p key={l.id}>
-                  <time>{dayTime(l.at)}</time> <strong>{l.speaker}</strong> {l.text}
-                </p>
-              ))}
-            </details>
-          </div>
-        </details>
-        <input
-          ref={input}
-          hidden
-          type="file"
-          accept="application/json,.json"
-          onChange={async (e) => {
-            try {
-              const file = e.target.files?.[0];
-              if (file) resetPresentation(upgradeRules(loadGame(await file.text())));
-            } catch (error) {
-              setStatus(
-                error instanceof Error ? error.message : 'This save could not be imported.',
-              );
+  const crises = workshopCrises(state);
+  const dayStart = state.now - (state.now % 1440);
+  const dueToday = state.jobs.filter(
+    (j) =>
+      !j.isDonor &&
+      !j.isPersonal &&
+      ['active', 'ready'].includes(j.status) &&
+      j.due >= dayStart &&
+      j.due < dayStart + 1440,
+  );
+  const elapsed = Math.max(0, Math.min(100, (((state.now % 1440) - 540) / 480) * 100));
+  const actionJob = state.jobs.find((j) => j.id === actionJobId);
+  const responsibilityActions = (j: Job) => (
+    <div className="responsibility-actions">
+      {' '}
+      {j.blocked ? (
+        <>
+          <button
+            type="button"
+            onClick={() =>
+              actSequence([{ type: 'recall', jobId: j.id }, { type: 'request-lesson' }])
             }
-            e.target.value = '';
-          }}
-        />
-      </header>
-      {!guided && workshopCrises(state).length > 0 && (
-        <ul className="workshop-crises" aria-label="Needs attention">
-          {workshopCrises(state)
-            .slice(0, 3)
-            .map((c) => {
-              const target = state.jobs.find((j) => j.id === c.jobId);
-              return (
-                <li key={`${c.jobId}-${c.text}`} className={c.urgent ? 'is-urgent' : undefined}>
+          >
+            Review together
+            <small>Take object back · request lesson</small>
+          </button>
+          <button type="button" onClick={() => act({ type: 'retry-sam', jobId: j.id })}>
+            Retry after teaching
+          </button>
+          <button type="button" onClick={() => act({ type: 'recall', jobId: j.id })}>
+            Take over / cancel responsibility
+          </button>
+        </>
+      ) : !progress.apprenticeshipAvailable || j.isDonor || samFinishedPersonal(j) ? null : (
+        <button
+          type="button"
+          onClick={() =>
+            act(
+              j.assignedTo
+                ? { type: 'recall', jobId: j.id }
+                : { type: 'assign', jobId: j.id, personId: 'sam' },
+            )
+          }
+        >
+          {j.assignedTo
+            ? 'Recall'
+            : j.status === 'ready' && evidenceContext(j, 'sam').stage === 'ready' && !j.isPersonal
+              ? 'Ask Sam to return the checked object'
+              : 'Ask Sam to take repair responsibility'}
+        </button>
+      )}
+      {!j.isPersonal && !j.isDonor && (
+        <>
+          <button type="button" onClick={() => act({ type: 'deliver', jobId: j.id })}>
+            Return checked object
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              act({
+                type: 'deliver',
+                jobId: j.id,
+                unfinished: true,
+              })
+            }
+          >
+            Return unfinished
+          </button>
+        </>
+      )}
+    </div>
+  );
+  const isEnd = screen === 'play' && state.ended;
+  const startWorkshop = (seed: number) => {
+    resetPresentation(createGame(seed), true);
+    setNewConfirmed(false);
+  };
+  const workday = (large = false) => (
+    <div
+      role="img"
+      className={`workday-track ${large ? 'large' : ''}`}
+      aria-label={`${Math.round(elapsed)}% of the workday used`}
+    >
+      <span>09</span>
+      <div className="workday-rail">
+        <div className="workday-fill" style={{ width: `${elapsed}%` }} />
+        <span className="workday-marker" style={{ left: `${elapsed}%` }} />
+        {dueToday.map((j) => (
+          <span
+            key={j.id}
+            className="promise-tick"
+            title={`${j.title} · ${dayTime(j.due)}`}
+            style={{ left: `${Math.max(0, Math.min(100, (((j.due % 1440) - 540) / 480) * 100))}%` }}
+          >
+            ◷
+          </span>
+        ))}
+      </div>
+      <span>17</span>
+    </div>
+  );
+  const dayActions = (
+    <>
+      <button type="button" onClick={() => act({ type: 'wait', minutes: 30 })}>
+        Wait 30 min
+      </button>
+      <button type="button" onClick={() => act({ type: 'next-day' })}>
+        Close for the day
+      </button>
+    </>
+  );
+  const info =
+    screen === 'title'
+      ? [
+          'The workshop',
+          'People bring broken things and say how they use them.',
+          'Every act takes workshop minutes. The day closes at 17:00.',
+          'A promise has a due time. You may return something honestly unfinished.',
+        ]
+      : isEnd
+        ? [
+            'Your first week',
+            'The account records returns, open promises and Sam’s work.',
+            'The tally is this game’s own convention. It is not a measure of people.',
+          ]
+        : view === 'people'
+          ? [
+              'Sam',
+              'He learns by watching agreed lessons.',
+              'You can ask for more time. Overrunning his agreed time costs his goodwill.',
+            ]
+          : view === 'board'
+            ? [
+                'Promises',
+                'Accepting binds you to the due time. Decline what you cannot do.',
+                'Sam can take responsibility once he has watched the work.',
+              ]
+            : pane === 'meter'
+              ? [
+                  'The meter',
+                  'Place the red and black probes on two terminals.',
+                  'Voltage shows the difference across that span. Continuity checks a conducting path with power off.',
+                  'Carried means the object moves while you read. A reading before a change no longer holds.',
+                ]
+              : [
+                  'Finding the fault',
+                  'Test it the owner’s way first. Open it.',
+                  'Measure between two terminals in one condition.',
+                  'Look closely at the part the reading points to before changing it. Parts are finite.',
+                ];
+  return (
+    <div
+      className={`workshop focused-workshop workshop-shell ${guided ? 'is-guided' : ''} screen-${screen} ${isEnd ? 'is-end' : ''}`}
+    >
+      <header className="shell-topbar">
+        {screen === 'title' ? (
+          <a href="https://human.adamwhite.work/games/">All games</a>
+        ) : (
+          <span className="where-when">
+            Day {state.day} · {isEnd ? 'morning' : dayTime(state.now).split(' · ').at(-1)}
+          </span>
+        )}
+        {screen === 'play' && !isEnd && (
+          <div className="state-strip">
+            <button
+              type="button"
+              className="workday-button"
+              aria-label="The day"
+              onClick={() => setSheet('day')}
+            >
+              {workday()}
+            </button>
+            <strong className="cash">{money(state.cash)}</strong>
+            {!guided && (
+              <nav className="view-chips" aria-label="Workshop">
+                {(['bench', 'board', 'people'] as const).map((v) => (
                   <button
                     type="button"
-                    onClick={() => (c.people ? setView('people') : target && chooseJob(target))}
+                    key={v}
+                    aria-current={view === v ? 'page' : undefined}
+                    onClick={() => setView(v)}
                   >
-                    {c.text}
+                    {v.charAt(0).toUpperCase() + v.slice(1)}
+                    {crises.some((c) =>
+                      v === 'people'
+                        ? c.people
+                        : v === 'board'
+                          ? !c.people
+                          : c.jobId === job?.id && !c.people,
+                    ) && (
+                      <span role="img" aria-label="needs attention">
+                        {' '}
+                        •
+                      </span>
+                    )}
                   </button>
-                </li>
-              );
-            })}
-        </ul>
-      )}
-      <RecentConversation
-        key={conversationSession}
-        lines={todaysWords(state)}
-        canAskSam={!state.pendingRequest && !state.watching}
-        onAskSam={() => act({ type: 'request-lesson' })}
-      />
-      {view === 'bench' && job && (
-        <main className={`focused-bench ${showTools ? 'tools-visible' : ''} active-${pane}`}>
-          <div className="focused-owner">
-            <p className="eyebrow">{state.people[job.ownerId]?.name ?? job.ownerId}</p>
-            <h1>{job.title}</h1>
-            <p>{job.description}</p>
-          </div>
-          {guided && (
-            <FirstRepairGuide
-              state={state}
-              job={job}
-              pane={pane}
-              opened={opened}
-              onOpen={() => setOpened(true)}
-              onPane={navigatePane}
-              onTest={() => act({ type: 'verify', jobId: job.id, condition: 'movement' })}
-              disabled={jobLocked}
-              onSkip={skipIntro}
-            />
-          )}
-          {!guided && (
-            <div className="focused-shelf">
-              <label>
-                On the bench{' '}
-                <select
-                  value={job.id}
-                  onChange={(e) => {
-                    const next = state.jobs.find((j) => j.id === e.target.value);
-                    if (next) chooseJob(next);
-                  }}
-                >
-                  {state.jobs
-                    .filter((j) => j.status !== 'declined')
-                    .map((j) => (
-                      <option key={j.id} value={j.id}>
-                        {j.title}
-                        {j.assignedTo ? ' · with Sam' : ''}
-                        {j.status === 'delivered' ? ' · returned' : ''}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <span>
-                {dayTime(state.now)} · {money(state.cash)}
-              </span>
-            </div>
-          )}
-          <div
-            className={`focused-workspace ${showTools ? 'tools-open' : 'object-only'} ${showTools && pane !== 'object' ? 'instrument-focused' : ''}`}
-          >
-            <section className="focused-object" aria-label="Physical object">
-              <PhysicalObjectScene
-                job={job}
-                disabled={jobLocked}
-                testCondition={guided ? undefined : useCondition}
-                onPower={() => act({ type: 'power', jobId: job.id, on: !job.model.power })}
-                onTry={(condition) => act({ type: 'verify', jobId: job.id, condition })}
-                onOpen={() => {
-                  setOpened(true);
-                  setPane('object');
-                  // This explicit reveal keeps the cue and parts together on a phone.
-                  if (window.matchMedia('(max-width: 900px)').matches)
-                    requestAnimationFrame(() =>
-                      document
-                        .querySelector('.first-repair-guide')
-                        ?.scrollIntoView({ block: 'start' }),
-                    );
-                }}
-                opened={opened}
-                allowOpen={!guided || progress.phase !== 'try'}
-              />
-              {!showTools && result}
-              {job.status === 'ready' && !job.isDonor && !job.isPersonal && (
-                <button
-                  type="button"
-                  className="primary-action focused-return"
-                  disabled={jobLocked}
-                  onClick={() => act({ type: 'deliver', jobId: job.id })}
-                >
-                  Return to {state.people[job.ownerId]?.name ?? job.ownerId}
-                  <small>10 min</small>
-                </button>
-              )}
-              {job.status === 'delivered' && (
-                <ReturnReceipt job={job} people={state.people} onNext={() => setView('board')} />
-              )}
-              {jobLocked && job.status !== 'delivered' && (
-                <p className="focused-lock">
-                  {job.assignedTo
-                    ? 'Sam has this object.'
-                    : state.community?.reservedJobIds.includes(job.id)
-                      ? 'Reserved for the gathering.'
-                      : 'This object is read-only.'}
-                </p>
-              )}
-            </section>
-            {showTools && (
-              <section className="focused-tools" aria-label="Bench tools">
-                <div
-                  className="focused-tabs"
-                  role="tablist"
-                  aria-label="Bench tool"
-                  onKeyDown={(e) => {
-                    const keys = ['object', 'meter', 'repair', 'notes'] as const;
-                    const i = keys.indexOf(pane);
-                    const next =
-                      e.key === 'ArrowRight'
-                        ? keys[(i + 1) % 4]
-                        : e.key === 'ArrowLeft'
-                          ? keys[(i + 3) % 4]
-                          : e.key === 'Home'
-                            ? keys[0]
-                            : e.key === 'End'
-                              ? keys[3]
-                              : undefined;
-                    if (next) {
-                      e.preventDefault();
-                      navigatePane(next);
-                      document.getElementById(`tab-${next}`)?.focus();
-                    }
-                  }}
-                >
-                  {(['object', 'meter', 'repair', 'notes'] as const).map((tab, i) => (
-                    <button
-                      type="button"
-                      key={tab}
-                      role="tab"
-                      id={`tab-${tab}`}
-                      aria-selected={pane === tab}
-                      aria-controls={`pane-${tab}`}
-                      tabIndex={pane === tab ? 0 : -1}
-                      onClick={() => navigatePane(tab)}
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        aria-hidden="true"
-                      >
-                        {i === 0 ? (
-                          <>
-                            <path d="m12 2 9 5v10l-9 5-9-5V7Z" />
-                            <path d="m3 7 9 5 9-5M12 12v10" />
-                          </>
-                        ) : i === 1 ? (
-                          <>
-                            <rect x="4" y="2" width="16" height="20" rx="2" />
-                            <path d="M7 6h10v5H7zM8 16h2m4 0h2M8 19h2m4 0h2" />
-                          </>
-                        ) : i === 2 ? (
-                          <path d="M14 3a6 6 0 0 0-7 7L2 17a3 3 0 0 0 5 4l7-8a6 6 0 0 0 7-7l-4 4-4-3 1-4Z" />
-                        ) : (
-                          <path d="M5 2h14v20H5zM8 7h8M8 12h8M8 17h5" />
-                        )}
-                      </svg>
-                      {tab}
-                    </button>
-                  ))}
-                </div>
-                <div
-                  role="tabpanel"
-                  id={`pane-${pane}`}
-                  aria-labelledby={`tab-${pane}`}
-                  className={`focused-pane pane-${pane}`}
-                >
-                  {(pane === 'object' || pane === 'repair') && diagram}
-                  {pane === 'object' && !guided && (
-                    <fieldset className="use-conditions">
-                      <legend>Try the object</legend>
-                      <div>
-                        {conditions.map((c) => (
-                          <button
-                            key={c}
-                            type="button"
-                            disabled={jobLocked}
-                            aria-pressed={useCondition === c}
-                            onClick={() => setUseCondition(c)}
-                          >
-                            {c === 'bench'
-                              ? '▱ On table'
-                              : c === 'movement'
-                                ? '↝ Carry'
-                                : '◉ Under load'}
-                            <small>
-                              {job.verified.includes(c)
-                                ? 'Passed'
-                                : requiredChecks(job).includes(c) && !job.isDonor
-                                  ? 'Required'
-                                  : 'Optional'}
-                            </small>
-                          </button>
-                        ))}
-                      </div>
-                      <p>
-                        Use the{' '}
-                        {useCondition === 'movement'
-                          ? 'Carry'
-                          : useCondition === 'load' && job.kind === 'lantern'
-                            ? 'Read'
-                            : useCondition === 'bench'
-                              ? 'Try'
-                              : job.kind === 'music-box'
-                                ? 'Play'
-                                : 'Try'}{' '}
-                        button on the object. {checkPurpose(job)}
-                      </p>
-                    </fieldset>
-                  )}
-                  {pane === 'object' && (
-                    <div className="focused-action">
-                      <h2>{part?.label ?? 'Choose a component'}</h2>
-                      <button
-                        type="button"
-                        disabled={!part || jobLocked}
-                        onClick={() =>
-                          part && act({ type: 'inspect', jobId: job.id, componentId: part.id })
-                        }
-                      >
-                        Look closely <small>10 min</small>
-                      </button>
-                    </div>
-                  )}
-                  {pane === 'meter' && (
-                    <div className="meter-controls">
-                      <div className="meter-screen">
-                        <span>
-                          {lastReading?.request
-                            ? `${lastReading.request.mode} · ${lastReading.request.condition}`
-                            : 'No reading yet'}
-                        </span>
-                        <strong>
-                          {lastReading?.value === undefined || lastReading.value === null
-                            ? '—'
-                            : lastReading.value.toFixed(2)}
-                          <small>{lastReading?.unit}</small>
-                        </strong>
-                        <small>
-                          {lastReading?.request
-                            ? `${lastReading.request.a} → ${lastReading.request.b} · ${dayTime(lastReading.at)}`
-                            : 'Place both probes on terminals'}
-                          {lastReading && lastWorkId > lastReading.id
-                            ? ' · recorded before later work'
-                            : ''}
-                        </small>
-                      </div>
-                      <div className="meter-settings">
-                        <div className="segmented">
-                          {(job.kind === 'music-box'
-                            ? (['motion'] as const)
-                            : (['voltage', 'continuity'] as const)
-                          ).map((m) => (
-                            <button
-                              type="button"
-                              key={m}
-                              aria-pressed={mode === m}
-                              onClick={() => setMode(m)}
-                            >
-                              {m}
-                            </button>
-                          ))}
-                        </div>
-                        <button
-                          type="button"
-                          className="meter-power-toggle"
-                          disabled={jobLocked}
-                          aria-pressed={job.model.power}
-                          onClick={() =>
-                            act({ type: 'power', jobId: job.id, on: !job.model.power })
-                          }
-                        >
-                          Power {job.model.power ? 'on' : 'off'}
-                        </button>
-                      </div>
-                      <div className="focused-conditions">
-                        {conditions.map((c) => (
-                          <button
-                            type="button"
-                            key={c}
-                            aria-pressed={condition === c}
-                            onClick={() => setCondition(c)}
-                          >
-                            {c === 'bench'
-                              ? '▱ On table'
-                              : c === 'movement'
-                                ? '↝ Carry'
-                                : '◉ Under load'}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="probe-tabs">
-                        <button
-                          type="button"
-                          aria-pressed={activeProbe === 'a'}
-                          onClick={() => setActiveProbe('a')}
-                        >
-                          Red probe · {a || 'place'}
-                        </button>
-                        <button
-                          type="button"
-                          aria-pressed={activeProbe === 'b'}
-                          onClick={() => setActiveProbe('b')}
-                        >
-                          Black probe · {b || 'place'}
-                        </button>
-                      </div>
-                      <div className="terminal-strip">
-                        {terminals.map((t) => (
-                          <button
-                            type="button"
-                            key={t}
-                            disabled={jobLocked}
-                            onClick={() => chooseTerminal(t)}
-                            aria-label={`Place ${activeProbe === 'a' ? 'red' : 'black'} probe on terminal ${t}`}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                      {powerConflict && (
-                        <p className="power-hint">
-                          Switch power {mode === 'continuity' ? 'off' : 'on'} for {mode}.
-                        </p>
-                      )}
-                      <button
-                        type="button"
-                        className="measure-button"
-                        disabled={jobLocked || !a || !b || Boolean(powerConflict)}
-                        onClick={() =>
-                          act({
-                            type: 'measure',
-                            jobId: job.id,
-                            request: { mode, a, b, condition },
-                          })
-                        }
-                      >
-                        Read meter <small>10 min</small>
-                      </button>
-                    </div>
-                  )}
-                  {pane === 'meter' && diagram}
-                  {pane === 'repair' && (
-                    <>
-                      <button
-                        type="button"
-                        disabled={!part || jobLocked}
-                        onClick={() =>
-                          part && act({ type: 'inspect', jobId: job.id, componentId: part.id })
-                        }
-                      >
-                        Look closely <small>10 min</small>
-                      </button>
-                      <h2>{part?.label ?? 'Choose a component'}</h2>
-                      {state.watching &&
-                        part &&
-                        !hasPendingPartLesson &&
-                        !hasComponentBaseline &&
-                        !hasCalibrationBaseline && (
-                          <p className="teaching-baseline-notice">
-                            Before another intervention on this part, let Sam watch a relevant test.
-                            That gives him an observation to compare with the outcome.
-                          </p>
-                        )}
-                      <div className="focused-repairs">
-                        {(['clean', 'adjust', 'replace'] as const)
-                          .filter((action) => !(action === 'adjust' && part?.kind === 'governor'))
-                          .map((action) => (
-                            <button
-                              type="button"
-                              key={action}
-                              className={
-                                guided && progress.phase === 'repair' && action === 'replace'
-                                  ? 'guided-replace'
-                                  : ''
-                              }
-                              disabled={
-                                jobLocked ||
-                                !part ||
-                                (action === 'replace' && !(state.stock[part.kind] ?? 0))
-                              }
-                              onClick={() =>
-                                part &&
-                                act({
-                                  type: 'work',
-                                  jobId: job.id,
-                                  componentId: part.id,
-                                  intervention: action,
-                                })
-                              }
-                            >
-                              {action}
-                              <small>
-                                {action === 'replace'
-                                  ? part
-                                    ? (state.stock[part.kind] ?? 0) > 0
-                                      ? `30 min · 1 ${part.kind} (${state.stock[part.kind]} stocked)`
-                                      : `No ${part.kind} stocked`
-                                    : 'Choose a component'
-                                  : '20 min'}
-                              </small>
-                              {state.watching &&
-                                state.watchUntil !== undefined &&
-                                state.now + (action === 'replace' ? 30 : 20) > state.watchUntil && (
-                                  <em>After Sam’s agreed time</em>
-                                )}
-                            </button>
-                          ))}
-                      </div>
-                      {part?.kind === 'governor' && (
-                        <div className="governor-control">
-                          <p>Collar setting {part.setting ?? 2}</p>
-                          <div>
-                            {[0, 1, 2, 3, 4].map((setting) => (
-                              <button
-                                type="button"
-                                key={setting}
-                                aria-pressed={(collarPreview ?? part.setting ?? 2) === setting}
-                                onClick={() => setCollarPreview(setting)}
-                              >
-                                {setting}
-                              </button>
-                            ))}
-                            <button
-                              type="button"
-                              disabled={jobLocked}
-                              onClick={() =>
-                                act({
-                                  type: 'calibrate',
-                                  jobId: job.id,
-                                  componentId: part.id,
-                                  setting: collarPreview ?? part.setting ?? 2,
-                                })
-                              }
-                            >
-                              Apply setting · 20 min
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      {job.isDonor && (
-                        <button
-                          type="button"
-                          disabled={!part || jobLocked}
-                          onClick={() =>
-                            part && act({ type: 'salvage', jobId: job.id, componentId: part.id })
-                          }
-                        >
-                          Recover part · 25 min
-                        </button>
-                      )}
-                    </>
-                  )}
-                  {pane === 'notes' && (
-                    <>
-                      <ReadingComparison job={job} />
-                      <details>
-                        <summary>Recorded observations · {job.evidence.length}</summary>
-                        {[...job.evidence].reverse().map((e) => (
-                          <p key={e.id}>
-                            <time>{dayTime(e.at)}</time> {e.summary}
-                          </p>
-                        ))}
-                      </details>
-                      <details>
-                        <summary>Reference</summary>
-                        <p>{checkPurpose(job)}</p>
-                        {job.kind === 'music-box' ? (
-                          <div className="drive-reference">
-                            <p>
-                              Nominal motion path. Probe a shaft against the stationary frame,
-                              terminal 0.
-                            </p>
-                            <ol>
-                              <li>
-                                <strong>Spring · A</strong>
-                                <span>Rated drive {job.model.ratedDrive ?? 120} rpm</span>
-                              </li>
-                              <li>
-                                <strong>Gear · B</strong>
-                                <span>Divide input by {job.model.gearRatio ?? 4}</span>
-                              </li>
-                              <li>
-                                <strong>Governor · C</strong>
-                                <span>Multiply by the collar factor</span>
-                              </li>
-                              <li>
-                                <strong>Drum · D</strong>
-                                <span>Divide governor output by 2</span>
-                              </li>
-                            </ol>
-                            <table>
-                              <caption>Governor collar reference</caption>
-                              <thead>
-                                <tr>
-                                  <th scope="col">Setting</th>
-                                  {governorMultipliers.map((factor, i) => (
-                                    <th scope="col" key={factor}>
-                                      {i}
-                                    </th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr>
-                                  <th scope="row">Factor</th>
-                                  {governorMultipliers.map((factor) => (
-                                    <td key={factor}>×{factor}</td>
-                                  ))}
-                                </tr>
-                              </tbody>
-                            </table>
-                            <p>
-                              Owner’s requested drum output:{' '}
-                              <strong>
-                                {job.model.desiredRPM ?? 15} ± {job.model.tolerance ?? 3} rpm
-                              </strong>
-                              . These ratios describe the mechanism; compare actual readings across
-                              the path and under the requested condition.
-                            </p>
-                          </div>
-                        ) : (
-                          <p>
-                            A nominal source supplies {job.model.sourceVolts} V. Healthy conducting
-                            links usually drop less than 0.2 V. Compare the same probe pair on the
-                            table and under the condition that caused trouble.
-                          </p>
-                        )}
-                      </details>
-                      {hasSamObservation && <TeachingRecord job={job} />}
-                    </>
-                  )}
-                  {state.watching &&
-                    state.watchUntil !== undefined &&
-                    (pane === 'object' || pane === 'meter') &&
-                    state.now + 10 > state.watchUntil && (
-                      <p className="lesson-overrun">
-                        This 10-minute step would finish after Sam’s agreed time.
-                      </p>
-                    )}
-                  {state.watching &&
-                    state.watchUntil !== undefined &&
-                    pane === 'repair' &&
-                    part?.kind === 'governor' &&
-                    state.now + 20 > state.watchUntil && (
-                      <p className="lesson-overrun">
-                        Applying the collar would finish after Sam’s agreed time.
-                      </p>
-                    )}
-                  {result}
-                  {pane !== 'notes' && state.watching && job.pendingLessons.length > 0 && (
-                    <TeachingRecord job={job} />
-                  )}
-                </div>
-              </section>
+                ))}
+              </nav>
             )}
           </div>
-          {samPresent && (
-            <details className="focused-sam">
-              <summary>
-                Sam ·{' '}
-                {state.people.sam ? describePerson(state.people.sam).state : 'Not at the bench'}
-                {state.watching
-                  ? ` · ${Math.max(0, (state.watchUntil ?? state.now) - state.now)} min agreed time`
-                  : ''}
-              </summary>
-              {progress.apprenticeshipAvailable && <SamRequest state={state} act={act} />}
-              <LessonControl
-                state={state}
-                act={act}
-                onRequestMore={() =>
-                  actSequence([{ type: 'watch', enabled: false }, { type: 'request-lesson' }])
-                }
+        )}
+        <div className="topbar-controls">
+          <button
+            type="button"
+            aria-label="Information"
+            aria-expanded={infoOpen}
+            onClick={() => {
+              setSheet(null);
+              setInfoOpen(!infoOpen);
+            }}
+          >
+            i
+          </button>
+          <button
+            type="button"
+            aria-label="Menu"
+            aria-expanded={sheet === 'menu'}
+            onClick={() => {
+              setInfoOpen(false);
+              setSheet('menu');
+            }}
+          >
+            <span className="desktop-menu-label">Menu </span>≡
+          </button>
+        </div>
+      </header>
+      <input
+        ref={input}
+        hidden
+        type="file"
+        accept="application/json,.json"
+        onChange={async (e) => {
+          try {
+            const file = e.target.files?.[0];
+            if (file) resetPresentation(upgradeRules(loadGame(await file.text())));
+          } catch (error) {
+            setStatus(error instanceof Error ? error.message : 'This save could not be imported.');
+          }
+          e.target.value = '';
+        }}
+      />
+      {screen === 'title' && (
+        <main className="title-page">
+          <div className="title-art">
+            <svg viewBox="0 0 400 230" aria-hidden="true">
+              <path
+                d="M40 200H360M150 190L160 72H240L250 190ZM170 69V46C170 10 230 10 230 46V69M151 195H249M178 78L173 180M222 78L227 180"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="6"
               />
-            </details>
-          )}
+              <ellipse cx="200" cy="133" rx="18" ry="36" fill="currentColor" opacity=".35" />
+            </svg>
+            <h1>SMALL WORKS</h1>
+          </div>
+          <p className="title-goal">
+            Mend what people bring you, keep your word, and teach Sam the work.
+          </p>
+          <button type="button" className="reading-row" onClick={() => setSheet('ways')}>
+            Other ways in <span>▸</span>
+          </button>
+          <div className="title-actions">
+            <button
+              type="button"
+              className="primary-action"
+              onClick={() => {
+                setHasSave(true);
+                setScreen('play');
+              }}
+            >
+              {hasSave ? `Back to the bench · day ${state.day}` : 'Open the workshop'}
+            </button>
+            {hasSave && !newConfirmed && (
+              <button type="button" onClick={() => setNewConfirmed(true)}>
+                A new workshop
+              </button>
+            )}
+            {newConfirmed && (
+              <div className="inline-confirm">
+                <p>The current workshop is put away.</p>
+                <button type="button" onClick={() => startWorkshop(state.seed + 1)}>
+                  Yes, begin
+                </button>
+                <button type="button" onClick={() => setNewConfirmed(false)}>
+                  No
+                </button>
+              </div>
+            )}
+            <small>Saved on this device.</small>
+          </div>
         </main>
       )}
-      {view !== 'bench' && status && (
-        <p className="focused-result" role="status">
-          {status}
-        </p>
+      {screen === 'feedback' && (
+        <SendWord
+          getRun={() => JSON.parse(saveGame(stateRef.current))}
+          onGame={() => {
+            setScreen('play');
+            setSheet(null);
+          }}
+          onBack={() => {
+            setScreen('play');
+            setSheet('menu');
+          }}
+        />
       )}
-      {view === 'board' && (
-        <main className="board-page">
-          {progress.apprenticeshipAvailable && <SamRequest state={state} act={act} />}
-          <CommunityPanel
-            state={state}
-            act={act}
-            onPause={() => setPaused(true)}
-            onOpenJob={(id) => {
-              const object = state.jobs.find((j) => j.id === id);
-              if (object) chooseJob(object);
-            }}
-          />
-          <div className="page-heading">
-            <p className="eyebrow">Promises, not a queue</p>
-            <h1>The workboard</h1>
-            <p>Choose what this workshop can finish. Time, parts and people are shared.</p>
-          </div>
-          <div className="workboard-columns">
-            {[
-              ['offer', 'Incoming requests'],
-              ['active', 'At the workshop'],
-              ['delivered', 'Returned objects'],
-            ].map(([statusKey, label]) => (
-              <section className="board-column" key={statusKey}>
-                <h2>{label}</h2>
-                {state.jobs
-                  .filter((j) =>
-                    statusKey === 'active'
-                      ? ['active', 'ready'].includes(j.status)
-                      : j.status === statusKey,
-                  )
-                  .map((j) =>
-                    j.status === 'delivered' ? (
-                      <ReturnedHistory
-                        key={j.id}
-                        job={j}
-                        people={state.people}
-                        onOpen={() => chooseJob(j)}
-                      />
-                    ) : (
-                      <article className="job-paper" key={j.id}>
-                        <p className="eyebrow">
-                          <span aria-hidden="true">
-                            {j.kind === 'lantern' ? '◈' : j.kind === 'fan' ? '✳' : '♫'}
-                          </span>{' '}
-                          {state.people[j.ownerId]?.name ??
-                            (j.ownerId === 'player' ? 'Your project' : j.ownerId)}
-                        </p>
-                        <h3>{j.title}</h3>
-                        <p>{j.description}</p>
-                        {!j.isPersonal && !j.isDonor ? (
-                          <div className="promise">
-                            <span>
-                              <span aria-hidden="true">◷</span>
-                              <span className="screen-reader-only">Return by </span>{' '}
-                              <strong>{dayTime(j.due)}</strong>
-                            </span>
-                            <span>
-                              <span className="screen-reader-only">Payment </span>
-                              <strong>{money(j.reward)}</strong>
-                            </span>
-                          </div>
-                        ) : (
-                          <p className="personal-purpose">
-                            {j.isDonor
-                              ? 'Parts donor · no customer return promise'
-                              : 'Your retained project · no customer return promise'}
-                          </p>
-                        )}
-                        <p className="readiness">{jobReadiness(j)}</p>
-                        {samFinishedPersonal(j) && (
-                          <p className="personal-completion">
-                            Sam finished this piece of work; the project stays here.
-                          </p>
-                        )}
-                        {progress.apprenticeshipAvailable &&
-                          j.status === 'ready' &&
-                          !j.isDonor &&
-                          !j.isPersonal &&
-                          !j.assignedTo && (
-                            <p className="handoff-knowledge">
-                              {evidenceContext(j, 'sam').stage === 'ready'
-                                ? 'Checked by you; Sam has received the checks.'
-                                : 'Checked by you; Sam may need to recheck.'}
-                            </p>
-                          )}
-                        {j.kind === 'lantern' &&
-                          j.ownerId === 'evan' &&
-                          requiredChecks(j).includes('movement') &&
-                          state.people.sam?.methods?.rules.some((rule) =>
-                            rule.conditions.some(
-                              (c) => c.cue === 'requested-use' && c.value === 'lantern:movement',
-                            ),
-                          ) && (
-                            <p className="practice-opportunity">
-                              Sam has watched carried-light work; this is another carried-light
-                              request. He may still need help.
-                            </p>
-                          )}
-                        {j.blocked && (
-                          <div className="blocked-responsibility">
-                            <strong>Sam has put this repair aside</strong>
-                            <p>{j.blocked.reason}</p>
-                          </div>
-                        )}
-                        <div className="paper-actions">
-                          {j.status === 'offer' ? (
-                            <>
+      {screen === 'play' && !isEnd && (
+        <div className={`play-content view-${view}`}>
+          {!guided && crises[0] && (
+            <button
+              className="crisis-banner"
+              type="button"
+              onClick={() => {
+                const c = crises[0];
+                if (!c) return;
+                const target = state.jobs.find((j) => j.id === c.jobId);
+                if (c.people) setView('people');
+                else if (target) chooseJob(target);
+              }}
+            >
+              {crises[0].text} ▸
+            </button>
+          )}
+          {view === 'bench' && job && (
+            <main className={`focused-bench ${showTools ? 'tools-visible' : ''} active-${pane}`}>
+              <div
+                className={`focused-workspace ${guided ? `guide-${progress.phase}` : ''} ${showTools ? 'tools-open' : 'object-only'} ${showTools && pane !== 'object' ? 'instrument-focused' : ''}`}
+              >
+                <section className="focused-object" aria-label="Physical object">
+                  <PhysicalObjectScene
+                    job={job}
+                    disabled={jobLocked}
+                    testCondition={guided ? undefined : useCondition}
+                    onPower={() => act({ type: 'power', jobId: job.id, on: !job.model.power })}
+                    onTry={(condition) => act({ type: 'verify', jobId: job.id, condition })}
+                    onOpen={() => {
+                      setOpened(true);
+                      setPane('object');
+                      // This explicit reveal keeps the cue and parts together on a phone.
+                      if (window.matchMedia('(max-width: 900px)').matches)
+                        requestAnimationFrame(() =>
+                          document
+                            .querySelector('.first-repair-guide')
+                            ?.scrollIntoView({ block: 'start' }),
+                        );
+                    }}
+                    opened={opened}
+                    allowOpen={!guided || progress.phase !== 'try'}
+                  />
+                  <div className="scene-speech">
+                    <RecentConversation
+                      key={conversationSession}
+                      lines={todaysWords(state)}
+                      canAskSam={false}
+                      onAskSam={() => {}}
+                      overlay
+                    />
+                  </div>
+                  {samPresent && !guided && (
+                    <button type="button" className="sam-chip" onClick={() => setView('people')}>
+                      Sam · {state.watching ? 'watching' : 'at work'}
+                    </button>
+                  )}
+                  <button type="button" className="job-header" onClick={() => setSheet('job')}>
+                    {job.title} <span>▾</span>
+                  </button>
+                </section>
+                <section className="focused-tools" aria-label="Bench tools">
+                  {guided && (
+                    <FirstRepairGuide
+                      state={state}
+                      job={job}
+                      pane={pane}
+                      opened={opened}
+                      onOpen={() => setOpened(true)}
+                      onPane={navigatePane}
+                      onTest={() => act({ type: 'verify', jobId: job.id, condition: 'movement' })}
+                      disabled={jobLocked}
+                      onSkip={skipIntro}
+                    />
+                  )}
+                  {jobLocked && job.status !== 'delivered' && (
+                    <p className="focused-lock">
+                      {job.assignedTo
+                        ? 'Sam has this object.'
+                        : state.community?.reservedJobIds.includes(job.id)
+                          ? 'Reserved for the gathering.'
+                          : 'This object is read-only.'}
+                    </p>
+                  )}
+
+                  {job.status === 'delivered' ? (
+                    <ReturnReceipt
+                      job={job}
+                      people={state.people}
+                      onNext={() => setView('board')}
+                      nextLabel="To the board"
+                    />
+                  ) : (
+                    <>
+                      {!showTools && <div className="opening-quote">{job.description}</div>}
+                      {showTools && (
+                        <>
+                          <div
+                            className="focused-tabs"
+                            role="tablist"
+                            aria-label="Bench tool"
+                            onKeyDown={(e) => {
+                              const keys = ['object', 'meter', 'repair', 'notes'] as const;
+                              const i = keys.indexOf(pane);
+                              const next =
+                                e.key === 'ArrowRight'
+                                  ? keys[(i + 1) % 4]
+                                  : e.key === 'ArrowLeft'
+                                    ? keys[(i + 3) % 4]
+                                    : e.key === 'Home'
+                                      ? keys[0]
+                                      : e.key === 'End'
+                                        ? keys[3]
+                                        : undefined;
+                              if (next) {
+                                e.preventDefault();
+                                navigatePane(next);
+                                document.getElementById(`tab-${next}`)?.focus();
+                              }
+                            }}
+                          >
+                            {(['object', 'meter', 'repair', 'notes'] as const).map((tab, i) => (
                               <button
                                 type="button"
-                                disabled={j.due < state.now}
-                                onClick={() => act({ type: 'accept', jobId: j.id })}
+                                key={tab}
+                                role="tab"
+                                id={`tab-${tab}`}
+                                className={
+                                  guided &&
+                                  ((tab === 'meter' &&
+                                    (progress.phase === 'measure-source' ||
+                                      progress.phase === 'measure-path')) ||
+                                    (tab === 'repair' &&
+                                      (progress.phase === 'inspect' ||
+                                        progress.phase === 'repair')))
+                                    ? 'guide-target'
+                                    : undefined
+                                }
+                                aria-selected={pane === tab}
+                                aria-controls={`pane-${tab}`}
+                                tabIndex={pane === tab ? 0 : -1}
+                                onClick={() => navigatePane(tab)}
                               >
-                                {j.due < state.now ? 'Requested time passed' : 'Accept promise'}
+                                <svg
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  aria-hidden="true"
+                                >
+                                  {i === 0 ? (
+                                    <>
+                                      <path d="m12 2 9 5v10l-9 5-9-5V7Z" />
+                                      <path d="m3 7 9 5 9-5M12 12v10" />
+                                    </>
+                                  ) : i === 1 ? (
+                                    <>
+                                      <rect x="4" y="2" width="16" height="20" rx="2" />
+                                      <path d="M7 6h10v5H7zM8 16h2m4 0h2M8 19h2m4 0h2" />
+                                    </>
+                                  ) : i === 2 ? (
+                                    <path d="M14 3a6 6 0 0 0-7 7L2 17a3 3 0 0 0 5 4l7-8a6 6 0 0 0 7-7l-4 4-4-3 1-4Z" />
+                                  ) : (
+                                    <path d="M5 2h14v20H5zM8 7h8M8 12h8M8 17h5" />
+                                  )}
+                                </svg>
+                                {tab}
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => act({ type: 'decline', jobId: j.id })}
-                              >
-                                {j.due < state.now ? 'Clear expired request' : 'Decline'}
-                              </button>
-                            </>
-                          ) : ['active', 'ready'].includes(j.status) ? (
-                            <>
-                              <button type="button" onClick={() => chooseJob(j)}>
-                                Open on bench
-                              </button>
-                              {j.blocked ? (
-                                <>
+                            ))}
+                          </div>
+                          <div
+                            role="tabpanel"
+                            id={`pane-${pane}`}
+                            aria-labelledby={`tab-${pane}`}
+                            className={`focused-pane pane-${pane}`}
+                          >
+                            {(pane === 'object' || pane === 'repair') && diagram}
+                            {pane === 'object' && !guided && (
+                              <fieldset className="use-conditions">
+                                <legend>Try the object</legend>
+                                <div>
+                                  {conditions.map((c) => (
+                                    <button
+                                      key={c}
+                                      type="button"
+                                      disabled={jobLocked}
+                                      aria-pressed={useCondition === c}
+                                      onClick={() => setUseCondition(c)}
+                                    >
+                                      {c === 'bench'
+                                        ? '▱ On table'
+                                        : c === 'movement'
+                                          ? '↝ Carry'
+                                          : '◉ Under load'}
+                                      <small>
+                                        {job.verified.includes(c)
+                                          ? 'Passed'
+                                          : requiredChecks(job).includes(c) && !job.isDonor
+                                            ? 'Required'
+                                            : 'Optional'}
+                                      </small>
+                                    </button>
+                                  ))}
+                                </div>
+                                <p>
+                                  Use the{' '}
+                                  {useCondition === 'movement'
+                                    ? 'Carry'
+                                    : useCondition === 'load' && job.kind === 'lantern'
+                                      ? 'Read'
+                                      : useCondition === 'bench'
+                                        ? 'Try'
+                                        : job.kind === 'music-box'
+                                          ? 'Play'
+                                          : 'Try'}{' '}
+                                  button on the object. {checkPurpose(job)}
+                                </p>
+                              </fieldset>
+                            )}
+                            {pane === 'object' && <h2>{part?.label ?? 'Choose a component'}</h2>}
+                            {pane === 'meter' && (
+                              <div className="meter-controls">
+                                <div className="meter-screen">
+                                  <span>
+                                    {lastReading?.request
+                                      ? `${lastReading.request.mode} · ${lastReading.request.condition}`
+                                      : 'No reading yet'}
+                                  </span>
+                                  <strong>
+                                    {lastReading?.value === undefined || lastReading.value === null
+                                      ? '—'
+                                      : lastReading.value.toFixed(2)}
+                                    <small>{lastReading?.unit}</small>
+                                  </strong>
+                                  <small>
+                                    {lastReading?.request
+                                      ? `${lastReading.request.a} → ${lastReading.request.b} · ${dayTime(lastReading.at)}`
+                                      : 'Place both probes on terminals'}
+                                    {lastReading && lastWorkId > lastReading.id
+                                      ? ' · recorded before later work'
+                                      : ''}
+                                  </small>
+                                </div>
+                                <div className="meter-settings">
+                                  <div className="segmented">
+                                    {(job.kind === 'music-box'
+                                      ? (['motion'] as const)
+                                      : (['voltage', 'continuity'] as const)
+                                    ).map((m) => (
+                                      <button
+                                        type="button"
+                                        key={m}
+                                        aria-pressed={mode === m}
+                                        onClick={() => setMode(m)}
+                                      >
+                                        {m}
+                                      </button>
+                                    ))}
+                                  </div>
                                   <button
                                     type="button"
+                                    className="meter-power-toggle"
+                                    disabled={jobLocked}
+                                    aria-pressed={job.model.power}
                                     onClick={() =>
-                                      actSequence([
-                                        { type: 'recall', jobId: j.id },
-                                        { type: 'request-lesson' },
-                                      ])
+                                      act({ type: 'power', jobId: job.id, on: !job.model.power })
                                     }
                                   >
-                                    Review together<small>Take object back · request lesson</small>
+                                    Power {job.model.power ? 'on' : 'off'}
+                                  </button>
+                                </div>
+                                <div className="focused-conditions">
+                                  {conditions.map((c) => (
+                                    <button
+                                      type="button"
+                                      key={c}
+                                      aria-pressed={condition === c}
+                                      onClick={() => setCondition(c)}
+                                    >
+                                      {c === 'bench'
+                                        ? '▱ On table'
+                                        : c === 'movement'
+                                          ? '↝ Carry'
+                                          : '◉ Under load'}
+                                    </button>
+                                  ))}
+                                </div>
+                                <div className="probe-tabs">
+                                  <button
+                                    type="button"
+                                    aria-pressed={activeProbe === 'a'}
+                                    onClick={() => setActiveProbe('a')}
+                                  >
+                                    Red probe · {a || 'place'}
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => act({ type: 'retry-sam', jobId: j.id })}
+                                    aria-pressed={activeProbe === 'b'}
+                                    onClick={() => setActiveProbe('b')}
                                   >
-                                    Retry after teaching
+                                    Black probe · {b || 'place'}
                                   </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => act({ type: 'recall', jobId: j.id })}
-                                  >
-                                    Take over / cancel responsibility
-                                  </button>
-                                </>
-                              ) : !progress.apprenticeshipAvailable ||
-                                j.isDonor ||
-                                samFinishedPersonal(j) ? null : (
+                                </div>
+                                <div className="terminal-strip">
+                                  {terminals.map((t) => (
+                                    <button
+                                      type="button"
+                                      key={t}
+                                      disabled={jobLocked}
+                                      onClick={() => chooseTerminal(t)}
+                                      aria-label={`Place ${activeProbe === 'a' ? 'red' : 'black'} probe on terminal ${t}`}
+                                    >
+                                      {t}
+                                    </button>
+                                  ))}
+                                </div>
+                                {powerConflict && (
+                                  <p className="power-hint">
+                                    Switch power {mode === 'continuity' ? 'off' : 'on'} for {mode}.
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                            {pane === 'meter' && diagram}
+                            {pane === 'repair' && (
+                              <>
+                                <h2>{part?.label ?? 'Choose a component'}</h2>
+                                {state.watching &&
+                                  part &&
+                                  !hasPendingPartLesson &&
+                                  !hasComponentBaseline &&
+                                  !hasCalibrationBaseline && (
+                                    <p className="teaching-baseline-notice">
+                                      Before another intervention on this part, let Sam watch a
+                                      relevant test. That gives him an observation to compare with
+                                      the outcome.
+                                    </p>
+                                  )}
+                                {part?.kind === 'governor' && (
+                                  <div className="governor-control">
+                                    <p>Collar setting {part.setting ?? 2}</p>
+                                    <div>
+                                      {[0, 1, 2, 3, 4].map((setting) => (
+                                        <button
+                                          type="button"
+                                          key={setting}
+                                          aria-pressed={
+                                            (collarPreview ?? part.setting ?? 2) === setting
+                                          }
+                                          onClick={() => setCollarPreview(setting)}
+                                        >
+                                          {setting}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                            {pane === 'notes' && (
+                              <>
+                                <ReadingComparison job={job} />
+                                <details>
+                                  <summary>Recorded observations · {job.evidence.length}</summary>
+                                  {[...job.evidence].reverse().map((e) => (
+                                    <p key={e.id}>
+                                      <time>{dayTime(e.at)}</time> {e.summary}
+                                    </p>
+                                  ))}
+                                </details>
+                                <details>
+                                  <summary>Reference</summary>
+                                  <p>{checkPurpose(job)}</p>
+                                  {job.kind === 'music-box' ? (
+                                    <div className="drive-reference">
+                                      <p>
+                                        Nominal motion path. Probe a shaft against the stationary
+                                        frame, terminal 0.
+                                      </p>
+                                      <ol>
+                                        <li>
+                                          <strong>Spring · A</strong>
+                                          <span>Rated drive {job.model.ratedDrive ?? 120} rpm</span>
+                                        </li>
+                                        <li>
+                                          <strong>Gear · B</strong>
+                                          <span>Divide input by {job.model.gearRatio ?? 4}</span>
+                                        </li>
+                                        <li>
+                                          <strong>Governor · C</strong>
+                                          <span>Multiply by the collar factor</span>
+                                        </li>
+                                        <li>
+                                          <strong>Drum · D</strong>
+                                          <span>Divide governor output by 2</span>
+                                        </li>
+                                      </ol>
+                                      <table>
+                                        <caption>Governor collar reference</caption>
+                                        <thead>
+                                          <tr>
+                                            <th scope="col">Setting</th>
+                                            {governorMultipliers.map((factor, i) => (
+                                              <th scope="col" key={factor}>
+                                                {i}
+                                              </th>
+                                            ))}
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          <tr>
+                                            <th scope="row">Factor</th>
+                                            {governorMultipliers.map((factor) => (
+                                              <td key={factor}>×{factor}</td>
+                                            ))}
+                                          </tr>
+                                        </tbody>
+                                      </table>
+                                      <p>
+                                        Owner’s requested drum output:{' '}
+                                        <strong>
+                                          {job.model.desiredRPM ?? 15} ± {job.model.tolerance ?? 3}{' '}
+                                          rpm
+                                        </strong>
+                                        . These ratios describe the mechanism; compare actual
+                                        readings across the path and under the requested condition.
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <p>
+                                      A nominal source supplies {job.model.sourceVolts} V. Healthy
+                                      conducting links usually drop less than 0.2 V. Compare the
+                                      same probe pair on the table and under the condition that
+                                      caused trouble.
+                                    </p>
+                                  )}
+                                </details>
+                                {hasSamObservation && <TeachingRecord job={job} />}
+                              </>
+                            )}
+                            {state.watching &&
+                              state.watchUntil !== undefined &&
+                              (pane === 'object' || pane === 'meter') &&
+                              state.now + 10 > state.watchUntil && (
+                                <p className="lesson-overrun">
+                                  This 10-minute step would finish after Sam’s agreed time.
+                                </p>
+                              )}
+                            {state.watching &&
+                              state.watchUntil !== undefined &&
+                              pane === 'repair' &&
+                              part?.kind === 'governor' &&
+                              state.now + 20 > state.watchUntil && (
+                                <p className="lesson-overrun">
+                                  Applying the collar would finish after Sam’s agreed time.
+                                </p>
+                              )}
+                            {pane !== 'notes' &&
+                              state.watching &&
+                              job.pendingLessons.length > 0 && <TeachingRecord job={job} />}
+                          </div>
+                        </>
+                      )}
+                      {result}
+                      <div className={`bench-action-bar ${pane === 'notes' ? 'notes-bar' : ''}`}>
+                        {job.status === 'ready' && !job.isDonor && !job.isPersonal && (
+                          <button
+                            type="button"
+                            className="primary-action focused-return"
+                            disabled={jobLocked}
+                            onClick={() => act({ type: 'deliver', jobId: job.id })}
+                          >
+                            Return to {state.people[job.ownerId]?.name ?? job.ownerId}
+                            <small>10 min</small>
+                          </button>
+                        )}
+                        {showTools && (
+                          <div className="bench-verbs">
+                            {(pane === 'object' || pane === 'repair') && (
+                              <>
+                                {' '}
                                 <button
                                   type="button"
+                                  disabled={!part || jobLocked}
                                   onClick={() =>
-                                    act(
-                                      j.assignedTo
-                                        ? { type: 'recall', jobId: j.id }
-                                        : { type: 'assign', jobId: j.id, personId: 'sam' },
-                                    )
+                                    part &&
+                                    act({ type: 'inspect', jobId: job.id, componentId: part.id })
                                   }
                                 >
-                                  {j.assignedTo
-                                    ? 'Recall'
-                                    : j.status === 'ready' &&
-                                        evidenceContext(j, 'sam').stage === 'ready' &&
-                                        !j.isPersonal
-                                      ? 'Ask Sam to return the checked object'
-                                      : 'Ask Sam to take repair responsibility'}
+                                  Look closely <small>10 min</small>
                                 </button>
+                              </>
+                            )}
+                            {pane === 'meter' && (
+                              <>
+                                {' '}
+                                <button
+                                  type="button"
+                                  className="measure-button"
+                                  disabled={jobLocked || !a || !b || Boolean(powerConflict)}
+                                  onClick={() =>
+                                    act({
+                                      type: 'measure',
+                                      jobId: job.id,
+                                      request: { mode, a, b, condition },
+                                    })
+                                  }
+                                >
+                                  Read meter <small>10 min</small>
+                                </button>
+                              </>
+                            )}
+                            {pane === 'repair' && !job.isDonor && part?.kind !== 'governor' && (
+                              <>
+                                {' '}
+                                <div className="focused-repairs">
+                                  {(['clean', 'adjust', 'replace'] as const)
+                                    .filter(
+                                      (action) =>
+                                        !(action === 'adjust' && part?.kind === 'governor'),
+                                    )
+                                    .map((action) => (
+                                      <button
+                                        type="button"
+                                        key={action}
+                                        className={
+                                          guided &&
+                                          progress.phase === 'repair' &&
+                                          action === 'replace'
+                                            ? 'guided-replace'
+                                            : ''
+                                        }
+                                        disabled={
+                                          jobLocked ||
+                                          !part ||
+                                          (action === 'replace' && !(state.stock[part.kind] ?? 0))
+                                        }
+                                        onClick={() =>
+                                          part &&
+                                          act({
+                                            type: 'work',
+                                            jobId: job.id,
+                                            componentId: part.id,
+                                            intervention: action,
+                                          })
+                                        }
+                                      >
+                                        {action}
+                                        <small>
+                                          {action === 'replace'
+                                            ? part
+                                              ? (state.stock[part.kind] ?? 0) > 0
+                                                ? `30 min · 1 ${part.kind} (${state.stock[part.kind]} stocked)`
+                                                : `No ${part.kind} stocked`
+                                              : 'Choose a component'
+                                            : '20 min'}
+                                        </small>
+                                        {state.watching &&
+                                          state.watchUntil !== undefined &&
+                                          state.now + (action === 'replace' ? 30 : 20) >
+                                            state.watchUntil && <em>After Sam’s agreed time</em>}
+                                      </button>
+                                    ))}
+                                </div>
+                              </>
+                            )}
+                            {pane === 'repair' && part?.kind === 'governor' && (
+                              <>
+                                {' '}
+                                <button
+                                  type="button"
+                                  disabled={jobLocked}
+                                  onClick={() =>
+                                    act({
+                                      type: 'calibrate',
+                                      jobId: job.id,
+                                      componentId: part.id,
+                                      setting: collarPreview ?? part.setting ?? 2,
+                                    })
+                                  }
+                                >
+                                  Apply setting · 20 min
+                                </button>
+                              </>
+                            )}
+                            {pane === 'repair' && (
+                              <>
+                                {' '}
+                                {job.isDonor && (
+                                  <button
+                                    type="button"
+                                    disabled={!part || jobLocked}
+                                    onClick={() =>
+                                      part &&
+                                      act({ type: 'salvage', jobId: job.id, componentId: part.id })
+                                    }
+                                  >
+                                    Recover part · 25 min
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </section>
+              </div>
+            </main>
+          )}
+          {view === 'board' && (
+            <main className="board-page">
+              {progress.apprenticeshipAvailable && <SamRequest state={state} act={act} />}
+              <CommunityPanel
+                state={state}
+                act={act}
+                onPause={() => setScreen('title')}
+                onOpenJob={(id) => {
+                  const object = state.jobs.find((j) => j.id === id);
+                  if (object) chooseJob(object);
+                }}
+              />
+              <div className="page-heading">
+                <p className="eyebrow">Promises, not a queue</p>
+                <h1>The workboard</h1>
+                <p>Choose what this workshop can finish. Time, parts and people are shared.</p>
+              </div>
+              <div className="workboard-columns">
+                {[
+                  ['offer', 'Asked of you'],
+                  ['active', 'In the workshop'],
+                  ['delivered', 'Returned'],
+                ].map(([statusKey, label]) => (
+                  <details
+                    className="board-column"
+                    key={statusKey}
+                    open={statusKey !== 'delivered'}
+                  >
+                    <summary>{label}</summary>
+                    {state.jobs
+                      .filter((j) =>
+                        statusKey === 'active'
+                          ? ['active', 'ready'].includes(j.status)
+                          : j.status === statusKey,
+                      )
+                      .map((j) =>
+                        j.status === 'delivered' ? (
+                          <ReturnedHistory
+                            key={j.id}
+                            job={j}
+                            people={state.people}
+                            onOpen={() => chooseJob(j)}
+                          />
+                        ) : (
+                          <article className="job-paper" key={j.id}>
+                            <p className="eyebrow">
+                              <span aria-hidden="true">
+                                {j.kind === 'lantern' ? '◈' : j.kind === 'fan' ? '✳' : '♫'}
+                              </span>{' '}
+                              {state.people[j.ownerId]?.name ??
+                                (j.ownerId === 'player' ? 'Your project' : j.ownerId)}
+                            </p>
+                            <h3>{j.title}</h3>
+                            <p>{j.description}</p>
+                            {!j.isPersonal && !j.isDonor ? (
+                              <div className="promise">
+                                <span>
+                                  <span aria-hidden="true">◷</span>
+                                  <span className="screen-reader-only">Return by </span>{' '}
+                                  <strong>{dayTime(j.due)}</strong>
+                                </span>
+                                <span>
+                                  <span className="screen-reader-only">Payment </span>
+                                  <strong>{money(j.reward)}</strong>
+                                </span>
+                              </div>
+                            ) : (
+                              <p className="personal-purpose">
+                                {j.isDonor
+                                  ? 'Parts donor · no customer return promise'
+                                  : 'Your retained project · no customer return promise'}
+                              </p>
+                            )}
+                            <p className="readiness">{jobReadiness(j)}</p>
+                            {samFinishedPersonal(j) && (
+                              <p className="personal-completion">
+                                Sam finished this piece of work; the project stays here.
+                              </p>
+                            )}
+                            {progress.apprenticeshipAvailable &&
+                              j.status === 'ready' &&
+                              !j.isDonor &&
+                              !j.isPersonal &&
+                              !j.assignedTo && (
+                                <p className="handoff-knowledge">
+                                  {evidenceContext(j, 'sam').stage === 'ready'
+                                    ? 'Checked by you; Sam has received the checks.'
+                                    : 'Checked by you; Sam may need to recheck.'}
+                                </p>
                               )}
-                              {!j.isPersonal && !j.isDonor && (
+                            {j.kind === 'lantern' &&
+                              j.ownerId === 'evan' &&
+                              requiredChecks(j).includes('movement') &&
+                              state.people.sam?.methods?.rules.some((rule) =>
+                                rule.conditions.some(
+                                  (c) =>
+                                    c.cue === 'requested-use' && c.value === 'lantern:movement',
+                                ),
+                              ) && (
+                                <p className="practice-opportunity">
+                                  Sam has watched carried-light work; this is another carried-light
+                                  request. He may still need help.
+                                </p>
+                              )}
+                            {j.blocked && (
+                              <div className="blocked-responsibility">
+                                <strong>Sam has put this repair aside</strong>
+                                <p>{j.blocked.reason}</p>
+                              </div>
+                            )}
+                            <div className="paper-actions">
+                              {j.status === 'offer' ? (
                                 <>
                                   <button
                                     type="button"
-                                    onClick={() => act({ type: 'deliver', jobId: j.id })}
+                                    disabled={j.due < state.now}
+                                    onClick={() => act({ type: 'accept', jobId: j.id })}
                                   >
-                                    Return checked object
+                                    {j.due < state.now ? 'Requested time passed' : 'Accept promise'}
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      act({ type: 'deliver', jobId: j.id, unfinished: true })
-                                    }
+                                    onClick={() => act({ type: 'decline', jobId: j.id })}
                                   >
-                                    Return unfinished
+                                    {j.due < state.now ? 'Clear expired request' : 'Decline'}
                                   </button>
                                 </>
+                              ) : ['active', 'ready'].includes(j.status) ? (
+                                <>
+                                  <button type="button" onClick={() => chooseJob(j)}>
+                                    Open on bench
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActionJobId(j.id);
+                                      setSheet('job-actions');
+                                    }}
+                                  >
+                                    More ▾
+                                  </button>
+                                </>
+                              ) : (
+                                <span>
+                                  {j.returnedUnfinished ? 'Returned unfinished' : 'Returned'}
+                                </span>
                               )}
-                            </>
-                          ) : (
-                            <span>{j.returnedUnfinished ? 'Returned unfinished' : 'Returned'}</span>
-                          )}
-                        </div>
-                        {!j.isPersonal &&
-                          !j.isDonor &&
-                          ['active', 'ready'].includes(j.status) &&
-                          !requiredChecks(j).every((c) => j.verified.includes(c)) && (
-                            <small className="warning">
-                              Check the owner’s use before returning, or choose an honest unfinished
-                              return.
-                            </small>
-                          )}
-                      </article>
-                    ),
-                  )}
-              </section>
-            ))}
-          </div>
-        </main>
-      )}
-      {view === 'people' && (
-        <main className="people-page">
-          {progress.apprenticeshipAvailable && <SamRequest state={state} act={act} />}
-          <div className="page-heading">
-            <p className="eyebrow">A shared workshop day</p>
-            <h1>People & supplies</h1>
-          </div>
-          <div className="people-supplies">
-            <section className="people-section">
-              <h2>Working together</h2>
-              {state.independentRepairs > 0 && (
-                <div className="capacity-milestone">
-                  <p className="eyebrow">A whole repair handled independently</p>
-                  <p>
-                    {state.jobs
-                      .filter(
-                        (j) =>
-                          j.status === 'delivered' &&
-                          j.completedBy === 'sam' &&
-                          !j.returnedUnfinished,
-                      )
-                      .map((j) => j.title)
-                      .join(', ') || 'Sam completed an independent repair.'}
-                  </p>
-                  <small>
-                    You can spend that workshop time on another object or your own plans. Future
-                    unfamiliar faults may still need teaching.
-                  </small>
-                </div>
-              )}
-              {progress.apprenticeshipAvailable && !state.pendingRequest && (
-                <LessonControl
-                  state={state}
-                  act={act}
-                  onRequestMore={() =>
-                    actSequence([{ type: 'watch', enabled: false }, { type: 'request-lesson' }])
-                  }
-                />
-              )}
-              {Object.entries(state.people).map(([id, person]) => (
-                <article className="person" key={id}>
-                  <span className="avatar">{id.slice(0, 1).toUpperCase()}</span>
-                  <div>
-                    <h3>{person.name}</h3>
-                    {id === 'sam' && progress.apprenticeshipAvailable ? (
-                      <>
-                        <p>
-                          {state.npcWork.find((w) => w.personId === id)?.option.label ??
-                            describePerson(person).state}
-                        </p>
-                        {state.npcWork.find((w) => w.personId === id) && (
-                          <small>
-                            Until{' '}
-                            {dayTime(
-                              state.npcWork.find((w) => w.personId === id)?.endsAt ?? state.now,
-                            )}
-                          </small>
-                        )}
-                        {playerWordReading(person) && (
-                          <p className="word-reading">
-                            {person.name} {playerWordReading(person)}.
-                          </p>
-                        )}
-                        <div className="commitment-list">
-                          {person.agenda.commitments
-                            .filter(
-                              (c) =>
-                                c.status === 'pending' &&
-                                c.actions.includes('personal') &&
-                                c.until >= state.now,
-                            )
-                            .map((c) => (
-                              <p key={`${c.label}-${c.from}`}>
-                                <strong>{c.label}</strong>
-                                <small>
-                                  {dayTime(c.from)} – {dayTime(c.until)}
+                            </div>
+                            {!j.isPersonal &&
+                              !j.isDonor &&
+                              ['active', 'ready'].includes(j.status) &&
+                              !requiredChecks(j).every((c) => j.verified.includes(c)) && (
+                                <small className="warning">
+                                  Check the owner’s use before returning, or choose an honest
+                                  unfinished return.
                                 </small>
-                              </p>
-                            ))}
-                        </div>
-                        <h4 className="knowledge-heading">Observed repair methods</h4>
-                        <p className="knowledge-note">
-                          Attended demonstrations. Independent whole repairs:{' '}
-                          {state.independentRepairs}.
-                        </p>
-                        <p className="knowledge-note">
-                          Conditions observed when taught; not an outcome or a guarantee.
-                        </p>
-                        <div className="knowledge-list">
-                          {person.methods?.rules.length ? (
-                            person.methods.rules.map((rule) => {
-                              const action = rule.action.split(':');
-                              const label =
-                                action[0] === 'work'
-                                  ? `${action[1]} ${action[2] ?? 'component'}`
-                                  : action[0] === 'measure'
-                                    ? `Measure ${action[1] ?? 'electrical response'}`
-                                    : action[0] === 'verify'
-                                      ? `Check ${action[1] ?? 'use'}`
-                                      : rule.action.replaceAll('-', ' ').replaceAll(':', ' ');
-                              return (
-                                <article key={rule.id}>
-                                  <strong>Observed: {label}</strong>
-                                  <p>
-                                    {rule.conditions
-                                      .filter((c) => c.cue === 'signal')
-                                      .map((c) => String(c.value).replaceAll('-', ' '))
-                                      .join(', ') || 'A workshop demonstration'}
-                                  </p>
-                                </article>
-                              );
-                            })
-                          ) : (
-                            <p className="empty-knowledge">
-                              Sam has not yet attended a repair demonstration.
-                            </p>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {state.npcWork.find((w) => w.personId === id) && (
-                          <p className="customer-activity">
-                            Now: {state.npcWork.find((w) => w.personId === id)?.option.label}
-                            <small>
-                              Until{' '}
-                              {dayTime(
-                                state.npcWork.find((w) => w.personId === id)?.endsAt ?? state.now,
                               )}
-                            </small>
-                          </p>
-                        )}
-                        {playerWordReading(person) && (
-                          <p className="word-reading">
-                            {person.name} {playerWordReading(person)}.
-                          </p>
-                        )}
-                        <p className="person-role">
-                          {id === 'mum'
-                            ? 'Family objects at home'
-                            : id === 'nora'
-                              ? 'Neighbourhood projects'
-                              : 'Household repairs and collection promises'}
-                        </p>
+                          </article>
+                        ),
+                      )}
+                  </details>
+                ))}
+              </div>
+            </main>
+          )}
+          {view === 'people' && (
+            <main className="people-page">
+              {progress.apprenticeshipAvailable && <SamRequest state={state} act={act} />}
+              <div className="page-heading">
+                <p className="eyebrow">A shared workshop day</p>
+                <h1>People & supplies</h1>
+              </div>
+              <div className="people-supplies">
+                <section className="people-section">
+                  <h2>Working together</h2>
+                  {state.independentRepairs > 0 && (
+                    <div className="capacity-milestone">
+                      <p className="eyebrow">A whole repair handled independently</p>
+                      <p>
                         {state.jobs
                           .filter(
                             (j) =>
-                              j.ownerId === id &&
-                              !j.isDonor &&
-                              !['declined', 'salvaged'].includes(j.status),
+                              j.status === 'delivered' &&
+                              j.completedBy === 'sam' &&
+                              !j.returnedUnfinished,
                           )
-                          .map((j) => (
-                            <div className="customer-ask" key={j.id}>
-                              <strong>{j.title}</strong>
-                              <p>{j.description}</p>
+                          .map((j) => j.title)
+                          .join(', ') || 'Sam completed an independent repair.'}
+                      </p>
+                      <small>
+                        You can spend that workshop time on another object or your own plans. Future
+                        unfamiliar faults may still need teaching.
+                      </small>
+                    </div>
+                  )}
+                  {Object.entries(state.people).map(([id, person]) => (
+                    <article className="person" key={id}>
+                      <span className="avatar">{id.slice(0, 1).toUpperCase()}</span>
+                      <div>
+                        <h3>{person.name}</h3>
+                        {id === 'sam' && progress.apprenticeshipAvailable && (
+                          <div className="sam-actions">
+                            <button
+                              type="button"
+                              disabled={Boolean(state.pendingRequest) || state.watching}
+                              onClick={() => act({ type: 'request-lesson' })}
+                            >
+                              Ask Sam to watch
+                            </button>{' '}
+                            {progress.apprenticeshipAvailable && !state.pendingRequest && (
+                              <LessonControl
+                                state={state}
+                                act={act}
+                                onRequestMore={() =>
+                                  actSequence([
+                                    { type: 'watch', enabled: false },
+                                    { type: 'request-lesson' },
+                                  ])
+                                }
+                              />
+                            )}
+                          </div>
+                        )}
+                        {id === 'sam' && progress.apprenticeshipAvailable ? (
+                          <>
+                            <p>
+                              {state.npcWork.find((w) => w.personId === id)?.option.label ??
+                                describePerson(person).state}
+                            </p>
+                            {state.npcWork.find((w) => w.personId === id) && (
                               <small>
-                                {jobReadiness(j)}
-                                {['offer', 'active', 'ready'].includes(j.status)
-                                  ? ` · Return ${dayTime(j.due)}`
-                                  : ''}
+                                Until{' '}
+                                {dayTime(
+                                  state.npcWork.find((w) => w.personId === id)?.endsAt ?? state.now,
+                                )}
                               </small>
+                            )}
+                            {playerWordReading(person) && (
+                              <p className="word-reading">
+                                {person.name} {playerWordReading(person)}.
+                              </p>
+                            )}
+                            <div className="commitment-list">
+                              {person.agenda.commitments
+                                .filter(
+                                  (c) =>
+                                    c.status === 'pending' &&
+                                    c.actions.includes('personal') &&
+                                    c.until >= state.now,
+                                )
+                                .map((c) => (
+                                  <p key={`${c.label}-${c.from}`}>
+                                    <strong>{c.label}</strong>
+                                    <small>
+                                      {dayTime(c.from)} – {dayTime(c.until)}
+                                    </small>
+                                  </p>
+                                ))}
                             </div>
-                          ))}
-                        <div className="commitment-list">
-                          {person.agenda.commitments
-                            .filter(
-                              (c) =>
-                                c.status === 'pending' &&
-                                c.actions.includes('personal') &&
-                                c.until >= state.now,
-                            )
-                            .map((c) => (
-                              <p key={`${c.label}-${c.from}`}>
-                                <strong>{c.label}</strong>
+                            <h4 className="knowledge-heading">Observed repair methods</h4>
+                            <p className="knowledge-note">
+                              Attended demonstrations. Independent whole repairs:{' '}
+                              {state.independentRepairs}.
+                            </p>
+                            <p className="knowledge-note">
+                              Conditions observed when taught; not an outcome or a guarantee.
+                            </p>
+                            <div className="knowledge-list">
+                              {person.methods?.rules.length ? (
+                                person.methods.rules.map((rule) => {
+                                  const action = rule.action.split(':');
+                                  const label =
+                                    action[0] === 'work'
+                                      ? `${action[1]} ${action[2] ?? 'component'}`
+                                      : action[0] === 'measure'
+                                        ? `Measure ${action[1] ?? 'electrical response'}`
+                                        : action[0] === 'verify'
+                                          ? `Check ${action[1] ?? 'use'}`
+                                          : rule.action.replaceAll('-', ' ').replaceAll(':', ' ');
+                                  return (
+                                    <article key={rule.id}>
+                                      <strong>Observed: {label}</strong>
+                                      <p>
+                                        {rule.conditions
+                                          .filter((c) => c.cue === 'signal')
+                                          .map((c) => String(c.value).replaceAll('-', ' '))
+                                          .join(', ') || 'A workshop demonstration'}
+                                      </p>
+                                    </article>
+                                  );
+                                })
+                              ) : (
+                                <p className="empty-knowledge">
+                                  Sam has not yet attended a repair demonstration.
+                                </p>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            {state.npcWork.find((w) => w.personId === id) && (
+                              <p className="customer-activity">
+                                Now: {state.npcWork.find((w) => w.personId === id)?.option.label}
                                 <small>
-                                  {dayTime(c.from)} – {dayTime(c.until)}
+                                  Until{' '}
+                                  {dayTime(
+                                    state.npcWork.find((w) => w.personId === id)?.endsAt ??
+                                      state.now,
+                                  )}
                                 </small>
                               </p>
-                            ))}
-                        </div>
-                      </>
-                    )}
-                    <details>
-                      <summary>Actual reports</summary>
-                      {state.log
-                        .filter((l) => l.speaker.toLowerCase() === id.toLowerCase())
-                        .slice(-8)
-                        .map((l) => (
-                          <p key={l.id}>{l.text}</p>
-                        ))}
-                    </details>
-                  </div>
-                </article>
-              ))}
-            </section>
-            <section className="stock-section">
-              <h2>Parts drawer</h2>
-              <p>Replacing a component uses one part. Buying stock uses cash.</p>
-              <div className="stock-list">
-                {Object.entries(PART_PRICES).map(([kind, price]) => (
-                  <div key={kind}>
-                    <span className="part-name">{kind}</span>
-                    <strong>
-                      {state.stock[kind as ComponentKind] ?? 0}
-                      <small> in stock</small>
-                    </strong>
-                    <button
-                      type="button"
-                      onClick={() => act({ type: 'buy', part: kind as ComponentKind })}
-                    >
-                      Buy · {money(price as number)} · 20 min
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <h2 className="upgrade-heading">Workshop improvements</h2>
-              <div className="upgrades">
-                {UPGRADE_CATALOG.map((upgrade) => (
-                  <div key={upgrade.id}>
-                    <strong>{upgrade.name}</strong>
-                    <p>
-                      {upgrade.id === 'second-bench'
-                        ? state.upgrades.includes(upgrade.id)
-                          ? 'You and Sam can use separate benches.'
-                          : state.npcWork.some(
-                                (w) =>
-                                  w.personId === 'sam' &&
-                                  w.jobId &&
-                                  ![
-                                    'rest',
-                                    'eat',
-                                    'drink',
-                                    'personal',
-                                    'ask-help',
-                                    'accept-repair',
-                                    'decline-repair',
-                                  ].includes(w.option.action),
+                            )}
+                            {playerWordReading(person) && (
+                              <p className="word-reading">
+                                {person.name} {playerWordReading(person)}.
+                              </p>
+                            )}
+                            <p className="person-role">
+                              {id === 'mum'
+                                ? 'Family objects at home'
+                                : id === 'nora'
+                                  ? 'Neighbourhood projects'
+                                  : 'Household repairs and collection promises'}
+                            </p>
+                            {state.jobs
+                              .filter(
+                                (j) =>
+                                  j.ownerId === id &&
+                                  !j.isDonor &&
+                                  !['declined', 'salvaged'].includes(j.status),
                               )
-                            ? `Sam is using the shared bench. A second bench lets you work on another object beside him.`
-                            : 'The shared bench is available during Sam’s breaks and personal plans. A second bench lets both of you do hands-on repair at once.'
-                        : upgrade.description}
-                    </p>
-                    <button
-                      type="button"
-                      disabled={state.upgrades.includes(upgrade.id)}
-                      onClick={() => act({ type: 'upgrade', id: upgrade.id })}
-                    >
-                      {state.upgrades.includes(upgrade.id)
-                        ? 'Installed'
-                        : `Buy · ${money(upgrade.price)}`}
-                    </button>
+                              .map((j) => (
+                                <div className="customer-ask" key={j.id}>
+                                  <strong>{j.title}</strong>
+                                  <p>{j.description}</p>
+                                  <small>
+                                    {jobReadiness(j)}
+                                    {['offer', 'active', 'ready'].includes(j.status)
+                                      ? ` · Return ${dayTime(j.due)}`
+                                      : ''}
+                                  </small>
+                                </div>
+                              ))}
+                            <div className="commitment-list">
+                              {person.agenda.commitments
+                                .filter(
+                                  (c) =>
+                                    c.status === 'pending' &&
+                                    c.actions.includes('personal') &&
+                                    c.until >= state.now,
+                                )
+                                .map((c) => (
+                                  <p key={`${c.label}-${c.from}`}>
+                                    <strong>{c.label}</strong>
+                                    <small>
+                                      {dayTime(c.from)} – {dayTime(c.until)}
+                                    </small>
+                                  </p>
+                                ))}
+                            </div>
+                          </>
+                        )}
+                        <details>
+                          <summary>Actual reports</summary>
+                          {state.log
+                            .filter((l) => l.speaker.toLowerCase() === id.toLowerCase())
+                            .slice(-8)
+                            .map((l) => (
+                              <p key={l.id}>{l.text}</p>
+                            ))}
+                        </details>
+                      </div>
+                    </article>
+                  ))}
+                </section>
+                <section className="stock-section">
+                  <h2>Supplies</h2>
+                  <h3>Parts drawer</h3>
+                  <p>Replacing a component uses one part. Buying stock uses cash.</p>
+                  <div className="stock-list">
+                    {Object.entries(PART_PRICES).map(([kind, price]) => (
+                      <div key={kind}>
+                        <span className="part-name">{kind}</span>
+                        <strong>
+                          {state.stock[kind as ComponentKind] ?? 0}
+                          <small> in stock</small>
+                        </strong>
+                        <button
+                          type="button"
+                          onClick={() => act({ type: 'buy', part: kind as ComponentKind })}
+                        >
+                          Buy · {money(price as number)} · 20 min
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                  <h2 className="upgrade-heading">Workshop improvements</h2>
+                  <div className="upgrades">
+                    {UPGRADE_CATALOG.map((upgrade) => (
+                      <div key={upgrade.id}>
+                        <strong>{upgrade.name}</strong>
+                        <p>
+                          {upgrade.id === 'second-bench'
+                            ? state.upgrades.includes(upgrade.id)
+                              ? 'You and Sam can use separate benches.'
+                              : state.npcWork.some(
+                                    (w) =>
+                                      w.personId === 'sam' &&
+                                      w.jobId &&
+                                      ![
+                                        'rest',
+                                        'eat',
+                                        'drink',
+                                        'personal',
+                                        'ask-help',
+                                        'accept-repair',
+                                        'decline-repair',
+                                      ].includes(w.option.action),
+                                  )
+                                ? `Sam is using the shared bench. A second bench lets you work on another object beside him.`
+                                : 'The shared bench is available during Sam’s breaks and personal plans. A second bench lets both of you do hands-on repair at once.'
+                            : upgrade.description}
+                        </p>
+                        <button
+                          type="button"
+                          disabled={state.upgrades.includes(upgrade.id)}
+                          onClick={() => act({ type: 'upgrade', id: upgrade.id })}
+                        >
+                          {state.upgrades.includes(upgrade.id)
+                            ? 'Installed'
+                            : `Buy · ${money(upgrade.price)}`}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
               </div>
-            </section>
-          </div>
-        </main>
-      )}
-      {state.ended && (
-        <div className="ending-banner">
-          <p className="eyebrow">First week complete</p>
-          <h2>Your first week, recorded.</h2>
-          <p>The calendar closes this chapter. These are the outcomes of your choices.</p>
-          <WorkshopTally state={state} enabled={tallyOn} />
-          {state.community?.phase === 'completed' && (
-            <>
-              <CommunityScene
-                event={state.community}
-                people={state.people}
-                selected={state.community.preparedFormats[0] ?? 'garden'}
-                stage="activity"
-                jobs={state.jobs}
-              />
-              <p className="recorded-caption">
-                Recorded afternoon · actual completed activities and prepared equipment.
-              </p>
-            </>
+            </main>
           )}
-          <div className="week-working-objects">
-            <h3>What can be used again</h3>
-            {state.jobs
-              .filter(
+          {view !== 'bench' && (
+            <div className="page-action-bar">
+              {result}
+              <div>{dayActions}</div>
+            </div>
+          )}
+        </div>
+      )}
+      {isEnd && (
+        <div className="end-page">
+          <div className="end-body">
+            <p className="eyebrow">First week complete</p>
+            <h2>Your first week, recorded.</h2>
+            <p>The calendar closes this chapter. These are the outcomes of your choices.</p>
+            <details className="tally-fold">
+              <summary>See the tally ▸</summary>
+              <WorkshopTally state={state} enabled />
+            </details>
+            {state.community?.phase === 'completed' && (
+              <>
+                <CommunityScene
+                  event={state.community}
+                  people={state.people}
+                  selected={state.community.preparedFormats[0] ?? 'garden'}
+                  stage="activity"
+                  jobs={state.jobs}
+                />
+                <p className="recorded-caption">
+                  Recorded afternoon · actual completed activities and prepared equipment.
+                </p>
+              </>
+            )}
+            <div className="week-working-objects">
+              <h3>What can be used again</h3>
+              {state.jobs
+                .filter(
+                  (j) =>
+                    !j.isDonor &&
+                    !j.returnedUnfinished &&
+                    requiredChecks(j).every((c) => j.verified.includes(c)),
+                )
+                .map((j) => (
+                  <p key={j.id}>
+                    <strong>{j.title}</strong> ·{' '}
+                    {j.status === 'delivered'
+                      ? `returned to ${state.people[j.ownerId]?.name ?? j.ownerId}`
+                      : 'retained at the workshop'}{' '}
+                    · checked for {requiredChecks(j).join(', ')}
+                  </p>
+                ))}
+              {!state.jobs.some(
                 (j) =>
                   !j.isDonor &&
                   !j.returnedUnfinished &&
                   requiredChecks(j).every((c) => j.verified.includes(c)),
-              )
-              .map((j) => (
-                <p key={j.id}>
-                  <strong>{j.title}</strong> ·{' '}
-                  {j.status === 'delivered'
-                    ? `returned to ${state.people[j.ownerId]?.name ?? j.ownerId}`
-                    : 'retained at the workshop'}{' '}
-                  · checked for {requiredChecks(j).join(', ')}
-                </p>
-              ))}
-            {!state.jobs.some(
-              (j) =>
-                !j.isDonor &&
-                !j.returnedUnfinished &&
-                requiredChecks(j).every((c) => j.verified.includes(c)),
-            ) && <p>No completed required use check is recorded. Unfinished work remains saved.</p>}
+              ) && (
+                <p>No completed required use check is recorded. Unfinished work remains saved.</p>
+              )}
+            </div>
+            <section className="end-people">
+              <h3>What people actually did</h3>
+              {state.community?.phase === 'completed' ? (
+                state.community.decisions.map((d) => (
+                  <p key={d.personId}>
+                    {state.people[d.personId]?.name ?? d.personId} · {d.activityLabel} ·{' '}
+                    {d.completed ? 'completed' : 'not completed'}
+                  </p>
+                ))
+              ) : (
+                <p>Sam completed {state.independentRepairs} independent repairs.</p>
+              )}
+            </section>
+            <SamWorkAccount jobs={state.jobs} />
+            <dl className="week-account">
+              <div>
+                <dt>Checked returns</dt>
+                <dd>
+                  {
+                    state.jobs.filter((j) => j.status === 'delivered' && !j.returnedUnfinished)
+                      .length
+                  }
+                </dd>
+              </div>
+              <div>
+                <dt>Unfinished returns</dt>
+                <dd>
+                  {
+                    state.jobs.filter((j) => j.status === 'delivered' && j.returnedUnfinished)
+                      .length
+                  }
+                </dd>
+              </div>
+              <div>
+                <dt>Independent repairs</dt>
+                <dd>{state.independentRepairs}</dd>
+              </div>
+              <div>
+                <dt>Workshop cash</dt>
+                <dd>{money(state.cash)}</dd>
+              </div>
+              <div>
+                <dt>Open promises</dt>
+                <dd>
+                  {
+                    state.jobs.filter(
+                      (j) => ['active', 'ready'].includes(j.status) && !j.isDonor && !j.isPersonal,
+                    ).length
+                  }
+                </dd>
+              </div>
+            </dl>
+            {state.community && (
+              <p className="week-community">
+                <strong>Community afternoon:</strong>{' '}
+                {state.community.phase === 'completed'
+                  ? state.community.outcome
+                  : 'No completed afternoon outcome is recorded yet.'}
+              </p>
+            )}
+            <p>Open promises, parts and acquired methods continue into the next workshop day.</p>
           </div>
-          <button type="button" className="primary-action" onClick={() => setPaused(true)}>
-            Close the workshop for now<small>Saved here · time waits</small>
-          </button>
-          <SamWorkAccount jobs={state.jobs} />
-          <dl className="week-account">
+          <div className="end-actions">
             <div>
-              <dt>Checked returns</dt>
-              <dd>
-                {state.jobs.filter((j) => j.status === 'delivered' && !j.returnedUnfinished).length}
-              </dd>
+              <button type="button" onClick={() => setScreen('feedback')}>
+                Send word
+              </button>
+              <button type="button" onClick={exportSave}>
+                Download this run
+              </button>
             </div>
-            <div>
-              <dt>Unfinished returns</dt>
-              <dd>
-                {state.jobs.filter((j) => j.status === 'delivered' && j.returnedUnfinished).length}
-              </dd>
-            </div>
-            <div>
-              <dt>Independent repairs</dt>
-              <dd>{state.independentRepairs}</dd>
-            </div>
-            <div>
-              <dt>Workshop cash</dt>
-              <dd>{money(state.cash)}</dd>
-            </div>
-            <div>
-              <dt>Open promises</dt>
-              <dd>
-                {
-                  state.jobs.filter(
-                    (j) => ['active', 'ready'].includes(j.status) && !j.isDonor && !j.isPersonal,
-                  ).length
-                }
-              </dd>
-            </div>
-          </dl>
-          {state.community && (
-            <p className="week-community">
-              <strong>Community afternoon:</strong>{' '}
-              {state.community.phase === 'completed'
-                ? state.community.outcome
-                : 'No completed afternoon outcome is recorded yet.'}
-            </p>
-          )}
-          <p>Open promises, parts and acquired methods continue into the next workshop day.</p>
-          <button type="button" onClick={() => act({ type: 'continue' })}>
-            Keep the workshop open →
-          </button>
-          <button type="button" onClick={exportSave}>
-            Export this milestone
-          </button>
-          <button
-            type="button"
-            disabled={replayChecking}
-            aria-busy={replayChecking}
-            onClick={verifyReplay}
-          >
-            {replayChecking ? 'Verifying replay…' : 'Verify recorded replay'}
-          </button>
+            <button
+              type="button"
+              className="primary-action"
+              onClick={() => act({ type: 'continue' })}
+            >
+              Keep the workshop open
+            </button>
+          </div>
         </div>
       )}
-      <footer className="hf-notebooks">
-        <a href="https://human.adamwhite.work/games/">◇ all notebooks</a>
-      </footer>
+      {infoOpen && (
+        <>
+          <button
+            className="info-backdrop"
+            type="button"
+            aria-label="Close information"
+            onClick={() => setInfoOpen(false)}
+          />
+          <aside className="info-popover" role="dialog" aria-label={info[0]}>
+            <button
+              type="button"
+              className="close-sheet"
+              aria-label="Close information"
+              onClick={() => setInfoOpen(false)}
+            >
+              ×
+            </button>
+            <h2>{info[0]}</h2>
+            {info.slice(1).map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+          </aside>
+        </>
+      )}
+      {sheet && (
+        <div className="sheet-backdrop">
+          <button
+            type="button"
+            className="sheet-dismiss"
+            aria-label="Close sheet"
+            onClick={() => setSheet(null)}
+          />
+          <section
+            ref={sheetRef}
+            className={`shell-sheet sheet-${sheet}`}
+            role="dialog"
+            aria-modal="true"
+            aria-label={
+              sheet === 'menu'
+                ? 'Workshop'
+                : sheet === 'ways'
+                  ? 'Other ways in'
+                  : sheet === 'job-actions'
+                    ? actionJob?.title
+                    : sheet === 'job'
+                      ? job?.title
+                      : sheet === 'day'
+                        ? 'The day'
+                        : 'The workshop’s history'
+            }
+          >
+            <button
+              className="close-sheet"
+              type="button"
+              aria-label="Close sheet"
+              onClick={() => setSheet(null)}
+            >
+              ×
+            </button>
+            {sheet === 'menu' && (
+              <>
+                <h2>Workshop</h2>
+                <p>Saved on this device. Time waits while you are away.</p>
+                <button className="reading-row" type="button" onClick={() => setSheet('history')}>
+                  The workshop's history <span>▸</span>
+                </button>
+                <button
+                  className="reading-row"
+                  type="button"
+                  onClick={() => {
+                    setSheet(null);
+                    setScreen('feedback');
+                  }}
+                >
+                  Send word <span>▸</span>
+                </button>
+                <button
+                  className="reading-row fullscreen-row"
+                  type="button"
+                  onClick={() => {
+                    if (document.fullscreenElement) void document.exitFullscreen();
+                    else void document.documentElement.requestFullscreen?.();
+                  }}
+                >
+                  Full screen
+                </button>
+                <button
+                  className="reading-row"
+                  type="button"
+                  onClick={() => {
+                    setSheet(null);
+                    setScreen('title');
+                  }}
+                >
+                  To the title page
+                </button>
+                <a className="reading-row" href="https://human.adamwhite.work/games/">
+                  All games
+                </a>
+                <div className="recording-footer">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={eventsOn}
+                      onChange={(e) => {
+                        lab.setTelemetryOff(!e.target.checked);
+                        setEventsOn(lab.telemetryOn);
+                      }}
+                    />{' '}
+                    Record play for the lab
+                  </label>
+                  <a
+                    href="https://human.adamwhite.work/lab/privacy/"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Lab privacy
+                  </a>
+                </div>
+                <button
+                  className="primary-action"
+                  type="button"
+                  onClick={() => {
+                    setSheet(null);
+                    setScreen('play');
+                    setHasSave(true);
+                  }}
+                >
+                  Back to the workshop
+                </button>
+              </>
+            )}
+            {sheet === 'ways' && (
+              <>
+                <h2>Other ways in</h2>
+                <button type="button" onClick={() => input.current?.click()}>
+                  Import a workshop
+                </button>
+                <button type="button" disabled={replayChecking} onClick={verifyReplay}>
+                  {replayChecking ? 'Verifying replay…' : 'Verify the recorded replay'}
+                </button>
+                {replayStatus && <p role="status">{replayStatus}</p>}
+                <label>
+                  Start from a seed
+                  <input
+                    type="number"
+                    value={seedText}
+                    onChange={(e) => setSeedText(e.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={!seedText.trim() || !Number.isFinite(Number(seedText))}
+                  onClick={() => startWorkshop(Number(seedText))}
+                >
+                  Start
+                </button>
+                <a className="reading-row" href="/experiments/">
+                  Earlier experiments
+                </a>
+                {status && <p role="status">{status}</p>}
+              </>
+            )}
+            {sheet === 'day' && (
+              <>
+                <h2>The day</h2>
+                <p>{dayTime(state.now)}</p>
+                {workday(true)}
+                <p>{Math.max(0, 1020 - (state.now % 1440))} min until closing</p>
+                {dueToday.map((j) => (
+                  <p key={j.id}>
+                    ◷ {j.title} · {dayTime(j.due)}
+                  </p>
+                ))}
+                <div className="day-sheet-actions">{dayActions}</div>
+                {result}
+              </>
+            )}
+            {sheet === 'job' && job && (
+              <>
+                <h2>{job.title}</h2>
+                <p>{state.people[job.ownerId]?.name ?? job.ownerId}</p>
+                <p>“{job.description}”</p>
+                {!job.isPersonal && !job.isDonor && <p>Promise · {dayTime(job.due)}</p>}
+                <RecentConversation
+                  key={conversationSession}
+                  lines={todaysWords(state)}
+                  canAskSam={!guided && !state.pendingRequest && !state.watching}
+                  onAskSam={() => act({ type: 'request-lesson' })}
+                />
+                {!guided && progress.apprenticeshipAvailable && (
+                  <button
+                    type="button"
+                    disabled={Boolean(state.pendingRequest) || state.watching}
+                    onClick={() => act({ type: 'request-lesson' })}
+                  >
+                    Ask Sam to watch
+                  </button>
+                )}
+                <h3>On the bench</h3>
+                {state.jobs
+                  .filter((j) => j.status !== 'declined')
+                  .map((j) => (
+                    <div className="bench-picker-row" key={j.id}>
+                      <span>
+                        {j.title}
+                        {j.assignedTo
+                          ? ' · with Sam'
+                          : j.status === 'delivered'
+                            ? ' · returned'
+                            : ''}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          chooseJob(j);
+                          setSheet(null);
+                        }}
+                      >
+                        Open
+                      </button>
+                    </div>
+                  ))}
+              </>
+            )}
+            {sheet === 'job-actions' && actionJob && (
+              <>
+                <h2>{actionJob.title}</h2>
+                <p>{state.people[actionJob.ownerId]?.name ?? actionJob.ownerId}</p>
+                <p>“{actionJob.description}”</p>
+                <p>{jobReadiness(actionJob)}</p>
+                {actionJob.blocked && (
+                  <p>Sam has put this repair aside: {actionJob.blocked.reason}</p>
+                )}
+                {!actionJob.isPersonal && !actionJob.isDonor && (
+                  <p>
+                    Promise · {dayTime(actionJob.due)} · {money(actionJob.reward)}
+                  </p>
+                )}
+                {!requiredChecks(actionJob).every((c) => actionJob.verified.includes(c)) && (
+                  <p>
+                    Check the owner’s use before returning, or choose an honest unfinished return.
+                  </p>
+                )}
+                {actionJob.status === 'ready' && progress.apprenticeshipAvailable && (
+                  <p>
+                    {evidenceContext(actionJob, 'sam').stage === 'ready'
+                      ? 'Sam has received your checks.'
+                      : 'Sam may need to recheck.'}
+                  </p>
+                )}
+                {['active', 'ready'].includes(actionJob.status) ? (
+                  responsibilityActions(actionJob)
+                ) : (
+                  <p>{jobReadiness(actionJob)}</p>
+                )}
+                {result}
+              </>
+            )}
+            {sheet === 'history' && (
+              <>
+                <h2>The workshop's history</h2>
+                {[...state.log].reverse().map((line) => (
+                  <p key={line.id}>
+                    <time>{dayTime(line.at)}</time> <strong>{line.speaker}</strong> {line.text}
+                  </p>
+                ))}
+              </>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }
