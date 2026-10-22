@@ -91,8 +91,6 @@ function Device({
   probeB,
   condition,
   collarPreview,
-  onTerminal,
-  activeProbe,
   suggestedTerminal,
   suggestedPart,
 }: {
@@ -100,8 +98,6 @@ function Device({
   probeB: string;
   condition: TestCondition;
   collarPreview?: number;
-  onTerminal: (terminal: string) => void;
-  activeProbe: string;
   suggestedTerminal?: string;
   suggestedPart?: string;
   job: Job;
@@ -250,33 +246,33 @@ function Device({
           const x = c.x * 6;
           const y = c.y * 4;
           return (
+            // biome-ignore lint/a11y/useSemanticElements: SVG selection has a native component chip equivalent.
             <g
               key={c.id}
               transform={`translate(${x},${y})`}
               className={`${selected === c.id ? 'component selected' : 'component'} ${suggestedPart === c.id ? 'guide-component' : ''}`}
+              role="button"
+              tabIndex={0}
+              aria-label={`Select ${c.label}`}
+              onClick={() => onSelect(c.id)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onSelect(c.id);
+                }
+              }}
             >
-              <path d="M-35 0 H35" />
-              {/* biome-ignore lint/a11y/useSemanticElements: This is the component target in an SVG diagram. */}
               <rect
-                x="-29"
-                y="-21"
-                width="58"
-                height="42"
-                rx="5"
-                role="button"
-                tabIndex={0}
-                aria-label={`Select ${c.label}`}
-                onClick={() => onSelect(c.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onSelect(c.id);
-                  }
-                }}
+                x="-60"
+                y="-60"
+                width="120"
+                height="120"
+                style={{ fill: 'transparent', stroke: 'none' }}
               />
+              <path d="M-35 0 H35" />
+              <rect x="-29" y="-21" width="58" height="42" rx="5" />
 
               {c.terminals.map((terminal, terminalIndex) => (
-                // biome-ignore lint/a11y/useSemanticElements: SVG terminals have native HTML keyboard equivalents in the meter.
                 <g
                   key={terminal}
                   className={
@@ -284,16 +280,6 @@ function Device({
                       ? 'terminal-hit suggested-terminal'
                       : 'terminal-hit'
                   }
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Place probe ${activeProbe.toUpperCase()} at terminal ${terminal}`}
-                  onClick={() => onTerminal(terminal)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      onTerminal(terminal);
-                    }
-                  }}
                 >
                   {terminal === suggestedTerminal && (
                     <circle
@@ -788,8 +774,6 @@ export default function App() {
       probeB={b}
       condition={condition}
       collarPreview={collarPreview}
-      onTerminal={chooseTerminal}
-      activeProbe={activeProbe}
       suggestedTerminal={suggestedTerminal}
       suggestedPart={guided ? progress.suggestedPart : undefined}
     />
