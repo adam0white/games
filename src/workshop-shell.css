@@ -1375,3 +1375,13 @@ body,
     gap: 0;
   }
 }
+/* Legacy promise typography must not add extra lines inside the compact row. */
+.workshop-shell .board-column .job-paper > .promise strong {
+  display: inline;
+  margin: 0;
+  font-size: 10px;
+  line-height: 18px;
+}
+.workshop-shell .board-column .job-paper > .readiness {
+  margin: 0;
+}
