@@ -1,5 +1,6 @@
 import { restore, snapshot } from '@adam0white/human-framework';
 import { compatiblePart, createModel } from './model';
+import { restoreOpeningPeople } from './opening';
 import {
   isCurrentProvenance,
   isInputRecording,
@@ -418,6 +419,8 @@ export function loadGame(text: string): GameState {
       return [id, person];
     }),
   );
+  if (value.openingPeople !== undefined)
+    value.openingPeople = restoreOpeningPeople(value.openingPeople);
   const responsibilityGoals = new Set<string>();
   for (const job of value.jobs) {
     const handle = job.responsibility;

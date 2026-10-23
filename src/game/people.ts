@@ -68,7 +68,7 @@ export function createPeople(seed: number, now: number): Record<string, Person> 
     // An incidental household owner, not an additional maintained foreground biography.
     {
       id: 'mum',
-      name: 'The household owner',
+      name: 'Sam’s mother',
       age: 43,
       sex: 'female' as const,
       traits,

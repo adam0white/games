@@ -21,6 +21,7 @@ import {
   supportedFaults,
   terminals,
 } from './model';
+import { restoreOpeningPeople } from './opening';
 import {
   agreeLearningSession,
   choiceSpeech,
@@ -265,7 +266,11 @@ export function upgradeRules(s: GameState): GameState {
   );
   return s;
 }
-export function createGame(seed = 416, rules: 'current' | 'legacy' = 'current'): GameState {
+export function createGame(
+  seed = 416,
+  rules: 'current' | 'legacy' = 'current',
+  openingPeople?: GameState['openingPeople'],
+): GameState {
   const now = OPEN;
   const legacy = rules === 'legacy';
   const s: GameState = {
@@ -281,7 +286,8 @@ export function createGame(seed = 416, rules: 'current' | 'legacy' = 'current'):
     reputation: 0,
     stock: { cell: 1, switch: 1, bulb: 1, gear: 1 },
     jobs: [],
-    people: createPeople(seed, now),
+    ...(openingPeople ? { openingPeople: restoreOpeningPeople(openingPeople) } : {}),
+    people: openingPeople ? restoreOpeningPeople(openingPeople) : createPeople(seed, now),
     npcWork: [],
     watching: false,
     selectedJobId: '',
@@ -346,11 +352,7 @@ export function createGame(seed = 416, rules: 'current' | 'legacy' = 'current'):
   ]);
   s.jobs.push(lantern, personal, donor);
   s.selectedJobId = lantern.id;
-  log(
-    s,
-    'The household owner',
-    'This lantern belongs to the household. It still has work left in it.',
-  );
+  log(s, 'Sam’s mother', 'This lantern belongs to the household. It still has work left in it.');
   log(
     s,
     'Sam',
@@ -1873,7 +1875,7 @@ function sleepToMorning(s: GameState): void {
     s.jobs.push(fan);
     log(
       s,
-      'The household owner',
+      'Sam’s mother',
       `We can use the room and garden tomorrow. The site opens at noon; people arrive at${currentRules(s) ? ' ' : ''}15:00. We have time to prepare two formats, at most. Your paper theatre could be one of them.`,
     );
   }

@@ -155,6 +155,8 @@ export interface GameState {
   migratedFrom?: import('./recording').MigratedFrom;
   inputs?: Command[];
   discoveries?: string[];
+  /** Complete target-clock initial people; never refreshed from live browser continuity. */
+  openingPeople?: Record<string, Person>;
   community?: import('./community').CommunityState;
   seed: number;
   rng: number;

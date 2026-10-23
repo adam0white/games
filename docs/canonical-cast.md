@@ -11,7 +11,7 @@ Technical done means the exact released canonical cast and browser-life packages
 | Evan, 36, customer with children and deliveries | Retired | His personal arc and family do not transfer to Halil or Rafi. |
 | No Rafi | Canonical Rafi, 19, dish worker and visiting repair learner | New borrowed-fan episode; no repair qualification. Can remains his background cousin. |
 | No Halil | Canonical Halil, 61, visiting repairman working fewer hours | Explicit later workshop visit. Nuran remains deceased; Selin remains his daughter. Illness, smoking and rent obligations are not cured by travel. |
-| Mum, 43, maintained family customer | Unnamed household owner | Incidental lantern and community episode only. No independent biography or foreground people panel. |
+| Mum, 43, maintained family customer | Unnamed household owner, Sam’s mother | Retains her mother status. Incidental lantern and community episode only. No independent biography or foreground people panel. |
 
 The current source has no generated named crowd pool. Sam's mother and sister, Nora's brother and grandmother, Rafi's cousin and household, Selin and Nuran, and unnamed neighbours/event participants remain scoped background references here. Their mention does not create another portable foreground actor. The canonical four-person allocation does not rewrite the two historical games under `/experiments/`.
 

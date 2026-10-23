@@ -2,6 +2,18 @@
 
 Updated 2026-10-20 for the F-231 clarity follow-up. Earlier sections are historical.
 
+## Canonical cast checkpoint, 2026-10-23 — not deployed
+
+What remains: the exact released platform contract, canonical shared-module and browser-life integration, privacy and admission controls, final integration review, push/CI/deploy and genuine cross-origin journeys at both required sizes. `platform-ready.md` was absent during this checkpoint. The shared contract explicitly permits independent content work while that release is pending. Do not infer candidate APIs or version pins.
+
+- Work is isolated on `cast-smallworks`. Content commit `f6ee7d1` is signed locally. No main push or deployment is claimed.
+- [Cast scope and discoveries](docs/canonical-cast.md) records four canonical foreground roles, retirement of Evan, the incidental unnamed mother role and unchanged historical archives.
+- Optional shared-work conversations disclose each person's bounded private account. The People panel preserves discovered accounts after conversation-log eviction. Larger hidden outcomes remain unimplemented.
+- The new edition uses isolated autosave/intro keys and refuses historical saves plainly. Their source exports remain unchanged. Current deterministic replay and learning controls remain.
+- Exact complete initial people can be pinned before creating a chapter. Construction, reload and replay preserve changed traits and bodily state without reading a browser shelf. This is preparation for admission, not a source-passport adapter.
+- Checkpoint verification: Node26.12.0; externally locked check:lane passed lint, types, **282 tests across 36 files**, and production build. Existing CSS and chunk-size warnings remain. One independent correctness/game-design reviewer covers this checkpoint; released integration remains unreviewed.
+- Local existing-Chrome checks covered the opening, phone and desktop layouts without horizontal overflow. A downloaded two-input local run replayed exactly before the final background-role wording change. This is a mechanism control, not independent play, a live delivery check or a cross-origin journey.
+
 ## Clarity follow-up, 2026-10-20
 
 What remains: Adam accepts feel personally. No fresh source-unread retest of these fixes is claimed.

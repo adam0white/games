@@ -35,7 +35,13 @@ function canonical(value: unknown): string {
  * older HF snapshot's engine stamp is normalised the same way a restore normalises it.
  */
 export function replayRecordedRun(
-  recording: { seed: number; inputs: unknown; provenance?: unknown; migratedFrom?: unknown },
+  recording: {
+    seed: number;
+    inputs: unknown;
+    provenance?: unknown;
+    migratedFrom?: unknown;
+    openingPeople?: GameState['openingPeople'];
+  },
   expectedSave?: string,
 ): ReplayResult {
   if (
@@ -96,7 +102,16 @@ export function replayRecordedRun(
       };
     }
   }
-  let state = createGame(recording.seed, legacy ? 'legacy' : 'current');
+  let state: GameState;
+  try {
+    state = createGame(recording.seed, legacy ? 'legacy' : 'current', recording.openingPeople);
+  } catch {
+    return {
+      ok: false,
+      reason: 'invalid-recording',
+      message: 'The pinned initial people are invalid.',
+    };
+  }
   for (const [index, command] of recording.inputs.entries()) {
     if (index === migratedAt) state = upgradeRules(structuredClone(state));
     const result = dispatch(state, structuredClone(command));

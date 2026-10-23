@@ -671,6 +671,7 @@ export default function App() {
           inputs: snapshot.inputs,
           provenance: snapshot.provenance,
           migratedFrom: snapshot.migratedFrom,
+          openingPeople: snapshot.openingPeople,
         },
         expected,
       );
