@@ -15,7 +15,7 @@ function intention(job: Job): string {
         ? 'I can keep this tune in its old box.'
         : 'I can use this for a quiet hour with my own projects.';
   if (job.ownerId === 'sam') return 'I can run my toy at the pace I asked for.';
-  if (job.ownerId === 'evan')
+  if (job.ownerId === 'rafi')
     return job.kind === 'fan'
       ? 'I can put the fan back beside my desk.'
       : 'I can put this back where we use it at home.';
@@ -55,12 +55,12 @@ export function ReturnReceipt({
         {job.returnedUnfinished
           ? 'An honest unfinished return'
           : job.ownerId === 'mum' && job.kind === 'lantern'
-            ? 'A light Mum can carry'
+            ? 'A light its owner can carry'
             : job.ownerId === 'nora' && job.kind === 'lantern'
               ? 'A reading light for Nora'
               : job.ownerId === 'nora' && job.kind === 'music-box'
                 ? 'Nora’s keepsake can play again'
-                : job.ownerId === 'evan' && job.kind === 'fan'
+                : job.ownerId === 'rafi' && job.kind === 'fan'
                   ? 'The desk fan can return'
                   : job.ownerId === 'sam'
                     ? 'Sam’s toy can run again'

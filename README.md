@@ -2,6 +2,10 @@
 
 A single-player repair strategy game. Investigate familiar electrical and mechanical objects at a home bench. Choose measurements, compare results, repair actual components and check the object under its owner's use. Time, stock and cash limit what the workshop can promise.
 
+## Canonical cast adoption
+
+The owner has reopened Small Works for a bounded four-person canonical cast and browser-life adoption. [The cast scope](docs/canonical-cast.md) defines the new edition, playable disclosures and archive boundary. Technical delivery and owner acceptance remain separate.
+
 ## Current direction
 
 Adam requested a new direction on 2026-10-16. The workshop is preserved rather than extended by default. [Open-source host research](docs/research/open-source-hosts-2026-10-16.md) compares existing games and living-agent simulations. It includes an Astra consultation, independent reviews and recovered original ideas. No new host is selected. [The later autonomous-coding assessment](docs/research/autonomous-coding-fit-2026-10-16.md) re-ranks the full list for executable tests, integration burden and bounded HF evidence; Concordia is the research lead and Wesnoth is the first game harness to validate.

@@ -89,7 +89,7 @@ export function FirstRepairGuide({
                 ? repairCue(state, part)
                 : phase === 'check'
                   ? 'The part has changed. Carry the lantern again to see what changed.'
-                  : 'It stays lit when carried. Give it back to Mum.';
+                  : 'It stays lit when carried. Give it back to its owner.';
   const pair = progress.suggestedPair;
   const showPair = pair && (phase === 'measure-source' || phase === 'measure-path');
   return (

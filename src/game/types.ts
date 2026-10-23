@@ -154,6 +154,7 @@ export interface GameState {
   /** Present when an engine-4 world continued under engine 5 (see `upgradeRules`). */
   migratedFrom?: import('./recording').MigratedFrom;
   inputs?: Command[];
+  discoveries?: string[];
   community?: import('./community').CommunityState;
   seed: number;
   rng: number;
@@ -178,6 +179,7 @@ export interface GameState {
   dailyCostsPaid: number;
 }
 export type Command =
+  | { type: 'ask-about-work'; personId: 'sam' | 'nora' | 'rafi' | 'halil' }
   | { type: 'prepare-event'; format: import('./community').CommunityFormat }
   | { type: 'wait-for-site' }
   | { type: 'accept'; jobId: string }

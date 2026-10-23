@@ -3,7 +3,7 @@ import type { Command } from './types';
 export const MAX_RECORDED_INPUTS = 10_000;
 export const SAVE_PROVENANCE = {
   engine: 'small-works@5',
-  scenario: 'first-week@2',
+  scenario: 'canonical-workshop@1',
   framework: '2.8.0',
   game: '3.1.0-alpha.3',
 } as const;
@@ -41,6 +41,11 @@ const conditions = ['bench', 'movement', 'load'];
 export function isRecordedCommand(value: unknown): value is Command {
   if (!object(value)) return false;
   switch (value.type) {
+    case 'ask-about-work':
+      return (
+        keys(value, ['type', 'personId']) &&
+        member(value.personId, ['sam', 'nora', 'rafi', 'halil'])
+      );
     case 'prepare-event':
       return (
         keys(value, ['type', 'format']) && member(value.format, ['garden', 'reading', 'theatre'])
@@ -143,7 +148,7 @@ const matches = (value: unknown, expected: Provenance): boolean =>
 export const isCurrentProvenance = (value: unknown): boolean => matches(value, SAVE_PROVENANCE);
 export const isLegacyProvenance = (value: unknown): boolean => matches(value, LEGACY_PROVENANCE);
 export function isSupportedProvenance(value: unknown): boolean {
-  return isCurrentProvenance(value) || isLegacyProvenance(value);
+  return isCurrentProvenance(value);
 }
 export function isMigratedFrom(value: unknown): value is MigratedFrom {
   return (

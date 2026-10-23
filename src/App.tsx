@@ -13,6 +13,7 @@ import { SamWorkAccount } from './components/SamWorkAccount';
 import { SendWord } from './components/SendWord';
 import { TeachingRecord } from './components/TeachingRecord';
 import { WorkshopTally } from './components/WorkshopTally';
+import { discoveredAccounts } from './game/cast-content';
 import {
   createGame,
   dayTime,
@@ -46,9 +47,7 @@ import './meter-layout.css';
 import './clarity.css';
 import './workshop-shell.css';
 
-const SAVE_KEY = 'small-works-save-v5';
-/** Engine-4 autosaves are read once, upgraded and written to the v5 key; the v4 key itself is never changed. */
-const LEGACY_SAVE_KEY = 'small-works-save-v4';
+const SAVE_KEY = 'small-works-canonical-save-v1';
 const conditions: TestCondition[] = ['bench', 'movement', 'load'];
 const money = (n: number) => `£${n.toFixed(0)}`;
 function checkPurpose(job: Job): string {
@@ -74,12 +73,6 @@ function initial(): GameState {
     if (saved) return upgradeRules(loadGame(saved));
   } catch {
     /* A damaged save does not overwrite historical saves. */
-  }
-  try {
-    const legacy = localStorage.getItem(LEGACY_SAVE_KEY);
-    if (legacy) return upgradeRules(loadGame(legacy));
-  } catch {
-    /* An engine-4 save that no longer loads stays untouched under its own key. */
   }
   return createGame(42);
 }
@@ -439,9 +432,7 @@ export default function App() {
   const [infoOpen, setInfoOpen] = useState(false);
   const [newConfirmed, setNewConfirmed] = useState(false);
   const [seedText, setSeedText] = useState(String(state.seed + 1));
-  const [hasSave, setHasSave] = useState(() =>
-    Boolean(localStorage.getItem(SAVE_KEY) || localStorage.getItem(LEGACY_SAVE_KEY)),
-  );
+  const [hasSave, setHasSave] = useState(() => Boolean(localStorage.getItem(SAVE_KEY)));
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -455,12 +446,12 @@ export default function App() {
   const [pane, setPane] = useState<'object' | 'meter' | 'repair' | 'notes'>('object');
   const [opened, setOpened] = useState(false);
   const [introSkipped, setIntroSkipped] = useState(
-    () => localStorage.getItem(`small-works-intro-${state.seed}`) === 'skipped',
+    () => localStorage.getItem(`small-works-canonical-intro-${state.seed}`) === 'skipped',
   );
   const progress = firstRepairProgress(state);
   const guided = !introSkipped && !progress.workshopAvailable;
   const skipIntro = () => {
-    localStorage.setItem(`small-works-intro-${state.seed}`, 'skipped');
+    localStorage.setItem(`small-works-canonical-intro-${state.seed}`, 'skipped');
     setIntroSkipped(true);
   };
 
@@ -729,8 +720,10 @@ export default function App() {
     setSelected('');
     setStatus('');
     setTeachingFeedback('');
-    setIntroSkipped(!fresh && localStorage.getItem(`small-works-intro-${next.seed}`) === 'skipped');
-    if (fresh) localStorage.removeItem(`small-works-intro-${next.seed}`);
+    setIntroSkipped(
+      !fresh && localStorage.getItem(`small-works-canonical-intro-${next.seed}`) === 'skipped',
+    );
+    if (fresh) localStorage.removeItem(`small-works-canonical-intro-${next.seed}`);
   };
   const samPresent =
     state.watching || Boolean(state.pendingRequest) || Boolean(job?.assignedTo === 'sam');
@@ -1793,7 +1786,7 @@ export default function App() {
                                 </p>
                               )}
                             {j.kind === 'lantern' &&
-                              j.ownerId === 'evan' &&
+                              j.ownerId === 'halil' &&
                               requiredChecks(j).includes('movement') &&
                               state.people.sam?.methods?.rules.some((rule) =>
                                 rule.conditions.some(
@@ -1897,114 +1890,71 @@ export default function App() {
                       </small>
                     </div>
                   )}
-                  {Object.entries(state.people).map(([id, person]) => (
-                    <article className="person" key={id}>
-                      <span className="avatar">{id.slice(0, 1).toUpperCase()}</span>
-                      <div>
-                        <h3>{person.name}</h3>
-                        {id === 'sam' && progress.apprenticeshipAvailable && (
-                          <div className="sam-actions">
+                  {Object.entries(state.people)
+                    .filter(([id]) => id !== 'mum' && (id !== 'halil' || state.day >= 3))
+                    .map(([id, person]) => (
+                      <article className="person" key={id}>
+                        <span className="avatar">{id.slice(0, 1).toUpperCase()}</span>
+                        <div>
+                          <h3>{person.name}</h3>
+                          <p>
+                            {id === 'sam'
+                              ? '18 · repair apprentice; occasional kitchen worker'
+                              : id === 'nora'
+                                ? '28 · repair designer and maker'
+                                : id === 'rafi'
+                                  ? '19 · dish worker; visiting repair learner from Bornova'
+                                  : '61 · visiting repairman; working fewer hours'}
+                          </p>
+                          {state.discoveries?.includes(id) && (
+                            <details>
+                              <summary>What {person.name} told me</summary>
+                              <p>{discoveredAccounts[id as keyof typeof discoveredAccounts]}</p>
+                            </details>
+                          )}
+                          {!state.discoveries?.includes(id) && (
                             <button
                               type="button"
-                              disabled={Boolean(state.pendingRequest) || state.watching}
-                              onClick={() => act({ type: 'request-lesson' })}
-                            >
-                              Ask Sam to watch
-                            </button>{' '}
-                            {progress.apprenticeshipAvailable && !state.pendingRequest && (
-                              <LessonControl
-                                state={state}
-                                act={act}
-                                onRequestMore={() =>
-                                  actSequence([
-                                    { type: 'watch', enabled: false },
-                                    { type: 'request-lesson' },
-                                  ])
-                                }
-                              />
-                            )}
-                          </div>
-                        )}
-                        {id === 'sam' && progress.apprenticeshipAvailable ? (
-                          <>
-                            <p>
-                              {state.npcWork.find((w) => w.personId === id)?.option.label ??
-                                describePerson(person).state}
-                            </p>
-                            {state.npcWork.find((w) => w.personId === id) && (
-                              <small>
-                                Until{' '}
-                                {dayTime(
-                                  state.npcWork.find((w) => w.personId === id)?.endsAt ?? state.now,
-                                )}
-                              </small>
-                            )}
-                            {playerWordReading(person) && (
-                              <p className="word-reading">
-                                {person.name} {playerWordReading(person)}.
-                              </p>
-                            )}
-                            <div className="commitment-list">
-                              {person.agenda.commitments
-                                .filter(
-                                  (c) =>
-                                    c.status === 'pending' &&
-                                    c.actions.includes('personal') &&
-                                    c.until >= state.now,
-                                )
-                                .map((c) => (
-                                  <p key={`${c.label}-${c.from}`}>
-                                    <strong>{c.label}</strong>
-                                    <small>
-                                      {dayTime(c.from)} – {dayTime(c.until)}
-                                    </small>
-                                  </p>
-                                ))}
-                            </div>
-                            <h4 className="knowledge-heading">Observed repair methods</h4>
-                            <p className="knowledge-note">
-                              Attended demonstrations. Independent whole repairs:{' '}
-                              {state.independentRepairs}.
-                            </p>
-                            <p className="knowledge-note">
-                              Conditions observed when taught; not an outcome or a guarantee.
-                            </p>
-                            <div className="knowledge-list">
-                              {person.methods?.rules.length ? (
-                                person.methods.rules.map((rule) => {
-                                  const action = rule.action.split(':');
-                                  const label =
-                                    action[0] === 'work'
-                                      ? `${action[1]} ${action[2] ?? 'component'}`
-                                      : action[0] === 'measure'
-                                        ? `Measure ${action[1] ?? 'electrical response'}`
-                                        : action[0] === 'verify'
-                                          ? `Check ${action[1] ?? 'use'}`
-                                          : rule.action.replaceAll('-', ' ').replaceAll(':', ' ');
-                                  return (
-                                    <article key={rule.id}>
-                                      <strong>Observed: {label}</strong>
-                                      <p>
-                                        {rule.conditions
-                                          .filter((c) => c.cue === 'signal')
-                                          .map((c) => String(c.value).replaceAll('-', ' '))
-                                          .join(', ') || 'A workshop demonstration'}
-                                      </p>
-                                    </article>
-                                  );
+                              onClick={() =>
+                                act({
+                                  type: 'ask-about-work',
+                                  personId: id as 'sam' | 'nora' | 'rafi' | 'halil',
                                 })
-                              ) : (
-                                <p className="empty-knowledge">
-                                  Sam has not yet attended a repair demonstration.
-                                </p>
+                              }
+                            >
+                              Ask {person.name} about the work
+                            </button>
+                          )}
+                          {id === 'sam' && progress.apprenticeshipAvailable && (
+                            <div className="sam-actions">
+                              <button
+                                type="button"
+                                disabled={Boolean(state.pendingRequest) || state.watching}
+                                onClick={() => act({ type: 'request-lesson' })}
+                              >
+                                Ask Sam to watch
+                              </button>{' '}
+                              {progress.apprenticeshipAvailable && !state.pendingRequest && (
+                                <LessonControl
+                                  state={state}
+                                  act={act}
+                                  onRequestMore={() =>
+                                    actSequence([
+                                      { type: 'watch', enabled: false },
+                                      { type: 'request-lesson' },
+                                    ])
+                                  }
+                                />
                               )}
                             </div>
-                          </>
-                        ) : (
-                          <>
-                            {state.npcWork.find((w) => w.personId === id) && (
-                              <p className="customer-activity">
-                                Now: {state.npcWork.find((w) => w.personId === id)?.option.label}
+                          )}
+                          {id === 'sam' && progress.apprenticeshipAvailable ? (
+                            <>
+                              <p>
+                                {state.npcWork.find((w) => w.personId === id)?.option.label ??
+                                  describePerson(person).state}
+                              </p>
+                              {state.npcWork.find((w) => w.personId === id) && (
                                 <small>
                                   Until{' '}
                                   {dayTime(
@@ -2012,70 +1962,144 @@ export default function App() {
                                       state.now,
                                   )}
                                 </small>
+                              )}
+                              {playerWordReading(person) && (
+                                <p className="word-reading">
+                                  {person.name} {playerWordReading(person)}.
+                                </p>
+                              )}
+                              <div className="commitment-list">
+                                {person.agenda.commitments
+                                  .filter(
+                                    (c) =>
+                                      c.status === 'pending' &&
+                                      c.actions.includes('personal') &&
+                                      c.until >= state.now,
+                                  )
+                                  .map((c) => (
+                                    <p key={`${c.label}-${c.from}`}>
+                                      <strong>{c.label}</strong>
+                                      <small>
+                                        {dayTime(c.from)} – {dayTime(c.until)}
+                                      </small>
+                                    </p>
+                                  ))}
+                              </div>
+                              <h4 className="knowledge-heading">Observed repair methods</h4>
+                              <p className="knowledge-note">
+                                Attended demonstrations. Independent whole repairs:{' '}
+                                {state.independentRepairs}.
                               </p>
-                            )}
-                            {playerWordReading(person) && (
-                              <p className="word-reading">
-                                {person.name} {playerWordReading(person)}.
+                              <p className="knowledge-note">
+                                Conditions observed when taught; not an outcome or a guarantee.
                               </p>
-                            )}
-                            <p className="person-role">
-                              {id === 'mum'
-                                ? 'Family objects at home'
-                                : id === 'nora'
-                                  ? 'Neighbourhood projects'
-                                  : 'Household repairs and collection promises'}
-                            </p>
-                            {state.jobs
-                              .filter(
-                                (j) =>
-                                  j.ownerId === id &&
-                                  !j.isDonor &&
-                                  !['declined', 'salvaged'].includes(j.status),
-                              )
-                              .map((j) => (
-                                <div className="customer-ask" key={j.id}>
-                                  <strong>{j.title}</strong>
-                                  <p>{j.description}</p>
-                                  <small>
-                                    {jobReadiness(j)}
-                                    {['offer', 'active', 'ready'].includes(j.status)
-                                      ? ` · Return ${dayTime(j.due)}`
-                                      : ''}
-                                  </small>
-                                </div>
-                              ))}
-                            <div className="commitment-list">
-                              {person.agenda.commitments
-                                .filter(
-                                  (c) =>
-                                    c.status === 'pending' &&
-                                    c.actions.includes('personal') &&
-                                    c.until >= state.now,
-                                )
-                                .map((c) => (
-                                  <p key={`${c.label}-${c.from}`}>
-                                    <strong>{c.label}</strong>
-                                    <small>
-                                      {dayTime(c.from)} – {dayTime(c.until)}
-                                    </small>
+                              <div className="knowledge-list">
+                                {person.methods?.rules.length ? (
+                                  person.methods.rules.map((rule) => {
+                                    const action = rule.action.split(':');
+                                    const label =
+                                      action[0] === 'work'
+                                        ? `${action[1]} ${action[2] ?? 'component'}`
+                                        : action[0] === 'measure'
+                                          ? `Measure ${action[1] ?? 'electrical response'}`
+                                          : action[0] === 'verify'
+                                            ? `Check ${action[1] ?? 'use'}`
+                                            : rule.action.replaceAll('-', ' ').replaceAll(':', ' ');
+                                    return (
+                                      <article key={rule.id}>
+                                        <strong>Observed: {label}</strong>
+                                        <p>
+                                          {rule.conditions
+                                            .filter((c) => c.cue === 'signal')
+                                            .map((c) => String(c.value).replaceAll('-', ' '))
+                                            .join(', ') || 'A workshop demonstration'}
+                                        </p>
+                                      </article>
+                                    );
+                                  })
+                                ) : (
+                                  <p className="empty-knowledge">
+                                    Sam has not yet attended a repair demonstration.
                                   </p>
+                                )}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              {state.npcWork.find((w) => w.personId === id) && (
+                                <p className="customer-activity">
+                                  Now: {state.npcWork.find((w) => w.personId === id)?.option.label}
+                                  <small>
+                                    Until{' '}
+                                    {dayTime(
+                                      state.npcWork.find((w) => w.personId === id)?.endsAt ??
+                                        state.now,
+                                    )}
+                                  </small>
+                                </p>
+                              )}
+                              {playerWordReading(person) && (
+                                <p className="word-reading">
+                                  {person.name} {playerWordReading(person)}.
+                                </p>
+                              )}
+                              <p className="person-role">
+                                {id === 'mum'
+                                  ? 'Family objects at home'
+                                  : id === 'nora'
+                                    ? 'Neighbourhood projects'
+                                    : 'Household repairs and collection promises'}
+                              </p>
+                              {state.jobs
+                                .filter(
+                                  (j) =>
+                                    j.ownerId === id &&
+                                    !j.isDonor &&
+                                    !['declined', 'salvaged'].includes(j.status),
+                                )
+                                .map((j) => (
+                                  <div className="customer-ask" key={j.id}>
+                                    <strong>{j.title}</strong>
+                                    <p>{j.description}</p>
+                                    <small>
+                                      {jobReadiness(j)}
+                                      {['offer', 'active', 'ready'].includes(j.status)
+                                        ? ` · Return ${dayTime(j.due)}`
+                                        : ''}
+                                    </small>
+                                  </div>
                                 ))}
-                            </div>
-                          </>
-                        )}
-                        <details>
-                          <summary>Actual reports</summary>
-                          {state.log
-                            .filter((l) => l.speaker.toLowerCase() === id.toLowerCase())
-                            .slice(-8)
-                            .map((l) => (
-                              <p key={l.id}>{l.text}</p>
-                            ))}
-                        </details>
-                      </div>
-                    </article>
-                  ))}
+                              <div className="commitment-list">
+                                {person.agenda.commitments
+                                  .filter(
+                                    (c) =>
+                                      c.status === 'pending' &&
+                                      c.actions.includes('personal') &&
+                                      c.until >= state.now,
+                                  )
+                                  .map((c) => (
+                                    <p key={`${c.label}-${c.from}`}>
+                                      <strong>{c.label}</strong>
+                                      <small>
+                                        {dayTime(c.from)} – {dayTime(c.until)}
+                                      </small>
+                                    </p>
+                                  ))}
+                              </div>
+                            </>
+                          )}
+                          <details>
+                            <summary>Actual reports</summary>
+                            {state.log
+                              .filter((l) => l.speaker.toLowerCase() === id.toLowerCase())
+                              .slice(-8)
+                              .map((l) => (
+                                <p key={l.id}>{l.text}</p>
+                              ))}
+                          </details>
+                        </div>
+                      </article>
+                    ))}
                 </section>
                 <section className="stock-section">
                   <h2>Supplies</h2>
@@ -2344,6 +2368,9 @@ export default function App() {
               <>
                 <h2>Workshop</h2>
                 <p>Saved on this device. Time waits while you are away.</p>
+                <button type="button" onClick={exportSave}>
+                  Download this run
+                </button>
                 <button className="reading-row" type="button" onClick={() => setSheet('history')}>
                   The workshop's history <span>▸</span>
                 </button>

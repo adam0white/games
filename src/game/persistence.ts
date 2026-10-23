@@ -3,7 +3,6 @@ import { compatiblePart, createModel } from './model';
 import {
   isCurrentProvenance,
   isInputRecording,
-  isLegacyProvenance,
   isMigratedFrom,
   LEGACY_PROVENANCE,
   SAVE_PROVENANCE,
@@ -33,6 +32,11 @@ export function saveGame(state: GameState): string {
 export function loadGame(text: string): GameState {
   if (text.length > 2_000_000) throw new Error('This save exceeds the supported size.');
   const value = JSON.parse(text) as GameState;
+  if (value?.schema !== 'small-works@5' || !isCurrentProvenance(value?.provenance)) {
+    throw new Error(
+      'This save belongs to an earlier workshop edition. Start fresh here, or use its historical archive.',
+    );
+  }
   const invalid = () => {
     throw new Error('This Small Works save is incomplete or invalid.');
   };
@@ -59,7 +63,7 @@ export function loadGame(text: string): GameState {
     'drum',
   ];
   const ids = new Set<string>();
-  const actors = ['player', 'sam', 'mum', 'nora', 'evan'];
+  const actors = ['player', 'sam', 'mum', 'nora', 'rafi', 'halil'];
   const conditions = ['good', 'weak', 'dirty', 'open', 'worn', 'jammed', 'misaligned'];
   const requestValid = (v: unknown) =>
     object(v) &&
@@ -86,16 +90,16 @@ export function loadGame(text: string): GameState {
   if (
     !object(value) ||
     !['small-works@4', 'small-works@5'].includes(value.schema) ||
-    (value.provenance !== undefined &&
-      !(value.schema === 'small-works@4'
-        ? isLegacyProvenance(value.provenance)
-        : isCurrentProvenance(value.provenance))) ||
+    !isCurrentProvenance(value.provenance) ||
     (value.migratedFrom !== undefined &&
       (value.schema !== 'small-works@5' ||
         !isMigratedFrom(value.migratedFrom) ||
         (value.inputs !== undefined && value.migratedFrom.atInput > value.inputs.length))) ||
     (value.inputs !== undefined &&
       (!isInputRecording(value.inputs) || value.provenance === undefined)) ||
+    (value.discoveries !== undefined &&
+      (!strings(value.discoveries) ||
+        value.discoveries.some((id) => !['sam', 'nora', 'rafi', 'halil'].includes(id)))) ||
     !integer(value.seed, 0, 0xffffffff) ||
     !integer(value.rng, 1, 0xffffffff) ||
     !integer(value.now) ||
@@ -116,7 +120,7 @@ export function loadGame(text: string): GameState {
     value.jobs.length < 1 ||
     value.jobs.length > 10000 ||
     !Array.isArray(value.npcWork) ||
-    value.npcWork.length > 4 ||
+    value.npcWork.length > 5 ||
     !Array.isArray(value.log) ||
     value.log.length > 160 ||
     !object(value.people) ||
@@ -298,8 +302,8 @@ export function loadGame(text: string): GameState {
       !integer(event.finishesAt) ||
       event.finishesAt < event.deadline ||
       !unique(event.invitedPersonIds) ||
-      event.invitedPersonIds.length > 4 ||
-      event.invitedPersonIds.some((id) => !['sam', 'mum', 'nora', 'evan'].includes(id)) ||
+      event.invitedPersonIds.length > 5 ||
+      event.invitedPersonIds.some((id) => !['sam', 'mum', 'nora', 'rafi', 'halil'].includes(id)) ||
       !unique(event.preparedFormats) ||
       event.preparedFormats.length > 3 ||
       event.preparedFormats.some((format) => !formats.includes(format)) ||
@@ -309,7 +313,7 @@ export function loadGame(text: string): GameState {
       !Array.isArray(event.preparations) ||
       event.preparations.length > 3 ||
       !Array.isArray(event.decisions) ||
-      event.decisions.length > 4 ||
+      event.decisions.length > 5 ||
       !str(event.outcome) ||
       (event.resolvedAt !== undefined &&
         (!integer(event.resolvedAt) ||
@@ -403,7 +407,7 @@ export function loadGame(text: string): GameState {
         ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
         : item,
     );
-  if (Object.keys(value.people).sort().join(',') !== 'evan,mum,nora,sam') invalid();
+  if (Object.keys(value.people).sort().join(',') !== 'halil,mum,nora,rafi,sam') invalid();
   value.people = Object.fromEntries(
     Object.entries(value.people).map(([id, saved]) => {
       const person = restore(saved);
@@ -466,7 +470,7 @@ export function loadGame(text: string): GameState {
     const person = value.people[w.personId];
     if (
       !object(w) ||
-      !['sam', 'mum', 'nora', 'evan'].includes(w.personId) ||
+      !['sam', 'mum', 'nora', 'rafi', 'halil'].includes(w.personId) ||
       working.has(w.personId) ||
       (w.jobId !== undefined && (!job || job.assignedTo !== w.personId)) ||
       job?.blocked !== undefined ||

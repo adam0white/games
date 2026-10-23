@@ -57,7 +57,7 @@ const definitions: Record<CommunityFormat, { label: string; description: string 
   garden: {
     label: 'Garden gathering',
     description:
-      'Carry Mum’s checked lantern to light the garden table. Neighbours are invited; company is not guaranteed.',
+      'Carry the household’s checked lantern to light the garden table. Neighbours are invited; company is not guaranteed.',
   },
   reading: {
     label: 'Indoor reading',
@@ -77,7 +77,7 @@ export function createCommunityEvent(): CommunityState {
     opensAt: 5040,
     deadline: 5220,
     finishesAt: 5250,
-    invitedPersonIds: ['mum', 'nora', 'sam', 'evan'],
+    invitedPersonIds: ['mum', 'nora', 'sam', 'rafi', 'halil'],
     preparedFormats: [],
     reservedJobIds: [],
     ownerConsentJobIds: [],
@@ -139,7 +139,7 @@ export function eventOptions(state: GameState, event: CommunityState): FormatVie
           ? format === 'reading'
             ? 'Needs a returned checked fan and its owner’s consent.'
             : format === 'garden'
-              ? 'Needs Mum’s retained checked lantern.'
+              ? 'Needs the household’s retained checked lantern.'
               : 'Needs your retained paper theatre.'
           : busy
             ? 'This object is already in use.'

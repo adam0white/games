@@ -228,7 +228,7 @@ describe('bounded community gathering', () => {
     const state = fixture();
     const event = createCommunityEvent();
     prepare(state, event, 'garden');
-    for (const id of ['nora', 'sam', 'evan'])
+    for (const id of ['nora', 'sam', 'rafi', 'halil'])
       state.npcWork.push({
         personId: id,
         startedAt: 5200,
@@ -244,7 +244,7 @@ describe('bounded community gathering', () => {
     finalizeCommunityEvent(state, event, 5250);
     expect(mum.needs.belonging).toBe(before);
     expect(mum.activity).toBeNull();
-    expect(event.outcome).toBe('Mum: Garden gathering.');
+    expect(event.outcome).toBe('The household owner: Garden gathering.');
     const equipmentMemory = mum.memory.episodes.find((episode) =>
       episode.summary.startsWith('The prepared equipment enabled'),
     );

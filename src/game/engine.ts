@@ -1,4 +1,5 @@
 import { perceive, releaseCommitment } from '@adam0white/human-framework';
+import { discoveredAccounts } from './cast-content';
 import {
   beginPreparation,
   completePreparation,
@@ -271,6 +272,7 @@ export function createGame(seed = 416, rules: 'current' | 'legacy' = 'current'):
     schema: legacy ? 'small-works@4' : 'small-works@5',
     provenance: { ...(legacy ? LEGACY_PROVENANCE : SAVE_PROVENANCE) },
     inputs: [],
+    discoveries: [],
     seed: seed >>> 0,
     rng: seed >>> 0 || 1,
     now,
@@ -301,7 +303,7 @@ export function createGame(seed = 416, rules: 'current' | 'legacy' = 'current'):
   const lantern = makeJob(
     s,
     'lantern',
-    'Mum’s walking lantern',
+    'The household walking lantern',
     'mum',
     '“It lights the table. Carry it to the garden and it goes dark. I want to take it to the evening gathering.”',
     0,
@@ -346,8 +348,8 @@ export function createGame(seed = 416, rules: 'current' | 'legacy' = 'current'):
   s.selectedJobId = lantern.id;
   log(
     s,
-    'Mum',
-    'I used this lantern on the walk home when you were small. It still has work left in it.',
+    'The household owner',
+    'This lantern belongs to the household. It still has work left in it.',
   );
   log(
     s,
@@ -368,14 +370,14 @@ function neighbourOffers(s: GameState, initial = false): void {
       'lantern',
       'Nora’s reading light',
       'nora',
-      '“It is bright for a moment, then fades. I read to my nephew after supper. Please test it with the light actually working.”',
+      '“It is bright for a moment, then fades. I am testing a reading-light design. Please test it with the light actually working.”',
       18,
     ],
     [
       'fan',
-      'Evan’s small desk fan',
-      'evan',
-      '“It spins here. Press it against the filter and it slows down. The room gets hot when the windows are closed.”',
+      'Rafi’s borrowed desk fan',
+      'rafi',
+      '“It spins here. Press it against the filter and it slows down. I work at the dish station in Bornova. I am here to learn repairs, not to offer expertise.”',
       32,
     ],
     [
@@ -387,9 +389,9 @@ function neighbourOffers(s: GameState, initial = false): void {
     ],
     [
       'lantern',
-      'Evan’s path lantern',
-      'evan',
-      '“It works on the shelf, but the garden path is uneven. I need it to stay on when it is carried.”',
+      'Halil’s visiting lantern',
+      'halil',
+      '“I came from my town for this workshop visit. I work fewer hours now. It goes out when carried; please do not promise a quick fix.”',
       20,
     ],
     [
@@ -409,10 +411,10 @@ function neighbourOffers(s: GameState, initial = false): void {
   ];
   const commissionTitles = [
     'Nora’s reading light commission',
-    'Evan’s desk fan commission',
+    'Rafi’s desk fan commission',
     'Nora’s music-box commission',
-    'Evan’s path lantern commission',
-    'Mum’s room-fan commission',
+    'Halil’s visiting lantern commission',
+    'The household room-fan commission',
     'Sam’s winding toy commission',
   ];
   const continuing = s.weekReviewed;
@@ -439,7 +441,7 @@ function neighbourOffers(s: GameState, initial = false): void {
   if (currentRules(s) && !initial) {
     const elsewhere = new Map<string, string>();
     const said = new Map<string, Job>();
-    for (const owner of ['nora', 'evan', 'mum']) {
+    for (const owner of ['nora', 'rafi', 'halil', 'mum']) {
       const waiting = s.jobs.find(
         (j) =>
           j.ownerId === owner &&
@@ -498,7 +500,7 @@ function neighbourOffers(s: GameState, initial = false): void {
     if (initial && i === 2)
       job.model = createModel('music-box', s.seed, [{ componentId: 'gear', condition: 'worn' }]);
     if (!continuing && choice === 3)
-      job.model = createModel('lantern', (s.seed ^ 0x6576616e) >>> 0, [
+      job.model = createModel('lantern', (s.seed ^ 0x68616c69) >>> 0, [
         { componentId: 'switch', condition: 'worn' },
       ]);
     if (choice === 5) {
@@ -530,8 +532,8 @@ function neighbourOffers(s: GameState, initial = false): void {
               'This is a different winding toy. Please check its pace while the figures move.',
             ]
           : [
-              'I read to my nephew after supper. Please test it with the light actually working.',
-              'The room gets hot when the windows are closed.',
+              'I am testing a reading-light design. Please test it with the light actually working.',
+              'I work at the dish station in Bornova. I am here to learn repairs, not to offer expertise.',
               'This was my grandmother’s. A new motor would miss the point; I want this one to work.',
               'The garden path is uneven. I need it to stay on when it is carried.',
               'We are opening the room on Saturday. The fan needs to move air through its grille.',
@@ -1355,8 +1357,9 @@ function handlePendingRequest(s: GameState): void {
 }
 function beginBackground(s: GameState): void {
   handlePendingRequest(s);
-  for (const id of ['sam', 'mum', 'nora', 'evan']) {
+  for (const id of ['sam', 'mum', 'nora', 'rafi', 'halil']) {
     const person = s.people[id];
+    if (id === 'halil' && s.day < 3) continue;
     if (!person || person.activity || s.npcWork.some((w) => w.personId === id)) continue;
     if (id === 'sam') {
       if (s.watching || s.pendingRequest) continue;
@@ -1385,8 +1388,10 @@ function beginBackground(s: GameState): void {
         : id === 'mum'
           ? 'Tend the house and garden'
           : id === 'nora'
-            ? 'Work on an illustration'
-            : 'Sort tomorrow’s deliveries';
+            ? 'Work on a repair design'
+            : id === 'rafi'
+              ? 'Label the uncertain parts I brought from Bornova'
+              : 'Rest before calling Selin';
     const options: WorkOption[] = [
       {
         id: 'eat',
@@ -1831,6 +1836,27 @@ function sleepToMorning(s: GameState): void {
   }
   if (s.day === 2) ensureNeighbours(s);
   else neighbourOffers(s);
+  if (s.day === 3 && !s.jobs.some((j) => j.ownerId === 'halil')) {
+    const visit = makeJob(
+      s,
+      'lantern',
+      'Halil’s visiting lantern',
+      'halil',
+      '“I came from my town for this visit. I repair things, but I am working fewer hours. This lantern goes dark when carried.”',
+      20,
+      Math.floor(s.now / DAY) * DAY + DAY + CLOSE,
+    );
+    visit.model = createModel('lantern', (s.seed ^ 0x68616c69) >>> 0, [
+      { componentId: 'switch', condition: 'worn' },
+    ]);
+    visit.requiredConditions = ['movement'];
+    s.jobs.push(visit);
+    log(
+      s,
+      'Halil',
+      'I am here for a short workshop visit. My daughter Selin knows I am travelling. I will take a break before we look at the lantern.',
+    );
+  }
   if (s.day === 3 && !s.community) {
     s.community = createCommunityEvent();
     const fan = makeJob(
@@ -1847,7 +1873,7 @@ function sleepToMorning(s: GameState): void {
     s.jobs.push(fan);
     log(
       s,
-      'Mum',
+      'The household owner',
       `We can use the room and garden tomorrow. The site opens at noon; people arrive at${currentRules(s) ? ' ' : ''}15:00. We have time to prepare two formats, at most. Your paper theatre could be one of them.`,
     );
   }
@@ -1888,6 +1914,33 @@ export function dispatch(state: GameState, command: Command): CommandResult {
   )
     return fail('That repair offer is waiting for Sam. Cancel the request before taking it back.');
   switch (command.type) {
+    case 'ask-about-work': {
+      const id = command.personId;
+      const person = s.people[id];
+      if (!person || (id === 'halil' && s.day < 3))
+        return fail('That person has not visited this workshop yet.');
+      if (s.discoveries?.includes(id))
+        return fail('That conversation is already in the workshop notes.');
+      const observed =
+        id === 'sam'
+          ? s.jobs.some((j) => j.evidence.some((e) => e.witnessedBy?.includes('sam')))
+          : s.jobs.some(
+              (j) =>
+                j.ownerId === id &&
+                j.evidence.some((e) => e.kind === 'inspection' || e.kind === 'use'),
+            );
+      if (!observed)
+        return fail(
+          id === 'sam'
+            ? 'Share an actual observation with Sam first. He has not brought out his notebook yet.'
+            : 'Look at an object together first. There is no shared work to ask about yet.',
+        );
+      s.discoveries ??= [];
+      s.discoveries.push(id);
+      log(s, person.name, discoveredAccounts[id]);
+      return done(`${person.name} chose to tell you about the work.`);
+    }
+
     case 'prepare-event': {
       const event = s.community;
       if (!event) return fail('The gathering has not been proposed yet.');

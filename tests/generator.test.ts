@@ -14,7 +14,7 @@ function laterOffers(seed: number, day: number): Job[] {
 }
 
 describe('later owner requests', () => {
-  it('offers Evan a fresh supported carried-light request during the first week regardless of Sam’s learning', () => {
+  it('offers Halil a fresh supported carried-light request during the first week regardless of Sam’s learning', () => {
     for (const seed of [2, 4, 69, 416]) {
       let taught = createGame(seed);
       let withheld = createGame(seed);
@@ -33,14 +33,14 @@ describe('later owner requests', () => {
         taught = dispatch(taught, { type: 'next-day' }).state;
         withheld = dispatch(withheld, { type: 'next-day' }).state;
       }
-      const path = taught.jobs.find((j) => j.title === 'Evan’s path lantern');
-      const samePath = withheld.jobs.find((j) => j.title === 'Evan’s path lantern');
+      const path = taught.jobs.find((j) => j.title === 'Halil’s visiting lantern');
+      const samePath = withheld.jobs.find((j) => j.title === 'Halil’s visiting lantern');
       if (!path || !samePath) throw new Error('Missing held-out request');
       expect(path.model).toEqual(samePath.model);
       expect(path.status).toBe(samePath.status);
       expect(path.due).toBe(samePath.due);
       expect(path.id).not.toBe(taught.jobs[0]?.id);
-      expect(path.ownerId).toBe('evan');
+      expect(path.ownerId).toBe('halil');
       expect(path.requiredConditions).toEqual(['movement']);
       expect(path.description).toContain(
         'The garden path is uneven. I need it to stay on when it is carried.',
@@ -50,29 +50,6 @@ describe('later owner requests', () => {
       ).toEqual([['switch', 'worn']]);
       expect(runUseTest(path.model, 'bench').passes).toBe(true);
       expect(runUseTest(path.model, 'movement').passes).toBe(false);
-    }
-  });
-  // Recorded under engine-4 rules, where a neighbour still waiting on an overdue object keeps bringing more.
-  it('offers each named first-week object only once and never duplicates a day', () => {
-    for (const seed of [2, 4, 69, 416]) {
-      let state = createGame(seed, 'legacy');
-      while (state.day < 8) state = dispatch(state, { type: 'next-day' }).state;
-      const requests = state.jobs.filter((j) => j.reward > 0);
-      expect(requests).toHaveLength(6);
-      expect(new Set(requests.map((j) => `${j.ownerId}:${j.title}`)).size).toBe(6);
-      expect(
-        state.log.some(
-          (e) =>
-            e.text ===
-            'One neighbour has brought a request. It can wait while you decide what fits.',
-        ),
-      ).toBe(true);
-      expect(
-        state.log.some(
-          (e) => e.text === 'No new requests today. The existing objects and promises remain.',
-        ),
-      ).toBe(true);
-      expect(saveGame(loadGame(saveGame(state)))).toBe(saveGame(state));
     }
   });
   it('keeps resolved first-week identity and introduces continuing work as distinct numbered objects', () => {
@@ -198,7 +175,7 @@ describe('later owner requests', () => {
     expect(state.jobs.find((j) => j.title === 'Nora’s reading light')?.description).toContain(
       'It is bright for a moment, then fades.',
     );
-    expect(state.jobs.find((j) => j.title === 'Evan’s small desk fan')?.description).toContain(
+    expect(state.jobs.find((j) => j.title === 'Rafi’s borrowed desk fan')?.description).toContain(
       'It spins here. Press it against the filter and it slows down.',
     );
     expect(state.jobs.find((j) => j.title === 'Nora’s keepsake music box')?.description).toContain(

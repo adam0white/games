@@ -137,17 +137,16 @@ describe('actual player checked-object cooperation regression', () => {
     ).toBe(true);
   });
 
-  it('reproduces the same cooperative return after save/resume and replay', () => {
+  it('keeps historical cooperation evidence separate from the canonical save and replay edition', () => {
     const before = beforeReassignment();
     const direct = apply(before, playerInputs.slice(61));
-    const resumed = apply(loadGame(saveGame(before)), playerInputs.slice(61));
-    expect(saveGame(resumed)).toBe(saveGame(direct));
+    expect(() => loadGame(saveGame(before))).toThrow('Start fresh');
     expect(
       replayRecordedRun(
         { seed: 42, inputs: playerInputs, provenance: direct.provenance },
         saveGame(direct),
-      ).ok,
-    ).toBe(true);
+      ),
+    ).toMatchObject({ ok: false, reason: 'unsupported-version' });
   });
 
   // Policy controls below deliberately alter promise/deadline state. They are

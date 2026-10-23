@@ -64,7 +64,7 @@ function campaign(attended: string[]) {
   const target = state.jobs.find(
     (candidate) =>
       candidate.status === 'offer' &&
-      candidate.title === 'Evan’s path lantern' &&
+      candidate.title === 'Halil’s visiting lantern' &&
       candidate.kind === 'lantern' &&
       candidate.requiredConditions?.includes('movement') &&
       candidate.model.components.filter((part) => part.condition !== 'good').length === 1 &&

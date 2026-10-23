@@ -26,21 +26,53 @@ const cueList = (cues: Record<string, string>) =>
   Object.entries(cues).map(([cue, value]) => ({ cue, value }));
 
 export function createPeople(seed: number, now: number): Record<string, Person> {
+  // Interim exact canonical content; replace with released shared canonical data at integration.
+  const traits = {
+    honesty: 0.5,
+    emotionality: 0.5,
+    extraversion: 0.5,
+    agreeableness: 0.5,
+    conscientiousness: 0.5,
+    openness: 0.5,
+  };
+  const values = {
+    selfDirection: 0.5,
+    stimulation: 0.5,
+    hedonism: 0.5,
+    achievement: 0.5,
+    power: 0.5,
+    security: 0.5,
+    conformity: 0.5,
+    tradition: 0.5,
+    benevolence: 0.5,
+    universalism: 0.5,
+  };
   const profiles = [
     {
       id: 'sam',
       name: 'Sam',
       age: 18,
       sex: 'male' as const,
-      values: { achievement: 0.8, stimulation: 0.7 },
+      traits: {
+        ...traits,
+        honesty: 0.65,
+        conscientiousness: 0.5,
+        extraversion: 0.6,
+        agreeableness: 0.65,
+        emotionality: 0.55,
+        openness: 0.8,
+      },
+      values: { ...values, achievement: 0.8, stimulation: 0.7 },
       needs: { competence: 0.45, leisure: 0.7 },
     },
+    // An incidental household owner, not an additional maintained foreground biography.
     {
       id: 'mum',
-      name: 'Mum',
+      name: 'The household owner',
       age: 43,
       sex: 'female' as const,
-      values: { benevolence: 0.9, security: 0.8 },
+      traits,
+      values,
       needs: { belonging: 0.5, leisure: 0.75 },
     },
     {
@@ -48,16 +80,42 @@ export function createPeople(seed: number, now: number): Record<string, Person> 
       name: 'Nora',
       age: 28,
       sex: 'female' as const,
-      values: { selfDirection: 0.9, stimulation: 0.8 },
+      traits: {
+        ...traits,
+        honesty: 0.7,
+        conscientiousness: 0.6,
+        extraversion: 0.45,
+        agreeableness: 0.5,
+        emotionality: 0.5,
+        openness: 0.85,
+      },
+      values: { ...values, selfDirection: 0.9, stimulation: 0.8 },
       needs: { autonomy: 0.5, leisure: 0.55 },
     },
     {
-      id: 'evan',
-      name: 'Evan',
-      age: 36,
+      id: 'rafi',
+      name: 'Rafi',
+      age: 19,
       sex: 'male' as const,
-      values: { conformity: 0.8, security: 0.9 },
-      needs: { safety: 0.55, leisure: 0.8 },
+      traits: { ...traits, honesty: 0.55, conscientiousness: 0.45, agreeableness: 0.65 },
+      values,
+      needs: { competence: 0.5, leisure: 0.7 },
+    },
+    {
+      id: 'halil',
+      name: 'Halil',
+      age: 61,
+      sex: 'male' as const,
+      traits: {
+        ...traits,
+        honesty: 0.7,
+        conscientiousness: 0.6,
+        extraversion: 0.35,
+        agreeableness: 0.6,
+        emotionality: 0.5,
+      },
+      values,
+      needs: { belonging: 0.5, leisure: 0.7 },
     },
   ];
   const people = Object.fromEntries(
@@ -540,7 +598,8 @@ export function prepareMorning(person: Person, dayStart: number): void {
       ][Math.floor(dayStart / 1440) % 7] ?? 'Spend time on my own plans',
     mum: 'Visit a neighbour',
     nora: 'Work on my own design',
-    evan: 'Collect my children',
+    rafi: 'Write to my cousin Can about the workshop exchange',
+    halil: 'Take a quiet break before calling my daughter Selin',
   };
   const label = routines[person.id];
   if (!label) return;

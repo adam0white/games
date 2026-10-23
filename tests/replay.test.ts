@@ -140,9 +140,7 @@ describe('recorded run replay', () => {
     const legacy = JSON.parse(saveGame(createGame(42)));
     delete legacy.inputs;
     delete legacy.provenance;
-    const restored = loadGame(JSON.stringify(legacy));
-    expect(restored.inputs).toBeUndefined();
-    expect(dispatch(restored, { type: 'wait', minutes: 1 }).state.inputs).toBeUndefined();
+    expect(() => loadGame(JSON.stringify(legacy))).toThrow('Start fresh');
   });
 
   it('rejects invalid provenance and recording metadata on import', () => {

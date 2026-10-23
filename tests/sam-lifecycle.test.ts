@@ -320,7 +320,9 @@ describe('Sam responsibility and requests', () => {
     ).toBe('success');
     state = dispatch(state, { type: 'watch', enabled: false }).state;
     while (state.day < 4) state = dispatch(state, { type: 'next-day' }).state;
-    const other = state.jobs.find((j) => j.status === 'offer' && j.title === 'Evan’s path lantern');
+    const other = state.jobs.find(
+      (j) => j.status === 'offer' && j.title === 'Halil’s visiting lantern',
+    );
     if (!other) throw new Error('Missing unfamiliar carried-light request');
     state = dispatch(state, { type: 'accept', jobId: other.id }).state;
     state = acceptRepairOffer(state, other.id);

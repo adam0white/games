@@ -177,7 +177,7 @@ describe('reviewed observation attribution and temporary meter setup', () => {
     state = act(state, { type: 'deliver', jobId });
     state = act(state, { type: 'next-day' });
     state = act(state, { type: 'next-day' });
-    const target = state.jobs.find((job) => job.title === 'Evan’s path lantern');
+    const target = state.jobs.find((job) => job.title === 'Halil’s visiting lantern');
     if (!target) throw new Error('Missing carried-light offer');
     state = act(state, { type: 'accept', jobId: target.id });
     state = act(state, { type: 'buy', part: 'switch' });
