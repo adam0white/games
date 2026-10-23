@@ -508,6 +508,13 @@ export default function App() {
         (state.pendingRequest?.kind === 'repair' && state.pendingRequest.jobId === job.id)),
   );
   const lastReading = [...(job?.evidence ?? [])].reverse().find((e) => e.kind === 'measurement');
+  const readingId = lastReading?.id;
+  const meterPanel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // Placing probes can scroll the reading out of the phone's short tool panel.
+    // Show the new result without moving keyboard focus away from Read meter.
+    if (pane === 'meter' && readingId !== undefined) meterPanel.current?.scrollTo({ top: 0 });
+  }, [pane, readingId]);
   const part = job?.model.components.find((c) => c.id === selected);
   const lastWorkId = job?.evidence.findLast((e) => e.kind === 'work')?.id ?? 0;
   const samBaseline =
@@ -1255,6 +1262,7 @@ export default function App() {
                           </div>
                           <div
                             role="tabpanel"
+                            ref={meterPanel}
                             id={`pane-${pane}`}
                             aria-labelledby={`tab-${pane}`}
                             className={`focused-pane pane-${pane}`}
