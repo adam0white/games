@@ -383,6 +383,11 @@ export default function App() {
   const [conversationSession, setConversationSession] = useState(0);
   const [view, setView] = useState('bench');
   const [screen, setScreen] = useState<'title' | 'play' | 'feedback'>('title');
+  const [feedbackSession, setFeedbackSession] = useState(0);
+  const openFeedback = () => {
+    setFeedbackSession((session) => session + 1);
+    setScreen('feedback');
+  };
   const [sheet, setSheet] = useState<
     'menu' | 'ways' | 'day' | 'job' | 'job-actions' | 'history' | null
   >(null);
@@ -1218,6 +1223,7 @@ export default function App() {
       )}
       {screen === 'feedback' && (
         <SendWord
+          key={feedbackSession}
           getRun={() => JSON.parse(saveGame(stateRef.current))}
           onGame={() => {
             setScreen('play');
@@ -2443,7 +2449,7 @@ export default function App() {
           </div>
           <div className="end-actions">
             <div>
-              <button type="button" onClick={() => setScreen('feedback')}>
+              <button type="button" onClick={openFeedback}>
                 Send word
               </button>
               <button type="button" onClick={exportSave}>
@@ -2535,7 +2541,7 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     setSheet(null);
-                    setScreen('feedback');
+                    openFeedback();
                   }}
                 >
                   Send word <span>▸</span>
