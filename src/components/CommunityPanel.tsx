@@ -33,8 +33,8 @@ export function CommunityPanel({
     <section className="community-panel" aria-labelledby="community-title">
       <div className="community-heading">
         <div>
-          <p className="eyebrow">A use beyond the workbench</p>
-          <h2 id="community-title">One afternoon, three possible plans</h2>
+          <p className="eyebrow">Use your repaired objects</p>
+          <h2 id="community-title">Choose activities for the afternoon</h2>
         </div>
         <span className="event-phase">
           {event.phase === 'completed'
@@ -155,8 +155,8 @@ export function CommunityPanel({
                   <span>
                     {job.isPersonal
                       ? option?.prepared || event.reservedJobIds.includes(job.id)
-                        ? 'Your retained project · reserved for this activity and returned to the workshop, with no customer promise'
-                        : 'Your retained project · available to prepare for this activity, with no customer promise'
+                        ? 'Your project is reserved for this activity. It will return to the workshop. No customer is waiting for it.'
+                        : 'You can use your project for this activity. No customer is waiting for it.'
                       : job.status === 'delivered'
                         ? 'Returned object, available for this loan'
                         : job.status === 'offer'
@@ -181,8 +181,8 @@ export function CommunityPanel({
             <div className="preparation-action">
               <strong>{COMMUNITY_PREPARATION_MINUTES} min per format</strong>
               <small>
-                At most two fit between 12:00 and 15:00. One prepared format is enough to offer a
-                plan.
+                You have time to prepare at most two activities between 12:00 and 15:00. You can
+                choose just one.
               </small>
               {beforeOpening ? (
                 Math.floor(state.now / 1440) === Math.floor(event.opensAt / 1440) ? (

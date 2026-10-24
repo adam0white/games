@@ -36,9 +36,9 @@ function repairCue(state: GameState, part: Job['model']['components'][number] | 
         ? `You have new ${name}s in stock.`
         : `You have no new ${name} in stock; the shop sells them.`;
   const fromDonor = donor
-    ? ` ${donor.title} has one too. Taking it out costs workshop time, commits the spare to parts, and the part may turn out unusable.`
+    ? ` ${donor.title} has one too. Removing it takes time and turns that object into spare parts. The part may be unusable.`
     : '';
-  return `${stock}${fromDonor} Fit one, then carry the lantern again.`;
+  return `${stock}${fromDonor} Fit a replacement, then carry the lantern again.`;
 }
 
 /** Readings exist, but all of them predate the latest work on the object. */
@@ -79,7 +79,7 @@ export function FirstRepairGuide({
           : 'Open the cover to look inside.'
         : phase === 'measure-source'
           ? staleReadings(job)
-            ? 'Your earlier readings were taken before that change, so they no longer hold. Measure again from the battery.'
+            ? 'The repair changed the object. Measure the battery again.'
             : 'Start at the battery. Put a probe on each marked connection.'
           : phase === 'measure-path'
             ? `Now compare both sides of the ${part?.label.toLowerCase() ?? 'next part'} while it moves.`

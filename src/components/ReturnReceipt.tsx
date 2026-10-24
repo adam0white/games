@@ -1,5 +1,6 @@
 import { dayTime, requiredChecks } from '../game/engine';
 import type { GameState, Job } from '../game/types';
+import { plainText } from '../ui/plain-text';
 
 function intention(job: Job): string {
   if (job.returnedUnfinished) return 'I can make another plan now that I know what remains.';
@@ -72,7 +73,7 @@ export function ReturnReceipt({
       <small className="authored-intention">Intended use</small>
       <div className="receipt-context">
         <p>
-          <strong>Original request</strong> {job.description}
+          <strong>Original request</strong> {plainText(job.description)}
         </p>
         <p>
           <strong>Recorded checks</strong>{' '}
@@ -84,7 +85,7 @@ export function ReturnReceipt({
               ? 'Returned without claiming a completed repair.'
               : job.verified.length
                 ? job.verified.join(', ')
-                : 'No successful required check recorded.'}
+                : 'The required use tests have not passed yet.'}
         </p>
         <p>
           <strong>Returned</strong>{' '}

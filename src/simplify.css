@@ -1,0 +1,109 @@
+/* Width, rather than device identity, controls text and workspace size. */
+:root {
+  font-size: clamp(16px, 14px + 0.35vw, 19px);
+}
+.workshop-shell p,
+.workshop-shell label,
+.workshop-shell .shell-sheet button,
+.workshop-shell .shell-sheet a,
+.workshop-shell .opening-quote,
+.workshop-shell .guide-cue p,
+.workshop-shell .physical-observation,
+.workshop-shell .tool-panel p,
+.workshop-shell .tool-panel label {
+  font-size: clamp(16px, 14px + 0.3vw, 19px);
+  line-height: 1.5;
+}
+.workshop-shell button,
+.workshop-shell select,
+.workshop-shell input,
+.workshop-shell summary {
+  min-height: 44px;
+}
+.workshop-shell .shell-sheet {
+  overflow-y: auto;
+}
+.workshop-shell .shell-sheet .inline-confirm {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--muted);
+}
+.workshop-shell .focused-tools {
+  min-width: 0;
+}
+@media (min-width: 768px) {
+  .workshop-shell .tool-tabs button,
+  .workshop-shell .view-chips button,
+  .workshop-shell .component-picker button,
+  .workshop-shell .device-controls button,
+  .workshop-shell .focused-tools button,
+  .workshop-shell .focused-tools label,
+  .workshop-shell .focused-tools select,
+  .workshop-shell .focused-tools small,
+  .workshop-shell .notes-pane,
+  .workshop-shell .where-when {
+    font-size: clamp(16px, 14px + 0.3vw, 19px);
+  }
+}
+@media (min-width: 901px) {
+  .workshop-shell .focused-object,
+  .workshop-shell.is-guided .focused-object {
+    min-width: 0;
+    flex: 1 1 55%;
+  }
+  .workshop-shell .focused-tools {
+    flex: 0 1 clamp(350px, 38vw, 480px);
+  }
+}
+
+/* Keep the first-visit footer in flow without covering the game's controls. */
+body {
+  display: flex;
+  flex-direction: column;
+}
+#root {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+.workshop-shell {
+  height: 100%;
+}
+.lab-notice-footer {
+  flex: none;
+}
+.lab-notice-footer:not(:has(.lk-telemetry-notice)) {
+  display: none;
+}
+
+.workshop-shell .physical-observation {
+  position: relative;
+  inset: auto;
+  height: auto;
+  min-height: 1.5em;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  padding: 0 8px;
+}
+
+.workshop-shell .focused-bench .focused-workspace .physical-scene {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+.workshop-shell .focused-bench .focused-workspace .physical-stage {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  width: 100%;
+}
+.workshop-shell .physical-use-action {
+  position: static;
+  align-self: flex-end;
+  flex-shrink: 0;
+}
+.workshop-shell .physical-observation {
+  flex-shrink: 0;
+}

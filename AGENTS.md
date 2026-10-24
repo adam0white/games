@@ -56,3 +56,5 @@ Current milestone (2026-10-10): the school-break campaign and released-HF teachi
 - Adam is the MVP acceptor. Deliver a runnable local build at the first real playtesting dependency. Tests and reviewer opinions cannot accept the player's experience for him. Any later generic HF extension follows HF's own release workflow.
 - Validate documentation links before a documentation commit. Once code exists, establish and run the appropriate lint, typecheck, tests and build before every code commit. Do not claim tests or deployment that have not run.
 - Keep this repository and its documents private on GitHub; do not make source public until public visibility and licensing have been decided. Local commits and integration are authorized for this work. HF changes require a demonstrated generic capability need, not repair-game convenience.
+
+Player-facing copy follows [Plain English](docs/lab/plain-english.md). Keep diagnostic and replay controls behind `?lab=1`.

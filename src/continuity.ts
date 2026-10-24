@@ -17,6 +17,7 @@ import { createGame } from './game/engine';
 import { loadGame, saveGame } from './game/persistence';
 import type { GameState } from './game/types';
 import { lab } from './lab';
+import { pauseForDeparture, resumeForPlay } from './ui/chapter';
 
 export const LOCAL_KEY = 'small-works-cast-local-v2';
 interface LocalMeta {
@@ -44,6 +45,8 @@ export class WorkshopContinuity {
   private state: (() => GameState) | null = null;
   private changed: () => void = () => {};
   private started = false;
+  private update: ((state: GameState) => void) | null = null;
+  private departure: Promise<void> | null = null;
   runId = crypto.randomUUID();
   fileSources: unknown[] = [];
   recordAfterStart = false;
@@ -67,12 +70,35 @@ export class WorkshopContinuity {
     });
     window.addEventListener('hf-persona-preference', invalidate);
   }
-  bind(state: () => GameState, changed: () => void) {
+  bind(state: () => GameState, changed: () => void, update?: (state: GameState) => void) {
     this.state = state;
     this.changed = changed;
-    return watchPersonaCheckpoint(() => {
-      if (this.started && this.state?.().chapterPaused) return this.checkpointAll();
-    });
+    this.update = update ?? null;
+    return watchPersonaCheckpoint(() => this.depart());
+  }
+  /** Menu navigation awaits this; browser close is best effort and keeps a paused local save. */
+  depart(): Promise<void> {
+    if (!this.departure) {
+      this.departure = this.pauseAndCheckpoint().finally(() => {
+        this.departure = null;
+      });
+    }
+    return this.departure;
+  }
+  private async pauseAndCheckpoint() {
+    const current = this.state?.();
+    if (!this.started || !current?.inputs?.length || !this.update) return;
+    const paused = pauseForDeparture(current);
+    this.update(paused);
+    localStorage.setItem(LOCAL_KEY, this.localSave(paused));
+    await this.checkpointAll();
+  }
+  async enter(state: GameState): Promise<GameState> {
+    await this.departure;
+    await this.resume();
+    // Retry a departure interrupted by browser close before continuing the same pinned chapter.
+    if (state.chapterPaused) await this.checkpointAll();
+    return resumeForPlay(state);
   }
   loadLocal(text: string): GameState {
     lab.setPersonaRecording('loading-workshop-history');
@@ -142,22 +168,47 @@ export class WorkshopContinuity {
       const base = createGame(seed);
       let state = base;
       let chapter: CastChapter | undefined;
+      let shelfUnavailable = false;
       if (this.shelf.enabled && !localOnly) {
-        const result = await claimCastChapterBatch(
-          this.shelf,
-          CAST.map((c) => c.castId),
-          source(),
-          async (inputs) => {
-            const people = structuredClone(base.people);
-            for (const input of inputs) {
-              const id = Object.keys(CAST_IDS).find((id) => CAST_IDS[id] === input.parent.castId);
-              if (!id) throw new Error('Unallocated person.');
-              people[id] = admitWorkshop(input, people[id]!);
-            }
-            return people;
+        let result: Awaited<ReturnType<typeof claimCastChapterBatch<GameState['people']>>>;
+        let prepared = false;
+        const bridge = {
+          request: async <T>(request: Parameters<typeof this.shelf.request>[0]): Promise<T> => {
+            const reply = await this.shelf.request<T>(request);
+            if (request.action === 'prepareBatch') prepared = true;
+            return reply;
           },
-          { isCurrent: () => generation === this.generation },
-        );
+        };
+        try {
+          result = await claimCastChapterBatch(
+            bridge,
+            CAST.map((c) => c.castId),
+            source(),
+            async (inputs) => {
+              const people = structuredClone(base.people);
+              for (const input of inputs) {
+                const id = Object.keys(CAST_IDS).find((id) => CAST_IDS[id] === input.parent.castId);
+                if (!id) throw new Error('Unallocated person.');
+                people[id] = admitWorkshop(input, people[id]!);
+              }
+              return people;
+            },
+            { isCurrent: () => generation === this.generation },
+          );
+        } catch (error) {
+          // Only a failed read may fall back. A lost write reply may already have committed ownership.
+          const message = error instanceof Error ? error.message : String(error);
+          if (
+            prepared ||
+            ![
+              'Continuity is local to this game. Use a file.',
+              'Shelf unavailable. Use a local file.',
+            ].includes(message)
+          )
+            throw error;
+          shelfUnavailable = true;
+          result = null;
+        }
         if (result) {
           chapter = { version: 'workshop-cast/1', inputs: result.inputs, claims: result.claims };
           state = createGame(seed, 'current', result.initial, chapter);
@@ -175,13 +226,15 @@ export class WorkshopContinuity {
       this.recordAfterStart = true;
       if (generation !== this.generation)
         throw new Error('Identity or run changed before chapter start.');
-      this.status = chapter
-        ? `Admitted ${chapter.inputs.length} carried histories atomically. Other allocated people are canonical fresh openings.`
-        : localOnly
-          ? 'Explicit fresh local chapter. Browser histories remain untouched.'
-          : this.shelf.enabled
-            ? 'Fresh chapter. No carried histories were present.'
-            : 'Continuity is off. This is a canonical fresh local chapter.';
+      this.status = shelfUnavailable
+        ? 'Your workshop is saved on this device. Shared character history is unavailable here.'
+        : chapter
+          ? `Admitted ${chapter.inputs.length} carried histories atomically. Other allocated people are canonical fresh openings.`
+          : localOnly
+            ? 'Explicit fresh local chapter. Browser histories remain untouched.'
+            : this.shelf.enabled
+              ? 'Fresh chapter. No carried histories were present.'
+              : 'Continuity is off. This is a canonical fresh local chapter.';
       return state;
     } finally {
       this.busy = false;

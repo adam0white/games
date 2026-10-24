@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { lab } from '../lab';
 import { FEEDBACK_NAME_KEY, LAB_PRIVACY, queueFeedback, storedPreference } from '../ui/feedback';
+import { labToolsEnabled } from '../ui/lab-tools';
 import './send-word.css';
 
 export function SendWord({
@@ -56,7 +57,9 @@ export function SendWord({
       setStatus(result);
     } catch (error) {
       setStatus(
-        error instanceof Error ? error.message : 'Your word could not be sent. Please try again.',
+        error instanceof Error
+          ? error.message
+          : 'Your feedback could not be sent. Please try again.',
       );
     } finally {
       pending.current = false;
@@ -80,10 +83,10 @@ export function SendWord({
     }
   };
   return (
-    <section className="sw-feedback" ref={screen} aria-label="Send word">
+    <section className="sw-feedback" ref={screen} aria-label="Feedback">
       <div className="sw-feedback-body">
-        <h1>Send word</h1>
-        <p>Send a note about this game. You can send a note with or without sharing play.</p>
+        <h1>Feedback</h1>
+        <p>Tell us about this game. Sharing your play data is optional.</p>
         <fieldset className="sw-verdicts" aria-label="Would you keep playing?">
           {(
             [
@@ -103,18 +106,18 @@ export function SendWord({
           ))}
         </fieldset>
         <label className="sw-note-label" htmlFor="sw-feedback-note">
-          What happened at the bench, what you wanted, what got in the way.
+          What happened? What did you want to do?
         </label>
         <textarea
           id="sw-feedback-note"
-          aria-label="Your word"
+          aria-label="Your feedback"
           rows={4}
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
         <details className="sw-feedback-name">
-          <summary>+ Add a name or tester id</summary>
-          <label htmlFor="sw-feedback-name">Your name or tester id</label>
+          <summary>Add a name (optional)</summary>
+          <label htmlFor="sw-feedback-name">Your name</label>
           <input
             id="sw-feedback-name"
             value={name}
@@ -124,7 +127,7 @@ export function SendWord({
           />
           <p>
             A sent name labels your whole linked history on this device, past and future. Leave it
-            empty to stay pseudonymous.
+            empty to send without a name.
           </p>
         </details>
         {!lab.telemetryOn && (
@@ -144,15 +147,17 @@ export function SendWord({
         >
           <summary>What is sent</summary>
           <p>
-            Recording on or Share includes this run and links play across games on this device.
-            Otherwise only your note, verdict and optional name are sent.
+            With Recording on or Share selected, we include your saved game and link your play
+            across games on this device. Otherwise we send only your note, answer and optional name.
           </p>
           <pre>{preview}</pre>
           <a href={LAB_PRIVACY}>Lab privacy</a>
         </details>
-        <button type="button" onClick={download}>
-          Keep a copy of this run
-        </button>
+        {labToolsEnabled(window.location.search) && (
+          <button type="button" onClick={download}>
+            Keep a copy of this run
+          </button>
+        )}
         {status && <p role="status">{status}</p>}
       </div>
       <div className="sw-feedback-actions">

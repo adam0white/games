@@ -70,6 +70,87 @@ async function runtime() {
   return new (await import('../src/continuity')).WorkshopContinuity();
 }
 describe('host recording and local ownership guards (synthetic controls)', () => {
+  it('automatically pauses/checkpoints departure and legally resumes a paused local save', async () => {
+    let state = createGame(42);
+    const host = await runtime();
+    host.bind(
+      () => state,
+      () => {},
+      (next) => {
+        state = next;
+      },
+    );
+    await host.resume();
+    state = dispatch(state, { type: 'power', jobId: state.selectedJobId, on: false }).state;
+    controls.request.mockResolvedValue(null);
+    await host.depart();
+    expect(state.chapterPaused).toBe(true);
+    expect(state.inputs?.at(-1)?.type).toBe('pause-chapter');
+    expect(controls.request.mock.calls.some(([request]) => request.action === 'put')).toBe(true);
+    const restored = await runtime();
+    state = restored.loadLocal(storage.get('small-works-cast-local-v2')!);
+    restored.bind(
+      () => state,
+      () => {},
+      (next) => {
+        state = next;
+      },
+    );
+    state = await restored.enter(state);
+    expect(state.chapterPaused).toBe(false);
+    expect(state.inputs?.at(-1)?.type).toBe('resume-chapter');
+    const { replayRecordedRun } = await import('../src/game/replay');
+    expect(
+      replayRecordedRun(
+        {
+          seed: state.seed,
+          inputs: state.inputs!,
+          provenance: state.provenance,
+          openingPeople: state.openingPeople,
+          castChapter: state.castChapter,
+        },
+        saveGame(state),
+      ).ok,
+    ).toBe(true);
+  });
+
+  it.each([
+    'Continuity is local to this game. Use a file.',
+    'Shelf unavailable. Use a local file.',
+  ])('keeps local play available when the shelf transport fails: %s', async (message) => {
+    const host = await runtime();
+    controls.request.mockRejectedValue(new Error(message));
+    const state = await host.fresh(42);
+    expect(state.seed).toBe(42);
+    expect(state.castChapter).toBeUndefined();
+    expect(controls.enabled).toBe(true);
+    expect(host.isStarted).toBe(true);
+    expect(host.status).toContain('saved on this device');
+  });
+  it('does not start a fallback workshop after a lost ownership write reply', async () => {
+    const { CAST } = await import('../src/game/cast');
+    const host = await runtime();
+    const oldRun = host.runId;
+    controls.request.mockImplementation(async (request) => {
+      if (request.action === 'prepareBatch')
+        return {
+          expectedHeads: Object.fromEntries(CAST.map((c) => [c.castId, null])),
+          inputs: [],
+          blocked: [],
+        };
+      throw new Error('Shelf unavailable. Use a local file.');
+    });
+    await expect(host.fresh(42)).rejects.toThrow('Shelf unavailable');
+    expect(host.runId).toBe(oldRun);
+    expect(host.isStarted).toBe(false);
+  });
+  it('does not hide a shelf ownership conflict behind local fallback', async () => {
+    const host = await runtime();
+    controls.request.mockRejectedValue(new Error('Ownership changed.'));
+    await expect(host.fresh(42)).rejects.toThrow('Ownership changed.');
+    expect(host.isStarted).toBe(false);
+  });
+
   it('uses an expected-absence transaction for a wholly fresh allocation', async () => {
     const { CAST } = await import('../src/game/cast');
     controls.request.mockImplementation(async (request) =>

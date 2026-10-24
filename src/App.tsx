@@ -43,11 +43,16 @@ import type {
 import { lab } from './lab';
 import { todaysWords, workshopCrises } from './ui/crises';
 import { firstRepairProgress } from './ui/first-repair';
+import { plainText } from './ui/plain-text';
 import './styles.css';
 import './focused-layout.css';
 import './meter-layout.css';
 import './clarity.css';
 import './workshop-shell.css';
+import './simplify.css';
+import { labToolsEnabled } from './ui/lab-tools';
+
+const labMode = labToolsEnabled(window.location.search);
 
 const SAVE_KEY = LOCAL_KEY;
 const conditions: TestCondition[] = ['bench', 'movement', 'load'];
@@ -57,8 +62,8 @@ function checkPurpose(job: Job): string {
   if (job.kind === 'lantern')
     return required.includes('movement')
       ? 'Check that the light survives being carried.'
-      : 'Check sustained light under demand for the owner’s reading.';
-  if (job.kind === 'fan') return 'Check airflow under the resistance of the fitted filter.';
+      : 'Check that the light stays bright while its owner reads.';
+  if (job.kind === 'fan') return 'Check that the fan blows strongly with its filter fitted.';
   return `Check the drive at the owner’s requested ${job.model.desiredRPM ?? 15} ± ${job.model.tolerance ?? 3} rpm under load.`;
 }
 function samFinishedPersonal(job: Job): boolean {
@@ -364,6 +369,7 @@ export default function App() {
   const [state, setState] = useState(initial);
   const [, refreshContinuity] = useState(0);
   const [entering, setEntering] = useState(false);
+  const [entryError, setEntryError] = useState('');
   const [eventsOn, setEventsOn] = useState(lab.telemetryOn);
   useEffect(() => {
     lab.screen('play');
@@ -473,6 +479,10 @@ export default function App() {
       continuity.bind(
         () => stateRef.current,
         () => refreshContinuity((n) => n + 1),
+        (next) => {
+          stateRef.current = next;
+          setState(next);
+        },
       ),
     [],
   );
@@ -605,7 +615,7 @@ export default function App() {
           const step = object?.evidence.at(-1);
           if (step) {
             if (!step.witnessedBy?.includes('sam'))
-              setTeachingFeedback('Sam has no recorded observation of this step.');
+              setTeachingFeedback('Sam did not watch this step.');
             else if (step.kind === 'work') {
               const action =
                 command.type === 'work'
@@ -618,22 +628,20 @@ export default function App() {
               );
               setTeachingFeedback(
                 pending
-                  ? 'Sam attended this intervention. A relevant observed outcome check is still needed before it becomes a retained repair method.'
-                  : 'Sam saw this work but had no relevant baseline observation after the previous intervention. A later check cannot show what this step changed.',
+                  ? 'Sam watched this repair step. Let him watch a relevant test next, so he can learn whether it worked.'
+                  : 'Sam saw this step, but he did not see a relevant test before it. He cannot tell what this step changed.',
               );
             } else if (step.kind === 'use' && step.cues.signal !== 'steady-output')
-              setTeachingFeedback(
-                'Sam attended this check. It did not demonstrate a successful repair.',
-              );
+              setTeachingFeedback('Sam watched this test. It did not show that the repair worked.');
             else if (step.kind === 'use') {
               const oldIds = new Set(prior.people.sam?.methods?.rules.map((r) => r.id) ?? []);
               const added = next.people.sam?.methods?.rules.filter((r) => !oldIds.has(r.id)) ?? [];
               setTeachingFeedback(
                 added.length
                   ? `Sam attended the check and retained ${added.length} new observed method${added.length === 1 ? '' : 's'}. See his methods in People.`
-                  : 'Sam attended this check. No new retained repair method was added by this step.',
+                  : 'Sam watched this test. He did not learn a new repair method.',
               );
-            } else setTeachingFeedback('Sam has a recorded observation of this step.');
+            } else setTeachingFeedback('Sam watched this step.');
           }
         }
 
@@ -642,15 +650,15 @@ export default function App() {
             .find((j) => j.id === command.jobId)
             ?.evidence.findLast((e) => e.kind === 'measurement');
           const interpretations: Record<string, string> = {
-            'high-drop': 'Large voltage drop across this measured span.',
-            'low-source': 'Source voltage is below the normal source reference.',
-            voltage: 'Voltage recorded for this probe pair and condition.',
-            'open-path': 'No conducting path between these terminals.',
+            'high-drop': 'The voltage drops sharply between these probes.',
+            'low-source': 'The battery voltage is below its normal range.',
+            voltage: 'This is the voltage between these probes in the selected condition.',
+            'open-path': 'Electricity cannot pass between these terminals.',
             resistance: 'Resistance is above the conducting-link reference.',
             connected: 'A conducting path is present between these terminals.',
-            rotation: 'Shaft motion recorded. Compare with the drive reference in Notes.',
+            rotation: 'Compare this shaft speed with the normal speed in Notes.',
             'slow-drive': 'The observed shaft turns slowly.',
-            'blocked-drive': 'No motion at the observed shaft.',
+            'blocked-drive': 'This shaft is not turning.',
             'power-off': 'The object is switched off.',
           };
           messages.push(
@@ -763,7 +771,7 @@ export default function App() {
   const showTools = opened || !guided;
   const result = status && (
     <div className="focused-result" role="status">
-      <p>{status}</p>
+      <p>{plainText(status)}</p>
       {teachingFeedback && (state.watching || hasSamObservation) && (
         <small>{teachingFeedback}</small>
       )}
@@ -881,12 +889,19 @@ export default function App() {
   );
   const isEnd = screen === 'play' && state.ended;
   const startWorkshop = async (seed: number, localOnly = false) => {
+    setEntryError('');
     setEntering(true);
     try {
+      await continuity.depart();
       resetPresentation(await continuity.fresh(seed, localOnly), true);
       setNewConfirmed(false);
     } catch (error) {
       continuity.status = error instanceof Error ? error.message : String(error);
+      setEntryError(
+        continuity.status === 'Shelf unavailable. Use a local file.'
+          ? 'The shared character history did not reply. Your current workshop is unchanged. Please try again.'
+          : continuity.status,
+      );
       refreshContinuity((n) => n + 1);
     } finally {
       setEntering(false);
@@ -898,19 +913,60 @@ export default function App() {
       await startWorkshop(state.seed);
       return;
     }
+    setEntryError('');
     setEntering(true);
     try {
-      await continuity.resume();
+      const next = await continuity.enter(stateRef.current);
+      stateRef.current = next;
+      setState(next);
+      setSheet(null);
       setHasSave(true);
       setScreen('play');
     } catch (error) {
       continuity.status = String(error);
+      setEntryError(
+        continuity.status === 'Shelf unavailable. Use a local file.'
+          ? 'The shared character history did not reply. Your current workshop is unchanged. Please try again.'
+          : continuity.status,
+      );
       refreshContinuity((n) => n + 1);
     } finally {
       setEntering(false);
     }
   };
-  const continuityPanel = (
+  useEffect(() => {
+    const returnToPlay = () => {
+      if (
+        document.visibilityState === 'visible' &&
+        screen === 'play' &&
+        stateRef.current.chapterPaused
+      ) {
+        const current = stateRef.current;
+        void continuity
+          .enter(current)
+          .then((next) => {
+            if (stateRef.current === current) {
+              stateRef.current = next;
+              setState(next);
+            }
+          })
+          .catch((error) => setEntryError(String(error)));
+      }
+    };
+    document.addEventListener('visibilitychange', returnToPlay);
+    window.addEventListener('pageshow', returnToPlay);
+    return () => {
+      document.removeEventListener('visibilitychange', returnToPlay);
+      window.removeEventListener('pageshow', returnToPlay);
+    };
+  }, [screen]);
+  const goToGames = async (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    await continuity.depart();
+    window.location.assign('https://human.adamwhite.work/games/');
+  };
+  const continuityPanel = labMode && (
     <details aria-label="Browser continuity">
       <summary>People between chapters</summary>
       <p>{continuity.status}</p>
@@ -1025,7 +1081,7 @@ export default function App() {
       ? [
           'The workshop',
           'People bring broken things and say how they use them.',
-          'Every act takes workshop minutes. The day closes at 17:00.',
+          'Each action takes time. The workshop closes at 17:00.',
           'A promise has a due time. You may return something honestly unfinished.',
         ]
       : isEnd
@@ -1043,21 +1099,21 @@ export default function App() {
           : view === 'board'
             ? [
                 'Promises',
-                'Accepting binds you to the due time. Decline what you cannot do.',
+                'Accept a job only if you can return it by the promised time.',
                 'Sam can take responsibility once he has watched the work.',
               ]
             : pane === 'meter'
               ? [
                   'The meter',
                   'Place the red and black probes on two terminals.',
-                  'Voltage shows the difference across that span. Continuity checks a conducting path with power off.',
-                  'Carried means the object moves while you read. A reading before a change no longer holds.',
+                  'Voltage measures the difference between the probes. Continuity checks whether electricity can pass between them. Turn the power off for continuity.',
+                  'Choose Carried to measure while the object moves. Measure again after each repair.',
                 ]
               : [
                   'Finding the fault',
-                  'Test it the owner’s way first. Open it.',
+                  'First test the object as its owner uses it. Then open the cover.',
                   'Measure between two terminals in one condition.',
-                  'Look closely at the part the reading points to before changing it. Parts are finite.',
+                  'Examine the part indicated by the reading before replacing it. You have limited spare parts.',
                 ];
   return (
     <div
@@ -1065,7 +1121,9 @@ export default function App() {
     >
       <header className="shell-topbar">
         {screen === 'title' ? (
-          <a href="https://human.adamwhite.work/games/">All games</a>
+          <a href="https://human.adamwhite.work/games/" onClick={(event) => void goToGames(event)}>
+            All games
+          </a>
         ) : (
           <span className="where-when">
             Day {state.day} · {isEnd ? 'morning' : dayTime(state.now).split(' · ').at(-1)}
@@ -1128,6 +1186,7 @@ export default function App() {
             aria-expanded={sheet === 'menu'}
             onClick={() => {
               setInfoOpen(false);
+              setNewConfirmed(false);
               setSheet('menu');
             }}
           >
@@ -1135,21 +1194,25 @@ export default function App() {
           </button>
         </div>
       </header>
-      <input
-        ref={input}
-        hidden
-        type="file"
-        accept="application/json,.json"
-        onChange={async (e) => {
-          try {
-            const file = e.target.files?.[0];
-            if (file) resetPresentation(await continuity.importFile(await file.text()));
-          } catch (error) {
-            setStatus(error instanceof Error ? error.message : 'This save could not be imported.');
-          }
-          e.target.value = '';
-        }}
-      />
+      {labMode && (
+        <input
+          ref={input}
+          hidden
+          type="file"
+          accept="application/json,.json"
+          onChange={async (e) => {
+            try {
+              const file = e.target.files?.[0];
+              if (file) resetPresentation(await continuity.importFile(await file.text()));
+            } catch (error) {
+              setStatus(
+                error instanceof Error ? error.message : 'This save could not be imported.',
+              );
+            }
+            e.target.value = '';
+          }}
+        />
+      )}
       {screen === 'title' && (
         <main className="title-page">
           <div className="title-art">
@@ -1164,12 +1227,12 @@ export default function App() {
             </svg>
             <h1>SMALL WORKS</h1>
           </div>
-          <p className="title-goal">
-            Mend what people bring you, keep your word, and teach Sam the work.
-          </p>
-          <button type="button" className="reading-row" onClick={() => setSheet('ways')}>
-            Other ways in <span>▸</span>
-          </button>
+          <p className="title-goal">Find out why the lantern goes dark.</p>
+          {labMode && (
+            <button type="button" className="reading-row" onClick={() => setSheet('ways')}>
+              Lab tools <span>▸</span>
+            </button>
+          )}
           <div className="title-actions">
             <button
               type="button"
@@ -1177,25 +1240,11 @@ export default function App() {
               disabled={entering}
               onClick={() => void enterWorkshop()}
             >
-              {hasSave ? `Back to the bench · day ${state.day}` : 'Open the workshop'}
+              {hasSave ? 'Resume' : 'Start repairing'}
             </button>
-            {hasSave && !newConfirmed && (
-              <button type="button" onClick={() => setNewConfirmed(true)}>
-                A new workshop
-              </button>
-            )}
-            {newConfirmed && (
-              <div className="inline-confirm">
-                <p>The current workshop is put away.</p>
-                <button type="button" onClick={() => startWorkshop(state.seed + 1)}>
-                  Yes, begin
-                </button>
-                <button type="button" onClick={() => setNewConfirmed(false)}>
-                  No
-                </button>
-              </div>
-            )}
             <small>Saved on this device.</small>
+            {entering && <p role="status">Opening your workshop…</p>}
+            {entryError && <p role="alert">{entryError}</p>}
             {continuityPanel}
           </div>
         </main>
@@ -1213,6 +1262,7 @@ export default function App() {
           }}
           onBack={() => {
             setScreen('play');
+            setNewConfirmed(false);
             setSheet('menu');
           }}
         />
@@ -1311,7 +1361,9 @@ export default function App() {
                     />
                   ) : (
                     <>
-                      {!showTools && <div className="opening-quote">{job.description}</div>}
+                      {!showTools && (
+                        <div className="opening-quote">{plainText(job.description)}</div>
+                      )}
                       {showTools && (
                         <>
                           <div
@@ -1584,7 +1636,7 @@ export default function App() {
                                   <summary>Recorded observations · {job.evidence.length}</summary>
                                   {[...job.evidence].reverse().map((e) => (
                                     <p key={e.id}>
-                                      <time>{dayTime(e.at)}</time> {e.summary}
+                                      <time>{dayTime(e.at)}</time> {plainText(e.summary)}
                                     </p>
                                   ))}
                                 </details>
@@ -1594,8 +1646,8 @@ export default function App() {
                                   {job.kind === 'music-box' ? (
                                     <div className="drive-reference">
                                       <p>
-                                        Nominal motion path. Probe a shaft against the stationary
-                                        frame, terminal 0.
+                                        Place one probe on a shaft and the other on the fixed frame
+                                        at terminal 0 to measure shaft speed.
                                       </p>
                                       <ol>
                                         <li>
@@ -1882,7 +1934,7 @@ export default function App() {
                                 (j.ownerId === 'player' ? 'Your project' : j.ownerId)}
                             </p>
                             <h3>{j.title}</h3>
-                            <p>{j.description}</p>
+                            <p>{plainText(j.description)}</p>
                             {!j.isPersonal && !j.isDonor ? (
                               <div className="promise">
                                 <span>
@@ -2042,12 +2094,12 @@ export default function App() {
                           )}
                           <p>
                             {id === 'sam'
-                              ? `${Math.floor((state.now - person.life.bornAt) / 525600)} · repair apprentice; occasional kitchen worker`
+                              ? `${Math.floor((state.now - person.life.bornAt) / 525600)} years old. He is a repair apprentice and sometimes works in a kitchen.`
                               : id === 'nora'
-                                ? `${Math.floor((state.now - person.life.bornAt) / 525600)} · repair designer and maker`
+                                ? `${Math.floor((state.now - person.life.bornAt) / 525600)} years old. She designs repairs and makes objects.`
                                 : id === 'rafi'
-                                  ? `${Math.floor((state.now - person.life.bornAt) / 525600)} · dish worker; visiting repair learner from Bornova`
-                                  : `${Math.floor((state.now - person.life.bornAt) / 525600)} · visiting repairman; working fewer hours`}
+                                  ? `${Math.floor((state.now - person.life.bornAt) / 525600)} years old. He is a dish worker from Bornova, visiting to learn repairs.`
+                                  : `${Math.floor((state.now - person.life.bornAt) / 525600)} years old. He repairs objects and is visiting the workshop. He now works fewer hours.`}
                           </p>
                           {state.discoveries?.includes(id) && (
                             <details>
@@ -2130,11 +2182,12 @@ export default function App() {
                               </div>
                               <h4 className="knowledge-heading">Observed repair methods</h4>
                               <p className="knowledge-note">
-                                Attended demonstrations. Independent whole repairs:{' '}
+                                Sam learned by watching. Repairs he completed alone:{' '}
                                 {state.independentRepairs}.
                               </p>
                               <p className="knowledge-note">
-                                Conditions observed when taught; not an outcome or a guarantee.
+                                These are the conditions Sam saw. They do not guarantee a successful
+                                repair.
                               </p>
                               <div className="knowledge-list">
                                 {person.methods?.rules.length ? (
@@ -2203,7 +2256,7 @@ export default function App() {
                                 .map((j) => (
                                   <div className="customer-ask" key={j.id}>
                                     <strong>{j.title}</strong>
-                                    <p>{j.description}</p>
+                                    <p>{plainText(j.description)}</p>
                                     <small>
                                       {jobReadiness(j)}
                                       {['offer', 'active', 'ready'].includes(j.status)
@@ -2237,7 +2290,7 @@ export default function App() {
                               .filter((l) => l.speaker.toLowerCase() === id.toLowerCase())
                               .slice(-8)
                               .map((l) => (
-                                <p key={l.id}>{l.text}</p>
+                                <p key={l.id}>{plainText(l.text)}</p>
                               ))}
                           </details>
                         </div>
@@ -2289,7 +2342,7 @@ export default function App() {
                                       ].includes(w.option.action),
                                   )
                                 ? `Sam is using the shared bench. A second bench lets you work on another object beside him.`
-                                : 'The shared bench is available during Sam’s breaks and personal plans. A second bench lets both of you do hands-on repair at once.'
+                                : 'You can use the shared bench when Sam takes a break or follows his own plans. A second bench lets you both repair objects at once.'
                             : upgrade.description}
                         </p>
                         <button
@@ -2320,8 +2373,8 @@ export default function App() {
         <div className="end-page">
           <div className="end-body">
             <p className="eyebrow">First week complete</p>
-            <h2>Your first week, recorded.</h2>
-            <p>The calendar closes this chapter. These are the outcomes of your choices.</p>
+            <h2>Your first week</h2>
+            <p>The first week is over. Here is what happened.</p>
             <details className="tally-fold">
               <summary>See the tally ▸</summary>
               <WorkshopTally state={state} enabled />
@@ -2427,16 +2480,18 @@ export default function App() {
                   : 'No completed afternoon outcome is recorded yet.'}
               </p>
             )}
-            <p>Open promises, parts and acquired methods continue into the next workshop day.</p>
+            <p>Your promises, parts and learned repair methods carry into the next day.</p>
           </div>
           <div className="end-actions">
             <div>
               <button type="button" onClick={openFeedback}>
-                Send word
+                Feedback
               </button>
-              <button type="button" onClick={exportSave}>
-                Download this run
-              </button>
+              {labMode && (
+                <button type="button" onClick={exportSave}>
+                  Download this run
+                </button>
+              )}
             </div>
             <button
               type="button"
@@ -2489,7 +2544,7 @@ export default function App() {
               sheet === 'menu'
                 ? 'Workshop'
                 : sheet === 'ways'
-                  ? 'Other ways in'
+                  ? 'Lab tools'
                   : sheet === 'job-actions'
                     ? actionJob?.title
                     : sheet === 'job'
@@ -2511,13 +2566,23 @@ export default function App() {
               <>
                 <h2>Workshop</h2>
                 <p>Saved on this device. Time waits while you are away.</p>
+                {entryError && <p role="alert">{entryError}</p>}
                 {continuityPanel}
-                <button type="button" onClick={exportSave}>
-                  Download this run
-                </button>
-                <button className="reading-row" type="button" onClick={() => setSheet('history')}>
-                  The workshop's history <span>▸</span>
-                </button>
+                {labMode && (
+                  <button type="button" onClick={exportSave}>
+                    Download this run
+                  </button>
+                )}
+                {labMode && (
+                  <button className="reading-row" type="button" onClick={() => setSheet('history')}>
+                    The workshop's history <span>▸</span>
+                  </button>
+                )}
+                {labMode && (
+                  <button type="button" onClick={() => setSheet('ways')}>
+                    Lab tools
+                  </button>
+                )}
                 <button
                   className="reading-row"
                   type="button"
@@ -2526,7 +2591,7 @@ export default function App() {
                     openFeedback();
                   }}
                 >
-                  Send word <span>▸</span>
+                  Feedback <span>▸</span>
                 </button>
                 <button
                   className="reading-row fullscreen-row"
@@ -2538,17 +2603,29 @@ export default function App() {
                 >
                   Full screen
                 </button>
-                <button
-                  className="reading-row"
-                  type="button"
-                  onClick={() => {
-                    setSheet(null);
-                    setScreen('title');
-                  }}
-                >
-                  To the title page
+                <button type="button" onClick={() => setNewConfirmed(true)}>
+                  New game
                 </button>
-                <a className="reading-row" href="https://human.adamwhite.work/games/">
+                {newConfirmed && (
+                  <div className="inline-confirm">
+                    <p>Replace the saved workshop on this device?</p>
+                    <button
+                      type="button"
+                      disabled={entering}
+                      onClick={() => void startWorkshop(state.seed + 1)}
+                    >
+                      Start new game
+                    </button>
+                    <button type="button" onClick={() => setNewConfirmed(false)}>
+                      Cancel
+                    </button>
+                  </div>
+                )}
+                <a
+                  className="reading-row"
+                  href="https://human.adamwhite.work/games/"
+                  onClick={(event) => void goToGames(event)}
+                >
                   All games
                 </a>
                 <div className="recording-footer">
@@ -2561,7 +2638,7 @@ export default function App() {
                         setEventsOn(lab.telemetryOn);
                       }}
                     />{' '}
-                    Record play for the lab
+                    Recording
                   </label>
                   <a
                     href="https://human.adamwhite.work/lab/privacy/"
@@ -2574,19 +2651,16 @@ export default function App() {
                 <button
                   className="primary-action"
                   type="button"
-                  onClick={() => {
-                    setSheet(null);
-                    setScreen('play');
-                    setHasSave(true);
-                  }}
+                  disabled={entering}
+                  onClick={() => void enterWorkshop()}
                 >
-                  Back to the workshop
+                  Resume
                 </button>
               </>
             )}
-            {sheet === 'ways' && (
+            {labMode && sheet === 'ways' && (
               <>
-                <h2>Other ways in</h2>
+                <h2>Lab tools</h2>
                 {continuityPanel}
                 <button type="button" onClick={() => input.current?.click()}>
                   Import a workshop
@@ -2613,7 +2687,7 @@ export default function App() {
                 <a className="reading-row" href="/experiments/">
                   Earlier experiments
                 </a>
-                {status && <p role="status">{status}</p>}
+                {status && <p role="status">{plainText(status)}</p>}
               </>
             )}
             {sheet === 'day' && (
@@ -2635,7 +2709,7 @@ export default function App() {
               <>
                 <h2>{job.title}</h2>
                 <p>{state.people[job.ownerId]?.name ?? job.ownerId}</p>
-                <p>“{job.description}”</p>
+                <p>“{plainText(job.description)}”</p>
                 {!job.isPersonal && !job.isDonor && <p>Promise · {dayTime(job.due)}</p>}
                 <RecentConversation
                   key={conversationSession}
@@ -2682,7 +2756,7 @@ export default function App() {
               <>
                 <h2>{actionJob.title}</h2>
                 <p>{state.people[actionJob.ownerId]?.name ?? actionJob.ownerId}</p>
-                <p>“{actionJob.description}”</p>
+                <p>“{plainText(actionJob.description)}”</p>
                 <p>{jobReadiness(actionJob)}</p>
                 {actionJob.blocked && (
                   <p>Sam has put this repair aside: {actionJob.blocked.reason}</p>
@@ -2717,7 +2791,8 @@ export default function App() {
                 <h2>The workshop's history</h2>
                 {[...state.log].reverse().map((line) => (
                   <p key={line.id}>
-                    <time>{dayTime(line.at)}</time> <strong>{line.speaker}</strong> {line.text}
+                    <time>{dayTime(line.at)}</time> <strong>{line.speaker}</strong>{' '}
+                    {plainText(line.text)}
                   </p>
                 ))}
               </>

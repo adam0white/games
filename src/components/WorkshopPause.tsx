@@ -1,5 +1,6 @@
 import { dayTime, requiredChecks } from '../game/engine';
 import type { GameState } from '../game/types';
+import { labToolsEnabled } from '../ui/lab-tools';
 import { CommunityScene } from './CommunityScene';
 export function WorkshopPause({
   state,
@@ -85,9 +86,11 @@ export function WorkshopPause({
         <button type="button" className="primary-action" onClick={onReturn}>
           Return to the workshop
         </button>
-        <button type="button" onClick={onExport}>
-          Export this moment
-        </button>
+        {labToolsEnabled(window.location.search) && (
+          <button type="button" onClick={onExport}>
+            Export this moment
+          </button>
+        )}
       </div>
     </main>
   );

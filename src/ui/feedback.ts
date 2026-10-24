@@ -50,5 +50,5 @@ export async function queueFeedback({
     sharePlay,
   });
   rememberFeedbackName(cleanName);
-  return `${noteOnly ? 'Note and verdict queued without a run or history linkage' : 'Note and verdict queued. Run details depend on recording and availability; recorded play is linked across games on this device'} · ${receipt}`;
+  return `${noteOnly ? 'Your feedback is queued without play data or linked history.' : 'Your feedback is queued. Available play data is included when recording is on. Recorded play links across games on this device.'} · ${receipt}`;
 }

@@ -1,5 +1,6 @@
 import { dayTime } from '../game/engine';
 import type { Evidence, Job, TestCondition } from '../game/types';
+import { plainText } from '../ui/plain-text';
 export function ReadingComparison({ job }: { job: Job }) {
   const rows = new Map<
     string,
@@ -43,7 +44,9 @@ export function ReadingComparison({ job }: { job: Job }) {
                   <td
                     key={c}
                     title={
-                      e ? `${e.summary} Recorded ${dayTime(e.at)}.` : 'No measurement recorded'
+                      e
+                        ? `${plainText(e.summary)} Recorded ${dayTime(e.at)}.`
+                        : 'No measurement recorded'
                     }
                   >
                     {e

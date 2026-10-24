@@ -28,15 +28,15 @@ export function SamRequest({
         <p>
           {request.status === 'ready'
             ? request.kind === 'lesson'
-              ? `${request.readyUntil !== undefined ? `Start before ${dayTime(request.readyUntil)}. ` : ''}The lesson window begins only when you start.`
-              : 'Sam is ready to consider the repair responsibility.'
+              ? `${request.readyUntil !== undefined ? `Start before ${dayTime(request.readyUntil)}. ` : ''}The lesson time starts when you begin.`
+              : 'Sam is ready to decide whether to take the repair.'
             : compact
-              ? `Waiting for consideration after Sam’s current activity; ${request.kind === 'lesson' ? 'the lesson has not started' : 'responsibility has not been accepted'}.`
+              ? `Sam will consider this after his current activity; ${request.kind === 'lesson' ? 'the lesson has not started' : 'responsibility has not been accepted'}.`
               : current
                 ? `Sam is finishing: ${current.option.label}. Current activity ends ${dayTime(current.endsAt)}.`
                 : 'Sam has the request. His next decision determines whether he can join.'}
         </p>
-        <small>Waiting does not count as attended teaching.</small>
+        <small>Sam does not learn from you while he is busy elsewhere.</small>
       </div>
       <div className="request-actions">
         {request.kind === 'lesson' && request.status === 'ready' && (

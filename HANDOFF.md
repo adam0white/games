@@ -100,3 +100,18 @@ Autosaves use `small-works-save-v4`, preserving older keys. Earlier campaign and
 On **2026-10-15**, contingent on Adam playing, review natural whole-handoff usability and teaching burden before selecting more world scope. This is a review priority, not scheduled unattended work.
 
 Read README.md, [vision](docs/vision.md), [MVP](docs/mvp.md), [design](docs/restart/design.md) and [ledger](docs/restart/ledger.md) before resuming. Dated earlier campaign documents are provenance, not the active queue. The [HF 2.2.1 release](https://github.com/adam0white/human-framework/releases/tag/v2.2.1) and [resolved issue 5](https://github.com/adam0white/human-framework/issues/5#issuecomment-6168092827) record the generic method-evidence correction separately.
+
+
+## Menu and reading simplification, 2026-10-24
+
+What remains: final release verification is recorded in the simplify worker report. Adam accepts game feel and decides when friends can play again. No new playtest round was run for this change.
+
+The normal menu contains Resume, Feedback, Full screen, All games, Recording and New game. New game asks for confirmation in the menu. Continuity starts automatically. Optional continuity controls, seeds, imports, replay checks, history inspection and run downloads require `?lab=1`. Historical replay and save data remain unchanged. Ordinary departure checkpoints automatically; Resume records the legal resume command even for an older paused save. Known shared-shelf read failures retain local play; ownership conflicts and invalid histories still fail visibly.
+
+Player instructions follow [Plain English](docs/lab/plain-english.md). Felt-use descriptions are clarified at display time so legacy exports retain their original evidence. Culture and Turkish names/words are preserved. Width-based fluid text and flexible bench/tool columns support tablet sizes. The shared first-visit notice lives in a footer, shares device notice state when the bridge works, and falls back to once per game when it cannot.
+
+The exact vendored lab-client 0.4.6 and lab-kit 0.5.6 add central navigation handoff and automatic continuity; the HF 2.18.0 engine pin is unchanged. Recording off remains a separate preference. One-page Feedback retains explicit optional sharing. The original iPad linking failure was not reproduced; a fallback improvement does not establish its historical cause.
+
+Before release, require the independent review, full `check:lane`, exact green CI, a clean deployment from a fresh managed worktree, exact `/release.json`, and Chromium/WebKit checks at 360×690, 820×1180, 1180×820 and 1280×800. The prior handoff evidence above remains historical and unchanged.
+
+Local simplify verification: lint, types, 312 tests across 40 files and production build pass. The one independent Codex review returned five findings; all were addressed with focused regressions and browser checks. Local Chromium and WebKit checks cover the opening and meter at all four required sizes, ordinary/lab control separation, menu initialization, legal paused-save recovery, replay and inline New game. Feedback Submit remains reachable with details expanded in a simulated short visual viewport; no real-device keyboard claim or new playtest round.

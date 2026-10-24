@@ -2,6 +2,7 @@ import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { requiredChecks } from '../game/engine';
 import { runUseTest } from '../game/model';
 import type { Evidence, Job, TestCondition, UseResult } from '../game/types';
+import { plainText } from '../ui/plain-text';
 import './physical-object.css';
 
 interface Props {
@@ -225,7 +226,9 @@ export function PhysicalObjectScene({
         <span>{action}</span>
         <small>15 min</small>
       </button>
-      <p className="physical-observation">{lastUse ? `Last test: ${lastUse.summary}` : ''}</p>
+      <p className="physical-observation">
+        {lastUse ? `Last test: ${plainText(lastUse.summary)}` : ''}
+      </p>
     </div>
   );
 }

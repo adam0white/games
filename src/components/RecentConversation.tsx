@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { dayTime } from '../game/engine';
 import type { SpokenLine } from '../ui/crises';
+import { plainText } from '../ui/plain-text';
 
 type ConversationState = { open: boolean; acknowledgedThrough: number };
 const latestId = (lines: SpokenLine[]) => Math.max(0, ...lines.map((line) => line.id));
@@ -55,7 +56,7 @@ export function RecentConversation({
   if (overlay)
     return visible && newest ? (
       <p className="speech-line">
-        <strong>{newest.speaker}:</strong> {newest.text}
+        <strong>{newest.speaker}:</strong> {plainText(newest.text)}
       </p>
     ) : null;
   return (
@@ -71,7 +72,7 @@ export function RecentConversation({
       <section className="todays-words" aria-label="What people said today">
         {lines.map((line) => (
           <p key={line.id} className={line.tone === 'warning' ? 'is-warning' : undefined}>
-            <strong>{line.speaker}</strong> {line.text} <time>{dayTime(line.at)}</time>
+            <strong>{line.speaker}</strong> {plainText(line.text)} <time>{dayTime(line.at)}</time>
             {line.speaker === 'Sam' &&
               line.text.includes('see how you find the fault') &&
               canAskSam && (
