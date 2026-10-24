@@ -39,6 +39,17 @@ describe('Send word consent and names', () => {
     expect(lab.sendFeedback).toHaveBeenCalled();
     expect(lab.sendRun).not.toHaveBeenCalled();
   });
+  it('sends only the note when carried-history permission is closed even with recording on', async () => {
+    const { lab, input } = setup();
+    Object.defineProperty(lab, 'personaRecordingAllowed', { value: false });
+    const getRun = vi.fn(() => ({ carried: 'private source history' }));
+    await expect(queueFeedback({ ...input, getRun })).resolves.toContain('without a run');
+    expect(getRun).not.toHaveBeenCalled();
+    expect(lab.sendFeedback).toHaveBeenCalledWith('Verdict: mixed\n\nA note', {
+      name: 'Tester',
+      run: undefined,
+    });
+  });
   it('leaves a send failure on this page', async () => {
     const { lab, input } = setup();
     vi.mocked(lab.sendFeedback).mockRejectedValueOnce(new Error('failed'));

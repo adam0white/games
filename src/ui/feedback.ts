@@ -41,8 +41,15 @@ export async function queueFeedback({
     }
   };
   const cleanName = name.trim().slice(0, 60);
-  const noteOnly = !lab.telemetryOn || (lab.privacySignalOn && !lab.privacyOverride);
-  const receipt = await lab.sendFeedback(message, { name: cleanName, run: feedbackRun() });
+  const noteOnly =
+    !lab.personaRecordingAllowed ||
+    !lab.telemetryOn ||
+    (lab.privacySignalOn && !lab.privacyOverride);
+  // Unlinked transport cannot turn a closed continuing-history gate into run permission.
+  const receipt = await lab.sendFeedback(message, {
+    name: cleanName,
+    run: noteOnly ? undefined : feedbackRun(),
+  });
   rememberFeedbackName(cleanName);
   return `${noteOnly ? 'Note and verdict queued without a run or history linkage' : 'Note and verdict queued. Run details depend on recording and availability; continuing-person history links only after explicit consent'} · ${receipt}`;
 }

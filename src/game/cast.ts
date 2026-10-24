@@ -40,7 +40,7 @@ export function admissionFacts(chapter: CastChapter | undefined, id: string) {
 const actions = new Set(['personal', 'rest', 'eat', 'drink', 'sleep']);
 const same = (a: unknown, b: unknown) => canonicalPersona(a) === canonicalPersona(b);
 
-/** Explicit Voice Halil + same-host dialects. No clinical, family, duty or qualification bypass. */
+/** Finite Voice Halil, Commonstead Nora and same-host dialects. No health or duty bypass. */
 export function admitWorkshop(input: LifePreparation, opening: Person): Person {
   const envelope = input.parent;
   const role = castRole(envelope.castId);
@@ -61,14 +61,28 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
     envelope.source.game === 'repair' &&
     envelope.transfer.castPassport === 'workshop-cast/1' &&
     envelope.transfer.sourceRole === role;
-  if (!site && !local)
+  const commonstead =
+    envelope.source.game === 'commonstead' &&
+    role === 'nora' &&
+    envelope.source.rules === 'commonstead-3' &&
+    envelope.source.engine === '2.17.0' &&
+    /^[a-f0-9]{12}$/.test(envelope.source.build) &&
+    envelope.transfer.castPassport === 'commonstead-cast/1' &&
+    envelope.transfer.sourceRole === 'hf.cast.nora.smallworks';
+  if (!site && !local && !commonstead)
     throw new Error(
       'This source needs an explicitly registered workshop adapter. Export it or play fresh locally.',
     );
   const portable = validateCalendarPersona(envelope.transfer.person);
+  const mapping = commonstead
+    ? 'commonstead-calendar/1'
+    : site
+      ? 'site-cast-calendar/1'
+      : CAST_MAPPING;
+  const sourceId = commonstead ? envelope.castId : role;
   if (
-    portable.person.mappingVersion !== (site ? 'site-cast-calendar/1' : CAST_MAPPING) ||
-    portable.person.source.id !== role ||
+    portable.person.mappingVersion !== mapping ||
+    portable.person.source.id !== sourceId ||
     portable.person.source.engine !== '2.17.0'
   )
     throw new Error('Unsupported source mapping, role or engine.');
@@ -95,6 +109,23 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
     )
   )
     throw new Error('A carried duty has no supported action in this workshop; keep it at source.');
+  // Commonstead's native v1 boundary is a healthy quiet Nora with no transported duties.
+  // Refuse future extensions until their reference/action semantics are explicitly mapped.
+  if (
+    commonstead &&
+    (portable.person.source.schema !== 'human/person@1' ||
+      portable.person.health.health !== 1 ||
+      portable.person.family !== null ||
+      portable.person.bonds !== null ||
+      Object.keys(portable.person.skills).length !== 0 ||
+      portable.person.commitments.length !== 0 ||
+      portable.calendar.offset !== 0 ||
+      portable.calendar.commitments.length !== 0 ||
+      portable.calendar.owed.length !== 0 ||
+      portable.calendar.lapse !== null ||
+      !same(portable.calendar.norms, DEFAULT_NORMS))
+  )
+    throw new Error('Unsupported Commonstead body, calendar or qualification semantics.');
   const target = restore(snapshot(opening));
   const shifted = structuredClone(portable);
   const offset = target.now - portable.person.source.now;
@@ -126,8 +157,8 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
   delete target.agenda.owed;
   delete target.agenda.lapse;
   return admitCalendarPersona(shifted, target, {
-    mappingVersion: site ? 'site-cast-calendar/1' : CAST_MAPPING,
-    sourceId: role!,
+    mappingVersion: mapping,
+    sourceId: sourceId!,
     targetId: role!,
     targetNorms: DEFAULT_NORMS,
   }).person;

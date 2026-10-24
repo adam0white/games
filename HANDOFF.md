@@ -2,27 +2,13 @@
 
 Updated 2026-10-20 for the F-231 clarity follow-up. Earlier sections are historical.
 
-## Published-platform integration, 2026-10-24 — delivery pending
+## Canonical continuity delivery, 2026-10-24
 
-What remains: final signed integration and rebase, exact green CI, normal deploy/live verification, and a genuine supported cross-origin journey. HF-site Halil has a chronic illness and its published passport refuses that actual source; do not clear it. Pass Rafi/Sam need their own explicit supported source adapter and ready peer. Owner review remains afterward.
+Current Small Works uses published HF2.18.0 / engine2.17.0 and exact immutable client0.4.2 / kit0.5.2. The four-person canonical cast and bounded disclosures are delivered; historical playable archives and their isolated saves remain unchanged. Whole applicable cast admission is one expected-head transaction, including absence. Full initial people/life/claims are pinned; loaded chapters restore local ownership without importing a later shelf head. File histories remain file-origin and grant no ownership. Raw source archives stay local/export only. Recording gates remain closed without valid permission; feedback notes remain available independently.
 
-The integration uses npm HF **2.18.0**, engine **2.17.0**, immutable client **0.4.0** and kit **0.5.0**. Artifact SHA256 values matched platform-ready, and explicit Homebrew-PATH npm ci verified actual installed versions. Game version is 4.0.0, scenario canonical-workshop@2. Shared castForGame/ canonicalCast replace manual canonical profiles.
+Finite receiving dialects are the native workshop calendar, Voice Halil (subject to actual clinical restrictions), and native Commonstead Nora. The latter requires commonstead-3/engine2.17.0, commonstead-cast/1, canonical Nora source role and Person source.id, commonstead-calendar/1, full checkpoint and exact source norm meanings. Its v1 boundary is healthy, no family/bonds, no portable qualifications or continuing obligations; unknown extensions refuse. The calendar offset changes chapter coordinates with zero duration, preserving age/RNG/fitness/profile. Unsupported source stores stay in the named archive; no travel, healing or repair qualification is implied. Title/Continue never publishes a competing fresh preview claim.
 
-Whole allocated cast admission uses one expected-head batch transaction, including expected absence. Complete admitted initial people, inputs, claims and coarse life are pinned; loaded chapters repeat semantic admission checks and never refresh from shelf. Source receipts stay in local autosave metadata, while raw source snapshots stay in a bounded source-local archive scoped to the run. File imports discard embedded ownership, retain file-origin status through local reload and keep raw archive metadata outside telemetry state. Mixed histories need complete current permission or an explicit whole-group choice. Death closes an owned branch under exact-parent CAS. Pause for departure is an actual recorded command, not a promise that an active project or illness can travel.
-
-Explicit adapter scope: same workshop calendar passports and HF-site Voice Halil calendar passports. Unknown roles, norms, unsupported duties, health/family conflicts and old editions refuse. Source repair skill is not converted into workshop methods. Larger personal outcomes remain bounded disclosures only. Supported coarse assignment/place/availability changes affect local background work and new Sam work requests. The single existing reviewer checked the complete integration and narrowly verified the archive and load-admission fixes. Final verification and live receipts are recorded in the private coordinator report.
-
-## Canonical cast checkpoint, 2026-10-23 — not deployed
-
-What remains: the exact released platform contract, canonical shared-module and browser-life integration, privacy and admission controls, final integration review, push/CI/deploy and genuine cross-origin journeys at both required sizes. `platform-ready.md` was absent during this checkpoint. The shared contract explicitly permits independent content work while that release is pending. Do not infer candidate APIs or version pins.
-
-- Work is isolated on `cast-smallworks`. Content commit `f6ee7d1` is signed locally. No main push or deployment is claimed.
-- [Cast scope and discoveries](docs/canonical-cast.md) records four canonical foreground roles, retirement of Evan, the incidental unnamed mother role and unchanged historical archives.
-- Optional shared-work conversations disclose each person's bounded private account. The People panel preserves discovered accounts after conversation-log eviction. Larger hidden outcomes remain unimplemented.
-- The new edition uses isolated autosave/intro keys and refuses historical saves plainly. Their source exports remain unchanged. Current deterministic replay and learning controls remain.
-- Exact complete initial people can be pinned before creating a chapter. Construction, reload and replay preserve changed traits and bodily state without reading a browser shelf. This is preparation for admission, not a source-passport adapter.
-- Checkpoint verification: Node26.12.0; externally locked check:lane passed lint, types, **282 tests across 36 files**, and production build. Existing CSS and chunk-size warnings remain. One independent correctness/game-design reviewer covers this checkpoint; released integration remains unreviewed.
-- Local existing-Chrome checks covered the opening, phone and desktop layouts without horizontal overflow. A downloaded two-input local run replayed exactly before the final background-role wording change. This is a mechanism control, not independent play, a live delivery check or a cross-origin journey.
+Adam accepts feel separately. Dynamic review/CI/deployment and genuine source→target journey receipts, plus any remaining acceptance gaps, are in `/Users/abdul/code/.lab-scratch/cast/smallworks.md`. Do not infer completed live acceptance from a source fixture or a page visit.
 
 ## Clarity follow-up, 2026-10-20
 
