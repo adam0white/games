@@ -58,13 +58,14 @@ export class WorkshopContinuity {
       lab.setPersonaRecording('invalidated-workshop-history');
       this.changed();
     };
-    window.addEventListener('hf-lab-preference', invalidate);
-    window.addEventListener('storage', invalidate);
-    window.addEventListener('hf-persona-preference', invalidate);
-    document.addEventListener('change', (event) => {
-      if ((event.target as HTMLElement)?.getAttribute('aria-label') === 'Record play for the lab')
+    window.addEventListener('storage', (event) => {
+      if (
+        event.key === null ||
+        (!event.key.startsWith('hf-lab-') && !event.key.startsWith('hf-persona-recording:'))
+      )
         invalidate();
     });
+    window.addEventListener('hf-persona-preference', invalidate);
   }
   bind(state: () => GameState, changed: () => void) {
     this.state = state;
@@ -227,45 +228,9 @@ export class WorkshopContinuity {
       : 'Continuity off. This loaded chapter remains pinned.';
     this.changed();
   }
-  async recording(allow: boolean) {
-    if (allow) {
-      this.generation++;
-      this.recordingKey = `workshop:${crypto.randomUUID()}`;
-    }
-    const generation = this.generation;
-    const player = lab.playerId;
-    const pinned = structuredClone(this.heads);
-    const revisions = pinned.map((p) => p.revision).join('/');
-    const current = () =>
-      generation === this.generation &&
-      player === lab.playerId &&
-      this.heads.map((p) => p.revision).join('/') === revisions;
-    lab.setPersonaRecording(this.fileOrigin || pinned.length ? this.recordingKey : null);
-    if (this.fileOrigin) {
-      if (allow && current()) lab.allowPersonaRecording(true);
-      this.changed();
-      return;
-    }
-    if (!pinned.length) {
-      this.changed();
-      return;
-    }
-    const result = await this.shelf.request<{
-      sameEpoch: boolean;
-      revisions: string[];
-      recordingEpoch: string | null;
-    }>({ action: 'recordingBatch', envelopes: pinned });
-    if (!current() || result.revisions.join('/') !== revisions) return;
-    if (allow) {
-      await this.shelf.request({
-        action: 'recordingBatch',
-        envelopes: pinned,
-        allowRecording: true,
-        recordingEpoch: result.recordingEpoch ?? undefined,
-      });
-      if (current()) lab.allowPersonaRecording(true);
-    } else lab.allowPersonaRecording(result.sameEpoch);
-    this.changed();
+  async recording(_allow: boolean) {
+    lab.setPersonaRecording(this.recordingKey);
+    lab.allowPersonaRecording(true);
   }
   denyRecording() {
     this.generation++;
@@ -326,16 +291,11 @@ export class WorkshopContinuity {
       localStorage.setItem(key, JSON.stringify(journal));
     }
     if (!current()) throw new Error('Run changed before checkpoint.');
-    const epoch = await this.shelf.request<{ recordingEpoch: string | null }>({
-      action: 'recording',
-    });
-    if (!current()) throw new Error('Identity or chapter changed before checkpoint.');
     await this.shelf.request({
       action: 'put',
       envelope,
       fork,
       authored: !fork && !parent && !this.fileOrigin && !state.castChapter?.inputs.length,
-      recordingEpoch: epoch.recordingEpoch ?? undefined,
     });
     if (!current()) return;
     this.heads = [...this.heads.filter((p) => p.castId !== castId), envelope].sort((a, b) =>

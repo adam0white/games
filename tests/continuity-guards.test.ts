@@ -5,6 +5,7 @@ import nativeReceipt from './fixtures/commonstead-nora-native.json';
 
 const controls = vi.hoisted(() => ({
   request: vi.fn(),
+  ready: Promise.resolve(true),
   enabled: true,
   player: 'test-a',
   key: null as string | null,
@@ -35,7 +36,9 @@ vi.mock('@adam0white/lab-client', async (load) => {
   return {
     ...real,
     personaChannel: () => ({
-      ready: Promise.resolve(true),
+      get ready() {
+        return controls.ready;
+      },
       get enabled() {
         return controls.enabled;
       },
@@ -53,6 +56,7 @@ beforeEach(() => {
   controls.key = null;
   controls.player = 'test-a';
   controls.enabled = true;
+  controls.ready = Promise.resolve(true);
   controls.request.mockReset();
   vi.stubGlobal('window', new EventTarget());
   vi.stubGlobal('document', new EventTarget());
@@ -85,7 +89,7 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
     ]);
     expect(Object.keys(controls.request.mock.calls[1]![0].expectedHeads)).toHaveLength(4);
   });
-  it('keeps file-origin through save/reload, never restores embedded ownership, and never reuses an old file grant', async () => {
+  it('keeps file-origin nonownership through reload and ignores recording-only identity changes', async () => {
     const host = await runtime();
     const real = await import('@adam0white/lab-client');
     const { admitWorkshop } = await import('../src/game/cast');
@@ -122,11 +126,11 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
     expect(restored.fileOrigin).toBe(true);
     expect(restored.heads).toEqual([]);
     expect(controls.key).not.toBe(oldKey);
-    expect(controls.grants.has(controls.key!)).toBe(false);
+    expect(controls.grants.has(controls.key!)).toBe(true);
     await restored.recording(true);
     expect(controls.grants.get(controls.key!)).toBe('test-a');
     window.dispatchEvent(new Event('hf-lab-preference'));
-    expect(controls.grants.get(controls.key!)).toBeUndefined();
+    expect(controls.grants.get(controls.key!)).toBe('test-a');
   });
   it('keeps a denied mixed history closed when an old positive acknowledgement arrives', async () => {
     const { createPersona } = await import('@adam0white/lab-client');
@@ -258,4 +262,19 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
     expect(journal.every((row: { runId: string }) => row.runId === original)).toBe(true);
     expect(JSON.parse(host.exportRun(fresh)).castSources).toEqual([]);
   });
+});
+
+it('does not cancel workshop admission while a recording identity reply arrives', async () => {
+  let release!: (value: boolean) => void;
+  controls.ready = new Promise<boolean>((resolve) => {
+    release = resolve;
+  });
+  const c = await runtime();
+  const pending = c.fresh(42, true);
+  window.dispatchEvent(new Event('hf-lab-preference'));
+  const storage = new Event('storage');
+  Object.defineProperty(storage, 'key', { value: 'hf-lab-player' });
+  window.dispatchEvent(storage);
+  release(true);
+  await expect(pending).resolves.toHaveProperty('seed', 42);
 });
