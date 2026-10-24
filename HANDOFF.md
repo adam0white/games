@@ -119,3 +119,5 @@ Local simplify verification: lint, types, 314 tests across 40 files and producti
 The director’s error-copy follow-up keeps SDK protocol detail in lab mode/logs. Ordinary entry failures show a plain message and Feedback. A damaged local save cannot be replaced through Resume; New game requires confirmation. Fault-injected Chromium/WebKit checks verify failed admission and damaged-load save preservation.
 
 The final prose audit also expands ordinary repair-result fragments at display time, including cleaning, reseating, power, returns and stock messages. Passive wording preserves who performed the work. The original evidence text and movement/load conditions remain unchanged.
+
+The live delivery check found Read Meter still inherited an 11px action-bar rule on tablets. A narrow selector correction applies fluid 16–19px action labels and 14–17px costs. The notice's Dismiss control also has readable text and a 44px target. No rules or replay text changed. The 12 screenshots from d44f13c are retained; post-fix verification uses DOM measurements to respect the screenshot cap.

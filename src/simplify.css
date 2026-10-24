@@ -107,3 +107,16 @@ body {
 .workshop-shell .physical-observation {
   flex-shrink: 0;
 }
+
+/* These action-bar selectors override older fixed 11px/9px descendants. */
+.workshop-shell .bench-action-bar .bench-verbs button {
+  font-size: clamp(16px, 14px + 0.3vw, 19px);
+}
+.workshop-shell .bench-action-bar .bench-verbs button small {
+  font-size: clamp(14px, 12px + 0.3vw, 17px);
+}
+.lab-notice-footer .lk-telemetry-notice button {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 14px;
+}
