@@ -1971,7 +1971,7 @@ export default function App() {
                                   : 'Your retained project · no customer return promise'}
                               </p>
                             )}
-                            <p className="readiness">{jobReadiness(j)}</p>
+                            <p className="readiness">{plainText(jobReadiness(j))}</p>
                             {samFinishedPersonal(j) && (
                               <p className="personal-completion">
                                 Sam finished this piece of work; the project stays here.
@@ -2275,7 +2275,7 @@ export default function App() {
                                     <strong>{j.title}</strong>
                                     <p>{plainText(j.description)}</p>
                                     <small>
-                                      {jobReadiness(j)}
+                                      {plainText(jobReadiness(j))}
                                       {['offer', 'active', 'ready'].includes(j.status)
                                         ? ` · Return ${dayTime(j.due)}`
                                         : ''}
@@ -2774,7 +2774,7 @@ export default function App() {
                 <h2>{actionJob.title}</h2>
                 <p>{state.people[actionJob.ownerId]?.name ?? actionJob.ownerId}</p>
                 <p>“{plainText(actionJob.description)}”</p>
-                <p>{jobReadiness(actionJob)}</p>
+                <p>{plainText(jobReadiness(actionJob))}</p>
                 {actionJob.blocked && (
                   <p>Sam has put this repair aside: {actionJob.blocked.reason}</p>
                 )}
@@ -2798,7 +2798,7 @@ export default function App() {
                 {['active', 'ready'].includes(actionJob.status) ? (
                   responsibilityActions(actionJob)
                 ) : (
-                  <p>{jobReadiness(actionJob)}</p>
+                  <p>{plainText(jobReadiness(actionJob))}</p>
                 )}
                 {result}
               </>

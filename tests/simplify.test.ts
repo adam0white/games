@@ -37,6 +37,19 @@ describe('player presentation', () => {
       'The tune plays at about the same speed as it did on the last try.',
     );
   });
+  it('uses complete actor-neutral repair result sentences without changing work conditions', () => {
+    expect(
+      plainText(
+        'Cleaned the switch contact faces; run under load and movement to check the result.',
+      ),
+    ).toBe(
+      'The switch contact faces were cleaned. Run the object under load and while moving it to check the result.',
+    );
+    expect(plainText('Replaced Switch. Test the object again.')).toBe(
+      'The Switch was replaced. Test the object again.',
+    );
+    expect(plainText('Power on.')).toBe('The power is on.');
+  });
   it('preserves names, cultural terms, numerical evidence and unrelated text', () => {
     const original = 'Halil, Nuran, Selin and Rafi in Bornova. 12 V from A to B.';
     expect(plainText(original)).toBe(original);
