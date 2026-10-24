@@ -144,8 +144,8 @@ export function SendWord({
         >
           <summary>What is sent</summary>
           <p>
-            Your note, verdict and optional name. With recording off, no run or linked history is
-            sent.
+            Recording on or Share includes this run and links play across games on this device.
+            Otherwise only your note, verdict and optional name are sent.
           </p>
           <pre>{preview}</pre>
           <a href={LAB_PRIVACY}>Lab privacy</a>

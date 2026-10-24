@@ -212,7 +212,7 @@ export class WorkshopContinuity {
     this.started = true;
     this.recordAfterStart = false;
     this.status =
-      'File-origin history stays local unless you explicitly permit recording. Embedded claims grant no ownership.';
+      'File-origin recorded play links across games on this device when recording is on. Embedded claims grant no ownership.';
     this.changed();
     return state;
   }
