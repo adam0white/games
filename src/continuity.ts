@@ -233,12 +233,9 @@ export class WorkshopContinuity {
     lab.allowPersonaRecording(true);
   }
   denyRecording() {
-    this.generation++;
-    this.recordingKey = `workshop:${crypto.randomUUID()}`;
-    lab.setPersonaRecording('denied-workshop-history');
-    this.status = 'Recording denied. Local play and export remain available.';
-    this.changed();
+    // Compatibility only. Recording is controlled by the menu switch.
   }
+
   async checkpoint(id: string, fork = false) {
     const state = this.state?.();
     if (!state || !this.started || !state.inputs?.length || !state.chapterPaused)

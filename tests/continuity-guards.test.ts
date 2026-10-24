@@ -132,7 +132,7 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
     window.dispatchEvent(new Event('hf-lab-preference'));
     expect(controls.grants.get(controls.key!)).toBe('test-a');
   });
-  it('keeps a denied mixed history closed when an old positive acknowledgement arrives', async () => {
+  it('does not turn a compatibility recording choice into gameplay invalidation', async () => {
     const { createPersona } = await import('@adam0white/lab-client');
     const p = await createPersona({
       format: 'hf-persona/1',
@@ -157,7 +157,8 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
     host.denyRecording();
     reply({ sameEpoch: true, revisions: [p.revision], recordingEpoch: 'opaque-test' });
     await pending;
-    expect(controls.grants.get(controls.key!)).toBeUndefined();
+    expect(controls.grants.get(controls.key!)).toBe('test-a');
+    expect(controls.request).not.toHaveBeenCalled();
   });
   it('requires an actually paused played source and preserves exact accepted local receipts on reload', async () => {
     const real =
