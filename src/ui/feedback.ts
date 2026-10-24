@@ -9,12 +9,6 @@ export function storedPreference(key: string): string {
     return '';
   }
 }
-export function recordingIsOff(): boolean {
-  return (
-    storedPreference('hf-lab-recording-off') === '1' ||
-    storedPreference('hf-lab-events-off:repair') === '1'
-  );
-}
 export function rememberFeedbackName(name: string) {
   try {
     const trimmed = name.trim().slice(0, 60);
@@ -24,26 +18,20 @@ export function rememberFeedbackName(name: string) {
     /* Device storage is optional. */
   }
 }
-/** A privacy signal allows only an explicitly consented, unlinked run. */
+/** Feedback stays available independently of automatic recording. */
 export async function queueFeedback({
   lab,
   getRun,
   note,
   verdict,
   name,
-  consent,
-  off,
 }: {
   lab: Lab;
   getRun: () => unknown;
   note: string;
   verdict: string;
   name: string;
-  consent: boolean;
-  off: boolean;
-  onSent?: () => void;
-}): Promise<'queued' | 'dialog'> {
-  const privacyOnly = lab.privacySignalOn && !lab.privacyOverride;
+}): Promise<string> {
   const message = [verdict ? `Verdict: ${verdict}` : '', note.trim()].filter(Boolean).join('\n\n');
   const feedbackRun = () => {
     try {
@@ -53,11 +41,8 @@ export async function queueFeedback({
     }
   };
   const cleanName = name.trim().slice(0, 60);
-  if (!off && privacyOnly && consent && lab.personaRecordingAllowed) {
-    await lab.sendRun(getRun(), { note: message, name: cleanName });
-  } else {
-    await lab.sendFeedback(message, { name: cleanName, run: feedbackRun() });
-  }
+  const noteOnly = !lab.telemetryOn || (lab.privacySignalOn && !lab.privacyOverride);
+  const receipt = await lab.sendFeedback(message, { name: cleanName, run: feedbackRun() });
   rememberFeedbackName(cleanName);
-  return 'queued';
+  return `${noteOnly ? 'Note and verdict queued without a run or history linkage' : 'Note and verdict queued. Run details depend on recording and availability; continuing-person history links only after explicit consent'} · ${receipt}`;
 }

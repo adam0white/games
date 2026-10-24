@@ -1,12 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { lab } from '../lab';
-import {
-  FEEDBACK_NAME_KEY,
-  LAB_PRIVACY,
-  queueFeedback,
-  recordingIsOff,
-  storedPreference,
-} from '../ui/feedback';
+import { FEEDBACK_NAME_KEY, LAB_PRIVACY, queueFeedback, storedPreference } from '../ui/feedback';
 import './send-word.css';
 
 export function SendWord({
@@ -18,9 +12,6 @@ export function SendWord({
   onBack: () => void;
   onGame?: () => void;
 }) {
-  const [off, setOff] = useState(recordingIsOff);
-  const [recording, setRecording] = useState(lab.telemetryOn);
-  const [consent, setConsent] = useState(false);
   const [verdict, setVerdict] = useState('');
   const [note, setNote] = useState('');
   const [name, setName] = useState(() => storedPreference(FEEDBACK_NAME_KEY));
@@ -30,22 +21,6 @@ export function SendWord({
   const [preview, setPreview] = useState('');
   const pending = useRef(false);
   const screen = useRef<HTMLElement>(null);
-  const privacyOnly = !off && lab.privacySignalOn && !lab.privacyOverride;
-  const disabled = false;
-  useEffect(() => {
-    const sync = () => {
-      setOff(recordingIsOff());
-      setRecording(lab.telemetryOn);
-    };
-    window.addEventListener('storage', sync);
-    window.addEventListener('focus', sync);
-    window.addEventListener('hf-lab-preference', sync);
-    return () => {
-      window.removeEventListener('storage', sync);
-      window.removeEventListener('focus', sync);
-      window.removeEventListener('hf-lab-preference', sync);
-    };
-  }, []);
   useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) return;
@@ -62,7 +37,7 @@ export function SendWord({
     };
   }, []);
   const send = async () => {
-    if (disabled || pending.current) return;
+    if (pending.current) return;
     pending.current = true;
     setBusy(true);
     setStatus('');
@@ -73,17 +48,9 @@ export function SendWord({
         note,
         verdict,
         name,
-        consent,
-        off,
-        onSent: () => {
-          setSent(true);
-          setStatus('Sent. Thank you.');
-        },
       });
-      setSent(result === 'queued');
-      setStatus(
-        result === 'queued' ? 'Sent. Thank you.' : 'Use the send dialog to finish sending.',
-      );
+      setSent(true);
+      setStatus(result);
     } catch (error) {
       setStatus(
         error instanceof Error ? error.message : 'Your word could not be sent. Please try again.',
@@ -163,33 +130,6 @@ export function SendWord({
             Link this continuing person to my recorded play (optional)
           </label>
         )}
-        {off && (
-          <div className="sw-recording-notice">
-            <p>Recording is off. You can still send your note.</p>
-            <label>
-              <input
-                type="checkbox"
-                checked={recording && !off}
-                onChange={(e) => {
-                  lab.setTelemetryOff(!e.target.checked);
-                  setOff(recordingIsOff());
-                  setRecording(lab.telemetryOn);
-                }}
-              />{' '}
-              Record play for the lab
-            </label>
-          </div>
-        )}
-        {privacyOnly && (
-          <label className="sw-run-consent">
-            <input
-              type="checkbox"
-              checked={consent}
-              onChange={(e) => setConsent(e.target.checked)}
-            />{' '}
-            Send this run with my note
-          </label>
-        )}
         <details
           onToggle={(e) => {
             if (e.currentTarget.open) setPreview(JSON.stringify(getRun(), null, 2));
@@ -217,7 +157,7 @@ export function SendWord({
         <button
           type="button"
           className="primary sw-primary"
-          disabled={!sent && (disabled || busy)}
+          disabled={!sent && busy}
           onClick={sent ? onGame : send}
         >
           {sent ? 'Back to the game' : busy ? 'Sending…' : 'Send'}
