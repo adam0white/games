@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGame, dispatch } from '../src/game/engine';
 import { saveGame } from '../src/game/persistence';
+import nativeReceipt from './fixtures/commonstead-nora-native.json';
 
 const controls = vi.hoisted(() => ({
   request: vi.fn(),
@@ -86,7 +87,31 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
   });
   it('keeps file-origin through save/reload, never restores embedded ownership, and never reuses an old file grant', async () => {
     const host = await runtime();
-    const state = await host.importFile(saveGame(createGame(42)));
+    const real = await import('@adam0white/lab-client');
+    const { admitWorkshop } = await import('../src/game/cast');
+    const parent = await real.validatePersona(nativeReceipt.envelope);
+    const input = real.preparePersonaLife(
+      parent,
+      nativeReceipt.envelope.transfer.life.clock.watermark * 3600000,
+    );
+    const people = createGame(42).people;
+    people.nora = admitWorkshop(input, people.nora!);
+    const { revision, ...body } = parent;
+    // Synthetic target claim on the actual native source: a file receipt is never local ownership.
+    const claim = await real.createPersona({
+      ...body,
+      parentRevision: revision,
+      source: { game: 'repair', build: 'test', engine: '2.17.0', rules: 'canonical-workshop-2' },
+      transfer: { ...parent.transfer, life: input.life },
+    });
+    const file = createGame(42, 'current', people, {
+      version: 'workshop-cast/1',
+      inputs: [input],
+      claims: [claim],
+    });
+    const state = await host.importFile(saveGame(file));
+    expect(state.castChapter?.claims[0]?.revision).toBe(claim.revision);
+    expect(state.openingPeople?.nora?.rng).toEqual(nativeReceipt.raw.rng);
     expect(host.heads).toEqual([]);
     await host.recording(true);
     const oldKey = controls.key;
