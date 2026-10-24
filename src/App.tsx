@@ -51,6 +51,7 @@ import './clarity.css';
 import './workshop-shell.css';
 import './simplify.css';
 import { labToolsEnabled } from './ui/lab-tools';
+import { damagedWorkshopMessage, workshopStartError } from './ui/start-error';
 
 const labMode = labToolsEnabled(window.location.search);
 
@@ -74,12 +75,14 @@ function samFinishedPersonal(job: Job): boolean {
   const lastWork = job.evidence.findLast((e) => e.kind === 'work')?.at ?? 0;
   return Boolean(completion && completion.at >= lastWork);
 }
+let initialLoadFailed = false;
 function initial(): GameState {
   try {
     const saved = localStorage.getItem(SAVE_KEY);
     if (saved) return continuity.loadLocal(saved);
   } catch {
-    /* A damaged save does not overwrite historical saves. */
+    initialLoadFailed = true;
+    /* A damaged save is replaced only after explicit New game confirmation. */
   }
   return createGame(42);
 }
@@ -369,7 +372,9 @@ export default function App() {
   const [state, setState] = useState(initial);
   const [, refreshContinuity] = useState(0);
   const [entering, setEntering] = useState(false);
-  const [entryError, setEntryError] = useState('');
+  const [entryError, setEntryError] = useState(() =>
+    initialLoadFailed ? damagedWorkshopMessage : '',
+  );
   const [eventsOn, setEventsOn] = useState(lab.telemetryOn);
   useEffect(() => {
     lab.screen('play');
@@ -894,14 +899,12 @@ export default function App() {
     try {
       await continuity.depart();
       resetPresentation(await continuity.fresh(seed, localOnly), true);
+      initialLoadFailed = false;
       setNewConfirmed(false);
     } catch (error) {
       continuity.status = error instanceof Error ? error.message : String(error);
-      setEntryError(
-        continuity.status === 'Shelf unavailable. Use a local file.'
-          ? 'The shared character history did not reply. Your current workshop is unchanged. Please try again.'
-          : continuity.status,
-      );
+      setEntryError(workshopStartError(error, labMode));
+      console.error('Workshop entry failed:', continuity.status);
       refreshContinuity((n) => n + 1);
     } finally {
       setEntering(false);
@@ -909,6 +912,10 @@ export default function App() {
   };
   const enterWorkshop = async () => {
     if (entering) return;
+    if (initialLoadFailed) {
+      setEntryError(damagedWorkshopMessage);
+      return;
+    }
     if (!continuity.loaded) {
       await startWorkshop(state.seed);
       return;
@@ -924,11 +931,8 @@ export default function App() {
       setScreen('play');
     } catch (error) {
       continuity.status = String(error);
-      setEntryError(
-        continuity.status === 'Shelf unavailable. Use a local file.'
-          ? 'The shared character history did not reply. Your current workshop is unchanged. Please try again.'
-          : continuity.status,
-      );
+      setEntryError(workshopStartError(error, labMode));
+      console.error('Workshop entry failed:', continuity.status);
       refreshContinuity((n) => n + 1);
     } finally {
       setEntering(false);
@@ -950,7 +954,7 @@ export default function App() {
               setState(next);
             }
           })
-          .catch((error) => setEntryError(String(error)));
+          .catch((error) => setEntryError(workshopStartError(error, labMode)));
       }
     };
     document.addEventListener('visibilitychange', returnToPlay);
@@ -1244,7 +1248,20 @@ export default function App() {
             </button>
             <small>Saved on this device.</small>
             {entering && <p role="status">Opening your workshop…</p>}
-            {entryError && <p role="alert">{entryError}</p>}
+            {entryError && (
+              <div className="entry-error">
+                <p role="alert">{entryError}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSheet(null);
+                    openFeedback();
+                  }}
+                >
+                  Feedback
+                </button>
+              </div>
+            )}
             {continuityPanel}
           </div>
         </main>
