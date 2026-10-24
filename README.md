@@ -4,7 +4,7 @@ A single-player repair strategy game. Investigate familiar electrical and mechan
 
 ## Canonical cast adoption
 
-The owner has reopened Small Works for a bounded four-person canonical cast and browser-life adoption. [The cast scope](docs/canonical-cast.md) defines the new edition, playable disclosures and archive boundary. Technical delivery and owner acceptance remain separate.
+Small Works now has a bounded four-person canonical cast and browser-life integration candidate using published HF 2.18.0. [The cast scope](docs/canonical-cast.md) defines the new edition, playable disclosures and archive boundary. Technical delivery and owner acceptance remain separate.
 
 ## Current direction
 

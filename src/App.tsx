@@ -13,6 +13,8 @@ import { SamWorkAccount } from './components/SamWorkAccount';
 import { SendWord } from './components/SendWord';
 import { TeachingRecord } from './components/TeachingRecord';
 import { WorkshopTally } from './components/WorkshopTally';
+import { continuity, LOCAL_KEY } from './continuity';
+import { admissionFacts, CAST_IDS } from './game/cast';
 import { discoveredAccounts } from './game/cast-content';
 import {
   createGame,
@@ -47,7 +49,7 @@ import './meter-layout.css';
 import './clarity.css';
 import './workshop-shell.css';
 
-const SAVE_KEY = 'small-works-canonical-save-v1';
+const SAVE_KEY = LOCAL_KEY;
 const conditions: TestCondition[] = ['bench', 'movement', 'load'];
 const money = (n: number) => `£${n.toFixed(0)}`;
 function checkPurpose(job: Job): string {
@@ -70,7 +72,7 @@ function samFinishedPersonal(job: Job): boolean {
 function initial(): GameState {
   try {
     const saved = localStorage.getItem(SAVE_KEY);
-    if (saved) return upgradeRules(loadGame(saved));
+    if (saved) return continuity.loadLocal(saved);
   } catch {
     /* A damaged save does not overwrite historical saves. */
   }
@@ -360,6 +362,8 @@ function Device({
 }
 export default function App() {
   const [state, setState] = useState(initial);
+  const [, refreshContinuity] = useState(0);
+  const [entering, setEntering] = useState(false);
   const [eventsOn, setEventsOn] = useState(lab.telemetryOn);
   useEffect(() => {
     lab.screen('play');
@@ -459,6 +463,14 @@ export default function App() {
   const [replayStatus, setReplayStatus] = useState('');
   const stateRef = useRef(state);
   stateRef.current = state;
+  useEffect(
+    () =>
+      continuity.bind(
+        () => stateRef.current,
+        () => refreshContinuity((n) => n + 1),
+      ),
+    [],
+  );
   useEffect(() => {
     const stop = lab.trackRun(
       () => {
@@ -466,7 +478,7 @@ export default function App() {
         // the actual stored save after identity settles, without blocking runs.
         try {
           const saved = localStorage.getItem(SAVE_KEY);
-          if (saved) lab.captureSave(JSON.parse(saved));
+          if (saved) lab.captureSave(JSON.parse(saveGame(stateRef.current)));
         } catch {}
         return JSON.parse(saveGame(stateRef.current));
       },
@@ -527,8 +539,16 @@ export default function App() {
   );
   const terminals = [...new Set(job?.model.components.flatMap((c) => c.terminals) ?? [])];
   useEffect(() => {
+    if (!continuity.isStarted) return;
+    if (continuity.recordAfterStart) {
+      continuity.recordAfterStart = false;
+      void continuity.recording(false).catch((error) => {
+        continuity.status = String(error);
+        refreshContinuity((n) => n + 1);
+      });
+    }
     const text = saveGame(state);
-    localStorage.setItem(SAVE_KEY, text);
+    localStorage.setItem(SAVE_KEY, continuity.localSave(state));
     lab.captureSave(JSON.parse(text));
   }, [state]);
   useEffect(() => {
@@ -643,7 +663,9 @@ export default function App() {
   };
   const act = (command: Command) => actSequence([command]);
   const exportSave = () => {
-    const url = URL.createObjectURL(new Blob([saveGame(state)], { type: 'application/json' }));
+    const url = URL.createObjectURL(
+      new Blob([continuity.exportRun(state)], { type: 'application/json' }),
+    );
     const link = document.createElement('a');
     link.href = url;
     link.download = `small-works-day-${state.day}.json`;
@@ -672,6 +694,7 @@ export default function App() {
           provenance: snapshot.provenance,
           migratedFrom: snapshot.migratedFrom,
           openingPeople: snapshot.openingPeople,
+          castChapter: snapshot.castChapter,
         },
         expected,
       );
@@ -852,10 +875,133 @@ export default function App() {
     </div>
   );
   const isEnd = screen === 'play' && state.ended;
-  const startWorkshop = (seed: number) => {
-    resetPresentation(createGame(seed), true);
-    setNewConfirmed(false);
+  const startWorkshop = async (seed: number, localOnly = false) => {
+    setEntering(true);
+    try {
+      resetPresentation(await continuity.fresh(seed, localOnly), true);
+      setNewConfirmed(false);
+    } catch (error) {
+      continuity.status = error instanceof Error ? error.message : String(error);
+      refreshContinuity((n) => n + 1);
+    } finally {
+      setEntering(false);
+    }
   };
+  const enterWorkshop = async () => {
+    if (entering) return;
+    if (!continuity.loaded) {
+      await startWorkshop(state.seed);
+      return;
+    }
+    setEntering(true);
+    try {
+      await continuity.resume();
+      setHasSave(true);
+      setScreen('play');
+    } catch (error) {
+      continuity.status = String(error);
+      refreshContinuity((n) => n + 1);
+    } finally {
+      setEntering(false);
+    }
+  };
+  const continuityPanel = (
+    <details aria-label="Browser continuity">
+      <summary>People between chapters</summary>
+      <p>{continuity.status}</p>
+      <p>
+        Continuity is local to this browser. Recording and character analysis are separate choices.
+      </p>
+      <button
+        type="button"
+        disabled={entering}
+        onClick={() => {
+          void continuity.setEnabled(!continuity.shelf.enabled).catch((error) => {
+            continuity.status = String(error);
+            refreshContinuity((n) => n + 1);
+          });
+        }}
+      >
+        {continuity.shelf.enabled ? 'Turn continuity off' : 'Enable browser continuity'}
+      </button>
+      <button
+        type="button"
+        disabled={entering}
+        onClick={() => void startWorkshop(state.seed + 1, true)}
+      >
+        Begin fresh locally without carrying history
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          void continuity.recording(true).catch((error) => {
+            continuity.status = String(error);
+            refreshContinuity((n) => n + 1);
+          });
+        }}
+      >
+        Allow recording of all histories in this chapter
+      </button>
+      <button type="button" onClick={() => continuity.denyRecording()}>
+        Keep this chapter local
+      </button>
+      <p>
+        {lab.personaRecordingAllowed
+          ? lab.telemetryOn
+            ? 'History recording is permitted and lab recording is on.'
+            : 'History recording is permitted; lab recording is off.'
+          : 'This chapter is recording-gated; local play and export remain available.'}
+      </p>
+      {screen === 'play' && (
+        <>
+          <button
+            type="button"
+            onClick={() => act({ type: state.chapterPaused ? 'resume-chapter' : 'pause-chapter' })}
+          >
+            {state.chapterPaused ? 'Resume this pinned chapter' : 'Pause chapter for departure'}
+          </button>
+          {state.chapterPaused &&
+            Object.entries(CAST_IDS).map(([id]) => (
+              <div key={id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void continuity.checkpoint(id).catch((error) => {
+                      continuity.status = String(error);
+                      refreshContinuity((n) => n + 1);
+                    });
+                  }}
+                >
+                  Save {state.people[id]?.name} to continuity
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void continuity.checkpoint(id, true).catch((error) => {
+                      continuity.status = String(error);
+                      refreshContinuity((n) => n + 1);
+                    });
+                  }}
+                >
+                  Save {state.people[id]?.name} as explicit alternative branch
+                </button>
+              </div>
+            ))}
+        </>
+      )}
+      {state.castChapter?.inputs.map((input) => (
+        <p key={input.parent.castId}>
+          Pinned source: {input.parent.source.game} · {input.parent.castId} · revision{' '}
+          {input.parent.revision} · clock {input.clockMs} · {input.life.events.length} retained life
+          events. Source obligations, health and qualifications are not cleared.
+        </p>
+      ))}
+      <a href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noreferrer">
+        Inspect and export browser histories
+      </a>
+    </details>
+  );
+
   const workday = (large = false) => (
     <div
       role="img"
@@ -1013,7 +1159,7 @@ export default function App() {
         onChange={async (e) => {
           try {
             const file = e.target.files?.[0];
-            if (file) resetPresentation(upgradeRules(loadGame(await file.text())));
+            if (file) resetPresentation(await continuity.importFile(await file.text()));
           } catch (error) {
             setStatus(error instanceof Error ? error.message : 'This save could not be imported.');
           }
@@ -1044,10 +1190,8 @@ export default function App() {
             <button
               type="button"
               className="primary-action"
-              onClick={() => {
-                setHasSave(true);
-                setScreen('play');
-              }}
+              disabled={entering}
+              onClick={() => void enterWorkshop()}
             >
               {hasSave ? `Back to the bench · day ${state.day}` : 'Open the workshop'}
             </button>
@@ -1068,6 +1212,7 @@ export default function App() {
               </div>
             )}
             <small>Saved on this device.</small>
+            {continuityPanel}
           </div>
         </main>
       )}
@@ -1898,14 +2043,23 @@ export default function App() {
                         <span className="avatar">{id.slice(0, 1).toUpperCase()}</span>
                         <div>
                           <h3>{person.name}</h3>
+                          {admissionFacts(state.castChapter, id) && (
+                            <p>
+                              {admissionFacts(state.castChapter, id)?.assignment} ·{' '}
+                              {admissionFacts(state.castChapter, id)?.life.place.replaceAll(
+                                '-',
+                                ' ',
+                              )}
+                            </p>
+                          )}
                           <p>
                             {id === 'sam'
-                              ? '18 · repair apprentice; occasional kitchen worker'
+                              ? `${Math.floor((state.now - person.life.bornAt) / 525600)} · repair apprentice; occasional kitchen worker`
                               : id === 'nora'
-                                ? '28 · repair designer and maker'
+                                ? `${Math.floor((state.now - person.life.bornAt) / 525600)} · repair designer and maker`
                                 : id === 'rafi'
-                                  ? '19 · dish worker; visiting repair learner from Bornova'
-                                  : '61 · visiting repairman; working fewer hours'}
+                                  ? `${Math.floor((state.now - person.life.bornAt) / 525600)} · dish worker; visiting repair learner from Bornova`
+                                  : `${Math.floor((state.now - person.life.bornAt) / 525600)} · visiting repairman; working fewer hours`}
                           </p>
                           {state.discoveries?.includes(id) && (
                             <details>
@@ -2369,6 +2523,7 @@ export default function App() {
               <>
                 <h2>Workshop</h2>
                 <p>Saved on this device. Time waits while you are away.</p>
+                {continuityPanel}
                 <button type="button" onClick={exportSave}>
                   Download this run
                 </button>
@@ -2444,6 +2599,7 @@ export default function App() {
             {sheet === 'ways' && (
               <>
                 <h2>Other ways in</h2>
+                {continuityPanel}
                 <button type="button" onClick={() => input.current?.click()}>
                   Import a workshop
                 </button>

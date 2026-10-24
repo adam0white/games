@@ -41,6 +41,7 @@ export function replayRecordedRun(
     provenance?: unknown;
     migratedFrom?: unknown;
     openingPeople?: GameState['openingPeople'];
+    castChapter?: GameState['castChapter'];
   },
   expectedSave?: string,
 ): ReplayResult {
@@ -104,7 +105,12 @@ export function replayRecordedRun(
   }
   let state: GameState;
   try {
-    state = createGame(recording.seed, legacy ? 'legacy' : 'current', recording.openingPeople);
+    state = createGame(
+      recording.seed,
+      legacy ? 'legacy' : 'current',
+      recording.openingPeople,
+      recording.castChapter,
+    );
   } catch {
     return {
       ok: false,

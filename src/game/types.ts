@@ -156,6 +156,8 @@ export interface GameState {
   inputs?: Command[];
   discoveries?: string[];
   /** Complete target-clock initial people; never refreshed from live browser continuity. */
+  castChapter?: import('./cast').CastChapter;
+  chapterPaused?: boolean;
   openingPeople?: Record<string, Person>;
   community?: import('./community').CommunityState;
   seed: number;
@@ -181,6 +183,7 @@ export interface GameState {
   dailyCostsPaid: number;
 }
 export type Command =
+  | { type: 'pause-chapter' | 'resume-chapter' }
   | { type: 'ask-about-work'; personId: 'sam' | 'nora' | 'rafi' | 'halil' }
   | { type: 'prepare-event'; format: import('./community').CommunityFormat }
   | { type: 'wait-for-site' }

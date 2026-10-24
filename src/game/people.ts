@@ -15,9 +15,12 @@ import {
   promise,
   receiveMethodCues,
   type Suggestion,
+  sicken,
   socialEvent,
   tick,
 } from '@adam0white/human-framework';
+import { canonicalCast } from '@adam0white/lab-client';
+import { CAST_IDS } from './cast';
 import { adoptRepairAspiration, aspirationAdvances } from './responsibility';
 import type { PersonChoice, WorkOption } from './types';
 
@@ -26,98 +29,35 @@ const cueList = (cues: Record<string, string>) =>
   Object.entries(cues).map(([cue, value]) => ({ cue, value }));
 
 export function createPeople(seed: number, now: number): Record<string, Person> {
-  // Interim exact canonical content; replace with released shared canonical data at integration.
-  const traits = {
-    honesty: 0.5,
-    emotionality: 0.5,
-    extraversion: 0.5,
-    agreeableness: 0.5,
-    conscientiousness: 0.5,
-    openness: 0.5,
-  };
-  const values = {
-    selfDirection: 0.5,
-    stimulation: 0.5,
-    hedonism: 0.5,
-    achievement: 0.5,
-    power: 0.5,
-    security: 0.5,
-    conformity: 0.5,
-    tradition: 0.5,
-    benevolence: 0.5,
-    universalism: 0.5,
-  };
   const profiles = [
-    {
-      id: 'sam',
-      name: 'Sam',
-      age: 18,
-      sex: 'male' as const,
-      traits: {
-        ...traits,
-        honesty: 0.65,
-        conscientiousness: 0.5,
-        extraversion: 0.6,
-        agreeableness: 0.65,
-        emotionality: 0.55,
-        openness: 0.8,
-      },
-      values: { ...values, achievement: 0.8, stimulation: 0.7 },
-      needs: { competence: 0.45, leisure: 0.7 },
-    },
-    // An incidental household owner, not an additional maintained foreground biography.
+    ...Object.entries(CAST_IDS).map(([id, castId]) => {
+      const cast = canonicalCast(castId);
+      return {
+        id,
+        name: cast.name,
+        age: cast.age,
+        sex: (id === 'nora' ? 'female' : 'male') as 'female' | 'male',
+        traits: cast.traits,
+        values: cast.values,
+        needs: {
+          leisure: id === 'sam' ? 0.7 : 0.55,
+          ...(id === 'sam' ? { competence: 0.45 } : {}),
+        },
+      };
+    }),
     {
       id: 'mum',
       name: 'Sam’s mother',
       age: 43,
       sex: 'female' as const,
-      traits,
-      values,
       needs: { belonging: 0.5, leisure: 0.75 },
     },
-    {
-      id: 'nora',
-      name: 'Nora',
-      age: 28,
-      sex: 'female' as const,
-      traits: {
-        ...traits,
-        honesty: 0.7,
-        conscientiousness: 0.6,
-        extraversion: 0.45,
-        agreeableness: 0.5,
-        emotionality: 0.5,
-        openness: 0.85,
-      },
-      values: { ...values, selfDirection: 0.9, stimulation: 0.8 },
-      needs: { autonomy: 0.5, leisure: 0.55 },
-    },
-    {
-      id: 'rafi',
-      name: 'Rafi',
-      age: 19,
-      sex: 'male' as const,
-      traits: { ...traits, honesty: 0.55, conscientiousness: 0.45, agreeableness: 0.65 },
-      values,
-      needs: { competence: 0.5, leisure: 0.7 },
-    },
-    {
-      id: 'halil',
-      name: 'Halil',
-      age: 61,
-      sex: 'male' as const,
-      traits: {
-        ...traits,
-        honesty: 0.7,
-        conscientiousness: 0.6,
-        extraversion: 0.35,
-        agreeableness: 0.6,
-        emotionality: 0.5,
-      },
-      values,
-      needs: { belonging: 0.5, leisure: 0.7 },
-    },
   ];
+  profiles.sort(
+    (a, b) =>
+      ['sam', 'mum', 'nora', 'rafi', 'halil'].indexOf(a.id) -
+      ['sam', 'mum', 'nora', 'rafi', 'halil'].indexOf(b.id),
+  );
   const people = Object.fromEntries(
     profiles.map((p, index) => [
       p.id,
@@ -131,6 +71,16 @@ export function createPeople(seed: number, now: number): Record<string, Person> 
       }),
     ]),
   );
+  if (people.halil)
+    sicken(people.halil, {
+      kind: 'hypertension',
+      severity: 0.2,
+      trendPerDay: 0,
+      contagious: false,
+      chronic: true,
+      baseline: 0.2,
+      aggravatedBy: ['smoke'],
+    });
   if (people.sam) adoptRepairAspiration(people.sam, now);
   return people;
 }

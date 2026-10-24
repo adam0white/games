@@ -1,6 +1,6 @@
 {
   "name": "repair-game",
-  "version": "3.1.0-alpha.3",
+  "version": "4.0.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -22,9 +22,9 @@
     "check:lane": "npm run check"
   },
   "dependencies": {
-    "@adam0white/human-framework": "2.8.0",
-    "@adam0white/lab-client": "file:vendor/adam0white-lab-client-0.2.1.tgz",
-    "@adam0white/lab-kit": "file:vendor/adam0white-lab-kit-0.3.1.tgz",
+    "@adam0white/human-framework": "2.18.0",
+    "@adam0white/lab-client": "file:vendor/adam0white-lab-client-0.4.0.tgz",
+    "@adam0white/lab-kit": "file:vendor/adam0white-lab-kit-0.5.0.tgz",
     "@fontsource/dm-sans": "5.3.0",
     "@fontsource/ibm-plex-mono": "5.3.0",
     "@fontsource/libre-baskerville": "5.3.0",

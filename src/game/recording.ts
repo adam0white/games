@@ -3,9 +3,9 @@ import type { Command } from './types';
 export const MAX_RECORDED_INPUTS = 10_000;
 export const SAVE_PROVENANCE = {
   engine: 'small-works@5',
-  scenario: 'canonical-workshop@1',
-  framework: '2.8.0',
-  game: '3.1.0-alpha.3',
+  scenario: 'canonical-workshop@2',
+  framework: '2.18.0',
+  game: '4.0.0',
 } as const;
 /**
  * Engine-4 behaviour, kept so historical exports and old autosaves restore and replay exactly. A legacy world keeps
@@ -50,6 +50,8 @@ export function isRecordedCommand(value: unknown): value is Command {
       return (
         keys(value, ['type', 'format']) && member(value.format, ['garden', 'reading', 'theatre'])
       );
+    case 'pause-chapter':
+    case 'resume-chapter':
     case 'wait-for-site':
     case 'request-lesson':
     case 'start-lesson':

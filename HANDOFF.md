@@ -2,6 +2,16 @@
 
 Updated 2026-10-20 for the F-231 clarity follow-up. Earlier sections are historical.
 
+## Published-platform integration, 2026-10-24 — delivery pending
+
+What remains: final signed integration and rebase, exact green CI, normal deploy/live verification, and a genuine supported cross-origin journey. HF-site Halil has a chronic illness and its published passport refuses that actual source; do not clear it. Pass Rafi/Sam need their own explicit supported source adapter and ready peer. Owner review remains afterward.
+
+The integration uses npm HF **2.18.0**, engine **2.17.0**, immutable client **0.4.0** and kit **0.5.0**. Artifact SHA256 values matched platform-ready, and explicit Homebrew-PATH npm ci verified actual installed versions. Game version is 4.0.0, scenario canonical-workshop@2. Shared castForGame/ canonicalCast replace manual canonical profiles.
+
+Whole allocated cast admission uses one expected-head batch transaction, including expected absence. Complete admitted initial people, inputs, claims and coarse life are pinned; loaded chapters repeat semantic admission checks and never refresh from shelf. Source receipts stay in local autosave metadata, while raw source snapshots stay in a bounded source-local archive scoped to the run. File imports discard embedded ownership, retain file-origin status through local reload and keep raw archive metadata outside telemetry state. Mixed histories need complete current permission or an explicit whole-group choice. Death closes an owned branch under exact-parent CAS. Pause for departure is an actual recorded command, not a promise that an active project or illness can travel.
+
+Explicit adapter scope: same workshop calendar passports and HF-site Voice Halil calendar passports. Unknown roles, norms, unsupported duties, health/family conflicts and old editions refuse. Source repair skill is not converted into workshop methods. Larger personal outcomes remain bounded disclosures only. Supported coarse assignment/place/availability changes affect local background work and new Sam work requests. The single existing reviewer checked the complete integration and narrowly verified the archive and load-admission fixes. Final verification and live receipts are recorded in the private coordinator report.
+
 ## Canonical cast checkpoint, 2026-10-23 — not deployed
 
 What remains: the exact released platform contract, canonical shared-module and browser-life integration, privacy and admission controls, final integration review, push/CI/deploy and genuine cross-origin journeys at both required sizes. `platform-ready.md` was absent during this checkpoint. The shared contract explicitly permits independent content work while that release is pending. Do not infer candidate APIs or version pins.

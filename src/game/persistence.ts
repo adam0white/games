@@ -1,4 +1,6 @@
 import { restore, snapshot } from '@adam0white/human-framework';
+import { validateCastChapter } from './cast';
+import { createGame } from './engine';
 import { compatiblePart, createModel } from './model';
 import { restoreOpeningPeople } from './opening';
 import {
@@ -32,7 +34,8 @@ export function saveGame(state: GameState): string {
 }
 export function loadGame(text: string): GameState {
   if (text.length > 2_000_000) throw new Error('This save exceeds the supported size.');
-  const value = JSON.parse(text) as GameState;
+  const value = JSON.parse(text) as GameState & { castSources?: unknown };
+  delete value.castSources;
   if (value?.schema !== 'small-works@5' || !isCurrentProvenance(value?.provenance)) {
     throw new Error(
       'This save belongs to an earlier workshop edition. Start fresh here, or use its historical archive.',
@@ -421,6 +424,20 @@ export function loadGame(text: string): GameState {
   );
   if (value.openingPeople !== undefined)
     value.openingPeople = restoreOpeningPeople(value.openingPeople);
+  if (value.chapterPaused !== undefined && typeof value.chapterPaused !== 'boolean') invalid();
+  if (value.castChapter !== undefined) {
+    validateCastChapter(value.castChapter);
+    createGame(value.seed, 'current', value.openingPeople, value.castChapter);
+    if (
+      value.castChapter.version !== 'workshop-cast/1' ||
+      !Array.isArray(value.castChapter.inputs) ||
+      value.castChapter.inputs.length > 4 ||
+      !Array.isArray(value.castChapter.claims) ||
+      value.castChapter.claims.length !== value.castChapter.inputs.length ||
+      !value.openingPeople
+    )
+      invalid();
+  }
   const responsibilityGoals = new Set<string>();
   for (const job of value.jobs) {
     const handle = job.responsibility;

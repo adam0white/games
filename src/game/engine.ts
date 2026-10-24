@@ -1,4 +1,12 @@
 import { perceive, releaseCommitment } from '@adam0white/human-framework';
+import { canonicalPersona } from '@adam0white/lab-client';
+import {
+  admissionFacts,
+  admitWorkshop,
+  type CastChapter,
+  castRole,
+  validateCastChapter,
+} from './cast';
 import { discoveredAccounts } from './cast-content';
 import {
   beginPreparation,
@@ -270,7 +278,19 @@ export function createGame(
   seed = 416,
   rules: 'current' | 'legacy' = 'current',
   openingPeople?: GameState['openingPeople'],
+  castChapter?: CastChapter,
 ): GameState {
+  if (castChapter) {
+    validateCastChapter(castChapter);
+    if (!openingPeople) throw new Error('A continuing chapter needs its exact pinned people.');
+    const expected = createGame(seed).people;
+    for (const input of castChapter.inputs) {
+      const role = castRole(input.parent.castId)!;
+      expected[role] = admitWorkshop(input, expected[role]!);
+    }
+    if (canonicalPersona(expected) !== canonicalPersona(openingPeople))
+      throw new Error('Pinned people differ from source admission.');
+  }
   const now = OPEN;
   const legacy = rules === 'legacy';
   const s: GameState = {
@@ -278,6 +298,7 @@ export function createGame(
     provenance: { ...(legacy ? LEGACY_PROVENANCE : SAVE_PROVENANCE) },
     inputs: [],
     discoveries: [],
+    ...(castChapter ? { castChapter: structuredClone(castChapter) } : {}),
     seed: seed >>> 0,
     rng: seed >>> 0 || 1,
     now,
@@ -363,6 +384,10 @@ export function createGame(
     'Workshop',
     'Time waits for your decisions. Tests leave evidence. Parts and promises are finite.',
   );
+  for (const input of castChapter?.inputs ?? []) {
+    const facts = admissionFacts(castChapter, castRole(input.parent.castId) ?? '');
+    if (facts) log(s, facts.cast.name, `${facts.line} ${facts.contacts.join(' ')}`);
+  }
   return s;
 }
 function neighbourOffers(s: GameState, initial = false): void {
@@ -1362,6 +1387,8 @@ function beginBackground(s: GameState): void {
   for (const id of ['sam', 'mum', 'nora', 'rafi', 'halil']) {
     const person = s.people[id];
     if (id === 'halil' && s.day < 3) continue;
+    const carried = admissionFacts(s.castChapter, id);
+    if (carried && carried.life.place !== 'local-workplace' && s.now < OPEN + 60) continue;
     if (!person || person.activity || s.npcWork.some((w) => w.personId === id)) continue;
     if (id === 'sam') {
       if (s.watching || s.pendingRequest) continue;
@@ -1419,7 +1446,7 @@ function beginBackground(s: GameState): void {
       {
         id: 'personal',
         action: 'personal',
-        label: currentPromise?.label ?? ownWork,
+        label: currentPromise?.label ?? carried?.assignment ?? ownWork,
         duration: Math.min(45, available),
         effort: 0.02,
       },
@@ -1915,7 +1942,31 @@ export function dispatch(state: GameState, command: Command): CommandResult {
     !['select', 'recall'].includes(command.type)
   )
     return fail('That repair offer is waiting for Sam. Cancel the request before taking it back.');
+  if (s.chapterPaused && !['resume-chapter', 'select'].includes(command.type))
+    return fail('This chapter is paused for departure. Resume it to act.');
+  if (['assign', 'start-lesson', 'request-lesson'].includes(command.type)) {
+    const facts = admissionFacts(s.castChapter, 'sam');
+    if (
+      facts &&
+      (!facts.availableForExtraWork ||
+        (facts.life.place !== 'local-workplace' && s.now < OPEN + 60))
+    )
+      return fail('Sam has carried plans first. He is not available for extra workshop work yet.');
+  }
   switch (command.type) {
+    case 'pause-chapter':
+      s.chapterPaused = true;
+      log(
+        s,
+        'Workshop',
+        'The chapter is paused for departure. Existing work, duties and illness remain. Only eligible quiet people can be saved to continuity.',
+      );
+      return done('Chapter paused.');
+    case 'resume-chapter':
+      s.chapterPaused = false;
+      log(s, 'Workshop', 'The same pinned chapter resumes. No newer browser history is read.');
+      return done('Chapter resumed.');
+
     case 'ask-about-work': {
       const id = command.personId;
       const person = s.people[id];
