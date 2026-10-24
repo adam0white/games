@@ -41,11 +41,8 @@ export async function queueFeedback({
     }
   };
   const cleanName = name.trim().slice(0, 60);
-  const noteOnly =
-    !lab.personaRecordingAllowed ||
-    !lab.telemetryOn ||
-    (lab.privacySignalOn && !lab.privacyOverride);
-  // Unlinked transport cannot turn a closed continuing-history gate into run permission.
+  const noteOnly = !lab.telemetryOn || (lab.privacySignalOn && !lab.privacyOverride);
+  // Explicit feedback includes an available unlinked run when recording is on; persona linkage remains separate.
   const receipt = await lab.sendFeedback(message, {
     name: cleanName,
     run: noteOnly ? undefined : feedbackRun(),

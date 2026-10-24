@@ -5,13 +5,16 @@ import './send-word.css';
 
 export function SendWord({
   getRun,
+  chooseRecording,
   onBack,
   onGame = onBack,
 }: {
   getRun: () => unknown;
+  chooseRecording: (allow: boolean) => void | Promise<void>;
   onBack: () => void;
   onGame?: () => void;
 }) {
+  const [personaLinked, setPersonaLinked] = useState(lab.personaRecordingAllowed);
   const [verdict, setVerdict] = useState('');
   const [note, setNote] = useState('');
   const [name, setName] = useState(() => storedPreference(FEEDBACK_NAME_KEY));
@@ -126,8 +129,20 @@ export function SendWord({
         </details>
         {lab.personaRecordingRequired && !lab.personaRecordingAllowed && (
           <label>
-            <input type="checkbox" onChange={(e) => lab.allowPersonaRecording(e.target.checked)} />
-            Link this continuing person to my recorded play (optional)
+            <input
+              type="checkbox"
+              checked={personaLinked}
+              onChange={(e) => {
+                const allow = e.target.checked;
+                void Promise.resolve()
+                  .then(() => chooseRecording(allow))
+                  .then(
+                    () => setPersonaLinked(lab.personaRecordingAllowed),
+                    () => setPersonaLinked(lab.personaRecordingAllowed),
+                  );
+              }}
+            />
+            Link all continuing histories in this run to lab recording (optional)
           </label>
         )}
         <details

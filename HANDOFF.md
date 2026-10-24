@@ -2,6 +2,10 @@
 
 Updated 2026-10-20 for the F-231 clarity follow-up. Earlier sections are historical.
 
+## Explicit feedback authority, 2026-10-24
+
+The newer direct owner task (2026-10-23 coordinator call, relayed task) supersedes the earlier interpretation that closed persona linkage makes explicit feedback note-only: “Feedback ALWAYS sends. A player's note and verdict are never blocked by any linkage consent or a missing answer. If continuing-person consent is unanswered or declined, send the feedback (and its run, if recording is on) WITHOUT persona linkage. Only link a persona after an explicit yes.” Recording off or a privacy signal without override remains note-only. Automatic recording and scoped group/epoch linkage checks remain unchanged. The inline optional choice uses the same host coordinator as the menu. Original runs and replay data remain unchanged.
+
 ## Canonical continuity delivery, 2026-10-24
 
 Current Small Works uses published HF2.18.0 / engine2.17.0 and exact immutable client0.4.2 / kit0.5.2. The four-person canonical cast and bounded disclosures are delivered; historical playable archives and their isolated saves remain unchanged. Whole applicable cast admission is one expected-head transaction, including absence. Full initial people/life/claims are pinned; loaded chapters restore local ownership without importing a later shelf head. File histories remain file-origin and grant no ownership. Raw source archives stay local/export only. Recording gates remain closed without valid permission; feedback notes remain available independently.

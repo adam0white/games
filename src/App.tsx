@@ -1224,6 +1224,9 @@ export default function App() {
       {screen === 'feedback' && (
         <SendWord
           key={feedbackSession}
+          chooseRecording={(allow) =>
+            allow ? continuity.recording(true) : continuity.denyRecording()
+          }
           getRun={() => JSON.parse(saveGame(stateRef.current))}
           onGame={() => {
             setScreen('play');
