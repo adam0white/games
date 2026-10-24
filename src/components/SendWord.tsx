@@ -5,7 +5,6 @@ import './send-word.css';
 
 export function SendWord({
   getRun,
-  chooseRecording,
   onBack,
   onGame = onBack,
 }: {
@@ -14,7 +13,7 @@ export function SendWord({
   onBack: () => void;
   onGame?: () => void;
 }) {
-  const [personaLinked, setPersonaLinked] = useState(lab.personaRecordingAllowed);
+  const [sharePlay, setSharePlay] = useState(false);
   const [verdict, setVerdict] = useState('');
   const [note, setNote] = useState('');
   const [name, setName] = useState(() => storedPreference(FEEDBACK_NAME_KEY));
@@ -51,6 +50,7 @@ export function SendWord({
         note,
         verdict,
         name,
+        sharePlay,
       });
       setSent(true);
       setStatus(result);
@@ -83,7 +83,7 @@ export function SendWord({
     <section className="sw-feedback" ref={screen} aria-label="Send word">
       <div className="sw-feedback-body">
         <h1>Send word</h1>
-        <p>Send a note about this game. Recording and continuing-person choices are optional.</p>
+        <p>Send a note about this game. You can send a note with or without sharing play.</p>
         <fieldset className="sw-verdicts" aria-label="Would you keep playing?">
           {(
             [
@@ -127,22 +127,14 @@ export function SendWord({
             empty to stay pseudonymous.
           </p>
         </details>
-        {lab.personaRecordingRequired && !lab.personaRecordingAllowed && (
+        {!lab.telemetryOn && (
           <label>
             <input
               type="checkbox"
-              checked={personaLinked}
-              onChange={(e) => {
-                const allow = e.target.checked;
-                void Promise.resolve()
-                  .then(() => chooseRecording(allow))
-                  .then(
-                    () => setPersonaLinked(lab.personaRecordingAllowed),
-                    () => setPersonaLinked(lab.personaRecordingAllowed),
-                  );
-              }}
+              checked={sharePlay}
+              onChange={(e) => setSharePlay(e.target.checked)}
             />
-            Link all continuing histories in this run to lab recording (optional)
+            Share this run and my play with the lab
           </label>
         )}
         <details
@@ -175,7 +167,7 @@ export function SendWord({
           disabled={!sent && busy}
           onClick={sent ? onGame : send}
         >
-          {sent ? 'Back to the game' : busy ? 'Sending…' : 'Send'}
+          {sent ? 'Back to the game' : busy ? 'Sending…' : 'Submit'}
         </button>
       </div>
     </section>

@@ -25,12 +25,14 @@ export async function queueFeedback({
   note,
   verdict,
   name,
+  sharePlay = false,
 }: {
   lab: Lab;
   getRun: () => unknown;
   note: string;
   verdict: string;
   name: string;
+  sharePlay?: boolean;
 }): Promise<string> {
   const message = [verdict ? `Verdict: ${verdict}` : '', note.trim()].filter(Boolean).join('\n\n');
   const feedbackRun = () => {
@@ -41,12 +43,12 @@ export async function queueFeedback({
     }
   };
   const cleanName = name.trim().slice(0, 60);
-  const noteOnly = !lab.telemetryOn || (lab.privacySignalOn && !lab.privacyOverride);
-  // Explicit feedback includes an available unlinked run when recording is on; persona linkage remains separate.
+  const noteOnly = !lab.telemetryOn && !sharePlay;
   const receipt = await lab.sendFeedback(message, {
     name: cleanName,
-    run: noteOnly ? undefined : feedbackRun(),
+    run: feedbackRun(),
+    sharePlay,
   });
   rememberFeedbackName(cleanName);
-  return `${noteOnly ? 'Note and verdict queued without a run or history linkage' : 'Note and verdict queued. Run details depend on recording and availability; continuing-person history links only after explicit consent'} · ${receipt}`;
+  return `${noteOnly ? 'Note and verdict queued without a run or history linkage' : 'Note and verdict queued. Run details depend on recording and availability; recorded play is linked across games on this device'} · ${receipt}`;
 }

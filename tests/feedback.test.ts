@@ -29,6 +29,7 @@ describe('Send word consent and names', () => {
     await expect(queueFeedback(input)).resolves.toContain('queued');
     expect(lab.sendFeedback).toHaveBeenCalledWith('Verdict: mixed\n\nA note', {
       name: 'Tester',
+      sharePlay: false,
       run: input.getRun(),
     });
     expect(lab.sendRun).not.toHaveBeenCalled();
@@ -47,9 +48,22 @@ describe('Send word consent and names', () => {
     expect(getRun).toHaveBeenCalledOnce();
     expect(lab.sendFeedback).toHaveBeenCalledWith('Verdict: mixed\n\nA note', {
       name: 'Tester',
+      sharePlay: false,
       run: { carried: 'private source history' },
     });
   });
+  it.each([false, true])(
+    'submits privacy-off feedback with sharePlay=%s on the same page',
+    async (sharePlay) => {
+      const { lab, input } = setup(true);
+      await queueFeedback({ ...input, sharePlay });
+      expect(lab.sendFeedback).toHaveBeenCalledWith('Verdict: mixed\n\nA note', {
+        name: 'Tester',
+        run: input.getRun(),
+        sharePlay,
+      });
+    },
+  );
   it('leaves a send failure on this page', async () => {
     const { lab, input } = setup();
     vi.mocked(lab.sendFeedback).mockRejectedValueOnce(new Error('failed'));
@@ -66,6 +80,7 @@ describe('Send word consent and names', () => {
     });
     expect(lab.sendFeedback).toHaveBeenCalledWith('Verdict: mixed\n\nA note', {
       name: 'Tester',
+      sharePlay: false,
       run: undefined,
     });
   });

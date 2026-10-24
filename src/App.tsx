@@ -936,27 +936,6 @@ export default function App() {
       >
         Begin fresh locally without carrying history
       </button>
-      <button
-        type="button"
-        onClick={() => {
-          void continuity.recording(true).catch((error) => {
-            continuity.status = String(error);
-            refreshContinuity((n) => n + 1);
-          });
-        }}
-      >
-        Allow recording of all histories in this chapter
-      </button>
-      <button type="button" onClick={() => continuity.denyRecording()}>
-        Keep this chapter local
-      </button>
-      <p>
-        {lab.personaRecordingAllowed
-          ? lab.telemetryOn
-            ? 'History recording is permitted and lab recording is on.'
-            : 'History recording is permitted; lab recording is off.'
-          : 'This chapter is recording-gated; local play and export remain available.'}
-      </p>
       {screen === 'play' && (
         <>
           <button
