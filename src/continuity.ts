@@ -188,22 +188,10 @@ export class WorkshopContinuity {
     }
   }
   async importFile(text: string) {
-    this.generation++;
+    const generation = ++this.generation;
     this.recordingKey = `workshop:${crypto.randomUUID()}`;
     lab.setPersonaRecording(this.recordingKey);
-    this.heads = [];
-    this.pendingLocal = null;
-    this.fileOrigin = true;
-    this.loaded = true;
-    this.started = true;
     const state = loadGame(text);
-    this.runId = crypto.randomUUID();
-    const importedSources = JSON.parse(text).castSources;
-    this.fileSources =
-      Array.isArray(importedSources) && JSON.stringify(importedSources).length <= 1_000_000
-        ? importedSources
-        : [];
-    const generation = this.generation;
     await Promise.all(
       [
         ...(state.castChapter?.claims ?? []),
@@ -211,6 +199,18 @@ export class WorkshopContinuity {
       ].map((p) => validatePersona(p)),
     );
     if (generation !== this.generation) throw new Error('Run changed during file validation.');
+    const importedSources = JSON.parse(text).castSources;
+    this.runId = crypto.randomUUID();
+    this.fileSources =
+      Array.isArray(importedSources) && JSON.stringify(importedSources).length <= 1_000_000
+        ? importedSources
+        : [];
+    this.heads = [];
+    this.pendingLocal = null;
+    this.fileOrigin = true;
+    this.loaded = true;
+    this.started = true;
+    this.recordAfterStart = false;
     this.status =
       'File-origin history stays local unless you explicitly permit recording. Embedded claims grant no ownership.';
     this.changed();
@@ -278,10 +278,12 @@ export class WorkshopContinuity {
     const state = this.state?.();
     if (!state || !this.started || !state.inputs?.length || !state.chapterPaused)
       throw new Error('Play, then pause this chapter for departure before saving a person.');
-    await this.shelf.ready;
-    if (!this.shelf.enabled) throw new Error('Enable browser continuity first.');
     const generation = this.generation;
+    const runId = this.runId;
     const current = () => generation === this.generation && this.state?.() === state;
+    await this.shelf.ready;
+    if (!current()) throw new Error('Run changed before checkpoint.');
+    if (!this.shelf.enabled) throw new Error('Enable browser continuity first.');
     const person = state.people[id];
     const castId = CAST_IDS[id];
     if (!person || !castId) throw new Error('Unallocated person.');
@@ -314,7 +316,7 @@ export class WorkshopContinuity {
         journal = JSON.parse(localStorage.getItem(key) ?? '[]');
       } catch {}
       const row = {
-        runId: this.runId,
+        runId,
         revision: envelope.revision,
         source: source(),
         snapshot: snapshot(person),

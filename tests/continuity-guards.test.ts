@@ -203,4 +203,34 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
     restored.loadLocal(host.localSave(state));
     expect(restored.exportRun(state)).toContain('source-only');
   });
+  it('does not replace the active run or its source archives after a failed file load', async () => {
+    const host = await runtime();
+    const state = await host.importFile(saveGame(createGame(42)));
+    const runId = host.runId;
+    host.fileSources = [{ raw: 'kept-source' }];
+    await expect(host.importFile('{invalid')).rejects.toThrow();
+    expect(host.runId).toBe(runId);
+    expect(host.exportRun(state)).toContain('kept-source');
+    expect(controls.grants.has(controls.key!)).toBe(false);
+  });
+  it('keeps a late source capture attached to its original run when a fresh run replaces it', async () => {
+    const host = await runtime();
+    let state = createGame(42);
+    host.bind(
+      () => state,
+      () => {},
+    );
+    await host.resume();
+    state = dispatch(state, { type: 'power', jobId: state.selectedJobId, on: false }).state;
+    state = dispatch(state, { type: 'pause-chapter' }).state;
+    const original = host.runId;
+    const pending = host.checkpoint('nora');
+    await Promise.resolve();
+    const fresh = await host.fresh(43, true);
+    await expect(pending).rejects.toThrow('Run changed');
+    const journal = JSON.parse(storage.get('small-works-source-journal-v2') ?? '[]');
+    expect(journal.length).toBeGreaterThan(0);
+    expect(journal.every((row: { runId: string }) => row.runId === original)).toBe(true);
+    expect(JSON.parse(host.exportRun(fresh)).castSources).toEqual([]);
+  });
 });
