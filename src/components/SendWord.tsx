@@ -31,7 +31,7 @@ export function SendWord({
   const pending = useRef(false);
   const screen = useRef<HTMLElement>(null);
   const privacyOnly = !off && lab.privacySignalOn && !lab.privacyOverride;
-  const disabled = off || (privacyOnly ? !consent : !recording);
+  const disabled = false;
   useEffect(() => {
     const sync = () => {
       setOff(recordingIsOff());
@@ -113,7 +113,7 @@ export function SendWord({
     <section className="sw-feedback" ref={screen} aria-label="Send word">
       <div className="sw-feedback-body">
         <h1>Send word</h1>
-        <p>Your run, saves and log reach us on their own. Tell us what they can't show.</p>
+        <p>Send a note about this game. Recording and continuing-person choices are optional.</p>
         <fieldset className="sw-verdicts" aria-label="Would you keep playing?">
           {(
             [
@@ -157,9 +157,15 @@ export function SendWord({
             empty to stay pseudonymous.
           </p>
         </details>
+        {lab.personaRecordingRequired && !lab.personaRecordingAllowed && (
+          <label>
+            <input type="checkbox" onChange={(e) => lab.allowPersonaRecording(e.target.checked)} />
+            Link this continuing person to my recorded play (optional)
+          </label>
+        )}
         {off && (
           <div className="sw-recording-notice">
-            <p>Recording is off, so nothing is sent.</p>
+            <p>Recording is off. You can still send your note.</p>
             <label>
               <input
                 type="checkbox"
@@ -190,7 +196,10 @@ export function SendWord({
           }}
         >
           <summary>What is sent</summary>
-          <p>The seed, recorded inputs, saved workshop, log and your optional note and name.</p>
+          <p>
+            Your note, verdict and optional name. With recording off, no run or linked history is
+            sent.
+          </p>
           <pre>{preview}</pre>
           <a href={LAB_PRIVACY}>Lab privacy</a>
         </details>

@@ -33,7 +33,6 @@ export async function queueFeedback({
   name,
   consent,
   off,
-  onSent,
 }: {
   lab: Lab;
   getRun: () => unknown;
@@ -44,22 +43,20 @@ export async function queueFeedback({
   off: boolean;
   onSent?: () => void;
 }): Promise<'queued' | 'dialog'> {
-  if (off) throw new Error('Lab recording is off.');
   const privacyOnly = lab.privacySignalOn && !lab.privacyOverride;
   const message = [verdict ? `Verdict: ${verdict}` : '', note.trim()].filter(Boolean).join('\n\n');
-  const cleanName = name.trim().slice(0, 60);
-  if (privacyOnly) {
-    if (!consent) throw new Error('Consent is required to send this run.');
-    const run = getRun();
+  const feedbackRun = () => {
     try {
-      await lab.sendRun(run, { note: message, name: cleanName });
+      return getRun();
     } catch {
-      lab.openSendDialog({ getRun: () => run, note: message, name: cleanName, onSent });
-      return 'dialog';
+      return undefined;
     }
+  };
+  const cleanName = name.trim().slice(0, 60);
+  if (!off && privacyOnly && consent && lab.personaRecordingAllowed) {
+    await lab.sendRun(getRun(), { note: message, name: cleanName });
   } else {
-    if (!lab.telemetryOn) throw new Error('Recording is unavailable.');
-    await lab.sendFeedback(message, { name: cleanName });
+    await lab.sendFeedback(message, { name: cleanName, run: feedbackRun() });
   }
   rememberFeedbackName(cleanName);
   return 'queued';
