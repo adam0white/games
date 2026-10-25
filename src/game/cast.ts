@@ -65,7 +65,7 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
     envelope.source.game === 'commonstead' &&
     role === 'nora' &&
     envelope.source.rules === 'commonstead-3' &&
-    envelope.source.engine === '2.17.0' &&
+    ['2.17.0', '2.21.0'].includes(envelope.source.engine) &&
     /^[a-f0-9]{12}$/.test(envelope.source.build) &&
     envelope.transfer.castPassport === 'commonstead-cast/1' &&
     envelope.transfer.sourceRole === 'hf.cast.nora.smallworks';
@@ -83,7 +83,8 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
   if (
     portable.person.mappingVersion !== mapping ||
     portable.person.source.id !== sourceId ||
-    !(commonstead ? ['2.17.0'] : ['2.17.0', '2.21.0']).includes(portable.person.source.engine)
+    !['2.17.0', '2.21.0'].includes(portable.person.source.engine) ||
+    (commonstead && envelope.source.engine !== portable.person.source.engine)
   )
     throw new Error(
       'The source uses a mapping, role or engine that this workshop does not support.',
