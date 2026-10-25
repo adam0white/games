@@ -65,7 +65,7 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
     envelope.source.game === 'commonstead' &&
     role === 'nora' &&
     envelope.source.rules === 'commonstead-3' &&
-    ['2.17.0', '2.21.0'].includes(envelope.source.engine) &&
+    ['2.17.0', '2.21.0', '2.23.0'].includes(envelope.source.engine) &&
     /^[a-f0-9]{12}$/.test(envelope.source.build) &&
     envelope.transfer.castPassport === 'commonstead-cast/1' &&
     envelope.transfer.sourceRole === 'hf.cast.nora.smallworks';
@@ -83,7 +83,9 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
   if (
     portable.person.mappingVersion !== mapping ||
     portable.person.source.id !== sourceId ||
-    !['2.17.0', '2.21.0', ...(local ? ['2.23.0'] : [])].includes(portable.person.source.engine) ||
+    !['2.17.0', '2.21.0', ...(local || commonstead ? ['2.23.0'] : [])].includes(
+      portable.person.source.engine,
+    ) ||
     (local && envelope.source.engine !== portable.person.source.engine) ||
     (commonstead && envelope.source.engine !== portable.person.source.engine)
   )
