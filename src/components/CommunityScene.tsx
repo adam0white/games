@@ -20,7 +20,9 @@ export function CommunityScene({
     (j) => j.id === event.preparations.find((p) => p.format === 'theatre')?.jobId,
   );
   const theatreUse = [...(theatreJob?.evidence ?? [])].reverse().find((e) => e.kind === 'use');
-  const rpm = Number(theatreUse?.summary.match(/at (\d+(?:\.\d+)?) rpm/)?.[1] ?? 0);
+  const rpm = Number(
+    theatreUse?.summary.match(/at (\d+(?:\.\d+)?) (?:rpm|turns per minute)/)?.[1] ?? 0,
+  );
   const names = { garden: 'The garden', reading: 'The reading room', theatre: 'The paper stage' };
   return (
     <svg

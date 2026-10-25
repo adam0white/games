@@ -27,7 +27,7 @@ const prosePaths = [
 const sha = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 function normalize(value, path = '') {
   // The new text edition refuses old mixed-prose saves. This is provenance, not a rule.
-  if (path === 'provenance.game' && ['4.0.0', '4.0.0+plain-english'].includes(value)) return '4.0.0';
+  if (path === 'provenance.game' && ['4.0.0', '4.0.0+plain-english', '4.0.0+plain-english-2'].includes(value)) return '4.0.0';
   if (typeof value === 'string' && prosePaths.some(re => re.test(path))) return '';
   if (Array.isArray(value)) return value.map((v, i) => normalize(v, path ? `${path}.${i}` : `${i}`));
   if (value && typeof value === 'object') {

@@ -208,7 +208,7 @@ describe('physical models', () => {
     expect(runUseTest(dirty, 'load').passes).toBe(true);
     intervene(loose, 'gear', 'clean');
     expect(runUseTest(loose, 'load').passes).toBe(false);
-    expect(intervene(loose, 'gear', 'adjust').summary).toContain('spindle');
+    expect(intervene(loose, 'gear', 'adjust').summary).toContain('rod');
     expect(runUseTest(loose, 'load').passes).toBe(true);
     intervene(worn, 'gear', 'clean');
     intervene(worn, 'gear', 'adjust');
@@ -279,7 +279,7 @@ describe('physical models', () => {
       expect(runUseTest(model, 'bench').passes).toBe(false);
       calibrate(model, 'governor', setting ?? 2);
       expect(runUseTest(model, 'load').passes).toBe(true);
-      expect(runUseTest(model, 'load').summary).toContain(`requested ${desiredRPM}`);
+      expect(runUseTest(model, 'load').summary).toContain(`requested speed is ${desiredRPM}`);
       expect(model.components.find((c) => c.id === 'governor')?.condition).toBe('good');
     }
   });

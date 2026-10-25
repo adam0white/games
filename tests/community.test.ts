@@ -222,7 +222,8 @@ describe('bounded community gathering', () => {
     tickPeople(state.people, 5250);
     finalizeCommunityEvent(state, event, 5250);
     expect(attendee.completed).toBe(false);
-    expect(event.outcome).not.toContain(`${person.name}: Garden gathering.`);
+    expect(event.outcome).toContain(`${person.name} did not finish the garden gathering.`);
+    expect(event.outcome).not.toContain(`${person.name} joined the garden gathering.`);
   });
   it('gives a lone attendee no realized belonging and records equipment rather than player attendance', () => {
     const state = fixture();
@@ -244,7 +245,7 @@ describe('bounded community gathering', () => {
     finalizeCommunityEvent(state, event, 5250);
     expect(mum.needs.belonging).toBe(before);
     expect(mum.activity).toBeNull();
-    expect(event.outcome).toBe('Sam’s mother chose this activity: Garden gathering.');
+    expect(event.outcome).toBe('Sam’s mother joined the garden gathering.');
     const equipmentMemory = mum.memory.episodes.find((episode) =>
       episode.summary.startsWith('The prepared equipment enabled'),
     );

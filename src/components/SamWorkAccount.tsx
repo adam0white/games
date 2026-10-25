@@ -1,5 +1,6 @@
 import { requiredChecks } from '../game/engine';
-import type { Job } from '../game/types';
+import { testWords } from '../game/test-words';
+import type { Job, TestCondition } from '../game/types';
 export interface SamWorkRow {
   jobId: string;
   title: string;
@@ -17,16 +18,16 @@ export function samWorkRows(jobs: Job[]): SamWorkRow[] {
       if (verb === 'deliver') label = `Sam returned ${job.title}.`;
       else if (verb === 'inspect') label = `Sam examined the ${component}.`;
       else if (verb === 'measure')
-        label = `Sam measured the ${component}${detail ? ` under the ${detail} condition` : ''}.`;
+        label = `Sam measured the ${component}${detail ? ` ${testWords[detail as TestCondition] ?? 'under the recorded conditions'}` : ''}.`;
       else if (verb === 'probe')
-        label = `Sam measured ${target} between ${detail} and ${extra} under the ${last} condition.`;
+        label = `Sam measured ${target} between ${detail} and ${extra} ${testWords[last as TestCondition] ?? 'under the recorded conditions'}.`;
       else if (verb === 'clean') label = `Sam cleaned the ${component}.`;
       else if (verb === 'adjust') label = `Sam adjusted the ${component}.`;
       else if (verb === 'replace') label = `Sam replaced the ${component}.`;
-      else if (verb === 'calibrate') label = `Sam set the ${component} collar to ${detail}.`;
+      else if (verb === 'calibrate') label = `Sam set the speed control ring to ${detail}.`;
       else if (verb === 'verify') {
         const required = requiredChecks(job);
-        label = `Sam ran the ${required.includes(target as 'bench' | 'movement' | 'load') ? 'required ' : ''}${target} use check.`;
+        label = `Sam ran the ${required.includes(target as 'bench' | 'movement' | 'load') ? 'required ' : ''}test ${testWords[target as TestCondition] ?? 'under the recorded conditions'}.`;
       } else if (verb === 'complete-project') label = 'Sam completed this project, which you kept.';
       else if (verb === 'install') label = `Sam installed the object for ${target}.`;
       else if (verb === 'intake') label = 'Sam received the object.';

@@ -1,9 +1,14 @@
 import { dayTime, requiredChecks } from '../game/engine';
+import { testWords } from '../game/test-words';
 import type { Job } from '../game/types';
 
 function nextObservation(job: Job, lesson: Job['pendingLessons'][number]): string {
   if (lesson.action.startsWith('calibrate:'))
-    return `Ask Sam to watch the requested ${requiredChecks(job).join(' or ')} use check at ${job.model.desiredRPM ?? 15} ± ${job.model.tolerance ?? 3} rpm.`;
+    return `Ask Sam to watch the requested test ${requiredChecks(job)
+      .map((check) => testWords[check])
+      .join(
+        ' or ',
+      )} at ${job.model.desiredRPM ?? 15} ± ${job.model.tolerance ?? 3} turns per minute.`;
   const baseline = lesson.baseline;
   if (baseline?.request) {
     const r = baseline.request;
@@ -15,10 +20,10 @@ function nextObservation(job: Job, lesson: Job['pendingLessons'][number]): strin
       'slow-drive',
       'blocked-drive',
     ].includes(baseline.cues.signal ?? '');
-    return `Repeat the ${r.mode} measurement from ${r.a} to ${r.b} under the ${r.condition} condition with Sam. ${abnormal ? `A successful use check under the ${r.condition} condition can also confirm the result.` : 'The starting reading was normal. Use the same probes to compare the result.'} A failed test cannot show what this part changed. Use the same probe pair again.`;
+    return `Repeat the ${r.mode} measurement from ${r.a} to ${r.b} ${testWords[r.condition]} with Sam. ${abnormal ? `A successful use check ${testWords[r.condition]} can also confirm the result.` : 'The starting reading was normal. Use the same probes to compare the result.'} A failed test cannot show what this part changed. Use the same probe pair again.`;
   }
   if (baseline?.kind === 'use')
-    return `Ask Sam to watch another use test under the same ${baseline.condition ?? 'recorded'} condition. Compare it with the starting test. A different condition does not show what this change did.`;
+    return `Ask Sam to watch another use test ${baseline.condition ? testWords[baseline.condition] : 'under the same conditions'}. Compare it with the starting test. A different condition does not show what this change did.`;
   return 'There is no starting measurement here. Review what Sam saw before claiming he learned a repair method.';
 }
 export function TeachingRecord({ job }: { job: Job }) {

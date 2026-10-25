@@ -1,4 +1,5 @@
 import { dayTime, requiredChecks } from '../game/engine';
+import { testWords } from '../game/test-words';
 import type { GameState, Job } from '../game/types';
 
 function intention(job: Job): string {
@@ -75,15 +76,15 @@ export function ReturnReceipt({
           <strong>Original request</strong> {job.description}
         </p>
         <p>
-          <strong>Recorded checks</strong>{' '}
+          <strong>Test results.</strong>{' '}
           {checked
             ? requiredChecks(job)
-                .map((check) => `${check} passed`)
-                .join(', ')
+                .map((check) => `It passed ${testWords[check]}.`)
+                .join(' ')
             : job.returnedUnfinished
               ? 'Returned without claiming a completed repair.'
               : job.verified.length
-                ? job.verified.join(', ')
+                ? job.verified.map((check) => `It passed ${testWords[check]}.`).join(' ')
                 : 'The required use tests have not passed yet.'}
         </p>
         <p>

@@ -3,6 +3,19 @@ import { physicalSceneOutput } from '../src/components/PhysicalObjectScene';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
 
 describe('physical object preview', () => {
+  it('reads plain speed units from a saved observation without recomputing the result', () => {
+    const job = createGame(42).jobs.find((candidate) => candidate.kind === 'music-box');
+    if (!job) throw new Error('Missing mechanical object');
+    job.evidence.push({
+      id: 1,
+      at: 540,
+      kind: 'use',
+      condition: 'bench',
+      cues: {},
+      summary: 'The drum turns at 7 turns per minute during the bench test.',
+    });
+    expect(physicalSceneOutput(job).output).toBe(7);
+  });
   it('shows visible bench behavior without awarding a check or teaching anyone', () => {
     const state = createGame(42);
     const job = state.jobs[0];

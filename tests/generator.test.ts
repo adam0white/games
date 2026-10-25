@@ -130,23 +130,36 @@ describe('later owner requests', () => {
       if (job.kind === 'lantern') {
         const bench = runUseTest(job.model, 'bench');
         const movement = runUseTest(job.model, 'movement');
+        const light = (result: ReturnType<typeof runUseTest>) =>
+          result.output === 0 ? 'goes dark' : result.passes ? 'stays bright' : 'stays dim';
+        const shelf = light(bench);
+        const carried = light(movement);
         expect(job.description).toContain(
-          `On the shelf, ${bench.output === 0 ? 'it stays dark' : bench.passes ? 'it stays bright' : 'it stays dim'}`,
+          shelf === carried
+            ? `It ${shelf} on the shelf and when I carry it.`
+            : `It ${shelf} on the shelf. When I carry it, it ${carried}.`,
         );
         expect(job.description).toContain(
-          `when carried, ${movement.output === 0 ? 'it goes dark' : movement.passes ? 'it stays bright' : 'it stays dim'}`,
+          `When it has to work harder, it ${light(runUseTest(job.model, 'load'))}.`,
         );
+        expect(job.description).not.toMatch(/for a long time|While working/);
       } else if (job.kind === 'fan') {
         const air = (condition: 'bench' | 'load') => {
           const result = runUseTest(job.model, condition);
           return result.output === 0
-            ? 'there is no airflow'
+            ? 'moves no air'
             : result.passes
-              ? 'the airflow stays steady'
-              : 'the airflow falls short';
+              ? 'moves air steadily'
+              : 'moves too little air';
         };
-        expect(job.description).toContain(`At rest, ${air('bench')}`);
-        expect(job.description).toContain(`through the grille, ${air('load')}`);
+        const bench = air('bench');
+        const load = air('load');
+        expect(job.description).toContain(
+          bench === load
+            ? `The fan ${bench}, with or without the grille.`
+            : `The fan ${bench} without the grille. With the grille, it ${load}.`,
+        );
+        expect(job.description).not.toMatch(/At rest|airflow falls short/);
       } else {
         const pace = (condition: 'bench' | 'load') => {
           const result = runUseTest(job.model, condition);
@@ -158,8 +171,14 @@ describe('later owner requests', () => {
                 ? 'the melody runs too slowly'
                 : 'the melody runs too fast';
         };
-        expect(job.description).toContain(`On the bench, ${pace('bench')}`);
-        expect(job.description).toContain(`while driving the figures, ${pace('load')}`);
+        const onTable = pace('bench');
+        const driving = pace('load');
+        const first = onTable.charAt(0).toUpperCase() + onTable.slice(1);
+        expect(job.description).toContain(
+          onTable === driving
+            ? `${first} on the table and while driving the figures.`
+            : `${first} on the table. While driving the figures, ${driving}.`,
+        );
       }
       expect(job.description).not.toMatch(
         /\b(dirty|worn|jammed|misaligned|weak cell|open circuit)\b/,

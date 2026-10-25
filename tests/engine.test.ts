@@ -241,7 +241,7 @@ describe('observed use and delegated continuity', () => {
     const before = saveGame(state);
     const refused = dispatch(state, { type: 'deliver', jobId });
     expect(refused.ok).toBe(false);
-    expect(refused.message).toContain('movement');
+    expect(refused.message).toContain('while carried');
     expect(saveGame(refused.state)).toBe(before);
     state = dispatch(state, {
       type: 'work',

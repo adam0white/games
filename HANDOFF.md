@@ -26,6 +26,14 @@ The current game now writes plain English at its source. The display lookup tabl
 
 One independent Codex review found and corrected false promise wording on unaccepted offers, an overbroad independence claim and singular count grammar. The full check passes 311 tests; four obsolete lookup tests were removed. The delivery report and rendered-text evidence are in `~/code/.lab-scratch/plain2/repair-game-report.md` and `repair-game-onscreen.txt`.
 
+## Plain-English second pass, 2026-10-25
+
+What remains: Adam accepts readability and feel through play. Automated reading and layout checks do not replace a second-language reader. Existing gameplay deferrals below remain separate.
+
+Customer requests now distinguish shelf, carried and harder-use results in full sentences. Equal symptoms are stated once. Mechanical readings use turns per minute; the spring shaft and speed control ring have plain names. Return receipts and learned methods explain test conditions. The notebook no longer doubles quotation marks. Bornova is explained as a district in Turkey. Privacy controls remain available with a plain link label; replay and diagnostic controls remain behind `?lab=1`.
+
+Only presentation prose changed. Saved HF labels, IDs, cues, numbers and internal measurement units remain exact. Speed-reading visuals accept the new wording. The current save text edition is `4.0.0+plain-english-2`; previous text editions receive the existing start-fresh message. New exports must replay exactly. The evidence report, ten before/after examples, independent review, seeded state/replay proof, browser text dump and delivery receipts are in the owner's `plain3/repair-game-report.md` scratch report.
+
 ## Clarity follow-up, 2026-10-20
 
 What remains: Adam accepts feel personally. No fresh source-unread retest of these fixes is claimed.

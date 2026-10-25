@@ -55,6 +55,7 @@ import {
   responsibilityAdvances,
   responsibilityOutcomeAdvances,
 } from './responsibility';
+import { testWords } from './test-words';
 import type {
   Command,
   CommandResult,
@@ -103,9 +104,9 @@ export const UPGRADE_CATALOG = [
   },
   {
     id: 'precision-meter',
-    name: 'A load tester',
+    name: 'A tester for harder use',
     price: 35,
-    description: 'Compare bench and loaded readings in one measurement.',
+    description: 'Compare readings on the table and while the object works harder.',
   },
 ];
 const DAY = 1440;
@@ -125,13 +126,14 @@ export function requiredChecks(job: Job): TestCondition[] {
 }
 export function jobReadiness(job: Job): string {
   if (job.returnedUnfinished) return 'The object was returned honestly, unfinished.';
-  if (job.status === 'delivered')
-    return `The object is back with ${job.ownerId.charAt(0).toUpperCase()}${job.ownerId.slice(1)}.`;
+  if (job.status === 'delivered') return 'The object is back with its owner.';
   if (job.status === 'ready')
-    return `The object passed these checks: ${requiredChecks(job).join(', ')}.`;
+    return `The object passed its tests ${requiredChecks(job)
+      .map((check) => testWords[check])
+      .join(' and ')}.`;
   if (job.assignedTo) return 'Sam has responsibility.';
   return job.verified.length
-    ? `The object passed these checks: ${job.verified.join(', ')}.`
+    ? `The object passed its tests ${job.verified.map((check) => testWords[check]).join(' and ')}.`
     : job.evidence.length
       ? 'The observations are saved. The object still needs checks.'
       : 'The object has not been examined yet.';
@@ -227,24 +229,31 @@ function reportedSymptoms(job: Job, stakes: string): string {
   const movement = runUseTest(job.model, 'movement');
   const load = runUseTest(job.model, 'load');
   if (job.kind === 'lantern') {
-    const light = (result: typeof bench, carried = false) =>
-      result.output === 0
-        ? carried
-          ? 'it goes dark'
-          : 'it stays dark'
-        : result.passes
-          ? 'it stays bright'
-          : 'it stays dim';
-    return `“On the shelf, ${light(bench)}; when carried, ${light(movement, true)}. While working, ${light(load)}. ${stakes}”`;
+    const light = (result: typeof bench) =>
+      result.output === 0 ? 'goes dark' : result.passes ? 'stays bright' : 'stays dim';
+    const onShelf = light(bench);
+    const carried = light(movement);
+    const harder = light(load);
+    const shelfAndCarry =
+      onShelf === carried
+        ? `It ${onShelf} on the shelf and when I carry it.`
+        : `It ${onShelf} on the shelf. When I carry it, it ${carried}.`;
+    return `“${shelfAndCarry} When it has to work harder, it ${harder}. ${stakes}”`;
   }
   if (job.kind === 'fan') {
     const air = (result: typeof bench) =>
       result.output === 0
-        ? 'there is no airflow'
+        ? 'moves no air'
         : result.passes
-          ? 'the airflow stays steady'
-          : 'the airflow falls short';
-    return `“At rest, ${air(bench)}; through the grille, ${air(load)}. ${stakes}”`;
+          ? 'moves air steadily'
+          : 'moves too little air';
+    const uncovered = air(bench);
+    const covered = air(load);
+    const symptoms =
+      uncovered === covered
+        ? `The fan ${uncovered}, with or without the grille.`
+        : `The fan ${uncovered} without the grille. With the grille, it ${covered}.`;
+    return `“${symptoms} ${stakes}”`;
   }
   const pace = (result: typeof bench) =>
     result.output === 0
@@ -254,7 +263,11 @@ function reportedSymptoms(job: Job, stakes: string): string {
         : result.output < (job.model.desiredRPM ?? 15)
           ? 'the melody runs too slowly'
           : 'the melody runs too fast';
-  return `“On the bench, ${pace(bench)}; while driving the figures, ${pace(load)}. ${stakes}”`;
+  const onTable = pace(bench);
+  const driving = pace(load);
+  return onTable === driving
+    ? `“${cap(onTable)} on the table and while driving the figures. ${stakes}”`
+    : `“${cap(onTable)} on the table. While driving the figures, ${driving}. ${stakes}”`;
 }
 /** Engine-5 rules: the HF 2.8 opt-ins and the 2026-10-19 lessons. Engine-4 worlds keep engine-4 behaviour. */
 export const currentRules = (s: Pick<GameState, 'schema'>): boolean => s.schema === 'small-works@5';
@@ -539,7 +552,8 @@ function neighbourOffers(s: GameState, initial = false): void {
     if (choice === 5) {
       job.model.desiredRPM = 18;
       job.model.tolerance = 1;
-      job.description += ' I want the figures to turn at 18 rpm, within one rpm.';
+      job.description +=
+        ' I want the figures to turn at 18 turns per minute, within one turn per minute.';
     }
     if (!initial && (continuing || choice !== 3) && s.day >= 4 && random(s) > 0.5) {
       const extra = job.model.components.find((c) => c.condition === 'good' && c.kind !== 'cell');
@@ -559,7 +573,7 @@ function neighbourOffers(s: GameState, initial = false): void {
           ? [
               'This is another reading light for the room. Please check it while working.',
               'This is another desk fan for a warm room. Please check airflow through its filter.',
-              'This is a different music box. Please keep its tune steady under load.',
+              'This is a different music box. Please keep its tune steady while it drives the figures.',
               'This is a different path lantern. I need it to stay on when carried.',
               'This is another fan for a shared room. Please test it with its grille fitted.',
               'This is a different winding toy. Please check its pace while the figures move.',
@@ -574,7 +588,9 @@ function neighbourOffers(s: GameState, initial = false): void {
             ])[choice] ?? 'Please check it in ordinary use.';
       const stored = job.description.includes('stored for years');
       job.description = reportedSymptoms(job, stakes);
-      if (choice === 5) job.description += ' I want the figures to turn at 18 rpm, within one rpm.';
+      if (choice === 5)
+        job.description +=
+          ' I want the figures to turn at 18 turns per minute, within one turn per minute.';
       if (stored)
         job.description += ' It has been stored for years; more than one part may have a fault.';
     }
@@ -1131,7 +1147,7 @@ function finishNpc(s: GameState, work: NpcWork): void {
       log(
         s,
         person.name,
-        `I have put ${named(s, job.title)} safely aside. I still have responsibility. ${job.blocked.reason}`,
+        `I have put ${named(s, job.title)} away safely. It is still my job. ${job.blocked.reason}`,
         'warning',
       );
     } else if (!['rest', 'eat', 'drink', 'personal'].includes(work.option.action)) {
@@ -1512,7 +1528,7 @@ function noteOverdue(s: GameState): void {
       s,
       owner?.name ?? 'Workshop',
       job.assignedTo
-        ? `You said ${dayTime(job.due)} for ${own(job.title)}. Sam has it, I know. I’m still waiting.`
+        ? `You said ${dayTime(job.due)} for ${own(job.title)}. ${s.people[job.assignedTo]?.name ?? 'Your helper'} is responsible for repairing it. I am still waiting for you to return it to me.`
         : `You said ${dayTime(job.due)} for ${own(job.title)}. I’m still waiting. If it can’t be done, tell me and give it back.`,
       'warning',
     );
@@ -2110,12 +2126,14 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       if (blocked) return fail(blocked);
       const preview = calibrate(structuredClone(job.model), command.componentId, command.setting);
       if (!preview.ok) return fail(preview.summary);
-      if (!canSpendTime(s, 20)) return fail('There is not enough time to set the collar today.');
+      if (!canSpendTime(s, 20))
+        return fail('There is not enough time to set the speed control ring today.');
       playerWork(s, job, 20, `calibrate:${command.componentId}:${command.setting}`, () =>
         resolvePhysical(s, job, `calibrate:${command.componentId}:${command.setting}`),
       );
       return done(
-        job.evidence.at(-1)?.summary ?? 'The collar was set. Measure the drive or test its pace.',
+        job.evidence.at(-1)?.summary ??
+          'The speed control ring was set. Measure how fast the shaft turns or test the melody.',
       );
     }
     case 'work': {
@@ -2159,10 +2177,14 @@ export function dispatch(state: GameState, command: Command): CommandResult {
         (job.status !== 'ready' || !requiredChecks(job).every((c) => job.verified.includes(c)))
       )
         return fail(
-          `Check restored use under ${
+          `Test the restored object ${
             requiredChecks(job)
               .filter((c) => !job.verified.includes(c))
-              .join(', ') || requiredChecks(job).join(', ')
+              .map((check) => testWords[check])
+              .join(' and ') ||
+            requiredChecks(job)
+              .map((check) => testWords[check])
+              .join(' and ')
           } before returning it, or choose to return it unfinished.`,
         );
       if (!canSpendTime(s, COSTS.deliver))

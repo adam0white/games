@@ -132,9 +132,9 @@ describe('published HF workshop adapter', () => {
       now,
     );
     expect(describePerson(p).learned[0]).toContain(
-      'voltage between cell plus and switch out under load',
+      'voltage between cell plus and switch out while the object works harder',
     );
-    expect(describePerson(p).learned[1]).toContain('set the governor collar to 3');
+    expect(describePerson(p).learned[1]).toContain('set the speed control ring to 3');
     const thirsty = sam();
     thirsty.body.hydration = 0.2;
     const drink = { ...option('drink', 0), duration: 5 };
@@ -161,11 +161,32 @@ describe('published HF workshop adapter', () => {
       now,
     );
     const description = describePerson(p).learned[0];
-    expect(description).toContain('a large voltage drop');
+    expect(description).toContain('the voltage falls a lot between the two test points');
     expect(description).toContain('replace the switch');
     expect(description).toContain('after testing');
     expect(description).not.toContain('family is');
     expect(description).not.toContain('high drop');
+  });
+
+  it('explains learned use tests and every successful condition without mutating the person', () => {
+    const p = sam();
+    teachObserved(
+      p,
+      'job',
+      { stage: 'checked-bench-movement', signal: 'steady-output', family: 'electrical' },
+      'verify:load',
+      'checks',
+      'success',
+      now,
+    );
+    const before = snapshot(p);
+    const description = describePerson(p).learned[0];
+    expect(description).toContain('test the object while the object works harder');
+    expect(description).toContain(
+      'after successful tests on the table and while carrying the object',
+    );
+    expect(description).not.toMatch(/verify the load|checked bench|steady output/);
+    expect(snapshot(p)).toEqual(before);
   });
 
   it('keeps future appointments out of morning fulfillment and speech', () => {

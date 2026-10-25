@@ -27,6 +27,13 @@ function eventFixture(now: number): GameState {
 }
 
 describe('save boundary', () => {
+  it('refuses the previous text edition instead of mixing narration during replay', () => {
+    const previous = JSON.parse(saveGame(createGame(42)));
+    previous.provenance.game = '4.0.0+plain-english';
+    expect(() => loadGame(JSON.stringify(previous))).toThrow(
+      /earlier workshop edition.*Start fresh/,
+    );
+  });
   it('preserves real dispatched daytime activities and resumes the same event proposal', () => {
     let state = createGame(416);
     state = dispatch(state, { type: 'wait', minutes: 10 }).state;

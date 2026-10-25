@@ -460,20 +460,38 @@ export function reportDelivery(
 }
 
 function readableMethod(action: string, conditions: { cue: string; value: string }[]): string {
-  const words = (text: string) => text.replace(/[:_-]/g, ' ');
+  const words = (text: string) =>
+    text === 'governor' ? 'speed control' : text.replace(/[:_-]/g, ' ');
+  const conditionWords = (test: string) =>
+    test === 'load'
+      ? 'while the object works harder'
+      : test === 'movement'
+        ? 'while carrying the object'
+        : 'on the table';
   const phrases: Record<string, string> = {
-    'high-drop': 'a large voltage drop',
-    'low-source': 'the source voltage falls under load',
-    'slow-drive': 'slower rotation',
+    'high-drop': 'the voltage falls a lot between the two test points',
+    'low-source': 'the cell pack voltage falls while the object works harder',
+    'slow-drive': 'the shaft turns slowly',
     intake: 'an unfamiliar object arrives',
+    examined: 'after looking inside',
+    rotation: 'the shaft turns',
+    connected: 'electricity can flow through the path',
+    voltage: 'a voltage reading is available',
+    timing: 'the melody runs at the wrong speed',
+    'control-setting': 'the speed control ring setting is visible',
+    'aged-surface': 'the exposed metal looks aged and dull',
+    intact: 'the outside looks intact',
+    'power-off': 'the power is off',
+    invalid: 'the test cannot give a reading',
     measured: 'after testing',
     repaired: 'after a repair step',
-    'open-path': 'an open circuit',
-    resistance: 'excess resistance',
+    worked: 'a repair step was performed',
+    'open-path': 'electricity cannot flow through the path',
+    resistance: 'the path resists the flow of electricity too much',
     'blocked-drive': 'the drive cannot turn',
-    'steady-output': 'steady output',
-    'weak-output': 'weak output',
-    'no-output': 'no output',
+    'steady-output': 'the object works steadily',
+    'weak-output': 'the object works weakly',
+    'no-output': 'the object does not work',
   };
   const specific = conditions.some((c) => c.cue === 'signal' && phrases[c.value]);
   const readable = conditions.filter((c) => !specific || (c.cue !== 'family' && c.cue !== 'stage'));
@@ -481,30 +499,31 @@ function readableMethod(action: string, conditions: { cue: string; value: string
     .map((c) => {
       if (c.cue === 'requested-use') {
         const [device, check] = c.value.split(':');
-        return `a ${words(device ?? 'device')} is needed ${check === 'movement' ? 'while being carried' : 'under load'}`;
+        return `a ${words(device ?? 'device')} is needed ${(check ?? 'bench').split('+').map(conditionWords).join(' and ')}`;
       }
-      if (c.cue === 'requested-pace') return `the requested pace is ${c.value} rpm`;
+      if (c.cue === 'requested-pace') return `the requested pace is ${c.value} turns per minute`;
       if (c.cue === 'observed-span') {
         const [mode, a, b, observed] = c.value.split(':');
-        const tests = (observed ?? '')
-          .split('+')
-          .map((test) =>
-            test === 'movement'
-              ? 'while moving it'
-              : test === 'load'
-                ? 'under load'
-                : 'on the bench',
-          );
+        const tests = (observed ?? '').split('+').map((test) => conditionWords(test));
         return `${mode === 'motion' ? 'rotation' : mode} between ${a} and ${b} has been measured ${tests.join(' and ')}`;
       }
       if (c.cue.startsWith('comparison-')) {
         const check = c.cue.slice('comparison-'.length);
         const [direction, , reference] = c.value.split('-');
-        return `the ${check} reading is ${direction === 'equal' ? 'equal to' : `${direction} than`} the ${reference} reading`;
+        return `the reading ${conditionWords(check)} is ${direction === 'equal' ? 'equal to' : `${direction} than`} the reading ${conditionWords(reference ?? 'bench')}`;
       }
       if (c.cue === 'part') return `you are checking the ${words(c.value)}`;
       if (c.cue === 'signal') return `your observation is “${phrases[c.value] ?? words(c.value)}”`;
-      if (c.cue === 'stage') return `the work stage is “${phrases[c.value] ?? words(c.value)}”`;
+      if (c.cue === 'stage') {
+        if (c.value === 'intake') return 'an unfamiliar object arrives';
+        if (c.value === 'examined') return 'you have looked inside';
+        if (c.value === 'measured') return 'you have tested the object';
+        if (c.value === 'repaired') return 'you have done a repair step';
+        if (c.value === 'ready') return 'the required tests have passed';
+        if (c.value.startsWith('checked-'))
+          return `the object has passed a test ${c.value.slice(8).split('-').map(conditionWords).join(' and ')}`;
+        return `the work has reached “${words(c.value)}”`;
+      }
       if (c.cue === 'family')
         return `you are working on ${c.value === 'electrical' ? 'an electrical circuit' : 'a mechanical drive'}`;
       return `${words(c.cue)} is ${words(c.value)}`;
@@ -518,19 +537,23 @@ function readableMethod(action: string, conditions: { cue: string; value: string
             ? c.value === 'electrical'
               ? 'electrical work'
               : 'mechanical work'
-            : (phrases[c.value] ?? words(c.value)),
+            : c.value.startsWith('checked-')
+              ? `after successful tests ${c.value.slice(8).split('-').map(conditionWords).join(' and ')}`
+              : (phrases[c.value] ?? words(c.value)),
         )
         .join(', ')
     : '';
   const [verb, target, a, b, testCondition] = action.split(':');
   const instruction =
     verb === 'probe'
-      ? `measure ${target === 'motion' ? 'rotation' : target} between ${words(a ?? '?')} and ${words(b ?? '?')} ${testCondition === 'load' ? 'under load' : testCondition === 'movement' ? 'while moving the object' : 'on the bench'}`
-      : verb === 'calibrate'
-        ? `set the ${words(target ?? 'governor')} collar to ${a ?? '?'}`
-        : verb === 'ask-help'
-          ? 'ask for help'
-          : `${words(verb ?? action)}${target ? ` the ${words(target)}` : ''}`;
+      ? `measure ${target === 'motion' ? 'rotation' : target} between ${words(a ?? '?')} and ${words(b ?? '?')} ${conditionWords(testCondition ?? 'bench')}`
+      : verb === 'verify'
+        ? `test the object ${conditionWords(target ?? 'bench')}`
+        : verb === 'calibrate'
+          ? `set the speed control ring to ${a ?? '?'}`
+          : verb === 'ask-help'
+            ? 'ask for help'
+            : `${words(verb ?? action)}${target ? ` the ${words(target)}` : ''}`;
   return `When ${condition}, ${instruction}.${scope ? ` This method applies to ${scope}.` : ''}`;
 }
 

@@ -374,6 +374,32 @@ export function resolveCommunityEvent(state: GameState, event: CommunityState, n
   }
 }
 /** Finalize elapsed activities. Close reservations even if a missing tick prevents completion credit. */
+function otherPlans(state: GameState, decisions: CommunityDecision[]): string {
+  const activities: Record<string, string> = {
+    'Take a break': 'chose to take a break',
+    'Have food and water': 'chose to eat and drink',
+    'Visit a neighbour': 'chose to visit a neighbour',
+    'Spend 30 minutes on my own plans': 'chose to spend time on other plans',
+    'Leave the gathering for another day': 'chose to leave the gathering for another day',
+  };
+  const groups = new Map<string, string[]>();
+  for (const decision of decisions) {
+    const name = state.people[decision.personId]?.name ?? decision.personId;
+    const label = decision.activityLabel.replace(/^spend \d+ minutes on: /i, '');
+    const activity = decision.format
+      ? `did not finish ${decision.format === 'garden' ? 'the garden gathering' : decision.format === 'reading' ? 'the indoor reading' : 'watching the paper theatre'}`
+      : (activities[label] ?? `chose “${label}” instead`);
+    groups.set(activity, [...(groups.get(activity) ?? []), name]);
+  }
+  return [...groups]
+    .map(([activity, names]) => {
+      const who =
+        names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+      return `${who} ${activity}.`;
+    })
+    .join(' ');
+}
+
 export function finalizeCommunityEvent(state: GameState, event: CommunityState, now: number): void {
   if (event.resolvedAt === undefined || now < event.finishesAt || event.phase === 'completed')
     return;
@@ -473,18 +499,19 @@ export function finalizeCommunityEvent(state: GameState, event: CommunityState, 
   const participants = event.decisions.filter((d) => d.completed && d.format);
   event.outcome = participants.length
     ? participants
-        .map(
-          (d) =>
-            `${state.people[d.personId]?.name ?? d.personId} chose this activity: ${d.activityLabel}.`,
-        )
+        .map((d) => {
+          const name = state.people[d.personId]?.name ?? d.personId;
+          const activity =
+            d.format === 'garden'
+              ? 'joined the garden gathering'
+              : d.format === 'reading'
+                ? 'joined the indoor reading'
+                : 'watched the paper theatre';
+          return `${name} ${activity}.`;
+        })
         .join(' ')
     : state.schema === 'small-works@5' && event.decisions.length
-      ? `Nobody used what you prepared. ${event.decisions
-          .map(
-            (d) =>
-              `${state.people[d.personId]?.name ?? d.personId} chose this instead: ${d.activityLabel.replace(/^spend \d+ minutes on: /i, '').toLowerCase()}.`,
-          )
-          .join(' ')}`
+      ? `Nobody finished an activity you prepared. ${otherPlans(state, event.decisions)}`
       : 'No prepared activity was completed. People kept other plans, were occupied, or stopped before completion.';
   event.reservedJobIds = [];
   event.phase = 'completed';

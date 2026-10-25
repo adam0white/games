@@ -23,7 +23,7 @@ export function helpFeedback(job: Job, person: Person, legalActions: string[]): 
   if (cues.stage === 'intake')
     return 'I have not learned where to begin checking this kind of object. Let me watch its first test.';
   if (cues.stage === 'repaired' || cues.stage?.startsWith('checked-'))
-    return 'I have not seen all the required use checks pass after the latest work. Let me watch a check under the requested use conditions.';
+    return 'Since the last change, I have not seen it pass every test it needs. Let me watch you test it the way it will be used.';
   const revision = job.evidence.findLast((step) => step.kind === 'work')?.id ?? 0;
   const received = job.evidence.findLast(
     (step) =>

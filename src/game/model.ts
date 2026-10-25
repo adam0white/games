@@ -189,7 +189,7 @@ export function inspectComponent(model: DeviceModel, id: string): Observation {
   if (c.kind === 'governor') {
     const setting = c.setting ?? (c.condition === 'misaligned' ? 4 : 2);
     return {
-      summary: `${c.label}: The collar pointer is at ${setting} on the 0–4 scale. The casing looks intact.`,
+      summary: `${c.label}: The pointer on the speed control ring is at ${setting} on the 0–4 scale. The casing looks intact.`,
       cues: { part: c.kind, signal: 'control-setting' },
     };
   }
@@ -226,7 +226,7 @@ export function measure(model: DeviceModel, request: MeasurementRequest): Measur
     return {
       value,
       unit: 'rpm Δ',
-      summary: `Terminal ${a} reads ${round(nodes[a] ?? 0)} rpm. Terminal ${b} reads ${round(nodes[b] ?? 0)} rpm. The rotation changes by ${value} rpm.`,
+      summary: `Point ${a} turns at ${round(nodes[a] ?? 0)} turns per minute. Point ${b} turns at ${round(nodes[b] ?? 0)} turns per minute. ${value === 0 ? 'The speed stays the same between them.' : `It ${value < 0 ? 'slows' : 'speeds up'} by ${Math.abs(value)} turns per minute between them.`}`,
       cues: {
         part: c?.kind ?? 'drive',
         signal:
@@ -291,7 +291,7 @@ export function measure(model: DeviceModel, request: MeasurementRequest): Measur
   return {
     value,
     unit: 'V',
-    summary: `The voltage from ${a} to ${b} is ${value} V (${condition}).`,
+    summary: `The voltage from ${a} to ${b} is ${value} volts ${condition === 'bench' ? 'on the table' : condition === 'movement' ? 'while carried' : 'while working harder'}.`,
     cues: { part: c?.kind ?? 'path', signal },
   };
 }
@@ -306,7 +306,7 @@ export function feltUse(model: DeviceModel, condition: TestCondition, use: UseRe
       ? 'on the table'
       : condition === 'movement'
         ? 'while carried'
-        : 'under load';
+        : 'while working harder';
   if (model.kind === 'music-box') {
     const specification = model as DeviceModel & { desiredRPM?: number; tolerance?: number };
     const desired = specification.desiredRPM ?? 15;
@@ -368,7 +368,7 @@ export function runUseTest(model: DeviceModel, condition: TestCondition): UseRes
     return {
       passes,
       output: round(output),
-      summary: `The drum turns at ${round(output)} rpm during the ${condition} test (requested ${desiredRPM} ± ${tolerance} rpm); ${passes ? 'the melody keeps its pace.' : output === 0 ? 'the melody stops.' : 'the melody loses its pace.'}`,
+      summary: `The drum turns at ${round(output)} turns per minute ${condition === 'bench' ? 'on the table' : condition === 'movement' ? 'while carried' : 'while working harder'}. The requested speed is ${desiredRPM} turns per minute, within ${tolerance}. ${passes ? 'The melody keeps its pace.' : output === 0 ? 'The melody stops.' : 'The melody loses its pace.'}`,
       cues: {
         part: 'drum',
         signal: output === 0 ? 'blocked-drive' : passes ? 'steady-output' : 'timing',
@@ -408,41 +408,42 @@ export function intervene(
     if (c.kind === 'governor') c.setting = 2;
     return {
       ok: true,
-      summary: `The ${c.label.toLowerCase()} was replaced. Test the object again.`,
+      summary: `The ${c.label.toLowerCase().replace(/\bv\b/g, 'V')} was replaced. Test the object again.`,
     };
   }
   if (c.kind === 'governor' && intervention === 'adjust')
     return {
       ok: false,
-      summary: 'Choose a collar setting from 0–4, then measure the resulting shaft speed.',
+      summary:
+        'Choose a speed control ring setting from 0–4. Then measure how fast the shaft turns.',
     };
   const fixes = intervention === 'clean' ? 'dirty' : 'misaligned';
   if (c.condition === fixes) c.condition = 'good';
   const cleanOperations: Record<ComponentKind, string> = {
     cell: 'The cell pack terminals were cleaned',
-    switch: 'The switch contact faces were cleaned',
-    contact: 'The mating contact faces were cleaned',
-    bulb: 'The bulb socket faces were cleaned',
-    motor: 'Residue was removed from the motor bearing',
-    spring: 'Residue was removed from the spring arbor',
+    switch: 'The metal contacts inside the switch were cleaned',
+    contact: 'The metal surfaces where the contacts meet were cleaned',
+    bulb: 'The metal contacts inside the bulb socket were cleaned',
+    motor: 'Residue was removed from the support around the motor shaft',
+    spring: 'Residue was removed from the shaft that holds the spring',
     gear: 'Residue was removed from the gear teeth',
-    governor: 'The governor braking surfaces were cleaned',
-    drum: 'Residue was removed from the drum spindle',
+    governor: 'The surfaces that slow rotation inside the speed control were cleaned',
+    drum: 'Residue was removed from the rod that turns with the drum',
   };
   const adjustOperations: Record<ComponentKind, string> = {
     cell: 'The cell pack was seated again in its holder',
     switch: 'The switch mounting was tightened again and its lever was seated',
     contact: 'The contact was seated again and its clip was tightened',
     bulb: 'The bulb was seated again in its socket',
-    motor: 'The motor bearing was centred in its mounting',
-    spring: 'The spring arbor was seated again',
-    gear: 'The gear was seated again on its spindle',
-    governor: 'The governor collar was moved',
-    drum: 'The drum spindle was centred in its mounting',
+    motor: 'The support around the motor shaft was centred in its mounting',
+    spring: 'The shaft that holds the spring was seated again',
+    gear: 'The gear was seated again on its rod',
+    governor: 'The speed control ring was moved',
+    drum: 'The rod that turns with the drum was centred in its mounting',
   };
   return {
     ok: true,
-    summary: `${(intervention === 'clean' ? cleanOperations : adjustOperations)[c.kind]}. Run the object under load and while moving it to check the result.`,
+    summary: `${(intervention === 'clean' ? cleanOperations : adjustOperations)[c.kind]}. Test the object while it works harder and while carrying it to check the result.`,
   };
 }
 
@@ -454,12 +455,12 @@ export function calibrate(
 ): { ok: boolean; summary: string } {
   const c = part(model, id);
   if (c?.kind !== 'governor' || model.kind !== 'music-box')
-    return { ok: false, summary: 'This component has no calibrated collar.' };
+    return { ok: false, summary: 'This part has no adjustable speed control ring.' };
   if (!Number.isInteger(setting) || setting < 0 || setting > 4)
-    return { ok: false, summary: 'Choose a whole collar setting from 0–4.' };
+    return { ok: false, summary: 'Choose a whole number from 0–4 for the speed control ring.' };
   c.setting = setting;
   return {
     ok: true,
-    summary: `The ${c.label.toLowerCase()} collar was set to ${setting}. Measure motion and test the melody.`,
+    summary: `The speed control ring was set to ${setting}. Measure how fast the shaft turns. Then test the melody.`,
   };
 }

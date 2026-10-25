@@ -1,4 +1,5 @@
 import { dayTime } from '../game/engine';
+import { readingUnit, testWords } from '../game/test-words';
 import type { Evidence, Job, TestCondition } from '../game/types';
 export function ReadingComparison({ job }: { job: Job }) {
   const rows = new Map<
@@ -23,7 +24,7 @@ export function ReadingComparison({ job }: { job: Job }) {
             <th scope="col">Mode / probes</th>
             {(['bench', 'movement', 'load'] as const).map((c) => (
               <th scope="col" key={c}>
-                {c}
+                {testWords[c]}
               </th>
             ))}
           </tr>
@@ -41,7 +42,7 @@ export function ReadingComparison({ job }: { job: Job }) {
                 const e = row.readings[c];
                 return (
                   <td
-                    key={c}
+                    key={testWords[c]}
                     title={
                       e
                         ? `${e.summary} This was recorded at ${dayTime(e.at)}.`
@@ -51,7 +52,7 @@ export function ReadingComparison({ job }: { job: Job }) {
                     {e
                       ? e.value === null
                         ? '—'
-                        : `${e.value?.toFixed(2) ?? '—'} ${e.unit ?? ''}`
+                        : `${e.value?.toFixed(2) ?? '—'} ${readingUnit(e.unit)}`
                       : '—'}
                     {e &&
                       job.evidence.some((later) => later.kind === 'work' && later.id > e.id) && (

@@ -49,6 +49,8 @@ import './meter-layout.css';
 import './clarity.css';
 import './workshop-shell.css';
 import './simplify.css';
+
+import { readingUnit, testWords } from './game/test-words';
 import { labToolsEnabled } from './ui/lab-tools';
 import { damagedWorkshopMessage, workshopStartError } from './ui/start-error';
 
@@ -64,7 +66,7 @@ function checkPurpose(job: Job): string {
       ? 'Check that the light stays on while it is carried.'
       : 'Check that the light stays bright while its owner reads.';
   if (job.kind === 'fan') return 'Check that the fan blows strongly with its filter fitted.';
-  return `Check that the drive turns at the owner’s requested ${job.model.desiredRPM ?? 15} ± ${job.model.tolerance ?? 3} rpm under load.`;
+  return `Check that the drive turns at the owner’s requested ${job.model.desiredRPM ?? 15} ± ${job.model.tolerance ?? 3} turns per minute while working harder.`;
 }
 function samFinishedPersonal(job: Job): boolean {
   if (!job.isPersonal || job.completedBy !== 'sam') return false;
@@ -107,7 +109,9 @@ function Device({
   onSelect: (id: string) => void;
 }) {
   const lastUse = [...job.evidence].reverse().find((e) => e.kind === 'use');
-  const observed = lastUse?.summary.match(/(?:reaches |at )(\d+(?:\.\d+)?)(%| rpm)/);
+  const observed = lastUse?.summary.match(
+    /(?:reaches |at )(\d+(?:\.\d+)?)(%| (?:rpm|turns per minute))/,
+  );
   const output = observed ? Number(observed[1]) : 0;
   return (
     <div className={`device-stage ${job.kind}`}>
@@ -346,7 +350,7 @@ function Device({
           );
         })}
         <text x="20" y="24" className="diagram-caption">
-          {`PARTS · ${condition.toUpperCase()} TEST`}
+          {`PARTS · TEST ${testWords[condition].toUpperCase()}`}
         </text>
       </svg>
       <div className="alternative-parts">
@@ -1111,14 +1115,14 @@ export default function App() {
             : pane === 'meter'
               ? [
                   'The meter',
-                  'Place the red and black probes on two terminals.',
+                  'Place the red and black probes on two labelled points, called terminals.',
                   'The voltage reading shows the voltage difference between the probes. The continuity test checks whether electricity can pass between them. Turn the power off before this test.',
                   'Choose Carry to measure while the object moves. Measure again after each repair.',
                 ]
               : [
                   'Finding the fault',
                   'First test the object as its owner uses it. Then open the cover.',
-                  'Place the probes on two terminals to take a reading. Choose whether to test on the table, while carrying the object or under load.',
+                  'Place the probes on two terminals to take a reading. Choose whether to test on the table, while carrying the object or while it works harder.',
                   'Look closely at the part that the reading points to before you replace it. You have limited spare parts.',
                 ];
   return (
@@ -1480,7 +1484,7 @@ export default function App() {
                                         ? '▱ On table'
                                         : c === 'movement'
                                           ? '↝ Carry'
-                                          : '◉ Under load'}
+                                          : '◉ Work harder'}
                                       <small>
                                         {job.verified.includes(c)
                                           ? 'Passed'
@@ -1512,14 +1516,14 @@ export default function App() {
                                 <div className="meter-screen">
                                   <span>
                                     {lastReading?.request
-                                      ? `${lastReading.request.mode} · ${lastReading.request.condition}`
+                                      ? `${lastReading.request.mode} · ${testWords[lastReading.request.condition]}`
                                       : 'There is no reading yet.'}
                                   </span>
                                   <strong>
                                     {lastReading?.value === undefined || lastReading.value === null
                                       ? '—'
                                       : lastReading.value.toFixed(2)}
-                                    <small>{lastReading?.unit}</small>
+                                    <small>{readingUnit(lastReading?.unit)}</small>
                                   </strong>
                                   <small>
                                     {lastReading?.request
@@ -1570,7 +1574,7 @@ export default function App() {
                                         ? '▱ On table'
                                         : c === 'movement'
                                           ? '↝ Carry'
-                                          : '◉ Under load'}
+                                          : '◉ Work harder'}
                                     </button>
                                   ))}
                                 </div>
@@ -1627,7 +1631,7 @@ export default function App() {
                                   )}
                                 {part?.kind === 'governor' && (
                                   <div className="governor-control">
-                                    <p>The collar is set to {part.setting ?? 2}.</p>
+                                    <p>The speed control ring is set to {part.setting ?? 2}.</p>
                                     <div>
                                       {[0, 1, 2, 3, 4].map((setting) => (
                                         <button
@@ -1664,14 +1668,15 @@ export default function App() {
                                     <div className="drive-reference">
                                       <p>
                                         Place one probe on a shaft and the other on the fixed frame
-                                        at terminal 0 to measure shaft speed.
+                                        at point 0 to measure how fast the shaft turns. The labelled
+                                        points show where to place the probes.
                                       </p>
                                       <ol>
                                         <li>
                                           <strong>Spring · A</strong>
                                           <span>
                                             The spring is rated to turn at{' '}
-                                            {job.model.ratedDrive ?? 120} rpm.
+                                            {job.model.ratedDrive ?? 120} turns per minute.
                                           </span>
                                         </li>
                                         <li>
@@ -1683,8 +1688,8 @@ export default function App() {
                                         <li>
                                           <strong>Governor · C</strong>
                                           <span>
-                                            Multiply the speed by the number listed for the collar
-                                            setting.
+                                            The governor controls the speed. Multiply the speed by
+                                            the number listed for the ring’s setting.
                                           </span>
                                         </li>
                                         <li>
@@ -1693,7 +1698,7 @@ export default function App() {
                                         </li>
                                       </ol>
                                       <table>
-                                        <caption>Governor collar reference</caption>
+                                        <caption>Speed control ring settings</caption>
                                         <thead>
                                           <tr>
                                             <th scope="col">Setting</th>
@@ -1717,7 +1722,7 @@ export default function App() {
                                         The owner wants the drum to turn at{' '}
                                         <strong>
                                           {job.model.desiredRPM ?? 15} ± {job.model.tolerance ?? 3}{' '}
-                                          rpm
+                                          turns per minute
                                         </strong>
                                         . These ratios describe how the parts change the speed.
                                         Compare readings along the mechanism. Test it as the owner
@@ -1726,10 +1731,12 @@ export default function App() {
                                     </div>
                                   ) : (
                                     <p>
-                                      A working power source supplies {job.model.sourceVolts} V.
-                                      Working connections usually lose less than 0.2 V. Compare
-                                      readings from the same two terminals on the table and in the
-                                      condition that caused the problem.
+                                      The terminals are the labelled points where you place the
+                                      probes. A working power source supplies{' '}
+                                      {job.model.sourceVolts} volts (V). Working connections usually
+                                      lose less than 0.2 volts. Compare readings from the same two
+                                      terminals on the table and in the condition that caused the
+                                      problem.
                                     </p>
                                   )}
                                 </details>
@@ -1750,7 +1757,8 @@ export default function App() {
                               part?.kind === 'governor' &&
                               state.now + 20 > state.watchUntil && (
                                 <p className="lesson-overrun">
-                                  Changing the collar setting would finish after Sam’s agreed time.
+                                  Changing the speed control ring would finish after Sam’s agreed
+                                  time.
                                 </p>
                               )}
                             {pane !== 'notes' &&
@@ -1768,7 +1776,9 @@ export default function App() {
                             disabled={jobLocked}
                             onClick={() => act({ type: 'deliver', jobId: job.id })}
                           >
-                            Return to {state.people[job.ownerId]?.name ?? job.ownerId}
+                            Return to{' '}
+                            {state.people[job.ownerId]?.name ??
+                              (job.ownerId === 'player' ? 'Your project' : 'Its owner')}
                             <small>10 min</small>
                           </button>
                         )}
@@ -2131,7 +2141,7 @@ export default function App() {
                               : id === 'nora'
                                 ? `She is ${Math.floor((state.now - person.life.bornAt) / 525600)} years old. She designs repairs and makes objects.`
                                 : id === 'rafi'
-                                  ? `He is ${Math.floor((state.now - person.life.bornAt) / 525600)} years old. He washes dishes for work. He is visiting from Bornova to learn repairs.`
+                                  ? `He is ${Math.floor((state.now - person.life.bornAt) / 525600)} years old. He washes dishes for work. He is visiting from Bornova, a district in Turkey, to learn repairs.`
                                   : `He is ${Math.floor((state.now - person.life.bornAt) / 525600)} years old. He repairs objects and is visiting the workshop. He now works fewer hours.`}
                           </p>
                           {state.discoveries?.includes(id) && (
@@ -2225,28 +2235,11 @@ export default function App() {
                               </p>
                               <div className="knowledge-list">
                                 {person.methods?.rules.length ? (
-                                  person.methods.rules.map((rule) => {
-                                    const action = rule.action.split(':');
-                                    const label =
-                                      action[0] === 'work'
-                                        ? `${action[1]} ${action[2] ?? 'component'}`
-                                        : action[0] === 'measure'
-                                          ? `Measure ${action[1] ?? 'electrical response'}`
-                                          : action[0] === 'verify'
-                                            ? `Check ${action[1] ?? 'use'}`
-                                            : rule.action.replaceAll('-', ' ').replaceAll(':', ' ');
-                                    return (
-                                      <article key={rule.id}>
-                                        <strong>Observed: {label}</strong>
-                                        <p>
-                                          {rule.conditions
-                                            .filter((c) => c.cue === 'signal')
-                                            .map((c) => String(c.value).replaceAll('-', ' '))
-                                            .join(', ') || 'A workshop demonstration'}
-                                        </p>
-                                      </article>
-                                    );
-                                  })
+                                  describePerson(person).learned.map((method, index) => (
+                                    <article key={person.methods?.rules[index]?.id}>
+                                      <p>{method}</p>
+                                    </article>
+                                  ))
                                 ) : (
                                   <p className="empty-knowledge">
                                     Sam has not watched a repair demonstration yet.
@@ -2320,7 +2313,7 @@ export default function App() {
                             </>
                           )}
                           <details>
-                            <summary>What they said</summary>
+                            <summary>What {person.name} said</summary>
                             {state.log
                               .filter((l) => l.speaker.toLowerCase() === id.toLowerCase())
                               .slice(-8)
@@ -2443,7 +2436,10 @@ export default function App() {
                     {j.status === 'delivered'
                       ? `returned to ${state.people[j.ownerId]?.name ?? j.ownerId}`
                       : 'kept at the workshop'}{' '}
-                    · checked for {requiredChecks(j).join(', ')}
+                    · tested{' '}
+                    {requiredChecks(j)
+                      .map((check) => testWords[check])
+                      .join(' and ')}
                   </p>
                 ))}
               {!state.jobs.some(
@@ -2685,7 +2681,7 @@ export default function App() {
                     target="_blank"
                     rel="noreferrer"
                   >
-                    Lab privacy
+                    How play is recorded
                   </a>
                 </div>
                 <button
@@ -2748,8 +2744,11 @@ export default function App() {
             {sheet === 'job' && job && (
               <>
                 <h2>{job.title}</h2>
-                <p>{state.people[job.ownerId]?.name ?? job.ownerId}</p>
-                <p>“{job.description}”</p>
+                <p>
+                  {state.people[job.ownerId]?.name ??
+                    (job.ownerId === 'player' ? 'Your project' : 'Its owner')}
+                </p>
+                <p>{job.description}</p>
                 {!job.isPersonal && !job.isDonor && (
                   <p>The owner requested this object back by {dayTime(job.due)}.</p>
                 )}
@@ -2797,7 +2796,10 @@ export default function App() {
             {sheet === 'job-actions' && actionJob && (
               <>
                 <h2>{actionJob.title}</h2>
-                <p>{state.people[actionJob.ownerId]?.name ?? actionJob.ownerId}</p>
+                <p>
+                  {state.people[actionJob.ownerId]?.name ??
+                    (actionJob.ownerId === 'player' ? 'Your project' : 'Its owner')}
+                </p>
                 <p>“{actionJob.description}”</p>
                 <p>{jobReadiness(actionJob)}</p>
                 {actionJob.blocked && (

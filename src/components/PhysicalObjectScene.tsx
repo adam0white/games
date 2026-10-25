@@ -44,7 +44,7 @@ export function physicalSceneOutput(job: Job): { output: number; signal: string 
   if (observed) {
     const signal = observed.cues.signal ?? 'no-output';
     const percent = observed.summary.match(/reaches (\d+(?:\.\d+)?)%/);
-    const rpm = observed.summary.match(/turns at (\d+(?:\.\d+)?) rpm/);
+    const rpm = observed.summary.match(/turns at (\d+(?:\.\d+)?) (?:rpm|turns per minute)/);
     const recorded = (observed as Evidence & Partial<UseResult>).output;
     const output =
       typeof recorded === 'number' && Number.isFinite(recorded)
