@@ -55,6 +55,7 @@ import {
   responsibilityAdvances,
   responsibilityOutcomeAdvances,
 } from './responsibility';
+import { refundPart, stockCount, takePart } from './stock';
 import { testWords } from './test-words';
 import type {
   Command,
@@ -114,6 +115,23 @@ const OPEN = 540;
 const CLOSE = 1020;
 const CONDITIONS: TestCondition[] = ['bench', 'movement', 'load'];
 const terminalStates = new Set(['delivered', 'declined', 'salvaged']);
+/** Player commands resolve atomically. Reserve their bench only during the costed advance;
+ * no reservation can survive a returned state or need a save migration. Legacy worlds bypass it.
+ */
+const playerBenchUntil = new WeakMap<GameState, number>();
+function advanceAtBench(s: GameState, minutes: number): void {
+  if (!s.busyWorkshop) {
+    advance(s, minutes);
+    return;
+  }
+  playerBenchUntil.set(s, s.now + minutes);
+  try {
+    advance(s, minutes);
+  } finally {
+    playerBenchUntil.delete(s);
+  }
+}
+
 export function dayTime(now: number): string {
   const minute = now % DAY;
   return `Day ${Math.floor(now / DAY) + 1} · ${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
@@ -474,6 +492,7 @@ function neighbourOffers(s: GameState, initial = false): void {
     .map((_, index) => index)
     .filter((choice) => {
       if (initial && choice >= 3) return false;
+      if (s.busyWorkshop && choice === 4) return false;
       const history = familyHistory(choice);
       if (!continuing) return history.length === 0;
       return !history.some(
@@ -596,6 +615,16 @@ function neighbourOffers(s: GameState, initial = false): void {
     }
     job.requiredConditions =
       choice === 0 ? ['load'] : job.kind === 'lantern' ? ['movement'] : ['load'];
+    if (s.busyWorkshop) {
+      const broken = s.jobs.find(
+        (past) =>
+          past.ownerId === job.ownerId &&
+          past.deliveredAt !== undefined &&
+          past.deliveredAt > past.due,
+      );
+      if (broken)
+        job.description += ` Last time, ${own(broken.title)} came back after the time you gave me. Please allow enough time for this one.`;
+    }
     job.quote = `You will receive £${job.reward} if the object is restored and checked. Return it by ${dayTime(job.due)}.`;
     // Engine 5: the music box has no motor; Nora says what she means.
     if (currentRules(s))
@@ -783,6 +812,12 @@ function activityOptions(s: GameState, job: Job): WorkOption[] {
         evidenceContext(job, job.assignedTo).stage !== 'ready' ||
         ['complete-project', 'deliver', 'rest', 'personal', 'eat', 'drink'].includes(option.action),
     )
+    .filter(
+      (option) =>
+        s.upgrades.includes('second-bench') ||
+        (playerBenchUntil.get(s) ?? 0) <= s.now ||
+        !/^(inspect|measure|probe|clean|adjust|replace|calibrate|verify):/.test(option.action),
+    )
     .filter((o) => canSpendTime(s, o.duration))
     .map((option) => ({
       ...option,
@@ -818,16 +853,18 @@ function beginNpc(s: GameState, job: Job): void {
     return;
   }
   let reservedPart: ComponentKind | undefined;
+  let reservedRecovered = false;
   if (option.action.startsWith('replace:')) {
     const part = compatiblePart(job.model, option.action.split(':')[1] ?? '');
     if (part && (s.stock[part] ?? 0) > 0) {
-      s.stock[part] = (s.stock[part] ?? 0) - 1;
+      reservedRecovered = takePart(s, part);
       reservedPart = part;
     } else {
       finishActivity(person, option, false, s.now);
       return;
     }
   }
+  if (reservedRecovered) log(s, person.name, `I took a recovered ${reservedPart} for this repair.`);
   s.npcWork.push({
     personId: person.id,
     jobId: job.id,
@@ -835,6 +872,7 @@ function beginNpc(s: GameState, job: Job): void {
     startedAt: s.now,
     endsAt: s.now + option.duration,
     ...(reservedPart ? { reservedPart } : {}),
+    ...(reservedRecovered ? { reservedRecovered: true } : {}),
   });
   log(
     s,
@@ -1085,7 +1123,7 @@ function reconcileResponsibilities(s: GameState): void {
       (work) => work.jobId === job.id && work.personId === job.assignedTo,
     );
     for (const work of cancelled) {
-      if (work.reservedPart) s.stock[work.reservedPart] = (s.stock[work.reservedPart] ?? 0) + 1;
+      refundPart(s, work);
       if (person) finishActivity(person, work.option, false, s.now);
     }
     s.npcWork = s.npcWork.filter((work) => !cancelled.includes(work));
@@ -1674,7 +1712,8 @@ function playerWork(
     );
   }
   const watcher = action === 'deliver' ? undefined : watcherStart(s, job, duration);
-  advance(s, duration);
+  if (action === 'deliver') advance(s, duration);
+  else advanceAtBench(s, duration);
   const success = resolve();
   job.contributions.push({ actorId: 'player', action, at: s.now });
   const newObservations = job.evidence.filter((e) => e.id > priorEvidenceId && e.at === s.now);
@@ -1843,7 +1882,7 @@ function playerWork(
 
 function sleepToMorning(s: GameState): void {
   for (const work of s.npcWork) {
-    if (work.reservedPart) s.stock[work.reservedPart] = (s.stock[work.reservedPart] ?? 0) + 1;
+    refundPart(s, work);
     const person = s.people[work.personId];
     if (person) finishActivity(person, work.option, false, s.now);
   }
@@ -1942,6 +1981,27 @@ function sleepToMorning(s: GameState): void {
     );
   }
 }
+export function canStartBusyWorkshop(s: GameState): boolean {
+  return (
+    currentRules(s) &&
+    !s.busyWorkshop &&
+    !s.ended &&
+    !s.chapterPaused &&
+    s.now % DAY <= 810 &&
+    !s.pendingRequest &&
+    !s.watching &&
+    s.jobs.some(
+      (job) => job.ownerId === 'mum' && job.status === 'delivered' && !job.returnedUnfinished,
+    ) &&
+    !s.jobs.some(
+      (job) => job.ownerId !== 'mum' && !job.isPersonal && !job.isDonor && job.status !== 'offer',
+    ) &&
+    !s.jobs.some((job) =>
+      job.contributions.some((contribution) => contribution.action === 'salvage:switch'),
+    ) &&
+    !(s.inputs ?? []).some((command) => command.type === 'buy' && command.part === 'switch')
+  );
+}
 export function dispatch(state: GameState, command: Command): CommandResult {
   const s = structuredClone(state);
   const fail = (message: string): CommandResult => ({ state, ok: false, message });
@@ -1979,6 +2039,70 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       );
   }
   switch (command.type) {
+    case 'start-busy-workshop': {
+      if (!canStartBusyWorkshop(s))
+        return fail(
+          'Try the busy workshop after returning the family lantern, before taking other work or buying or recovering switches. Start before 13:30.',
+        );
+      const start = Math.floor(s.now / DAY) * DAY + 810;
+      // Waiting for the agreed visit runs the ordinary actor clock and actual activities.
+      advance(s, start - s.now);
+      s.busyWorkshop = {
+        edition: 'busy-workshop@1',
+        startedAt: s.now,
+        restockAt: Math.floor(s.now / DAY) * DAY + DAY + OPEN,
+        recoveredStock: {},
+      };
+      s.jobs = s.jobs.filter((candidate) => candidate.status !== 'offer');
+      if (!s.jobs.some((candidate) => candidate.id === s.selectedJobId))
+        s.selectedJobId = s.jobs[0]?.id ?? '';
+      s.stock.switch = (s.stock.switch ?? 0) + 1;
+      const requests: [DeviceKind, string, string, string, number][] = [
+        [
+          'lantern',
+          'Nora’s path lantern',
+          'nora',
+          'I need light on the path before I leave. Please check it while carried.',
+          870,
+        ],
+        [
+          'fan',
+          'Rafi’s filter fan',
+          'rafi',
+          'The room gets warm this afternoon. Please check the airflow through its filter.',
+          900,
+        ],
+        [
+          'lantern',
+          'Nora’s work light',
+          'nora',
+          'I need this beside my design table. Please test it while the light works harder.',
+          930,
+        ],
+      ];
+      for (const [kind, title, owner, purpose, minute] of requests) {
+        const request = makeJob(
+          s,
+          kind,
+          title,
+          owner,
+          purpose,
+          kind === 'fan' ? 32 : 18,
+          Math.floor(s.now / DAY) * DAY + minute,
+        );
+        request.model = createModel(kind, s.seed, [{ componentId: 'switch', condition: 'worn' }]);
+        request.description = reportedSymptoms(request, purpose);
+        request.requiredConditions = kind === 'lantern' && minute === 870 ? ['movement'] : ['load'];
+        request.quote = `Return by ${dayTime(request.due)} for £${request.reward}. You can decline or return it unfinished.`;
+        s.jobs.push(request);
+      }
+      log(
+        s,
+        'Workshop',
+        'The afternoon visitors arrive. The supplier brought one new switch; further switches arrive tomorrow morning. The cracked lantern still has its own untested parts. These returns overlap. You do not have to promise all three.',
+      );
+      return done('The busy afternoon has begun. Choose which promises you can keep.');
+    }
     case 'pause-chapter':
       s.chapterPaused = true;
       log(
@@ -2150,10 +2274,21 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       if (!canSpendTime(s, duration)) return fail('There is not enough workshop time left today.');
       if (command.intervention === 'replace' && !(s.stock[part] ?? 0))
         return fail(`There is no compatible ${part} left. Buy or recover one first.`);
-      if (command.intervention === 'replace') s.stock[part] = (s.stock[part] ?? 0) - 1;
+      if (command.source && (!s.busyWorkshop || command.intervention !== 'replace'))
+        return fail('Choose a part source only for a replacement in the busy workshop.');
+      if (command.source && stockCount(s, part, command.source) < 1)
+        return fail(`There is no ${command.source} ${part} in stock.`);
+      const recovered = command.intervention === 'replace' && takePart(s, part, command.source);
       playerWork(s, job, duration, `${command.intervention}:${command.componentId}`, () =>
         resolvePhysical(s, job, `${command.intervention}:${command.componentId}`),
       );
+      if (s.busyWorkshop && command.intervention === 'replace') {
+        const evidence = job.evidence.at(-1);
+        if (evidence)
+          evidence.summary += recovered
+            ? ' You fitted the recovered part.'
+            : ' You fitted a new part.';
+      }
       return done(job.evidence.at(-1)?.summary ?? 'The work is complete.');
     }
     case 'verify': {
@@ -2187,6 +2322,19 @@ export function dispatch(state: GameState, command: Command): CommandResult {
               .join(' and ')
           } before returning it, or choose to return it unfinished.`,
         );
+      const ownerWork =
+        s.busyWorkshop &&
+        s.npcWork.find(
+          (work) =>
+            work.personId === job.ownerId &&
+            work.option.action === 'personal' &&
+            work.personId === 'mum' &&
+            work.option.label === 'Visit a neighbour',
+        );
+      if (ownerWork)
+        return fail(
+          `${s.people[job.ownerId]?.name ?? 'The owner'} is away: ${ownerWork.option.label}. Try after ${dayTime(ownerWork.endsAt)}.`,
+        );
       if (!canSpendTime(s, COSTS.deliver))
         return fail('There is not enough workshop time left today.');
       playerWork(s, job, COSTS.deliver, 'deliver', () => {
@@ -2216,11 +2364,14 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       if (!canSpendTime(s, COSTS.salvage))
         return fail('There is not enough workshop time left today.');
       // Recovery requires actual visible/tested suitability; hidden truth only resolves yield.
-      advance(s, COSTS.salvage);
+      advanceAtBench(s, COSTS.salvage);
       if (currentRules(s))
         job.contributions.push({ actorId: 'player', action: `salvage:${component.id}`, at: s.now });
       if (component.condition === 'good') {
         s.stock[component.kind] = (s.stock[component.kind] ?? 0) + 1;
+        if (s.busyWorkshop)
+          s.busyWorkshop.recoveredStock[component.kind] =
+            (s.busyWorkshop.recoveredStock[component.kind] ?? 0) + 1;
         log(
           s,
           'Workshop',
@@ -2241,6 +2392,10 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       return done('You finished recovering the part.');
     }
     case 'buy': {
+      if (command.part === 'switch' && s.busyWorkshop && s.now < s.busyWorkshop.restockAt)
+        return fail(
+          `The supplier has no more switches until ${dayTime(s.busyWorkshop.restockAt)}. You can recover one from the spare lantern or return work unfinished.`,
+        );
       const price = PART_PRICES[command.part];
       if (!price) return fail('That part is not stocked.');
       if (s.cash < price) return fail(`A ${command.part} costs £${price}; you have £${s.cash}.`);
@@ -2394,8 +2549,7 @@ export function dispatch(state: GameState, command: Command): CommandResult {
         );
       }
       if (current) {
-        if (current.reservedPart)
-          s.stock[current.reservedPart] = (s.stock[current.reservedPart] ?? 0) + 1;
+        refundPart(s, current);
         const person = s.people[current.personId];
         if (person) finishActivity(person, current.option, false, s.now);
         s.npcWork = s.npcWork.filter((w) => w !== current);

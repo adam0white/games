@@ -133,6 +133,7 @@ export interface NpcWork {
   endsAt: number;
   startedAt: number;
   reservedPart?: ComponentKind;
+  reservedRecovered?: boolean;
 }
 export interface LogEntry {
   id: number;
@@ -167,6 +168,13 @@ export interface GameState {
   cash: number;
   reputation: number;
   stock: Partial<Record<ComponentKind, number>>;
+  /** Recorded opt-in host scenario; absent worlds retain canonical-workshop@2 rules. */
+  busyWorkshop?: {
+    edition: 'busy-workshop@1';
+    startedAt: number;
+    restockAt: number;
+    recoveredStock: Partial<Record<ComponentKind, number>>;
+  };
   jobs: Job[];
   people: Record<string, Person>;
   npcWork: NpcWork[];
@@ -187,12 +195,19 @@ export type Command =
   | { type: 'ask-about-work'; personId: 'sam' | 'nora' | 'rafi' | 'halil' }
   | { type: 'prepare-event'; format: import('./community').CommunityFormat }
   | { type: 'wait-for-site' }
+  | { type: 'start-busy-workshop' }
   | { type: 'accept'; jobId: string }
   | { type: 'decline'; jobId: string }
   | { type: 'inspect'; jobId: string; componentId: string }
   | { type: 'measure'; jobId: string; request: MeasurementRequest }
   | { type: 'power'; jobId: string; on: boolean }
-  | { type: 'work'; jobId: string; componentId: string; intervention: Intervention }
+  | {
+      type: 'work';
+      jobId: string;
+      componentId: string;
+      intervention: Intervention;
+      source?: 'new' | 'recovered';
+    }
   | { type: 'calibrate'; jobId: string; componentId: string; setting: number }
   | { type: 'verify'; jobId: string; condition: TestCondition }
   | { type: 'deliver'; jobId: string; unfinished?: boolean }

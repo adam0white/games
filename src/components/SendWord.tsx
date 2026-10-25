@@ -1,3 +1,4 @@
+import { FEEDBACK_LABELS, type FeedbackLabel } from '@adam0white/lab-client';
 import { useEffect, useRef, useState } from 'react';
 import { lab } from '../lab';
 import { FEEDBACK_NAME_KEY, LAB_PRIVACY, queueFeedback, storedPreference } from '../ui/feedback';
@@ -17,6 +18,7 @@ export function SendWord({
   const [sharePlay, setSharePlay] = useState(false);
   const [verdict, setVerdict] = useState('');
   const [note, setNote] = useState('');
+  const [feedbackLabel, setFeedbackLabel] = useState<FeedbackLabel | undefined>();
   const [name, setName] = useState(() => storedPreference(FEEDBACK_NAME_KEY));
   const [status, setStatus] = useState('');
   const [sent, setSent] = useState(false);
@@ -52,6 +54,7 @@ export function SendWord({
         verdict,
         name,
         sharePlay,
+        feedbackLabel,
       });
       setSent(true);
       setStatus(result);
@@ -100,6 +103,18 @@ export function SendWord({
               type="button"
               aria-pressed={verdict === value}
               onClick={() => setVerdict(verdict === value ? '' : value)}
+            >
+              {label}
+            </button>
+          ))}
+        </fieldset>
+        <fieldset className="sw-verdicts" aria-label="What is happening?">
+          {(Object.entries(FEEDBACK_LABELS) as [FeedbackLabel, string][]).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={feedbackLabel === value}
+              onClick={() => setFeedbackLabel(feedbackLabel === value ? undefined : value)}
             >
               {label}
             </button>

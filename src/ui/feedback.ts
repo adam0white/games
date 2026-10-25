@@ -1,4 +1,4 @@
-import type { Lab } from '@adam0white/lab-client';
+import { FEEDBACK_LABELS, type FeedbackLabel, type Lab } from '@adam0white/lab-client';
 
 export const FEEDBACK_NAME_KEY = 'hf-lab-feedback-name';
 export const LAB_PRIVACY = 'https://human.adamwhite.work/lab/privacy/';
@@ -26,6 +26,7 @@ export async function queueFeedback({
   verdict,
   name,
   sharePlay = false,
+  feedbackLabel,
 }: {
   lab: Lab;
   getRun: () => unknown;
@@ -33,8 +34,15 @@ export async function queueFeedback({
   verdict: string;
   name: string;
   sharePlay?: boolean;
+  feedbackLabel?: FeedbackLabel;
 }): Promise<string> {
-  const message = [verdict ? `Verdict: ${verdict}` : '', note.trim()].filter(Boolean).join('\n\n');
+  const message = [
+    feedbackLabel ? FEEDBACK_LABELS[feedbackLabel] : '',
+    verdict ? `Verdict: ${verdict}` : '',
+    note.trim(),
+  ]
+    .filter(Boolean)
+    .join('\n\n');
   const feedbackRun = () => {
     try {
       return getRun();

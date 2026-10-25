@@ -50,6 +50,7 @@ export function isRecordedCommand(value: unknown): value is Command {
       return (
         keys(value, ['type', 'format']) && member(value.format, ['garden', 'reading', 'theatre'])
       );
+    case 'start-busy-workshop':
     case 'pause-chapter':
     case 'resume-chapter':
     case 'wait-for-site':
@@ -91,10 +92,12 @@ export function isRecordedCommand(value: unknown): value is Command {
       );
     case 'work':
       return (
-        keys(value, ['type', 'jobId', 'componentId', 'intervention']) &&
+        keys(value, ['type', 'jobId', 'componentId', 'intervention', 'source']) &&
         id(value.jobId) &&
         member(value.componentId, parts) &&
-        member(value.intervention, ['clean', 'adjust', 'replace'])
+        member(value.intervention, ['clean', 'adjust', 'replace']) &&
+        (value.source === undefined ||
+          (value.intervention === 'replace' && member(value.source, ['new', 'recovered'])))
       );
     case 'calibrate':
       return (

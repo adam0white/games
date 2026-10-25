@@ -17,6 +17,7 @@ import { continuity, LOCAL_KEY } from './continuity';
 import { admissionFacts, CAST_IDS } from './game/cast';
 import { discoveredAccounts } from './game/cast-content';
 import {
+  canStartBusyWorkshop,
   createGame,
   dayTime,
   dispatch,
@@ -30,6 +31,7 @@ import { evidenceContext } from './game/evidence-context';
 import { governorMultipliers } from './game/model';
 import { describePerson, playerWordReading } from './game/people';
 import { replayRecordedRun } from './game/replay';
+import { stockCount } from './game/stock';
 import type {
   Command,
   ComponentKind,
@@ -75,6 +77,9 @@ function samFinishedPersonal(job: Job): boolean {
   const lastWork = job.evidence.findLast((e) => e.kind === 'work')?.at ?? 0;
   return Boolean(completion && completion.at >= lastWork);
 }
+function freshSeed(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0] ?? 0;
+}
 let initialLoadFailed = false;
 function initial(): GameState {
   try {
@@ -84,7 +89,7 @@ function initial(): GameState {
     initialLoadFailed = true;
     /* A damaged save is replaced only after explicit New game confirmation. */
   }
-  return createGame(42);
+  return createGame(freshSeed());
 }
 function Device({
   job,
@@ -480,6 +485,7 @@ export default function App() {
   }, []);
   const [pane, setPane] = useState<'object' | 'meter' | 'repair' | 'notes'>('object');
   const [opened, setOpened] = useState(false);
+  const [replacementSource, setReplacementSource] = useState<'new' | 'recovered' | undefined>();
   const [introSkipped, setIntroSkipped] = useState(
     () => localStorage.getItem(`small-works-canonical-intro-${state.seed}`) === 'skipped',
   );
@@ -1773,6 +1779,32 @@ export default function App() {
                                   time.
                                 </p>
                               )}
+                            {pane === 'repair' && state.busyWorkshop && part && (
+                              <label className="replacement-source">
+                                Replacement part
+                                <select
+                                  aria-label="Replacement part source"
+                                  value={replacementSource ?? 'auto'}
+                                  onChange={(event) =>
+                                    setReplacementSource(
+                                      event.target.value === 'auto'
+                                        ? undefined
+                                        : (event.target.value as 'new' | 'recovered'),
+                                    )
+                                  }
+                                >
+                                  <option value="auto">
+                                    New if available, otherwise recovered
+                                  </option>
+                                  <option value="new">
+                                    New ({stockCount(state, part.kind, 'new')})
+                                  </option>
+                                  <option value="recovered">
+                                    Recovered ({stockCount(state, part.kind, 'recovered')})
+                                  </option>
+                                </select>
+                              </label>
+                            )}
                             {pane !== 'notes' &&
                               state.watching &&
                               job.pendingLessons.length > 0 && <TeachingRecord job={job} />}
@@ -1875,7 +1907,10 @@ export default function App() {
                                         disabled={
                                           jobLocked ||
                                           !part ||
-                                          (action === 'replace' && !(state.stock[part.kind] ?? 0))
+                                          (action === 'replace' &&
+                                            (replacementSource && state.busyWorkshop
+                                              ? stockCount(state, part.kind, replacementSource) < 1
+                                              : !(state.stock[part.kind] ?? 0)))
                                         }
                                         onClick={() =>
                                           part &&
@@ -1884,6 +1919,11 @@ export default function App() {
                                             jobId: job.id,
                                             componentId: part.id,
                                             intervention: action,
+                                            ...(action === 'replace' &&
+                                            state.busyWorkshop &&
+                                            replacementSource
+                                              ? { source: replacementSource }
+                                              : {}),
                                           })
                                         }
                                       >
@@ -1973,6 +2013,28 @@ export default function App() {
                   parts. People may have other plans.
                 </p>
               </div>
+              {canStartBusyWorkshop(state) && (
+                <details className="busy-workshop-choice">
+                  <summary>Try a busy afternoon</summary>
+                  <p>
+                    Wait until 13:30 for three urgent requests. They share one new switch and the
+                    only bench. The supplier has no further switches until tomorrow. Sam has his own
+                    afternoon plans. Accept only the promises you want to make.
+                  </p>
+                  <p>
+                    This changes this workshop’s afternoon. It takes time to wait for the visitors.
+                  </p>
+                  <button type="button" onClick={() => act({ type: 'start-busy-workshop' })}>
+                    Wait for the afternoon visitors
+                  </button>
+                </details>
+              )}
+              {state.busyWorkshop && (
+                <p className="busy-workshop-note">
+                  Busy afternoon · New and recovered parts stay separate. Further switches reach the
+                  supplier {dayTime(state.busyWorkshop.restockAt)}.
+                </p>
+              )}
               <div className="workboard-columns">
                 {[
                   ['offer', 'Asked of you'],
@@ -2251,7 +2313,7 @@ export default function App() {
                                   )
                                   .map((c) => (
                                     <p key={`${c.label}-${c.from}`}>
-                                      <strong>{c.label}</strong>
+                                      <strong>Planned: {c.label}</strong>
                                       <small>
                                         {dayTime(c.from)} – {dayTime(c.until)}
                                       </small>
@@ -2337,7 +2399,7 @@ export default function App() {
                                   )
                                   .map((c) => (
                                     <p key={`${c.label}-${c.from}`}>
-                                      <strong>{c.label}</strong>
+                                      <strong>Planned: {c.label}</strong>
                                       <small>
                                         {dayTime(c.from)} – {dayTime(c.until)}
                                       </small>
@@ -2363,13 +2425,20 @@ export default function App() {
                   <h2>Supplies</h2>
                   <h3>Parts drawer</h3>
                   <p>Replacing a part uses one spare part. Buying spare parts uses cash.</p>
+                  {state.busyWorkshop && <p>Recovered counts are included in the totals below.</p>}
                   <div className="stock-list">
                     {Object.entries(PART_PRICES).map(([kind, price]) => (
                       <div key={kind}>
                         <span className="part-name">{kind}</span>
                         <strong>
                           {state.stock[kind as ComponentKind] ?? 0}
-                          <small> in stock</small>
+                          <small>
+                            {' '}
+                            in stock
+                            {state.busyWorkshop
+                              ? ` · ${state.busyWorkshop.recoveredStock[kind as ComponentKind] ?? 0} recovered`
+                              : ''}
+                          </small>
                         </strong>
                         <button
                           type="button"
@@ -2437,6 +2506,13 @@ export default function App() {
             <p className="eyebrow">Your first week is complete.</p>
             <h2>Your first week</h2>
             <p>The first week is over. Here is what happened.</p>
+            <button
+              type="button"
+              className="primary-action"
+              onClick={() => act({ type: 'continue' })}
+            >
+              Keep the workshop open
+            </button>
             <details className="tally-fold">
               <summary>See the tally ▸</summary>
               <WorkshopTally state={state} enabled />
@@ -2563,13 +2639,6 @@ export default function App() {
                 </button>
               )}
             </div>
-            <button
-              type="button"
-              className="primary-action"
-              onClick={() => act({ type: 'continue' })}
-            >
-              Keep the workshop open
-            </button>
           </div>
         </div>
       )}
@@ -2682,7 +2751,7 @@ export default function App() {
                     <button
                       type="button"
                       disabled={entering}
-                      onClick={() => void startWorkshop(state.seed + 1)}
+                      onClick={() => void startWorkshop(freshSeed())}
                     >
                       Start new game
                     </button>

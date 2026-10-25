@@ -182,3 +182,34 @@ body {
   width: 100%;
   max-width: 100%;
 }
+
+/* Notes use light text on the same dark tool surface as their measurements. */
+.workshop-shell .reading-comparison table,
+.workshop-shell .reading-comparison td,
+.workshop-shell .reading-comparison th,
+.workshop-shell .reading-comparison caption,
+.workshop-shell .reading-comparison small {
+  color: #e2dfd2;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.workshop-shell .reading-comparison td,
+.workshop-shell .reading-comparison th {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+.workshop-shell .reading-comparison td small {
+  display: block;
+  color: #c6d3c7;
+}
+.workshop-shell .replacement-source {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+}
+.workshop-shell .busy-workshop-choice {
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--muted);
+}

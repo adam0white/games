@@ -134,6 +134,25 @@ export function loadGame(text: string): GameState {
     Object.entries(value.stock).some(([kind, count]) => !parts.includes(kind) || !integer(count))
   )
     invalid();
+  if (value.busyWorkshop !== undefined) {
+    const busy = value.busyWorkshop;
+    if (
+      !object(busy) ||
+      busy.edition !== 'busy-workshop@1' ||
+      !integer(busy.startedAt) ||
+      busy.startedAt > value.now ||
+      busy.startedAt % DAY !== 810 ||
+      busy.restockAt !== Math.floor(busy.startedAt / DAY) * DAY + DAY + OPEN ||
+      !object(busy.recoveredStock) ||
+      Object.entries(busy.recoveredStock).some(
+        ([part, count]) =>
+          !parts.includes(part) ||
+          !integer(count) ||
+          count > (value.stock[part as keyof typeof value.stock] ?? 0),
+      )
+    )
+      invalid();
+  }
   for (const job of value.jobs) {
     if (
       !object(job) ||
@@ -534,6 +553,8 @@ export function loadGame(text: string): GameState {
       (job !== undefined &&
         value.people[w.personId]?.activity?.targetId !==
           (w.option.action === 'accept-repair' ? 'ordinary-day' : job.id)) ||
+      (w.reservedRecovered !== undefined &&
+        (!value.busyWorkshop || w.reservedRecovered !== true || !w.reservedPart)) ||
       (w.reservedPart !== undefined &&
         (!job ||
           job.assignedTo !== w.personId ||

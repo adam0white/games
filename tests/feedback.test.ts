@@ -106,3 +106,13 @@ it('returns a stored receipt only after the send is acknowledged', async () => {
   await sending;
   expect(receipt).toBe('Sent. Your note is stored. · stored-ref');
 });
+
+it('keeps a chosen quiet label literal until normal submission', async () => {
+  const { lab, input } = setup();
+  await queueFeedback({ ...input, feedbackLabel: 'confused' });
+  expect(lab.sendFeedback).toHaveBeenCalledWith("I'm confused\n\nVerdict: mixed\n\nA note", {
+    name: 'Tester',
+    sharePlay: false,
+    run: input.getRun(),
+  });
+});
