@@ -82,7 +82,7 @@ describe('independent availability and return review', () => {
     for (const command of commands) {
       const result = dispatch(state, command);
       expect(result.ok).toBe(false);
-      expect(result.message).toMatch(/donor|ruined casing/);
+      expect(result.message).toMatch(/spare object|casing is ruined/);
       expect(result.state).toBe(state);
       expect(saveGame(result.state)).toBe(before);
     }

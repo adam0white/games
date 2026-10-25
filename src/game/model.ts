@@ -183,12 +183,13 @@ function mechanical(model: DeviceModel, condition: TestCondition) {
 }
 export function inspectComponent(model: DeviceModel, id: string): Observation {
   const c = part(model, id);
-  if (!c) return { summary: 'No component at that location.', cues: { signal: 'invalid' } };
+  if (!c)
+    return { summary: 'There is no component at that location.', cues: { signal: 'invalid' } };
   // Exterior age does not establish electrical resistance or internal wear.
   if (c.kind === 'governor') {
     const setting = c.setting ?? (c.condition === 'misaligned' ? 4 : 2);
     return {
-      summary: `${c.label}: Collar pointer is at ${setting} on the 0–4 scale. The casing looks intact.`,
+      summary: `${c.label}: The collar pointer is at ${setting} on the 0–4 scale. The casing looks intact.`,
       cues: { part: c.kind, signal: 'control-setting' },
     };
   }
@@ -225,7 +226,7 @@ export function measure(model: DeviceModel, request: MeasurementRequest): Measur
     return {
       value,
       unit: 'rpm Δ',
-      summary: `${a}: ${round(nodes[a] ?? 0)} rpm; ${b}: ${round(nodes[b] ?? 0)} rpm. Rotation change ${value} rpm.`,
+      summary: `Terminal ${a} reads ${round(nodes[a] ?? 0)} rpm. Terminal ${b} reads ${round(nodes[b] ?? 0)} rpm. The rotation changes by ${value} rpm.`,
       cues: {
         part: c?.kind ?? 'drive',
         signal:
@@ -242,7 +243,12 @@ export function measure(model: DeviceModel, request: MeasurementRequest): Measur
   if (mode === 'continuity') {
     if (model.power) return invalid('Turn power off before checking continuity.');
     if (a === b)
-      return { value: 0, unit: 'Ω', summary: 'Same terminal: 0 Ω.', cues: { signal: 'connected' } };
+      return {
+        value: 0,
+        unit: 'Ω',
+        summary: 'Both probes touch the same terminal, so the reading is 0 Ω.',
+        cues: { signal: 'connected' },
+      };
     // Cell voltage makes resistance testing through a source invalid even with its switch off.
     if (c?.kind === 'cell')
       return invalid('Resistance across the cell pack is not a valid continuity test.');
@@ -265,8 +271,8 @@ export function measure(model: DeviceModel, request: MeasurementRequest): Measur
       unit: 'Ω',
       summary:
         r >= 1e7
-          ? 'No conducting path between these terminals.'
-          : `${round(r)} Ω between ${a} and ${b}.`,
+          ? 'There is no conducting path between these terminals.'
+          : `The resistance between ${a} and ${b} is ${round(r)} Ω.`,
       cues: {
         part: c?.kind ?? 'path',
         signal: r >= 1e7 ? 'open-path' : r > 2 ? 'resistance' : 'connected',
@@ -285,7 +291,7 @@ export function measure(model: DeviceModel, request: MeasurementRequest): Measur
   return {
     value,
     unit: 'V',
-    summary: `${value} V from ${a} to ${b} (${condition}).`,
+    summary: `The voltage from ${a} to ${b} is ${value} V (${condition}).`,
     cues: { part: c?.kind ?? 'path', signal },
   };
 }
@@ -312,16 +318,16 @@ export function feltUse(model: DeviceModel, condition: TestCondition, use: UseRe
         : ratio < 0.3
           ? `The drum barely turns ${where}; the tune is hard to recognise.`
           : ratio < 0.55
-            ? `The drum crawls ${where}; the melody drags badly.`
+            ? `The drum turns very slowly ${where}; the melody is much too slow.`
             : ratio < 0.8
-              ? `The melody drags ${where}.`
+              ? `The melody is too slow ${where}.`
               : ratio < 1
-                ? `The melody drags a little ${where}.`
+                ? `The melody is a little too slow ${where}.`
                 : ratio > 2
-                  ? `The drum races ${where}; the melody gallops.`
+                  ? `The drum turns very fast ${where}; the melody is much too fast.`
                   : ratio > 1.4
-                    ? `The melody hurries ${where}.`
-                    : `The melody hurries a little ${where}.`;
+                    ? `The melody is too fast ${where}.`
+                    : `The melody is a little too fast ${where}.`;
   }
   const fan = model.kind === 'fan';
   const o = use.output;
@@ -331,26 +337,26 @@ export function feltUse(model: DeviceModel, condition: TestCondition, use: UseRe
       : `The light goes out ${where}.`
     : o < 0.4
       ? fan
-        ? `Barely a breath of air ${where}; not enough.`
-        : `Only a faint glow ${where}; not enough.`
+        ? `The fan barely moves air ${where}. It is not enough.`
+        : `The light glows faintly ${where}. It is not enough.`
       : !use.passes
         ? fan
-          ? `Air moves, but weakly, ${where}; not enough.`
-          : `It lights, but dimly, ${where}; not enough.`
+          ? `The fan moves air weakly ${where}. It is not enough.`
+          : `The light shines dimly ${where}. It is not enough.`
         : o >= 0.9
           ? fan
-            ? `A strong, steady breeze ${where}.`
-            : `Bright and steady ${where}.`
+            ? `The fan moves air strongly and steadily ${where}.`
+            : `The light shines brightly and steadily ${where}.`
           : fan
-            ? `A steady breeze ${where}.`
-            : `Steady light ${where}.`;
+            ? `The fan moves air steadily ${where}.`
+            : `The light shines steadily ${where}.`;
 }
 export function runUseTest(model: DeviceModel, condition: TestCondition): UseResult {
   if (!model.power)
     return {
       passes: false,
       output: 0,
-      summary: 'Power is off; no output.',
+      summary: 'The power is off, so the object does not run.',
       cues: { signal: 'power-off' },
     };
   if (model.kind === 'music-box') {
@@ -362,7 +368,7 @@ export function runUseTest(model: DeviceModel, condition: TestCondition): UseRes
     return {
       passes,
       output: round(output),
-      summary: `Drum turns at ${round(output)} rpm under ${condition} (requested ${desiredRPM} ± ${tolerance} rpm); ${passes ? 'melody keeps its pace.' : output === 0 ? 'melody stops.' : 'melody loses its pace.'}`,
+      summary: `The drum turns at ${round(output)} rpm during the ${condition} test (requested ${desiredRPM} ± ${tolerance} rpm); ${passes ? 'the melody keeps its pace.' : output === 0 ? 'the melody stops.' : 'the melody loses its pace.'}`,
       cues: {
         part: 'drum',
         signal: output === 0 ? 'blocked-drive' : passes ? 'steady-output' : 'timing',
@@ -383,7 +389,7 @@ export function runUseTest(model: DeviceModel, condition: TestCondition): UseRes
   return {
     passes,
     output: round(output),
-    summary: `${model.kind === 'fan' ? 'Airflow' : 'Light'} reaches ${Math.round(output * 100)}% under ${condition}; ${passes ? 'output stays steady.' : 'output falls short.'}`,
+    summary: `${model.kind === 'fan' ? 'Airflow' : 'Light'} reaches ${Math.round(output * 100)}% during the ${condition} test; ${passes ? 'the output stays steady.' : 'the output falls short.'}`,
     cues: {
       part: data.load.kind,
       signal: output === 0 ? 'no-output' : passes ? 'steady-output' : 'weak-output',
@@ -396,11 +402,14 @@ export function intervene(
   intervention: Intervention,
 ): { ok: boolean; summary: string } {
   const c = part(model, id);
-  if (!c) return { ok: false, summary: 'No component at that location.' };
+  if (!c) return { ok: false, summary: 'There is no component at that location.' };
   if (intervention === 'replace') {
     c.condition = 'good';
     if (c.kind === 'governor') c.setting = 2;
-    return { ok: true, summary: `Replaced ${c.label}. Test the object again.` };
+    return {
+      ok: true,
+      summary: `The ${c.label.toLowerCase()} was replaced. Test the object again.`,
+    };
   }
   if (c.kind === 'governor' && intervention === 'adjust')
     return {
@@ -410,30 +419,30 @@ export function intervene(
   const fixes = intervention === 'clean' ? 'dirty' : 'misaligned';
   if (c.condition === fixes) c.condition = 'good';
   const cleanOperations: Record<ComponentKind, string> = {
-    cell: 'Cleaned the cell pack terminals',
-    switch: 'Cleaned the switch contact faces',
-    contact: 'Cleaned the mating contact faces',
-    bulb: 'Cleaned the bulb socket faces',
-    motor: 'Removed residue from the motor bearing',
-    spring: 'Removed residue from the spring arbor',
-    gear: 'Removed residue from the gear teeth',
-    governor: 'Cleaned the governor braking surfaces',
-    drum: 'Removed residue from the drum spindle',
+    cell: 'The cell pack terminals were cleaned',
+    switch: 'The switch contact faces were cleaned',
+    contact: 'The mating contact faces were cleaned',
+    bulb: 'The bulb socket faces were cleaned',
+    motor: 'Residue was removed from the motor bearing',
+    spring: 'Residue was removed from the spring arbor',
+    gear: 'Residue was removed from the gear teeth',
+    governor: 'The governor braking surfaces were cleaned',
+    drum: 'Residue was removed from the drum spindle',
   };
   const adjustOperations: Record<ComponentKind, string> = {
-    cell: 'Reseated the cell pack in its holder',
-    switch: 'Retightened the switch mounting and seated its lever',
-    contact: 'Reseated the contact and tightened its clip',
-    bulb: 'Reseated the bulb in its socket',
-    motor: 'Centered the motor bearing in its mounting',
-    spring: 'Reseated the spring arbor',
-    gear: 'Reseated the gear on its spindle',
-    governor: 'Moved the governor collar',
-    drum: 'Centered the drum spindle in its mounting',
+    cell: 'The cell pack was seated again in its holder',
+    switch: 'The switch mounting was tightened again and its lever was seated',
+    contact: 'The contact was seated again and its clip was tightened',
+    bulb: 'The bulb was seated again in its socket',
+    motor: 'The motor bearing was centred in its mounting',
+    spring: 'The spring arbor was seated again',
+    gear: 'The gear was seated again on its spindle',
+    governor: 'The governor collar was moved',
+    drum: 'The drum spindle was centred in its mounting',
   };
   return {
     ok: true,
-    summary: `${(intervention === 'clean' ? cleanOperations : adjustOperations)[c.kind]}; run under load and movement to check the result.`,
+    summary: `${(intervention === 'clean' ? cleanOperations : adjustOperations)[c.kind]}. Run the object under load and while moving it to check the result.`,
   };
 }
 
@@ -451,6 +460,6 @@ export function calibrate(
   c.setting = setting;
   return {
     ok: true,
-    summary: `Set ${c.label} collar to ${setting}. Measure motion and test the melody.`,
+    summary: `The ${c.label.toLowerCase()} collar was set to ${setting}. Measure motion and test the melody.`,
   };
 }

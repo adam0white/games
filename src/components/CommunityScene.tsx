@@ -27,7 +27,7 @@ export function CommunityScene({
       className="community-scene"
       viewBox="0 0 870 290"
       role="img"
-      aria-label={`Recorded ${stage} stage. ${event.preparedFormats.length} formats prepared. ${participants.length} people completed an activity overall.`}
+      aria-label={`This scene shows the recorded ${stage} stage. ${event.preparedFormats.length} activities were prepared. ${participants.length} people completed an activity overall.`}
     >
       <defs>
         <pattern id="garden-fence" width="18" height="18" patternUnits="userSpaceOnUse">

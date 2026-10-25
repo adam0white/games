@@ -1,6 +1,5 @@
 import { dayTime } from '../game/engine';
 import type { Evidence, Job, TestCondition } from '../game/types';
-import { plainText } from '../ui/plain-text';
 export function ReadingComparison({ job }: { job: Job }) {
   const rows = new Map<
     string,
@@ -18,7 +17,7 @@ export function ReadingComparison({ job }: { job: Job }) {
   return (
     <div className="reading-comparison">
       <table>
-        <caption>Recorded comparisons · latest reading per condition</caption>
+        <caption>This table shows the latest recorded reading for each condition.</caption>
         <thead>
           <tr>
             <th scope="col">Mode / probes</th>
@@ -45,8 +44,8 @@ export function ReadingComparison({ job }: { job: Job }) {
                     key={c}
                     title={
                       e
-                        ? `${plainText(e.summary)} Recorded ${dayTime(e.at)}.`
-                        : 'No measurement recorded'
+                        ? `${e.summary} This was recorded at ${dayTime(e.at)}.`
+                        : 'No measurement has been recorded.'
                     }
                   >
                     {e
@@ -56,7 +55,7 @@ export function ReadingComparison({ job }: { job: Job }) {
                       : '—'}
                     {e &&
                       job.evidence.some((later) => later.kind === 'work' && later.id > e.id) && (
-                        <small>before work</small>
+                        <small>This reading was taken before the later repair work.</small>
                       )}
                   </td>
                 );

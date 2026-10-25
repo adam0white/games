@@ -102,10 +102,10 @@ describe('released whole-cast workshop adapter', () => {
     expect(replayRecordedRun({ ...state, inputs: state.inputs }, saved).ok).toBe(true);
     const changed = structuredClone(state.openingPeople!);
     changed.nora!.body.fitness = 0.99;
-    expect(() => createGame(42, 'current', changed, chapter)).toThrow('differ');
+    expect(() => createGame(42, 'current', changed, chapter)).toThrow('do not match');
     const tampered = JSON.parse(saved);
     tampered.openingPeople = changed;
-    expect(() => loadGame(JSON.stringify(tampered))).toThrow('differ');
+    expect(() => loadGame(JSON.stringify(tampered))).toThrow('do not match');
     expect(snapshot(state.people.nora!)).not.toEqual(snapshot(createGame(42).people.nora!));
   });
   it('refuses an unsupported person before any claim and refuses stale whole-batch writes', async () => {
@@ -113,7 +113,7 @@ describe('released whole-cast workshop adapter', () => {
     const input = preparePersonaLife(parent, 3600000);
     const bad = structuredClone(input);
     bad.parent.source.game = 'unregistered';
-    expect(() => admitWorkshop(bad, createGame(42).people.nora!)).toThrow('adapter');
+    expect(() => admitWorkshop(bad, createGame(42).people.nora!)).toThrow('cannot load people');
     let shelf = acceptPersona({ heads: {}, revisions: [] }, parent);
     const { revision, ...body } = parent;
     const first = await createPersona({ ...body, parentRevision: revision, source: stamps });

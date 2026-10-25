@@ -49,9 +49,9 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
     envelope.castRevision !== canonicalCast(envelope.castId).revision ||
     envelope.terminal
   )
-    throw new Error('Unsupported cast edition, identity or closed chapter.');
+    throw new Error('This cast version or identity is not supported, or its chapter has ended.');
   if (!same(preparePersonaLife(envelope, input.clockMs).life, input.life))
-    throw new Error('Pinned life result differs from its source clock.');
+    throw new Error('The saved life state does not match the time recorded at its source.');
   const site =
     envelope.source.game === 'voice' &&
     role === 'halil' &&
@@ -71,7 +71,7 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
     envelope.transfer.sourceRole === 'hf.cast.nora.smallworks';
   if (!site && !local && !commonstead)
     throw new Error(
-      'This source needs an explicitly registered workshop adapter. Export it or play fresh locally.',
+      'This workshop cannot load people from this source yet. Export the source chapter or start a new local game.',
     );
   const portable = validateCalendarPersona(envelope.transfer.person);
   const mapping = commonstead
@@ -85,7 +85,9 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
     portable.person.source.id !== sourceId ||
     portable.person.source.engine !== '2.17.0'
   )
-    throw new Error('Unsupported source mapping, role or engine.');
+    throw new Error(
+      'The source uses a mapping, role or engine that this workshop does not support.',
+    );
   const checkpoint = envelope.transfer.checkpoint as Record<string, unknown> | undefined;
   if (
     !checkpoint ||
@@ -95,10 +97,10 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
     typeof checkpoint.sha256 !== 'string' ||
     !/^[a-f0-9]{64}$/.test(checkpoint.sha256)
   )
-    throw new Error('Missing full-source checkpoint receipt.');
+    throw new Error('The full source checkpoint record is missing.');
   for (const norm of portable.calendar.norms) {
     if (!DEFAULT_NORMS.some((known) => same(known, norm)))
-      throw new Error('Unsupported source norm meaning.');
+      throw new Error('This workshop does not support the meaning of a rule from the source.');
   }
   if (
     portable.calendar.commitments.some((c) =>
@@ -108,7 +110,9 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
       [...c.actions, ...(c.violatedBy ?? [])].some((a) => !actions.has(a)),
     )
   )
-    throw new Error('A carried duty has no supported action in this workshop; keep it at source.');
+    throw new Error(
+      'This workshop cannot support an existing duty. Keep the person in the source chapter.',
+    );
   // Commonstead's native v1 boundary is a healthy quiet Nora with no transported duties.
   // Refuse future extensions until their reference/action semantics are explicitly mapped.
   if (
@@ -125,7 +129,9 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
       portable.calendar.lapse !== null ||
       !same(portable.calendar.norms, DEFAULT_NORMS))
   )
-    throw new Error('Unsupported Commonstead body, calendar or qualification semantics.');
+    throw new Error(
+      'This workshop cannot preserve this Commonstead body, calendar or qualification state.',
+    );
   const target = restore(snapshot(opening));
   const shifted = structuredClone(portable);
   const offset = target.now - portable.person.source.now;
@@ -143,7 +149,7 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
   if (shifted.calendar.lapse) shifted.calendar.lapse.since += offset;
   const age = portable.person.source.now - portable.person.life.bornAt;
   if (age < canonicalCast(envelope.castId).age * 525600)
-    throw new Error('Canonical age provenance differs.');
+    throw new Error('The age record does not match this character’s original age.');
   target.life.bornAt = portable.person.life.bornAt + offset;
   target.body.fitness = portable.person.health.fitness;
   // Source skill names are archived, not converted into repair methods or qualifications.
@@ -151,7 +157,7 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
   shifted.person.skills = {};
   if (omitted.length)
     shifted.person.limitations.push(
-      `Source skills remain in source archive: ${omitted.join(', ')}`,
+      `These source skills remain in the source archive: ${omitted.join(', ')}.`,
     );
   target.agenda.commitments = [];
   delete target.agenda.owed;
@@ -217,7 +223,7 @@ export async function workshopTransfer(person: Person) {
     raw,
     limitations: [
       ...projection.person.limitations,
-      'Host objects, money, repair methods, customer promises and source-world medical/family context remain in the full source archive. No settlement, healing or new qualification is implied.',
+      'Objects, money, repair methods, customer promises and medical and family context from the source game remain in the full source archive. This transfer does not settle debts, heal illness or grant qualifications.',
     ],
   };
 }
@@ -232,7 +238,7 @@ export function validateCastChapter(chapter: CastChapter) {
     chapter.claims.length !== chapter.inputs.length ||
     new Set(chapter.inputs.map((i) => i.parent.castId)).size !== chapter.inputs.length
   )
-    throw new Error('Invalid whole-cast chapter.');
+    throw new Error('The chapter has invalid or incomplete cast records.');
   for (const input of chapter.inputs) {
     const claim = chapter.claims.find((c) => c.castId === input.parent.castId);
     if (
@@ -246,6 +252,6 @@ export function validateCastChapter(chapter: CastChapter) {
       claim.terminal ||
       !same(claim.transfer, { ...input.parent.transfer, life: input.life })
     )
-      throw new Error('Invalid pinned source claim.');
+      throw new Error('The saved source record is invalid.');
   }
 }

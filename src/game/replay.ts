@@ -60,7 +60,8 @@ export function replayRecordedRun(
   const unsupported = (): ReplayResult => ({
     ok: false,
     reason: 'unsupported-version',
-    message: 'This recording belongs to a different game, scenario, or framework version.',
+    message:
+      'This recording belongs to a different version of Small Works. Start a new game here, or open the recording in its matching archive.',
   });
   if (recording.provenance !== undefined && !isSupportedProvenance(recording.provenance))
     return unsupported();
@@ -140,7 +141,8 @@ export function replayRecordedRun(
         return {
           ok: false,
           reason: 'state-mismatch',
-          message: 'The recorded inputs did not reproduce the exported world.',
+          message:
+            'This recording does not match the saved game. It may come from an older version. Start a new game instead.',
         };
       }
     } catch {

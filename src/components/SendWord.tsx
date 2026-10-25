@@ -126,8 +126,8 @@ export function SendWord({
             onChange={(e) => setName(e.target.value)}
           />
           <p>
-            A sent name labels your whole linked history on this device, past and future. Leave it
-            empty to send without a name.
+            If you send a name, it labels your linked play history on this device, including past
+            and future play. Leave this field empty to send without a name.
           </p>
         </details>
         {!lab.telemetryOn && (

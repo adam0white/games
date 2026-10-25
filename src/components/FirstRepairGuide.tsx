@@ -20,7 +20,7 @@ interface Props {
  * recovering the donor's part costs time and the donor and may yield nothing, and stock is not endless.
  */
 function repairCue(state: GameState, part: Job['model']['components'][number] | undefined): string {
-  if (!part) return 'Replace the part you found failing. Then carry the lantern again.';
+  if (!part) return 'Replace the part that failed. Then carry the lantern again.';
   const name = part.label.toLowerCase();
   const inStock = state.stock[part.kind] ?? 0;
   const donor = state.jobs.find(
@@ -33,12 +33,12 @@ function repairCue(state: GameState, part: Job['model']['components'][number] | 
     inStock === 1
       ? `You have one new ${name} in stock, and it is your only one.`
       : inStock > 1
-        ? `You have new ${name}s in stock.`
-        : `You have no new ${name} in stock; the shop sells them.`;
+        ? `You have more than one new ${name} in stock.`
+        : `You have no new ${name} in stock. The shop sells them.`;
   const fromDonor = donor
     ? ` ${donor.title} has one too. Removing it takes time and turns that object into spare parts. The part may be unusable.`
     : '';
-  return `${stock}${fromDonor} Fit a replacement, then carry the lantern again.`;
+  return `${stock}${fromDonor} Fit a replacement. Then carry the lantern again.`;
 }
 
 /** Readings exist, but all of them predate the latest work on the object. */
@@ -111,7 +111,7 @@ export function FirstRepairGuide({
         <div
           className="guide-probes"
           role="img"
-          aria-label={`Red probe on ${pair.a}, black probe on ${pair.b}; ${pair.condition}`}
+          aria-label={`Place the red probe on ${pair.a} and the black probe on ${pair.b}. Use the ${pair.condition} condition.`}
         >
           <span className="guide-red">
             ● <strong>{pair.a}</strong>
@@ -131,10 +131,10 @@ export function FirstRepairGuide({
           </span>
           <small>
             {pair.condition === 'movement'
-              ? 'while carried'
+              ? 'Measure while carrying it.'
               : pair.condition === 'load'
-                ? 'under load'
-                : 'on the table'}
+                ? 'Measure while it is under load.'
+                : 'Measure while it is on the table.'}
           </small>
         </div>
       )}

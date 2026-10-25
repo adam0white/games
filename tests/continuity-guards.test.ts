@@ -338,7 +338,7 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
     const pending = host.checkpoint('nora');
     await Promise.resolve();
     const fresh = await host.fresh(43, true);
-    await expect(pending).rejects.toThrow('Run changed');
+    await expect(pending).rejects.toThrow('The game changed');
     const journal = JSON.parse(storage.get('small-works-source-journal-v2') ?? '[]');
     expect(journal.length).toBeGreaterThan(0);
     expect(journal.every((row: { runId: string }) => row.runId === original)).toBe(true);

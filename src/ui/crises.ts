@@ -31,7 +31,7 @@ export function workshopCrises(state: GameState): Crisis[] {
       out.push({
         jobId: job.id,
         urgent: true,
-        text: `${owner} is waiting for ${inSentence(job.title)}. You said ${dayTime(job.due)}.`,
+        text: `${owner} is waiting for ${inSentence(job.title)}. You promised to return it at ${dayTime(job.due)}.`,
       });
     else if (job.due < state.now - (state.now % 1440) + 1440)
       out.push({
@@ -43,7 +43,7 @@ export function workshopCrises(state: GameState): Crisis[] {
       out.push({
         jobId: job.id,
         urgent: false,
-        text: `Sam has stopped on ${inSentence(job.title)}: ${job.blocked.reason}`,
+        text: `Sam has stopped working on ${inSentence(job.title)}: ${job.blocked.reason}`,
       });
   }
   const request = state.pendingRequest;

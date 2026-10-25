@@ -16,12 +16,12 @@ export function restoreOpeningPeople(value: unknown): Record<string, Person> {
     Array.isArray(value) ||
     Object.keys(value).sort().join(',') !== roster
   )
-    throw new Error('The pinned workshop opening has an invalid roster.');
+    throw new Error('The saved workshop opening has an invalid list of people.');
   return Object.fromEntries(
     Object.entries(value).map(([id, saved]) => {
       const person = restore(saved);
       if (person.id !== id || person.now !== 540 || canonical(person) !== canonical(saved))
-        throw new Error('The pinned workshop opening is invalid or belongs to another edition.');
+        throw new Error('The saved workshop opening is invalid or belongs to another version.');
       return [id, person];
     }),
   );

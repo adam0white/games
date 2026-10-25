@@ -16,7 +16,7 @@ describe('surfaced workshop problems', () => {
     const [first] = workshopCrises(state);
     expect(first?.urgent).toBe(true);
     expect(first?.jobId).toBe(job.id);
-    expect(first?.text).toContain('You said');
+    expect(first?.text).toContain('You promised to return it');
   });
 });
 

@@ -49,6 +49,16 @@ describe('recorded run replay', () => {
     ).toBe(true);
   });
 
+  it('refuses the earlier text edition so resumed old prose cannot produce a broken export', () => {
+    const oldSave = JSON.parse(saveGame(createGame(42)));
+    oldSave.provenance.game = '4.0.0';
+    expect(() => loadGame(JSON.stringify(oldSave))).toThrow('Start fresh');
+    expect(replayRecordedRun(oldSave, JSON.stringify(oldSave))).toMatchObject({
+      ok: false,
+      reason: 'unsupported-version',
+    });
+  });
+
   it('rejects fractional clock advances without breaking its own export', () => {
     const start = createGame(42);
     const result = dispatch(start, { type: 'wait', minutes: 0.5 });

@@ -43,7 +43,6 @@ import type {
 import { lab } from './lab';
 import { todaysWords, workshopCrises } from './ui/crises';
 import { firstRepairProgress } from './ui/first-repair';
-import { plainText } from './ui/plain-text';
 import './styles.css';
 import './focused-layout.css';
 import './meter-layout.css';
@@ -62,10 +61,10 @@ function checkPurpose(job: Job): string {
   const required = requiredChecks(job);
   if (job.kind === 'lantern')
     return required.includes('movement')
-      ? 'Check that the light survives being carried.'
+      ? 'Check that the light stays on while it is carried.'
       : 'Check that the light stays bright while its owner reads.';
   if (job.kind === 'fan') return 'Check that the fan blows strongly with its filter fitted.';
-  return `Check the drive at the owner’s requested ${job.model.desiredRPM ?? 15} ± ${job.model.tolerance ?? 3} rpm under load.`;
+  return `Check that the drive turns at the owner’s requested ${job.model.desiredRPM ?? 15} ± ${job.model.tolerance ?? 3} rpm under load.`;
 }
 function samFinishedPersonal(job: Job): boolean {
   if (!job.isPersonal || job.completedBy !== 'sam') return false;
@@ -112,7 +111,7 @@ function Device({
   const output = observed ? Number(observed[1]) : 0;
   return (
     <div className={`device-stage ${job.kind}`}>
-      <svg viewBox="0 0 620 400" role="img" aria-label={`${job.title} component layout`}>
+      <svg viewBox="0 0 620 400" role="img" aria-label={`Parts in ${job.title}`}>
         <defs>
           <pattern id="bench-grid" width="20" height="20" patternUnits="userSpaceOnUse">
             <path d="M 20 0 L 0 0 0 20" fill="none" stroke="currentColor" strokeWidth=".5" />
@@ -347,7 +346,7 @@ function Device({
           );
         })}
         <text x="20" y="24" className="diagram-caption">
-          {`FUNCTIONAL LAYOUT · ${condition.toUpperCase()} CONDITION`}
+          {`PARTS · ${condition.toUpperCase()} TEST`}
         </text>
       </svg>
       <div className="alternative-parts">
@@ -633,8 +632,8 @@ export default function App() {
               );
               setTeachingFeedback(
                 pending
-                  ? 'Sam watched this repair step. Let him watch a relevant test next, so he can learn whether it worked.'
-                  : 'Sam saw this step, but he did not see a relevant test before it. He cannot tell what this step changed.',
+                  ? 'Sam watched this repair step. Let him watch a test of the repair next. He can then learn whether it worked.'
+                  : 'Sam saw this step. He did not see a test of this part before the work. He cannot tell what this step changed.',
               );
             } else if (step.kind === 'use' && step.cues.signal !== 'steady-output')
               setTeachingFeedback('Sam watched this test. It did not show that the repair worked.');
@@ -643,7 +642,7 @@ export default function App() {
               const added = next.people.sam?.methods?.rules.filter((r) => !oldIds.has(r.id)) ?? [];
               setTeachingFeedback(
                 added.length
-                  ? `Sam attended the check and retained ${added.length} new observed method${added.length === 1 ? '' : 's'}. See his methods in People.`
+                  ? `Sam watched the test and learned ${added.length} new repair method${added.length === 1 ? '' : 's'}. See what he learned in People.`
                   : 'Sam watched this test. He did not learn a new repair method.',
               );
             } else setTeachingFeedback('Sam watched this step.');
@@ -659,10 +658,10 @@ export default function App() {
             'low-source': 'The battery voltage is below its normal range.',
             voltage: 'This is the voltage between these probes in the selected condition.',
             'open-path': 'Electricity cannot pass between these terminals.',
-            resistance: 'Resistance is above the conducting-link reference.',
-            connected: 'A conducting path is present between these terminals.',
+            resistance: 'The resistance is higher than expected for a working connection.',
+            connected: 'Electricity can pass between these terminals.',
             rotation: 'Compare this shaft speed with the normal speed in Notes.',
-            'slow-drive': 'The observed shaft turns slowly.',
+            'slow-drive': 'This shaft turns slowly.',
             'blocked-drive': 'This shaft is not turning.',
             'power-off': 'The object is switched off.',
           };
@@ -693,14 +692,14 @@ export default function App() {
   const verifyReplay = async () => {
     if (state.inputs === undefined) {
       setReplayStatus(
-        'Replay unavailable: this save has no complete input recording. Older saves and runs beyond the 10,000-action limit cannot be verified this way.',
+        'This save does not record every action, so it cannot be replayed for checking. Older saves and runs beyond the 10,000-action limit cannot be checked this way.',
       );
       return;
     }
     const snapshot = state;
     const expected = saveGame(snapshot);
     setReplayChecking(true);
-    setReplayStatus('Replaying recorded actions…');
+    setReplayStatus('The recorded actions are being replayed…');
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );
@@ -719,8 +718,8 @@ export default function App() {
       setReplayStatus(
         result.ok
           ? saveGame(stateRef.current) === expected
-            ? `Replayed ${snapshot.inputs?.length ?? 0} recorded actions to this exact workshop state.`
-            : 'The recorded snapshot replayed exactly, but your workshop has since changed. Verify the current state again.'
+            ? `All ${snapshot.inputs?.length ?? 0} recorded actions replayed. They produced this exact workshop state.`
+            : 'The recorded actions produced the saved workshop state exactly. Your workshop has changed since the check began. Check it again.'
           : `Replay failed${result.index === undefined ? '' : ` at action ${result.index + 1}`}: ${result.message}`,
       );
     } catch (error) {
@@ -776,7 +775,7 @@ export default function App() {
   const showTools = opened || !guided;
   const result = status && (
     <div className="focused-result" role="status">
-      <p>{plainText(status)}</p>
+      <p>{status}</p>
       {teachingFeedback && (state.watching || hasSamObservation) && (
         <small>{teachingFeedback}</small>
       )}
@@ -844,13 +843,13 @@ export default function App() {
             }
           >
             Review together
-            <small>Take object back · request lesson</small>
+            <small>Take the object back and ask Sam to watch.</small>
           </button>
           <button type="button" onClick={() => act({ type: 'retry-sam', jobId: j.id })}>
             Retry after teaching
           </button>
           <button type="button" onClick={() => act({ type: 'recall', jobId: j.id })}>
-            Take over / cancel responsibility
+            Take the object back
           </button>
         </>
       ) : !progress.apprenticeshipAvailable || j.isDonor || samFinishedPersonal(j) ? null : (
@@ -865,10 +864,10 @@ export default function App() {
           }
         >
           {j.assignedTo
-            ? 'Recall'
+            ? 'Take the object back'
             : j.status === 'ready' && evidenceContext(j, 'sam').stage === 'ready' && !j.isPersonal
               ? 'Ask Sam to return the checked object'
-              : 'Ask Sam to take repair responsibility'}
+              : 'Ask Sam to take charge of the repair'}
         </button>
       )}
       {!j.isPersonal && !j.isDonor && (
@@ -975,7 +974,8 @@ export default function App() {
       <summary>People between chapters</summary>
       <p>{continuity.status}</p>
       <p>
-        Continuity is local to this browser. Recording and character analysis are separate choices.
+        This browser can save people’s histories between chapters. Recording and character analysis
+        are separate choices.
       </p>
       <button
         type="button"
@@ -994,7 +994,7 @@ export default function App() {
         disabled={entering}
         onClick={() => void startWorkshop(state.seed + 1, true)}
       >
-        Begin fresh locally without carrying history
+        Start locally with no previous history
       </button>
       {screen === 'play' && (
         <>
@@ -1002,7 +1002,9 @@ export default function App() {
             type="button"
             onClick={() => act({ type: state.chapterPaused ? 'resume-chapter' : 'pause-chapter' })}
           >
-            {state.chapterPaused ? 'Resume this pinned chapter' : 'Pause chapter for departure'}
+            {state.chapterPaused
+              ? 'Resume this saved chapter'
+              : 'Pause this chapter before leaving'}
           </button>
           {state.chapterPaused &&
             Object.entries(CAST_IDS).map(([id]) => (
@@ -1027,7 +1029,7 @@ export default function App() {
                     });
                   }}
                 >
-                  Save {state.people[id]?.name} as explicit alternative branch
+                  Save {state.people[id]?.name} as a separate history
                 </button>
               </div>
             ))}
@@ -1035,13 +1037,13 @@ export default function App() {
       )}
       {state.castChapter?.inputs.map((input) => (
         <p key={input.parent.castId}>
-          Pinned source: {input.parent.source.game} · {input.parent.castId} · revision{' '}
-          {input.parent.revision} · clock {input.clockMs} · {input.life.events.length} retained life
-          events. Source obligations, health and qualifications are not cleared.
+          Saved source: {input.parent.source.game} · {input.parent.castId} · revision{' '}
+          {input.parent.revision} · clock {input.clockMs} · {input.life.events.length} saved life
+          events. People keep their obligations, health and qualifications from the source.
         </p>
       ))}
       <a href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noreferrer">
-        Inspect and export browser histories
+        View and export browser histories
       </a>
     </details>
   );
@@ -1086,38 +1088,38 @@ export default function App() {
           'The workshop',
           'People bring broken things and say how they use them.',
           'Each action takes time. The workshop closes at 17:00.',
-          'A promise has a due time. You may return something honestly unfinished.',
+          'Each promise has a return time. You may return an object unfinished if you say so.',
         ]
       : isEnd
         ? [
             'Your first week',
-            'The account records returns, open promises and Sam’s work.',
-            'The tally is this game’s own convention. It is not a measure of people.',
+            'The record lists returned objects, promises still open and Sam’s work.',
+            'The tally uses this game’s own rules. It does not measure people’s worth.',
           ]
         : view === 'people'
           ? [
               'Sam',
-              'He learns by watching agreed lessons.',
-              'You can ask for more time. Overrunning his agreed time costs his goodwill.',
+              'He learns by watching lessons that he agrees to attend.',
+              'You can ask Sam for more time. He loses goodwill towards you if a step takes longer than he agreed to stay.',
             ]
           : view === 'board'
             ? [
                 'Promises',
                 'Accept a job only if you can return it by the promised time.',
-                'Sam can take responsibility once he has watched the work.',
+                'Sam can take charge of a repair once he has watched the work.',
               ]
             : pane === 'meter'
               ? [
                   'The meter',
                   'Place the red and black probes on two terminals.',
-                  'Voltage measures the difference between the probes. Continuity checks whether electricity can pass between them. Turn the power off for continuity.',
-                  'Choose Carried to measure while the object moves. Measure again after each repair.',
+                  'The voltage reading shows the voltage difference between the probes. The continuity test checks whether electricity can pass between them. Turn the power off before this test.',
+                  'Choose Carry to measure while the object moves. Measure again after each repair.',
                 ]
               : [
                   'Finding the fault',
                   'First test the object as its owner uses it. Then open the cover.',
-                  'Measure between two terminals in one condition.',
-                  'Examine the part indicated by the reading before replacing it. You have limited spare parts.',
+                  'Place the probes on two terminals to take a reading. Choose whether to test on the table, while carrying the object or under load.',
+                  'Look closely at the part that the reading points to before you replace it. You have limited spare parts.',
                 ];
   return (
     <div
@@ -1246,8 +1248,8 @@ export default function App() {
             >
               {hasSave ? 'Resume' : 'Start repairing'}
             </button>
-            <small>Saved on this device.</small>
-            {entering && <p role="status">Opening your workshop…</p>}
+            <small>Your game is saved on this device.</small>
+            {entering && <p role="status">Your workshop is opening…</p>}
             {entryError && (
               <div className="entry-error">
                 <p role="alert">{entryError}</p>
@@ -1338,7 +1340,7 @@ export default function App() {
                   </div>
                   {samPresent && !guided && (
                     <button type="button" className="sam-chip" onClick={() => setView('people')}>
-                      Sam · {state.watching ? 'watching' : 'at work'}
+                      Sam {state.watching ? 'is watching.' : 'is at work.'}
                     </button>
                   )}
                   <button type="button" className="job-header" onClick={() => setSheet('job')}>
@@ -1364,8 +1366,8 @@ export default function App() {
                       {job.assignedTo
                         ? 'Sam has this object.'
                         : state.community?.reservedJobIds.includes(job.id)
-                          ? 'Reserved for the gathering.'
-                          : 'This object is read-only.'}
+                          ? 'This object is reserved for the gathering.'
+                          : 'You cannot work on this object.'}
                     </p>
                   )}
 
@@ -1378,9 +1380,7 @@ export default function App() {
                     />
                   ) : (
                     <>
-                      {!showTools && (
-                        <div className="opening-quote">{plainText(job.description)}</div>
-                      )}
+                      {!showTools && <div className="opening-quote">{job.description}</div>}
                       {showTools && (
                         <>
                           <div
@@ -1506,14 +1506,14 @@ export default function App() {
                                 </p>
                               </fieldset>
                             )}
-                            {pane === 'object' && <h2>{part?.label ?? 'Choose a component'}</h2>}
+                            {pane === 'object' && <h2>{part?.label ?? 'Choose a part'}</h2>}
                             {pane === 'meter' && (
                               <div className="meter-controls">
                                 <div className="meter-screen">
                                   <span>
                                     {lastReading?.request
                                       ? `${lastReading.request.mode} · ${lastReading.request.condition}`
-                                      : 'No reading yet'}
+                                      : 'There is no reading yet.'}
                                   </span>
                                   <strong>
                                     {lastReading?.value === undefined || lastReading.value === null
@@ -1524,9 +1524,9 @@ export default function App() {
                                   <small>
                                     {lastReading?.request
                                       ? `${lastReading.request.a} → ${lastReading.request.b} · ${dayTime(lastReading.at)}`
-                                      : 'Place both probes on terminals'}
+                                      : 'Place both probes on terminals.'}
                                     {lastReading && lastWorkId > lastReading.id
-                                      ? ' · recorded before later work'
+                                      ? ' · This reading was taken before the latest work.'
                                       : ''}
                                   </small>
                                 </div>
@@ -1605,7 +1605,8 @@ export default function App() {
                                 </div>
                                 {powerConflict && (
                                   <p className="power-hint">
-                                    Switch power {mode === 'continuity' ? 'off' : 'on'} for {mode}.
+                                    Switch the power {mode === 'continuity' ? 'off' : 'on'} to
+                                    measure {mode}.
                                   </p>
                                 )}
                               </div>
@@ -1613,21 +1614,20 @@ export default function App() {
                             {pane === 'meter' && diagram}
                             {pane === 'repair' && (
                               <>
-                                <h2>{part?.label ?? 'Choose a component'}</h2>
+                                <h2>{part?.label ?? 'Choose a part'}</h2>
                                 {state.watching &&
                                   part &&
                                   !hasPendingPartLesson &&
                                   !hasComponentBaseline &&
                                   !hasCalibrationBaseline && (
                                     <p className="teaching-baseline-notice">
-                                      Before another intervention on this part, let Sam watch a
-                                      relevant test. That gives him an observation to compare with
-                                      the outcome.
+                                      Before you work on this part again, let Sam watch a test of
+                                      it. He can then compare the result before and after the work.
                                     </p>
                                   )}
                                 {part?.kind === 'governor' && (
                                   <div className="governor-control">
-                                    <p>Collar setting {part.setting ?? 2}</p>
+                                    <p>The collar is set to {part.setting ?? 2}.</p>
                                     <div>
                                       {[0, 1, 2, 3, 4].map((setting) => (
                                         <button
@@ -1653,7 +1653,7 @@ export default function App() {
                                   <summary>Recorded observations · {job.evidence.length}</summary>
                                   {[...job.evidence].reverse().map((e) => (
                                     <p key={e.id}>
-                                      <time>{dayTime(e.at)}</time> {plainText(e.summary)}
+                                      <time>{dayTime(e.at)}</time> {e.summary}
                                     </p>
                                   ))}
                                 </details>
@@ -1669,19 +1669,27 @@ export default function App() {
                                       <ol>
                                         <li>
                                           <strong>Spring · A</strong>
-                                          <span>Rated drive {job.model.ratedDrive ?? 120} rpm</span>
+                                          <span>
+                                            The spring is rated to turn at{' '}
+                                            {job.model.ratedDrive ?? 120} rpm.
+                                          </span>
                                         </li>
                                         <li>
                                           <strong>Gear · B</strong>
-                                          <span>Divide input by {job.model.gearRatio ?? 4}</span>
+                                          <span>
+                                            Divide the input speed by {job.model.gearRatio ?? 4}.
+                                          </span>
                                         </li>
                                         <li>
                                           <strong>Governor · C</strong>
-                                          <span>Multiply by the collar factor</span>
+                                          <span>
+                                            Multiply the speed by the number listed for the collar
+                                            setting.
+                                          </span>
                                         </li>
                                         <li>
                                           <strong>Drum · D</strong>
-                                          <span>Divide governor output by 2</span>
+                                          <span>Divide the governor’s output speed by 2.</span>
                                         </li>
                                       </ol>
                                       <table>
@@ -1698,7 +1706,7 @@ export default function App() {
                                         </thead>
                                         <tbody>
                                           <tr>
-                                            <th scope="row">Factor</th>
+                                            <th scope="row">Multiplier</th>
                                             {governorMultipliers.map((factor) => (
                                               <td key={factor}>×{factor}</td>
                                             ))}
@@ -1706,21 +1714,22 @@ export default function App() {
                                         </tbody>
                                       </table>
                                       <p>
-                                        Owner’s requested drum output:{' '}
+                                        The owner wants the drum to turn at{' '}
                                         <strong>
                                           {job.model.desiredRPM ?? 15} ± {job.model.tolerance ?? 3}{' '}
                                           rpm
                                         </strong>
-                                        . These ratios describe the mechanism; compare actual
-                                        readings across the path and under the requested condition.
+                                        . These ratios describe how the parts change the speed.
+                                        Compare readings along the mechanism. Test it as the owner
+                                        uses it.
                                       </p>
                                     </div>
                                   ) : (
                                     <p>
-                                      A nominal source supplies {job.model.sourceVolts} V. Healthy
-                                      conducting links usually drop less than 0.2 V. Compare the
-                                      same probe pair on the table and under the condition that
-                                      caused trouble.
+                                      A working power source supplies {job.model.sourceVolts} V.
+                                      Working connections usually lose less than 0.2 V. Compare
+                                      readings from the same two terminals on the table and in the
+                                      condition that caused the problem.
                                     </p>
                                   )}
                                 </details>
@@ -1741,7 +1750,7 @@ export default function App() {
                               part?.kind === 'governor' &&
                               state.now + 20 > state.watchUntil && (
                                 <p className="lesson-overrun">
-                                  Applying the collar would finish after Sam’s agreed time.
+                                  Changing the collar setting would finish after Sam’s agreed time.
                                 </p>
                               )}
                             {pane !== 'notes' &&
@@ -1841,13 +1850,15 @@ export default function App() {
                                               ? (state.stock[part.kind] ?? 0) > 0
                                                 ? `30 min · 1 ${part.kind} (${state.stock[part.kind]} stocked)`
                                                 : `No ${part.kind} stocked`
-                                              : 'Choose a component'
+                                              : 'Choose a part'
                                             : '20 min'}
                                         </small>
                                         {state.watching &&
                                           state.watchUntil !== undefined &&
                                           state.now + (action === 'replace' ? 30 : 20) >
-                                            state.watchUntil && <em>After Sam’s agreed time</em>}
+                                            state.watchUntil && (
+                                            <em>This step will finish after Sam’s agreed time.</em>
+                                          )}
                                       </button>
                                     ))}
                                 </div>
@@ -1911,9 +1922,12 @@ export default function App() {
                 }}
               />
               <div className="page-heading">
-                <p className="eyebrow">Promises, not a queue</p>
+                <p className="eyebrow">Promises to keep</p>
                 <h1>The workboard</h1>
-                <p>Choose what this workshop can finish. Time, parts and people are shared.</p>
+                <p>
+                  Choose work that this workshop can finish. All repairs use the workshop’s time and
+                  parts. People may have other plans.
+                </p>
               </div>
               <div className="workboard-columns">
                 {[
@@ -1951,7 +1965,7 @@ export default function App() {
                                 (j.ownerId === 'player' ? 'Your project' : j.ownerId)}
                             </p>
                             <h3>{j.title}</h3>
-                            <p>{plainText(j.description)}</p>
+                            <p>{j.description}</p>
                             {!j.isPersonal && !j.isDonor ? (
                               <div className="promise">
                                 <span>
@@ -1967,14 +1981,14 @@ export default function App() {
                             ) : (
                               <p className="personal-purpose">
                                 {j.isDonor
-                                  ? 'Parts donor · no customer return promise'
-                                  : 'Your retained project · no customer return promise'}
+                                  ? 'You can recover parts from this object. You have not promised to return it.'
+                                  : 'You will keep this project. You have not promised to return it.'}
                               </p>
                             )}
-                            <p className="readiness">{plainText(jobReadiness(j))}</p>
+                            <p className="readiness">{jobReadiness(j)}</p>
                             {samFinishedPersonal(j) && (
                               <p className="personal-completion">
-                                Sam finished this piece of work; the project stays here.
+                                Sam finished this piece of work. The project stays here.
                               </p>
                             )}
                             {progress.apprenticeshipAvailable &&
@@ -1984,8 +1998,8 @@ export default function App() {
                               !j.assignedTo && (
                                 <p className="handoff-knowledge">
                                   {evidenceContext(j, 'sam').stage === 'ready'
-                                    ? 'Checked by you; Sam has received the checks.'
-                                    : 'Checked by you; Sam may need to recheck.'}
+                                    ? 'You checked the object. Sam has received the results.'
+                                    : 'You checked the object. Sam may need to check it again.'}
                                 </p>
                               )}
                             {j.kind === 'lantern' &&
@@ -1998,13 +2012,13 @@ export default function App() {
                                 ),
                               ) && (
                                 <p className="practice-opportunity">
-                                  Sam has watched carried-light work; this is another carried-light
-                                  request. He may still need help.
+                                  Sam has watched a repair to a light that is carried. This owner
+                                  also needs a light to work while carried. Sam may still need help.
                                 </p>
                               )}
                             {j.blocked && (
                               <div className="blocked-responsibility">
-                                <strong>Sam has put this repair aside</strong>
+                                <strong>Sam has put this repair aside.</strong>
                                 <p>{j.blocked.reason}</p>
                               </div>
                             )}
@@ -2016,7 +2030,9 @@ export default function App() {
                                     disabled={j.due < state.now}
                                     onClick={() => act({ type: 'accept', jobId: j.id })}
                                   >
-                                    {j.due < state.now ? 'Requested time passed' : 'Accept promise'}
+                                    {j.due < state.now
+                                      ? 'The requested time has passed'
+                                      : 'Accept promise'}
                                   </button>
                                   <button
                                     type="button"
@@ -2051,8 +2067,8 @@ export default function App() {
                               ['active', 'ready'].includes(j.status) &&
                               !requiredChecks(j).every((c) => j.verified.includes(c)) && (
                                 <small className="warning">
-                                  Check the owner’s use before returning, or choose an honest
-                                  unfinished return.
+                                  Test the object as its owner uses it before returning it. You can
+                                  also return it unfinished if you say so.
                                 </small>
                               )}
                           </article>
@@ -2075,7 +2091,7 @@ export default function App() {
                   <h2>Working together</h2>
                   {state.independentRepairs > 0 && (
                     <div className="capacity-milestone">
-                      <p className="eyebrow">A whole repair handled independently</p>
+                      <p className="eyebrow">Sam completed a whole repair alone.</p>
                       <p>
                         {state.jobs
                           .filter(
@@ -2088,8 +2104,8 @@ export default function App() {
                           .join(', ') || 'Sam completed an independent repair.'}
                       </p>
                       <small>
-                        You can spend that workshop time on another object or your own plans. Future
-                        unfamiliar faults may still need teaching.
+                        You can use that time to repair another object or follow your own plans. Sam
+                        may still need teaching when he meets an unfamiliar fault.
                       </small>
                     </div>
                   )}
@@ -2111,12 +2127,12 @@ export default function App() {
                           )}
                           <p>
                             {id === 'sam'
-                              ? `${Math.floor((state.now - person.life.bornAt) / 525600)} years old. He is a repair apprentice and sometimes works in a kitchen.`
+                              ? `He is ${Math.floor((state.now - person.life.bornAt) / 525600)} years old. He is a repair apprentice and sometimes works in a kitchen.`
                               : id === 'nora'
-                                ? `${Math.floor((state.now - person.life.bornAt) / 525600)} years old. She designs repairs and makes objects.`
+                                ? `She is ${Math.floor((state.now - person.life.bornAt) / 525600)} years old. She designs repairs and makes objects.`
                                 : id === 'rafi'
-                                  ? `${Math.floor((state.now - person.life.bornAt) / 525600)} years old. He is a dish worker from Bornova, visiting to learn repairs.`
-                                  : `${Math.floor((state.now - person.life.bornAt) / 525600)} years old. He repairs objects and is visiting the workshop. He now works fewer hours.`}
+                                  ? `He is ${Math.floor((state.now - person.life.bornAt) / 525600)} years old. He washes dishes for work. He is visiting from Bornova to learn repairs.`
+                                  : `He is ${Math.floor((state.now - person.life.bornAt) / 525600)} years old. He repairs objects and is visiting the workshop. He now works fewer hours.`}
                           </p>
                           {state.discoveries?.includes(id) && (
                             <details>
@@ -2163,8 +2179,9 @@ export default function App() {
                           {id === 'sam' && progress.apprenticeshipAvailable ? (
                             <>
                               <p>
-                                {state.npcWork.find((w) => w.personId === id)?.option.label ??
-                                  describePerson(person).state}
+                                {state.npcWork.find((w) => w.personId === id)
+                                  ? `${person.name} is doing this activity: ${state.npcWork.find((w) => w.personId === id)?.option.label}.`
+                                  : describePerson(person).state}
                               </p>
                               {state.npcWork.find((w) => w.personId === id) && (
                                 <small>
@@ -2199,7 +2216,7 @@ export default function App() {
                               </div>
                               <h4 className="knowledge-heading">Observed repair methods</h4>
                               <p className="knowledge-note">
-                                Sam learned by watching. Repairs he completed alone:{' '}
+                                Sam learned by watching. He has completed this many repairs alone:{' '}
                                 {state.independentRepairs}.
                               </p>
                               <p className="knowledge-note">
@@ -2232,7 +2249,7 @@ export default function App() {
                                   })
                                 ) : (
                                   <p className="empty-knowledge">
-                                    Sam has not yet attended a repair demonstration.
+                                    Sam has not watched a repair demonstration yet.
                                   </p>
                                 )}
                               </div>
@@ -2241,7 +2258,8 @@ export default function App() {
                             <>
                               {state.npcWork.find((w) => w.personId === id) && (
                                 <p className="customer-activity">
-                                  Now: {state.npcWork.find((w) => w.personId === id)?.option.label}
+                                  {person.name} is doing this activity:{' '}
+                                  {state.npcWork.find((w) => w.personId === id)?.option.label}.
                                   <small>
                                     Until{' '}
                                     {dayTime(
@@ -2273,9 +2291,9 @@ export default function App() {
                                 .map((j) => (
                                   <div className="customer-ask" key={j.id}>
                                     <strong>{j.title}</strong>
-                                    <p>{plainText(j.description)}</p>
+                                    <p>{j.description}</p>
                                     <small>
-                                      {plainText(jobReadiness(j))}
+                                      {jobReadiness(j)}
                                       {['offer', 'active', 'ready'].includes(j.status)
                                         ? ` · Return ${dayTime(j.due)}`
                                         : ''}
@@ -2302,12 +2320,12 @@ export default function App() {
                             </>
                           )}
                           <details>
-                            <summary>Actual reports</summary>
+                            <summary>What they said</summary>
                             {state.log
                               .filter((l) => l.speaker.toLowerCase() === id.toLowerCase())
                               .slice(-8)
                               .map((l) => (
-                                <p key={l.id}>{plainText(l.text)}</p>
+                                <p key={l.id}>{l.text}</p>
                               ))}
                           </details>
                         </div>
@@ -2317,7 +2335,7 @@ export default function App() {
                 <section className="stock-section">
                   <h2>Supplies</h2>
                   <h3>Parts drawer</h3>
-                  <p>Replacing a component uses one part. Buying stock uses cash.</p>
+                  <p>Replacing a part uses one spare part. Buying spare parts uses cash.</p>
                   <div className="stock-list">
                     {Object.entries(PART_PRICES).map(([kind, price]) => (
                       <div key={kind}>
@@ -2389,7 +2407,7 @@ export default function App() {
       {isEnd && (
         <div className="end-page">
           <div className="end-body">
-            <p className="eyebrow">First week complete</p>
+            <p className="eyebrow">Your first week is complete.</p>
             <h2>Your first week</h2>
             <p>The first week is over. Here is what happened.</p>
             <details className="tally-fold">
@@ -2406,7 +2424,7 @@ export default function App() {
                   jobs={state.jobs}
                 />
                 <p className="recorded-caption">
-                  Recorded afternoon · actual completed activities and prepared equipment.
+                  This record shows the afternoon’s completed activities and prepared equipment.
                 </p>
               </>
             )}
@@ -2424,7 +2442,7 @@ export default function App() {
                     <strong>{j.title}</strong> ·{' '}
                     {j.status === 'delivered'
                       ? `returned to ${state.people[j.ownerId]?.name ?? j.ownerId}`
-                      : 'retained at the workshop'}{' '}
+                      : 'kept at the workshop'}{' '}
                     · checked for {requiredChecks(j).join(', ')}
                   </p>
                 ))}
@@ -2434,11 +2452,13 @@ export default function App() {
                   !j.returnedUnfinished &&
                   requiredChecks(j).every((c) => j.verified.includes(c)),
               ) && (
-                <p>No completed required use check is recorded. Unfinished work remains saved.</p>
+                <p>
+                  No required use test is recorded as complete. Your unfinished work is still saved.
+                </p>
               )}
             </div>
             <section className="end-people">
-              <h3>What people actually did</h3>
+              <h3>What people did</h3>
               {state.community?.phase === 'completed' ? (
                 state.community.decisions.map((d) => (
                   <p key={d.personId}>
@@ -2494,10 +2514,13 @@ export default function App() {
                 <strong>Community afternoon:</strong>{' '}
                 {state.community.phase === 'completed'
                   ? state.community.outcome
-                  : 'No completed afternoon outcome is recorded yet.'}
+                  : 'No completed afternoon is recorded yet.'}
               </p>
             )}
-            <p>Your promises, parts and learned repair methods carry into the next day.</p>
+            <p>
+              Your promises stay open on the next day. You keep your parts and learned repair
+              methods.
+            </p>
           </div>
           <div className="end-actions">
             <div>
@@ -2582,7 +2605,7 @@ export default function App() {
             {sheet === 'menu' && (
               <>
                 <h2>Workshop</h2>
-                <p>Saved on this device. Time waits while you are away.</p>
+                <p>Your game is saved on this device. Time stops while you are away.</p>
                 {entryError && <p role="alert">{entryError}</p>}
                 {continuityPanel}
                 {labMode && (
@@ -2687,7 +2710,7 @@ export default function App() {
                 </button>
                 {replayStatus && <p role="status">{replayStatus}</p>}
                 <label>
-                  Start from a seed
+                  Choose a starting number (seed)
                   <input
                     type="number"
                     value={seedText}
@@ -2704,7 +2727,7 @@ export default function App() {
                 <a className="reading-row" href="/experiments/">
                   Earlier experiments
                 </a>
-                {status && <p role="status">{plainText(status)}</p>}
+                {status && <p role="status">{status}</p>}
               </>
             )}
             {sheet === 'day' && (
@@ -2712,7 +2735,7 @@ export default function App() {
                 <h2>The day</h2>
                 <p>{dayTime(state.now)}</p>
                 {workday(true)}
-                <p>{Math.max(0, 1020 - (state.now % 1440))} min until closing</p>
+                <p>The workshop closes in {Math.max(0, 1020 - (state.now % 1440))} min.</p>
                 {dueToday.map((j) => (
                   <p key={j.id}>
                     ◷ {j.title} · {dayTime(j.due)}
@@ -2726,8 +2749,10 @@ export default function App() {
               <>
                 <h2>{job.title}</h2>
                 <p>{state.people[job.ownerId]?.name ?? job.ownerId}</p>
-                <p>“{plainText(job.description)}”</p>
-                {!job.isPersonal && !job.isDonor && <p>Promise · {dayTime(job.due)}</p>}
+                <p>“{job.description}”</p>
+                {!job.isPersonal && !job.isDonor && (
+                  <p>The owner requested this object back by {dayTime(job.due)}.</p>
+                )}
                 <RecentConversation
                   key={conversationSession}
                   lines={todaysWords(state)}
@@ -2773,32 +2798,34 @@ export default function App() {
               <>
                 <h2>{actionJob.title}</h2>
                 <p>{state.people[actionJob.ownerId]?.name ?? actionJob.ownerId}</p>
-                <p>“{plainText(actionJob.description)}”</p>
-                <p>{plainText(jobReadiness(actionJob))}</p>
+                <p>“{actionJob.description}”</p>
+                <p>{jobReadiness(actionJob)}</p>
                 {actionJob.blocked && (
                   <p>Sam has put this repair aside: {actionJob.blocked.reason}</p>
                 )}
                 {!actionJob.isPersonal && !actionJob.isDonor && (
                   <p>
-                    Promise · {dayTime(actionJob.due)} · {money(actionJob.reward)}
+                    The owner requested this object back by {dayTime(actionJob.due)}. The payment is{' '}
+                    {money(actionJob.reward)}.
                   </p>
                 )}
                 {!requiredChecks(actionJob).every((c) => actionJob.verified.includes(c)) && (
                   <p>
-                    Check the owner’s use before returning, or choose an honest unfinished return.
+                    Test the object as its owner uses it before returning it. You can also return it
+                    unfinished if you say so.
                   </p>
                 )}
                 {actionJob.status === 'ready' && progress.apprenticeshipAvailable && (
                   <p>
                     {evidenceContext(actionJob, 'sam').stage === 'ready'
-                      ? 'Sam has received your checks.'
-                      : 'Sam may need to recheck.'}
+                      ? 'Sam has received your test results.'
+                      : 'Sam may need to check the object again.'}
                   </p>
                 )}
                 {['active', 'ready'].includes(actionJob.status) ? (
                   responsibilityActions(actionJob)
                 ) : (
-                  <p>{plainText(jobReadiness(actionJob))}</p>
+                  <p>{jobReadiness(actionJob)}</p>
                 )}
                 {result}
               </>
@@ -2808,8 +2835,7 @@ export default function App() {
                 <h2>The workshop's history</h2>
                 {[...state.log].reverse().map((line) => (
                   <p key={line.id}>
-                    <time>{dayTime(line.at)}</time> <strong>{line.speaker}</strong>{' '}
-                    {plainText(line.text)}
+                    <time>{dayTime(line.at)}</time> <strong>{line.speaker}</strong> {line.text}
                   </p>
                 ))}
               </>

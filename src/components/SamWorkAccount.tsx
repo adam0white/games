@@ -14,29 +14,29 @@ export function samWorkRows(jobs: Job[]): SamWorkRow[] {
       const component =
         job.model.components.find((c) => c.id === target)?.label ?? target ?? 'component';
       let label: string | undefined;
-      if (verb === 'deliver') label = `Returned ${job.title}`;
-      else if (verb === 'inspect') label = `Inspected ${component}`;
+      if (verb === 'deliver') label = `Sam returned ${job.title}.`;
+      else if (verb === 'inspect') label = `Sam examined the ${component}.`;
       else if (verb === 'measure')
-        label = `Measured ${component}${detail ? ` under ${detail}` : ''}`;
+        label = `Sam measured the ${component}${detail ? ` under the ${detail} condition` : ''}.`;
       else if (verb === 'probe')
-        label = `Read ${target} between ${detail} and ${extra} under ${last}`;
-      else if (verb === 'clean') label = `Cleaned ${component}`;
-      else if (verb === 'adjust') label = `Adjusted ${component}`;
-      else if (verb === 'replace') label = `Replaced ${component}`;
-      else if (verb === 'calibrate') label = `Set ${component} collar to ${detail}`;
+        label = `Sam measured ${target} between ${detail} and ${extra} under the ${last} condition.`;
+      else if (verb === 'clean') label = `Sam cleaned the ${component}.`;
+      else if (verb === 'adjust') label = `Sam adjusted the ${component}.`;
+      else if (verb === 'replace') label = `Sam replaced the ${component}.`;
+      else if (verb === 'calibrate') label = `Sam set the ${component} collar to ${detail}.`;
       else if (verb === 'verify') {
         const required = requiredChecks(job);
-        label = `Ran ${required.includes(target as 'bench' | 'movement' | 'load') ? 'required ' : ''}${target} use check`;
-      } else if (verb === 'complete-project') label = 'Completed this retained piece of work';
-      else if (verb === 'install') label = `Installed for ${target}`;
-      else if (verb === 'intake') label = 'Received the object';
+        label = `Sam ran the ${required.includes(target as 'bench' | 'movement' | 'load') ? 'required ' : ''}${target} use check.`;
+      } else if (verb === 'complete-project') label = 'Sam completed this project, which you kept.';
+      else if (verb === 'install') label = `Sam installed the object for ${target}.`;
+      else if (verb === 'intake') label = 'Sam received the object.';
       if (!label) continue;
       const grouped = actions.get(contribution.action);
       if (grouped) grouped.count++;
       else actions.set(contribution.action, { label, count: 1 });
     }
     if (job.status === 'delivered' && job.completedBy === 'sam') {
-      const label = `Returned ${job.title}${job.returnedUnfinished ? ', unfinished' : ''}`;
+      const label = `Sam returned ${job.title}${job.returnedUnfinished ? ' unfinished' : ''}.`;
       const recorded = actions.get('deliver');
       if (recorded) recorded.label = label;
       else actions.set('deliver', { label, count: 1 });

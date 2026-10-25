@@ -40,7 +40,7 @@ export class WorkshopContinuity {
   fileOrigin = false;
   loaded = false;
   busy = false;
-  status = 'Browser continuity is separate from lab recording.';
+  status = 'Saving character history across games in this browser is separate from lab recording.';
   private pendingLocal: LocalMeta | null = null;
   private state: (() => GameState) | null = null;
   private changed: () => void = () => {};
@@ -105,19 +105,19 @@ export class WorkshopContinuity {
     this.generation++;
     const saved = JSON.parse(text);
     const state = loadGame(saved.state);
-    if (!saved.started) throw new Error('This was only an unstarted preview.');
+    if (!saved.started) throw new Error('This preview was saved before play started.');
     if (
       !saved.continuity ||
       !Array.isArray(saved.continuity.heads) ||
       typeof saved.continuity.fileOrigin !== 'boolean'
     )
-      throw new Error('Invalid local continuity receipts.');
+      throw new Error('The saved character history records are invalid.');
     if (
       typeof saved.continuity.runId !== 'string' ||
       !Array.isArray(saved.continuity.fileSources) ||
       JSON.stringify(saved.continuity.fileSources).length > 1_000_000
     )
-      throw new Error('Invalid local source archive.');
+      throw new Error('The saved source archive is invalid.');
     this.runId = saved.continuity.runId;
     this.fileSources = saved.continuity.fileSources;
     this.pendingLocal = saved.continuity;
@@ -144,12 +144,12 @@ export class WorkshopContinuity {
     if (this.pendingLocal) {
       const heads = await Promise.all(this.pendingLocal.heads.map((p) => validatePersona(p)));
       if (generation !== this.generation)
-        throw new Error('Identity or run changed during local restore.');
+        throw new Error('The identity or game changed while the saved game was being restored.');
       if (
         heads.some((p) => !CAST.some((c) => c.castId === p.castId)) ||
         new Set(heads.map((p) => p.castId)).size !== heads.length
       )
-        throw new Error('Invalid local ownership roster.');
+        throw new Error('The saved list of character owners is invalid.');
       this.heads = heads;
       this.pendingLocal = null;
     }
@@ -164,7 +164,7 @@ export class WorkshopContinuity {
     lab.setPersonaRecording('preparing-whole-cast');
     try {
       await this.shelf.ready;
-      if (generation !== this.generation) throw new Error('Run changed. Choose again.');
+      if (generation !== this.generation) throw new Error('The game changed. Choose again.');
       const base = createGame(seed);
       let state = base;
       let chapter: CastChapter | undefined;
@@ -188,7 +188,7 @@ export class WorkshopContinuity {
               const people = structuredClone(base.people);
               for (const input of inputs) {
                 const id = Object.keys(CAST_IDS).find((id) => CAST_IDS[id] === input.parent.castId);
-                if (!id) throw new Error('Unallocated person.');
+                if (!id) throw new Error('This character is not assigned to the workshop.');
                 people[id] = admitWorkshop(input, people[id]!);
               }
               return people;
@@ -215,7 +215,7 @@ export class WorkshopContinuity {
         }
       }
       if (generation !== this.generation)
-        throw new Error('Identity or run changed. Chapter did not start.');
+        throw new Error('The identity or game changed. The chapter did not start.');
       this.runId = crypto.randomUUID();
       this.fileSources = [];
       this.heads = chapter?.claims ?? [];
@@ -225,16 +225,16 @@ export class WorkshopContinuity {
       this.started = true;
       this.recordAfterStart = true;
       if (generation !== this.generation)
-        throw new Error('Identity or run changed before chapter start.');
+        throw new Error('The identity or game changed before the chapter started.');
       this.status = shelfUnavailable
         ? 'Your workshop is saved on this device. Shared character history is unavailable here.'
         : chapter
-          ? `Admitted ${chapter.inputs.length} carried histories atomically. Other allocated people are canonical fresh openings.`
+          ? `The chapter loaded all ${chapter.inputs.length} saved character histories together. Other characters start with their original histories.`
           : localOnly
-            ? 'Explicit fresh local chapter. Browser histories remain untouched.'
+            ? 'You started a fresh chapter on this device. Saved character histories in this browser are unchanged.'
             : this.shelf.enabled
-              ? 'Fresh chapter. No carried histories were present.'
-              : 'Continuity is off. This is a canonical fresh local chapter.';
+              ? 'You started a fresh chapter. There were no saved character histories to load.'
+              : 'Character history across games is off. This fresh chapter starts on this device with the original characters.';
       return state;
     } finally {
       this.busy = false;
@@ -252,7 +252,8 @@ export class WorkshopContinuity {
         ...(state.castChapter?.inputs.map((i) => i.parent) ?? []),
       ].map((p) => validatePersona(p)),
     );
-    if (generation !== this.generation) throw new Error('Run changed during file validation.');
+    if (generation !== this.generation)
+      throw new Error('The game changed while the file was being checked.');
     const importedSources = JSON.parse(text).castSources;
     this.runId = crypto.randomUUID();
     this.fileSources =
@@ -266,7 +267,7 @@ export class WorkshopContinuity {
     this.started = true;
     this.recordAfterStart = false;
     this.status =
-      'File-origin recorded play links across games on this device when recording is on. Embedded claims grant no ownership.';
+      'When recording is on, recorded play from this file links to play in other games on this device. Character ownership records in the file do not grant ownership.';
     this.changed();
     return state;
   }
@@ -277,8 +278,8 @@ export class WorkshopContinuity {
     await this.shelf.ready;
     this.shelf.setEnabled(on);
     this.status = on
-      ? 'Continuity enabled. It applies to the next fresh chapter.'
-      : 'Continuity off. This loaded chapter remains pinned.';
+      ? 'Character history across games is on. It applies to the next fresh chapter.'
+      : 'Character history across games is off. The loaded chapter keeps the histories it started with.';
     this.changed();
   }
   async recording(_allow: boolean) {
@@ -297,15 +298,16 @@ export class WorkshopContinuity {
     const runId = this.runId;
     const current = () => generation === this.generation && this.state?.() === state;
     await this.shelf.ready;
-    if (!current()) throw new Error('Run changed before checkpoint.');
-    if (!this.shelf.enabled) throw new Error('Enable browser continuity first.');
+    if (!current()) throw new Error('The game changed before the character could be saved.');
+    if (!this.shelf.enabled)
+      throw new Error('Turn on character history across games in this browser first.');
     const person = state.people[id];
     const castId = CAST_IDS[id];
-    if (!person || !castId) throw new Error('Unallocated person.');
+    if (!person || !castId) throw new Error('This character is not assigned to the workshop.');
     const parent = this.heads.find((p) => p.castId === castId);
     let envelope: PersonaEnvelope;
     if (!person.body.alive) {
-      if (!parent) throw new Error('No owned branch to close.');
+      if (!parent) throw new Error('You do not own a character history that can be closed.');
       envelope = await closePersonaBranch(parent, source(), state.now);
     } else {
       const captured = await workshopTransfer(person);
@@ -340,7 +342,7 @@ export class WorkshopContinuity {
       while (JSON.stringify(journal).length > 1_000_000) journal.shift();
       localStorage.setItem(key, JSON.stringify(journal));
     }
-    if (!current()) throw new Error('Run changed before checkpoint.');
+    if (!current()) throw new Error('The game changed before the character could be saved.');
     await this.shelf.request({
       action: 'put',
       envelope,
@@ -352,7 +354,7 @@ export class WorkshopContinuity {
       a.castId.localeCompare(b.castId),
     );
     localStorage.setItem(LOCAL_KEY, this.localSave(state));
-    this.status = `${person.name}: accepted ${envelope.terminal ? 'terminal closure' : 'checkpoint'}. Source data and unsupported state remain in the local export.`;
+    this.status = `${person.name}: ${envelope.terminal ? 'The end of this character history was saved' : 'The character history was saved'}. Source data and state that cannot transfer remain in the local export.`;
     this.changed();
   }
   async checkpointAll() {

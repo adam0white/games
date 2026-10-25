@@ -79,7 +79,7 @@ describe('recent conversation acknowledgment', () => {
     const baseline = initialConversation(todaysWords(state));
     const returned = dispatch(state, { type: 'deliver', jobId: box.id });
     expect(returned.ok, returned.message).toBe(true);
-    expect(returned.message).toBe('Returned to use.');
+    expect(returned.message).toBe('The object was returned to use.');
     state = returned.state;
     const lines = todaysWords(state);
     expect(lines.some((line) => line.tone === 'warning' && line.text.includes(warning.text))).toBe(

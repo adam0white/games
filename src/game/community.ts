@@ -134,18 +134,18 @@ export function eventOptions(state: GameState, event: CommunityState): FormatVie
       jobId: job?.id,
       jobTitle: job?.title,
       reason: prepared
-        ? 'Prepared for the gathering.'
+        ? 'This activity is prepared for the gathering.'
         : !job
           ? format === 'reading'
-            ? 'Needs a returned checked fan and its owner’s consent.'
+            ? 'This activity needs a returned, checked fan and its owner’s consent.'
             : format === 'garden'
-              ? 'Needs the household’s retained checked lantern.'
-              : 'Needs your retained paper theatre.'
+              ? 'This activity needs the household’s checked lantern to remain available.'
+              : 'This activity needs your paper theatre to remain available.'
           : busy
             ? 'This object is already in use.'
             : !ready
-              ? `Needs a successful retained ${format === 'garden' ? 'movement' : 'load'} check.`
-              : 'Equipment checked; preparation takes 90 minutes.',
+              ? `This activity needs a saved, successful ${format === 'garden' ? 'movement' : 'load'} check.`
+              : 'The equipment is checked. Preparation takes 90 minutes.',
     };
   });
 }
@@ -164,16 +164,17 @@ export function beginPreparation(
   if (event.preparations.some((p) => p.completedAt === undefined))
     return reject('Finish the current preparation first.');
   if (event.preparations.some((p) => p.format === format))
-    return reject('This format is already prepared.');
+    return reject('This gathering activity is already prepared.');
   const view = eventOptions(state, event).find((v) => v.format === format);
-  if (!view?.ready || !view.jobId) return reject(view?.reason ?? 'Unknown gathering format.');
+  if (!view?.ready || !view.jobId)
+    return reject(view?.reason ?? 'This gathering activity is not available.');
   if (event.reservedJobIds.includes(view.jobId)) return reject('This object is already reserved.');
   event.reservedJobIds.push(view.jobId);
   event.preparations.push({ format, jobId: view.jobId, startedAt: now });
   event.phase = 'setting-up';
   return {
     ok: true,
-    message: `Prepare ${view.label.toLowerCase()} for 90 minutes.`,
+    message: `You spend 90 minutes preparing the ${view.label.toLowerCase()}.`,
     cost: COMMUNITY_PREPARATION_MINUTES,
     jobId: view.jobId,
   };
@@ -312,7 +313,7 @@ export function resolveCommunityEvent(state: GameState, event: CommunityState, n
           ? 'Time set aside to start the agreed lesson'
           : 'The agreed repair lesson',
         speech: reservedLessonStart
-          ? 'I have agreed time to start a lesson. Start it before my availability ends.'
+          ? 'I have set aside time to start a lesson. Start it before my availability ends.'
           : 'I have already agreed to watch the repair lesson.',
         completed: false,
       });
@@ -472,13 +473,16 @@ export function finalizeCommunityEvent(state: GameState, event: CommunityState, 
   const participants = event.decisions.filter((d) => d.completed && d.format);
   event.outcome = participants.length
     ? participants
-        .map((d) => `${state.people[d.personId]?.name ?? d.personId}: ${d.activityLabel}.`)
+        .map(
+          (d) =>
+            `${state.people[d.personId]?.name ?? d.personId} chose this activity: ${d.activityLabel}.`,
+        )
         .join(' ')
     : state.schema === 'small-works@5' && event.decisions.length
       ? `Nobody used what you prepared. ${event.decisions
           .map(
             (d) =>
-              `${state.people[d.personId]?.name ?? d.personId}: ${d.activityLabel.replace(/^spend \d+ minutes on: /i, '').toLowerCase()} instead.`,
+              `${state.people[d.personId]?.name ?? d.personId} chose this instead: ${d.activityLabel.replace(/^spend \d+ minutes on: /i, '').toLowerCase()}.`,
           )
           .join(' ')}`
       : 'No prepared activity was completed. People kept other plans, were occupied, or stopped before completion.';

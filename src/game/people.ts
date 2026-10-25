@@ -462,11 +462,11 @@ function readableMethod(action: string, conditions: { cue: string; value: string
   const words = (text: string) => text.replace(/[:_-]/g, ' ');
   const phrases: Record<string, string> = {
     'high-drop': 'a large voltage drop',
-    'low-source': 'the source sags under load',
+    'low-source': 'the source voltage falls under load',
     'slow-drive': 'slower rotation',
     intake: 'an unfamiliar object arrives',
     measured: 'after testing',
-    repaired: 'after intervening',
+    repaired: 'after a repair step',
     'open-path': 'an open circuit',
     resistance: 'excess resistance',
     'blocked-drive': 'the drive cannot turn',
@@ -501,11 +501,11 @@ function readableMethod(action: string, conditions: { cue: string; value: string
         const [direction, , reference] = c.value.split('-');
         return `the ${check} reading is ${direction === 'equal' ? 'equal to' : `${direction} than`} the ${reference} reading`;
       }
-      if (c.cue === 'part') return `the ${words(c.value)}`;
-      if (c.cue === 'signal') return `you observe ${phrases[c.value] ?? words(c.value)}`;
-      if (c.cue === 'stage') return phrases[c.value] ?? `the work is ${words(c.value)}`;
+      if (c.cue === 'part') return `you are checking the ${words(c.value)}`;
+      if (c.cue === 'signal') return `your observation is “${phrases[c.value] ?? words(c.value)}”`;
+      if (c.cue === 'stage') return `the work stage is “${phrases[c.value] ?? words(c.value)}”`;
       if (c.cue === 'family')
-        return `working on ${c.value === 'electrical' ? 'an electrical circuit' : 'a mechanical drive'}`;
+        return `you are working on ${c.value === 'electrical' ? 'an electrical circuit' : 'a mechanical drive'}`;
       return `${words(c.cue)} is ${words(c.value)}`;
     })
     .join(' and ');
@@ -530,7 +530,7 @@ function readableMethod(action: string, conditions: { cue: string; value: string
         : verb === 'ask-help'
           ? 'ask for help'
           : `${words(verb ?? action)}${target ? ` the ${words(target)}` : ''}`;
-  return `When ${condition}, ${instruction}.${scope ? ` Applies to ${scope}.` : ''}`;
+  return `When ${condition}, ${instruction}.${scope ? ` This method applies to ${scope}.` : ''}`;
 }
 
 /** Install one explicit afternoon commitment; do not simulate unobserved activity. */
@@ -574,11 +574,11 @@ export function describePerson(person: Person): {
 } {
   return {
     state: person.activity
-      ? person.activity.affordance.label
+      ? `${person.name} is doing this activity: ${person.activity.affordance.label}.`
       : person.body.exertion > 0.65
-        ? 'Tired'
-        : 'Available',
+        ? `${person.name} is tired.`
+        : `${person.name} is available.`,
     learned: (person.methods?.rules ?? []).map((r) => readableMethod(r.action, r.conditions)),
-    desire: person.trace.at(-1)?.intention ?? 'No recent decision',
+    desire: person.trace.at(-1)?.intention ?? `${person.name} has not made a recent decision.`,
   };
 }

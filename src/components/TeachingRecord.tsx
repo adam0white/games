@@ -1,10 +1,9 @@
 import { dayTime, requiredChecks } from '../game/engine';
 import type { Job } from '../game/types';
-import { plainText } from '../ui/plain-text';
 
 function nextObservation(job: Job, lesson: Job['pendingLessons'][number]): string {
   if (lesson.action.startsWith('calibrate:'))
-    return `Have Sam observe the requested ${requiredChecks(job).join(' or ')} use check at ${job.model.desiredRPM ?? 15} ± ${job.model.tolerance ?? 3} rpm.`;
+    return `Ask Sam to watch the requested ${requiredChecks(job).join(' or ')} use check at ${job.model.desiredRPM ?? 15} ± ${job.model.tolerance ?? 3} rpm.`;
   const baseline = lesson.baseline;
   if (baseline?.request) {
     const r = baseline.request;
@@ -16,10 +15,10 @@ function nextObservation(job: Job, lesson: Job['pendingLessons'][number]): strin
       'slow-drive',
       'blocked-drive',
     ].includes(baseline.cues.signal ?? '');
-    return `Repeat ${r.mode} from ${r.a} to ${r.b} under ${r.condition} with Sam. ${abnormal ? `A successful use check under ${r.condition} can also establish the result.` : 'The starting reading was normal. Use the same probes to compare the result.'} A failed test cannot show what this part changed. Use the same probe pair again.`;
+    return `Repeat the ${r.mode} measurement from ${r.a} to ${r.b} under the ${r.condition} condition with Sam. ${abnormal ? `A successful use check under the ${r.condition} condition can also confirm the result.` : 'The starting reading was normal. Use the same probes to compare the result.'} A failed test cannot show what this part changed. Use the same probe pair again.`;
   }
   if (baseline?.kind === 'use')
-    return `Have Sam observe the same ${baseline.condition ?? 'recorded'} use condition again. Compare it with the recorded baseline; a different condition does not establish this change.`;
+    return `Ask Sam to watch another use test under the same ${baseline.condition ?? 'recorded'} condition. Compare it with the starting test. A different condition does not show what this change did.`;
   return 'There is no starting measurement here. Review what Sam saw before claiming he learned a repair method.';
 }
 export function TeachingRecord({ job }: { job: Job }) {
@@ -53,12 +52,12 @@ export function TeachingRecord({ job }: { job: Job }) {
               <time>
                 {dayTime(step.at)} · {step.kind}
               </time>
-              <p>{plainText(step.summary)}</p>
+              <p>{step.summary}</p>
               <small className="observation-label">
                 {step.actorId === 'sam'
-                  ? 'Sam performed this step'
+                  ? 'Sam performed this step.'
                   : !step.witnessedBy?.includes('sam')
-                    ? 'Sam has no recorded observation of this step'
+                    ? 'There is no record that Sam watched this step.'
                     : step.kind === 'work'
                       ? pending.some(
                           (lesson) => step.componentId && lesson.action.includes(step.componentId),
@@ -67,12 +66,12 @@ export function TeachingRecord({ job }: { job: Job }) {
                         : 'Sam watched. Compare the later test with what he learned.'
                       : step.kind === 'use' && step.cues.signal !== 'steady-output'
                         ? 'Sam watched. This test did not show that the object worked.'
-                        : 'Sam attended this observation'}
+                        : 'Sam watched this test or examination.'}
               </small>
             </li>
           ))}
         </ol>
-        {!attended.length && <p>No attended step is recorded for this object yet.</p>}
+        {!attended.length && <p>There is no record that Sam watched a step on this object yet.</p>}
         {job.ownerId === 'mum' &&
           job.status === 'delivered' &&
           !job.evidence.some((e) => e.kind === 'work' && e.witnessedBy?.includes('sam')) && (

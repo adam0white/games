@@ -50,7 +50,7 @@ describe('canonical workshop edition', () => {
     state = step(state, { type: 'accept', jobId: lantern!.id });
     state = step(state, { type: 'inspect', jobId: lantern!.id, componentId: 'switch' });
     state = step(state, { type: 'ask-about-work', personId: 'halil' });
-    expect(state.log.at(-1)?.text).toContain('no medical treatment or debt settlement');
+    expect(state.log.at(-1)?.text).toContain('does not treat his illness or settle his debts');
     expect(state.log.at(-1)?.text).toContain('Nuran');
   });
   it('requires actual shared objects before Nora or Rafi volunteer a private account', () => {

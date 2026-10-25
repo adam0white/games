@@ -124,16 +124,17 @@ export function requiredChecks(job: Job): TestCondition[] {
   return job.requiredConditions ?? [job.kind === 'lantern' ? 'movement' : 'load'];
 }
 export function jobReadiness(job: Job): string {
-  if (job.returnedUnfinished) return 'Returned honestly, unfinished';
+  if (job.returnedUnfinished) return 'The object was returned honestly, unfinished.';
   if (job.status === 'delivered')
-    return `Back with ${job.ownerId.charAt(0).toUpperCase()}${job.ownerId.slice(1)}`;
-  if (job.status === 'ready') return `Checked for ${requiredChecks(job).join(', ')}`;
-  if (job.assignedTo) return 'Sam has responsibility';
+    return `The object is back with ${job.ownerId.charAt(0).toUpperCase()}${job.ownerId.slice(1)}.`;
+  if (job.status === 'ready')
+    return `The object passed these checks: ${requiredChecks(job).join(', ')}.`;
+  if (job.assignedTo) return 'Sam has responsibility.';
   return job.verified.length
-    ? `Checked: ${job.verified.join(', ')}`
+    ? `The object passed these checks: ${job.verified.join(', ')}.`
     : job.evidence.length
-      ? 'Evidence retained; not fully checked'
-      : 'Not yet investigated';
+      ? 'The observations are saved. The object still needs checks.'
+      : 'The object has not been examined yet.';
 }
 /** A title inside a sentence. Engine 5 keeps a person's name capitalised ("Nora’s reading light"). */
 function named(s: GameState, title: string): string {
@@ -282,14 +283,15 @@ export function createGame(
 ): GameState {
   if (castChapter) {
     validateCastChapter(castChapter);
-    if (!openingPeople) throw new Error('A continuing chapter needs its exact pinned people.');
+    if (!openingPeople)
+      throw new Error('A continuing chapter needs the exact people saved at its start.');
     const expected = createGame(seed).people;
     for (const input of castChapter.inputs) {
       const role = castRole(input.parent.castId)!;
       expected[role] = admitWorkshop(input, expected[role]!);
     }
     if (canonicalPersona(expected) !== canonicalPersona(openingPeople))
-      throw new Error('Pinned people differ from source admission.');
+      throw new Error('The saved people do not match the people loaded from the source.');
   }
   const now = OPEN;
   const legacy = rules === 'legacy';
@@ -339,13 +341,13 @@ export function createGame(
   );
   lantern.model = createModel('lantern', seed, [{ componentId: 'switch', condition: 'worn' }]);
   lantern.acceptedAt = now;
-  lantern.quote = 'A family favour. Return it by 17:00 if you can.';
+  lantern.quote = 'This is a family favour. Return it by 17:00 if you can.';
   const personal = makeJob(
     s,
     'music-box',
     'The little paper theatre',
     'player',
-    'A cardboard street on a music-box drive. The tune races ahead of the figures. Keep it, improve it, or take your time.',
+    'A music-box drive moves this cardboard street. The tune plays too fast for the figures. Keep it, improve it, or take your time.',
     0,
     DAY * 30 + CLOSE,
     'active',
@@ -361,7 +363,7 @@ export function createGame(
     'lantern',
     'The cracked spare lantern',
     'player',
-    'The casing is ruined, but some internals still work. Recovering a part commits this object to salvage.',
+    'The casing is ruined, but some parts inside still work. Once you recover a part, this object can only supply spare parts.',
     0,
     DAY * 30 + CLOSE,
     'active',
@@ -373,7 +375,11 @@ export function createGame(
   ]);
   s.jobs.push(lantern, personal, donor);
   s.selectedJobId = lantern.id;
-  log(s, 'Sam’s mother', 'This lantern belongs to the household. It still has work left in it.');
+  log(
+    s,
+    'Sam’s mother',
+    'This lantern belongs to the household. We can still use it if it is repaired.',
+  );
   log(
     s,
     'Sam',
@@ -382,7 +388,7 @@ export function createGame(
   log(
     s,
     'Workshop',
-    'Time waits for your decisions. Tests leave evidence. Parts and promises are finite.',
+    'The clock moves when you act. Tests leave observations you can review. You have limited parts and time to keep promises.',
   );
   for (const input of castChapter?.inputs ?? []) {
     const facts = admissionFacts(castChapter, castRole(input.parent.castId) ?? '');
@@ -411,7 +417,7 @@ function neighbourOffers(s: GameState, initial = false): void {
       'music-box',
       'Nora’s keepsake music box',
       'nora',
-      '“The melody sounds wrong. This was my grandmother’s. A new motor would miss the point; I want this one to work.”',
+      '“The melody sounds wrong. This was my grandmother’s. I do not want a new motor; I want this one to work.”',
       26,
     ],
     [
@@ -432,7 +438,7 @@ function neighbourOffers(s: GameState, initial = false): void {
       'music-box',
       'Sam’s winding toy',
       'sam',
-      '“I picked this up with my sister. It is meant to move slowly; now it runs ahead or stops. No hurry if you want to try.”',
+      '“I picked this up with my sister. It is meant to move slowly; now it moves too quickly or stops. There is no hurry if you want to try.”',
       22,
     ],
   ];
@@ -545,7 +551,7 @@ function neighbourOffers(s: GameState, initial = false): void {
         );
       }
       job.reward += 8;
-      job.description += ' It has been stored for years; more than one thing may need attention.';
+      job.description += ' It has been stored for years; more than one part may have a fault.';
     }
     if (!initial) {
       const stakes =
@@ -561,25 +567,25 @@ function neighbourOffers(s: GameState, initial = false): void {
           : [
               'I am testing a reading-light design. Please test it with the light actually working.',
               'I work at the dish station in Bornova. I am here to learn repairs, not to offer expertise.',
-              'This was my grandmother’s. A new motor would miss the point; I want this one to work.',
+              'This was my grandmother’s. I do not want a new motor; I want this one to work.',
               'The garden path is uneven. I need it to stay on when it is carried.',
               'We are opening the room on Saturday. The fan needs to move air through its grille.',
-              'I picked this up with my sister. No hurry if you want to try.',
+              'I picked this up with my sister. There is no hurry if you want to try.',
             ])[choice] ?? 'Please check it in ordinary use.';
       const stored = job.description.includes('stored for years');
       job.description = reportedSymptoms(job, stakes);
       if (choice === 5) job.description += ' I want the figures to turn at 18 rpm, within one rpm.';
       if (stored)
-        job.description += ' It has been stored for years; more than one thing may need attention.';
+        job.description += ' It has been stored for years; more than one part may have a fault.';
     }
     job.requiredConditions =
       choice === 0 ? ['load'] : job.kind === 'lantern' ? ['movement'] : ['load'];
-    job.quote = `£${job.reward} if restored and checked. Return by ${dayTime(job.due)}.`;
+    job.quote = `You will receive £${job.reward} if the object is restored and checked. Return it by ${dayTime(job.due)}.`;
     // Engine 5: the music box has no motor; Nora says what she means.
     if (currentRules(s))
       job.description = job.description.replace(
-        'A new motor would miss the point',
-        'New parts would miss the point',
+        'I do not want a new motor',
+        'I do not want new parts',
       );
     s.jobs.push(job);
   }
@@ -587,7 +593,7 @@ function neighbourOffers(s: GameState, initial = false): void {
     s,
     'Workshop',
     count === 0
-      ? 'No new requests today. The existing objects and promises remain.'
+      ? 'There are no new requests today. The existing objects and promises remain.'
       : initial
         ? 'Word of the family repair reaches the neighbours. Three requests are waiting. You do not have to accept all of them.'
         : count === 1
@@ -913,10 +919,10 @@ function resolvePhysical(s: GameState, job: Job, action: string): boolean {
       before === undefined || tried.passes || tried.output === 0
         ? ''
         : tried.output > before * 1.05
-          ? ' Faster than the last try.'
+          ? ' The drum turns faster than it did on the last try.'
           : tried.output < before * 0.95
-            ? ' Slower than the last try.'
-            : ' About the same as the last try.';
+            ? ' The drum turns slower than it did on the last try.'
+            : ' The drum turns at about the same speed as it did on the last try.';
     const felt = feltUse(job.model, condition, tried);
     const use = currentRules(s)
       ? { ...tried, summary: job.model.kind === 'music-box' ? `${felt}${change}` : felt }
@@ -987,13 +993,13 @@ function deliver(s: GameState, job: Job, unfinished: boolean, who = 'player'): v
     log(
       s,
       owner?.name ?? 'Workshop',
-      `${job.title} is back in use.${payment ? ` Received £${payment}.` : ''}${onTime ? '' : ' It came back later than promised.'}${independent ? ' Sam handled the whole repair.' : who !== 'player' ? ' Sam returned the object after shared work.' : ''}`,
+      `${job.title} is back in use.${payment ? ` The workshop received £${payment}.` : ''}${onTime ? '' : ' It came back later than promised.'}${independent ? ' Sam handled the whole repair.' : who !== 'player' ? ' Sam returned the object after shared work.' : ''}`,
       'good',
     );
     const replaced = job.contributions
       .filter((c) => c.action.startsWith('replace:'))
       .map((c) => c.action.slice('replace:'.length));
-    if (currentRules(s) && replaced.length && job.description.includes('miss the point'))
+    if (currentRules(s) && replaced.length && job.description.includes('I want this one to work'))
       log(
         s,
         owner?.name ?? 'Workshop',
@@ -1071,7 +1077,7 @@ function reconcileResponsibilities(s: GameState): void {
     log(
       s,
       person?.name ?? 'Workshop',
-      `My repair purpose for ${named(s, job.title)} has ended. The object is back on the bench for you to decide what happens next.`,
+      `I no longer have the goal of repairing ${named(s, job.title)}. The object is back on the bench for you to decide what happens next.`,
       'warning',
     );
   }
@@ -1137,7 +1143,7 @@ function finishNpc(s: GameState, work: NpcWork): void {
         log(
           s,
           'Workshop',
-          'The object changed again before the previous intervention’s outcome was established. A later result cannot identify which intervention caused it.',
+          'The object changed again before the previous repair step was checked. A later result cannot show which step caused it.',
         );
       }
       const priorEvidenceId = job.evidence.at(-1)?.id ?? 0;
@@ -1495,7 +1501,7 @@ function noteOverdue(s: GameState): void {
       log(
         s,
         owner?.name ?? 'Workshop',
-        `${cap(own(job.title))} is a day past what you said. I’ll take it back as it is whenever you like. I won’t plan around your times so readily now.`,
+        `${cap(own(job.title))} is a day past what you said. I’ll take it back as it is whenever you like. I will be less willing to rely on the times you promise.`,
         'warning',
       );
       continue;
@@ -1535,7 +1541,8 @@ function advance(s: GameState, minutes: number): void {
       s.pendingRequest?.readyUntil ?? Infinity,
       s.watching && (s.watchUntil ?? 0) > s.now ? (s.watchUntil ?? Infinity) : Infinity,
     );
-    if (next < s.now) throw new Error('A workshop activity ended before the current clock.');
+    if (next < s.now)
+      throw new Error('A workshop activity has an end time before the current time.');
     s.now = next;
     tickPeople(s.people, next);
     reconcileResponsibilities(s);
@@ -1647,7 +1654,7 @@ function playerWork(
     log(
       s,
       'Workshop',
-      'The object changed again before the previous intervention’s outcome was established. A later result cannot identify which intervention caused it.',
+      'The object changed again before the previous repair step was checked. A later result cannot show which step caused it.',
     );
   }
   const watcher = action === 'deliver' ? undefined : watcherStart(s, job, duration);
@@ -1707,7 +1714,7 @@ function playerWork(
           log(
             s,
             'Sam',
-            'I watched the intervention, but I did not see a relevant test after the previous work and before this step. A later check cannot establish what this step changed.',
+            'I watched the repair step, but I did not see a relevant test after the previous work and before this step. A later check cannot show what this step changed.',
           );
           return;
         }
@@ -1721,7 +1728,7 @@ function playerWork(
         log(
           s,
           'Sam',
-          'I watched the intervention. We need an observed check before I know its result.',
+          'I watched the repair step. I need to watch a check before I know its result.',
         );
       } else {
         for (const observation of witnessedObservations) {
@@ -1789,8 +1796,8 @@ function playerWork(
               s,
               'Sam',
               improved
-                ? 'The check showed that intervention helped. I can try it with the same evidence.'
-                : 'The check showed no improvement from that intervention. I’ll remember the limit.',
+                ? 'The check showed that repair step helped. I can try it when I have the same observations.'
+                : 'The check showed no improvement from that repair step. I’ll remember that result.',
             );
             return false;
           });
@@ -1861,7 +1868,7 @@ function sleepToMorning(s: GameState): void {
     const cost = Math.min(s.cash, 4);
     s.cash -= cost;
     s.dailyCostsPaid += cost;
-    log(s, 'Workshop', `£${cost} covers consumables and shared workshop costs for today.`);
+    log(s, 'Workshop', `£${cost} covers supplies and shared workshop costs for today.`);
   }
   if (s.day === 2) ensureNeighbours(s);
   else neighbourOffers(s);
@@ -1903,7 +1910,7 @@ function sleepToMorning(s: GameState): void {
     log(
       s,
       'Sam’s mother',
-      `We can use the room and garden tomorrow. The site opens at noon; people arrive at${currentRules(s) ? ' ' : ''}15:00. We have time to prepare two formats, at most. Your paper theatre could be one of them.`,
+      `We can use the room and garden tomorrow. The site opens at noon; people arrive at${currentRules(s) ? ' ' : ''}15:00. We have time to prepare two activities, at most. Your paper theatre could be one of them.`,
     );
   }
   log(s, 'Sam', 'I’m back this morning. I have my own afternoon promise again.');
@@ -1951,7 +1958,9 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       (!facts.availableForExtraWork ||
         (facts.life.place !== 'local-workplace' && s.now < OPEN + 60))
     )
-      return fail('Sam has carried plans first. He is not available for extra workshop work yet.');
+      return fail(
+        'Sam must attend to his existing plans first. He is not available for extra workshop work yet.',
+      );
   }
   switch (command.type) {
     case 'pause-chapter':
@@ -1959,13 +1968,13 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       log(
         s,
         'Workshop',
-        'The chapter is paused for departure. Existing work, duties and illness remain. Only eligible quiet people can be saved to continuity.',
+        'The chapter is paused so people can leave. Existing work, duties and illness remain. You can save people for another chapter only when they are available and meet the transfer rules.',
       );
-      return done('Chapter paused.');
+      return done('The chapter is paused.');
     case 'resume-chapter':
       s.chapterPaused = false;
-      log(s, 'Workshop', 'The same pinned chapter resumes. No newer browser history is read.');
-      return done('Chapter resumed.');
+      log(s, 'Workshop', 'The same saved chapter resumes. It does not load newer browser history.');
+      return done('The chapter has resumed.');
 
     case 'ask-about-work': {
       const id = command.personId;
@@ -2001,7 +2010,7 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       if (!result.ok) return fail(result.message);
       advance(s, result.cost);
       return done(
-        `The format is prepared. The organisers will choose what they can join at${currentRules(s) ? ' ' : ''}15:00.`,
+        `This gathering activity is prepared. The organisers will choose what they can join at${currentRules(s) ? ' ' : ''}15:00.`,
       );
     }
     case 'wait-for-site': {
@@ -2015,7 +2024,7 @@ export function dispatch(state: GameState, command: Command): CommandResult {
     }
     case 'select':
       s.selectedJobId = command.jobId;
-      return done('Object selected.');
+      return done('The object is selected.');
     case 'accept': {
       if (job?.status !== 'offer') return fail('This request has already been decided.');
       if (job.due < s.now) return fail('The requested return time has passed.');
@@ -2023,20 +2032,22 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       job.acceptedAt = s.now;
       log(s, 'You', `I’ll take responsibility for ${named(s, job.title)} by ${dayTime(job.due)}.`);
       s.selectedJobId = job.id;
-      return done('Promise accepted. You can put the object aside without losing evidence.');
+      return done(
+        'You accepted the promise. You can put the object aside without losing your observations.',
+      );
     }
     case 'decline':
       if (job?.status !== 'offer') return fail('Only an unaccepted offer can be declined.');
       job.status = 'declined';
       log(s, 'You', `I cannot promise ${named(s, job.title)} this time.`);
-      return done('Request declined honestly.');
+      return done('You declined the request honestly.');
     case 'power':
       if (!job || terminalStates.has(job.status))
         return fail('This object is no longer on the bench.');
       if (job.assignedTo) return fail('Recall the object before changing its setup.');
       job.model.power = command.on;
       job.contributions.push({ actorId: 'player', action: `power:${command.on}`, at: s.now });
-      return done(command.on ? 'Power on.' : 'Power off.');
+      return done(command.on ? 'The power is on.' : 'The power is off.');
     case 'inspect': {
       if (!job) return fail('Choose an object.');
       const blocked = canWork(s, job);
@@ -2048,7 +2059,7 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       playerWork(s, job, COSTS.inspect, `inspect:${command.componentId}`, () =>
         resolvePhysical(s, job, `inspect:${command.componentId}`),
       );
-      return done(job.evidence.at(-1)?.summary ?? 'Examined.');
+      return done(job.evidence.at(-1)?.summary ?? 'The component was examined.');
     }
     case 'measure': {
       if (!job) return fail('Choose an object.');
@@ -2092,23 +2103,27 @@ export function dispatch(state: GameState, command: Command): CommandResult {
     case 'calibrate': {
       if (!job) return fail('Choose an object.');
       if (job.isDonor)
-        return fail('The ruined casing makes this object a donor. Recover parts instead.');
+        return fail(
+          'The casing is ruined, so this object can only supply spare parts. Recover its parts instead.',
+        );
       const blocked = canWork(s, job);
       if (blocked) return fail(blocked);
       const preview = calibrate(structuredClone(job.model), command.componentId, command.setting);
       if (!preview.ok) return fail(preview.summary);
-      if (!canSpendTime(s, 20)) return fail('The calibration will not fit today.');
+      if (!canSpendTime(s, 20)) return fail('There is not enough time to set the collar today.');
       playerWork(s, job, 20, `calibrate:${command.componentId}:${command.setting}`, () =>
         resolvePhysical(s, job, `calibrate:${command.componentId}:${command.setting}`),
       );
       return done(
-        job.evidence.at(-1)?.summary ?? 'Collar set. Measure the drive or test its pace.',
+        job.evidence.at(-1)?.summary ?? 'The collar was set. Measure the drive or test its pace.',
       );
     }
     case 'work': {
       if (!job) return fail('Choose an object.');
       if (job.isDonor)
-        return fail('The ruined casing makes this object a donor. Recover parts instead.');
+        return fail(
+          'The casing is ruined, so this object can only supply spare parts. Recover its parts instead.',
+        );
       const blocked = canWork(s, job);
       if (blocked) return fail(blocked);
       const part = compatiblePart(job.model, command.componentId);
@@ -2116,12 +2131,12 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       const duration = COSTS[command.intervention];
       if (!canSpendTime(s, duration)) return fail('There is not enough workshop time left today.');
       if (command.intervention === 'replace' && !(s.stock[part] ?? 0))
-        return fail(`No compatible ${part} remains. Buy or recover one first.`);
+        return fail(`There is no compatible ${part} left. Buy or recover one first.`);
       if (command.intervention === 'replace') s.stock[part] = (s.stock[part] ?? 0) - 1;
       playerWork(s, job, duration, `${command.intervention}:${command.componentId}`, () =>
         resolvePhysical(s, job, `${command.intervention}:${command.componentId}`),
       );
-      return done(job.evidence.at(-1)?.summary ?? 'Work completed.');
+      return done(job.evidence.at(-1)?.summary ?? 'The work is complete.');
     }
     case 'verify': {
       if (!job) return fail('Choose an object.');
@@ -2132,7 +2147,7 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       playerWork(s, job, COSTS.verify, `verify:${command.condition}`, () =>
         resolvePhysical(s, job, `verify:${command.condition}`),
       );
-      return done(job.evidence.at(-1)?.summary ?? 'Checked.');
+      return done(job.evidence.at(-1)?.summary ?? 'The check is complete.');
     }
     case 'deliver': {
       if (!job || terminalStates.has(job.status) || job.status === 'offer' || job.isDonor)
@@ -2148,7 +2163,7 @@ export function dispatch(state: GameState, command: Command): CommandResult {
             requiredChecks(job)
               .filter((c) => !job.verified.includes(c))
               .join(', ') || requiredChecks(job).join(', ')
-          } before returning it, or explicitly return unfinished.`,
+          } before returning it, or choose to return it unfinished.`,
         );
       if (!canSpendTime(s, COSTS.deliver))
         return fail('There is not enough workshop time left today.');
@@ -2159,11 +2174,15 @@ export function dispatch(state: GameState, command: Command): CommandResult {
           notePlayerWord(owner, true, 'deliver', s.now);
         return job.status === 'delivered' && !job.returnedUnfinished;
       });
-      return done(job.returnedUnfinished ? 'Returned unfinished.' : 'Returned to use.');
+      return done(
+        job.returnedUnfinished
+          ? 'The object was returned unfinished.'
+          : 'The object was returned to use.',
+      );
     }
     case 'salvage': {
       if (!job || terminalStates.has(job.status) || !job.isDonor)
-        return fail('Only your spare donor object can be salvaged.');
+        return fail('You can only recover parts from your spare object.');
       const blocked = canWork(s, job);
       if (blocked) return fail(blocked);
       const component = job.model.components.find((c) => c.id === command.componentId);
@@ -2183,44 +2202,45 @@ export function dispatch(state: GameState, command: Command): CommandResult {
         log(
           s,
           'Workshop',
-          `Recovered one working ${component.kind}. The donor is now committed to salvage.`,
+          `You recovered one working ${component.kind}. The donor can now only supply spare parts.`,
           'good',
         );
       } else
         log(
           s,
           'Workshop',
-          `The recovered ${component.kind} is not usable. The donor is committed to salvage.`,
+          `The recovered ${component.kind} is not usable. The donor can now only supply spare parts.`,
           'warning',
         );
       component.condition = 'open';
       if (job.model.components.every((c) => c.condition === 'open')) job.status = 'salvaged';
       job.description =
-        'This object is a donor now. Recover remaining parts; it will not return to service.';
-      return done('Recovery finished.');
+        'This object now supplies spare parts. Recover its remaining parts. It cannot be used again.';
+      return done('You finished recovering the part.');
     }
     case 'buy': {
       const price = PART_PRICES[command.part];
       if (!price) return fail('That part is not stocked.');
       if (s.cash < price) return fail(`A ${command.part} costs £${price}; you have £${s.cash}.`);
-      if (!canSpendTime(s, COSTS.buy)) return fail('The supplier trip will not fit today.');
+      if (!canSpendTime(s, COSTS.buy))
+        return fail('There is not enough time for the supplier trip today.');
       s.cash -= price;
       advance(s, COSTS.buy);
       s.stock[command.part] = (s.stock[command.part] ?? 0) + 1;
-      log(s, 'Workshop', `Bought one ${command.part} for £${price}.`);
-      return done('Part added to the tray.');
+      log(s, 'Workshop', `You bought one ${command.part} for £${price}.`);
+      return done('The part is in the tray.');
     }
     case 'upgrade': {
       const upgrade = UPGRADE_CATALOG.find((u) => u.id === command.id);
-      if (!upgrade) return fail('Unknown improvement.');
+      if (!upgrade) return fail('This improvement is not available.');
       if (s.upgrades.includes(upgrade.id)) return fail('That improvement is already installed.');
       if (s.cash < upgrade.price) return fail(`This costs £${upgrade.price}; you have £${s.cash}.`);
-      if (!canSpendTime(s, 30)) return fail('The installation will not fit today.');
+      if (!canSpendTime(s, 30)) return fail('There is not enough time to install it today.');
       s.cash -= upgrade.price;
       advance(s, 30);
       s.upgrades.push(upgrade.id);
       log(s, 'Workshop', `${upgrade.name} is ready. ${upgrade.description}`, 'good');
-      return done('Workshop improved.');
+      return done('You improved the workshop.');
     }
     case 'cancel-request': {
       if (!s.pendingRequest && !s.watching) return fail('There is no request or lesson to cancel.');
@@ -2236,7 +2256,7 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       s.pendingRequest = undefined;
       releaseLesson(s);
       log(s, 'Sam', 'The request is cancelled. I’ll keep my own plans.');
-      return done('Request cancelled.');
+      return done('The request is cancelled.');
     }
     case 'watch':
     case 'request-lesson':
@@ -2246,8 +2266,8 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       if (command.type === 'watch' && !command.enabled) {
         if (s.pendingRequest?.kind === 'lesson') s.pendingRequest = undefined;
         releaseLesson(s);
-        log(s, 'Sam', 'I’ll leave you to the bench.');
-        return done('Learning session ended.');
+        log(s, 'Sam', 'I’ll stop watching your work.');
+        return done('The learning session has ended.');
       }
       if (s.watching) return fail('The learning session has already started.');
       if (s.jobs.some((j) => j.assignedTo === 'sam' && !j.blocked))
@@ -2262,14 +2282,14 @@ export function dispatch(state: GameState, command: Command): CommandResult {
             s.pendingRequest?.status === 'requested'
               ? 'Sam will consider the lesson after his current activity.'
               : s.pendingRequest
-                ? 'Sam has agreed time to start a lesson.'
+                ? 'Sam has set aside time to start a lesson.'
                 : 'Sam is keeping his own plans.',
           );
       }
       if (s.pendingRequest?.kind !== 'lesson' || s.pendingRequest.status !== 'ready')
         return fail('Ask Sam for a lesson and wait for his agreement first.');
       if (s.now >= (s.pendingRequest.readyUntil ?? 0))
-        return fail('That lesson availability has expired.');
+        return fail('The time Sam set aside to start the lesson has passed.');
       if (sam.activity || s.npcWork.some((w) => w.personId === 'sam'))
         return fail('Sam is still occupied.');
       releaseLesson(s);
@@ -2292,7 +2312,7 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       if (!job || (job.status !== 'active' && job.status !== 'ready'))
         return fail('Accept an active job first.');
       if (job.isDonor)
-        return fail('This donor cannot return to service. Recover its parts yourself.');
+        return fail('This spare object cannot be used again. Recover its parts yourself.');
       if (command.personId !== 'sam')
         return fail('Only Sam has agreed to help with workshop repairs.');
       if (job.assignedTo || s.jobs.some((j) => j.assignedTo === 'sam'))
@@ -2309,7 +2329,7 @@ export function dispatch(state: GameState, command: Command): CommandResult {
           jobId: job.id,
         };
         log(s, 'Sam', `I’ll consider ${named(s, job.title)} after my current activity.`);
-        return done('Repair offer held until Sam finishes his current activity.');
+        return done('The repair offer will wait until Sam finishes his current activity.');
       }
       const accepted = acceptResponsibility(s, job);
       return done(
@@ -2359,8 +2379,8 @@ export function dispatch(state: GameState, command: Command): CommandResult {
         s.npcWork = s.npcWork.filter((w) => w !== current);
       }
       releaseJob(s, job);
-      log(s, 'You', `I’ll take ${named(s, job.title)} back. Sam’s acquired knowledge remains his.`);
-      return done('Responsibility recalled.');
+      log(s, 'You', `I’ll take ${named(s, job.title)} back. Sam still knows what he learned.`);
+      return done('You took responsibility back.');
     }
     case 'wait':
       if (!Number.isInteger(command.minutes) || command.minutes <= 0 || command.minutes > 480)
@@ -2373,7 +2393,9 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       const remainder = dayRemaining(s);
       if (remainder) advance(s, remainder);
       sleepToMorning(s);
-      return done(s.ended ? 'Your first-week account is ready.' : 'A new workshop morning.');
+      return done(
+        s.ended ? 'Your first-week account is ready.' : 'A new workshop morning has begun.',
+      );
     }
     case 'continue':
       if (!s.ended) return fail('The workshop is already open.');

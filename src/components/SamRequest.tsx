@@ -18,7 +18,7 @@ export function SamRequest({
     <section className="sam-request" aria-label="Sam’s pending request">
       <div>
         <p className="eyebrow">
-          {request.status === 'ready' ? 'Sam is ready' : 'Request is waiting'}
+          {request.status === 'ready' ? 'Sam is ready' : 'Sam has not answered yet.'}
         </p>
         <strong>
           {request.kind === 'lesson'
@@ -33,7 +33,7 @@ export function SamRequest({
             : compact
               ? `Sam will consider this after his current activity; ${request.kind === 'lesson' ? 'the lesson has not started' : 'responsibility has not been accepted'}.`
               : current
-                ? `Sam is finishing: ${current.option.label}. Current activity ends ${dayTime(current.endsAt)}.`
+                ? `Sam is finishing this activity: ${current.option.label}. It ends at ${dayTime(current.endsAt)}.`
                 : 'Sam has the request. His next decision determines whether he can join.'}
         </p>
         <small>Sam does not learn from you while he is busy elsewhere.</small>
@@ -45,7 +45,11 @@ export function SamRequest({
             className="primary-action"
             onClick={() => act({ type: 'start-lesson' })}
           >
-            Start lesson<small>Up to {Math.min(90, dayRemaining(state))} min if started now</small>
+            Start lesson
+            <small>
+              The lesson can last up to {Math.min(90, dayRemaining(state))} minutes if it starts
+              now.
+            </small>
           </button>
         )}
         {request.status === 'requested' && current && current.endsAt > state.now && (

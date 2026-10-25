@@ -22,7 +22,7 @@ export function WorkshopPause({
         <span className="brand-mark">sw</span>
         <p className="eyebrow">Workshop paused by you</p>
         <h1>You can leave it here.</h1>
-        <p>Saved on this device. Time waits at {dayTime(state.now)}.</p>
+        <p>Your workshop is saved on this device. The game is paused at {dayTime(state.now)}.</p>
       </div>
       {event && (
         <>
@@ -34,8 +34,8 @@ export function WorkshopPause({
             jobs={state.jobs}
           />
           <p className="recorded-caption">
-            Recorded afternoon · completed activities, not the current location of people or loaned
-            objects.
+            This scene shows the activities people completed that afternoon. It does not show where
+            people or borrowed objects are now.
           </p>
         </>
       )}
@@ -48,14 +48,14 @@ export function WorkshopPause({
                 <strong>{j.title}</strong>
                 <span>
                   {j.status === 'delivered'
-                    ? `Returned to ${state.people[j.ownerId]?.name ?? j.ownerId}`
-                    : 'Retained at the workshop'}{' '}
-                  · checked for {requiredChecks(j).join(', ')}
+                    ? `The object was returned to ${state.people[j.ownerId]?.name ?? j.ownerId}.`
+                    : 'The object is kept at the workshop.'}{' '}
+                  It passed these use checks: {requiredChecks(j).join(', ')}.
                 </span>
               </p>
             ))
           ) : (
-            <p>No completed required use check is recorded yet. Unfinished work stays saved.</p>
+            <p>No completed required use check is recorded here. Your unfinished work is saved.</p>
           )}
         </div>
         <div>
@@ -73,13 +73,13 @@ export function WorkshopPause({
             <p>
               {state.independentRepairs
                 ? `Sam completed ${state.independentRepairs} independent repair${state.independentRepairs === 1 ? '' : 's'}.`
-                : 'No independent whole repair is recorded yet.'}
+                : 'Sam has not completed a whole repair independently yet.'}
             </p>
           )}
         </div>
       </section>
       <p className="pause-promise">
-        Open promises and parts remain exactly where you left them. Returning here does not advance
+        Your unfinished promises and parts stay saved. Returning to the workshop does not advance
         the clock.
       </p>
       <div className="pause-actions">

@@ -20,7 +20,7 @@ export function ReturnedHistory({
           {job.deliveredAt !== undefined ? ` · ${dayTime(job.deliveredAt)}` : ''}
         </span>
       </summary>
-      <ReturnReceipt job={job} people={people} onNext={onOpen} nextLabel="Open retained notebook" />
+      <ReturnReceipt job={job} people={people} onNext={onOpen} nextLabel="Open saved notebook" />
     </details>
   );
 }

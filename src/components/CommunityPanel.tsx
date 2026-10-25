@@ -38,12 +38,12 @@ export function CommunityPanel({
         </div>
         <span className="event-phase">
           {event.phase === 'completed'
-            ? 'Afternoon recorded'
+            ? 'The afternoon has been recorded.'
             : event.resolvedAt !== undefined
-              ? 'Activities underway'
+              ? 'Activities are underway.'
               : event.phase === 'setting-up'
-                ? 'Setting up'
-                : 'Neighbours invited'}
+                ? 'Setup is in progress.'
+                : 'Neighbours have been invited.'}
         </span>
       </div>
       <p className="community-intro">
@@ -93,11 +93,11 @@ export function CommunityPanel({
       />
       {event.phase === 'completed' && (
         <p className="recorded-caption">
-          Recorded afternoon ·{' '}
+          This scene records the afternoon.{' '}
           {recordStage === 'prepared'
             ? `Equipment was prepared before ${dayTime(event.deadline)}.`
             : recordStage === 'returned'
-              ? `Loan reservations ended at ${dayTime(event.finishesAt)}. Objects returned to their owners or the workshop.`
+              ? `The borrowing period ended at ${dayTime(event.finishesAt)}. Objects returned to their owners or the workshop.`
               : 'People shown here completed these activities. The scene records that afternoon.'}
         </p>
       )}
@@ -158,19 +158,19 @@ export function CommunityPanel({
                         ? 'Your project is reserved for this activity. It will return to the workshop. No customer is waiting for it.'
                         : 'You can use your project for this activity. No customer is waiting for it.'
                       : job.status === 'delivered'
-                        ? 'Returned object, available for this loan'
+                        ? 'The object has been returned and is available for this loan.'
                         : job.status === 'offer'
-                          ? 'Offer not yet accepted'
+                          ? 'You have not accepted this offer yet.'
                           : job.status === 'ready'
-                            ? 'Accepted and checked; its return is a separate promise'
-                            : 'Accepted favour at the workshop; still needs its use check'}
+                            ? 'You have accepted and checked this object. Your promise to return it still applies.'
+                            : 'You have accepted this favour. The object is at the workshop and still needs a use check.'}
                   </span>
                 </p>
               )}
               <p className="separate-promises">
                 {job?.isPersonal
-                  ? 'Preparing reserves your retained project for this activity. It stays yours and comes back to the workshop.'
-                  : 'Preparing this plan borrows the selected object. Other accepted objects keep their separate return promises.'}
+                  ? 'Preparing this activity reserves your project for it. The project stays yours and returns to the workshop.'
+                  : 'Preparing this activity borrows the selected object. Your promises to return other accepted objects still apply.'}
               </p>
               {job && (
                 <button type="button" className="text-button" onClick={() => onOpenJob(job.id)}>
@@ -179,7 +179,9 @@ export function CommunityPanel({
               )}
             </div>
             <div className="preparation-action">
-              <strong>{COMMUNITY_PREPARATION_MINUTES} min per format</strong>
+              <strong>
+                Each activity takes {COMMUNITY_PREPARATION_MINUTES} minutes to prepare.
+              </strong>
               <small>
                 You have time to prepare at most two activities between 12:00 and 15:00. You can
                 choose just one.
@@ -208,8 +210,10 @@ export function CommunityPanel({
                       : `Prepare ${option?.label.toLowerCase()}`}
                   <small>
                     {COMMUNITY_PREPARATION_MINUTES} min ·{' '}
-                    {job?.isPersonal ? 'project reserved until' : 'borrowed object returns at'}{' '}
-                    {dayTime(event.finishesAt)}
+                    {job?.isPersonal
+                      ? 'Your project is reserved until'
+                      : 'The borrowed object returns at'}{' '}
+                    {dayTime(event.finishesAt)}.
                   </small>
                 </button>
               )}
@@ -225,8 +229,9 @@ export function CommunityPanel({
           {!beforeOpening && event.preparedFormats.length > 0 && state.now < event.deadline && (
             <div className="community-wait">
               <span>
-                {event.preparedFormats.length} format{event.preparedFormats.length === 1 ? '' : 's'}{' '}
-                prepared. More setup uses the time before neighbours choose.
+                You have prepared {event.preparedFormats.length} activit
+                {event.preparedFormats.length === 1 ? 'y' : 'ies'}. More setup uses the time before
+                neighbours choose.
               </span>
               <button
                 type="button"
@@ -243,13 +248,15 @@ export function CommunityPanel({
       ) : (
         <div className="event-outcome">
           <p className="eyebrow">
-            Prepared {event.preparedFormats.length} · completed attendance {participants.length}
+            You prepared {event.preparedFormats.length}{' '}
+            {event.preparedFormats.length === 1 ? 'activity' : 'activities'}. {participants.length}{' '}
+            {participants.length === 1 ? 'person' : 'people'} completed an activity.
           </p>
           <h3>
             {event.phase === 'completed'
               ? participants.length
                 ? 'What the afternoon made possible'
-                : 'The prepared plans were not attended'
+                : 'No one completed a prepared activity'
               : 'People have chosen their afternoon'}
           </h3>
           {event.phase === 'completed' && (
@@ -277,7 +284,7 @@ export function CommunityPanel({
           )}
           <p>
             {event.outcome ||
-              'Activities are underway. Completion is recorded after the actual time passes.'}
+              'Activities are underway. Completion is recorded after the activity time passes.'}
           </p>
           {event.phase !== 'completed' && event.finishesAt > state.now && (
             <button
@@ -298,12 +305,12 @@ export function CommunityPanel({
                 <span>{d.activityLabel}</span>
                 <small>
                   {d.completed
-                    ? 'Completed'
+                    ? 'This activity was completed.'
                     : event.phase === 'completed'
-                      ? 'Not completed'
+                      ? 'This activity was not completed.'
                       : d.startedAt !== undefined
-                        ? `In progress until ${dayTime(d.endsAt ?? event.finishesAt)}`
-                        : 'No new activity started'}
+                        ? `This activity is in progress until ${dayTime(d.endsAt ?? event.finishesAt)}.`
+                        : 'No new activity has started.'}
                 </small>
                 <details className="decision-quote">
                   <summary>

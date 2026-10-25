@@ -4,7 +4,7 @@ Immutable client0.4.4 and kit0.5.4 implement this direction. The owner directs a
 
 # Handoff
 
-Updated 2026-10-20 for the F-231 clarity follow-up. Earlier sections are historical.
+Updated 2026-10-25 for the plain-English source rewrite. Earlier sections are historical.
 
 ## Historical feedback authority, superseded by the frictionless direction above
 
@@ -17,6 +17,14 @@ Current Small Works uses published HF2.18.0 / engine2.17.0 and exact immutable c
 Finite receiving dialects are the native workshop calendar, Voice Halil (subject to actual clinical restrictions), and native Commonstead Nora. The latter requires commonstead-3/engine2.17.0, commonstead-cast/1, canonical Nora source role and Person source.id, commonstead-calendar/1, full checkpoint and exact source norm meanings. Its v1 boundary is healthy, no family/bonds, no portable qualifications or continuing obligations; unknown extensions refuse. The calendar offset changes chapter coordinates with zero duration, preserving age/RNG/fitness/profile. Unsupported source stores stay in the named archive; no travel, healing or repair qualification is implied. Title/Continue never publishes a competing fresh preview claim.
 
 Adam accepts feel separately. Dynamic review/CI/deployment and genuine source→target journey receipts, plus any remaining acceptance gaps, are in `/Users/abdul/code/.lab-scratch/cast/smallworks.md`. Do not infer completed live acceptance from a source fixture or a page visit.
+
+## Plain-English source rewrite, 2026-10-25
+
+What remains: Adam accepts readability and game feel through play. HF package narration is unchanged.
+
+The current game now writes plain English at its source. The display lookup table is removed. Rules, numbers, cues and non-prose HF state remain unchanged in nine seeded seven-day runs against `6e3712c`. Each accepted/rejected step is pinned after blanking only named game-prose fields; HF fields remain exact except game-authored observation prose copied into witnessed memories. The text-edition provenance marker is normalized separately. Current exports replay exactly; older text-edition files and autosaves are refused with a start-fresh message. Run `node scripts/check-text-state.mjs /tmp/repair-text-state tests/fixtures/plain-english-state-pins.json` to repeat the controls.
+
+One independent Codex review found and corrected false promise wording on unaccepted offers, an overbroad independence claim and singular count grammar. The full check passes 311 tests; four obsolete lookup tests were removed. The delivery report and rendered-text evidence are in `~/code/.lab-scratch/plain2/repair-game-report.md` and `repair-game-onscreen.txt`.
 
 ## Clarity follow-up, 2026-10-20
 

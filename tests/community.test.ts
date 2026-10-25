@@ -244,7 +244,7 @@ describe('bounded community gathering', () => {
     finalizeCommunityEvent(state, event, 5250);
     expect(mum.needs.belonging).toBe(before);
     expect(mum.activity).toBeNull();
-    expect(event.outcome).toBe('Sam’s mother: Garden gathering.');
+    expect(event.outcome).toBe('Sam’s mother chose this activity: Garden gathering.');
     const equipmentMemory = mum.memory.episodes.find((episode) =>
       episode.summary.startsWith('The prepared equipment enabled'),
     );
