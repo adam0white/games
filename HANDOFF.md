@@ -1,15 +1,40 @@
+# Handoff
+
+## Current state, 2026-10-25
+
+Remaining: Adam accepts readability, game feel, canonical receiving journeys and recording through play. Owner review target: **2026-11-03**. Lab-panel rounds on HF3 builds are allowed under the playtest director; friends' playtests and Show HN stay paused. This documentation update runs no rounds. Game design and Deferred updates belong to games-deferred. F-138 remains a scenario proposal, not a completed difficulty change.
+
+### Source and deployed receipt
+
+The fetched source baseline is `8dcca86b455c052bf5136830019ccbcb4685cb9e`, following README-only `35391a0`. It pins released HF **3.0.0**, whose person engine is **2.23.0**, and immutable lab-client **0.4.10** / lab-kit **0.5.11**. The game package is **4.1.0**; save provenance is **4.1.0+hf3**, scenario **canonical-workshop@2**, workshop engine/schema **small-works@5**. These values describe different contracts.
+
+The live [release manifest](https://repair.adamwhite.work/release.json), fetched on 2026-10-25, matches `8dcca86` with `dirty:false`, game/app 4.1.0, framework 3.0.0 and engine `small-works@5`. Exact [CI 40236338346](https://github.com/adam0white/repair-game/actions/runs/40236338346) passed. The receiver delivery report records the normal deployment check: lint, types, **329 tests across 43 files**, build and both historical archive builds; Cloudflare version `8d61712e-4c6e-4ab8-9063-7cbc3a5b0e40`. These are technical receipts, not owner acceptance or completion of the other games.
+
+[HF3 adoption](docs/hf3-adoption.md) records raw replay controls, maintenance and the dated Undici exception. Final source/live/cleanup receipts are in the owner's `~/code/.lab-scratch/v3/smallworks/report.md` and `~/code/.lab-scratch/v3/commonstead-receiver/report.md`. Both deliveries removed their own source/deploy trees and branches. Their archive build diffs and untracked files were preserved before temporary-tree cleanup. The earlier Small Works report's pending Commonstead 2.23 admission is superseded by the receiver delivery.
+
+### Play, saves and people
+
+[README](README.md#how-to-play) describes the guided lantern repair and later workshop work. Small Works owns objects, faults, measurements, stock, cash, time and customer promises. Released HF supplies people's perceptions, learned methods, decisions, activities and saved person state. This is bounded conditional-learning evidence; whole independent repair and owner enjoyment are not established by these checks.
+
+The ordinary Menu offers Resume, Feedback, Full screen, All games, Recording and confirmed New game. Diagnostic controls, run download, import and replay verification require `?lab=1`. No explanatory About or Credits surface exists. The requested Feedback choices “I'm stopping” and “I'm confused” are authorized work, but are not exposed by this host source.
+
+The current local chapter uses `small-works-cast-local-v2`; saves pin workshop state, HF people, RNG and recorded inputs. Workshop time does not advance while away. Departure checkpoints a paused chapter; Resume continues that chapter. Current-version exports must replay exactly. Older root-game editions receive the existing start-fresh refusal; compatible historical exports belong in their fixed archives with isolated saves. Imported file histories do not grant shared-shelf ownership. Loaded chapters retain their pinned opening and local ownership rather than importing a later shelf head.
+
+Recording links play across games on this device while on. The single menu switch can enable it under DNT/GPC; those signals set the initial default off. With recording off, Feedback offers the optional unchecked share checkbox. Feedback remains available without recording. The 2026-10-23 owner direction below is retained; a toggle or opened form is not a server receipt.
+
+### Finite continuation boundary
+
+The native contract remains `canonical-workshop-2 / workshop-cast/1 / workshop-calendar/1`. Local claims and projected person stamps must agree. Voice Halil retains its finite historical source dialects and clinical restrictions. Commonstead Nora admits actual `commonstead-3` sources at engines **2.17.0, 2.21.0 and 2.23.0**, with matching portable engine, canonical identity, exact passport/calendar meanings and full checkpoint. It still requires the supported healthy body with no transported family, bonds, skills or duties. Unknown engines and semantic extensions refuse.
+
+The delivered 2.23 receiver uses a real Commonstead checkpoint and replay control. It does not prove an ordinary browser ownership journey. Reverse Small Works Nora → Commonstead remains refused for unsupported continuing obligations. Do not clear duties or broaden a stamp guard to claim support. Wider mapping work belongs to games-deferred and the relevant host owners.
+
+## Historical handoff records, 2026-10-14–25
+
+Everything below describes its dated edition. Version pins, storage keys, compatibility claims, work queues, deadlines and pending receipts below are historical; use the current section above and current source before resuming. Owner words, policy provenance and original receipts are preserved.
+
 ## Frictionless recording direction, 2026-10-23
 
 Immutable client0.4.4 and kit0.5.4 implement this direction. The owner directs automatic linkage across games on this device whenever recording is on. The first-visit notice covers recording and linkage. One menu switch turns recording on even with DNT/GPC; those signals set the initial default off. Send word uses one optional unchecked “Share this run and my play with the lab” checkbox only while recording is off. Submit with it checked enables recording/linkage and sends an available run; unchecked sends the note alone. Old linkage choices migrate silently. No separate continuing-person recording consent applies, including identity changes and loaded histories. This supersedes earlier recording-consent sections below. Owner words and authority: human-framework/docs/owner-directions-2026-10-18.md (2026-10-23 frictionless feedback).
-
-# Handoff
-
-## HF3 maintenance, 2026-10-25
-
-Remaining: Adam accepts readability, game feel, canonical receiving journeys and recording in play; target2026-11-03. Technical delivery receipts are in the v3 Small Works report. [HF3 adoption](docs/hf3-adoption.md) gives current runtime, raw replay proof, per-ask dispositions and dependency exception. The older sections below describe their dated editions.
-
-
-Updated 2026-10-25 for the plain-English source rewrite. Earlier sections are historical.
 
 ## Historical feedback authority, superseded by the frictionless direction above
 

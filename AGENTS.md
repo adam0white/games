@@ -8,6 +8,14 @@ Read README.md, HANDOFF.md, docs/vision.md and docs/mvp.md before resuming. This
 
 ## Current authorization
 
+2026-10-25: the owner's HF v3 increment includes maintenance, game feedback and documentation that matches shipped source. This host currently pins HF 3.0.0; later HF releases do not automatically change its pin. Read the current section of HANDOFF.md and docs/hf3-adoption.md before using the historical records below. Technical delivery and Adam's acceptance remain separate; owner review is targeted for 2026-11-03.
+
+Lab-panel rounds on HF3 builds are allowed under the playtest director. Friends' playtests and Show HN stay paused. The requested Feedback choices “I'm stopping” and “I'm confused” are authorized work; describe them as shipped only after the shared artifacts and host source expose them. Lab client and kit remain immutable release artifacts. HF's npm package requires TypeScript 7 or later.
+
+## Historical authorization records
+
+These dated directions preserve owner scope and words. Their old deadlines, pins and selected increments are history, not a current work queue. Current owner directions take precedence.
+
 2026-10-16 autonomous-fit comparison: Adam asks to compare the full prior-art list for meaningful autonomous testing, codebase difficulty and HF evidence potential. Existing AI-oriented games are disfavored; a structured HF-versus-LLM comparison remains a candidate. Avoid 3D as a first step because visible consequences add verification work. Done for this increment is reviewed source-backed research with candid local test evidence; no game or study implementation is selected. See docs/research/autonomous-coding-fit-2026-10-16.md.
 
 2026-10-16 archive and new-host research: Adam requests preserving Small Works and the earlier repair campaign as playable archive paths/branches, then starting concept selection again from his recovered ideas and open-source prior art. Research games and living-agent simulations, including Smallville/Generative Agents and Concordia; consult Astra and get independent review. Done for this increment is two reviewed, publicly verified historical builds with isolated autosaves, recovered idea provenance and a sourced comparison with honest integration limits. Adam chooses the next experience and accepts game feel. No new game fork or rewrite is selected. See docs/research/open-source-hosts-2026-10-16.md.
@@ -32,7 +40,7 @@ Read README.md, HANDOFF.md, docs/vision.md and docs/mvp.md before resuming. This
 
 The owner authorized autonomous implementation on 2026-10-09: own a substantial portion or finish the proposed work until real playtesting and feedback are needed; delegate bounded work and always get reviews, including asynchronous Gemini when available. Do not stop for routine design or implementation approvals. Preserve ambitions without silently activating the economy/MMORPG roadmap.
 
-Current milestone (2026-10-10): the school-break campaign and released-HF teaching/independent handoff are implemented. Review and polish the first authored service week: actual promises, separately agreed paid help, a personal project and a returning object with a different cause. Delegate most implementation and get lightly briefed playtesters plus a wildcard; polish before the next owner playtest. Adam accepts the feel by playing it. The separate learning controls in docs/mvp.md remain regression requirements, not a claim of general planning.
+Historical milestone (2026-10-10): the school-break campaign and released-HF teaching/independent handoff are implemented. Review and polish the first authored service week: actual promises, separately agreed paid help, a personal project and a returning object with a different cause. Delegate most implementation and get lightly briefed playtesters plus a wildcard; polish before the next owner playtest. Adam accepts the feel by playing it. The separate learning controls in docs/mvp.md remain regression requirements, not a claim of general planning.
 
 ## Product direction
 
@@ -58,7 +66,7 @@ Current milestone (2026-10-10): the school-break campaign and released-HF teachi
 - Owner directions take precedence over skills. Do not turn planning into an indefinite sequence of small approval steps; complete the authorized stage and present a concrete result.
 - For gameplay implementation, define one milestone's missing capability, causal check and stopping condition. Do not activate the whole roadmap.
 - Adam is the MVP acceptor. Deliver a runnable local build at the first real playtesting dependency. Tests and reviewer opinions cannot accept the player's experience for him. Any later generic HF extension follows HF's own release workflow.
-- Validate documentation links before a documentation commit. Once code exists, establish and run the appropriate lint, typecheck, tests and build before every code commit. Do not claim tests or deployment that have not run.
+- Run `npm run check:lane` before every commit. This repository currently runs the full check, including the shared-lock test suite. Validate documentation links before a documentation commit. Once code exists, establish and run the appropriate lint, typecheck, tests and build before every code commit. Do not claim tests or deployment that have not run.
 - Keep this repository and its documents private on GitHub; do not make source public until public visibility and licensing have been decided. Local commits and integration are authorized for this work. HF changes require a demonstrated generic capability need, not repair-game convenience.
 
 Player-facing copy follows [Plain English](docs/lab/plain-english.md). Keep diagnostic and replay controls behind `?lab=1`.
