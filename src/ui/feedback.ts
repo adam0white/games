@@ -43,12 +43,11 @@ export async function queueFeedback({
     }
   };
   const cleanName = name.trim().slice(0, 60);
-  const noteOnly = !lab.telemetryOn && !sharePlay;
   const receipt = await lab.sendFeedback(message, {
     name: cleanName,
     run: feedbackRun(),
     sharePlay,
   });
   rememberFeedbackName(cleanName);
-  return `${noteOnly ? 'Your feedback is queued without play data or linked history.' : 'Your feedback is queued. Available play data is included when recording is on. Recorded play links across games on this device.'} · ${receipt}`;
+  return `Sent. Your note is stored. · ${receipt}`;
 }

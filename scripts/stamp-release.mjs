@@ -11,6 +11,7 @@ mkdirSync('public', { recursive: true });
 writeFileSync('public/release.json', JSON.stringify({
   commit: git('rev-parse', 'HEAD'),
   dirty: Boolean(git('status', '--porcelain')),
+  app: packageInfo.version,
   game: packageInfo.version,
   framework: human.version,
   engine,

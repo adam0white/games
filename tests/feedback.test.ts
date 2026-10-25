@@ -24,9 +24,9 @@ function setup(privacySignalOn = false) {
   return { lab, input };
 }
 describe('Send word consent and names', () => {
-  it('queues linked feedback with the trimmed name and optional verdict', async () => {
+  it('sends linked feedback with the trimmed name and optional verdict', async () => {
     const { lab, input } = setup();
-    await expect(queueFeedback(input)).resolves.toContain('queued');
+    await expect(queueFeedback(input)).resolves.toContain('Sent. Your note is stored.');
     expect(lab.sendFeedback).toHaveBeenCalledWith('Verdict: mixed\n\nA note', {
       name: 'Tester',
       sharePlay: false,
@@ -34,9 +34,9 @@ describe('Send word consent and names', () => {
     });
     expect(lab.sendRun).not.toHaveBeenCalled();
   });
-  it('queues a note when automatic recording is unavailable', async () => {
+  it('sends a note when automatic recording is unavailable', async () => {
     const { lab, input } = setup(true);
-    await expect(queueFeedback(input)).resolves.toContain('queued');
+    await expect(queueFeedback(input)).resolves.toContain('Sent. Your note is stored.');
     expect(lab.sendFeedback).toHaveBeenCalled();
     expect(lab.sendRun).not.toHaveBeenCalled();
   });
@@ -44,7 +44,9 @@ describe('Send word consent and names', () => {
     const { lab, input } = setup();
     Object.defineProperty(lab, 'personaRecordingAllowed', { value: false });
     const getRun = vi.fn(() => ({ carried: 'private source history' }));
-    await expect(queueFeedback({ ...input, getRun })).resolves.toContain('queued');
+    await expect(queueFeedback({ ...input, getRun })).resolves.toContain(
+      'Sent. Your note is stored.',
+    );
     expect(getRun).toHaveBeenCalledOnce();
     expect(lab.sendFeedback).toHaveBeenCalledWith('Verdict: mixed\n\nA note', {
       name: 'Tester',
@@ -70,7 +72,7 @@ describe('Send word consent and names', () => {
     await expect(queueFeedback(input)).rejects.toThrow('failed');
     expect(lab.openSendDialog).not.toHaveBeenCalled();
   });
-  it('queues the note when the optional run export fails', async () => {
+  it('sends the note when the optional run export fails', async () => {
     const { lab, input } = setup();
     await queueFeedback({
       ...input,
@@ -84,4 +86,23 @@ describe('Send word consent and names', () => {
       run: undefined,
     });
   });
+});
+
+it('returns a stored receipt only after the send is acknowledged', async () => {
+  const { lab, input } = setup();
+  let acknowledge!: (receipt: string) => void;
+  vi.mocked(lab.sendFeedback).mockReturnValueOnce(
+    new Promise((resolve) => {
+      acknowledge = resolve;
+    }),
+  );
+  let receipt: string | undefined;
+  const sending = queueFeedback(input).then((value) => {
+    receipt = value;
+  });
+  await Promise.resolve();
+  expect(receipt).toBeUndefined();
+  acknowledge('stored-ref');
+  await sending;
+  expect(receipt).toBe('Sent. Your note is stored. · stored-ref');
 });
