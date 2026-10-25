@@ -2,19 +2,42 @@
 
 A single-player repair strategy game. Investigate familiar electrical and mechanical objects at a home bench. Choose measurements, compare results, repair actual components and check the object under its owner's use. Time, stock and cash limit what the workshop can promise.
 
-Current runtime: game4.1.0, HF3.0.0 (engine2.23.0). [HF3 adoption](docs/hf3-adoption.md) records exact replay, maintenance and feedback dispositions. Older dated build descriptions below remain historical. Adam accepts readiness separately.
+The current source pins `@adam0white/human-framework` to exactly **3.0.0**. The source game version is 4.1.0; HF uses engine 2.23.0. Check the live [release manifest](https://repair.adamwhite.work/release.json) for the deployed commit and versions. [HF3 adoption](docs/hf3-adoption.md) records replay checks, maintenance and remaining feedback. Adam accepts readability and game feel through play.
+
+## How to play
+
+Open [Small Works](https://repair.adamwhite.work). Begin with the family lantern. The optional first-repair guide shows one next action at a time. Choose **Explore freely** when you want to work without the guide.
+
+1. Try the object under the condition that causes trouble. A lantern that lights on the table may fail when carried.
+2. Open the cover and select a component. Use the meter to compare connections under the relevant condition. Read the result before choosing a repair.
+3. Clean or replace a part when the evidence supports it. Work takes time. Replacement parts come from limited stock, purchases or another object used for spare parts.
+4. Test again after each repair. Return the object after checking the use its owner needs, or return it honestly unfinished.
+
+Later, use the workboard to accept repair requests and keep track of their return times. Repairs share the workshop day, stock and cash. Sam can watch actual work and later try work himself. His attendance and what he has learned matter; asking him to watch does not give him the answer.
+
+The game saves on this device. Workshop time stops while you are away. Open **Menu** for **Resume**, **New game**, **Feedback** and the **Recording** switch. Starting a new game replaces the saved workshop after confirmation.
+
+## What Human Framework contributes
+
+[Human Framework](https://human.adamwhite.work/) supplies the people simulation through its published package. Small Works uses HF for people's perceptions, learned methods, decisions, activities, fatigue, social responses and saved person state. Sam learns conditional methods from work he actually attends. Those methods can affect later choices when the conditions match. Rest and commitments can compete with repair work.
+
+Small Works supplies the objects, hidden faults, physical measurements, parts, stock, prices, workshop clock, customer promises and interface. The actor simulation uses seeded randomness and public HF APIs. It does not use LLMs or sibling-source imports. Saves retain the workshop and HF person state together. These checks can show learning under specific conditions; they do not establish general human realism or enjoyment. See [the narration adoption checks](docs/hf-plain-narration.md) and [HF3 adoption](docs/hf3-adoption.md).
+
+There is no in-game About or Credits page in the current source. This README explains the framework's contribution.
 
 ## Canonical cast adoption
 
-Small Works now has a bounded four-person canonical cast and browser-life integration candidate using published HF 3.0.0. [The cast scope](docs/canonical-cast.md) defines the new edition, playable disclosures and archive boundary. Technical delivery and owner acceptance remain separate.
+Small Works has a bounded four-person canonical cast and browser-life integration using published HF 3.0.0. [The cast scope](docs/canonical-cast.md) defines the new edition, playable disclosures and archive boundary. Technical delivery and owner acceptance remain separate.
 
-## Current direction
+## Direction recorded on 2026-10-16
 
 Adam requested a new direction on 2026-10-16. The workshop is preserved rather than extended by default. [Open-source host research](docs/research/open-source-hosts-2026-10-16.md) compares existing games and living-agent simulations. It includes an Astra consultation, independent reviews and recovered original ideas. No new host is selected. [The later autonomous-coding assessment](docs/research/autonomous-coding-fit-2026-10-16.md) re-ranks the full list for executable tests, integration burden and bounded HF evidence; Concordia is the research lead and Wesnoth is the first game harness to validate.
 
 [Earlier experiments](https://repair.adamwhite.work/experiments/) preserves Small Works and the earlier home/garage campaign at separate paths. Their exact source snapshots are also private archive branches. Autosaves are isolated from the main game and each other; import a compatible export to carry historical progress into its archive. See [archive delivery](docs/research/archives-2026-10-16.md).
 
-## Preserved Small Works status
+## Historical Small Works delivery notes
+
+The following paragraphs describe earlier editions and their verification. Their build hashes, test counts and compatibility rules are historical. Use the live release manifest above for the deployed version and [HF3 adoption](docs/hf3-adoption.md) for current source checks.
 
 The 2026-10-14 restart replaces the earlier campaign and interface. The working candidate includes a diagnostic bench, shared workshop clock, retained paper theatre, customer promises, parts recovery and purchases, and Sam's attended learning through published Human Framework APIs. A community gathering offers three timed formats; preparation time permits at most two. The first-week account offers an ending and a choice to continue.
 
@@ -31,7 +54,13 @@ npm ci
 npm run dev
 ```
 
-Open the address printed by the development server. Browser saves retain workshop and HF person state. Export a save before reporting a playtest. `npm run check` runs lint, types, tests and the production build.
+Open the address printed by the development server. `npm run check` runs lint, types, tests and the production build. Run `npm run check:lane` before each commit. In this repository it currently runs the full check. `npm test` uses the shared machine suite lock.
+
+### Save and replay tools
+
+Add `?lab=1` to the game URL to show diagnostic and replay controls. In **Menu**, choose **Download this run** to export the saved workshop. Choose **Lab tools** for **Import a workshop**, **Verify the recorded replay** and a starting-number control. Export the run before reporting a problem. Keep the original file so a replay can be checked against its recorded actions.
+
+Current-version exports must replay exactly. Older editions may be refused with a start-fresh message. The historical compatibility notes above describe their own editions. [HF3 adoption](docs/hf3-adoption.md) records the current replay checks.
 
 ## Project authority
 
@@ -39,8 +68,6 @@ Open the address printed by the development server. Browser saves retain worksho
 - [Run ledger](docs/restart/ledger.md): decisions, evidence and remaining verification.
 - [MVP checks](docs/mvp.md): gameplay and causal acceptance.
 - [Vision](docs/vision.md): owner direction and its history.
-- [Latest general play](docs/restart/playtest-7.md): actual source-unread play and limitations.
+- [Historical general play](docs/restart/playtest-7.md): actual source-unread play and limitations.
 - [Mentoring and public follow-up](docs/restart/playtest-8.md): attended learning, courier work and revised teaching instructions.
 - [External reviews](docs/restart/external-reviews.md): returned consultations and selected corrections.
-
-The current dependency is exactly `@adam0white/human-framework` 3.0.0. Fresh people use persisted plain narration; pinned replay openings preserve their saved choice. See [the adoption regression and lesson](docs/hf-plain-narration.md). The game owns physics, stock, prices, promises and presentation. HF owns people's acquired conditional methods, decisions, activities and snapshots. The simulation uses public package APIs, without sibling-source imports or LLMs. Bounded controls can establish conditional transfer; they cannot establish general human realism or enjoyment.
