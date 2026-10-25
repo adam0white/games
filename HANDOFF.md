@@ -121,3 +121,7 @@ The director’s error-copy follow-up keeps SDK protocol detail in lab mode/logs
 The final prose audit also expands ordinary repair-result fragments at display time, including cleaning, reseating, power, returns and stock messages. Passive wording preserves who performed the work. The original evidence text and movement/load conditions remain unchanged.
 
 The live delivery check found Read Meter still inherited an 11px action-bar rule on tablets. A narrow selector correction applies fluid 16–19px action labels and 14–17px costs. The notice's Dismiss control also has readable text and a 44px target. No rules or replay text changed. The 12 screenshots from d44f13c are retained; post-fix verification uses DOM measurements to respect the screenshot cap.
+
+## Compact shared notice, 2026-10-24
+
+The final narrow adoption pins lab-kit 0.5.7 with unchanged lab-client 0.4.6 and HF 2.18.0. The actual async-suppressed node remains in the stable footer. Its complete sentence is “We record and link play across games on this device.” The SDK no longer provides a Dismiss control; the obsolete local button override is removed. Two-pixel horizontal notice padding preserves one readable line at 360px with wider system fonts. Enlarged text may wrap without a height cap. Reviewed copy, workshop action fonts, archive pins, replay and game rules remain unchanged. Final lane, CI and delivery receipts are recorded outside the worktree in the simplify worker report. No additional review or playtest round.

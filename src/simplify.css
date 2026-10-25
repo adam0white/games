@@ -72,6 +72,8 @@ body {
 }
 .lab-notice-footer {
   flex: none;
+  display: block;
+  padding: 0;
 }
 .lab-notice-footer:not(:has(.lk-telemetry-notice)) {
   display: none;
@@ -115,8 +117,7 @@ body {
 .workshop-shell .bench-action-bar .bench-verbs button small {
   font-size: clamp(14px, 12px + 0.3vw, 17px);
 }
-.lab-notice-footer .lk-telemetry-notice button {
-  min-width: 44px;
-  min-height: 44px;
-  font-size: 14px;
+/* Keep the complete shared sentence on one line at 360px with system fonts. */
+.lab-notice-footer .lk-telemetry-notice {
+  padding-inline: 2px !important;
 }
