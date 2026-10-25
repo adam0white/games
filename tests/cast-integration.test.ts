@@ -7,7 +7,6 @@ import {
   closePersonaBranch,
   createPersona,
   initialPersonaLife,
-  type PersonaEnvelope,
   type PersonaRequest,
   type PersonaShelfState,
   preparePersonaLife,
@@ -24,7 +23,7 @@ import { createGame, dispatch } from '../src/game/engine';
 import { loadGame, saveGame } from '../src/game/persistence';
 import { replayRecordedRun } from '../src/game/replay';
 
-const stamps = { game: 'repair', build: 'test', engine: '2.21.0', rules: 'canonical-workshop-2' };
+const stamps = { game: 'repair', build: 'test', engine: '2.23.0', rules: 'canonical-workshop-2' };
 async function source(id: string) {
   const person = createGame(42).people[id]!;
   person.traits.honesty = 0.91;

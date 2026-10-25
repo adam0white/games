@@ -2,6 +2,10 @@
 
 Read README.md, HANDOFF.md, docs/vision.md and docs/mvp.md before resuming. This repository owns the game; ../human-framework owns the framework.
 
+## Current stack and maintenance
+
+2026-10-25: HF3 maintenance uses Node >=24, TypeScript7.0.2, React19.3.1, Vite8.3.5, Vitest5.0.5, Biome2.6.3, Wrangler4.152.0 and Knip6.43.0. Published HF3.0.0 (engine2.23.0), lab-client0.4.10 and lab-kit0.5.11. Run full suites through `npm test` and the shared machine lock. Current Worker compatibility date2026-10-25. See docs/hf3-adoption.md for replay, scope, dated dependency exception and owner acceptance.
+
 ## Current authorization
 
 2026-10-16 autonomous-fit comparison: Adam asks to compare the full prior-art list for meaningful autonomous testing, codebase difficulty and HF evidence potential. Existing AI-oriented games are disfavored; a structured HF-versus-LLM comparison remains a candidate. Avoid 3D as a first step because visible consequences add verification work. Done for this increment is reviewed source-backed research with candid local test evidence; no game or study implementation is selected. See docs/research/autonomous-coding-fit-2026-10-16.md.

@@ -21,12 +21,10 @@ import {
   dayTime,
   dispatch,
   jobReadiness,
-  loadGame,
   PART_PRICES,
   requiredChecks,
   saveGame,
   UPGRADE_CATALOG,
-  upgradeRules,
 } from './game/engine';
 import { evidenceContext } from './game/evidence-context';
 import { governorMultipliers } from './game/model';
@@ -43,6 +41,7 @@ import type {
 import { lab } from './lab';
 import { todaysWords, workshopCrises } from './ui/crises';
 import { firstRepairProgress } from './ui/first-repair';
+import { componentWorkReading, ownerPromiseAccount } from './ui/workshop-feedback';
 import './styles.css';
 import './focused-layout.css';
 import './meter-layout.css';
@@ -251,12 +250,14 @@ function Device({
         {job.model.components.map((c) => {
           const x = c.x * 6;
           const y = c.y * 4;
+          const work = componentWorkReading(job, c.id);
           return (
             // biome-ignore lint/a11y/useSemanticElements: SVG selection has a native component chip equivalent.
             <g
               key={c.id}
               transform={`translate(${x},${y})`}
-              className={`${selected === c.id ? 'component selected' : 'component'} ${suggestedPart === c.id ? 'guide-component' : ''}`}
+              className={`${selected === c.id ? 'component selected' : 'component'} ${suggestedPart === c.id ? 'guide-component' : ''} ${work ? `worked-${work.kind}` : ''}`}
+              data-work={work?.kind}
               role="button"
               tabIndex={0}
               aria-label={`Select ${c.label}`}
@@ -343,6 +344,17 @@ function Device({
                               ? '∿'
                               : '•'}
               </text>
+              {work && (
+                <g className="component-work-mark">
+                  <path
+                    d={
+                      work.kind === 'replace'
+                        ? 'M-20-8h40v16h-40z'
+                        : 'M-17-8v16m34-16v16M-9-4h18M-9 4h18'
+                    }
+                  />
+                </g>
+              )}
               <text y="42" textAnchor="middle" className="diagram-label">
                 {c.label}
               </text>
@@ -1767,7 +1779,29 @@ export default function App() {
                           </div>
                         </>
                       )}
-                      {result}
+                      {pane === 'repair' && part && componentWorkReading(job, part.id) && (
+                        <p className="part-work-reading">
+                          {componentWorkReading(job, part.id)?.text}
+                        </p>
+                      )}
+                      <section
+                        className="bench-feedback"
+                        aria-label="Repair response and next test"
+                      >
+                        {result}
+                        {pane === 'repair' &&
+                          job.evidence.some((entry) => entry.kind === 'work') && (
+                            <button
+                              type="button"
+                              disabled={jobLocked}
+                              onClick={() =>
+                                act({ type: 'verify', jobId: job.id, condition: useCondition })
+                              }
+                            >
+                              Test {testWords[useCondition]} <small>15 min</small>
+                            </button>
+                          )}
+                      </section>
                       <div className={`bench-action-bar ${pane === 'notes' ? 'notes-bar' : ''}`}>
                         {job.status === 'ready' && !job.isDonor && !job.isPersonal && (
                           <button
@@ -2204,7 +2238,7 @@ export default function App() {
                               )}
                               {playerWordReading(person) && (
                                 <p className="word-reading">
-                                  {person.name} {playerWordReading(person)}.
+                                  {ownerPromiseAccount(person, state.jobs)}
                                 </p>
                               )}
                               <div className="commitment-list">
@@ -2264,7 +2298,7 @@ export default function App() {
                               )}
                               {playerWordReading(person) && (
                                 <p className="word-reading">
-                                  {person.name} {playerWordReading(person)}.
+                                  {ownerPromiseAccount(person, state.jobs)}
                                 </p>
                               )}
                               <p className="person-role">

@@ -52,7 +52,7 @@ export interface FormatView {
   reason: string;
 }
 export const COMMUNITY_PREPARATION_MINUTES = 90;
-export const COMMUNITY_ACTIVITY_MINUTES = 30;
+const COMMUNITY_ACTIVITY_MINUTES = 30;
 const definitions: Record<CommunityFormat, { label: string; description: string }> = {
   garden: {
     label: 'Garden gathering',

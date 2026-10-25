@@ -4,6 +4,11 @@ Immutable client0.4.4 and kit0.5.4 implement this direction. The owner directs a
 
 # Handoff
 
+## HF3 maintenance, 2026-10-25
+
+Remaining: Adam accepts readability, game feel, canonical receiving journeys and recording in play; target2026-11-03. Technical delivery receipts are in the v3 Small Works report. [HF3 adoption](docs/hf3-adoption.md) gives current runtime, raw replay proof, per-ask dispositions and dependency exception. The older sections below describe their dated editions.
+
+
 Updated 2026-10-25 for the plain-English source rewrite. Earlier sections are historical.
 
 ## Historical feedback authority, superseded by the frictionless direction above

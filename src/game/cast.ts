@@ -27,7 +27,7 @@ export const CAST_IDS: Record<string, string> = {
 };
 export const castRole = (castId: string) =>
   Object.keys(CAST_IDS).find((id) => CAST_IDS[id] === castId);
-export const CAST_MAPPING = 'workshop-calendar/1';
+const CAST_MAPPING = 'workshop-calendar/1';
 export interface CastChapter {
   version: 'workshop-cast/1';
   inputs: LifePreparation[];
@@ -83,7 +83,8 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
   if (
     portable.person.mappingVersion !== mapping ||
     portable.person.source.id !== sourceId ||
-    !['2.17.0', '2.21.0'].includes(portable.person.source.engine) ||
+    !['2.17.0', '2.21.0', ...(local ? ['2.23.0'] : [])].includes(portable.person.source.engine) ||
+    (local && envelope.source.engine !== portable.person.source.engine) ||
     (commonstead && envelope.source.engine !== portable.person.source.engine)
   )
     throw new Error(
@@ -248,7 +249,7 @@ export function validateCastChapter(chapter: CastChapter) {
       claim.branchId !== input.parent.branchId ||
       claim.parentRevision !== input.parent.revision ||
       claim.source.game !== 'repair' ||
-      claim.source.engine !== '2.21.0' ||
+      claim.source.engine !== '2.23.0' ||
       claim.source.rules !== 'canonical-workshop-2' ||
       claim.terminal ||
       !same(claim.transfer, { ...input.parent.transfer, life: input.life })

@@ -121,3 +121,64 @@ body {
 .lab-notice-footer .lk-telemetry-notice {
   padding-inline: 2px !important;
 }
+
+/* Show the work performed, without exposing a fault or claiming a successful test. */
+.workshop-shell .component.worked-clean > rect:not(:first-child),
+.workshop-shell .component.worked-replace > rect:not(:first-child) {
+  stroke: #f2dfab;
+  stroke-width: 3px;
+}
+.workshop-shell .component-work-mark {
+  stroke: #f2dfab;
+  fill: #3b493d;
+  stroke-width: 2px;
+  pointer-events: none;
+}
+.workshop-shell .part-work-reading {
+  margin: 8px 12px;
+  color: #f0eedb;
+}
+.workshop-shell .bench-feedback {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 12px;
+}
+.workshop-shell .bench-feedback .focused-result {
+  flex: 1 1 220px;
+  margin: 0;
+}
+.workshop-shell .bench-feedback > button {
+  flex: 1 0 140px;
+  padding: 8px;
+}
+@media (max-width: 900px) {
+  .workshop-shell .focused-tools:has(.pane-repair) .first-repair-guide {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+  }
+  .workshop-shell .focused-tools:has(.pane-repair) .guide-dismiss {
+    display: none;
+  }
+  .workshop-shell .focused-tools:has(.pane-repair) .device-stage > svg {
+    max-height: 160px;
+  }
+}
+.workshop-shell .bench-feedback > button small {
+  display: block;
+  color: inherit;
+  font-size: 14px;
+}
+
+/* Column layout must not inherit the old row-wrap and 100% flex-basis rules. */
+.workshop-shell .focused-bench .focused-workspace .physical-scene {
+  flex-wrap: nowrap;
+}
+.workshop-shell .physical-observation {
+  flex-basis: auto;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}

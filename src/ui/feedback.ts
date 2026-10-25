@@ -9,7 +9,7 @@ export function storedPreference(key: string): string {
     return '';
   }
 }
-export function rememberFeedbackName(name: string) {
+function rememberFeedbackName(name: string) {
   try {
     const trimmed = name.trim().slice(0, 60);
     if (trimmed) localStorage.setItem(FEEDBACK_NAME_KEY, trimmed);

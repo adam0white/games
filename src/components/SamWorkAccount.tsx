@@ -6,7 +6,7 @@ export interface SamWorkRow {
   title: string;
   actions: { label: string; count: number }[];
 }
-export function samWorkRows(jobs: Job[]): SamWorkRow[] {
+function samWorkRows(jobs: Job[]): SamWorkRow[] {
   return jobs.flatMap((job) => {
     const actions = new Map<string, { label: string; count: number }>();
     for (const contribution of job.contributions) {

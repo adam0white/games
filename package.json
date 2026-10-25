@@ -1,6 +1,6 @@
 {
   "name": "repair-game",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -11,7 +11,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "build:archives": "node scripts/build-archives.mjs",
-    "test": "vitest run",
+    "test": "node scripts/suite-lock.ts -- vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src tests vite.config.ts",
     "format": "biome check --write src tests vite.config.ts",
@@ -19,12 +19,13 @@
     "prebuild": "node scripts/stamp-release.mjs",
     "deploy": "node scripts/deploy.mjs",
     "deploy:check": "node scripts/deploy.mjs --dry-run",
-    "check:lane": "npm run check"
+    "check:lane": "npm run check",
+    "knip": "knip"
   },
   "dependencies": {
-    "@adam0white/human-framework": "2.21.0",
-    "@adam0white/lab-client": "file:vendor/adam0white-lab-client-0.4.8.tgz",
-    "@adam0white/lab-kit": "file:vendor/adam0white-lab-kit-0.5.9.tgz",
+    "@adam0white/human-framework": "3.0.0",
+    "@adam0white/lab-client": "file:vendor/adam0white-lab-client-0.4.10.tgz",
+    "@adam0white/lab-kit": "file:vendor/adam0white-lab-kit-0.5.11.tgz",
     "@fontsource/dm-sans": "5.3.0",
     "@fontsource/ibm-plex-mono": "5.3.0",
     "@fontsource/libre-baskerville": "5.3.0",
@@ -32,15 +33,16 @@
     "react-dom": "19.3.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.15",
+    "@biomejs/biome": "2.6.3",
     "@types/node": "26.6.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
     "typescript": "7.0.2",
-    "vite": "8.3.4",
+    "vite": "8.3.5",
     "vitest": "5.0.5",
-    "wrangler": "4.151.3"
+    "wrangler": "4.152.0",
+    "knip": "6.43.0"
   },
   "overrides": {
     "miniflare": {

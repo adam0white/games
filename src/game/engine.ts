@@ -72,7 +72,7 @@ import type {
   WorkOption,
 } from './types';
 
-export const COSTS = {
+const COSTS = {
   inspect: 10,
   measure: 10,
   clean: 20,
@@ -270,7 +270,7 @@ function reportedSymptoms(job: Job, stakes: string): string {
     : `“${cap(onTable)} on the table. While driving the figures, ${driving}. ${stakes}”`;
 }
 /** Engine-5 rules: the HF 2.8 opt-ins and the 2026-10-19 lessons. Engine-4 worlds keep engine-4 behaviour. */
-export const currentRules = (s: Pick<GameState, 'schema'>): boolean => s.schema === 'small-works@5';
+const currentRules = (s: Pick<GameState, 'schema'>): boolean => s.schema === 'small-works@5';
 /**
  * Move an engine-4 world to the current rules, recording the input index so a replay applies the old rules before
  * it and the new rules after it. Idempotent for a current world.

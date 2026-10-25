@@ -2,9 +2,11 @@
 
 A single-player repair strategy game. Investigate familiar electrical and mechanical objects at a home bench. Choose measurements, compare results, repair actual components and check the object under its owner's use. Time, stock and cash limit what the workshop can promise.
 
+Current runtime: game4.1.0, HF3.0.0 (engine2.23.0). [HF3 adoption](docs/hf3-adoption.md) records exact replay, maintenance and feedback dispositions. Older dated build descriptions below remain historical. Adam accepts readiness separately.
+
 ## Canonical cast adoption
 
-Small Works now has a bounded four-person canonical cast and browser-life integration candidate using published HF 2.21.0. [The cast scope](docs/canonical-cast.md) defines the new edition, playable disclosures and archive boundary. Technical delivery and owner acceptance remain separate.
+Small Works now has a bounded four-person canonical cast and browser-life integration candidate using published HF 3.0.0. [The cast scope](docs/canonical-cast.md) defines the new edition, playable disclosures and archive boundary. Technical delivery and owner acceptance remain separate.
 
 ## Current direction
 
@@ -18,7 +20,7 @@ The 2026-10-14 restart replaces the earlier campaign and interface. The working 
 
 The focused first-repair UX renewal is delivered locally and publicly. The integrated local candidate passed lint, types, **241 tests across 25 files** and production build. Lint reported 151 CSS warnings; the build reported a chunk-size warning. [First-visitor play](docs/restart/playtest-9.md) supports the guided opening, with disclosed setup resets and remaining confusion. Source-unread desktop and mobile play completed the guided repair. The clean public build is `39793cd`; desktop, mobile and exact replay checks pass. Independent diagnosis remains unproven. The earlier published build remains historical evidence. [HANDOFF.md](HANDOFF.md) records current limits. Adam accepts feel through play.
 
-The current game is `3.1.0-alpha.3`, with schema and engine `small-works@5` and strict HF 2.8.0 provenance. Autosaves use `small-works-save-v5`; an engine-4 autosave under `small-works-save-v4`, or an imported engine-4 export, continues under engine 5 with the switch point recorded. Tests replay real engine-4 exports exactly under engine-4 rules. Earlier campaign saves and Small Works engine-1, engine-2 and engine-3 candidate exports are intentionally incompatible. Their evidence remains pinned to its original behavior version. The earlier implementation remains in Git; dated campaign documents describe history, not the active work queue. Repository source remains private. Static public deployment is authorized at [repair.adamwhite.work](https://repair.adamwhite.work); see [HANDOFF](HANDOFF.md) for the verified live manifest.
+The historical October19 game was `3.1.0-alpha.3`, with schema and engine `small-works@5` and strict HF 2.8.0 provenance. Autosaves use `small-works-save-v5`; an engine-4 autosave under `small-works-save-v4`, or an imported engine-4 export, continues under engine 5 with the switch point recorded. Tests replay real engine-4 exports exactly under engine-4 rules. Earlier campaign saves and Small Works engine-1, engine-2 and engine-3 candidate exports are intentionally incompatible. Their evidence remains pinned to its original behavior version. The earlier implementation remains in Git; dated campaign documents describe history, not the active work queue. Repository source remains private. Static public deployment is authorized at [repair.adamwhite.work](https://repair.adamwhite.work); see [HANDOFF](HANDOFF.md) for the verified live manifest.
 
 ## Run locally
 
@@ -41,4 +43,4 @@ Open the address printed by the development server. Browser saves retain worksho
 - [Mentoring and public follow-up](docs/restart/playtest-8.md): attended learning, courier work and revised teaching instructions.
 - [External reviews](docs/restart/external-reviews.md): returned consultations and selected corrections.
 
-The current dependency is exactly `@adam0white/human-framework` 2.21.0. Fresh people use persisted plain narration; pinned replay openings preserve their saved choice. See [the adoption regression and lesson](docs/hf-plain-narration.md). The game owns physics, stock, prices, promises and presentation. HF owns people's acquired conditional methods, decisions, activities and snapshots. The simulation uses public package APIs, without sibling-source imports or LLMs. Bounded controls can establish conditional transfer; they cannot establish general human realism or enjoyment.
+The current dependency is exactly `@adam0white/human-framework` 3.0.0. Fresh people use persisted plain narration; pinned replay openings preserve their saved choice. See [the adoption regression and lesson](docs/hf-plain-narration.md). The game owns physics, stock, prices, promises and presentation. HF owns people's acquired conditional methods, decisions, activities and snapshots. The simulation uses public package APIs, without sibling-source imports or LLMs. Bounded controls can establish conditional transfer; they cannot establish general human realism or enjoyment.

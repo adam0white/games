@@ -4,8 +4,8 @@ export const MAX_RECORDED_INPUTS = 10_000;
 export const SAVE_PROVENANCE = {
   engine: 'small-works@5',
   scenario: 'canonical-workshop@2',
-  framework: '2.21.0',
-  game: '4.0.0+plain-english-2',
+  framework: '3.0.0',
+  game: '4.1.0+hf3',
 } as const;
 /**
  * Engine-4 behaviour, kept so historical exports and old autosaves restore and replay exactly. A legacy world keeps
