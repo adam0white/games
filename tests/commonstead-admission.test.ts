@@ -42,7 +42,7 @@ describe('finite Commonstead native Nora receiver', () => {
     const claim = await createPersona({
       ...body,
       parentRevision: revision,
-      source: { game: 'repair', build: 'test', engine: '2.17.0', rules: 'canonical-workshop-2' },
+      source: { game: 'repair', build: 'test', engine: '2.21.0', rules: 'canonical-workshop-2' },
       transfer: { ...parent.transfer, life: input.life },
     });
     let state = createGame(42, 'current', people, {

@@ -24,7 +24,7 @@ import { createGame, dispatch } from '../src/game/engine';
 import { loadGame, saveGame } from '../src/game/persistence';
 import { replayRecordedRun } from '../src/game/replay';
 
-const stamps = { game: 'repair', build: 'test', engine: '2.17.0', rules: 'canonical-workshop-2' };
+const stamps = { game: 'repair', build: 'test', engine: '2.21.0', rules: 'canonical-workshop-2' };
 async function source(id: string) {
   const person = createGame(42).people[id]!;
   person.traits.honesty = 0.91;
@@ -88,6 +88,8 @@ describe('released whole-cast workshop adapter', () => {
     };
     let state = createGame(42, 'current', result!.initial, chapter);
     expect(state.people.nora!.traits.honesty).toBe(0.91);
+    for (const person of Object.values(state.people))
+      expect(person.lexicon?.plainEnglish).toBe(true);
     expect(state.people.rafi!.body.fitness).toBe(0.37);
     expect(state.castChapter!.inputs[0]!.life).toEqual(inputs[0]!.life);
     state = dispatch(state, { type: 'wait', minutes: 15 }).state;

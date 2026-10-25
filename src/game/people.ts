@@ -63,6 +63,7 @@ export function createPeople(seed: number, now: number): Record<string, Person> 
       p.id,
       createPerson({
         ...p,
+        lexicon: { plainEnglish: true },
         seed: seed + index * 7919,
         now,
         bornAt: now - p.age * 365 * 1440,

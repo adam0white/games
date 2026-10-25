@@ -83,7 +83,7 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
   if (
     portable.person.mappingVersion !== mapping ||
     portable.person.source.id !== sourceId ||
-    portable.person.source.engine !== '2.17.0'
+    !(commonstead ? ['2.17.0'] : ['2.17.0', '2.21.0']).includes(portable.person.source.engine)
   )
     throw new Error(
       'The source uses a mapping, role or engine that this workshop does not support.',
@@ -247,7 +247,7 @@ export function validateCastChapter(chapter: CastChapter) {
       claim.branchId !== input.parent.branchId ||
       claim.parentRevision !== input.parent.revision ||
       claim.source.game !== 'repair' ||
-      claim.source.engine !== '2.17.0' ||
+      claim.source.engine !== '2.21.0' ||
       claim.source.rules !== 'canonical-workshop-2' ||
       claim.terminal ||
       !same(claim.transfer, { ...input.parent.transfer, life: input.life })

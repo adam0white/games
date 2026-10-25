@@ -186,7 +186,7 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
     const claim = await real.createPersona({
       ...body,
       parentRevision: revision,
-      source: { game: 'repair', build: 'test', engine: '2.17.0', rules: 'canonical-workshop-2' },
+      source: { game: 'repair', build: 'test', engine: '2.21.0', rules: 'canonical-workshop-2' },
       transfer: { ...parent.transfer, life: input.life },
     });
     const file = createGame(42, 'current', people, {
@@ -221,7 +221,7 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
       castRevision: '1',
       branchId: 'test',
       parentRevision: null,
-      source: { game: 'repair', engine: '2.17.0', rules: 'test', build: 'test' },
+      source: { game: 'repair', engine: '2.21.0', rules: 'test', build: 'test' },
       transfer: {},
       limitations: [],
     });

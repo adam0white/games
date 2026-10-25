@@ -4,7 +4,7 @@ A single-player repair strategy game. Investigate familiar electrical and mechan
 
 ## Canonical cast adoption
 
-Small Works now has a bounded four-person canonical cast and browser-life integration candidate using published HF 2.18.0. [The cast scope](docs/canonical-cast.md) defines the new edition, playable disclosures and archive boundary. Technical delivery and owner acceptance remain separate.
+Small Works now has a bounded four-person canonical cast and browser-life integration candidate using published HF 2.21.0. [The cast scope](docs/canonical-cast.md) defines the new edition, playable disclosures and archive boundary. Technical delivery and owner acceptance remain separate.
 
 ## Current direction
 
@@ -41,4 +41,4 @@ Open the address printed by the development server. Browser saves retain worksho
 - [Mentoring and public follow-up](docs/restart/playtest-8.md): attended learning, courier work and revised teaching instructions.
 - [External reviews](docs/restart/external-reviews.md): returned consultations and selected corrections.
 
-The dependency is exactly `@adam0white/human-framework` 2.2.1. The game owns physics, stock, prices, promises and presentation. HF owns people's acquired conditional methods, decisions, activities and snapshots. The simulation uses public package APIs, without sibling-source imports or LLMs. Bounded controls can establish conditional transfer; they cannot establish general human realism or enjoyment.
+The current dependency is exactly `@adam0white/human-framework` 2.21.0. Fresh people use persisted plain narration; pinned replay openings preserve their saved choice. See [the adoption regression and lesson](docs/hf-plain-narration.md). The game owns physics, stock, prices, promises and presentation. HF owns people's acquired conditional methods, decisions, activities and snapshots. The simulation uses public package APIs, without sibling-source imports or LLMs. Bounded controls can establish conditional transfer; they cannot establish general human realism or enjoyment.

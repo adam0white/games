@@ -83,6 +83,7 @@ try {
       act({type:'next-day'});
     }
     const saved = saveGame(state);
+    writeFileSync(`${output}/${seed}-${policy}.save.json`, saved);
     const replay = replayRecordedRun({seed,inputs:state.inputs,provenance:state.provenance,openingPeople:state.openingPeople,castChapter:state.castChapter},saved);
     if (!replay.ok) throw Error(`Current export did not replay: ${seed}/${policy}: ${replay.message}`);
     const summary = {seed,policy,day:state.day,ended:state.ended,steps:steps.length,accepted:steps.filter(x=>x.ok).length,state:sha(normalize(state)),people:sha(normalize(state.people, 'people')),replay:true,trace:sha(steps)};

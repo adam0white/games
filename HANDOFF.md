@@ -133,3 +133,9 @@ The live delivery check found Read Meter still inherited an 11px action-bar rule
 ## Compact shared notice, 2026-10-24
 
 The final narrow adoption pins lab-kit 0.5.7 with unchanged lab-client 0.4.6 and HF 2.18.0. The actual async-suppressed node remains in the stable footer. Its complete sentence is “We record and link play across games on this device.” The SDK no longer provides a Dismiss control; the obsolete local button override is removed. Two-pixel horizontal notice padding preserves one readable line at 360px with wider system fonts. Enlarged text may wrap without a height cap. Reviewed copy, workshop action fonts, archive pins, replay and game rules remain unchanged. Final lane, CI and delivery receipts are recorded outside the worktree in the simplify worker report. No additional review or playtest round.
+
+## Published plain narration, 2026-10-25
+
+What remains: Adam accepts readability and game feel. No new player playtest round is claimed.
+
+The host now pins HF 2.21.0 directly and through the lab-client dependency override. Fresh local and canonical people opt in through persisted `Lexicon.plainEnglish`; loaded people and pinned replay openings retain their saved choice. Current export and continuity headers use the exact release. Earlier package exports receive the existing start-fresh refusal. Historical archives and admitted historical source dialects keep their original pins. See [the adoption regression and lesson](docs/hf-plain-narration.md) for the strict proof allowlist and scope. All nine seeded seven-day final hashes and all command acceptance results match; all nine current exports replay exactly. Delivery receipts and actual on-screen coverage/gaps live in the owner's `hfadopt/repair-game-report.md` scratch report.
