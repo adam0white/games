@@ -5,7 +5,7 @@
   "description": "Two minds, one island: an HF person and an LLM agent on the same small Eko-style island (lab experiment, not a game)",
   "type": "module",
   "engines": {
-    "node": ">=24"
+    "node": "26.12.0"
   },
   "scripts": {
     "check": "biome check . && tsc --noEmit && vitest run",
@@ -20,5 +20,6 @@
     "@types/node": "^26.6.5",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
-  }
+  },
+  "packageManager": "pnpm@12.14.0+sha512.c18ba6d87993d3d164cb5e8948f32b2c06ee854487e06cd8d86781342fb3e5bb4634367034711e86802baa9c37bea906ce1929ad08d70884c97d801df13389a6"
 }
