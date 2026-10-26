@@ -3,10 +3,13 @@ import { validateCastChapter } from './cast';
 import { createGame } from './engine';
 import { compatiblePart, createModel } from './model';
 import { restoreOpeningPeople } from './opening';
+import { OUTCOME_TERMS } from './outcomes';
+import { validateOutcomeSave } from './outcomes-validation';
 import {
-  isCurrentProvenance,
   isInputRecording,
   isMigratedFrom,
+  isOutcomeProvenance,
+  isSupportedProvenance,
   LEGACY_PROVENANCE,
   SAVE_PROVENANCE,
 } from './recording';
@@ -26,7 +29,13 @@ const UPGRADE_IDS = ['second-bench', 'precision-meter'];
 export function saveGame(state: GameState): string {
   return JSON.stringify({
     ...state,
-    provenance: { ...(state.schema === 'small-works@4' ? LEGACY_PROVENANCE : SAVE_PROVENANCE) },
+    provenance: {
+      ...(state.schema === 'small-works@4'
+        ? LEGACY_PROVENANCE
+        : state.castOutcomes
+          ? state.provenance
+          : SAVE_PROVENANCE),
+    },
     people: Object.fromEntries(
       Object.entries(state.people).map(([id, person]) => [id, snapshot(person)]),
     ),
@@ -36,7 +45,7 @@ export function loadGame(text: string): GameState {
   if (text.length > 2_000_000) throw new Error('This save exceeds the supported size.');
   const value = JSON.parse(text) as GameState & { castSources?: unknown };
   delete value.castSources;
-  if (value?.schema !== 'small-works@5' || !isCurrentProvenance(value?.provenance)) {
+  if (value?.schema !== 'small-works@5' || !isSupportedProvenance(value?.provenance)) {
     throw new Error(
       'This save belongs to an earlier workshop edition. Start fresh here, or use its historical archive.',
     );
@@ -94,7 +103,7 @@ export function loadGame(text: string): GameState {
   if (
     !object(value) ||
     !['small-works@4', 'small-works@5'].includes(value.schema) ||
-    !isCurrentProvenance(value.provenance) ||
+    !isSupportedProvenance(value.provenance) ||
     (value.migratedFrom !== undefined &&
       (value.schema !== 'small-works@5' ||
         !isMigratedFrom(value.migratedFrom) ||
@@ -134,6 +143,8 @@ export function loadGame(text: string): GameState {
     Object.entries(value.stock).some(([kind, count]) => !parts.includes(kind) || !integer(count))
   )
     invalid();
+  if (isOutcomeProvenance(value.provenance) !== (value.castOutcomes !== undefined)) invalid();
+  if (value.castOutcomes !== undefined) validateOutcomeSave(value);
   if (value.busyWorkshop !== undefined) {
     const busy = value.busyWorkshop;
     if (
@@ -597,6 +608,20 @@ export function loadGame(text: string): GameState {
     )
       continue;
     invalid();
+  }
+  const outcomeWork = value.castOutcomes?.pending;
+  if (outcomeWork) {
+    const owner = OUTCOME_TERMS[outcomeWork.action].person;
+    const activity = value.people[owner]?.activity;
+    if (
+      working.has(owner) ||
+      !activity ||
+      activity.startedAt !== outcomeWork.startedAt ||
+      activity.endsAt !== outcomeWork.endsAt ||
+      activity.affordance.id !== outcomeWork.option.id
+    )
+      invalid();
+    working.add(owner);
   }
   for (const [id, person] of Object.entries(value.people)) {
     if (!person.activity || working.has(id)) continue;

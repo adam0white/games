@@ -1,5 +1,9 @@
 # Handoff
 
+## Optional cast-outcome candidate, 2026-10-26
+
+Remaining: one parent-arranged correctness/game-design review, correction, signing/CI/delivery and Adam’s feel acceptance. This dirty source candidate adds explicit `cast-outcomes@1` under existing engine5/HF3.0.0. See [finite scope and provenance](docs/cast-outcomes.md). Parent evidence, raw replay captures and handback manifest are in `~/code/.lab-scratch/games-deferred/smallworks-outcomes-*`. No commit, push, deployment or player round is claimed. Ordinary/loaded5 exact continuation and fixed archives remain required.
+
 ## Current installer, 2026-10-26
 
 Use shared Node 26.12.0 and pnpm 12.14.0; install with `pnpm install --frozen-lockfile`. The current npm lock is replaced by `pnpm-lock.yaml`, with overrides and native build permissions in `pnpm-workspace.yaml`. `npm run` remains valid for scripts. Scheduler0.28.0 is declared directly because current license generation reads its files; its installed version is unchanged.

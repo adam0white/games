@@ -19,6 +19,9 @@ import { lab } from './lab';
 import { pauseForDeparture, resumeForPlay } from './ui/chapter';
 
 export const LOCAL_KEY = 'small-works-cast-local-v2';
+export const OUTCOME_LOCAL_KEY = 'small-works-cast-outcomes-v1';
+export const workshopSaveKey = (state: GameState) =>
+  state.castOutcomes ? OUTCOME_LOCAL_KEY : LOCAL_KEY;
 interface LocalMeta {
   runId: string;
   fileSources: unknown[];
@@ -89,7 +92,7 @@ export class WorkshopContinuity {
     if (!this.started || !current?.inputs?.length || !this.update) return;
     const paused = pauseForDeparture(current);
     this.update(paused);
-    localStorage.setItem(LOCAL_KEY, this.localSave(paused));
+    localStorage.setItem(workshopSaveKey(paused), this.localSave(paused));
     await this.checkpointAll();
   }
   async enter(state: GameState): Promise<GameState> {
@@ -354,7 +357,7 @@ export class WorkshopContinuity {
     this.heads = [...this.heads.filter((p) => p.castId !== castId), envelope].sort((a, b) =>
       a.castId.localeCompare(b.castId),
     );
-    localStorage.setItem(LOCAL_KEY, this.localSave(state));
+    localStorage.setItem(workshopSaveKey(state), this.localSave(state));
     this.status = `${person.name}: ${envelope.terminal ? 'The end of this character history was saved' : 'The character history was saved'}. Source data and state that cannot transfer remain in the local export.`;
     this.changed();
   }

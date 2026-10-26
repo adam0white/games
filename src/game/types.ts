@@ -156,6 +156,7 @@ export interface GameState {
   migratedFrom?: import('./recording').MigratedFrom;
   inputs?: Command[];
   discoveries?: string[];
+  castOutcomes?: import('./outcomes').CastOutcomes;
   /** Complete target-clock initial people; never refreshed from live browser continuity. */
   castChapter?: import('./cast').CastChapter;
   chapterPaused?: boolean;
@@ -191,6 +192,8 @@ export interface GameState {
   dailyCostsPaid: number;
 }
 export type Command =
+  | { type: 'start-cast-outcomes' | 'stop-cast-outcome' }
+  | { type: 'cast-outcome'; action: import('./outcomes').OutcomeAction }
   | { type: 'pause-chapter' | 'resume-chapter' }
   | { type: 'ask-about-work'; personId: 'sam' | 'nora' | 'rafi' | 'halil' }
   | { type: 'prepare-event'; format: import('./community').CommunityFormat }

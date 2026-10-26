@@ -4,6 +4,7 @@ import {
   isInputRecording,
   isLegacyProvenance,
   isMigratedFrom,
+  isOutcomeProvenance,
   isSupportedProvenance,
 } from './recording';
 import type { Command, GameState } from './types';
@@ -64,6 +65,12 @@ export function replayRecordedRun(
       'This recording belongs to a different version of Small Works. Start a new game here, or open the recording in its matching archive.',
   });
   if (recording.provenance !== undefined && !isSupportedProvenance(recording.provenance))
+    return unsupported();
+  const startsOutcomes = recording.inputs[0]?.type === 'start-cast-outcomes';
+  if (
+    recording.provenance !== undefined &&
+    isOutcomeProvenance(recording.provenance) !== startsOutcomes
+  )
     return unsupported();
   if (recording.migratedFrom !== undefined && !isMigratedFrom(recording.migratedFrom))
     return unsupported();

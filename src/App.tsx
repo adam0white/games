@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { CastOutcomes } from './components/CastOutcomes';
 import { CommunityPanel } from './components/CommunityPanel';
 import { CommunityScene } from './components/CommunityScene';
 import { FirstRepairGuide } from './components/FirstRepairGuide';
@@ -13,7 +14,7 @@ import { SamWorkAccount } from './components/SamWorkAccount';
 import { SendWord } from './components/SendWord';
 import { TeachingRecord } from './components/TeachingRecord';
 import { WorkshopTally } from './components/WorkshopTally';
-import { continuity, LOCAL_KEY } from './continuity';
+import { continuity, LOCAL_KEY, OUTCOME_LOCAL_KEY, workshopSaveKey } from './continuity';
 import { admissionFacts, CAST_IDS } from './game/cast';
 import { discoveredAccounts } from './game/cast-content';
 import {
@@ -589,7 +590,7 @@ export default function App() {
       });
     }
     const text = saveGame(state);
-    localStorage.setItem(SAVE_KEY, continuity.localSave(state));
+    localStorage.setItem(workshopSaveKey(state), continuity.localSave(state));
     lab.captureSave(JSON.parse(text));
   }, [state]);
   useEffect(() => {
@@ -914,12 +915,21 @@ export default function App() {
     </div>
   );
   const isEnd = screen === 'play' && state.ended;
-  const startWorkshop = async (seed: number, localOnly = false) => {
+  const startWorkshop = async (
+    seed: number,
+    localOnly = false,
+    outcomes = Boolean(state.castOutcomes),
+  ) => {
     setEntryError('');
     setEntering(true);
     try {
       await continuity.depart();
-      resetPresentation(await continuity.fresh(seed, localOnly), true);
+      const base = await continuity.fresh(seed, localOnly || outcomes);
+      const next = outcomes
+        ? dispatch(base, { type: 'start-cast-outcomes' })
+        : { ok: true, state: base, message: '' };
+      if (!next.ok) throw new Error(next.message);
+      resetPresentation(next.state, true);
       initialLoadFailed = false;
       setNewConfirmed(false);
     } catch (error) {
@@ -927,6 +937,29 @@ export default function App() {
       setEntryError(workshopStartError(error, labMode));
       console.error('Workshop entry failed:', continuity.status);
       refreshContinuity((n) => n + 1);
+    } finally {
+      setEntering(false);
+    }
+  };
+  const enterOutcomeWorkshop = async () => {
+    if (entering) return;
+    setEntering(true);
+    setEntryError('');
+    try {
+      await continuity.depart();
+      const saved = localStorage.getItem(OUTCOME_LOCAL_KEY);
+      if (saved) {
+        const restored = continuity.loadLocal(saved);
+        if (!restored.castOutcomes) throw new Error('This is not the cast-outcome chapter.');
+        resetPresentation(await continuity.enter(restored), true);
+      } else {
+        const base = await continuity.fresh(freshSeed(), true);
+        const result = dispatch(base, { type: 'start-cast-outcomes' });
+        if (!result.ok) throw new Error(result.message);
+        resetPresentation(result.state, true);
+      }
+    } catch (error) {
+      setEntryError(workshopStartError(error, labMode));
     } finally {
       setEntering(false);
     }
@@ -1256,6 +1289,9 @@ export default function App() {
             <h1>SMALL WORKS</h1>
           </div>
           <p className="title-goal">Find out why the lantern goes dark.</p>
+          {state.castOutcomes && (
+            <p>Current chapter: optional cast outcomes. Its autosave is separate.</p>
+          )}
           {labMode && (
             <button type="button" className="reading-row" onClick={() => setSheet('ways')}>
               Lab tools <span>▸</span>
@@ -1271,6 +1307,17 @@ export default function App() {
               {hasSave ? 'Resume' : 'Start repairing'}
             </button>
             <small>Your game is saved on this device.</small>
+            <details>
+              <summary>Optional cast-outcome chapter</summary>
+              <p>
+                Keep the diagnostic workshop. Hear Sam, Nora, Rafi and Halil’s accounts, then choose
+                finite work with real time, stock and payment. This separate local chapter keeps the
+                ordinary autosave. Each person can refuse.
+              </p>
+              <button type="button" disabled={entering} onClick={() => void enterOutcomeWorkshop()}>
+                Open cast outcomes
+              </button>
+            </details>
             {entering && <p role="status">Your workshop is opening…</p>}
             {entryError && (
               <div className="entry-error">
@@ -2259,6 +2306,7 @@ export default function App() {
                               Ask {person.name} about the work
                             </button>
                           )}
+                          <CastOutcomes state={state} personId={id} act={act} />
                           {id === 'sam' && progress.apprenticeshipAvailable && (
                             <div className="sam-actions">
                               <button

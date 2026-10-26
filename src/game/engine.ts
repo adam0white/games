@@ -31,6 +31,14 @@ import {
 } from './model';
 import { restoreOpeningPeople } from './opening';
 import {
+  outcomeBlock,
+  outcomeBoundary,
+  requestOutcome,
+  resolveOutcome,
+  startOutcomes,
+  stopOutcome,
+} from './outcomes';
+import {
   agreeLearningSession,
   choiceSpeech,
   chooseActivity,
@@ -1591,6 +1599,7 @@ function advance(s: GameState, minutes: number): void {
           : event.finishesAt;
     const next = Math.min(
       target,
+      outcomeBoundary(s),
       ...s.npcWork.map((w) => w.endsAt),
       ...preparationEnds,
       eventBoundary,
@@ -1601,6 +1610,7 @@ function advance(s: GameState, minutes: number): void {
       throw new Error('A workshop activity has an end time before the current time.');
     s.now = next;
     tickPeople(s.people, next);
+    resolveOutcome(s);
     reconcileResponsibilities(s);
     const completed = s.npcWork.filter((w) => w.endsAt <= next);
     s.npcWork = s.npcWork.filter((w) => w.endsAt > next);
@@ -2040,7 +2050,37 @@ export function dispatch(state: GameState, command: Command): CommandResult {
         'Sam must attend to his existing plans first. He is not available for extra workshop work yet.',
       );
   }
+  if (
+    s.castOutcomes?.pending &&
+    !['wait', 'select', 'stop-cast-outcome', 'pause-chapter', 'resume-chapter'].includes(
+      command.type,
+    )
+  )
+    return fail(
+      'You are attending this work. Let time pass or stop it before doing something else.',
+    );
   switch (command.type) {
+    case 'start-cast-outcomes':
+      if (s.schema !== 'small-works@5' || s.castOutcomes || (s.inputs?.length ?? 0) !== 0)
+        return fail(
+          'Choose this separate optional chapter at a fresh title start. Existing chapters keep their edition.',
+        );
+      startOutcomes(s);
+      log(
+        s,
+        'Workshop',
+        'Optional cast outcomes. Work, parts and payments share this workshop day. Each person can refuse. Rafi’s authored account is £12 deposit: £8 travel, £4 held; separate jar debt £3. No other edition is changed.',
+      );
+      return done('The optional cast-outcome chapter has begun.');
+    case 'cast-outcome': {
+      const block = outcomeBlock(s, command.action);
+      if (block) return fail(block);
+      return done(requestOutcome(s, command.action));
+    }
+    case 'stop-cast-outcome':
+      if (!s.castOutcomes?.pending) return fail('No attended cast work is running.');
+      stopOutcome(s);
+      return done('The activity stopped without completion or payment.');
     case 'start-busy-workshop': {
       if (!canStartBusyWorkshop(s))
         return fail(

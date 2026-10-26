@@ -79,3 +79,7 @@ Current-version exports must replay exactly. Older editions may be refused with 
 - [Historical general play](docs/restart/playtest-7.md): actual source-unread play and limitations.
 - [Mentoring and public follow-up](docs/restart/playtest-8.md): attended learning, courier work and revised teaching instructions.
 - [External reviews](docs/restart/external-reviews.md): returned consultations and selected corrections.
+
+## Optional cast-outcome source candidate
+
+The title offers a separate local cast-outcome chapter. Sam can correct his copied report and negotiate a paid shift. Nora can try and revise a credited handle. Rafi can return conserved money and diagnose the separate appliance. Halil can reopen one priced service. All require actual shared work and voluntary HF choices. See [scope, terms and limits](docs/cast-outcomes.md). This source candidate is not yet reviewed or deployed. Ordinary chapters and historical archives retain their autosaves and rules.

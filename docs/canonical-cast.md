@@ -31,3 +31,7 @@ The game does not disclose these accounts on import or in introductory profile t
 ## Archives and compatibility
 
 The archive builder keeps both historical source commits and storage prefixes fixed. The new cast edition uses its own autosave key and scenario provenance. Old same-name characters are not evidence of a shared life. Historical exports belong to their compatible archive; this edition may refuse them with a start-fresh explanation. Current-version export, import and replay remain required.
+
+## Optional outcome source candidate, 2026-10-26
+
+The optional `cast-outcomes@1` source candidate implements the four finite host paths in [cast outcomes](cast-outcomes.md). The table above describes the earlier disclosure-only edition. Ordinary and loaded engine5 chapters retain their exact rules. This candidate adds a separate title choice and autosave, not an automatic migration. Independent parent review and delivery remain pending; no player acceptance is claimed. The linked document records the exact shipped alternatives and the separate consent/guardrail-dependent possibilities.

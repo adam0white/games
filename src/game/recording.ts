@@ -1,3 +1,4 @@
+import { OUTCOME_ACTIONS } from './outcomes';
 import type { Command } from './types';
 
 export const MAX_RECORDED_INPUTS = 10_000;
@@ -41,6 +42,11 @@ const conditions = ['bench', 'movement', 'load'];
 export function isRecordedCommand(value: unknown): value is Command {
   if (!object(value)) return false;
   switch (value.type) {
+    case 'cast-outcome':
+      return keys(value, ['type', 'action']) && member(value.action, OUTCOME_ACTIONS);
+    case 'start-cast-outcomes':
+    case 'stop-cast-outcome':
+      return keys(value, ['type']);
     case 'ask-about-work':
       return (
         keys(value, ['type', 'personId']) &&
@@ -153,7 +159,7 @@ const matches = (value: unknown, expected: Provenance): boolean =>
 export const isCurrentProvenance = (value: unknown): boolean => matches(value, SAVE_PROVENANCE);
 export const isLegacyProvenance = (value: unknown): boolean => matches(value, LEGACY_PROVENANCE);
 export function isSupportedProvenance(value: unknown): boolean {
-  return isCurrentProvenance(value);
+  return isCurrentProvenance(value) || isOutcomeProvenance(value);
 }
 export function isMigratedFrom(value: unknown): value is MigratedFrom {
   return (
@@ -164,3 +170,6 @@ export function isMigratedFrom(value: unknown): value is MigratedFrom {
     Number.isInteger(value.atInput)
   );
 }
+
+export const OUTCOME_PROVENANCE = { ...SAVE_PROVENANCE, scenario: 'cast-outcomes@1' } as const;
+export const isOutcomeProvenance = (value: unknown): boolean => matches(value, OUTCOME_PROVENANCE);
