@@ -4,13 +4,13 @@ Read README.md, HANDOFF.md, docs/vision.md and docs/mvp.md before resuming. This
 
 ## Current stack and maintenance
 
-2026-10-25: HF3 maintenance uses Node >=24, TypeScript7.0.2, React19.3.1, Vite8.3.5, Vitest5.0.5, Biome2.6.3, Wrangler4.152.0 and Knip6.43.0. Published HF3.0.0 (engine2.23.0), lab-client0.4.10 and lab-kit0.5.11. Run full suites through `npm test` and the shared machine lock. Current Worker compatibility date2026-10-25. See docs/hf3-adoption.md for replay, scope, dated dependency exception and owner acceptance.
+2026-10-25: HF3 maintenance uses Node >=24, TypeScript7.0.2, React19.3.1, Vite8.3.5, Vitest5.0.5, Biome2.6.3, Wrangler4.152.0 and Knip6.43.0. Published HF3.0.0 (engine2.23.0), lab-client0.4.11 and lab-kit0.5.12. Run full suites through `npm test` and the shared machine lock. Current Worker compatibility date2026-10-25. See docs/hf3-adoption.md for replay, scope, dated dependency exception and owner acceptance.
 
 ## Current authorization
 
 2026-10-25: the owner's HF v3 increment includes maintenance, game feedback and documentation that matches shipped source. This host currently pins HF 3.0.0; later HF releases do not automatically change its pin. Read the current section of HANDOFF.md and docs/hf3-adoption.md before using the historical records below. Technical delivery and Adam's acceptance remain separate; owner review is targeted for 2026-11-03.
 
-Lab-panel rounds on HF3 builds are allowed under the playtest director. Friends' playtests and Show HN stay paused. The requested Feedback choices “I'm stopping” and “I'm confused” are authorized work; describe them as shipped only after the shared artifacts and host source expose them. Lab client and kit remain immutable release artifacts. HF's npm package requires TypeScript 7 or later.
+Lab-panel rounds on HF3 builds are allowed under the playtest director. Friends' playtests and Show HN stay paused. The Feedback choices “I'm stopping” and “I'm confused” are exposed by the released shared artifacts and this host’s custom Feedback page. Selection sends nothing; ordinary Submit retains the note and optional run boundary. Lab client and kit remain immutable release artifacts. HF's npm package requires TypeScript 7 or later.
 
 ## Historical authorization records
 

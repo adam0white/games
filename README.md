@@ -15,7 +15,11 @@ Open [Small Works](https://repair.adamwhite.work). Begin with the family lantern
 
 Later, use the workboard to accept repair requests and keep track of their return times. Repairs share the workshop day, stock and cash. Sam can watch actual work and later try work himself. His attendance and what he has learned matter; asking him to watch does not give him the answer.
 
+For an optional busy afternoon, return the family lantern after a successful use check, then open **Board** → **Try a busy afternoon** → **Wait for the afternoon visitors**. Choose it by 13:30, before taking other work or buying or recovering switches. Waiting advances workshop time to the 13:30 visit. Nora’s path lantern, Rafi’s filter fan and Nora’s work light request returns at 14:30, 15:00 and 15:30. They share one new switch; the supplier gets more next morning. Recovering a switch costs time and its donor object. New and recovered parts remain separate within total stock, and you choose which to fit. Sam keeps his HF decisions and afternoon plans. Existing workshops keep their ordinary rules and saved state unless you choose this option.
+
 The game saves on this device. Workshop time stops while you are away. Open **Menu** for **Resume**, **New game**, **Feedback** and the **Recording** switch. Starting a new game replaces the saved workshop after confirmation.
+
+Feedback offers **I'm stopping** and **I'm confused**. Choosing one changes only the local selection and sends nothing. **Submit** sends the literal choice, any verdict and your edited note through the ordinary feedback path. A note receipt confirms the note was stored; it does not prove optional run chunks arrived.
 
 ## What Human Framework contributes
 

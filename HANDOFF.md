@@ -1,26 +1,36 @@
 # Handoff
 
-## Current state, 2026-10-25
+## Current state, 2026-10-26
 
-Remaining: Adam accepts readability, game feel, canonical receiving journeys and recording through play. Owner review target: **2026-11-03**. Lab-panel rounds on HF3 builds are allowed under the playtest director; friends' playtests and Show HN stay paused. This documentation update runs no rounds. Game design and Deferred updates belong to games-deferred. F-138 remains a scenario proposal, not a completed difficulty change.
+Remaining: Adam accepts readability, game feel, canonical receiving journeys and recording through play. Owner review target: **2026-11-03**. Lab-panel rounds on HF3 builds are allowed under the playtest director; friends' playtests and Show HN stay paused. This documentation update runs no rounds. Game design and Deferred updates belong to games-deferred. F-138’s optional busy afternoon is technically delivered; player and owner acceptance remain separate.
 
 ### Source and deployed receipt
 
-The fetched source baseline is `8dcca86b455c052bf5136830019ccbcb4685cb9e`, following README-only `35391a0`. It pins released HF **3.0.0**, whose person engine is **2.23.0**, and immutable lab-client **0.4.10** / lab-kit **0.5.11**. The game package is **4.1.0**; save provenance is **4.1.0+hf3**, scenario **canonical-workshop@2**, workshop engine/schema **small-works@5**. These values describe different contracts.
+The fetched source baseline is `29218f50717a926bf4d4e1dd22f8a2b76bbb6f6d`, signed G with the Codex trailer; exact [CI 40252310186](https://github.com/adam0white/repair-game/actions/runs/40252310186) passed. It pins released HF **3.0.0**, whose person engine is **2.23.0**, and immutable lab-client **0.4.11** / lab-kit **0.5.12**. The game package is **4.1.0**; save provenance is **4.1.0+hf3**, scenario **canonical-workshop@2**, workshop engine/schema **small-works@5**. These values describe different contracts.
 
-The live [release manifest](https://repair.adamwhite.work/release.json), fetched on 2026-10-25, matches `8dcca86` with `dirty:false`, game/app 4.1.0, framework 3.0.0 and engine `small-works@5`. Exact [CI 40236338346](https://github.com/adam0white/repair-game/actions/runs/40236338346) passed. The receiver delivery report records the normal deployment check: lint, types, **329 tests across 43 files**, build and both historical archive builds; Cloudflare version `8d61712e-4c6e-4ab8-9063-7cbc3a5b0e40`. These are technical receipts, not owner acceptance or completion of the other games.
+The maintenance delivery report verifies the live [release manifest](https://repair.adamwhite.work/release.json) at `29218f5`, `dirty:false`, game/app 4.1.0, framework 3.0.0 and engine `small-works@5`; Cloudflare version `e874b71d-7950-4c2d-b60c-731de2c5cac0`. Its normal lane and deployment checks passed **341 tests across 46 files**, lint, types, build and both historical archive builds. The bounded maintenance removed five production non-null assertions with exact raw save/continuation/replay comparisons and no UI change. **239 lint warnings remain**; this is not completion of the maintenance sweep.
 
-[HF3 adoption](docs/hf3-adoption.md) records raw replay controls, maintenance and the dated Undici exception. Final source/live/cleanup receipts are in the owner's `~/code/.lab-scratch/v3/smallworks/report.md` and `~/code/.lab-scratch/v3/commonstead-receiver/report.md`. Both deliveries removed their own source/deploy trees and branches. Their archive build diffs and untracked files were preserved before temporary-tree cleanup. The earlier Small Works report's pending Commonstead 2.23 admission is superseded by the receiver delivery.
+Gameplay delivery `7ad0c204b79bdc9bc2a3fe620b870fa2be23eb1a` / [CI 40247182903](https://github.com/adam0white/repair-game/actions/runs/40247182903) / Cloudflare `6a1ea231-443c-4885-a568-c231b3eef21a` and docs-only receipt `8dc26c0` / [CI 40248151180](https://github.com/adam0white/repair-game/actions/runs/40248151180) are earlier receipts. The gameplay delivery checked Chrome at 360×690 and 1280×800 and controlled WebKit Feedback behavior. These are older scoped browser checks, not fresh browser proof of `29218f5`, all-device acceptance or a player round. This source-only documentation update deploys nothing.
+
+[HF3 adoption](docs/hf3-adoption.md) records replay controls and the dated Undici exception. Current delivery reports are `~/code/.lab-scratch/games-deferred/repair-report.md` and `~/code/.lab-scratch/v3/smallworks-null-maint/report.md`. Their source/deploy trees and branches were cleaned. Technical receipts do not establish owner acceptance, human learning/control acceptance, an ordinary shared-shelf journey or completion of other games.
 
 ### Play, saves and people
 
 [README](README.md#how-to-play) describes the guided lantern repair and later workshop work. Small Works owns objects, faults, measurements, stock, cash, time and customer promises. Released HF supplies people's perceptions, learned methods, decisions, activities and saved person state. This is bounded conditional-learning evidence; whole independent repair and owner enjoyment are not established by these checks.
 
-The ordinary Menu offers Resume, Feedback, Full screen, All games, Recording and confirmed New game. Diagnostic controls, run download, import and replay verification require `?lab=1`. No explanatory About or Credits surface exists. The requested Feedback choices “I'm stopping” and “I'm confused” are authorized work, but are not exposed by this host source.
+The ordinary Menu offers Resume, Feedback, Full screen, All games, Recording and confirmed New game. Diagnostic controls, run download, import and replay verification require `?lab=1`. No explanatory About or Credits surface exists. The custom Feedback page exposes the released client’s literal “I'm stopping” / “I'm confused” labels. Selection changes local UI only and sends nothing. Ordinary Submit combines the selected words, verdict and edited note. A note receipt does not prove optional run chunks arrived.
 
 The current local chapter uses `small-works-cast-local-v2`; saves pin workshop state, HF people, RNG and recorded inputs. Workshop time does not advance while away. Departure checkpoints a paused chapter; Resume continues that chapter. Current-version exports must replay exactly. Older root-game editions receive the existing start-fresh refusal; compatible historical exports belong in their fixed archives with isolated saves. Imported file histories do not grant shared-shelf ownership. Loaded chapters retain their pinned opening and local ownership rather than importing a later shelf head.
 
 Recording links play across games on this device while on. The single menu switch can enable it under DNT/GPC; those signals set the initial default off. With recording off, Feedback offers the optional unchecked share checkbox. Feedback remains available without recording. The 2026-10-23 owner direction below is retained; a toggle or opened form is not a server receipt.
+
+### Bounded gameplay dispositions
+
+The optional [busy afternoon](docs/restart/design.md#busy-afternoon-2026-10-25) is available after a checked family return: **Board → Try a busy afternoon → Wait for the afternoon visitors**. The 13:30 visit creates 14:30/15:00/15:30 requests with one new switch and next-morning supplier stock. New/recovered stock and actual bench/time costs are conserved. Sam remains HF-controlled. Ordinary current worlds retain exact behavior without the opt-in command.
+
+The opt-in scenario uses actual outings for the scoped return boundary, excludes the duplicate room-fan template and carries late returns into later requests. Fresh browser starts save a random seed; the guided opening fault remains authored. Equal reported symptoms are already grouped, and Look inside already opens rather than toggles the cover. First-week continuation now precedes the long account; Notes contrast is corrected. Existing F-137/F-247 fixes remain. These bounded dispositions supersede the dated deferred list below; they do not establish player acceptance or a broader business progression.
+
+SW1/SW2 remain unresolved generic HF routes owned by **all**, target **2026-10-30**. No local faculty or HF pin change is authorized by those requests. Adam’s feel/readability review and lab retesting remain targeted for Nov 3. The lab director owns rounds; the active deployment hold remains in force.
 
 ### Finite continuation boundary
 
