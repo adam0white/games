@@ -2,6 +2,10 @@
 
 Owner renewal: 2026-10-14. This restart supersedes the earlier campaign, UI, historical-save requirements and dated campaign queues. Original implementation remains in Git at `9f0e997` and later hosting commits. Source remains private; static deployment and private pushes remain authorized.
 
+## Current runtime and storage
+
+The source game is 4.1.0. It pins published HF 3.0.0 (Person engine 2.23.0) and immutable lab-client 0.4.11 / lab-kit 0.5.12 artifacts. Workshop saves use `small-works@5`, scenario `canonical-workshop@2` and game provenance `4.1.0+hf3`. Native cast claims use `canonical-workshop-2`. The current local chapter and app autosave use `small-works-cast-local-v2`.
+
 ## Done
 
 Deliver a reviewed, runnable local/public repair strategy game with genuine diagnostic puzzles, a shared workshop day, consequential parts and promises, and published-HF people whose actual acquired knowledge and competing priorities change autonomous work. Adam accepts enjoyment by playing. Five actual hours of development and revision run from 09:21:55 to 14:21:55 UTC on October 14. Do useful iteration through the deadline, not a short checkpoint followed by idle waiting.
@@ -36,6 +40,8 @@ App source [`7ad0c204b79bdc9bc2a3fe620b870fa2be23eb1a`](https://github.com/adam0
 | GDI043 / 044 and current UI, cast, recording readiness | No player round or owner acceptance by this worker. The lab director owns retesting. | lab director / Adam, 2026-11-03 |
 | Pre-restart campaign and long-term roadmap | The October14 restart retires old chapter queues. Current vision retains crew, management, economy and multiplayer ambitions behind their recorded activation conditions. No server or economy slice selected here. | Adam; roadmap review 2026-11-09 |
 
+
+The restart sections below retain their original HF 2.2.1, `small-works@4`, `3.0.0-alpha.4` and `small-works-save-v4` records. Those runtime, storage and publication values are historical; use the current identifiers above. Owner words, diagnostic principles and original receipts remain unchanged.
 
 ## Game
 
