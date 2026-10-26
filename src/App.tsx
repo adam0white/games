@@ -495,6 +495,16 @@ export default function App() {
   }, []);
   const [pane, setPane] = useState<'object' | 'meter' | 'repair' | 'notes'>('object');
   const [opened, setOpened] = useState(false);
+  const [referenceOpen, setReferenceOpen] = useState(false);
+  const openReference = () => {
+    setReferenceOpen(true);
+    setPane('notes');
+    requestAnimationFrame(() => {
+      const entry = document.getElementById('bench-reference');
+      entry?.focus();
+      entry?.scrollIntoView({ block: 'nearest' });
+    });
+  };
   const [replacementSource, setReplacementSource] = useState<'new' | 'recovered' | undefined>();
   const [introSkipped, setIntroSkipped] = useState(
     () => localStorage.getItem(`small-works-canonical-intro-${state.seed}`) === 'skipped',
@@ -1541,6 +1551,15 @@ export default function App() {
                             aria-labelledby={`tab-${pane}`}
                             className={`focused-pane pane-${pane}`}
                           >
+                            {pane !== 'notes' && (
+                              <p>
+                                Reference in Notes lists the normal voltages and drive ratios to
+                                compare with your readings.{' '}
+                                <button type="button" onClick={openReference}>
+                                  Open Reference
+                                </button>
+                              </p>
+                            )}
                             {(pane === 'object' || pane === 'repair') && diagram}
                             {pane === 'object' && !guided && (
                               <fieldset className="use-conditions">
@@ -1692,6 +1711,13 @@ export default function App() {
                             {pane === 'meter' && diagram}
                             {pane === 'repair' && (
                               <>
+                                <div className="opening-quote">
+                                  <strong>
+                                    {state.people[job.ownerId]?.name ??
+                                      (job.ownerId === 'player' ? 'Your project' : 'Its owner')}
+                                  </strong>
+                                  <p>{job.description}</p>
+                                </div>
                                 <h2>{part?.label ?? 'Choose a part'}</h2>
                                 {state.watching &&
                                   part &&
@@ -1735,8 +1761,11 @@ export default function App() {
                                     </p>
                                   ))}
                                 </details>
-                                <details>
-                                  <summary>Reference</summary>
+                                <details
+                                  open={referenceOpen}
+                                  onToggle={(event) => setReferenceOpen(event.currentTarget.open)}
+                                >
+                                  <summary id="bench-reference">Reference</summary>
                                   <p>{checkPurpose(job)}</p>
                                   {job.kind === 'music-box' ? (
                                     <div className="drive-reference">

@@ -26,6 +26,8 @@ App source [`7ad0c204b79bdc9bc2a3fe620b870fa2be23eb1a`](https://github.com/adam0
 
 ## Deferred and reconciled, 2026-10-25
 
+F1485 requests: “Show the owner's own words, like "my grandmother's, no new parts", on the bench next to the repair buttons, not only on People.” F1482 requests: “Point me to the Reference table the first time a target speed or voltage appears.” The 2026-10-26 display-only candidate repeats the existing full request beside repair controls and introduces a direct entry to the existing Reference from every active bench tool. It does not change diagnosis, questions, costs, saved state or the Reference facts. This is candidate coverage, not a fresh retest or whole-ask acceptance. Nia found the request on People and did not open the bench disclosure; Emre valued the calculation after discovering Reference. Their conditional returns and causal limits remain in the literal full reports. Money/nightly £4, recovered cells, varied faults, same-screen supply, reactions/replies and personal-project performance remain separate open asks with all clauses retained. Parent review target 2026-10-27; Adam/lab acceptance 2026-11-03. Live2bf hold remains.
+
 | Source | Current disposition | Owner / target |
 |---|---|---|
 | F138 / GDI033 | Optional busy afternoon delivered in `7ad0c20`, 2026-10-26. Acceptance is an observed player result, not a test gate. | Adam / lab director, 2026-11-03 |

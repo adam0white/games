@@ -1,5 +1,9 @@
 # Handoff
 
+## Owner words and Reference candidate, 2026-10-26
+
+Remaining: parent review/integration and actual player/Adam acceptance. Display-only candidate on a486d02 shows the existing full object request with its owner beside repair controls. The bench tools introduce Notes → Reference; Open Reference opens that existing disclosure and focuses its summary. It supplies no diagnosis, new Hint, cost change or simulation input. No browser/player, signing, push or deployment by this worker. Live2bf hold remains. F1485/F1482 are candidate coverage only; all other asks, including money/recovered cells, dialogue and performance, remain separate. Exact plan, checks and archive receipt: `~/code/.lab-scratch/games-deferred/smallworks-ownerwords-*`.
+
 ## Optional cast-outcome candidate, 2026-10-26
 
 Remaining: one parent-arranged correctness/game-design review, correction, signing/CI/delivery and Adam’s feel acceptance. This dirty source candidate adds explicit `cast-outcomes@1` under existing engine5/HF3.0.0. See [finite scope and provenance](docs/cast-outcomes.md). Parent evidence, raw replay captures and handback manifest are in `~/code/.lab-scratch/games-deferred/smallworks-outcomes-*`. No commit, push, deployment or player round is claimed. Ordinary/loaded5 exact continuation and fixed archives remain required.
