@@ -318,8 +318,10 @@ export function createGame(
       throw new Error('A continuing chapter needs the exact people saved at its start.');
     const expected = createGame(seed).people;
     for (const input of castChapter.inputs) {
-      const role = castRole(input.parent.castId)!;
-      expected[role] = admitWorkshop(input, expected[role]!);
+      const role = castRole(input.parent.castId);
+      const opening = role === undefined ? undefined : expected[role];
+      if (role === undefined || !opening) throw new Error('The saved source record is invalid.');
+      expected[role] = admitWorkshop(input, opening);
     }
     if (canonicalPersona(expected) !== canonicalPersona(openingPeople))
       throw new Error('The saved people do not match the people loaded from the source.');

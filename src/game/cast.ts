@@ -45,6 +45,7 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
   const envelope = input.parent;
   const role = castRole(envelope.castId);
   if (
+    role === undefined ||
     role !== opening.id ||
     envelope.castRevision !== canonicalCast(envelope.castId).revision ||
     envelope.terminal
@@ -168,8 +169,8 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
   delete target.agenda.lapse;
   return admitCalendarPersona(shifted, target, {
     mappingVersion: mapping,
-    sourceId: sourceId!,
-    targetId: role!,
+    sourceId,
+    targetId: role,
     targetNorms: DEFAULT_NORMS,
   }).person;
 }

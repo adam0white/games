@@ -187,8 +187,10 @@ export class WorkshopContinuity {
               const people = structuredClone(base.people);
               for (const input of inputs) {
                 const id = Object.keys(CAST_IDS).find((id) => CAST_IDS[id] === input.parent.castId);
-                if (!id) throw new Error('This character is not assigned to the workshop.');
-                people[id] = admitWorkshop(input, people[id]!);
+                const opening = id ? people[id] : undefined;
+                if (!id || !opening)
+                  throw new Error('This character is not assigned to the workshop.');
+                people[id] = admitWorkshop(input, opening);
               }
               return people;
             },
