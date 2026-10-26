@@ -16,11 +16,15 @@ An actual late return remains in the owner’s later request. An outstanding ove
 
 The opt-in command and `busyWorkshop.edition` are saved and replayed. Without that command, existing `canonical-workshop@2` inputs retain their rules and saved state. A fresh browser seed changes generated later work; the first guided fault and ordinary opening requests remain authored. Remembering a valid repair is allowed. This is a bounded challenge, not a claim that the broader business progression is implemented.
 
+## Verified delivery, 2026-10-26
+
+App source [`7ad0c204b79bdc9bc2a3fe620b870fa2be23eb1a`](https://github.com/adam0white/repair-game/commit/7ad0c204b79bdc9bc2a3fe620b870fa2be23eb1a) passed the one independent review after its bench-reservation correction, the normal 341-test lane and [exact CI](https://github.com/adam0white/repair-game/actions/runs/40247182903). A fresh clean managed deployment reports that exact source and `dirty:false` in the [live manifest](https://repair.adamwhite.work/release.json). Builder checks covered both required Chrome sizes and controlled WebKit Feedback choices. The owner’s existing save was preserved. No new player round or owner acceptance is claimed.
+
 ## Deferred and reconciled, 2026-10-25
 
 | Source | Current disposition | Owner / target |
 |---|---|---|
-| F138 / GDI033 | Optional busy afternoon implemented in source; independent review and delivery still required. Acceptance is an observed player result, not a test gate. | repair delivery; Adam / lab director, 2026-11-03 |
+| F138 / GDI033 | Optional busy afternoon delivered in `7ad0c20`, 2026-10-26. Acceptance is an observed player result, not a test gate. | Adam / lab director, 2026-11-03 |
 | GDI034 / 036 / 038 | Actual outing boundary, distinct recovered stock and duplicate meeting-room fan suppression apply to the opt-in scenario. Earlier ordinary worlds retain their saved behavior. | Adam / lab retest, 2026-11-03 |
 | GDI037 | Current `reportedSymptoms` groups equal readings rather than repeating a generated clause. No duplicate rewrite. | Adam / lab retest, 2026-11-03 |
 | GDI039 | Fresh browser starts use a saved random seed. Replay retains its recorded seed. Opening faults are intentionally authored; no claim of a different opening puzzle on every run. | Adam / lab retest, 2026-11-03 |
