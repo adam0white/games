@@ -7,11 +7,11 @@ const dryRun = process.argv.includes('--dry-run');
 if (!dryRun && execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim()) {
   throw Error('Commit the verified build before public deployment');
 }
-run('npm', ['run', 'check']);
+run('pnpm', ['run', 'check']);
 run('node', ['scripts/build-archives.mjs']);
-run('npx', ['--no-install', 'wrangler', 'deploy', '--dry-run']);
+run('pnpm', ['exec', 'wrangler', 'deploy', '--dry-run']);
 if (!dryRun) {
-  run('npx', ['--no-install', 'wrangler', 'deploy']);
+  run('pnpm', ['exec', 'wrangler', 'deploy']);
   const local = JSON.parse(readFileSync('dist/release.json', 'utf8'));
   const live = await verifyLiveRelease(local);
   console.log(`Verified https://repair.adamwhite.work at ${live.commit}`);

@@ -51,14 +51,18 @@ The historical October19 game was `3.1.0-alpha.3`, with schema and engine `small
 
 ## Run locally
 
-Use Node 24 or newer.
+Use the shared Node 26.12.0 runtime and pnpm 12.14.0.
 
 ```sh
-npm ci
-npm run dev
+pnpm install --frozen-lockfile
+pnpm run dev
 ```
 
 Open the address printed by the development server. `npm run check` runs lint, types, tests and the production build. Run `npm run check:lane` before each commit. In this repository it currently runs the full check. `npm test` uses the shared machine suite lock.
+
+Current installation uses `pnpm-lock.yaml` and the strict isolated dependency policy in `pnpm-workspace.yaml`. `npm run` remains valid for scripts. When updating an old npm tree, remove its root and workspace `node_modules`, install frozen with pnpm, and delete `dist`, `.types` and `*.tsbuildinfo` before rebuilding.
+
+`npm run build:archives` reconstructs two fixed historical snapshots. Its historical `npm ci` calls are a compatibility exception: their original npm locks and build provenance stay intact. The current installer migration preserves `scripts/build-archives.mjs` byte for byte and compares all raw output, including both archives and their provenance manifests. It does not deploy the game.
 
 ### Save and replay tools
 

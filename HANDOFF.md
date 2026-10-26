@@ -1,5 +1,11 @@
 # Handoff
 
+## Current installer, 2026-10-26
+
+Use shared Node 26.12.0 and pnpm 12.14.0; install with `pnpm install --frozen-lockfile`. The current npm lock is replaced by `pnpm-lock.yaml`, with overrides and native build permissions in `pnpm-workspace.yaml`. `npm run` remains valid for scripts. Scheduler0.28.0 is declared directly because current license generation reads its files; its installed version is unchanged.
+
+Historical archive reconstruction keeps its two fixed npm locks and `npm ci` calls as a compatibility exception. The archive builder remains byte-identical; the migration compares full raw `dist`, including both historical archives and provenance manifests. Installer delivery does not deploy the app or replace the game acceptance below.
+
 ## Current state, 2026-10-26
 
 Remaining: Adam accepts readability, game feel, canonical receiving journeys and recording through play. Owner review target: **2026-11-03**. Lab-panel rounds on HF3 builds are allowed under the playtest director; friends' playtests and Show HN stay paused. This documentation update runs no rounds. Game design and Deferred updates belong to games-deferred. F-138’s optional busy afternoon is technically delivered; player and owner acceptance remain separate.

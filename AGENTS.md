@@ -4,7 +4,7 @@ Read README.md, HANDOFF.md, docs/vision.md and docs/mvp.md before resuming. This
 
 ## Current stack and maintenance
 
-2026-10-25: HF3 maintenance uses Node >=24, TypeScript7.0.2, React19.3.1, Vite8.3.5, Vitest5.0.5, Biome2.6.3, Wrangler4.152.0 and Knip6.43.0. Published HF3.0.0 (engine2.23.0), lab-client0.4.11 and lab-kit0.5.12. Run full suites through `npm test` and the shared machine lock. Current Worker compatibility date2026-10-25. See docs/hf3-adoption.md for replay, scope, dated dependency exception and owner acceptance.
+2026-10-25: HF3 maintenance uses shared Node 26.12.0, TypeScript7.0.2, React19.3.1, Vite8.3.5, Vitest5.0.5, Biome2.6.3, Wrangler4.152.0 and Knip6.43.0. Published HF3.0.0 (engine2.23.0), lab-client0.4.11 and lab-kit0.5.12. Run full suites through `npm test` and the shared machine lock. Current Worker compatibility date2026-10-25. See docs/hf3-adoption.md for replay, scope, dated dependency exception and owner acceptance.
 
 ## Current authorization
 
@@ -52,7 +52,7 @@ Historical milestone (2026-10-10): the school-break campaign and released-HF tea
 
 ## Engineering boundary
 
-- Install released HF through npm, pinned exactly. No sibling-source imports, vendored HF, or game-specific rules added to HF.
+- Install released HF from npm through pnpm, pinned exactly. No sibling-source imports, vendored HF, or game-specific rules added to HF.
 - The game owns objects, faults, parts, repairs, prices, promises made to customers, workspaces and presentation. HF owns people's perceptions, understanding, decisions, learning and development. A host bookkeeping fact is not automatically known by every person.
 - The actor loop remains deterministic and independent of UI and LLMs. All randomness is seeded and saved. Match exogenous events independently of actor draw order in causal comparisons.
 - Saves include world state, person snapshots, dependency/engine/scenario versions and RNG state. Every playable milestone offers an export and replay.
@@ -70,3 +70,9 @@ Historical milestone (2026-10-10): the school-break campaign and released-HF tea
 - Keep this repository and its documents private on GitHub; do not make source public until public visibility and licensing have been decided. Local commits and integration are authorized for this work. HF changes require a demonstrated generic capability need, not repair-game convenience.
 
 Player-facing copy follows [Plain English](docs/lab/plain-english.md). Keep diagnostic and replay controls behind `?lab=1`.
+
+## Current installer delivery
+
+Use shared Node 26.12.0 and pnpm 12.14.0 with /opt/homebrew/bin first on PATH. Install with `pnpm install --frozen-lockfile`; keep `pnpm-lock.yaml`. `pnpm-workspace.yaml` owns overrides and exact native build permissions. `npm run` remains valid for scripts. The normal `check:lane` already acquires the shared test lock; do not wrap it in another suite lock. Sign commits and include `Co-Authored-By: Codex <noreply@openai.com>`.
+
+The two fixed historical snapshots retain their original npm locks and `npm ci` reconstruction as a compatibility exception. Preserve `scripts/build-archives.mjs` byte for byte: its hash is embedded in archive provenance. Current installer delivery requires the full lane, identical raw current and archive output including provenance, independent review, signed main and exact green CI. This installer change does not deploy the game or establish game readiness.
