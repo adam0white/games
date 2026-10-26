@@ -1,6 +1,8 @@
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { existsSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import createMind from '../src/minds/llm.ts';
@@ -13,10 +15,11 @@ vi.mock('node:child_process', async (original) => ({
   spawn: vi.fn(),
 }));
 
-// Preserve the legacy backend byte-for-byte while keeping this test's actual scratch writes in island2.
+// Preserve the legacy backend while keeping this test's scratch writes in the OS temporary directory.
 vi.mock('node:fs', async (original) => {
   const fs = await original<typeof import('node:fs')>();
-  const redirect = (path: string) => path.replace('/scratch/island/', '/scratch/island2/');
+  const redirect = (path: string) =>
+    path.replace('/Users/abdul/code/human-framework/scratch/island/', join(tmpdir(), 'island-test/'));
   return {
     ...fs,
     mkdirSync: (path: string) => fs.mkdirSync(redirect(path), { recursive: true }),
@@ -267,7 +270,7 @@ describe('Claude transport (mocked, no model calls)', () => {
     );
     expect(result).toEqual({ text: plan(['look']), inputTokens: 130, outputTokens: 50, usd: 0.001 });
     expect(receivedPrompt).toBe('Test prompt');
-    expect(directory).toContain('/human-framework/scratch/island2/claude-cwd/call-');
+    expect(directory).toContain(join(tmpdir(), 'island-test/claude-cwd/call-'));
     expect(existsSync(directory)).toBe(false);
     const [command, args] = vi.mocked(spawn).mock.calls[0] ?? [];
     expect(command).toBe('claude');

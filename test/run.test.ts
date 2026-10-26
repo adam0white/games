@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import random from '../src/minds/random.ts';
@@ -8,9 +9,7 @@ import { type Mind, type Observation, PERSONA } from '../src/types.ts';
 import { apply, createWorld } from '../src/world.ts';
 
 async function scratchDirectory() {
-  const root = '/Users/abdul/code/human-framework/scratch/island2';
-  await mkdir(root, { recursive: true });
-  return mkdtemp(join(root, 'runner-test-'));
+  return mkdtemp(join(tmpdir(), 'island-runner-test-'));
 }
 
 describe('runner', () => {

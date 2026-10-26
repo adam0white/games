@@ -26,4 +26,4 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm audit --audit-level=high
-      - run: npm run check
+      - run: pnpm check
