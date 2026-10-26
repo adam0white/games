@@ -45,7 +45,12 @@ import { lab } from './lab';
 import { todaysWords, workshopCrises } from './ui/crises';
 import { firstRepairProgress } from './ui/first-repair';
 import { partSupplyTarget } from './ui/part-supply';
-import { componentWorkReading, ownerPromiseAccount } from './ui/workshop-feedback';
+import {
+  actionAccount,
+  componentWorkReading,
+  latestRecoveryAccount,
+  ownerPromiseAccount,
+} from './ui/workshop-feedback';
 import './styles.css';
 import './focused-layout.css';
 import './meter-layout.css';
@@ -710,7 +715,7 @@ export default function App() {
           messages.push(
             interpretations[reading?.cues.signal ?? ''] ?? reading?.summary ?? result.message,
           );
-        } else messages.push(result.message);
+        } else messages.push(actionAccount(prior, command, result));
         if (!result.ok) break;
       }
       setState(next);
@@ -2524,6 +2529,9 @@ export default function App() {
                 <section className="stock-section">
                   <h2>Supplies</h2>
                   <h3>Parts drawer</h3>
+                  {latestRecoveryAccount(state) && (
+                    <p>Latest recovery: {latestRecoveryAccount(state)}</p>
+                  )}
                   <p>Replacing a part uses one spare part. Buying spare parts uses cash.</p>
                   {state.busyWorkshop && <p>Recovered counts are included in the totals below.</p>}
                   <div className="stock-list">
