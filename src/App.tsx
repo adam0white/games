@@ -44,6 +44,7 @@ import type {
 import { lab } from './lab';
 import { todaysWords, workshopCrises } from './ui/crises';
 import { firstRepairProgress } from './ui/first-repair';
+import { partSupplyTarget } from './ui/part-supply';
 import { componentWorkReading, ownerPromiseAccount } from './ui/workshop-feedback';
 import './styles.css';
 import './focused-layout.css';
@@ -414,6 +415,14 @@ export default function App() {
   }, []);
   const [conversationSession, setConversationSession] = useState(0);
   const [view, setView] = useState('bench');
+  const [supplyTarget, setSupplyTarget] = useState<string | undefined>();
+  useEffect(() => {
+    if (view !== 'people' || !supplyTarget) return;
+    const drawer = document.getElementById(supplyTarget);
+    drawer?.scrollIntoView({ block: 'center' });
+    drawer?.focus({ preventScroll: true });
+    setSupplyTarget(undefined);
+  }, [view, supplyTarget]);
   const [screen, setScreen] = useState<'title' | 'play' | 'feedback'>('title');
   const [feedbackSession, setFeedbackSession] = useState(0);
   const openFeedback = () => {
@@ -1992,6 +2001,20 @@ export default function App() {
                                           )}
                                       </button>
                                     ))}
+                                  {part &&
+                                    partSupplyTarget(part.kind) &&
+                                    !(state.stock[part.kind] ?? 0) && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSupplyTarget(partSupplyTarget(part.kind));
+                                          setView('people');
+                                        }}
+                                      >
+                                        Find this part
+                                        <small>{part.kind} · Supplies</small>
+                                      </button>
+                                    )}
                                 </div>
                               </>
                             )}
@@ -2477,7 +2500,13 @@ export default function App() {
                   <div className="stock-list">
                     {Object.entries(PART_PRICES).map(([kind, price]) => (
                       <div key={kind}>
-                        <span className="part-name">{kind}</span>
+                        <h4
+                          className="part-name"
+                          id={partSupplyTarget(kind as ComponentKind)}
+                          tabIndex={-1}
+                        >
+                          {kind}
+                        </h4>
                         <strong>
                           {state.stock[kind as ComponentKind] ?? 0}
                           <small>
@@ -2488,6 +2517,7 @@ export default function App() {
                               : ''}
                           </small>
                         </strong>
+                        <small>{money(price as number)} · 20 min supplier trip</small>
                         <button
                           type="button"
                           onClick={() => act({ type: 'buy', part: kind as ComponentKind })}
