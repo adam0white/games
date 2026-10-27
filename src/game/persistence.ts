@@ -1,5 +1,6 @@
 import { restore, snapshot } from '@adam0white/human-framework';
 import { validateCastChapter } from './cast';
+import { ownerReplacementProposal, ownerReplacementResponse } from './cast-content';
 import { createGame } from './engine';
 import { compatiblePart, createModel } from './model';
 import { restoreOpeningPeople } from './opening';
@@ -9,8 +10,10 @@ import {
   isInputRecording,
   isMigratedFrom,
   isOutcomeProvenance,
+  isRecordedCommand,
   isSupportedProvenance,
   LEGACY_PROVENANCE,
+  MAX_RECORDED_INPUTS,
   SAVE_PROVENANCE,
 } from './recording';
 import {
@@ -288,6 +291,112 @@ export function loadGame(text: string): GameState {
     )
   )
     invalid();
+  if (value.ownerExchanges !== undefined) {
+    if (
+      !Array.isArray(value.ownerExchanges) ||
+      value.ownerExchanges.length < 1 ||
+      value.ownerExchanges.length > 100
+    )
+      invalid();
+    const questions = new Set<string>();
+    for (const r of value.ownerExchanges) {
+      if (!object(r)) invalid();
+      const job = value.jobs.find((j) => j.id === r.jobId);
+      const key = `${r.jobId}:${r.componentId}`;
+      if (
+        !job ||
+        questions.has(key) ||
+        Object.keys(r)
+          .filter((key) => key !== 'recordingClosedAtInput')
+          .sort()
+          .join(',') !==
+          'activation,answeredAt,askedAt,componentId,decision,edition,evidence,importance,intervention,jobId,originalRequest,ownerId,proposal,response,terms' ||
+        r.edition !== 'object-owner-exchange@1' ||
+        r.ownerId !== job.ownerId ||
+        job.isDonor ||
+        job.isPersonal ||
+        !job.model.components.some((c) => c.id === r.componentId) ||
+        r.intervention !== 'replace' ||
+        !integer(r.askedAt) ||
+        !integer(r.answeredAt) ||
+        r.answeredAt !== r.askedAt + 5 ||
+        r.answeredAt > value.now ||
+        (r.askedAt % DAY) + 5 > CLOSE ||
+        !str(r.originalRequest) ||
+        r.originalRequest !== job.description ||
+        r.importance !== job.importance ||
+        r.proposal !== ownerReplacementProposal(job, r.componentId) ||
+        !['one-part', 'original-parts', 'refused'].includes(r.terms) ||
+        r.response !== ownerReplacementResponse(job, r.componentId, r.terms) ||
+        !Array.isArray(r.evidence) ||
+        r.evidence.length < 1 ||
+        r.evidence.length > 80 ||
+        new Set(r.evidence.map((e) => e.id)).size !== r.evidence.length ||
+        r.evidence.some(
+          (e) =>
+            !evidenceValid(e, job) ||
+            e.actorId !== 'player' ||
+            e.kind === 'work' ||
+            e.at > r.askedAt ||
+            r.askedAt - e.at > DAY,
+        ) ||
+        !r.evidence.some((e) => e.kind === 'inspection' && e.componentId === r.componentId) ||
+        !r.evidence.some(
+          (e) => e.kind === 'use' || (e.kind === 'measurement' && e.componentId === r.componentId),
+        ) ||
+        !object(r.decision) ||
+        !str(r.decision.narration) ||
+        !str(r.decision.reason) ||
+        !object(r.decision.terms) ||
+        Object.values(r.decision.terms).some((v) => !num(v, -100_000_000)) ||
+        (r.decision.chosenId !== undefined && !str(r.decision.chosenId)) ||
+        (r.decision.answer !== undefined &&
+          (!object(r.decision.answer) ||
+            !['assented', 'complied', 'deferred', 'modified', 'refused', 'commanded'].includes(
+              r.decision.answer.verdict,
+            ) ||
+            !str(r.decision.answer.says) ||
+            !str(r.decision.answer.reason))) ||
+        (r.terms === 'one-part' &&
+          (r.decision.chosenId !== 'owner-one-part' ||
+            r.decision.answer?.verdict !== 'assented')) ||
+        (r.terms === 'original-parts' && r.decision.chosenId !== 'owner-original-parts') ||
+        (r.terms === 'refused' &&
+          (r.decision.chosenId === 'owner-original-parts' ||
+            (r.decision.chosenId === 'owner-one-part' &&
+              r.decision.answer?.verdict === 'assented')))
+      )
+        invalid();
+      const activation = r.activation;
+      if (
+        !object(activation) ||
+        Object.keys(activation).sort().join(',') !== 'command,index' ||
+        !integer(activation.index, 0, MAX_RECORDED_INPUTS - 1) ||
+        !isRecordedCommand(activation.command) ||
+        activation.command.type !== 'ask-owner-about-object'
+      )
+        invalid();
+      const command = activation.command;
+      if (
+        command.jobId !== r.jobId ||
+        command.ownerId !== r.ownerId ||
+        command.componentId !== r.componentId ||
+        command.evidenceText !== JSON.stringify(r.evidence) ||
+        JSON.stringify(command.evidenceIds) !== JSON.stringify(r.evidence.map((e) => e.id))
+      )
+        invalid();
+      // A missing ordinary input list is not proof of this new action. Only the actual existing cap
+      // transition retains a closed recording receipt, with its complete original activating input.
+      if (value.inputs === undefined) {
+        if (r.recordingClosedAtInput !== MAX_RECORDED_INPUTS) invalid();
+      } else if (
+        r.recordingClosedAtInput !== undefined ||
+        JSON.stringify(value.inputs[activation.index]) !== JSON.stringify(command)
+      )
+        invalid();
+      questions.add(key);
+    }
+  }
   const request = value.pendingRequest;
   if (request !== undefined) {
     const offered = object(request) ? value.jobs.find((j) => j.id === request.jobId) : undefined;

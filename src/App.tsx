@@ -4,6 +4,7 @@ import { CommunityPanel } from './components/CommunityPanel';
 import { CommunityScene } from './components/CommunityScene';
 import { FirstRepairGuide } from './components/FirstRepairGuide';
 import { LessonControl } from './components/LessonControl';
+import { ObjectOwnerExchange } from './components/ObjectOwnerExchange';
 import { PersonalReply } from './components/PersonalReply';
 import { PhysicalObjectScene } from './components/PhysicalObjectScene';
 import { ReadingComparison } from './components/ReadingComparison';
@@ -1772,6 +1773,14 @@ function Workshop({
                                   <p>{job.description}</p>
                                 </div>
                                 <h2>{part?.label ?? 'Choose a part'}</h2>
+                                {part && (
+                                  <ObjectOwnerExchange
+                                    state={state}
+                                    jobId={job.id}
+                                    componentId={part.id}
+                                    act={act}
+                                  />
+                                )}
                                 {state.watching &&
                                   part &&
                                   !hasPendingPartLesson &&
