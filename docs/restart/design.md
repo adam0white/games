@@ -1,5 +1,12 @@
 # Small Works
 
+## Public tools candidate, 2026-10-27
+
+Remaining: director independent review, exact CI and clean live delivery, then Adam's acceptance on 2026-11-03. No player round is run. Gameplay editions and scenes remain public. The menu and title offer a collapsed Debug beside Lab privacy, with download, import, replay verification, seed and startup error detail. The workshop history is public. Cast controls link to the central shelf; local enable/disable, fork and per-person checkpoint controls are removed. Fresh ordinary and cast-outcome chapters automatically enable same-person carryover through the released SDK and existing strict admission. Loaded chapters keep their recorded people. The outcome edition keeps its authored scene terms and carried-person availability guards; no imported obligations are erased.
+
+Open a workshop file through the public **Open a workshop file** link at `/file/`. Debug Import opens that isolated route; it never replaces the native workshop. Pending selections and validation are invalidated on empty selection, pagehide, navigation and unmount. That route remains separate from the saved browser workshop and shared ownership. No query-string gate remains in current source. Workshop time advances through costed actions; there is no hidden speed control to expose. HF stays pinned to 3.0.0. Vendor artifacts, physical rules and current-version replay remain unchanged. Source and live receipts belong in the worker's private report until verified delivery.
+
+
 Owner renewal: 2026-10-14. This restart supersedes the earlier campaign, UI, historical-save requirements and dated campaign queues. Original implementation remains in Git at `9f0e997` and later hosting commits. Source remains private; static deployment and private pushes remain authorized.
 
 ## Current runtime and storage

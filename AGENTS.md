@@ -69,7 +69,7 @@ Historical milestone (2026-10-10): the school-break campaign and released-HF tea
 - Run `npm run check:lane` before every commit. This repository currently runs the full check, including the shared-lock test suite. Validate documentation links before a documentation commit. Once code exists, establish and run the appropriate lint, typecheck, tests and build before every code commit. Do not claim tests or deployment that have not run.
 - Keep this repository and its documents private on GitHub; do not make source public until public visibility and licensing have been decided. Local commits and integration are authorized for this work. HF changes require a demonstrated generic capability need, not repair-game convenience.
 
-Player-facing copy follows [Plain English](docs/lab/plain-english.md). Keep diagnostic and replay controls behind `?lab=1`.
+Player-facing copy follows [Plain English](docs/lab/plain-english.md). Keep the few diagnostic and replay controls in collapsed Debug beside Lab privacy. Every gameplay feature is public.
 
 ## Current installer delivery
 

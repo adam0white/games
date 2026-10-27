@@ -2,7 +2,6 @@ import { FEEDBACK_LABELS, type FeedbackLabel } from '@adam0white/lab-client';
 import { useEffect, useRef, useState } from 'react';
 import { lab } from '../lab';
 import { FEEDBACK_NAME_KEY, LAB_PRIVACY, queueFeedback, storedPreference } from '../ui/feedback';
-import { labToolsEnabled } from '../ui/lab-tools';
 import './send-word.css';
 
 export function SendWord({
@@ -69,22 +68,7 @@ export function SendWord({
       setBusy(false);
     }
   };
-  const download = () => {
-    try {
-      const run = getRun();
-      const day = (run as { day?: number }).day ?? 1;
-      const url = URL.createObjectURL(
-        new Blob([JSON.stringify(run)], { type: 'application/json' }),
-      );
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `small-works-day-${day}.json`;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    } catch {
-      setStatus('This run could not be prepared. Please try again.');
-    }
-  };
+
   return (
     <section className="sw-feedback" ref={screen} aria-label="Feedback">
       <div className="sw-feedback-body">
@@ -168,11 +152,6 @@ export function SendWord({
           <pre>{preview}</pre>
           <a href={LAB_PRIVACY}>Lab privacy</a>
         </details>
-        {labToolsEnabled(window.location.search) && (
-          <button type="button" onClick={download}>
-            Keep a copy of this run
-          </button>
-        )}
         {status && <p role="status">{status}</p>}
       </div>
       <div className="sw-feedback-actions">
