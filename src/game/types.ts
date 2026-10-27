@@ -149,6 +149,25 @@ export interface PendingRequest {
   readyUntil?: number;
   jobId?: string;
 }
+/** Finite public question receipt. Permission never changes physical state or the original request. */
+export interface OwnerExchange {
+  edition: 'object-owner-exchange@1';
+  activation: { index: number; command: Extract<Command, { type: 'ask-owner-about-object' }> };
+  recordingClosedAtInput?: 10000;
+  jobId: string;
+  ownerId: string;
+  componentId: string;
+  intervention: 'replace';
+  askedAt: number;
+  answeredAt: number;
+  originalRequest: string;
+  importance: string;
+  proposal: string;
+  evidence: Evidence[];
+  decision: PersonChoice;
+  response: string;
+  terms: 'one-part' | 'original-parts' | 'refused';
+}
 export interface GameState {
   schema: 'small-works@4' | 'small-works@5';
   provenance?: import('./recording').Provenance;
@@ -156,6 +175,7 @@ export interface GameState {
   migratedFrom?: import('./recording').MigratedFrom;
   inputs?: Command[];
   discoveries?: string[];
+  ownerExchanges?: OwnerExchange[];
   castOutcomes?: import('./outcomes').CastOutcomes;
   /** Complete target-clock initial people; never refreshed from live browser continuity. */
   castChapter?: import('./cast').CastChapter;
@@ -192,6 +212,15 @@ export interface GameState {
   dailyCostsPaid: number;
 }
 export type Command =
+  | {
+      type: 'ask-owner-about-object';
+      jobId: string;
+      ownerId: string;
+      componentId: string;
+      intervention: 'replace';
+      evidenceIds: number[];
+      evidenceText: string;
+    }
   | {
       type: 'reply-personal';
       personId: 'sam' | 'nora' | 'rafi' | 'halil';

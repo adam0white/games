@@ -1,4 +1,5 @@
-import type { GameState } from './types';
+import { admissionFacts } from './cast';
+import type { Command, GameState, Job } from './types';
 /** Authored private accounts. Render only after the corresponding played discovery. */
 export const discoveredAccounts = {
   sam: 'Sam opens his testing notebook. “I once copied another player’s bug report without reproducing it. The developer chased the wrong conditions. I still need to correct that report. Here I want to write what I actually saw, including what I have not checked.”',
@@ -78,4 +79,86 @@ export function personalReplyBlock(
   )
     return 'You already answered this account.';
   return undefined;
+}
+
+/** Object questions use only player observations. They never reveal the hidden component condition.
+ * A limited replacement response concerns one part of one held object; biography is a separate topic.
+ */
+export function ownerQuestionEvidence(job: Job) {
+  const revision = job.evidence.findLast((e) => e.kind === 'work')?.id ?? 0;
+  return job.evidence.filter((e) => e.id > revision && e.actorId === 'player' && e.kind !== 'work');
+}
+export type OwnerQuestion = Extract<Command, { type: 'ask-owner-about-object' }>;
+export function ownerQuestionBlock(s: GameState, q: OwnerQuestion): string | undefined {
+  if (s.schema !== 'small-works@5' || !s.inputs || s.inputs.length >= 10000)
+    return 'This question needs a current workshop with room for its recorded input.';
+  const job = s.jobs.find((j) => j.id === q.jobId);
+  const p = s.people[q.ownerId];
+  if (
+    !job ||
+    job.id !== s.selectedJobId ||
+    !['active', 'ready'].includes(job.status) ||
+    job.isDonor ||
+    job.isPersonal ||
+    job.assignedTo ||
+    job.ownerId !== q.ownerId ||
+    !p
+  )
+    return 'Select an active object belonging to this owner.';
+  const part = job.model.components.find((c) => c.id === q.componentId);
+  if (!part || !job.inspected.includes(part.id) || q.intervention !== 'replace')
+    return 'Inspect the selected part before proposing its replacement.';
+  const evidence = ownerQuestionEvidence(job);
+  if (
+    q.evidenceText !== JSON.stringify(evidence) ||
+    !q.evidenceIds.length ||
+    new Set(q.evidenceIds).size !== q.evidenceIds.length ||
+    q.evidenceIds.length !== evidence.length ||
+    evidence.some((e, i) => q.evidenceIds[i] !== e.id) ||
+    !evidence.some((e) => e.kind === 'inspection' && e.componentId === part.id) ||
+    !evidence.some(
+      (e) => e.kind === 'use' || (e.kind === 'measurement' && e.componentId === part.id),
+    ) ||
+    evidence.some((e) => e.at > s.now || s.now - e.at > 1440)
+  )
+    return 'Use the current inspected part and actual recent readings, after the last intervention.';
+  if (
+    s.ownerExchanges?.some((e) => e.jobId === q.jobId && e.componentId === q.componentId) ||
+    (s.ownerExchanges?.length ?? 0) >= 100
+  )
+    return 'That finite question is already answered, or this chapter has no question space left.';
+  const carried = admissionFacts(s.castChapter, q.ownerId);
+  const activity = p.activity;
+  const work = s.npcWork.find((w) => w.personId === q.ownerId);
+  if (
+    s.chapterPaused ||
+    s.ended ||
+    (q.ownerId === 'halil' && s.day < 3) ||
+    (carried &&
+      (!carried.availableForExtraWork ||
+        (carried.life.place !== 'local-workplace' && s.now % 1440 < 600))) ||
+    (activity && (activity.action !== 'personal' || !work || work.jobId)) ||
+    (q.ownerId === 'sam' && (s.watching || s.pendingRequest)) ||
+    p.agenda.commitments.some(
+      (c) => c.status === 'pending' && c.from < s.now + 5 && c.until > s.now,
+    )
+  )
+    return 'The owner is unavailable. Their current work or agreed plans come first.';
+  if ((s.now % 1440) + 5 > 1020)
+    return 'There is not enough workshop time for a five-minute question.';
+  return undefined;
+}
+export function ownerReplacementProposal(job: Job, componentId: string): string {
+  return `May I replace only the ${componentId} in ${job.title}, keeping every other original part? This is a proposal, not a diagnosis or a promise that it will work.`;
+}
+export function ownerReplacementResponse(
+  job: Job,
+  componentId: string,
+  terms: 'one-part' | 'original-parts' | 'refused',
+): string {
+  if (terms === 'one-part')
+    return `For ${job.title}, I agree only to replacing the ${componentId}. Keep every other original part. Check it afterwards; I have not agreed to any other replacement.`;
+  if (terms === 'original-parts')
+    return `For ${job.title}, keep the original ${componentId}. I do not agree to replacing it. You may put it aside or return it unfinished.`;
+  return `For ${job.title}, I am not agreeing to replace the ${componentId}. I am keeping my plans. You may put it aside or return it unfinished.`;
 }

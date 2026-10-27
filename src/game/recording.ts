@@ -42,6 +42,31 @@ const conditions = ['bench', 'movement', 'load'];
 export function isRecordedCommand(value: unknown): value is Command {
   if (!object(value)) return false;
   switch (value.type) {
+    case 'ask-owner-about-object':
+      return (
+        keys(value, [
+          'type',
+          'jobId',
+          'ownerId',
+          'componentId',
+          'intervention',
+          'evidenceIds',
+          'evidenceText',
+        ]) &&
+        id(value.jobId) &&
+        member(value.ownerId, ['sam', 'mum', 'nora', 'rafi', 'halil']) &&
+        member(value.componentId, parts) &&
+        value.intervention === 'replace' &&
+        typeof value.evidenceText === 'string' &&
+        value.evidenceText.length <= 1_000_000 &&
+        Array.isArray(value.evidenceIds) &&
+        value.evidenceIds.length > 0 &&
+        value.evidenceIds.length <= 80 &&
+        new Set(value.evidenceIds).size === value.evidenceIds.length &&
+        value.evidenceIds.every(
+          (n) => Number.isSafeInteger(n) && finite(n, 1, Number.MAX_SAFE_INTEGER),
+        )
+      );
     case 'cast-outcome':
       return keys(value, ['type', 'action']) && member(value.action, OUTCOME_ACTIONS);
     case 'start-cast-outcomes':

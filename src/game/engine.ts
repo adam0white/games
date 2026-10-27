@@ -10,6 +10,10 @@ import {
 import {
   declinePersonal,
   discoveredAccounts,
+  ownerQuestionBlock,
+  ownerQuestionEvidence,
+  ownerReplacementProposal,
+  ownerReplacementResponse,
   personalReplies,
   personalReplyBlock,
   replyReceiptKey,
@@ -1073,7 +1077,19 @@ function deliver(s: GameState, job: Job, unfinished: boolean, who = 'player'): v
       log(
         s,
         owner?.name ?? 'Workshop',
-        `It plays, and I’m glad. You put in a new ${[...new Set(replaced)].join(' and a new ')}, though. It isn’t quite her box any more.`,
+        job.contributions
+          .filter((c) => c.action.startsWith('replace:'))
+          .every((c) =>
+            s.ownerExchanges?.some(
+              (e) =>
+                e.jobId === job.id &&
+                e.componentId === c.action.slice('replace:'.length) &&
+                e.terms === 'one-part' &&
+                c.at >= e.answeredAt,
+            ),
+          )
+          ? `It plays. We agreed only to replacing the ${[...new Set(replaced)].join(' and ')} in ${job.title}. The other original parts matter to me.`
+          : `It plays, and I’m glad. You put in a new ${[...new Set(replaced)].join(' and a new ')}, though. It isn’t quite her box any more.`,
         'warning',
       );
   } else {
@@ -2025,8 +2041,12 @@ export function dispatch(state: GameState, command: Command): CommandResult {
   const fail = (message: string): CommandResult => ({ state, ok: false, message });
   const done = (message: string): CommandResult => {
     if (s.inputs !== undefined) {
-      if (s.inputs.length >= MAX_RECORDED_INPUTS) delete s.inputs;
-      else s.inputs.push(structuredClone(command));
+      if (s.inputs.length >= MAX_RECORDED_INPUTS) {
+        // Preserve the explicit owner-question activation when the existing recording reaches its cap.
+        for (const receipt of s.ownerExchanges ?? [])
+          receipt.recordingClosedAtInput = MAX_RECORDED_INPUTS;
+        delete s.inputs;
+      } else s.inputs.push(structuredClone(command));
     }
     return { state: s, ok: true, message };
   };
@@ -2164,6 +2184,104 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       log(s, 'Workshop', 'The same saved chapter resumes. It does not load newer browser history.');
       return done('The chapter has resumed.');
 
+    case 'ask-owner-about-object': {
+      const block = ownerQuestionBlock(s, command);
+      if (block) return fail(block);
+      if (!job) return fail('Choose the held object.');
+      const owner = s.people[command.ownerId];
+      if (!owner) return fail('The owner is not here.');
+      const proposal = ownerReplacementProposal(job, command.componentId);
+      const evidence = structuredClone(ownerQuestionEvidence(job));
+      const at = s.now;
+      perceive(owner, [
+        {
+          at,
+          channel: 'social',
+          kind: 'object-proposal-received',
+          actorId: 'player',
+          targetId: job.id,
+          summary: `${job.description} ${job.importance} ${proposal} Observed: ${evidence.map((e) => `[${e.id}] ${e.summary}`).join(' ')}`,
+          salience: 0.7,
+          valence: 0,
+        },
+      ]);
+      const existing = s.npcWork.find((w) => w.personId === owner.id);
+      const options: WorkOption[] = [
+        {
+          id: 'owner-one-part',
+          action: 'agree-replacement',
+          label: `permit only replacing the ${command.componentId} in ${job.title}`,
+          duration: 5,
+          effort: 0.02,
+        },
+        {
+          id: 'owner-original-parts',
+          action: 'keep-original-parts',
+          label: `keep the original ${command.componentId} in ${job.title}`,
+          duration: 5,
+          effort: 0,
+        },
+        existing?.option ?? {
+          id: 'owner-refuse',
+          action: 'personal',
+          label: 'keep my own plans',
+          duration: 5,
+          effort: 0,
+        },
+      ];
+      const choice = chooseActivity(
+        owner,
+        job.id,
+        {},
+        options,
+        at,
+        playerAsk('owner-one-part', 0.4),
+      );
+      const terms =
+        choice.chosenId === 'owner-one-part' && choice.answer?.verdict === 'assented'
+          ? 'one-part'
+          : choice.chosenId === 'owner-original-parts'
+            ? 'original-parts'
+            : 'refused';
+      const selected = options.find((o) => o.id === choice.chosenId);
+      // Only voluntary discussion can interrupt uncommitted personal work. Refusal reserves nothing.
+      if (selected && ['owner-one-part', 'owner-original-parts'].includes(selected.id)) {
+        if (existing) {
+          finishActivity(owner, existing.option, false, at);
+          s.npcWork = s.npcWork.filter((w) => w !== existing);
+        }
+        if (!startActivity(owner, selected, at))
+          return fail('The owner could not set aside those five minutes.');
+        s.npcWork.push({ personId: owner.id, option: selected, startedAt: at, endsAt: at + 5 });
+      }
+      log(
+        s,
+        'You',
+        `${proposal} Evidence: ${evidence.map((e) => `[${e.id}] ${e.summary}`).join(' ')}`,
+      );
+      const response = ownerReplacementResponse(job, command.componentId, terms);
+      advance(s, 5);
+      log(s, owner.name, response);
+      s.ownerExchanges ??= [];
+      s.ownerExchanges.push({
+        edition: 'object-owner-exchange@1',
+        activation: { index: s.inputs?.length ?? 0, command: structuredClone(command) },
+        jobId: job.id,
+        ownerId: owner.id,
+        componentId: command.componentId,
+        intervention: 'replace',
+        askedAt: at,
+        answeredAt: at + 5,
+        originalRequest: job.description,
+        importance: job.importance,
+        proposal,
+        evidence,
+        decision: choice,
+        response,
+        terms,
+      });
+      return done(`${response} The question took five minutes. No repair was performed.`);
+    }
     case 'reply-personal': {
       const block = personalReplyBlock(s, command.personId, command.statementId, command.jobId);
       if (block) return fail(block);
