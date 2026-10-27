@@ -7,7 +7,13 @@ import {
   castRole,
   validateCastChapter,
 } from './cast';
-import { discoveredAccounts } from './cast-content';
+import {
+  declinePersonal,
+  discoveredAccounts,
+  personalReplies,
+  personalReplyBlock,
+  replyReceiptKey,
+} from './cast-content';
 import {
   beginPreparation,
   completePreparation,
@@ -2158,6 +2164,33 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       log(s, 'Workshop', 'The same saved chapter resumes. It does not load newer browser history.');
       return done('The chapter has resumed.');
 
+    case 'reply-personal': {
+      const block = personalReplyBlock(s, command.personId, command.statementId, command.jobId);
+      if (block) return fail(block);
+      const person = s.people[command.personId];
+      if (!person) return fail('That person is not here.');
+      const words =
+        command.choice === 'acknowledge' ? personalReplies[command.personId] : declinePersonal;
+      perceive(person, [
+        {
+          at: s.now,
+          channel: 'social',
+          kind: 'personal-reply-received',
+          actorId: 'player',
+          targetId: command.jobId,
+          summary: `${replyReceiptKey(command.personId, command.statementId)} “${words}”`,
+          salience: 0.5,
+          valence: 0,
+        },
+      ]);
+      log(s, 'You', `${replyReceiptKey(command.personId, command.statementId)} “${words}”`);
+      log(
+        s,
+        'Workshop',
+        `${person.name} received your reply to that account. No agreement or completed work is recorded.`,
+      );
+      return done('Your reply was received. Further work needs its own agreement.');
+    }
     case 'ask-about-work': {
       const id = command.personId;
       const person = s.people[id];

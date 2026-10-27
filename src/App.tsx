@@ -4,6 +4,7 @@ import { CommunityPanel } from './components/CommunityPanel';
 import { CommunityScene } from './components/CommunityScene';
 import { FirstRepairGuide } from './components/FirstRepairGuide';
 import { LessonControl } from './components/LessonControl';
+import { PersonalReply } from './components/PersonalReply';
 import { PhysicalObjectScene } from './components/PhysicalObjectScene';
 import { ReadingComparison } from './components/ReadingComparison';
 import { RecentConversation } from './components/RecentConversation';
@@ -17,7 +18,7 @@ import { TheatrePerformance } from './components/TheatrePerformance';
 import { WorkshopTally } from './components/WorkshopTally';
 import { continuity, LOCAL_KEY, OUTCOME_LOCAL_KEY } from './continuity';
 import { admissionFacts } from './game/cast';
-import { discoveredAccounts } from './game/cast-content';
+import { accountParts, type PersonalRole, personalReplies } from './game/cast-content';
 import {
   canStartBusyWorkshop,
   createGame,
@@ -2346,7 +2347,7 @@ function Workshop({
           )}
           {view === 'people' && (
             <main className="people-page">
-              {progress.apprenticeshipAvailable && <SamRequest state={state} act={act} />}
+              {state.pendingRequest?.kind === 'repair' && <SamRequest state={state} act={act} />}
               <div className="page-heading">
                 <p className="eyebrow">A shared workshop day</p>
                 <h1>People & supplies</h1>
@@ -2399,11 +2400,8 @@ function Workshop({
                                   ? `He is ${Math.floor((state.now - person.life.bornAt) / 525600)} years old. He washes dishes for work. He is visiting from Bornova, a district in Turkey, to learn repairs.`
                                   : `He is ${Math.floor((state.now - person.life.bornAt) / 525600)} years old. He repairs objects and is visiting the workshop. He now works fewer hours.`}
                           </p>
-                          {state.discoveries?.includes(id) && (
-                            <details>
-                              <summary>What {person.name} told me</summary>
-                              <p>{discoveredAccounts[id as keyof typeof discoveredAccounts]}</p>
-                            </details>
+                          {id in personalReplies && (
+                            <PersonalReply state={state} personId={id as PersonalRole} act={act} />
                           )}
                           {!state.discoveries?.includes(id) && (
                             <button
@@ -2415,32 +2413,25 @@ function Workshop({
                                 })
                               }
                             >
-                              Ask {person.name} about the work
+                              Ask {person.name} about their own experience
                             </button>
                           )}
                           <CastOutcomes state={state} personId={id} act={act} />
-                          {id === 'sam' && progress.apprenticeshipAvailable && (
-                            <div className="sam-actions">
-                              <button
-                                type="button"
-                                disabled={Boolean(state.pendingRequest) || state.watching}
-                                onClick={() => act({ type: 'request-lesson' })}
-                              >
-                                Ask Sam to watch
-                              </button>{' '}
-                              {progress.apprenticeshipAvailable && !state.pendingRequest && (
-                                <LessonControl
-                                  state={state}
-                                  act={act}
-                                  onRequestMore={() =>
-                                    actSequence([
-                                      { type: 'watch', enabled: false },
-                                      { type: 'request-lesson' },
-                                    ])
-                                  }
-                                />
-                              )}
-                            </div>
+                          {id === 'sam' && (
+                            <LessonControl
+                              state={state}
+                              act={act}
+                              onBench={() => {
+                                setSheet(null);
+                                setView('bench');
+                              }}
+                              onRequestMore={() =>
+                                actSequence([
+                                  { type: 'watch', enabled: false },
+                                  { type: 'request-lesson' },
+                                ])
+                              }
+                            />
                           )}
                           {id === 'sam' && progress.apprenticeshipAvailable ? (
                             <>
@@ -2574,7 +2565,15 @@ function Workshop({
                               .filter((l) => l.speaker.toLowerCase() === id.toLowerCase())
                               .slice(-8)
                               .map((l) => (
-                                <p key={l.id}>{l.text}</p>
+                                <div key={l.id}>
+                                  <p>{accountParts(l.text).words}</p>
+                                  {accountParts(l.text).limits && (
+                                    <details>
+                                      <summary>Narrator limits</summary>
+                                      <p>{accountParts(l.text).limits}</p>
+                                    </details>
+                                  )}
+                                </div>
                               ))}
                           </details>
                         </div>
@@ -3086,9 +3085,18 @@ function Workshop({
               <>
                 <h2>The workshop's history</h2>
                 {[...state.log].reverse().map((line) => (
-                  <p key={line.id}>
-                    <time>{dayTime(line.at)}</time> <strong>{line.speaker}</strong> {line.text}
-                  </p>
+                  <div key={line.id}>
+                    <p>
+                      <time>{dayTime(line.at)}</time> <strong>{line.speaker}</strong>{' '}
+                      {accountParts(line.text).words}
+                    </p>
+                    {accountParts(line.text).limits && (
+                      <details>
+                        <summary>Narrator limits</summary>
+                        <p>{accountParts(line.text).limits}</p>
+                      </details>
+                    )}
+                  </div>
                 ))}
               </>
             )}
