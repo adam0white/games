@@ -36,7 +36,9 @@ const source = () => ({
 });
 /** One source of ownership and recording permission. Local receipts never replace initial replay actors. */
 export class WorkshopContinuity {
-  readonly shelf = personaChannel();
+  readonly fileSession =
+    typeof location !== 'undefined' && new URLSearchParams(location.search).get('file') === '1';
+  readonly shelf = this.fileSession ? undefined : personaChannel();
   generation = 0;
   heads: PersonaEnvelope[] = [];
   fileOrigin = false;
@@ -92,17 +94,18 @@ export class WorkshopContinuity {
     if (!this.started || !current?.inputs?.length || !this.update) return;
     const paused = pauseForDeparture(current);
     this.update(paused);
-    localStorage.setItem(workshopSaveKey(paused), this.localSave(paused));
-    await this.checkpointAll();
+    this.persist(paused, false);
+    if (!this.fileSession) await this.checkpointAll();
   }
   async enter(state: GameState): Promise<GameState> {
     await this.departure;
     await this.resume();
     // Retry a departure interrupted by browser close before continuing the same pinned chapter.
-    if (state.chapterPaused) await this.checkpointAll();
+    if (state.chapterPaused && !this.fileSession) await this.checkpointAll();
     return resumeForPlay(state);
   }
   loadLocal(text: string): GameState {
+    if (this.fileSession) throw new Error('A file session cannot open this browser’s workshop.');
     lab.setPersonaRecording('loading-workshop-history');
     this.generation++;
     const saved = JSON.parse(text);
@@ -159,24 +162,26 @@ export class WorkshopContinuity {
     await this.recording(false);
   }
   async fresh(seed: number, localOnly = false) {
+    const shelf = this.shelf;
+    if (!shelf) throw new Error('Starting a new workshop is unavailable in a file session.');
     if (this.busy) throw new Error('A chapter is already being prepared.');
     this.busy = true;
     this.recordingKey = `workshop:${crypto.randomUUID()}`;
     const generation = ++this.generation;
     lab.setPersonaRecording('preparing-whole-cast');
     try {
-      await this.shelf.ready;
+      await shelf.ready;
       if (generation !== this.generation) throw new Error('The game changed. Choose again.');
       const base = createGame(seed);
       let state = base;
       let chapter: CastChapter | undefined;
       let shelfUnavailable = false;
-      if (this.shelf.enabled && !localOnly) {
+      if (shelf.enabled && !localOnly) {
         let result: Awaited<ReturnType<typeof claimCastChapterBatch<GameState['people']>>>;
         let prepared = false;
         const bridge = {
-          request: async <T>(request: Parameters<typeof this.shelf.request>[0]): Promise<T> => {
-            const reply = await this.shelf.request<T>(request);
+          request: async <T>(request: Parameters<typeof shelf.request>[0]): Promise<T> => {
+            const reply = await shelf.request<T>(request);
             if (request.action === 'prepareBatch') prepared = true;
             return reply;
           },
@@ -236,7 +241,7 @@ export class WorkshopContinuity {
           ? `The chapter loaded all ${chapter.inputs.length} saved character histories together. Other characters start with their original histories.`
           : localOnly
             ? 'You started a fresh chapter on this device. Saved character histories in this browser are unchanged.'
-            : this.shelf.enabled
+            : shelf.enabled
               ? 'You started a fresh chapter. There were no saved character histories to load.'
               : 'Character history across games is off. This fresh chapter starts on this device with the original characters.';
       return state;
@@ -247,8 +252,16 @@ export class WorkshopContinuity {
   }
   async importFile(text: string) {
     const generation = ++this.generation;
-    this.recordingKey = `workshop:${crypto.randomUUID()}`;
-    lab.setPersonaRecording(this.recordingKey);
+    const importedSources = JSON.parse(text).castSources;
+    if (
+      importedSources !== undefined &&
+      (!Array.isArray(importedSources) ||
+        JSON.stringify(importedSources).length > 1_000_000 ||
+        (this.fileSession && importedSources.length > 0))
+    )
+      throw new Error(
+        'This file has unsupported source archives. Keep the complete original file.',
+      );
     const state = loadGame(text);
     await Promise.all(
       [
@@ -258,12 +271,10 @@ export class WorkshopContinuity {
     );
     if (generation !== this.generation)
       throw new Error('The game changed while the file was being checked.');
-    const importedSources = JSON.parse(text).castSources;
+    this.recordingKey = `workshop:${crypto.randomUUID()}`;
+    lab.setPersonaRecording(this.recordingKey);
     this.runId = crypto.randomUUID();
-    this.fileSources =
-      Array.isArray(importedSources) && JSON.stringify(importedSources).length <= 1_000_000
-        ? importedSources
-        : [];
+    this.fileSources = importedSources ?? [];
     this.heads = [];
     this.pendingLocal = null;
     this.fileOrigin = true;
@@ -276,11 +287,13 @@ export class WorkshopContinuity {
     return state;
   }
   async setEnabled(on: boolean) {
+    const shelf = this.shelf;
+    if (!shelf) throw new Error('Shared character history is unavailable in a file session.');
     this.generation++;
     this.recordingKey = `workshop:${crypto.randomUUID()}`;
     lab.setPersonaRecording('continuity-preference-changed');
-    await this.shelf.ready;
-    this.shelf.setEnabled(on);
+    await shelf.ready;
+    shelf.setEnabled(on);
     this.status = on
       ? 'Character history across games is on. It applies to the next fresh chapter.'
       : 'Character history across games is off. The loaded chapter keeps the histories it started with.';
@@ -295,15 +308,20 @@ export class WorkshopContinuity {
   }
 
   async checkpoint(id: string, fork = false) {
+    const shelf = this.shelf;
+    if (!shelf)
+      throw new Error(
+        'Saving or forking shared character history is unavailable in a file session.',
+      );
     const state = this.state?.();
     if (!state || !this.started || !state.inputs?.length || !state.chapterPaused)
       throw new Error('Play, then pause this chapter for departure before saving a person.');
     const generation = this.generation;
     const runId = this.runId;
     const current = () => generation === this.generation && this.state?.() === state;
-    await this.shelf.ready;
+    await shelf.ready;
     if (!current()) throw new Error('The game changed before the character could be saved.');
-    if (!this.shelf.enabled)
+    if (!shelf.enabled)
       throw new Error('Turn on character history across games in this browser first.');
     const person = state.people[id];
     const castId = CAST_IDS[id];
@@ -347,7 +365,7 @@ export class WorkshopContinuity {
       localStorage.setItem(key, JSON.stringify(journal));
     }
     if (!current()) throw new Error('The game changed before the character could be saved.');
-    await this.shelf.request({
+    await shelf.request({
       action: 'put',
       envelope,
       fork,
@@ -362,6 +380,7 @@ export class WorkshopContinuity {
     this.changed();
   }
   async checkpointAll() {
+    if (this.fileSession) return;
     for (const id of Object.keys(CAST_IDS)) {
       try {
         await this.checkpoint(id);
@@ -371,10 +390,39 @@ export class WorkshopContinuity {
     }
     this.changed();
   }
+  /** File progress is a recording save, never an owner-native write. */
+  persist(state: GameState, capture = true) {
+    if (!this.started) return;
+    if (this.fileSession) {
+      lab.captureSave({
+        key: `workshop-file:${this.runId}`,
+        value: JSON.parse(this.localSave(state)),
+      });
+      return;
+    }
+    localStorage.setItem(workshopSaveKey(state), this.localSave(state));
+    if (capture) lab.captureSave(JSON.parse(saveGame(state)));
+  }
+  closeFile() {
+    if (!this.fileSession) throw new Error('This is not a file session.');
+    this.generation++;
+    this.started = false;
+    this.loaded = false;
+    this.heads = [];
+    this.pendingLocal = null;
+    this.fileSources = [];
+    this.fileOrigin = false;
+    this.state = null;
+    this.update = null;
+    this.changed = () => {};
+    lab.setPersonaRecording(null);
+  }
   exportRun(state: GameState) {
     let castSources: unknown[] = [];
     try {
-      const journal = JSON.parse(localStorage.getItem('small-works-source-journal-v2') ?? '[]');
+      const journal = this.fileSession
+        ? []
+        : JSON.parse(localStorage.getItem('small-works-source-journal-v2') ?? '[]');
       castSources = journal.filter((row: { runId?: string }) => row.runId === this.runId);
     } catch {}
     return JSON.stringify({

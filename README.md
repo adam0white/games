@@ -83,3 +83,11 @@ Current-version exports must replay exactly. Older editions may be refused with 
 ## Optional cast-outcome source candidate
 
 The title offers a separate local cast-outcome chapter. Sam can correct his copied report and negotiate a paid shift. Nora can try and revise a credited handle. Rafi can return conserved money and diagnose the separate appliance. Halil can reopen one priced service. All require actual shared work and voluntary HF choices. See [scope, terms and limits](docs/cast-outcomes.md). This source candidate is not yet reviewed or deployed. Ordinary chapters and historical archives retain their autosaves and rules.
+
+## Open a workshop file without replacing the browser’s workshop
+
+Use `?file=1`, then **Open a workshop file**. This route does not open the saved workshop, source journal or shared character channel. A complete supported file supplies all five people and its recorded state. This is foreign file play, not ownership of the imported characters. Source archives are unsupported on this route and are refused before replacing the session.
+
+Progress stays in the tab. The menu offers **Download this game file**, **Verify the recorded replay** and **Close file session**. Download before closing or reloading. New/outcome workshops, shared checkpoints and forks are unavailable. The ordinary action-costed clock and recorded pause/resume remain unchanged. Guide choices stay in memory.
+
+Normal recording and actual privacy preferences still apply through the existing lab client. Recording may reuse/create SDK identities, rotate run keys and add/drain pending uploads. This route does not clear queues, replace SDK IDs or change consent. Recording capture is not an acknowledgment or ingestion receipt. Actual signed-in-profile preservation and acceptance require separate observation.

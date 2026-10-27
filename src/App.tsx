@@ -14,7 +14,7 @@ import { SamWorkAccount } from './components/SamWorkAccount';
 import { SendWord } from './components/SendWord';
 import { TeachingRecord } from './components/TeachingRecord';
 import { WorkshopTally } from './components/WorkshopTally';
-import { continuity, LOCAL_KEY, OUTCOME_LOCAL_KEY, workshopSaveKey } from './continuity';
+import { continuity, LOCAL_KEY, OUTCOME_LOCAL_KEY } from './continuity';
 import { admissionFacts, CAST_IDS } from './game/cast';
 import { discoveredAccounts } from './game/cast-content';
 import {
@@ -396,7 +396,75 @@ function Device({
   );
 }
 export default function App() {
-  const [state, setState] = useState(initial);
+  const [fileState, setFileState] = useState<{ state: GameState; selection: number } | null>(null);
+  const fileSelection = useRef(0);
+  useEffect(() => {
+    if (!continuity.fileSession) return;
+    return () => {
+      ++fileSelection.current;
+      ++continuity.generation;
+    };
+  }, []);
+  const [fileError, setFileError] = useState('');
+  if (!continuity.fileSession) return <Workshop />;
+  if (fileState)
+    return (
+      <Workshop
+        key={fileState.selection}
+        fileState={fileState.state}
+        onCloseFile={async () => {
+          ++fileSelection.current;
+          ++continuity.generation;
+          await continuity.depart();
+          continuity.closeFile();
+          setFileState(null);
+        }}
+      />
+    );
+  return (
+    <main className="title-page">
+      <h1>Small Works</h1>
+      <p>
+        Open a complete workshop file. Progress stays in this tab. Download the file to keep it.
+        Your browser’s saved workshop and shared character histories are not opened or replaced.
+      </p>
+      <label>
+        Open a workshop file
+        <input
+          type="file"
+          accept=".json,application/json"
+          onChange={async (event) => {
+            const selection = ++fileSelection.current;
+            ++continuity.generation;
+            const file = event.currentTarget.files?.[0];
+            event.currentTarget.value = '';
+            if (!file) return;
+            try {
+              const text = await file.text();
+              if (selection !== fileSelection.current) return;
+              const state = await continuity.importFile(text);
+              if (selection !== fileSelection.current) return;
+              setFileError('');
+              setFileState({ state, selection });
+            } catch (error) {
+              if (selection !== fileSelection.current) return;
+              setFileError(error instanceof Error ? error.message : 'The file could not open.');
+            }
+          }}
+        />
+      </label>
+      {fileError && <p role="alert">{fileError}</p>}
+    </main>
+  );
+}
+function Workshop({
+  fileState,
+  onCloseFile,
+}: {
+  fileState?: GameState;
+  onCloseFile?: () => Promise<void>;
+}) {
+  const [state, setState] = useState(() => fileState ?? initial());
   const [, refreshContinuity] = useState(0);
   const [entering, setEntering] = useState(false);
   const [entryError, setEntryError] = useState(() =>
@@ -487,7 +555,9 @@ export default function App() {
   const [infoOpen, setInfoOpen] = useState(false);
   const [newConfirmed, setNewConfirmed] = useState(false);
   const [seedText, setSeedText] = useState(String(state.seed + 1));
-  const [hasSave, setHasSave] = useState(() => Boolean(localStorage.getItem(SAVE_KEY)));
+  const [hasSave, setHasSave] = useState(
+    () => continuity.fileSession || Boolean(localStorage.getItem(SAVE_KEY)),
+  );
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -512,12 +582,15 @@ export default function App() {
   };
   const [replacementSource, setReplacementSource] = useState<'new' | 'recovered' | undefined>();
   const [introSkipped, setIntroSkipped] = useState(
-    () => localStorage.getItem(`small-works-canonical-intro-${state.seed}`) === 'skipped',
+    () =>
+      !continuity.fileSession &&
+      localStorage.getItem(`small-works-canonical-intro-${state.seed}`) === 'skipped',
   );
   const progress = firstRepairProgress(state);
   const guided = !introSkipped && !progress.workshopAvailable;
   const skipIntro = () => {
-    localStorage.setItem(`small-works-canonical-intro-${state.seed}`, 'skipped');
+    if (!continuity.fileSession)
+      localStorage.setItem(`small-works-canonical-intro-${state.seed}`, 'skipped');
     setIntroSkipped(true);
   };
 
@@ -543,7 +616,7 @@ export default function App() {
         // The first autosave can precede the shared identity bridge. Recapture
         // the actual stored save after identity settles, without blocking runs.
         try {
-          const saved = localStorage.getItem(SAVE_KEY);
+          const saved = !continuity.fileSession && localStorage.getItem(SAVE_KEY);
           if (saved) lab.captureSave(JSON.parse(saveGame(stateRef.current)));
         } catch {}
         return JSON.parse(saveGame(stateRef.current));
@@ -613,9 +686,7 @@ export default function App() {
         refreshContinuity((n) => n + 1);
       });
     }
-    const text = saveGame(state);
-    localStorage.setItem(workshopSaveKey(state), continuity.localSave(state));
-    lab.captureSave(JSON.parse(text));
+    continuity.persist(state);
   }, [state]);
   useEffect(() => {
     if (!job?.id) return;
@@ -809,9 +880,12 @@ export default function App() {
     setStatus('');
     setTeachingFeedback('');
     setIntroSkipped(
-      !fresh && localStorage.getItem(`small-works-canonical-intro-${next.seed}`) === 'skipped',
+      !continuity.fileSession &&
+        !fresh &&
+        localStorage.getItem(`small-works-canonical-intro-${next.seed}`) === 'skipped',
     );
-    if (fresh) localStorage.removeItem(`small-works-canonical-intro-${next.seed}`);
+    if (fresh && !continuity.fileSession)
+      localStorage.removeItem(`small-works-canonical-intro-${next.seed}`);
   };
   const samPresent =
     state.watching || Boolean(state.pendingRequest) || Boolean(job?.assignedTo === 'sam');
@@ -944,6 +1018,7 @@ export default function App() {
     localOnly = false,
     outcomes = Boolean(state.castOutcomes),
   ) => {
+    if (continuity.fileSession) return;
     setEntryError('');
     setEntering(true);
     try {
@@ -966,6 +1041,7 @@ export default function App() {
     }
   };
   const enterOutcomeWorkshop = async () => {
+    if (continuity.fileSession) return;
     if (entering) return;
     setEntering(true);
     setEntryError('');
@@ -1048,7 +1124,7 @@ export default function App() {
     await continuity.depart();
     window.location.assign('https://human.adamwhite.work/games/');
   };
-  const continuityPanel = labMode && (
+  const continuityPanel = labMode && continuity.shelf && (
     <details aria-label="Browser continuity">
       <summary>People between chapters</summary>
       <p>{continuity.status}</p>
@@ -1060,13 +1136,13 @@ export default function App() {
         type="button"
         disabled={entering}
         onClick={() => {
-          void continuity.setEnabled(!continuity.shelf.enabled).catch((error) => {
+          void continuity.setEnabled(!continuity.shelf?.enabled).catch((error) => {
             continuity.status = String(error);
             refreshContinuity((n) => n + 1);
           });
         }}
       >
-        {continuity.shelf.enabled ? 'Turn continuity off' : 'Enable browser continuity'}
+        {continuity.shelf?.enabled ? 'Turn continuity off' : 'Enable browser continuity'}
       </button>
       <button
         type="button"
@@ -1279,7 +1355,7 @@ export default function App() {
           </button>
         </div>
       </header>
-      {labMode && (
+      {labMode && !continuity.fileSession && (
         <input
           ref={input}
           hidden
@@ -1313,10 +1389,10 @@ export default function App() {
             <h1>SMALL WORKS</h1>
           </div>
           <p className="title-goal">Find out why the lantern goes dark.</p>
-          {state.castOutcomes && (
+          {!continuity.fileSession && state.castOutcomes && (
             <p>Current chapter: optional cast outcomes. Its autosave is separate.</p>
           )}
-          {labMode && (
+          {labMode && !continuity.fileSession && (
             <button type="button" className="reading-row" onClick={() => setSheet('ways')}>
               Lab tools <span>▸</span>
             </button>
@@ -1330,18 +1406,28 @@ export default function App() {
             >
               {hasSave ? 'Resume' : 'Start repairing'}
             </button>
-            <small>Your game is saved on this device.</small>
-            <details>
-              <summary>Optional cast-outcome chapter</summary>
-              <p>
-                Keep the diagnostic workshop. Hear Sam, Nora, Rafi and Halil’s accounts, then choose
-                finite work with real time, stock and payment. This separate local chapter keeps the
-                ordinary autosave. Each person can refuse.
-              </p>
-              <button type="button" disabled={entering} onClick={() => void enterOutcomeWorkshop()}>
-                Open cast outcomes
-              </button>
-            </details>
+            <small>
+              {continuity.fileSession
+                ? 'Progress stays in this tab. Download the game file to keep it.'
+                : 'Your game is saved on this device.'}
+            </small>
+            {!continuity.fileSession && (
+              <details>
+                <summary>Optional cast-outcome chapter</summary>
+                <p>
+                  Keep the diagnostic workshop. Hear Sam, Nora, Rafi and Halil’s accounts, then
+                  choose finite work with real time, stock and payment. This separate local chapter
+                  keeps the ordinary autosave. Each person can refuse.
+                </p>
+                <button
+                  type="button"
+                  disabled={entering}
+                  onClick={() => void enterOutcomeWorkshop()}
+                >
+                  Open cast outcomes
+                </button>
+              </details>
+            )}
             {entering && <p role="status">Your workshop is opening…</p>}
             {entryError && (
               <div className="entry-error">
@@ -2748,7 +2834,7 @@ export default function App() {
               <button type="button" onClick={openFeedback}>
                 Feedback
               </button>
-              {labMode && (
+              {labMode && !continuity.fileSession && (
                 <button type="button" onClick={exportSave}>
                   Download this run
                 </button>
@@ -2819,20 +2905,44 @@ export default function App() {
             {sheet === 'menu' && (
               <>
                 <h2>Workshop</h2>
-                <p>Your game is saved on this device. Time stops while you are away.</p>
+                <p>
+                  {continuity.fileSession
+                    ? 'Progress stays in this tab. Download the game file to keep it.'
+                    : 'Your game is saved on this device.'}{' '}
+                  Time stops while you are away.
+                </p>
                 {entryError && <p role="alert">{entryError}</p>}
                 {continuityPanel}
-                {labMode && (
+                {continuity.fileSession && (
+                  <>
+                    <button type="button" onClick={exportSave}>
+                      Download this game file
+                    </button>
+                    <button type="button" disabled={replayChecking} onClick={verifyReplay}>
+                      {replayChecking ? 'Verifying replay…' : 'Verify the recorded replay'}
+                    </button>
+                    {replayStatus && <p role="status">{replayStatus}</p>}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await onCloseFile?.();
+                      }}
+                    >
+                      Close file session
+                    </button>
+                  </>
+                )}
+                {labMode && !continuity.fileSession && (
                   <button type="button" onClick={exportSave}>
                     Download this run
                   </button>
                 )}
-                {labMode && (
+                {labMode && !continuity.fileSession && (
                   <button className="reading-row" type="button" onClick={() => setSheet('history')}>
                     The workshop's history <span>▸</span>
                   </button>
                 )}
-                {labMode && (
+                {labMode && !continuity.fileSession && (
                   <button type="button" onClick={() => setSheet('ways')}>
                     Lab tools
                   </button>
@@ -2857,10 +2967,12 @@ export default function App() {
                 >
                   Full screen
                 </button>
-                <button type="button" onClick={() => setNewConfirmed(true)}>
-                  New game
-                </button>
-                {newConfirmed && (
+                {!continuity.fileSession && (
+                  <button type="button" onClick={() => setNewConfirmed(true)}>
+                    New game
+                  </button>
+                )}
+                {!continuity.fileSession && newConfirmed && (
                   <div className="inline-confirm">
                     <p>Replace the saved workshop on this device?</p>
                     <button
