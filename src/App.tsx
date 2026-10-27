@@ -15,7 +15,7 @@ import { SendWord } from './components/SendWord';
 import { TeachingRecord } from './components/TeachingRecord';
 import { WorkshopTally } from './components/WorkshopTally';
 import { continuity, LOCAL_KEY, OUTCOME_LOCAL_KEY } from './continuity';
-import { admissionFacts, CAST_IDS } from './game/cast';
+import { admissionFacts } from './game/cast';
 import { discoveredAccounts } from './game/cast-content';
 import {
   canStartBusyWorkshop,
@@ -59,10 +59,7 @@ import './workshop-shell.css';
 import './simplify.css';
 
 import { readingUnit, testWords } from './game/test-words';
-import { labToolsEnabled } from './ui/lab-tools';
 import { damagedWorkshopMessage, workshopStartError } from './ui/start-error';
-
-const labMode = labToolsEnabled(window.location.search);
 
 const SAVE_KEY = LOCAL_KEY;
 const conditions: TestCondition[] = ['bench', 'movement', 'load'];
@@ -400,9 +397,16 @@ export default function App() {
   const fileSelection = useRef(0);
   useEffect(() => {
     if (!continuity.fileSession) return;
-    return () => {
+    const invalidateSelection = () => {
       ++fileSelection.current;
       ++continuity.generation;
+    };
+    window.addEventListener('pagehide', invalidateSelection);
+    window.addEventListener('popstate', invalidateSelection);
+    return () => {
+      window.removeEventListener('pagehide', invalidateSelection);
+      window.removeEventListener('popstate', invalidateSelection);
+      invalidateSelection();
     };
   }, []);
   const [fileError, setFileError] = useState('');
@@ -467,6 +471,7 @@ function Workshop({
   const [state, setState] = useState(() => fileState ?? initial());
   const [, refreshContinuity] = useState(0);
   const [entering, setEntering] = useState(false);
+  const [debugError, setDebugError] = useState('');
   const [entryError, setEntryError] = useState(() =>
     initialLoadFailed ? damagedWorkshopMessage : '',
   );
@@ -502,9 +507,9 @@ function Workshop({
     setFeedbackSession((session) => session + 1);
     setScreen('feedback');
   };
-  const [sheet, setSheet] = useState<
-    'menu' | 'ways' | 'day' | 'job' | 'job-actions' | 'history' | null
-  >(null);
+  const [sheet, setSheet] = useState<'menu' | 'day' | 'job' | 'job-actions' | 'history' | null>(
+    null,
+  );
   const [actionJobId, setActionJobId] = useState('');
   const sheetRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -640,7 +645,6 @@ function Workshop({
   const [status, setStatus] = useState('');
   const [teachingFeedback, setTeachingFeedback] = useState('');
   const [collarPreview, setCollarPreview] = useState<number | undefined>(undefined);
-  const input = useRef<HTMLInputElement>(null);
   const job = state.jobs.find((j) => j.id === state.selectedJobId) ?? state.jobs[0];
   const jobLocked = Boolean(
     job &&
@@ -1013,17 +1017,13 @@ function Workshop({
     </div>
   );
   const isEnd = screen === 'play' && state.ended;
-  const startWorkshop = async (
-    seed: number,
-    localOnly = false,
-    outcomes = Boolean(state.castOutcomes),
-  ) => {
+  const startWorkshop = async (seed: number, outcomes = Boolean(state.castOutcomes)) => {
     if (continuity.fileSession) return;
     setEntryError('');
     setEntering(true);
     try {
       await continuity.depart();
-      const base = await continuity.fresh(seed, localOnly || outcomes);
+      const base = await continuity.fresh(seed);
       const next = outcomes
         ? dispatch(base, { type: 'start-cast-outcomes' })
         : { ok: true, state: base, message: '' };
@@ -1033,7 +1033,8 @@ function Workshop({
       setNewConfirmed(false);
     } catch (error) {
       continuity.status = error instanceof Error ? error.message : String(error);
-      setEntryError(workshopStartError(error, labMode));
+      setDebugError(error instanceof Error ? error.message : String(error));
+      setEntryError(workshopStartError());
       console.error('Workshop entry failed:', continuity.status);
       refreshContinuity((n) => n + 1);
     } finally {
@@ -1053,13 +1054,14 @@ function Workshop({
         if (!restored.castOutcomes) throw new Error('This is not the cast-outcome chapter.');
         resetPresentation(await continuity.enter(restored), true);
       } else {
-        const base = await continuity.fresh(freshSeed(), true);
+        const base = await continuity.fresh(freshSeed());
         const result = dispatch(base, { type: 'start-cast-outcomes' });
         if (!result.ok) throw new Error(result.message);
         resetPresentation(result.state, true);
       }
     } catch (error) {
-      setEntryError(workshopStartError(error, labMode));
+      setDebugError(error instanceof Error ? error.message : String(error));
+      setEntryError(workshopStartError());
     } finally {
       setEntering(false);
     }
@@ -1085,7 +1087,8 @@ function Workshop({
       setScreen('play');
     } catch (error) {
       continuity.status = String(error);
-      setEntryError(workshopStartError(error, labMode));
+      setDebugError(error instanceof Error ? error.message : String(error));
+      setEntryError(workshopStartError());
       console.error('Workshop entry failed:', continuity.status);
       refreshContinuity((n) => n + 1);
     } finally {
@@ -1108,7 +1111,10 @@ function Workshop({
               setState(next);
             }
           })
-          .catch((error) => setEntryError(workshopStartError(error, labMode)));
+          .catch((error) => {
+            setDebugError(error instanceof Error ? error.message : String(error));
+            setEntryError(workshopStartError());
+          });
       }
     };
     document.addEventListener('visibilitychange', returnToPlay);
@@ -1121,86 +1127,50 @@ function Workshop({
   const goToGames = async (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
+    const destination = event.currentTarget.href;
     await continuity.depart();
-    window.location.assign('https://human.adamwhite.work/games/');
+    window.location.assign(destination);
   };
-  const continuityPanel = labMode && continuity.shelf && (
-    <details aria-label="Browser continuity">
-      <summary>People between chapters</summary>
-      <p>{continuity.status}</p>
-      <p>
-        This browser can save people’s histories between chapters. Recording and character analysis
-        are separate choices.
-      </p>
-      <button
-        type="button"
-        disabled={entering}
-        onClick={() => {
-          void continuity.setEnabled(!continuity.shelf?.enabled).catch((error) => {
-            continuity.status = String(error);
-            refreshContinuity((n) => n + 1);
-          });
-        }}
-      >
-        {continuity.shelf?.enabled ? 'Turn continuity off' : 'Enable browser continuity'}
-      </button>
-      <button
-        type="button"
-        disabled={entering}
-        onClick={() => void startWorkshop(state.seed + 1, true)}
-      >
-        Start locally with no previous history
-      </button>
-      {screen === 'play' && (
-        <>
-          <button
-            type="button"
-            onClick={() => act({ type: state.chapterPaused ? 'resume-chapter' : 'pause-chapter' })}
-          >
-            {state.chapterPaused
-              ? 'Resume this saved chapter'
-              : 'Pause this chapter before leaving'}
-          </button>
-          {state.chapterPaused &&
-            Object.entries(CAST_IDS).map(([id]) => (
-              <div key={id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void continuity.checkpoint(id).catch((error) => {
-                      continuity.status = String(error);
-                      refreshContinuity((n) => n + 1);
-                    });
-                  }}
-                >
-                  Save {state.people[id]?.name} to continuity
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void continuity.checkpoint(id, true).catch((error) => {
-                      continuity.status = String(error);
-                      refreshContinuity((n) => n + 1);
-                    });
-                  }}
-                >
-                  Save {state.people[id]?.name} as a separate history
-                </button>
-              </div>
-            ))}
-        </>
-      )}
-      {state.castChapter?.inputs.map((input) => (
-        <p key={input.parent.castId}>
-          Saved source: {input.parent.source.game} · {input.parent.castId} · revision{' '}
-          {input.parent.revision} · clock {input.clockMs} · {input.life.events.length} saved life
-          events. People keep their obligations, health and qualifications from the source.
-        </p>
-      ))}
-      <a href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noreferrer">
-        View and export browser histories
-      </a>
+  const debugTools = (
+    <details className="workshop-debug">
+      <summary>Debug</summary>
+      <div className="debug-tools">
+        <button type="button" onClick={exportSave}>
+          Download this run
+        </button>
+        <button type="button" disabled={replayChecking} onClick={verifyReplay}>
+          {replayChecking ? 'Verifying replay…' : 'Verify the recorded replay'}
+        </button>
+        {replayStatus && <p role="status">{replayStatus}</p>}
+        {!continuity.fileSession && (
+          <>
+            <a href="/file/" onClick={(event) => void goToGames(event)}>
+              Import a workshop
+            </a>
+            <label>
+              Starting number (seed)
+              <input type="number" value={seedText} onChange={(e) => setSeedText(e.target.value)} />
+            </label>
+            <button
+              type="button"
+              disabled={entering || !seedText.trim() || !Number.isFinite(Number(seedText))}
+              onClick={() => void startWorkshop(Number(seedText))}
+            >
+              Start with this number
+            </button>
+          </>
+        )}
+        {debugError && <p>{debugError}</p>}
+      </div>
     </details>
+  );
+  const privacyTools = (
+    <div className="privacy-tools">
+      <a href="https://human.adamwhite.work/lab/privacy/" target="_blank" rel="noreferrer">
+        Lab privacy
+      </a>
+      {debugTools}
+    </div>
   );
 
   const workday = (large = false) => (
@@ -1355,25 +1325,6 @@ function Workshop({
           </button>
         </div>
       </header>
-      {labMode && !continuity.fileSession && (
-        <input
-          ref={input}
-          hidden
-          type="file"
-          accept="application/json,.json"
-          onChange={async (e) => {
-            try {
-              const file = e.target.files?.[0];
-              if (file) resetPresentation(await continuity.importFile(await file.text()));
-            } catch (error) {
-              setStatus(
-                error instanceof Error ? error.message : 'This save could not be imported.',
-              );
-            }
-            e.target.value = '';
-          }}
-        />
-      )}
       {screen === 'title' && (
         <main className="title-page">
           <div className="title-art">
@@ -1391,11 +1342,6 @@ function Workshop({
           <p className="title-goal">Find out why the lantern goes dark.</p>
           {!continuity.fileSession && state.castOutcomes && (
             <p>Current chapter: optional cast outcomes. Its autosave is separate.</p>
-          )}
-          {labMode && !continuity.fileSession && (
-            <button type="button" className="reading-row" onClick={() => setSheet('ways')}>
-              Lab tools <span>▸</span>
-            </button>
           )}
           <div className="title-actions">
             <button
@@ -1443,7 +1389,20 @@ function Workshop({
                 </button>
               </div>
             )}
-            {continuityPanel}
+
+            <a href="/file/" onClick={(event) => void goToGames(event)}>
+              Open a workshop file
+            </a>
+            <a href="/experiments/" onClick={(event) => void goToGames(event)}>
+              Earlier experiments
+            </a>
+            <a
+              href="https://human.adamwhite.work/lab/people/"
+              onClick={(event) => void goToGames(event)}
+            >
+              People across games
+            </a>
+            {privacyTools}
           </div>
         </main>
       )}
@@ -2834,7 +2793,7 @@ function Workshop({
               <button type="button" onClick={openFeedback}>
                 Feedback
               </button>
-              {labMode && !continuity.fileSession && (
+              {!continuity.fileSession && (
                 <button type="button" onClick={exportSave}>
                   Download this run
                 </button>
@@ -2883,15 +2842,13 @@ function Workshop({
             aria-label={
               sheet === 'menu'
                 ? 'Workshop'
-                : sheet === 'ways'
-                  ? 'Lab tools'
-                  : sheet === 'job-actions'
-                    ? actionJob?.title
-                    : sheet === 'job'
-                      ? job?.title
-                      : sheet === 'day'
-                        ? 'The day'
-                        : 'The workshop’s history'
+                : sheet === 'job-actions'
+                  ? actionJob?.title
+                  : sheet === 'job'
+                    ? job?.title
+                    : sheet === 'day'
+                      ? 'The day'
+                      : 'The workshop’s history'
             }
           >
             <button
@@ -2912,41 +2869,20 @@ function Workshop({
                   Time stops while you are away.
                 </p>
                 {entryError && <p role="alert">{entryError}</p>}
-                {continuityPanel}
+
                 {continuity.fileSession && (
-                  <>
-                    <button type="button" onClick={exportSave}>
-                      Download this game file
-                    </button>
-                    <button type="button" disabled={replayChecking} onClick={verifyReplay}>
-                      {replayChecking ? 'Verifying replay…' : 'Verify the recorded replay'}
-                    </button>
-                    {replayStatus && <p role="status">{replayStatus}</p>}
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await onCloseFile?.();
-                      }}
-                    >
-                      Close file session
-                    </button>
-                  </>
-                )}
-                {labMode && !continuity.fileSession && (
-                  <button type="button" onClick={exportSave}>
-                    Download this run
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await onCloseFile?.();
+                    }}
+                  >
+                    Close file session
                   </button>
                 )}
-                {labMode && !continuity.fileSession && (
-                  <button className="reading-row" type="button" onClick={() => setSheet('history')}>
-                    The workshop's history <span>▸</span>
-                  </button>
-                )}
-                {labMode && !continuity.fileSession && (
-                  <button type="button" onClick={() => setSheet('ways')}>
-                    Lab tools
-                  </button>
-                )}
+                <button className="reading-row" type="button" onClick={() => setSheet('history')}>
+                  The workshop's history <span>▸</span>
+                </button>
                 <button
                   className="reading-row"
                   type="button"
@@ -2994,6 +2930,18 @@ function Workshop({
                 >
                   All games
                 </a>
+                <a href="/file/" onClick={(event) => void goToGames(event)}>
+                  Open a workshop file
+                </a>
+                <a href="/experiments/" onClick={(event) => void goToGames(event)}>
+                  Earlier experiments
+                </a>
+                <a
+                  href="https://human.adamwhite.work/lab/people/"
+                  onClick={(event) => void goToGames(event)}
+                >
+                  People across games
+                </a>
                 <div className="recording-footer">
                   <label>
                     <input
@@ -3006,13 +2954,7 @@ function Workshop({
                     />{' '}
                     Recording
                   </label>
-                  <a
-                    href="https://human.adamwhite.work/lab/privacy/"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    How play is recorded
-                  </a>
+                  {privacyTools}
                 </div>
                 <button
                   className="primary-action"
@@ -3022,38 +2964,6 @@ function Workshop({
                 >
                   Resume
                 </button>
-              </>
-            )}
-            {labMode && sheet === 'ways' && (
-              <>
-                <h2>Lab tools</h2>
-                {continuityPanel}
-                <button type="button" onClick={() => input.current?.click()}>
-                  Import a workshop
-                </button>
-                <button type="button" disabled={replayChecking} onClick={verifyReplay}>
-                  {replayChecking ? 'Verifying replay…' : 'Verify the recorded replay'}
-                </button>
-                {replayStatus && <p role="status">{replayStatus}</p>}
-                <label>
-                  Choose a starting number (seed)
-                  <input
-                    type="number"
-                    value={seedText}
-                    onChange={(e) => setSeedText(e.target.value)}
-                  />
-                </label>
-                <button
-                  type="button"
-                  disabled={!seedText.trim() || !Number.isFinite(Number(seedText))}
-                  onClick={() => startWorkshop(Number(seedText))}
-                >
-                  Start
-                </button>
-                <a className="reading-row" href="/experiments/">
-                  Earlier experiments
-                </a>
-                {status && <p role="status">{status}</p>}
               </>
             )}
             {sheet === 'day' && (

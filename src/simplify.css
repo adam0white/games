@@ -213,3 +213,21 @@ body {
   padding: 12px;
   border: 1px solid var(--muted);
 }
+
+.privacy-tools {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+}
+.workshop-debug {
+  font-size: 0.85rem;
+}
+.workshop-debug summary {
+  cursor: pointer;
+}
+.debug-tools {
+  display: grid;
+  gap: 0.5rem;
+  padding-block: 0.5rem;
+}

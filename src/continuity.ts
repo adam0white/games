@@ -36,8 +36,7 @@ const source = () => ({
 });
 /** One source of ownership and recording permission. Local receipts never replace initial replay actors. */
 export class WorkshopContinuity {
-  readonly fileSession =
-    typeof location !== 'undefined' && new URLSearchParams(location.search).get('file') === '1';
+  readonly fileSession = typeof location !== 'undefined' && /^\/file\/?$/.test(location.pathname);
   readonly shelf = this.fileSession ? undefined : personaChannel();
   generation = 0;
   heads: PersonaEnvelope[] = [];
@@ -171,6 +170,12 @@ export class WorkshopContinuity {
     lab.setPersonaRecording('preparing-whole-cast');
     try {
       await shelf.ready;
+      // Owner direction 2026-10-27: same-person carryover is automatic for fresh ordinary play.
+      // Existing pinned chapters and deliberately local authored editions keep their history.
+      if (!localOnly && !shelf.enabled) {
+        shelf.setEnabled(true);
+        await shelf.ready;
+      }
       if (generation !== this.generation) throw new Error('The game changed. Choose again.');
       const base = createGame(seed);
       let state = base;

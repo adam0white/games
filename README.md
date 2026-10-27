@@ -66,7 +66,7 @@ Current installation uses `pnpm-lock.yaml` and the strict isolated dependency po
 
 ### Save and replay tools
 
-Add `?lab=1` to the game URL to show diagnostic and replay controls. In **Menu**, choose **Download this run** to export the saved workshop. Choose **Lab tools** for **Import a workshop**, **Verify the recorded replay** and a starting-number control. Export the run before reporting a problem. Keep the original file so a replay can be checked against its recorded actions.
+Open **Menu → Debug** beside **Lab privacy** for **Download this run**, **Import a workshop**, **Verify the recorded replay** and a starting-number control. Export the run before reporting a problem. Keep the original file so a replay can be checked against its recorded actions.
 
 Current-version exports must replay exactly. Older editions may be refused with a start-fresh message. The historical compatibility notes above describe their own editions. [HF3 adoption](docs/hf3-adoption.md) records the current replay checks.
 
@@ -86,8 +86,14 @@ The title offers a separate local cast-outcome chapter. Sam can correct his copi
 
 ## Open a workshop file without replacing the browser’s workshop
 
-Use `?file=1`, then **Open a workshop file**. This route does not open the saved workshop, source journal or shared character channel. A complete supported file supplies all five people and its recorded state. This is foreign file play, not ownership of the imported characters. Source archives are unsupported on this route and are refused before replacing the session.
+Use **Open a workshop file** at `/file/`. This route does not open the saved workshop, source journal or shared character channel. A complete supported file supplies all five people and its recorded state. This is foreign file play, not ownership of the imported characters. Source archives are unsupported on this route and are refused before replacing the session.
 
 Progress stays in the tab. The menu offers **Download this game file**, **Verify the recorded replay** and **Close file session**. Download before closing or reloading. New/outcome workshops, shared checkpoints and forks are unavailable. The ordinary action-costed clock and recorded pause/resume remain unchanged. Guide choices stay in memory.
 
 Normal recording and actual privacy preferences still apply through the existing lab client. Recording may reuse/create SDK identities, rotate run keys and add/drain pending uploads. This route does not clear queues, replace SDK IDs or change consent. Recording capture is not an acknowledgment or ingestion receipt. Actual signed-in-profile preservation and acceptance require separate observation.
+
+## Public tools candidate, 2026-10-27
+
+Remaining: director independent review, exact CI and clean live delivery, then Adam's acceptance on 2026-11-03. No player round is run. Gameplay editions and scenes remain public. The menu and title offer a collapsed Debug beside Lab privacy, with download, import, replay verification, seed and startup error detail. The workshop history is public. Cast controls link to the central shelf; local enable/disable, fork and per-person checkpoint controls are removed. Fresh ordinary and cast-outcome chapters automatically enable same-person carryover through the released SDK and existing strict admission. Loaded chapters keep their recorded people. The outcome edition keeps its authored scene terms and carried-person availability guards; no imported obligations are erased.
+
+Open a workshop file through the public **Open a workshop file** link at `/file/`. Debug Import opens that isolated route; it never replaces the native workshop. Pending selections and validation are invalidated on empty selection, pagehide, navigation and unmount. That route remains separate from the saved browser workshop and shared ownership. No query-string gate remains in current source. Workshop time advances through costed actions; there is no hidden speed control to expose. HF stays pinned to 3.0.0. Vendor artifacts, physical rules and current-version replay remain unchanged. Source and live receipts belong in the worker's private report until verified delivery.

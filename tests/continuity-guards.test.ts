@@ -151,6 +151,27 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
     expect(host.isStarted).toBe(false);
   });
 
+  it('automatically carries people into a fresh ordinary chapter despite the old off preference', async () => {
+    controls.enabled = false;
+    const { CAST } = await import('../src/game/cast');
+    controls.request.mockImplementation(async (request) =>
+      request.action === 'prepareBatch'
+        ? {
+            expectedHeads: Object.fromEntries(CAST.map((c) => [c.castId, null])),
+            inputs: [],
+            blocked: [],
+          }
+        : null,
+    );
+    const host = await runtime();
+    await host.fresh(42);
+    expect(controls.enabled).toBe(true);
+    expect(controls.request.mock.calls.map((c) => c[0].action)).toEqual([
+      'prepareBatch',
+      'putBatch',
+    ]);
+  });
+
   it('uses an expected-absence transaction for a wholly fresh allocation', async () => {
     const { CAST } = await import('../src/game/cast');
     controls.request.mockImplementation(async (request) =>
@@ -194,6 +215,21 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
       inputs: [input],
       claims: [claim],
     });
+    const outcomes = dispatch(file, { type: 'start-cast-outcomes' });
+    expect(outcomes.ok).toBe(true);
+    const { replayRecordedRun } = await import('../src/game/replay');
+    expect(
+      replayRecordedRun(
+        {
+          seed: outcomes.state.seed,
+          inputs: outcomes.state.inputs,
+          provenance: outcomes.state.provenance,
+          openingPeople: outcomes.state.openingPeople,
+          castChapter: outcomes.state.castChapter,
+        },
+        saveGame(outcomes.state),
+      ).ok,
+    ).toBe(true);
     const state = await host.importFile(saveGame(file));
     expect(state.castChapter?.claims[0]?.revision).toBe(claim.revision);
     expect(state.openingPeople?.nora?.rng).toEqual(nativeReceipt.raw.rng);

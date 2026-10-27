@@ -1,5 +1,12 @@
 # Handoff
 
+## Public tools candidate, 2026-10-27
+
+Remaining: director independent review, exact CI and clean live delivery, then Adam's acceptance on 2026-11-03. No player round is run. Gameplay editions and scenes remain public. The menu and title offer a collapsed Debug beside Lab privacy, with download, import, replay verification, seed and startup error detail. The workshop history is public. Cast controls link to the central shelf; local enable/disable, fork and per-person checkpoint controls are removed. Fresh ordinary and cast-outcome chapters automatically enable same-person carryover through the released SDK and existing strict admission. Loaded chapters keep their recorded people. The outcome edition keeps its authored scene terms and carried-person availability guards; no imported obligations are erased.
+
+Open a workshop file through the public **Open a workshop file** link at `/file/`. Debug Import opens that isolated route; it never replaces the native workshop. Pending selections and validation are invalidated on empty selection, pagehide, navigation and unmount. That route remains separate from the saved browser workshop and shared ownership. No query-string gate remains in current source. Workshop time advances through costed actions; there is no hidden speed control to expose. HF stays pinned to 3.0.0. Vendor artifacts, physical rules and current-version replay remain unchanged. Source and live receipts belong in the worker's private report until verified delivery.
+
+
 ## Owner words and Reference candidate, 2026-10-26
 
 Remaining: parent review/integration and actual player/Adam acceptance. Display-only candidate on a486d02 shows the existing full object request with its owner beside repair controls. The bench tools introduce Notes → Reference; Open Reference opens that existing disclosure and focuses its summary. It supplies no diagnosis, new Hint, cost change or simulation input. No browser/player, signing, push or deployment by this worker. Live2bf hold remains. F1485/F1482 are candidate coverage only; all other asks, including money/recovered cells, dialogue and performance, remain separate. Exact plan, checks and archive receipt: `~/code/.lab-scratch/games-deferred/smallworks-ownerwords-*`.
