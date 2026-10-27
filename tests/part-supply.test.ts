@@ -2,7 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
 import type { Command, GameState } from '../src/game/types';
-import { partSupplyTarget } from '../src/ui/part-supply';
+import { partSupplyDetail, partSupplyTarget } from '../src/ui/part-supply';
 
 it('routes the held toy to its existing spring drawer without changing a raw save, then buys normally', () => {
   function act(state: GameState, command: Command) {
@@ -34,6 +34,9 @@ it('routes the held toy to its existing spring drawer without changing a raw sav
   if (!selected) throw new Error('No selected spring');
   const target = partSupplyTarget(selected.kind);
   expect(target).toBe('supply-spring');
+  expect(partSupplyDetail(state, selected.kind)).toBe(
+    'Spring · Supplier · £12 · 20 min supplier trip.',
+  );
   expect(saveGame(state)).toBe(raw);
   const direct = act(loadGame(raw), { type: 'buy', part: 'spring' });
   const routed = act(state, { type: 'buy', part: selected.kind });
@@ -49,4 +52,29 @@ it('routes the held toy to its existing spring drawer without changing a raw sav
       JSON.stringify({ raw, target, bought: saveGame(routed) }),
     );
   }
+});
+
+it('keeps the actual busy supplier restriction visible instead of promising an available switch', () => {
+  let state = createGame(42);
+  const id = state.jobs[0]?.id;
+  if (!id) throw new Error('Missing opening object');
+  for (const command of [
+    { type: 'work', jobId: id, componentId: 'switch', intervention: 'replace' },
+    { type: 'verify', jobId: id, condition: 'movement' },
+    { type: 'deliver', jobId: id },
+    { type: 'start-busy-workshop' },
+  ] as Command[]) {
+    const result = dispatch(state, command);
+    expect(result.ok, result.message).toBe(true);
+    state = result.state;
+  }
+  const raw = saveGame(state);
+  expect(partSupplyDetail(state, 'switch')).toContain(
+    'Switch · Supplier · £9 · 20 min supplier trip. No supplier stock until',
+  );
+  expect(partSupplyDetail(state, 'switch')).toContain(
+    'recover one from the spare lantern or return work unfinished',
+  );
+  expect(dispatch(state, { type: 'buy', part: 'switch' }).ok).toBe(false);
+  expect(saveGame(state)).toBe(raw);
 });

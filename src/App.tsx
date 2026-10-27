@@ -13,6 +13,7 @@ import { SamRequest } from './components/SamRequest';
 import { SamWorkAccount } from './components/SamWorkAccount';
 import { SendWord } from './components/SendWord';
 import { TeachingRecord } from './components/TeachingRecord';
+import { TheatrePerformance } from './components/TheatrePerformance';
 import { WorkshopTally } from './components/WorkshopTally';
 import { continuity, LOCAL_KEY, OUTCOME_LOCAL_KEY } from './continuity';
 import { admissionFacts } from './game/cast';
@@ -44,7 +45,7 @@ import type {
 import { lab } from './lab';
 import { todaysWords, workshopCrises } from './ui/crises';
 import { firstRepairProgress } from './ui/first-repair';
-import { partSupplyTarget } from './ui/part-supply';
+import { partSupplyDetail, partSupplyTarget } from './ui/part-supply';
 import {
   actionAccount,
   componentWorkReading,
@@ -1610,6 +1611,7 @@ function Workshop({
                                 </button>
                               </p>
                             )}
+                            {job.isPersonal && <TheatrePerformance job={job} />}
                             {(pane === 'object' || pane === 'repair') && diagram}
                             {pane === 'object' && !guided && (
                               <fieldset className="use-conditions">
@@ -2083,16 +2085,19 @@ function Workshop({
                                   {part &&
                                     partSupplyTarget(part.kind) &&
                                     !(state.stock[part.kind] ?? 0) && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setSupplyTarget(partSupplyTarget(part.kind));
-                                          setView('people');
-                                        }}
-                                      >
-                                        Find this part
-                                        <small>{part.kind} · Supplies</small>
-                                      </button>
+                                      <div className="selected-part-supply">
+                                        <p>{partSupplyDetail(state, part.kind)}</p>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setSupplyTarget(partSupplyTarget(part.kind));
+                                            setView('people');
+                                          }}
+                                        >
+                                          Find this part
+                                          <small>{part.kind} · Supplies</small>
+                                        </button>
+                                      </div>
                                     )}
                                 </div>
                               </>
@@ -2184,6 +2189,11 @@ function Workshop({
                   supplier {dayTime(state.busyWorkshop.restockAt)}.
                 </p>
               )}
+              {state.jobs
+                .filter((project) => project.isPersonal)
+                .map((project) => (
+                  <TheatrePerformance key={project.id} job={project} />
+                ))}
               <div className="workboard-columns">
                 {[
                   ['offer', 'Asked of you'],
