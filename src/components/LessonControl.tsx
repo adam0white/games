@@ -1,6 +1,8 @@
 import { dayRemaining, dayTime } from '../game/engine';
 import type { Command, GameState } from '../game/types';
-export function LessonControl({
+import { SamRequest } from './SamRequest';
+
+function SessionControl({
   state,
   act,
   onRequestMore,
@@ -78,5 +80,55 @@ export function LessonControl({
         Request lesson
       </button>
     </div>
+  );
+}
+
+/** Route to existing voluntary attendance and physical tests; never grants a witness or method. */
+export function LessonControl({
+  state,
+  act,
+  onRequestMore,
+  onBench,
+}: {
+  state: GameState;
+  act: (command: Command) => void;
+  onRequestMore?: () => void;
+  onBench?: () => void;
+}) {
+  const job = state.jobs.find((j) => j.id === state.selectedJobId);
+  const tests =
+    job?.evidence.filter((e) => e.kind === 'use' && e.witnessedBy?.includes('sam')) ?? [];
+  return (
+    <section aria-label="Share an observation with Sam">
+      <h4>Share an observation with Sam</h4>
+      <p>
+        Request a lesson. If Sam agrees, choose Start lesson. Then go to the held object and try it
+        or read the meter while he attends. A request alone teaches nothing.
+      </p>
+      {state.pendingRequest?.kind === 'lesson' ? (
+        <SamRequest state={state} act={act} compact />
+      ) : (
+        <SessionControl state={state} act={act} onRequestMore={onRequestMore} />
+      )}
+      {onBench && (
+        <button type="button" onClick={onBench}>
+          Go to the held object
+          <small>
+            {job?.title ?? 'Choose an active object on Board'} · testing spends workshop time
+          </small>
+        </button>
+      )}
+      {tests.length ? (
+        <p>
+          Witnessed test: {tests.at(-1)?.summary} Sam attended this test; this does not prove a
+          diagnosis or that he learned every step.
+        </p>
+      ) : (
+        <p>
+          No witnessed use test on this object yet. The test record will name Sam only if he
+          actually attends.
+        </p>
+      )}
+    </section>
   );
 }

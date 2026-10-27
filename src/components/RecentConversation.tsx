@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { accountParts } from '../game/cast-content';
 import { dayTime } from '../game/engine';
 import type { SpokenLine } from '../ui/crises';
 
@@ -55,7 +56,7 @@ export function RecentConversation({
   if (overlay)
     return visible && newest ? (
       <p className="speech-line">
-        <strong>{newest.speaker}:</strong> {newest.text}
+        <strong>{newest.speaker}:</strong> {accountParts(newest.text).words}
       </p>
     ) : null;
   return (
@@ -70,8 +71,17 @@ export function RecentConversation({
       <summary>Recent conversation{conversationCue(conversation, lines)}</summary>
       <section className="todays-words" aria-label="What people said today">
         {lines.map((line) => (
-          <p key={line.id} className={line.tone === 'warning' ? 'is-warning' : undefined}>
-            <strong>{line.speaker}</strong> {line.text} <time>{dayTime(line.at)}</time>
+          <div key={line.id} className={line.tone === 'warning' ? 'is-warning' : undefined}>
+            <p>
+              <strong>{line.speaker}</strong> {accountParts(line.text).words}{' '}
+              <time>{dayTime(line.at)}</time>
+            </p>
+            {accountParts(line.text).limits && (
+              <details>
+                <summary>Narrator limits</summary>
+                <p>{accountParts(line.text).limits}</p>
+              </details>
+            )}
             {line.speaker === 'Sam' &&
               line.text.includes('see how you find the fault') &&
               canAskSam && (
@@ -79,7 +89,7 @@ export function RecentConversation({
                   Ask Sam to watch
                 </button>
               )}
-          </p>
+          </div>
         ))}
       </section>
     </details>

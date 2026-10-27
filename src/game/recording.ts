@@ -47,6 +47,15 @@ export function isRecordedCommand(value: unknown): value is Command {
     case 'start-cast-outcomes':
     case 'stop-cast-outcome':
       return keys(value, ['type']);
+    case 'reply-personal':
+      return (
+        keys(value, ['type', 'personId', 'statementId', 'jobId', 'choice']) &&
+        member(value.personId, ['sam', 'nora', 'rafi', 'halil']) &&
+        Number.isSafeInteger(value.statementId) &&
+        finite(value.statementId, 1, Number.MAX_SAFE_INTEGER) &&
+        id(value.jobId) &&
+        member(value.choice, ['acknowledge', 'decline'])
+      );
     case 'ask-about-work':
       return (
         keys(value, ['type', 'personId']) &&

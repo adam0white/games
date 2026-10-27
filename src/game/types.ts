@@ -192,6 +192,13 @@ export interface GameState {
   dailyCostsPaid: number;
 }
 export type Command =
+  | {
+      type: 'reply-personal';
+      personId: 'sam' | 'nora' | 'rafi' | 'halil';
+      statementId: number;
+      jobId: string;
+      choice: 'acknowledge' | 'decline';
+    }
   | { type: 'start-cast-outcomes' | 'stop-cast-outcome' }
   | { type: 'cast-outcome'; action: import('./outcomes').OutcomeAction }
   | { type: 'pause-chapter' | 'resume-chapter' }
