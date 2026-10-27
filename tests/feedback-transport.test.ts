@@ -21,8 +21,10 @@ it('submits literal choices through the released transport with linked and recor
   const envelopes: Record<string, unknown>[] = [];
   const network = vi.fn(async (_url: unknown, init: RequestInit) => {
     const body = new Uint8Array(await (init.body as Blob).arrayBuffer());
-    envelopes.push(JSON.parse(gunzipSync(body).toString()));
-    return Response.json({ ok: true, id: 'local-control' });
+    const envelope = JSON.parse(gunzipSync(body).toString());
+    envelopes.push(envelope);
+    // Client 0.4.14+ retires a record only on a stored receipt for its own id.
+    return Response.json({ ok: true, id: envelope.id ?? 'local-control' });
   });
   vi.stubGlobal('fetch', network);
   const lab = createLab({ game: 'repair', build: { a: 'local-control' } });
