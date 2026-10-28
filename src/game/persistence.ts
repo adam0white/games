@@ -667,7 +667,7 @@ export function loadGame(text: string): GameState {
       (w.jobId !== undefined && (!job || job.assignedTo !== w.personId)) ||
       job?.blocked !== undefined ||
       (w.jobId === undefined &&
-        !['eat', 'drink', 'rest', 'personal', 'leisure'].includes(w.option?.action)) ||
+        !['eat', 'drink', 'rest', 'personal', 'leisure', 'pray'].includes(w.option?.action)) ||
       !object(w.option) ||
       !str(w.option.id) ||
       !str(w.option.action) ||
