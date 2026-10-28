@@ -7,7 +7,9 @@ const dryRun = process.argv.includes('--dry-run');
 if (!dryRun && execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim()) {
   throw Error('Commit the verified build before public deployment');
 }
-run('pnpm', ['run', 'check']);
+// Game gates are lock-free; exact merged CI owns the full suite.
+run('pnpm', ['run', 'check:lane']);
+run('pnpm', ['run', 'build']);
 run('node', ['scripts/build-archives.mjs']);
 run('pnpm', ['exec', 'wrangler', 'deploy', '--dry-run']);
 if (!dryRun) {
