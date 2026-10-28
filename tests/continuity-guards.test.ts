@@ -373,7 +373,8 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
     const original = host.runId;
     const pending = host.checkpoint('nora');
     await Promise.resolve();
-    const fresh = await host.fresh(43, true);
+    controls.request.mockRejectedValue(new Error('Shelf unavailable. Use a local file.'));
+    const fresh = await host.fresh(43);
     await expect(pending).rejects.toThrow('The game changed');
     const journal = JSON.parse(storage.get('small-works-source-journal-v2') ?? '[]');
     expect(journal.length).toBeGreaterThan(0);
@@ -388,7 +389,8 @@ it('does not cancel workshop admission while a recording identity reply arrives'
     release = resolve;
   });
   const c = await runtime();
-  const pending = c.fresh(42, true);
+  controls.request.mockRejectedValue(new Error('Shelf unavailable. Use a local file.'));
+  const pending = c.fresh(42);
   window.dispatchEvent(new Event('hf-lab-preference'));
   const storage = new Event('storage');
   Object.defineProperty(storage, 'key', { value: 'hf-lab-player' });

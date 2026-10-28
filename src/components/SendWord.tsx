@@ -139,19 +139,30 @@ export function SendWord({
             Share this run and my play with the lab
           </label>
         )}
-        <details
-          onToggle={(e) => {
-            if (e.currentTarget.open) setPreview(JSON.stringify(getRun(), null, 2));
-          }}
-        >
+        <details>
           <summary>What is sent</summary>
           <p>
             With Recording on or Share selected, we include your saved game and link your play
             across games on this device. Otherwise we send only your note, answer and optional name.
           </p>
-          <pre>{preview}</pre>
-          <a href={LAB_PRIVACY}>Lab privacy</a>
         </details>
+        <div className="privacy-tools">
+          <a href={LAB_PRIVACY}>Lab privacy</a>
+          <details
+            className="workshop-debug"
+            onToggle={(e) => {
+              if (!e.currentTarget.open) return;
+              try {
+                setPreview(JSON.stringify(getRun(), null, 2));
+              } catch {
+                setPreview('The current run could not be read. You can still send your note.');
+              }
+            }}
+          >
+            <summary>Debug</summary>
+            <pre>{preview}</pre>
+          </details>
+        </div>
         {status && <p role="status">{status}</p>}
       </div>
       <div className="sw-feedback-actions">
