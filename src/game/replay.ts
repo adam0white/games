@@ -1,4 +1,4 @@
-import { createGame, dispatch, upgradeRules } from './engine';
+import { createGame, replayCommands } from './engine';
 import { loadGame, saveGame } from './persistence';
 import {
   isInputRecording,
@@ -126,21 +126,17 @@ export function replayRecordedRun(
       message: 'The pinned initial people are invalid.',
     };
   }
-  for (const [index, command] of recording.inputs.entries()) {
-    if (index === migratedAt) state = upgradeRules(structuredClone(state));
-    const result = dispatch(state, structuredClone(command));
-    if (!result.ok) {
-      return {
-        ok: false,
-        reason: 'command-failed',
-        index,
-        command: structuredClone(command),
-        message: `Recorded input ${index + 1} failed: ${result.message}`,
-      };
-    }
-    state = result.state;
+  const result = replayCommands(state, recording.inputs, migratedAt);
+  if (!result.ok) {
+    return {
+      ok: false,
+      reason: 'command-failed',
+      index: result.index,
+      command: result.command,
+      message: `Recorded input ${result.index + 1} failed: ${result.message}`,
+    };
   }
-  if (migratedAt === recording.inputs.length) state = upgradeRules(structuredClone(state));
+  state = result.state;
   const save = saveGame(state);
   if (expectedCanonical !== undefined) {
     try {

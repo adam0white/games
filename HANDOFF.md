@@ -1,5 +1,15 @@
 # Handoff
 
+## Native admission optimization candidate, 2026-10-27
+
+Remaining: root-arranged sole independent Codex review at the exact `gd-resume-smallworks-admission-optimize-REVIEWED.md` CLEAR, fresh normal precommit lane, signed source/CI, root matched-head merge verification and clean delivery. No commit or deployment is claimed at this candidate stage. [Design scope](docs/restart/design.md#native-admission-optimization-candidate-2026-10-27).
+
+Replay now owns its accumulated input array inside a command sequence while cloning the rest of the world per dispatch. Public dispatch keeps full caller state/input isolation, including the previously aliased nested measurement request. Every historical command, real cap closure, original/current job and evidence/receipt binding remain checked. No new faculty, flags, bypasses, cap changes, HF edits or dependency changes.
+
+Same original723360-character closed10000-input packet, cold public loadGame with Node26.12.0 CPU profiles: wall27.77s→9.89s; CPU28.26s→10.02s; complete save bytes exact. Concurrent host work and profiling qualify these measurements; no new latency budget or browser responsiveness claim. Exact proof and freeze live at `~/code/.lab-scratch/games-deferred/gd-resume-smallworks-admission-optimize-*`. Ordinary/busy/outcome saved fields, full/compact replay and ordinary1440-minute continuation remain exact. All ten retained attacks reject through native and actual synthetic App chooser/held-session importer. Actual public-HF five-minute cost/refusal/availability and both required viewports remain checked.
+
+F1481 variety remains a separate2026-10-28 unit. Restart acceptance, crew, management, economy and multiplayer remain individual2026-10-29 engineering units. Adam/player acceptance remains2026-11-03; this optimization does not accept the whole game.
+
 ## Public tools candidate, 2026-10-27
 
 Remaining: director independent review, exact CI and clean live delivery, then Adam's acceptance on 2026-11-03. No player round is run. Gameplay editions and scenes remain public. The menu and title offer a collapsed Debug beside Lab privacy, with download, import, replay verification, seed and startup error detail. The workshop history is public. Cast controls link to the central shelf; local enable/disable, fork and per-person checkpoint controls are removed. Fresh ordinary and cast-outcome chapters automatically enable same-person carryover through the released SDK and existing strict admission. Loaded chapters keep their recorded people. The outcome edition keeps its authored scene terms and carried-person availability guards; no imported obligations are erased.
