@@ -1872,7 +1872,12 @@ function playerWork(
   for (const received of newObservations) received.actorId = 'player';
   const sam = s.people.sam;
   if (watcher && sam) {
-    if (watcher.action === 'observe') finishActivity(sam, watcher, true, s.now);
+    if (watcher.action === 'observe') {
+      finishActivity(sam, watcher, true, s.now);
+      // Observation held the shared Run before later finishes inside this minute.
+      finishDueNpcWork(s, s.now);
+      settleWorkshopInterruptions(s);
+    }
     if (s.watching && s.watchUntil !== undefined && s.now >= s.watchUntil) {
       releaseLesson(s);
       log(s, 'Sam', 'Our agreed learning session has ended. I’ll keep what I actually saw.');
