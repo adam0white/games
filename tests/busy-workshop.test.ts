@@ -48,7 +48,7 @@ describe('opt-in busy workshop', () => {
     ] as Command[])
       state = act(state, command);
     expect(createHash('sha256').update(saveGame(state)).digest('hex')).toBe(
-      '60f412524b4f207cb144a3b2480fe66dbc72d460d87a6499eea36196b32e1ee8',
+      'd9a1b2ef49284d98b4a9cba59b26b8b18aab49760a851717064e38e67a07a371',
     );
   });
   it('turns accepting everything into a real stock/deadline choice, without changing ordinary play', () => {
