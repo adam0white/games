@@ -57,6 +57,7 @@ import {
 } from './model.ts';
 import { restoreOpeningPeople } from './opening.ts';
 import {
+  OUTCOME_TERMS,
   outcomeBlock,
   outcomeBoundary,
   requestOutcome,
@@ -1235,6 +1236,21 @@ function settleWorkshopFinishes(s: GameState): void {
   }
   throw new Error('Workshop finishes did not settle after 128 outcomes.');
 }
+/** Settle host work in native order, optionally before an attended scene's exact end. */
+function finishDueNpcWork(s: GameState, minute: number, beforeMs = Infinity): void {
+  const completed = s.npcWork
+    .filter(
+      (work) =>
+        work.endsAt <= minute && activityEndMs(required(s.people[work.personId])) < beforeMs,
+    )
+    .sort(
+      (a, b) =>
+        activityEndMs(required(s.people[a.personId])) -
+        activityEndMs(required(s.people[b.personId])),
+    );
+  for (const work of completed)
+    if (finishNpc(s, work)) s.npcWork = s.npcWork.filter((candidate) => candidate !== work);
+}
 function finishNpc(s: GameState, work: NpcWork): boolean {
   const person = s.people[work.personId];
   const job = s.jobs.find((j) => j.id === work.jobId);
@@ -1718,17 +1734,14 @@ function advance(s: GameState, minutes: number): void {
     next = Math.min(next, workshopMinute(s.people));
     s.now = next;
     settleWorkshopInterruptions(s);
+    const scene = s.castOutcomes?.pending;
+    if (scene && scene.endsAt <= next) {
+      const person = s.people[OUTCOME_TERMS[scene.action].person];
+      if (person) finishDueNpcWork(s, next, activityEndMs(person));
+    }
     resolveOutcome(s);
     reconcileResponsibilities(s);
-    const completed = s.npcWork
-      .filter((w) => w.endsAt <= next)
-      .sort(
-        (a, b) =>
-          activityEndMs(required(s.people[a.personId])) -
-          activityEndMs(required(s.people[b.personId])),
-      );
-    for (const work of completed)
-      if (finishNpc(s, work)) s.npcWork = s.npcWork.filter((w) => w !== work);
+    finishDueNpcWork(s, next);
     settleWorkshopInterruptions(s);
     if (
       s.watching &&

@@ -1,7 +1,9 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { gunzipSync, gzipSync } from 'node:zlib';
+import { replay as replayNative } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
+import { activityEndMs, snapshotRuntime } from '../src/game/hf';
 import {
   OUTCOME_TERMS,
   type OutcomeAction,
@@ -275,3 +277,73 @@ it('saves immediately when a cast request interrupts background work and is decl
   const advanced = act(loadGame(raw), { type: 'wait', minutes: 1 });
   expect(advanced.stock.switch).toBe(stock);
 });
+
+it.each(['npc-first', 'scene-first'] as const)(
+  'settles scene and NPC finishes in native order within one displayed minute (%s)',
+  (order) => {
+    let state = samDisclosure();
+    state = act(state, { type: 'wait', minutes: 20 });
+    let otherPerson: string | undefined;
+    for (let attempts = 0; attempts < 8; attempts++) {
+      state = act(state, { type: 'cast-outcome', action: 'sam-correction' });
+      const scene = state.castOutcomes?.pending;
+      expect(scene?.action).toBe('sam-correction');
+      if (!scene || !state.people.sam) throw new Error('Missing accepted correction');
+      const sceneEnd = activityEndMs(state.people.sam);
+      otherPerson = state.npcWork.find((work) => {
+        const person = state.people[work.personId];
+        return (
+          person &&
+          work.endsAt === scene.endsAt &&
+          (order === 'npc-first'
+            ? activityEndMs(person) < sceneEnd
+            : activityEndMs(person) > sceneEnd) &&
+          Math.floor(activityEndMs(person) / 60_000) === Math.floor(sceneEnd / 60_000)
+        );
+      })?.personId;
+      if (otherPerson) break;
+      state = act(state, { type: 'stop-cast-outcome' });
+    }
+    expect(otherPerson).toBeDefined();
+    const scene = state.castOutcomes?.pending;
+    if (!scene || !otherPerson) throw new Error('Missing aligned native finishes');
+    const before = snapshotRuntime(state.people);
+    const npcActivity = before.active[otherPerson]?.id;
+    const sceneActivity = before.active.sam?.id;
+    expect(npcActivity).toBeDefined();
+    expect(sceneActivity).toBeDefined();
+    const cash = state.cash;
+    const stock = structuredClone(state.stock);
+    const waiting = dispatch(state, { type: 'wait', minutes: scene.endsAt - state.now });
+    expect(waiting.ok, waiting.message).toBe(true);
+    state = waiting.state;
+    expect(outcomeDone(state, 'sam-correction')).toBe(true);
+    expect(state.castOutcomes?.pending).toBeUndefined();
+    expect(state.cash).toBe(cash);
+    expect(state.stock).toEqual(stock);
+    const raw = saveGame(state);
+    expect(saveGame(loadGame(raw))).toBe(raw);
+    const archive = snapshotRuntime(state.people).archive;
+    const completions = archive.history
+      .flatMap((tx) => tx.inputs)
+      .filter(
+        (input) =>
+          input.kind === 'action.resolved' &&
+          input.payload.stage === 'finish' &&
+          input.payload.disposition === 'completed' &&
+          [npcActivity, sceneActivity].includes(input.payload.activityId),
+      );
+    expect(completions).toHaveLength(2);
+    const first = completions[0];
+    const second = completions[1];
+    if (!first || !second || first.kind !== 'action.resolved')
+      throw new Error('Missing finish receipts');
+    expect(first.payload.activityId).toBe(order === 'npc-first' ? npcActivity : sceneActivity);
+    expect(first.at).toBeLessThan(second.at);
+    const native = replayNative(archive);
+    expect(native.ok && native.value.verified).toBe(true);
+    const replayed = replayRecordedRun(JSON.parse(raw), raw);
+    expect(replayed.ok).toBe(true);
+    if (replayed.ok) expect(replayed.save).toBe(raw);
+  },
+);
