@@ -1872,8 +1872,9 @@ function playerWork(
   for (const received of newObservations) received.actorId = 'player';
   const sam = s.people.sam;
   if (watcher && sam) {
+    let observationCompleted = false;
     if (watcher.action === 'observe') {
-      finishActivity(sam, watcher, true, s.now);
+      observationCompleted = finishActivity(sam, watcher, true, s.now)?.status === 'completed';
       // Observation held the shared Run before later finishes inside this minute.
       finishDueNpcWork(s, s.now);
       settleWorkshopInterruptions(s);
@@ -1883,6 +1884,10 @@ function playerWork(
       log(s, 'Sam', 'Our agreed learning session has ended. I’ll keep what I actually saw.');
     }
     if (watcher.action === 'observe') {
+      if (!observationCompleted) {
+        log(s, 'Sam', 'I left before the final observation. I did not see that result.');
+        return;
+      }
       for (const received of newObservations)
         if (perceiveEvidence(s, sam.id, job, received)) received.witnessedBy = ['sam'];
       const witnessedObservations = newObservations.filter((received) =>

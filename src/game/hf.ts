@@ -296,7 +296,7 @@ function refresh(c: Context): void {
     p.trace = c.data.decisions[p.id] ? [clone(c.data.decisions[p.id]!)] : [];
   }
 }
-function accept(c: Context, until: number, inputs: Input[]): void {
+function accept(c: Context, until: number, inputs: Input[]) {
   if (!c.base) archiveOf(c);
   const batch = { until, inputs: JSON.parse(JSON.stringify(inputs)) as Input[] };
   const result = need(step(c.run, batch));
@@ -315,6 +315,7 @@ function accept(c: Context, until: number, inputs: Input[]): void {
     }
   }
   refresh(c);
+  return result;
 }
 function ingress(c: Context, minute: number): number {
   return Math.max(
@@ -339,7 +340,7 @@ function input<K extends keyof Payloads>(
     payload,
   } as Input<K>;
 }
-function submit(p: Person, entry: Input): void {
+function submit(p: Person, entry: Input) {
   const c = context(p);
   settleAutomatic(c);
   if (c.data.pending.length) {
@@ -347,7 +348,7 @@ function submit(p: Person, entry: Input): void {
     return;
   }
   entry.at = ingress(c, entry.at / MINUTE);
-  accept(c, entry.at, [entry]);
+  return accept(c, entry.at, [entry]);
 }
 function drain(c: Context): void {
   while (c.data.queue.length && !c.data.pending.length) {
@@ -968,7 +969,10 @@ export interface Finished {
   summary?: string;
   preserveNextStart?: boolean;
 }
-export function finish(p: Person, outcome: Finished): { achieved: Goal[] } | null {
+export function finish(
+  p: Person,
+  outcome: Finished,
+): { achieved: Goal[]; status: Finished['status'] } | null {
   const c = context(p),
     active = c.data.active[p.id];
   if (!active || active.offer.id !== outcome.affordanceId) return null;
@@ -1037,7 +1041,10 @@ export function finish(p: Person, outcome: Finished): { achieved: Goal[] } | nul
     observations: [],
   });
   if (!outcome.preserveNextStart) settleAutomatic(c);
-  return { achieved: p.agenda.goals.filter((g) => g.status === 'achieved' && !prior.has(g.id)) };
+  return {
+    status,
+    achieved: p.agenda.goals.filter((g) => g.status === 'achieved' && !prior.has(g.id)),
+  };
 }
 export function promise(
   p: Person,
@@ -1137,30 +1144,43 @@ export function perceive(
     targetId?: string;
   }[],
 ): PerceptData[] {
-  submit(
+  const sequence = context(p).data.nextInput;
+  const evidenceId = `observation:${sequence}`;
+  const prepared: PerceptData[] = percepts.map((v, i) => {
+    const { at, ...rest } = v;
+    return {
+      ...rest,
+      id: `percept:${sequence}:${i}`,
+      occurredAt: Math.round(at * MINUTE),
+      claims: [],
+      norms: [],
+      advice: [],
+      consequences: [],
+      withdrawConsequences: [],
+      witnesses: [],
+      reports: [],
+      provenance: [],
+    };
+  });
+  const result = submit(
     p,
     input(p, 'observation.received', {
       person: p.id,
-      evidenceId: `observation:${context(p).data.nextInput}`,
-      percepts: percepts.map((v, i) => {
-        const { at, ...rest } = v;
-        return {
-          ...rest,
-          id: `percept:${context(p).data.nextInput}:${i}`,
-          occurredAt: Math.round(at * MINUTE),
-          claims: [],
-          norms: [],
-          advice: [],
-          consequences: [],
-          withdrawConsequences: [],
-          witnesses: [],
-          reports: [],
-          provenance: [],
-        };
-      }),
+      evidenceId,
+      percepts: prepared,
     }),
   );
-  return percepts as unknown as PerceptData[];
+  const attended = new Set(
+    result?.events.flatMap((event) =>
+      event.person === p.id &&
+      event.data.kind === 'observation-attended' &&
+      event.data.evidenceId === evidenceId &&
+      event.data.attention > 0
+        ? [event.data.perceptId]
+        : [],
+    ),
+  );
+  return prepared.filter((percept) => attended.has(percept.id));
 }
 export function socialEvent(
   p: Person,

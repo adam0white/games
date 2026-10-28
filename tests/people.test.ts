@@ -7,6 +7,8 @@ import {
   createPerson,
   exportPersonRun,
   methodEvidence,
+  perceive,
+  prepareActivityFinish,
   promise,
   snapshotRuntime,
 } from '../src/game/hf';
@@ -217,4 +219,50 @@ it.each([
   expect(person.trace[0]?.considered.some((candidate) => candidate.affordanceId === 'pray')).toBe(
     false,
   );
+});
+
+it('returns only percepts HF actually attended instead of echoing the submitted batch', () => {
+  const { person } = opening();
+  const offered = Array.from({ length: 40 }, (_, index) => ({
+    at: 600,
+    channel: 'saw' as const,
+    kind: 'quiet-background-detail',
+    summary: `Quiet detail ${index}`,
+    salience: 0,
+    valence: 0,
+  }));
+  const attended = perceive(person, offered);
+  expect(attended.length).toBeGreaterThan(0);
+  expect(attended.length).toBeLessThan(offered.length);
+  expect(attended.every((percept) => typeof percept.id === 'string')).toBe(true);
+  const native = replay(exportPersonRun(person));
+  expect(native.ok && native.value.verified).toBe(true);
+});
+
+it('does not claim queued perception before the pending action receipt is supplied', () => {
+  const { person } = opening();
+  beginRest(person);
+  expect(prepareActivityFinish(person, 630)).toBe(true);
+  const attended = perceive(person, [
+    {
+      at: 600,
+      channel: 'saw',
+      kind: 'visible-object',
+      summary: 'The workshop object',
+      salience: 0.75,
+    },
+  ]);
+  expect(attended).toHaveLength(0);
+  expect(finishActivity(person, rest, true, 630)).not.toBeNull();
+  const archive = exportPersonRun(person);
+  expect(
+    archive.current.events.some(
+      (event) =>
+        event.person === 'sam' &&
+        event.data.kind === 'observation-attended' &&
+        event.data.summary === 'The workshop object',
+    ),
+  ).toBe(true);
+  const native = replay(archive);
+  expect(native.ok && native.value.verified).toBe(true);
 });

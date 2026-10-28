@@ -10,6 +10,7 @@ import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
 import { activityEndMs, snapshotRuntime } from '../src/game/hf';
 import { replayRecordedRun } from '../src/game/replay';
 import type { Command, GameState } from '../src/game/types';
+import { reAuthor } from './hf-fixture';
 
 function act(s: GameState, c: Command) {
   const r = dispatch(s, c);
@@ -130,4 +131,56 @@ it('drains later NPC finishes before returning a watched replacement', () => {
   const replayed = replayRecordedRun(JSON.parse(raw), raw);
   expect(replayed.ok).toBe(true);
   if (replayed.ok) expect(replayed.save).toBe(raw);
+});
+
+it('withholds final witness and teaching credit when HF interrupts an observation', () => {
+  let state = createGame(1);
+  const sam = state.people.sam;
+  if (!sam) throw new Error('Missing observer');
+  // Controlled public authoring makes dozing likely. HF still chooses and interrupts.
+  reAuthor(sam, {
+    body: {
+      sleepPressure: 1,
+      sleepDebtHours: 24,
+      doze: {
+        context: { posture: 'reclined', stimulation: 0 },
+        basis: { kind: 'authored', author: 'repair', at: state.now * 60000 },
+      },
+    } as Parameters<typeof reAuthor>[1]['body'],
+  });
+  state = act(state, { type: 'watch', enabled: true });
+  state = act(state, {
+    type: 'work',
+    jobId: state.selectedJobId,
+    componentId: 'cell',
+    intervention: 'replace',
+  });
+  const archive = snapshotRuntime(state.people).archive;
+  const inputs = archive.history.flatMap((tx) => tx.inputs);
+  const interruption = inputs.find(
+    (input) =>
+      input.kind === 'action.resolved' &&
+      input.payload.person === 'sam' &&
+      input.payload.stage === 'interrupt' &&
+      input.payload.outcome?.actionId === 'observe',
+  );
+  expect(interruption).toBeDefined();
+  expect(
+    inputs.some(
+      (input) =>
+        input.kind === 'action.resolved' &&
+        input.payload.person === 'sam' &&
+        input.payload.stage === 'start' &&
+        input.payload.disposition === 'accepted',
+    ),
+  ).toBe(true);
+  const evidence = state.jobs[0]?.evidence.at(-1);
+  expect(evidence).toBeDefined();
+  expect(evidence?.witnessedBy ?? []).not.toContain('sam');
+  expect(inputs.filter((input) => input.kind === 'method.demonstrated')).toHaveLength(0);
+  expect(state.jobs[0]?.pendingLessons).toHaveLength(0);
+  const raw = saveGame(state);
+  expect(saveGame(loadGame(raw))).toBe(raw);
+  const native = replayNative(archive);
+  expect(native.ok && native.value.verified).toBe(true);
 });
