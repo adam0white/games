@@ -4,7 +4,7 @@ Read README.md, HANDOFF.md, docs/vision.md and docs/mvp.md before resuming. This
 
 ## Current stack and maintenance
 
-2026-10-28: HF4 port targets published HF 4.6.0, immutable lab-client 0.5.2 and lab-kit 0.5.19. Client 0.5.2 deliberately retains its pure portable HF 4.4.0 bridge and legacy adapter dependency. Do not force those transitive pins to the actor version. Use shared Node 26.12.0, TypeScript 7.0.2, React 19.3.1, Vite 8.3.5, Vitest 5.0.5, Biome 2.6.3, Wrangler 4.152.0 and Knip 6.43.0. Run suites through `npm test` and the shared machine lock. Worker compatibility date 2026-10-25. [HF4 adoption](docs/hf4-adoption.md) owns the port; HF3 records are historical.
+2026-10-28: HF4 port targets published HF 4.7.0, immutable lab-client 0.5.3 and lab-kit 0.5.21. The game, client and kit resolve the same physical HF 4.7.0 module. Client 0.5.3 intentionally retains the `hf-legacy` alias at 3.0.0 for its legacy adapter. Use shared Node 26.12.0, TypeScript 7.0.2, React 19.3.1, Vite 8.3.5, Vitest 5.0.5, Biome 2.6.3, Wrangler 4.152.0 and Knip 6.43.0. Run suites through `npm test` and the shared machine lock. Worker compatibility date 2026-10-25. [HF4 adoption](docs/hf4-adoption.md) owns the port; HF3 records are historical.
 
 ## Current authorization
 

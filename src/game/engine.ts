@@ -718,7 +718,9 @@ function canWork(s: GameState, job: Job): string | undefined {
   if (
     !s.upgrades.includes('second-bench') &&
     s.npcWork.some(
-      (w) => w.jobId && !['ask-help', 'rest', 'personal', 'eat', 'drink'].includes(w.option.action),
+      (w) =>
+        w.jobId &&
+        !['ask-help', 'rest', 'personal', 'eat', 'drink', 'pray'].includes(w.option.action),
     )
   )
     return 'Sam is using the only bench. Recall his work or add a second bench.';
@@ -1285,7 +1287,7 @@ function finishNpc(s: GameState, work: NpcWork): boolean {
         `I have put ${named(s, job.title)} away safely. It is still my job. ${job.blocked.reason}`,
         'warning',
       );
-    } else if (!['rest', 'eat', 'drink', 'personal'].includes(work.option.action)) {
+    } else if (!['rest', 'eat', 'drink', 'personal', 'pray'].includes(work.option.action)) {
       if (
         /^(clean|adjust|replace|calibrate):/.test(work.option.action) &&
         job.pendingLessons.length
@@ -1813,7 +1815,18 @@ function watcherStart(s: GameState, job: Job, duration: number): WorkOption | un
   const choice = chooseActivity(sam, 'workshop-lesson', {}, options, s.now);
   if (choice.chosenId !== 'observe') log(s, 'Sam', choiceSpeech(sam, choice));
   const option = options.find((o) => o.id === choice.chosenId);
-  if (option && startActivity(sam, option, s.now)) return option;
+  if (option && startActivity(sam, option, s.now)) {
+    // Only observation depends on the player's later physical outcome. Other
+    // choices finish at their own boundary, which can precede the player's work.
+    if (option.action !== 'observe')
+      s.npcWork.push({
+        personId: sam.id,
+        option,
+        startedAt: s.now,
+        endsAt: s.now + option.duration,
+      });
+    return option;
+  }
   return;
 }
 function playerWork(
@@ -1846,7 +1859,7 @@ function playerWork(
   for (const received of newObservations) received.actorId = 'player';
   const sam = s.people.sam;
   if (watcher && sam) {
-    finishActivity(sam, watcher, true, s.now);
+    if (watcher.action === 'observe') finishActivity(sam, watcher, true, s.now);
     if (s.watching && s.watchUntil !== undefined && s.now >= s.watchUntil) {
       releaseLesson(s);
       log(s, 'Sam', 'Our agreed learning session has ended. I’ll keep what I actually saw.');

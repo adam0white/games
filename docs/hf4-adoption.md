@@ -1,17 +1,17 @@
 # Small Works HF4 port, 2026-10-28
 
-Remaining: complete the full lane and signed follow-up, merge with exact green CI, deploy and verify the clean live manifest. The requested hosted review is complete; its findings are fixed in this PR. This candidate document is not a delivery receipt. Adam accepts readability and game feel through play, targeted 2026-11-03. No owner decision is pending.
+Remaining: merge with exact green CI, deploy and verify the clean live manifest. The requested hosted review is complete; its findings are fixed in this PR. This candidate document is not a delivery receipt. Adam accepts readability and game feel through play, targeted 2026-11-03. No owner decision is pending.
 
 ## Scope and decisions
 
-The owner selected latest published HF4, checked on npm as 4.6.0. This game pins it exactly. Immutable release artifacts are lab-client 0.5.2 and lab-kit 0.5.19. Their SHA256 values match the GitHub release assets:
+The current target is published HF 4.7.0, pinned exactly, with immutable lab-client 0.5.3 and lab-kit 0.5.21 release artifacts. Their SHA256 values match the GitHub release assets:
 
 | Artifact | SHA256 |
 | --- | --- |
-| `adam0white-lab-client-0.5.2.tgz` | `08b4c0e30d9f0def5c5855597954e5a9f0c0df0dca97a063bb52a804b0b9c62d` |
-| `adam0white-lab-kit-0.5.19.tgz` | `5602a8755f83644c05c5b1c95e94ede32fccd7b35aa7eb13369c2f7a4ad91b13` |
+| `adam0white-lab-client-0.5.3.tgz` | `18270bc9ac2b6121852f38daac3aada4c4189dd9e379f2d508bf3753a28f29a9` |
+| `adam0white-lab-kit-0.5.21.tgz` | `8b2bc1e86cb5856a89e6d2560212851396f624c8c296984f0123bfb8028a12f3` |
 
-Client 0.5.2 deliberately depends on HF 4.4.0 for its pure portable bridge and an aliased HF3 legacy adapter. These are released SDK internals. The game's people use the direct HF 4.6.0 package. The former workspace-wide HF3 override is removed so it cannot replace either exact SDK pin. No framework code is copied into this repository.
+The game, client and kit resolve the same physical HF 4.7.0 module. Client 0.5.3 intentionally retains the `hf-legacy` alias at 3.0.0 for its legacy adapter. No framework code is copied into this repository.
 
 The implementer chose game 4.2.0 and provenance `4.2.0+hf4`. The host schema name remains `small-works@5`; exact provenance and the run archive identify the new edition. Older saves receive the explicit start-fresh refusal. This is authorized abandonment of old-save compatibility, not conversion of an old person into a fresh replacement. Fixed historical archives and their builder remain separate.
 
@@ -35,7 +35,7 @@ Complete HF archives exceed the former two-megabyte save limit during normal pla
 
 The decoder bounds a complete save at 268,435,456 characters. This is a defensive input limit, not a tested gameplay duration. The source journal retains complete local snapshots. Distinct character revision rows reference one SHA256-identified snapshot instead of copying the same workshop for every character. Every revision binding remains in the export. Source archives stay out of telemetry and the shared character shelf.
 
-The host accepts its own `workshop-hf4/1` passport and Commonstead’s exact `commonstead-retained/4` passport on HF 4.6.0. Both carry the public retained-v2 projection. Unknown passports, changed identities and unsupported current versions stop preparation before ownership changes. Pre-HF4 receipts remain in their source. Actual longer-day Commonstead producer controls passed for Nora and Sam at source tick1800: the original public passport was equal to the admitted passport, the shelf claim completed, save/load matched exactly, and both native HF and game replay verified. Envelope-only fixtures are separate admission guards.
+The host accepts its own `workshop-hf4/1` passport and Commonstead’s exact `commonstead-retained/4` passport from HF 4.6.0 or 4.7.0 into the receiving 4.7.0 game. Both carry the public retained-v2 projection. Unknown passports, changed identities and unsupported current versions stop preparation before ownership changes. Pre-HF4 receipts remain in their source. Actual longer-day Commonstead producer controls passed for Nora and Sam at source tick1800: the original public passport was equal to the admitted passport, the shelf claim completed, save/load matched exactly, and both native HF and game replay verified. Envelope-only fixtures are separate admission guards.
 
 Pre-HF4 shared heads remain in their source. Their characters start fresh with a visible notice and cannot overwrite those heads. A current HF4 head that cannot be admitted stops chapter preparation before ownership changes. The isolated `/file/` route preserves imported opaque sources in its download and does not open or replace native saves or shared histories.
 
@@ -49,7 +49,7 @@ A played Nora control crossed the source's next-day and paused boundary, admitte
 
 On the resumed published HF 4.5.2 candidate, played Nora again retained all 20 source episodes through admission and a receiving next-day transition. Native replay, whole-game replay and byte-exact save restoration passed. Full hash: `c5f81ab511734fccfbda0d39e51fccfa6e6e93f71ba55f4433ea69f28b0761eb`. The preceding 4.5.1 hashes describe their original dated candidate only.
 
-The bridge materializes its immutable public archive at a save/export checkpoint. A trusted internal branch copies host metadata and can take the unchanged live public Run. Older or sibling branches retain a checkpoint plus an immutable list of accepted public `step` calls; public restoration and those exact calls reconstruct that branch on demand. They never share a mutable Run, clone a private kernel or implement actor rules. Forward branches release their source-context reference on acquisition, so old game states do not accumulate merely because play advances. Imported files retain complete strict decoding and public restoration. Full-hash fixtures are retained and re-recorded for the published 4.6.0 engine. A control checks unsaved siblings, subsequent cold restoration and native replay.
+The bridge materializes its immutable public archive at a save/export checkpoint. A trusted internal branch copies host metadata and can take the unchanged live public Run. Older or sibling branches retain a checkpoint plus an immutable list of accepted public `step` calls; public restoration and those exact calls reconstruct that branch on demand. They never share a mutable Run, clone a private kernel or implement actor rules. Forward branches release their source-context reference on acquisition, so old game states do not accumulate merely because play advances. Imported files retain complete strict decoding and public restoration. Full-hash fixtures were retained and re-recorded for the published 4.6.0 candidate. A control checks unsaved siblings, subsequent cold restoration and native replay.
 
 A reconsidered activity first produces its interruption outcome. The host then requests a new actual decision; an earlier intention never substitutes for a start receipt. Pending finishes reached within millisecond ingress settle their real host outcomes before the next workshop decision.
 
@@ -66,7 +66,7 @@ The complete-archive controls are materially slower than the earlier per-person 
 - Refuse malformed or unsupported archives before replacing the current workshop. Old saves may start fresh only after an explicit user action.
 - Keep gameplay public. Download and opening a saved workshop live in the ordinary menu. Debug contains only diagnostics, seed and replay verification beside Lab privacy. No query parameter unlocks a gameplay feature.
 - Run `npm run check:lane` before each signed commit. Include the Codex trailer. Use exactly one hosted `@codex review` for the PR and fix its findings there.
-- Merge without `--delete-branch`, require green CI on the exact merged commit, run `npm run deploy`, and verify live `/release.json` matches that commit, HF 4.6.0 and `dirty:false`.
+- Merge without `--delete-branch`, require green CI on the exact merged commit, run `npm run deploy`, and verify live `/release.json` matches that commit, HF 4.7.0 and `dirty:false`.
 - Remove the merged task worktree and its local/origin branches. Stop only task-owned exact PIDs. Technical receipts do not establish owner acceptance.
 
 If a real released-HF gap prevents an existing feature, record the dated blocker in `docs/restart/design.md`, name its matching G-row in the framework needs inventory, and retain the released game. Unimplemented SW-1/G15 and SW-2/G9 requests do not by themselves prove a port regression.
@@ -78,7 +78,7 @@ The checkpoint candidate also passed the public browser workflow at1280×800 and
 
 ## Published 4.6.0 follow-up
 
-The frozen actor target is the latest published package checked at 09:47 UTC on 2026-10-28. Format 5 bounds duplicated event/receipt journals while retaining accepted input history. Earlier hashes above remain evidence for their original pins. Current ordinary-save SHA256 is `9e4c5f4164f5792dc1a1bb59f6effc18937b4484361cb62a86ee3834b36d00b8`; the lesson native full hash is `109a6a7bb88ec2cbde710d7330af3f1ec4629950df9ddabdba80d0a44abefb3c`. Both assertions remain in the test suite.
+The 4.6.0 candidate used the latest published package checked at 09:47 UTC on 2026-10-28. Format 5 bounds duplicated event/receipt journals while retaining accepted input history. Earlier hashes above remain evidence for their original pins. That candidate’s ordinary-save SHA256 is `9e4c5f4164f5792dc1a1bb59f6effc18937b4484361cb62a86ee3834b36d00b8`; the lesson native full hash is `109a6a7bb88ec2cbde710d7330af3f1ec4629950df9ddabdba80d0a44abefb3c`. Both exact assertions remain in the test suite, re-recorded for the current pin below.
 
 Played Nora retained all 20 source episodes through admission and a receiving next day on 4.6.0. Complete save restoration, native HF replay and complete game replay passed; full hash `a86bc5169894362d8ec3ae606ae0ad2ac91b913fd7c932fe67a49ec90e071964`.
 
@@ -97,3 +97,21 @@ The coordinator’s public-menu correction joins this same PR. Download this wor
 A follow-up control found that callers could not find a prayer offer appended only to a local list. The shared host-owned offer list now includes the actual HF alternative, so callers can start it. The regression checks native choice, actual start and completion, kept duty and exact native replay. Sleep-only batches and awake slots shorter than fifteen minutes do not advertise that offer. All nine focused actor-boundary tests pass.
 
 The final prayer/menu follow-up normal lane passes368 tests in58files (682.06seconds), lint, typecheck and build.273 lint warnings and the bundle-size warning remain. Actual public-menu download, chooser cancel, file import, Resume and return to the preserved native workshop pass at360×690/1280×800. The downloaded369,685-character file reproduces the complete save and game replay, native full hash `0acefe2de0612887426e443c7658d7684334eab8cdd7f5a78ccf8006e4e0bce5`.
+
+The automatic hosted follow-up found two additional prayer paths: a shorter alternative while Sam watches player work could leave the HF clock behind, and assigned prayer could be sent to the physical repair resolver. Non-observation watcher alternatives now have ordinary jobless host work records, so their own finish boundary settles before player work continues. Prayer uses the non-repair outcome path and claims no bench or object contribution. Three controlled public-authoring gameplay tests reproduce the original clock/save and false-contribution failures, then verify exact save restoration, native replay, actual completed receipts and unchanged physical work. Forty-one focused gameplay tests pass.
+
+A workshop passport can retain historical actions from an earlier Commonstead visit. Receiving authoring registers only referenced missing actions from the known literal vocabulary for both supported passport sources. It does not add corresponding workshop jobs or drop remembered actions. A public retained-workshop re-entry regression fails before this fix and passes with its pending prayer duty and complete admitted passport intact.
+
+The later actual Commonstead controls continue the receiving game through Wait60minutes, Next day, Wait30minutes and Pause. Every boundary restores byte-exactly; final native HF and complete game replays match. These receipts supersede the earlier admission-only hashes for the final host candidate.
+
+Nora: receiving day2, 4 commands, 1,519,202 saved characters; full hash `cf30f337a3948782967937bd8b37aaacdce25017b4483e67b2ffcaa137c8d35a`.
+
+Sam: receiving day2, 4 commands, 1,523,386 saved characters; full hash `b807b15c576b25a66f308fc4cf719e3ef7b90eae6941ba78b2522ab8ccfdbb74`.
+
+## Published 4.7.0 phase
+
+The installation receipt verifies the 4.7.0, client 0.5.3 and kit 0.5.21 dependency pins and release artifact integrity. Forty focused gameplay, carryover, narration and continuity tests pass on 4.7. Public belief inspections now expose credence; the host cache uses the exported BeliefReading type and does not recreate internal log odds. The exact ordinary-save SHA256 is `60f412524b4f207cb144a3b2480fe66dbc72d460d87a6499eea36196b32e1ee8`; the lesson native full hash is `b65d2641cbdc0256583d9e9a989f0d3cb1f769f91b48941b835747ec477c912c`. Both exact assertions remain.
+
+Actual Commonstead source `69370bf49cdcfbfe5e77c55a4cb3deb7fb8433ec` used installed HF4.6.0. Nora and Sam each carried all88 episodes at tick1800 into the4.7 receiver. Wait60minutes, Next day, Wait30minutes and Pause passed byte-exact restoration at every boundary, final native replay and complete game replay. Nora’s final full hash is `2a8f14017045226b3aba2fbc89976b29b20234a5ce1f1f5e42450bc2fd566101`; Sam’s is `8a4e2b165a1278e188cb70596d8d0fe96b377fc49dc423cf00c2f5441318c530`. The same-game played Nora control retained20episodes through receiving next day and passed save/native/game replay, full hash `9184e413179163c3a8a2d9f3484d61908d8b7c9cdb492a13a89ed219f998d025`.
+
+The4.7 browser build passed360×690 and1280×800 with no horizontal overflow. Start, Carry09:00→09:15, ordinary menu download, file chooser cancellation, actual isolated file import/Resume09:15 and return to native Resume09:15 passed. The actual downloaded save replayed completely and restored byte-exactly at369,393characters, native full hash `a71ec014ec2c8154c143b13c1dba85b84c4039432fc344c8c760f3768723c8e9`. These engineering controls do not establish player acceptance. The final normal lane passed372tests across59files in706.10seconds, plus lint, typecheck and production build.274 lint warnings and the bundle-size warning remain. Signed delivery, exact CI, merge and live verification remain. Earlier results and hashes remain evidence for their original pins.

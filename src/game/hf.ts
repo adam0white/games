@@ -3,6 +3,7 @@ import {
   type ActionRequest,
   type ActionResolution,
   createPerson as authorPerson,
+  type BeliefReading,
   createRun,
   DEFAULT_NORMS,
   exportRun,
@@ -94,7 +95,7 @@ export interface Person {
   activity: Activity | null;
   social: { relationships: Actor['social']['relationships'] };
   skills: Actor['skills'];
-  memory: { beliefs: Actor['memory']['beliefs']; sourceTrust: Actor['memory']['sourceTrust'] };
+  memory: { beliefs: readonly BeliefReading[]; sourceTrust: Actor['memory']['sourceTrust'] };
 }
 interface HostAction {
   id: string;
@@ -552,7 +553,7 @@ export function attachWorkshop(state: {
     !Number.isSafeInteger(data.nextInput) ||
     data.nextInput < 1 ||
     !record(data.archive) ||
-    data.archive.engine.package !== '@adam0white/human-framework@4.6.0' ||
+    data.archive.engine.package !== '@adam0white/human-framework@4.7.0' ||
     !record(data.active) ||
     !record(data.offers) ||
     !record(data.revisions) ||
@@ -1268,7 +1269,7 @@ export function admitOpeningPerson(p: Person, portable: PortableAdmission): Pers
       });
   // Commonstead's literal action vocabulary stays available to retained
   // memories and duties. Historical actions do not create workshop offers.
-  if (passport.source.game === 'commonstead') {
+  if (passport.source.game === 'commonstead' || passport.source.game === 'repair') {
     const historical = [
       'wait',
       'rest',
@@ -1293,7 +1294,13 @@ export function admitOpeningPerson(p: Person, portable: PortableAdmission): Pers
     spec.definitions.actions = [
       ...spec.definitions.actions,
       ...historical
-        .filter((id) => !spec.definitions.actions.some((a) => a.id === id))
+        .filter(
+          (id) =>
+            !spec.definitions.actions.some((a) => a.id === id) &&
+            portable.mapping.references.some(
+              (binding) => binding.kind === 'action' && binding.target === id,
+            ),
+        )
         .map((id) => ({
           id,
           label: id === 'pray' ? 'Pray' : id,

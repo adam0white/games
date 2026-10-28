@@ -20,16 +20,16 @@ import {
   workshopTransfer,
 } from '../src/game/cast';
 import { createGame, dispatch } from '../src/game/engine';
-import { createPeopleRuntime, createPerson, snapshotRuntime } from '../src/game/hf';
+import { createPeopleRuntime, createPerson, promise, snapshotRuntime } from '../src/game/hf';
 import { loadGame, saveGame } from '../src/game/persistence';
 import { replayRecordedRun } from '../src/game/replay';
 
-const stamps = { game: 'repair', build: 'test', engine: '4.6.0', rules: 'canonical-workshop-2' };
+const stamps = { game: 'repair', build: 'test', engine: '4.7.0', rules: 'canonical-workshop-2' };
 // Explicit public authoring makes a distinct source. No cache edit changes an HF actor.
-async function source(id: 'nora' | 'rafi') {
+async function source(id: 'nora' | 'rafi', prayer = false) {
   const castId = CAST_IDS[id]!;
   const cast = canonicalCast(castId);
-  const people = createPeopleRuntime(17, 540, ['rest']);
+  const people = createPeopleRuntime(17, 540, prayer ? ['rest', 'pray'] : ['rest']);
   const person = createPerson(people, {
     id,
     name: cast.name,
@@ -39,6 +39,15 @@ async function source(id: 'nora' | 'rafi') {
     traits: { honesty: 0.91 },
     body: { fitness: 0.37 },
   });
+  if (prayer)
+    promise(person, {
+      kind: 'worship',
+      actions: ['pray'],
+      from: 540,
+      until: 600,
+      importance: 1,
+      label: 'A retained prayer duty',
+    });
   const { transfer, limitations } = await workshopTransfer(person);
   const native = replay(snapshotRuntime(people).archive);
   expect(native.ok).toBe(true);
@@ -174,4 +183,25 @@ describe('released HF4 whole-cast workshop adapter', () => {
     const child = await createPersona({ ...body, parentRevision: revision, source: stamps });
     expect(() => acceptPersona(closed, child)).toThrow();
   });
+});
+
+it('keeps historical worship actions on workshop re-entry', async () => {
+  const parent = await source('nora', true);
+  const input = preparePersonaLife(parent, 0);
+  const base = createGame(42);
+  admitWorkshop(input, base.people.nora!);
+  const archive = snapshotRuntime(base.people).archive;
+  expect(archive.initial.spec.definitions.actions.some((action) => action.id === 'pray')).toBe(
+    true,
+  );
+  expect(archive.initial.people.find((person) => person.id === 'nora')?.portable?.person).toEqual(
+    parent.transfer.person,
+  );
+  expect(
+    base.people.nora?.agenda.commitments.some(
+      (duty) => duty.actions.includes('pray') && duty.status === 'pending',
+    ),
+  ).toBe(true);
+  const exact = replay(archive);
+  expect(exact.ok && exact.value.verified).toBe(true);
 });

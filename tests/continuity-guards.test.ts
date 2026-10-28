@@ -85,7 +85,7 @@ async function ownNoraSource() {
     castRevision: real.canonicalCast(castId).revision,
     branchId,
     parentRevision: null,
-    source: { game: 'repair', build: 'test', engine: '4.6.0', rules: 'canonical-workshop-2' },
+    source: { game: 'repair', build: 'test', engine: '4.7.0', rules: 'canonical-workshop-2' },
     transfer: { ...projected.transfer, life: real.initialPersonaLife(castId, branchId, 0) },
     limitations: projected.limitations,
   });
@@ -375,7 +375,7 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
     const claim = await real.createPersona({
       ...body,
       parentRevision: revision,
-      source: { game: 'repair', build: 'test', engine: '4.6.0', rules: 'canonical-workshop-2' },
+      source: { game: 'repair', build: 'test', engine: '4.7.0', rules: 'canonical-workshop-2' },
       transfer: { ...parent.transfer, life: input.life },
     });
     const file = createGame(42, 'current', people, {
@@ -428,7 +428,7 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
       castRevision: '1',
       branchId: 'test',
       parentRevision: null,
-      source: { game: 'repair', engine: '4.6.0', rules: 'test', build: 'test' },
+      source: { game: 'repair', engine: '4.7.0', rules: 'test', build: 'test' },
       transfer: {},
       limitations: [],
     });
