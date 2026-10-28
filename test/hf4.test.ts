@@ -6,7 +6,7 @@ import { Hf4Mind } from '../src/minds/hf4.ts';
 import random from '../src/minds/random.ts';
 import { runIsland } from '../src/run.ts';
 import { PERSONA } from '../src/types.ts';
-import { createWorld, observe } from '../src/world.ts';
+import { apply, createWorld, observe } from '../src/world.ts';
 
 const options = { seed: 1, persona: PERSONA };
 describe('published HF4 observation-only host', () => {
@@ -32,6 +32,31 @@ describe('published HF4 observation-only host', () => {
     world.carrying = null;
     world.objects[0] = { id: 'cube-1', kind: 'cube', at: { ...world.spire }, level: 0 };
     expect(mind.offers(observe(world)).find((o) => o.id === 'pick cube-1')?.diminishes).toHaveLength(1);
+  });
+  it('does not turn an unseen Spire stack into zero observed progress', () => {
+    const world = createWorld(1);
+    world.objects = [{ id: 'cube-1', kind: 'cube', at: { ...world.spire }, level: 0 }];
+    world.me = { x: world.spire.x + 5, y: world.spire.y };
+    const mind = new Hf4Mind(options);
+    const unseen = mind.prospects(observe(world)).find((p) => p.label === 'a pile on the Spire');
+    expect(unseen).toBeDefined();
+    expect(unseen?.progress).toBeUndefined();
+    const restOnly = observe(world);
+    restOnly.actions = restOnly.actions.filter((a) => a.id === 'rest');
+    mind.step(restOnly);
+    mind.endEpisode({ ...observe(apply(world, 'rest').state), stepsLeft: 0 });
+    const outcomes = mind
+      .archive()
+      .history.flatMap((t) => t.inputs)
+      .flatMap((i) => (i.kind === 'action.resolved' && i.payload.outcome ? [i.payload.outcome] : []));
+    expect(outcomes[0]?.actual.observedProgress).toEqual([]);
+    const looked = mind
+      .prospects(observe(apply(world, 'look').state))
+      .find((p) => p.label === 'a pile on the Spire');
+    expect(looked?.progress).toBe(0.1);
+    world.me = { ...world.spire };
+    world.objects = [];
+    expect(mind.prospects(observe(world)).find((p) => p.label === 'a pile on the Spire')?.progress).toBe(0);
   });
   it('settles every action once and preserves exact physical and HF archive replay across resets', async () => {
     const mind = new Hf4Mind(options);

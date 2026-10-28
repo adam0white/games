@@ -24,7 +24,7 @@ PATH=/opt/homebrew/bin:$PATH npm run check:lane
 
 Walk, jump, pick, place, throw, rest and look have distinct action semantics, target identities and relative places. The body tracks its own legal moves from the reset origin. At each decision, visible objects, observation text and actual events enter the public percept channel. The closing action also returns its outcome summary and observed progress before an episode reset. The full text is context; the adapter also supplies object identities/locations as structured percepts. Throw offers use the launch/adjacent direction as a prior, never a predicted landing. Observed throw events remain evidence rather than a hidden physics model.
 
-As in the historical HF5 host, visible Spire and ring cells supply `arrange` prospects. Their materials are only visible/carried cubes; observed progress is visible cubes on the cell divided by the authored ten-cube target, bounded to [0,1]. Placement offers advance a matching prospect; picking from its cell diminishes it. Outcome progress is reported from current sight, including losses of progress. The same prospects and offers apply in free and task time. HF owns project adoption, abandonment, persistence and choice. Only the stated task introduces an explicit goal; only a completed cube placement on the observed Spire has its endpoint action. Picks, moves and throws receive no task progress.
+As in the historical HF5 host, the observed Spire landmark and visible ring cells supply `arrange` prospects. Their materials are only visible/carried cubes; observed progress is visible cubes on the cell divided by the authored ten-cube target, bounded to [0,1]. The landmark remains visible from anywhere, but its contents are unknown outside ordinary object sight (radius 4, or radius 7 after the observed look result). Such prospects omit progress, and outcomes omit observedProgress for them; leaving sight never asserts zero contents. Placement offers advance a matching prospect; picking from its cell diminishes it. Outcome progress is reported from current sight, including losses of progress. The same prospects and offers apply in free and task time. HF owns project adoption, abandonment, persistence and choice. Only the stated task introduces an explicit goal; only a completed cube placement on the observed Spire has its endpoint action. Picks, moves and throws receive no task progress.
 
 The public package exports no authoring helper. `hf4-authoring.ts` adapts the explicit HF4 minimal example: adult male, healthy body, no norms/skills/relationships, otherwise the example's engineering priors, with openness/stimulation 0.9 to express the shared curious persona. HF4's default will and all faculties remain on. There are no legacy enable switches or mutable-person calls. There are no supplied food/drink actions; bodily drift can affect choices.
 
@@ -38,7 +38,7 @@ This adapter supplies neither remembered-target navigation nor received successo
 
 ## Results
 
-Registry latest was **4.5.1** at batch start `2026-10-28T05:46:31.220Z`; batch finished `2026-10-28T05:49:14.149Z` (machine ISO timestamps). All ten seeds adopted one free-time arrangement project. All ten reached zero project progress, placed zero free-time Spire objects, showed zero repeated pursuit and finished the task with zero Spire cubes. These runs do not demonstrate project completion or the efficacy of undo protection/net-credit.
+Registry latest was **4.5.1** at batch start `2026-10-28T05:55:23.450Z`; batch finished `2026-10-28T05:58:09.242Z` (machine ISO timestamps). All ten seeds adopted one free-time arrangement project. All ten reached zero project progress, placed zero free-time Spire objects, showed zero repeated pursuit and finished the task with zero Spire cubes. These runs do not demonstrate project completion or the efficacy of undo protection/net-credit.
 
 | Seed | Cells | Kind entropy | Manipulation share | Idle share | Free Spire objects | Free tallest stack | Repeated pursuit | Task cubes | Project adoptions | Max project progress |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -81,16 +81,16 @@ All 2,400 HF4 actions and 2,400 random-control actions physically replayed with 
 
 | Seed | Recording SHA-256 (compact JSON) | HF archive full hash |
 |---|---|---|
-| 1 | `58b9fcf86894f327b32f962a1be28cf92f9a8f8bd56b3fd80ae48fb27f32be0d` | `20ffc21f3c3eb7b8879d8194976404d842923f8f8863993459a2a5de27549047` |
-| 2 | `12a112d08b622e6c6fe0a9b3c3785c2ee74182bc931fb49d8f2b65a424fad5f3` | `b40e8b9e4bc5cf00df489a92914e4e69636ceb8ff2812c7c577fb33b56d8f0f8` |
-| 3 | `ed56eeb658f8fcf3c0ea8eef58e2b0e59da50561720aec5ffb3f21a32ccdb987` | `a3f6d5de21b7d3492db614508abb65884a2b297901b177544b869d54da7ba9a1` |
-| 4 | `1f1cc4625740f7a182a980e9cd334908a10f2f13e5ebbfecf0c960c448d0bd0d` | `1bc3c5ec2472a3579d4745d4d342e597809a00feba172916831116d4e8b1598e` |
-| 5 | `30055a4903588c6524472ae8194162a02c9695481fa7a4d677cb2e63b8891106` | `01dd3cca1da58a47e223611de5fd6ee74a997ea29fb0baae13981f012057408c` |
-| 6 | `5ab6185ab9471323c8b0c4e64a7dad13c08b4cc82816a0bc00710e3aaed3416f` | `4e0b2888e1452dcc5b72a6df05e4f0eb153e0e5fcb992b8a7db9b19b000138ef` |
-| 7 | `6841474004721faeb57c7371a754a8ba4a4e1f4a4756897d95fa81634335bcb1` | `7fc03d99b17cd608f01e61f5eb65ebedb26c6566243a7f291a7203de527dfc4c` |
-| 8 | `c523a6ca51a8bab0180214925c4a79d68901a04dc9af548685572d23e86af656` | `30e462560281f046a8c59fb54aa40c180015a9365cb04be9c98c5b207a88ce22` |
-| 9 | `445c369fc06d4d2e8097532c4c9a98abd407a447d7da7a06755453f972bd04bd` | `9ee17bde65568b2a0ccb72a0749cdd5ce808583b4a8489f8e12d3920827ceb5d` |
-| 10 | `50548de2fef46a436c9bd9b504b5df66444932f9f3ce396e11153940e0c0b139` | `dff5baf64cbeda2cb3a0f0d5317946504817dec9bfa78dc06dcb91e4afda8559` |
+| 1 | `58b9fcf86894f327b32f962a1be28cf92f9a8f8bd56b3fd80ae48fb27f32be0d` | `1ad5ddcf8f7ab558796fa412d0b1d8c66d742a25acd853c7aa6fcb3af3e2a845` |
+| 2 | `12a112d08b622e6c6fe0a9b3c3785c2ee74182bc931fb49d8f2b65a424fad5f3` | `5840ca8787c088da77a3448c6d220ee9b63d916d873f5cdae9fee68ed2b55857` |
+| 3 | `ed56eeb658f8fcf3c0ea8eef58e2b0e59da50561720aec5ffb3f21a32ccdb987` | `a09553d83debe544d0915e841fec60d33f17c0aa3b612e45ab6e03352ebd053e` |
+| 4 | `1f1cc4625740f7a182a980e9cd334908a10f2f13e5ebbfecf0c960c448d0bd0d` | `b7307bc48e1c347fa6bc7eed41940e01850737a9fc202469e8e17e8d1390ddce` |
+| 5 | `30055a4903588c6524472ae8194162a02c9695481fa7a4d677cb2e63b8891106` | `552cda4a962e44a867a50632f19211eb9dc752eee02cf32847cc8d628d72296f` |
+| 6 | `5ab6185ab9471323c8b0c4e64a7dad13c08b4cc82816a0bc00710e3aaed3416f` | `f4e832839cc904c614bbacabe71764c97a1d14cd02936d12691178d0dedae62c` |
+| 7 | `6841474004721faeb57c7371a754a8ba4a4e1f4a4756897d95fa81634335bcb1` | `47e83e2fedb801af1a76935c155eea5219872cb626f8fb4a61a5820c55471918` |
+| 8 | `c523a6ca51a8bab0180214925c4a79d68901a04dc9af548685572d23e86af656` | `5b63ba6445014ed3de2c4ed28998ca94cdaa87cebae58883daf2d84623bfd178` |
+| 9 | `445c369fc06d4d2e8097532c4c9a98abd407a447d7da7a06755453f972bd04bd` | `ff046196a7d57d4c15dbb0815634cf29a626550e42e1459b3b406a85bcb4b176` |
+| 10 | `50548de2fef46a436c9bd9b504b5df66444932f9f3ce396e11153940e0c0b139` | `01c27c5cc17414093727e3a911ae07c32a3dedf59b28c501431f20c533a6c1e0` |
 
 Seed-1 independent repeat recording hash is `58b9fcf86894f327b32f962a1be28cf92f9a8f8bd56b3fd80ae48fb27f32be0d`. The old adapters, 83 retained viewer recordings and fixture bytes remain unchanged; the existing legacy replay-hash test remains. The batch stores only new evidence in `/Users/abdul/code/.lab-scratch/codex/island-rerun`. No dev server or browser was started.
 
@@ -100,4 +100,6 @@ The initial statistics postprocessor read missing extra metrics from legacy-shap
 PATH=/opt/homebrew/bin:$PATH npm run rerun:hf4 -- /Users/abdul/code/.lab-scratch/codex/island-rerun --summarize
 ```
 
-Focused tests: 4 passed. Full check and hosted-review outcome are recorded in the PR and coordinator report. No app deploy or `/release.json` gate applies to this CLI repository.
+Focused tests: 5 passed. Full check and hosted-review outcome are recorded in the PR and coordinator report. No app deploy or `/release.json` gate applies to this CLI repository.
+
+The one hosted Codex review found P2: the global Spire landmark had been mistaken for observed contents outside object sight. The fix omits unknown prospect progress and corresponding outcome progress. The corrected ten-seed batch above supersedes the initial batch (`2026-10-28T05:46:31.220Z`–`2026-10-28T05:49:14.149Z`), retained at `/Users/abdul/code/.lab-scratch/codex/island-rerun-initial/summary.json` with its original recording/archive hashes. Every recording hash and reported statistic stayed unchanged; every HF archive hash changed because the corrected input logs omit false zero evidence. The superseded seed-1 archive hash was `20ffc21f3c3eb7b8879d8194976404d842923f8f8863993459a2a5de27549047`. The new sight-boundary regression verifies unknown at distance 5, observed 0.1 after look, observed zero at an empty nearby cell, and omission from actual outcome progress. No second review was requested.

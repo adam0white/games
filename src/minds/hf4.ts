@@ -156,7 +156,7 @@ export class Hf4Mind implements Mind {
       };
     });
   }
-  private prospects(obs: Observation) {
+  prospects(obs: Observation) {
     const places = [
       ...(obs.seen.spire ? [{ id: 'Spire', dx: obs.seen.spire.dx, dy: obs.seen.spire.dy }] : []),
       ...obs.seen.things.filter((t) => t.kind === 'ring'),
@@ -170,10 +170,16 @@ export class Hf4Mind implements Mind {
         ...obs.seen.things.filter((o) => o.kind === 'cube').map((o) => o.id),
         ...(obs.seen.carrying?.startsWith('cube-') ? [obs.seen.carrying] : []),
       ],
-      progress: Math.min(
-        1,
-        obs.seen.things.filter((o) => o.kind === 'cube' && o.dx === t.dx && o.dy === t.dy).length / 10,
-      ),
+      // The landmark offset is global; object contents have ordinary radius 4,
+      // extended to 7 only by the observed result of this body's last look.
+      ...(Math.abs(t.dx) + Math.abs(t.dy) <= (obs.events.includes('You look farther around.') ? 7 : 4)
+        ? {
+            progress: Math.min(
+              1,
+              obs.seen.things.filter((o) => o.kind === 'cube' && o.dx === t.dx && o.dy === t.dy).length / 10,
+            ),
+          }
+        : {}),
     }));
   }
   private percepts(obs: Observation): PerceptData[] {
@@ -251,11 +257,17 @@ export class Hf4Mind implements Mind {
             ...(manipulation ? { competence: novel ? 0.01 : 0.002 } : {}),
           },
           exposures: [],
-          observedProgress: this.prospects(obs).map((p) => ({
-            prospectId: p.id,
-            progress: p.progress,
-            evidenceId: `progress:${r.id}:${p.id}`,
-          })),
+          observedProgress: this.prospects(obs).flatMap((p) =>
+            p.progress === undefined
+              ? []
+              : [
+                  {
+                    prospectId: p.id,
+                    progress: p.progress,
+                    evidenceId: `progress:${r.id}:${p.id}`,
+                  },
+                ],
+          ),
         },
         fulfills: [],
         advances: o.advances,
