@@ -27,6 +27,7 @@ import {
 } from './community';
 import { evidenceContext } from './evidence-context';
 import { helpFeedback } from './help-feedback';
+import { methodBlock, methodReport, methodResponse } from './method-response';
 import {
   calibrate,
   compatiblePart,
@@ -2045,6 +2046,14 @@ export function dispatch(state: GameState, command: Command): CommandResult {
         // Preserve the explicit owner-question activation when the existing recording reaches its cap.
         for (const receipt of s.ownerExchanges ?? [])
           receipt.recordingClosedAtInput = MAX_RECORDED_INPUTS;
+        for (const receipt of s.methodResponses ?? [])
+          receipt.recordingClosedAtInput = MAX_RECORDED_INPUTS;
+        const methodReceipt = s.methodResponses?.[0];
+        if (methodReceipt)
+          methodReceipt.recordingClosure = {
+            inputs: structuredClone(s.inputs),
+            command: structuredClone(command),
+          };
         delete s.inputs;
       } else s.inputs.push(structuredClone(command));
     }
@@ -2184,6 +2193,93 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       log(s, 'Workshop', 'The same saved chapter resumes. It does not load newer browser history.');
       return done('The chapter has resumed.');
 
+    case 'discuss-repair-method': {
+      const block = methodBlock(s, command);
+      if (block) return fail(block);
+      if (!job) return fail('Select the object.');
+      const owner = s.people[command.ownerId];
+      const report = methodReport(s, job.id, command.componentId);
+      if (!owner || !report) return fail('No owner or recorded work is available.');
+      const at = s.now;
+      perceive(owner, [
+        {
+          at,
+          channel: 'social',
+          kind: 'repair-method-shown',
+          actorId: 'player',
+          targetId: job.id,
+          summary: `Original request: ${job.description}. Performed record: ${report.work.map((w) => `${w.actorId} ${w.action}`).join('; ')}. Tests: ${report.evidence
+            .filter((e) => e.kind === 'use')
+            .map((e) => e.summary)
+            .join(' ')}`,
+          salience: 0.7,
+          valence: 0,
+        },
+      ]);
+      const existing = s.npcWork.find((w) => w.personId === owner.id);
+      const options: WorkOption[] = [
+        {
+          id: 'method-discussion',
+          action: 'discuss-method',
+          label: `hear the performed work and tests on ${job.title}`,
+          duration: 5,
+          effort: 0.02,
+        },
+        existing?.option ?? {
+          id: 'method-refuse',
+          action: 'personal',
+          label: 'keep my own plans',
+          duration: 5,
+          effort: 0,
+        },
+      ];
+      const decision = chooseActivity(
+        owner,
+        job.id,
+        {},
+        options,
+        at,
+        playerAsk('method-discussion', 0.4),
+      );
+      const attended =
+        decision.chosenId === 'method-discussion' && decision.answer?.verdict === 'assented';
+      if (attended) {
+        if (existing) {
+          finishActivity(owner, existing.option, false, at);
+          s.npcWork = s.npcWork.filter((w) => w !== existing);
+        }
+        const option = options[0];
+        if (!option || !startActivity(owner, option, at))
+          return fail('The owner could not set aside those five minutes.');
+        s.npcWork.push({ personId: owner.id, option, startedAt: at, endsAt: at + 5 });
+      }
+      const response = methodResponse({ report, originalRequest: job.description, attended });
+      log(
+        s,
+        'You',
+        `May we discuss the recorded work and tests on ${job.title}, including the ${command.componentId}?`,
+      );
+      advance(s, 5);
+      log(s, owner.name, response);
+      s.methodResponses ??= [];
+      s.methodResponses.push({
+        edition: 'repair-method-response@1',
+        activation: { index: s.inputs?.length ?? 0, command: structuredClone(command) },
+        jobId: job.id,
+        ownerId: owner.id,
+        componentId: command.componentId,
+        askedAt: at,
+        answeredAt: at + 5,
+        originalRequest: job.description,
+        report,
+        attended,
+        decision,
+        response,
+      });
+      return done(
+        `${response} The exchange took five minutes. Physical work and return remain separate.`,
+      );
+    }
     case 'ask-owner-about-object': {
       const block = ownerQuestionBlock(s, command);
       if (block) return fail(block);

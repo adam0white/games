@@ -4,6 +4,7 @@ import { CommunityPanel } from './components/CommunityPanel';
 import { CommunityScene } from './components/CommunityScene';
 import { FirstRepairGuide } from './components/FirstRepairGuide';
 import { LessonControl } from './components/LessonControl';
+import { MethodResponse } from './components/MethodResponse';
 import { ObjectOwnerExchange } from './components/ObjectOwnerExchange';
 import { PersonalReply } from './components/PersonalReply';
 import { PhysicalObjectScene } from './components/PhysicalObjectScene';
@@ -1513,12 +1514,26 @@ function Workshop({
                   )}
 
                   {job.status === 'delivered' ? (
-                    <ReturnReceipt
-                      job={job}
-                      people={state.people}
-                      onNext={() => setView('board')}
-                      nextLabel="To the board"
-                    />
+                    <>
+                      <ReturnReceipt
+                        job={job}
+                        people={state.people}
+                        onNext={() => setView('board')}
+                        nextLabel="To the board"
+                      />
+                      <MethodResponse
+                        state={state}
+                        jobId={job.id}
+                        componentId={
+                          job.contributions
+                            .findLast((w) => /^(clean|adjust|replace|calibrate):/.test(w.action))
+                            ?.action.split(':')[1] ??
+                          job.model.components[0]?.id ??
+                          ''
+                        }
+                        act={act}
+                      />
+                    </>
                   ) : (
                     <>
                       {!showTools && <div className="opening-quote">{job.description}</div>}
@@ -1774,12 +1789,20 @@ function Workshop({
                                 </div>
                                 <h2>{part?.label ?? 'Choose a part'}</h2>
                                 {part && (
-                                  <ObjectOwnerExchange
-                                    state={state}
-                                    jobId={job.id}
-                                    componentId={part.id}
-                                    act={act}
-                                  />
+                                  <>
+                                    <ObjectOwnerExchange
+                                      state={state}
+                                      jobId={job.id}
+                                      componentId={part.id}
+                                      act={act}
+                                    />
+                                    <MethodResponse
+                                      state={state}
+                                      jobId={job.id}
+                                      componentId={part.id}
+                                      act={act}
+                                    />
+                                  </>
                                 )}
                                 {state.watching &&
                                   part &&
