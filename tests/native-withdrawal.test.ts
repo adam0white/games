@@ -1,10 +1,11 @@
-import { AGENDA_DEFAULTS, abandonGoal, adoptGoal } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
+import { abandonGoal, adoptGoal } from '../src/game/hf';
 import { chooseActivity, promiseJob, startActivity } from '../src/game/people';
 import { replayRecordedRun } from '../src/game/replay';
 import { adoptResponsibility } from '../src/game/responsibility';
 import type { Command, GameState, WorkOption } from '../src/game/types';
+import { maxClosedGoals, native, nativeOf } from './hf-fixture';
 
 function act(state: GameState, command: Command): GameState {
   const result = dispatch(state, command);
@@ -35,7 +36,7 @@ describe('native responsibility withdrawal', () => {
     expect(state.jobs.find((job) => job.id === jobId)?.responsibility?.goalId).toBe(goalId);
     const person = state.people.sam;
     if (!person) throw new Error('Missing learner');
-    for (let index = 0; index <= AGENDA_DEFAULTS.maxClosedGoals; index++) {
+    for (let index = 0; index <= maxClosedGoals(person); index++) {
       const goal = adoptGoal(
         person,
         {

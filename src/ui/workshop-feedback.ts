@@ -1,4 +1,4 @@
-import type { Person } from '@adam0white/human-framework';
+import type { Person } from '../game/hf';
 import { playerWordReading } from '../game/people';
 import type { Command, CommandResult, GameState, Job } from '../game/types';
 

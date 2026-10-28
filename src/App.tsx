@@ -55,6 +55,7 @@ import {
   latestRecoveryAccount,
   ownerPromiseAccount,
 } from './ui/workshop-feedback';
+import { readWorkshopSave } from './workshop-storage';
 import './styles.css';
 import './focused-layout.css';
 import './meter-layout.css';
@@ -91,7 +92,7 @@ function freshSeed(): number {
 let initialLoadFailed = false;
 function initial(): GameState {
   try {
-    const saved = localStorage.getItem(SAVE_KEY);
+    const saved = readWorkshopSave(SAVE_KEY);
     if (saved) return continuity.loadLocal(saved);
   } catch {
     initialLoadFailed = true;
@@ -476,6 +477,7 @@ function Workshop({
   const [, refreshContinuity] = useState(0);
   const [entering, setEntering] = useState(false);
   const [debugError, setDebugError] = useState('');
+  const [saveError, setSaveError] = useState('');
   const [entryError, setEntryError] = useState(() =>
     initialLoadFailed ? damagedWorkshopMessage : '',
   );
@@ -565,7 +567,7 @@ function Workshop({
   const [newConfirmed, setNewConfirmed] = useState(false);
   const [seedText, setSeedText] = useState(String(state.seed + 1));
   const [hasSave, setHasSave] = useState(
-    () => continuity.fileSession || Boolean(localStorage.getItem(SAVE_KEY)),
+    () => continuity.fileSession || Boolean(readWorkshopSave(SAVE_KEY)),
   );
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
@@ -625,7 +627,7 @@ function Workshop({
         // The first autosave can precede the shared identity bridge. Recapture
         // the actual stored save after identity settles, without blocking runs.
         try {
-          const saved = !continuity.fileSession && localStorage.getItem(SAVE_KEY);
+          const saved = !continuity.fileSession && readWorkshopSave(SAVE_KEY);
           if (saved) lab.captureSave(JSON.parse(saveGame(stateRef.current)));
         } catch {}
         return JSON.parse(saveGame(stateRef.current));
@@ -694,7 +696,20 @@ function Workshop({
         refreshContinuity((n) => n + 1);
       });
     }
-    continuity.persist(state);
+    let current = true;
+    void continuity.persist(state).then(
+      () => {
+        if (current) setSaveError('');
+      },
+      (error) => {
+        if (!current) return;
+        setSaveError('This workshop could not be saved. Download a copy before leaving.');
+        setDebugError(error instanceof Error ? error.message : String(error));
+      },
+    );
+    return () => {
+      current = false;
+    };
   }, [state]);
   useEffect(() => {
     if (!job?.id) return;
@@ -1052,7 +1067,7 @@ function Workshop({
     setEntryError('');
     try {
       await continuity.depart();
-      const saved = localStorage.getItem(OUTCOME_LOCAL_KEY);
+      const saved = readWorkshopSave(OUTCOME_LOCAL_KEY);
       if (saved) {
         const restored = continuity.loadLocal(saved);
         if (!restored.castOutcomes) throw new Error('This is not the cast-outcome chapter.');
@@ -1329,6 +1344,19 @@ function Workshop({
           </button>
         </div>
       </header>
+      {continuity.historyNotice && (
+        <p role="status" className="entry-error">
+          {continuity.historyNotice}
+        </p>
+      )}
+      {saveError && (
+        <aside className="entry-error" role="alert">
+          <p>{saveError}</p>
+          <button type="button" onClick={exportSave}>
+            Download this run
+          </button>
+        </aside>
+      )}
       {screen === 'title' && (
         <main className="title-page">
           <div className="title-art">

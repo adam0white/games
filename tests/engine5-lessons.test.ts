@@ -35,29 +35,20 @@ describe('engine 5: surfaced promises', () => {
     expect(saveGame(loadGame(saveGame(state)))).toBe(saveGame(state));
   });
 
-  it('engine-4 worlds never hear these lines', () => {
-    let state = createGame(416, 'legacy');
-    const job = state.jobs.find(
-      (j) => !j.isDonor && !j.isPersonal && ['offer', 'active'].includes(j.status),
-    );
-    if (!job) throw new Error('No opening object');
-    if (job.status === 'offer') state = dispatch(state, { type: 'accept', jobId: job.id }).state;
-    for (let d = 0; d < 4; d++) state = dispatch(state, { type: 'next-day' }).state;
-    expect(lines(state, 'I’m still waiting')).toHaveLength(0);
-    expect(lines(state, 'shop in town')).toHaveLength(0);
-    expect(lines(state, 'a day past what you said')).toHaveLength(0);
+  it('refuses the historical engine-4 edition instead of replacing its people', () => {
+    expect(() => createGame(416, 'legacy')).toThrow('fresh HF4');
   });
 
   it('a donor part that looks present costs the attempt before it is known to be unusable', () => {
-    for (const rules of ['current', 'legacy'] as const) {
+    {
+      const rules = 'current' as const;
       let state = createGame(416, rules);
       const donor = state.jobs.find((j) => j.isDonor);
       const open = donor?.model.components.find((c) => c.condition === 'open');
       if (!donor || !open) throw new Error('Missing donor part');
       const before = state.now;
       const first = dispatch(state, { type: 'salvage', jobId: donor.id, componentId: open.id });
-      expect(first.ok).toBe(rules === 'current');
-      if (rules === 'legacy') continue;
+      expect(first.ok).toBe(true);
       state = first.state;
       expect(state.now).toBeGreaterThan(before);
       expect(lines(state, 'is not usable')).toHaveLength(1);

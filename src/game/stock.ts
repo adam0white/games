@@ -1,4 +1,4 @@
-import type { ComponentKind, GameState, NpcWork } from './types';
+import type { ComponentKind, GameState, NpcWork } from './types.ts';
 
 /** Recovered stock is a subset of total stock, never extra inventory. Legacy worlds keep their old pool. */
 export function stockCount(s: GameState, part: ComponentKind, source: 'new' | 'recovered'): number {

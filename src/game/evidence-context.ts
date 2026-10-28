@@ -1,4 +1,4 @@
-import type { Evidence, Job, TestCondition } from './types';
+import type { Evidence, Job, TestCondition } from './types.ts';
 
 const conditions: TestCondition[] = ['bench', 'movement', 'load'];
 

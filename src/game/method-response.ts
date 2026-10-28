@@ -1,8 +1,9 @@
-import { admissionFacts } from './cast';
-import { dispatch } from './engine';
-import { isInputRecording, isRecordedCommand, MAX_RECORDED_INPUTS } from './recording';
-import { replayRecordedRun } from './replay';
-import type { Command, Evidence, GameState, Job, PersonChoice } from './types';
+import { admissionFacts } from './cast.ts';
+import { dispatch } from './engine.ts';
+import { matchesJson } from './json-data.ts';
+import { isInputRecording, isRecordedCommand, MAX_RECORDED_INPUTS } from './recording.ts';
+import { replayRecordedRun } from './replay.ts';
+import type { Command, Evidence, GameState, Job, PersonChoice } from './types.ts';
 
 type Question = Extract<Command, { type: 'discuss-repair-method' }>;
 type Work = Job['contributions'][number];
@@ -121,7 +122,7 @@ export function methodBlock(s: GameState, q: Question): string | undefined {
   const r = methodReport(s, j.id, q.componentId);
   if (
     !r ||
-    q.reportText !== JSON.stringify(r) ||
+    !matchesJson(q.reportText, r) ||
     q.reportText.length > 100_000 ||
     !r.work.some((w) => w.action.split(':')[1] === q.componentId) ||
     !r.evidence.some(

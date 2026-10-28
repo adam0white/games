@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { createGame, dispatch } from '../src/game/engine';
+import { createGame as createBaseGame, dispatch } from '../src/game/engine';
 import type { GameState } from '../src/game/types';
+import { readyToLearn } from './hf-fixture';
 
+function createGame(seed: number): GameState {
+  const state = createBaseGame(seed);
+  readyToLearn(state.people.sam!);
+  return state;
+}
 function attend(state: GameState): void {
-  const sam = state.people.sam;
-  if (!sam) throw new Error('Missing Sam');
-  for (const key of Object.keys(sam.needs)) sam.needs[key as keyof typeof sam.needs] = 1;
-  sam.needs.competence = 0;
-  sam.body.exertion = 0;
+  expect(state.watching).toBe(true);
 }
 
 describe('causal teaching and current checks', () => {

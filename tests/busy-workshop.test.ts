@@ -1,10 +1,17 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
-import { chooseActivity, finishActivity, startActivity, teachObserved } from '../src/game/people';
+import {
+  chooseActivity,
+  createPeople,
+  finishActivity,
+  startActivity,
+  teachObserved,
+} from '../src/game/people';
 import { replayRecordedRun } from '../src/game/replay';
 import { stockCount } from '../src/game/stock';
 import type { Command, GameState } from '../src/game/types';
+import { cloneGame } from './hf-fixture';
 import { acceptRepairOffer } from './repair-offer';
 
 function present<T>(value: T | undefined): T {
@@ -31,7 +38,7 @@ function busy(): GameState {
 }
 
 describe('opt-in busy workshop', () => {
-  it('preserves the exact ordinary continuation captured before scenario changes', () => {
+  it('pins the HF4 ordinary continuation independently of the busy scenario', () => {
     let state = createGame(416);
     for (const command of [
       { type: 'wait', minutes: 45 },
@@ -40,7 +47,7 @@ describe('opt-in busy workshop', () => {
     ] as Command[])
       state = act(state, command);
     expect(createHash('sha256').update(saveGame(state)).digest('hex')).toBe(
-      '5d6ce2b87670204ac72efed1df24f215d36a80f2f6d0f5dc080d0c4b1c4956e7',
+      '0478454617f13b4cd42293137e4f3a2bc9895ac741333f03eb7771f6a1948fde',
     );
   });
   it('turns accepting everything into a real stock/deadline choice, without changing ordinary play', () => {
@@ -216,8 +223,10 @@ describe('opt-in busy workshop', () => {
   });
   it('keeps a pending native repair off the occupied bench during player recovery, with a second-bench control', () => {
     let initial = busy();
+    // A controlled public opening isolates bench capacity from HF3's old rest timing.
+    initial.people = createPeople(initial.seed, initial.now);
+    initial.npcWork = [];
     const sam = present(initial.people.sam);
-    // Known-method fixture only. Assent, rest and physical choices remain actual HF decisions.
     teachObserved(
       sam,
       'prior',
@@ -227,6 +236,21 @@ describe('opt-in busy workshop', () => {
       'success',
       initial.now,
     );
+    const rest = {
+      id: 'capacity-rest',
+      action: 'rest',
+      label: 'Take a short break',
+      duration: 10,
+      effort: 0,
+    };
+    chooseActivity(sam, 'ordinary-day', {}, [rest], initial.now);
+    expect(startActivity(sam, rest, initial.now)).toBe(true);
+    initial.npcWork.push({
+      personId: sam.id,
+      option: rest,
+      startedAt: initial.now,
+      endsAt: initial.now + 10,
+    });
     const target = present(initial.jobs.find((j) => j.status === 'offer'));
     initial = act(initial, { type: 'accept', jobId: target.id });
     initial = act(initial, { type: 'assign', jobId: target.id, personId: 'sam' });
@@ -234,7 +258,7 @@ describe('opt-in busy workshop', () => {
     expect(initial.npcWork.find((w) => w.personId === 'sam')?.option.action).toBe('rest');
     expect(initial.npcWork.find((w) => w.personId === 'sam')?.endsAt).toBe(820);
     for (const secondBench of [false, true]) {
-      let state = structuredClone(initial);
+      let state = cloneGame(initial);
       // Physical-capacity fixture; it changes no HF state or decision.
       if (secondBench) state.upgrades.push('second-bench');
       state = act(state, {

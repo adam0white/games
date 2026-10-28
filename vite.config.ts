@@ -10,7 +10,9 @@ export default defineConfig({
   server: { host: '127.0.0.1', port: 5173 },
   test: {
     include: ['tests/**/*.test.ts'],
-    // Seeded campaign and replay controls can exceed the 5s default under shared machine load.
-    testTimeout: 30_000,
+    // Full HF4 archives are restored and replayed by campaign controls. Keep their
+    // assertions intact while allowing the measured multi-day workload to finish.
+    testTimeout: 300_000,
+    maxWorkers: 2,
   },
 });

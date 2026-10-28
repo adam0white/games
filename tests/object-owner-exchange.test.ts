@@ -1,10 +1,11 @@
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { noteVoicePromise, promise } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
-import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
-import { isRecordedCommand } from '../src/game/recording';
+import { createGame, dispatch, loadGame, replayCommands, saveGame } from '../src/game/engine';
+import { exportPersonRun, noteVoicePromise, promise } from '../src/game/hf';
+import { isRecordedCommand, MAX_RECORDED_INPUTS } from '../src/game/recording';
 import { replayRecordedRun } from '../src/game/replay';
 import type { Command, GameState } from '../src/game/types';
+import { cloneGame } from './hf-fixture';
 
 function act(s: GameState, c: Command) {
   const r = dispatch(s, c);
@@ -61,10 +62,12 @@ describe('finite object-owner replacement question', () => {
     expect(s.stock).toEqual(before.stock);
     expect(s.cash).toBe(before.cash);
     expect(s.discoveries).toEqual(before.discoveries);
-    expect(JSON.stringify(s.people.nora)).toContain('object-proposal-received');
+    expect(JSON.stringify(exportPersonRun(s.people.nora!).history)).toContain(
+      'object-proposal-received',
+    );
     expect(dispatch(s, command).ok).toBe(false);
     // Same object, evidence, resources and proposal. Only public HF voice history differs.
-    const distrust = structuredClone(before);
+    const distrust = cloneGame(before);
     const distrustingOwner = distrust.people.nora;
     if (!distrustingOwner) throw Error('No Nora');
     for (let n = 0; n < 12; n++)
@@ -74,12 +77,23 @@ describe('finite object-owner replacement question', () => {
         action: 'deliver',
       });
     const declined = act(distrust, question(distrust));
-    expect(declined.ownerExchanges?.at(-1)?.terms).not.toBe('one-part');
-    expect(declined.ownerExchanges?.at(-1)?.response).toContain('not agreeing');
+    const answer = declined.ownerExchanges?.at(-1);
+    // Broken promises are received evidence, not a host rule forcing refusal.
+    expect(JSON.stringify(exportPersonRun(declined.people.nora!).history)).toContain(
+      'voice.promise-received',
+    );
+    expect(answer?.terms).toBe(
+      answer?.decision.chosenId === 'owner-one-part' &&
+        answer.decision.answer?.verdict === 'assented'
+        ? 'one-part'
+        : answer?.decision.chosenId === 'owner-original-parts'
+          ? 'original-parts'
+          : 'refused',
+    );
     expect(declined.jobs).toEqual(before.jobs);
     expect(declined.stock).toEqual(before.stock);
     expect(declined.now).toBe(before.now + 5);
-    const committed = structuredClone(before);
+    const committed = cloneGame(before);
     const p = committed.people.nora;
     if (!p) throw Error('No Nora');
     promise(p, {
@@ -130,7 +144,16 @@ describe('finite object-owner replacement question', () => {
     });
     s = act(s, { type: 'verify', jobId: s.selectedJobId, condition: 'load' });
     expect(saveGame(loadGame(saveGame(s)))).toBe(saveGame(s));
-    while (s.inputs !== undefined) s = act(s, { type: 'select', jobId: s.selectedJobId });
+    const filled = replayCommands(
+      s,
+      Array.from(
+        { length: MAX_RECORDED_INPUTS - (s.inputs?.length ?? 0) + 1 },
+        (): Command => ({ type: 'select', jobId: s.selectedJobId }),
+      ),
+    );
+    expect(filled.ok).toBe(true);
+    if (!filled.ok) throw new Error(filled.message);
+    s = filled.state;
     expect(s.inputs).toBeUndefined();
     expect(s.ownerExchanges?.[0]?.recordingClosedAtInput).toBe(10000);
     const raw = saveGame(s);

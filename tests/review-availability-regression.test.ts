@@ -5,6 +5,7 @@ import { SamRequest } from '../src/components/SamRequest';
 import { createGame, dispatch, saveGame } from '../src/game/engine';
 import { chooseActivity, createPeople, reportDelivery, startActivity } from '../src/game/people';
 import type { Command, WorkOption } from '../src/game/types';
+import { native, nativeOf } from './hf-fixture';
 
 function required<T>(value: T | undefined): T {
   if (value === undefined) throw new Error('Missing fixture');
@@ -36,7 +37,7 @@ describe('independent availability and return review', () => {
     if (!job) throw new Error('Expected family repair');
     expect(state.now).toBeGreaterThan(job.due);
     state = dispatch(state, { type: 'deliver', jobId: job.id, unfinished: true }).state;
-    const reports = state.people[job.ownerId]?.memory.episodes.filter(
+    const reports = nativeOf(state.people[job.ownerId])?.memory.episodes.filter(
       (episode) => episode.targetId === job.id,
     );
     expect(reports?.some((episode) => episode.summary.includes('unfinished'))).toBe(true);
@@ -58,14 +59,16 @@ describe('independent availability and return review', () => {
     reportDelivery(lateUnfinished, 'repair', 'unfinished', 540, 'player', 'Lantern', false);
     reportDelivery(lateChecked, 'repair', 'late', 540);
     reportDelivery(explicitLateChecked, 'repair', 'late', 540, 'player', 'repair', false);
-    expect(onTime.memory.episodes.some((episode) => episode.action === 'repair-return:late')).toBe(
-      false,
-    );
+    expect(
+      native(onTime).memory.episodes.some((episode) => episode.action === 'repair-return:late'),
+    ).toBe(false);
     const relationship = (person: typeof onTime) =>
       person.social.relationships.find((entry) => entry.otherId === 'player');
     expect(relationship(lateUnfinished)?.trust).toBeLessThan(relationship(onTime)?.trust ?? 0);
     expect(explicitLateChecked.social).toEqual(lateChecked.social);
-    expect(explicitLateChecked.memory.episodes).toEqual(lateChecked.memory.episodes);
+    expect(native(explicitLateChecked).memory.episodes).toEqual(
+      native(lateChecked).memory.episodes,
+    );
   });
 
   it('rejects donor repair requests without spending resources, time, or recorded inputs', () => {

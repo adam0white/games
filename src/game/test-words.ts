@@ -1,4 +1,4 @@
-import type { TestCondition } from './types';
+import type { TestCondition } from './types.ts';
 
 export const testWords: Record<TestCondition, string> = {
   bench: 'on the table',

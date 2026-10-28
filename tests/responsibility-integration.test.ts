@@ -1,9 +1,10 @@
-import { promise } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
+import { promise } from '../src/game/hf';
 import { chooseActivity, finishActivity, startActivity, teachObserved } from '../src/game/people';
 import { MASTERY_LABEL } from '../src/game/responsibility';
 import type { GameState } from '../src/game/types';
+import { native, reAuthor, readyToLearn } from './hf-fixture';
 import { acceptRepairOffer } from './repair-offer';
 
 function required<T>(value: T | undefined): T {
@@ -42,7 +43,7 @@ describe('native responsibility integration', () => {
     expect(saveGame(loadGame(saveGame(state)))).toBe(saveGame(state));
     const received = dispatch(state, { type: 'wait', minutes: 1 }).state;
     expect(
-      sam(received).memory.expectations.find(
+      native(sam(received)).memory.expectations.find(
         (outcome) => outcome.key === 'accept-repair@ordinary-day',
       )?.needs.competence,
     ).toBe(0);
@@ -58,8 +59,10 @@ describe('native responsibility integration', () => {
     (pressure) => {
       const state = createGame(42);
       const person = sam(state);
-      if (pressure === 'food') person.body.satiety = 0.1;
-      if (pressure === 'water') person.body.hydration = 0.1;
+      if (pressure === 'food')
+        reAuthor(person, { body: { satiety: 0.1 } as Parameters<typeof reAuthor>[1]['body'] });
+      if (pressure === 'water')
+        reAuthor(person, { body: { hydration: 0.1 } as Parameters<typeof reAuthor>[1]['body'] });
       if (pressure === 'promise')
         promise(person, {
           kind: 'promise',
@@ -118,7 +121,7 @@ describe('native responsibility integration', () => {
   it('allows an aspiration despite full competence but never treats accepting or observing as mastery', () => {
     const state = createGame(42);
     const person = sam(state);
-    person.needs.competence = 1;
+    readyToLearn(person, 1);
     const accepted = dispatch(state, {
       type: 'assign',
       jobId: state.selectedJobId,

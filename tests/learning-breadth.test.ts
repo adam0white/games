@@ -1,6 +1,6 @@
-import { methodEvidence } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
+import { methodEvidence } from '../src/game/hf';
 import type { Command, GameState, Job } from '../src/game/types';
 
 function campaign(attended: string[]) {
@@ -164,5 +164,5 @@ describe('ordinary attended teaching across multiple repair briefs', () => {
       withheld.state.jobs.find((candidate) => candidate.id === withheld.targetId)?.blocked?.kind,
     ).toBe('help');
     expect(withheld.state.independentRepairs).toBe(0);
-  }, 30_000);
+  });
 });

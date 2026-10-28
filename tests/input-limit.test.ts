@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
+import { createGame, dispatch, loadGame, replayCommands, saveGame } from '../src/game/engine';
 import { MAX_RECORDED_INPUTS } from '../src/game/recording';
 import { replayRecordedRun } from '../src/game/replay';
 import type { Command, GameState } from '../src/game/types';
@@ -27,8 +27,16 @@ it.each([false, true])(
       s = act(s, { type: 'inspect', jobId: s.selectedJobId, componentId: 'switch' });
     }
     const account = structuredClone(s.castOutcomes);
-    while ((s.inputs?.length ?? 0) < MAX_RECORDED_INPUTS)
-      s = act(s, { type: 'select', jobId: s.selectedJobId });
+    const filled = replayCommands(
+      s,
+      Array.from(
+        { length: MAX_RECORDED_INPUTS - (s.inputs?.length ?? 0) },
+        (): Command => ({ type: 'select', jobId: s.selectedJobId }),
+      ),
+    );
+    expect(filled.ok).toBe(true);
+    if (!filled.ok) throw new Error(filled.message);
+    s = filled.state;
     expect(s.inputs).toHaveLength(MAX_RECORDED_INPUTS);
     expect(saveGame(loadGame(saveGame(s)))).toBe(saveGame(s));
     s = act(s, { type: 'select', jobId: s.selectedJobId });

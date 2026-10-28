@@ -1,6 +1,6 @@
-import { methodEvidence, type Person } from '@adam0white/human-framework';
-import { evidenceContext } from './evidence-context';
-import type { Job } from './types';
+import { evidenceContext } from './evidence-context.ts';
+import { methodEvidence, type Person } from './hf.ts';
+import type { Job } from './types.ts';
 
 /** Describe received evidence and acquired support, never the hidden physical cause.
  * Choosing help does not itself establish that a person lacks a method.

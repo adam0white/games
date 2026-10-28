@@ -1,4 +1,3 @@
-import { snapshot } from '@adam0white/human-framework';
 import {
   anchorPersonaLife,
   canonicalCast,
@@ -6,6 +5,7 @@ import {
   closePersonaBranch,
   createPersona,
   initialPersonaLife,
+  type LifeBatchPreparation,
   type PersonaEnvelope,
   personaChannel,
   validatePersona,
@@ -13,13 +13,21 @@ import {
 } from '@adam0white/lab-client';
 import { admitWorkshop, CAST, CAST_IDS, type CastChapter, workshopTransfer } from './game/cast';
 import { createGame } from './game/engine';
-import { loadGame, saveGame } from './game/persistence';
+import { attachWorkshop } from './game/hf';
+import { loadGame, MAX_GAME_SAVE_LENGTH, saveGame } from './game/persistence.ts';
 import type { GameState } from './game/types';
 import { lab } from './lab';
 import { pauseForDeparture, resumeForPlay } from './ui/chapter';
 
-export const LOCAL_KEY = 'small-works-cast-local-v2';
-export const OUTCOME_LOCAL_KEY = 'small-works-cast-outcomes-v1';
+import {
+  LOCAL_KEY,
+  OUTCOME_LOCAL_KEY,
+  readWorkshopSave,
+  SOURCE_JOURNAL_KEY,
+  writeWorkshopSave,
+} from './workshop-storage.ts';
+
+export { LOCAL_KEY, OUTCOME_LOCAL_KEY } from './workshop-storage.ts';
 export const workshopSaveKey = (state: GameState) =>
   state.castOutcomes ? OUTCOME_LOCAL_KEY : LOCAL_KEY;
 interface LocalMeta {
@@ -27,11 +35,12 @@ interface LocalMeta {
   fileSources: unknown[];
   heads: PersonaEnvelope[];
   fileOrigin: boolean;
+  unclaimedCastIds?: string[];
 }
 const source = () => ({
   game: 'repair',
   build: String(lab.build().c ?? 'local'),
-  engine: '2.23.0',
+  engine: '4.5.2',
   rules: 'canonical-workshop-2',
 });
 /** One source of ownership and recording permission. Local receipts never replace initial replay actors. */
@@ -41,6 +50,12 @@ export class WorkshopContinuity {
   generation = 0;
   heads: PersonaEnvelope[] = [];
   fileOrigin = false;
+  private unclaimedCastIds = new Set<string>();
+  get historyNotice() {
+    return this.unclaimedCastIds.size
+      ? `Earlier character histories were kept in their source. These characters start fresh here: ${[...this.unclaimedCastIds].map((id) => canonicalCast(id).name).join(', ')}. This workshop does not replace those histories.`
+      : '';
+  }
   loaded = false;
   busy = false;
   status = 'Saving character history across games in this browser is separate from lab recording.';
@@ -93,7 +108,7 @@ export class WorkshopContinuity {
     if (!this.started || !current?.inputs?.length || !this.update) return;
     const paused = pauseForDeparture(current);
     this.update(paused);
-    this.persist(paused, false);
+    await this.persist(paused, false);
     if (!this.fileSession) await this.checkpointAll();
   }
   async enter(state: GameState): Promise<GameState> {
@@ -119,9 +134,19 @@ export class WorkshopContinuity {
     if (
       typeof saved.continuity.runId !== 'string' ||
       !Array.isArray(saved.continuity.fileSources) ||
-      JSON.stringify(saved.continuity.fileSources).length > 1_000_000
+      JSON.stringify(saved.continuity.fileSources).length > MAX_GAME_SAVE_LENGTH
     )
       throw new Error('The saved source archive is invalid.');
+    if (
+      saved.continuity.unclaimedCastIds !== undefined &&
+      (!Array.isArray(saved.continuity.unclaimedCastIds) ||
+        saved.continuity.unclaimedCastIds.length > 4 ||
+        saved.continuity.unclaimedCastIds.some(
+          (id: unknown) => !CAST.some((cast) => cast.castId === id),
+        ))
+    )
+      throw new Error('The saved fresh-character boundary is invalid.');
+    this.unclaimedCastIds = new Set(saved.continuity.unclaimedCastIds ?? []);
     this.runId = saved.continuity.runId;
     this.fileSources = saved.continuity.fileSources;
     this.pendingLocal = saved.continuity;
@@ -138,6 +163,7 @@ export class WorkshopContinuity {
         fileSources: this.fileSources,
         heads: this.pendingLocal?.heads ?? this.heads,
         fileOrigin: this.fileOrigin,
+        unclaimedCastIds: [...this.unclaimedCastIds],
       },
     });
   }
@@ -181,13 +207,52 @@ export class WorkshopContinuity {
       let state = base;
       let chapter: CastChapter | undefined;
       let shelfUnavailable = false;
+      const legacyIds = new Set<string>();
+      const currentIds = new Set<string>();
+      let preflightFailure: Error | undefined;
       if (shelf.enabled) {
         let result: Awaited<ReturnType<typeof claimCastChapterBatch<GameState['people']>>>;
         let prepared = false;
         const bridge = {
           request: async <T>(request: Parameters<typeof shelf.request>[0]): Promise<T> => {
             const reply = await shelf.request<T>(request);
-            if (request.action === 'prepareBatch') prepared = true;
+            if (request.action === 'prepareBatch') {
+              prepared = true;
+              const batch = reply as unknown as LifeBatchPreparation;
+              const inputs = batch.inputs.filter((input) => {
+                if (!CAST.some((cast) => cast.castId === input.parent.castId))
+                  throw new Error('The source has an unknown character.');
+                if (!input.parent.source.engine.startsWith('4.')) {
+                  legacyIds.add(input.parent.castId);
+                  return false;
+                }
+                currentIds.add(input.parent.castId);
+                if (input.parent.source.game !== 'repair')
+                  preflightFailure = new Error(
+                    'A current character is still in another chapter. Continue or export that chapter first.',
+                  );
+                return true;
+              });
+              const blocked = [];
+              for (const item of batch.blocked) {
+                const revision = batch.expectedHeads[item.castId];
+                const parent = revision
+                  ? await shelf.request<PersonaEnvelope | null>({
+                      action: 'get',
+                      castId: item.castId,
+                      revision,
+                    })
+                  : null;
+                if (parent && !parent.source.engine.startsWith('4.')) legacyIds.add(item.castId);
+                else {
+                  blocked.push(item);
+                  preflightFailure = new Error(
+                    `${canonicalCast(item.castId).name}: ${item.reason}`,
+                  );
+                }
+              }
+              return { ...batch, inputs, blocked } as T;
+            }
             return reply;
           },
         };
@@ -197,7 +262,17 @@ export class WorkshopContinuity {
             CAST.map((c) => c.castId),
             source(),
             async (inputs) => {
-              const people = structuredClone(base.people);
+              if (preflightFailure) throw preflightFailure;
+              if (
+                inputs.length !== currentIds.size ||
+                [...currentIds].some((id) => !inputs.some((input) => input.parent.castId === id))
+              )
+                throw new Error(
+                  'A current character history could not be loaded. Keep or export its source chapter.',
+                );
+              const copy = structuredClone(base);
+              attachWorkshop(copy);
+              const people = copy.people;
               for (const input of inputs) {
                 const id = Object.keys(CAST_IDS).find((id) => CAST_IDS[id] === input.parent.castId);
                 const opening = id ? people[id] : undefined;
@@ -207,7 +282,23 @@ export class WorkshopContinuity {
               }
               return people;
             },
-            { isCurrent: () => generation === this.generation },
+            {
+              isCurrent: () => generation === this.generation,
+              admitPerson: async (input) => {
+                try {
+                  const test = createGame(seed);
+                  const role = Object.keys(CAST_IDS).find(
+                    (id) => CAST_IDS[id] === input.parent.castId,
+                  );
+                  if (!role || !test.people[role])
+                    throw new Error('This character has no workshop role.');
+                  admitWorkshop(input, test.people[role]!);
+                } catch (error) {
+                  preflightFailure = error instanceof Error ? error : new Error(String(error));
+                  throw error;
+                }
+              },
+            },
           );
         } catch (error) {
           // Only a failed read may fall back. A lost write reply may already have committed ownership.
@@ -233,6 +324,7 @@ export class WorkshopContinuity {
       this.runId = crypto.randomUUID();
       this.fileSources = [];
       this.heads = chapter?.claims ?? [];
+      this.unclaimedCastIds = legacyIds;
       this.fileOrigin = false;
       this.pendingLocal = null;
       this.loaded = true;
@@ -240,11 +332,13 @@ export class WorkshopContinuity {
       this.recordAfterStart = true;
       if (generation !== this.generation)
         throw new Error('The identity or game changed before the chapter started.');
-      this.status = shelfUnavailable
-        ? 'Your workshop is saved on this device. Shared character history is unavailable here.'
-        : chapter
-          ? `The chapter loaded all ${chapter.inputs.length} saved character histories together. Other characters start with their original histories.`
-          : 'You started a fresh chapter. There were no saved character histories to load.';
+      this.status = legacyIds.size
+        ? this.historyNotice
+        : shelfUnavailable
+          ? 'Your workshop is saved on this device. Shared character history is unavailable here.'
+          : chapter
+            ? `The chapter loaded all ${chapter.inputs.length} saved character histories together. Other characters start with their original histories.`
+            : 'You started a fresh chapter. There were no saved character histories to load.';
       return state;
     } finally {
       this.busy = false;
@@ -257,8 +351,7 @@ export class WorkshopContinuity {
     if (
       importedSources !== undefined &&
       (!Array.isArray(importedSources) ||
-        JSON.stringify(importedSources).length > 1_000_000 ||
-        (this.fileSession && importedSources.length > 0))
+        JSON.stringify(importedSources).length > MAX_GAME_SAVE_LENGTH)
     )
       throw new Error(
         'This file has unsupported source archives. Keep the complete original file.',
@@ -277,6 +370,7 @@ export class WorkshopContinuity {
     this.runId = crypto.randomUUID();
     this.fileSources = importedSources ?? [];
     this.heads = [];
+    this.unclaimedCastIds.clear();
     this.pendingLocal = null;
     this.fileOrigin = true;
     this.loaded = true;
@@ -314,6 +408,10 @@ export class WorkshopContinuity {
     const person = state.people[id];
     const castId = CAST_IDS[id];
     if (!person || !castId) throw new Error('This character is not assigned to the workshop.');
+    if (this.unclaimedCastIds.has(castId))
+      throw new Error(
+        'This character starts fresh in HF4. The earlier history is still in its source. Download this workshop to keep it.',
+      );
     const parent = this.heads.find((p) => p.castId === castId);
     let envelope: PersonaEnvelope;
     if (!person.body.alive) {
@@ -336,21 +434,25 @@ export class WorkshopContinuity {
         transfer: { ...captured.transfer, life },
         limitations: captured.limitations,
       });
-      // Raw snapshots stay only in a bounded source-local journal, never sent to shelf/telemetry.
-      const key = 'small-works-source-journal-v2';
-      let journal: unknown[] = [];
-      try {
-        journal = JSON.parse(localStorage.getItem(key) ?? '[]');
-      } catch {}
-      const row = {
-        runId,
-        revision: envelope.revision,
-        source: source(),
-        snapshot: snapshot(person),
-      };
-      journal.push(row);
-      while (JSON.stringify(journal).length > 1_000_000) journal.shift();
-      localStorage.setItem(key, JSON.stringify(journal));
+      // Keep one complete game snapshot per distinct save, plus every source revision binding.
+      // Snapshot rows and receipt rows remain local; neither is sent to the shelf or telemetry.
+      const text = saveGame(state);
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+      const snapshotId = Array.from(new Uint8Array(digest), (byte) =>
+        byte.toString(16).padStart(2, '0'),
+      ).join('');
+      const journal = JSON.parse(readWorkshopSave(SOURCE_JOURNAL_KEY) ?? '[]');
+      if (!Array.isArray(journal))
+        throw new Error('The source history could not be read. Keep the original data.');
+      if (
+        !journal.some(
+          (row) =>
+            row.runId === runId && row.snapshotId === snapshotId && row.kind === 'game-snapshot',
+        )
+      )
+        journal.push({ runId, kind: 'game-snapshot', snapshotId, game: JSON.parse(text) });
+      journal.push({ runId, revision: envelope.revision, source: source(), snapshotId });
+      await writeWorkshopSave(SOURCE_JOURNAL_KEY, JSON.stringify(journal));
     }
     if (!current()) throw new Error('The game changed before the character could be saved.');
     await shelf.request({
@@ -363,7 +465,7 @@ export class WorkshopContinuity {
     this.heads = [...this.heads.filter((p) => p.castId !== castId), envelope].sort((a, b) =>
       a.castId.localeCompare(b.castId),
     );
-    localStorage.setItem(workshopSaveKey(state), this.localSave(state));
+    await writeWorkshopSave(workshopSaveKey(state), this.localSave(state));
     this.status = `${person.name}: ${envelope.terminal ? 'The end of this character history was saved' : 'The character history was saved'}. Source data and state that cannot transfer remain in the local export.`;
     this.changed();
   }
@@ -379,16 +481,16 @@ export class WorkshopContinuity {
     this.changed();
   }
   /** File progress is a recording save, never an owner-native write. */
-  persist(state: GameState, capture = true) {
+  async persist(state: GameState, capture = true) {
     if (!this.started) return;
     if (this.fileSession) {
       lab.captureSave({
         key: `workshop-file:${this.runId}`,
-        value: JSON.parse(this.localSave(state)),
+        value: JSON.parse(saveGame(state)),
       });
       return;
     }
-    localStorage.setItem(workshopSaveKey(state), this.localSave(state));
+    await writeWorkshopSave(workshopSaveKey(state), this.localSave(state));
     if (capture) lab.captureSave(JSON.parse(saveGame(state)));
   }
   closeFile() {
@@ -397,6 +499,7 @@ export class WorkshopContinuity {
     this.started = false;
     this.loaded = false;
     this.heads = [];
+    this.unclaimedCastIds.clear();
     this.pendingLocal = null;
     this.fileSources = [];
     this.fileOrigin = false;
@@ -410,7 +513,7 @@ export class WorkshopContinuity {
     try {
       const journal = this.fileSession
         ? []
-        : JSON.parse(localStorage.getItem('small-works-source-journal-v2') ?? '[]');
+        : JSON.parse(readWorkshopSave(SOURCE_JOURNAL_KEY) ?? '[]');
       castSources = journal.filter((row: { runId?: string }) => row.runId === this.runId);
     } catch {}
     return JSON.stringify({

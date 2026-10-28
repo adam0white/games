@@ -2,7 +2,7 @@
 
 A single-player repair strategy game. Investigate familiar electrical and mechanical objects at a home bench. Choose measurements, compare results, repair actual components and check the object under its owner's use. Time, stock and cash limit what the workshop can promise.
 
-The current source pins `@adam0white/human-framework` to exactly **3.0.0**. The source game version is 4.1.0; HF uses engine 2.23.0. Check the live [release manifest](https://repair.adamwhite.work/release.json) for the deployed commit and versions. [HF3 adoption](docs/hf3-adoption.md) records replay checks, maintenance and remaining feedback. Adam accepts readability and game feel through play.
+The current source pins `@adam0white/human-framework` to exactly **4.5.2**. The source game version is 4.2.0. Check the live [release manifest](https://repair.adamwhite.work/release.json) for the deployed commit and versions. [HF4 adoption](docs/hf4-adoption.md) records the port boundary and verification requirements. Earlier HF3 receipts remain historical. Adam accepts readability and game feel through play.
 
 ## How to play
 
@@ -25,13 +25,13 @@ Feedback offers **I'm stopping** and **I'm confused**. Choosing one changes only
 
 [Human Framework](https://human.adamwhite.work/) supplies the people simulation through its published package. Small Works uses HF for people's perceptions, learned methods, decisions, activities, fatigue, social responses and saved person state. Sam learns conditional methods from work he actually attends. Those methods can affect later choices when the conditions match. Rest and commitments can compete with repair work.
 
-Small Works supplies the objects, hidden faults, physical measurements, parts, stock, prices, workshop clock, customer promises and interface. The actor simulation uses seeded randomness and public HF APIs. It does not use LLMs or sibling-source imports. Saves retain the workshop and HF person state together. These checks can show learning under specific conditions; they do not establish general human realism or enjoyment. See [the narration adoption checks](docs/hf-plain-narration.md) and [HF3 adoption](docs/hf3-adoption.md).
+Small Works supplies the objects, hidden faults, physical measurements, parts, stock, prices, workshop clock, customer promises and interface. The actor simulation uses seeded randomness and public HF APIs. It does not use LLMs or sibling-source imports. The HF4 port stores one run archive with the workshop. Earlier root-game saves are refused with a start-fresh message. These checks can show learning under specific conditions; they do not establish general human realism or enjoyment. See [HF4 adoption](docs/hf4-adoption.md); the [narration adoption checks](docs/hf-plain-narration.md) describe an earlier edition.
 
 There is no in-game About or Credits page in the current source. This README explains the framework's contribution.
 
 ## Canonical cast adoption
 
-Small Works has a bounded four-person canonical cast and browser-life integration using published HF 3.0.0. [The cast scope](docs/canonical-cast.md) defines the new edition, playable disclosures and archive boundary. Technical delivery and owner acceptance remain separate.
+Small Works has a bounded four-person canonical cast and browser-life integration. [HF4 adoption](docs/hf4-adoption.md) owns the current transfer boundary. [The earlier cast scope](docs/canonical-cast.md) records the HF3 edition. Technical delivery and owner acceptance remain separate.
 
 ## Direction recorded on 2026-10-16
 
@@ -41,7 +41,7 @@ Adam requested a new direction on 2026-10-16. The workshop is preserved rather t
 
 ## Historical Small Works delivery notes
 
-The following paragraphs describe earlier editions and their verification. Their build hashes, test counts and compatibility rules are historical. Use the live release manifest above for the deployed version and [HF3 adoption](docs/hf3-adoption.md) for current source checks.
+The following paragraphs describe earlier editions and their verification. Their build hashes, test counts and compatibility rules are historical. Use the live release manifest above for the deployed version and [HF4 adoption](docs/hf4-adoption.md) for current source checks.
 
 The 2026-10-14 restart replaces the earlier campaign and interface. The working candidate includes a diagnostic bench, shared workshop clock, retained paper theatre, customer promises, parts recovery and purchases, and Sam's attended learning through published Human Framework APIs. A community gathering offers three timed formats; preparation time permits at most two. The first-week account offers an ending and a choice to continue.
 
@@ -68,7 +68,7 @@ Current installation uses `pnpm-lock.yaml` and the strict isolated dependency po
 
 Open **Menu → Debug** beside **Lab privacy** for **Download this run**, **Import a workshop**, **Verify the recorded replay** and a starting-number control. Export the run before reporting a problem. Keep the original file so a replay can be checked against its recorded actions.
 
-Current-version exports must replay exactly. Older editions may be refused with a start-fresh message. The historical compatibility notes above describe their own editions. [HF3 adoption](docs/hf3-adoption.md) records the current replay checks.
+Current-version exports must replay exactly. Older editions may be refused with a start-fresh message. The historical compatibility notes above describe their own editions. [HF4 adoption](docs/hf4-adoption.md) records the current replay checks.
 
 ## Project authority
 
@@ -92,8 +92,8 @@ Progress stays in the tab. The menu offers **Download this game file**, **Verify
 
 Normal recording and actual privacy preferences still apply through the existing lab client. Recording may reuse/create SDK identities, rotate run keys and add/drain pending uploads. This route does not clear queues, replace SDK IDs or change consent. Recording capture is not an acknowledgment or ingestion receipt. Actual signed-in-profile preservation and acceptance require separate observation.
 
-## Public tools candidate, 2026-10-27
+## Public tools baseline, 2026-10-27
 
-Remaining: director independent review, exact CI and clean live delivery, then Adam's acceptance on 2026-11-03. No player round is run. Gameplay editions and scenes remain public. The menu and title offer a collapsed Debug beside Lab privacy, with download, import, replay verification, seed and startup error detail. The workshop history is public. Cast controls link to the central shelf; local enable/disable, fork and per-person checkpoint controls are removed. Fresh ordinary and cast-outcome chapters automatically enable same-person carryover through the released SDK and existing strict admission. Loaded chapters keep their recorded people. The outcome edition keeps its authored scene terms and carried-person availability guards; no imported obligations are erased.
+The public tools baseline merged in PR 7 before the HF4 port. Adam's acceptance remains separate. Gameplay editions and scenes remain public. The menu and title offer a collapsed Debug beside Lab privacy, with download, import, replay verification, seed and startup error detail. The workshop history is public. Cast controls link to the central shelf; local enable/disable, fork and per-person checkpoint controls are removed. Fresh ordinary and cast-outcome chapters automatically enable same-person carryover through the released SDK and existing strict admission. Loaded chapters keep their recorded people. The outcome edition keeps its authored scene terms and carried-person availability guards; no imported obligations are erased.
 
-Open a workshop file through the public **Open a workshop file** link at `/file/`. Debug Import opens that isolated route; it never replaces the native workshop. Pending selections and validation are invalidated on empty selection, pagehide, navigation and unmount. That route remains separate from the saved browser workshop and shared ownership. No query-string gate remains in current source. Workshop time advances through costed actions; there is no hidden speed control to expose. HF stays pinned to 3.0.0. Vendor artifacts, physical rules and current-version replay remain unchanged. Source and live receipts belong in the worker's private report until verified delivery.
+Open a workshop file through the public **Open a workshop file** link at `/file/`. Debug Import opens that isolated route; it never replaces the native workshop. Pending selections and validation are invalidated on empty selection, pagehide, navigation and unmount. That route remains separate from the saved browser workshop and shared ownership. No query-string gate remains in current source. Workshop time advances through costed actions; there is no hidden speed control to expose. The HF4 port preserves those public routes. [HF4 adoption](docs/hf4-adoption.md) records the current dependencies, save boundary and delivery gates.

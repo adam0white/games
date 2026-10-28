@@ -2,15 +2,33 @@ import { describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
 import { runUseTest } from '../src/game/model';
 import { teachObserved } from '../src/game/people';
-import type { Job } from '../src/game/types';
+import type { GameState, Job } from '../src/game/types';
 
+// Reuse each identical public campaign prefix. Physics/report checks below
+// inspect copied host jobs; they do not need another HF week for every assertion.
+const campaigns = new Map<number, { state: GameState; offers: Map<number, Job[]> }>();
 function laterOffers(seed: number, day: number): Job[] {
-  let state = createGame(seed);
-  while (state.day < day) {
-    if (state.ended) state = dispatch(state, { type: 'continue' }).state;
-    state = dispatch(state, { type: 'next-day' }).state;
+  let campaign = campaigns.get(seed);
+  if (!campaign) {
+    campaign = { state: createGame(seed), offers: new Map() };
+    campaigns.set(seed, campaign);
   }
-  return state.jobs.filter((j) => j.status === 'offer' && j.due === (day - 1) * 1440 + 1440 + 1020);
+  while (campaign.state.day < day) {
+    if (campaign.state.ended) campaign.state = dispatch(campaign.state, { type: 'continue' }).state;
+    const result = dispatch(campaign.state, { type: 'next-day' });
+    expect(result.ok, result.message).toBe(true);
+    campaign.state = result.state;
+    const currentDay = campaign.state.day;
+    campaign.offers.set(
+      currentDay,
+      structuredClone(
+        campaign.state.jobs.filter(
+          (job) => job.status === 'offer' && job.due === currentDay * 1440 + 1020,
+        ),
+      ),
+    );
+  }
+  return structuredClone(campaign.offers.get(day) ?? []);
 }
 
 describe('later owner requests', () => {
@@ -64,7 +82,10 @@ describe('later owner requests', () => {
     state = dispatch(state, { type: 'continue' }).state;
     const resumed = loadGame(saveGame(state));
     state = dispatch(state, { type: 'next-day' }).state;
-    expect(saveGame(dispatch(resumed, { type: 'next-day' }).state)).toBe(saveGame(state));
+    expect(
+      saveGame(dispatch(resumed, { type: 'next-day' }).state) === saveGame(state),
+      'complete next-day save equality',
+    ).toBe(true);
     const commissions = state.jobs.filter((j) => j.title.includes(' commission '));
     expect(commissions).toHaveLength(2);
     expect(new Set(commissions.map((j) => `${j.ownerId}:${j.title}`)).size).toBe(2);
@@ -86,7 +107,10 @@ describe('later owner requests', () => {
     state = dispatch(state, { type: 'deliver', jobId: original.id, unfinished: true }).state;
     state = dispatch(state, { type: 'next-day' }).state;
     expect(state.jobs.filter((j) => j.title.startsWith('Nora’s reading light'))).toHaveLength(1);
-    expect(saveGame(loadGame(saveGame(state)))).toBe(saveGame(state));
+    expect(
+      saveGame(loadGame(saveGame(state))) === saveGame(state),
+      'complete save restoration equality',
+    ).toBe(true);
   });
   it.each([2, 4, 69, 72, 416])(
     'keeps seed %s governor faults physically meaningful and clears an old setting with its old fault',
@@ -211,7 +235,10 @@ describe('later owner requests', () => {
       expect(state.log.some((e) => e.tone === 'warning' && e.text.startsWith('You said '))).toBe(
         true,
       );
-      expect(saveGame(loadGame(saveGame(state)))).toBe(saveGame(state));
+      expect(
+        saveGame(loadGame(saveGame(state))) === saveGame(state),
+        'complete save restoration equality',
+      ).toBe(true);
     }
   });
 });

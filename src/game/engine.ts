@@ -1,4 +1,3 @@
-import { perceive, releaseCommitment } from '@adam0white/human-framework';
 import { canonicalPersona } from '@adam0white/lab-client';
 import {
   admissionFacts,
@@ -6,7 +5,7 @@ import {
   type CastChapter,
   castRole,
   validateCastChapter,
-} from './cast';
+} from './cast.ts';
 import {
   declinePersonal,
   discoveredAccounts,
@@ -17,17 +16,33 @@ import {
   personalReplies,
   personalReplyBlock,
   replyReceiptKey,
-} from './cast-content';
+} from './cast-content.ts';
 import {
   beginPreparation,
   completePreparation,
   createCommunityEvent,
   finalizeCommunityEvent,
   resolveCommunityEvent,
-} from './community';
-import { evidenceContext } from './evidence-context';
-import { helpFeedback } from './help-feedback';
-import { methodBlock, methodReport, methodResponse } from './method-response';
+} from './community.ts';
+import { evidenceContext } from './evidence-context.ts';
+import { helpFeedback } from './help-feedback.ts';
+import {
+  activityEndMs,
+  arriveForDay,
+  attachWorkshop,
+  bindWorkshopResolver,
+  forkWorkshop,
+  hasUnsettledWork,
+  pendingFinishes,
+  perceive,
+  prepareActivityFinish,
+  promise,
+  releaseCommitment,
+  snapshotRuntime,
+  takeInterruptions,
+  workshopMinute,
+} from './hf.ts';
+import { methodBlock, methodReport, methodResponse } from './method-response.ts';
 import {
   calibrate,
   compatiblePart,
@@ -39,8 +54,8 @@ import {
   runUseTest,
   supportedFaults,
   terminals,
-} from './model';
-import { restoreOpeningPeople } from './opening';
+} from './model.ts';
+import { restoreOpeningPeople } from './opening.ts';
 import {
   outcomeBlock,
   outcomeBoundary,
@@ -48,13 +63,12 @@ import {
   resolveOutcome,
   startOutcomes,
   stopOutcome,
-} from './outcomes';
+} from './outcomes.ts';
 import {
   agreeLearningSession,
   choiceSpeech,
   chooseActivity,
   createPeople,
-  enableCurrentPeople,
   finishActivity,
   notePlayerWord,
   playerAsk,
@@ -64,8 +78,8 @@ import {
   startActivity,
   teachObserved,
   tickPeople,
-} from './people';
-import { LEGACY_PROVENANCE, MAX_RECORDED_INPUTS, SAVE_PROVENANCE } from './recording';
+} from './people.ts';
+import { LEGACY_PROVENANCE, MAX_RECORDED_INPUTS, SAVE_PROVENANCE } from './recording.ts';
 import {
   abandonResponsibility,
   adoptResponsibility,
@@ -73,9 +87,9 @@ import {
   completeResponsibility,
   responsibilityAdvances,
   responsibilityOutcomeAdvances,
-} from './responsibility';
-import { refundPart, stockCount, takePart } from './stock';
-import { testWords } from './test-words';
+} from './responsibility.ts';
+import { refundPart, stockCount, takePart } from './stock.ts';
+import { testWords } from './test-words.ts';
 import type {
   Command,
   CommandResult,
@@ -90,7 +104,7 @@ import type {
   Observation,
   TestCondition,
   WorkOption,
-} from './types';
+} from './types.ts';
 
 const COSTS = {
   inspect: 10,
@@ -317,7 +331,7 @@ export function upgradeRules(s: GameState): GameState {
   s.schema = 'small-works@5';
   s.provenance = { ...SAVE_PROVENANCE };
   s.migratedFrom = { engine: 'small-works@4', atInput: s.inputs?.length ?? 0 };
-  enableCurrentPeople(s.people, s.now);
+
   log(
     s,
     'Workshop',
@@ -331,6 +345,11 @@ export function createGame(
   openingPeople?: GameState['openingPeople'],
   castChapter?: CastChapter,
 ): GameState {
+  if (openingPeople && !castChapter)
+    throw new Error(
+      'Initial people need their recorded source chapter. Keep the file and start fresh.',
+    );
+  let admitted: GameState['people'] | undefined;
   if (castChapter) {
     validateCastChapter(castChapter);
     if (!openingPeople)
@@ -342,12 +361,16 @@ export function createGame(
       if (role === undefined || !opening) throw new Error('The saved source record is invalid.');
       expected[role] = admitWorkshop(input, opening);
     }
+    admitted = expected;
     if (canonicalPersona(expected) !== canonicalPersona(openingPeople))
       throw new Error('The saved people do not match the people loaded from the source.');
   }
   const now = OPEN;
   const legacy = rules === 'legacy';
+  if (legacy) throw new Error('This workshop edition needs a fresh HF4 game. Keep the old file.');
+  const people = admitted ?? createPeople(seed, now);
   const s: GameState = {
+    hf: snapshotRuntime(people),
     schema: legacy ? 'small-works@4' : 'small-works@5',
     provenance: { ...(legacy ? LEGACY_PROVENANCE : SAVE_PROVENANCE) },
     inputs: [],
@@ -362,7 +385,7 @@ export function createGame(
     stock: { cell: 1, switch: 1, bulb: 1, gear: 1 },
     jobs: [],
     ...(openingPeople ? { openingPeople: restoreOpeningPeople(openingPeople) } : {}),
-    people: openingPeople ? restoreOpeningPeople(openingPeople) : createPeople(seed, now),
+    people,
     npcWork: [],
     watching: false,
     selectedJobId: '',
@@ -374,8 +397,11 @@ export function createGame(
     ended: false,
     dailyCostsPaid: 0,
   };
-  if (!legacy) enableCurrentPeople(s.people, now);
-  for (const person of Object.values(s.people)) prepareMorning(person, 0);
+
+  if (!admitted)
+    for (const person of Object.values(s.people).sort((a, b) => a.id.localeCompare(b.id)))
+      prepareMorning(person, 0);
+  s.hf = snapshotRuntime(s.people);
   log(
     s,
     'Sam',
@@ -808,6 +834,9 @@ function activityOptions(s: GameState, job: Job): WorkOption[] {
     options.push({
       id: job.isPersonal ? 'complete-project' : 'deliver',
       action: job.isPersonal ? 'complete-project' : 'deliver',
+      ...(!job.isPersonal && independentRepair(job, 'sam')
+        ? { nativeAction: 'delivery-independent' }
+        : {}),
       label: job.isPersonal ? `Finish the checked work on ${job.title}` : `Return ${job.title}`,
       duration: 10,
       effort: 0.04,
@@ -1011,6 +1040,29 @@ function resolvePhysical(s: GameState, job: Job, action: string): boolean {
   }
   return false;
 }
+function independentRepair(job: Job, who: string): boolean {
+  const actions = job.contributions.filter((c) => c.actorId === who).map((c) => c.action);
+  const firstIntervention = job.evidence.find((e) => e.actorId === who && e.kind === 'work');
+  const diagnosed =
+    !!firstIntervention &&
+    job.evidence.some(
+      (e) =>
+        e.actorId === who &&
+        e.id < firstIntervention.id &&
+        e.kind === 'measurement' &&
+        e.request &&
+        e.cues.signal !== 'invalid' &&
+        e.cues.signal !== 'power-off',
+    );
+  return (
+    who !== 'player' &&
+    !job.contributions.some((c) => c.actorId === 'player') &&
+    actions.includes('intake') &&
+    diagnosed &&
+    actions.some((a) => /^(clean|adjust|replace|calibrate):/.test(a)) &&
+    requiredChecks(job).every((c) => actions.includes(`verify:${c}`))
+  );
+}
 function deliver(s: GameState, job: Job, unfinished: boolean, who = 'player'): void {
   if (job.isDonor) return;
   const realChecks = requiredChecks(job).every(
@@ -1023,7 +1075,7 @@ function deliver(s: GameState, job: Job, unfinished: boolean, who = 'player'): v
   const onTime = s.now <= job.due;
   const responsible = job.assignedTo ? s.people[job.assignedTo] : undefined;
   if (responsible) {
-    if (checked && !unfinished)
+    if (checked && !unfinished && who !== 'player')
       completeResponsibility(responsible, job.responsibility, job.id, true, s.now);
     else {
       abandonResponsibility(responsible, job.responsibility);
@@ -1040,26 +1092,7 @@ function deliver(s: GameState, job: Job, unfinished: boolean, who = 'player'): v
     const payment = onTime ? job.reward : Math.floor(job.reward * 0.7);
     s.cash += payment;
     s.reputation += onTime ? 1 : 0;
-    const actions = job.contributions.filter((c) => c.actorId === who).map((c) => c.action);
-    const firstIntervention = job.evidence.find((e) => e.actorId === who && e.kind === 'work');
-    const diagnosed =
-      !!firstIntervention &&
-      job.evidence.some(
-        (e) =>
-          e.actorId === who &&
-          e.id < firstIntervention.id &&
-          e.kind === 'measurement' &&
-          e.request &&
-          e.cues.signal !== 'invalid' &&
-          e.cues.signal !== 'power-off',
-      );
-    const independent =
-      who !== 'player' &&
-      !job.contributions.some((c) => c.actorId === 'player') &&
-      actions.includes('intake') &&
-      diagnosed &&
-      actions.some((a) => /^(clean|adjust|replace|calibrate):/.test(a)) &&
-      requiredChecks(job).every((c) => actions.includes(`verify:${c}`));
+    const independent = independentRepair(job, who);
     if (independent) {
       s.independentRepairs++;
       const person = s.people[who];
@@ -1169,10 +1202,40 @@ function reconcileResponsibilities(s: GameState): void {
     );
   }
 }
-function finishNpc(s: GameState, work: NpcWork): void {
+function settleWorkshopInterruptions(s: GameState): void {
+  for (const event of takeInterruptions(s.people)) {
+    const work = s.npcWork.find(
+      (w) => w.personId === event.person && w.option.id === event.offerId,
+    );
+    s.npcWork = s.npcWork.filter((w) => w !== work);
+    if (work && event.person === 'sam' && s.watching) releaseLesson(s);
+    if (work)
+      log(
+        s,
+        s.people[event.person]?.name ?? event.person,
+        'I stopped before completing this activity. No repair or return is credited.',
+        'warning',
+      );
+  }
+}
+/** Millisecond ingress can reach another actor's end inside the displayed minute. */
+function settleWorkshopFinishes(s: GameState): void {
+  for (let guard = 0; guard < 128; guard++) {
+    const personId = pendingFinishes(s.people)[0];
+    if (!personId) return;
+    const work = s.npcWork.find((w) => w.personId === personId);
+    // Attended player work and scenes settle through their own actual outcome resolver.
+    if (!work) return;
+    if (!finishNpc(s, work)) return;
+    s.npcWork = s.npcWork.filter((w) => w !== work);
+    settleWorkshopInterruptions(s);
+  }
+  throw new Error('Workshop finishes did not settle after 128 outcomes.');
+}
+function finishNpc(s: GameState, work: NpcWork): boolean {
   const person = s.people[work.personId];
   const job = s.jobs.find((j) => j.id === work.jobId);
-  if (!person) return;
+  if (!person || !prepareActivityFinish(person, s.now)) return false;
   let success = true;
   if (job && !terminalStates.has(job.status)) {
     if (work.option.action === 'accept-repair') {
@@ -1266,6 +1329,7 @@ function finishNpc(s: GameState, work: NpcWork): void {
         )
       : [],
   );
+  return true;
 }
 function perceiveEvidence(s: GameState, personId: string, job: Job, evidence: Evidence): boolean {
   const person = s.people[personId];
@@ -1295,6 +1359,8 @@ function releaseLesson(s: GameState): void {
       releaseCommitment(sam, commitment.id);
 }
 function acceptResponsibility(s: GameState, job: Job): boolean {
+  tickPeople(s.people, s.now);
+  settleWorkshopFinishes(s);
   const sam = s.people.sam;
   if (!sam) return false;
   if (job.isPersonal && job.completedBy) {
@@ -1476,8 +1542,21 @@ function handlePendingRequest(s: GameState): void {
   } else s.pendingRequest = undefined;
 }
 function beginBackground(s: GameState): void {
+  // Player observations and attended scenes own their completion receipts. Do
+  // not let another choice's ingress cross that unrecorded physical outcome.
+  if (
+    Object.values(s.people).some(
+      (p) =>
+        p.activity && p.activity.endsAt <= s.now && !s.npcWork.some((w) => w.personId === p.id),
+    )
+  )
+    return;
+  settleWorkshopFinishes(s);
+  if (hasUnsettledWork(s.people)) return;
   handlePendingRequest(s);
   for (const id of ['sam', 'mum', 'nora', 'rafi', 'halil']) {
+    settleWorkshopFinishes(s);
+    if (hasUnsettledWork(s.people)) return;
     const person = s.people[id];
     if (id === 'halil' && s.day < 3) continue;
     const carried = admissionFacts(s.castChapter, id);
@@ -1620,7 +1699,7 @@ function advance(s: GameState, minutes: number): void {
         : event.resolvedAt === undefined
           ? event.deadline
           : event.finishesAt;
-    const next = Math.min(
+    let next = Math.min(
       target,
       outcomeBoundary(s),
       ...s.npcWork.map((w) => w.endsAt),
@@ -1633,11 +1712,21 @@ function advance(s: GameState, minutes: number): void {
       throw new Error('A workshop activity has an end time before the current time.');
     s.now = next;
     tickPeople(s.people, next);
+    next = Math.min(next, workshopMinute(s.people));
+    s.now = next;
+    settleWorkshopInterruptions(s);
     resolveOutcome(s);
     reconcileResponsibilities(s);
-    const completed = s.npcWork.filter((w) => w.endsAt <= next);
-    s.npcWork = s.npcWork.filter((w) => w.endsAt > next);
-    for (const work of completed) finishNpc(s, work);
+    const completed = s.npcWork
+      .filter((w) => w.endsAt <= next)
+      .sort(
+        (a, b) =>
+          activityEndMs(required(s.people[a.personId])) -
+          activityEndMs(required(s.people[b.personId])),
+      );
+    for (const work of completed)
+      if (finishNpc(s, work)) s.npcWork = s.npcWork.filter((w) => w !== work);
+    settleWorkshopInterruptions(s);
     if (
       s.watching &&
       s.watchUntil !== undefined &&
@@ -1693,6 +1782,7 @@ function advance(s: GameState, minutes: number): void {
   }
   s.now = target;
   tickPeople(s.people, target);
+  settleWorkshopFinishes(s);
   reconcileResponsibilities(s);
   noteOverdue(s);
 }
@@ -1929,20 +2019,40 @@ function sleepToMorning(s: GameState): void {
   }
   const nextBase = Math.floor(s.now / DAY) * DAY + DAY;
   const morning = nextBase + OPEN;
-  for (const person of Object.values(s.people)) {
-    const duration = morning - s.now;
+  const sleeps: { person: GameState['people'][string]; option: WorkOption }[] = [];
+  for (const person of Object.values(s.people).sort((a, b) => a.id.localeCompare(b.id))) {
+    promise(person, {
+      kind: 'promise',
+      actions: ['start-day'],
+      from: morning - 60,
+      until: morning + 1,
+      importance: 0.7,
+      label: 'Arrive for the workshop day',
+    });
     const sleep: WorkOption = {
       id: 'sleep',
       action: 'sleep',
       label: 'Sleep through the night',
-      duration,
+      duration: morning - s.now,
       effort: 0,
     };
     chooseActivity(person, 'home', {}, [sleep], s.now);
-    if (startActivity(person, sleep, s.now)) {
-      tickPeople({ [person.id]: person }, morning);
-      finishActivity(person, sleep, true, morning);
-    } else tickPeople({ [person.id]: person }, morning);
+    if (startActivity(person, sleep, s.now)) sleeps.push({ person, option: sleep });
+  }
+  tickPeople(s.people, morning);
+  settleWorkshopInterruptions(s);
+  for (const { person, option } of sleeps.sort(
+    (a, b) => activityEndMs(a.person) - activityEndMs(b.person),
+  ))
+    if (person.activity) finishActivity(person, option, true, morning);
+  for (const person of Object.values(s.people).sort((a, b) => a.id.localeCompare(b.id))) {
+    if (!arriveForDay(person, morning))
+      log(
+        s,
+        person.name,
+        'I have not woken for the workshop yet. My history stays here until I am available.',
+        'warning',
+      );
     prepareMorning(person, nextBase);
   }
   s.now = morning;
@@ -2039,7 +2149,10 @@ export function canStartBusyWorkshop(s: GameState): boolean {
 }
 /** Public commands and returned worlds never retain caller-owned nested references. */
 export function dispatch(state: GameState, command: Command): CommandResult {
-  return dispatchPrepared(state, structuredClone(command), structuredClone(state));
+  const hf = snapshotRuntime(state.people);
+  const next = { ...structuredClone({ ...state, hf: undefined }), hf };
+  forkWorkshop(next.people, hf, state.people);
+  return dispatchPrepared(state, structuredClone(command), next);
 }
 
 /**
@@ -2054,24 +2167,39 @@ export function replayCommands(
 ):
   | { ok: true; state: GameState }
   | { ok: false; index: number; command: Command; message: string } {
-  let state = structuredClone(initial);
+  let state = structuredClone({ ...initial, hf: snapshotRuntime(initial.people) });
+  attachWorkshop(state);
   for (const [index, input] of commands.entries()) {
     if (index === migratedAt) state = upgradeRules(state);
     // Keep inputs in its original property position for byte-exact native saves.
-    const next: GameState = structuredClone({ ...state, inputs: undefined });
+    const next = structuredClone({
+      ...state,
+      hf: undefined,
+      people: undefined,
+      inputs: undefined,
+    }) as unknown as GameState;
+    next.people = state.people;
+    next.hf = state.hf;
     if (Object.hasOwn(state, 'inputs')) next.inputs = state.inputs;
     else delete next.inputs;
     const command = structuredClone(input);
-    const result = dispatchPrepared(state, command, next);
+    const result = dispatchPrepared(state, command, next, false);
     if (!result.ok) return { ok: false, index, command, message: result.message };
     state = result.state;
   }
   if (migratedAt === commands.length) state = upgradeRules(state);
+  state.hf = snapshotRuntime(state.people);
   return { ok: true, state };
 }
 
 /** Both callers supply isolated world/command data; only replay owns and reuses its input prefix. */
-function dispatchPrepared(state: GameState, command: Command, s: GameState): CommandResult {
+function dispatchPrepared(
+  state: GameState,
+  command: Command,
+  s: GameState,
+  coldSnapshot = true,
+): CommandResult {
+  bindWorkshopResolver(s.people, () => settleWorkshopFinishes(s));
   const fail = (message: string): CommandResult => ({ state, ok: false, message });
   const done = (message: string): CommandResult => {
     if (s.inputs !== undefined) {
@@ -2090,6 +2218,7 @@ function dispatchPrepared(state: GameState, command: Command, s: GameState): Com
         delete s.inputs;
       } else s.inputs.push(structuredClone(command));
     }
+    if (coldSnapshot) s.hf = snapshotRuntime(s.people);
     return { state: s, ok: true, message };
   };
   if (s.ended && command.type !== 'continue' && command.type !== 'select')
@@ -2249,6 +2378,7 @@ function dispatchPrepared(state: GameState, command: Command, s: GameState): Com
           valence: 0,
         },
       ]);
+      settleWorkshopFinishes(s);
       const existing = s.npcWork.find((w) => w.personId === owner.id);
       const options: WorkOption[] = [
         {
@@ -2278,7 +2408,7 @@ function dispatchPrepared(state: GameState, command: Command, s: GameState): Com
         decision.chosenId === 'method-discussion' && decision.answer?.verdict === 'assented';
       if (attended) {
         if (existing) {
-          finishActivity(owner, existing.option, false, at);
+          finishActivity(owner, existing.option, false, at, [], true);
           s.npcWork = s.npcWork.filter((w) => w !== existing);
         }
         const option = options[0];
@@ -2334,6 +2464,7 @@ function dispatchPrepared(state: GameState, command: Command, s: GameState): Com
           valence: 0,
         },
       ]);
+      settleWorkshopFinishes(s);
       const existing = s.npcWork.find((w) => w.personId === owner.id);
       const options: WorkOption[] = [
         {
@@ -2376,7 +2507,7 @@ function dispatchPrepared(state: GameState, command: Command, s: GameState): Com
       // Only voluntary discussion can interrupt uncommitted personal work. Refusal reserves nothing.
       if (selected && ['owner-one-part', 'owner-original-parts'].includes(selected.id)) {
         if (existing) {
-          finishActivity(owner, existing.option, false, at);
+          finishActivity(owner, existing.option, false, at, [], true);
           s.npcWork = s.npcWork.filter((w) => w !== existing);
         }
         if (!startActivity(owner, selected, at))
@@ -2903,4 +3034,4 @@ function dispatchPrepared(state: GameState, command: Command, s: GameState): Com
   }
 }
 
-export { loadGame, saveGame } from './persistence';
+export { loadGame, saveGame } from './persistence.ts';

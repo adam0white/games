@@ -1,13 +1,13 @@
-import { createGame, replayCommands } from './engine';
-import { loadGame, saveGame } from './persistence';
+import { createGame, replayCommands } from './engine.ts';
+import { loadGame, saveGame } from './persistence.ts';
 import {
   isInputRecording,
   isLegacyProvenance,
   isMigratedFrom,
   isOutcomeProvenance,
   isSupportedProvenance,
-} from './recording';
-import type { Command, GameState } from './types';
+} from './recording.ts';
+import type { Command, GameState } from './types.ts';
 
 export type ReplayResult =
   | { ok: true; state: GameState; save: string }

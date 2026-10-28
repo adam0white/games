@@ -1,4 +1,4 @@
-import type { Person } from '@adam0white/human-framework';
+import type { Person } from './hf.ts';
 
 export type DeviceKind = 'lantern' | 'fan' | 'music-box';
 export type ComponentKind =
@@ -111,6 +111,7 @@ export interface Job {
   wentElsewhere?: boolean;
 }
 export interface WorkOption {
+  nativeAction?: string;
   id: string;
   action: string;
   label: string;
@@ -169,6 +170,7 @@ export interface OwnerExchange {
   terms: 'one-part' | 'original-parts' | 'refused';
 }
 export interface GameState {
+  hf: import('./hf').WorkshopRuntime;
   schema: 'small-works@4' | 'small-works@5';
   provenance?: import('./recording').Provenance;
   /** Present when an engine-4 world continued under engine 5 (see `upgradeRules`). */

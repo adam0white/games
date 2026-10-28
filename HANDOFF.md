@@ -1,5 +1,11 @@
 # Handoff
 
+## HF4 port, 2026-10-28
+
+Remaining: pass the full lane, obtain the one hosted review, merge with exact green CI, deploy and verify the clean live manifest. No HF4 delivery is claimed at this candidate stage. Adam accepts feel separately on 2026-11-03.
+
+The target is actor HF 4.5.2 with immutable client 0.5.2 / kit 0.5.19. Client's deliberate HF 4.4.0 pure portable dependency is retained. Source game 4.2.0 uses provenance `4.2.0+hf4`; the host schema stays `small-works@5`, and provenance refuses the old root-game edition. The owner waived old saves, links and HF3 compatibility. The historical archive builder is unchanged. [HF4 adoption](docs/hf4-adoption.md) owns this port's scope and evidence. The older candidates below are prior work and do not impose an extra review or a deployment hold on this authorized port.
+
 ## Native admission optimization candidate, 2026-10-27
 
 Remaining: root-arranged sole independent Codex review at the exact `gd-resume-smallworks-admission-optimize-REVIEWED.md` CLEAR, fresh normal precommit lane, signed source/CI, root matched-head merge verification and clean delivery. No commit or deployment is claimed at this candidate stage. [Design scope](docs/restart/design.md#native-admission-optimization-candidate-2026-10-27).

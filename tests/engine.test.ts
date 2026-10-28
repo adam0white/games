@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
 import { teachObserved } from '../src/game/people';
 import type { GameState } from '../src/game/types';
+import { readyToLearn } from './hf-fixture';
 import { acceptRepairOffer } from './repair-offer';
 
 function required<T>(value: T | undefined): T {
@@ -10,7 +11,14 @@ function required<T>(value: T | undefined): T {
 }
 
 // Requests wait for actual HF activity completion; they never clear a person to make a fixture idle.
-function startLesson(state: GameState): GameState {
+function startLesson(state: GameState, authoredReadiness = true): GameState {
+  if (
+    authoredReadiness &&
+    !state.hf.archive.history.some((tx) =>
+      tx.inputs.some((input) => input.kind === 'action.resolved'),
+    )
+  )
+    readyToLearn(required(state.people.sam));
   state = dispatch(state, { type: 'watch', enabled: true }).state;
   if (state.pendingRequest?.status === 'requested') {
     const endsAt = required(state.npcWork.find((w) => w.personId === 'sam')).endsAt;
@@ -160,14 +168,9 @@ describe('reviewed ownership and observation regressions', () => {
     state = dispatch(state, { type: 'inspect', jobId, componentId: 'contact' }).state;
     state = dispatch(state, { type: 'power', jobId, on: false }).state;
     const request = { mode: 'continuity' as const, a: 'C', b: 'D', condition: 'bench' as const };
-    for (const key of Object.keys(required(state.people.sam).needs))
-      required(state.people.sam).needs[key as keyof GameState['people'][string]['needs']] = 1;
-    required(state.people.sam).needs.competence = 0;
-    required(state.people.sam).body.exertion = 0;
+
     state = dispatch(state, { type: 'measure', jobId, request }).state;
-    for (const key of Object.keys(required(state.people.sam).needs))
-      required(state.people.sam).needs[key as keyof GameState['people'][string]['needs']] = 1;
-    required(state.people.sam).needs.competence = 0;
+
     state = dispatch(state, {
       type: 'work',
       jobId,
@@ -179,10 +182,7 @@ describe('reviewed ownership and observation regressions', () => {
         (rule) => rule.action === 'clean:contact',
       ),
     ).toBe(false);
-    for (const key of Object.keys(required(state.people.sam).needs))
-      required(state.people.sam).needs[key as keyof GameState['people'][string]['needs']] = 1;
-    required(state.people.sam).needs.competence = 0;
-    required(state.people.sam).body.exertion = 0;
+
     state = dispatch(state, { type: 'measure', jobId, request }).state;
     expect(
       required(required(state.people.sam).methods).rules.some(
@@ -315,7 +315,7 @@ describe('observed use and delegated continuity', () => {
   });
   it('rejects malformed NPC work and nested HF state instead of sanitizing it', () => {
     const saved = JSON.parse(saveGame(createGame(42)));
-    delete saved.people.sam.needs.competence;
+    delete saved.people.sam.body.satiety;
     expect(() => loadGame(JSON.stringify(saved))).toThrow();
     const malformed = JSON.parse(saveGame(createGame(42)));
     malformed.npcWork.push({ personId: 'sam', jobId: malformed.jobs[0].id, endsAt: 550 });
@@ -326,10 +326,7 @@ describe('observed use and delegated continuity', () => {
 
 describe('pending teaching and whole-job provenance', () => {
   const attend = (state: GameState) => {
-    const sam = required(state.people.sam);
-    for (const key of Object.keys(sam.needs)) sam.needs[key as keyof typeof sam.needs] = 1;
-    sam.needs.competence = 0;
-    sam.body.exertion = 0;
+    expect(state.watching).toBe(true);
   };
   it('preserves a pending lesson across save and requires the watcher to attend its check', () => {
     let state = createGame(42);
@@ -479,7 +476,7 @@ it('lets an attended cross-component probe procedure transfer with its actual mo
   let state = createGame(416);
   const theatre = state.jobs.find((j) => j.isPersonal);
   if (!theatre) throw new Error('Missing theatre');
-  state = startLesson(state);
+  state = startLesson(state, false);
   state = dispatch(state, {
     type: 'measure',
     jobId: theatre.id,

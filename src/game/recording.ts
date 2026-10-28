@@ -1,12 +1,12 @@
-import { OUTCOME_ACTIONS } from './outcomes';
-import type { Command } from './types';
+import { OUTCOME_ACTIONS } from './outcomes.ts';
+import type { Command } from './types.ts';
 
 export const MAX_RECORDED_INPUTS = 10_000;
 export const SAVE_PROVENANCE = {
   engine: 'small-works@5',
   scenario: 'canonical-workshop@2',
-  framework: '3.0.0',
-  game: '4.1.0+hf3',
+  framework: '4.5.2',
+  game: '4.2.0+hf4',
 } as const;
 /**
  * Engine-4 behaviour, kept so historical exports and old autosaves restore and replay exactly. A legacy world keeps

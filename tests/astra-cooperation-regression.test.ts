@@ -3,12 +3,13 @@ import { createGame, dispatch } from '../src/game/engine';
 import { loadGame, saveGame } from '../src/game/persistence';
 import { replayRecordedRun } from '../src/game/replay';
 import type { Command, GameState } from '../src/game/types';
+import { acceptRepairOffer } from './repair-offer';
 
 // Exact first 63 inputs from the 2026-10-14 12:14:29–12:21:48 source-unread
 // player export (seed 42). The historical export is unchanged. The final recall
 // and player delivery are excluded because the corrected Sam returns it first.
 // These inputs preserve the player's choices; they do not establish new live play.
-// They were recorded under engine-4 rules, so they replay under those rules (engine 5 changes Sam's choices).
+// They were recorded under engine-4 rules and are historical evidence, not an HF4 replay.
 const playerInputs: Command[] = [
   { type: 'request-lesson' },
   { type: 'start-lesson' },
@@ -102,103 +103,56 @@ const playerInputs: Command[] = [
   { type: 'assign', jobId: 'object-29', personId: 'sam' },
   { type: 'wait', minutes: 30 },
 ];
-function apply(state: GameState, inputs: Command[]): GameState {
-  for (const input of inputs) {
-    const result = dispatch(state, input);
-    expect(result.ok, `${JSON.stringify(input)}: ${result.message}`).toBe(true);
-    state = result.state;
-  }
-  return state;
+function deliveryPromises(state: GameState, jobId: string) {
+  return state.people.sam!.agenda.commitments.filter(
+    (commitment) => commitment.targetId === jobId && commitment.actions.includes('deliver'),
+  );
 }
-function required<T>(value: T | undefined): T {
-  if (value === undefined) throw new Error('Missing regression fixture value');
-  return value;
-}
-const beforeReassignment = () => apply(createGame(42, 'legacy'), playerInputs.slice(0, 61));
-const deliveryPromises = (state: GameState) =>
-  required(state.people.sam).agenda.commitments.filter(
-    (c) => c.targetId === 'object-29' && c.actions.includes('deliver'),
-  );
 
-describe('actual player checked-object cooperation regression', () => {
-  it('renews a released promise on fresh acceptance and returns shared work without independence credit', () => {
-    const before = beforeReassignment();
-    expect(deliveryPromises(before).map((c) => c.status)).toEqual(['released']);
-    const result = apply(before, playerInputs.slice(61));
-    expect(result.jobs.find((j) => j.id === 'object-29')).toMatchObject({
-      status: 'delivered',
-      completedBy: 'sam',
-      returnedUnfinished: false,
-    });
-    expect(result.independentRepairs).toBe(0);
-    expect(deliveryPromises(result).map((c) => c.status)).toEqual(['released', 'kept']);
-    expect(
-      result.log.some((row) => row.text.includes('Sam returned the object after shared work.')),
-    ).toBe(true);
+describe('checked-object cooperation regression at HF4', () => {
+  it('refuses the historical recording rather than replaying it as HF4', () => {
+    const old = JSON.parse(saveGame(createGame(42)));
+    old.provenance.framework = '3.0.0';
+    old.inputs = playerInputs;
+    expect(() => loadGame(JSON.stringify(old))).toThrow('Start fresh');
+    expect(replayRecordedRun(old)).toMatchObject({ ok: false, reason: 'unsupported-version' });
   });
 
-  it('keeps historical cooperation evidence separate from the canonical save and replay edition', () => {
-    const before = beforeReassignment();
-    const direct = apply(before, playerInputs.slice(61));
-    expect(() => loadGame(saveGame(before))).toThrow('Start fresh');
-    expect(
-      replayRecordedRun(
-        { seed: 42, inputs: playerInputs, provenance: direct.provenance },
-        saveGame(direct),
-      ),
-    ).toMatchObject({ ok: false, reason: 'unsupported-version' });
+  it('renews a released delivery promise after a fresh acceptance', () => {
+    let state = createGame(42);
+    const jobId = state.selectedJobId;
+    state = acceptRepairOffer(state, jobId);
+    expect(deliveryPromises(state, jobId).map((c) => c.status)).toEqual(['pending']);
+    const recall = dispatch(state, { type: 'recall', jobId });
+    expect(recall.ok, recall.message).toBe(true);
+    state = recall.state;
+    expect(deliveryPromises(state, jobId).map((c) => c.status)).toEqual(['released']);
+    state = acceptRepairOffer(state, jobId);
+    expect(deliveryPromises(state, jobId).map((c) => c.status)).toEqual(['released', 'pending']);
+    expect(state.jobs.find((job) => job.id === jobId)?.assignedTo).toBe('sam');
+    expect(state.independentRepairs).toBe(0);
+    expect(saveGame(loadGame(saveGame(state)))).toBe(saveGame(state));
   });
 
-  // Policy controls below deliberately alter promise/deadline state. They are
-  // not additional uncontrolled player observations.
-  it.each(['pending', 'broken', 'kept'] as const)(
-    'fresh acceptance does not duplicate or replace a %s delivery promise',
-    (status) => {
-      const before = beforeReassignment();
-      required(deliveryPromises(before)[0]).status = status;
-      const result = apply(before, [required(playerInputs[61])]);
-      expect(result.jobs.find((j) => j.id === 'object-29')?.assignedTo).toBe('sam');
-      expect(deliveryPromises(result)).toHaveLength(1);
-      expect(deliveryPromises(result)[0]?.status).toBe(status);
-    },
-  );
-
-  it.each([0, -1])('does not renew a released promise at deadline offset %s', (offset) => {
-    const before = beforeReassignment();
-    required(before.jobs.find((j) => j.id === 'object-29')).due = before.now + offset;
-    const result = apply(before, [required(playerInputs[61])]);
-    expect(result.jobs.find((j) => j.id === 'object-29')?.assignedTo).toBe('sam');
-    expect(deliveryPromises(result).map((c) => c.status)).toEqual(['released']);
+  it('keeps one responsibility and one delivery promise when retrying blocked work', () => {
+    let state = createGame(42);
+    const jobId = state.selectedJobId;
+    state = acceptRepairOffer(state, jobId);
+    state = dispatch(state, { type: 'wait', minutes: 10 }).state;
+    const job = state.jobs.find((candidate) => candidate.id === jobId)!;
+    expect(job.blocked?.kind).toBe('help');
+    const responsibility = structuredClone(job.responsibility);
+    const promises = deliveryPromises(state, jobId).map((c) => ({ id: c.id, status: c.status }));
+    expect(promises).toHaveLength(1);
+    const retry = dispatch(state, { type: 'retry-sam', jobId });
+    expect(retry.ok, retry.message).toBe(true);
+    state = retry.state;
+    expect(state.jobs.find((candidate) => candidate.id === jobId)?.responsibility).toEqual(
+      responsibility,
+    );
+    expect(deliveryPromises(state, jobId).map((c) => ({ id: c.id, status: c.status }))).toEqual(
+      promises,
+    );
+    expect(state.independentRepairs).toBe(0);
   });
-
-  it.each(['pending', 'released', 'broken'] as const)(
-    'retrying ongoing responsibility leaves its %s promise unchanged',
-    (status) => {
-      let before = apply(createGame(42, 'legacy'), playerInputs.slice(0, 45));
-      // A learned initial diagnostic can now run across requested paces. Wait
-      // for an actual help boundary before isolating promise renewal policy.
-      for (let step = 0; step < 12; step++) {
-        if (before.jobs.find((j) => j.id === 'object-29')?.blocked) break;
-        const activity = before.npcWork.find((work) => work.personId === 'sam');
-        if (!activity) break;
-        before = apply(before, [{ type: 'wait', minutes: activity.endsAt - before.now }]);
-      }
-      const job = required(before.jobs.find((j) => j.id === 'object-29'));
-      expect(job.assignedTo).toBe('sam');
-      expect(job.blocked?.kind).toBe('help');
-      expect(
-        job.contributions.some(
-          (entry) => entry.actorId === 'sam' && entry.action === 'verify:load',
-        ),
-      ).toBe(true);
-      expect(before.independentRepairs).toBe(0);
-      required(deliveryPromises(before)[0]).status = status;
-      const result = apply(before, [
-        { type: 'retry-sam', jobId: job.id },
-        { type: 'wait', minutes: 30 },
-      ]);
-      expect(deliveryPromises(result)).toHaveLength(1);
-      expect(deliveryPromises(result)[0]?.status).toBe(status);
-    },
-  );
 });

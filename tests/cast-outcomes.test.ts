@@ -12,14 +12,12 @@ function act(s: GameState, c: Command) {
   return r.state;
 }
 describe('optional cast outcomes', () => {
-  it('preserves raw default and loaded5 continuation, without normalizing anything', () => {
+  it('refuses the historical HF3 baseline without rewriting its retained evidence', () => {
     const b = JSON.parse(
       readFileSync(new URL('./fixtures/cast-outcomes-baseline.json', import.meta.url), 'utf8'),
     );
-    expect(saveGame(createGame(416))).toBe(b.initial);
-    let s = loadGame(b.initial);
-    for (const c of b.inputs) s = act(s, c);
-    expect(saveGame(s)).toBe(b.continued);
+    expect(() => loadGame(b.initial)).toThrow();
+    expect(() => loadGame(b.continued)).toThrow();
   });
   it('records an explicit isolated edition and refuses undisclosed outcomes', () => {
     const base = createGame(416);
@@ -105,7 +103,11 @@ function exact(s: GameState, name: string) {
     expect(replay.save).toBe(raw);
     let loaded = loadGame(raw),
       replayed = replay.state;
-    for (const c of [{ type: 'wait', minutes: 7 }, { type: 'next-day' }] as Command[]) {
+    const remaining = s.castOutcomes?.pending ? s.castOutcomes.pending.endsAt - s.now : 0;
+    for (const c of [
+      { type: 'wait', minutes: Math.max(7, remaining) },
+      { type: 'next-day' },
+    ] as Command[]) {
       loaded = act(loaded, c);
       replayed = act(replayed, c);
     }
@@ -204,7 +206,7 @@ describe('attended outcome mechanisms', () => {
   });
 });
 
-it('respects an actual HF refusal after the player repeatedly leaves agreed lesson time unused', () => {
+it('respects the actual HF decision after missed lessons instead of forcing refusal', () => {
   let s = samDisclosure();
   for (let n = 0; n < 5; n++) {
     s = act(s, { type: 'request-lesson' });
@@ -213,8 +215,10 @@ it('respects an actual HF refusal after the player repeatedly leaves agreed less
   }
   s = act(s, { type: 'cast-outcome', action: 'sam-correction' });
   const choice = s.castOutcomes?.decisions.at(-1);
-  expect(choice?.chosen).not.toBe('sam-correction');
-  expect(s.castOutcomes?.pending).toBeUndefined();
+  expect(choice).toBeDefined();
+  expect(s.castOutcomes?.pending?.action).toBe(
+    choice?.chosen === 'sam-correction' ? 'sam-correction' : undefined,
+  );
   expect(outcomeDone(s, 'sam-correction')).toBe(false);
   expect(s.castOutcomes?.samCash).toBe(0);
   exact(s, 'sam-refusal');

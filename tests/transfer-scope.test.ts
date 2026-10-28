@@ -1,6 +1,6 @@
-import { methodEvidence, receiveMethodCues } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
+import { methodEvidence, receiveMethodCues } from '../src/game/hf';
 import { createPeople, teachObserved } from '../src/game/people';
 import type { Command, GameState } from '../src/game/types';
 import { acceptRepairOffer } from './repair-offer';

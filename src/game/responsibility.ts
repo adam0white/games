@@ -1,12 +1,4 @@
-import {
-  type Affordance,
-  AGENDA_DEFAULTS,
-  abandonGoal,
-  adoptGoal,
-  type Goal,
-  onFinished,
-  type Person,
-} from '@adam0white/human-framework';
+import { type Affordance, abandonGoal, adoptGoal, type Goal, type Person } from './hf.ts';
 
 /** Save this handle beside the job. It links host responsibility to one native HF goal. */
 export interface Responsibility {
@@ -16,7 +8,7 @@ export interface Responsibility {
 }
 
 export const MASTERY_LABEL = 'Learn to handle a whole repair myself';
-const masteryCompletion = 'mastery:independent-repair';
+const masteryCompletion = 'delivery-independent';
 
 /** Authored personal direction, independent of whether any particular repair is accepted. */
 export function adoptRepairAspiration(person: Person, now: number): void {
@@ -48,14 +40,9 @@ export function completeRepairAspiration(
   now: number,
 ): boolean {
   if (person.id !== 'sam' || !independentRepair) return false;
-  return onFinished(person, {
-    affordanceId: masteryCompletion,
-    action: masteryCompletion,
-    at: now,
-    status: 'completed',
-    advances: [],
-    fulfills: [],
-  }).achieved.some((goal) => goal.label === MASTERY_LABEL);
+  return person.agenda.goals.some(
+    (goal) => goal.label === MASTERY_LABEL && goal.status === 'active',
+  );
 }
 
 export const responsibilityCompletionAction = (responsibility: Responsibility) =>
@@ -75,13 +62,16 @@ export function adoptResponsibility(person: Person, jobId: string, now: number):
       label: `Resolve accepted repair ${jobId}`,
       serves: ['achievement'],
       importance: 0.2,
-      advancedBy: [],
+      advancedBy: [
+        { action: 'deliver', amount: 1 },
+        { action: 'complete-project', amount: 1 },
+        { action: 'delivery-independent', amount: 1 },
+      ],
     },
     now,
   );
   const responsibility = { jobId, goalId: goal.id };
-  // HF action matching has no target check for goals. Use a unique completion action.
-  goal.advancedBy.push({ action: responsibilityCompletionAction(responsibility), amount: 1 });
+  // Sam holds one repair responsibility at a time. Only its real completed delivery can finish it.
   return responsibility;
 }
 
@@ -126,9 +116,7 @@ export function responsibilityOutcomeAdvances(
     return [];
   responsibility.lastHelpEvidenceRevision = receivedEvidenceRevision;
   // Asking identifies an unresolved block. It cannot finish the repair, even after many new observations.
-  return goal.progress + AGENDA_DEFAULTS.defaultAdvanceAmount <= 0.2 + Number.EPSILON
-    ? [goal.id]
-    : [];
+  return goal.progress < 0.2 ? [goal.id] : [];
 }
 
 /** Only the host's validated successful delivery may finish this purpose. */
@@ -146,15 +134,8 @@ export function completeResponsibility(
     !activeGoal(person, responsibility)
   )
     return false;
-  return onFinished(person, {
-    affordanceId: responsibilityCompletionAction(responsibility),
-    action: responsibilityCompletionAction(responsibility),
-    targetId: jobId,
-    at: now,
-    status: 'completed',
-    advances: [],
-    fulfills: [],
-  }).achieved.some((goal) => goal.id === responsibility.goalId);
+  // The real delivery receipt settles this goal. A host validation is not an HF completion.
+  return true;
 }
 
 export function abandonResponsibility(

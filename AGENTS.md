@@ -4,11 +4,11 @@ Read README.md, HANDOFF.md, docs/vision.md and docs/mvp.md before resuming. This
 
 ## Current stack and maintenance
 
-2026-10-25: HF3 maintenance uses shared Node 26.12.0, TypeScript7.0.2, React19.3.1, Vite8.3.5, Vitest5.0.5, Biome2.6.3, Wrangler4.152.0 and Knip6.43.0. Published HF3.0.0 (engine2.23.0), lab-client0.4.11 and lab-kit0.5.12. Run full suites through `npm test` and the shared machine lock. Current Worker compatibility date2026-10-25. See docs/hf3-adoption.md for replay, scope, dated dependency exception and owner acceptance.
+2026-10-28: HF4 port targets published HF 4.5.2, immutable lab-client 0.5.2 and lab-kit 0.5.19. Client 0.5.2 deliberately retains its pure portable HF 4.4.0 bridge and legacy adapter dependency. Do not force those transitive pins to the actor version. Use shared Node 26.12.0, TypeScript 7.0.2, React 19.3.1, Vite 8.3.5, Vitest 5.0.5, Biome 2.6.3, Wrangler 4.152.0 and Knip 6.43.0. Run suites through `npm test` and the shared machine lock. Worker compatibility date 2026-10-25. [HF4 adoption](docs/hf4-adoption.md) owns the port; HF3 records are historical.
 
 ## Current authorization
 
-2026-10-25: the owner's HF v3 increment includes maintenance, game feedback and documentation that matches shipped source. This host currently pins HF 3.0.0; later HF releases do not automatically change its pin. Read the current section of HANDOFF.md and docs/hf3-adoption.md before using the historical records below. Technical delivery and Adam's acceptance remain separate; owner review is targeted for 2026-11-03.
+2026-10-28: the owner authorizes this HF4 port, public gameplay corrections, one PR, one hosted `@codex review`, fixes in that PR, merge, exact merged CI and deployment. Old saves, old links and HF3 compatibility may be refused. Preserve exact new-pin game export replay. Ordinary design decisions belong to the implementer and must be recorded in the PR. Record a real HF blocker with a date in the design doc and the matching G-row in `../human-framework/docs/hf4-game-needs.md`; do not edit HF. Read the current HANDOFF and [HF4 adoption](docs/hf4-adoption.md) before historical records. Technical delivery and Adam's acceptance remain separate; owner review target 2026-11-03.
 
 Lab-panel rounds on HF3 builds are allowed under the playtest director. Friends' playtests and Show HN stay paused. The Feedback choices “I'm stopping” and “I'm confused” are exposed by the released shared artifacts and this host’s custom Feedback page. Selection sends nothing; ordinary Submit retains the note and optional run boundary. Lab client and kit remain immutable release artifacts. HF's npm package requires TypeScript 7 or later.
 
