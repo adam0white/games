@@ -176,6 +176,7 @@ export interface GameState {
   inputs?: Command[];
   discoveries?: string[];
   ownerExchanges?: OwnerExchange[];
+  methodResponses?: import('./method-response').MethodResponse[];
   castOutcomes?: import('./outcomes').CastOutcomes;
   /** Complete target-clock initial people; never refreshed from live browser continuity. */
   castChapter?: import('./cast').CastChapter;
@@ -212,6 +213,13 @@ export interface GameState {
   dailyCostsPaid: number;
 }
 export type Command =
+  | {
+      type: 'discuss-repair-method';
+      jobId: string;
+      ownerId: string;
+      componentId: string;
+      reportText: string;
+    }
   | {
       type: 'ask-owner-about-object';
       jobId: string;

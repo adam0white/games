@@ -42,6 +42,15 @@ const conditions = ['bench', 'movement', 'load'];
 export function isRecordedCommand(value: unknown): value is Command {
   if (!object(value)) return false;
   switch (value.type) {
+    case 'discuss-repair-method':
+      return (
+        keys(value, ['type', 'jobId', 'ownerId', 'componentId', 'reportText']) &&
+        id(value.jobId) &&
+        member(value.ownerId, ['sam', 'mum', 'nora', 'rafi', 'halil']) &&
+        member(value.componentId, parts) &&
+        typeof value.reportText === 'string' &&
+        value.reportText.length <= 100_000
+      );
     case 'ask-owner-about-object':
       return (
         keys(value, [

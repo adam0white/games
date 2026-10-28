@@ -2,6 +2,7 @@ import { restore, snapshot } from '@adam0white/human-framework';
 import { validateCastChapter } from './cast';
 import { ownerReplacementProposal, ownerReplacementResponse } from './cast-content';
 import { createGame } from './engine';
+import { validMethodResponses } from './method-response';
 import { compatiblePart, createModel } from './model';
 import { restoreOpeningPeople } from './opening';
 import { OUTCOME_TERMS } from './outcomes';
@@ -397,6 +398,7 @@ export function loadGame(text: string): GameState {
       questions.add(key);
     }
   }
+  if (!validMethodResponses(value)) invalid();
   const request = value.pendingRequest;
   if (request !== undefined) {
     const offered = object(request) ? value.jobs.find((j) => j.id === request.jobId) : undefined;
