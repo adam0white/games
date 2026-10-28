@@ -9,7 +9,8 @@ import {
   teachObserved,
 } from '../src/game/people';
 import { replayRecordedRun } from '../src/game/replay';
-import { stockCount } from '../src/game/stock';
+import { adoptResponsibility } from '../src/game/responsibility';
+import { stockCount, takePart } from '../src/game/stock';
 import type { Command, GameState } from '../src/game/types';
 import { cloneGame } from './hf-fixture';
 import { acceptRepairOffer } from './repair-offer';
@@ -305,4 +306,82 @@ describe('opt-in busy workshop', () => {
       }
     }
   });
+});
+
+// A controlled opening isolates the real HF interruption receipt and host inventory.
+it('refunds an interrupted replacement once and keeps recovered-part provenance', () => {
+  let state = busy();
+  const donor = present(state.jobs.find((job) => job.isDonor));
+  state = act(state, { type: 'salvage', jobId: donor.id, componentId: 'switch' });
+  state.people = createPeople(state.seed, state.now);
+  state.npcWork = [];
+  const sam = present(state.people.sam);
+  const job = present(state.jobs.find((job) => job.status === 'offer'));
+  job.status = 'active';
+  job.acceptedAt = state.now;
+  job.assignedTo = sam.id;
+  job.responsibility = adoptResponsibility(sam, job.id, state.now);
+  const model = structuredClone(job.model);
+  const total = state.stock.switch;
+  const recovered = stockCount(state, 'switch', 'recovered');
+  const replacement = {
+    id: 'replace:switch',
+    action: 'replace:switch',
+    label: 'Replace the switch',
+    duration: 30,
+    effort: 0.1,
+  };
+  chooseActivity(sam, job.id, {}, [replacement], state.now);
+  expect(startActivity(sam, replacement, state.now)).toBe(true);
+  expect(takePart(state, 'switch', 'recovered')).toBe(true);
+  state.npcWork.push({
+    personId: sam.id,
+    jobId: job.id,
+    option: replacement,
+    startedAt: state.now,
+    endsAt: state.now + 30,
+    reservedPart: 'switch',
+    reservedRecovered: true,
+  });
+  const rest = {
+    id: 'interrupting-rest',
+    action: 'rest',
+    label: 'Take a break',
+    duration: 10,
+    effort: 0,
+  };
+  chooseActivity(sam, 'ordinary-day', {}, [rest], state.now);
+  expect(startActivity(sam, rest, state.now)).toBe(true);
+  state.npcWork.push({
+    personId: sam.id,
+    option: rest,
+    startedAt: state.now,
+    endsAt: state.now + 10,
+  });
+  job.blocked = {
+    at: state.now,
+    kind: 'help',
+    reason: 'Controlled responsibility waiting during the break.',
+  };
+  state = act(state, { type: 'wait', minutes: 1 });
+  expect(
+    state.hf.archive.history.some((tx) =>
+      tx.inputs.some(
+        (input) =>
+          input.kind === 'action.resolved' &&
+          input.payload.stage === 'interrupt' &&
+          input.payload.disposition === 'interrupted',
+      ),
+    ),
+  ).toBe(true);
+  expect(state.stock.switch).toBe(total);
+  expect(stockCount(state, 'switch', 'recovered')).toBe(recovered);
+  expect(state.jobs.find((candidate) => candidate.id === job.id)?.model).toEqual(model);
+  expect(state.npcWork.some((work) => work.option.id === replacement.id)).toBe(false);
+  expect(state.people.sam?.activity?.affordance.id).toBe(rest.id);
+  const raw = saveGame(state);
+  expect(saveGame(loadGame(raw))).toBe(raw);
+  state = act(state, { type: 'wait', minutes: 1 });
+  expect(state.stock.switch).toBe(total);
+  expect(stockCount(state, 'switch', 'recovered')).toBe(recovered);
 });

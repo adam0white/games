@@ -1207,6 +1207,7 @@ function settleWorkshopInterruptions(s: GameState): void {
     const work = s.npcWork.find(
       (w) => w.personId === event.person && w.option.id === event.offerId,
     );
+    if (work) refundPart(s, work);
     s.npcWork = s.npcWork.filter((w) => w !== work);
     if (work && event.person === 'sam' && s.watching) releaseLesson(s);
     if (work)
