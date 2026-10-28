@@ -2,9 +2,16 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
-import { OUTCOME_TERMS, type OutcomeAction, outcomeDone } from '../src/game/outcomes';
+import {
+  OUTCOME_TERMS,
+  type OutcomeAction,
+  outcomeDone,
+  requestOutcome,
+} from '../src/game/outcomes';
+import { chooseActivity, startActivity } from '../src/game/people';
 import { replayRecordedRun } from '../src/game/replay';
 import type { Command, GameState } from '../src/game/types';
+import { reAuthor } from './hf-fixture';
 
 function act(s: GameState, c: Command) {
   const r = dispatch(s, c);
@@ -222,4 +229,49 @@ it('respects the actual HF decision after missed lessons instead of forcing refu
   expect(outcomeDone(s, 'sam-correction')).toBe(false);
   expect(s.castOutcomes?.samCash).toBe(0);
   exact(s, 'sam-refusal');
+});
+
+it('saves immediately when a cast request interrupts background work and is declined', () => {
+  const s = start(1);
+  const p = s.people.sam;
+  if (!p) throw new Error('Missing Sam');
+  reAuthor(p, {
+    needs: {
+      safety: 1,
+      belonging: 1,
+      esteem: 1,
+      autonomy: 1,
+      competence: 1,
+      leisure: 0,
+      meaning: 1,
+    },
+  });
+  const option = {
+    id: 'background-test',
+    action: 'clean:contact',
+    label: 'background work',
+    duration: 60,
+    effort: 0.9,
+  };
+  chooseActivity(p, 'workshop', {}, [option], s.now);
+  expect(startActivity(p, option, s.now)).toBe(true);
+  const stock = s.stock.switch ?? 0;
+  s.stock.switch = stock - 1;
+  s.npcWork.push({
+    personId: p.id,
+    option,
+    startedAt: s.now,
+    endsAt: s.now + option.duration,
+    reservedPart: 'switch',
+  });
+  requestOutcome(s, 'sam-correction');
+  expect(s.stock.switch).toBe(stock);
+  expect(s.castOutcomes?.decisions.at(-1)?.chosen).toBe('personal');
+  expect(s.people.sam?.activity?.affordance.id).toBe('personal');
+  expect(s.npcWork.filter((w) => w.personId === 'sam')).toHaveLength(1);
+  expect(s.npcWork.find((w) => w.personId === 'sam')?.option.id).toBe('personal');
+  const raw = saveGame(s);
+  expect(saveGame(loadGame(raw))).toBe(raw);
+  const advanced = act(loadGame(raw), { type: 'wait', minutes: 1 });
+  expect(advanced.stock.switch).toBe(stock);
 });

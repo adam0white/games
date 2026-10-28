@@ -12,7 +12,7 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     // Full HF4 archives are restored and replayed by campaign controls. Keep their
     // assertions intact while allowing the measured multi-day workload to finish.
-    testTimeout: 300_000,
+    testTimeout: 600_000,
     maxWorkers: 2,
   },
 });

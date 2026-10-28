@@ -34,28 +34,32 @@ const same = (a: unknown, b: unknown) => canonicalPersona(a) === canonicalPerson
 /** Existing shelf transport carries the host passport; HF owns retained projection and admission. */
 export function admitWorkshop(input: LifePreparation, opening: Person): Person {
   const e = input.parent,
-    role = castRole(e.castId);
+    role = castRole(e.castId),
+    workshop = e.source.game === 'repair' && e.transfer.castPassport === 'workshop-hf4/1',
+    commonstead =
+      e.source.game === 'commonstead' &&
+      e.source.rules === 'commonstead-4' &&
+      e.transfer.castPassport === 'commonstead-retained/4';
   if (
     role !== opening.id ||
     e.castRevision !== canonicalCast(e.castId).revision ||
     e.terminal ||
-    e.source.game !== 'repair' ||
-    e.source.engine !== '4.5.2' ||
-    e.transfer.castPassport !== 'workshop-hf4/1' ||
-    e.transfer.sourceRole !== role ||
+    (!workshop && !commonstead) ||
+    e.source.engine !== '4.6.0' ||
+    e.transfer.sourceRole !== (commonstead ? e.castId : role) ||
     !same(preparePersonaLife(e, input.clockMs).life, input.life)
   )
     throw new Error(
       'This saved person belongs to an unsupported chapter. Keep or export it there; start fresh here.',
     );
-  const person = validatePortablePerson(e.transfer.person);
+  const person = validatePortablePerson(commonstead ? e.transfer.portable : e.transfer.person);
   if (
     person.version !== 2 ||
     person.castId !== e.castId ||
     person.castRevision !== e.castRevision ||
-    person.source.game !== 'repair' ||
+    person.source.game !== e.source.game ||
     person.source.engine !== e.source.engine ||
-    person.source.personId !== role
+    person.source.personId !== (commonstead ? e.castId : role)
   )
     throw new Error('The saved person identity or source does not match.');
   const references: {
@@ -67,7 +71,12 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
   const add = (kind: (typeof references)[number]['kind'], id: string | undefined) => {
     if (!id || id === 'self' || seen.has(`${kind}:${id}`)) return;
     seen.add(`${kind}:${id}`);
-    references.push({ kind, source: id, target: id });
+    references.push({
+      kind,
+      source: id,
+      target:
+        (kind === 'entity' || kind === 'source') && id === person.source.personId ? opening.id : id,
+    });
   };
   for (const episode of [...person.retained.memory.episodes, ...person.retained.memory.gists]) {
     add('action', episode.action);
@@ -142,7 +151,7 @@ export function validateCastChapter(chapter: CastChapter): void {
       claim.branchId !== input.parent.branchId ||
       claim.parentRevision !== input.parent.revision ||
       claim.source.game !== 'repair' ||
-      claim.source.engine !== '4.5.2' ||
+      claim.source.engine !== '4.6.0' ||
       claim.terminal ||
       !same(claim.transfer, { ...input.parent.transfer, life: input.life })
     )

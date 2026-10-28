@@ -85,7 +85,7 @@ async function ownNoraSource() {
     castRevision: real.canonicalCast(castId).revision,
     branchId,
     parentRevision: null,
-    source: { game: 'repair', build: 'test', engine: '4.5.2', rules: 'canonical-workshop-2' },
+    source: { game: 'repair', build: 'test', engine: '4.6.0', rules: 'canonical-workshop-2' },
     transfer: { ...projected.transfer, life: real.initialPersonaLife(castId, branchId, 0) },
     limitations: projected.limitations,
   });
@@ -93,6 +93,54 @@ async function ownNoraSource() {
 }
 
 describe('host recording and local ownership guards (synthetic controls)', () => {
+  it('admits a Commonstead checkpoint before writing its workshop claim', async () => {
+    const { real, parent: original } = await ownNoraSource();
+    const { validatePortablePerson } = await import('@adam0white/human-framework');
+    const { CAST } = await import('../src/game/cast');
+    const portable = structuredClone(validatePortablePerson(original.transfer.person));
+    portable.source.game = 'commonstead';
+    portable.source.personId = original.castId;
+    const { revision: _revision, ...body } = original;
+    const parent = await real.createPersona({
+      ...body,
+      source: { ...body.source, game: 'commonstead', rules: 'commonstead-4' },
+      transfer: {
+        castPassport: 'commonstead-retained/4',
+        sourceRole: original.castId,
+        portable,
+        life: original.transfer.life,
+      },
+    });
+    let shelf = real.acceptPersona({ heads: {}, revisions: [] }, parent);
+    controls.request.mockImplementation(async (request) => {
+      if (request.action === 'prepareBatch')
+        return {
+          expectedHeads: Object.fromEntries(
+            CAST.map((c) => [c.castId, shelf.heads[c.castId] ?? null]),
+          ),
+          inputs: [real.preparePersonaLife(parent, 0)],
+          blocked: [],
+        };
+      if (request.action === 'putBatch') {
+        shelf = real.acceptPersonaBatch(shelf, request.envelopes, request.expectedHeads);
+        return null;
+      }
+      throw new Error('Unexpected request');
+    });
+    const host = await runtime();
+    const state = await host.fresh(42);
+    expect(state.castChapter?.inputs[0]?.parent.revision).toBe(parent.revision);
+    expect(state.hf.archive.initial.people.find((p) => p.id === 'nora')?.portable?.person).toEqual(
+      portable,
+    );
+    const saved = saveGame(state);
+    const { loadGame } = await import('../src/game/persistence');
+    expect(saveGame(loadGame(saved))).toBe(saved);
+    expect(controls.request.mock.calls.map(([request]) => request.action)).toEqual([
+      'prepareBatch',
+      'putBatch',
+    ]);
+  });
   it('keeps source archives in an isolated file without recording them or changing native saves', async () => {
     const previous = globalThis.location;
     vi.stubGlobal('location', { pathname: '/file/' });
@@ -327,7 +375,7 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
     const claim = await real.createPersona({
       ...body,
       parentRevision: revision,
-      source: { game: 'repair', build: 'test', engine: '4.5.2', rules: 'canonical-workshop-2' },
+      source: { game: 'repair', build: 'test', engine: '4.6.0', rules: 'canonical-workshop-2' },
       transfer: { ...parent.transfer, life: input.life },
     });
     const file = createGame(42, 'current', people, {
@@ -380,7 +428,7 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
       castRevision: '1',
       branchId: 'test',
       parentRevision: null,
-      source: { game: 'repair', engine: '4.5.2', rules: 'test', build: 'test' },
+      source: { game: 'repair', engine: '4.6.0', rules: 'test', build: 'test' },
       transfer: {},
       limitations: [],
     });

@@ -118,42 +118,67 @@ export interface WorkshopRuntime {
   nextAt: number | null;
   interruptions: { person: string; at: number; action: string; offerId: string }[];
 }
+interface AcceptedCall {
+  readonly previous?: AcceptedCall;
+  readonly batch: { until: number; inputs: Input[] };
+}
 interface Context {
   run: Run;
   live?: Run;
+  provider?: Context;
+  base?: RunArchive;
+  calls?: AcceptedCall;
   archive?: RunArchive;
   resolveFinishes?: () => void;
   data: WorkshopRuntime;
   people: Record<string, Person>;
 }
-/** A mutable public Run has one host owner. Older branches keep their immutable archive. */
+/** One mutable public Run owner; other branches retain public call history, not kernel copies. */
 function runtimeContext(
   run: Run | undefined,
   data: WorkshopRuntime,
   people: Record<string, Person>,
-  archive?: RunArchive,
+  checkpoint = {
+    base: data.archive,
+    calls: undefined as AcceptedCall | undefined,
+    archive: data.archive as RunArchive | undefined,
+  },
   source?: Context,
 ): Context {
   const c: Context = {
     live: run,
+    provider: source?.live ? source : source?.provider,
     get run() {
       if (!c.live) {
-        // Transfer a still-unchanged live run to its forward branch. A sibling
-        // or a changed source reconstructs the exact saved public archive.
-        if (source?.live && source.archive === c.archive) {
-          c.live = source.live;
-          source.live = undefined;
-        } else c.live = need(restoreRun(c.archive ?? data.archive));
+        const provider = c.provider;
+        c.provider = undefined;
+        if (provider?.live && provider.base === c.base && provider.calls === c.calls) {
+          c.live = provider.live;
+          provider.live = undefined;
+        } else {
+          if (!c.base) throw new Error('Missing public workshop checkpoint.');
+          c.live = need(restoreRun(c.base));
+          const calls: AcceptedCall[] = [];
+          for (let call = c.calls; call; call = call.previous) calls.push(call);
+          for (const call of calls.reverse()) need(step(c.live, call.batch));
+        }
       }
       return c.live;
     },
     set run(value: Run) {
       c.live = value;
     },
-    archive,
+    base: checkpoint.base,
+    calls: checkpoint.calls,
+    archive: checkpoint.archive,
     data,
     people,
   };
+  Object.defineProperty(data, 'archive', {
+    enumerable: true,
+    configurable: true,
+    get: () => archiveOf(c),
+  });
   return c;
 }
 const contexts = new WeakMap<Person, Context>();
@@ -165,7 +190,11 @@ const need = <T>(r: Result<T>): T => {
 };
 /** A cold immutable public export can be reused until the next accepted transaction. */
 function archiveOf(c: Context): RunArchive {
-  if (!c.archive) c.archive = exportRun(c.run) as RunArchive;
+  if (!c.archive) {
+    c.archive = exportRun(c.run) as RunArchive;
+    c.base = c.archive;
+    c.calls = undefined;
+  }
   return c.archive;
 }
 function context(p: Person) {
@@ -267,9 +296,10 @@ function refresh(c: Context): void {
   }
 }
 function accept(c: Context, until: number, inputs: Input[]): void {
-  const result = need(
-    step(c.run, { until, inputs: JSON.parse(JSON.stringify(inputs)) as Input[] }),
-  );
+  if (!c.base) archiveOf(c);
+  const batch = { until, inputs: JSON.parse(JSON.stringify(inputs)) as Input[] };
+  const result = need(step(c.run, batch));
+  c.calls = { previous: c.calls, batch };
   c.archive = undefined;
   c.data.pending = result.boundary.type === 'world-required' ? clone(result.boundary.requests) : [];
   c.data.nextAt = result.nextAt;
@@ -437,6 +467,8 @@ export function createPerson(
   if (options.portable) author.portable = options.portable;
   need(authorPerson(c.run, author));
   c.archive = undefined;
+  c.base = undefined;
+  c.calls = undefined;
   const p = {
     id: options.id,
     name: options.name,
@@ -453,22 +485,40 @@ export function createPerson(
   refresh(c);
   return p;
 }
+/** Copy host metadata without invoking its cold archive getter. */
+function copiedMetadata(c: Context): Omit<WorkshopRuntime, 'archive'> {
+  return structuredClone(
+    Object.fromEntries(
+      Object.keys(c.data)
+        .filter((key) => key !== 'archive')
+        .map((key) => [key, c.data[key as keyof WorkshopRuntime]]),
+    ),
+  ) as Omit<WorkshopRuntime, 'archive'>;
+}
 export function snapshotRuntime(people: Record<string, Person>): WorkshopRuntime {
   const c = rosters.get(people);
   if (!c) throw new Error('Missing workshop runtime.');
-  // HF exports an isolated frozen value. Only the returned host snapshot needs cloning.
-  c.data.archive = archiveOf(c);
-  return { ...structuredClone({ ...c.data, archive: undefined }), archive: c.data.archive };
+  return { ...copiedMetadata(c), archive: archiveOf(c) };
 }
-/** Fork trusted host state; restore the public archive only when this branch first uses HF. */
+/** Fork trusted host metadata; preserve older branches through exact public step calls. */
 export function forkWorkshop(
   people: Record<string, Person>,
-  data: WorkshopRuntime,
   sourcePeople: Record<string, Person>,
-): void {
-  const c = runtimeContext(undefined, data, people, data.archive, rosters.get(sourcePeople));
+): WorkshopRuntime {
+  const source = rosters.get(sourcePeople);
+  if (!source) throw new Error('Missing source workshop run.');
+  if (!source.base) archiveOf(source);
+  const data = { ...copiedMetadata(source), archive: source.base! };
+  const c = runtimeContext(
+    undefined,
+    data,
+    people,
+    { base: source.base!, calls: source.calls, archive: source.archive },
+    source,
+  );
   rosters.set(people, c);
   for (const person of Object.values(people)) contexts.set(person, c);
+  return data;
 }
 
 const canonical = (value: unknown): string =>
@@ -502,7 +552,7 @@ export function attachWorkshop(state: {
     !Number.isSafeInteger(data.nextInput) ||
     data.nextInput < 1 ||
     !record(data.archive) ||
-    data.archive.engine.package !== '@adam0white/human-framework@4.5.2' ||
+    data.archive.engine.package !== '@adam0white/human-framework@4.6.0' ||
     !record(data.active) ||
     !record(data.offers) ||
     !record(data.revisions) ||
@@ -609,7 +659,12 @@ export function attachWorkshop(state: {
       accepted.some((i) => i.id === queued.id)
     )
       bad();
-  const c = runtimeContext(run, data, state.people);
+  const checkpoint = exportRun(run) as RunArchive;
+  const c = runtimeContext(run, data, state.people, {
+    base: checkpoint,
+    calls: undefined,
+    archive: checkpoint,
+  });
   for (const p of Object.values(state.people)) contexts.set(p, c);
   rosters.set(state.people, c);
   refresh(c);
@@ -1184,6 +1239,7 @@ export function admitOpeningPerson(p: Person, portable: PortableAdmission): Pers
   const facts = [...archive.initial.spec.world.facts];
   const spec = {
     ...archive.initial.spec,
+    definitions: structuredClone(archive.initial.spec.definitions),
     world: { ...archive.initial.spec.world, facts },
   } as unknown as RunSpec;
   const passport = portable.person;
@@ -1210,6 +1266,43 @@ export function admitOpeningPerson(p: Person, portable: PortableAdmission): Pers
         at: spec.start,
         provenance: { source: 'repair', evidenceId: `retained:${passport.castId}` },
       });
+  // Commonstead's literal action vocabulary stays available to retained
+  // memories and duties. Historical actions do not create workshop offers.
+  if (passport.source.game === 'commonstead') {
+    const historical = [
+      'wait',
+      'rest',
+      'work',
+      'move',
+      'eat',
+      'drink',
+      'sleep',
+      'pray',
+      'talk',
+      'spar',
+      'try-grip',
+      'share-story',
+      'inspect',
+      'yield',
+      'correction',
+      'visit',
+      'letter',
+      'telescope',
+      'deliver',
+    ];
+    spec.definitions.actions = [
+      ...spec.definitions.actions,
+      ...historical
+        .filter((id) => !spec.definitions.actions.some((a) => a.id === id))
+        .map((id) => ({
+          id,
+          label: id === 'pray' ? 'Pray' : id,
+          demands: { effort: 0, focus: 0, mode: 'awake' as const, requires: {} },
+          tags: id === 'rest' ? ['rest'] : id === 'pray' ? ['worship'] : [],
+          norms: [],
+        })),
+    ];
+  }
   const run = need(createRun(spec));
   for (const original of archive.initial.people) {
     const authored = structuredClone(original) as PersonAuthoring;
@@ -1252,6 +1345,9 @@ export function admitOpeningPerson(p: Person, portable: PortableAdmission): Pers
   }
   c.run = run;
   c.archive = undefined;
+  c.base = undefined;
+  c.calls = undefined;
+  archiveOf(c);
   p.life = {
     bornAt: (passport.retained.bornAt + portable.mapping.offsetMs) / MINUTE,
     sex: passport.retained.sex,

@@ -164,6 +164,7 @@ function offer(person: Person, option: WorkOption, contextId: string): Affordanc
   const observe = option.action === 'observe';
   const rest = option.action === 'rest';
   const personal = option.action === 'personal';
+  const worship = option.action === 'pray';
   const leisure = option.action === 'leisure';
   const help = option.action === 'ask-help';
   const accept = option.action === 'accept-repair';
@@ -183,27 +184,30 @@ function offer(person: Person, option: WorkOption, contextId: string): Affordanc
     methodContext: contextId,
     targetId: contextId,
     mode: sleep ? 'sleep' : 'awake',
-    advertises: drink
-      ? { water: 0.7 }
-      : sleep
-        ? { sleep: 0.9, rest: 0.7 }
-        : eat
-          ? { food: 0.7, water: 0.4 }
-          : observe || accept
-            ? { competence: 0.12, belonging: 0.05 }
-            : rest
-              ? { rest: 0.7, leisure: 0.05 }
-              : leisure
-                ? { leisure: 0.18, meaning: 0.08 }
-                : personal
-                  ? { leisure: 0.18, autonomy: 0.12 }
-                  : help
-                    ? { competence: 0.4, belonging: 0.08 }
-                    : diagnose
-                      ? { competence: 0.075 }
-                      : { competence: 0.05 },
-    tags:
-      sleep || rest
+    advertises: worship
+      ? {}
+      : drink
+        ? { water: 0.7 }
+        : sleep
+          ? { sleep: 0.9, rest: 0.7 }
+          : eat
+            ? { food: 0.7, water: 0.4 }
+            : observe || accept
+              ? { competence: 0.12, belonging: 0.05 }
+              : rest
+                ? { rest: 0.7, leisure: 0.05 }
+                : leisure
+                  ? { leisure: 0.18, meaning: 0.08 }
+                  : personal
+                    ? { leisure: 0.18, autonomy: 0.12 }
+                    : help
+                      ? { competence: 0.4, belonging: 0.08 }
+                      : diagnose
+                        ? { competence: 0.075 }
+                        : { competence: 0.05 },
+    tags: worship
+      ? ['worship']
+      : sleep || rest
         ? ['rest']
         : personal
           ? ['leisure']
@@ -228,6 +232,19 @@ export function chooseActivity(
   tick(person, now);
   if (Object.keys(cues).length) receiveMethodCues(person, { contextId, cues: cueList(cues) });
   else clearMethodContext(person);
+  // Continuing people can attend to their retained prayer duties. This is an
+  // ordinary optional activity; HF owns its timing, choice and duty outcome.
+  if (
+    person.agenda.commitments.some(
+      (duty) =>
+        duty.status === 'pending' &&
+        duty.actions.includes('pray') &&
+        duty.from <= now &&
+        now < duty.until,
+    ) &&
+    !options.some((option) => option.action === 'pray')
+  )
+    options = [...options, { id: 'pray', action: 'pray', label: 'Pray', duration: 15, effort: 0 }];
   const offers = options.map((option) => offer(person, option, contextId));
   const record = decide(person, offers, ask ? { now, suggestion: ask } : { now });
   pending.set(person, { record, offers });

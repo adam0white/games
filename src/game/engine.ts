@@ -2150,9 +2150,8 @@ export function canStartBusyWorkshop(s: GameState): boolean {
 }
 /** Public commands and returned worlds never retain caller-owned nested references. */
 export function dispatch(state: GameState, command: Command): CommandResult {
-  const hf = snapshotRuntime(state.people);
-  const next = { ...structuredClone({ ...state, hf: undefined }), hf };
-  forkWorkshop(next.people, hf, state.people);
+  const next = structuredClone({ ...state, hf: undefined }) as unknown as GameState;
+  next.hf = forkWorkshop(next.people, state.people);
   return dispatchPrepared(state, structuredClone(command), next);
 }
 
@@ -2184,7 +2183,7 @@ export function replayCommands(
     if (Object.hasOwn(state, 'inputs')) next.inputs = state.inputs;
     else delete next.inputs;
     const command = structuredClone(input);
-    const result = dispatchPrepared(state, command, next, false);
+    const result = dispatchPrepared(state, command, next);
     if (!result.ok) return { ok: false, index, command, message: result.message };
     state = result.state;
   }
@@ -2194,12 +2193,7 @@ export function replayCommands(
 }
 
 /** Both callers supply isolated world/command data; only replay owns and reuses its input prefix. */
-function dispatchPrepared(
-  state: GameState,
-  command: Command,
-  s: GameState,
-  coldSnapshot = true,
-): CommandResult {
+function dispatchPrepared(state: GameState, command: Command, s: GameState): CommandResult {
   bindWorkshopResolver(s.people, () => settleWorkshopFinishes(s));
   const fail = (message: string): CommandResult => ({ state, ok: false, message });
   const done = (message: string): CommandResult => {
@@ -2219,7 +2213,6 @@ function dispatchPrepared(
         delete s.inputs;
       } else s.inputs.push(structuredClone(command));
     }
-    if (coldSnapshot) s.hf = snapshotRuntime(s.people);
     return { state: s, ok: true, message };
   };
   if (s.ended && command.type !== 'continue' && command.type !== 'select')

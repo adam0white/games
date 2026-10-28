@@ -7,6 +7,7 @@ import { perceive, prepareActivityFinish } from './hf.ts';
 import { createModel, intervene, runUseTest } from './model.ts';
 import { chooseActivity, finishActivity, playerAsk, startActivity } from './people.ts';
 import { OUTCOME_PROVENANCE } from './recording.ts';
+import { refundPart } from './stock.ts';
 import type { GameState, Job, WorkOption } from './types.ts';
 
 export const OUTCOME_ACTIONS = [
@@ -273,11 +274,14 @@ export function requestOutcome(s: GameState, action: OutcomeAction): string {
   if (o.decisions.length > 100) o.decisions.shift();
   message(s, p.name, choice.answer?.says ?? choice.narration);
   const selected = options.find((a) => a.id === choice.chosenId);
-  if (choice.chosenId === action) {
-    if (existing) {
-      finishActivity(p, existing.option, false, s.now, [], true);
-      s.npcWork = s.npcWork.filter((w) => w !== existing);
-    } else if (p.activity) return 'Their existing activity cannot be interrupted by this scene.';
+  // The HF decision can interrupt the current activity before the host's next time drain.
+  // Reconcile the old reservation before starting the selected alternative.
+  if (existing && (!p.activity || choice.chosenId === action)) {
+    finishActivity(p, existing.option, false, s.now, [], true);
+    refundPart(s, existing);
+    s.npcWork = s.npcWork.filter((w) => w !== existing);
+  } else if (choice.chosenId === action && p.activity && !existing) {
+    return 'Their existing activity cannot be interrupted by this scene.';
   }
   if (choice.chosenId !== action || !startActivity(p, option, s.now)) {
     if (selected && selected.id !== action && !p.activity && startActivity(p, selected, s.now))

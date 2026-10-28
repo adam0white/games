@@ -1,5 +1,6 @@
+import { replay } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
-import { createGame } from '../src/game/engine';
+import { createGame, dispatch } from '../src/game/engine';
 import { attachWorkshop, createPeopleRuntime, createPerson, snapshotRuntime } from '../src/game/hf';
 import { loadGame, saveGame } from '../src/game/persistence';
 
@@ -59,4 +60,34 @@ describe('HF4 runtime save boundary', () => {
     };
     expect(() => attachWorkshop(state)).toThrow();
   });
+});
+
+it('keeps unsaved sibling histories isolated across public checkpoints', () => {
+  const opening = createGame(42);
+  const initial = saveGame(opening);
+  const jobId = opening.selectedJobId;
+  const shared = dispatch(opening, { type: 'verify', jobId, condition: 'movement' }).state;
+  const work = {
+    type: 'work' as const,
+    jobId,
+    componentId: 'switch',
+    intervention: 'replace' as const,
+  };
+  const left = dispatch(shared, work).state;
+  // The shared branch has no cold save yet. Taking its other path must replay
+  // its public call prefix without changing either the source or the first path.
+  const right = dispatch(shared, { type: 'wait', minutes: 1 }).state;
+  const sharedSave = saveGame(shared);
+  const leftSave = saveGame(left);
+  expect(saveGame(dispatch(loadGame(sharedSave), work).state) === leftSave).toBe(true);
+  expect(
+    saveGame(dispatch(loadGame(sharedSave), { type: 'wait', minutes: 1 }).state) ===
+      saveGame(right),
+  ).toBe(true);
+  expect(saveGame(opening) === initial).toBe(true);
+  const archive = JSON.parse(leftSave).hf.archive;
+  const exact = replay(archive);
+  expect(exact.ok && exact.value.verified && exact.value.fullHash === archive.hashes.full).toBe(
+    true,
+  );
 });

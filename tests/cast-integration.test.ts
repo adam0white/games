@@ -1,4 +1,4 @@
-import { replay } from '@adam0white/human-framework';
+import { replay, validatePortablePerson } from '@adam0white/human-framework';
 import {
   acceptPersona,
   acceptPersonaBatch,
@@ -24,7 +24,7 @@ import { createPeopleRuntime, createPerson, snapshotRuntime } from '../src/game/
 import { loadGame, saveGame } from '../src/game/persistence';
 import { replayRecordedRun } from '../src/game/replay';
 
-const stamps = { game: 'repair', build: 'test', engine: '4.5.2', rules: 'canonical-workshop-2' };
+const stamps = { game: 'repair', build: 'test', engine: '4.6.0', rules: 'canonical-workshop-2' };
 // Explicit public authoring makes a distinct source. No cache edit changes an HF actor.
 async function source(id: 'nora' | 'rafi') {
   const castId = CAST_IDS[id]!;
@@ -57,6 +57,34 @@ async function source(id: 'nora' | 'rafi') {
 }
 
 describe('released HF4 whole-cast workshop adapter', () => {
+  it('admits a Commonstead retained v2 envelope with its canonical source identity', async () => {
+    const original = await source('nora');
+    const portable = structuredClone(validatePortablePerson(original.transfer.person));
+    portable.source.game = 'commonstead';
+    portable.source.personId = original.castId;
+    const { revision: _revision, ...body } = original;
+    const parent = await createPersona({
+      ...body,
+      source: { ...stamps, game: 'commonstead', rules: 'commonstead-4' },
+      transfer: {
+        castPassport: 'commonstead-retained/4',
+        sourceRole: original.castId,
+        portable,
+        life: original.transfer.life,
+      },
+    });
+    const input = preparePersonaLife(parent, 0);
+    const opening = createGame(42).people.nora!;
+    const admitted = admitWorkshop(input, opening);
+    expect(admitted.traits.honesty).toBeCloseTo(0.91, 9);
+    expect(admitted.body.fitness).toBeCloseTo(0.37, 9);
+    const bad = structuredClone(input);
+    bad.parent.transfer.sourceRole = 'nora';
+    expect(() => admitWorkshop(bad, opening)).toThrow();
+    const wrongRules = structuredClone(input);
+    wrongRules.parent.source.rules = 'unknown';
+    expect(() => admitWorkshop(wrongRules, opening)).toThrow();
+  });
   it('admits two authored source people atomically and replays without the shelf', async () => {
     const parents = await Promise.all([source('nora'), source('rafi')]);
     let shelf: PersonaShelfState = { heads: {}, revisions: [] };

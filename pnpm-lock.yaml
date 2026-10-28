@@ -171,8 +171,8 @@ importers:
   .:
     dependencies:
       '@adam0white/human-framework':
-        specifier: 4.5.2
-        version: 4.5.2
+        specifier: 4.6.0
+        version: 4.6.0
       '@adam0white/lab-client':
         specifier: file:vendor/adam0white-lab-client-0.5.2.tgz
         version: file:vendor/adam0white-lab-client-0.5.2.tgz
@@ -242,8 +242,8 @@ packages:
     resolution: {integrity: sha512-4+DgBQitSTfgWMSPOeiZe6OY3Dd5tv5lM2u/rOHdsG6WySIy7bkxE5dn8onGqtgXOZRr92H6oEjUHhu6BK8OXQ==}
     engines: {node: '>=24'}
 
-  '@adam0white/human-framework@4.5.2':
-    resolution: {integrity: sha512-RKYUaEeF9TmbXwnhmxw3ISnz/qr4MvzhsoecC2uQkwgGS55Al2ZaM33hotoj9hzBQTeYmIdCQQlPfUUE5hBFuw==}
+  '@adam0white/human-framework@4.6.0':
+    resolution: {integrity: sha512-FRwo9yEuU/kik2C8/Ed5jK8vVifIOaE5z0z80kRaLAruAY3dKIasKGwXPT/tBwPdSfIwblQrELvPPnAjBCLKnQ==}
     engines: {node: '>=24'}
 
   '@adam0white/lab-client@file:vendor/adam0white-lab-client-0.5.2.tgz':
@@ -1678,7 +1678,7 @@ snapshots:
 
   '@adam0white/human-framework@4.4.0': {}
 
-  '@adam0white/human-framework@4.5.2': {}
+  '@adam0white/human-framework@4.6.0': {}
 
   '@adam0white/lab-client@file:vendor/adam0white-lab-client-0.5.2.tgz':
     dependencies:

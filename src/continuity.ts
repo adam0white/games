@@ -40,7 +40,7 @@ interface LocalMeta {
 const source = () => ({
   game: 'repair',
   build: String(lab.build().c ?? 'local'),
-  engine: '4.5.2',
+  engine: '4.6.0',
   rules: 'canonical-workshop-2',
 });
 /** One source of ownership and recording permission. Local receipts never replace initial replay actors. */
@@ -227,7 +227,10 @@ export class WorkshopContinuity {
                   return false;
                 }
                 currentIds.add(input.parent.castId);
-                if (input.parent.source.game !== 'repair')
+                if (
+                  input.parent.source.game !== 'repair' &&
+                  input.parent.source.game !== 'commonstead'
+                )
                   preflightFailure = new Error(
                     'A current character is still in another chapter. Continue or export that chapter first.',
                   );
