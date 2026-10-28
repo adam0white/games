@@ -7,6 +7,7 @@ import {
   createPerson,
   exportPersonRun,
   methodEvidence,
+  promise,
   snapshotRuntime,
 } from '../src/game/hf';
 import {
@@ -156,4 +157,64 @@ describe('published HF4 workshop actor boundary', () => {
     expect(after.hashes.full).toBe(before.hashes.full);
     expect(after).toEqual(before);
   });
+});
+
+function prayerOpening() {
+  const people = createPeopleRuntime(42, 600, ['rest', 'pray', 'sleep']);
+  const person = createPerson(people, {
+    id: 'nora',
+    name: 'Nora',
+    age: 20,
+    sex: 'female',
+    now: 600,
+    needs: {
+      safety: 1,
+      belonging: 1,
+      esteem: 1,
+      autonomy: 1,
+      competence: 1,
+      leisure: 1,
+      meaning: 1,
+    },
+  });
+  const duty = promise(person, {
+    kind: 'worship',
+    actions: ['pray'],
+    from: 600,
+    until: 660,
+    importance: 1,
+    label: 'Retained prayer duty',
+  });
+  return { person, duty };
+}
+
+it('lets the host start and finish a chosen retained prayer opportunity', () => {
+  const { person, duty } = prayerOpening();
+  const options: WorkOption[] = [{ ...rest, duration: 15 }];
+  const choice = chooseActivity(person, 'workshop', {}, options, 600);
+  expect(choice.chosenId).toBe('pray');
+  const selected = options.find((option) => option.id === choice.chosenId);
+  expect(selected).toBeDefined();
+  expect(startActivity(person, selected!, 600)).toBe(true);
+  expect(finishActivity(person, selected!, true, 615)).not.toBeNull();
+  expect(person.agenda.commitments.find((c) => c.id === duty.id)?.status).toBe('kept');
+  const archive = exportPersonRun(person);
+  const exact = replay(archive);
+  expect(exact.ok && exact.value.verified).toBe(true);
+});
+
+it.each([
+  {
+    label: 'a sleep-only night',
+    option: { id: 'sleep', action: 'sleep', label: 'Sleep', duration: 600, effort: 0 },
+  },
+  { label: 'less than fifteen minutes', option: { ...rest, duration: 1 } },
+])('does not advertise an unsupported prayer opportunity during $label', ({ option }) => {
+  const { person } = prayerOpening();
+  const options: WorkOption[] = [option];
+  chooseActivity(person, 'workshop', {}, options, 600);
+  expect(options.map((option) => option.id)).toEqual([option.id]);
+  expect(person.trace[0]?.considered.some((candidate) => candidate.affordanceId === 'pray')).toBe(
+    false,
+  );
 });

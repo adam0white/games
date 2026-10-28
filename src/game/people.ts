@@ -235,6 +235,7 @@ export function chooseActivity(
   // Continuing people can attend to their retained prayer duties. This is an
   // ordinary optional activity; HF owns its timing, choice and duty outcome.
   if (
+    options.some((option) => option.action !== 'sleep' && option.duration >= 15) &&
     person.agenda.commitments.some(
       (duty) =>
         duty.status === 'pending' &&
@@ -244,7 +245,8 @@ export function chooseActivity(
     ) &&
     !options.some((option) => option.action === 'pray')
   )
-    options = [...options, { id: 'pray', action: 'pray', label: 'Pray', duration: 15, effort: 0 }];
+    // Callers use this same offer list to start the actual selected activity.
+    options.push({ id: 'pray', action: 'pray', label: 'Pray', duration: 15, effort: 0 });
   const offers = options.map((option) => offer(person, option, contextId));
   const record = decide(person, offers, ask ? { now, suggestion: ask } : { now });
   pending.set(person, { record, offers });

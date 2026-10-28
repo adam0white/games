@@ -1154,18 +1154,12 @@ function Workshop({
     <details className="workshop-debug">
       <summary>Debug</summary>
       <div className="debug-tools">
-        <button type="button" onClick={exportSave}>
-          Download this run
-        </button>
         <button type="button" disabled={replayChecking} onClick={verifyReplay}>
           {replayChecking ? 'Verifying replay…' : 'Verify the recorded replay'}
         </button>
         {replayStatus && <p role="status">{replayStatus}</p>}
         {!continuity.fileSession && (
           <>
-            <a href="/file/" onClick={(event) => void goToGames(event)}>
-              Import a workshop
-            </a>
             <label>
               Starting number (seed)
               <input type="number" value={seedText} onChange={(e) => setSeedText(e.target.value)} />
@@ -1183,12 +1177,12 @@ function Workshop({
       </div>
     </details>
   );
-  const privacyTools = (
+  const privacyTools = (showDebug = true) => (
     <div className="privacy-tools">
       <a href="https://human.adamwhite.work/lab/privacy/" target="_blank" rel="noreferrer">
         Lab privacy
       </a>
-      {debugTools}
+      {showDebug && debugTools}
     </div>
   );
 
@@ -1353,7 +1347,7 @@ function Workshop({
         <aside className="entry-error" role="alert">
           <p>{saveError}</p>
           <button type="button" onClick={exportSave}>
-            Download this run
+            Download this workshop
           </button>
         </aside>
       )}
@@ -1391,11 +1385,9 @@ function Workshop({
             </small>
             {!continuity.fileSession && (
               <details>
-                <summary>Optional cast-outcome chapter</summary>
+                <summary>What became of Sam, Nora, Rafi and Halil</summary>
                 <p>
-                  Keep the diagnostic workshop. Hear Sam, Nora, Rafi and Halil’s accounts, then
-                  choose finite work with real time, stock and payment. This separate local chapter
-                  keeps the ordinary autosave. Each person can refuse.
+                  Hear how they are doing and take on one more job. Your saved workshop is kept.
                 </p>
                 <button
                   type="button"
@@ -1422,16 +1414,13 @@ function Workshop({
               </div>
             )}
 
-            <a href="/experiments/" onClick={(event) => void goToGames(event)}>
-              Earlier experiments
-            </a>
             <a
               href="https://human.adamwhite.work/lab/people/"
               onClick={(event) => void goToGames(event)}
             >
               People across games
             </a>
-            {privacyTools}
+            {privacyTools(false)}
           </div>
         </main>
       )}
@@ -2861,7 +2850,7 @@ function Workshop({
               </button>
               {!continuity.fileSession && (
                 <button type="button" onClick={exportSave}>
-                  Download this run
+                  Download this workshop
                 </button>
               )}
             </div>
@@ -2959,6 +2948,14 @@ function Workshop({
                 >
                   Feedback <span>▸</span>
                 </button>
+                <button type="button" onClick={exportSave}>
+                  Download this workshop
+                </button>
+                {!continuity.fileSession && (
+                  <a href="/file/" onClick={(event) => void goToGames(event)}>
+                    Open a saved workshop
+                  </a>
+                )}
                 <button
                   className="reading-row fullscreen-row"
                   type="button"
@@ -2996,9 +2993,6 @@ function Workshop({
                 >
                   All games
                 </a>
-                <a href="/experiments/" onClick={(event) => void goToGames(event)}>
-                  Earlier experiments
-                </a>
                 <a
                   href="https://human.adamwhite.work/lab/people/"
                   onClick={(event) => void goToGames(event)}
@@ -3017,8 +3011,11 @@ function Workshop({
                     />{' '}
                     Recording
                   </label>
-                  {privacyTools}
+                  {privacyTools()}
                 </div>
+                <a href="/experiments/" onClick={(event) => void goToGames(event)}>
+                  Older versions of this game
+                </a>
                 <button
                   className="primary-action"
                   type="button"

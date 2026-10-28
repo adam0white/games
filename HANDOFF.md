@@ -4,6 +4,8 @@
 
 Remaining: complete the current full lane, push the follow-up in PR8, merge with exact green CI, deploy and verify the clean live manifest. The one requested hosted review is complete; its refund finding and a later automatic refusal-path finding are fixed in the same PR. No HF4 delivery is claimed at this candidate stage. Adam accepts feel separately on 2026-11-03.
 
+The current public menu exposes Download this workshop and Open a saved workshop. Debug stays beside Lab privacy in that menu, holding seed/replay diagnostics. The title has no Debug or older-versions link; the chapter and history links use plain words. These current choices supersede the earlier public-tools candidate below.
+
 The target is actor HF 4.6.0 with immutable client 0.5.2 / kit 0.5.19. Client's deliberate HF 4.4.0 pure portable dependency is retained. Source game 4.2.0 uses provenance `4.2.0+hf4`; the host schema stays `small-works@5`, and provenance refuses the old root-game edition. The owner waived old saves, links and HF3 compatibility. The historical archive builder is unchanged. [HF4 adoption](docs/hf4-adoption.md) owns this port's scope and evidence. The older candidates below are prior work and do not impose an extra review or a deployment hold on this authorized port.
 
 ## Native admission optimization candidate, 2026-10-27
