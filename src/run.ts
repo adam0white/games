@@ -28,7 +28,7 @@ export async function runIsland(
     format: 'island-recording@1',
     mind: mind.name,
     seed,
-    hf: '2.9.0',
+    hf: mind.hfVersion ?? '2.9.0',
     world: { size: state.size, height: structuredClone(state.height), spire: { ...state.spire } },
     config: settings,
     frames: [],
@@ -75,7 +75,7 @@ export async function runIsland(
   }
   const cost = (mind as Mind & { cost?: () => Recording['cost'] }).cost?.();
   if (cost) recording.cost = { ...cost };
-  recording.measures = measureRecording(recording, !/^hf[23]/.test(mind.name));
+  recording.measures = measureRecording(recording, !/^hf[234]/.test(mind.name));
   return recording;
 }
 
@@ -114,6 +114,7 @@ async function main(args: string[]) {
       'scripted',
       'hf2',
       'hf3',
+      'hf4',
       'hf2-no-boredom',
       'hf2-no-memory',
       'hf2-no-goals',
