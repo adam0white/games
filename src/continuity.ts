@@ -160,7 +160,7 @@ export class WorkshopContinuity {
     this.started = true;
     await this.recording(false);
   }
-  async fresh(seed: number, localOnly = false) {
+  async fresh(seed: number) {
     const shelf = this.shelf;
     if (!shelf) throw new Error('Starting a new workshop is unavailable in a file session.');
     if (this.busy) throw new Error('A chapter is already being prepared.');
@@ -171,8 +171,8 @@ export class WorkshopContinuity {
     try {
       await shelf.ready;
       // Owner direction 2026-10-27: same-person carryover is automatic for fresh ordinary play.
-      // Existing pinned chapters and deliberately local authored editions keep their history.
-      if (!localOnly && !shelf.enabled) {
+      // Existing pinned chapters keep their history; imported files use the separate file session.
+      if (!shelf.enabled) {
         shelf.setEnabled(true);
         await shelf.ready;
       }
@@ -181,7 +181,7 @@ export class WorkshopContinuity {
       let state = base;
       let chapter: CastChapter | undefined;
       let shelfUnavailable = false;
-      if (shelf.enabled && !localOnly) {
+      if (shelf.enabled) {
         let result: Awaited<ReturnType<typeof claimCastChapterBatch<GameState['people']>>>;
         let prepared = false;
         const bridge = {
@@ -244,11 +244,7 @@ export class WorkshopContinuity {
         ? 'Your workshop is saved on this device. Shared character history is unavailable here.'
         : chapter
           ? `The chapter loaded all ${chapter.inputs.length} saved character histories together. Other characters start with their original histories.`
-          : localOnly
-            ? 'You started a fresh chapter on this device. Saved character histories in this browser are unchanged.'
-            : shelf.enabled
-              ? 'You started a fresh chapter. There were no saved character histories to load.'
-              : 'Character history across games is off. This fresh chapter starts on this device with the original characters.';
+          : 'You started a fresh chapter. There were no saved character histories to load.';
       return state;
     } finally {
       this.busy = false;
@@ -290,19 +286,6 @@ export class WorkshopContinuity {
       'When recording is on, recorded play from this file links to play in other games on this device. Character ownership records in the file do not grant ownership.';
     this.changed();
     return state;
-  }
-  async setEnabled(on: boolean) {
-    const shelf = this.shelf;
-    if (!shelf) throw new Error('Shared character history is unavailable in a file session.');
-    this.generation++;
-    this.recordingKey = `workshop:${crypto.randomUUID()}`;
-    lab.setPersonaRecording('continuity-preference-changed');
-    await shelf.ready;
-    shelf.setEnabled(on);
-    this.status = on
-      ? 'Character history across games is on. It applies to the next fresh chapter.'
-      : 'Character history across games is off. The loaded chapter keeps the histories it started with.';
-    this.changed();
   }
   async recording(_allow: boolean) {
     lab.setPersonaRecording(this.recordingKey);

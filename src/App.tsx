@@ -1394,9 +1394,6 @@ function Workshop({
               </div>
             )}
 
-            <a href="/file/" onClick={(event) => void goToGames(event)}>
-              Open a workshop file
-            </a>
             <a href="/experiments/" onClick={(event) => void goToGames(event)}>
               Earlier experiments
             </a>
@@ -2970,9 +2967,6 @@ function Workshop({
                   onClick={(event) => void goToGames(event)}
                 >
                   All games
-                </a>
-                <a href="/file/" onClick={(event) => void goToGames(event)}>
-                  Open a workshop file
                 </a>
                 <a href="/experiments/" onClick={(event) => void goToGames(event)}>
                   Earlier experiments
