@@ -98,6 +98,7 @@ export interface MindStep {
 }
 
 export interface Mind {
+  hfVersion?: string;
   name: string; // 'hf', 'hf-no-boredom', 'random', 'llm-workers-ai', 'llm-claude'
   /** Called once per step. May be async (LLM minds). */
   step(obs: Observation): MindStep | Promise<MindStep>;

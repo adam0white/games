@@ -169,6 +169,9 @@ importers:
       '@adam0white/human-framework':
         specifier: 2.9.0
         version: 2.9.0
+      hf4:
+        specifier: npm:@adam0white/human-framework@4.5.1
+        version: '@adam0white/human-framework@4.5.1'
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.5.15
@@ -187,6 +190,10 @@ packages:
 
   '@adam0white/human-framework@2.9.0':
     resolution: {integrity: sha512-KxQNP4rCv5bwLS4cym7zUNaozdTX482o/XeM+T0s8C7dPQDW/HIJx6tfuYRaHCQ+C8xeTxseNZcipuD0mW1Lpg==}
+    engines: {node: '>=24'}
+
+  '@adam0white/human-framework@4.5.1':
+    resolution: {integrity: sha512-bw5W7dOq3TuSsxAOpu2GuYXel4yZDA1mXf9cAZxjX+kZ0s5tcxemzFUdcxitPuCSbUY7QCh7/RJhWPyoAYhx9w==}
     engines: {node: '>=24'}
 
   '@biomejs/biome@2.5.15':
@@ -761,6 +768,8 @@ packages:
 snapshots:
 
   '@adam0white/human-framework@2.9.0': {}
+
+  '@adam0white/human-framework@4.5.1': {}
 
   '@biomejs/biome@2.5.15':
     optionalDependencies:

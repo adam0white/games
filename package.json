@@ -10,10 +10,13 @@
   "scripts": {
     "check": "biome check . && tsc --noEmit && vitest run",
     "test": "vitest run",
-    "run:hf": "node src/run.ts"
+    "run:hf": "node src/run.ts",
+    "check:lane": "node scripts/check-lane.ts",
+    "rerun:hf4": "node scripts/rerun-hf4.ts"
   },
   "dependencies": {
-    "@adam0white/human-framework": "2.9.0"
+    "@adam0white/human-framework": "2.9.0",
+    "hf4": "npm:@adam0white/human-framework@4.5.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
