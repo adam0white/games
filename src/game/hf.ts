@@ -553,7 +553,7 @@ export function attachWorkshop(state: {
     !Number.isSafeInteger(data.nextInput) ||
     data.nextInput < 1 ||
     !record(data.archive) ||
-    data.archive.engine.package !== '@adam0white/human-framework@4.7.0' ||
+    data.archive.engine.package !== '@adam0white/human-framework@4.8.0' ||
     !record(data.active) ||
     !record(data.offers) ||
     !record(data.revisions) ||

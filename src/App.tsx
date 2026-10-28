@@ -55,7 +55,7 @@ import {
   latestRecoveryAccount,
   ownerPromiseAccount,
 } from './ui/workshop-feedback';
-import { readWorkshopSave } from './workshop-storage';
+import { readFreshWorkshopSave, readWorkshopSave, SOURCE_JOURNAL_KEY } from './workshop-storage';
 import './styles.css';
 import './focused-layout.css';
 import './meter-layout.css';
@@ -1060,6 +1060,23 @@ function Workshop({
       setEntering(false);
     }
   };
+  const enterRestoredWorkshop = async (restored: GameState) => {
+    const previous = stateRef.current;
+    // Resuming a paused chapter checkpoints through continuity's bound state reader.
+    stateRef.current = restored;
+    setState(restored);
+    try {
+      const next = await continuity.enter(restored);
+      stateRef.current = next;
+      return next;
+    } catch (error) {
+      if (stateRef.current === restored) {
+        stateRef.current = previous;
+        setState(previous);
+      }
+      throw error;
+    }
+  };
   const enterOutcomeWorkshop = async () => {
     if (continuity.fileSession) return;
     if (entering) return;
@@ -1067,11 +1084,12 @@ function Workshop({
     setEntryError('');
     try {
       await continuity.depart();
-      const saved = readWorkshopSave(OUTCOME_LOCAL_KEY);
+      const saved = await readFreshWorkshopSave(OUTCOME_LOCAL_KEY);
       if (saved) {
+        await readFreshWorkshopSave(SOURCE_JOURNAL_KEY);
         const restored = continuity.loadLocal(saved);
         if (!restored.castOutcomes) throw new Error('This is not the cast-outcome chapter.');
-        resetPresentation(await continuity.enter(restored), true);
+        resetPresentation(await enterRestoredWorkshop(restored), true);
       } else {
         const base = await continuity.fresh(freshSeed());
         const result = dispatch(base, { type: 'start-cast-outcomes' });
@@ -1091,15 +1109,21 @@ function Workshop({
       setEntryError(damagedWorkshopMessage);
       return;
     }
-    if (!continuity.loaded) {
-      await startWorkshop(state.seed);
-      return;
-    }
     setEntryError('');
     setEntering(true);
     try {
-      const next = await continuity.enter(stateRef.current);
-      stateRef.current = next;
+      let restored = stateRef.current;
+      if (!continuity.fileSession) {
+        const key = restored.castOutcomes ? OUTCOME_LOCAL_KEY : SAVE_KEY;
+        const saved = await readFreshWorkshopSave(key);
+        if (!saved) {
+          await startWorkshop(restored.seed, Boolean(restored.castOutcomes));
+          return;
+        }
+        await readFreshWorkshopSave(SOURCE_JOURNAL_KEY);
+        restored = continuity.loadLocal(saved);
+      }
+      const next = await enterRestoredWorkshop(restored);
       setState(next);
       setSheet(null);
       setHasSave(true);

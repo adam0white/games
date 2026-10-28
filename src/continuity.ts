@@ -22,6 +22,7 @@ import { pauseForDeparture, resumeForPlay } from './ui/chapter';
 import {
   LOCAL_KEY,
   OUTCOME_LOCAL_KEY,
+  readFreshWorkshopSave,
   readWorkshopSave,
   SOURCE_JOURNAL_KEY,
   writeWorkshopSave,
@@ -40,7 +41,7 @@ interface LocalMeta {
 const source = () => ({
   game: 'repair',
   build: String(lab.build().c ?? 'local'),
-  engine: '4.7.0',
+  engine: '4.8.0',
   rules: 'canonical-workshop-2',
 });
 /** One source of ownership and recording permission. Local receipts never replace initial replay actors. */
@@ -444,7 +445,7 @@ export class WorkshopContinuity {
       const snapshotId = Array.from(new Uint8Array(digest), (byte) =>
         byte.toString(16).padStart(2, '0'),
       ).join('');
-      const journal = JSON.parse(readWorkshopSave(SOURCE_JOURNAL_KEY) ?? '[]');
+      const journal = JSON.parse((await readFreshWorkshopSave(SOURCE_JOURNAL_KEY)) ?? '[]');
       if (!Array.isArray(journal))
         throw new Error('The source history could not be read. Keep the original data.');
       if (

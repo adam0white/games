@@ -4,14 +4,14 @@ Remaining: merge with exact green CI, deploy and verify the clean live manifest.
 
 ## Scope and decisions
 
-The current target is published HF 4.7.0, pinned exactly, with immutable lab-client 0.5.3 and lab-kit 0.5.21 release artifacts. Their SHA256 values match the GitHub release assets:
+The current target is published HF 4.8.0, pinned exactly, with immutable lab-client 0.5.4 and lab-kit 0.5.22 release artifacts. Their SHA256 values match the GitHub release assets:
 
 | Artifact | SHA256 |
 | --- | --- |
-| `adam0white-lab-client-0.5.3.tgz` | `18270bc9ac2b6121852f38daac3aada4c4189dd9e379f2d508bf3753a28f29a9` |
-| `adam0white-lab-kit-0.5.21.tgz` | `8b2bc1e86cb5856a89e6d2560212851396f624c8c296984f0123bfb8028a12f3` |
+| `adam0white-lab-client-0.5.4.tgz` | `7f0c01e723b13e10f4a5e1aeb8376e21b409906af82d0ef97a4a1150d319364c` |
+| `adam0white-lab-kit-0.5.22.tgz` | `6b9cc3072e91e97bda044cdb10586e3cb8fa789e53b00f0328b379eba435510d` |
 
-The game, client and kit resolve the same physical HF 4.7.0 module. Client 0.5.3 intentionally retains the `hf-legacy` alias at 3.0.0 for its legacy adapter. No framework code is copied into this repository.
+The game, client and kit resolve the same physical HF 4.8.0 module. Client 0.5.4 intentionally retains the `hf-legacy` alias at 3.0.0 for its legacy adapter. No framework code is copied into this repository.
 
 The implementer chose game 4.2.0 and provenance `4.2.0+hf4`. The host schema name remains `small-works@5`; exact provenance and the run archive identify the new edition. Older saves receive the explicit start-fresh refusal. This is authorized abandonment of old-save compatibility, not conversion of an old person into a fresh replacement. Fixed historical archives and their builder remain separate.
 
@@ -114,4 +114,21 @@ The installation receipt verifies the 4.7.0, client 0.5.3 and kit 0.5.21 depende
 
 Actual Commonstead source `69370bf49cdcfbfe5e77c55a4cb3deb7fb8433ec` used installed HF4.6.0. Nora and Sam each carried all88 episodes at tick1800 into the4.7 receiver. Wait60minutes, Next day, Wait30minutes and Pause passed byte-exact restoration at every boundary, final native replay and complete game replay. Nora’s final full hash is `2a8f14017045226b3aba2fbc89976b29b20234a5ce1f1f5e42450bc2fd566101`; Sam’s is `8a4e2b165a1278e188cb70596d8d0fe96b377fc49dc423cf00c2f5441318c530`. The same-game played Nora control retained20episodes through receiving next day and passed save/native/game replay, full hash `9184e413179163c3a8a2d9f3484d61908d8b7c9cdb492a13a89ed219f998d025`.
 
-The4.7 browser build passed360×690 and1280×800 with no horizontal overflow. Start, Carry09:00→09:15, ordinary menu download, file chooser cancellation, actual isolated file import/Resume09:15 and return to native Resume09:15 passed. The actual downloaded save replayed completely and restored byte-exactly at369,393characters, native full hash `a71ec014ec2c8154c143b13c1dba85b84c4039432fc344c8c760f3768723c8e9`. These engineering controls do not establish player acceptance. The final normal lane passed372tests across59files in706.10seconds, plus lint, typecheck and production build.274 lint warnings and the bundle-size warning remain. Signed delivery, exact CI, merge and live verification remain. Earlier results and hashes remain evidence for their original pins.
+The4.7 browser build passed360×690 and1280×800 with no horizontal overflow. Start, Carry09:00→09:15, ordinary menu download, file chooser cancellation, actual isolated file import/Resume09:15 and return to native Resume09:15 passed. The actual downloaded save replayed completely and restored byte-exactly at369,393characters, native full hash `a71ec014ec2c8154c143b13c1dba85b84c4039432fc344c8c760f3768723c8e9`. These engineering controls do not establish player acceptance. The earlier 4.7 normal lane passed372tests across59files in706.10seconds, plus lint, typecheck and production build.274 lint warnings and the bundle-size warning remain. Signed delivery, exact CI, merge and live verification remain. Earlier results and hashes remain evidence for their original pins.
+
+
+## Cross-tab saved chapter correction
+
+The hosted review’s next automatic refresh found that an already initialized tab could open an older cached save after another tab wrote newer progress. The issue reproduced through ordinary browser controls in both native Resume and the optional chapter. Opening a slot now awaits a fresh IndexedDB transaction after this tab’s queued writes. A failed read preserves the previous cache and stored data and blocks entry. The restored state is bound before paused-chapter checkpointing. File sessions stay isolated; explicit New game remains explicit. Sixteen storage controls and all eighteen continuity controls pass, with typecheck and scoped lint. The same cache could also drop another tab’s source-journal rows when appending a checkpoint. That sequential two-store failure was reproduced; checkpoint append now refreshes the journal, and restored entry refreshes source rows for complete synchronous downloads. The original late-capture and post-journal generation checks remain intact. Final actual two-tab browser controls pass: the older tab opens the latest paused native and optional saves, and both downloaded files restore byte-exactly and pass native and complete game replay. The unchanged final normal gate passes383tests across59files in738.62seconds, plus lint, typecheck and build.274 lint warnings and the bundle-size warning remain. A prior unchanged run had382passes and one600-second timeout during documented host paging; no assertion failed. No timeout or assertion changed. Simultaneous active tabs retain the existing last-write behavior.
+
+Delivery status is recorded in [PR8](https://github.com/adam0white/repair-game/pull/8). Completion requires exact merged CI and the matching clean [live release](https://repair.adamwhite.work/release.json).
+
+## Host-restored resume, 2026-10-28
+
+The preserved five-file storage correction reconstructed tree `810d59fce510d8b169af27ab8dccad9fcbfe4b64` exactly before repinning. All five source hashes matched the saved manifest. The source moves to HF4.8.0/client0.5.4/kit0.5.22 in the same PR8. The HF4.7-to-4.8 core delta is only the engine stamp; schema is unchanged. Client changes add another game's role map and reject malformed ownership candidates. This is a small adoption step, not a second port or review. Commonstead source passports at4.6/4.7/4.8 remain accepted; local claim and save stamps require4.8. Earlier4.7 test receipts above remain historical.
+
+The coordinator's13:40Z ruling is implemented in `check:lane`: lint and typecheck run without the machine lock. Full hosted CI remains `pnpm run check` plus both historical builds. No test, replay-hash assertion, full CI step or timeout is removed. Deployment uses the normal `npm run deploy` with `SUITE_LOCK=0` for this game under the same ruling. Fresh focused/headless/build and exact CI receipts are recorded in the external CS-SW delivery report.
+
+HF4.8 resume controls: the first focused run passed50 of51; only the expected4.7 golden hash differed after the engine stamp changed. The4.8 seed42 lesson archive hash is `488458885ff942c99ebe59e0cf4e25f3fdbb7df2c37938ead2e2d7abf7873a94`. The assertion remains fixed to that literal value. Storage, continuity, runtime-save and cast-admission controls passed on4.8. Both native HF and complete game replay remain required by the narration control; its rerun receipt is in the CS-SW report.
+
+The fresh4.8 narration/headless rerun passed5/5 in85.71seconds, including the literal golden hash, save/load byte equality, native replay and full game replay. Combined with the other46 focused controls in the first run, all51 selected controls pass. Lock-free lint/typecheck and production build pass;274 lint warnings and the large-bundle warning remain. No new4.8 browser run is claimed; the actual two-tab browser RED/GREEN receipt above was on4.7 with the same storage correction.

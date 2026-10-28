@@ -83,6 +83,33 @@ export class WorkshopSaveStore {
     return this.cache.get(key) ?? this.legacy.getItem(key);
   }
 
+  /** Refresh a slot when opening it, after this store's earlier writes settle. */
+  readFresh(key: string): Promise<string | null> {
+    checkKey(key);
+    const operation = this.queue.then(async () => {
+      await this.initialize();
+      if (!this.factory) return this.legacy.getItem(key);
+      const db = this.db;
+      if (!db) throw new Error('Workshop save database connection is closed');
+      const value = await new Promise<string | undefined>((resolve, reject) => {
+        const transaction = db.transaction(STORE_NAME, 'readonly');
+        const request = transaction.objectStore(STORE_NAME).get(key);
+        transaction.oncomplete = () =>
+          resolve(typeof request.result === 'string' ? request.result : undefined);
+        transaction.onabort = transaction.onerror = () =>
+          reject(new Error('Could not read workshop save database', { cause: transaction.error }));
+      });
+      if (value === undefined) this.cache.delete(key);
+      else this.cache.set(key, value);
+      return value ?? this.legacy.getItem(key);
+    });
+    this.queue = operation.then(
+      () => {},
+      () => {},
+    );
+    return operation;
+  }
+
   write(key: string, text: string): Promise<void> {
     checkKey(key);
     const operation = this.queue.then(async () => {
@@ -123,6 +150,9 @@ export function initializeWorkshopStorage(): Promise<void> {
 }
 export function readWorkshopSave(key: string): string | null {
   return getStore().read(key);
+}
+export function readFreshWorkshopSave(key: string): Promise<string | null> {
+  return getStore().readFresh(key);
 }
 export function writeWorkshopSave(key: string, text: string): Promise<void> {
   return getStore().write(key, text);

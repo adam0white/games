@@ -5,7 +5,7 @@ export const MAX_RECORDED_INPUTS = 10_000;
 export const SAVE_PROVENANCE = {
   engine: 'small-works@5',
   scenario: 'canonical-workshop@2',
-  framework: '4.7.0',
+  framework: '4.8.0',
   game: '4.2.0+hf4',
 } as const;
 /**

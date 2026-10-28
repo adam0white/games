@@ -2,7 +2,7 @@
 
 A single-player repair strategy game. Investigate familiar electrical and mechanical objects at a home bench. Choose measurements, compare results, repair actual components and check the object under its owner's use. Time, stock and cash limit what the workshop can promise.
 
-The current source pins `@adam0white/human-framework` to exactly **4.7.0**. The source game version is 4.2.0. Check the live [release manifest](https://repair.adamwhite.work/release.json) for the deployed commit and versions. [HF4 adoption](docs/hf4-adoption.md) records the port boundary and verification requirements. Earlier HF3 receipts remain historical. Adam accepts readability and game feel through play.
+The current source pins `@adam0white/human-framework` to exactly **4.8.0**. The source game version is 4.2.0. Check the live [release manifest](https://repair.adamwhite.work/release.json) for the deployed commit and versions. [HF4 adoption](docs/hf4-adoption.md) records the port boundary and verification requirements. Earlier HF3 receipts remain historical. Adam accepts readability and game feel through play.
 
 ## How to play
 
@@ -58,7 +58,7 @@ pnpm install --frozen-lockfile
 pnpm run dev
 ```
 
-Open the address printed by the development server. `npm run check` runs lint, types, tests and the production build. Run `npm run check:lane` before each commit. In this repository it currently runs the full check. `npm test` uses the shared machine suite lock.
+Open the address printed by the development server. `npm run check` runs lint, types, tests and the production build. Run `npm run check:lane` before each commit. In this repository it runs lint and typecheck without the machine lock; hosted CI runs the full check. `npm test` uses the shared machine suite lock.
 
 Current installation uses `pnpm-lock.yaml` and the strict isolated dependency policy in `pnpm-workspace.yaml`. `npm run` remains valid for scripts. When updating an old npm tree, remove its root and workspace `node_modules`, install frozen with pnpm, and delete `dist`, `.types` and `*.tsbuildinfo` before rebuilding.
 

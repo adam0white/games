@@ -45,7 +45,7 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
     e.castRevision !== canonicalCast(e.castId).revision ||
     e.terminal ||
     (!workshop && !commonstead) ||
-    !['4.6.0', '4.7.0'].includes(e.source.engine) ||
+    !['4.6.0', '4.7.0', '4.8.0'].includes(e.source.engine) ||
     e.transfer.sourceRole !== (commonstead ? e.castId : role) ||
     !same(preparePersonaLife(e, input.clockMs).life, input.life)
   )
@@ -151,7 +151,7 @@ export function validateCastChapter(chapter: CastChapter): void {
       claim.branchId !== input.parent.branchId ||
       claim.parentRevision !== input.parent.revision ||
       claim.source.game !== 'repair' ||
-      claim.source.engine !== '4.7.0' ||
+      claim.source.engine !== '4.8.0' ||
       claim.terminal ||
       !same(claim.transfer, { ...input.parent.transfer, life: input.life })
     )

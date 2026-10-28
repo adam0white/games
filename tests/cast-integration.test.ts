@@ -24,7 +24,7 @@ import { createPeopleRuntime, createPerson, promise, snapshotRuntime } from '../
 import { loadGame, saveGame } from '../src/game/persistence';
 import { replayRecordedRun } from '../src/game/replay';
 
-const stamps = { game: 'repair', build: 'test', engine: '4.7.0', rules: 'canonical-workshop-2' };
+const stamps = { game: 'repair', build: 'test', engine: '4.8.0', rules: 'canonical-workshop-2' };
 // Explicit public authoring makes a distinct source. No cache edit changes an HF actor.
 async function source(id: 'nora' | 'rafi', prayer = false) {
   const castId = CAST_IDS[id]!;
