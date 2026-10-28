@@ -1,5 +1,15 @@
 # Small Works
 
+## Native admission optimization candidate, 2026-10-27
+
+Remaining: one root-arranged independent Codex review of the exact frozen candidate, signed source, exact CI, root merge verification and clean delivery. Adam accepts feel separately. F1481 fault variety, restart acceptance, crew responsibility, management, economy and multiplayer remain separate units; their next engineering review remains 2026-10-29 (F1481: 2026-10-28).
+
+Historical method admission still executes each recorded command and the actual cap-closing command. The replay executor owns its accumulated recording until it returns. Each command clones the remaining world and reads the full prefix; only successful dispatch appends to that private prefix. Public dispatch clones caller state and command, including nested measurement requests. Failed commands retain the original caller state and message. No new faculty, flag, cache, packet exception, validation shortcut or cap change is introduced. Existing version, current-job, performed-work, evidence and exact nested receipt checks remain authoritative.
+
+Two cold Node26.12.0 processes profiled public loadGame on the same retained actual10000-input, closed, later-repaired/81-inspection-rollover/returned packet. All723360 saved characters round-tripped exactly. Import wall time was27.77s before and9.89s after; import process CPU was28.26s before and10.02s after. This is a local measured comparison under concurrent host activity, not a latency budget or regression attribution. Admission remains synchronous and expensive; no maximum-size browser responsiveness is claimed.
+
+Private scratch evidence at `~/code/.lab-scratch/games-deferred/gd-resume-smallworks-admission-optimize-evidence` retains original packet hashes, cold profiles, exact full/compact JSON/gzip replay, ordinary/busy/outcome omission and actual1440-minute ordinary continuation, ten immutable native/App/held-session rejection controls, and public HF available/refused/unavailable controls at360×690 and1280×800. These are synthetic technical controls, not player, panel, retest or owner acceptance. HF, SDK/vendor dependencies, fixed archive builder and source pins remain unchanged.
+
 ## Public tools candidate, 2026-10-27
 
 Remaining: director independent review, exact CI and clean live delivery, then Adam's acceptance on 2026-11-03. No player round is run. Gameplay editions and scenes remain public. The menu and title offer a collapsed Debug beside Lab privacy, with download, import, replay verification, seed and startup error detail. The workshop history is public. Cast controls link to the central shelf; local enable/disable, fork and per-person checkpoint controls are removed. Fresh ordinary and cast-outcome chapters automatically enable same-person carryover through the released SDK and existing strict admission. Loaded chapters keep their recorded people. The outcome edition keeps its authored scene terms and carried-person availability guards; no imported obligations are erased.

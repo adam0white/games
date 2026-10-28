@@ -2037,8 +2037,41 @@ export function canStartBusyWorkshop(s: GameState): boolean {
     !(s.inputs ?? []).some((command) => command.type === 'buy' && command.part === 'switch')
   );
 }
+/** Public commands and returned worlds never retain caller-owned nested references. */
 export function dispatch(state: GameState, command: Command): CommandResult {
-  const s = structuredClone(state);
+  return dispatchPrepared(state, structuredClone(command), structuredClone(state));
+}
+
+/**
+ * Replay owns this sequence's state and recording until it returns. Only done() appends inputs;
+ * all rules still receive the complete prefix. Clone the rest of the world before each command
+ * so a failed command keeps the same rollback semantics as public dispatch. No new faculty.
+ */
+export function replayCommands(
+  initial: GameState,
+  commands: readonly Command[],
+  migratedAt?: number,
+):
+  | { ok: true; state: GameState }
+  | { ok: false; index: number; command: Command; message: string } {
+  let state = structuredClone(initial);
+  for (const [index, input] of commands.entries()) {
+    if (index === migratedAt) state = upgradeRules(state);
+    // Keep inputs in its original property position for byte-exact native saves.
+    const next: GameState = structuredClone({ ...state, inputs: undefined });
+    if (Object.hasOwn(state, 'inputs')) next.inputs = state.inputs;
+    else delete next.inputs;
+    const command = structuredClone(input);
+    const result = dispatchPrepared(state, command, next);
+    if (!result.ok) return { ok: false, index, command, message: result.message };
+    state = result.state;
+  }
+  if (migratedAt === commands.length) state = upgradeRules(state);
+  return { ok: true, state };
+}
+
+/** Both callers supply isolated world/command data; only replay owns and reuses its input prefix. */
+function dispatchPrepared(state: GameState, command: Command, s: GameState): CommandResult {
   const fail = (message: string): CommandResult => ({ state, ok: false, message });
   const done = (message: string): CommandResult => {
     if (s.inputs !== undefined) {
@@ -2869,4 +2902,5 @@ export function dispatch(state: GameState, command: Command): CommandResult {
       return done('The workshop continues with new requests.');
   }
 }
+
 export { loadGame, saveGame } from './persistence';

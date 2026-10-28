@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createGame, dispatch } from '../src/game/engine';
+import { createGame, dispatch, replayCommands } from '../src/game/engine';
 import { loadGame, saveGame } from '../src/game/persistence';
 import {
   isInputRecording,
@@ -139,6 +139,85 @@ describe('recorded run replay', () => {
     expect(failed.ok).toBe(false);
     expect(failed.state).toBe(result.state);
     expect(failed.state.inputs).toHaveLength(1);
+  });
+
+  it('isolates nested caller commands, prior recordings and world state on success and failure', () => {
+    const start = createGame(42);
+    const command: Extract<Command, { type: 'measure' }> = {
+      type: 'measure',
+      jobId: start.selectedJobId,
+      request: { mode: 'voltage', a: 'A', b: '0', condition: 'bench' },
+    };
+    const before = saveGame(start);
+    const result = dispatch(start, command);
+    expect(result.ok, result.message).toBe(true);
+    expect(saveGame(start)).toBe(before);
+    const saved = saveGame(result.state);
+    command.request.condition = 'load';
+    expect(saveGame(result.state)).toBe(saved);
+    const next = dispatch(result.state, { type: 'select', jobId: start.selectedJobId });
+    expect(next.ok).toBe(true);
+    const recorded = next.state.inputs?.[0];
+    if (recorded?.type !== 'measure') throw Error('Missing recorded measurement');
+    recorded.request.a = 'B';
+    next.state.jobs[0]?.evidence.splice(0);
+    expect(saveGame(result.state)).toBe(saved);
+    const invalid: Command = {
+      type: 'measure',
+      jobId: start.selectedJobId,
+      request: { mode: 'continuity', a: 'A', b: 'B', condition: 'bench' },
+    };
+    const failed = dispatch(result.state, invalid);
+    expect(failed.ok).toBe(false);
+    expect(failed.state).toBe(result.state);
+    expect(saveGame(failed.state)).toBe(saved);
+  });
+
+  it('keeps replay-owned recordings isolated and reports the exact failed command', () => {
+    const start = createGame(42);
+    const inputs: Command[] = [
+      {
+        type: 'measure',
+        jobId: start.selectedJobId,
+        request: { mode: 'voltage', a: 'A', b: '0', condition: 'bench' },
+      },
+      { type: 'select', jobId: start.selectedJobId },
+    ];
+    const before = saveGame(start);
+    const result = replayCommands(start, inputs);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw Error(result.message);
+    expect(saveGame(result.state)).toBe(saveGame(apply(start, inputs)));
+    const saved = saveGame(result.state);
+    const first = inputs[0];
+    if (first?.type !== 'measure') throw Error('Missing measurement');
+    first.request.b = 'B';
+    start.jobs[0]?.evidence.splice(0);
+    expect(saveGame(result.state)).toBe(saved);
+    const recorded = result.state.inputs?.[0];
+    if (recorded?.type !== 'measure') throw Error('Missing replay measurement');
+    recorded.request.a = 'C';
+    expect(first.request.a).toBe('A');
+    expect(saveGame(start)).toBe(before);
+    const invalid: Command = {
+      type: 'measure',
+      jobId: start.selectedJobId,
+      request: { mode: 'continuity', a: 'A', b: 'B', condition: 'bench' },
+    };
+    const failure = replayCommands(start, [inputs[1] as Command, invalid]);
+    const publicFailure = dispatch(start, invalid);
+    expect(publicFailure.ok).toBe(false);
+    expect(failure).toEqual({
+      ok: false,
+      index: 1,
+      command: invalid,
+      message: publicFailure.message,
+    });
+    if (failure.ok || failure.command.type !== 'measure')
+      throw Error('Expected failed measurement');
+    failure.command.request.a = 'D';
+    expect(invalid.request.a).toBe('A');
+    expect(saveGame(start)).toBe(before);
   });
 
   it('keeps playing after the input limit and never invents legacy history', () => {
