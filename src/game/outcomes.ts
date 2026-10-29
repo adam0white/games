@@ -265,15 +265,21 @@ export function requestOutcome(s: GameState, action: OutcomeAction): string {
   const options = [option, ...alternatives(t.minutes)];
   if (existing && !options.some((a) => a.id === existing.option.id)) options.push(existing.option);
   const choice = chooseActivity(p, 'cast-outcomes', {}, options, s.now, playerAsk(action));
+  const selected = options.find((a) => a.id === choice.chosenId);
+  const says =
+    choice.chosenId === action
+      ? `${p.name} agrees to this work.`
+      : selected
+        ? `${p.name} chooses “${selected.label}” instead.`
+        : `${p.name} does not agree to this work.`;
   o.decisions.push({
     action,
     at: s.now,
     ...(choice.chosenId ? { chosen: choice.chosenId } : {}),
-    says: choice.answer?.says ?? choice.narration,
+    says,
   });
   if (o.decisions.length > 100) o.decisions.shift();
-  message(s, p.name, choice.answer?.says ?? choice.narration);
-  const selected = options.find((a) => a.id === choice.chosenId);
+  message(s, p.name, says);
   // The HF decision can interrupt the current activity before the host's next time drain.
   // Reconcile the old reservation before starting the selected alternative.
   if (existing && (!p.activity || choice.chosenId === action)) {
@@ -303,12 +309,16 @@ export function requestOutcome(s: GameState, action: OutcomeAction): string {
   );
   return 'The attended activity has begun. The outcome and payment remain pending.';
 }
-export function stopOutcome(s: GameState, reason = 'You stopped attending.'): void {
+export function stopOutcome(
+  s: GameState,
+  reason = 'You stopped attending.',
+  preserveNextStart = false,
+): void {
   const o = s.castOutcomes;
   const pending = o?.pending;
   if (!o || !pending) return;
   const p = s.people[OUTCOME_TERMS[pending.action].person];
-  if (p) finishActivity(p, pending.option, false, s.now);
+  if (p) finishActivity(p, pending.option, false, s.now, [], preserveNextStart);
   s.cash += pending.reservedCash;
   delete o.pending;
   message(
@@ -321,7 +331,12 @@ export function stopOutcome(s: GameState, reason = 'You stopped attending.'): vo
 export function outcomeBoundary(s: GameState): number {
   const pending = s.castOutcomes?.pending;
   if (!pending) return Infinity;
-  return pending.endsAt;
+  const person = s.people[OUTCOME_TERMS[pending.action].person];
+  const review = Math.min(
+    person?.activity?.reviewAt ?? Infinity,
+    person?.activity?.thresholdAt ?? Infinity,
+  );
+  return Math.min(pending.endsAt, Math.max(s.now + 1, Math.ceil(review)));
 }
 function sceneJob(s: GameState, kind: 'fan', ownerId: 'rafi', title: string): Job {
   const id = `object-${s.nextId++}`;
@@ -349,7 +364,7 @@ function sceneJob(s: GameState, kind: 'fan', ownerId: 'rafi', title: string): Jo
   s.jobs.push(job);
   return job;
 }
-export function resolveOutcome(s: GameState): void {
+export function resolveOutcome(s: GameState, reviewDue = false): void {
   const o = s.castOutcomes;
   const w = o?.pending;
   if (!o || !w) return;
@@ -359,7 +374,27 @@ export function resolveOutcome(s: GameState): void {
     stopOutcome(s, 'The person could not continue.');
     return;
   }
-  if (s.now < w.endsAt) return;
+  if (s.now < w.endsAt) {
+    if (reviewDue) {
+      const continuation = { ...w.option, duration: w.endsAt - s.now };
+      const options = [continuation, ...alternatives(w.endsAt - s.now)];
+      const choice = chooseActivity(p, 'cast-outcomes', {}, options, s.now);
+      if (choice.chosenId === w.option.id && !p.activity && startActivity(p, continuation, s.now))
+        return;
+      if (choice.chosenId !== w.option.id || !p.activity) {
+        stopOutcome(s, `${p.name} chose to stop.`, true);
+        const next = options.find((option) => option.id === choice.chosenId);
+        if (next && startActivity(p, next, s.now))
+          s.npcWork.push({
+            personId: p.id,
+            option: next,
+            startedAt: s.now,
+            endsAt: s.now + next.duration,
+          });
+      }
+    }
+    return;
+  }
   if (!prepareActivityFinish(p, s.now)) {
     stopOutcome(s, 'The person stopped before completing this work.');
     return;
@@ -381,7 +416,7 @@ export function resolveOutcome(s: GameState): void {
   }
   const result = finishActivity(p, w.option, true, s.now);
   if (!result) {
-    stopOutcome(s, 'HF did not confirm activity completion.');
+    stopOutcome(s, 'The work could not be completed.');
     return;
   }
   let text = '';

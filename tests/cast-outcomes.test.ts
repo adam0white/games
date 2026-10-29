@@ -7,6 +7,7 @@ import { activityEndMs, snapshotRuntime } from '../src/game/hf';
 import {
   OUTCOME_TERMS,
   type OutcomeAction,
+  outcomeBoundary,
   outcomeDone,
   requestOutcome,
 } from '../src/game/outcomes';
@@ -142,6 +143,7 @@ describe('attended outcome mechanisms', () => {
       begun = act(begun, { type: 'cast-outcome', action: 'sam-shift' });
     }
     expect(begun.castOutcomes?.pending?.action).toBe('sam-shift');
+    expect(begun.castOutcomes?.decisions.at(-1)?.says).toBe('Sam agrees to this work.');
     begun = act(begun, { type: 'pause-chapter' });
     expect(dispatch(begun, { type: 'wait', minutes: 5 }).ok).toBe(false);
     const pendingSave = saveGame(begun);
@@ -269,6 +271,7 @@ it('saves immediately when a cast request interrupts background work and is decl
   requestOutcome(s, 'sam-correction');
   expect(s.stock.switch).toBe(stock);
   expect(s.castOutcomes?.decisions.at(-1)?.chosen).toBe('personal');
+  expect(s.castOutcomes?.decisions.at(-1)?.says).toBe('Sam chooses “keep my own plans” instead.');
   expect(s.people.sam?.activity?.affordance.id).toBe('personal');
   expect(s.npcWork.filter((w) => w.personId === 'sam')).toHaveLength(1);
   expect(s.npcWork.find((w) => w.personId === 'sam')?.option.id).toBe('personal');
@@ -281,14 +284,14 @@ it('saves immediately when a cast request interrupts background work and is decl
 it.each(['npc-first', 'scene-first'] as const)(
   'settles scene and NPC finishes in native order within one displayed minute (%s)',
   (order) => {
-    let state = samDisclosure();
-    state = act(state, { type: 'wait', minutes: 20 });
+    let state = complete(samDisclosure(), 'sam-correction');
+    state = act(state, { type: 'wait', minutes: 15 });
     let otherPerson: string | undefined;
     for (let attempts = 0; attempts < 8; attempts++) {
-      state = act(state, { type: 'cast-outcome', action: 'sam-correction' });
+      state = act(state, { type: 'cast-outcome', action: 'sam-terms' });
       const scene = state.castOutcomes?.pending;
-      expect(scene?.action).toBe('sam-correction');
-      if (!scene || !state.people.sam) throw new Error('Missing accepted correction');
+      expect(scene?.action).toBe('sam-terms');
+      if (!scene || !state.people.sam) throw new Error('Missing accepted terms agreement');
       const sceneEnd = activityEndMs(state.people.sam);
       otherPerson = state.npcWork.find((work) => {
         const person = state.people[work.personId];
@@ -317,7 +320,7 @@ it.each(['npc-first', 'scene-first'] as const)(
     const waiting = dispatch(state, { type: 'wait', minutes: scene.endsAt - state.now });
     expect(waiting.ok, waiting.message).toBe(true);
     state = waiting.state;
-    expect(outcomeDone(state, 'sam-correction')).toBe(true);
+    expect(outcomeDone(state, 'sam-terms')).toBe(true);
     expect(state.castOutcomes?.pending).toBeUndefined();
     expect(state.cash).toBe(cash);
     expect(state.stock).toEqual(stock);
@@ -347,3 +350,59 @@ it.each(['npc-first', 'scene-first'] as const)(
     if (replayed.ok) expect(replayed.save).toBe(raw);
   },
 );
+
+it.each([
+  { name: 'tired', exertion: 0.9 },
+  { name: 'rested', exertion: 0 },
+])('lets HF reconsider attended work when $name', ({ exertion }) => {
+  let s = start(1);
+  const p = s.people.sam;
+  if (!p || !s.castOutcomes) throw new Error('Missing Sam or outcomes');
+  reAuthor(p, {
+    needs: {
+      safety: 1,
+      belonging: 1,
+      esteem: 1,
+      autonomy: 1,
+      competence: 0,
+      leisure: 1,
+      meaning: 1,
+    },
+    body: { exertion } as Parameters<typeof reAuthor>[1]['body'],
+  });
+  const option = {
+    id: 'sam-shift',
+    action: 'sam-shift',
+    label: 'help with the shift',
+    duration: 60,
+    effort: 0.25,
+  };
+  chooseActivity(p, 'cast-outcomes', {}, [option], s.now);
+  expect(startActivity(p, option, s.now)).toBe(true);
+  s.castOutcomes.pending = {
+    action: 'sam-shift',
+    option,
+    startedAt: s.now,
+    endsAt: s.now + 60,
+    reservedCash: 6,
+  };
+  const cash = s.cash;
+  const boundary = outcomeBoundary(s);
+  expect(boundary).toBeLessThan(s.castOutcomes.pending.endsAt);
+  s = act(s, { type: 'wait', minutes: boundary - s.now });
+  if (exertion > 0) {
+    expect(s.castOutcomes?.pending).toBeUndefined();
+    expect(s.cash).toBe(cash + 6);
+    expect(s.castOutcomes?.samCash).toBe(0);
+    expect(outcomeDone(s, 'sam-shift')).toBe(false);
+    expect(s.npcWork.find((w) => w.personId === p.id)?.option.id).toBe('rest');
+  } else {
+    expect(s.castOutcomes?.pending?.action).toBe('sam-shift');
+    expect(s.people.sam?.activity?.affordance.id).toBe('sam-shift');
+    const endsAt = s.castOutcomes?.pending?.endsAt;
+    if (endsAt === undefined) throw new Error('Missing continued work');
+    s = act(s, { type: 'wait', minutes: endsAt - s.now });
+    expect(outcomeDone(s, 'sam-shift')).toBe(true);
+    expect(s.castOutcomes?.samCash).toBe(6);
+  }
+});
