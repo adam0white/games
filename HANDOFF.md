@@ -2,7 +2,9 @@
 
 ## smallworks-hf411, 2026-10-29
 
-Remaining: full-suite completion, signed commit, PR, exact green merged CI, deployment and clean manifest verification. Adam accepts feel separately.
+Remaining: restore GitHub Actions billing, rerun PR11 CI, merge on exact green CI, require exact green merged CI, deploy and verify the clean live manifest. GitHub refused to start run 40892397613: recent account payments failed or the spending limit needs increasing. No merge or deployment is claimed. Adam accepts feel separately.
+
+Signed candidate `d8bce61f2fab33367380cdc69c11eb6644a93f73` is in [PR11](https://github.com/adam0white/repair-game/pull/11). Local check:lane, production build, deployment dry run including both historical archives, 12 focused save/replay checks and headless native replay/save roundtrip passed. The first full suite had 397 passes and 6 synthetic passport failures while the stamp correction was being made; the fresh exact-candidate full suite passed all 403 tests across 59 files in 540.63s. The dependency audit found no known vulnerabilities. The live repo URL remains `https://repair.adamwhite.work`, clean commit `d48782129bbf015e2b2bf1475d144838c095c93f`, HF 4.8.0. The task report at `~/code/.lab-scratch/codex/smallworks-hf411.md` owns final verification and cleanup receipts.
 
 Adopts published HF 4.11.0, client 0.5.11 and kit 0.5.28. Read HF CHANGELOG 4.8.1–4.11.0. History consumers use `readRunHistory`; native exports remain complete format-7 archives. IndexedDB autosaves atomically commit journal chunks, opening, matching host snapshot and head. Restoration verifies the whole journal. The storage adapter restores and compares the incoming full archive and committed prefix before appending; this reduces repeated writes, not replay CPU or read costs. The no-IndexedDB fallback keeps native saves.
 
