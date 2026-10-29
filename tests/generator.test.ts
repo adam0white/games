@@ -225,8 +225,9 @@ describe('later owner requests', () => {
       'The melody sounds wrong. This was my grandmother’s.',
     );
   });
-  it('under engine 5, a neighbour still waiting past the promised time says so and brings nothing new', () => {
-    for (const seed of [2, 4, 69, 416]) {
+  it.each([2, 4, 69, 416])(
+    'under engine 5, a neighbour still waiting past the promised time says so and brings nothing new (seed %i)',
+    (seed) => {
       let state = createGame(seed);
       while (state.day < 8) state = dispatch(state, { type: 'next-day' }).state;
       const requests = state.jobs.filter((j) => j.reward > 0);
@@ -239,6 +240,6 @@ describe('later owner requests', () => {
         saveGame(loadGame(saveGame(state))) === saveGame(state),
         'complete save restoration equality',
       ).toBe(true);
-    }
-  });
+    },
+  );
 });

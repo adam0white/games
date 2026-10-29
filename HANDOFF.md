@@ -2,7 +2,7 @@
 
 ## HF4 port, 2026-10-28
 
-Remaining: publish the restored storage correction and HF4.8 repin in PR8, merge with exact green CI, deploy and verify the clean live manifest. The one requested hosted review is complete; its refund finding and a later automatic refusal-path finding are fixed in the same PR. No HF4 delivery is claimed at this candidate stage. Adam accepts feel separately on 2026-11-03.
+Remaining: publish the reboot-resume CI correction in PR8, merge with exact green CI, deploy and verify the clean live manifest. The one requested hosted review is complete; its refund finding and a later automatic refusal-path finding are fixed in the same PR. No HF4 delivery is claimed at this candidate stage. Adam accepts feel separately on 2026-11-03.
 
 The current public menu exposes Download this workshop and Open a saved workshop. Debug stays beside Lab privacy in that menu, holding seed/replay diagnostics. The title has no Debug or older-versions link; the chapter and history links use plain words. These current choices supersede the earlier public-tools candidate below.
 
