@@ -1,5 +1,5 @@
-import { ORIGINAL_REPORT, OUTCOME_ACTIONS, OUTCOME_TERMS, outcomeDone } from './outcomes';
-import type { GameState } from './types';
+import { ORIGINAL_REPORT, OUTCOME_ACTIONS, OUTCOME_TERMS, outcomeDone } from './outcomes.ts';
+import type { GameState } from './types.ts';
 /** Reject malformed edition/account state rather than silently starting or upgrading it. */
 export function validateOutcomeSave(s: GameState): void {
   function fail(): never {
@@ -12,7 +12,12 @@ export function validateOutcomeSave(s: GameState): void {
   if (
     o.edition !== 'cast-outcomes@1' ||
     o.startedAt !== 540 ||
-    JSON.stringify(o.originalReport) !== JSON.stringify(ORIGINAL_REPORT) ||
+    !o.originalReport ||
+    Object.keys(o.originalReport).sort().join(',') !==
+      Object.keys(ORIGINAL_REPORT).sort().join(',') ||
+    Object.entries(ORIGINAL_REPORT).some(
+      ([key, value]) => o.originalReport[key as keyof typeof ORIGINAL_REPORT] !== value,
+    ) ||
     !Array.isArray(o.receipts) ||
     o.receipts.length > OUTCOME_ACTIONS.length ||
     !Array.isArray(o.decisions) ||

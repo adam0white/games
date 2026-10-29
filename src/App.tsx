@@ -55,6 +55,7 @@ import {
   latestRecoveryAccount,
   ownerPromiseAccount,
 } from './ui/workshop-feedback';
+import { readFreshWorkshopSave, readWorkshopSave, SOURCE_JOURNAL_KEY } from './workshop-storage';
 import './styles.css';
 import './focused-layout.css';
 import './meter-layout.css';
@@ -91,7 +92,7 @@ function freshSeed(): number {
 let initialLoadFailed = false;
 function initial(): GameState {
   try {
-    const saved = localStorage.getItem(SAVE_KEY);
+    const saved = readWorkshopSave(SAVE_KEY);
     if (saved) return continuity.loadLocal(saved);
   } catch {
     initialLoadFailed = true;
@@ -476,6 +477,7 @@ function Workshop({
   const [, refreshContinuity] = useState(0);
   const [entering, setEntering] = useState(false);
   const [debugError, setDebugError] = useState('');
+  const [saveError, setSaveError] = useState('');
   const [entryError, setEntryError] = useState(() =>
     initialLoadFailed ? damagedWorkshopMessage : '',
   );
@@ -565,7 +567,7 @@ function Workshop({
   const [newConfirmed, setNewConfirmed] = useState(false);
   const [seedText, setSeedText] = useState(String(state.seed + 1));
   const [hasSave, setHasSave] = useState(
-    () => continuity.fileSession || Boolean(localStorage.getItem(SAVE_KEY)),
+    () => continuity.fileSession || Boolean(readWorkshopSave(SAVE_KEY)),
   );
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
@@ -625,7 +627,7 @@ function Workshop({
         // The first autosave can precede the shared identity bridge. Recapture
         // the actual stored save after identity settles, without blocking runs.
         try {
-          const saved = !continuity.fileSession && localStorage.getItem(SAVE_KEY);
+          const saved = !continuity.fileSession && readWorkshopSave(SAVE_KEY);
           if (saved) lab.captureSave(JSON.parse(saveGame(stateRef.current)));
         } catch {}
         return JSON.parse(saveGame(stateRef.current));
@@ -694,7 +696,20 @@ function Workshop({
         refreshContinuity((n) => n + 1);
       });
     }
-    continuity.persist(state);
+    let current = true;
+    void continuity.persist(state).then(
+      () => {
+        if (current) setSaveError('');
+      },
+      (error) => {
+        if (!current) return;
+        setSaveError('This workshop could not be saved. Download a copy before leaving.');
+        setDebugError(error instanceof Error ? error.message : String(error));
+      },
+    );
+    return () => {
+      current = false;
+    };
   }, [state]);
   useEffect(() => {
     if (!job?.id) return;
@@ -1045,6 +1060,23 @@ function Workshop({
       setEntering(false);
     }
   };
+  const enterRestoredWorkshop = async (restored: GameState) => {
+    const previous = stateRef.current;
+    // Resuming a paused chapter checkpoints through continuity's bound state reader.
+    stateRef.current = restored;
+    setState(restored);
+    try {
+      const next = await continuity.enter(restored);
+      stateRef.current = next;
+      return next;
+    } catch (error) {
+      if (stateRef.current === restored) {
+        stateRef.current = previous;
+        setState(previous);
+      }
+      throw error;
+    }
+  };
   const enterOutcomeWorkshop = async () => {
     if (continuity.fileSession) return;
     if (entering) return;
@@ -1052,11 +1084,12 @@ function Workshop({
     setEntryError('');
     try {
       await continuity.depart();
-      const saved = localStorage.getItem(OUTCOME_LOCAL_KEY);
+      const saved = await readFreshWorkshopSave(OUTCOME_LOCAL_KEY);
       if (saved) {
+        await readFreshWorkshopSave(SOURCE_JOURNAL_KEY);
         const restored = continuity.loadLocal(saved);
         if (!restored.castOutcomes) throw new Error('This is not the cast-outcome chapter.');
-        resetPresentation(await continuity.enter(restored), true);
+        resetPresentation(await enterRestoredWorkshop(restored), true);
       } else {
         const base = await continuity.fresh(freshSeed());
         const result = dispatch(base, { type: 'start-cast-outcomes' });
@@ -1076,15 +1109,21 @@ function Workshop({
       setEntryError(damagedWorkshopMessage);
       return;
     }
-    if (!continuity.loaded) {
-      await startWorkshop(state.seed);
-      return;
-    }
     setEntryError('');
     setEntering(true);
     try {
-      const next = await continuity.enter(stateRef.current);
-      stateRef.current = next;
+      let restored = stateRef.current;
+      if (!continuity.fileSession) {
+        const key = restored.castOutcomes ? OUTCOME_LOCAL_KEY : SAVE_KEY;
+        const saved = await readFreshWorkshopSave(key);
+        if (!saved) {
+          await startWorkshop(restored.seed, Boolean(restored.castOutcomes));
+          return;
+        }
+        await readFreshWorkshopSave(SOURCE_JOURNAL_KEY);
+        restored = continuity.loadLocal(saved);
+      }
+      const next = await enterRestoredWorkshop(restored);
       setState(next);
       setSheet(null);
       setHasSave(true);
@@ -1139,18 +1178,12 @@ function Workshop({
     <details className="workshop-debug">
       <summary>Debug</summary>
       <div className="debug-tools">
-        <button type="button" onClick={exportSave}>
-          Download this run
-        </button>
         <button type="button" disabled={replayChecking} onClick={verifyReplay}>
           {replayChecking ? 'Verifying replay…' : 'Verify the recorded replay'}
         </button>
         {replayStatus && <p role="status">{replayStatus}</p>}
         {!continuity.fileSession && (
           <>
-            <a href="/file/" onClick={(event) => void goToGames(event)}>
-              Import a workshop
-            </a>
             <label>
               Starting number (seed)
               <input type="number" value={seedText} onChange={(e) => setSeedText(e.target.value)} />
@@ -1168,12 +1201,12 @@ function Workshop({
       </div>
     </details>
   );
-  const privacyTools = (
+  const privacyTools = (showDebug = true) => (
     <div className="privacy-tools">
       <a href="https://human.adamwhite.work/lab/privacy/" target="_blank" rel="noreferrer">
         Lab privacy
       </a>
-      {debugTools}
+      {showDebug && debugTools}
     </div>
   );
 
@@ -1329,6 +1362,19 @@ function Workshop({
           </button>
         </div>
       </header>
+      {continuity.historyNotice && (
+        <p role="status" className="entry-error">
+          {continuity.historyNotice}
+        </p>
+      )}
+      {saveError && (
+        <aside className="entry-error" role="alert">
+          <p>{saveError}</p>
+          <button type="button" onClick={exportSave}>
+            Download this workshop
+          </button>
+        </aside>
+      )}
       {screen === 'title' && (
         <main className="title-page">
           <div className="title-art">
@@ -1363,11 +1409,9 @@ function Workshop({
             </small>
             {!continuity.fileSession && (
               <details>
-                <summary>Optional cast-outcome chapter</summary>
+                <summary>What became of Sam, Nora, Rafi and Halil</summary>
                 <p>
-                  Keep the diagnostic workshop. Hear Sam, Nora, Rafi and Halil’s accounts, then
-                  choose finite work with real time, stock and payment. This separate local chapter
-                  keeps the ordinary autosave. Each person can refuse.
+                  Hear how they are doing and take on one more job. Your saved workshop is kept.
                 </p>
                 <button
                   type="button"
@@ -1394,16 +1438,13 @@ function Workshop({
               </div>
             )}
 
-            <a href="/experiments/" onClick={(event) => void goToGames(event)}>
-              Earlier experiments
-            </a>
             <a
               href="https://human.adamwhite.work/lab/people/"
               onClick={(event) => void goToGames(event)}
             >
               People across games
             </a>
-            {privacyTools}
+            {privacyTools(false)}
           </div>
         </main>
       )}
@@ -2833,7 +2874,7 @@ function Workshop({
               </button>
               {!continuity.fileSession && (
                 <button type="button" onClick={exportSave}>
-                  Download this run
+                  Download this workshop
                 </button>
               )}
             </div>
@@ -2931,6 +2972,14 @@ function Workshop({
                 >
                   Feedback <span>▸</span>
                 </button>
+                <button type="button" onClick={exportSave}>
+                  Download this workshop
+                </button>
+                {!continuity.fileSession && (
+                  <a href="/file/" onClick={(event) => void goToGames(event)}>
+                    Open a saved workshop
+                  </a>
+                )}
                 <button
                   className="reading-row fullscreen-row"
                   type="button"
@@ -2968,9 +3017,6 @@ function Workshop({
                 >
                   All games
                 </a>
-                <a href="/experiments/" onClick={(event) => void goToGames(event)}>
-                  Earlier experiments
-                </a>
                 <a
                   href="https://human.adamwhite.work/lab/people/"
                   onClick={(event) => void goToGames(event)}
@@ -2989,8 +3035,11 @@ function Workshop({
                     />{' '}
                     Recording
                   </label>
-                  {privacyTools}
+                  {privacyTools()}
                 </div>
+                <a href="/experiments/" onClick={(event) => void goToGames(event)}>
+                  Older versions of this game
+                </a>
                 <button
                   className="primary-action"
                   type="button"

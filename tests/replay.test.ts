@@ -276,9 +276,14 @@ describe('recorded run replay', () => {
       act({ type: 'wait', minutes: work.endsAt - state.now });
       if (state.jobs[0]?.assignedTo === 'sam' && work.option.action === 'accept-repair') break;
     }
-    expect(state.people.sam?.trace.some((trace) => trace.chosenAction === 'accept-repair')).toBe(
-      true,
-    );
+    expect(
+      state.hf.archive.current.events.some(
+        (event) =>
+          event.person === 'sam' &&
+          event.data.kind === 'decision' &&
+          event.data.decision.chosenAction === 'accept-repair',
+      ),
+    ).toBe(true);
   });
 
   it('replays preparation and actual community attendance from a fresh seed', () => {

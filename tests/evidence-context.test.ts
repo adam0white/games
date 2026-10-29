@@ -1,10 +1,10 @@
-import { restore, snapshot } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import { createGame, dispatch } from '../src/game/engine';
 import { evidenceContext } from '../src/game/evidence-context';
 import { measure } from '../src/game/model';
 import { chooseActivity } from '../src/game/people';
 import type { Evidence, GameState, Job, MeasurementRequest, WorkOption } from '../src/game/types';
+import { readyToLearn, restore, snapshot } from './hf-fixture';
 
 function job(): Job {
   const result = createGame(42).jobs[0];
@@ -198,12 +198,13 @@ describe('received measurement comparisons', () => {
   });
 });
 
+function learningGame(): GameState {
+  const state = createGame(42);
+  readyToLearn(state.people.sam!);
+  return state;
+}
 function attend(state: GameState): void {
-  const sam = state.people.sam;
-  if (!sam) throw new Error('Missing Sam');
-  for (const key of Object.keys(sam.needs)) sam.needs[key as keyof typeof sam.needs] = 1;
-  sam.needs.competence = 0;
-  sam.body.exertion = 0;
+  expect(state.watching).toBe(true);
 }
 
 describe('command demonstrations with controlled observer availability', () => {
@@ -211,7 +212,7 @@ describe('command demonstrations with controlled observer availability', () => {
     ['bench', 'movement'],
     ['movement', 'bench'],
   ] as const)('learns a matching contrast in %s then %s order', (first, second) => {
-    let state = dispatch(createGame(42), { type: 'watch', enabled: true }).state;
+    let state = dispatch(learningGame(), { type: 'watch', enabled: true }).state;
     const jobId = state.selectedJobId;
     const probe = (condition: MeasurementRequest['condition']) => {
       attend(state);
@@ -246,7 +247,6 @@ describe('command demonstrations with controlled observer availability', () => {
       duration: 10,
       effort: 0.15,
     }));
-    sam.needs.competence = 0.45;
     const choose = (target: Job) =>
       chooseActivity(
         restore(snapshot(sam)),

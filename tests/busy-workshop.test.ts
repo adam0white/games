@@ -1,10 +1,18 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
-import { chooseActivity, finishActivity, startActivity, teachObserved } from '../src/game/people';
+import {
+  chooseActivity,
+  createPeople,
+  finishActivity,
+  startActivity,
+  teachObserved,
+} from '../src/game/people';
 import { replayRecordedRun } from '../src/game/replay';
-import { stockCount } from '../src/game/stock';
+import { adoptResponsibility } from '../src/game/responsibility';
+import { stockCount, takePart } from '../src/game/stock';
 import type { Command, GameState } from '../src/game/types';
+import { cloneGame } from './hf-fixture';
 import { acceptRepairOffer } from './repair-offer';
 
 function present<T>(value: T | undefined): T {
@@ -31,7 +39,7 @@ function busy(): GameState {
 }
 
 describe('opt-in busy workshop', () => {
-  it('preserves the exact ordinary continuation captured before scenario changes', () => {
+  it('pins the HF4 ordinary continuation independently of the busy scenario', () => {
     let state = createGame(416);
     for (const command of [
       { type: 'wait', minutes: 45 },
@@ -40,7 +48,7 @@ describe('opt-in busy workshop', () => {
     ] as Command[])
       state = act(state, command);
     expect(createHash('sha256').update(saveGame(state)).digest('hex')).toBe(
-      '5d6ce2b87670204ac72efed1df24f215d36a80f2f6d0f5dc080d0c4b1c4956e7',
+      'd9a1b2ef49284d98b4a9cba59b26b8b18aab49760a851717064e38e67a07a371',
     );
   });
   it('turns accepting everything into a real stock/deadline choice, without changing ordinary play', () => {
@@ -216,8 +224,10 @@ describe('opt-in busy workshop', () => {
   });
   it('keeps a pending native repair off the occupied bench during player recovery, with a second-bench control', () => {
     let initial = busy();
+    // A controlled public opening isolates bench capacity from HF3's old rest timing.
+    initial.people = createPeople(initial.seed, initial.now);
+    initial.npcWork = [];
     const sam = present(initial.people.sam);
-    // Known-method fixture only. Assent, rest and physical choices remain actual HF decisions.
     teachObserved(
       sam,
       'prior',
@@ -227,6 +237,21 @@ describe('opt-in busy workshop', () => {
       'success',
       initial.now,
     );
+    const rest = {
+      id: 'capacity-rest',
+      action: 'rest',
+      label: 'Take a short break',
+      duration: 10,
+      effort: 0,
+    };
+    chooseActivity(sam, 'ordinary-day', {}, [rest], initial.now);
+    expect(startActivity(sam, rest, initial.now)).toBe(true);
+    initial.npcWork.push({
+      personId: sam.id,
+      option: rest,
+      startedAt: initial.now,
+      endsAt: initial.now + 10,
+    });
     const target = present(initial.jobs.find((j) => j.status === 'offer'));
     initial = act(initial, { type: 'accept', jobId: target.id });
     initial = act(initial, { type: 'assign', jobId: target.id, personId: 'sam' });
@@ -234,7 +259,7 @@ describe('opt-in busy workshop', () => {
     expect(initial.npcWork.find((w) => w.personId === 'sam')?.option.action).toBe('rest');
     expect(initial.npcWork.find((w) => w.personId === 'sam')?.endsAt).toBe(820);
     for (const secondBench of [false, true]) {
-      let state = structuredClone(initial);
+      let state = cloneGame(initial);
       // Physical-capacity fixture; it changes no HF state or decision.
       if (secondBench) state.upgrades.push('second-bench');
       state = act(state, {
@@ -281,4 +306,82 @@ describe('opt-in busy workshop', () => {
       }
     }
   });
+});
+
+// A controlled opening isolates the real HF interruption receipt and host inventory.
+it('refunds an interrupted replacement once and keeps recovered-part provenance', () => {
+  let state = busy();
+  const donor = present(state.jobs.find((job) => job.isDonor));
+  state = act(state, { type: 'salvage', jobId: donor.id, componentId: 'switch' });
+  state.people = createPeople(state.seed, state.now);
+  state.npcWork = [];
+  const sam = present(state.people.sam);
+  const job = present(state.jobs.find((job) => job.status === 'offer'));
+  job.status = 'active';
+  job.acceptedAt = state.now;
+  job.assignedTo = sam.id;
+  job.responsibility = adoptResponsibility(sam, job.id, state.now);
+  const model = structuredClone(job.model);
+  const total = state.stock.switch;
+  const recovered = stockCount(state, 'switch', 'recovered');
+  const replacement = {
+    id: 'replace:switch',
+    action: 'replace:switch',
+    label: 'Replace the switch',
+    duration: 30,
+    effort: 0.1,
+  };
+  chooseActivity(sam, job.id, {}, [replacement], state.now);
+  expect(startActivity(sam, replacement, state.now)).toBe(true);
+  expect(takePart(state, 'switch', 'recovered')).toBe(true);
+  state.npcWork.push({
+    personId: sam.id,
+    jobId: job.id,
+    option: replacement,
+    startedAt: state.now,
+    endsAt: state.now + 30,
+    reservedPart: 'switch',
+    reservedRecovered: true,
+  });
+  const rest = {
+    id: 'interrupting-rest',
+    action: 'rest',
+    label: 'Take a break',
+    duration: 10,
+    effort: 0,
+  };
+  chooseActivity(sam, 'ordinary-day', {}, [rest], state.now);
+  expect(startActivity(sam, rest, state.now)).toBe(true);
+  state.npcWork.push({
+    personId: sam.id,
+    option: rest,
+    startedAt: state.now,
+    endsAt: state.now + 10,
+  });
+  job.blocked = {
+    at: state.now,
+    kind: 'help',
+    reason: 'Controlled responsibility waiting during the break.',
+  };
+  state = act(state, { type: 'wait', minutes: 1 });
+  expect(
+    state.hf.archive.history.some((tx) =>
+      tx.inputs.some(
+        (input) =>
+          input.kind === 'action.resolved' &&
+          input.payload.stage === 'interrupt' &&
+          input.payload.disposition === 'interrupted',
+      ),
+    ),
+  ).toBe(true);
+  expect(state.stock.switch).toBe(total);
+  expect(stockCount(state, 'switch', 'recovered')).toBe(recovered);
+  expect(state.jobs.find((candidate) => candidate.id === job.id)?.model).toEqual(model);
+  expect(state.npcWork.some((work) => work.option.id === replacement.id)).toBe(false);
+  expect(state.people.sam?.activity?.affordance.id).toBe(rest.id);
+  const raw = saveGame(state);
+  expect(saveGame(loadGame(raw))).toBe(raw);
+  state = act(state, { type: 'wait', minutes: 1 });
+  expect(state.stock.switch).toBe(total);
+  expect(stockCount(state, 'switch', 'recovered')).toBe(recovered);
 });

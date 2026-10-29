@@ -1,6 +1,6 @@
-import { methodEvidence } from '@adam0white/human-framework';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
+import { methodEvidence } from '../src/game/hf';
 import type { Command, GameState, Job } from '../src/game/types';
 
 function campaign(attended: string[]) {
@@ -136,33 +136,48 @@ function physical(state: GameState) {
 }
 
 describe('ordinary attended teaching across multiple repair briefs', () => {
+  let broad: ReturnType<typeof campaign>;
+  // Each complete campaign keeps the existing ten-minute budget. The shared
+  // broad arm supplies the same physical baseline to both causal controls.
+  beforeAll(() => {
+    broad = campaign(['switch', 'contact', 'cell']);
+  }, 600_000);
+
+  function expectIndependent(run: ReturnType<typeof campaign>) {
+    expect(run.support).toBeGreaterThan(0.2);
+    expect(run.choice).toBe('inspect:switch');
+    const target = run.state.jobs.find((candidate) => candidate.id === run.targetId);
+    expect(target?.status).toBe('delivered');
+    expect(target?.completedBy).toBe('sam');
+    expect(target?.contributions.map((entry) => entry.action)).toEqual([
+      'intake',
+      'inspect:switch',
+      'measure:switch:movement',
+      'replace:switch',
+      'verify:movement',
+    ]);
+    expect(target?.contributions.every((entry) => entry.actorId === 'sam')).toBe(true);
+    expect(run.state.independentRepairs).toBe(1);
+  }
+
   it('retains earlier complete methods after teaching three valid intake procedures', () => {
-    const broad = campaign(['switch', 'contact', 'cell']);
+    expectIndependent(broad);
+  });
+
+  it('retains the switch-only control with the same physical opening', () => {
     const switchOnly = campaign(['switch']);
-    const withheld = campaign(['contact', 'cell']);
     expect(physical(broad.before)).toEqual(physical(switchOnly.before));
+    expectIndependent(switchOnly);
+  });
+
+  it('asks for help when switch teaching is withheld from the same physical opening', () => {
+    const withheld = campaign(['contact', 'cell']);
     expect(physical(broad.before)).toEqual(physical(withheld.before));
-    for (const run of [broad, switchOnly]) {
-      expect(run.support).toBeGreaterThan(0.2);
-      expect(run.choice).toBe('inspect:switch');
-      const target = run.state.jobs.find((candidate) => candidate.id === run.targetId);
-      expect(target?.status).toBe('delivered');
-      expect(target?.completedBy).toBe('sam');
-      expect(target?.contributions.map((entry) => entry.action)).toEqual([
-        'intake',
-        'inspect:switch',
-        'measure:switch:movement',
-        'replace:switch',
-        'verify:movement',
-      ]);
-      expect(target?.contributions.every((entry) => entry.actorId === 'sam')).toBe(true);
-      expect(run.state.independentRepairs).toBe(1);
-    }
     expect(withheld.support).toBe(0);
     expect(withheld.choice).toBe('ask-help');
     expect(
       withheld.state.jobs.find((candidate) => candidate.id === withheld.targetId)?.blocked?.kind,
     ).toBe('help');
     expect(withheld.state.independentRepairs).toBe(0);
-  }, 30_000);
+  });
 });

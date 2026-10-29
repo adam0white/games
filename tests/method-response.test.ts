@@ -1,7 +1,9 @@
-import { promise } from '@adam0white/human-framework';
 import { expect, it } from 'vitest';
-import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
+import { createGame, dispatch, loadGame, replayCommands, saveGame } from '../src/game/engine';
+import { promise } from '../src/game/hf';
 import { methodQuestion, methodReport, methodResponse } from '../src/game/method-response';
+import { MAX_GAME_SAVE_LENGTH } from '../src/game/persistence';
+import { MAX_RECORDED_INPUTS } from '../src/game/recording';
 import { replayRecordedRun } from '../src/game/replay';
 import type { Command, GameState } from '../src/game/types';
 
@@ -95,11 +97,20 @@ it('leaves unavailable people alone and never invents an old method', () => {
 it('supports the actual recording capacity and later native continuation without enlarging limits', () => {
   let s = repaired('replace');
   s = act(s, methodQuestion(s, s.selectedJobId, 'gear'));
-  while (s.inputs) s = act(s, { type: 'select', jobId: s.selectedJobId });
+  const filled = replayCommands(
+    s,
+    Array.from(
+      { length: MAX_RECORDED_INPUTS - (s.inputs?.length ?? 0) + 1 },
+      (): Command => ({ type: 'select', jobId: s.selectedJobId }),
+    ),
+  );
+  expect(filled.ok).toBe(true);
+  if (!filled.ok) throw new Error(filled.message);
+  s = filled.state;
   expect(s.methodResponses?.[0]?.recordingClosedAtInput).toBe(10000);
   s = act(s, { type: 'work', jobId: s.selectedJobId, componentId: 'gear', intervention: 'clean' });
   s = act(s, { type: 'deliver', jobId: s.selectedJobId, unfinished: true });
-  expect(saveGame(s).length).toBeLessThan(2_000_000);
+  expect(saveGame(s).length).toBeLessThan(MAX_GAME_SAVE_LENGTH);
   expect(saveGame(loadGame(saveGame(s)))).toBe(saveGame(s));
 }, 120000);
 

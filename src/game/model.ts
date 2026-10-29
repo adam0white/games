@@ -10,7 +10,7 @@ import type {
   Observation,
   TestCondition,
   UseResult,
-} from './types';
+} from './types.ts';
 
 /** Collar factors are visible instrument reference data, not hidden fault values. */
 export const governorMultipliers = [0.4, 0.8, 1, 1.2, 1.6] as const;

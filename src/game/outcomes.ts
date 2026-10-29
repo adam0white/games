@@ -1,11 +1,14 @@
 /** Finite authored cast scenes. HF owns willingness and activity; this module owns receipts and objects.
  * Only the explicit start input enables these rules. No biography grants a method or a completed memory.
  */
-import { perceive, reviewed } from '@adam0white/human-framework';
-import { admissionFacts } from './cast';
-import { createModel, intervene, runUseTest } from './model';
-import { chooseActivity, finishActivity, playerAsk, startActivity } from './people';
-import type { GameState, Job, WorkOption } from './types';
+
+import { admissionFacts } from './cast.ts';
+import { perceive, prepareActivityFinish } from './hf.ts';
+import { createModel, intervene, runUseTest } from './model.ts';
+import { chooseActivity, finishActivity, playerAsk, startActivity } from './people.ts';
+import { OUTCOME_PROVENANCE } from './recording.ts';
+import { refundPart } from './stock.ts';
+import type { GameState, Job, WorkOption } from './types.ts';
 
 export const OUTCOME_ACTIONS = [
   'sam-correction',
@@ -146,12 +149,7 @@ export interface CastOutcomes {
 export const outcomeDone = (s: GameState, action: OutcomeAction) =>
   s.castOutcomes?.receipts.some((r) => r.action === action) ?? false;
 export function startOutcomes(s: GameState): void {
-  s.provenance = {
-    engine: 'small-works@5',
-    scenario: 'cast-outcomes@1',
-    framework: '3.0.0',
-    game: '4.1.0+hf3',
-  };
+  s.provenance = { ...OUTCOME_PROVENANCE };
   s.castOutcomes = {
     edition: 'cast-outcomes@1',
     startedAt: s.now,
@@ -276,10 +274,14 @@ export function requestOutcome(s: GameState, action: OutcomeAction): string {
   if (o.decisions.length > 100) o.decisions.shift();
   message(s, p.name, choice.answer?.says ?? choice.narration);
   const selected = options.find((a) => a.id === choice.chosenId);
-  if (choice.chosenId === action && p.activity) {
-    if (existing) finishActivity(p, existing.option, false, s.now);
-    else return 'Their existing activity cannot be interrupted by this scene.';
-    s.npcWork = s.npcWork.filter((w) => w.personId !== p.id);
+  // The HF decision can interrupt the current activity before the host's next time drain.
+  // Reconcile the old reservation before starting the selected alternative.
+  if (existing && (!p.activity || choice.chosenId === action)) {
+    finishActivity(p, existing.option, false, s.now, [], true);
+    refundPart(s, existing);
+    s.npcWork = s.npcWork.filter((w) => w !== existing);
+  } else if (choice.chosenId === action && p.activity && !existing) {
+    return 'Their existing activity cannot be interrupted by this scene.';
   }
   if (choice.chosenId !== action || !startActivity(p, option, s.now)) {
     if (selected && selected.id !== action && !p.activity && startActivity(p, selected, s.now))
@@ -319,12 +321,7 @@ export function stopOutcome(s: GameState, reason = 'You stopped attending.'): vo
 export function outcomeBoundary(s: GameState): number {
   const pending = s.castOutcomes?.pending;
   if (!pending) return Infinity;
-  const p = s.people[OUTCOME_TERMS[pending.action].person];
-  return Math.min(
-    pending.endsAt,
-    p?.activity?.reviewAt ?? pending.endsAt,
-    p?.activity?.thresholdAt ?? pending.endsAt,
-  );
+  return pending.endsAt;
 }
 function sceneJob(s: GameState, kind: 'fan', ownerId: 'rafi', title: string): Job {
   const id = `object-${s.nextId++}`;
@@ -358,35 +355,16 @@ export function resolveOutcome(s: GameState): void {
   if (!o || !w) return;
   const t = OUTCOME_TERMS[w.action];
   const p = s.people[t.person];
-  if (
-    !p?.activity ||
-    p.activity.affordance.id !== w.option.id ||
-    p.activity.dozedAt !== undefined
-  ) {
+  if (!p?.activity || p.activity.affordance.id !== w.option.id || p.body.asleep) {
     stopOutcome(s, 'The person could not continue.');
     return;
   }
-  if (s.now < w.endsAt) {
-    if (s.now >= p.activity.reviewAt || s.now >= (p.activity.thresholdAt ?? Infinity)) {
-      const options = [
-        { ...w.option, duration: w.endsAt - s.now },
-        ...alternatives(w.endsAt - s.now),
-      ];
-      const choice = chooseActivity(p, 'cast-outcomes', {}, options, s.now);
-      if (choice.chosenId !== w.option.id) {
-        stopOutcome(s, `${p.name} chose to stop.`);
-        const next = options.find((a) => a.id === choice.chosenId);
-        if (next && startActivity(p, next, s.now))
-          s.npcWork.push({
-            personId: p.id,
-            option: next,
-            startedAt: s.now,
-            endsAt: s.now + next.duration,
-          });
-      } else reviewed(p);
-    }
+  if (s.now < w.endsAt) return;
+  if (!prepareActivityFinish(p, s.now)) {
+    stopOutcome(s, 'The person stopped before completing this work.');
     return;
   }
+
   const action = w.action;
   if (action === 'halil-service') {
     const job = s.jobs.find((j) => j.id === o.serviceId);

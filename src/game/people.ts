@@ -1,28 +1,29 @@
+import { canonicalCast } from '@adam0white/lab-client';
+import { CAST_IDS } from './cast.ts';
 import {
   type Affordance,
   begin,
   clearMethodContext,
+  createPeopleRuntime,
   createPerson,
   type DecisionRecord,
   decide,
   demonstrateMethod,
-  enableFatigueStore,
-  enableFullness,
   finish,
   noteVoicePromise,
   type Person,
+  pendingOffer,
   perceive,
   promise,
   receiveMethodCues,
+  rejectPendingStart,
   type Suggestion,
-  sicken,
   socialEvent,
   tick,
-} from '@adam0white/human-framework';
-import { canonicalCast } from '@adam0white/lab-client';
-import { CAST_IDS } from './cast';
-import { adoptRepairAspiration, aspirationAdvances } from './responsibility';
-import type { PersonChoice, WorkOption } from './types';
+  tickPeopleRuntime,
+} from './hf.ts';
+import { adoptRepairAspiration, aspirationAdvances } from './responsibility.ts';
+import type { PersonChoice, WorkOption } from './types.ts';
 
 const pending = new WeakMap<Person, { record: DecisionRecord; offers: Affordance[] }>();
 const cueList = (cues: Record<string, string>) =>
@@ -58,47 +59,73 @@ export function createPeople(seed: number, now: number): Record<string, Person> 
       ['sam', 'mum', 'nora', 'rafi', 'halil'].indexOf(a.id) -
       ['sam', 'mum', 'nora', 'rafi', 'halil'].indexOf(b.id),
   );
-  const people = Object.fromEntries(
-    profiles.map((p, index) => [
-      p.id,
-      createPerson({
-        ...p,
-        lexicon: { plainEnglish: true },
-        seed: seed + index * 7919,
-        now,
-        bornAt: now - p.age * 365 * 1440,
-        body: { satiety: 0.9, hydration: 0.9, sleepPressure: 0.12, exertion: 0.05 },
-        voices: [{ voiceId: 'player', trust: 0.85 }],
-      }),
-    ]),
-  );
-  if (people.halil)
-    sicken(people.halil, {
-      kind: 'hypertension',
-      severity: 0.2,
-      trendPerDay: 0,
-      contagious: false,
-      chronic: true,
-      baseline: 0.2,
-      aggravatedBy: ['smoke'],
-    });
+  const people = createPeopleRuntime(seed, now, workshopActions());
+  for (const p of profiles) createPerson(people, { ...p, now });
   if (people.sam) adoptRepairAspiration(people.sam, now);
   return people;
 }
 
-/**
- * Engine-5 people (HF 2.8): a slow fatigue store, so a long day at the bench tires a person and a night's sleep
- * restores them, and fullness, so an idle person stops looping on drinks and snacks they no longer need.
- */
-export function enableCurrentPeople(people: Record<string, Person>, _now: number): void {
-  for (const person of Object.values(people)) {
-    enableFatigueStore(person);
-    enableFullness(person);
-  }
+/** All HF4 faculties stay active. Differences belong to authored state. */
+export function tickPeople(people: Record<string, Person>, now: number): void {
+  tickPeopleRuntime(people, now);
 }
 
-export function tickPeople(people: Record<string, Person>, now: number): void {
-  for (const person of Object.values(people)) tick(person, now);
+function workshopActions(): string[] {
+  const actions = [
+    'start-day',
+    'sleep',
+    'eat',
+    'drink',
+    'observe',
+    'rest',
+    'personal',
+    'leisure',
+    'ask-help',
+    'accept-repair',
+    'complete-lesson',
+    'deliver',
+    'complete-project',
+    'postpone',
+    'discuss-method',
+    'agree-replacement',
+    'keep-original-parts',
+    'handle-use',
+    'delivery-independent',
+    'sam-correction',
+    'sam-terms',
+    'sam-shift',
+    'rafi-return',
+    'rafi-appliance',
+    'rafi-deposit-loan',
+    'rafi-jar-loan',
+    'halil-terms',
+    'community:garden',
+    'community:reading',
+    'community:theatre',
+  ];
+  const parts = [
+    'cell',
+    'switch',
+    'contact',
+    'bulb',
+    'motor',
+    'spring',
+    'gear',
+    'governor',
+    'drum',
+  ];
+  for (const part of parts)
+    for (const verb of ['inspect', 'clean', 'adjust', 'replace']) actions.push(`${verb}:${part}`);
+  for (const test of ['bench', 'movement', 'load']) {
+    actions.push(`verify:${test}`);
+    for (const part of parts) actions.push(`measure:${part}:${test}`);
+    for (const mode of ['voltage', 'continuity', 'motion'])
+      for (const a of ['0', 'A', 'B', 'C', 'D', 'E', 'F'])
+        for (const b of ['0', 'A', 'B', 'C', 'D', 'E', 'F'])
+          actions.push(`probe:${mode}:${a}:${b}:${test}`);
+  }
+  for (let setting = 0; setting <= 20; setting++) actions.push(`calibrate:governor:${setting}`);
+  return actions;
 }
 
 /** The host calls this only for an attended, observed demonstration. */
@@ -137,6 +164,7 @@ function offer(person: Person, option: WorkOption, contextId: string): Affordanc
   const observe = option.action === 'observe';
   const rest = option.action === 'rest';
   const personal = option.action === 'personal';
+  const worship = option.action === 'pray';
   const leisure = option.action === 'leisure';
   const help = option.action === 'ask-help';
   const accept = option.action === 'accept-repair';
@@ -156,27 +184,30 @@ function offer(person: Person, option: WorkOption, contextId: string): Affordanc
     methodContext: contextId,
     targetId: contextId,
     mode: sleep ? 'sleep' : 'awake',
-    advertises: drink
-      ? { water: 0.7 }
-      : sleep
-        ? { sleep: 0.9, rest: 0.7 }
-        : eat
-          ? { food: 0.7, water: 0.4 }
-          : observe || accept
-            ? { competence: 0.12, belonging: 0.05 }
-            : rest
-              ? { rest: 0.7, leisure: 0.05 }
-              : leisure
-                ? { leisure: 0.18, meaning: 0.08 }
-                : personal
-                  ? { leisure: 0.18, autonomy: 0.12 }
-                  : help
-                    ? { competence: 0.4, belonging: 0.08 }
-                    : diagnose
-                      ? { competence: 0.075 }
-                      : { competence: 0.05 },
-    tags:
-      sleep || rest
+    advertises: worship
+      ? {}
+      : drink
+        ? { water: 0.7 }
+        : sleep
+          ? { sleep: 0.9, rest: 0.7 }
+          : eat
+            ? { food: 0.7, water: 0.4 }
+            : observe || accept
+              ? { competence: 0.12, belonging: 0.05 }
+              : rest
+                ? { rest: 0.7, leisure: 0.05 }
+                : leisure
+                  ? { leisure: 0.18, meaning: 0.08 }
+                  : personal
+                    ? { leisure: 0.18, autonomy: 0.12 }
+                    : help
+                      ? { competence: 0.4, belonging: 0.08 }
+                      : diagnose
+                        ? { competence: 0.075 }
+                        : { competence: 0.05 },
+    tags: worship
+      ? ['worship']
+      : sleep || rest
         ? ['rest']
         : personal
           ? ['leisure']
@@ -201,6 +232,21 @@ export function chooseActivity(
   tick(person, now);
   if (Object.keys(cues).length) receiveMethodCues(person, { contextId, cues: cueList(cues) });
   else clearMethodContext(person);
+  // Continuing people can attend to their retained prayer duties. This is an
+  // ordinary optional activity; HF owns its timing, choice and duty outcome.
+  if (
+    options.some((option) => option.action !== 'sleep' && option.duration >= 15) &&
+    person.agenda.commitments.some(
+      (duty) =>
+        duty.status === 'pending' &&
+        duty.actions.includes('pray') &&
+        duty.from <= now &&
+        now < duty.until,
+    ) &&
+    !options.some((option) => option.action === 'pray')
+  )
+    // Callers use this same offer list to start the actual selected activity.
+    options.push({ id: 'pray', action: 'pray', label: 'Pray', duration: 15, effort: 0 });
   const offers = options.map((option) => offer(person, option, contextId));
   const record = decide(person, offers, ask ? { now, suggestion: ask } : { now });
   pending.set(person, { record, offers });
@@ -212,7 +258,7 @@ export function chooseActivity(
     reason: record.intention,
     terms: Object.fromEntries((chosen?.terms ?? []).map((t) => [t.source, t.value])),
     ...(answer
-      ? { answer: { verdict: answer.verdict, says: answer.says, reason: answer.reason } }
+      ? { answer: { verdict: answer.verdict, says: record.narration, reason: answer.reason } }
       : {}),
   };
 }
@@ -248,10 +294,10 @@ export function startActivity(person: Person, option: WorkOption, now: number): 
   const captured = pending.get(person);
   // The trace survives a save made between choosing and beginning.
   const record = captured?.record ?? person.trace.at(-1);
-  if (!record || record.at !== now || record.chosenAffordanceId !== option.id || person.activity)
-    return false;
+  if (!record || record.chosenAffordanceId !== option.id || person.activity) return false;
   const selected =
     captured?.offers.find((a) => a.id === option.id) ??
+    pendingOffer(person, option.id) ??
     offer(person, option, person.methods?.context?.id ?? 'workshop');
   pending.delete(person);
   return begin(person, selected, record) !== null;
@@ -263,12 +309,14 @@ export function finishActivity(
   success: boolean,
   now: number,
   advances: string[] = [],
+  preserveNextStart = false,
 ): ReturnType<typeof finish> {
   if (person.activity?.affordance.id !== option.id) return null;
   const activity = person.activity;
   return finish(person, {
     affordanceId: option.id,
     action: option.action,
+    preserveNextStart,
     targetId: activity.affordance.targetId,
     at: now,
     status: success ? 'completed' : 'failed',
@@ -353,6 +401,7 @@ export function agreeLearningSession(
     },
   ];
   const choice = chooseActivity(person, contextId, {}, options, now, ask);
+  if (choice.chosenId === 'observe') rejectPendingStart(person);
   if (choice.chosenId !== 'observe')
     return {
       accepted: false,

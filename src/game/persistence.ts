@@ -1,53 +1,85 @@
-import { restore, snapshot } from '@adam0white/human-framework';
-import { validateCastChapter } from './cast';
-import { ownerReplacementProposal, ownerReplacementResponse } from './cast-content';
-import { createGame } from './engine';
-import { validMethodResponses } from './method-response';
-import { compatiblePart, createModel } from './model';
-import { restoreOpeningPeople } from './opening';
-import { OUTCOME_TERMS } from './outcomes';
-import { validateOutcomeSave } from './outcomes-validation';
+import { validateCastChapter } from './cast.ts';
+import { ownerReplacementProposal, ownerReplacementResponse } from './cast-content.ts';
+import { createGame } from './engine.ts';
+import { attachWorkshop, snapshotRuntime, type WorkshopRuntime } from './hf.ts';
+import { matchesJson } from './json-data.ts';
+import { validMethodResponses } from './method-response.ts';
+import { compatiblePart, createModel } from './model.ts';
+import { restoreOpeningPeople } from './opening.ts';
+import { OUTCOME_TERMS } from './outcomes.ts';
+import { validateOutcomeSave } from './outcomes-validation.ts';
 import {
   isInputRecording,
   isMigratedFrom,
   isOutcomeProvenance,
   isRecordedCommand,
   isSupportedProvenance,
-  LEGACY_PROVENANCE,
   MAX_RECORDED_INPUTS,
-  SAVE_PROVENANCE,
-} from './recording';
-import {
-  aspirationAdvances,
-  responsibilityAdvances,
-  responsibilityCompletionAction,
-} from './responsibility';
-import type { Evidence, GameState, Job, TestCondition } from './types';
+} from './recording.ts';
+import { aspirationAdvances, responsibilityAdvances } from './responsibility.ts';
+import type { Evidence, GameState, Job, TestCondition } from './types.ts';
 
 const DAY = 1440;
 const OPEN = 540;
 const CLOSE = 1020;
 const CONDITIONS: TestCondition[] = ['bench', 'movement', 'load'];
 const UPGRADE_IDS = ['second-bench', 'precision-meter'];
+export const MAX_GAME_SAVE_LENGTH = 256 * 1024 * 1024;
+const SAVE_FIELDS = new Set<keyof GameState>([
+  'hf',
+  'schema',
+  'provenance',
+  'migratedFrom',
+  'inputs',
+  'discoveries',
+  'ownerExchanges',
+  'methodResponses',
+  'castOutcomes',
+  'castChapter',
+  'chapterPaused',
+  'openingPeople',
+  'community',
+  'seed',
+  'rng',
+  'now',
+  'day',
+  'cash',
+  'reputation',
+  'stock',
+  'busyWorkshop',
+  'jobs',
+  'people',
+  'npcWork',
+  'watching',
+  'watchUntil',
+  'pendingRequest',
+  'selectedJobId',
+  'log',
+  'nextId',
+  'upgrades',
+  'independentRepairs',
+  'weekReviewed',
+  'ended',
+  'dailyCostsPaid',
+]);
 
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, item) =>
+    item && typeof item === 'object' && !Array.isArray(item)
+      ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : item,
+  );
+}
 export function saveGame(state: GameState): string {
-  return JSON.stringify({
-    ...state,
-    provenance: {
-      ...(state.schema === 'small-works@4'
-        ? LEGACY_PROVENANCE
-        : state.castOutcomes
-          ? state.provenance
-          : SAVE_PROVENANCE),
-    },
-    people: Object.fromEntries(
-      Object.entries(state.people).map(([id, person]) => [id, snapshot(person)]),
-    ),
-  });
+  if (!isSupportedProvenance(state.provenance))
+    throw new Error('This workshop belongs to an earlier edition. Start fresh here.');
+  // Object insertion order may change when HF restores an archive. Canonical object keys make
+  // the first save and every restored save byte-identical without changing arrays or evidence.
+  return canonical({ ...state, hf: snapshotRuntime(state.people) });
 }
 export function loadGame(text: string): GameState {
-  if (text.length > 2_000_000) throw new Error('This save exceeds the supported size.');
-  const value = JSON.parse(text) as GameState & { castSources?: unknown };
+  if (text.length > MAX_GAME_SAVE_LENGTH) throw new Error('This save exceeds the supported size.');
+  const value = JSON.parse(text) as GameState & { hf: WorkshopRuntime; castSources?: unknown };
   delete value.castSources;
   if (value?.schema !== 'small-works@5' || !isSupportedProvenance(value?.provenance)) {
     throw new Error(
@@ -106,6 +138,7 @@ export function loadGame(text: string): GameState {
       (strings(e.witnessedBy) && e.witnessedBy.every((id) => actors.includes(id))));
   if (
     !object(value) ||
+    Object.keys(value).some((key) => !SAVE_FIELDS.has(key as keyof GameState)) ||
     !['small-works@4', 'small-works@5'].includes(value.schema) ||
     !isSupportedProvenance(value.provenance) ||
     (value.migratedFrom !== undefined &&
@@ -382,7 +415,7 @@ export function loadGame(text: string): GameState {
         command.jobId !== r.jobId ||
         command.ownerId !== r.ownerId ||
         command.componentId !== r.componentId ||
-        command.evidenceText !== JSON.stringify(r.evidence) ||
+        !matchesJson(command.evidenceText, r.evidence) ||
         JSON.stringify(command.evidenceIds) !== JSON.stringify(r.evidence.map((e) => e.id))
       )
         invalid();
@@ -392,7 +425,7 @@ export function loadGame(text: string): GameState {
         if (r.recordingClosedAtInput !== MAX_RECORDED_INPUTS) invalid();
       } else if (
         r.recordingClosedAtInput !== undefined ||
-        JSON.stringify(value.inputs[activation.index]) !== JSON.stringify(command)
+        canonical(value.inputs[activation.index]) !== canonical(command)
       )
         invalid();
       questions.add(key);
@@ -545,24 +578,18 @@ export function loadGame(text: string): GameState {
       decided.add(decision.personId);
     }
   }
-  // HF owns validation of its slices. Refuse saves it would sanitize instead of silently changing acquired state.
-  const canonical = (v: unknown): string =>
-    JSON.stringify(v, (_key, item) =>
-      object(item)
-        ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
-        : item,
-    );
+  // HF restores the archive. The host validates its own runtime ledger and cached inspection views.
   if (Object.keys(value.people).sort().join(',') !== 'halil,mum,nora,rafi,sam') invalid();
-  value.people = Object.fromEntries(
-    Object.entries(value.people).map(([id, saved]) => {
-      const person = restore(saved);
-      // HF restore stamps its own engine version on older snapshots; nothing else may change.
-      const stamped = object(saved) ? { ...saved, engine: person.engine } : saved;
-      if (person.id !== id || person.now !== value.now || canonical(person) !== canonical(stamped))
-        invalid();
-      return [id, person];
-    }),
-  );
+  if (!object(value.hf) || !object(value.hf.archive)) invalid();
+  const savedPeople = canonical(value.people);
+  attachWorkshop(value);
+  if (
+    canonical(value.people) !== savedPeople ||
+    Object.entries(value.people).some(
+      ([id, person]) => person.id !== id || person.now !== value.now,
+    )
+  )
+    invalid();
   if (value.openingPeople !== undefined)
     value.openingPeople = restoreOpeningPeople(value.openingPeople);
   if (value.chapterPaused !== undefined && typeof value.chapterPaused !== 'boolean') invalid();
@@ -603,9 +630,12 @@ export function loadGame(text: string): GameState {
       goal.label !== `Resolve accepted repair ${job.id}` ||
       goal.baseImportance !== 0.2 ||
       JSON.stringify(goal.serves) !== '["achievement"]' ||
-      goal.advancedBy.length !== 1 ||
-      goal.advancedBy[0]?.action !== responsibilityCompletionAction(handle) ||
-      goal.advancedBy[0]?.amount !== 1 ||
+      canonical(goal.advancedBy) !==
+        canonical([
+          { action: 'deliver', amount: 1 },
+          { action: 'complete-project', amount: 1 },
+          { action: 'delivery-independent', amount: 1 },
+        ]) ||
       (goal.status === 'active' &&
         (job.assignedTo !== 'sam' ||
           !['active', 'ready'].includes(job.status) ||
@@ -631,12 +661,13 @@ export function loadGame(text: string): GameState {
     const person = value.people[w.personId];
     if (
       !object(w) ||
+      !person ||
       !['sam', 'mum', 'nora', 'rafi', 'halil'].includes(w.personId) ||
       working.has(w.personId) ||
       (w.jobId !== undefined && (!job || job.assignedTo !== w.personId)) ||
       job?.blocked !== undefined ||
       (w.jobId === undefined &&
-        !['eat', 'drink', 'rest', 'personal', 'leisure'].includes(w.option?.action)) ||
+        !['eat', 'drink', 'rest', 'personal', 'leisure', 'pray'].includes(w.option?.action)) ||
       !object(w.option) ||
       !str(w.option.id) ||
       !str(w.option.action) ||
@@ -648,12 +679,7 @@ export function loadGame(text: string): GameState {
           JSON.stringify(w.option.advances) !==
             JSON.stringify(
               job
-                ? responsibilityAdvances(
-                    person as import('@adam0white/human-framework').Person,
-                    job.responsibility,
-                    job.id,
-                    w.option.action,
-                  )
+                ? responsibilityAdvances(person, job.responsibility, job.id, w.option.action)
                 : [],
             ))) ||
       !integer(w.startedAt) ||

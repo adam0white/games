@@ -1,14 +1,7 @@
-import {
-  type Affordance,
-  begin,
-  decide,
-  finish,
-  perceive,
-  socialEvent,
-} from '@adam0white/human-framework';
-import { runUseTest } from './model';
-import { choiceSpeech, finishActivity, realizedActivityNeeds } from './people';
-import type { GameState, Job, PersonChoice, WorkOption } from './types';
+import { type Affordance, begin, decide, finish, perceive, socialEvent } from './hf.ts';
+import { runUseTest } from './model.ts';
+import { choiceSpeech, finishActivity, realizedActivityNeeds } from './people.ts';
+import type { GameState, Job, PersonChoice, WorkOption } from './types.ts';
 
 export type CommunityFormat = 'garden' | 'reading' | 'theatre';
 export interface CommunityDecision {
@@ -356,22 +349,8 @@ export function resolveCommunityEvent(state: GameState, event: CommunityState, n
       completed: false,
     });
   }
-  // Belonging advertisements describe possible company among invited neighbours, not guaranteed attendance.
-  // Only actual selected participants enter the running activity's observed company.
-  for (const decision of event.decisions) {
-    if (!decision.format || !decision.activityId) continue;
-    const activity = state.people[decision.personId]?.activity;
-    if (activity?.affordanceId === decision.activityId) {
-      activity.affordance.with = event.decisions
-        .filter(
-          (other) =>
-            other.personId !== decision.personId &&
-            other.format === decision.format &&
-            other.activityId,
-        )
-        .map((other) => other.personId);
-    }
-  }
+  // The host event records actual attendance. Actor inspections stay read only;
+  // completion receipts below convey actual company and realized outcomes.
 }
 /** Finalize elapsed activities. Close reservations even if a missing tick prevents completion credit. */
 function otherPlans(state: GameState, decisions: CommunityDecision[]): string {
@@ -445,7 +424,6 @@ export function finalizeCommunityEvent(state: GameState, event: CommunityState, 
       );
       const companionIds = companions.map((other) => other.personId);
       // Actual co-presence determines both realized belonging and whether an appointment was kept.
-      activity.affordance.with = companionIds;
       const needs = {
         ...realizedActivityNeeds(activity.affordance.advertises),
         belonging:
@@ -509,7 +487,13 @@ export function finalizeCommunityEvent(state: GameState, event: CommunityState, 
                 : 'watched the paper theatre';
           return `${name} ${activity}.`;
         })
-        .join(' ')
+        .join(' ') +
+      (event.decisions.some((d) => d.format && !d.completed)
+        ? ` ${otherPlans(
+            state,
+            event.decisions.filter((d) => d.format && !d.completed),
+          )}`
+        : '')
     : state.schema === 'small-works@5' && event.decisions.length
       ? `Nobody finished an activity you prepared. ${otherPlans(state, event.decisions)}`
       : 'No prepared activity was completed. People kept other plans, were occupied, or stopped before completion.';

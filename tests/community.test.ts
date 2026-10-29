@@ -1,4 +1,3 @@
-import { restore, snapshot } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import type { CommunityFormat, CommunityState } from '../src/game/community';
 import {
@@ -10,14 +9,43 @@ import {
   resolveCommunityEvent,
 } from '../src/game/community';
 import { createGame } from '../src/game/engine';
+import { createPeopleRuntime, createPerson, exportPersonRun } from '../src/game/hf';
 import { createModel } from '../src/game/model';
 import { createPeople, finishActivity, prepareMorning, tickPeople } from '../src/game/people';
 import type { GameState } from '../src/game/types';
+import { cloneGame, native, reAuthor, snapshot } from './hf-fixture';
 
 function fixture(): GameState {
   const state = createGame(416);
   state.now = 5040;
-  state.people = createPeople(416, state.now);
+  const profiles = createPeople(416, state.now);
+  const first = profiles.sam;
+  if (!first) throw new Error('Missing Sam');
+  const actions = exportPersonRun(first).initial.spec.definitions.actions.map(
+    (action) => action.id,
+  );
+  const people = createPeopleRuntime(416, state.now, actions);
+  for (const profile of Object.values(profiles)) {
+    createPerson(people, {
+      id: profile.id,
+      name: profile.name,
+      age: Math.round((state.now - profile.life.bornAt) / (365 * 1440)),
+      sex: profile.life.sex,
+      traits: profile.traits,
+      values: profile.values,
+      needs: {
+        safety: 1,
+        belonging: 0.1,
+        esteem: 1,
+        autonomy: 1,
+        competence: 1,
+        leisure: 1,
+        meaning: 1,
+      },
+      now: state.now,
+    });
+  }
+  state.people = people;
   const lantern = state.jobs.find((j) => j.ownerId === 'mum');
   const theatre = state.jobs.find((j) => j.isPersonal);
   if (!lantern || !theatre) throw new Error('Missing equipment');
@@ -85,12 +113,25 @@ describe('bounded community gathering', () => {
     const state = fixture();
     const event = createCommunityEvent();
     prepare(state, event, 'garden');
+    const sam = state.people.sam;
+    if (!sam) throw new Error('Missing Sam');
+    reAuthor(sam, {
+      needs: {
+        safety: 1,
+        belonging: 1,
+        esteem: 1,
+        autonomy: 0.1,
+        competence: 1,
+        leisure: 0.1,
+        meaning: 1,
+      },
+    });
     for (const person of Object.values(state.people)) prepareMorning(person, 4320);
     resolve(state, event);
-    const sam = event.decisions.find((d) => d.personId === 'sam');
-    expect(sam?.activityId).toBe('personal');
-    expect(sam?.activityLabel).toBe('Spend 30 minutes on: Play football');
-    expect(sam?.speech).toContain('promised');
+    const samDecision = event.decisions.find((d) => d.personId === 'sam');
+    expect(samDecision?.activityId).toBe('personal');
+    expect(samDecision?.activityLabel).toBe('Spend 30 minutes on: Play football');
+    expect(samDecision?.speech).toContain('own plans');
     expect(event.decisions.find((d) => d.personId === 'mum')?.format).toBe('garden');
   });
   it('uses real activity ticks and returns the theatre with the identical physical model', () => {
@@ -131,12 +172,7 @@ describe('bounded community gathering', () => {
     const state = fixture();
     const event = createCommunityEvent();
     prepare(state, event, 'garden');
-    const resumed = {
-      ...state,
-      people: Object.fromEntries(
-        Object.entries(state.people).map(([id, p]) => [id, restore(snapshot(p))]),
-      ),
-    };
+    const resumed = cloneGame(state);
     const resumedEvent = JSON.parse(JSON.stringify(event)) as CommunityState;
     resolve(state, event);
     resolve(resumed, resumedEvent);
@@ -179,12 +215,7 @@ describe('bounded community gathering', () => {
     prepare(state, event, 'garden');
     resolve(state, event);
     tickPeople(state.people, 5230);
-    const resumed = {
-      ...state,
-      people: Object.fromEntries(
-        Object.entries(state.people).map(([id, person]) => [id, restore(snapshot(person))]),
-      ),
-    };
+    const resumed = cloneGame(state);
     const resumedEvent = structuredClone(event);
     const decisions = structuredClone(event.decisions);
     resolveCommunityEvent(resumed, resumedEvent, 5230);
@@ -241,12 +272,13 @@ describe('bounded community gathering', () => {
     if (!mum) throw new Error('Missing Mum');
     expect(event.decisions.find((d) => d.personId === 'mum')?.format).toBe('garden');
     tickPeople(state.people, 5250);
-    const before = mum.needs.belonging;
+    const before = native(mum).needs.belonging;
     finalizeCommunityEvent(state, event, 5250);
-    expect(mum.needs.belonging).toBe(before);
+    // Settlement advances the native clock slightly; no advertised social gain is realized.
+    expect(native(mum).needs.belonging).toBeCloseTo(before, 6);
     expect(mum.activity).toBeNull();
     expect(event.outcome).toBe('Sam’s mother joined the garden gathering.');
-    const equipmentMemory = mum.memory.episodes.find((episode) =>
+    const equipmentMemory = native(mum).memory.episodes.find((episode) =>
       episode.summary.startsWith('The prepared equipment enabled'),
     );
     expect(equipmentMemory?.summary).toContain('no other neighbour joined');
@@ -288,9 +320,6 @@ describe('bounded community gathering', () => {
     const presentMum = present.people.mum;
     if (!presentMum) throw new Error('Missing Mum');
     prepareMorning(presentMum, 4320);
-    const nora = present.people.nora;
-    if (!nora) throw new Error('Missing Nora');
-    nora.needs.belonging = 0.1; // Controlled unmet social need makes joining compete strongly.
     resolve(present, presentEvent);
     expect(presentEvent.decisions.find((d) => d.personId === 'nora')?.format).toBe('garden');
     tickPeople(present.people, 5250);

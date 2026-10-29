@@ -4,6 +4,7 @@ import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
 import { createModel } from '../src/game/model';
 import { createPeople } from '../src/game/people';
 import type { GameState, Job } from '../src/game/types';
+import { nativeOf } from './hf-fixture';
 
 function fixture(now = 5040): GameState {
   const state = createGame(416);
@@ -73,7 +74,7 @@ describe('community installation is an actual unpaid return', () => {
     ).toHaveLength(1);
     expect(finished.community?.reservedJobIds).toContain('favour-fan');
     expect(
-      finished.people.mum?.memory.episodes.some(
+      nativeOf(finished.people.mum)?.memory.episodes.some(
         (episode) => episode.targetId === 'favour-fan' && episode.summary.includes('returned'),
       ),
     ).toBe(true);

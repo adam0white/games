@@ -1,10 +1,13 @@
 import { gunzipSync, gzipSync } from 'node:zlib';
+import { exportRun, restoreRun, step } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import { discoveredAccounts } from '../src/game/cast-content';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
+import { exportPersonRun } from '../src/game/hf';
 import { isRecordedCommand } from '../src/game/recording';
 import { replayRecordedRun } from '../src/game/replay';
 import type { Command, GameState } from '../src/game/types';
+import { cloneGame, native } from './hf-fixture';
 
 function act(s: GameState, c: Command) {
   const r = dispatch(s, c);
@@ -45,7 +48,9 @@ describe('finite personal reply receipt', () => {
           e.text.includes('I heard you say you copied the report without checking it.'),
       ),
     ).toBe(true);
-    expect(JSON.stringify(s.people.sam)).toContain('personal-reply-received');
+    expect(JSON.stringify(exportPersonRun(s.people.sam!).history)).toContain(
+      'personal-reply-received',
+    );
     expect(s.cash).toBe(before.cash);
     expect(s.jobs).toEqual(before.jobs);
     expect(s.now).toBe(before.now);
@@ -101,7 +106,7 @@ describe('finite personal reply receipt', () => {
     s = act(s, { type: 'ask-about-work', personId: 'halil' });
     const statement = s.log.find((e) => e.text === discoveredAccounts.halil);
     if (!statement) throw new Error('No actual Halil statement');
-    const before = structuredClone(s);
+    const before = cloneGame(s);
     const command: Command = {
       type: 'reply-personal',
       personId: 'halil',
@@ -116,7 +121,19 @@ describe('finite personal reply receipt', () => {
           e.speaker === 'You' && e.text.includes('Nuran asking why you would not name a price.'),
       ),
     ).toBe(true);
-    expect(s.people.halil?.body).toEqual(before.people.halil?.body);
+    // Receiving the words consumes native milliseconds. Compare the body with the same
+    // elapsed time without that observation, rather than freezing ordinary physiology.
+    const baseline = restoreRun(exportPersonRun(before.people.halil!));
+    expect(baseline.ok).toBe(true);
+    if (!baseline.ok) throw new Error('The matched body control did not restore.');
+    const elapsed = step(baseline.value, {
+      until: exportPersonRun(s.people.halil!).current.at,
+      inputs: [],
+    });
+    expect(elapsed.ok).toBe(true);
+    expect(native(s.people.halil!).body).toEqual(
+      exportRun(baseline.value).current.people.halil!.body,
+    );
     expect(s.people.halil?.activity).toEqual(before.people.halil?.activity);
     expect(s.people.halil?.agenda).toEqual(before.people.halil?.agenda);
     expect(s.cash).toBe(before.cash);
@@ -137,7 +154,7 @@ describe('finite personal reply receipt', () => {
     s = act(s, { type: 'ask-about-work', personId: 'nora' });
     const statement = s.log.find((e) => e.text === discoveredAccounts.nora);
     if (!statement) throw new Error('No actual Nora statement');
-    const before = structuredClone(s);
+    const before = cloneGame(s);
     s = act(s, {
       type: 'reply-personal',
       personId: 'nora',

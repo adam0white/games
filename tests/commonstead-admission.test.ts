@@ -1,168 +1,38 @@
 import { createHash } from 'node:crypto';
-import { snapshot } from '@adam0white/human-framework';
-import {
-  canonicalPersona,
-  createPersona,
-  preparePersonaLife,
-  validatePersona,
-} from '@adam0white/lab-client';
+import { canonicalPersona, preparePersonaLife, validatePersona } from '@adam0white/lab-client';
 import { describe, expect, it } from 'vitest';
 import { admitWorkshop } from '../src/game/cast';
-import { createGame, dispatch } from '../src/game/engine';
-import { loadGame, saveGame } from '../src/game/persistence';
-import { replayRecordedRun } from '../src/game/replay';
+import { createGame } from '../src/game/engine';
 import currentReceipt from './fixtures/commonstead-nora-hf221-native.json';
 import hf3Receipt from './fixtures/commonstead-nora-hf223-native.json';
 import receipt from './fixtures/commonstead-nora-native.json';
 
-// Actual ordinary Commonstead pause/Save Nora receipt. No fabricated live shelf state.
-describe('finite Commonstead native Nora receiver', () => {
+// Actual historical source receipts remain unchanged. Commonstead has no HF4 producer yet.
+// The owner waived old3 compatibility; refused history is never replaced by a fresh person.
+describe('historical Commonstead source boundary at HF4', () => {
   it.each([
-    ['historical HF2.21', currentReceipt],
-    ['HF3', hf3Receipt],
-  ] as const)(
-    'admits actual %s native projection and replays the admitted workshop',
-    async (_label, sourceReceipt) => {
-      const parent = await validatePersona(sourceReceipt.envelope);
-      const portable = sourceReceipt.envelope.transfer.person.person;
-      expect(sourceReceipt.raw.engine).toBe(sourceReceipt.envelope.source.engine);
-      expect(portable.source.engine).toBe(sourceReceipt.raw.engine);
-      expect(createHash('sha256').update(canonicalPersona(sourceReceipt.raw)).digest('hex')).toBe(
-        sourceReceipt.envelope.transfer.checkpoint.sha256,
-      );
-      const input = preparePersonaLife(parent, 0);
-      const people = createGame(42).people;
-      people.nora = admitWorkshop(input, people.nora!);
-      const admitted = snapshot(people.nora);
-      expect(admitted.rng).toEqual(portable.rng);
-      expect(admitted.traits).toEqual(portable.traits);
-      expect(admitted.values).toEqual(portable.values);
-      expect(admitted.now - admitted.life.bornAt).toBe(portable.source.now - portable.life.bornAt);
-      expect(admitted.lexicon?.plainEnglish).toBe(true);
-      const { revision, ...body } = parent;
-      const claim = await createPersona({
-        ...body,
-        parentRevision: revision,
-        source: { game: 'repair', build: 'test', engine: '2.23.0', rules: 'canonical-workshop-2' },
-        transfer: { ...parent.transfer, life: input.life },
-      });
-      const state = createGame(42, 'current', people, {
-        version: 'workshop-cast/1',
-        inputs: [input],
-        claims: [claim],
-      });
-      const played = dispatch(state, {
-        type: 'verify',
-        jobId: state.selectedJobId!,
-        condition: 'movement',
-      }).state;
-      const saved = saveGame(played);
-      expect(saveGame(loadGame(saved))).toBe(saved);
-      expect(replayRecordedRun(JSON.parse(saved), saved).ok).toBe(true);
-    },
-  );
-
-  it('preserves actual native RNG, fitness, age and profile in pinned current replay', async () => {
+    ['historical native', receipt],
+    ['HF2.21 native', currentReceipt],
+    ['HF3 native', hf3Receipt],
+  ] as const)('retains the exact %s source hash and refuses admission', async (_label, source) => {
+    const parent = await validatePersona(source.envelope);
+    expect(source.raw.engine).toBe(parent.source.engine);
+    expect(createHash('sha256').update(canonicalPersona(source.raw)).digest('hex')).toBe(
+      source.envelope.transfer.checkpoint.sha256,
+    );
+    const target = createGame(42);
+    const before = canonicalPersona(target.people);
+    const input = preparePersonaLife(
+      parent,
+      source.envelope.transfer.life.clock.watermark * 3_600_000,
+    );
+    expect(() => admitWorkshop(input, target.people.nora!)).toThrow(/start fresh/i);
+    expect(canonicalPersona(target.people)).toBe(before);
+  });
+  it('retains the original pinned receipt identity', async () => {
     const parent = await validatePersona(receipt.envelope);
     expect(parent.revision).toBe(
       '957c44e876d2019d0410b7580dbffd3ae8dd55a94d243af46beef25108d555d1',
     );
-    expect(createHash('sha256').update(canonicalPersona(receipt.raw)).digest('hex')).toBe(
-      receipt.envelope.transfer.checkpoint.sha256,
-    );
-    const input = preparePersonaLife(
-      parent,
-      receipt.envelope.transfer.life.clock.watermark * 3600000,
-    );
-    const people = createGame(42).people;
-    people.nora = admitWorkshop(input, people.nora!);
-    const admitted = snapshot(people.nora);
-    const portable = receipt.envelope.transfer.person.person;
-    expect(admitted.rng).toEqual(portable.rng);
-    expect(admitted.body.fitness).toBe(portable.health.fitness);
-    expect(admitted.traits).toEqual(portable.traits);
-    expect(admitted.values).toEqual(portable.values);
-    expect(admitted.now - admitted.life.bornAt).toBe(portable.source.now - portable.life.bornAt);
-    expect(admitted.skills).toEqual({});
-    // Synthetic target claim for the recorded-source mechanism control, never a live shelf receipt.
-    const { revision, ...body } = parent;
-    const claim = await createPersona({
-      ...body,
-      parentRevision: revision,
-      source: { game: 'repair', build: 'test', engine: '2.23.0', rules: 'canonical-workshop-2' },
-      transfer: { ...parent.transfer, life: input.life },
-    });
-    let state = createGame(42, 'current', people, {
-      version: 'workshop-cast/1',
-      inputs: [input],
-      claims: [claim],
-    });
-    state = dispatch(state, {
-      type: 'verify',
-      jobId: state.selectedJobId!,
-      condition: 'movement',
-    }).state;
-    const saved = saveGame(state);
-    expect(saveGame(loadGame(saved))).toBe(saved);
-    expect(replayRecordedRun(JSON.parse(saved), saved).ok).toBe(true);
-  });
-  it('refuses incompatible native metadata, calendar, body and qualification semantics', async () => {
-    const parent = await validatePersona(receipt.envelope);
-    const original = preparePersonaLife(
-      parent,
-      receipt.envelope.transfer.life.clock.watermark * 3600000,
-    );
-    for (const mutate of [
-      (p: typeof receipt.envelope) => {
-        p.source.rules = 'commonstead-unknown';
-      },
-      (p: typeof receipt.envelope) => {
-        p.source.engine = '2.16.0';
-      },
-      (p: typeof receipt.envelope) => {
-        p.transfer.sourceRole = 'nora';
-      },
-      (p: typeof receipt.envelope) => {
-        p.transfer.person.person.source.id = 'nora';
-      },
-      (p: typeof receipt.envelope) => {
-        p.transfer.person.calendar.offset = 1;
-      },
-      (p: typeof receipt.envelope) => {
-        p.transfer.person.person.family = {} as never;
-      },
-      (p: typeof receipt.envelope) => {
-        p.transfer.person.person.health.health = 0.5;
-      },
-      (p: typeof receipt.envelope) => {
-        p.transfer.person.calendar.norms.pop();
-      },
-      (p: typeof receipt.envelope) => {
-        p.transfer.checkpoint.sourceMinute++;
-      },
-    ]) {
-      const input = structuredClone(original);
-      mutate(input.parent as unknown as typeof receipt.envelope);
-      expect(() => admitWorkshop(input, createGame(42).people.nora!)).toThrow();
-    }
-  });
-
-  it('refuses unsupported or mismatched current Commonstead engine stamps', async () => {
-    const original = await validatePersona(currentReceipt.envelope);
-    for (const [envelopeEngine, portableEngine] of [
-      ['2.20.0', '2.21.0'],
-      ['2.21.0', '2.20.0'],
-      ['2.17.0', '2.21.0'],
-      ['2.23.0', '2.21.0'],
-      ['2.24.0', '2.24.0'],
-    ] as const) {
-      const parent = structuredClone(original);
-      parent.source.engine = envelopeEngine;
-      (
-        parent.transfer.person as typeof currentReceipt.envelope.transfer.person
-      ).person.source.engine = portableEngine;
-      const input = preparePersonaLife(parent, 0);
-      expect(() => admitWorkshop(input, createGame(42).people.nora!)).toThrow();
-    }
   });
 });

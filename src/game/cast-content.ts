@@ -1,5 +1,6 @@
-import { admissionFacts } from './cast';
-import type { Command, GameState, Job } from './types';
+import { admissionFacts } from './cast.ts';
+import { matchesJson } from './json-data.ts';
+import type { Command, GameState, Job } from './types.ts';
 /** Authored private accounts. Render only after the corresponding played discovery. */
 export const discoveredAccounts = {
   sam: 'Sam opens his testing notebook. “I once copied another player’s bug report without reproducing it. The developer chased the wrong conditions. I still need to correct that report. Here I want to write what I actually saw, including what I have not checked.”',
@@ -110,7 +111,7 @@ export function ownerQuestionBlock(s: GameState, q: OwnerQuestion): string | und
     return 'Inspect the selected part before proposing its replacement.';
   const evidence = ownerQuestionEvidence(job);
   if (
-    q.evidenceText !== JSON.stringify(evidence) ||
+    !matchesJson(q.evidenceText, evidence) ||
     !q.evidenceIds.length ||
     new Set(q.evidenceIds).size !== q.evidenceIds.length ||
     q.evidenceIds.length !== evidence.length ||

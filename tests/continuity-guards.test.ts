@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGame, dispatch } from '../src/game/engine';
 import { saveGame } from '../src/game/persistence';
-import nativeReceipt from './fixtures/commonstead-nora-native.json';
+import legacyNora from './fixtures/commonstead-nora-hf223-native.json';
 
 const controls = vi.hoisted(() => ({
   request: vi.fn(),
+  captureSave: vi.fn(),
   ready: Promise.resolve(true),
   enabled: true,
   player: 'test-a',
@@ -14,6 +15,7 @@ const controls = vi.hoisted(() => ({
 vi.mock('../src/lab', () => ({
   lab: {
     build: () => ({ c: 'test' }),
+    captureSave: controls.captureSave,
     get playerId() {
       return controls.player;
     },
@@ -58,6 +60,7 @@ beforeEach(() => {
   controls.enabled = true;
   controls.ready = Promise.resolve(true);
   controls.request.mockReset();
+  controls.captureSave.mockReset();
   vi.stubGlobal('window', new EventTarget());
   vi.stubGlobal('document', new EventTarget());
   vi.stubGlobal('localStorage', {
@@ -69,7 +72,176 @@ beforeEach(() => {
 async function runtime() {
   return new (await import('../src/continuity')).WorkshopContinuity();
 }
+async function ownNoraSource() {
+  const real = await import('@adam0white/lab-client');
+  const { workshopTransfer, CAST_IDS } = await import('../src/game/cast');
+  const sourcePerson = createGame(41).people.nora!;
+  const projected = await workshopTransfer(sourcePerson);
+  const castId = CAST_IDS.nora!;
+  const branchId = 'hf4-file-source';
+  const parent = await real.createPersona({
+    format: 'hf-persona/1',
+    castId,
+    castRevision: real.canonicalCast(castId).revision,
+    branchId,
+    parentRevision: null,
+    source: { game: 'repair', build: 'test', engine: '4.8.0', rules: 'canonical-workshop-2' },
+    transfer: { ...projected.transfer, life: real.initialPersonaLife(castId, branchId, 0) },
+    limitations: projected.limitations,
+  });
+  return { real, sourcePerson, parent };
+}
+
 describe('host recording and local ownership guards (synthetic controls)', () => {
+  it('admits a Commonstead checkpoint before writing its workshop claim', async () => {
+    const { real, parent: original } = await ownNoraSource();
+    const { validatePortablePerson } = await import('@adam0white/human-framework');
+    const { CAST } = await import('../src/game/cast');
+    const portable = structuredClone(validatePortablePerson(original.transfer.person));
+    portable.source.game = 'commonstead';
+    portable.source.personId = original.castId;
+    const { revision: _revision, ...body } = original;
+    const parent = await real.createPersona({
+      ...body,
+      source: { ...body.source, game: 'commonstead', rules: 'commonstead-4' },
+      transfer: {
+        castPassport: 'commonstead-retained/4',
+        sourceRole: original.castId,
+        portable,
+        life: original.transfer.life,
+      },
+    });
+    let shelf = real.acceptPersona({ heads: {}, revisions: [] }, parent);
+    controls.request.mockImplementation(async (request) => {
+      if (request.action === 'prepareBatch')
+        return {
+          expectedHeads: Object.fromEntries(
+            CAST.map((c) => [c.castId, shelf.heads[c.castId] ?? null]),
+          ),
+          inputs: [real.preparePersonaLife(parent, 0)],
+          blocked: [],
+        };
+      if (request.action === 'putBatch') {
+        shelf = real.acceptPersonaBatch(shelf, request.envelopes, request.expectedHeads);
+        return null;
+      }
+      throw new Error('Unexpected request');
+    });
+    const host = await runtime();
+    const state = await host.fresh(42);
+    expect(state.castChapter?.inputs[0]?.parent.revision).toBe(parent.revision);
+    expect(state.hf.archive.initial.people.find((p) => p.id === 'nora')?.portable?.person).toEqual(
+      portable,
+    );
+    const saved = saveGame(state);
+    const { loadGame } = await import('../src/game/persistence');
+    expect(saveGame(loadGame(saved))).toBe(saved);
+    expect(controls.request.mock.calls.map(([request]) => request.action)).toEqual([
+      'prepareBatch',
+      'putBatch',
+    ]);
+  });
+  it('keeps source archives in an isolated file without recording them or changing native saves', async () => {
+    const previous = globalThis.location;
+    vi.stubGlobal('location', { pathname: '/file/' });
+    try {
+      storage.set('small-works-cast-local-v2', 'native-kept');
+      const host = await runtime();
+      const text = JSON.stringify({
+        ...JSON.parse(saveGame(createGame(42))),
+        castSources: [{ raw: 'private-imported-source' }],
+      });
+      const state = await host.importFile(text);
+      await host.persist(state);
+      expect(host.fileSession).toBe(true);
+      expect(host.heads).toEqual([]);
+      expect(host.exportRun(state)).toContain('private-imported-source');
+      expect(JSON.stringify(controls.captureSave.mock.calls)).not.toContain(
+        'private-imported-source',
+      );
+      expect(controls.captureSave).toHaveBeenCalled();
+      expect(storage.get('small-works-cast-local-v2')).toBe('native-kept');
+      expect(controls.request).not.toHaveBeenCalled();
+    } finally {
+      vi.stubGlobal('location', previous);
+    }
+  });
+
+  it('starts an explicit HF4 lineage without replacing pre4 shelf heads', async () => {
+    const real = await import('@adam0white/lab-client');
+    const { CAST } = await import('../src/game/cast');
+    const parent = await real.validatePersona(legacyNora.envelope);
+    const input = real.preparePersonaLife(
+      parent,
+      legacyNora.envelope.transfer.life.clock.watermark * 3_600_000,
+    );
+    let shelf = real.acceptPersona({ heads: {}, revisions: [] }, parent);
+    const before = structuredClone(shelf);
+    controls.request.mockImplementation(async (request) => {
+      if (request.action === 'prepareBatch')
+        return {
+          expectedHeads: Object.fromEntries(
+            CAST.map((cast) => [cast.castId, shelf.heads[cast.castId] ?? null]),
+          ),
+          inputs: [input],
+          blocked: [],
+        };
+      if (request.action === 'putBatch') {
+        shelf = real.acceptPersonaBatch(shelf, request.envelopes, request.expectedHeads);
+        return null;
+      }
+      throw new Error('Unexpected request');
+    });
+    const host = await runtime();
+    let state = await host.fresh(42);
+    expect(shelf).toEqual(before);
+    expect(host.heads).toEqual([]);
+    expect(host.historyNotice).toContain('start fresh here: Nora');
+    const restored = await runtime();
+    restored.loadLocal(host.localSave(state));
+    expect(restored.historyNotice).toBe(host.historyNotice);
+    state = dispatch(state, { type: 'power', jobId: state.selectedJobId, on: false }).state;
+    state = dispatch(state, { type: 'pause-chapter' }).state;
+    host.bind(
+      () => state,
+      () => {},
+    );
+    await expect(host.checkpoint('nora')).rejects.toThrow('starts fresh in HF4');
+    expect(shelf).toEqual(before);
+  });
+
+  it('refuses an unsupported current4 head before any ownership write', async () => {
+    const { real, parent } = await ownNoraSource();
+    const { CAST } = await import('../src/game/cast');
+    const { revision: _revision, ...body } = parent;
+    const incompatible = await real.createPersona({
+      ...body,
+      transfer: { ...body.transfer, castPassport: 'unsupported-current4' },
+    });
+    controls.request.mockImplementation(async (request) => {
+      if (request.action === 'prepareBatch')
+        return {
+          expectedHeads: Object.fromEntries(
+            CAST.map((cast) => [
+              cast.castId,
+              cast.castId === parent.castId ? incompatible.revision : null,
+            ]),
+          ),
+          inputs: [real.preparePersonaLife(incompatible, 0)],
+          blocked: [],
+        };
+      throw new Error('No write is permitted after failed admission');
+    });
+    const host = await runtime();
+    const runId = host.runId;
+    await expect(host.fresh(42)).rejects.toThrow();
+    expect(host.runId).toBe(runId);
+    expect(host.isStarted).toBe(false);
+    expect(controls.request.mock.calls.map(([request]) => request.action)).toEqual([
+      'prepareBatch',
+    ]);
+  });
+
   it('automatically pauses/checkpoints departure and legally resumes a paused local save', async () => {
     let state = createGame(42);
     const host = await runtime();
@@ -193,21 +365,17 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
   });
   it('keeps file-origin nonownership through reload and ignores recording-only identity changes', async () => {
     const host = await runtime();
-    const real = await import('@adam0white/lab-client');
+    const { real, sourcePerson, parent } = await ownNoraSource();
     const { admitWorkshop } = await import('../src/game/cast');
-    const parent = await real.validatePersona(nativeReceipt.envelope);
-    const input = real.preparePersonaLife(
-      parent,
-      nativeReceipt.envelope.transfer.life.clock.watermark * 3600000,
-    );
+    const input = real.preparePersonaLife(parent, 0);
     const people = createGame(42).people;
     people.nora = admitWorkshop(input, people.nora!);
     const { revision, ...body } = parent;
-    // Synthetic target claim on the actual native source: a file receipt is never local ownership.
+    // Synthetic shelf claim from an actual HF4 projection; file data never grants local ownership.
     const claim = await real.createPersona({
       ...body,
       parentRevision: revision,
-      source: { game: 'repair', build: 'test', engine: '2.23.0', rules: 'canonical-workshop-2' },
+      source: { game: 'repair', build: 'test', engine: '4.8.0', rules: 'canonical-workshop-2' },
       transfer: { ...parent.transfer, life: input.life },
     });
     const file = createGame(42, 'current', people, {
@@ -232,7 +400,10 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
     ).toBe(true);
     const state = await host.importFile(saveGame(file));
     expect(state.castChapter?.claims[0]?.revision).toBe(claim.revision);
-    expect(state.openingPeople?.nora?.rng).toEqual(nativeReceipt.raw.rng);
+    // Retained traits age for the actual receiving ingress milliseconds. The
+    // admitted passport, rather than a floating-point frozen cache, proves identity.
+    const admitted = state.hf.archive.initial.people.find((p) => p.id === 'nora')?.portable;
+    expect(admitted?.person).toEqual(input.parent.transfer.person);
     expect(host.heads).toEqual([]);
     await host.recording(true);
     const oldKey = controls.key;
@@ -257,7 +428,7 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
       castRevision: '1',
       branchId: 'test',
       parentRevision: null,
-      source: { game: 'repair', engine: '2.23.0', rules: 'test', build: 'test' },
+      source: { game: 'repair', engine: '4.8.0', rules: 'test', build: 'test' },
       transfer: {},
       limitations: [],
     });

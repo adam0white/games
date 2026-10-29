@@ -3,6 +3,7 @@ import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
 import { createModel } from '../src/game/model';
 import { teachObserved } from '../src/game/people';
 import type { GameState } from '../src/game/types';
+import { nativeOf, reAuthor } from './hf-fixture';
 import { acceptRepairOffer } from './repair-offer';
 
 function trainReplacement(state: GameState): void {
@@ -72,21 +73,35 @@ describe('Sam responsibility and requests', () => {
   });
   it('keeps accepted work through food and resumes without another assignment', () => {
     let state = createGame(42);
-    trainReplacement(state);
     const sam = state.people.sam;
     if (!sam) throw new Error('Missing Sam');
+    reAuthor(sam, { body: { satiety: 0.345 } as Parameters<typeof reAuthor>[1]['body'] });
+    const lessons = [
+      [{ family: 'electrical', stage: 'intake' }, 'inspect:switch'],
+      [
+        { family: 'electrical', stage: 'examined', part: 'switch', signal: 'intact' },
+        'replace:switch',
+      ],
+      [
+        { family: 'electrical', stage: 'repaired', part: 'switch', signal: 'worked' },
+        'verify:movement',
+      ],
+    ] as const;
+    for (const [cues, action] of lessons)
+      teachObserved(sam, 'prior', cues, action, action, 'success', state.now);
     const jobId = state.selectedJobId;
     state = dispatch(state, { type: 'assign', jobId, personId: 'sam' }).state;
-    const acceptedSam = state.people.sam;
-    if (!acceptedSam) throw new Error('Missing accepted Sam');
-    acceptedSam.body.satiety = 0.1;
+    state = nextSamFinish(state);
+    expect(state.npcWork.find((w) => w.personId === 'sam')?.option.action).toBe('inspect:switch');
+    state = nextSamFinish(state);
+    expect(state.npcWork.find((w) => w.personId === 'sam')?.option.action).toBe('replace:switch');
     state = nextSamFinish(state);
     expect(state.npcWork.find((w) => w.personId === 'sam')?.option.action).toBe('eat');
     expect(state.jobs[0]?.assignedTo).toBe('sam');
     const resumed = loadGame(saveGame(state));
     state = nextSamFinish(state);
     expect(saveGame(nextSamFinish(resumed))).toBe(saveGame(state));
-    expect(state.npcWork.find((w) => w.personId === 'sam')?.option.action).toBe('replace:switch');
+    expect(state.npcWork.find((w) => w.personId === 'sam')?.option.action).toBe('verify:movement');
     expect(state.stock.switch).toBe(0);
     expect(state.jobs[0]?.assignedTo).toBe('sam');
   });
@@ -185,12 +200,14 @@ describe('Sam responsibility and requests', () => {
     const observation = attended.jobs[0]?.evidence.at(-1);
     expect(observation?.witnessedBy).toContain('sam');
     expect(
-      attended.people.sam?.memory.episodes.some(
-        (e) => e.action === 'repair-observation:measurement' && e.summary === observation?.summary,
+      nativeOf(attended.people.sam)?.memory.episodes.some(
+        (e) => e.kind === 'repair-observation:measurement' && e.summary === observation?.summary,
       ),
     ).toBe(true);
     expect(
-      unseen.people.sam?.memory.episodes.some((e) => e.action === 'repair-observation:measurement'),
+      nativeOf(unseen.people.sam)?.memory.episodes.some(
+        (e) => e.kind === 'repair-observation:measurement',
+      ),
     ).toBe(false);
   });
   it('remeasures the same legal probe after an intervention and remembers its own reading', () => {
@@ -226,8 +243,8 @@ describe('Sam responsibility and requests', () => {
     expect(readings[0]?.cues.signal).toBe('resistance');
     expect(readings[1]?.cues.signal).toBe('connected');
     expect(
-      state.people.sam?.memory.episodes.some(
-        (e) => e.action === 'repair-observation:measurement' && e.summary === readings[1]?.summary,
+      nativeOf(state.people.sam)?.memory.episodes.some(
+        (e) => e.kind === 'repair-observation:measurement' && e.summary === readings[1]?.summary,
       ),
     ).toBe(true);
   });
