@@ -1718,9 +1718,10 @@ function advance(s: GameState, minutes: number): void {
         : event.resolvedAt === undefined
           ? event.deadline
           : event.finishesAt;
+    const sceneBoundary = outcomeBoundary(s);
     let next = Math.min(
       target,
-      outcomeBoundary(s),
+      sceneBoundary,
       ...s.npcWork.map((w) => w.endsAt),
       ...preparationEnds,
       eventBoundary,
@@ -1739,7 +1740,7 @@ function advance(s: GameState, minutes: number): void {
       const person = s.people[OUTCOME_TERMS[scene.action].person];
       if (person) finishDueNpcWork(s, next, activityEndMs(person));
     }
-    resolveOutcome(s);
+    resolveOutcome(s, next >= sceneBoundary && next < (scene?.endsAt ?? Infinity));
     reconcileResponsibilities(s);
     finishDueNpcWork(s, next);
     settleWorkshopInterruptions(s);
