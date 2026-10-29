@@ -8,14 +8,14 @@ import { replayRecordedRun } from '../src/game/replay';
 describe('published HF narration and provenance', () => {
   it('preserves inspected narration and verifies the current archive replay', () => {
     let state = createGame(42);
-    expect(SAVE_PROVENANCE.framework).toBe('4.8.0');
+    expect(SAVE_PROVENANCE.framework).toBe('4.11.0');
     state = dispatch(state, { type: 'request-lesson' }).state;
     const saved = saveGame(state);
     const archive = JSON.parse(saved).hf.archive;
     expect(archive.format).toBe('hf-run');
-    expect(archive.version).toBe(5);
+    expect(archive.version).toBe(7);
     expect(archive.hashes.full).toBe(
-      '488458885ff942c99ebe59e0cf4e25f3fdbb7df2c37938ead2e2d7abf7873a94',
+      '98675c2b347f8d18760e34c5d7a4eb9edc5dcd2bc79c849d0bcd86809f5bbbe2',
     );
     const restored = restoreRun(archive);
     expect(restored.ok).toBe(true);
@@ -56,17 +56,20 @@ describe('published HF narration and provenance', () => {
     if (gameReplay.ok) expect(gameReplay.save).toBe(saved);
   });
 
-  it('refuses an earlier framework provenance with a start-fresh message', () => {
-    const old = JSON.parse(saveGame(createGame(42)));
-    old.provenance.framework = '3.0.0';
-    expect(() => loadGame(JSON.stringify(old))).toThrow('Start fresh');
-    const result = replayRecordedRun(old);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.reason).toBe('unsupported-version');
-      expect(result.message).toContain('Start a new game');
-    }
-  });
+  it.each(['3.0.0', '4.8.0', '4.8.1', '4.9.0', '4.10.0'])(
+    'refuses framework %s with a start-fresh message',
+    (framework) => {
+      const old = JSON.parse(saveGame(createGame(42)));
+      old.provenance.framework = framework;
+      expect(() => loadGame(JSON.stringify(old))).toThrow('Start fresh');
+      const result = replayRecordedRun(old);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.reason).toBe('unsupported-version');
+        expect(result.message).toContain('Start a new game');
+      }
+    },
+  );
 });
 
 describe('HF4 raw continuation', () => {

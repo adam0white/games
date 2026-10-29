@@ -1,5 +1,5 @@
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { exportRun, restoreRun, step } from '@adam0white/human-framework';
+import { exportRun, readRunHistory, restoreRun, step } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import { discoveredAccounts } from '../src/game/cast-content';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
@@ -48,7 +48,7 @@ describe('finite personal reply receipt', () => {
           e.text.includes('I heard you say you copied the report without checking it.'),
       ),
     ).toBe(true);
-    expect(JSON.stringify(exportPersonRun(s.people.sam!).history)).toContain(
+    expect(JSON.stringify(readRunHistory(exportPersonRun(s.people.sam!)))).toContain(
       'personal-reply-received',
     );
     expect(s.cash).toBe(before.cash);

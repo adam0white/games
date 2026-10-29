@@ -1,3 +1,5 @@
+import { prepare, type RecordValue, unpack } from './workshop-journal';
+
 export const LOCAL_KEY = 'small-works-cast-local-v2';
 export const OUTCOME_LOCAL_KEY = 'small-works-cast-outcomes-v1';
 export const SOURCE_JOURNAL_KEY = 'small-works-source-journal-v2';
@@ -53,16 +55,25 @@ export class WorkshopSaveStore {
     };
     try {
       const records = await new Promise<Map<string, string>>((resolve, reject) => {
-        const values = new Map<string, string>();
         const transaction = db.transaction(STORE_NAME, 'readonly');
         const store = transaction.objectStore(STORE_NAME);
-        for (const key of KEYS) {
-          const request = store.get(key);
-          request.onsuccess = () => {
-            if (typeof request.result === 'string') values.set(key, request.result);
-          };
-        }
-        transaction.oncomplete = () => resolve(values);
+        const keys = store.getAllKeys();
+        const data = store.getAll();
+        transaction.oncomplete = () => {
+          try {
+            const records = new Map(
+              keys.result.map((key, i) => [String(key), data.result[i] as RecordValue]),
+            );
+            const values = new Map<string, string>();
+            for (const key of KEYS) {
+              const value = unpack(records.get(key), records);
+              if (value !== undefined) values.set(key, value);
+            }
+            resolve(values);
+          } catch (error) {
+            reject(error);
+          }
+        };
         transaction.onabort = transaction.onerror = () =>
           reject(new Error('Could not read workshop save database', { cause: transaction.error }));
       });
@@ -93,9 +104,19 @@ export class WorkshopSaveStore {
       if (!db) throw new Error('Workshop save database connection is closed');
       const value = await new Promise<string | undefined>((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, 'readonly');
-        const request = transaction.objectStore(STORE_NAME).get(key);
-        transaction.oncomplete = () =>
-          resolve(typeof request.result === 'string' ? request.result : undefined);
+        const store = transaction.objectStore(STORE_NAME);
+        const keys = store.getAllKeys();
+        const data = store.getAll();
+        transaction.oncomplete = () => {
+          try {
+            const records = new Map(
+              keys.result.map((id, i) => [String(id), data.result[i] as RecordValue]),
+            );
+            resolve(unpack(records.get(key), records));
+          } catch (error) {
+            reject(error);
+          }
+        };
         transaction.onabort = transaction.onerror = () =>
           reject(new Error('Could not read workshop save database', { cause: transaction.error }));
       });
@@ -123,7 +144,23 @@ export class WorkshopSaveStore {
       if (!db) throw new Error('Workshop save database connection is closed');
       await new Promise<void>((resolve, reject) => {
         const transaction = db.transaction(STORE_NAME, 'readwrite');
-        transaction.objectStore(STORE_NAME).put(text, key);
+        const store = transaction.objectStore(STORE_NAME);
+        const keys = store.getAllKeys();
+        const data = store.getAll();
+        data.onsuccess = () => {
+          try {
+            const records = new Map(
+              keys.result.map((id, i) => [String(id), data.result[i] as RecordValue]),
+            );
+            const change = prepare(text, records.get(key), records, key);
+            for (const id of change.removals) store.delete(id);
+            for (const [id, chunk] of change.additions) store.put(chunk, id);
+            store.put(change.slot, key);
+          } catch (error) {
+            transaction.abort();
+            reject(error);
+          }
+        };
         transaction.oncomplete = () => resolve();
         transaction.onabort = transaction.onerror = () =>
           reject(new Error('Could not write workshop save database', { cause: transaction.error }));

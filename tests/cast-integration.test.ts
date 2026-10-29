@@ -1,4 +1,4 @@
-import { replay, validatePortablePerson } from '@adam0white/human-framework';
+import { readRunHistory, replay, validatePortablePerson } from '@adam0white/human-framework';
 import {
   acceptPersona,
   acceptPersonaBatch,
@@ -24,7 +24,7 @@ import { createPeopleRuntime, createPerson, promise, snapshotRuntime } from '../
 import { loadGame, saveGame } from '../src/game/persistence';
 import { replayRecordedRun } from '../src/game/replay';
 
-const stamps = { game: 'repair', build: 'test', engine: '4.8.0', rules: 'canonical-workshop-2' };
+const stamps = { game: 'repair', build: 'test', engine: '4.11.0', rules: 'canonical-workshop-2' };
 // Explicit public authoring makes a distinct source. No cache edit changes an HF actor.
 async function source(id: 'nora' | 'rafi', prayer = false, prayerFrom = 540) {
   const castId = CAST_IDS[id]!;
@@ -271,8 +271,8 @@ it('restores a carried person during jobless prayer and finishes it exactly once
     (duty) => duty.actions.includes('pray') && duty.status === 'kept',
   );
   expect(kept).toHaveLength(1);
-  const completions = snapshotRuntime(finished.state.people)
-    .archive.history.flatMap((tx) => tx.inputs)
+  const completions = readRunHistory(snapshotRuntime(finished.state.people).archive)
+    .flatMap((tx) => tx.inputs)
     .filter(
       (input) =>
         input.kind === 'action.resolved' &&

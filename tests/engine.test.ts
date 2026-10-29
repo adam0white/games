@@ -1,3 +1,4 @@
+import { readRunHistory } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
 import { teachObserved } from '../src/game/people';
@@ -14,7 +15,7 @@ function required<T>(value: T | undefined): T {
 function startLesson(state: GameState, authoredReadiness = true): GameState {
   if (
     authoredReadiness &&
-    !state.hf.archive.history.some((tx) =>
+    !readRunHistory(state.hf.archive).some((tx) =>
       tx.inputs.some((input) => input.kind === 'action.resolved'),
     )
   )

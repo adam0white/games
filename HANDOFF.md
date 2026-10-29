@@ -1,5 +1,17 @@
 # Handoff
 
+## smallworks-hf411, 2026-10-29
+
+Remaining: full-suite completion, signed commit, PR, exact green merged CI, deployment and clean manifest verification. Adam accepts feel separately.
+
+Adopts published HF 4.11.0, client 0.5.11 and kit 0.5.28. Read HF CHANGELOG 4.8.1–4.11.0. History consumers use `readRunHistory`; native exports remain complete format-7 archives. IndexedDB autosaves atomically commit journal chunks, opening, matching host snapshot and head. Restoration verifies the whole journal. The storage adapter restores and compares the incoming full archive and committed prefix before appending; this reduces repeated writes, not replay CPU or read costs. The no-IndexedDB fallback keeps native saves.
+
+The public People disclosure reads live affect and expectations through host inspection and shows words only. These are host readings, not another person's inferred knowledge. HF's always-on seeded English phrasebook already supplies decision, advice and daily narration through the existing event renderer; retain its four-alternative defaults rather than add workshop claims to generic events. Small Works has no newborn or retelling flow, so those options do not apply. Previous whole-run saves receive the existing plain start-fresh refusal; retained person passports are a separate supported boundary. Current outgoing claims pin 4.11.0.
+
+Replay assertions remain. The unchanged seed42/request-lesson workload moves native full hash from `488458885ff942c99ebe59e0cf4e25f3fdbb7df2c37938ead2e2d7abf7873a94` to `98675c2b347f8d18760e34c5d7a4eb9edc5dcd2bc79c849d0bcd86809f5bbbe2`. The unchanged seed416/wait45/next-day/next-day ordinary-save SHA256 moves from `d9a1b2ef49284d98b4a9cba59b26b8b18aab49760a851717064e38e67a07a371` to `5679c975b8dc61ad0484d602acb623f69f96e6e42de74da59c83b414ce4e3043`. Only the required published engine/schema/codec/narration identity migration is rebaselined; scenario authoring and host commands are unchanged. Save/restore equality and native/game replay assertions remain independent of those pins.
+
+Hosted review is waived by coordinator ruling **2026-10-29T09:25Z**, as supplied in the task. No extra review requested. One task PR; leave concurrent PR9 untouched.
+
 ## HF4 port, 2026-10-28
 
 Remaining: publish the reboot-resume CI correction in PR8, merge with exact green CI, deploy and verify the clean live manifest. The one requested hosted review is complete; its refund finding and a later automatic refusal-path finding are fixed in the same PR. No HF4 delivery is claimed at this candidate stage. Adam accepts feel separately on 2026-11-03.

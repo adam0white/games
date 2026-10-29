@@ -1,3 +1,13 @@
+# Small Works HF 4.11 adoption, 2026-10-29
+
+Remaining: see the current HF411 entry in [HANDOFF](../HANDOFF.md) for delivery state. Earlier 4.8 receipts below are historical.
+
+Exact published pins are HF 4.11.0, client 0.5.11 and kit 0.5.28. Companion release asset SHA256 values are `0731cf90d09def6f6a0268de5a683ae87d6f521db608c32138a46cda0dec2508` (client) and `ce3797e31ac58c9a993d1f53bf1b454b35aa14ab25c3814117a50d0e645eeb69` (kit). All resolve the same current HF module; the client retains its intentional HF3 legacy alias.
+
+The migration adopts the public format-7 history decoder, atomically committed IndexedDB journal autosaves, and live host affect/expectation inspection rendered as words. Complete downloads and replay exports remain native archives. The existing renderer uses HF's seeded phrasebook defaults for decisions, advice and daily accounts. Newborn and retelling options have no game flow here. Whole-run old saves refuse with plain start-fresh text. Supported retained person passports remain independent of native run compatibility. See HANDOFF for hash rebaseline provenance and journal CPU limitations.
+
+The hosted-review gate is waived by coordinator ruling 2026-10-29T09:25Z. This supersedes the historical review directions below for this task only.
+
 # Small Works HF4 port, 2026-10-28
 
 Remaining: merge with exact green CI, deploy and verify the clean live manifest. The requested hosted review is complete; its findings are fixed in this PR. This candidate document is not a delivery receipt. Adam accepts readability and game feel through play, targeted 2026-11-03. No owner decision is pending.

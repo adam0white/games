@@ -2,7 +2,7 @@
 
 A single-player repair strategy game. Investigate familiar electrical and mechanical objects at a home bench. Choose measurements, compare results, repair actual components and check the object under its owner's use. Time, stock and cash limit what the workshop can promise.
 
-The current source pins `@adam0white/human-framework` to exactly **4.8.0**. The source game version is 4.2.0. Check the live [release manifest](https://repair.adamwhite.work/release.json) for the deployed commit and versions. [HF4 adoption](docs/hf4-adoption.md) records the port boundary and verification requirements. Earlier HF3 receipts remain historical. Adam accepts readability and game feel through play.
+The current source pins `@adam0white/human-framework` to exactly **4.11.0**. The source game version is 4.2.0. Check the live [release manifest](https://repair.adamwhite.work/release.json) for the deployed commit and versions. [HF4 adoption](docs/hf4-adoption.md) records the port boundary and verification requirements. Earlier HF3 receipts remain historical. Adam accepts readability and game feel through play.
 
 ## How to play
 

@@ -2,6 +2,7 @@ import {
   createPerson as authorPerson,
   createRun,
   exportRun,
+  readRunHistory,
   replay,
   step,
 } from '@adam0white/human-framework';
@@ -47,7 +48,7 @@ function opening(): GameState {
     const result = authorPerson(run, person);
     if (!result.ok) throw new Error(JSON.stringify(result.error));
   }
-  for (const tx of runtime.archive.history) {
+  for (const tx of readRunHistory(runtime.archive)) {
     const result = step(run, { until: tx.until, inputs: tx.inputs, fidelity: tx.fidelity });
     if (!result.ok) throw new Error(JSON.stringify(result.error));
   }
@@ -92,8 +93,8 @@ it('settles actual shorter watcher prayer before the player finishes a replaceme
   expect(
     required(state.people.sam).agenda.commitments.find((c) => c.id === commitment.id)?.status,
   ).toBe('kept');
-  const completion = snapshotRuntime(state.people)
-    .archive.history.flatMap((tx) => tx.inputs)
+  const completion = readRunHistory(snapshotRuntime(state.people).archive)
+    .flatMap((tx) => tx.inputs)
     .find(
       (input) =>
         input.kind === 'action.resolved' &&

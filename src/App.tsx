@@ -33,6 +33,7 @@ import {
   UPGRADE_CATALOG,
 } from './game/engine';
 import { evidenceContext } from './game/evidence-context';
+import { livePersonWords } from './game/hf';
 import { governorMultipliers } from './game/model';
 import { describePerson, playerWordReading } from './game/people';
 import { replayRecordedRun } from './game/replay';
@@ -2486,6 +2487,12 @@ function Workshop({
                               Ask {person.name} about their own experience
                             </button>
                           )}
+                          <details>
+                            <summary>How {person.name} feels and what they expect</summary>
+                            {[...new Set(livePersonWords(person))].map((line) => (
+                              <p key={line}>{line}</p>
+                            ))}
+                          </details>
                           <CastOutcomes state={state} personId={id} act={act} />
                           {id === 'sam' && (
                             <LessonControl

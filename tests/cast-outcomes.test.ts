@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { gunzipSync, gzipSync } from 'node:zlib';
-import { replay as replayNative } from '@adam0white/human-framework';
+import { readRunHistory, replay as replayNative } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
 import { activityEndMs, snapshotRuntime } from '../src/game/hf';
@@ -327,7 +327,7 @@ it.each(['npc-first', 'scene-first'] as const)(
     const raw = saveGame(state);
     expect(saveGame(loadGame(raw))).toBe(raw);
     const archive = snapshotRuntime(state.people).archive;
-    const completions = archive.history
+    const completions = readRunHistory(archive)
       .flatMap((tx) => tx.inputs)
       .filter(
         (input) =>
