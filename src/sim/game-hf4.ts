@@ -1,3 +1,4 @@
+import { exportRun, readRunHistory } from '@adam0white/human-framework';
 import { canonicalPersona } from '@adam0white/lab-client';
 /**
  * The Two Voices: the day host. Pure and deterministic: state is plain JSON, and every player input is stamped
@@ -355,7 +356,12 @@ export function cardView(s: GameState): CardView | null {
   const view: CardView = {
     id: m.id,
     day: m.day,
-    scene: castScene(s, m, text(m.scene, c)),
+    // The late question is fixed when opened. Cold restore retains it; replay reconstructs its evidence.
+    // During open()'s internal pull preview the scene is not stored yet and that preview scene is unused.
+    scene:
+      (m.id === 'late-2'
+        ? s.log.find((line) => line.who === 'scene' && line.at === card.openedAt)?.text
+        : undefined) ?? castScene(s, m, text(m.scene, c)),
     pullLine: card.borrowed && m.pull.borrow ? m.pull.borrow : text(m.pull.line, c),
     pullTo: m.pull.to,
     borrowed: card.borrowed,
@@ -484,6 +490,22 @@ function open(s: GameState, m: Moment) {
   s.answer = null;
   // The journal keeps what was asked, so a card that closed while the player was away still reads.
   const c = ctxOf(s);
+  // Materialize this completed-history fact once at the actual opening boundary, after liveUntil.
+  // Ordinary context/options/preview reads use the stored question, never a persisted fact or cache.
+  if (m.id === 'late-2')
+    c.completedMondayTruth = readRunHistory(exportRun(s.hf.run)).some((turn) =>
+      turn.inputs.some(
+        (input) =>
+          input.kind === 'action.resolved' &&
+          input.payload.person === 'dilan' &&
+          input.payload.disposition === 'completed' &&
+          input.payload.outcome?.status === 'completed' &&
+          input.payload.outcome.actionId === 'own-up' &&
+          input.payload.outcome.offerId === 'truth' &&
+          input.payload.outcome.start >= dayStart(1) * 60_000 &&
+          input.payload.outcome.end < dayStart(2) * 60_000,
+      ),
+    );
   const v = cardView(s);
   s.log.push({ at: s.minute, who: 'scene', text: castScene(s, m, text(m.scene, c)) });
   if (v) s.log.push({ at: s.minute, who: 'pull', text: v.pullLine });

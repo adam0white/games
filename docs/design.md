@@ -203,13 +203,13 @@ Owner, 2026-10-20: "We both need more of the same as well as other campaigns." "
 - **Week one's last page is canon.** Its thread lines and closing line ("On Sunday she rang anyway", "Ece has her own columns now", "Aylin came round on Saturday for the shelf", the lock screen) are true in week two. Nothing in week two contradicts them.
 - **More of the same, at the same density.** Five or six cards a day: the alarm, the bus home (the call to Mum), bed, and three new situations. Habits she built show as lines she does unasked. While "Feet on the floor" is strong she gets up alone and the journal says so.
 - **One new kind of choice a day:**
-  - Monday, _accept help_: Ece offers to clear the returns. Let her, or redo them herself. Mum's answer to Saturday opens the day; a tenancy renewal letter arrives and is never explained.
+  - Monday, _accept help_: Ece offers to clear the returns. Let her, or redo them herself. Mum's answer to Saturday opens the day; a tenancy renewal letter arrives. The 2026-10-31 bounded candidate discloses two newly authored facts only after completed reading (see below).
   - Tuesday, _your words in her mouth_: Ece asks Dilan how to handle something, and Dilan answers with a phrase she learned from you. It may be wrong for Ece. Let it stand, soften it, or tell her to ask Ece what she thinks. Ece also asks for practice on the board: Dilan promises twenty minutes, Thursday evening, or nothing (an HF promise to Ece).
   - Wednesday, _correct your own advice_: the pull quotes her own learned phrase, bent ("Just say it plainly. In front of everyone."). Then Ece makes a mistake: correct her privately or across the room. The evening is family.
   - Thursday, _let another method stand_: Ece runs the board her own way. It works, and Dilan can't read it. Leave it, change it together, or put it back. Any promise to Ece falls due on the same evening as Dilan's own thread.
   - Friday, _take back a promise_: she wants the early bus, and something is in her bag. Ece asks her to stay. Stay, withdraw a promise openly (HF `release`), or slip out.
   - Saturday: Ece's message about the week, then the last page with both weeks.
-- **Kept unresolved for good:** who was cropped out of the photo, what ended, the subscription, the tenancy letter, what is in her bag on Friday.
+- **Kept unresolved for good:** who was cropped out of the photo, what ended, the subscription, what is in her bag on Friday. The tenancy letter was originally deliberately unexplained; the 2026-10-31 owner direction replaces that mystery only with a newly authored one-year renewal and a signed-copy return date of Friday17:00. These were not recovered contract facts. Other terms and consequences remain unspecified. Two facts do not establish complete informed consent. No rent, penalty, eviction, benefit, landlord motive, legal interpretation or deadline enforcement is added.
 - **The edge we keep:** leaving can be selfish and still work. Staying can help Ece and cost Dilan something she won't explain. Kindness gets no guaranteed reward. The week-two pull is harder, because it uses her own phrases.
 
 Cut after review: a Sunday "aim for the week" (it read as a quest log with a pass/fail stamp), and a Tuesday double booking that repeated Wednesday of week one. HF pin stays 2.8.0 (`promise`, `release` and promptings cover the slice).
@@ -398,3 +398,21 @@ Per-ask disposition (owner · date · reason). “Words” means buildable plain
 - F2336 · partial · Murmur writer + lead designer · 2026-11-03 · two paths do not prove a budget; current eligibility cue buildable.
 - F2337 · partial, NOT fully fixed · Murmur writer + root UI owner · 2026-11-03 · first-card and Info cost words built; fit of the longer card is unverified.
 - F2338 · built, UI verification open · Murmur writer + root UI owner · 2026-11-03 · the result line follows the recorded verdict and option id.
+
+
+## Retest1 bounded candidate — 2026-10-31 (not delivered or accepted)
+
+Root adopted the completed read-only investigation on source9e. This candidate adds the new bounded letter summary after an actual completed ten-minute reading action and repeats it at the later unsigned decision. The initial unread-sign option remains. All numerical durations, options, agency, trust, difficulty and the clock remain unchanged. Other terms and consequences are not shown, and later outcomes are unknown. The summary is not a full contract or a promise about a safe choice.
+
+The two reached complied holds, lunch-1/outside and slump-1/walk, receive contextual display protests only when recorded speech is absent. Actual speech and weak-hold/refused/deferred/modified/silence/timeout branches remain. The journal is the actual consumer; the gap panel contains only next-choice/Skip text. Tuesday's late question may recall Monday truth only from retained completed native action outcomes. The derived context is not a saved flag or a notebook schema change. Prior-lie and no-completed-truth branches remain.
+
+All nineteen literal routes, quotes, reasons, owners, dates and open candidate dispositions are retained in [Deferred](Deferred.md). F2708 has no geometry or wording change; scroll/phone proof at360×690 and1280×800 is UNRUN. No trust meter, forecast or timer tuning is added. Exact Opus review at signed SHA is required and HELD. Root owns later delivery and Adam owns fiction acceptance; neither is established by focused controls.
+
+
+### Bounded correction1 after independent review — 2026-10-31
+
+MR1-1 moves the completed Monday truth read out of ordinary context/options/preview reads. It derives the same exact accepted completed person/day/action fact once when late-2 actually opens, after advancing to its opening boundary. Later card views reuse that opening's stored scene. Cold restore keeps the validated stored scene; replay and journal reconstruction derive it at their own opening. No saved flag, persisted cache, kernel change or seed/day cache is added. Independent re-review and future exact Opus remain required; this candidate is not clear.
+
+MR1-2 corrects the protest fixture: ece-1 now deliberately receives a real quiet input. Ordinary submitted choices assert actual card/option availability. Earlier bounded held/held-next evidence contains an unavailable map no-op followed by quiet. Those native outcomes remain actual, but the old host prefix was not all-ordinary. Original artifacts are preserved and qualified in the correction1 packet. New ordinary source9e/candidate state and fullHash/next-input evidence uses correction1 filenames. The letter fiction, numerical rules, difficulty, agency and all nineteen open routes remain as above. F2708 remains UNRUN.
+
+The prior three non-reading cases retain30s each: their aggregate possible allowance is90s, versus30s for the former combined case. This is not a measured speedup. No full suite, browser, timing/trust retune, signing or delivery is established by these focused corrections.
