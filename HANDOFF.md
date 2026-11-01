@@ -1,5 +1,11 @@
 # Handoff
 
+## Final ordinary iteration source candidate, 2026-11-01
+
+Remaining: signed source, independent review of the exact SHA, source CI, signed integration, target CI and cleanup. The normal frozen install and unchanged own lane passed under actual Node26.12.0. The guarded run exited0 in3.047seconds;11 observed process identities were absent, and source was unchanged. Root checked all12 literals and five full return paragraphs byte-exact and retained the historical Deferred prefix. This is a docs-only source candidate; no app changed, so this record requires no new deployment. The existing live `bc52f86` release with HF 4.11.0 and app 4.3.0 is separate from any future docs head; no deployment of the docs is claimed. Adam accepts feel.
+
+The qualified final ordinary iteration, twelve literal requests, five conditional return paragraphs and method limits are recorded in [Deferred player requests](docs/Deferred.md#final-ordinary-iteration-2026-11-01). Two fixed iterations end the ordinary-panel obligation, not engineering or new scope. The parent released the `bc52f86` hold after qualification. Review and integration of this record remain pending; older qualified requests and failures remain open within their recorded scope.
+
 ## PR9 CI routing correction, 2026-11-01
 
 Remaining: signed successor, fresh independent exact-SHA review and green CI before merge. The reviewed `619d675` run `41293086624` reached the unchanged 60-minute job limit after only 35 of 61 configured test files completed. Their file durations sum to 7,080.716 seconds. The log also records the owner-question recording-capacity case failing at 76.047 seconds against its explicit 60-second limit; cancellation prevented its final failure stack. Both facts remain part of the failure record.

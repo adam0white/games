@@ -118,3 +118,104 @@ The eleven retained raw-wall versus manuscript timestamp differences are listed 
 - Nia desktop stop: raw 72.696 s; manuscript 72.697 s.
 - Rosa phone note: raw 21.657 s; manuscript 21.658 s.
 - Rosa desktop note: raw 20.048 s; manuscript 20.049 s.
+
+## Final ordinary iteration, 2026-11-01
+
+The externally sealed, qualified packet has manifest SHA-256 `b3486750ce960f945f6920c09d85a470aeaaf53f2567cd0a7b6fddfb61581c9e` and root qualification SHA-256 `ebbc136e89f5e1921585aa14e5992eaf83f0f0d6e15ea26b2faee4d7e7e5413a`. Its unchanged packet and source-epoch draft labels are historical; the later external root seal governs sealed status. Five current reports are engineering eligible. Ten voluntary unfinished stops comprise five TASTE, two BORED and three CONFUSED. No ending, cut, automatic ceiling, BUDGET or TOOL stop was observed; this does not prove no ending exists.
+
+The two fixed ordinary iterations end the ordinary-panel obligation: no third panel or cap reset. This is not an engineering or new-scope freeze. Adam accepts feel. The parent released the `bc52f86` deployment hold after qualification; review, CI, integration and cleanup of this dated record remain pending. The dates below are inspection targets, not deferrals of buildable work. `fix:repair` routes the requests; it does not assert twelve bugs.
+
+F3071–F3082 remain open in the [canonical HF feedback ledger](https://github.com/adam0white/human-framework/blob/main/docs/lab/feedback-ledger.md), with the targets recorded there. F3011–F3023 and prior game requests retain their existing qualified scope. Nia found the Sam opening invitation on the reached path only; that does not close F3076, F1475 or other prior asks. Rosa understood the own-plans sentence on the reached path; she did not see the pre-repair forgiveness sentence. This is partial scope, not blanket F3019 closure.
+
+### Requests
+
+**F-3101 — Maya, preference; inspection 2026-11-10**
+
+> Let me follow up with Rafi about what he will tell his customer. His story still interests me, but my reply got a receipt and no words from him in the conversation I reached.
+
+**F-3102 — Maya, preference; inspection 2026-11-10**
+
+> Tell me which object Nora’s handle sketch concerns. I heard the story beside her reading light this time and beside the music box on my first visit; I still could not connect it confidently to either object.
+
+**F-3103 — Maya, preference; inspection 2026-11-10**
+
+> Make the music box card easier to reach on the desktop workboard. It was below the fixed bottom area until I scrolled.
+
+**F-3104 — Emre, preference; inspection 2026-11-10**
+
+> Draw attention to the meter condition when it differs from the object’s required test. Nora’s light needed “work harder,” but the meter opened on “on table.”
+
+**F-3105 — Emre, preference; inspection 2026-11-10**
+
+> Keep offering faults that require different diagnosis. The contact measurement still made sense, but I had solved both lights before and wanted a new problem.
+
+**F-3106 — Nia, blocker; inspection 2026-11-03**
+
+> Show me how to ask Sam to take on a repair himself, or tell me what must happen first. I found another lesson request, but no way to give him Rafi’s fan in the places I looked. This was the blocking question I reached.
+
+**F-3107 — Nia, preference; inspection 2026-11-10**
+
+> Make Sam’s observed-method record easier to connect to what actually happened. It included checking a bulb and a weak-object observation that I did not remember making.
+
+**F-3108 — Nia, preference; inspection 2026-11-10**
+
+> Give Sam a more natural voice during the lesson. Watching and learning felt meaningful, but his replies still sounded like a repair record.
+
+**F-3109 — Rosa, blocker; inspection 2026-11-03**
+
+> Explain “retained work and test records” and “existing rules,” or omit those sentences from the repair conversation. These were the blocking questions I reached.
+
+**F-3110 — Rosa, keep; inspection 2026-11-10**
+
+> Keep the clearer sentence explaining that Sam’s mother may follow her own plans instead of discussing the work.
+
+**F-3111 — Rosa, keep; inspection 2026-11-10**
+
+> Keep the repair guide’s short instructions.
+
+**F-3112 — Ines, blocker; inspection 2026-11-03**
+
+> Help me interpret a reading and choose a next test after the first guided repair.
+
+F-3110 and F-3111 are immediate preservation constraints, tracked on November 10; they are not unimplemented bugs. Causes of the inspection leads remain unproved. F-3106 does not establish that an independent-work route is absent; F-3107 does not establish the cause of the record; F-3112 does not establish an electrical defect.
+
+### Conditional return paragraphs
+
+**Maya**
+
+> I would not return voluntarily tonight; I might come back another evening if I could hear what Rafi tells his customer or try a fresh repair puzzle, but I would not leave the workshop running.
+
+**Emre**
+
+> I would return voluntarily another evening on desktop for a different repair, and I would not leave it running.
+
+**Nia**
+
+> I would come back another evening to see Sam use what he learned on his own, but I would not return tonight or leave the game running.
+
+**Rosa**
+
+> I would return voluntarily another evening if the repair conversation were shorter and explained its records and rules plainly; I would close it now, not leave it running.
+
+**Ines**
+
+> I would not voluntarily return tonight; I would leave the game saved rather than running.
+
+### Method qualifications
+
+Inherited W, SW, NR and SWF qualifications remain in force, including FREE/CONT selection, old exposure, prior Well pass-false and unverified prior history delivery. A later complete read does not erase earlier uncertainty.
+
+1. **Engineering scope:** One actual final-five controller exited successfully with five positive completions; no historical 3+2 substitution or old Nia exception. Eligibility proves neither protocol perfection, bug-free behavior, ask closure nor acceptance.
+2. **Physical closure:** Native exit, CPU receipt and underlying evidence match; the sampled identity census, five absent profiles and eleven closed ports support bounded return. They cannot prove the absence of unseen or transient processes.
+3. **Stops:** All ten were voluntary and unfinished, with the reasons and absence of observed ending or cut stated above. No administrative reset or extra iteration follows.
+4. **History receipt:** All 11,194 selected lines have exact retained stdout coverage in 283 bounded own-history calls before driver action, and reports claim full reading. No truncation indicator or literal mismatch was found; client-visible delivery and comprehension remain unverified.
+5. **Wrap checkpoints:** Maya phone and desktop and Rosa phone wanted to stop before 60 seconds; Feedback-only wrapping crossed it without a first-minute diary. The actionable checkpoint obligation remains unverified, not waived or proven compliant; no forced wait or retroactive diary is inferred.
+6. **Checkpoint entries:** Four valid first-minute diaries were retained. Nia phone also had an accepted premature duplicate; the later valid entry does not erase it. All sessions ended before 180 seconds, so later pulse checkpoints were untested.
+7. **Post-stop images:** Nia desktop and Rosa desktop automatic images followed stops with no later tester actions. Emre phone stopped before an automatic shot and had none. Saved images do not imply continued play, diary or viewing.
+8. **Image perception:** No identifiable returned image-view events appear in the five completed transcripts. Saved screenshots and reported viewing do not independently prove perception, layout, font or viewport behavior. No image was viewed by the reviewer. Startup driver check remains fork-unverified; source hash and prior instrument control are separate evidence.
+9. **Errors:** All 602 completed shell commands had recognized successful shapes; 318 driver requests matched operations and responses. Ines had a connection-reset/reconnecting message between completed operations and exited successfully; its cause is unknown, with no inferred retry, cut or TOOL stop. Browser diagnostics do not establish a product cause.
+10. **Feedback boundary:** Fourteen label/Back interactions showed selected labels and Resume on Back. No classified command typed a note, submitted, or toggled recording or consent. An offered Submit control is not a backend receipt, save/linking receipt or proof of universally unchanged recording defaults. Reports say defaults and no submission.
+11. **Diary and confidence:** The 51 reaction strings, order, engagement values and explicit diary times match requests and driver responses. Thirteen explicit report times differ from raw wall by 1 ms and match responses. Later high-confidence descriptions by Emre and Ines are not contemporaneous log confidence; Nia's invitation has no separately stated confidence. Rosa's concept and reread counts are subjective and incomplete battery-guide concepts are disclosed.
+12. **Timing:** All 75 retained raw-wall/response pairs differ by 1 ms, with response later; 13 are explicitly referenced in reports. Preserve both values without normalization or inferring end-user latency, network or game performance, or cause.
+13. **Source, prompt and models:** Clean `bc52f86`, HF 4.11.0 and app 4.3.0 were observed before and after each person; bounded SDK and body evidence supports admission. Agent markers were present. There was no independent rebuild, complete asset graph, network or backend proof. Effective prompts and requested model/effort matched their bindings; serving model identity is unverified.
+14. **Report outcomes:** Maya and Emre explicitly had no blocking ask; Nia, Rosa and Ines reached blocking questions. Preserve their voluntary choices, difficulty and conditional returns without a verdict. Nia found the invitation and saw bulb-record content, not proof of a missing independent-repair route or record cause. Rosa's clarity and rereads are not cognitive measurement or fix acceptance. Ines's 5.91 V uncertainty is not a proven electrical or game defect. Root owns qualification and triage; this audit supplies no target verdict.
