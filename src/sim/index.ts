@@ -3613,7 +3613,7 @@ function proposeTerms(s: Sim, sc: SceneView, terms: EmploymentTerms) {
   n.terms = structuredClone(terms);
   n.worker = response.worker;
   n.familyResponse = response.familyResponse;
-  s.cards[c.id]!.wageKnown = true;
+  if (response.workerWageDisclosed) s.cards[c.id]!.wageKnown = true;
   s.cards[c.id]!.introduced = true;
   sc.lines.push(
     { speaker: 'Nermin', text: termsWords(terms), kind: 'speech' },

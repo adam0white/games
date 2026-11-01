@@ -22,7 +22,7 @@ const STORY: Record<
   nermin: {
     invite: 'Ask Nermin whether she wants to review an earlier agency decision',
     disclosure:
-      'Nermin agrees to review her own account. She covers the details that identify the client. “I said the worker and client were not suited to each other. The worker had warned me about unpaid nights. I made the warning sound less serious, then refunded the client before checking how much the worker had lost.”',
+      'Nermin agrees to review her own account. She covers the details that identify the client. “I said the worker and client were not suited to each other. The worker had warned me about unpaid nights. I made the warning sound less serious, then refunded the client before checking how much the worker had lost.” This choice can correct the record and draft a letter. This game has no step to send the letter or make a payment.',
     choice: 'Help her correct the agency record and write to the worker first',
     outcome:
       'Nermin corrects the record. She writes that she failed to record the warning about unpaid nights. She drafts a private letter asking the worker to check the dates before she offers a payment based on those dates. She keeps the draft. This game has no step that sends the letter or makes a payment, so nothing has been sent or paid.',
