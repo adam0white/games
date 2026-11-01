@@ -37,6 +37,8 @@ vi.mock('@adam0white/lab-client', async (load) => {
   const real = await load<typeof import('@adam0white/lab-client')>();
   return {
     ...real,
+    // Synthetic permissive-policy fixture; real published closed-gate controls live separately.
+    portableWriteBlockers: () => [],
     personaChannel: () => ({
       get ready() {
         return controls.ready;
@@ -74,9 +76,21 @@ async function runtime() {
 }
 async function ownNoraSource() {
   const real = await import('@adam0white/lab-client');
-  const { workshopTransfer, CAST_IDS } = await import('../src/game/cast');
+  const { CAST_IDS } = await import('../src/game/cast');
   const sourcePerson = createGame(41).people.nora!;
-  const projected = await workshopTransfer(sourcePerson);
+  const { projectPerson } = await import('../src/game/hf');
+  const projected = {
+    transfer: {
+      castPassport: 'workshop-hf4/1',
+      sourceRole: 'nora',
+      person: projectPerson(
+        sourcePerson,
+        CAST_IDS.nora!,
+        real.canonicalCast(CAST_IDS.nora!).revision,
+      ),
+    },
+    limitations: [],
+  };
   const castId = CAST_IDS.nora!;
   const branchId = 'hf4-file-source';
   const parent = await real.createPersona({
@@ -85,7 +99,7 @@ async function ownNoraSource() {
     castRevision: real.canonicalCast(castId).revision,
     branchId,
     parentRevision: null,
-    source: { game: 'repair', build: 'test', engine: '4.11.0', rules: 'canonical-workshop-2' },
+    source: { game: 'repair', build: 'test', engine: '4.11.0', rules: 'canonical-workshop-3' },
     transfer: { ...projected.transfer, life: real.initialPersonaLife(castId, branchId, 0) },
     limitations: projected.limitations,
   });
@@ -258,7 +272,9 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
     await host.depart();
     expect(state.chapterPaused).toBe(true);
     expect(state.inputs?.at(-1)?.type).toBe('pause-chapter');
-    expect(controls.request.mock.calls.some(([request]) => request.action === 'put')).toBe(true);
+    expect(controls.request.mock.calls.some(([request]) => request.action === 'putBatch')).toBe(
+      true,
+    );
     const restored = await runtime();
     state = restored.loadLocal(storage.get('small-works-cast-local-v2')!);
     restored.bind(
@@ -375,7 +391,7 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
     const claim = await real.createPersona({
       ...body,
       parentRevision: revision,
-      source: { game: 'repair', build: 'test', engine: '4.11.0', rules: 'canonical-workshop-2' },
+      source: { game: 'repair', build: 'test', engine: '4.11.0', rules: 'canonical-workshop-3' },
       transfer: { ...parent.transfer, life: input.life },
     });
     const file = createGame(42, 'current', people, {
@@ -462,8 +478,8 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
           ),
           recordingEpoch: 'opaque-test',
         };
-      if (request.action === 'put') {
-        shelf = real.acceptPersona(shelf, request.envelope, request.fork);
+      if (request.action === 'putBatch') {
+        shelf = real.acceptPersonaBatch(shelf, request.envelopes, request.expectedHeads);
         return null;
       }
       throw new Error('Unexpected request');

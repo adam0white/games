@@ -1,6 +1,10 @@
 # Handoff
 
-## smallworks-hf411, 2026-10-29
+## PR9 composition candidate, 2026-11-01
+
+Remaining: focused controls, final lane, signed push, independent exact-SHA review and green CI. Adam accepts feel separately. Merged PR11 commit `447ea89ad8364b0aaaae1ec6c6ba22966f39ba2e` passed exact CI `41289008351` and was deployed with its clean full SHA and HF4.11.0 verified live. This candidate combines the retained fan-variety and guarded continuity work with the HF4.11 journal. Current edition saves use canonical-workshop@3; earlier workshop saves receive start-fresh refusal. Historical 4.8.1 evidence does not review this composition.
+
+## Historical smallworks-hf411 candidate, 2026-10-29
 
 Remaining: restore GitHub Actions billing, rerun PR11 CI, merge on exact green CI, require exact green merged CI, deploy and verify the clean live manifest. GitHub refused to start run 40892397613: recent account payments failed or the spending limit needs increasing. No merge or deployment is claimed. Adam accepts feel separately.
 

@@ -18,6 +18,7 @@ import {
 } from './recording.ts';
 import { aspirationAdvances, responsibilityAdvances } from './responsibility.ts';
 import type { Evidence, GameState, Job, TestCondition } from './types.ts';
+import { assertWorldAuthority } from './world-authority.ts';
 
 const DAY = 1440;
 const OPEN = 540;
@@ -27,6 +28,7 @@ const UPGRADE_IDS = ['second-bench', 'precision-meter'];
 export const MAX_GAME_SAVE_LENGTH = 256 * 1024 * 1024;
 const SAVE_FIELDS = new Set<keyof GameState>([
   'hf',
+  'faultVariety',
   'schema',
   'provenance',
   'migratedFrom',
@@ -180,6 +182,8 @@ export function loadGame(text: string): GameState {
     Object.entries(value.stock).some(([kind, count]) => !parts.includes(kind) || !integer(count))
   )
     invalid();
+  if (value.faultVariety?.recordingClosure && value.methodResponses?.[0]?.recordingClosure)
+    invalid();
   if (isOutcomeProvenance(value.provenance) !== (value.castOutcomes !== undefined)) invalid();
   if (value.castOutcomes !== undefined) validateOutcomeSave(value);
   if (value.busyWorkshop !== undefined) {
@@ -187,6 +191,9 @@ export function loadGame(text: string): GameState {
     if (
       !object(busy) ||
       busy.edition !== 'busy-workshop@1' ||
+      !Array.isArray(busy.discardedGeneration) ||
+      busy.discardedGeneration.length > 8 ||
+      busy.discardedGeneration.some((job) => !object(job) || job.status !== 'offer') ||
       !integer(busy.startedAt) ||
       busy.startedAt > value.now ||
       busy.startedAt % DAY !== 810 ||
@@ -201,7 +208,7 @@ export function loadGame(text: string): GameState {
     )
       invalid();
   }
-  for (const job of value.jobs) {
+  for (const job of [...value.jobs, ...(value.busyWorkshop?.discardedGeneration ?? [])]) {
     if (
       !object(job) ||
       !str(job.id) ||
@@ -311,6 +318,9 @@ export function loadGame(text: string): GameState {
     )
       invalid();
   }
+  // Discarded source objects remain archived, never active job references.
+  ids.clear();
+  for (const job of value.jobs) ids.add(job.id);
   if (
     !ids.has(value.selectedJobId) ||
     value.log.some(
@@ -804,5 +814,6 @@ export function loadGame(text: string): GameState {
       value.jobs.some((j) => j.assignedTo === 'sam' && !j.blocked))
   )
     invalid();
+  assertWorldAuthority(value);
   return value;
 }

@@ -7,7 +7,7 @@ import currentReceipt from './fixtures/commonstead-nora-hf221-native.json';
 import hf3Receipt from './fixtures/commonstead-nora-hf223-native.json';
 import receipt from './fixtures/commonstead-nora-native.json';
 
-// Actual historical source receipts remain unchanged. Commonstead has no HF4 producer yet.
+// Actual historical source receipts remain unchanged. The current HF4 producer is qualified separately; these old formats remain refused.
 // The owner waived old3 compatibility; refused history is never replaced by a fresh person.
 describe('historical Commonstead source boundary at HF4', () => {
   it.each([

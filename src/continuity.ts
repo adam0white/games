@@ -16,7 +16,9 @@ import { createGame } from './game/engine';
 import { attachWorkshop } from './game/hf';
 import { loadGame, MAX_GAME_SAVE_LENGTH, saveGame } from './game/persistence.ts';
 import type { GameState } from './game/types';
+import { assertWorldAuthority } from './game/world-authority.ts';
 import { lab } from './lab';
+import { requireSharedWrite } from './shared-write.ts';
 import { pauseForDeparture, resumeForPlay } from './ui/chapter';
 
 import {
@@ -42,8 +44,30 @@ const source = () => ({
   game: 'repair',
   build: String(lab.build().c ?? 'local'),
   engine: '4.11.0',
-  rules: 'canonical-workshop-2',
+  rules: 'canonical-workshop-3',
 });
+/** A failed shared reply may already have committed. Preserve complete source bytes first. */
+async function journalSnapshot(state: GameState, runId: string, envelopes: PersonaEnvelope[]) {
+  // Keep one complete game snapshot per distinct save, plus every source revision binding.
+  // Snapshot rows and receipt rows remain local; neither is sent to the shelf or telemetry.
+  const text = saveGame(state);
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  const snapshotId = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('');
+  const journal = JSON.parse((await readFreshWorkshopSave(SOURCE_JOURNAL_KEY)) ?? '[]');
+  if (!Array.isArray(journal))
+    throw new Error('The source history could not be read. Keep the original data.');
+  if (
+    !journal.some(
+      (row) => row.runId === runId && row.snapshotId === snapshotId && row.kind === 'game-snapshot',
+    )
+  )
+    journal.push({ runId, kind: 'game-snapshot', snapshotId, game: JSON.parse(text) });
+  for (const envelope of envelopes)
+    journal.push({ runId, revision: envelope.revision, source: source(), snapshotId });
+  await writeWorkshopSave(SOURCE_JOURNAL_KEY, JSON.stringify(journal));
+}
 /** One source of ownership and recording permission. Local receipts never replace initial replay actors. */
 export class WorkshopContinuity {
   readonly fileSession = typeof location !== 'undefined' && /^\/file\/?$/.test(location.pathname);
@@ -205,6 +229,9 @@ export class WorkshopContinuity {
       }
       if (generation !== this.generation) throw new Error('The game changed. Choose again.');
       const base = createGame(seed);
+      const preparedRunId = crypto.randomUUID();
+      let preparedPeople: GameState['people'] | undefined;
+      let preparedInputs: CastChapter['inputs'] = [];
       let state = base;
       let chapter: CastChapter | undefined;
       let shelfUnavailable = false;
@@ -216,6 +243,23 @@ export class WorkshopContinuity {
         let prepared = false;
         const bridge = {
           request: async <T>(request: Parameters<typeof shelf.request>[0]): Promise<T> => {
+            if (request.action === 'putBatch') {
+              assertWorldAuthority(base);
+              const envelopes = request.envelopes ?? [];
+              for (const envelope of envelopes) requireSharedWrite(envelope.castId);
+              if (envelopes.length) {
+                if (!preparedPeople) throw new Error('The complete opening is missing.');
+                const candidate = createGame(seed, 'current', preparedPeople, {
+                  version: 'workshop-cast/1',
+                  inputs: preparedInputs,
+                  claims: envelopes,
+                });
+                loadGame(saveGame(candidate));
+                await journalSnapshot(candidate, preparedRunId, envelopes);
+                if (generation !== this.generation)
+                  throw new Error('The game changed before the cast could be saved.');
+              }
+            }
             const reply = await shelf.request<T>(request);
             if (request.action === 'prepareBatch') {
               prepared = true;
@@ -284,6 +328,8 @@ export class WorkshopContinuity {
                   throw new Error('This character is not assigned to the workshop.');
                 people[id] = admitWorkshop(input, opening);
               }
+              preparedPeople = people;
+              preparedInputs = structuredClone(inputs);
               return people;
             },
             {
@@ -297,6 +343,7 @@ export class WorkshopContinuity {
                   if (!role || !test.people[role])
                     throw new Error('This character has no workshop role.');
                   admitWorkshop(input, test.people[role]!);
+                  requireSharedWrite(input.parent.castId);
                 } catch (error) {
                   preflightFailure = error instanceof Error ? error : new Error(String(error));
                   throw error;
@@ -325,7 +372,7 @@ export class WorkshopContinuity {
       }
       if (generation !== this.generation)
         throw new Error('The identity or game changed. The chapter did not start.');
-      this.runId = crypto.randomUUID();
+      this.runId = preparedRunId;
       this.fileSources = [];
       this.heads = chapter?.claims ?? [];
       this.unclaimedCastIds = legacyIds;
@@ -416,13 +463,20 @@ export class WorkshopContinuity {
       throw new Error(
         'This character starts fresh in HF4. The earlier history is still in its source. Download this workshop to keep it.',
       );
+    assertWorldAuthority(state);
+    loadGame(saveGame(state));
+    requireSharedWrite(castId);
+    if (fork)
+      throw new Error(
+        'The shared SDK cannot atomically fork with an expected head. Keep the workshop export.',
+      );
     const parent = this.heads.find((p) => p.castId === castId);
     let envelope: PersonaEnvelope;
     if (!person.body.alive) {
       if (!parent) throw new Error('You do not own a character history that can be closed.');
       envelope = await closePersonaBranch(parent, source(), state.now);
     } else {
-      const captured = await workshopTransfer(person);
+      const captured = await workshopTransfer(person, state);
       const branchId = fork ? crypto.randomUUID() : (parent?.branchId ?? crypto.randomUUID());
       const oldLife = !fork ? parent?.transfer.life : undefined;
       const life = oldLife
@@ -438,30 +492,13 @@ export class WorkshopContinuity {
         transfer: { ...captured.transfer, life },
         limitations: captured.limitations,
       });
-      // Keep one complete game snapshot per distinct save, plus every source revision binding.
-      // Snapshot rows and receipt rows remain local; neither is sent to the shelf or telemetry.
-      const text = saveGame(state);
-      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-      const snapshotId = Array.from(new Uint8Array(digest), (byte) =>
-        byte.toString(16).padStart(2, '0'),
-      ).join('');
-      const journal = JSON.parse((await readFreshWorkshopSave(SOURCE_JOURNAL_KEY)) ?? '[]');
-      if (!Array.isArray(journal))
-        throw new Error('The source history could not be read. Keep the original data.');
-      if (
-        !journal.some(
-          (row) =>
-            row.runId === runId && row.snapshotId === snapshotId && row.kind === 'game-snapshot',
-        )
-      )
-        journal.push({ runId, kind: 'game-snapshot', snapshotId, game: JSON.parse(text) });
-      journal.push({ runId, revision: envelope.revision, source: source(), snapshotId });
-      await writeWorkshopSave(SOURCE_JOURNAL_KEY, JSON.stringify(journal));
     }
+    await journalSnapshot(state, runId, [envelope]);
     if (!current()) throw new Error('The game changed before the character could be saved.');
     await shelf.request({
-      action: 'put',
-      envelope,
+      action: 'putBatch',
+      envelopes: [envelope],
+      expectedHeads: { [castId]: parent?.revision ?? null },
       fork,
       authored: !fork && !parent && !this.fileOrigin && !state.castChapter?.inputs.length,
     });

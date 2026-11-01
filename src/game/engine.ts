@@ -217,13 +217,18 @@ function required<T>(value: T | undefined): T {
   if (value === undefined) throw new Error('A required workshop record is missing.');
   return value;
 }
-function random(s: GameState): number {
+function random(s: Pick<GameState, 'rng'>): number {
   let value = s.rng | 0;
   value ^= value << 13;
   value ^= value >>> 17;
   value ^= value << 5;
   s.rng = value >>> 0;
   return s.rng / 0x100000000;
+}
+export function generationRngAfter(rng: number, draws: number): number {
+  const s = { rng };
+  for (let i = 0; i < draws; i++) random(s);
+  return s.rng;
 }
 function log(
   s: GameState,
@@ -254,8 +259,26 @@ function makeJob(
       setGeneratedCondition(part, faults[(seed >>> 6) % faults.length] ?? 'good');
     }
   }
+  const previous = s.faultVariety?.first;
+  let selected: { componentId: string; condition: Condition } | undefined;
+  const varying = kind === 'fan' && previous && !s.faultVariety?.second;
+  if (varying) {
+    selected = distinctFanFault(s.faultVariety!.generationSeed, previous.model);
+    if (selected) {
+      for (const part of model.components) setGeneratedCondition(part, 'good');
+      const part = model.components.find((part) => part.id === selected?.componentId);
+      if (part) setGeneratedCondition(part, selected.condition);
+    }
+  }
+  const id = `object-${s.nextId++}`;
+  if (varying && s.faultVariety)
+    s.faultVariety.second = {
+      jobId: id,
+      seed: s.faultVariety.generationSeed,
+      fault: selected ?? null,
+    };
   return {
-    id: `object-${s.nextId++}`,
+    id,
     title,
     ownerId,
     description,
@@ -271,6 +294,32 @@ function makeJob(
     inspected: [],
     verified: [],
   };
+}
+/** SCOPE: one host generation rule, using the actual preceding fan's original physical cause.
+ * A different label or a load-passing fault is not an alternative repair puzzle. */
+export function distinctFanFault(seed: number, previous: import('./types').DeviceModel) {
+  const priorParts = new Set(
+    previous.components.filter((p) => p.condition !== 'good').map((p) => p.id),
+  );
+  const choices: { componentId: string; condition: Condition }[] = [];
+  for (const part of createModel('fan', seed, []).components) {
+    if (priorParts.has(part.id)) continue;
+    for (const condition of supportedFaults[part.kind]) {
+      const candidate = { componentId: part.id, condition };
+      const model = createModel('fan', seed, [candidate]);
+      if (runUseTest(model, 'load').passes) continue;
+      const action =
+        condition === 'dirty' ? 'clean' : condition === 'misaligned' ? 'adjust' : 'replace';
+      intervene(model, part.id, action);
+      if (runUseTest(model, 'load').passes) choices.push(candidate);
+    }
+  }
+  // If there is no modeled alternative, retain existing generation; do not invent a solved fault.
+  return choices[(seed >>> 6) % choices.length];
+}
+function rememberFirstFan(s: GameState, job: Job, source: 'opening' | 'busy'): void {
+  if (s.faultVariety && job.kind === 'fan' && !s.faultVariety.first)
+    s.faultVariety.first = { jobId: job.id, source, model: structuredClone(job.model) };
 }
 function setGeneratedCondition(part: Component, condition: Condition): void {
   part.condition = condition;
@@ -374,6 +423,7 @@ export function createGame(
     hf: snapshotRuntime(people),
     schema: legacy ? 'small-works@4' : 'small-works@5',
     provenance: { ...(legacy ? LEGACY_PROVENANCE : SAVE_PROVENANCE) },
+    faultVariety: { edition: 'fault-variety@1', generationSeed: 0 },
     inputs: [],
     discoveries: [],
     ...(castChapter ? { castChapter: structuredClone(castChapter) } : {}),
@@ -473,6 +523,7 @@ export function createGame(
     const facts = admissionFacts(castChapter, castRole(input.parent.castId) ?? '');
     if (facts) log(s, facts.cast.name, `${facts.line} ${facts.contacts.join(' ')}`);
   }
+  s.faultVariety!.generationSeed = Math.floor(random(s) * 100000);
   return s;
 }
 function neighbourOffers(s: GameState, initial = false): void {
@@ -610,6 +661,7 @@ function neighbourOffers(s: GameState, initial = false): void {
       job.model = createModel('lantern', s.seed, [{ componentId: 'contact', condition: 'dirty' }]);
     if (initial && i === 1)
       job.model = createModel('fan', s.seed, [{ componentId: 'cell', condition: 'weak' }]);
+    if (initial && i === 1) rememberFirstFan(s, job, 'opening');
     if (initial && i === 2)
       job.model = createModel('music-box', s.seed, [{ componentId: 'gear', condition: 'worn' }]);
     if (!continuing && choice === 3)
@@ -2176,6 +2228,7 @@ export function canStartBusyWorkshop(s: GameState): boolean {
     s.jobs.some(
       (job) => job.ownerId === 'mum' && job.status === 'delivered' && !job.returnedUnfinished,
     ) &&
+    !s.jobs.some((job) => job.kind === 'fan' && job.status !== 'offer') &&
     !s.jobs.some(
       (job) => job.ownerId !== 'mum' && !job.isPersonal && !job.isDonor && job.status !== 'offer',
     ) &&
@@ -2244,6 +2297,11 @@ function dispatchPrepared(state: GameState, command: Command, s: GameState): Com
         const methodReceipt = s.methodResponses?.[0];
         if (methodReceipt)
           methodReceipt.recordingClosure = {
+            inputs: structuredClone(s.inputs),
+            command: structuredClone(command),
+          };
+        if (!methodReceipt)
+          s.faultVariety!.recordingClosure = {
             inputs: structuredClone(s.inputs),
             command: structuredClone(command),
           };
@@ -2319,11 +2377,14 @@ function dispatchPrepared(state: GameState, command: Command, s: GameState): Com
       advance(s, start - s.now);
       s.busyWorkshop = {
         edition: 'busy-workshop@1',
+        discardedGeneration: structuredClone(s.jobs.filter((job) => job.status === 'offer')),
         startedAt: s.now,
         restockAt: Math.floor(s.now / DAY) * DAY + DAY + OPEN,
         recoveredStock: {},
       };
       s.jobs = s.jobs.filter((candidate) => candidate.status !== 'offer');
+      delete s.faultVariety!.first;
+      delete s.faultVariety!.second;
       if (!s.jobs.some((candidate) => candidate.id === s.selectedJobId))
         s.selectedJobId = s.jobs[0]?.id ?? '';
       s.stock.switch = (s.stock.switch ?? 0) + 1;
@@ -2361,6 +2422,7 @@ function dispatchPrepared(state: GameState, command: Command, s: GameState): Com
           Math.floor(s.now / DAY) * DAY + minute,
         );
         request.model = createModel(kind, s.seed, [{ componentId: 'switch', condition: 'worn' }]);
+        rememberFirstFan(s, request, 'busy');
         request.description = reportedSymptoms(request, purpose);
         request.requiredConditions = kind === 'lantern' && minute === 870 ? ['movement'] : ['load'];
         request.quote = `Return by ${dayTime(request.due)} for £${request.reward}. You can decline or return it unfinished.`;

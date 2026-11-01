@@ -1,7 +1,14 @@
 import { createHash } from 'node:crypto';
-import { readRunHistory } from '@adam0white/human-framework';
+import { readRunHistory, replay } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
-import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
+import {
+  canStartBusyWorkshop,
+  createGame,
+  dispatch,
+  loadGame,
+  replayCommands,
+  saveGame,
+} from '../src/game/engine';
 import {
   chooseActivity,
   createPeople,
@@ -48,8 +55,12 @@ describe('opt-in busy workshop', () => {
       { type: 'next-day' },
     ] as Command[])
       state = act(state, command);
-    expect(createHash('sha256').update(saveGame(state)).digest('hex')).toBe(
-      '5679c975b8dc61ad0484d602acb623f69f96e6e42de74da59c83b414ce4e3043',
+    const saved = saveGame(state);
+    expect(saveGame(loadGame(saved))).toBe(saved);
+    expect(replay(state.hf.archive)).toMatchObject({ ok: true, value: { verified: true } });
+    expect(replayRecordedRun({ ...state, inputs: state.inputs }, saved).ok).toBe(true);
+    expect(createHash('sha256').update(saved).digest('hex')).toBe(
+      'a1de1f3a698617f4bb9a9191fa8eda58564248b348728038279602f6712cadf7',
     );
   });
   it('turns accepting everything into a real stock/deadline choice, without changing ordinary play', () => {
@@ -386,3 +397,47 @@ it('refunds an interrupted replacement once and keeps recovered-part provenance'
   expect(state.stock.switch).toBe(total);
   expect(stockCount(state, 'switch', 'recovered')).toBe(recovered);
 });
+
+it('preserves an accepted community fan and actual discarded generation through the recording cut', () => {
+  let state = createGame(4);
+  state = act(state, { type: 'next-day' });
+  state = act(state, { type: 'next-day' });
+  const family = present(state.jobs[0]);
+  for (const command of [
+    { type: 'work', jobId: family.id, componentId: 'switch', intervention: 'replace' },
+    { type: 'verify', jobId: family.id, condition: 'movement' },
+    { type: 'deliver', jobId: family.id },
+  ] as Command[])
+    state = act(state, command);
+  const community = present(state.jobs.find((job) => job.title === 'The community room fan'));
+  const accepted = act(state, { type: 'accept', jobId: community.id });
+  const before = saveGame(accepted);
+  expect(canStartBusyWorkshop(accepted)).toBe(false);
+  const rejected = dispatch(accepted, { type: 'start-busy-workshop' });
+  expect(rejected.ok).toBe(false);
+  expect(saveGame(rejected.state)).toBe(before);
+  expect(saveGame(loadGame(before))).toBe(before);
+  state = act(state, { type: 'start-busy-workshop' });
+  expect(state.busyWorkshop?.discardedGeneration.some((job) => job.id === community.id)).toBe(true);
+  const filled = replayCommands(
+    state,
+    Array.from(
+      { length: 10001 - state.inputs!.length },
+      (): Command => ({ type: 'select', jobId: state.selectedJobId }),
+    ),
+  );
+  expect(filled.ok).toBe(true);
+  if (!filled.ok) throw new Error(filled.message);
+  state = filled.state;
+  expect(state.inputs).toBeUndefined();
+  const raw = saveGame(state),
+    cold = loadGame(raw);
+  expect(saveGame(cold)).toBe(raw);
+  const changed = JSON.parse(raw);
+  changed.busyWorkshop.discardedGeneration.pop();
+  expect(() => loadGame(JSON.stringify(changed))).toThrow();
+  const warmNext = act(state, { type: 'next-day' }),
+    coldNext = act(cold, { type: 'next-day' });
+  expect(saveGame(coldNext)).toBe(saveGame(warmNext));
+  expect(saveGame(loadGame(saveGame(coldNext)))).toBe(saveGame(coldNext));
+}, 600000);

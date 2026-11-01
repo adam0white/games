@@ -112,6 +112,11 @@ it('supports the actual recording capacity and later native continuation without
   s = act(s, { type: 'deliver', jobId: s.selectedJobId, unfinished: true });
   expect(saveGame(s).length).toBeLessThan(MAX_GAME_SAVE_LENGTH);
   expect(saveGame(loadGame(saveGame(s)))).toBe(saveGame(s));
+  const duplicate = JSON.parse(saveGame(s));
+  duplicate.faultVariety.recordingClosure = structuredClone(
+    duplicate.methodResponses[0].recordingClosure,
+  );
+  expect(() => loadGame(JSON.stringify(duplicate))).toThrow();
 }, 120000);
 
 it('binds historical evidence, context and exact nested receipt shapes to actual recorded execution', () => {

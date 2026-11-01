@@ -173,6 +173,18 @@ export interface GameState {
   hf: import('./hf').WorkshopRuntime;
   schema: 'small-works@4' | 'small-works@5';
   provenance?: import('./recording').Provenance;
+  /** New-world host edition. Originals survive repair and recording closure. Never player evidence. */
+  faultVariety?: {
+    edition: 'fault-variety@1';
+    generationSeed: number;
+    first?: { jobId: string; source: 'opening' | 'busy'; model: DeviceModel };
+    second?: {
+      jobId: string;
+      seed: number;
+      fault: { componentId: string; condition: Condition } | null;
+    };
+    recordingClosure?: { inputs: Command[]; command: Command };
+  };
   /** Present when an engine-4 world continued under engine 5 (see `upgradeRules`). */
   migratedFrom?: import('./recording').MigratedFrom;
   inputs?: Command[];
@@ -195,6 +207,8 @@ export interface GameState {
   /** Recorded opt-in host scenario; absent worlds retain canonical-workshop@2 rules. */
   busyWorkshop?: {
     edition: 'busy-workshop@1';
+    /** Actual offers removed at entry, retained in generation order for closed-recording authority. */
+    discardedGeneration: Job[];
     startedAt: number;
     restockAt: number;
     recoveredStock: Partial<Record<ComponentKind, number>>;
