@@ -20,7 +20,7 @@ it('bounds recent host diagnostics while retaining every accepted completion and
   expect(game.host.completed).toHaveLength(RECENT_COMPLETIONS);
   const restored = restoreMurmur(JSON.parse(JSON.stringify(saved)));
   const roundtrip = checkpointMurmur(restored);
-  expect(roundtrip.run.history).toEqual(saved.run.history);
+  expect(readRunHistory(roundtrip.run)).toEqual(readRunHistory(saved.run));
   expect(roundtrip.run.hashes.full).toBe(saved.run.hashes.full);
   expect(restored.host.completed).toEqual(game.host.completed);
   expect(verifySessionReplay(saved.run)).toBe(true);

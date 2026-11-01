@@ -8,6 +8,7 @@ import {
   replay,
   restoreRun,
 } from '@adam0white/human-framework';
+import { requireCurrentNativePackage, START_FRESH } from './edition.ts';
 import { decodeMurmurWorld } from './hf4-world.ts';
 
 export interface MurmurSession<H> {
@@ -20,7 +21,9 @@ export function restoreSession<H>(
   archive: unknown,
   decodeHost: (archive: DeepReadonly<RunArchive>) => H,
 ): MurmurSession<H> {
+  requireCurrentNativePackage(archive);
   const restored = restoreRun(archive);
+  if (!restored.ok && restored.error.code === 'unsupported-archive') throw Error(START_FRESH);
   if (!restored.ok)
     throw new Error(`Cannot restore this notebook: ${restored.error.code} ${restored.error.message}`);
   const canonical = exportRun(restored.value);

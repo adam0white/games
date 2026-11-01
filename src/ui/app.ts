@@ -1,6 +1,11 @@
 import { canonicalPersona } from '@adam0white/lab-client';
 import { assertCastMetadata } from '../sim/cast-authority.ts';
-import { isHf4Edition, requireCurrentEdition, START_FRESH } from '../sim/edition.ts';
+import {
+  isHf4Edition,
+  requireCurrentEdition,
+  requireCurrentNativePackage,
+  START_FRESH,
+} from '../sim/edition.ts';
 /**
  * The Two Voices UI: plain DOM over the pure sim. The UI reads state and queues inputs; it never changes the sim
  * directly. Real time drives sim minutes, continuously: fast between cards (dead time skipped quickly), strongly
@@ -159,6 +164,7 @@ async function readSave(): Promise<Save | null> {
     let sv: Save | null = parsed;
     if (parsed?.format === 'murmur-notebook/1') sv = (await expandNotebook(parsed)) as unknown as Save;
     if (parsed?.format === 'murmur-replay-save/1') {
+      requireCurrentNativePackage({ engine: parsed.hfEngine });
       const host = parsed.host as Omit<GameStateSnapshot, 'hf'>;
       assertCastMetadata(host);
       const rebuilt = replay(
@@ -183,6 +189,7 @@ async function readSave(): Promise<Save | null> {
       }
       const state = cloneState(rebuilt),
         { hf, ...rebuiltHost } = state;
+      if (canonicalPersona(hf.run.engine) !== canonicalPersona(parsed.hfEngine)) throw Error(START_FRESH);
       if (hf.run.hashes.full !== parsed.hfHash || canonicalPersona(rebuiltHost) !== canonicalPersona(host))
         throw new Error('The saved input checkpoint does not reconstruct exactly.');
       sv = {
@@ -247,6 +254,7 @@ function writeSave() {
         SAVE,
         JSON.stringify({
           format: 'murmur-replay-save/1',
+          hfEngine: hf.run.engine,
           host,
           hfHash: hf.run.hashes.full,
           clockFraction,

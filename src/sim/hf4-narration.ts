@@ -192,10 +192,10 @@ const dilanWordings = {
   ],
   'decision.wait': ['I will wait.', 'I have decided to wait.', 'For now, I will wait.', 'I choose to wait.'],
   'suggestion.resolved': [
-    'I {verdict}.',
-    'I heard the suggestion. I {verdict}.',
-    'I thought about it. I {verdict}.',
-    'In response, I {verdict}.',
+    'I {verdict}.{reason}',
+    'I heard the suggestion. I {verdict}.{reason}',
+    'I thought about it. I {verdict}.{reason}',
+    'In response, I {verdict}.{reason}',
   ],
 } as const;
 

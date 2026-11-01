@@ -152,7 +152,13 @@ const packed = await compactNotebook({
 });
 const expanded = await expandNotebook(packed);
 if (JSON.stringify(expanded.state) !== json) throw new Error('Complete notebook codec differs');
-const envelope = JSON.stringify(runEnvelope('murmur', { a: '0.10.0', hf: '4.9.0' }, packed));
+const envelope = JSON.stringify(
+  runEnvelope(
+    'murmur',
+    { a: '0.10.0', hf: saved.hf.run.engine.package.slice('@adam0white/human-framework@'.length) },
+    packed,
+  ),
+);
 const wireBytes = (await gzip(envelope)).size;
 if (!checkRun(envelope) || wireBytes > RUN_LIMITS.compressedBytes)
   throw new Error(`Complete notebook exceeds released upload bounds: ${envelope.length}/${wireBytes}`);

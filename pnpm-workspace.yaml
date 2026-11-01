@@ -15,6 +15,8 @@ allowBuilds:
   workerd@1.20261019.1: true
   fsevents: false
 overrides:
+  # The game and shelf must admit the same exact native engine.
+  "@adam0white/lab-client>@adam0white/human-framework": 4.15.1
   sharp: 0.35.5
   miniflare>undici: 7.30.1
   # Preserve the existing npm lock version for the optional WASM target.
