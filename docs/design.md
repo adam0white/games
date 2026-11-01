@@ -283,6 +283,108 @@ require generic family custody or an Ada actor.
 
 ## Deferred and acceptance
 
+### Second-cycle dated Deferred — 2026-10-31
+
+The second cycle was collected. These are open inspection leads for 2026-11-03, not established defects or accepted changes. The private sealed packet is at `~/code/.lab-scratch/playtest/light-1030/source-packets/warren-retest2/`; its seal is neither canonical HF import nor game delivery. F-2776–F-2790 are unused. No third ordinary panel or automatic new game-fix cycle follows. The two-iteration rule is separate from technical proof, canonical import, owner acceptance and bug-free status.
+
+The five reports describe two independent fresh games each, same evening, without matched seed or imported save. Recording and consent stayed at defaults; feedback labels were selected locally, without Submit or a receipt. Nine stops were voluntary; Nia's phone TOOL stop followed two selection timeouts. None of the games ended. Unseen riders, unfinished work, unknown causes and untested later checkpoints remain unknown. Earlier accepted partial R2 FREE and separate CONT remain distinct; missing CONT bodies and selected own-history limits are not filled by this round. Rosa's 26 retained history lines are unverified, not proven unread. Retained output and image blocks do not prove attention or perception.
+
+**Ranked asks and dispositions.** Each quoted ask is literal; source line and character offsets refer to the private packet report. Owner is the Warren maintainer for fix:warren and the lab driver owner for fix:lab.
+
+- **F-2761 — Maya Chen, rank 1** (maya/report.md:5, chars 224–389 exclusive): “Tell me whether the first chalked square must be dug before the next one becomes connected. The two marks looked adjacent, but the second still told me to join them.” **fix:warren; owner: Warren maintainer; inspect 2026-11-03.** Inspect how the connecting-passage instruction distinguishes chalked marks from a completed cut. Maya guessed that the first square must be dug, but did not establish this.
+- **F-2762 — Maya Chen, rank 2** (maya/report.md:6, chars 393–531 exclusive): “Keep the cellar and my plan in view on the phone, or make it clear how to get back to them. The view moved to a field while I was waiting.” **fix:warren; owner: Warren maintainer; inspect 2026-11-03.** Inspect how to find the cellar and plan after the phone view moved. The cause of the movement is unknown.
+- **F-2763 — Maya Chen, rank 3** (maya/report.md:7, chars 535–695 exclusive): “Explain why the fresh game’s plan reading refers to an unavailable Yusuf invitation and an unrecorded stopping line. I did not know what to make of those words.” **fix:warren; owner: Warren maintainer; inspect 2026-11-03.** Inspect why a fresh plan reading mentions an unavailable invitation and an unrecorded stopping line. Do not infer save corruption or cross-game recovery.
+- **F-2764 — Emre Kaya, rank 1** (emre/report.md:5, chars 170–238 exclusive): “Give me a useful shelter decision while the first marked room waits.” **fix:warren; owner: Warren maintainer; inspect 2026-11-03.** Review a useful shelter decision during the first-room wait. Emre saw Meryem eating on phone; that does not establish the full cause of the desktop wait. Do not mandate a clock or digging retune.
+- **F-2765 — Emre Kaya, rank 2** (emre/report.md:6, chars 242–307 exclusive): “Show how Yusuf’s stopping line relates to the hill I am planning.” **fix:warren; owner: Warren maintainer; inspect 2026-11-03.** Inspect how Yusuf’s stopping line relates to the current hill and what a player can do with it. He answered in the journal, but Emre could not place the line.
+- **F-2766 — Emre Kaya, rank 3** (emre/report.md:7, chars 311–392 exclusive): “Tell me what, if anything, I can usefully do about a marked wall that is waiting.” **fix:warren; owner: Warren maintainer; inspect 2026-11-03.** Review what a player can usefully do while a marked wall waits. Preserve the named diggers and competing needs, without forcing an outcome.
+- **F-2767 — Nia Okafor, rank 1** (nia/report.md:5, chars 168–335 exclusive): “Let me make the quiet door-test request through the phone control. Selecting Meryem timed out twice through the driver, so I could not reach the experiment I came for.” **fix:lab; owner: lab driver owner; inspect 2026-11-03.** Investigate the phone quiet-test selection in the lab driver: two attempts to select Meryem timed out. No quiet-test request was sent and the cause is unknown; do not diagnose a game-source defect.
+- **F-2768 — Nia Okafor, rank 2** (nia/report.md:6, chars 339–485 exclusive): “Give me something engaging to do while I wait for a door to be carved. On desktop I stopped after waiting on Fast and finding it still unfinished.” **fix:warren; owner: Warren maintainer; inspect 2026-11-03.** Review Nia’s request for something engaging while a door is carved. The desktop door remained unfinished during the reached session; no timing retune is implied.
+- **F-2769 — Nia Okafor, rank 3** (nia/report.md:7, chars 489–551 exclusive): “Give me a clearer sense of when riders might become a concern.” **fix:warren; owner: Warren maintainer; inspect 2026-11-03.** Inspect how the game communicates when riders might become a concern. Nia did not reach riders; do not invent a schedule.
+- **F-2770 — Rosa Alvarez, rank 1** (rosa/report.md:5, chars 202–314 exclusive): “Show me clearly which squares remain marked after I tap, especially when the answer says the chalk is unchanged.” **fix:warren; owner: Warren maintainer; inspect 2026-11-03.** Inspect how remaining chalk marks are communicated after removal or an unchanged answer. Rosa did not view a post-mark screenshot; cause and final mark locations remain unknown.
+- **F-2771 — Rosa Alvarez, rank 2** (rosa/report.md:6, chars 318–407 exclusive): “Explain “open route” when it becomes relevant. I did not reach that advice on this visit.” **fix:warren; owner: Warren maintainer; inspect 2026-11-03.** Review plain explanation of open route when relevant. Rosa did not reach that advice in this visit.
+- **F-2772 — Rosa Alvarez, rank 3** (rosa/report.md:7, chars 411–450 exclusive): “Explain “spoil” in the digging message.” **fix:warren; owner: Warren maintainer; inspect 2026-11-03.** Review explanation of spoil in the digging message. Rosa found the word unfamiliar but continued.
+- **F-2773 — Sanja Marković, rank 1** (sanja/report.md:5, chars 100–203 exclusive): “Make it clearer which sleeping places already exist, which are planned, and which are safe from riders.” **fix:warren; owner: Warren maintainer; inspect 2026-11-03.** Clarify the distinction between existing, planned, potential and rider-safe sleeping places using actual source rules. Sanja did not reach a completed shelter.
+- **F-2774 — Sanja Marković, rank 2** (sanja/report.md:6, chars 207–289 exclusive): “Show the progress of marked work more plainly while people attend to other duties.” **fix:warren; owner: Warren maintainer; inspect 2026-11-03.** Review how marked work progress is communicated while workers attend to other duties. Sanja saw work begin and a separate door complete; no blanket speed change follows.
+- **F-2775 — Sanja Marković, rank 3** (sanja/report.md:7, chars 293–391 exclusive): “Explain what the unavailable invitation and stopping line mean for a first-time player’s decision.” **fix:warren; owner: Warren maintainer; inspect 2026-11-03.** Explain the unavailable invitation and stopping line in the context a cold player can actually know. Do not invent prior events or hidden facts.
+
+**Returns, separate from ranked asks.** Complete source passages and their exact locators follow; a return statement is not a new ask.
+
+**Maya Chen** (maya/report.md):
+
+Lines 1–1, chars 0–202 exclusive:
+
+> I would not return voluntarily tonight; I might return another evening to see the shelter take shape if I understood what the connecting-passage instruction wants me to do. I would not leave it running.
+
+Lines 9–9, chars 697–1077 exclusive:
+
+```text
+I am Maya Chen, 24, a Vancouver library assistant. This was a return to *The Warren*, in two independent fresh games on the same evening. I used the supplied start URL with `?labRunSource=agent`. The phone was 360×690 with touch; the desktop was 1280×800 with mouse-like taps. I imported no save or matched seed. Recording and consent stayed at their defaults. Neither game ended.
+```
+
+**Emre Kaya** (emre/report.md):
+
+Lines 1–1, chars 0–148 exclusive:
+
+> I would return voluntarily another evening on desktop if there were a useful shelter decision while the digging waits; I would not leave it running.
+
+Lines 26–34, chars 1837–3981 exclusive:
+
+> - **6.650, note:** “The shelter goal is familiar. I want to see whether the work and the door make more sense in a fresh village.”
+> - **19.217, note:** “The mark now tells me who can dig, that the wall is available, and that meals, harvest and rest take priority. That is a useful explanation for the waiting I remember.”
+> - **First-minute attempt, time not captured:** “The shelter goal and chalk are familiar. The new mark explains who digs and what takes priority, which gives me a reason for waiting. I want to see the work and plan storage and a protected room.” This request was issued before the next observed time of 55.522 seconds, so I cannot count it as a valid first-minute checkpoint.
+> - **61.864, first_minute:** “The shelter goal and chalk are familiar. The new mark explains who digs and what takes priority, which gives me a reason for waiting. Six people need sleeping places, and I want to plan storage and a protected room.”
+> - **106.834, note:** “The journal now groups four routine lines, which makes the repeated reports less distracting. I asked Yusuf about the stopping line again; the invitation is pending and the journal says so.”
+> - **141.472, note:** “Yusuf answered in the main journal this time, so I did not have to reopen him. The admission is clear, but I still do not know where the stopping mark is on my hill or what to do with it.”
+> - **208.159, pulse, engagement 3/5:** “I like seeing Yusuf answer in the journal and the routine lines grouped. The first square still seems to be waiting, so I am watching rather than building the shelter I came for.”
+> - **220.938, want_quit, BORED, engagement 2/5:** “The first marked square is still stone after several days, and I am watching the same early preparation again. The explanation helps, but I do not want to wait longer tonight.”
+> - **230.533, stop, BORED, engagement 2/5:** “I am stopping on desktop before the first room is dug. The wall explanation and visible invitation answer help, but I am tired of waiting through the same preparation. I would return another evening if there were a useful shelter decision while work waits; I would not leave it running.”
+
+Lines 38–42, chars 3994–5025 exclusive:
+
+> - **5.796, note:** “The phone title and shelter goal fit clearly. This is another fresh village, after the slow desktop start.”
+> - **20.686, note:** “I can distinguish and mark the small wall on the phone. The explanation is the same as desktop; I will see whether this village starts work.”
+> - **61.202, first_minute:** “I marked one square on the small phone hill. Meryem needs food and water and is eating, so I understand why she is not digging at this moment. I have already watched the same start on desktop tonight.”
+> - **64.072, want_quit, BORED, engagement 2/5:** “I do not want to wait through the same first room on the phone after doing it on desktop. The needs make sense, but I have no new shelter decision yet.”
+> - **75.823, stop, BORED, engagement 2/5:** “I am stopping on the phone after marking the first square. The layout is usable and Meryem eating is understandable, but I have already waited through this opening on desktop. I would return another evening on desktop for a useful decision, not leave it running.”
+
+**Nia Okafor** (nia/report.md):
+
+Lines 1–1, chars 0–146 exclusive:
+
+> I would come back another evening to try the quiet door test if I could make the request; I would not come back tonight or leave the game running.
+
+Lines 9–9, chars 553–963 exclusive:
+
+> I’m Nia Okafor, 19, a Lagos design student. This was a return visit to **The Warren**, the second fix/retest cycle. I played fresh, independent games at the supplied URL with `?labRunSource=agent`: first on a 360×690 touch phone, then on a 1280×800 desktop the same evening. No save or matched seed was imported. I left recording and consent at their defaults. Both games began on Slow; I changed each to Fast.
+
+**Rosa Alvarez** (rosa/report.md):
+
+Lines 1–1, chars 0–176 exclusive:
+
+> I would return voluntarily another evening to see the people work on the shelter, if I could tell where my chalk marks are; I would close the game now and not leave it running.
+
+Lines 9–9, chars 452–918 exclusive:
+
+> I am Rosa Alvarez, 62, a retired school administrator from Puebla. I read English as a second language. This was a return visit and the second fix/retest cycle. The two sessions were fresh, independent games on my other devices the same evening: a **360×690 touch phone** and a **1280×800 desktop**, where I used the mouse. Neither used an old save or matched seed. Both began at the supplied URL with the agent query. Recording and consent stayed at their defaults.
+
+**Sanja Marković** (sanja/report.md):
+
+Lines 1–1, chars 0–74 exclusive:
+
+> I would come back another evening, but I would not leave the game running.
+
+Lines 42–49, chars 4674–6113 exclusive:
+
+> - **5.558 s — note, engagement 4:** “The bigger drawing gives me a better view of the village. I want to see whether I can make the shelter safer this time.”
+> - **23.295 s — note, engagement 4:** “The larger screen lets me read the village events alongside the hill. I accidentally removed a chalk mark by clicking again, then restored it; that surprised me while chalk was selected.”
+> - **40.910 s — note, engagement 4:** “A door can make the entrance safer, and the message confirms it is only marked. I want to see someone actually carve it.”
+> - **66.972 s — first_minute, engagement 4:** “The door task gave me a clear response, and I can follow people more easily here. I still need sleeping space and am waiting to see the work completed.”
+> - **92.450 s — note, engagement 4:** “The door was finished when I checked, which is satisfying. I asked Yusuf to test it; pending is clear, though I missed the moment it was finished.”
+> - **99.428 s — note, engagement 5:** “Yusuf shut and reopened the door, and the journal tells me the result. That is the consequence I wanted to see.”
+> - **101.717 s — want_quit, BORED, engagement 3:** “I have seen the door work and would leave for tonight. I am interested in the people, but I do not want to wait through more routine right now.”
+> - **111.522 s — stop, BORED, engagement 3:** “I am stopping after seeing the door test. I would come back another evening, but I would not leave the game running.”
+
+
 Current-only policy: unsupported configurations must be kept as originals and refused with a start-fresh choice. Root still owns peer/source review, exact CI, integration, deployment and live verification. Peer certification remains blocked by the specific Valley, Watch and Lefthand dependencies above; source replay and receipt checks do not authenticate independently rewritten histories. Adam's 2026-11-03 play and camera decision remain separate; no player or shared journey is claimed.
 
 
