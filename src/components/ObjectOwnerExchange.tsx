@@ -3,6 +3,7 @@ import {
   ownerQuestionEvidence,
   ownerReplacementProposal,
 } from '../game/cast-content';
+import { dayRemaining, dayTime } from '../game/engine';
 import type { Command, GameState } from '../game/types';
 
 /** A public replacement proposal about this selected part; personal accounts stay separate. */
@@ -35,6 +36,9 @@ export function ObjectOwnerExchange({
     evidenceText: JSON.stringify(evidence),
   };
   const block = ownerQuestionBlock(state, command);
+  const current = state.npcWork.find((work) => work.personId === owner.id);
+  const wait = current ? current.endsAt - state.now : 0;
+  const showCurrent = block?.startsWith('The owner is unavailable.') && current && wait > 0;
   const receipt = state.ownerExchanges?.find(
     (r) => r.jobId === jobId && r.componentId === componentId,
   );
@@ -65,9 +69,9 @@ export function ObjectOwnerExchange({
         <p>No current observations. Inspect this part and test or measure the object first.</p>
       )}
       <p>
-        The question costs five minutes, including a refusal. {owner.name} can keep the original
-        parts or keep their plans. Agreement covers only this proposed replacement. Parts, repair
-        time and the final test remain your responsibility.
+        Asking costs five minutes, even if {owner.name} says no. {owner.name} can refuse the
+        replacement or continue with other plans. Agreement covers only the replacement described
+        above. Parts, repair time and the final test remain your responsibility.
       </p>
       {owner.activity?.action === 'personal' && (
         <p>
@@ -86,8 +90,8 @@ export function ObjectOwnerExchange({
           </details>
           <p>
             Only {job.title} · {componentId} · replacement. Asked at workshop minute{' '}
-            {receipt.askedAt}; answered at {receipt.answeredAt}. Personal acknowledgment is
-            separate.
+            {receipt.askedAt}; answered at {receipt.answeredAt}. This answer concerns the repair
+            proposal, not a separate personal conversation.
           </p>
         </div>
       ) : (
@@ -96,6 +100,21 @@ export function ObjectOwnerExchange({
             Ask about replacing this {componentId} · 5 minutes
           </button>
           {block && <p>{block}</p>}
+          {showCurrent ? (
+            <>
+              <p>
+                {owner.name} is doing this activity: {current.option.label}. It is due to end at{' '}
+                {dayTime(current.endsAt)}. Check again then; another commitment may follow.
+              </p>
+              {wait <= 480 && wait <= dayRemaining(state) && (
+                <button type="button" onClick={() => act({ type: 'wait', minutes: wait })}>
+                  Wait for this activity to end · {wait} minutes
+                </button>
+              )}
+            </>
+          ) : block?.startsWith('The owner is unavailable.') ? (
+            <p>Their next available time is not known. Check again later in People.</p>
+          ) : null}
         </>
       )}
       <p>
