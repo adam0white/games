@@ -1544,6 +1544,18 @@ function Workshop({
                       onSkip={skipIntro}
                     />
                   )}
+                  {job.id === progress.openingJobId && job.status === 'active' && (
+                    <details>
+                      <summary>
+                        {state.watching
+                          ? 'Sam’s agreed lesson'
+                          : state.pendingRequest?.kind === 'lesson'
+                            ? 'Sam’s lesson request'
+                            : 'Invite Sam to watch this repair'}
+                      </summary>
+                      <LessonControl state={state} act={act} />
+                    </details>
+                  )}
                   {jobLocked && job.status !== 'delivered' && (
                     <p className="focused-lock">
                       {job.assignedTo
