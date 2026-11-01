@@ -74,6 +74,7 @@ it('sends complete in-progress native notebooks through automatic recording and 
       kind: string;
       data: { upload: string; index: number; total: number; text: string };
     }[] = [];
+    const recordListeners = new Set<() => void>();
     // A reserved synthetic HTTPS origin makes normal recording eligible without changing the client.
     await context.route('https://murmur.fixture/**', async (route) => {
       const url = new URL(route.request().url());
@@ -94,6 +95,7 @@ it('sends complete in-progress native notebooks through automatic recording and 
       } else if (request.url().endsWith('/lab/api/linked') && request.postDataBuffer()) {
         const record = JSON.parse(gunzipSync(request.postDataBuffer()!).toString());
         records.push(record);
+        for (const listener of recordListeners) listener();
         await route.fulfill({
           json: { ok: true, id: record.id },
           headers: { 'access-control-allow-origin': '*' },
@@ -149,24 +151,61 @@ it('sends complete in-progress native notebooks through automatic recording and 
     await page.clock.runFor(60_100);
     await expect.poll(() => records.filter((r) => r.kind === 'run').length).toBeGreaterThan(0);
     const notebookFor = async (state: typeof automatic) => {
-      const groups = new Map<string, typeof records>();
-      for (const record of records.filter((r) => r.kind === 'run')) {
-        const group = groups.get(record.data.upload) ?? [];
-        if (!group.some((r) => r.data.index === record.data.index)) group.push(record);
-        groups.set(record.data.upload, group);
+      const deadline = Date.now() + 10_000;
+      let diagnostics = '';
+      while (true) {
+        const seen = records.length;
+        const groups = new Map<string, typeof records>();
+        for (const record of records.filter((r) => r.kind === 'run')) {
+          const group = groups.get(record.data.upload) ?? [];
+          const previous = group.find((r) => r.data.index === record.data.index);
+          if (
+            previous &&
+            (previous.data.total !== record.data.total || previous.data.text !== record.data.text)
+          )
+            throw new Error('Conflicting pieces in synthetic transport');
+          if (!previous) group.push(record);
+          groups.set(record.data.upload, group);
+        }
+        const summary: string[] = [];
+        for (const [upload, group] of groups) {
+          const total = group[0]!.data.total;
+          const complete =
+            Number.isInteger(total) &&
+            total > 0 &&
+            group.length === total &&
+            group.every((r) => r.data.total === total) &&
+            group.every((r) => Number.isInteger(r.data.index) && r.data.index >= 0 && r.data.index < total);
+          if (!complete) {
+            summary.push(`${upload}: ${group.length}/${total} pieces, incomplete`);
+            continue;
+          }
+          const packed = JSON.parse(
+            group
+              .sort((a, b) => a.data.index - b.data.index)
+              .map((r) => r.data.text)
+              .join(''),
+          );
+          const expanded = await expandNotebook(packed);
+          const matches = JSON.stringify(expanded.state) === JSON.stringify(state);
+          summary.push(`${upload}: ${group.length}/${total} pieces, match=${matches}`);
+          if (matches) return expanded;
+        }
+        diagnostics = summary.join('; ') || 'no run uploads';
+        const remaining = deadline - Date.now();
+        if (remaining <= 0)
+          throw new Error(`No complete matching notebook reached the synthetic transport: ${diagnostics}`);
+        if (records.length !== seen) continue;
+        await new Promise<void>((resolve) => {
+          const wake = () => {
+            clearTimeout(timer);
+            recordListeners.delete(wake);
+            resolve();
+          };
+          const timer = setTimeout(wake, remaining);
+          recordListeners.add(wake);
+        });
       }
-      for (const group of groups.values()) {
-        if (group.length !== group[0]!.data.total) continue;
-        const packed = JSON.parse(
-          group
-            .sort((a, b) => a.data.index - b.data.index)
-            .map((r) => r.data.text)
-            .join(''),
-        );
-        const expanded = await expandNotebook(packed);
-        if (JSON.stringify(expanded.state) === JSON.stringify(state)) return expanded;
-      }
-      throw new Error('No complete matching notebook reached the synthetic transport');
     };
     expect((await notebookFor(automatic)).state).toEqual(automatic);
     await page.evaluate(() => window.__murmur.quiet());

@@ -416,3 +416,10 @@ MR1-1 moves the completed Monday truth read out of ordinary context/options/prev
 MR1-2 corrects the protest fixture: ece-1 now deliberately receives a real quiet input. Ordinary submitted choices assert actual card/option availability. Earlier bounded held/held-next evidence contains an unavailable map no-op followed by quiet. Those native outcomes remain actual, but the old host prefix was not all-ordinary. Original artifacts are preserved and qualified in the correction1 packet. New ordinary source9e/candidate state and fullHash/next-input evidence uses correction1 filenames. The letter fiction, numerical rules, difficulty, agency and all nineteen open routes remain as above. F2708 remains UNRUN.
 
 The prior three non-reading cases retain30s each: their aggregate possible allowance is90s, versus30s for the former combined case. This is not a measured speedup. No full suite, browser, timing/trust retune, signing or delivery is established by these focused corrections.
+
+
+## Second retest record — 2026-11-01
+
+The two-iteration panel record is qualified with limits; [Deferred](Deferred.md) contains all fourteen literal F2971–F2984 asks, sources, routes, dates and return intentions.
+
+F2974 and F2977 have 2026-11-03 checkpoints; the other twelve have 2026-11-10 checkpoints. Buildable engineering remains active. No third ordinary panel or bulk fixed designation follows. At 2026-11-01 19:00 UTC, HF 4.15.1 migration source has merged in PR17 at dd56d905c99b5145d2b173a6b0a8060a0a29a901 after exact independent CLEAR review and green source CI. The earlier failed CI and measured diagnostic remain historical evidence; they establish neither CI cause nor an uninstrumented speedup. Target CI, normal deployment, clean live release, cross-origin proof at both required sizes, and Adam’s fiction acceptance remain pending at this checkpoint. This documentation change has its own exact review, CI and integration gates.

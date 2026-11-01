@@ -220,3 +220,10 @@ Replay identity: preserved every archival fixed hash. `next-legacy.test.ts` now 
 Campaign decision is dated in `docs/hf49-editions.md`: the pre-existing third-week and outcomes story routes already use current rules; their combined chronological placement/pacing is targeted to Adam's 2026-11-03 fiction pass. This fix removes the 0.10 rules opt-in.
 
 Hosted review is waived by coordinator ruling 2026-10-29T09:25Z. No hosted @codex request, Opus read, or second review was made for this fix. The supplied Opus read of merged PR8 is the findings source.
+
+
+## 2026-11-01 — second retest record
+
+The two-iteration panel record is qualified with limits; [Deferred](docs/Deferred.md) contains all fourteen literal F2971–F2984 asks, sources, routes, dates and return intentions.
+
+F2974 and F2977 have 2026-11-03 checkpoints; the other twelve have 2026-11-10 checkpoints. Buildable engineering remains active. No third ordinary panel or bulk fixed designation follows. At 2026-11-01 19:00 UTC, HF 4.15.1 migration source has merged in PR17 at dd56d905c99b5145d2b173a6b0a8060a0a29a901 after exact independent CLEAR review and green source CI. The earlier failed CI and measured diagnostic remain historical evidence; they establish neither CI cause nor an uninstrumented speedup. Target CI, normal deployment, clean live release, cross-origin proof at both required sizes, and Adam’s fiction acceptance remain pending at this checkpoint. This documentation change has its own exact review, CI and integration gates.

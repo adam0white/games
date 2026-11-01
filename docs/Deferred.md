@@ -96,6 +96,13 @@ Routes fix:murmur; target 2026-11-10; preference/other observation; no product-c
 
 Routes fix:murmur; target 2026-11-10; preference/other observation; no product-cause inference. Source /Users/abdul/code/.lab-scratch/playtest/light-1030/murmur-retest2-inputs/soraya/report.md line 6; Unicode [202, 279); UTF-8 bytes [202, 283); SHA-256 67d26cb2293d52ebd6c215b1ce60de23ae8d46ce4f718b3a3951dab4fc60b5ec.
 
+
+## Reported return intentions
+
+These are the five reporters’ stated intentions, not observed returns or acceptance. Aisha would return another evening if conversations responded more distinctly to prior events. Mei would return on her laptop if she could continue from a saved place and see the tenancy terms before deciding. Nia might return another evening to explore the second week if Dilan’s replies varied; she would not return tonight. Rosa would return another evening on either device to see more of the week, while still wanting to understand trust. Soraya would not return tonight. All five said they would not leave the game running. Each statement is in line 1 of the respective sealed report.
+
+Buildable engineering remains active. These dates are checkpoints, not a freeze.
+
 ---
 
 # Murmur Deferred — retest1 bounded candidate, 2026-10-31
