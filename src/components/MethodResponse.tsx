@@ -48,9 +48,9 @@ export function MethodResponse({
         </ul>
       </details>
       <p>
-        This exchange costs five minutes, including a refusal. {owner.name} may keep their own
-        plans. A successful test, this response, returning the object and personal forgiveness are
-        separate. This response grants no repair permission.
+        Ask after you have worked on this part and tested the object. The exchange takes five
+        minutes, including a refusal. {owner.name} may choose to keep{' '}
+        {j.ownerId === 'mum' ? 'her' : 'their'} own plans instead of discussing the work.
       </p>
       {receipt ? (
         <div role="status">

@@ -47,6 +47,16 @@ describe('visible route to an actual shared observation', () => {
     s = act(s, { type: 'verify', jobId: s.selectedJobId, condition: 'movement' });
     expect(s.jobs[0]?.evidence.at(-1)?.witnessedBy ?? []).not.toContain('sam');
   });
+  it('does not start or credit a lesson when the opening invitation is rendered', () => {
+    const s = createGame(42);
+    const before = saveGame(s);
+    const html = lesson(s);
+    expect(html).toContain('Request lesson');
+    expect(s.pendingRequest).toBeUndefined();
+    expect(s.watching).toBe(false);
+    expect(s.jobs[0]?.evidence ?? []).toHaveLength(0);
+    expect(saveGame(s)).toBe(before);
+  });
   it('keeps Halil’s exact quoted words and moves narrator limits outside the speech', () => {
     const original = discoveredAccounts.halil;
     const markup = renderToStaticMarkup(
