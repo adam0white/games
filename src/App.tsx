@@ -50,6 +50,7 @@ import { lab } from './lab';
 import { todaysWords, workshopCrises } from './ui/crises';
 import { firstRepairProgress } from './ui/first-repair';
 import { partSupplyDetail, partSupplyTarget } from './ui/part-supply';
+import { readingExplanation } from './ui/reading-explanation';
 import {
   actionAccount,
   componentWorkReading,
@@ -796,7 +797,8 @@ function Workshop({
             .find((j) => j.id === command.jobId)
             ?.evidence.findLast((e) => e.kind === 'measurement');
           const interpretations: Record<string, string> = {
-            'high-drop': 'The voltage drops sharply between these probes.',
+            'high-drop':
+              'A large voltage difference across these probes points to a poor connection.',
             'low-source': 'The battery voltage is below its normal range.',
             voltage: 'This is the voltage between these probes in the selected condition.',
             'open-path': 'Electricity cannot pass between these terminals.',
@@ -1735,6 +1737,9 @@ function Workshop({
                                       : ''}
                                   </small>
                                 </div>
+                                {readingExplanation(lastReading) && (
+                                  <p>{readingExplanation(lastReading)}</p>
+                                )}
                                 <div className="meter-settings">
                                   <div className="segmented">
                                     {(job.kind === 'music-box'

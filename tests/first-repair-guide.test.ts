@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
 import type { Command, GameState } from '../src/game/types';
 import { firstRepairProgress } from '../src/ui/first-repair';
+import { readingExplanation } from '../src/ui/reading-explanation';
 
 function act(state: GameState, command: Command): GameState {
   const result = dispatch(state, command);
@@ -40,6 +41,7 @@ describe('first repair disclosure', () => {
       jobId: job.id,
       request: { mode: 'voltage', a: 'A', b: '0', condition: 'movement' },
     });
+    expect(readingExplanation(state.jobs[0]?.evidence.at(-1))).toBeUndefined();
     expect(firstRepairProgress(state)).toMatchObject({
       phase: 'measure-path',
       suggestedPart: 'switch',
@@ -50,6 +52,10 @@ describe('first repair disclosure', () => {
       jobId: job.id,
       request: { mode: 'voltage', a: 'B', b: 'C', condition: 'movement' },
     });
+    const explanation = readingExplanation(state.jobs[0]?.evidence.at(-1));
+    expect(explanation).toContain('between B and C');
+    expect(explanation).toContain('less than 0.2 V');
+    expect(explanation).toContain('does not say why or prove a repair');
     expect(firstRepairProgress(state)).toMatchObject({ phase: 'inspect', suggestedPart: 'switch' });
     state = act(state, { type: 'inspect', jobId: job.id, componentId: 'switch' });
     expect(firstRepairProgress(state).phase).toBe('repair');

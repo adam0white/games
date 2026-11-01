@@ -53,6 +53,8 @@ F1473/F1474 source coverage is described in the object-owner exchange section be
 
 ## Deferred and reconciled, 2026-10-25
 
+The 2026-11-01 continuation asks F3011–F3023 are recorded in [Deferred player requests](../Deferred.md). Their inspection targets do not establish fixes or player acceptance.
+
 F1485 requests: “Show the owner's own words, like "my grandmother's, no new parts", on the bench next to the repair buttons, not only on People.” F1482 requests: “Point me to the Reference table the first time a target speed or voltage appears.” The 2026-10-26 display-only candidate repeats the existing full request beside repair controls and introduces a direct entry to the existing Reference from every active bench tool. It does not change diagnosis, questions, costs, saved state or the Reference facts. This is candidate coverage, not a fresh retest or whole-ask acceptance. Nia found the request on People and did not open the bench disclosure; Emre valued the calculation after discovering Reference. Their conditional returns and causal limits remain in the literal full reports. Money/nightly £4, recovered cells, varied faults, same-screen supply, reactions/replies and personal-project performance remain separate open asks with all clauses retained. Parent review target 2026-10-27; Adam/lab acceptance 2026-11-03. Live2bf hold remains.
 
 | Source | Current disposition | Owner / target |
