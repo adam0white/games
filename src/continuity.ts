@@ -41,7 +41,7 @@ interface LocalMeta {
 const source = () => ({
   game: 'repair',
   build: String(lab.build().c ?? 'local'),
-  engine: '4.8.0',
+  engine: '4.11.0',
   rules: 'canonical-workshop-2',
 });
 /** One source of ownership and recording permission. Local receipts never replace initial replay actors. */

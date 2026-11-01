@@ -5,6 +5,7 @@ import {
   inspect,
   type PersonAuthoring,
   type Result,
+  readRunHistory,
   step,
 } from '@adam0white/human-framework';
 import {
@@ -44,7 +45,7 @@ export function reAuthor(
         Object.assign(authored.state[key as keyof typeof changes], value);
     need(createPerson(run, authored));
   }
-  for (const tx of archive.history)
+  for (const tx of readRunHistory(archive))
     need(step(run, { until: tx.until, inputs: tx.inputs, fidelity: tx.fidelity }));
   const fresh = awaitlessExport(run);
   state.hf.archive = fresh;

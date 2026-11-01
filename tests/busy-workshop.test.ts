@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { readRunHistory } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, saveGame } from '../src/game/engine';
 import {
@@ -48,7 +49,7 @@ describe('opt-in busy workshop', () => {
     ] as Command[])
       state = act(state, command);
     expect(createHash('sha256').update(saveGame(state)).digest('hex')).toBe(
-      'd9a1b2ef49284d98b4a9cba59b26b8b18aab49760a851717064e38e67a07a371',
+      '5679c975b8dc61ad0484d602acb623f69f96e6e42de74da59c83b414ce4e3043',
     );
   });
   it('turns accepting everything into a real stock/deadline choice, without changing ordinary play', () => {
@@ -365,7 +366,7 @@ it('refunds an interrupted replacement once and keeps recovered-part provenance'
   };
   state = act(state, { type: 'wait', minutes: 1 });
   expect(
-    state.hf.archive.history.some((tx) =>
+    readRunHistory(state.hf.archive).some((tx) =>
       tx.inputs.some(
         (input) =>
           input.kind === 'action.resolved' &&

@@ -1,4 +1,4 @@
-import { replay as replayNative } from '@adam0white/human-framework';
+import { readRunHistory, replay as replayNative } from '@adam0white/human-framework';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -100,7 +100,7 @@ it('drains later NPC finishes before returning a watched replacement', () => {
     intervention: 'replace',
   });
   const archive = snapshotRuntime(state.people).archive;
-  const finishes = archive.history
+  const finishes = readRunHistory(archive)
     .flatMap((tx) => tx.inputs)
     .filter(
       (input) =>
@@ -156,7 +156,7 @@ it('withholds final witness and teaching credit when HF interrupts an observatio
     intervention: 'replace',
   });
   const archive = snapshotRuntime(state.people).archive;
-  const inputs = archive.history.flatMap((tx) => tx.inputs);
+  const inputs = readRunHistory(archive).flatMap((tx) => tx.inputs);
   const interruption = inputs.find(
     (input) =>
       input.kind === 'action.resolved' &&

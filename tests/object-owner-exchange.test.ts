@@ -1,4 +1,5 @@
 import { gunzipSync, gzipSync } from 'node:zlib';
+import { readRunHistory } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import { createGame, dispatch, loadGame, replayCommands, saveGame } from '../src/game/engine';
 import { exportPersonRun, noteVoicePromise, promise } from '../src/game/hf';
@@ -62,7 +63,7 @@ describe('finite object-owner replacement question', () => {
     expect(s.stock).toEqual(before.stock);
     expect(s.cash).toBe(before.cash);
     expect(s.discoveries).toEqual(before.discoveries);
-    expect(JSON.stringify(exportPersonRun(s.people.nora!).history)).toContain(
+    expect(JSON.stringify(readRunHistory(exportPersonRun(s.people.nora!)))).toContain(
       'object-proposal-received',
     );
     expect(dispatch(s, command).ok).toBe(false);
@@ -79,7 +80,7 @@ describe('finite object-owner replacement question', () => {
     const declined = act(distrust, question(distrust));
     const answer = declined.ownerExchanges?.at(-1);
     // Broken promises are received evidence, not a host rule forcing refusal.
-    expect(JSON.stringify(exportPersonRun(declined.people.nora!).history)).toContain(
+    expect(JSON.stringify(readRunHistory(exportPersonRun(declined.people.nora!)))).toContain(
       'voice.promise-received',
     );
     expect(answer?.terms).toBe(

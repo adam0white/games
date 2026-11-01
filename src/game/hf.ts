@@ -19,6 +19,7 @@ import {
   type Run,
   type RunArchive,
   type RunSpec,
+  readRunHistory,
   restoreRun,
   step,
 } from '@adam0white/human-framework';
@@ -554,7 +555,7 @@ export function attachWorkshop(state: {
     !Number.isSafeInteger(data.nextInput) ||
     data.nextInput < 1 ||
     !record(data.archive) ||
-    data.archive.engine.package !== '@adam0white/human-framework@4.8.0' ||
+    data.archive.engine.package !== '@adam0white/human-framework@4.11.0' ||
     !record(data.active) ||
     !record(data.offers) ||
     !record(data.revisions) ||
@@ -574,7 +575,7 @@ export function attachWorkshop(state: {
     canonical(data.pending) !== canonical(data.archive.current.pending)
   )
     bad();
-  const accepted = data.archive.history.flatMap((t) => t.inputs);
+  const accepted = readRunHistory(data.archive).flatMap((t) => t.inputs);
   const sequence = accepted
     .filter((i) => /^workshop:\d+$/.test(i.id))
     .map((i) => Number(i.id.slice(9)));
@@ -589,7 +590,7 @@ export function attachWorkshop(state: {
   for (const entry of accepted)
     if (entry.kind === 'offers.received') {
       revisions[entry.payload.person] = entry.payload.revision;
-      offers[entry.payload.person] = entry.payload.offers;
+      offers[entry.payload.person] = clone(entry.payload.offers) as Offer[];
     }
   if (
     canonical(revisions) !== canonical(data.revisions) ||
@@ -1336,7 +1337,7 @@ export function admitOpeningPerson(p: Person, portable: PortableAdmission): Pers
     if (authored.id === p.id) authored.portable = clone(portable);
     need(authorPerson(run, authored));
   }
-  for (const transaction of archive.history) {
+  for (const transaction of readRunHistory(archive)) {
     const inputs: Input[] = [];
     for (const original of transaction.inputs) {
       const entry = structuredClone(original) as Input;
@@ -1555,4 +1556,64 @@ export function arriveForDay(p: Person, minute: number): boolean {
     summary: 'The person woke and arrived for the workshop day.',
   });
   return !p.body.asleep;
+}
+
+/** Current host readings. The UI renders words, never faculty scores. */
+export function livePersonWords(p: Person): string[] {
+  const view = need(
+    inspect(context(p).run, {
+      perspective: { kind: 'host' },
+      people: [p.id],
+      select: ['affect', 'expectations'],
+    }),
+  ).people[0];
+  if (view?.kind !== 'host') return [];
+  const words: string[] = [];
+  for (const part of view.parts) {
+    if (part.select === 'affect') {
+      const mood = part.value.mood.valence;
+      words.push(
+        `${p.name} feels ${mood > 0.2 ? 'in good spirits' : mood < -0.2 ? 'low' : 'fairly settled'}.`,
+      );
+      for (const feeling of part.value.emotions)
+        words.push(
+          `${p.name} feels ${feeling.intensity > 0.6 ? 'strong ' : ''}${feeling.id.replaceAll('-', ' ')}${feeling.targetId && context(p).people[feeling.targetId] ? ` toward ${context(p).people[feeling.targetId]!.name}` : ''}.`,
+        );
+    }
+    if (part.select === 'expectations') {
+      for (const learned of part.value) {
+        const [action] = learned.key.split('@');
+        const label = liveActionWords(action ?? '');
+        words.push(
+          `${p.name} expects ${label} to ${learned.successRate > 0.7 ? 'usually work' : learned.successRate < 0.3 ? 'often go wrong' : 'have an uncertain result'}.`,
+        );
+      }
+      if (!part.value.length) words.push(`${p.name} has no learned expectations to report yet.`);
+    }
+  }
+  return words;
+}
+
+function liveActionWords(action: string): string {
+  const verb = action.split(':')[0] ?? '';
+  const words: Record<string, string> = {
+    sleep: 'sleeping',
+    rest: 'resting',
+    eat: 'eating',
+    drink: 'drinking',
+    inspect: 'examining an object',
+    measure: 'measuring an object',
+    probe: 'testing a circuit',
+    clean: 'cleaning a part',
+    replace: 'replacing a part',
+    adjust: 'adjusting a part',
+    calibrate: 'setting the speed control',
+    verify: 'checking an object in use',
+    deliver: 'returning an object',
+    observe: 'watching the work',
+    pray: 'praying',
+    personal: 'taking personal time',
+    leisure: 'taking leisure time',
+  };
+  return words[verb] ?? 'this kind of work';
 }

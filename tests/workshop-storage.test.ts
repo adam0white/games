@@ -213,3 +213,103 @@ describe('WorkshopSaveStore', () => {
     expect(() => store.read(LOCAL_KEY)).toThrow('initialized');
   });
 });
+
+it('recovers journal saves, continues after reload, and preserves the last commit on abort', async () => {
+  const { createGame, dispatch, saveGame } = await import('../src/game/engine');
+  const factory = new IDBFactory();
+  const legacy = legacyStorage();
+  const first = new WorkshopSaveStore(legacy, factory);
+  const opening = createGame(42);
+  const envelope = (state: typeof opening) =>
+    JSON.stringify({ state: saveGame(state), started: true, continuity: {} });
+  const original = envelope(opening);
+  await first.write(LOCAL_KEY, original);
+  const reopened = new WorkshopSaveStore(legacy, factory);
+  await reopened.initialize();
+  expect(reopened.read(LOCAL_KEY)).toBe(original);
+  const result = dispatch(opening, { type: 'wait', minutes: 1 });
+  expect(result.ok).toBe(true);
+  const next = envelope(result.state);
+  const originalTransaction = IDBDatabase.prototype.transaction;
+  const abort = vi.spyOn(IDBDatabase.prototype, 'transaction').mockImplementationOnce(function (
+    this: IDBDatabase,
+    ...args
+  ) {
+    const transaction = originalTransaction.apply(this, args);
+    queueMicrotask(() => transaction.abort());
+    return transaction;
+  });
+  try {
+    await expect(reopened.write(LOCAL_KEY, next)).rejects.toThrow();
+  } finally {
+    abort.mockRestore();
+  }
+  expect(reopened.read(LOCAL_KEY)).toBe(original);
+  const afterFailure = new WorkshopSaveStore(legacy, factory);
+  await afterFailure.initialize();
+  expect(afterFailure.read(LOCAL_KEY)).toBe(original);
+  await reopened.write(LOCAL_KEY, next);
+  expect(await afterFailure.readFresh(LOCAL_KEY)).toBe(next);
+  expect(JSON.parse(JSON.parse(next).state).hf.archive.hashes.full).toBeTruthy();
+});
+
+it('appends chunks without rewriting the opening or prior chunks and rejects incomplete journals', async () => {
+  const { createGame, dispatch, saveGame } = await import('../src/game/engine');
+  const factory = new IDBFactory();
+  const legacy = legacyStorage();
+  const store = new WorkshopSaveStore(legacy, factory);
+  const envelope = (state: ReturnType<typeof createGame>) =>
+    JSON.stringify({ state: saveGame(state), started: true, continuity: {} });
+  const snapshot = () =>
+    new Promise<Map<string, unknown>>((resolve, reject) => {
+      const request = factory.open('small-works-saves-hf4', 1);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const db = request.result;
+        const tx = db.transaction('saves', 'readonly');
+        const keys = tx.objectStore('saves').getAllKeys();
+        const values = tx.objectStore('saves').getAll();
+        tx.oncomplete = () => {
+          db.close();
+          resolve(new Map(keys.result.map((key, i) => [String(key), values.result[i]])));
+        };
+        tx.onabort = () => reject(tx.error);
+      };
+    });
+  const initial = dispatch(createGame(42), { type: 'wait', minutes: 1 });
+  expect(initial.ok).toBe(true);
+  const opening = initial.state;
+  await store.write(LOCAL_KEY, envelope(opening));
+  const before = await snapshot();
+  const slot = before.get(LOCAL_KEY) as { openingId: string; chunks: string[]; opening?: unknown };
+  expect(slot.opening).toBeUndefined();
+  expect(slot.chunks.length).toBeGreaterThan(0);
+  expect(before.has(slot.openingId)).toBe(true);
+  const next = dispatch(opening, { type: 'wait', minutes: 1 });
+  expect(next.ok).toBe(true);
+  await store.write(LOCAL_KEY, envelope(next.state));
+  const after = await snapshot();
+  const updated = after.get(LOCAL_KEY) as typeof slot;
+  expect(updated.openingId).toBe(slot.openingId);
+  expect(after.get(slot.openingId)).toEqual(before.get(slot.openingId));
+  expect(updated.chunks.length).toBeGreaterThan(slot.chunks.length);
+  for (const id of slot.chunks)
+    expect(JSON.stringify(after.get(id))).toBe(JSON.stringify(before.get(id)));
+  await new Promise<void>((resolve, reject) => {
+    const request = factory.open('small-works-saves-hf4', 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction('saves', 'readwrite');
+      tx.objectStore('saves').delete(updated.chunks[0]!);
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onabort = () => reject(tx.error);
+    };
+  });
+  const reopened = new WorkshopSaveStore(legacy, factory);
+  await expect(reopened.initialize()).rejects.toThrow();
+  await expect(store.write(LOCAL_KEY, envelope(next.state))).rejects.toThrow();
+});
