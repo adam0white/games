@@ -386,6 +386,10 @@ function bed(day: number): Moment {
   };
 }
 
+// New fiction, 2026-10-31: two disclosed facts, not a complete contract or an enforced deadline.
+const renewalSummary =
+  'The renewal is for one year. The signed copy is due back Friday at 17:00. Other terms are not shown here. The consequences are unknown.';
+
 const signLetter: Opt = {
   id: 'sign',
   ink: 'Sign it.',
@@ -426,7 +430,7 @@ const monday: Moment[] = [
         effort: 0.1,
         advertises: { competence: 0.15, autonomy: 0.1 },
         gives: { competence: 0.1, autonomy: 0.05 },
-        done: 'She read the tenancy letter and left it unsigned by her shoes.',
+        done: `She read the tenancy letter and left it unsigned by her shoes. ${renewalSummary}`,
       },
       signLetter,
       {
@@ -447,13 +451,13 @@ const monday: Moment[] = [
     },
   },
   {
-    // Prospective host paper task, not legal terms or a new reading faculty. Only completed reading opens it.
+    // Only actual completed reading opens this unsigned decision and its bounded summary.
     id: 'letter-decision-8',
     day: 8,
     at: at(7, 25),
     place: 'home',
     when: (c) => c.flags.w2?.letter === 'read',
-    scene: 'Dilan has read the tenancy letter. It is still unsigned. The envelope is open by her shoes.',
+    scene: `Dilan has read the tenancy letter. It is still unsigned. The envelope is open by her shoes. ${renewalSummary}`,
     pull: { to: 'bowl', line: 'You can still leave it for later.' },
     options: [signLetter, putLetter],
     after: (s, chosen) => {

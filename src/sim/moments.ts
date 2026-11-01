@@ -78,7 +78,9 @@ function late(day: number): Moment {
     scene: (c) =>
       c.flags.lied !== undefined && c.flags.lied < c.day
         ? 'It is 08:25. Murat doesn’t look up. “Was it the ring road again?”'
-        : 'It is 08:25. Murat looks at the clock, then at her. “Did traffic hold you up?”',
+        : c.day === 2 && c.completedMondayTruth
+          ? 'It is 08:25. Murat looks at the clock. “Late again, Dilan. What happened this morning?”'
+          : 'It is 08:25. Murat looks at the clock, then at her. “Did traffic hold you up?”',
     pull: { to: 'lie', line: 'Say the ring road delayed you. Everyone uses that excuse.', strength: 1 },
     options: [
       {

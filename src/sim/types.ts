@@ -74,6 +74,8 @@ export interface Moment {
 
 /** What content functions may read. */
 export interface Ctx {
+  /** Transient view from retained completed HF outcomes; never a saved flag. */
+  completedMondayTruth?: boolean;
   /** Edition used for authored copy; omitted by legacy direct content callers. */
   version?: string;
   day: number;

@@ -143,8 +143,13 @@ function pushedWords(s: GameState, a: Answer, index: number, doing: string): str
 function heldAssentWords(s: GameState, a: Answer): string | undefined {
   if (!listens(s)) return a.says;
   if (a.says === HOLD_NOT_CARRIED) return 'You keep pushing me. I’m doing this one.';
-  if (!a.says && a.verdict === 'complied')
+  if (!a.says && a.verdict === 'complied') {
+    if (a.moment === 'lunch-1' && a.chosen === 'outside')
+      return 'I’m eating outside because you pushed me. I don’t like being pushed.';
+    if (a.moment === 'slump-1' && a.chosen === 'walk')
+      return 'I’m taking the water and going outside because you pushed me. I don’t like being pushed.';
     return 'Fine. I’m doing it because you pushed me. I don’t like it.';
+  }
   return a.says;
 }
 
