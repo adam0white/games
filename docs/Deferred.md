@@ -121,6 +121,8 @@ The eleven retained raw-wall versus manuscript timestamp differences are listed 
 
 ## Final ordinary iteration, 2026-11-01
 
+These are synthetic sessions with fictional AI personas, not reports from recruited people or population evidence.
+
 The externally sealed, qualified packet has manifest SHA-256 `b3486750ce960f945f6920c09d85a470aeaaf53f2567cd0a7b6fddfb61581c9e` and root qualification SHA-256 `ebbc136e89f5e1921585aa14e5992eaf83f0f0d6e15ea26b2faee4d7e7e5413a`. Its unchanged packet and source-epoch draft labels are historical; the later external root seal governs sealed status. Five current reports are engineering eligible. Ten voluntary unfinished stops comprise five TASTE, two BORED and three CONFUSED. No ending, cut, automatic ceiling, BUDGET or TOOL stop was observed; this does not prove no ending exists.
 
 The two fixed ordinary iterations end the ordinary-panel obligation: no third panel or cap reset. This is not an engineering or new-scope freeze. Adam accepts feel. The parent released the `bc52f86` deployment hold after qualification; review, CI, integration and cleanup of this dated record remain pending. The dates below are inspection targets, not deferrals of buildable work. `fix:repair` routes the requests; it does not assert twelve bugs.
