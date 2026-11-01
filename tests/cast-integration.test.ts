@@ -20,11 +20,17 @@ import {
   workshopTransfer,
 } from '../src/game/cast';
 import { createGame, dispatch } from '../src/game/engine';
-import { createPeopleRuntime, createPerson, promise, snapshotRuntime } from '../src/game/hf';
+import {
+  createPeopleRuntime,
+  createPerson,
+  projectPerson,
+  promise,
+  snapshotRuntime,
+} from '../src/game/hf';
 import { loadGame, saveGame } from '../src/game/persistence';
 import { replayRecordedRun } from '../src/game/replay';
 
-const stamps = { game: 'repair', build: 'test', engine: '4.11.0', rules: 'canonical-workshop-2' };
+const stamps = { game: 'repair', build: 'test', engine: '4.11.0', rules: 'canonical-workshop-3' };
 // Explicit public authoring makes a distinct source. No cache edit changes an HF actor.
 async function source(id: 'nora' | 'rafi', prayer = false, prayerFrom = 540) {
   const castId = CAST_IDS[id]!;
@@ -48,7 +54,12 @@ async function source(id: 'nora' | 'rafi', prayer = false, prayerFrom = 540) {
       importance: 1,
       label: 'A retained prayer duty',
     });
-  const { transfer, limitations } = await workshopTransfer(person);
+  const transfer = {
+    castPassport: 'workshop-hf4/1',
+    sourceRole: id,
+    person: projectPerson(person, castId, cast.revision),
+  };
+  const limitations: string[] = [];
   const native = replay(snapshotRuntime(people).archive);
   expect(native.ok).toBe(true);
   if (native.ok) expect(native.value.verified).toBe(true);
@@ -174,8 +185,8 @@ describe('released HF4 whole-cast workshop adapter', () => {
   });
   it('refuses ongoing goals and clinical state and preserves closed branch authority', async () => {
     const state = createGame(42);
-    await expect(workshopTransfer(state.people.sam!)).rejects.toThrow();
-    await expect(workshopTransfer(state.people.halil!)).rejects.toThrow();
+    await expect(workshopTransfer(state.people.sam!, state)).rejects.toThrow();
+    await expect(workshopTransfer(state.people.halil!, state)).rejects.toThrow();
     const parent = await source('nora');
     const terminal = await closePersonaBranch(parent, stamps, 600);
     const closed = acceptPersona(acceptPersona({ heads: {}, revisions: [] }, parent), terminal);

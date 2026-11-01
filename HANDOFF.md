@@ -1,6 +1,18 @@
 # Handoff
 
-## smallworks-hf411, 2026-10-29
+## PR9 CI routing correction, 2026-11-01
+
+Remaining: signed successor, fresh independent exact-SHA review and green CI before merge. The reviewed `619d675` run `41293086624` reached the unchanged 60-minute job limit after only 35 of 61 configured test files completed. Their file durations sum to 7,080.716 seconds. The log also records the owner-question recording-capacity case failing at 76.047 seconds against its explicit 60-second limit; cancellation prevented its final failure stack. Both facts remain part of the failure record.
+
+The original capacity case then passed all assertions in 15.726 seconds in a quiet one-worker local run with its original 60-second limit. Actual-worker profiling identifies native restoration and retained-input replay as substantial overlapping costs. This does not establish the missing CI failure reason or justify calling it a flake. Every production file, test body, assertion, horizon, timeout, dependency pin and historical archive-builder byte remains unchanged by this correction.
+
+CI now assigns the generator file to one test job and partitions the other 60 files across three jobs, with one worker per job. Actual Vitest discovery and its installed sequencer verify disjoint complete file counts of 1/20/20/20. Each job retains the 60-minute limit. Audit, lint, typecheck, production build, every test partition and both historical builds remain required by the fail-closed aggregate. The previously failed case stays intact and must pass the successor CI. No local timing ratio is a guarantee of CI performance.
+
+## PR9 composition candidate, 2026-11-01
+
+Remaining: focused controls, final lane, signed push, independent exact-SHA review and green CI. Adam accepts feel separately. Merged PR11 commit `447ea89ad8364b0aaaae1ec6c6ba22966f39ba2e` passed exact CI `41289008351` and was deployed with its clean full SHA and HF4.11.0 verified live. This candidate combines the retained fan-variety and guarded continuity work with the HF4.11 journal. Current edition saves use canonical-workshop@3; earlier workshop saves receive start-fresh refusal. Historical 4.8.1 evidence does not review this composition.
+
+## Historical smallworks-hf411 candidate, 2026-10-29
 
 Remaining: restore GitHub Actions billing, rerun PR11 CI, merge on exact green CI, require exact green merged CI, deploy and verify the clean live manifest. GitHub refused to start run 40892397613: recent account payments failed or the spending limit needs increasing. No merge or deployment is claimed. Adam accepts feel separately.
 

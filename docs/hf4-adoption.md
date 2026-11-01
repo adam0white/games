@@ -1,6 +1,6 @@
 # Small Works HF 4.11 adoption, 2026-10-29
 
-Remaining: see the current HF411 entry in [HANDOFF](../HANDOFF.md) for delivery state. Earlier 4.8 receipts below are historical.
+Remaining: see [HANDOFF](../HANDOFF.md) for the current PR9 candidate. PR11 was delivered at merged `447ea89` after exact CI `41289008351`; the 4.8 receipts below are historical.
 
 Exact published pins are HF 4.11.0, client 0.5.11 and kit 0.5.28. Companion release asset SHA256 values are `0731cf90d09def6f6a0268de5a683ae87d6f521db608c32138a46cda0dec2508` (client) and `ce3797e31ac58c9a993d1f53bf1b454b35aa14ab25c3814117a50d0e645eeb69` (kit). All resolve the same current HF module; the client retains its intentional HF3 legacy alias.
 

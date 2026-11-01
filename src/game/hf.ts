@@ -1331,6 +1331,19 @@ export function admitOpeningPerson(p: Person, portable: PortableAdmission): Pers
         })),
     ];
   }
+  // Published Commonstead4's player voice is a distinct historical source. Keeping its literal
+  // identity does not turn its past statements into this workshop player's statements.
+  if (
+    ['commonstead', 'repair'].includes(passport.source.game) &&
+    portable.mapping.references.some(
+      (binding) =>
+        binding.kind === 'source' &&
+        binding.source === 'commander' &&
+        binding.target === 'commander',
+    ) &&
+    !spec.definitions.sources.some((source) => source.id === 'commander')
+  )
+    spec.definitions.sources = [...spec.definitions.sources, { id: 'commander', type: 'voice' }];
   const run = need(createRun(spec));
   for (const original of archive.initial.people) {
     const authored = structuredClone(original) as PersonAuthoring;

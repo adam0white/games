@@ -8,7 +8,11 @@ import {
   type PersonaEnvelope,
   preparePersonaLife,
 } from '@adam0white/lab-client';
+import { requireSharedWrite } from '../shared-write.ts';
 import { admitOpeningPerson, exportPersonRun, type Person, projectPerson } from './hf.ts';
+import { loadGame, saveGame } from './persistence.ts';
+import type { GameState } from './types.ts';
+import { assertWorldAuthority } from './world-authority.ts';
 
 export const CAST = castForGame('repair');
 export const CAST_IDS: Record<string, string> = {
@@ -45,7 +49,9 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
     e.castRevision !== canonicalCast(e.castId).revision ||
     e.terminal ||
     (!workshop && !commonstead) ||
-    !['4.6.0', '4.7.0', '4.8.0', '4.11.0'].includes(e.source.engine) ||
+    !(workshop
+      ? e.source.engine === '4.11.0' && e.source.rules === 'canonical-workshop-3'
+      : ['4.8.1', '4.11.0'].includes(e.source.engine)) ||
     e.transfer.sourceRole !== (commonstead ? e.castId : role) ||
     !same(preparePersonaLife(e, input.clockMs).life, input.life)
   )
@@ -121,9 +127,14 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
     mapping: { offsetMs: 540 * 60000 - person.retained.at, references },
   });
 }
-export async function workshopTransfer(person: Person) {
+export async function workshopTransfer(person: Person, state: GameState) {
+  assertWorldAuthority(state);
+  loadGame(saveGame(state));
+  if (state.people[person.id] !== person)
+    throw new Error('This person is not the current workshop actor.');
   const castId = CAST_IDS[person.id];
   if (!castId) throw new Error('This person has no shared role.');
+  requireSharedWrite(castId);
   const portable = projectPerson(person, castId, canonicalCast(castId).revision);
   return {
     transfer: { castPassport: 'workshop-hf4/1', sourceRole: person.id, person: portable },
@@ -152,6 +163,7 @@ export function validateCastChapter(chapter: CastChapter): void {
       claim.parentRevision !== input.parent.revision ||
       claim.source.game !== 'repair' ||
       claim.source.engine !== '4.11.0' ||
+      claim.source.rules !== 'canonical-workshop-3' ||
       claim.terminal ||
       !same(claim.transfer, { ...input.parent.transfer, life: input.life })
     )
