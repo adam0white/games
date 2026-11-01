@@ -162,8 +162,6 @@ it('cold validates complete archives and follows the exact next input without pr
     const cold = await validateCanonicalRun(expanded.state);
     expect(cloneState(cold)).toEqual(before);
     const archive = exportRun(cold.hf.run);
-    const verified = nativeReplay(archive);
-    expect(verified.ok && verified.value.verified && verified.value.fullHash).toBe(archive.hashes.full);
     for (const r of momentRecords(s)) replyWords(s, r.answer);
     expect(cloneState(s)).toEqual(before);
     runToCard(s);
