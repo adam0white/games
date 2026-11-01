@@ -41,6 +41,7 @@ export function responses(
   worker: NegotiationView['worker'];
   familyResponse: NegotiationView['familyResponse'];
   workerWords: string;
+  workerWageDisclosed: boolean;
   familyWords: string;
 } {
   const finish = workerNeed(c.id).finishBy / 60;
@@ -66,6 +67,7 @@ export function responses(
   return {
     worker,
     familyResponse,
+    workerWageDisclosed: !workerRefuses && low,
     workerWords: workerRefuses
       ? 'No. I cannot take a job on those terms. Offer a fair wage and working hours I can manage.'
       : low
