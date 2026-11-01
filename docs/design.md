@@ -535,3 +535,104 @@ Reason and route: Review Ivo’s preference for varied responses to news; he hea
 Source: [ivo/report.md, section 5](/Users/abdul/code/.lab-scratch/playtest/light-1030/source-packets/stairwell-retest1/ivo/report.md). Folded under F-2675 / F-2689; no fourth ranked ask. Owner: **Stairwell**. Date: **2026-11-03**. Status: **Deferred / open**.
 
 Reason: the stored task label “help carry a folding work table” also appears in HF activity and recorded completion words. This UI candidate has no verified projection for every display surface. A partial replacement could contradict retained activity or journal words. Keep the lead open for a complete display-only wording review. Do not change stored text, HF words, job rules, resident presence or clock to resolve it.
+
+## Second retest Deferred — 2026-11-01
+
+The owner’s rule ends the ordinary lab cycle after two iterations, or when a retest raises no new blocking ask. Two iterations are complete with limits; no third ordinary panel is scheduled under that rule. Four standing players reported no new blocking ask in the parts they reached, not across the whole game. The cold player’s gate outcome remains unknown. Nine stops were voluntary and unfinished; Marisol’s phone stop was a nonvoluntary TOOL stop of unknown cause. There were no endings or coordinator cuts. No fix, player acceptance, owner acceptance, or absence of blockers is established. Friends’ playtests and Show HN remain paused.
+
+The sealed private packet has 32 payloads and manifest SHA-256 `8c0e94b300dca16be5039e3f6f6fc7e9e7a5f7a08701c1ffb1bf363b1fe38f14`. Both independent packet reviews were CLEAR and the parent read them. Its draft ledger header predates that review. Full history stdout and read acknowledgments do not prove delivery to or comprehension by a model. Feedback labels and Close were observed; note submission, settings changes, complete network containment and backend receipt are not established.
+
+Method limits retained from the root qualification:
+
+- **S1:** All five reports claim screenshot views, but retained completed event inventories contain only command_execution and agent_message, with no identifiable image-tool records or returned image blocks. Saved PNGs are quota-compliant; actual views/perception and screenshot-dependent layout claims remain UNVERIFIABLE. No full image-protocol compliance claim.
+- **S2:** Marisol phone stops TOOL169.014 after two gate taps at151.500/158.634. Returned visible controls retain Leave the courtyard gate open without gate confirmation; neither wallclock tap records an error. This supports her unresolved input/outcome observation, not a proven game defect or driver cause. TOOL is nonvoluntary by method; preserve cause UNKNOWN. Nine other stops are voluntary BORED/TASTE. None is an ending.
+- **S3:** Jonas desktop first_minute58.808 is premature and explicitly disclosed; successor60.835 is valid. Report60.836 vs wallclock60.835 remains literal response-time difference. Four automatic60-second images occur after voluntary stops: Maya desktop60.047 after47.449; Jonas phone60.048 after42.101; Leila desktop60.051 after53.914; Rosa desktop60.060 after42.903. They are not continued gameplay or player checkpoint compliance. No later gameplay commands observed.
+- **S4:** Rosa phone want_quit52.049 precedes60; stop62.882 follows Feedback. Automatic60.052 image is between wish and final stop, not a player first-minute reaction. No forced checkpoint required. Every session stops before180, so no forced pulse. Preserve actual times.
+- **S5:** Leila omits engagement ratings in every actual log on both devices and discloses this. Preserve null values; no full diary protocol compliance claim. Rosa supplies contemporaneous concept estimates plus a retrospective additional-screen table; the table does not independently establish contemporaneous counts on every reached screen.
+- **S6:** Marisol has one nonzero malformed-shell quoting failure before confusion label; corrected assigned operation succeeds. Do not infer a gameplay request from failed shell text. Preserve raw errors and report/wallclock millisecond differences rather than rewriting source.
+
+Each entry below is an open Deferred inspection lead with unknown cause, not a proven defect or completed fix. Player numbering and words are literal. Source lines refer to the sealed packet reports.
+
+### F2951 — Maya, rank 1
+
+> 1. Let neighbours respond to things they saw me do. Hacer saw the gate and newspaper swap, but neither came up in the conversation I reached.
+
+`fix:stairwell`; target **2026-11-03**; Deferred / open; inspection lead, cause unknown. Source: sealed `maya/report.md`, line 5; SHA-256 `2ed7c7d76bb73a2395de8c1c77145e58ed0de49b2d61eea359c063e66aab6ded`.
+
+### F2952 — Maya, rank 2
+
+> 2. Give conversations more varied continuations. Hacer’s shop story and her response to “I am listening” were familiar from my last visit.
+
+`fix:stairwell`; target **2026-11-10**; Deferred / open; inspection lead, cause unknown. Source: sealed `maya/report.md`, line 6; SHA-256 `2ed7c7d76bb73a2395de8c1c77145e58ed0de49b2d61eea359c063e66aab6ded`.
+
+### F2953 — Maya, rank 3
+
+> 3. Give Tarık something on the first “Anything new?” ask. He again said he had no news, then told the ferry story when I sat with him.
+
+`fix:stairwell`; target **2026-11-10**; Deferred / open; inspection lead, cause unknown. Source: sealed `maya/report.md`, line 7; SHA-256 `2ed7c7d76bb73a2395de8c1c77145e58ed0de49b2d61eea359c063e66aab6ded`.
+
+### F2954 — Jonas, rank 1
+
+> 1. Give sitting and replying a visible consequence I can understand before the Sunday vote.
+
+`fix:stairwell`; target **2026-11-10**; Deferred / open; inspection lead, cause unknown. Source: sealed `jonas/report.md`, line 5; SHA-256 `234e040836271e8ba7e7a469c2ae698e7341a0d41d54cb958d7a529bd374ea3b`.
+
+### F2955 — Jonas, rank 2
+
+> 2. Make the conversations I reached produce more distinct outcomes.
+
+`fix:stairwell`; target **2026-11-10**; Deferred / open; inspection lead, cause unknown. Source: sealed `jonas/report.md`, line 6; SHA-256 `234e040836271e8ba7e7a469c2ae698e7341a0d41d54cb958d7a529bd374ea3b`.
+
+### F2956 — Jonas, rank 3
+
+> 3. Explain why a story enters or does not enter the notebook.
+
+`fix:stairwell`; target **2026-11-10**; Deferred / open; inspection lead, cause unknown. Source: sealed `jonas/report.md`, line 7; SHA-256 `234e040836271e8ba7e7a469c2ae698e7341a0d41d54cb958d7a529bd374ea3b`.
+
+### F2957 — Leila, rank 1
+
+> 1. Give residents more distinct responses to what I say, including after their stories.
+
+`fix:stairwell`; target **2026-11-10**; Deferred / open; inspection lead, cause unknown. Source: sealed `leila/report.md`, line 5; SHA-256 `d9bb4d4572e7cad4853e7c9d24b99db8d54543c9249443e5d7339060464262bb`.
+
+### F2958 — Leila, rank 2
+
+> 2. Record the stories I hear in the notebook, or explain which stories reach it.
+
+`fix:stairwell`; target **2026-11-10**; Deferred / open; inspection lead, cause unknown. Source: sealed `leila/report.md`, line 6; SHA-256 `d9bb4d4572e7cad4853e7c9d24b99db8d54543c9249443e5d7339060464262bb`.
+
+### F2959 — Rosa, rank 1
+
+> 1. Explain in plain words how the Sunday vote is decided. I know it concerns my extra pay, but I still do not know how the decision is made.
+
+`fix:stairwell`; target **2026-11-10**; Deferred / open; inspection lead, cause unknown. Source: sealed `rosa/report.md`, line 5; SHA-256 `f669be5e6ef9790956094e622852a01cd9670eb82cae43872a172a8536ec4cae`.
+
+### F2960 — Rosa, rank 2
+
+> 2. Keep the explanation of the newspaper prank and say that it may upset someone.
+
+`fix:stairwell`; target **2026-11-10**; Deferred / open; inspection lead, cause unknown. Source: sealed `rosa/report.md`, line 6; SHA-256 `f669be5e6ef9790956094e622852a01cd9670eb82cae43872a172a8536ec4cae`.
+
+### F2961 — Rosa, rank 3
+
+> 3. Say how far Skip will take me. I did not reach Skip on this visit, so this remains a question from my earlier play.
+
+`fix:stairwell`; target **2026-11-10**; Deferred / open; inspection lead, cause unknown. Rosa did not reach Skip on this visit; this is a prior-play question. Source: sealed `rosa/report.md`, line 7; SHA-256 `f669be5e6ef9790956094e622852a01cd9670eb82cae43872a172a8536ec4cae`.
+
+### F2962 — Marisol, rank 1
+
+> 1. Show whether the courtyard gate opened. On the phone, I tapped the enabled control twice and saw no confirmation; that was the blocking interaction I reached.
+
+Primary `fix:lab`; secondary `fix:stairwell`; target **2026-11-03**; Deferred / open; inspection lead, cause unknown. The gate outcome is unresolved; neither a product nor driver cause is proven. Source: sealed `marisol/report.md`, line 5; SHA-256 `c8671d56ec6c41ec112929d4c38ae756a2d0d37ffdc0c4beced349fd3a6a8024`.
+
+### F2963 — Marisol, rank 2
+
+> 2. Show where a piece of news came from when I am choosing whether to repeat it. I did not know why the water shutoff was marked certain.
+
+`fix:stairwell`; target **2026-11-03**; Deferred / open; inspection lead, cause unknown. Source: sealed `marisol/report.md`, line 6; SHA-256 `c8671d56ec6c41ec112929d4c38ae756a2d0d37ffdc0c4beced349fd3a6a8024`.
+
+### F2964 — Marisol, rank 3
+
+> 3. Make the phone journal easier to scan as it grows. The same earlier lines kept occupying space while I looked for what happened next.
+
+`fix:stairwell`; target **2026-11-10**; Deferred / open; inspection lead, cause unknown. Source: sealed `marisol/report.md`, line 7; SHA-256 `c8671d56ec6c41ec112929d4c38ae756a2d0d37ffdc0c4beced349fd3a6a8024`.
