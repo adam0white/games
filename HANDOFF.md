@@ -1,3 +1,15 @@
+## Clarity delivered — 2026-11-02
+
+Remaining: other open availability and Stage 4/shared-history requests retain their existing scope and targets. Adam accepts feel separately.
+
+Signed merge `6d09154c6f71a3ab74e0751fee1e36b5a3ea0ed2` has independent Codex CLEAR at exact source `646cf080d932002ea5fe2d803cde5b3b8b466f3c`, green source CI and green target CI `41402817408`. The normal frozen install, build and deployment passed. Live `release.json` reports that merge, HF 4.12.0 and `dirty:false`. Five served files match build bytes; the HTML differs only by validated same-origin font rules replacing Google font links, with the remaining DOM identical.
+
+Technical live checks mounted the heading and Begin control at 360×690 and 1280×800, with no page errors or horizontal overflow. Writes were blocked in fresh project-test contexts. Generic console resource failures appeared alongside blocked RUM requests; exact request-level attribution was not captured. These opening checks did not click Begin or prove in-run play, accessibility or acceptance. The earlier local production control passed Chromium and WebKit at four sizes each; all 14 focused controls and the normal lane passed.
+
+The delivered presentation fixes are marked for F-2648 and F-2657 in [Deferred](docs/design.md). They preserve every distinct record and the existing clock policy. No other ask is closed. The deployment and mounted-check controllers both returned 0; all 26+8 sampled child identities and both controllers were absent on fresh birth/executable checks. Sampling does not rule out unseen processes. This follow-up changes documents only and requires no new app deployment.
+
+Earlier dated entries below preserve their historical state.
+
 ## Clarity candidate — 2026-11-01
 
 Remaining: signed source, independent exact-source review, exact green CI, clean deployment and Adam’s separate acceptance by playing. The candidate changes record, busy-refusal and pace wording in `src/ui/garden-guidance.ts` and `src/ui/garden-app.ts`, with controls in `test/garden-guidance.test.ts` and `test/garden-ui-pace.test.ts`. The lane passed and 14 focused tests passed across two files. An earlier lane failed with TS18048; that failure is preserved in the validation record. F-2647, F-2648, F-2655 and F-2657 remain open. Stage 4 producer/return and SDK/Ece guards remain separate.
@@ -122,7 +134,7 @@ The v3 worker recorded 46 files/304 tests passing under the machine lock, exact 
 
 The live game is canonical garden edition 6 (`hearsay-cast/6`). It instantiates exactly eight people: Hatice48, Derya44, Dilan33, Nermin45, Aylin36, Ece24, Rıza63 and Osman55. Derya and Dilan use canonical revision2. Derya is a single night nurse with temporary relief lodging; Dilan is Aylin’s sister and a delivery visitor. Rıza is a retired worker and bread-delivery helper, not a baker. Osman is a trader/supplier and small landlord, not a porter. The former32-person household and engagement arcs are historical test fixtures, not the live cast.
 
-Canonical adoption and the replay correction were delivered in `47f9caa` and `f273ceb`. An actual ordinary Voice encounter and eligible source checkpoint led to atomic admission of both Rıza and Osman into the eight-person garden. The same pinned run passed360×690 and1280×800 checks, local save/reload and current-version export/import/replay. These are agent-operated technical checks, not human recognition or owner acceptance. Later feedback releases preserve that adoption.
+Canonical adoption and the replay correction were delivered in `47f9caa` and `f273ceb`. An actual ordinary Voice encounter and eligible source checkpoint led to atomic admission of both Rıza and Osman into the eight-person garden. The same pinned run passed360×690 and 1280×800 checks, local save/reload and current-version export/import/replay. These are agent-operated technical checks, not human recognition or owner acceptance. Later feedback releases preserve that adoption.
 
 What remains: Adam’s owner play/review by2026-11-03. This handoff makes no all15-game acceptance claim. Dynamic checks, exact release/source stamps, accepted-head chains, screenshots, archives and cleanup receipts are in `~/code/.lab-scratch/cast/hearsay.md`, `hearsay-receipts/final-live-verification.json` and `hearsay-handoff-correction.md`. Do not treat an earlier operational stop in those chronological records as the current delivery state.
 
