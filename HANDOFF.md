@@ -1,3 +1,7 @@
+## Clarity candidate — 2026-11-01
+
+Remaining: signed source, independent exact-source review, exact green CI, clean deployment and Adam’s separate acceptance by playing. The candidate changes record, busy-refusal and pace wording in `src/ui/garden-guidance.ts` and `src/ui/garden-app.ts`, with controls in `test/garden-guidance.test.ts` and `test/garden-ui-pace.test.ts`. The lane passed and 14 focused tests passed across two files. An earlier lane failed with TS18048; that failure is preserved in the validation record. F-2647, F-2648, F-2655 and F-2657 remain open. Stage 4 producer/return and SDK/Ece guards remain separate.
+
 # HF 4.12 migration — hearsay-hf412, 2026-10-29
 
 Remaining: integrate the dated second-retest Deferred record in a reviewed candidate. The coordinator ruling of 2026-10-31 20:22 UTC replaces the coordinator Opus clearance with one independent, read-only Codex CLEAR on the exact SHA until the Claude brake ends on 2026-11-03 08:00 UTC. Record that CLEAR in coordination, require green CI on the exact final source commit and check for later FIX or HOLD before merging. This rule applies to this playtest-owned documentation PR; games-deferred’s separate direct Opus-only instruction remains unchanged. Adam’s acceptance by playing remains separate, due 2026-11-03. Friends and Show HN remain paused.
