@@ -1,6 +1,7 @@
 /** Presentation only. These helpers read the run and change none of it. */
 import { GARDEN_CAST, GARDEN_IDS, type GardenPerson } from '../sim/garden-cast.ts';
 import { type GardenInput, type GardenRun, gardenHere } from '../sim/garden4.ts';
+import { actualGardenLocation } from '../sim/garden4-stakes.ts';
 
 export const esc = (s: string) =>
   s.replace(
@@ -78,7 +79,11 @@ export function gardenRefusal(run: GardenRun, input: GardenInput): string {
     if (busy(run, input.person))
       return input.person === 'hatice'
         ? `You cannot reflect while your current activity is unfinished. Try again later. ${end}`
-        : `${name(input.person)} cannot talk now. You do not know when ${name(input.person)} will be free. ${end}`;
+        : run.people[input.person].activity?.action === 'chat' &&
+            gardenHere(run, 'hatice') &&
+            actualGardenLocation(run, 'hatice') === actualGardenLocation(run, input.person)
+          ? `${name(input.person)} is talking now. You do not know when ${name(input.person)} will be free. Try again later. ${end}`
+          : `${name(input.person)} cannot talk now. You do not know why ${name(input.person)} cannot talk or when ${name(input.person)} will be free. Try again later. ${end}`;
     if (input.person !== 'hatice' && run.people.hatice.activity?.action === 'chat')
       return `You are already talking with someone else. ${end}`;
   } else if (input.type === 'respond') {
@@ -196,22 +201,21 @@ const KEY_KINDS = new Set([
 export function recordHtml(run: GardenRun): string {
   const row = (l: GardenRun['log'][number]) =>
     `<p><small>Day ${dayOf(l.at)} ${Math.floor((l.at % 1440) / 60)}:${String(l.at % 60).padStart(2, '0')}</small> ${esc(l.text)}</p>`;
-  const shownLater = (l: GardenRun['log'][number]) => l.kind !== 'opening';
   const days = new Map<number, GardenRun['log']>();
   for (const l of run.log) days.set(dayOf(l.at), [...(days.get(dayOf(l.at)) ?? []), l]);
-  // The current day is the game clock's day. Rows keep their own labels. After the end, that section is not a game day.
   const today = dayOf(run.minute);
-  const earlier = [...days].filter(([day]) => day !== today);
-  // The opening is shown once, under the goal. It stays in the log.
-  return `<h3>Goal, agreements and what you saw</h3>${run.log
-    .filter((l) => KEY_KINDS.has(l.kind))
-    .map(row)
-    .join('')}<h3>Everything you heard</h3>${earlier
-    .map(
-      ([day, lines]) =>
-        `<details><summary>Day ${day}</summary>${lines.filter(shownLater).map(row).join('')}</details>`,
-    )
-    .join(
-      '',
-    )}<h4>${run.ended ? 'After the fourteen days' : `Day ${today}`}</h4>${(days.get(today) ?? []).filter(shownLater).map(row).join('') || '<p class="fine">Nothing has been added to the record today.</p>'}`;
+  const section = (key: boolean) => {
+    const selected = (lines: GardenRun['log']) => lines.filter((l) => KEY_KINDS.has(l.kind) === key);
+    const earlier = [...days].filter(([day, lines]) => day !== today && selected(lines).length > 0);
+    const current = selected(days.get(today) ?? []);
+    return `${earlier
+      .map(
+        ([day, lines]) =>
+          `<details><summary>Day ${day}</summary>${selected(lines).map(row).join('')}</details>`,
+      )
+      .join(
+        '',
+      )}<h4>${run.ended ? 'After the fourteen days' : `Day ${today}`}</h4>${current.map(row).join('') || (key ? '' : `<p class="fine">${run.ended ? 'No other entries after the fourteen days.' : 'No other entries for today.'}</p>`)}`;
+  };
+  return `<h3>Goal, agreements and what you saw</h3>${section(true)}<h3>Other things you heard</h3>${section(false)}`;
 }

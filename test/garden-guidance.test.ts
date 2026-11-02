@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { GARDEN_CAST, GARDEN_IDS } from '../src/sim/garden-cast.ts';
 import { advanceGarden, chooseGarden, freshGarden, gardenHere } from '../src/sim/garden4.ts';
 import { exportGarden, importGarden } from '../src/sim/garden4-export.ts';
+import { actualGardenLocation } from '../src/sim/garden4-stakes.ts';
 import {
   claimControls,
   gardenEmpty,
@@ -138,23 +139,60 @@ it('keeps every record line and opens the day the game clock is in', () => {
     text: 'Osman counts eight produce crates but writes ten.',
     person: 'osman',
   });
+  g.log.push(
+    { at: 391, kind: 'testimony', text: 'A repeated account.' },
+    { at: 392, kind: 'testimony', text: 'A repeated account.' },
+    { at: 1450, kind: 'agreement', text: 'A second-day agreement <tea>.' },
+  );
+  const originalLog = structuredClone(g.log);
+  const expectEntriesOnce = (html: string) => {
+    for (const time of ['6:31', '6:32']) {
+      expect(html.split(`${time}</small> A repeated account.`).length - 1).toBe(1);
+    }
+    for (const text of new Set(g.log.map((entry) => entry.text))) {
+      const escaped = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+      expect(html.split(escaped).length - 1).toBe(g.log.filter((entry) => entry.text === text).length);
+    }
+  };
   const sameDay = recordHtml(g);
+  expectEntriesOnce(sameDay);
+  expect(g.log).toEqual(originalLog);
   expect(sameDay).toContain('Your goal is to serve a paid workers’ lunch on Day 13.');
   expect(sameDay).toContain('counts eight produce crates but writes ten');
   expect(sameDay).not.toContain('<summary>Day 1</summary>');
   // Past midnight with no new line yet: Day 1 folds, Day 2 is current.
   g.minute = 1440 + 5;
   const rolled = recordHtml(g);
+  expectEntriesOnce(rolled);
+  expect(g.log).toEqual(originalLog);
   expect(rolled).toContain('<summary>Day 1</summary>');
+  const keySection = rolled.split('<h3>Other things you heard</h3>')[0];
+  if (keySection === undefined) throw new Error('Missing key section');
+  const firstDay = keySection.split('</details>')[0];
+  const currentDay = keySection.split('<h4>Day 2</h4>')[1];
+  expect(firstDay).toContain('counts eight produce crates but writes ten');
+  expect(firstDay).not.toContain('second-day agreement');
+  expect(currentDay).toContain('Day 2 0:10</small> A second-day agreement &lt;tea&gt;.');
+  expect(currentDay).not.toContain('counts eight produce crates');
   expect(rolled).toContain('<h4>Day 2</h4>');
   expect((rolled.match(/<p><small>/g) ?? []).length).toBeGreaterThanOrEqual(g.log.length);
   g.minute = 14 * 1440;
   g.ended = true;
   g.log.push({ at: 14 * 1440, kind: 'ending', text: 'The two weeks end.' });
+  const endedLog = structuredClone(g.log);
   const ended = recordHtml(g);
+  expectEntriesOnce(ended);
+  expect(g.log).toEqual(endedLog);
   expect(ended).toContain('<h4>After the fourteen days</h4>');
   expect(ended).not.toContain('<h4>Day 15</h4>');
   expect(ended).toContain('The two weeks end.');
+  expect(ended).toContain('No other entries after the fourteen days.');
+  expect(ended).not.toContain('Nothing has been added to the record today.');
 });
 
 it('words a busy refusal from the player’s view, without inventing a reason or a time', () => {
@@ -164,8 +202,11 @@ it('words a busy refusal from the player’s view, without inventing a reason or
   expect(g.people.derya.activity?.action).toBe('chat');
   expect(chooseGarden(g, other)).toBe(false);
   const refusal = gardenRefusal(g, other);
+  expect(gardenHere(g, 'hatice')).toBe(true);
+  expect(gardenHere(g, 'derya')).toBe(true);
+  expect(actualGardenLocation(g, 'hatice')).toBe(actualGardenLocation(g, 'derya'));
   expect(refusal).toBe(
-    'Derya cannot talk now. You do not know when Derya will be free. This choice was not made.',
+    'Derya is talking now. You do not know when Derya will be free. Try again later. This choice was not made.',
   );
   expect(refusal).not.toMatch(/busy|work|pray|\d:\d\d/i);
   const self = { type: 'listen', person: 'hatice', approach: 'invite' } as const;
@@ -180,9 +221,21 @@ it('shows the opening once in the record and keeps it in the log', () => {
   const g = freshGarden(17);
   const opening = 'Your goal is to serve a paid workers’ lunch on Day 13.';
   expect(g.log.filter((l) => l.kind === 'opening').length).toBe(1);
-  expect(recordHtml(g).split(opening).length - 1).toBe(1);
+  const originalLog = structuredClone(g.log);
+  const keyOnly = recordHtml(g);
+  expect(keyOnly.split(opening).length - 1).toBe(1);
+  expect(keyOnly).toContain('No other entries for today.');
+  expect(keyOnly).not.toContain('Nothing has been added to the record today.');
+  expect(g.log).toEqual(originalLog);
   g.minute = 1440 + 5;
-  expect(recordHtml(g).split(opening).length - 1).toBe(1);
+  const emptyDay = recordHtml(g);
+  expect(emptyDay.split(opening).length - 1).toBe(1);
+  expect(emptyDay).toContain('<summary>Day 1</summary>');
+  expect(emptyDay).toContain('No other entries for today.');
+  expect(g.log).toEqual(originalLog);
+  g.log = [];
+  expect(recordHtml(g)).toContain('No other entries for today.');
+  expect(g.log).toEqual([]);
 });
 
 it('explains the fixed repeated claim and the empty garden return wording', () => {
