@@ -1,10 +1,11 @@
 /** Scope: finite heard words, consent-based private time and physical abandoned plates.
  * HF chooses the activity; these controls never set a Person's feelings or decision.
  */
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { PRIVATE_CLUES } from '../src/sim/cast-scenes.ts';
 import { replayExport } from '../src/sim/continuation.ts';
-import { interrupt, verifyCommunity } from '../src/sim/hf4-person.ts';
+import { communityRun, interrupt, verifyCommunity } from '../src/sim/hf4-person.ts';
+import { KitchenRun } from '../src/sim/hf4-run.ts';
 import {
   boardDefaults,
   cloneState,
@@ -102,39 +103,182 @@ it('reveals no account from an interrupted private activity or a later ordinary 
 }, 120000);
 
 it('clears one real abandoned meal, conserves its plate, and retains fallback after interruption', () => {
-  // Headless ordinary-input prefix: night two, Dilek takes room work, table 2 (ticket T10) is plated at its walkout limit and leaves.
-  const s = replay(
-    clearingPrefix.seed,
-    clearingPrefix.inputs as Parameters<typeof replay>[1],
-    clearingPrefix.minute,
-    'pass@20',
-  );
+  // New authored public manager policy, not the original successful prefix.
+  // Retain all 21 inputs, Dilek room2650, Selim grill
+  // INSIST2664, Rafi room2667, seed42/end2670. No search, forced reply or retry.
+  // kitchenTask can offer Rafi room work; only HF's actual start can supply a
+  // roomDelivery carrier with end > plating minute + 2. No receipt handoff is needed.
+  // The failed 23-input policy (Selim2663, no new Rafi request), tape and provenance
+  // remain immutable in pass-three-gaps-trace1102/run-root-01 and its policies.json.
+  expect(clearingPrefix.seed).toBe(42);
+  expect(clearingPrefix.minute).toBe(2670);
+  expect(clearingPrefix.inputs).toHaveLength(21);
+  const additions: Parameters<typeof replay>[1] = [
+    { kind: 'kitchen-task', who: 'dilek', task: 'room', at: 2650 },
+    { kind: 'ask', cook: 'selim', verb: 'grill', insist: true, at: 2664 },
+    { kind: 'kitchen-task', who: 'rafi', task: 'room', at: 2667 },
+  ];
+  // Stable merge: retain the original order, including equal-time original inputs.
+  const inputs = [...(clearingPrefix.inputs as Parameters<typeof replay>[1]), ...additions]
+    .map((input, index) => ({ input, index }))
+    .sort((a, b) => a.input.at - b.input.at || a.index - b.index)
+    .map(({ input }) => input);
+  expect(inputs).toHaveLength(24);
+  expect(inputs.filter((input) => !additions.includes(input))).toEqual(clearingPrefix.inputs);
+  const completed: KitchenRun['completed'] = [];
+  const clearCompleted = KitchenRun.prototype.clearCompleted;
+  // Observe actual completion receipts before the host drains them. Do not change settlement.
+  const spy = vi.spyOn(KitchenRun.prototype, 'clearCompleted').mockImplementation(function (
+    this: KitchenRun,
+  ) {
+    completed.push(...this.completed);
+    return clearCompleted.call(this);
+  });
+  let s: ReturnType<typeof replay>;
+  try {
+    s = replay(clearingPrefix.seed, inputs, clearingPrefix.minute, 'pass@20');
+  } finally {
+    spy.mockRestore();
+  }
+  expect(s.minute).toBe(2670);
+  expect(s.phase).toBe('service');
+  expect(s.inputs).toEqual(inputs);
+  expect(s.applied).toBe(inputs.length);
+  expect(
+    completed.some(
+      (work) =>
+        work.person === 'dilek' &&
+        work.action === 'room' &&
+        work.status === 'completed' &&
+        work.at > 2650 * 60000 &&
+        work.at <= 2670 * 60000,
+    ),
+    'Dilek actually completes room work before the fixed deadline',
+  ).toBe(true);
+  expect(
+    s.said.some(
+      (line) =>
+        line.who === 'dilek' &&
+        line.at === 2650 &&
+        line.text === 'I will take the dining room for fifteen minutes. I cannot cook while I am there.',
+    ),
+  ).toBe(true);
+  // Admit the original clearing guards only with the proposed physical chain.
+  const room = personOf(s, 'rafi').activity;
+  const nativeRoom = communityRun(s.chef).active.find((a) => a.person === 'rafi');
+  expect(room?.affordanceId).toBe('room');
+  expect(Math.floor(room?.startedAt ?? 0)).toBe(2667);
+  expect(room?.endsAt).toBeGreaterThan(2668 + 2);
+  expect(nativeRoom).toBeDefined();
+  expect(nativeRoom?.offer.id).toBe('room');
+  expect((nativeRoom?.start ?? 0) / 60000).toBe(room?.startedAt);
+  expect(((nativeRoom?.start ?? 0) + (nativeRoom?.offer.durationMs ?? 0)) / 60000).toBe(room?.endsAt);
+  expect(
+    s.said.some(
+      (line) =>
+        line.who === 'rafi' &&
+        line.at === 2667 &&
+        line.text === 'I will take the dining room for fifteen minutes. I cannot cook while I am there.',
+    ),
+  ).toBe(true);
+  const meal = s.tickets.find((t) => t.id === 10);
+  expect(meal).toMatchObject({ status: 'walked', platedAt: 2668 });
+  expect(meal?.doneGrill).toBe(meal?.grill);
+  expect(meal?.servedAt).toBeUndefined();
+  expect(s.kitchen?.followup?.deliveries.find((d) => d.ticket === 10)).toMatchObject({
+    who: 'rafi',
+    at: 2668,
+    arrives: 2670,
+    outcome: 'carrying',
+  });
+  expect(
+    s.said.some(
+      (line) =>
+        line.at === 2669 &&
+        line.kind === 'journal' &&
+        line.text ===
+          `Table ${meal?.table} left after waiting 39 minutes. ₺${meal?.price} in meal payment was lost.`,
+    ),
+  ).toBe(true);
+  expect(s.plates.dirty.find((plate) => plate.abandonedTicket === 10)?.at).toBe(2687);
   const ticket = s.tickets.find((ticket) => clearingAvailable(s, ticket.id));
   if (!ticket) throw new Error('The actual played prefix must leave an abandoned plate.');
+  expect(ticket.id).toBe(10);
   expect(ticket.status).toBe('walked');
+  expect(ticket.platedAt).toBeDefined();
   expect(
     heardTopics(s, 'dilek').some((topic) => topic.text.includes('dining room for fifteen minutes')),
   ).toBe(true);
   expect(heardTopic(s, 'dilek')).toBeDefined();
   const fallback = s.plates.dirty.find((plate) => plate.abandonedTicket === ticket.id)?.at;
-  const plates = () => s.plates.clean + s.plates.pile + s.plates.dirty.length;
+  expect(fallback).toBeGreaterThan(s.minute + 3);
+  // A plated meal holds its plate until service or abandonment queues its return.
+  // This ordinary-meal prefix has no wedding trays; count each in-service plate once.
+  const inService = (state: ReturnType<typeof service>) =>
+    state.tickets.filter(
+      (t) =>
+        t.status === 'open' &&
+        t.platedAt !== undefined &&
+        t.servedAt === undefined &&
+        !state.plates.dirty.some((plate) => plate.abandonedTicket === t.id),
+    ).length;
+  const plates = (state = s) =>
+    state.plates.clean + state.plates.pile + state.plates.dirty.length + inService(state);
   const total = plates(),
     till = s.till;
-  queueInput(s, { kind: 'clear-table', who: 'dilek', ticket: ticket.id });
-  queueInput(s, { kind: 'clear-table', who: 'selim', ticket: ticket.id });
-  expect(personOf(s, 'selim').activity?.affordanceId).toBe('clear-table');
-  expect(stationOf(s, 'selim')).toBeNull();
+  // The retained observer records Dilek accepting first. Selim's duplicate is
+  // blocked before HF chooses again. This source correction is not a rerun.
+  const clearingActivity = 'b55effcf4aed3a9c0b5680edccdf3379de8592de8080bd193a3fdd23a611b841';
+  const clearingEntry = {
+    ticket: ticket.id,
+    who: 'dilek',
+    activity: clearingActivity,
+    at: 2670,
+    outcome: 'clearing',
+  };
+  expect(s.kitchen?.clearings ?? []).toHaveLength(0);
+  const choices = vi.spyOn(KitchenRun.prototype, 'decide');
+  try {
+    queueInput(s, { kind: 'clear-table', who: 'dilek', ticket: ticket.id });
+    expect(choices).toHaveBeenCalledTimes(1);
+    expect(s.kitchen?.clearings).toEqual([clearingEntry]);
+    const active = communityRun(s.chef).active;
+    expect(active.filter((a) => a.offer.id === 'clear-table')).toHaveLength(1);
+    expect(active.find((a) => a.id === clearingActivity)).toMatchObject({
+      person: 'dilek',
+      offer: { id: 'clear-table' },
+    });
+    expect(personOf(s, 'dilek').activity?.affordanceId).toBe('clear-table');
+    expect(stationOf(s, 'dilek')).toBeNull();
+    expect(clearingAvailable(s, ticket.id)).toBe(false);
+    const firstNative = JSON.parse(JSON.stringify(active));
+    queueInput(s, { kind: 'clear-table', who: 'selim', ticket: ticket.id });
+    expect(choices).toHaveBeenCalledTimes(1);
+    expect(s.kitchen?.clearings).toEqual([clearingEntry]);
+    expect(communityRun(s.chef).active).toEqual(firstNative);
+    expect(personOf(s, 'dilek').activity?.affordanceId).toBe('clear-table');
+    expect(stationOf(s, 'dilek')).toBeNull();
+    expect(personOf(s, 'selim').activity?.affordanceId).toBe('grill');
+    expect(stationOf(s, 'selim')).toBe('grill');
+    expect(clearingAvailable(s, ticket.id)).toBe(false);
+  } finally {
+    choices.mockRestore();
+  }
   expect(s.till).toBe(till);
   const restored = restoreState(raw(s));
   const interrupted = restoreState(raw(s));
-  interrupt(personOf(interrupted, 'selim'), interrupted.minute, 'control:clearing-interrupted');
+  interrupt(personOf(interrupted, 'dilek'), interrupted.minute, 'control:clearing-interrupted');
   for (let i = 0; i < 5; i++) {
     step(s);
     step(restored);
     step(interrupted);
+    for (const state of [s, restored, interrupted]) expect(plates(state)).toBe(total);
   }
   expect(s.kitchen?.clearings?.at(-1)?.outcome).toBe('returned');
   expect(s.plates.dirty.some((plate) => plate.abandonedTicket === ticket.id)).toBe(false);
+  expect(s.tickets.find((t) => t.id === 11)).toMatchObject({ status: 'open', platedAt: 2673 });
+  expect(s.tickets.find((t) => t.id === 11)?.servedAt).toBeUndefined();
+  expect(inService(s)).toBe(1);
   expect(plates()).toBe(total);
   expect(ticket.status).toBe('walked');
   expect(interrupted.kitchen?.clearings?.at(-1)?.outcome).toBe('interrupted');

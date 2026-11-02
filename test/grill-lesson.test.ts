@@ -4,11 +4,12 @@
  */
 import { beforeAll, expect, it } from 'vitest';
 import { replayExport, validateReplayFile } from '../src/sim/continuation.ts';
-import { interrupt, verifyCommunity } from '../src/sim/hf4-person.ts';
+import { communityRun, interrupt, verifyCommunity } from '../src/sim/hf4-person.ts';
 import {
   boardDefaults,
   cloneState,
   exportRun,
+  inKitchen,
   newGame,
   personOf,
   queueInput,
@@ -17,7 +18,7 @@ import {
   stationOf,
   step,
 } from '../src/sim/kitchen.ts';
-import { grillLessonAvailable } from '../src/sim/kitchen-edition.ts';
+import { attentionAvailable, grillLessonAvailable } from '../src/sim/kitchen-edition.ts';
 import historicalExport from './fixtures/grill-lesson-historical-public-export.json';
 import historicalMeta from './fixtures/grill-lesson-historical-public-export.meta.json';
 import native from './fixtures/grill-lesson-native-modified.json';
@@ -56,16 +57,22 @@ it('records real guidance and later food work, preserving full replay and cold c
   expect(teacherWork?.affordanceId).toBe('conversation');
   expect((teacherWork?.endsAt ?? 0) - (teacherWork?.startedAt ?? 0)).toBe(3);
   expect(stationOf(s, 'rafi')).toBe('dish');
-  // Exactly one existing insist request. HF supplies actual compliance and its cost.
+  // Exactly one existing insist request. Current HF assents; no compliance cost is inferred.
+  // Preregistered: seven steps to 2622, one minute beyond the preserved six-step tape.
   queueInput(s, { kind: 'ask', cook: 'rafi', verb: 'grill', insist: true });
-  for (let i = 0; i < 6; i++) step(s);
+  for (let i = 0; i < 7; i++) step(s);
+  expect(s.minute).toBe(2622);
   const lesson = s.grillLessons?.[0];
   expect(lesson?.state).toBe('practised');
-  expect(lesson?.learnerVerdict).toBe('complied');
+  expect(lesson?.learnerVerdict).toBe('assented');
   expect(lesson?.learnerInsisted).toBe(true);
   expect(lesson?.guidedWork).toBeGreaterThan(0);
   expect(lesson?.learnerWork).toBeGreaterThan(0);
   expect(lesson?.food).toBeDefined();
+  expect(lesson?.food?.at).toBeGreaterThan(lesson?.teacherCompleted ?? 0);
+  const food = s.tickets.find((ticket) => ticket.id === lesson?.food?.ticket);
+  expect(food).toBeDefined();
+  expect(food?.doneGrill).toBeGreaterThan(0);
   expect(lesson?.teacherCompleted).toBeGreaterThan(lesson?.at ?? 0);
   expect(s.inputs[lesson?.id ?? -1]?.kind).toBe('grill-lesson');
   const file = exportRun(s, '4.12.0');
@@ -83,7 +90,7 @@ it('records real guidance and later food work, preserving full replay and cold c
   expect(verifyCommunity(s.chef).verified).toBe(true);
 }, 120000);
 
-it('does not credit food work when the learner defers the ordinary request', () => {
+it('does not credit food work when the learner modifies the ordinary request to dish work', () => {
   const s = restoreState(checkpoint);
   queueInput(s, { kind: 'grill-lesson', learner: 'rafi' });
   expect(s.grillLessons?.[0]?.teacherVerdict).toBe('assented');
@@ -91,46 +98,52 @@ it('does not credit food work when the learner defers the ordinary request', () 
   for (let i = 0; i < 6; i++) step(s);
   expect(s.cooks.find((cook) => cook.id === 'rafi')?.night.events.at(-1)).toMatchObject({
     verb: 'grill',
-    verdict: 'deferred',
-    insisted: false,
-  });
-  expect(s.grillLessons?.[0]?.learnerActivity).toBeUndefined();
-  expect(s.grillLessons?.[0]?.guidedWork).toBe(0);
-  expect(s.grillLessons?.[0]?.food).toBeUndefined();
-  expect(s.grillLessons?.[0]?.state).toBe('no-food-work');
-  expect(s.said.some((line) => line.who === 'rafi' && line.kind === 'answer')).toBe(true);
-}, 120000);
-
-/** HISTORICAL NATIVE UNIT TEST — not a current C1 public-replay witness.
- * The negative-credit handler is exercised on a genuine R3 pass@20 / HF4.12 ordinary-input witness: seed 7, 62 public
- * inputs to minute 2670, a real invite and five steps (actual private disclosure), checkpointed BEFORE any teacher or
- * learner request. The complete native HF archive was written by the immutable R3 source (generator, source hashes and
- * the actual R3 outcome are in the fixture's `meta`). Nothing in it is edited, and no verdict is written by hand.
- * It is restored only here; the production reader has no legacy fallback and the old public export is refused below.
- * Whether the current C1 seed-plus-public-input path reaches a `modified` verdict is UNOBSERVED (Deferred, 2026-11-03).
- */
-it('does not credit food work when the learner modifies the ordinary request (historical native unit)', () => {
-  // One real cold restore of the R3 native archive and the same ordinary requests. The behavior assertions below are the evidence.
-  // The single final verifyCommunity replays the whole archive (R3 prefix plus this suffix). Current replay/cold-restore equality and
-  // continuation live in 'records real guidance…'; the archive is not re-verified here before the suffix, and no twin restore is made.
-  const s = restoreState(structuredClone(native.checkpoint) as unknown as ReturnType<typeof cloneState>);
-  expect(native.meta.archiveVerified).toBe(true);
-  expect(s.privateAccounts?.selim).toBeDefined();
-  expect(grillLessonAvailable(s, 'rafi')).toBe(true);
-  queueInput(s, { kind: 'grill-lesson', learner: 'rafi' });
-  queueInput(s, { kind: 'ask', cook: 'rafi', verb: 'grill', insist: false });
-  expect(s.grillLessons?.[0]?.teacherVerdict).toBe('assented');
-  for (let i = 0; i < 6; i++) step(s);
-  expect(s.cooks.find((cook) => cook.id === 'rafi')?.night.events.at(-1)).toMatchObject({
-    verb: 'grill',
     verdict: 'modified',
     insisted: false,
   });
+  expect(stationOf(s, 'rafi')).toBe('dish');
+  expect(personOf(s, 'rafi').activity?.affordanceId).toBe('dish');
+  expect(s.grillLessons?.[0]?.teacherCompleted).toBeGreaterThan(s.grillLessons?.[0]?.at ?? 0);
   expect(s.grillLessons?.[0]?.learnerActivity).toBeUndefined();
   expect(s.grillLessons?.[0]?.guidedWork).toBe(0);
+  expect(s.grillLessons?.[0]?.learnerWork).toBe(0);
+  expect(s.grillLessons?.[0]?.learnerVerdict).toBe('not-asked');
+  expect(s.grillLessons?.[0]?.learnerInsisted).toBeUndefined();
+  expect(s.grillLessons?.[0]?.learnerCompleted).toBeUndefined();
+  expect(s.grillLessons?.[0]?.lastLearnerWorkAt).toBeUndefined();
   expect(s.grillLessons?.[0]?.food).toBeUndefined();
   expect(s.grillLessons?.[0]?.state).toBe('no-food-work');
+  expect(s.said.some((line) => line.who === 'rafi' && line.kind === 'answer')).toBe(true);
+  const replayed = replayExport(exportRun(s, '4.12.0')),
+    cold = restoreState(raw(s));
+  expect(raw(replayed)).toEqual(raw(s));
+  expect(raw(cold)).toEqual(raw(s));
   expect(verifyCommunity(s.chef).verified).toBe(true);
+  const next = { kind: 'ask', cook: 'dilek', verb: 'cold' } as const;
+  for (const state of [s, replayed, cold]) queueInput(state, next);
+  for (let i = 0; i < 8; i++) {
+    step(s);
+    step(replayed);
+    step(cold);
+  }
+  expect(raw(replayed)).toEqual(raw(s));
+  expect(raw(cold)).toEqual(raw(s));
+  expect(verifyCommunity(s.chef).verified).toBe(true);
+}, 120000);
+
+/** The original historical native unit body is byte-exact and inert in
+ * archive/evidence/2026-11-02-pass-ci-corrections/grill-lesson-historical-native-unit.ts.txt.
+ * Its provenance is retained there and in native.meta; it is not executed current coverage.
+ * The unaltered /1 fixture must refuse under current guest rules, preserving the original.
+ */
+it('refuses the unaltered historical native archive and tells the player to keep it and start fresh', () => {
+  const original = JSON.stringify(native);
+  expect(native.meta.archiveVerified).toBe(true);
+  expect(native.checkpoint.hf4.schema).toBe('pass-hf4/1');
+  expect(() =>
+    restoreState(structuredClone(native.checkpoint) as unknown as ReturnType<typeof cloneState>),
+  ).toThrow('Keep this file. This kitchen needs a new game.');
+  expect(JSON.stringify(native)).toBe(original);
 }, 120000);
 
 /** The file is a genuine R3 public export serialized before any mutation (generator and source hashes in the .meta sidecar), and the
@@ -149,16 +162,45 @@ it('refuses the internally consistent historical R3 public export under current 
   expect(ex.state.inputs).toEqual(ex.inputs);
   expect(historicalMeta.listsAgree).toBe(true);
   expect(historicalMeta.validUnderR3Replay).toBe(true);
-  await expect(validateReplayFile(ex)).rejects.toThrow('does not match its replay');
+  await expect(validateReplayFile(ex)).rejects.toThrow(
+    'Keep this file and start a new game. This kitchen uses different guest request rules.',
+  );
 }, 120000);
 
 it('does not offer a second lesson to a learner already working at the grill', () => {
   const s = restoreState(checkpoint);
   queueInput(s, { kind: 'grill-lesson', learner: 'rafi' });
   queueInput(s, { kind: 'ask', cook: 'rafi', verb: 'grill', insist: true });
+  // Fixed station-guard control: six steps, ending 2621. Practice is not this guard's premise.
+  // The failed post-practice 2622 point remains immutable in
+  // pass-three-gaps-trace1102/run-root-01: T11 then lacks cold, not grill.
+  // The separate seven-step practice/food/replay/cold30 positive is unchanged.
   for (let i = 0; i < 6; i++) step(s);
-  expect(s.grillLessons?.[0]?.state).toBe('practised');
+  expect(s.minute).toBe(2621);
+  expect(s.version).toBe('pass@20');
+  expect(s.phase).toBe('service');
+  expect(s.privateAccounts?.selim).toBeDefined();
+  const lesson = s.grillLessons?.[0];
+  expect(lesson?.state).toBe('demonstrated');
+  expect(lesson?.teacherCompleted).toBeGreaterThan(lesson?.at ?? 0);
+  const learnerWork = communityRun(s.chef).active.find((a) => a.person === 'rafi');
+  expect(learnerWork).toBeDefined();
+  expect(learnerWork?.offer.id).toBe('grill');
+  expect(lesson?.learnerActivity).toBeDefined();
+  expect(learnerWork?.id).toBe(lesson?.learnerActivity);
+  expect(personOf(s, 'rafi').activity?.affordanceId).toBe('grill');
   expect(stationOf(s, 'rafi')).toBe('grill');
+  expect(s.crew.some((m) => m.id === 'rafi' && !m.left)).toBe(true);
+  for (const who of ['rafi', 'selim']) {
+    expect(s.cooks.some((c) => c.id === who && c.here && !c.gone)).toBe(true);
+    expect(inKitchen(s, who)).toBe(true);
+    expect(['no-replies', 'resign', 'conversation', 'explain-wait', 'clear-table']).not.toContain(
+      personOf(s, who).activity?.affordanceId,
+    );
+    expect(attentionAvailable(s, who)).toBe(true);
+  }
+  expect(s.grillLessons?.some((x) => ['waiting', 'watching'].includes(x.state))).toBe(false);
+  expect(s.tickets.find((t) => t.id === 11)).toMatchObject({ status: 'open', doneGrill: 0, grill: 1 });
   expect(s.tickets.some((t) => t.status === 'open' && t.doneGrill < t.grill)).toBe(true);
   expect(grillLessonAvailable(s, 'rafi')).toBe(false);
   queueInput(s, { kind: 'grill-lesson', learner: 'rafi' });
