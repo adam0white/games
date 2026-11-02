@@ -1222,3 +1222,161 @@ for (const mode of ['tap', 'hold', 'keyboard'] as const) {
     ).toEqual(actual.state);
   });
 }
+
+// One opening-board journey. The fixture is an actual current producer export;
+// every changed plan and answer below comes through the rendered editor.
+test('F-2507 current draft intervals, rush and cover answers stay truthful in the rendered board', async ({
+  page,
+}) => {
+  const opening = await freshCurrentControl(page);
+  expect(opening.version).toBe('pass@20');
+  expect(opening.phase).toBe('board');
+  expect(opening.seed).toBe(42);
+  // The existing service loader waits for #clock. A board has no #clock, so
+  // use its same producer/export/chooser path and assert the actual board instead.
+  const file = await page.evaluate(
+    ({ inputs, minute }) => {
+      const fixture = window as CurrentControlPage;
+      if (!fixture.f2505Export) throw new Error('Missing actual current producer');
+      const file = fixture.f2505Export(inputs, minute);
+      delete fixture.f2505Export;
+      return file;
+    },
+    { inputs: opening.inputs, minute: opening.minute },
+  );
+  if (!file) throw new Error('Current producer refused its opening export');
+  expect(file.state).toEqual(cloneState(opening));
+  await page.locator('#game-menu').click();
+  await page.locator('.debug-tools summary').click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('#debug-import').click();
+  await (await chooser).setFiles({
+    name: 'current-opening-board.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(file)),
+  });
+  await page.locator('#title-confirm-yes').click();
+  await expect(page.locator('.people-board')).toBeVisible();
+  const card = (cook: string) => page.locator(`.board-row[data-board-cook="${cook}"]`);
+  const editor = page.locator('.board-editor');
+  const edit = async (cook: string) => card(cook).locator('.board-change').click();
+  const choose = async (field: string, value: string) =>
+    editor.locator(`[data-field="${field}"][data-value="${value}"]`).click();
+  const read = (): Promise<GameState> =>
+    page.evaluate(async () => {
+      const path = '/src/ui/app.ts';
+      const simPath = '/src/sim/kitchen.ts';
+      return (await import(simPath)).cloneState((await import(path))._debug.state);
+    });
+  expect(await read()).toEqual(cloneState(opening));
+  // CAUSAL RED: the current editor renders a gap sentence without this interval.
+  // No proposed helper is imported by this test.
+  await edit('dilek');
+  await choose('break', '1185');
+  await expect(editor.locator('.board-gap')).toContainText(
+    'Dilek’s planned meal break is 19:45–20:05 at the cold side.',
+  );
+  await page.locator('#board-done').click();
+  for (const [cook, name, station] of [
+    ['selim', 'Selim', 'grill'],
+    ['dilek', 'Dilek', 'cold side'],
+  ]) {
+    await edit(cook!);
+    for (const [minute, interval, overlap] of [
+      ['1090', '18:10–18:30', false],
+      ['1115', '18:35–18:55', true],
+      ['1185', '19:45–20:05', true],
+      ['1260', '21:00–21:20', false],
+    ] as const) {
+      await choose('break', minute);
+      await expect(editor.locator(`[data-field="break"][data-value="${minute}"]`)).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      await expect(editor.locator('.board-gap')).toContainText(
+        `${name}’s planned meal break is ${interval} at the ${station}.`,
+      );
+      await expect(card(cook!).locator('.board-summary')).toContainText(interval);
+      if (overlap) {
+        const warning = `${name}’s planned meal break (${interval}) overlaps the rush (18:30–20:30) at the ${station}.`;
+        await expect(editor.locator('.board-rush')).toHaveText(warning);
+        await expect(card(cook!).locator('.board-rush')).toHaveText(warning);
+      } else {
+        await expect(editor.locator('.board-rush')).toHaveCount(0);
+        await expect(card(cook!).locator('.board-rush')).toHaveCount(0);
+      }
+    }
+    await page.locator('#board-done').click();
+  }
+  // The draft did not change the actual board, inputs or native state.
+  expect(await read()).toEqual(cloneState(opening));
+  // The fixed public plan asks for relief; its actual refusal stays a refusal.
+  await edit('dilek');
+  await choose('break', '1185');
+  await page.locator('#board-done').click();
+  await edit('selim');
+  await choose('break', '1090');
+  await choose('cover', 'dilek');
+  await expect(editor.locator('.board-gap')).toContainText(
+    'You will ask Dilek to cover the grill for this interval. Cover is not agreed.',
+  );
+  await expect(card('selim').locator('.board-summary')).not.toContainText('Dilek agreed');
+  await page.locator('#board-done').click();
+  await page.locator('#ask-board').click();
+  const accepted = await read();
+  const selim = accepted.board?.rows.find((row) => row.cook === 'selim');
+  // Require the actual station assent and distinct relief refusal; do not set either field.
+  expect(selim?.accepted, 'fixed fixture requires the real station assent').toBe(true);
+  expect(selim?.coverAccepted, 'the fixed public plan records actual relief refusal').toBe(false);
+  await expect(card('selim').locator('.board-summary')).toContainText(
+    'Dilek did not agree to cover the grill for this interval.',
+  );
+  await edit('selim');
+  await expect(editor.locator('.board-gap')).toContainText(
+    'Dilek did not agree to cover the grill for this interval.',
+  );
+  await page.locator('#board-done').click();
+  // Keep the selected cover while moving its own break into collision.
+  await edit('dilek');
+  await choose('break', '1090');
+  await page.locator('#board-done').click();
+  await edit('selim');
+  await expect(editor.locator('.board-gap')).toContainText('Cover is not agreed.');
+  await expect(editor.locator('.board-gap')).not.toContainText('Dilek agreed');
+  await page.locator('#board-done').click();
+  await page.locator('#ask-board').click();
+  const refused = await read();
+  expect(refused.board?.rows.find((row) => row.cook === 'selim')?.coverAccepted).toBe(false);
+  await expect(card('selim').locator('.board-summary')).toContainText(
+    'Dilek did not agree to cover the grill for this interval.',
+  );
+  await edit('selim');
+  await expect(editor.locator('.board-gap')).toContainText(
+    'Dilek did not agree to cover the grill for this interval.',
+  );
+  await page.locator('#board-done').click();
+  // A second worker on the same station in the proposed plan is not an empty station.
+  await edit('dilek');
+  await choose('station', 'grill');
+  await choose('break', '1260');
+  await page.locator('#board-done').click();
+  await edit('selim');
+  await choose('cover', '');
+  await choose('break', '1185');
+  await expect(editor.locator('.board-gap')).toContainText(
+    'In this proposed plan, Dilek is also assigned to the grill throughout this interval.',
+  );
+  await expect(editor.locator('.board-gap')).not.toContainText('Nobody will work');
+  await expect(card('selim').locator('.board-summary')).toContainText('Dilek is also assigned to the grill');
+  await expect(card('selim').locator('.board-summary')).not.toContainText('Nobody will work');
+  await page.locator('#board-done').click();
+  // Reading and editing preserve the refused native answer until another submission.
+  expect(await read()).toEqual(refused);
+  const final = restoreState(await read());
+  expect(
+    cloneState(
+      replay(final.seed, final.inputs, final.minute, final.version, final.castChapter, final.plainNarration),
+    ),
+  ).toEqual(cloneState(final));
+  expect(verifyCommunity(final.chef).verified).toBe(true);
+});

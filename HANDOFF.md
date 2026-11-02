@@ -2,6 +2,10 @@
 
 Other Deferred asks remain open. The coupled prayer and running ordinary review witness remains open, with a target of 2026-11-03. Player judgment and Adam's acceptance of game readiness remain. Friends' playtests and Show HN remain paused. No new player round was run.
 
+## F-2507 presentation candidate — 2026-11-02
+
+Remaining: signed source, exact independent Codex review, green CI, merge, normal deployment and live checks. The selected break interval and rush warning now follow the current pass@20 draft for either cook. Cover wording distinguishes a proposal and a recorded answer; another assigned cook is not described as absent. The normal lane and build passed, followed by the same rendered opening-board journey at 360×690 and 1280×800, with complete host/native replay. These controls include real relief refusal. Accepted relief remains unproved. The reported 19:48 meal after a 21:00 plan remains unreproduced. Simulation, quiet prayer and earlier editions are unchanged. No player round or readiness acceptance is claimed.
+
 ## F-2500, F-2502 and F-2505 technical delivery — 2026-11-02
 
 Signed source [b61b555737f71f40acee43d6e55f564c20a17427](https://github.com/adam0white/pass/commit/b61b555737f71f40acee43d6e55f564c20a17427) merged in [PR 18](https://github.com/adam0white/pass/pull/18) after two exact Codex CLEAR reviews. [Source CI 41524577038](https://github.com/adam0white/pass/actions/runs/41524577038) and [main CI 41526567687](https://github.com/adam0white/pass/actions/runs/41526567687) were green at that SHA. A normal production dry run and deployment succeeded. The [live release manifest](https://pass.adamwhite.work/release.json) matched the built commit, reported `dirty: false`, and named Human Framework 4.12.0.

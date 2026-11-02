@@ -73,6 +73,81 @@ export function earlyCoverageWarnings(s: GameState, rows: readonly BoardRow[]): 
   return out;
 }
 
+/** Half-open local-minute intervals: touching endpoints do not overlap. */
+function overlaps(a: number, duration: number, b: number, end: number): boolean {
+  return a < end && a + duration > b;
+}
+
+/** Describe only the draft and recorded answers, never a future activity. */
+export function plannedBreakText(s: GameState, rows: readonly BoardRow[], row: BoardRow, revised: boolean) {
+  const place = { grill: 'grill', cold: 'cold side', dish: 'dishes', oven: 'oven' };
+  const station = place[row.station];
+  const name = nameOf(s, row.cook);
+  const interval = `${hhmm(row.breakAt)}–${hhmm(row.breakAt + 20)}`;
+  const prefix = `${name}’s planned meal break is ${interval} at the ${station}.`;
+  const answer =
+    !revised && s.board?.agreed
+      ? s.board.rows.find(
+          (old) =>
+            old.cook === row.cook &&
+            old.station === row.station &&
+            old.breakAt === row.breakAt &&
+            old.cover === row.cover,
+        )
+      : undefined;
+  const cover = row.cover ? nameOf(s, row.cover) : null;
+  const relief = !cover
+    ? 'You have not chosen anyone to take over.'
+    : answer?.accepted && answer.coverAccepted === true
+      ? `${cover} agreed to cover the ${station} for this interval.`
+      : answer?.coverAccepted === false
+        ? `${cover} did not agree to cover the ${station} for this interval.`
+        : `You will ask ${cover} to cover the ${station} for this interval. Cover is not agreed.`;
+  const others = rows.filter(
+    (other) =>
+      other.cook !== row.cook &&
+      other.station === row.station &&
+      !overlaps(other.breakAt, 20, row.breakAt, row.breakAt + 20) &&
+      !rows.some(
+        (borrow) =>
+          borrow.cover === other.cook &&
+          borrow.cook !== row.cook &&
+          overlaps(borrow.breakAt, 20, row.breakAt, row.breakAt + 20) &&
+          (revised ||
+            s.board?.rows.some(
+              (old) =>
+                old.cook === borrow.cook &&
+                old.accepted &&
+                old.coverAccepted &&
+                old.cover === borrow.cover &&
+                old.breakAt === borrow.breakAt,
+            )),
+      ) &&
+      (revised ||
+        s.board?.rows.some(
+          (old) =>
+            old.cook === other.cook &&
+            old.accepted &&
+            old.station === other.station &&
+            old.breakAt === other.breakAt,
+        )),
+  );
+  const staffing = others.length
+    ? `${revised ? 'In this proposed plan' : 'In the agreed plan'}, ${others.map((other) => nameOf(s, other.cook)).join(' and ')} ${others.length === 1 ? 'is' : 'are'} also assigned to the ${station} throughout this interval.`
+    : `No other cook ${revised ? 'is assigned' : 'has agreed'} to stay at the ${station} throughout this interval.`;
+  const borrowed = row.cover ? rows.find((other) => other.cook === row.cover) : undefined;
+  const tradeoff =
+    borrowed && borrowed.station !== row.station
+      ? `If ${cover} takes over, they leave the ${place[borrowed.station]}; that station may need cover too.`
+      : '';
+  return {
+    gap: [prefix, relief, staffing, tradeoff].filter(Boolean).join(' '),
+    rush: overlaps(row.breakAt, 20, RUSH_FROM, RUSH_TO)
+      ? `${name}’s planned meal break (${interval}) overlaps the rush (${hhmm(RUSH_FROM)}–${hhmm(RUSH_TO)}) at the ${station}.`
+      : '',
+  };
+}
+
 export function openingBoard(s: GameState): BoardRow[] {
   const rows = boardDefaults(s);
   const ids = onShift(s);

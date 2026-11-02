@@ -90,7 +90,7 @@ import {
 } from '../sim/kitchen.ts';
 import { zeynepDepartureStatus } from '../sim/one-cast.ts';
 import { indexedAutosave } from './autosave.ts';
-import { boardReplies, breakSlots, earlyCoverageWarnings, sameBoard } from './board.ts';
+import { boardReplies, breakSlots, earlyCoverageWarnings, plannedBreakText, sameBoard } from './board.ts';
 import { automaticClockPlayback, inspectingCook, SPEED_NAMES } from './clock.ts';
 import { type ContinuitySave, continuity, guardedContinuity } from './continuity.ts';
 import { portionEdition } from './editions.ts';
@@ -1052,7 +1052,7 @@ function board(draft?: BoardRow[], editing: string | null = null) {
         (other) =>
           `${nameOf(st, other.cook)} could take over, but then nobody would work at the ${stationName[other.station]}.`,
       );
-      const gap = row.cover
+      let gap = row.cover
         ? revised
           ? `You will ask ${nameOf(st, row.cover)} to work at the ${station} in ${nameOf(st, row.cook)}’s place. ${tradeoff} for those twenty minutes.`
           : answer?.coverAccepted
@@ -1066,7 +1066,12 @@ function board(draft?: BoardRow[], editing: string | null = null) {
             ? `${nameOf(st, row.cover)} will take over`
             : `${nameOf(st, row.cover)} has not agreed to take over. Nobody will work at the ${station} during the break.`
         : `Nobody will work at the ${station} during the break.`;
-      const summary = `${nameOf(st, row.cook)} will work at the ${station}. The meal break is at ${clock(row.breakAt)}, for 20 minutes. ${capital(coverSummary)}${coverSummary.endsWith('.') ? '' : '.'}`;
+      const planned = st.version === 'pass@20' ? plannedBreakText(st, rows, row, revised) : null;
+      if (planned) gap = planned.gap;
+      const rush = planned?.rush ? `<p class="board-rush">${esc(planned.rush)}</p>` : '';
+      const summary = planned
+        ? `The meal break is at ${clock(row.breakAt)}, for 20 minutes. ${gap}`
+        : `${nameOf(st, row.cook)} will work at the ${station}. The meal break is at ${clock(row.breakAt)}, for 20 minutes. ${capital(coverSummary)}${coverSummary.endsWith('.') ? '' : '.'}`;
       if (editing === row.cook) {
         editor = `<div class="board-editor-backdrop"><section class="board-editor" id="board-fields-${esc(row.cook)}" role="dialog" aria-modal="true" aria-labelledby="board-editor-title" data-board-cook="${esc(row.cook)}"><header><h2 id="board-editor-title">${esc(nameOf(st, row.cook))}’s plan</h2><button type="button" class="board-editor-close" aria-label="Close plan">×</button></header><div class="board-editor-body"><div class="board-fields">${chips(
           row,
@@ -1083,9 +1088,9 @@ function board(draft?: BoardRow[], editing: string | null = null) {
             label: slot.label,
           })),
           String(row.breakAt),
-        )}${chips(row, 'cover', 'Who takes over', [...covers.map((other) => ({ value: other.cook, label: nameOf(st, other.cook) })), { value: '', label: 'Nobody' }], row.cover ?? '')}</div><p class="board-gap">${esc(gap)}</p>${publicPrayerPlan(st, row.cook, row.breakAt) ? `<p class="plan-warning">${esc(publicPrayerPlan(st, row.cook, row.breakAt))}</p>` : ''}</div><footer><button type="button" id="board-done" class="primary">Done</button></footer></section></div>`;
+        )}${chips(row, 'cover', 'Who takes over', [...covers.map((other) => ({ value: other.cook, label: nameOf(st, other.cook) })), { value: '', label: 'Nobody' }], row.cover ?? '')}</div><p class="board-gap">${esc(gap)}</p>${rush}${publicPrayerPlan(st, row.cook, row.breakAt) ? `<p class="plan-warning">${esc(publicPrayerPlan(st, row.cook, row.breakAt))}</p>` : ''}</div><footer><button type="button" id="board-done" class="primary">Done</button></footer></section></div>`;
       }
-      return `<section class="board-row" data-board-cook="${esc(row.cook)}"><h2>${esc(nameOf(st, row.cook))}</h2><p class="board-summary">${esc(summary)}</p>${publicPrayerPlan(st, row.cook, row.breakAt) ? `<p class="plan-warning">${esc(publicPrayerPlan(st, row.cook, row.breakAt))}</p>` : ''}<button class="board-change" type="button" aria-expanded="${editing === row.cook}" aria-controls="board-fields-${esc(row.cook)}">Change ${esc(nameOf(st, row.cook))}’s plan</button>${answer?.answer ? `<div class="board-answer"><p>${esc(agreementStatus(st, answer, revised))}</p><details><summary>Read ${esc(nameOf(st, row.cook))}’s full answer</summary><p class="hand">“${esc(gloss(answer.answer))}”</p></details></div>` : ''}</section>`;
+      return `<section class="board-row" data-board-cook="${esc(row.cook)}"><h2>${esc(nameOf(st, row.cook))}</h2><p class="board-summary">${esc(summary)}</p>${rush}${publicPrayerPlan(st, row.cook, row.breakAt) ? `<p class="plan-warning">${esc(publicPrayerPlan(st, row.cook, row.breakAt))}</p>` : ''}<button class="board-change" type="button" aria-expanded="${editing === row.cook}" aria-controls="board-fields-${esc(row.cook)}">Change ${esc(nameOf(st, row.cook))}’s plan</button>${answer?.answer ? `<div class="board-answer"><p>${esc(agreementStatus(st, answer, revised))}</p><details><summary>Read ${esc(nameOf(st, row.cook))}’s full answer</summary><p class="hand">“${esc(gloss(answer.answer))}”</p></details></div>` : ''}</section>`;
     })
     .join(
       '',

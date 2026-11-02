@@ -603,6 +603,7 @@ The scoped wording and current activity evidence changes were delivered (fixed b
 - Disposition and conditions: Warn about Dilek’s meal break in the rush, and make the plan-dialog line match the chosen break. Selim eating at 19:48 after a 21:00 plan may be a different meal; it is not proven that the schedule was ignored. Warning and status wording.
 - Owner and date: the games-deferred Pass host owner; sealed route `target2026-11-03 (open)`, so Nov 3. Verdict word: mixed (the tester’s own stated conditions, not a vote).
 - Source: `docs/lab/reviews/light-2026-10-30/pass-retest2/rosa/report.md` in the sealed packet.
+- Source candidate, 2026-11-02: current pass@20 board summaries and editors name the selected 20-minute interval and station. Either cook gets a conditional rush-overlap warning. Copy distinguishes proposed cover, recorded refusal and recorded assent; it describes another assigned worker without promising future attendance. The actual rendered seed42 journey passed at 360×690 and 1280×800 with pending and refused relief, a changed draft and both cooks on one station, then complete host/native replay. A real accepted-relief witness remains unproved. The historical 19:48 meal after a 21:00 plan remains unreproduced; no scheduling change or closure follows. Exact review, CI, deployment and player acceptance remain pending.
 
 ### F-2508 — Sonia Ionescu
 
