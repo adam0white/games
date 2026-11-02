@@ -19,6 +19,7 @@ import { NARRATION_EDITION } from '../sim/narration-edition.ts';
  */
 
 import { communityRun, frameworkEngine, visibleFatigue } from '../sim/hf4-person.ts';
+import { HF4_HOST } from '../sim/hf4-run.ts';
 
 const FRAMEWORK_VERSION = '4.12.0';
 
@@ -144,6 +145,8 @@ const app = document.getElementById('app') as HTMLElement;
 let s: GameState | null = null;
 // Imported play keeps the occupied native notebook byte-for-byte. Export keeps file progress.
 let filePlay = false;
+// Engineering evidence only. Never render caught import errors in player text.
+let fileImportFailure: { stage: string; error: unknown } | null = null;
 let pages: { week: number; k: number }[] = [];
 let speed = 1;
 let readingUntil = 0;
@@ -180,12 +183,19 @@ function openable(sv: Save | undefined): sv is Save {
     !!sv &&
     sv.format === SAVE_FORMAT &&
     sv.game === 'pass@20' &&
+    sv.hf4Host?.schema === HF4_HOST.schema &&
     sv.framework === FRAMEWORK_VERSION &&
     JSON.stringify(sv.hf4Engine) === JSON.stringify(frameworkEngine())
   );
 }
-const autosave = new Autosave<Save>(indexedJournalStorage<Save>((host) => !openable(host)));
+const failedSaveLineages = new Set<string>();
+const autosave = new Autosave<Save>(
+  indexedJournalStorage<Save>((host, lineage) => !openable(host) || failedSaveLineages.has(lineage)),
+);
 let savedRecord: Awaited<ReturnType<typeof autosave.read>> = null;
+let saveReadFailed = true;
+const saveReadProblem =
+  'This device could not read your saved game. Reload the page to try again before starting a new game.';
 
 function readSave(): Save | null {
   try {
@@ -211,6 +221,7 @@ function oldSave(): boolean {
   }
 }
 function writeSave(): Promise<boolean> {
+  if (saveReadFailed) return Promise.resolve(false);
   if (!s) return Promise.resolve(true);
   try {
     cast.assertActive(s);
@@ -277,6 +288,57 @@ const clock = (m: number) => {
   const d = ((whole % 1440) + 1440) % 1440;
   return `${String(Math.floor(d / 60)).padStart(2, '0')}:${String(d % 60).padStart(2, '0')}`;
 };
+/** Show the table only when the retained utterance uniquely identifies its recorded guest. */
+function displaySpeech(st: GameState, line: Pick<Said, 'at' | 'who' | 'text'>): string {
+  const original =
+    'I will explain the wait. I am leaving the other tables for three minutes. The cooks will keep the orders they already have.';
+  if (st.version !== 'pass@20') return line.text;
+  const guestWords = (who: string, at: number) => {
+    const matches = st.kitchen?.guests.filter(
+      (guest) =>
+        guest.who === who &&
+        guest.at === at &&
+        guest.action === 'explain-wait' &&
+        ['heard', 'explained', 'left-before-reply', 'interrupted'].includes(guest.outcome),
+    );
+    if (matches?.length !== 1) return original;
+    const tickets = st.tickets.filter((ticket) => ticket.id === matches[0]?.ticket);
+    if (tickets.length !== 1) return original;
+    const table = tickets[0]?.table;
+    if (table === undefined) return original;
+    return `I will tell table ${table} why their food is not here. I will leave my work for three minutes. The cooks will keep the orders they already have.`;
+  };
+  if (line.text === original) return guestWords(line.who, line.at);
+  // A follow-up repeats the retained utterance in the chef's words. Use the actual
+  // conversation source, not the cook currently selected or their present activity.
+  if (line.who === 'chef' && line.text.startsWith(`You said, “${original}”`)) {
+    const matches = st.kitchen?.conversations.filter(
+      (conversation) =>
+        conversation.at === line.at &&
+        conversation.source?.text === original &&
+        conversation.source?.at !== undefined &&
+        line.text ===
+          `You said, “${original}” Would you like to talk about that, ${nameOf(st, conversation.who)}?`,
+    );
+    const entry = matches?.length === 1 ? matches[0] : undefined;
+    const sourceAt = entry?.source?.at;
+    if (entry && sourceAt !== undefined) {
+      const words = guestWords(entry.who, sourceAt);
+      if (words !== original) return `You asked ${nameOf(st, entry.who)} about what they said: ${words}`;
+    }
+  }
+  return line.text;
+}
+
+/** Mark a display paraphrase; unchanged recorded words remain in quotation marks. */
+function speechWords(st: GameState, line: Pick<Said, 'at' | 'who' | 'text'>): string {
+  const words = displaySpeech(st, line);
+  return words === line.text ? `“${words}”` : `In plain words: ${words}`;
+}
+function speechTime(st: GameState, at: number): string {
+  return `${Math.floor(at / 1440) === Math.floor(st.minute / 1440) ? '' : 'another day, '}${clock(at)}`;
+}
+
 /** A hand-drawn line: a few jittered points between two ends, deterministic per key. */
 function wob(x1: number, y1: number, x2: number, y2: number, key: number, amp = 1.4): string {
   let d = `M${x1.toFixed(1)} ${y1.toFixed(1)}`;
@@ -293,7 +355,7 @@ const markLink = '<button id="game-menu" class="menu-trigger" aria-label="Game m
 const INFO: Record<string, [string, string]> = {
   title: [
     'The kitchen',
-    'Tap a cook, then tap a job. Hold the job button to insist, or use “Insist on a job”. A cook can say no. A promise means a party’s food comes first. With Nevin’s pace, tables wait longer before they leave. Money is in Turkish lira.',
+    'Tap a cook, then tap a job. Press and keep holding the job button to ask more firmly, or use “Ask more firmly”. This can cost their trust. A cook can say no. A promise means a party’s food comes first. With Nevin’s pace, tables wait longer before they leave. Money is in Turkish lira.',
   ],
   board: [
     'Tonight’s plan',
@@ -301,7 +363,7 @@ const INFO: Record<string, [string, string]> = {
   ],
   service: [
     'Running the pass',
-    'The pass is the counter where finished food waits to be served. To give a cook a job, tap the cook and then tap the job. To insist, hold the job button down or use “Insist on a job”. Insisting can cost you some of the cook’s trust. The words under each job are your guess at how the cook will answer. A ● means a dish is ready to serve. The bar at the top shows the money taken tonight. The mark on the bar shows how much you need tonight to pay Saturday’s bill. Time slows down when someone speaks to you or needs an answer.',
+    'The pass is the counter where finished food waits to be served. To give a cook a job, tap the cook and then tap the job. To ask more firmly, press and keep holding the job button, or use “Ask more firmly”. This can cost you some of the cook’s trust. The cook can still say no. The words under each job are your guess at how the cook will answer. A ● means a dish is ready to serve. The bar at the top shows the money taken tonight. The mark on the bar shows how much you need tonight to pay Saturday’s bill. Time slows down when someone speaks to you or needs an answer.',
   ],
   evening: [
     'The night',
@@ -374,12 +436,17 @@ function openGameMenu() {
   for (const id of ['menu-back', 'menu-close'])
     dialog.querySelector(`#${id}`)?.addEventListener('click', () => dialog.close());
   dialog.querySelector('#menu-new')?.addEventListener('click', () => {
+    if (saveReadFailed) {
+      (dialog.querySelector('#save-result') as HTMLElement).textContent = saveReadProblem;
+      return;
+    }
     (dialog.querySelector('#menu-new-confirm') as HTMLElement).hidden = false;
   });
   dialog.querySelector('#menu-new-no')?.addEventListener('click', () => {
     (dialog.querySelector('#menu-new-confirm') as HTMLElement).hidden = true;
   });
   dialog.querySelector('#menu-new-yes')?.addEventListener('click', async () => {
+    if (saveReadFailed) return;
     const button = dialog.querySelector('#menu-new-yes') as HTMLButtonElement;
     button.disabled = true;
     try {
@@ -605,13 +672,14 @@ export async function start() {
 async function title() {
   try {
     savedRecord = await autosave.read();
+    saveReadFailed = false;
   } catch {
-    savedRecord = null;
+    saveReadFailed = true;
   }
   lab.screen('title');
   cancelAnimationFrame(raf);
-  const save = readSave();
-  const old = !save && oldSave();
+  const save = saveReadFailed ? null : readSave();
+  const old = !saveReadFailed && !save && oldSave();
   const w1 = weekOf(1);
   const turnBack = (save?.pages ?? [])
     .map((p) => `<button data-page="${p.week}">Turn back to Sunday, week ${p.week}</button>`)
@@ -647,6 +715,7 @@ async function title() {
   const status = (message: string) => {
     (document.getElementById('title-status') as HTMLElement).textContent = message;
   };
+  if (saveReadFailed) status(saveReadProblem);
   const enterWithStatus = (message = '') => {
     enter();
     if (!message || message === cast.skippedMessage) return;
@@ -659,6 +728,10 @@ async function title() {
   };
   let confirmed: (() => void) | null = null;
   const ask = (message: string, action: () => void) => {
+    if (saveReadFailed) {
+      status(saveReadProblem);
+      return;
+    }
     if (sheet?.open) sheet.close();
     confirmed = action;
     (document.getElementById('title-confirm-message') as HTMLElement).textContent = message;
@@ -675,20 +748,38 @@ async function title() {
   document.getElementById('close-other-ways')?.addEventListener('click', () => sheet.close());
   document.getElementById('cont')?.addEventListener('click', async () => {
     if (!save) return;
+    let record: Awaited<ReturnType<typeof autosave.read>>;
     try {
-      const record = await autosave.read();
-      if (!record) throw new Error('Missing saved journal.');
-      const { state: restored, run, cursor } = restoreJournalState(save.state, save.hf4Host, record.journal);
-      await cast.restore(guardedContinuity(restored, save.continuity), false, true, restored);
+      record = await autosave.read();
+      savedRecord = record;
+    } catch {
+      saveReadFailed = true;
+      status(saveReadProblem);
+      return;
+    }
+    if (!record) {
+      void title();
+      return;
+    }
+    try {
+      const currentSave = record.host;
+      if (!openable(currentSave)) throw new Error('Saved game needs a new game.');
+      const {
+        state: restored,
+        run,
+        cursor,
+      } = restoreJournalState(currentSave.state, currentSave.hf4Host, record.journal);
+      await cast.restore(guardedContinuity(restored, currentSave.continuity), false, true, restored);
       autosave.adopt(run, record.journal, cursor);
-      firstPartyStart = save.firstPartyStart ?? false;
-      partyHandover = save.partyHandover ?? null;
-      pages = save.pages ?? [];
+      firstPartyStart = currentSave.firstPartyStart ?? false;
+      partyHandover = currentSave.partyHandover ?? null;
+      pages = currentSave.pages ?? [];
       filePlay = false;
       s = restored;
       cast.track();
       enterWithStatus(cast.message);
     } catch {
+      failedSaveLineages.add(record.journal.head.lineage);
       status(
         'This saved game could not be opened. It is still saved. Start a fresh game, or send Feedback from the menu.',
       );
@@ -722,7 +813,15 @@ async function title() {
       });
     });
   const begin = (secondWeek: boolean, firstParty = false) => {
+    if (saveReadFailed) {
+      status(saveReadProblem);
+      return;
+    }
     const start = () => {
+      if (saveReadFailed) {
+        status(saveReadProblem);
+        return;
+      }
       void (async () => {
         const nevin = app.querySelector<HTMLInputElement>('input[name="pace"]:checked')?.value === 'nevin';
         const seed = (Date.now() ^ (Math.random() * 1e9)) >>> 0;
@@ -761,6 +860,7 @@ async function title() {
   file?.addEventListener('change', async () => {
     const f = file.files?.[0];
     if (!f) return;
+    fileImportFailure = null;
     if (sheet?.open) sheet.close();
     try {
       const ex = JSON.parse(await f.text()) as Export & { minute?: number };
@@ -776,6 +876,7 @@ async function title() {
       }
       const r = await validateReplayFile(ex);
       const load = () => {
+        let stage = 'continuity-restore';
         void (async () => {
           await cast.restore(
             guardedContinuity(r, (ex as Export & { continuity?: ContinuitySave }).continuity),
@@ -783,6 +884,7 @@ async function title() {
             false,
             r,
           );
+          stage = 'file-activation';
           filePlay = true;
           s = r;
           cast.track();
@@ -791,9 +893,10 @@ async function title() {
           pages = [];
           writeSave();
           enterWithStatus('The game was replayed. It matches the saved game in the file.');
-        })().catch(() =>
-          status('Keep the original file and start a fresh game. This file could not be loaded.'),
-        );
+        })().catch((error: unknown) => {
+          fileImportFailure = { stage, error };
+          status('Keep the original file and start a fresh game. This file could not be loaded.');
+        });
       };
       if (save)
         ask(
@@ -801,7 +904,8 @@ async function title() {
           load,
         );
       else load();
-    } catch {
+    } catch (error: unknown) {
+      fileImportFailure = { stage: 'file-validation', error };
       status('Keep the original file and start a fresh game. This file could not be loaded.');
     }
   });
@@ -1444,6 +1548,8 @@ function collectSaid() {
 }
 
 function drawAll(force = false) {
+  // The final service step can close the night; evening renders its own screen.
+  if (s?.phase !== 'service') return;
   if (!force && (railHeld || performance.now() < railGraceUntil)) return;
   collectSaid();
   drawStatus();
@@ -1877,7 +1983,7 @@ function drawCaption() {
     ? s.said.findLast((line) => line.kind === 'answer' && line.who !== 'chef' && spokenAt - line.at <= 10)
     : undefined;
   const caption = spoken
-    ? `<span class="hand">${esc(spoken.who === 'narrator' ? spoken.text : `${nameOf(s, spoken.who)}: “${spoken.text}”`)}</span>`
+    ? `<span class="hand">${esc(spoken.who === 'narrator' ? spoken.text : `${speechTime(s, spoken.at)} · ${nameOf(s, spoken.who)}: ${speechWords(s, spoken)}`)}</span>`
     : peopleRun(s)
       ? esc(situation)
       : fresh && a
@@ -2045,13 +2151,14 @@ function drawSheet() {
   }
 
   if (rq?.state === 'asking') {
-    const key = `rq${rq.kind}${rq.at}`;
+    const header = crewHeader();
+    const key = `rq${rq.kind}${rq.at}${header}`;
     if (sheetKey === key) return;
     sheetKey = key;
     const [yes, no] = ANSWERS[rq.kind] ?? ['Yes', 'No'];
     renderPanel(
       el,
-      `${crewHeader()}<div class="card ink-in"><div class="hand">${esc(nameOf(st, rq.who))}: “${esc(gloss(requestText(st, rq)))}”</div>
+      `${header}<div class="card ink-in"><div class="hand">${esc(nameOf(st, rq.who))}: “${esc(gloss(requestText(st, rq)))}”</div>
       <p class="request-warning">${esc(cookRequestWarning(st, rq.who))} ${esc(publicPrayerPlan(st, rq.who))}</p><div class="row"><button id="yes">${esc(yes)}</button><button id="no">${esc(no)}</button></div></div>`,
     );
     const answer = (choice: 'yes' | 'no') => {
@@ -2074,13 +2181,13 @@ function drawSheet() {
       : undefined;
     const key = `j${st.minute}${st.inputs.length}${st.said.length}${seenHint.tap}${onShift(st)
       .map((id) => placeOf(id))
-      .join()}${st.crew.map((m) => cookOf(st, m.id).gone).join()}`;
+      .join()}${st.crew.map((m) => cookOf(st, m.id).gone).join()}${crewHeader()}`;
     if (sheetKey === key) return;
     sheetKey = key;
     const lineHTML = (x: Said) =>
       x.who === 'narrator'
         ? `<div class="${highlightedLines.has(x) ? 'new-log-line' : ''}">${peopleRun(st) ? `<time>${clock(x.at)}</time> ` : ''}${esc(gloss(journalWords(st, x)))}</div>`
-        : `<div class="hand ${highlightedLines.has(x) ? 'new-log-line' : ''}">${peopleRun(st) ? `<time>${clock(x.at)}</time> ` : ''}${esc(nameOf(st, x.who))}: “${esc(gloss(x.text))}”</div>`;
+        : `<div class="hand ${highlightedLines.has(x) ? 'new-log-line' : ''}">${peopleRun(st) ? `<time>${clock(x.at)}</time> ` : ''}${esc(nameOf(st, x.who))}: ${esc(gloss(speechWords(st, x)))}</div>`;
     const opening = lines.filter((x) => x.at === openAt(st.night) - 5 && x.who === 'narrator');
     const legacyOpening = st.night === 1 && lines.slice(-3).every((x) => x.at === openAt(1) - 5);
     const journal = peopleRun(st)
@@ -2110,7 +2217,7 @@ function drawSheet() {
       : peopleRun(st)
         ? st.said.findLast((line) => line.who === selected && line.kind === 'answer')
         : null;
-  const key = `c${selected}${h.at}${waiting}${absent}${doing}${st.inputs.length}${answer?.at}${answer?.text}`;
+  const key = `c${selected}${h.at}${waiting}${absent}${doing}${placeOf(selected)}${st.inputs.length}${answer?.at}${answer?.text}${crewHeader()}`;
   if (sheetKey === key) return;
   sheetKey = key;
   const guess = h.list.some((v) => v.guess);
@@ -2124,7 +2231,7 @@ function drawSheet() {
           `<button data-v="${v.verb}" ${waiting || absent || !attentionAvailable(st, selected as CookId) ? 'disabled' : ''}>${queued && st.inputs.slice(st.applied).some((i) => i.kind === 'ask' && i.cook === selected && i.verb === v.verb) ? 'asked…' : VERB_LABEL[v.verb]}${v.verb === stationOf(st, selected as CookId) ? ' (now)' : ''}<span class="h ${v.verdict === 'refused' ? 'no' : ''} ${v.guess ? 'guess' : ''}">${absent ? 'left the kitchen' : `${esc(gloss(v.short))}${v.guess ? '?' : ''}`}</span><span class="fill"></span></button>`,
       )
       .join('')}</div>
-    <details class="insist-choice"><summary>Insist on a job for ${esc(m.name)}</summary><p>Insisting puts pressure on ${esc(m.name)} and can cost their trust. They still choose how to answer.</p><div class="insist-jobs">${h.list.map((v) => `<button data-insist="${v.verb}" ${waiting || absent || !attentionAvailable(st, selected as CookId) ? 'disabled' : ''}>Insist: ${esc(m.name)}, ${VERB_LABEL[v.verb].toLowerCase()}</button>`).join('')}</div></details>
+    <details class="insist-choice"><summary>Ask more firmly: ${esc(m.name)}</summary><p>This puts pressure on ${esc(m.name)} and can cost their trust. They can still say no.</p><div class="insist-jobs">${h.list.map((v) => `<button data-insist="${v.verb}" ${waiting || absent || !attentionAvailable(st, selected as CookId) ? 'disabled' : ''}>Ask ${esc(m.name)} more firmly: ${VERB_LABEL[v.verb].toLowerCase()}</button>`).join('')}</div></details>
     ${(st.version === 'pass@13' || kitchenEdition(st)) && !absent && inKitchen(st, selected) ? `<div class="row crew-contact"><button data-contact="check-in">How are you doing?</button>${([FOLLOWUP_EDITION, NARRATION_EDITION, 'pass@17', 'pass@18', 'pass@20'].includes(st.version) ? !!heardTopic(st, selected) : st.said.some((line) => line.who === selected && line.at >= openAt(st.night) - 5)) ? `<button data-contact="follow-up">${[FOLLOWUP_EDITION, NARRATION_EDITION, 'pass@17', 'pass@18', 'pass@20'].includes(st.version) && heardTopic(st, selected)?.text.includes('sunset prayer') ? 'About the missed sunset prayer' : 'About what you said'}</button>` : ''}</div>` : ''}
     ${
       st.version === 'pass@20' && !absent
@@ -2136,7 +2243,7 @@ function drawSheet() {
                 )
                   .map(
                     (topic) =>
-                      `<button data-heard-topic="${esc(topic.id)}" ${contactAvailable(st, m.id, 'follow-up') ? '' : 'disabled'}>Talk about: “${esc(topic.text)}”</button>`,
+                      `<button data-heard-topic="${esc(topic.id)}" ${contactAvailable(st, m.id, 'follow-up') ? '' : 'disabled'}>Talk about ${topic.at === undefined ? 'an earlier conversation' : `what they said at ${speechTime(st, topic.at)}`}: ${esc(speechWords(st, { who: m.id, at: topic.at ?? -1, text: topic.text }))}</button>`,
                   )
                   .join('')}</details>`
               : ''
@@ -2164,11 +2271,11 @@ function drawSheet() {
             )
             .join(
               '',
-            )}<p class="soft">This needs a waiting grill order and both cooks in the kitchen, free to answer. A cook already working at the grill cannot be offered this lesson. After Selim answers, use the learner’s ordinary Grill control. Insisting uses the same pressure and trust cost as any job request.</p>${(st.grillLessons ?? []).map((lesson) => `<p>${esc(memberOf(st, lesson.learner).name)}: ${esc(lesson.state === 'practised' ? 'worked at the grill during guidance and afterwards as a portion finished' : lesson.state === 'demonstrated' ? 'worked at the grill during completed guidance' : lesson.state === 'waiting' || lesson.state === 'watching' ? 'guidance in progress; a separate grill request is still needed unless already answered' : lesson.state === 'no-food-work' ? 'guidance time ended without confirmed shared food work' : lesson.state === 'interrupted' ? 'guidance interrupted' : 'Selim did not agree to guide now')}.${lesson.learnerInsisted ? ' The learner complied after you insisted.' : ''}</p>`).join('')}<p class="soft">Observed work does not establish mastery or complete Selim’s larger aim.</p></details>`
+            )}<p class="soft">This needs a waiting grill order and both cooks in the kitchen, free to answer. A cook already working at the grill cannot be offered this lesson. After Selim answers, use the learner’s ordinary Grill control. Asking more firmly uses the same pressure and trust cost as any other job request.</p>${(st.grillLessons ?? []).map((lesson) => `<p>${esc(memberOf(st, lesson.learner).name)}: ${esc(lesson.state === 'practised' ? 'worked at the grill during guidance and afterwards as a portion finished' : lesson.state === 'demonstrated' ? 'worked at the grill during completed guidance' : lesson.state === 'waiting' || lesson.state === 'watching' ? 'guidance in progress; a separate grill request is still needed unless already answered' : lesson.state === 'no-food-work' ? 'guidance time ended without confirmed shared food work' : lesson.state === 'interrupted' ? 'guidance interrupted' : 'Selim did not agree to guide now')}.${lesson.learnerInsisted ? ' The learner complied after you asked more firmly.' : ''}</p>`).join('')}<p class="soft">Observed work does not establish mastery or complete Selim’s larger aim.</p></details>`
         : ''
     }
     ${kitchenEdition(st) && !absent ? '<div class="row"><button data-kitchen-task="room">Ask for fifteen minutes in the dining room</button><p class="soft">This cook cannot prepare food while working there.</p></div>' : ''}
-    <div class="panel-reply" role="status">${answer ? `“${esc(gloss(answer.text))}”` : ''}</div>${!attentionAvailable(st, selected as CookId) ? '<p class="soft" role="status">Let this cook finish this part of their work before asking again. The kitchen keeps running.</p>' : ''}<div class="hint">${
+    <div class="panel-reply" role="status">${answer ? `Said at ${speechTime(st, answer.at)}: ${esc(gloss(speechWords(st, answer)))}` : ''}</div>${!attentionAvailable(st, selected as CookId) ? '<p class="soft" role="status">Let this cook finish this part of their work before asking again. The kitchen keeps running.</p>' : ''}<div class="hint">${
       absent
         ? 'This cook has left the kitchen.'
         : guess
@@ -2176,8 +2283,8 @@ function drawSheet() {
           : seenHint.job
             ? waiting
               ? 'They heard you.'
-              : 'Hold a job button, or open “Insist on a job” and choose a job. If they already agreed, insisting puts more pressure on them.'
-            : 'Tap a job to ask. Hold it to insist, or open “Insist on a job” for tap and keyboard controls.'
+              : 'Press and keep holding a job button, or open “Ask more firmly” and choose a job. Asking again more firmly puts more pressure on them, even if they already agreed.'
+            : 'Tap a job to ask. Press and keep holding it to ask more firmly, or open “Ask more firmly” for tap and keyboard controls.'
     }</div>`,
   );
   bindCrew(el);
@@ -2288,13 +2395,43 @@ function crewRow(): string {
     .filter((m) => !m.left && cookOf(st, m.id).here)
     .map((m) => {
       const c = cookOf(st, m.id);
-      return `<button data-pick="${m.id}" aria-pressed="${selected === m.id}" ${c.gone ? 'disabled' : ''}><b>${esc(m.name)}</b><span class="soft">${c.gone ? 'has left' : (WHERE[placeOf(m.id)] ?? '')}</span></button>`;
+      return `<button data-pick="${m.id}" aria-pressed="${selected === m.id}" ${c.gone ? 'disabled' : ''}><b>${esc(m.name)}</b><span class="soft">${c.gone ? 'has left' : `Now: ${WHERE[placeOf(m.id)] ?? 'free'}`}</span></button>`;
     })
     .join('')}</div>`;
 }
 
+function homeRecovery(st: GameState): string {
+  if (st.phase !== 'service') return '';
+  const departed = st.cooks.filter(
+    (cook) =>
+      cook.gone &&
+      cook.night.events.some(
+        (event) =>
+          event.verb === 'home' &&
+          event.at >= openAt(st.night) - 5 &&
+          ['assented', 'complied', 'countered'].includes(event.verdict),
+      ),
+  );
+  if (!departed.length) return '';
+  const available = onShift(st);
+  const ticket = st.tickets.filter((t) => t.status === 'open').sort((a, b) => a.at - b.at || a.id - b.id)[0];
+  const parts = ticket
+    ? (['cold', 'grill', 'oven'] as const)
+        .filter((station) => ticket[station] > 0)
+        .map((station) => {
+          const done =
+            station === 'cold' ? ticket.doneCold : station === 'grill' ? ticket.doneGrill : ticket.doneOven;
+          return `${VERB_LABEL[station].toLowerCase()}: ${done} finished, ${Math.max(0, ticket[station] - done)} still needed`;
+        })
+        .join('; ')
+    : '';
+  const coverWaiting = !!(availableStaffing(st)[0] ?? actionableStaffing(st)[0]);
+  const names = departed.map((cook) => nameOf(st, cook.id)).join(', ');
+  return `<div class="card" data-home-recovery><p>${esc(names)} ${departed.length === 1 ? 'has' : 'have'} gone home for this service. Finished food stays on each ticket.</p>${ticket ? `<p>Oldest open ticket, table ${ticket.table}: ${esc(parts)}.</p>` : '<p>There is no open ticket now.</p>'}<p>${available.length ? `You can ask ${esc(available.map((id) => nameOf(st, id)).join(', '))} to work at the ${VERB_LABEL.cold.toLowerCase()}, wait for the work to finish, then ask them to return to the ${VERB_LABEL.grill.toLowerCase()} or another station.` : 'No cook is available to ask now.'} One person can work at one station at a time. A cook can refuse. Tables keep waiting.</p>${coverWaiting ? '<p>Answer the cover question first.</p>' : ''}${available.map((id) => `<button data-recovery-cook="${esc(id)}" ${coverWaiting ? 'disabled' : ''}>Choose ${esc(nameOf(st, id))}’s job</button>`).join('')}</div>`;
+}
+
 function crewHeader(): string {
-  return `<div class="who">${crewRow()}<button class="x" id="close" aria-label="Close" ${selected ? '' : 'style="visibility:hidden"'}>×</button></div>`;
+  return `<div class="who">${crewRow()}<button class="x" id="close" aria-label="Close" ${selected ? '' : 'style="visibility:hidden"'}>×</button></div>${s ? homeRecovery(s) : ''}`;
 }
 
 function foodWork(st: GameState): string {
@@ -2452,6 +2589,18 @@ function drawChefWork() {
 }
 
 function bindCrew(el: HTMLElement) {
+  for (const b of el.querySelectorAll<HTMLButtonElement>('[data-recovery-cook]'))
+    b.onclick = () => {
+      if (!s || b.disabled || availableStaffing(s)[0] || actionableStaffing(s)[0]) return;
+      const id = b.dataset.recoveryCook as CookId;
+      if (!onShift(s).includes(id)) return;
+      if (selected !== id) select(id);
+      else {
+        sheetKey = '';
+        drawSheet();
+      }
+      el.querySelector<HTMLButtonElement>('.verbs button:not(:disabled)')?.focus({ preventScroll: true });
+    };
   const close = document.getElementById('close');
   if (close) close.onclick = () => select(null);
   for (const b of el.querySelectorAll<HTMLButtonElement>('[data-pick]'))
@@ -3016,6 +3165,9 @@ document.addEventListener('visibilitychange', () => {
 });
 
 export const _debug = {
+  get fileImportFailure() {
+    return fileImportFailure;
+  },
   readSave,
   oldSave,
   refresh: () => enter(),

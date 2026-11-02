@@ -23,10 +23,10 @@ export interface JournalStorage<T> {
 
 /** One transaction commits a new chunk, the head, and the matching host snapshot. */
 /**
- * `retain` marks a stored save this edition can no longer open. Replacing it keeps its original head and
- * chunks under a separate key instead of deleting them, so a new game never destroys an unreadable save.
+ * `retain` marks a stored save that could not be opened. Replacing it keeps its original head and
+ * chunks under a separate key instead of deleting them. The stored original stays intact.
  */
-export function indexedJournalStorage<T>(retain?: (host: T) => boolean): JournalStorage<T> {
+export function indexedJournalStorage<T>(retain?: (host: T, lineage: string) => boolean): JournalStorage<T> {
   let db: Promise<IDBDatabase> | undefined;
   const open = () =>
     (db ??= new Promise<IDBDatabase>((resolve, reject) => {
@@ -47,19 +47,23 @@ export function indexedJournalStorage<T>(retain?: (host: T) => boolean): Journal
         const headRequest = tx.objectStore('head').get('current');
         let result: { host: T; journal: Journal } | null = null;
         headRequest.onsuccess = () => {
-          const value = headRequest.result as Omit<Commit<T>, 'chunk'> | undefined;
-          if (!value) return;
-          const range = IDBKeyRange.bound(
-            [value.head.lineage, 0],
-            [value.head.lineage, Number.MAX_SAFE_INTEGER],
-          );
-          const chunks = tx.objectStore('chunks').getAll(range);
-          chunks.onsuccess = () => {
-            result = {
-              host: value.host,
-              journal: { opening: value.opening, head: value.head, chunks: chunks.result },
+          try {
+            const value = headRequest.result as Omit<Commit<T>, 'chunk'> | undefined;
+            if (value === undefined) return;
+            const range = IDBKeyRange.bound(
+              [value.head.lineage, 0],
+              [value.head.lineage, Number.MAX_SAFE_INTEGER],
+            );
+            const chunks = tx.objectStore('chunks').getAll(range);
+            chunks.onsuccess = () => {
+              result = {
+                host: value.host,
+                journal: { opening: value.opening, head: value.head, chunks: chunks.result },
+              };
             };
-          };
+          } catch {
+            tx.abort();
+          }
         };
         tx.oncomplete = () => resolve(result);
         tx.onerror = () => reject(tx.error);
@@ -74,23 +78,56 @@ export function indexedJournalStorage<T>(retain?: (host: T) => boolean): Journal
         const chunks = tx.objectStore('chunks');
         const old = heads.get('current');
         old.onsuccess = () => {
-          const previous = old.result as Omit<Commit<T>, 'chunk'> | undefined;
-          if (previous && (value.fresh || previous.head.lineage !== value.head.lineage)) {
-            if (retain?.(previous.host as T)) heads.put(previous, `kept:${previous.head.lineage}`);
-            else
-              chunks.delete(
-                IDBKeyRange.bound(
-                  [previous.head.lineage, 0],
-                  [previous.head.lineage, Number.MAX_SAFE_INTEGER],
-                ),
+          try {
+            const previous = old.result as Omit<Commit<T>, 'chunk'> | undefined;
+            const replacing = previous && (value.fresh || previous.head.lineage !== value.head.lineage);
+            const keep = replacing && retain?.(previous.host as T, previous.head.lineage);
+            // A journal's lineage is its opening digest. Equal initial data can reuse it.
+            // Refuse that collision rather than overwriting any retained raw chunks.
+            if (previous && keep && previous.head.lineage === value.head.lineage) {
+              tx.abort();
+              return;
+            }
+            const write = () => {
+              try {
+                if (previous && replacing) {
+                  // add, not put: an earlier archive must never be overwritten.
+                  if (keep) heads.add(previous, `kept:${previous.head.lineage}`);
+                  else
+                    chunks.delete(
+                      IDBKeyRange.bound(
+                        [previous.head.lineage, 0],
+                        [previous.head.lineage, Number.MAX_SAFE_INTEGER],
+                      ),
+                    );
+                }
+                if (value.fresh && previous?.head.lineage === value.head.lineage)
+                  chunks.delete(
+                    IDBKeyRange.bound([value.head.lineage, 0], [value.head.lineage, Number.MAX_SAFE_INTEGER]),
+                  );
+                if (value.chunk) chunks.put(value.chunk);
+                heads.put({ host: value.host, opening: value.opening, head: value.head }, 'current');
+              } catch {
+                tx.abort();
+              }
+            };
+            if (value.fresh || previous?.head.lineage !== value.head.lineage) {
+              const archived = heads.getKey(`kept:${value.head.lineage}`);
+              const occupied = chunks.getAllKeys(
+                IDBKeyRange.bound([value.head.lineage, 0], [value.head.lineage, Number.MAX_SAFE_INTEGER]),
               );
+              occupied.onsuccess = () => {
+                if (
+                  archived.result !== undefined ||
+                  (occupied.result.length > 0 && previous?.head.lineage !== value.head.lineage)
+                ) {
+                  tx.abort();
+                } else write();
+              };
+            } else write();
+          } catch {
+            tx.abort();
           }
-          if (value.fresh && (!previous || previous.head.lineage !== value.head.lineage))
-            chunks.delete(
-              IDBKeyRange.bound([value.head.lineage, 0], [value.head.lineage, Number.MAX_SAFE_INTEGER]),
-            );
-          if (value.chunk) chunks.put(value.chunk);
-          heads.put({ host: value.host, opening: value.opening, head: value.head }, 'current');
         };
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);

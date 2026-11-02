@@ -7,6 +7,7 @@ import {
 } from '@adam0white/human-framework-legacy';
 import { canonicalPersona, type PersonaEnvelope, validatePersona } from '@adam0white/lab-client';
 import { requireChapterAuthority, validateKitchenChapter } from './cast-chapter.ts';
+import { HF4_HOST } from './hf4-run.ts';
 import { canReplay, cloneState, type Export, type GameState, personOf, replay } from './kitchen.ts';
 import { returnedZeynep, zeynepDepartureStatus } from './one-cast.ts';
 
@@ -18,7 +19,10 @@ export interface ReturnChapter {
 }
 
 type ReplayFile = Pick<Export, 'game' | 'seed' | 'inputs'> &
-  Partial<Pick<Export, 'state' | 'returnChapter' | 'castChapter' | 'plainNarration'>> & { minute?: number };
+  Partial<Pick<Export, 'state' | 'returnChapter' | 'castChapter' | 'plainNarration'>> & {
+    minute?: number;
+    hf4Host?: { schema?: string };
+  };
 
 const canonicalJson = (value: unknown) => canonicalPersona(JSON.parse(JSON.stringify(value)));
 
@@ -115,7 +119,23 @@ export async function prepareReturn(envelope: PersonaEnvelope, prefix: Export): 
 }
 
 export function replayExport(ex: ReplayFile): GameState {
-  if (ex.game === 'pass@20') requireChapterAuthority(ex.castChapter ?? ex.state?.castChapter);
+  if (ex.game === 'pass@20') {
+    requireChapterAuthority(ex.castChapter ?? ex.state?.castChapter);
+    const host = ex.state?.hf4?.archive.host;
+    // Files carry the full checkpoint. Native Sunday rewind carries its journal header.
+    if (
+      (host
+        ? ex.state?.hf4?.schema !== HF4_HOST.schema ||
+          host.id !== HF4_HOST.id ||
+          host.edition !== HF4_HOST.edition ||
+          host.schema !== HF4_HOST.schema
+        : ex.hf4Host?.schema !== HF4_HOST.schema) ||
+      (ex.hf4Host !== undefined && ex.hf4Host.schema !== HF4_HOST.schema)
+    )
+      throw new Error(
+        'Keep this file and start a new game. This kitchen uses different guest request rules.',
+      );
+  }
   if (!canReplay(ex.game) || !Number.isSafeInteger(ex.seed) || !Array.isArray(ex.inputs))
     throw new Error('That is not a supported Pass notebook.');
   const header = ex.returnChapter ?? ex.state?.returnChapter;

@@ -1,4 +1,36 @@
+## Current combined candidate — 2026-11-02
+
+Remaining: exact independent review, signed source/target CI and deployment/live checks. Adam accepts readiness. No third player panel is planned; the source is uncommitted.
+
+The recovery guidance passes one preregistered ordinary Monday scenario at seed42. Actual Dilek departure, Selim's initial modified reply, one later costly cold Insist, real cold work, ordinary grill return and an autonomous table explanation all remain. Both arms continue through authored22:00 close and ordinary evening to23:10. Recovery serves6 orders for240 actual till receipts; leaving the remaining cook unchanged serves5 for200. Both complete native checkpoints and full host/HF/RNG replay pass. This is one technical scenario, not general benefit or player acceptance. The earlier17:47 cash40=40 result remains part of the evidence.
+
+The guidance stays visible during the cover question, disables its shortcut until that question is answered, and opens the existing cook job sheet without queuing a request. It describes refusal, an uncovered station and waiting tables. No simulation, costs, forced obedience or chef preparation clicks changed. The late-night control also found service rendering querying invalid-duration job hints after close; drawAll now stops outside service and the ordinary frame proceeds to evening.
+
+Actual full-night recovery GREEN15651/d41a5b passes with a retained5.94MB witness and two native archives, all12 sampled identities absent, source unchanged and port5186 free. All nine F-2500/F-2505 combined-source browser regressions pass after declared safe formatting, with source unchanged and all20 sampled identities returned. The normal lint/full TypeScript lane and production build also pass. Lint reports24 warnings; the build retains its chunk/dynamic-import warnings. The complete-night recovery control is a separate pass with preserved native/witness bodies. Save collisions still fail closed and may leave a fresh identical-lineage game unsaved. No request is marked fixed before delivery.
+
+Earlier dated entries follow; their pending labels describe those source stages.
+
+## Earlier correction checkpoint — 2026-11-02 (historical)
+
+Remaining: prove a physical F-2502 recovery route, implement only supported UI, run the combined normal lane and exact independent review, obtain signed source/target CI and deployment/live checks. Adam accepts readiness. Current candidates are uncommitted.
+
+F-2500 now passes three prepared browser controls: a journal read failure blocks replacement; a failed Resume preserves the original journal and raw chunks across confirmed replacement; an aborted replacement transaction preserves both stores. The read-error path does not treat an unknown save as empty. The existing atomic transaction and collision refusal remain. Equal-opening collision may leave a fresh game unsaved; that is not a proven usable new-save outcome. F-2505's earlier six controls and lane pass remain separate and preserved.
+
+The first F-2502 fixed-seed control did send Dilek home, then Selim's ordinary cold request returned modified and selected grill at17:27 before the selected ticket arrived. It stopped before actual cold work, payment or the missing-UI assertion. This is a scenario prerequisite failure, not UI RED. A source-only revision keeps that refusal, waits for the already selected ticket, and makes one existing keyboard Insist request with the existing warning/cost. It still requires actual assent, cold work, ordinary grill return, payment, matched no-recovery difference and full replay in both arms. The revised control is UNRUN. No recovery UI or simulation change has been made. No retries, seed search, forced assent or weaker acceptance assertion is authorized.
+
+Earlier dated entries follow and may show superseded pending states.
+
 # Pass handoff
+
+## Guest-start repair candidate — 2026-11-01 (source only, UNRUN)
+
+Remaining: root execution and exact independent review. The first current F-2505 browser attempts failed: attempt2 selected historical matching speech after a bathroom transition; attempt3 found no ongoing accepted visit. Both remain in `games-deferred/pass-f2505-browser-first1101-attempt2` and `attempt3`. This candidate settles current guest decisions through the existing explicit foreground path and checks actual public activity before recording heard/washing or the three-minute promise. Failed starts retain the actual verdict and record a narrator notice; actual activity IDs bind completion and interruption. Historical HF3 routes remain unchanged.
+
+This changes deterministic current host behavior. New pass@20 games use host/checkpoint/journal schema `pass-hf4/2`; `/1` files and native saves require a fresh game. Native admission uses the same header so existing original-preserving storage retains incompatible saves. Sunday rewind accepts the current journal header. No legacy continuation or edition switch is added. The six F-2505 controls remain: two sizes, one labelled host-only fallback and one each tap/hold/keyboard. Witness selection scans all matching actual speaker/time evidence and requires the same public HF activity ID. The 360 control adds full host/HF replay, actual guest evidence and old-schema refusal checks. Every execution gate is UNRUN for these bytes. F-2502 is not implemented. Root retains this worktree and cleanup. Full patch, backup and rationale: `games-deferred/pass-guest-start-repair1101.md` and `.json`.
+
+## F-2505 source candidate — 2026-11-01 (uncommitted, controls UNRUN)
+
+Remaining: run the written ordinary-input pass@20 explain-wait browser controls and review the full candidate before any commit. The controls construct seed 42 night two from ordinary inputs, fail if its accepted event is absent, check its cook/time/guest/ticket and original topic, and cover dated display, a real activity transition, a labelled host-only open request and missing/ambiguous evidence. Tap, hold and keyboard controls compare the existing input, answer, trust and full host/HF replay. All controls are UNRUN, including runtime, tests, review, CI and deployment. This source-only candidate does not establish player acceptance or fix any player ask. F-2502 and F-2500 remain source-trace follow-ups; do not infer free cover, obedience, automatic undo or a successful saved reload. The director retains the worktree and runs the checks. Handback: `~/code/.lab-scratch/games-deferred/pass-f2505-control1101-result.md` and `.json`.
 
 ## Player-loop documentation checkpoint — 2026-10-31
 

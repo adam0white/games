@@ -56,7 +56,15 @@ export interface KitchenWorld {
     at: number;
     action: string;
     verdict: string;
-    outcome: 'heard' | 'explained' | 'unanswered' | 'washing' | 'left-before-reply';
+    activity?: string;
+    outcome:
+      | 'heard'
+      | 'explained'
+      | 'unanswered'
+      | 'washing'
+      | 'left-before-reply'
+      | 'not-started'
+      | 'interrupted';
   }[];
   conversations: {
     who: string;
@@ -380,6 +388,16 @@ export function kitchenInterrupted(s: GameState, who: string, action: string, at
   }
   const conversation = s.kitchen?.conversations.find((entry) => entry.activity === activity);
   if (conversation) conversation.interrupted = at;
+  const guest = s.kitchen?.guests.find((entry) => entry.activity === activity && entry.outcome === 'heard');
+  if (guest && action === 'explain-wait') {
+    guest.outcome = 'interrupted';
+    words(
+      s,
+      'narrator',
+      `${nameOf(s, who)} stopped explaining the wait before finishing. The order is unchanged.`,
+      at,
+    );
+  }
   const clearing = s.kitchen?.clearings?.find(
     (entry) => entry.activity === activity && entry.outcome === 'clearing',
   );
@@ -445,7 +463,9 @@ export function kitchenCompleted(s: GameState, who: string, action: string, at: 
     }
   }
   if (action === 'explain-wait') {
-    const entry = world.guests.findLast((x) => x.who === who && x.outcome === 'heard');
+    const entry = world.guests.findLast(
+      (x) => x.who === who && x.outcome === 'heard' && (!x.activity || x.activity === activity),
+    );
     if (entry) {
       const table = s.tickets.find((t) => t.id === entry.ticket);
       entry.outcome = table?.status === 'walked' ? 'left-before-reply' : 'explained';
@@ -542,18 +562,42 @@ export function kitchenMinute(s: GameState) {
     const rec = decide(p, a.affordanceId === requested ? [a.affordance] : [a.affordance, requestedOffer], {
       now: s.minute,
       suggestion: { voiceId: `table:${t.id}`, affordanceId: requested, strength: 0.5 },
+      settleForeground: s.version === 'pass@20',
     });
     const accepted =
       rec.chosenAffordanceId === requested &&
       ['assented', 'complied'].includes(rec.suggestion?.verdict ?? '');
+    // HF4 begin confirms public activity; an answer alone does not start work.
+    // Historical editions retain their original start order and behavior.
+    const current = s.version === 'pass@20';
+    const started = accepted && (!current || start(s, c.id, requestedOffer, rec, a));
+    const activity =
+      current && started ? communityRun(p).active.find((entry) => entry.person === c.id)?.id : undefined;
     world.guests.push({
       ticket: t.id,
       who: c.id,
       at: s.minute,
       action: requested,
       verdict: rec.suggestion?.verdict ?? 'refused',
-      outcome: accepted ? (requested === 'dish' ? 'washing' : 'heard') : 'unanswered',
+      ...(activity ? { activity } : {}),
+      outcome: started
+        ? requested === 'dish'
+          ? 'washing'
+          : 'heard'
+        : accepted
+          ? 'not-started'
+          : 'unanswered',
     });
+    if (current && !started) {
+      // Preserve HF's actual verdict without inventing a cook's refusal or next action.
+      if (rec.suggestion?.says) words(s, c.id, rec.suggestion.says);
+      words(
+        s,
+        'narrator',
+        `${p.name} did not start ${requested === 'dish' ? 'washing plates' : 'explaining the wait'} for table ${t.table}. The order and its wait are unchanged.`,
+      );
+      continue;
+    }
     words(
       s,
       c.id,
@@ -563,7 +607,7 @@ export function kitchenMinute(s: GameState) {
           : 'I will explain the wait. I am leaving the other tables for three minutes. The cooks will keep the orders they already have.'
         : `${rec.suggestion?.says ?? 'No.'} I am staying with my work. Your order and your wait have not changed.`,
     );
-    if (accepted) start(s, c.id, requestedOffer, rec, a);
+    if (accepted && !current) start(s, c.id, requestedOffer, rec, a);
   }
 }
 
@@ -764,7 +808,9 @@ export function heardTopics(s: GameState, who: string): HeardTopic[] {
             ? 'I explained the wait. I did not promise to put that table ahead of the other orders.'
             : visit.outcome === 'left-before-reply'
               ? 'They left before I finished explaining. Speaking to them did not finish their order.'
-              : 'I agreed to explain the wait. That does not finish their order or put it ahead of the others.';
+              : visit.outcome === 'interrupted'
+                ? 'I stopped before I finished explaining. Their order is unchanged.'
+                : 'I agreed to explain the wait. That does not finish their order or put it ahead of the others.';
     }
     if (reply) topics.push({ id: `said:${index}`, at: line.at, text: line.text, reply });
   }

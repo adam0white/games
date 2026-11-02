@@ -477,6 +477,12 @@ GDI-568, GDI-569 and GDI-642 are candidate source only. Parent independent revie
 signed delivery, exact green CI and live release checks remain. Adam accepts
 game readiness. No player round was run.
 
+## Current engineering checkpoint — 2026-11-02
+
+F-2500 save protection, F-2505 current-word evidence and F-2502 recovery guidance are combined source candidates. The three save-failure controls and earlier six wording controls pass separately. The new fixed-seed Monday recovery control passes actual native/host replay, till accounting, full service outcomes and guidance controls:240 receipts/6 served against200/5 in the unchanged remaining-cook arm. Both worlds retain refusal, real elapsed work, pressure costs and autonomous interruptions. This is a single-scenario technical result, not a new player judgment or a general win guarantee. The post-close rendering exception found by that control has a service-phase guard candidate.
+
+The combined lint/full TypeScript lane, nine save/wording browser regressions and production build pass. Exact review, signed source/target CI and live delivery remain. Inspection target2026-11-03 is a checkpoint while engineering continues. The sealed literal asks, returns, historical dates and owner acceptance remain unchanged below; no fixed marker is added.
+
 ## Deferred — second retest asks, 2026-10-31 (F-2496–F-2510)
 
 Source: the second Pass retest, a fictional agent panel on commit `288b2fda7c8589931a9d9e8f044f1a8aaf630333`, app 0.1.0, Human Framework 4.12.0, round `light-1031-pass-retest2`. The panel was the same four standing testers (Maya, Emre, Nia, Rosa) and one new cold tester (Sonia), each in fresh independent contexts on a phone and a desktop, one tester at a time, with a free stop. Collection ended 2026-10-31T07:36:57.910821Z. These are synthetic observations, not human recruitment, and the run lengths (73.602–455 seconds) are model and tool time, not human reading speed.

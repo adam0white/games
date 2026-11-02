@@ -28,7 +28,9 @@ import {
 } from '@adam0white/human-framework';
 
 export const MINUTE_MS = 60_000;
-export const HF4_HOST = { id: 'pass', edition: 'pass@20', schema: 'pass-hf4/1' } as const;
+// /2 settles guest requests before withdrawing their offers and confirms actual starts.
+// /1 worlds cannot continue under that changed deterministic host behavior.
+export const HF4_HOST = { id: 'pass', edition: 'pass@20', schema: 'pass-hf4/2' } as const;
 export function admitted<T>(result: Result<T>): T {
   if (!result.ok) throw new Error(`${result.error.code} ${result.error.path}: ${result.error.message}`);
   return result.value;
@@ -53,7 +55,7 @@ export interface KitchenRunState {
   }[];
 }
 export interface KitchenCheckpoint {
-  schema: 'pass-hf4/1';
+  schema: 'pass-hf4/2';
   archive: DeepReadonly<RunArchive>;
   ingress: { minute: number; phase: number; serial: number };
   offers: [string, Offer[]][];
@@ -96,7 +98,7 @@ export class KitchenRun {
 
   static restore(value: KitchenCheckpoint): KitchenRun {
     if (
-      value.schema !== 'pass-hf4/1' ||
+      value.schema !== HF4_HOST.schema ||
       value.archive.host.id !== HF4_HOST.id ||
       value.archive.host.edition !== HF4_HOST.edition ||
       value.archive.host.schema !== HF4_HOST.schema
@@ -107,6 +109,7 @@ export class KitchenRun {
   }
 
   static restoreJournal(value: Omit<KitchenCheckpoint, 'archive'>, journal: DeepReadonly<RunJournalArchive>) {
+    if (value.schema !== HF4_HOST.schema) throw new Error('Keep this file. This kitchen needs a new game.');
     const recovered = admitted(restoreRunJournal(journal));
     const archive = exportRun(recovered.run);
     const run = KitchenRun.fromRun({ ...value, archive }, recovered.run);
@@ -115,7 +118,7 @@ export class KitchenRun {
 
   private static fromRun(value: KitchenCheckpoint, run: Run): KitchenRun {
     if (
-      value.schema !== 'pass-hf4/1' ||
+      value.schema !== HF4_HOST.schema ||
       value.archive.host.id !== HF4_HOST.id ||
       value.archive.host.edition !== HF4_HOST.edition ||
       value.archive.host.schema !== HF4_HOST.schema
@@ -183,7 +186,7 @@ export class KitchenRun {
   }
   checkpoint(): KitchenCheckpoint {
     return {
-      schema: 'pass-hf4/1',
+      schema: HF4_HOST.schema,
       archive: exportRun(this.run),
       ...(this.pending ? { pending: this.pending } : {}),
       ingress: { ...this.ingress },
@@ -195,7 +198,7 @@ export class KitchenRun {
   }
   journalHost(): Omit<KitchenCheckpoint, 'archive'> {
     return {
-      schema: 'pass-hf4/1',
+      schema: HF4_HOST.schema,
       ...(this.pending ? { pending: this.pending } : {}),
       ingress: { ...this.ingress },
       offers: [...this.offers].map(([id, offers]) => [id, structuredClone(offers)]),
