@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createGame, dispatch } from '../src/game/engine';
 import { createModel } from '../src/game/model';
+import { methodRecords } from '../src/game/people';
+import { loadGame, saveGame } from '../src/game/persistence';
 import type { Command, GameState } from '../src/game/types';
+import { lessonWords } from '../src/ui/workshop-feedback';
 
 function act(state: GameState, command: Command): GameState {
   const result = dispatch(state, command);
@@ -40,6 +43,13 @@ describe('condition-specific observed intervention outcomes', () => {
     expect(state.jobs[0]?.pendingLessons).toHaveLength(1);
     state = act(state, { type: 'verify', jobId, condition: 'movement' });
     expect(outcomes(state, 'clean:contact')).toEqual(['failure']);
+    const raw = saveGame(state);
+    const spoken = state.log.findLast(
+      (line) => line.speaker === 'Sam' && line.text.startsWith('The check showed no improvement'),
+    );
+    if (!spoken) throw new Error('Missing actual unsuccessful lesson outcome');
+    expect(lessonWords(spoken.speaker, spoken.text)).not.toBe(spoken.text);
+    expect(saveGame(state)).toBe(raw);
     expect(state.jobs[0]?.verified).not.toContain('movement');
   });
 
@@ -68,6 +78,40 @@ describe('condition-specific observed intervention outcomes', () => {
     state = act(state, { type: 'verify', jobId, condition: 'movement' });
     expect(outcomes(state, 'replace:switch')).toEqual(['success']);
     expect(state.jobs[0]?.pendingLessons).toHaveLength(0);
+    const sam = state.people.sam;
+    if (!sam) throw new Error('Missing Sam');
+    const raw = saveGame(state);
+    const index = sam.methods.rules.findIndex((rule) => rule.action === 'replace:switch');
+    const evidence = sam.methods.rules[index]?.evidence[0];
+    if (!evidence) throw new Error('Missing observed method evidence');
+    const source = methodRecords(sam, state)[index]?.sources[0];
+    expect(source).toMatchObject({
+      kind: 'witnessed',
+      jobId,
+      evidenceId: evidence.id,
+      at: evidence.at,
+      sourceId: evidence.sourceId,
+    });
+    const restored = loadGame(raw);
+    expect(methodRecords(restored.people.sam!, restored)).toEqual(methodRecords(sam, state));
+    // Presentation-only retention fixtures reuse actual evidence; they author no person or act.
+    const inherited = methodRecords(sam, { ...state, openingPeople: { sam } });
+    expect(inherited[index]?.sources[0]?.kind).toBe('earlier');
+    expect(inherited[index]?.sources[0]?.jobId).toBeUndefined();
+    const unlinked = methodRecords(sam, {
+      ...state,
+      jobs: state.jobs.map((job) => ({ ...job, evidence: [] })),
+    });
+    expect(unlinked[index]?.sources[0]).toMatchObject({ kind: 'unlinked', jobId });
+    expect(methodRecords(sam, { ...state, jobs: [] })[index]?.sources[0]?.kind).toBe('unknown');
+    const spoken = state.log.findLast(
+      (line) =>
+        line.speaker === 'Sam' && line.text.startsWith('The check showed that repair step helped.'),
+    );
+    if (!spoken) throw new Error('Missing actual successful lesson outcome');
+    expect(lessonWords(spoken.speaker, spoken.text)).not.toBe(spoken.text);
+    expect(lessonWords('Workshop', spoken.text)).toBe(spoken.text);
+    expect(saveGame(state)).toBe(raw);
   });
 
   it('retains a measured local improvement when a different fault still blocks use', () => {

@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { SamOffer } from '../src/components/SamOffer';
 import { SamRequest } from '../src/components/SamRequest';
 import { createGame, dispatch, saveGame } from '../src/game/engine';
 import { chooseActivity, createPeople, reportDelivery, startActivity } from '../src/game/people';
@@ -145,4 +146,20 @@ describe('independent availability and return review', () => {
     expect(result.jobs).toHaveLength(state.jobs.length);
     expect(result.log.some((entry) => entry.text.includes('back in use'))).toBe(false);
   });
+});
+
+it('renders the offer only after its presentation gate opens', () => {
+  const action = createElement(
+    'button',
+    { type: 'button' },
+    'Ask Sam to take charge of the repair',
+  );
+  const locked = renderToStaticMarkup(
+    createElement(SamOffer, { available: false, actions: action }),
+  );
+  const open = renderToStaticMarkup(createElement(SamOffer, { available: true, actions: action }));
+  expect(locked).not.toContain('<button');
+  expect(locked).toContain('three checked objects');
+  expect(open).toContain('<button');
+  expect(open).toContain('Sam decides whether to accept');
 });

@@ -1,8 +1,9 @@
-import { isValidElement, type ReactElement, type ReactNode } from 'react';
+import { createElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { FirstRepairGuide } from '../src/components/FirstRepairGuide';
-import { createGame, dispatch } from '../src/game/engine';
+import { MeterContext } from '../src/components/MeterContext';
+import { createGame, dispatch, saveGame } from '../src/game/engine';
 
 function buttons(node: ReactNode): ReactElement<Record<string, unknown>>[] {
   if (Array.isArray(node)) return node.flatMap(buttons);
@@ -78,4 +79,31 @@ describe('first repair test action', () => {
   it('disables the test while the object is unavailable', () => {
     expect(fixture(false, true).action.props.disabled).toBe(true);
   });
+});
+
+// The later meter explanation uses the recorded request and the object's required check.
+it('shows the recorded voltage context and the required condition without diagnosing a part', () => {
+  const state = createGame(42);
+  const job = state.jobs[0];
+  if (!job) throw new Error('Missing opening object');
+  const measured = dispatch(state, {
+    type: 'measure',
+    jobId: job.id,
+    request: { mode: 'voltage', a: 'A', b: '0', condition: 'bench' },
+  });
+  expect(measured.ok).toBe(true);
+  const current = measured.state.jobs[0];
+  if (!current) throw new Error('Missing measured object');
+  const before = saveGame(measured.state);
+  const html = renderToStaticMarkup(
+    createElement(MeterContext, {
+      job: current,
+      reading: current.evidence.at(-1),
+      condition: 'bench',
+    }),
+  );
+  expect(html).toContain('while carried');
+  expect(html).toContain('on the table');
+  expect(html).toContain('does not identify a faulty part');
+  expect(saveGame(measured.state)).toBe(before);
 });

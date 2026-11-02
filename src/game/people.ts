@@ -23,7 +23,7 @@ import {
   tickPeopleRuntime,
 } from './hf.ts';
 import { adoptRepairAspiration, aspirationAdvances } from './responsibility.ts';
-import type { PersonChoice, WorkOption } from './types.ts';
+import type { GameState, PersonChoice, WorkOption } from './types.ts';
 
 const pending = new WeakMap<Person, { record: DecisionRecord; offers: Affordance[] }>();
 const cueList = (cues: Record<string, string>) =>
@@ -561,20 +561,21 @@ function readableMethod(action: string, conditions: { cue: string; value: string
         const [direction, , reference] = c.value.split('-');
         return `the reading ${conditionWords(check)} is ${direction === 'equal' ? 'equal to' : `${direction} than`} the reading ${conditionWords(reference ?? 'bench')}`;
       }
-      if (c.cue === 'part') return `you are checking the ${words(c.value)}`;
-      if (c.cue === 'signal') return `your observation is “${phrases[c.value] ?? words(c.value)}”`;
+      if (c.cue === 'part') return `the ${words(c.value)} is being checked`;
+      if (c.cue === 'signal')
+        return `the recorded observation is “${phrases[c.value] ?? words(c.value)}”`;
       if (c.cue === 'stage') {
         if (c.value === 'intake') return 'an unfamiliar object arrives';
-        if (c.value === 'examined') return 'you have looked inside';
-        if (c.value === 'measured') return 'you have tested the object';
-        if (c.value === 'repaired') return 'you have done a repair step';
+        if (c.value === 'examined') return 'the inside has been examined';
+        if (c.value === 'measured') return 'the object has been tested';
+        if (c.value === 'repaired') return 'a repair step has been done';
         if (c.value === 'ready') return 'the required tests have passed';
         if (c.value.startsWith('checked-'))
           return `the object has passed a test ${c.value.slice(8).split('-').map(conditionWords).join(' and ')}`;
         return `the work has reached “${words(c.value)}”`;
       }
       if (c.cue === 'family')
-        return `you are working on ${c.value === 'electrical' ? 'an electrical circuit' : 'a mechanical drive'}`;
+        return `the work concerns ${c.value === 'electrical' ? 'an electrical circuit' : 'a mechanical drive'}`;
       return `${words(c.cue)} is ${words(c.value)}`;
     })
     .join(' and ');
@@ -604,6 +605,112 @@ function readableMethod(action: string, conditions: { cue: string; value: string
             ? 'ask for help'
             : `${words(verb ?? action)}${target ? ` the ${words(target)}` : ''}`;
   return `When ${condition}, ${instruction}.${scope ? ` This method applies to ${scope}.` : ''}`;
+}
+
+type MethodRecordSource = {
+  kind: 'earlier' | 'witnessed' | 'unlinked' | 'unknown';
+  text: string;
+  evidenceId?: string;
+  at?: number;
+  sourceId?: string;
+  jobId?: string;
+};
+
+/** Read retained method provenance without turning a condition into a player action. */
+export function methodRecords(
+  person: Person,
+  state: GameState,
+): {
+  method: string;
+  sources: MethodRecordSource[];
+}[] {
+  return (person.methods?.rules ?? []).map((rule) => ({
+    method: readableMethod(rule.action, rule.conditions),
+    sources: rule.evidence
+      .map((evidence) => {
+        const record = (
+          kind: MethodRecordSource['kind'],
+          text: string,
+          jobId?: string,
+        ): MethodRecordSource => ({
+          kind,
+          text,
+          jobId,
+          evidenceId: evidence.id,
+          at: evidence.at,
+          sourceId: evidence.sourceId,
+        });
+        const result = `Recorded result: ${evidence.outcome}.`;
+        const inherited = state.openingPeople?.[person.id]?.methods?.rules.some(
+          (earlier) =>
+            earlier.action === rule.action &&
+            earlier.evidence.some(
+              (entry) =>
+                entry.id === evidence.id &&
+                entry.sourceId === evidence.sourceId &&
+                entry.at === evidence.at &&
+                entry.outcome === evidence.outcome,
+            ),
+        );
+        if (inherited)
+          return record(
+            'earlier',
+            `This entry was in the starting record. We cannot match it to an object or occasion here. ${result}`,
+          );
+        // teachObserved encodes this workshop's seed, counter, object and action.
+        // A carried record is checked above before interpreting that local vocabulary.
+        const prefix = `${state.seed}:`;
+        const job = state.jobs.find((candidate) => {
+          const suffix = `:${candidate.id}:${rule.action}`;
+          return (
+            evidence.sourceId === 'player' &&
+            evidence.id.startsWith(prefix) &&
+            evidence.id.endsWith(suffix) &&
+            /^\d+$/.test(evidence.id.slice(prefix.length, -suffix.length))
+          );
+        });
+        const occasion = `Day ${Math.floor(evidence.at / 1440) + 1}, ${clock(Math.floor(evidence.at))}`;
+        if (!job)
+          return record(
+            'unknown',
+            `We cannot match this entry to an object or occasion here. ${result}`,
+          );
+        // HF ingress retains sub-minute ordering; host evidence uses whole workshop minutes.
+        const recordedMinute = Math.floor(evidence.at);
+        const attended = job.evidence.filter(
+          (step) => step.at === recordedMinute && step.witnessedBy?.includes(person.id),
+        );
+        const contribution = job.contributions.some(
+          (step) =>
+            step.actorId === 'player' &&
+            step.action === rule.action &&
+            (/^(clean|adjust|replace|calibrate):/.test(rule.action)
+              ? step.at <= recordedMinute
+              : step.at === recordedMinute),
+        );
+        return attended.length && contribution
+          ? record(
+              'witnessed',
+              `${job.title} · ${occasion}. ${person.name} saw: ${attended.map((step) => step.summary).join(' ')} ${result}`,
+              job.id,
+            )
+          : record(
+              'unlinked',
+              `${job.title} · ${occasion}. The entry names this object, but we cannot match it to a step ${person.name} watched. ${result}`,
+              job.id,
+            );
+      })
+      .concat(
+        rule.evidence.length
+          ? []
+          : [
+              {
+                kind: 'unknown',
+                text: 'No observation is attached to this entry, so we cannot match it to a person, object or time.',
+              },
+            ],
+      ),
+  }));
 }
 
 /** Install one explicit afternoon commitment; do not simulate unobserved activity. */

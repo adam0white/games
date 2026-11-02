@@ -34,7 +34,11 @@ export function MethodResponse({
         <strong>Original request:</strong> {j.description}
       </p>
       <p>{j.importance}</p>
-      <p>{methodAccount(report)}</p>
+      <p>
+        {report.known
+          ? methodAccount(report)
+          : 'The complete repair method is unknown. The list below shows only the work and object tests recorded so far.'}
+      </p>
       <details>
         <summary>Performed work and test records</summary>
         <ul>
@@ -74,10 +78,6 @@ export function MethodResponse({
           {block && <p>{block}</p>}
         </>
       )}
-      <p>
-        You can leave this unanswered. Working, putting the object aside and returning it unfinished
-        keep their existing rules.
-      </p>
     </details>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { accountParts } from '../game/cast-content';
 import { dayTime } from '../game/engine';
 import type { SpokenLine } from '../ui/crises';
+import { lessonWords } from '../ui/workshop-feedback';
 
 type ConversationState = { open: boolean; acknowledgedThrough: number };
 const latestId = (lines: SpokenLine[]) => Math.max(0, ...lines.map((line) => line.id));
@@ -56,7 +57,8 @@ export function RecentConversation({
   if (overlay)
     return visible && newest ? (
       <p className="speech-line">
-        <strong>{newest.speaker}:</strong> {accountParts(newest.text).words}
+        <strong>{newest.speaker}:</strong>{' '}
+        {lessonWords(newest.speaker, accountParts(newest.text).words)}
       </p>
     ) : null;
   return (
@@ -73,7 +75,8 @@ export function RecentConversation({
         {lines.map((line) => (
           <div key={line.id} className={line.tone === 'warning' ? 'is-warning' : undefined}>
             <p>
-              <strong>{line.speaker}</strong> {accountParts(line.text).words}{' '}
+              <strong>{line.speaker}</strong>{' '}
+              {lessonWords(line.speaker, accountParts(line.text).words)}{' '}
               <time>{dayTime(line.at)}</time>
             </p>
             {accountParts(line.text).limits && (

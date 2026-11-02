@@ -15,6 +15,9 @@ import {
   ownerReplacementResponse,
   personalReplies,
   personalReplyBlock,
+  rafiCustomerBlock,
+  rafiCustomerQuestion,
+  rafiCustomerReply,
   replyReceiptKey,
 } from './cast-content.ts';
 import {
@@ -1384,7 +1387,7 @@ function finishNpc(s: GameState, work: NpcWork): boolean {
           .map((e) => e.id),
       )
     : 0;
-  finishActivity(
+  const finished = finishActivity(
     person,
     work.option,
     success,
@@ -1400,6 +1403,8 @@ function finishNpc(s: GameState, work: NpcWork): boolean {
         )
       : [],
   );
+  if (work.option.id === 'rafi-customer-account' && finished?.status === 'completed')
+    log(s, person.name, rafiCustomerReply);
   return true;
 }
 function perceiveEvidence(s: GameState, personId: string, job: Job, evidence: Evidence): boolean {
@@ -2667,6 +2672,55 @@ function dispatchPrepared(state: GameState, command: Command, s: GameState): Com
       const person = s.people[id];
       if (!person || (id === 'halil' && s.day < 3))
         return fail('That person has not visited this workshop yet.');
+      if (id === 'rafi' && s.discoveries?.includes(id)) {
+        const block = rafiCustomerBlock(s);
+        if (block) return fail(block);
+        settleWorkshopFinishes(s);
+        const at = s.now;
+        const existing = s.npcWork.find((w) => w.personId === id);
+        const options: WorkOption[] = [
+          {
+            id: 'rafi-customer-account',
+            action: 'discuss-method',
+            label: 'discuss what I can tell the customer about the other appliance',
+            duration: 5,
+            effort: 0.02,
+          },
+          existing?.option ?? {
+            id: 'rafi-keep-plans',
+            action: 'personal',
+            label: 'keep my own plans',
+            duration: 5,
+            effort: 0,
+          },
+        ];
+        const decision = chooseActivity(
+          person,
+          'rafi-customer-account',
+          {},
+          options,
+          at,
+          playerAsk('rafi-customer-account', 0.4),
+        );
+        const accepted =
+          decision.chosenId === 'rafi-customer-account' && decision.answer?.verdict === 'assented';
+        if (accepted) {
+          if (existing) {
+            finishActivity(person, existing.option, false, at, [], true);
+            s.npcWork = s.npcWork.filter((w) => w !== existing);
+          }
+          const option = options[0];
+          if (!option || !startActivity(person, option, at))
+            return fail('Rafi could not set aside those five minutes.');
+          s.npcWork.push({ personId: id, option, startedAt: at, endsAt: at + 5 });
+        }
+        log(s, 'You', rafiCustomerQuestion);
+        advance(s, 5);
+        if (!accepted) log(s, person.name, 'I cannot talk about that now.');
+        return done(
+          'The conversation took five minutes. No customer contact or repayment is recorded.',
+        );
+      }
       if (s.discoveries?.includes(id))
         return fail('That conversation is already in the workshop notes.');
       const observed =

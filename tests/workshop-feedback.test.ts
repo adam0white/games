@@ -5,6 +5,7 @@ import {
   actionAccount as account,
   componentWorkReading,
   latestRecoveryAccount as latestRecovery,
+  lessonWords,
   ownerPromiseAccount,
 } from '../src/ui/workshop-feedback';
 
@@ -14,6 +15,49 @@ function present<T>(value: T | undefined): T {
 }
 
 describe('observed workshop feedback', () => {
+  it('presents only recorded lesson acceptance and preserves pending messages and decision reasons', () => {
+    let state = createGame(42);
+    for (let attempt = 0; attempt < 12 && state.pendingRequest?.status !== 'ready'; attempt++) {
+      if (!state.pendingRequest) {
+        const prior = state;
+        const request = dispatch(state, { type: 'request-lesson' });
+        expect(request.ok).toBe(true);
+        // A successful request is not an utterance or acceptance.
+        expect(account(prior, { type: 'request-lesson' }, request)).toBe(request.message);
+        state = request.state;
+      }
+      if (state.pendingRequest?.status === 'ready') break;
+      const work = state.npcWork.find((entry) => entry.personId === 'sam');
+      if (!work) break;
+      state = dispatch(state, { type: 'wait', minutes: work.endsAt - state.now }).state;
+    }
+    expect(state.pendingRequest?.status).toBe('ready');
+    const prior = state;
+    const result = dispatch(prior, { type: 'start-lesson' });
+    expect(result.ok).toBe(true);
+    expect(result.state.watching).toBe(true);
+    const before = saveGame(prior);
+    const after = saveGame(result.state);
+    const spoken = result.state.log.findLast((line) => line.speaker === 'Sam');
+    if (!spoken) throw new Error('Missing lesson response');
+    expect(spoken.text).toBe(result.message);
+    expect(account(prior, { type: 'start-lesson' }, result)).toBe(
+      lessonWords(spoken.speaker, spoken.text),
+    );
+    // Reworded acceptance must retain the actual deadline, including its digits.
+    expect(lessonWords(spoken.speaker, spoken.text).match(/\d+/g)).toEqual(
+      spoken.text.match(/\d+/g),
+    );
+    for (const person of Object.values(result.state.people)) {
+      for (const decision of person.trace) {
+        // Native reasons are not paraphrased by the finite lesson vocabulary.
+        expect(lessonWords(person.name, decision.narration)).toBe(decision.narration);
+      }
+    }
+    expect(saveGame(prior)).toBe(before);
+    expect(saveGame(result.state)).toBe(after);
+  });
+
   it('shows only performed work and does not claim a cleaned contact fixes a worn switch', () => {
     let state = createGame(42);
     const id = present(state.jobs[0]).id;
