@@ -596,6 +596,8 @@ The scoped wording and current activity evidence changes were delivered (fixed b
 - Disposition and conditions: Show early whether ₺5,200 is reachable. Rosa saw no forecast. An early bank-target explanation is clarity, not a financial guarantee. Monday totals do not prove the target impossible. No bank deadline was reached.
 - Owner and date: the games-deferred Pass host owner; sealed route `target2026-11-03 (open)`, so Nov 3. Verdict word: mixed (the tester’s own stated conditions, not a vote).
 - Source: `docs/lab/reviews/light-2026-10-30/pass-retest2/rosa/report.md` in the sealed packet.
+- Source candidate, 2026-11-02: the opening pass@20 board explains current till, the existing estimated bill, remaining service nights and the arithmetic gap per night. Future service and costs can change the amounts. This is not a success forecast; exact review, delivery and player acceptance remain pending.
+
 
 ### F-2507 — Rosa Alvarez
 
@@ -603,7 +605,7 @@ The scoped wording and current activity evidence changes were delivered (fixed b
 - Disposition and conditions: Warn about Dilek’s meal break in the rush, and make the plan-dialog line match the chosen break. Selim eating at 19:48 after a 21:00 plan may be a different meal; it is not proven that the schedule was ignored. Warning and status wording.
 - Owner and date: the games-deferred Pass host owner; sealed route `target2026-11-03 (open)`, so Nov 3. Verdict word: mixed (the tester’s own stated conditions, not a vote).
 - Source: `docs/lab/reviews/light-2026-10-30/pass-retest2/rosa/report.md` in the sealed packet.
-- Source candidate, 2026-11-02: current pass@20 board summaries and editors name the selected 20-minute interval and station. Either cook gets a conditional rush-overlap warning. Copy distinguishes proposed cover, recorded refusal and recorded assent; it describes another assigned worker without promising future attendance. The actual rendered seed42 journey passed at 360×690 and 1280×800 with pending and refused relief, a changed draft and both cooks on one station, then complete host/native replay. A real accepted-relief witness remains unproved. The historical 19:48 meal after a 21:00 plan remains unreproduced; no scheduling change or closure follows. Exact review, CI, deployment and player acceptance remain pending.
+- Technical wording delivery, 2026-11-02, a201f421a1a23495b54906a84af053d1bb202ad9: current pass@20 board summaries and editors name the selected 20-minute interval and station. Either cook gets a conditional rush-overlap warning. Copy distinguishes proposed cover, recorded refusal and recorded assent; it describes another assigned worker without promising future attendance. The actual rendered seed42 journey passed at 360×690 and 1280×800 with pending and refused relief, a changed draft and both cooks on one station, then complete host/native replay. A real accepted-relief witness remains unproved. The historical 19:48 meal after a 21:00 plan remains unreproduced; no scheduling change or closure follows. Exact source review, source/target CI and clean live delivery passed; player acceptance remains open.
 
 ### F-2508 — Sonia Ionescu
 
@@ -611,6 +613,8 @@ The scoped wording and current activity evidence changes were delivered (fixed b
 - Disposition and conditions: Sonia saw cooks agree to a plan and then be shown eating at another time. Preview versus action wording. Source cause unverified. An earlier meal than planned could be a different meal; it is not proven that the schedule was ignored. No rule that a cook must always obey. Refusal and agency stay.
 - Owner and date: the games-deferred Pass host owner; sealed route `target2026-11-03 (open)`, so Nov 3. Verdict word: mixed (the tester’s own stated conditions, not a vote).
 - Source: `docs/lab/reviews/light-2026-10-30/pass-retest2/sonia/report.md` in the sealed packet.
+- Source candidate, 2026-11-02: job predictions are locally marked “Possible reply” in current pass@20. The global chef-guess explanation and every actual reply, decision and start remain. The two actual rendered-copy failures and focused source controls are retained. Historical assent/meal behavior and player acceptance remain unproved.
+
 
 ### F-2509 — Sonia Ionescu
 
@@ -625,6 +629,8 @@ The scoped wording and current activity evidence changes were delivered (fixed b
 - Disposition and conditions: Early help to see how the week’s money could work, and what flatbreads are when they are always 0. An early bank-target explanation is clarity, not a financial guarantee. Monday’s ₺520 and ₺560 do not prove the target impossible. No bank deadline was reached.
 - Owner and date: the games-deferred Pass host owner; sealed route `target2026-11-03 (open)`, so Nov 3. Verdict word: mixed (the tester’s own stated conditions, not a vote).
 - Source: `docs/lab/reviews/light-2026-10-30/pass-retest2/sonia/report.md` in the sealed packet.
+- Source candidate, 2026-11-02: the early money explanation is shared with F-2506. This does not close the separate flatbread explanation, a whole-week success forecast or player acceptance.
+
 
 ### Unranked source lead — Maya Chen, phone “talk another time” button
 

@@ -1160,6 +1160,7 @@ for (const mode of ['tap', 'hold', 'keyboard'] as const) {
     await expect(page.locator('.insist-choice')).toContainText('can cost their trust');
     await expect(page.locator('.insist-choice')).toContainText('can still say no');
     await expect(page.locator('#sheet .hint')).toContainText('Press and keep holding');
+    if (mode === 'tap') await expect(page.locator('[data-v="cold"] .h')).toContainText('Possible reply:');
     if (mode === 'tap') {
       await page.locator('.insist-choice summary').tap();
       await page.locator('[data-insist="cold"]').tap();
@@ -1222,6 +1223,63 @@ for (const mode of ['tap', 'hold', 'keyboard'] as const) {
     ).toEqual(actual.state);
   });
 }
+
+test('F-2506 and F-2510 explain the opening money target on the actual board', async ({ page }) => {
+  const opening = await freshCurrentControl(page);
+  expect(opening.version).toBe('pass@20');
+  expect(opening.phase).toBe('board');
+  expect(opening.seed).toBe(42);
+  const file = await page.evaluate(
+    ({ inputs, minute }) => {
+      const fixture = window as CurrentControlPage;
+      if (!fixture.f2505Export) throw new Error('Missing actual current producer');
+      const result = fixture.f2505Export(inputs, minute);
+      delete fixture.f2505Export;
+      return result;
+    },
+    { inputs: opening.inputs, minute: opening.minute },
+  );
+  if (!file) throw new Error('Current producer refused its opening export');
+  expect(file.state).toEqual(cloneState(opening));
+  await page.locator('#game-menu').click();
+  await page.locator('.debug-tools summary').click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('#debug-import').click();
+  await (await chooser).setFiles({
+    name: 'current-opening-board.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(file)),
+  });
+  await page.locator('#title-confirm-yes').click();
+  await expect(page.locator('.people-board')).toBeVisible();
+  const read = (): Promise<GameState> =>
+    page.evaluate(async () => {
+      const path = '/src/ui/app.ts';
+      const simPath = '/src/sim/kitchen.ts';
+      return (await import(simPath)).cloneState((await import(path))._debug.state);
+    });
+  expect(await read()).toEqual(cloneState(opening));
+  const money = (n: number) => `₺${n.toLocaleString('en-GB')}`;
+  const bill =
+    5200 +
+    opening.carry +
+    opening.wagesDue +
+    opening.crew.filter((m) => !m.founder && !m.left).reduce((sum, m) => sum + m.wage, 0) * 5;
+  const need = Math.max(0, bill - opening.till);
+  const average = Math.ceil(need / 6 / 10) * 10;
+  const explanation = page.locator('.board-money');
+  await expect(explanation).toBeVisible(); // CAUSAL RED: the board has no explanation yet.
+  await expect(explanation).toContainText(`The till has ${money(opening.till)}.`);
+  await expect(explanation).toContainText(`The estimated bill is ${money(bill)}.`);
+  await expect(explanation).toContainText(
+    `${money(need)} is still needed over 6 service nights, including tonight.`,
+  );
+  await expect(explanation).toContainText(
+    `The gap averages about ${money(average)} per remaining service night.`,
+  );
+  await expect(explanation).toContainText('Future service and costs can change these amounts.');
+  expect(await read()).toEqual(cloneState(opening));
+});
 
 // One opening-board journey. The fixture is an actual current producer export;
 // every changed plan and answer below comes through the rendered editor.

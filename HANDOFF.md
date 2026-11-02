@@ -2,9 +2,13 @@
 
 Other Deferred asks remain open. The coupled prayer and running ordinary review witness remains open, with a target of 2026-11-03. Player judgment and Adam's acceptance of game readiness remain. Friends' playtests and Show HN remain paused. No new player round was run.
 
-## F-2507 presentation candidate — 2026-11-02
+## F-2507 interval and rush wording delivered — 2026-11-02
 
-Remaining: signed source, exact independent Codex review, green CI, merge, normal deployment and live checks. The selected break interval and rush warning now follow the current pass@20 draft for either cook. Cover wording distinguishes a proposal and a recorded answer; another assigned cook is not described as absent. The normal lane and build passed, followed by the same rendered opening-board journey at 360×690 and 1280×800, with complete host/native replay. These controls include real relief refusal. Accepted relief remains unproved. The reported 19:48 meal after a 21:00 plan remains unreproduced. Simulation, quiet prayer and earlier editions are unchanged. No player round or readiness acceptance is claimed.
+Signed `a201f421a1a23495b54906a84af053d1bb202ad9` merged in PR20 after exact Codex CLEAR and green source CI41543412050. Main CI41544518032 is also green. Normal deployment serves this commit with dirty:false. Public board controls at 360×690 and 1280×800 pass both cooks' selected intervals and rush warnings, changed nonrush interval, save/reload, full native replay, export and public file-import replay; no page errors. The actual earlier technical control includes relief refusal. Accepted relief and the reported 19:48 meal after a 21:00 plan remain unproved. No scheduling change, player round or readiness acceptance is claimed.
+
+## Early money and prediction wording candidate — 2026-11-02
+
+Remaining: signed source, exact Codex review, green CI, deployment and live checks. The normal lane and build passed. Three mobile controls and two desktop controls passed at 360×690 and 1280×800 under the original 30-second cap, including the earlier meal-interval/rush journey and the actual tap/request/refusal/replay path. The current board now explains actual till, estimated bill and the current gap per remaining service night. The line warns that future service and costs change amounts; it is arithmetic, not a success forecast. Each job prediction gets a local “Possible reply” label. Actual speech, native decisions and activity remain unchanged. The final current-source controls include the explicit legacy-copy guard and unchanged opening state after reading the explanation. F-2510 flatbreads, historical status/meal collisions, accepted relief and player acceptance remain open.
 
 ## F-2500, F-2502 and F-2505 technical delivery — 2026-11-02
 

@@ -654,6 +654,18 @@ function billNow(st: GameState): number {
   return weekOf(week).bill + st.carry + st.wagesDue + wages * left;
 }
 
+function boardMoneyLine(st: GameState): string {
+  const plan = planOf(st.night);
+  const nights = weekOf(plan.week).weekdays.filter((day) => day >= plan.weekday).length;
+  const bill = billNow(st);
+  const need = Math.max(0, bill - st.till);
+  const remaining =
+    nights > 0
+      ? `${lira(need)} is still needed over ${nights} service night${nights === 1 ? '' : 's'}, including tonight.${need > 0 ? ` The gap averages about ${lira(Math.ceil(need / nights / 10) * 10)} per remaining service night.` : ''}`
+      : `${lira(need)} is still needed. There are no service nights left this week.`;
+  return `The till has ${lira(st.till)}. The estimated bill is ${lira(bill)}. ${remaining} Future service and costs can change these amounts.`;
+}
+
 // ---------- title ----------
 
 export async function start() {
@@ -1035,7 +1047,7 @@ function board(draft?: BoardRow[], editing: string | null = null) {
   const boardScroll = app.querySelector('.board-body')?.scrollTop ?? 0;
   const editorScroll = app.querySelector('.board-editor-body')?.scrollTop ?? 0;
   let editor = '';
-  app.innerHTML = `<div class="board-page people-board">${topBar(`${planOf(st.night).title}, week ${planOf(st.night).week} · Doors open at ${clock(openAt(st.night))}`, 'board')}${tillBar(st)}<form id="board-form"><div class="board-body"><p class="kitchen-context">A station is a work area. The cold side prepares salads and other cold dishes. The rush is the busiest part of service, 18:30–20:30. The crew cooks and sends finished meals out; you decide whom to ask and when.</p>${bareNote}${parties ? `<div class="board-parties">${parties}</div>` : ''}<div class="board-rows">${rows
+  app.innerHTML = `<div class="board-page people-board">${topBar(`${planOf(st.night).title}, week ${planOf(st.night).week} · Doors open at ${clock(openAt(st.night))}`, 'board')}${tillBar(st)}<form id="board-form"><div class="board-body">${st.version === 'pass@20' ? `<p class="board-money">${boardMoneyLine(st)}</p>` : ''}<p class="kitchen-context">A station is a work area. The cold side prepares salads and other cold dishes. The rush is the busiest part of service, 18:30–20:30. The crew cooks and sends finished meals out; you decide whom to ask and when.</p>${bareNote}${parties ? `<div class="board-parties">${parties}</div>` : ''}<div class="board-rows">${rows
     .map((row) => {
       const answer = agreed.find((r) => r.cook === row.cook);
       const revised = changed;
@@ -2230,7 +2242,7 @@ function drawSheet() {
     <p class="guess-context">The words under each job are the chef’s guess at the reply. Work and needs can change before the cook answers.</p><p class="request-warning">${esc(cookRequestWarning(st, selected))} ${esc(publicPrayerPlan(st, selected))}</p><div class="verbs" role="group" aria-label="Ask for a job">${h.list
       .map(
         (v) =>
-          `<button data-v="${v.verb}" ${waiting || absent || !attentionAvailable(st, selected as CookId) ? 'disabled' : ''}>${queued && st.inputs.slice(st.applied).some((i) => i.kind === 'ask' && i.cook === selected && i.verb === v.verb) ? 'asked…' : VERB_LABEL[v.verb]}${v.verb === stationOf(st, selected as CookId) ? ' (now)' : ''}<span class="h ${v.verdict === 'refused' ? 'no' : ''} ${v.guess ? 'guess' : ''}">${absent ? 'left the kitchen' : `${esc(gloss(v.short))}${v.guess ? '?' : ''}`}</span><span class="fill"></span></button>`,
+          `<button data-v="${v.verb}" ${waiting || absent || !attentionAvailable(st, selected as CookId) ? 'disabled' : ''}>${queued && st.inputs.slice(st.applied).some((i) => i.kind === 'ask' && i.cook === selected && i.verb === v.verb) ? 'asked…' : VERB_LABEL[v.verb]}${v.verb === stationOf(st, selected as CookId) ? ' (now)' : ''}<span class="h ${v.verdict === 'refused' ? 'no' : ''} ${v.guess ? 'guess' : ''}">${absent ? 'left the kitchen' : st.version === 'pass@20' ? `Possible reply: “${esc(gloss(v.short))}”${v.guess ? '?' : ''}` : `${esc(gloss(v.short))}${v.guess ? '?' : ''}`}</span><span class="fill"></span></button>`,
       )
       .join('')}</div>
     <details class="insist-choice"><summary>Ask more firmly: ${esc(m.name)}</summary><p>This puts pressure on ${esc(m.name)} and can cost their trust. They can still say no.</p><div class="insist-jobs">${h.list.map((v) => `<button data-insist="${v.verb}" ${waiting || absent || !attentionAvailable(st, selected as CookId) ? 'disabled' : ''}>Ask ${esc(m.name)} more firmly: ${VERB_LABEL[v.verb].toLowerCase()}</button>`).join('')}</div></details>
