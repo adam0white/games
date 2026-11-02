@@ -1,3 +1,13 @@
+## Save custody correction — 2026-11-02
+
+Remaining: normal lane/build, signed follow-up, independent review at its exact SHA, green source/target CI, deployment and live checks. Adam accepts readiness. The existing managed worktree stays under RESUME.
+
+Review of signed2a4b313 found that failed-Resume custody was lost after another reload. The causal browser control reproduced loss of the original raw journal after a confirmed different-lineage New game. Custody now defaults to retaining an unknown stored head. Only an exact lineage/digest/ordinal/time head successfully resumed or atomically committed in this page may be replaced without retention. Failed reads and failed Resume clear that validation. The opaque journal cursor and storage schema are unchanged.
+
+Five browser controls pass: read failure, invalid current journal, aborted replacement, failed Resume followed by another reload, and a confirmed valid same-opening prefix rewind. The last is an I/O component: it authors only notebook routing metadata to a real native prefix, then uses actual Resume, notebook confirmation, native replay and persistence. It is not a full Sunday journey. Its first failure exposed a separate rewind call missing the existing continuity authority record. Rewind now passes the saved continuity through the same guard as file import, retaining file-origin behavior and acquiring no shared ownership.
+
+The blanket-retention intermediate candidate was rejected because it blocked valid same-opening replacement. Unknown same-opening collisions still fail closed and report an unsaved game. These controls do not establish cross-tab safety, eviction resistance or an external backup. The earlier17 native controls remain prior evidence; no new full native run is claimed by this storage follow-up. Prayer-plus-running scheduled review remains deferred to2026-11-03.
+
 ## Current combined candidate — 2026-11-02
 
 Remaining: signed follow-up source, exact independent Codex review, green source/target CI, normal deployment and live checks. Adam accepts readiness. Friends and Show HN remain paused. The RESUME instruction retains the existing managed worktree.

@@ -23,10 +23,13 @@ export interface JournalStorage<T> {
 
 /** One transaction commits a new chunk, the head, and the matching host snapshot. */
 /**
- * `retain` marks a stored save that could not be opened. Replacing it keeps its original head and
- * chunks under a separate key instead of deleting them. The stored original stays intact.
+ * `retain` protects a stored save whose exact head has not been validated on this page.
+ * Replacing it keeps its original head and chunks under a separate key instead of
+ * deleting them. The stored original stays intact.
  */
-export function indexedJournalStorage<T>(retain?: (host: T, lineage: string) => boolean): JournalStorage<T> {
+export function indexedJournalStorage<T>(
+  retain?: (host: T, lineage: string, head: DeepReadonly<RunJournalHead>) => boolean,
+): JournalStorage<T> {
   let db: Promise<IDBDatabase> | undefined;
   const open = () =>
     (db ??= new Promise<IDBDatabase>((resolve, reject) => {
@@ -81,7 +84,7 @@ export function indexedJournalStorage<T>(retain?: (host: T, lineage: string) => 
           try {
             const previous = old.result as Omit<Commit<T>, 'chunk'> | undefined;
             const replacing = previous && (value.fresh || previous.head.lineage !== value.head.lineage);
-            const keep = replacing && retain?.(previous.host as T, previous.head.lineage);
+            const keep = replacing && retain?.(previous.host as T, previous.head.lineage, previous.head);
             // A journal's lineage is its opening digest. Equal initial data can reuse it.
             // Refuse that collision rather than overwriting any retained raw chunks.
             if (previous && keep && previous.head.lineage === value.head.lineage) {
@@ -141,16 +144,47 @@ export class Autosave<T> {
   private run?: KitchenRun;
   private cursor?: RunJournalCursor;
   private opening?: DeepReadonly<RunJournalOpening>;
+  private validatedHead?: RunJournalHead;
   private tail: Promise<void> = Promise.resolve();
   constructor(private storage: JournalStorage<T>) {}
   async read() {
     await this.tail;
-    return this.storage.read();
+    try {
+      return await this.storage.read();
+    } catch (error) {
+      this.reset();
+      throw error;
+    }
+  }
+  reset() {
+    this.run = undefined;
+    this.cursor = undefined;
+    this.opening = undefined;
+    this.validatedHead = undefined;
+  }
+  matchesValidatedHead(head: DeepReadonly<RunJournalHead>): boolean {
+    const known = this.validatedHead;
+    return (
+      !!known &&
+      known.lineage === head.lineage &&
+      known.digest === head.digest &&
+      known.ordinal === head.ordinal &&
+      known.at === head.at
+    );
+  }
+  private rememberHead(head: DeepReadonly<RunJournalHead>) {
+    this.validatedHead = {
+      lineage: head.lineage,
+      digest: head.digest,
+      ordinal: head.ordinal,
+      at: head.at,
+    };
   }
   adopt(run: KitchenRun, journal: Journal, cursor: RunJournalCursor) {
     this.run = run;
     this.cursor = cursor;
     this.opening = journal.opening;
+    this.rememberHead(journal.head);
   }
   write(capture: () => { run: KitchenRun; host: T } | null): Promise<boolean> {
     const result = this.tail.then(async () => {
@@ -172,6 +206,7 @@ export class Autosave<T> {
         this.run = value.run;
         this.cursor = update.cursor;
         this.opening = opening;
+        this.rememberHead(update.head);
         return true;
       } catch {
         return false;
@@ -180,4 +215,12 @@ export class Autosave<T> {
     this.tail = result.then(() => {});
     return result;
   }
+}
+
+/** Only a successfully adopted or committed exact head may be replaced without retention. */
+export function indexedAutosave<T>(openable: (host: T) => boolean): Autosave<T> {
+  const save: Autosave<T> = new Autosave<T>(
+    indexedJournalStorage<T>((host, _lineage, head) => !openable(host) || !save.matchesValidatedHead(head)),
+  );
+  return save;
 }

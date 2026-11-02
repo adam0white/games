@@ -89,7 +89,7 @@ import {
   type Verb,
 } from '../sim/kitchen.ts';
 import { zeynepDepartureStatus } from '../sim/one-cast.ts';
-import { Autosave, indexedJournalStorage } from './autosave.ts';
+import { indexedAutosave } from './autosave.ts';
 import { boardReplies, breakSlots, earlyCoverageWarnings, sameBoard } from './board.ts';
 import { automaticClockPlayback, inspectingCook, SPEED_NAMES } from './clock.ts';
 import { type ContinuitySave, continuity, guardedContinuity } from './continuity.ts';
@@ -177,7 +177,7 @@ const cast = continuity(
 
 // ---------- save ----------
 
-/** Whether this edition can open a stored save; anything else is kept as it was. */
+/** Recognise a stored header. Resume validates the journal separately. */
 function openable(sv: Save | undefined): sv is Save {
   return (
     !!sv &&
@@ -188,10 +188,7 @@ function openable(sv: Save | undefined): sv is Save {
     JSON.stringify(sv.hf4Engine) === JSON.stringify(frameworkEngine())
   );
 }
-const failedSaveLineages = new Set<string>();
-const autosave = new Autosave<Save>(
-  indexedJournalStorage<Save>((host, lineage) => !openable(host) || failedSaveLineages.has(lineage)),
-);
+const autosave = indexedAutosave<Save>(openable);
 let savedRecord: Awaited<ReturnType<typeof autosave.read>> = null;
 let saveReadFailed = true;
 const saveReadProblem =
@@ -779,7 +776,7 @@ async function title() {
       cast.track();
       enterWithStatus(cast.message);
     } catch {
-      failedSaveLineages.add(record.journal.head.lineage);
+      autosave.reset();
       status(
         'This saved game could not be opened. It is still saved. Start a fresh game, or send Feedback from the menu.',
       );
@@ -798,7 +795,7 @@ async function title() {
             inputs: save.inputs.slice(0, page.k),
             minute: undefined,
           } as unknown as Export);
-          await cast.restore(undefined, true, true, restored);
+          await cast.restore(guardedContinuity(restored, save.continuity), true, true, restored);
           firstPartyStart = save.firstPartyStart ?? false;
           partyHandover = null;
           pages = save.pages.filter((p) => p.week <= week);
