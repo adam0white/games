@@ -1,4 +1,18 @@
-## Save custody correction — 2026-11-02
+## What remains — 2026-11-02
+
+Other Deferred asks remain open. The coupled prayer and running ordinary review witness remains open, with a target of 2026-11-03. Player judgment and Adam's acceptance of game readiness remain. Friends' playtests and Show HN remain paused. No new player round was run.
+
+## F-2500, F-2502 and F-2505 technical delivery — 2026-11-02
+
+Signed source [b61b555737f71f40acee43d6e55f564c20a17427](https://github.com/adam0white/pass/commit/b61b555737f71f40acee43d6e55f564c20a17427) merged in [PR 18](https://github.com/adam0white/pass/pull/18) after two exact Codex CLEAR reviews. [Source CI 41524577038](https://github.com/adam0white/pass/actions/runs/41524577038) and [main CI 41526567687](https://github.com/adam0white/pass/actions/runs/41526567687) were green at that SHA. A normal production dry run and deployment succeeded. The [live release manifest](https://pass.adamwhite.work/release.json) matched the built commit, reported `dirty: false`, and named Human Framework 4.12.0.
+
+The automated project live smoke passed in 16.564 seconds with zero page errors. It covered a native mobile tap at 360 x 690 and desktop at 1280 x 800: fresh New game, saved pause, full native Replay, download, reload and Resume, native Replay, public Debug import through the file chooser and confirmation, and native Replay again. Two current exports were 1,003,118 and 1,003,146 bytes; root verified their hashes. Root also verified that all 14 sampled IDs were gone and all 270 source hashes matched. The smoke used fresh fictional test profiles, DNT 1, no POST or Feedback, and no screenshots. The first harness attempt blocked a functional identity frame GET. Allowing the source-backed public GET to the identity endpoint and assets let New game pass; no production patch or authentication bypass was used. The existing default Chrome extension inventory did not return, so no interactive check is claimed.
+
+The smoke covers opening, saving and replay, not a full Sunday or service journey. The earlier 17 native controls and nine save and wording cases retain their prior runtime bindings. Green current full native CI is not a new playtest. The one Monday recovery comparison remains a single technical scenario: 240 in actual till receipts and 6 served versus 200 and 5. It does not establish general success, undo, or override of refusal. Unknown same-opening collisions still fail closed and leave the game unsaved. There is no cross-tab, eviction or external backup guarantee. Current new games use the single 4.x behavior without an opt-in. Faith and game behavior remain intact. Adam accepts feel separately from these technical checks.
+
+The candidate checkpoints immediately below are historical. This documentation-only update does not require an app redeploy.
+
+## Save custody correction — 2026-11-02 (historical candidate)
 
 Remaining: normal lane/build, signed follow-up, independent review at its exact SHA, green source/target CI, deployment and live checks. Adam accepts readiness. The existing managed worktree stays under RESUME.
 
@@ -8,7 +22,7 @@ Five browser controls pass: read failure, invalid current journal, aborted repla
 
 The blanket-retention intermediate candidate was rejected because it blocked valid same-opening replacement. Unknown same-opening collisions still fail closed and report an unsaved game. These controls do not establish cross-tab safety, eviction resistance or an external backup. The earlier17 native controls remain prior evidence; no new full native run is claimed by this storage follow-up. Prayer-plus-running scheduled review remains deferred to2026-11-03.
 
-## Current combined candidate — 2026-11-02
+## Combined candidate — 2026-11-02 (historical)
 
 Remaining: signed follow-up source, exact independent Codex review, green source/target CI, normal deployment and live checks. Adam accepts readiness. Friends and Show HN remain paused. The RESUME instruction retains the existing managed worktree.
 
