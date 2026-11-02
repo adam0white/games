@@ -131,51 +131,77 @@ F3071–F3082 remain open in the [canonical HF feedback ledger](https://github.c
 
 ### Requests
 
+All source candidates below are UNRUN, unreviewed and not fixed.
+
 **F-3101 — Maya, preference; inspection 2026-11-10**
+
+Reason: The return hook needs a voluntary, completed-topic reply; the source candidate is UNRUN and unreviewed.
 
 > Let me follow up with Rafi about what he will tell his customer. His story still interests me, but my reply got a receipt and no words from him in the conversation I reached.
 
 **F-3102 — Maya, preference; inspection 2026-11-10**
 
+Reason: The source candidate identifies a separate handle prototype; source identity still needs verification.
+
 > Tell me which object Nora’s handle sketch concerns. I heard the story beside her reading light this time and beside the music box on my first visit; I still could not connect it confidently to either object.
 
 **F-3103 — Maya, preference; inspection 2026-11-10**
+
+Reason: The card was reachable by scrolling; the screenshot is unverified and the source candidate needs a viewport test.
 
 > Make the music box card easier to reach on the desktop workboard. It was below the fixed bottom area until I scrolled.
 
 **F-3104 — Emre, preference; inspection 2026-11-10**
 
+Reason: Manual meter difficulty remains; a mismatch cue needs verification without automatically setting the condition.
+
 > Draw attention to the meter condition when it differs from the object’s required test. Nora’s light needed “work harder,” but the meter opened on “on table.”
 
 **F-3105 — Emre, preference; inspection 2026-11-10**
+
+Reason: Variety remains a taste preference; current early diagnoses differ, and this request does not authorize puzzle retuning.
 
 > Keep offering faults that require different diagnosis. The contact measurement still made sense, but I had solved both lights before and wanted a new problem.
 
 **F-3106 — Nia, blocker; inspection 2026-11-03**
 
+Reason: Discoverability and prerequisites need verification; the reached path proves neither route absence nor guaranteed assent.
+
 > Show me how to ask Sam to take on a repair himself, or tell me what must happen first. I found another lesson request, but no way to give him Rafi’s fan in the places I looked. This was the blocking question I reached.
 
 **F-3107 — Nia, preference; inspection 2026-11-10**
+
+Reason: The actual record provenance is unknown; the source candidate needs verification.
 
 > Make Sam’s observed-method record easier to connect to what actually happened. It included checking a bulb and a weak-object observation that I did not remember making.
 
 **F-3108 — Nia, preference; inspection 2026-11-10**
 
+Reason: The wording candidate needs verification; this request does not call for a dialogue system.
+
 > Give Sam a more natural voice during the lesson. Watching and learning felt meaningful, but his replies still sounded like a repair record.
 
 **F-3109 — Rosa, blocker; inspection 2026-11-03**
+
+Reason: The reached jargon has a source candidate that needs verification.
 
 > Explain “retained work and test records” and “existing rules,” or omit those sentences from the repair conversation. These were the blocking questions I reached.
 
 **F-3110 — Rosa, keep; inspection 2026-11-10**
 
+Reason: Preserve the sentence and Sam’s mother’s agency.
+
 > Keep the clearer sentence explaining that Sam’s mother may follow her own plans instead of discussing the work.
 
 **F-3111 — Rosa, keep; inspection 2026-11-10**
 
+Reason: Preserve the guide’s short instructions.
+
 > Keep the repair guide’s short instructions.
 
 **F-3112 — Ines, blocker; inspection 2026-11-03**
+
+Reason: The reading interpretation candidate needs verification and must not change the actual fault.
 
 > Help me interpret a reading and choose a next test after the first guided repair.
 
@@ -221,3 +247,18 @@ Inherited W, SW, NR and SWF qualifications remain in force, including FREE/CONT 
 12. **Timing:** All 75 retained raw-wall/response pairs differ by 1 ms, with response later; 13 are explicitly referenced in reports. Preserve both values without normalization or inferring end-user latency, network or game performance, or cause.
 13. **Source, prompt and models:** Clean `bc52f86`, HF 4.11.0 and app 4.3.0 were observed before and after each person; bounded SDK and body evidence supports admission. Agent markers were present. There was no independent rebuild, complete asset graph, network or backend proof. Effective prompts and requested model/effort matched their bindings; serving model identity is unverified.
 14. **Report outcomes:** Maya and Emre explicitly had no blocking ask; Nia, Rosa and Ines reached blocking questions. Preserve their voluntary choices, difficulty and conditional returns without a verdict. Nia found the invitation and saw bulb-record content, not proof of a missing independent-repair route or record cause. Rosa's clarity and rereads are not cognitive measurement or fix acceptance. Ines's 5.91 V uncertainty is not a proven electrical or game defect. Root owns qualification and triage; this audit supplies no target verdict.
+
+
+## Source candidate, 2026-11-02
+
+A presentation-only candidate for F-3106, F-3109 and F-3112 is prepared. Controls, review, integration, CI and live verification remain; the requests are not marked fixed. Adam accepts feel separately.
+
+
+## Preference source candidate, 2026-11-02
+
+F-3101–F-3103 have a bounded source candidate: a separate five-minute Rafi customer-account question with voluntary HF acceptance and completed-topic words only; Nora’s separate handle prototype identified at display time; desktop workboard cards arranged across the existing scroll area above the day controls. The ordinary account supplies no customer outcome. Later cast-outcome work keeps its separate record. The saved Nora account is unchanged. Controls, viewport checks, exact review, replay, integration, CI, delivery and Adam’s feel acceptance remain. All runtime validation is UNRUN. No request is marked fixed. F-3105, F-3107 and F-3108 remain open; F-3110 and F-3111 remain preservation constraints.
+
+
+## Record and lesson voice source candidate, 2026-11-02
+
+F-3107/F-3108 have an UNRUN presentation candidate connecting retained method evidence to its source, object and recorded occasion where available, distinguishing earlier and unknown provenance, and shortening only existing lesson utterances. Nia’s specific record cause remains unknown. Earlier source notes, all literal requests, five conditional returns and fourteen qualifications remain. F-3105 stays a preference: current authored early objects require different diagnosis; the incoming card layout intends access to those routes, without viewport or player proof. The private `smallworks-record-voice1102.md/json` records scope, remaining repeat-visit gap and gates. F-3110/F-3111 remain exact preservation constraints. No ask is marked fixed, delivered, accepted or reclassified.

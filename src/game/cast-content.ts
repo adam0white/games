@@ -27,7 +27,15 @@ export function accountParts(text: string): { words: string; limits: string } {
   if (!Object.values(discoveredAccounts).some((account) => account === text))
     return { words: text, limits: '' };
   const end = text.lastIndexOf('”') + 1;
-  return { words: text.slice(0, end), limits: text.slice(end).trim() };
+  return {
+    words: text
+      .slice(0, end)
+      .replace(
+        'Nora lays a handle sketch beside the object.',
+        'Nora lays out a sketch of her separate handle prototype. It is not a design for the object on your bench.',
+      ),
+    limits: text.slice(end).trim(),
+  };
 }
 export function personalStatement(s: GameState, personId: PersonalRole) {
   return s.log.findLast(
@@ -162,4 +170,40 @@ export function ownerReplacementResponse(
   if (terms === 'original-parts')
     return `For ${job.title}, keep the original ${componentId}. I do not agree to replacing it. You may put it aside or return it unfinished.`;
   return `For ${job.title}, I am not agreeing to replace the ${componentId}. I am keeping my plans. You may put it aside or return it unfinished.`;
+}
+
+/** One authored follow-up. Only an accepted, completed exchange supplies these words. */
+export const rafiCustomerQuestion = 'What will you tell the customer about the other appliance?';
+export const rafiCustomerReply =
+  'What I can tell them is: I took your deposit before checking the part. I spent some of it on this exchange. I should not have left you thinking the appliance was fixed. I still need to check it.';
+export function rafiCustomerReceipt(s: GameState) {
+  return s.log.findLast((e) => e.speaker === s.people.rafi?.name && e.text === rafiCustomerReply);
+}
+export function rafiCustomerBlock(s: GameState): string | undefined {
+  if (s.schema !== 'small-works@5' || !s.inputs || s.inputs.length >= 10000)
+    return 'This conversation needs room for its recorded input.';
+  if (!s.discoveries?.includes('rafi') || !personalStatement(s, 'rafi'))
+    return 'Hear Rafi’s account before asking about the customer.';
+  if (rafiCustomerReceipt(s)) return 'Rafi’s answer is in your notes.';
+  const p = s.people.rafi;
+  if (!p) return 'Rafi is not here.';
+  const carried = admissionFacts(s.castChapter, 'rafi');
+  const work = s.npcWork.find((w) => w.personId === 'rafi');
+  if (
+    s.chapterPaused ||
+    s.ended ||
+    (carried &&
+      (!carried.availableForExtraWork ||
+        (carried.life.place !== 'local-workplace' && s.now % 1440 < 600))) ||
+    (p.activity && (p.activity.action !== 'personal' || !work || work.jobId)) ||
+    p.agenda.commitments.some(
+      (c) => c.status === 'pending' && c.from < s.now + 5 && c.until > s.now,
+    )
+  )
+    return 'Rafi is unavailable. His current work or agreed plans come first.';
+  if ((s.now % 1440) + 5 > 1020) return 'There is not enough time for a five-minute conversation.';
+  // The ordinary account leaves the other appliance unchecked. Later outcome work may change it.
+  if (s.castOutcomes)
+    return 'This question concerns the earlier account. Later customer work has its own record.';
+  return undefined;
 }

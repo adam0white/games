@@ -48,6 +48,37 @@ export function latestRecoveryAccount(state: GameState): string | undefined {
   )?.text;
 }
 
+/** Display only an existing lesson utterance. Unknown lines and native reasons stay exact. */
+export function lessonWords(speaker: string, text: string): string {
+  if (speaker !== 'Sam') return text;
+  const lines: Record<string, string> = {
+    'I watched the repair step, but I did not see a relevant test after the previous work and before this step. A later check cannot show what this step changed.':
+      'I saw you work on it, but I didn’t see a relevant test after the previous change. I can’t tell what this change did.',
+    'I watched the repair step. I need to watch a check before I know its result.':
+      'I saw that. Let’s test it before we say it helped.',
+    'The check showed that repair step helped. I can try it when I have the same observations.':
+      'That helped. I can try it when I see the same signs.',
+    'The check showed no improvement from that repair step. I’ll remember that result.':
+      'That didn’t help. I’ll remember that when I see the same signs.',
+    'Our agreed learning session has ended. I’ll keep what I actually saw.':
+      'That’s all the time we agreed on. I’ll keep what I saw.',
+    'I left before the final observation. I did not see that result.':
+      'I left before the result. I didn’t see how it turned out.',
+    'I was present but did not follow that observation closely enough to learn it.':
+      'I was here, but I didn’t follow that closely enough to learn it.',
+    'I kept my own plans during that work.': 'I followed my own plans while you worked.',
+    'I took a break instead of watching that step.': 'I took a break. I didn’t watch that step.',
+  };
+  if (Object.hasOwn(lines, text)) return lines[text] ?? text;
+  const ready = text.match(
+    /^I can start a lesson with you before (.+)\. Start it when you are ready\.$/,
+  );
+  if (ready) return `I have time to start before ${ready[1]}. Let me know when you’re ready.`;
+  const accepted = text.match(/^I will watch this repair with you until (.+)\.$/);
+  if (accepted) return `I’ll watch with you until ${accepted[1]}.`;
+  return text;
+}
+
 /** Explain only consequences of this completed command. The simulation remains the authority. */
 export function actionAccount(prior: GameState, command: Command, result: CommandResult): string {
   if (!result.ok) return result.message;
@@ -84,5 +115,7 @@ export function actionAccount(prior: GameState, command: Command, result: Comman
     }
     return `${result.message} ${drawer}`;
   }
-  return result.message;
+  return command.type === 'start-lesson' || command.type === 'watch'
+    ? lessonWords('Sam', result.message)
+    : result.message;
 }

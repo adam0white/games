@@ -1,6 +1,20 @@
+## Current candidate verification, 2026-11-02
+
+Remaining: one exact-commit independent Codex review, signed source/target CI and integration, then approved deployment/live verification. Adam accepts feel. No third ordinary player panel is planned; available engineering remains active.
+
+The combined correction candidate passes the normal own lane (lint and full TypeScript). Lint reports308 warnings; this run does not establish their baseline difference. All30 tests across the six changed test files pass through the normal suite-lock wrapper with one worker and unchanged test caps. Actual controller evidence: smallworks-lane1102 and smallworks-focused1102b under the director's private store; all sampled identities returned, the suite lock is gone and source stayed unchanged. These are focused correctness and rendered-component results, not the full hosted suite or live interaction. The normal production build also passes. Private automated-project controls at360x690 and1280x800 pass keyboard Carry/Look inside, actual red-A/black-0 voltage measurement, visible MeterContext after leaving the guide through Object, centre-hit/44px checks and no horizontal overflow. No page errors occurred. They do not prove complete repair, Sam’s ordinary offer gate or native input capture; the30 focused source/render/replay controls are separate. Actual88446/2ace9f returned all9 sampled identities with source unchanged and port5189 free. Two earlier harness failures (stale Menu selector; phone-hidden guide dismissal beside the meter) are retained and do not count as product failures.
+
+The candidate covers existing offer discoverability, plain owner/account wording and measurement context, preserving real costs, availability, possible refusal and stored replies. All12 literal final asks keep individual reasons in Deferred; no fixed or player-acceptance marker is added. The old source-preparation entries below retain their original pending labels as history.
+
 # Handoff
 
-## Final ordinary iteration source candidate, 2026-11-01
+## Earlier blocker source preparation, 2026-11-02 (historical)
+
+Remaining: root-run focused controls and lane, independent review, integration, exact CI and live verification. All candidate tests are unrun. Adam accepts feel separately; no third ordinary panel is planned. The signed Small Works 14 record merged at `4fdbf9db`; target CI `41399539324` succeeded. That merge was documentation only and did not deploy the game.
+
+This source candidate addresses the reached F-3106, F-3109 and F-3112 questions using existing offers, records and measurements. It changes presentation only; the original requests remain open until delivery and evaluation. The private source record is `games-deferred/smallworks-blockers1102.md` outside this repository.
+
+## Historical final ordinary iteration source candidate, 2026-11-01
 
 The reports use fictional AI personas; no recruited human participants are claimed. This clarification passed the unchanged own lane in1.728seconds;7 observed process identities were absent and source was unchanged.
 
@@ -158,7 +172,9 @@ What remains: Adam accepts feel personally. No fresh source-unread retest of the
 - The simulation, save format and exact HF 2.8.0 pin are unchanged. The existing historical-export replay controls still govern compatibility.
 - Verification uses two Vitest workers on the shared machine. Campaign controls run per seed, and the harness allows 30 seconds per test; all behavioral assertions remain unchanged.
 
-## What remains
+## Historical what remains, recorded 2026-10-19
+
+**Current clarification, 2026-11-02:** The October 25 widened work authorizes engineering. November 3 is the review target for natural difficulty and the prior engineering items listed below, not a deferral, freeze or closure. The old expert finding remains historical evidence; current evidence is needed before deciding whether difficulty needs redesign. Current request and candidate status is in [Deferred](docs/Deferred.md); Adam accepts feel separately.
 
 Deferred 2026-10-19 under the owner's soft stop. Each item below is deferred to **2026-10-26** for the owner to choose from; none is started unasked.
 
@@ -274,3 +290,15 @@ The public-command control reaches Sam’s winding toy through the ordinary seed
 ## Money and parts explanation candidate, 2026-10-26
 
 Remaining: independent review, normal gate, source delivery and actual player/Adam acceptance. The bounded display candidate for F1479/F1480/F1483 shows the actual overnight supplies/shared-workshop cost and cash before/after beside the morning result. Recovery shows its earned working/unusable log and actual drawer change, replacement reports the actual drawer before/after, and Supplies repeats the latest recovery outcome. The authored weak donor cell still yields no spare; recovery still costs25minutes. No extra stock, fee, price, simulation/schema/version, HF or SDK change. Existing ordinary/old continuations retain their rules. No browser/player/deployment was run in this author stage; all other ask clauses and live2bf hold remain open. Exact plan and checks: `~/code/.lab-scratch/playtest-b/smallworks-money-parts-*`.
+
+
+## Preference source candidate, 2026-11-02
+
+Remaining: run focused controls, normal checks and exact replay; obtain the parent’s exact default review; verify desktop card access and phone/keyboard preservation; integrate, verify exact CI and deploy. Adam accepts feel. This source-only F-3101–F-3103 candidate preserves the incoming three-blocker candidate. Rafi’s finite follow-up uses the existing ask-about-work input and voluntary HF activity route; words appear only after actual completion of that topic. Nora’s handle is identified as a separate prototype without changing saved account text. Desktop cards use the existing board scroll region and in-flow day-control reserve. No runtime or player validation ran. F-3105/F-3107/F-3108 remain outside this writer’s scope.
+
+
+## Observed-method record and lesson voice source candidate, 2026-11-02
+
+Remaining: original focused and replay/guard controls, owner UI checks, lane/full build, independent exact-candidate review, integration, exact merged CI and deployment verification. All new code and controls are UNRUN. Adam accepts feel separately; no third ordinary panel is planned.
+
+F-3107/F-3108 now have a presentation-only candidate. Method conditions no longer imply the current player performed them. Retained evidence supplies source, object and occasion only where linked; opening records remain earlier records and missing provenance stays unknown. Existing recorded lesson lines use shorter wording; native decisions, reasons and pending requests remain unchanged. Nia’s specific bulb-record cause is unknown. F-3105 remains a preference: authored early diagnosis differs, but fresh-puzzle interest and card reachability are not player-proven. The private `games-deferred/smallworks-record-voice1102.md/json` reports own source detail and the smallest remaining repeat-visit implementation question. All earlier notes and preservation constraints remain.

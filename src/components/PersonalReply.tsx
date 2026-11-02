@@ -7,6 +7,9 @@ import {
   personalReplies,
   personalReplyBlock,
   personalStatement,
+  rafiCustomerBlock,
+  rafiCustomerQuestion,
+  rafiCustomerReceipt,
   replyReceiptKey,
 } from '../game/cast-content';
 import type { Command, GameState } from '../game/types';
@@ -33,6 +36,8 @@ export function PersonalReply({
         (e) => e.speaker === 'You' && e.text.startsWith(replyReceiptKey(personId, statement.id)),
       )
     : undefined;
+  const customerReply = personId === 'rafi' ? rafiCustomerReceipt(state) : undefined;
+  const customerBlock = personId === 'rafi' ? rafiCustomerBlock(state) : undefined;
   const answer = (choice: 'acknowledge' | 'decline') => {
     if (!statement) return;
     act({
@@ -52,6 +57,28 @@ export function PersonalReply({
           <summary>Narrator limits</summary>
           <p>{parts.limits}</p>
         </details>
+      )}
+      {personId === 'rafi' && (
+        <section aria-label="Rafi’s customer account">
+          {customerReply ? (
+            <p>Rafi: {customerReply.text}</p>
+          ) : (
+            <>
+              <button
+                type="button"
+                disabled={Boolean(customerBlock)}
+                onClick={() => act({ type: 'ask-about-work', personId: 'rafi' })}
+              >
+                Ask: {rafiCustomerQuestion} · 5 min
+              </button>
+              <p>Rafi may keep his own plans. Asking takes five minutes, including a refusal.</p>
+              {customerBlock && <p>{customerBlock}</p>}
+            </>
+          )}
+          <p>
+            This conversation does not contact the customer, repair the appliance or return money.
+          </p>
+        </section>
       )}
       {receipt ? (
         <p role="status">

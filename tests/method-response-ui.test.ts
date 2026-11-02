@@ -32,6 +32,9 @@ it('requires actual work and a later use test without overriding the owner’s p
     renderToStaticMarkup(
       createElement(MethodResponse, { state: s, jobId: id, componentId: 'switch', act: () => {} }),
     );
+  expect(render()).toContain('work and object tests recorded so far');
+  expect(render()).not.toContain('existing rules');
+  expect(render()).toContain('own plans instead of discussing the work');
   expect(render()).toContain('disabled');
   expect(render()).toContain('Show actual performed work on this part and a later use test');
   const work = dispatch(s, {

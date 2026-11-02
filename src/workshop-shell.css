@@ -1390,3 +1390,23 @@ details[aria-label="Browser continuity"] {
 .workshop-shell .board-column .job-paper > .readiness {
   margin: 0;
 }
+
+/* Desktop workboard: use its existing scroll area above the in-flow day controls.
+   Give each status a row so three offers need not stack below the visible area. */
+@media (min-width: 901px) {
+  .workshop-shell .board-page {
+    display: block;
+  }
+  .workshop-shell .board-page > .workboard-columns {
+    display: block;
+  }
+  .workshop-shell .board-column[open] {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+    align-items: start;
+    gap: 8px 12px;
+  }
+  .workshop-shell .board-column > summary {
+    grid-column: 1 / -1;
+  }
+}

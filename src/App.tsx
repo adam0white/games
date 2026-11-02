@@ -4,6 +4,7 @@ import { CommunityPanel } from './components/CommunityPanel';
 import { CommunityScene } from './components/CommunityScene';
 import { FirstRepairGuide } from './components/FirstRepairGuide';
 import { LessonControl } from './components/LessonControl';
+import { MeterContext } from './components/MeterContext';
 import { MethodResponse } from './components/MethodResponse';
 import { ObjectOwnerExchange } from './components/ObjectOwnerExchange';
 import { PersonalReply } from './components/PersonalReply';
@@ -12,6 +13,7 @@ import { ReadingComparison } from './components/ReadingComparison';
 import { RecentConversation } from './components/RecentConversation';
 import { ReturnedHistory } from './components/ReturnedHistory';
 import { ReturnReceipt } from './components/ReturnReceipt';
+import { SamOffer } from './components/SamOffer';
 import { SamRequest } from './components/SamRequest';
 import { SamWorkAccount } from './components/SamWorkAccount';
 import { SendWord } from './components/SendWord';
@@ -35,7 +37,7 @@ import {
 import { evidenceContext } from './game/evidence-context';
 import { livePersonWords } from './game/hf';
 import { governorMultipliers } from './game/model';
-import { describePerson, playerWordReading } from './game/people';
+import { describePerson, methodRecords, playerWordReading } from './game/people';
 import { replayRecordedRun } from './game/replay';
 import { stockCount } from './game/stock';
 import type {
@@ -55,6 +57,7 @@ import {
   actionAccount,
   componentWorkReading,
   latestRecoveryAccount,
+  lessonWords,
   ownerPromiseAccount,
 } from './ui/workshop-feedback';
 import { readFreshWorkshopSave, readWorkshopSave, SOURCE_JOURNAL_KEY } from './workshop-storage';
@@ -978,7 +981,7 @@ function Workshop({
   );
   const elapsed = Math.max(0, Math.min(100, (((state.now % 1440) - 540) / 480) * 100));
   const actionJob = state.jobs.find((j) => j.id === actionJobId);
-  const responsibilityActions = (j: Job) => (
+  const responsibilityActions = (j: Job, samOnly = false) => (
     <div className="responsibility-actions">
       {' '}
       {j.blocked ? (
@@ -1017,7 +1020,7 @@ function Workshop({
               : 'Ask Sam to take charge of the repair'}
         </button>
       )}
-      {!j.isPersonal && !j.isDonor && (
+      {!samOnly && !j.isPersonal && !j.isDonor && (
         <>
           <button type="button" onClick={() => act({ type: 'deliver', jobId: j.id })}>
             Return checked object
@@ -1751,6 +1754,13 @@ function Workshop({
                                 </div>
                                 {readingExplanation(lastReading) && (
                                   <p>{readingExplanation(lastReading)}</p>
+                                )}
+                                {!guided && (
+                                  <MeterContext
+                                    job={job}
+                                    reading={lastReading}
+                                    condition={condition}
+                                  />
                                 )}
                                 <div className="meter-settings">
                                   <div className="segmented">
@@ -2567,23 +2577,28 @@ function Workshop({
                               </div>
                               <h4 className="knowledge-heading">Observed repair methods</h4>
                               <p className="knowledge-note">
-                                Sam learned by watching. He has completed this many repairs alone:{' '}
-                                {state.independentRepairs}.
+                                Sam’s retained methods are listed below. He has completed this many
+                                repairs alone: {state.independentRepairs}.
                               </p>
                               <p className="knowledge-note">
-                                These are the conditions Sam saw. They do not guarantee a successful
-                                repair.
+                                Each method describes conditions for trying a step. It does not say
+                                you performed that step here or guarantee a successful repair.
                               </p>
                               <div className="knowledge-list">
                                 {person.methods?.rules.length ? (
-                                  describePerson(person).learned.map((method, index) => (
+                                  methodRecords(person, state).map((record, index) => (
                                     <article key={person.methods?.rules[index]?.id}>
-                                      <p>{method}</p>
+                                      <p>{record.method}</p>
+                                      {record.sources.map((source) => (
+                                        <p key={source.evidenceId ?? source.kind}>
+                                          <small>{source.text}</small>
+                                        </p>
+                                      ))}
                                     </article>
                                   ))
                                 ) : (
                                   <p className="empty-knowledge">
-                                    Sam has not watched a repair demonstration yet.
+                                    No repair methods are retained here.
                                   </p>
                                 )}
                               </div>
@@ -3115,6 +3130,15 @@ function Workshop({
                     Ask Sam to watch
                   </button>
                 )}
+                {!guided &&
+                  ['active', 'ready'].includes(job.status) &&
+                  !job.isDonor &&
+                  !samFinishedPersonal(job) && (
+                    <SamOffer
+                      available={progress.apprenticeshipAvailable}
+                      actions={responsibilityActions(job, true)}
+                    />
+                  )}
                 <h3>On the bench</h3>
                 {state.jobs
                   .filter((j) => j.status !== 'declined')
@@ -3187,7 +3211,7 @@ function Workshop({
                   <div key={line.id}>
                     <p>
                       <time>{dayTime(line.at)}</time> <strong>{line.speaker}</strong>{' '}
-                      {accountParts(line.text).words}
+                      {lessonWords(line.speaker, accountParts(line.text).words)}
                     </p>
                     {accountParts(line.text).limits && (
                       <details>
