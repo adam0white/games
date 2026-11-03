@@ -1,3 +1,13 @@
+# Bathroom drawing qualification — 2026-11-03
+
+Remaining: signed source, exact independent Codex review, green CI, integration, normal deployment and live checks. Adam accepts readiness. F-2509 remains open for Sonia's historical phone-label cause and player judgment, target2026-11-03.
+
+Only current pass@20 rendering changes. A labelled bathroom has its own drawing position between the storeroom and back door. The figure and short speech bubbles share one pure position lookup. Toilet figures use x250; the yard/back door stays x318. Other editions keep their existing coordinates and drawing branches. The existing Said at prefix is unchanged. No simulation, saved words, native activity, time, faith or difficulty changed. The early candidate left bubbles on the old lookup; source review found and corrected that before qualification. The actual cut has no short speech bubble, so this is not a runtime bubble witness.
+
+Normal Node26 lane/build and the existing real18:34 public-import control passed at360×690 with tap and1280×800 with click. Both match the complete game/native state and native replay, show Dilek in the bathroom atx250 and leave the back-door label atx318; zero page errors or horizontal overflow. Root inspected both new screenshots. All33 observed identities exited and270 source hashes matched. The diagram remains small on the phone; no general readability or historical-seed reproduction is claimed. Evidence: ~/code/.lab-scratch/games-deferred/pass-bathroom-scene-qa1103.
+
+Past-speech PR23 already delivered signed096ede55ffc3365c544b7245551ce63556a40860 with exact CLEAR, green source/main CI41565358312/41567315713, normal deployment and clean live manifest. Both live public-import/replay sizes passed. The complete caption is reachable by scrolling its phone pane. Earlier candidate entries below are dated history.
+
 # Past-speech caption qualification — 2026-11-03
 
 Remaining: signed commit, exact independent Codex review, green CI, integration, normal deployment and live checks. Adam accepts readiness. F-2509 remains open for historical cause, diagram placement and player judgment, target 2026-11-03.

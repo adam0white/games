@@ -1756,6 +1756,10 @@ const FIXTURES: Record<string, { x: number; y: number }> = {
   'no-replies': { x: 318, y: 22 },
 };
 
+function fixtureOf(st: GameState, place: string): { x: number; y: number } | undefined {
+  return st.version === 'pass@20' && place === 'toilet' ? { x: 250, y: 22 } : FIXTURES[place];
+}
+
 function placeOf(id: CookId): string {
   if (!s) return 'idle';
   const a = personOf(s, id).activity;
@@ -1793,6 +1797,10 @@ function drawScene() {
   parts.push(
     `<path d="${wob(162, 50, 162, 6, 5, 0.6)} ${wob(198, 50, 198, 6, 6, 0.6)}" stroke="${soft}" stroke-width="1.5" fill="none"/><text x="180" y="62" text-anchor="middle" font-size="11" fill="${soft}">storeroom</text>`,
   );
+  if (st.version === 'pass@20')
+    parts.push(
+      `<path d="${wob(232, 50, 232, 6, 7, 0.6)} ${wob(268, 50, 268, 6, 8, 0.6)}" stroke="${soft}" stroke-width="1.5" fill="none"/><text x="250" y="62" text-anchor="middle" font-size="11" fill="${soft}">bathroom</text>`,
+    );
   const o = owed(st);
   const manned = new Set(st.cooks.filter((c) => c.here && !c.gone).map((c) => placeOf(c.id)));
   list.forEach((name, i) => {
@@ -1892,6 +1900,7 @@ function drawScene() {
       return;
     }
     const pl = placeOf(m.id);
+    const fixture = fixtureOf(st, pl);
     const k = at[pl] ?? 0;
     at[pl] = k + 1;
     let x: number;
@@ -1899,9 +1908,9 @@ function drawScene() {
     if (pos[pl] !== undefined) {
       x = (pos[pl] as number) + (SPREAD[k] ?? 0);
       y = 124;
-    } else if (FIXTURES[pl]) {
-      x = (FIXTURES[pl] as { x: number }).x + (SPREAD[k] ?? 0);
-      y = FIXTURES[pl]?.y ?? 22;
+    } else if (fixture) {
+      x = fixture.x + (SPREAD[k] ?? 0);
+      y = fixture.y;
     } else {
       x = 60 + idx * 60;
       y = 212;
@@ -1965,7 +1974,7 @@ function drawBubbles() {
     const b = bubbles[id];
     if (!b || b.until < now || st.minute - b.minute > 6) continue;
     const pl = placeOf(id);
-    const bx = pos[pl] ?? FIXTURES[pl]?.x ?? 180;
+    const bx = pos[pl] ?? fixtureOf(st, pl)?.x ?? 180;
     const n = (stack[pl] ?? -1) + 1;
     stack[pl] = n;
     const y = (pos[pl] !== undefined ? 82 : pl === 'idle' ? 160 : 96) - n * 18;

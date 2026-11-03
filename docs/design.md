@@ -625,6 +625,8 @@ The scoped wording and current activity evidence changes were delivered (fixed b
 
 - Caption-only qualification, 2026-11-03: current pass@20 actual actor captions prefix their retained speech time with “Said at”. Native, accepted host and projected activity matched in one current public-export trace. The 18:34 bathroom cut shows a staffing card, with the phone request hidden by priority; this is not Sonia’s historical-seed reproduction. Normal lane/build and both-size public-import/native-replay checks passed with the complete game/native state unchanged. Signed delivery and live checks remain. Bathroom/yard share the back-door position, and the mobile caption is clipped at the panel boundary. Historical cause, diagram/layout work and player acceptance remain open, games-deferred target 2026-11-03.
 
+- Drawing qualification, 2026-11-03: current pass@20 gives bathroom its own labelled position atx250, with the yard/back door atx318. Figure and bubble rendering share the lookup; other editions retain the old positions. The actual18:34 toilet cut passed normal lane/build, both public-import sizes, complete game/native export equality and native replay; root viewed both screenshots. No short bubble occurred in this cut, so its placement is source-verified only. Signed delivery/live checks remain. Historical Sonia phone-label cause and player acceptance remain open, games-deferred checkpoint2026-11-03.
+
 ### F-2510 — Sonia Ionescu
 
 - Player words, exact (opening ask, then labelled later spans): "Show me early how the week's money could work. ₺40 a table against ₺5,200 by Saturday. And say what flatbreads are, if there are always 0." Later wording (section 5): "Flatbreads are always 0 and never explained."
