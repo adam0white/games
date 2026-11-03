@@ -1,3 +1,13 @@
+# Past-speech caption qualification — 2026-11-03
+
+Remaining: signed commit, exact independent Codex review, green CI, integration, normal deployment and live checks. Adam accepts readiness. F-2509 remains open for historical cause, diagram placement and player judgment, target 2026-11-03.
+
+Current pass@20 actor captions now say “Said at” before the existing speech time. Actual words, narrator captions, other editions and all simulation behavior remain unchanged. A current public-export trace found native, accepted host and projected activity IDs agree at Dilek’s 18:21 explanation and 18:34 bathroom activity. At 18:34 a staffing card takes priority over a pending phone request. This does not reproduce Sonia’s historical seed or prove a phone-label bug fixed.
+
+Normal Node 26 check:lane and build passed. The existing public-import control passed at 360×690 with tap and 1280×800 with click, retaining the complete game/native state and matching native replay. Both show “Said at 18:24” beside current time 18:34. No page errors or horizontal overflow; all 29 observed identities exited and all 270 source hashes matched. Root inspected both screenshots. The phone caption is clipped at the existing panel boundary, and bathroom/yard still share back-door geometry. These limitations remain open. No new repo tests or player round. Evidence: ~/code/.lab-scratch/games-deferred/pass-speech-label-qa1103.
+
+Earlier candidates below are historical. Flatbread PR22 delivered signed32c8f79 after exact CLEAR, source CI41554458312 and main CI41555379588 attempt2 SUCCESS. The first main attempt failed the existing 5-second staffing test and remains recorded; no cap changed. Normal deployment and both-size live replay checks confirmed32c8f79, dirty:false. Money/prediction PR21 likewise delivered signedff82356 after exact CLEAR and green CI, normal deployment and both-size live checks. These technical deliveries do not establish whole-week success or player acceptance.
+
 # Flatbread stock wording — 2026-11-03
 
 Remaining: signed commit, exact independent review, green CI, integration, normal deployment and live checks. Adam accepts readiness. F-2510 flatbread wording is qualified locally; it is not delivered yet.

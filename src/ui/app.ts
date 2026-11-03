@@ -2002,7 +2002,7 @@ function drawCaption() {
     ? s.said.findLast((line) => line.kind === 'answer' && line.who !== 'chef' && spokenAt - line.at <= 10)
     : undefined;
   const caption = spoken
-    ? `<span class="hand">${esc(spoken.who === 'narrator' ? spoken.text : `${speechTime(s, spoken.at)} · ${nameOf(s, spoken.who)}: ${speechWords(s, spoken)}`)}</span>`
+    ? `<span class="hand">${esc(spoken.who === 'narrator' ? spoken.text : `${s.version === 'pass@20' ? 'Said at ' : ''}${speechTime(s, spoken.at)} · ${nameOf(s, spoken.who)}: ${speechWords(s, spoken)}`)}</span>`
     : peopleRun(s)
       ? esc(situation)
       : fresh && a
