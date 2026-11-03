@@ -1,3 +1,11 @@
+# Flatbread stock wording — 2026-11-03
+
+Remaining: signed commit, exact independent review, green CI, integration, normal deployment and live checks. Adam accepts readiness. F-2510 flatbread wording is qualified locally; it is not delivered yet.
+
+Only current pass@20 service copy changes. The stock panel explains flatbread is food baked in the oven for tables and labels the value as portions left to prepare. Other editions retain their exact prior string. The value is oven ingredient stock; zero does not count ready food. Week 1 has no oven menu; week 2 introduces it. No simulation, timing, faith or legacy behavior changed.
+
+Normal Node26 check:lane and build passed. A private automated project smoke used public New game and Open the doors at 360x690 with tap and 1280x800 with click. Both displayed the exact explanation and zero stock without horizontal overflow, within the original 30-second case caps. No game-state edits, produced-flatbread, played week-two or player-acceptance claim. No screenshots. Evidence: ~/code/.lab-scratch/games-deferred/pass-flatbread-qualification1103.
+
 ## What remains — 2026-11-02
 
 Other Deferred asks remain open. The coupled prayer and running ordinary review witness remains open, with a target of 2026-11-03. Player judgment and Adam's acceptance of game readiness remain. Friends' playtests and Show HN remain paused. No new player round was run.

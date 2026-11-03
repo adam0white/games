@@ -630,6 +630,7 @@ The scoped wording and current activity evidence changes were delivered (fixed b
 - Owner and date: the games-deferred Pass host owner; sealed route `target2026-11-03 (open)`, so Nov 3. Verdict word: mixed (the tester’s own stated conditions, not a vote).
 - Source: `docs/lab/reviews/light-2026-10-30/pass-retest2/sonia/report.md` in the sealed packet.
 - Source candidate, 2026-11-02: the early money explanation is shared with F-2506. This does not close the separate flatbread explanation, a whole-week success forecast or player acceptance.
+- Flatbread copy qualification, 2026-11-03: current pass@20 service explains oven-baked food for tables and labels the counter as portions left to prepare. The value is oven ingredient stock, not ready food. Normal lane/build and public opening-service checks passed at both required sizes. Signed delivery and live checks remain with games-deferred, target 2026-11-03; production in a played week two, a whole-week success forecast and player acceptance remain unproved.
 
 
 ### Unranked source lead — Maya Chen, phone “talk another time” button

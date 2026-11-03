@@ -3209,7 +3209,10 @@ function drawKitchenStock() {
   const el = document.getElementById('kitchen-stock');
   if (!el || !s?.kitchen) return;
   const w = s.kitchen;
-  const text = `Ingredients left: ${w.stock.grill} grill portions, ${w.stock.cold} cold portions and ${w.stock.oven} flatbreads.`;
+  const text =
+    s.version === 'pass@20'
+      ? `Ingredients left: ${w.stock.grill} grill portions and ${w.stock.cold} cold portions. Flatbread is food baked in the oven for tables. Portions left to prepare: ${w.stock.oven}.`
+      : `Ingredients left: ${w.stock.grill} grill portions, ${w.stock.cold} cold portions and ${w.stock.oven} flatbreads.`;
   const supply = w.supply;
   const html = `<p>${esc(text)}</p>${supply.expected ? `<p>${supply.failed ? 'The original wedding lamb delivery has failed.' : 'Eight wedding lamb portions are expected at six; they are not here yet.'}${supply.replacement ? (supply.replacement.delivered ? ' The paid replacement has arrived.' : ` The paid replacement arrives at ${clock(supply.replacement.arrives)}.`) : ''}</p>` : ''}${supply.failed && !supply.replacement ? `<button id="buy-replacement" ${s.till < 240 ? 'disabled' : ''}>Order eight replacement lamb portions for ${lira(240)}. Allow 45 minutes.</button>` : ''}`;
   if (el.innerHTML === html) return;
