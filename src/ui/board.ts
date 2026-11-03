@@ -1,4 +1,6 @@
 /** Board suggestions are player inputs, not new simulation rules. */
+
+import { planOf, weekOf } from '../sim/campaign.ts';
 import { RUSH_FROM, RUSH_TO } from '../sim/cooks.ts';
 import {
   type BoardRow,
@@ -8,9 +10,22 @@ import {
   memberOf,
   nameOf,
   onShift,
+  promisesOn,
   queueInput,
   restoreState,
 } from '../sim/kitchen.ts';
+
+type BoardMoneyState = Pick<GameState, 'night' | 'till' | 'carry' | 'wagesDue' | 'seen' | 'crew' | 'version'>;
+/** Board-only projection: current active crew attend the remaining services; future changes are unknown. */
+export function boardMoneyEstimate(s: BoardMoneyState) {
+  const plan = planOf(s.night);
+  const nights = weekOf(plan.week).weekdays.filter((day) => day >= plan.weekday).length;
+  const wages = s.crew.filter((m) => !m.founder && !m.left).reduce((sum, m) => sum + m.wage, 0);
+  const bill =
+    weekOf(plan.week).bill + s.carry + s.wagesDue + (promisesOn(s) ? (s.seen ?? 0) : 0) + wages * nights;
+  const need = Math.max(0, bill - s.till);
+  return { bill, nights, need, average: nights > 0 ? Math.ceil(need / nights / 10) * 10 : 0 };
+}
 
 export function breakSlots(current: number): { minute: number; label: string }[] {
   return [...new Set([1090, 1115, 1185, 1260, current])]

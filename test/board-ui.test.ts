@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { boardDefaults, cloneState, newGame, queueInput, step } from '../src/sim/kitchen.ts';
-import { boardReplies, breakSlots, earlyCoverageWarnings, openingBoard } from '../src/ui/board.ts';
+import {
+  boardMoneyEstimate,
+  boardReplies,
+  breakSlots,
+  earlyCoverageWarnings,
+  openingBoard,
+} from '../src/ui/board.ts';
 
 function tuesday() {
   const s = newGame(42);
@@ -12,6 +18,51 @@ function tuesday() {
 }
 
 describe('board presentation choices', () => {
+  it('counts tonight pay and an already recorded surcharge in the current board gap', () => {
+    // Host-only accounting inputs. This does not claim a played week-two native run.
+    const opening = newGame(42, 'pass@20');
+    const before = cloneState(opening);
+    const founders = opening.crew.map((m) => ({ ...m, founder: true }));
+    const hired = founders.map((m, i) => (i === 0 ? { ...m, founder: false, wage: 40 } : m));
+    expect
+      .soft(
+        boardMoneyEstimate({
+          ...opening,
+          night: 10,
+          till: 3000,
+          carry: 0,
+          wagesDue: 120,
+          seen: 0,
+          crew: hired,
+        }),
+      )
+      .toEqual({ bill: 3160, nights: 1, need: 160, average: 160 });
+    expect
+      .soft(
+        boardMoneyEstimate({
+          ...opening,
+          night: 7,
+          till: 3000,
+          carry: 0,
+          wagesDue: 0,
+          seen: 500,
+          crew: founders,
+        }),
+      )
+      .toEqual({ bill: 3500, nights: 4, need: 500, average: 130 });
+    expect(
+      boardMoneyEstimate({
+        ...opening,
+        night: 7,
+        till: 4000,
+        carry: 0,
+        wagesDue: 0,
+        seen: 500,
+        crew: founders,
+      }),
+    ).toMatchObject({ need: 0, average: 0 });
+    expect(cloneState(opening)).toEqual(before);
+  });
   it('names the default break that leaves the grill empty for the 18:12 table (F-2168)', () => {
     const s = newGame(42, 'pass@20');
     const rows = openingBoard(s);

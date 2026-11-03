@@ -90,7 +90,14 @@ import {
 } from '../sim/kitchen.ts';
 import { zeynepDepartureStatus } from '../sim/one-cast.ts';
 import { indexedAutosave } from './autosave.ts';
-import { boardReplies, breakSlots, earlyCoverageWarnings, plannedBreakText, sameBoard } from './board.ts';
+import {
+  boardMoneyEstimate,
+  boardReplies,
+  breakSlots,
+  earlyCoverageWarnings,
+  plannedBreakText,
+  sameBoard,
+} from './board.ts';
 import { automaticClockPlayback, inspectingCook, SPEED_NAMES } from './clock.ts';
 import { type ContinuitySave, continuity, guardedContinuity } from './continuity.ts';
 import { portionEdition } from './editions.ts';
@@ -646,6 +653,7 @@ const weekTitle = (n: number) => `${planOf(n).title}, week ${planOf(n).week}`;
 /** What the week's bill comes to so far: the bill, anything carried over, and the new hands' wages. */
 /** Saturday's bill as it will stand: the week's bill, what was carried, and the hires' wages for the whole week. */
 function billNow(st: GameState): number {
+  if (st.version === 'pass@20' && st.phase === 'board') return boardMoneyEstimate(st).bill;
   const week = planOf(st.night).week;
   let left = 0;
   for (let n = st.night + (st.phase === 'service' ? 0 : 1); n <= LAST_NIGHT && planOf(n).week === week; n++)
@@ -655,15 +663,12 @@ function billNow(st: GameState): number {
 }
 
 function boardMoneyLine(st: GameState): string {
-  const plan = planOf(st.night);
-  const nights = weekOf(plan.week).weekdays.filter((day) => day >= plan.weekday).length;
-  const bill = billNow(st);
-  const need = Math.max(0, bill - st.till);
+  const { bill, nights, need, average } = boardMoneyEstimate(st);
   const remaining =
     nights > 0
-      ? `${lira(need)} is still needed over ${nights} service night${nights === 1 ? '' : 's'}, including tonight.${need > 0 ? ` The gap averages about ${lira(Math.ceil(need / nights / 10) * 10)} per remaining service night.` : ''}`
+      ? `${lira(need)} is still needed over ${nights} service night${nights === 1 ? '' : 's'}, including tonight.${need > 0 ? ` The gap averages about ${lira(average)} per remaining service night.` : ''}`
       : `${lira(need)} is still needed. There are no service nights left this week.`;
-  return `The till has ${lira(st.till)}. The estimated bill is ${lira(bill)}. ${remaining} Future service and costs can change these amounts.`;
+  return `The till has ${lira(st.till)}. The estimated bill with the current crew is ${lira(bill)}. ${remaining} Future service and costs can change these amounts.`;
 }
 
 // ---------- title ----------

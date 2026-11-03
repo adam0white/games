@@ -1264,13 +1264,14 @@ test('F-2506 and F-2510 explain the opening money target on the actual board', a
     5200 +
     opening.carry +
     opening.wagesDue +
-    opening.crew.filter((m) => !m.founder && !m.left).reduce((sum, m) => sum + m.wage, 0) * 5;
+    (opening.seen ?? 0) +
+    opening.crew.filter((m) => !m.founder && !m.left).reduce((sum, m) => sum + m.wage, 0) * 6;
   const need = Math.max(0, bill - opening.till);
   const average = Math.ceil(need / 6 / 10) * 10;
   const explanation = page.locator('.board-money');
   await expect(explanation).toBeVisible(); // CAUSAL RED: the board has no explanation yet.
   await expect(explanation).toContainText(`The till has ${money(opening.till)}.`);
-  await expect(explanation).toContainText(`The estimated bill is ${money(bill)}.`);
+  await expect(explanation).toContainText(`The estimated bill with the current crew is ${money(bill)}.`);
   await expect(explanation).toContainText(
     `${money(need)} is still needed over 6 service nights, including tonight.`,
   );
