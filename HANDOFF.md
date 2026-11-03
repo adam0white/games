@@ -1,3 +1,9 @@
+# Week-two production evidence — 2026-11-03
+
+Remaining: F-2510’s historical cause, whole-week success and player acceptance remain open, with a 2026-11-10 recheck while player rounds are paused. Other Pass Deferred asks and Adam’s readiness acceptance remain separate.
+
+[The fixed-seed technical control](docs/lab/week-two-control-2026-11-03.md) records a real first-week-two flatbread portion after one noninsistent Selim oven ask and actual assent. Complete host replay and native verification of all 7,177 transactions passed. All 61 inputs and a bounded receipt are archived; the complete private exports remain preserved. This documentation changes no gameplay, dependency or deployment. Older checkpoints below are historical; the bathroom drawing is already delivered as ec912438.
+
 # Bathroom drawing qualification — 2026-11-03
 
 Remaining: signed source, exact independent Codex review, green CI, integration, normal deployment and live checks. Adam accepts readiness. F-2509 remains open for Sonia's historical phone-label cause and player judgment, target2026-11-03.
