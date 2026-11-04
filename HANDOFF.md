@@ -1,4 +1,12 @@
-## Current candidate verification, 2026-11-02
+## Delivered technical record, 2026-11-04
+
+Remaining: Adam's play and acceptance of the game remain open. The twelve literal player requests and their reasons remain in [Deferred player requests](docs/Deferred.md#final-ordinary-iteration-2026-11-01). The ordinary player-panel gate remains paused; no new panel was run. Recheck the remaining owner and player dependency on 2026-11-05 as an engineering follow-up; this is not an appointment or commitment by Adam.
+
+The live release identifies signed source `ae2d1d88ee84484ee4d5acd323a67fc308c46c47` and `dirty:false`. Independent review returned CLEAR for `0ae3e0d68ecddc8f301911f3cd6ea87f420ae7d4`, which has the same tree as the delivered source. Exact target CI `41481803656` passed. The normal deployment returned 0 in 23.615 seconds; its lane, build, archives, dry run, upload, built-in release and archive checks passed. An earlier deployment attempt ended with 10500; its cause remains unknown.
+
+The first browser navigation timed out after 30 seconds waiting for network idle and its browser closed. A subsequent DOM-loaded opening smoke found the actual Start repairing button at 360×690 and 1280×800, with no page errors or horizontal overflow. No screenshots were retained. Test-owned browsers closed. All 41 observed deployment process identities were absent in the final check, including zombies; sampling cannot prove the absence of unsampled short-lived processes. This opening engineering smoke is not a played repair, player acceptance or native replay qualification. Technical delivery and Adam's acceptance are separate.
+
+## Current candidate verification, 2026-11-02 (historical)
 
 Remaining: one exact-commit independent Codex review, signed source/target CI and integration, then approved deployment/live verification. Adam accepts feel. No third ordinary player panel is planned; available engineering remains active.
 
