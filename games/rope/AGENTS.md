@@ -32,3 +32,7 @@ Use the root pnpm workspace and its frozen lockfile. Keep overrides and native b
 ## Public gameplay
 
 Every gameplay feature is public. Shared people should carry over automatically through supported admission. Native completed climbs attempt to save eligible histories before next-climb navigation. A refusal is not a publication. File play cannot publish. Cast controls live on the central shelf. Diagnostics sit in one collapsed Debug item beside Lab privacy.
+
+Biome 2.6.5 keeps formatter exclusions only for the historical report paths listed in biome.json, preserving their evidence text and layout. Lint still applies to those files.
+
+Stack (2026-11-05): HF 4.17.0, Node 26.12.0, pnpm 12.16.1, TypeScript 7.0.2, Vite 8.3.5, Vitest 5.1.0, Biome 2.6.5, Wrangler 4.157.0; Worker compatibility date 2026-11-05.

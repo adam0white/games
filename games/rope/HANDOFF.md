@@ -1,3 +1,11 @@
+# Monorepo source synchronization — 2026-11-05
+
+Merged upstream source `9989ee495f40e371ec20e3c3d83a068b2783fe57` from Rope PR #21 without squash. Keep the root workspace, lockfile, scoped worker and shared deployment gate. The entries below describe source-repository work. CLARITY tutorial synchronization and the new client/kit artifacts still gate cutover; this import does not deploy either origin.
+
+# Upkeep candidate — 2026-11-05
+
+Remaining: full suite, review, integration of current Clarity work and exact CI before deployment. Recheck F-2931–F-2943 on 2026-11-12: the existing second-cycle reports are inspection leads and this dependency update did not reproduce or fix them. Recheck peer certification and the owner/player fun judgment for the model-call gate on 2026-11-12; no live peer or human acceptance was established here.
+
 # RETEST2 correction 1 — 2026-10-31
 
 Remaining: future exact-source Opus CLEAR, review, CI, deploy, phone retest and Adam feel acceptance. All edition 1 in-progress saves and exports are refused by this candidate; pin `99a4227` to replay the old round. No migration.
@@ -373,7 +381,6 @@ Goal: finish the owner’s bounded simplify scope, then verify delivery. Adam se
 Next action, only after `/Users/abdul/code/.lab-scratch/simplify/PRIORITY-HF.md` is removed: from `/Users/abdul/code/.lab-scratch/wt/rope/simplify-20261024`, run `PATH=/opt/homebrew/bin:$PATH node /Users/abdul/code/human-framework/scripts/suite-lock.ts -- npm run check:lane`. Then sign with the prepared `/Users/abdul/code/.lab-scratch/simplify/workers/rope-commit-message.txt`, rebase origin before push, and follow worker-contract.md’s exact-CI/central phase exit. Do not deploy old kit0.5.6. No extra reviewer.
 
 Resume this session: `01a17020-6825-7e33-aafa-be735803312b`. All evidence, fixtures, review/disposition, inventory, source patch and report are outside the tree in `/Users/abdul/code/.lab-scratch/simplify/workers/rope*`. The authoritative report is `workers/rope.md`. No owned reviewer, browser, dev server or suite waiter remains running. Verified own queued PID21005 was canceled for HF priority; no foreign process was signaled. Source remains staged and must be preserved until signed/on origin/exact CI green. No user-only question blocks source work.
-
 
 ## Compact footer correction (2026-10-24)
 
