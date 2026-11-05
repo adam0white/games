@@ -1,3 +1,46 @@
+.teaching-cue {
+  border: 2px solid #b16921;
+  border-radius: 10px;
+  background: #fff5d8;
+  color: #33200e;
+  padding: 10px;
+  margin: 8px 0;
+  font-size: 16px;
+  line-height: 1.4;
+}
+.teaching-cue p {
+  margin: 0 0 8px;
+}
+.teaching-cue button {
+  min-height: 44px;
+}
+.teaching-target {
+  outline: 3px solid #b16921;
+  outline-offset: 2px;
+}
+.tutorial-plan {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+}
+.tutorial-plan [data-gap="true"] {
+  color: #932d21;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .teaching-target {
+    animation: teaching-arrival 0.5s ease-out;
+  }
+  @keyframes teaching-arrival {
+    from {
+      outline-offset: 7px;
+    }
+    to {
+      outline-offset: 2px;
+    }
+  }
+}
+
 /* The people-run board has one scrolling list and one board action. */
 .people-board {
   height: 100dvh;

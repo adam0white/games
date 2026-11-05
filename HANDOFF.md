@@ -363,3 +363,7 @@ The pre-delivery coordinator audit found current outgoing 2.21.0 envelopes rejec
 ## 2026-10-30 combined reader candidate follow-up
 
 The speech highlight timer can expire after the public file chooser replaces the service view. `drawSheet` now returns when that view has no sheet. Highlight timing and simulation remain unchanged. The browser regression advances the real highlight timer after public navigation; both current-file viewport controls also require zero page errors. Combined patch, hashes, backups and RED/GREEN logs are in `~/code/.lab-scratch/games-deferred/resume-pass-reader-combined-report.md` and its JSON proof. Root owns independent combined review and release; this tree remains uncommitted.
+
+## CLARITY tutorial candidate — 2026-11-05
+
+Remaining: exact reviewed PR, green CI, merge and verified clean deployment; owner readiness acceptance remains separate. The first-minute guide uses actual station/break/cover proposals and cook requests, waits for the requested answer, and offers Skip and menu replay. It has a no-body-reading browser check and one synthetic Terra skim tester with retest. See [the playtest record](docs/playtests/2026-11-05-clarity.md). The optional first-party start timeout is a separate unconfirmed performance observation for 2026-11-24; no general speed claim follows.

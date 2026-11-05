@@ -12,6 +12,13 @@ import {
   privateConversationNote,
 } from '../sim/kitchen-edition.ts';
 import { NARRATION_EDITION } from '../sim/narration-edition.ts';
+import {
+  beginTeaching,
+  mountTeaching,
+  refreshTeaching,
+  teachingBill,
+  teachingRequestSent,
+} from './teaching.ts';
 /**
  * The Pass UI: plain DOM and inline SVG over the pure sim. The UI reads state and queues inputs; it never
  * changes the sim directly. Real time drives sim minutes (continuous, with slowdown while a consequential
@@ -420,7 +427,7 @@ function openGameMenu() {
   const dialog = document.createElement('dialog');
   dialog.className = 'game-menu-dialog';
   dialog.setAttribute('aria-label', 'Game menu');
-  dialog.innerHTML = `<div class="menu-heading"><h2>Game menu <small>${s ? `· ${esc(planOf(s.night).title)}, week ${planOf(s.night).week} · ${clock(s.minute)}` : '· The Pass'}</small></h2><button id="menu-close" aria-label="Close menu">×</button></div><p id="save-result" role="status">${s ? (filePlay ? 'The game is paused. You are playing a file. Your saved game stays on this device. Keep a copy of this run through Feedback before leaving.' : 'Saving your game…') : 'No game has started.'}</p><div class="menu-rows"><button id="send-run">Feedback</button><button id="full-screen">Full screen</button><button id="menu-new">New game</button><div id="menu-new-confirm" hidden><p>Start a new game? This replaces your saved game.</p><button id="menu-new-yes">Start new game</button><button id="menu-new-no">Cancel</button></div><a href="https://human.adamwhite.work/games/">All games</a></div><div id="record-controls"><a href="${PRIVACY_URL}" target="_blank" rel="noopener">Lab privacy</a></div><button class="primary" id="menu-back">Resume</button>`;
+  dialog.innerHTML = `<div class="menu-heading"><h2>Game menu <small>${s ? `· ${esc(planOf(s.night).title)}, week ${planOf(s.night).week} · ${clock(s.minute)}` : '· The Pass'}</small></h2><button id="menu-close" aria-label="Close menu">×</button></div><p id="save-result" role="status">${s ? (filePlay ? 'The game is paused. You are playing a file. Your saved game stays on this device. Keep a copy of this run through Feedback before leaving.' : 'Saving your game…') : 'No game has started.'}</p><div class="menu-rows"><button id="send-run">Feedback</button><button id="full-screen">Full screen</button><button id="menu-tutorial">Replay kitchen practice</button><button id="menu-new">New game</button><div id="menu-new-confirm" hidden><p>Start a new game? This replaces your saved game.</p><button id="menu-new-yes">Start new game</button><button id="menu-new-no">Cancel</button></div><a href="https://human.adamwhite.work/games/">All games</a></div><div id="record-controls"><a href="${PRIVACY_URL}" target="_blank" rel="noopener">Lab privacy</a></div><button class="primary" id="menu-back">Resume</button>`;
   void saved.then((ok) => {
     const status = dialog.querySelector('#save-result');
     if (status && !ok)
@@ -439,6 +446,12 @@ function openGameMenu() {
   });
   for (const id of ['menu-back', 'menu-close'])
     dialog.querySelector(`#${id}`)?.addEventListener('click', () => dialog.close());
+  dialog.querySelector('#menu-tutorial')?.addEventListener('click', () => {
+    dialog.close();
+    beginTeaching(s?.phase ?? 'title', true);
+    enter();
+    mountTeaching();
+  });
   dialog.querySelector('#menu-new')?.addEventListener('click', () => {
     if (saveReadFailed) {
       (dialog.querySelector('#save-result') as HTMLElement).textContent = saveReadProblem;
@@ -848,6 +861,7 @@ async function title() {
           (secondWeek
             ? beginAtWeekTwo(seed, nevin ? 'nevin' : undefined, 'pass@20')
             : newGame(seed, 'pass@20'));
+        beginTeaching(s.phase);
         cast.track();
         if (!secondWeek && nevin && s.inputs.length === 0) queueInput(s, { kind: 'pace', value: 'nevin' });
         const saved = await writeSave();
@@ -988,6 +1002,7 @@ function enter() {
   else if (s.phase === 'sunday') sunday();
   else if (s.phase === 'end') ending();
   else evening();
+  mountTeaching();
 }
 
 // ---------- the board ----------
@@ -1210,6 +1225,12 @@ function board(draft?: BoardRow[], editing: string | null = null) {
     writeSave();
     enter();
   });
+  teachingBill(billNow(st), st.till);
+  const tutorialRow = rows.find((row) => row.cook === editing);
+  const tutorialPlan = tutorialRow
+    ? `<span>🥗 ${esc(stationName[tutorialRow.station])}</span> → <span>🍽 ${clock(tutorialRow.breakAt)}–${clock(tutorialRow.breakAt + 20)}</span> → <strong data-gap="${!tutorialRow.cover}">${tutorialRow.cover ? `↪ ${esc(nameOf(st, tutorialRow.cover))} takes over` : '⚠ Empty station'}</strong>`
+    : '';
+  mountTeaching(tutorialPlan);
   if (!draft) window.scrollTo(0, 0);
 
   function legacyBoard(draft?: BoardRow[], editing: string | null = null) {
@@ -1579,6 +1600,7 @@ function drawAll(force = false) {
   drawScene();
   drawCaption();
   drawSheet();
+  refreshTeaching();
 }
 
 function drawTop() {
@@ -2685,6 +2707,8 @@ function bindHold(b: HTMLButtonElement) {
 
 function ask(verb: Verb, insist: boolean) {
   if (!s || !selected) return;
+  const previousAnswer = s.lastAnswer;
+  const askedCook = selected;
   queueInput(s, { kind: 'ask', cook: selected, verb, insist });
   seenHint.job = true;
   drawStatus();
@@ -2693,6 +2717,14 @@ function ask(verb: Verb, insist: boolean) {
   cachedHints = null;
   drawScene();
   drawSheet();
+  teachingRequestSent(
+    () =>
+      !!s?.lastAnswer &&
+      s.lastAnswer !== previousAnswer &&
+      s.lastAnswer.who === askedCook &&
+      s.lastAnswer.verb === verb,
+    askedCook,
+  );
 }
 
 // ---------- evening ----------
