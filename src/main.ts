@@ -13,6 +13,7 @@ let acceptedFile: AcceptedNativeFile | null = null;
 let stopTracking: (() => void) | null = null;
 const saveKey = 'his-word-save-v1';
 const noticeKey = 'his-word-notice-v1';
+const guideKey = 'his-word-guide-v1';
 function read(key: string): string | null {
   try {
     return localStorage.getItem(key);
@@ -44,6 +45,9 @@ if (!fileMode) {
     }
   }
 }
+let guide = !fileMode && !read(guideKey) && !!state && state.inputs.length === 0;
+let guideReply = false;
+let replayGuideOnNew = false;
 type Surface = 'play' | 'menu' | 'notebook' | 'feedback' | 'new' | 'notice' | 'lab' | 'file';
 let surface: Surface = fileMode ? 'file' : read(noticeKey) ? 'play' : 'notice';
 function trackMeeting(): void {
@@ -89,6 +93,7 @@ function button(text: string, action: () => void, className = ''): HTMLButtonEle
   return node;
 }
 function change(next: Surface): void {
+  if (surface === 'new' && next !== 'new') replayGuideOnNew = false;
   selection.cancel();
   surface = next;
   status = '';
@@ -145,6 +150,21 @@ function menu(leaf: HTMLElement): void {
   options.append(
     button('Resume', () => change('play')),
     button('Notebook', () => change('notebook')),
+    ...(!fileMode ||
+    (currentMeeting().result === 'playing' && ['opening', 'table', 'hear'].includes(currentMeeting().page))
+      ? [
+          button('Replay guide', () => {
+            if (fileMode) {
+              guide = true;
+              guideReply = false;
+              change('play');
+            } else {
+              replayGuideOnNew = true;
+              change('new');
+            }
+          }),
+        ]
+      : []),
     button('Feedback', () => change('feedback')),
     ...(fileMode
       ? [button('Choose another file', () => change('file')), button('Close file', closeFile)]
@@ -322,7 +342,12 @@ function render(focus = true): void {
   leaf.id = 'reading';
   if (surface === 'play') {
     const scene = view(meeting);
+    if (guide && !guideReply && !['opening', 'table', 'hear'].includes(meeting.page)) {
+      guide = false;
+      if (!fileMode) write(guideKey, '1');
+    }
     lab.screen(scene.title);
+    leaf.classList.toggle('guided', guide && !scene.ending);
     leaf.append(
       element(
         'p',
@@ -334,6 +359,27 @@ function render(focus = true): void {
       heading(scene.title),
     );
     const prose = element('div', '', 'prose');
+    const guideBox = element('aside', '', 'guide');
+    if (guide && !scene.ending) {
+      const message = guideReply
+        ? 'A real reply. The clock moved. Find terms all four can sign before time runs out.'
+        : meeting.page === 'opening'
+          ? 'Agree on work, cart storage and rent for a month before Osman leaves.'
+          : meeting.page === 'table'
+            ? 'Choose what to do. No agreement when time runs out means the shop stays shut.'
+            : meeting.page === 'hear'
+              ? 'Choose someone to ask. The conversation costs two minutes.'
+              : 'Choose a real action. Time spent brings Osman closer to leaving.';
+      guideBox.append(
+        element('strong', message),
+        button('Skip guide', () => {
+          guide = false;
+          if (!fileMode) write(guideKey, '1');
+          render(false);
+        }),
+      );
+      leaf.append(guideBox);
+    }
     for (const line of scene.prose) prose.append(paragraph(line));
     if (scene.speech) {
       const quote = element('blockquote');
@@ -341,14 +387,17 @@ function render(focus = true): void {
       quote.append(paragraph(scene.speech));
       leaf.append(quote);
     }
-    leaf.append(prose);
     const choices = element('div', '', 'choices');
     choices.setAttribute('aria-label', 'Your next decision');
     for (const choice of scene.choices) {
       const option = button(
         choice.text,
         () => {
+          const previousPage = meeting.page;
+          if (guideReply) guide = false;
           act(meeting, { choice: choice.id });
+          guideReply = guide && previousPage === 'hear' && !!meeting.speaker;
+          if (guide && guideReply && !fileMode) write(guideKey, '1');
           persist();
           render();
         },
@@ -373,7 +422,8 @@ function render(focus = true): void {
           : [button('Begin again', () => change('new'), 'choice')]),
       );
     }
-    leaf.append(choices);
+    if (guide && !scene.ending && !guideReply) leaf.append(choices, prose);
+    else leaf.append(prose, choices);
     const foot = element('footer');
     foot.append(button('Open notebook', () => change('notebook'), 'text-button'));
     leaf.append(foot);
@@ -421,13 +471,23 @@ function render(focus = true): void {
     );
   } else if (surface === 'new' && !fileMode) {
     leaf.append(
-      heading('Start another meeting?'),
+      heading(replayGuideOnNew ? 'Start again with the guide?' : 'Start another meeting?'),
       paragraph('This replaces your current place. Export your playtest first if you want to keep it.'),
-      button('Keep this meeting', () => change('play'), 'choice'),
+      button(
+        'Keep this meeting',
+        () => {
+          replayGuideOnNew = false;
+          change('play');
+        },
+        'choice',
+      ),
       button(
         'Start new game',
         () => {
           state = createGame(freshSeed());
+          guide = replayGuideOnNew;
+          guideReply = false;
+          replayGuideOnNew = false;
           persist();
           change('play');
         },
