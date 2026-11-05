@@ -119,6 +119,17 @@ for (const viewport of [
         await page.setViewportSize(viewport);
         await expectPracticeInView(page, 'result');
       }
+      // The private invitation has a warning and optional topics, unlike the two-button check-in row.
+      const invitation = page.locator('[data-contact="invite"]');
+      await expect(invitation).toBeAttached();
+      const contactLayout = await invitation.evaluate((button) => {
+        const parent = button.parentElement?.getBoundingClientRect();
+        const action = button.getBoundingClientRect();
+        const warning = button.nextElementSibling?.getBoundingClientRect();
+        if (!parent || !warning) return false;
+        return action.width >= parent.width * 0.9 && warning.top >= action.bottom;
+      });
+      expect(contactLayout).toBe(true);
       await page.screenshot({ path: `test-results/practice-${viewport.width}-reply.png` });
       await page.evaluate(() => {
         const game = (window as unknown as { __pass: { state: { till: number }; draw(): void } }).__pass;

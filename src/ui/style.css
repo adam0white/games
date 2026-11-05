@@ -1233,3 +1233,11 @@ button.party-slip {
   padding: 6px 8px;
   font-size: 15px;
 }
+
+/* An invitation includes a warning and optional topics; only check-ins form a button row. */
+.sheet .crew-contact:not(.row) {
+  display: block;
+}
+.sheet .crew-contact:not(.row) > button {
+  width: 100%;
+}
