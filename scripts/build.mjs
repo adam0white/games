@@ -5,6 +5,7 @@ import { validateGame } from './game.mjs';
 if (!registry.games.length) throw new Error('Cannot build an empty game registry');
 const commit = head();
 if (!clean()) throw new Error('Build requires a clean checkout');
+run('node', ['scripts/check-redirects.mjs'], { stdio: 'inherit' });
 rmSync('dist', { recursive: true, force: true });
 const headers = [], redirects = [];
 function rejectRootWorker(dir) {

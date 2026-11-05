@@ -8,11 +8,12 @@ export function validateRegistry(registry) {
     if (!/^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(game.source?.repository ?? '') || !sha.test(game.source?.commit ?? '')) throw new Error('Invalid source lineage');
     if (!game.saveSchema || typeof game.saveSchema !== 'string') throw new Error('Missing save schema');
     if (game.redirectEnabled !== undefined && typeof game.redirectEnabled !== 'boolean') throw new Error('Invalid redirect flag');
-    if (game.redirectEnabled === true) throw new Error('Redirect activation requires a verified live release and ancestry preflight');
+    if (game.verifiedRelease !== undefined && (typeof game.verifiedRelease !== 'string' || !sha.test(game.verifiedRelease))) throw new Error('Invalid verified release commit');
+    if (game.redirectEnabled === true && (!game.legacyOrigin || !sha.test(game.verifiedRelease ?? ''))) throw new Error('Redirect activation requires an origin and verified release commit');
     if (game.legacyOrigin !== undefined) {
       let origin;
       try { origin = new URL(game.legacyOrigin); } catch { throw new Error('Invalid legacy origin'); }
-      if (origin.protocol !== 'https:' || origin.origin !== game.legacyOrigin || origin.origin === 'https://play.adamwhite.work' || origins.has(origin.origin)) throw new Error('Invalid or duplicate legacy origin');
+      if (!/^https:\/\/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.adamwhite\.work$/.test(game.legacyOrigin) || origin.origin !== game.legacyOrigin || ['https://play.adamwhite.work', 'https://human.adamwhite.work'].includes(origin.origin) || origins.has(origin.origin)) throw new Error('Invalid or duplicate legacy origin');
       origins.add(origin.origin);
     }
     if (game.ciBrowsers !== undefined && (!Array.isArray(game.ciBrowsers) || game.ciBrowsers.some(b => !['chromium', 'chromium-headless-shell', 'webkit', 'firefox'].includes(b)))) throw new Error('Invalid CI browser');

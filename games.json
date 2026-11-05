@@ -7,7 +7,9 @@
         "repository": "https://github.com/adam0white/rope",
         "commit": "db6bfa37196617ecc9db7aba437ee86213432fbb"
       },
-      "saveSchema": "rope-hf4/1"
+      "saveSchema": "rope-hf4/1",
+      "legacyOrigin": "https://rope.adamwhite.work",
+      "redirectEnabled": false
     },
     {
       "slug": "hearsay",
@@ -18,7 +20,9 @@
       "saveSchema": "hearsay-hf4/1",
       "ciBrowsers": [
         "chromium-headless-shell"
-      ]
+      ],
+      "legacyOrigin": "https://hearsay.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }
