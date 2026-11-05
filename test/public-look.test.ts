@@ -19,7 +19,7 @@ it('does not reveal private body or voice state in drawing or mood', () => {
 it('teaches observable replies without claiming fatigue or sadness', () => {
   const { climb } = newSeason(7);
   const d = newDisclosure();
-  d.seen.push('lead', 'ask', 'with');
+  d.seen.push('intro-skip', 'lead', 'ask', 'with');
   climb.lines.push({
     at: climb.minute,
     who: 'oskar',
@@ -38,7 +38,10 @@ it('teaches pack help from a known empty ration ledger without inferring a condi
   const oskar = climb.members.find((member) => member.id === 'oskar')!;
   oskar.rations = 0;
   const note = nextNote(
-    { unlocked: ['insist', 'tell', 'promise', 'rope', 'fix'], seen: ['lead', 'ask', 'with', 'watch'] },
+    {
+      unlocked: ['insist', 'tell', 'promise', 'rope', 'fix'],
+      seen: ['intro-skip', 'lead', 'ask', 'with', 'watch'],
+    },
     climb,
   );
   expect(note?.id).toBe('pack');

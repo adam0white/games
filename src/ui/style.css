@@ -1735,3 +1735,21 @@ body {
 .sheet > :last-child {
   margin-bottom: 12px;
 }
+
+/* Opening cues stay on their actual controls; no animation is required. */
+.tutorial-cue {
+  display: block;
+  font-size: 12px;
+  line-height: 1.15;
+  color: var(--rope);
+}
+.note .tutorial-skip {
+  flex: 0 0 auto;
+  font-size: 12px;
+  min-height: 44px;
+  padding: 4px 8px;
+}
+.force.lit {
+  outline: 2px solid var(--rope);
+  outline-offset: -2px;
+}
