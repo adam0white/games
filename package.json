@@ -19,7 +19,8 @@
     "measure": "node scripts/measure.ts",
     "check": "npm run lint && npm run typecheck && npm test",
     "deploy": "npm run check:lane && npm run build && wrangler deploy",
-    "check:lane": "SUITE_LOCK=0 npm run check"
+    "check:lane": "SUITE_LOCK=0 npm run check",
+    "test:first-minute": "node test/browser/first-minute.mjs"
   },
   "dependencies": {
     "@adam0white/human-framework": "4.17.0",
@@ -29,12 +30,13 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.5",
     "@types/node": "26.6.6",
+    "fake-indexeddb": "6.2.7",
     "happy-dom": "21.0.4",
+    "playwright": "1.64.1",
     "typescript": "7.0.2",
     "vite": "8.3.5",
     "vitest": "5.1.0",
-    "wrangler": "4.157.0",
-    "fake-indexeddb": "6.2.7"
+    "wrangler": "4.157.0"
   },
   "packageManager": "pnpm@12.16.1"
 }

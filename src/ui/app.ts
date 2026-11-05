@@ -10,6 +10,7 @@ import { displayOwner } from '../sim/display.ts';
 import { callumAway, daiAway, type KeeperSceneAction, keeperSceneAvailable } from '../sim/keeper-scenes.ts';
 import { type RotaAction, rotaAvailable, rotaAway, rotaStatus, rotaTerms } from '../sim/rota.ts';
 import { liveWords } from './live-readings.ts';
+import { type TutorialPhase, tutorialCue } from './tutorial.ts';
 import { catchWords, durationWords } from './watch-copy.ts';
 
 /**
@@ -157,6 +158,18 @@ const fx: SceneFx = { flashAt: -1e9 };
 let wake: { release(): Promise<void> } | null = null;
 const seen = { hold: false };
 
+let tutorial: TutorialPhase | null = null;
+let tutorialSpeaker: KeeperId | null = null;
+let tutorialSince = 0;
+let tutorialStarted = 0;
+let tutorialReply = '';
+let tutorialReplyIsReport = false;
+let tutorialRequest: {
+  job: 'level' | 'gate';
+  index: number;
+  reportAt: number;
+} | null = null;
+let tutorialAnchor: Element | null = null;
 let openingAttempt = 0;
 let tracked = false;
 function trackRun() {
@@ -564,6 +577,7 @@ function fileChooser() {
       const loaded = await continuity.importSelected(await selected.arrayBuffer(), selection);
       if (!continuity.isFileSelection(selection)) return;
       s = loaded;
+      tutorial = loaded.inputs.length === 0 ? 'read' : null;
       await continuity.recording();
       if (!continuity.isFileSelection(selection)) return;
       trackRun();
@@ -606,6 +620,7 @@ async function beginWeek(localOnly = false, chosen?: WatchRules) {
     const prepared = await continuity.fresh(Date.now() >>> 0, localOnly === true, rules);
     if (attempt !== openingAttempt) return;
     s = prepared;
+    tutorial = 'read';
     const generation = continuity.generation;
     clearSave();
     await continuity.recording();
@@ -746,6 +761,16 @@ function gameMenu() {
       `<p>Progress stays in memory. Download this run before closing the page.</p>${paceSetting()}<button id="file-download">Download this run</button><button id="choose-another">Choose another file</button><button id="file-departure">Pause chapter for departure</button>${recordSwitch('record-file-menu')}<p>Recording links new play across games on this device. Your browser’s privacy signal keeps recording off unless you choose to turn it on.</p>`,
       '<button class="primary" id="dialog-back">Resume current file</button>',
     );
+    if (s?.phase === 'watch') {
+      const replay = document.createElement('button');
+      replay.textContent = 'Replay tutorial';
+      replay.addEventListener('click', () => {
+        tutorial = 'read';
+        d.close();
+        drawAll();
+      });
+      d.querySelector('.dialog-body')?.append(replay);
+    }
     bindRecord(d, 'record-file-menu');
     bindPace(d);
     d.querySelector('#file-download')?.addEventListener('click', download);
@@ -772,6 +797,16 @@ function gameMenu() {
     <button class="reading-row" id="send-word">Feedback</button><button class="reading-row" id="fullscreen">Full screen</button><a class="reading-row" href="${GAMES}" target="_top">All games</a>${recordSwitch('record-menu')}<button id="menu-new">New game</button><div id="menu-confirm" hidden><p>Start a new game? This replaces your saved watch after the new game is ready.</p><button id="menu-confirm-new">Yes, start again</button><button id="menu-cancel-new">Cancel</button></div>${debugFooter()}`,
     '<button class="primary" id="dialog-back">Resume</button>',
   );
+  if (s?.phase === 'watch') {
+    const replay = document.createElement('button');
+    replay.textContent = 'Replay tutorial';
+    replay.addEventListener('click', () => {
+      tutorial = 'read';
+      d.close();
+      drawAll();
+    });
+    d.querySelector('.dialog-body')?.append(replay);
+  }
   d.querySelector('#debug-download')?.addEventListener('click', download);
   d.querySelector('#menu-new')?.addEventListener('click', () => {
     required(d.querySelector<HTMLElement>('#menu-confirm')).hidden = false;
@@ -1080,6 +1115,7 @@ async function frame(t: number) {
       drawBoard();
       drawLog();
       drawSheet();
+      renderTutorial();
       writeSave();
     }
     drawTop();
@@ -1100,8 +1136,127 @@ function drawAll() {
   drawBoard();
   drawLog();
   drawSheet();
+  renderTutorial();
   const canvas = document.getElementById('scene') as HTMLCanvasElement | null;
   if (canvas && s) drawScene(canvas, s, fx, performance.now(), sceneBounds);
+}
+
+function renderTutorial() {
+  const root = document.querySelector<HTMLElement>('.watch');
+  if (!root || !s) return;
+  if (!tutorial) {
+    root.querySelector('.tutorial-cue')?.remove();
+    tutorialAnchor?.classList.remove('tutorial-target');
+    tutorialAnchor?.removeAttribute('aria-describedby');
+    tutorialAnchor = null;
+    return;
+  }
+  if (
+    tutorialRequest &&
+    tutorialSpeaker &&
+    (tutorial === 'waiting-read' || tutorial === 'waiting-gate' || tutorial === 'waiting-report')
+  ) {
+    const request = tutorialRequest;
+    if (s.inputs.length > request.index + 1) {
+      tutorial = 'read';
+      tutorialRequest = null;
+    } else if (s.applied > request.index) {
+      const latest = s.said
+        .slice(tutorialSince)
+        .findLast((item) => item.who === tutorialSpeaker && item.kind === 'answer');
+      if (latest) {
+        tutorialReply = latest.text;
+        tutorialReplyIsReport = false;
+      }
+    }
+    const report = s.board[request.job];
+    if (
+      tutorialRequest &&
+      s.applied > request.index &&
+      report &&
+      report.who === tutorialSpeaker &&
+      report.at > Math.max(request.reportAt, tutorialStarted)
+    ) {
+      tutorialReply = `${request.job === 'gate' ? 'Gate' : 'Level'}: ${report.value} · ${clock(report.wrote)}`;
+      tutorialReplyIsReport = true;
+      tutorial = request.job === 'level' ? 'gate' : 'answered';
+    }
+  }
+  const cue = tutorialCue({ phase: tutorial, gateOpen: sheet?.kind === 'gauge' && sheet.gauge === 'gate' });
+  const target =
+    (cue === 'read'
+      ? (root.querySelector('.first-call [data-job=level]') ?? root.querySelector('[data-g=level]'))
+      : cue === 'gate'
+        ? root.querySelector('[data-g=gate]')
+        : cue === 'gate-choice'
+          ? root.querySelector('[data-job=gate]')
+          : root.querySelector('#latest-radio')) ?? root.querySelector('#menu');
+  if (!target) return;
+  const existing = root.querySelector<HTMLElement>('.tutorial-cue');
+  const waited = cue === 'radio' && s.minute - tutorialStarted >= 30;
+  if (
+    existing?.dataset.cue === cue &&
+    existing.dataset.waited === String(waited) &&
+    existing.dataset.reply === tutorialReply &&
+    tutorialAnchor === target
+  ) {
+    positionTutorial(existing, target);
+    return;
+  }
+  existing?.remove();
+  tutorialAnchor?.classList.remove('tutorial-target');
+  tutorialAnchor?.removeAttribute('aria-describedby');
+  tutorialAnchor = target;
+  target.classList.add('tutorial-target');
+  target.setAttribute('aria-describedby', 'tutorial-cue');
+  const note = document.createElement('div');
+  note.className = 'tutorial-cue';
+  note.id = 'tutorial-cue';
+  note.dataset.cue = cue;
+  note.dataset.waited = String(waited);
+  note.dataset.reply = tutorialReply;
+  note.setAttribute('role', 'status');
+  const text = document.createElement('span');
+  text.textContent =
+    cue === 'read'
+      ? 'Keep the dam below its crest. Ask for a level reading.'
+      : cue === 'gate'
+        ? `${tutorialReply ? `${tutorialReplyIsReport ? 'New report since the request' : `${tutorialSpeaker === 'callum' ? 'Callum' : 'Dai'} said`}: ${tutorialReply}. ` : ''}Tap Gate. Overtopping ends the watch; releases reach town later.`
+        : cue === 'gate-choice'
+          ? 'Choose a gate request. Overtopping ends the watch; releases reach town later.'
+          : cue === 'radio'
+            ? tutorialReply && !tutorialReplyIsReport
+              ? `New radio line since the request: ${tutorialReply}. A report may follow; choose another action or skip.`
+              : s.minute - tutorialStarted >= 30
+                ? tutorial === 'waiting-report'
+                  ? 'No newer report has arrived yet. Keep watching or skip the tutorial.'
+                  : 'No answer observed yet. Keep watching or skip the tutorial.'
+                : 'Watch for the keeper’s answer. Time and travel matter.'
+            : `${tutorialReplyIsReport ? 'New report since the request' : `${tutorialSpeaker === 'callum' ? 'Callum' : 'Dai'} said`}: ${tutorialReply}. Keep checking; reports can be wrong.`;
+  const skip = document.createElement('button');
+  skip.textContent = cue === 'answer' ? 'Done' : 'Skip tutorial';
+  skip.addEventListener('click', () => {
+    tutorial = null;
+    renderTutorial();
+  });
+  note.append(text, skip);
+  root.append(note);
+  positionTutorial(note, target);
+}
+
+function positionTutorial(note: HTMLElement, target: Element) {
+  const rect = target.getBoundingClientRect();
+  const panel = document.querySelector<HTMLElement>('.watch.sheet-open #sheet');
+  const panelTop = panel?.getBoundingClientRect().top;
+  const below = rect.bottom + 8;
+  const above = rect.top - note.offsetHeight - 8;
+  const top =
+    panelTop !== undefined
+      ? panelTop - note.offsetHeight - 8
+      : below + note.offsetHeight <= innerHeight - 4
+        ? below
+        : above;
+  note.style.top = `${Math.max(4, top)}px`;
 }
 
 function drawTop() {
@@ -1300,6 +1455,7 @@ function openSheet(sh: Sheet) {
   }
   drawBoard();
   drawTop();
+  renderTutorial();
 }
 
 function shortConcern(line: string) {
@@ -2027,11 +2183,25 @@ function riverFrom(st: GameState): string {
 
 function ask(who: KeeperId, job: Job, target: number | undefined, insist: boolean) {
   if (!s) return;
+  const state = s;
+  const before = state.said.length;
+  const inputIndex = state.inputs.length;
+  const oldReportAt = job === 'level' || job === 'gate' ? (state.board[job]?.at ?? -1) : -1;
   const inp =
     target === undefined
       ? { kind: 'ask' as const, keeper: who, job, insist }
       : { kind: 'ask' as const, keeper: who, job, target, insist };
-  inputNow(s, inp);
+  void inputNow(state, inp).then((accepted) => {
+    if (!accepted || s !== state || !tutorial || (job !== 'level' && job !== 'gate')) return;
+    tutorial = job === 'gate' ? 'waiting-gate' : 'waiting-read';
+    tutorialSpeaker = who;
+    tutorialSince = before;
+    tutorialStarted = state.minute;
+    tutorialReply = '';
+    tutorialReplyIsReport = false;
+    tutorialRequest = { job, index: inputIndex, reportAt: oldReportAt };
+    drawAll();
+  });
   writeSave();
   openSheet(null);
 }
