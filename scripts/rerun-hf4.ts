@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { replay } from 'hf4';
 import { exactPermutation, holmAdjust, median } from '../src/compare.ts';
@@ -63,10 +63,11 @@ export function statisticsFor(runs: Recording[], controls: Recording[]) {
 }
 export async function batch(directory: string) {
   await mkdir(directory, { recursive: true });
+  if ((await readdir(directory)).length) throw new Error('Use an empty directory for a new HF4 batch.');
   const latest = execFileSync('npm', ['view', '@adam0white/human-framework', 'version'], {
     encoding: 'utf8',
   }).trim();
-  if (latest !== '4.5.1')
+  if (latest !== '4.17.0')
     throw new Error(`Registry latest is ${latest}; update the exact alias before starting this batch.`);
   const startedAt = new Date().toISOString();
   const rows = [],
@@ -81,13 +82,20 @@ export async function batch(directory: string) {
     const verified = replay(archive);
     assert.ok(verified.ok, JSON.stringify(verified));
     assert.equal(verified.value.fullHash, archive.hashes.full);
-    await writeFile(resolve(directory, `hf4-${seed}.json`), `${JSON.stringify(run, null, 2)}\n`);
-    if (seed === 1) await writeFile(resolve(directory, 'hf4-1.archive.json'), `${JSON.stringify(archive)}\n`);
+    await writeFile(resolve(directory, `hf4-${seed}.json`), `${JSON.stringify(run, null, 2)}\n`, {
+      flag: 'wx',
+    });
+    if (seed === 1)
+      await writeFile(resolve(directory, 'hf4-1.archive.json'), `${JSON.stringify(archive)}\n`, {
+        flag: 'wx',
+      });
     const control = await runIsland(random({ seed, persona: PERSONA }), seed);
     physicalReplay(control);
     controls.push(control);
     runs.push(run);
-    await writeFile(resolve(directory, `random-${seed}.json`), `${JSON.stringify(control, null, 2)}\n`);
+    await writeFile(resolve(directory, `random-${seed}.json`), `${JSON.stringify(control, null, 2)}\n`, {
+      flag: 'wx',
+    });
     const row = {
       seed,
       hash: hash(run),
@@ -124,7 +132,7 @@ export async function batch(directory: string) {
     composition: { hf4: composition(runs), random: composition(controls) },
     controls: controls.map((r) => ({ seed: r.seed, hash: hash(r), ...measureRecording(r) })),
   };
-  await writeFile(resolve(directory, 'summary.json'), `${JSON.stringify(result, null, 2)}\n`);
+  await writeFile(resolve(directory, 'summary.json'), `${JSON.stringify(result, null, 2)}\n`, { flag: 'wx' });
   return result;
 }
 export async function summarize(directory: string) {

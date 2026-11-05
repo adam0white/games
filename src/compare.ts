@@ -129,9 +129,10 @@ export async function compare(directory = 'viewer/runs'): Promise<string> {
     '| Arm | Seeds | Spire objects | Tallest stack | Repeated pursuit | Task score |',
     '|---|---|---|---|---|---|',
   );
-  const arms = [...new Set(recordings.map((r) => r.mind))].sort();
+  const armKey = (r: Recording) => (r.mind === 'hf4' ? `${r.mind} (HF ${r.hf})` : r.mind);
+  const arms = [...new Set(recordings.map(armKey))].sort();
   for (const arm of arms) {
-    const runs = recordings.filter((r) => r.mind === arm).sort((a, b) => a.seed - b.seed);
+    const runs = recordings.filter((r) => armKey(r) === arm).sort((a, b) => a.seed - b.seed);
     const measures = runs.map((r) => measureRecording(r));
     rows.push(
       `| ${arm} | ${runs.map((r) => r.seed).join(', ')} | ${['freeSpireObjects', 'freeMaxStack', 'repeatedPursuit', 'taskScore'].map((key) => measures.map((m) => m[key]).join(', ')).join(' | ')} |`,
@@ -146,7 +147,7 @@ export async function compare(directory = 'viewer/runs'): Promise<string> {
   );
   for (const arm of arms) {
     const frames = recordings
-      .filter((r) => r.mind === arm)
+      .filter((r) => armKey(r) === arm)
       .flatMap((r) => r.frames.filter((f) => f.e < r.config.freeEpisodes));
     rows.push(
       `| ${arm} | ${['move', 'jump', 'look', 'rest', 'pick', 'place', 'throw'].map((kind) => (frames.filter((f) => f.action.split(' ')[0] === kind).length / frames.length).toFixed(4)).join(' | ')} |`,

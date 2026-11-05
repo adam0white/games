@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { exportRun, replay, restoreRun } from 'hf4';
+import { exportRun, readRunHistory, replay, restoreRun } from 'hf4';
 import { describe, expect, it } from 'vitest';
 import { physicalReplay, statisticsFor } from '../scripts/rerun-hf4.ts';
 import { Hf4Mind } from '../src/minds/hf4.ts';
@@ -45,9 +45,8 @@ describe('published HF4 observation-only host', () => {
     restOnly.actions = restOnly.actions.filter((a) => a.id === 'rest');
     mind.step(restOnly);
     mind.endEpisode({ ...observe(apply(world, 'rest').state), stepsLeft: 0 });
-    const outcomes = mind
-      .archive()
-      .history.flatMap((t) => t.inputs)
+    const outcomes = readRunHistory(mind.archive())
+      .flatMap((t) => t.inputs)
       .flatMap((i) => (i.kind === 'action.resolved' && i.payload.outcome ? [i.payload.outcome] : []));
     expect(outcomes[0]?.actual.observedProgress).toEqual([]);
     const looked = mind
@@ -61,14 +60,14 @@ describe('published HF4 observation-only host', () => {
   it('settles every action once and preserves exact physical and HF archive replay across resets', async () => {
     const mind = new Hf4Mind(options);
     const run = await runIsland(mind, 1, { freeEpisodes: 1, stepsPerEpisode: 4, taskSteps: 4 });
-    expect(run.hf).toBe('4.5.1');
+    expect(run.hf).toBe('4.17.0');
     expect(physicalReplay(run)).toBe(8);
     const archive = mind.archive(),
       verified = replay(archive),
       restored = restoreRun(archive);
     expect(verified.ok && verified.value.fullHash).toBe(archive.hashes.full);
     expect(restored.ok && exportRun(restored.value).hashes.full).toBe(archive.hashes.full);
-    const outcomes = archive.history
+    const outcomes = readRunHistory(archive)
       .flatMap((t) => t.inputs)
       .filter((i) => i.kind === 'action.resolved' && i.payload.disposition === 'completed');
     expect(outcomes).toHaveLength(8);

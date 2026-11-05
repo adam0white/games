@@ -1,4 +1,4 @@
-import { emotionLevel, feel } from '@adam0white/human-framework';
+import { emotionLevel, feel } from 'hfLegacy';
 import { describe, expect, it } from 'vitest';
 import createMind, { HfMind, inputOffers, scoreInputs, taskAdvances } from '../src/minds/hf.ts';
 import { type Action, type Observation, PERSONA } from '../src/types.ts';

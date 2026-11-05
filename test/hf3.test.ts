@@ -1,4 +1,4 @@
-import { consequenceEvidence, decide } from '@adam0white/human-framework';
+import { consequenceEvidence, decide } from 'hfLegacy';
 import { describe, expect, it } from 'vitest';
 import { Hf2Mind } from '../src/minds/hf2.ts';
 import { PERSONA } from '../src/types.ts';

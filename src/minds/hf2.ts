@@ -43,7 +43,7 @@ import {
   recall,
   remember,
   tick,
-} from '@adam0white/human-framework';
+} from 'hfLegacy';
 import type {
   Cell,
   GoalReading,

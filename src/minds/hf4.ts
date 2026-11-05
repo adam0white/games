@@ -70,7 +70,7 @@ export function islandSpec(seed: number): RunSpec {
 
 export class Hf4Mind implements Mind {
   readonly name = 'hf4';
-  readonly hfVersion = '4.5.1';
+  readonly hfVersion = '4.17.0';
   readonly run;
   private now = START;
   private serial = 0;
