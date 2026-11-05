@@ -1,3 +1,7 @@
+## Upkeep follow-up — 2026-11-05
+
+Remaining: integrate open Clarity work, qualify HF 4.17 replay and release, and obtain Adam's readiness judgment. Recheck F-2509 on 2026-11-12: the delivered bathroom drawing did not reproduce Sonia's historical phone-label cause or establish her judgment. Recheck the current public modified-learner verdict and same-tester return on 2026-11-12: neither was observed in the bounded controls and player rounds remain paused. Recheck shared attention and obligation contracts on 2026-11-12: their generic HF owner must establish the missing authority-bound evidence and reassignment semantics. F-2510 retains its 2026-11-10 recheck. Dates are engineering follow-ups, not appointments. Historical receipts below remain unchanged.
+
 # Week-two production evidence — 2026-11-03
 
 Remaining: F-2510’s historical cause, whole-week success and player acceptance remain open, with a 2026-11-10 recheck while player rounds are paused. Other Pass Deferred asks and Adam’s readiness acceptance remain separate.

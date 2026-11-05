@@ -28,7 +28,7 @@ import {
 import { communityRun, frameworkEngine, visibleFatigue } from '../sim/hf4-person.ts';
 import { HF4_HOST } from '../sim/hf4-run.ts';
 
-const FRAMEWORK_VERSION = '4.12.0';
+const FRAMEWORK_VERSION = '4.17.0';
 
 import { PRIVACY_URL } from '@adam0white/lab-client';
 import { telemetryToggle } from '@adam0white/lab-kit';
