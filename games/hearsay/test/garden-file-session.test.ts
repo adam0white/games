@@ -29,7 +29,7 @@ beforeAll(async () => {
   server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false, watch: null } });
   await server.listen();
   origin = server.resolvedUrls?.local[0] ?? '';
-  browser = await chromium.launch();
+  browser = await chromium.launch({ proxy: { server: 'http://127.0.0.1:9', bypass: '127.0.0.1,localhost' } });
 });
 afterAll(async () => {
   for (const context of browser?.contexts() ?? [])
@@ -69,7 +69,9 @@ async function closeTestPage(page: Page) {
   expect(pending.count).toBe(0);
   expect(
     observation.externalRequests.filter(
-      (request) => !request.startsWith('GET https://fonts.googleapis.com/'),
+      (request) =>
+        !request.startsWith('GET https://fonts.googleapis.com/') &&
+        request !== 'GET https://static.cloudflareinsights.com/beacon.min.js',
     ),
   ).toEqual([]);
   await page.close();
@@ -106,8 +108,8 @@ async function occupied(): Promise<Page> {
     localStorage.setItem('unrelated-owner-key', 'keep');
   });
   await page.evaluate(`(async () => {
-    const { importGarden } = await import('/src/sim/garden4-export.ts');
-    const { saveGardenJournal } = await import('/src/ui/garden-journal.ts');
+    const { importGarden } = await import('/hearsay/src/sim/garden4-export.ts');
+    const { saveGardenJournal } = await import('/hearsay/src/ui/garden-journal.ts');
     const saved = ${JSON.stringify(owner.value)};
     if (!await saveGardenJournal(importGarden(JSON.stringify(saved.export)), { fileOrigin: false, fileKey: null, ownedHeads: {}, archives: [] })) throw Error('Fixture save failed');
   })()`);
@@ -116,7 +118,7 @@ async function occupied(): Promise<Page> {
     Object.assign(window, { fileSessionBoundary: state });
     const open = IDBFactory.prototype.open;
     IDBFactory.prototype.open = function (...args: Parameters<IDBFactory['open']>) {
-      if (args[0] === 'hearsay') state.nativeOpens++;
+      if (args[0] === 'mono-hearsay-v1') state.nativeOpens++;
       return open.apply(this, args);
     };
   });
@@ -190,7 +192,7 @@ it('plays a complete foreign file through the public route without replacing nat
     );
     await expect.poll(() => page.locator('#import-run').count()).toBe(1);
     await page.evaluate(`(async () => {
-      const { lab } = await import('/src/ui/lab.ts');
+      const { lab } = await import('/hearsay/src/ui/lab.ts');
       const capture = lab.captureSave.bind(lab);
       window.fileCaptures = [];
       lab.captureSave = (value) => {
@@ -256,8 +258,8 @@ it('plays a complete foreign file through the public route without replacing nat
     await page.locator('.cg-game').waitFor();
     await page.getByRole('button', { name: 'Pause', exact: true }).click();
     const restored = (await page.evaluate(`(async()=>{
-      const {loadGardenJournal}=await import('/src/ui/garden-journal.ts');
-      const {exportGarden}=await import('/src/sim/garden4-export.ts');return exportGarden((await loadGardenJournal()).run);
+      const {loadGardenJournal}=await import('/hearsay/src/ui/garden-journal.ts');
+      const {exportGarden}=await import('/hearsay/src/sim/garden4-export.ts');return exportGarden((await loadGardenJournal()).run);
     })()`)) as ReturnType<typeof exportGarden>;
     expect(restored.seed).toBe(owner.value.export.seed);
     expect(restored.inputs).toEqual([]);
@@ -286,7 +288,7 @@ it('retains ordinary native startup and persistence outside the foreign-file rou
     await page.locator('.cg-game').waitFor();
     await page.getByRole('button', { name: 'Pause', exact: true }).click();
     const saved = await page.evaluate(`(async () => {
-      const { loadGardenJournal } = await import('/src/ui/garden-journal.ts');
+      const { loadGardenJournal } = await import('/hearsay/src/ui/garden-journal.ts');
       return (await loadGardenJournal()).run.inputs;
     })()`);
     expect(saved).toEqual([{ at: 360, input: { type: 'silence' } }]);

@@ -5,13 +5,15 @@ import { expect, it } from 'vitest';
 it('compresses and restores saves without reading a document-owned Blob stream', async () => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false, watch: null } });
   await server.listen();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({
+    proxy: { server: 'http://127.0.0.1:9', bypass: '127.0.0.1,localhost' },
+  });
   try {
     const page = await browser.newPage();
     await page.goto(server.resolvedUrls?.local[0] ?? '');
     await page.locator('.cg-title').waitFor();
     const result = await page.evaluate<{ saved: boolean; compressed: boolean; loaded: unknown }>(`(async()=>{
-      const {put,get}=await import('/src/ui/store.ts');
+      const {put,get}=await import('/hearsay/src/ui/store.ts');
       const original=Blob.prototype.stream;
       Blob.prototype.stream=function(){throw new Error('Document-owned Blob stream is unavailable during unload');};
       let saved;

@@ -68,6 +68,12 @@ try {
       ]) {
         const context = await browser.newContext({ viewport, acceptDownloads: true });
         try {
+          await context.route('**/*', (route) =>
+            route.request().method() !== 'GET' &&
+            new URL(route.request().url()).origin !== new URL(origin).origin
+              ? route.abort()
+              : route.continue(),
+          );
           const page = await context.newPage();
           const errors: string[] = [];
           const externalWrites: string[] = [];
@@ -84,16 +90,16 @@ try {
           const fixtureModules = async (route: import('playwright-core').Route) => {
             const url = new URL(route.request().url());
             const response = await route.fetch({
-              url: new URL(url.pathname + url.search, fixtureOrigin).href,
+              url: new URL(url.pathname.replace(/^\/hearsay\//, '') + url.search, fixtureOrigin).href,
             });
             await route.fulfill({ response });
           };
           await page.route(/\/(src|node_modules)\//, fixtureModules);
           await page.evaluate(`(async () => {
             localStorage.setItem('hf-telemetry-off', '1');
-            const { importGarden } = await import('/src/sim/garden4-export.ts');
-            const { saveGardenJournal } = await import('/src/ui/garden-journal.ts');
-            const { put } = await import('/src/ui/store.ts');
+            const { importGarden } = await import('/hearsay/src/sim/garden4-export.ts');
+            const { saveGardenJournal } = await import('/hearsay/src/ui/garden-journal.ts');
+            const { put } = await import('/hearsay/src/ui/store.ts');
             const fixture = ${JSON.stringify(native)};
             if (!await saveGardenJournal(importGarden(JSON.stringify(fixture)), { fileOrigin: false, fileKey: null, ownedHeads: {}, archives: [] })) throw Error('Fixture save failed');
             if (!await put('unrelated-control', { sentinel: 'keep' })) throw Error('Sentinel save failed');

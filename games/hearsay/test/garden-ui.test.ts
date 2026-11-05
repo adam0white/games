@@ -8,7 +8,9 @@ let page: Page;
 beforeAll(async () => {
   server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false, watch: null } });
   await server.listen();
-  browser = await (process.env.HEARSAY_BROWSER === 'webkit' ? webkit : chromium).launch();
+  browser = await (process.env.HEARSAY_BROWSER === 'webkit' ? webkit : chromium).launch({
+    proxy: { server: 'http://127.0.0.1:9', bypass: '127.0.0.1,localhost' },
+  });
   page = await browser.newPage();
 });
 afterAll(async () => {
@@ -81,8 +83,8 @@ it('starts current conversations and continues the native garden after reload', 
     await fresh.getByRole('button', { name: 'Pour tea without sharing news', exact: true }).click();
     const saved = () =>
       fresh.evaluate(`(async()=>{
-        const {loadGardenJournal}=await import('/src/ui/garden-journal.ts');
-        const {exportGarden}=await import('/src/sim/garden4-export.ts');
+        const {loadGardenJournal}=await import('/hearsay/src/ui/garden-journal.ts');
+        const {exportGarden}=await import('/hearsay/src/sim/garden4-export.ts');
         const journal=await loadGardenJournal();
         return journal ? exportGarden(journal.run) : null;
       })()`);
@@ -139,9 +141,9 @@ it.each([
           }
         });
       await fresh.evaluate(`(async () => {
-      const { freshGarden } = await import('/src/sim/garden4.ts');
-      const { saveGardenJournal } = await import('/src/ui/garden-journal.ts');
-      const { get, put } = await import('/src/ui/store.ts');
+      const { freshGarden } = await import('/hearsay/src/sim/garden4.ts');
+      const { saveGardenJournal } = await import('/hearsay/src/ui/garden-journal.ts');
+      const { get, put } = await import('/hearsay/src/ui/store.ts');
       await saveGardenJournal(freshGarden(17), {fileOrigin:false,fileKey:null,ownedHeads:{},archives:[]});
       const key = 'garden-hf4-journal-1';
       const head = (await get(key)).value;

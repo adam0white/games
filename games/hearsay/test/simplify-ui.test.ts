@@ -10,7 +10,9 @@ beforeAll(async () => {
   server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false, watch: null } });
   await server.listen();
   base = server.resolvedUrls?.local[0] ?? '';
-  browser = await (process.env.HEARSAY_BROWSER === 'webkit' ? webkit : chromium).launch();
+  browser = await (process.env.HEARSAY_BROWSER === 'webkit' ? webkit : chromium).launch({
+    proxy: { server: 'http://127.0.0.1:9', bypass: '127.0.0.1,localhost' },
+  });
 });
 afterAll(async () => {
   await browser?.close();
@@ -19,10 +21,10 @@ afterAll(async () => {
 async function savedGarden(page: Page) {
   // Local fixture: this does not prove shared admission.
   await page.evaluate(`(async()=>{
-    const {saveGardenJournal}=await import('/src/ui/garden-journal.ts');
-    const {freshGarden}=await import('/src/sim/garden4.ts');
-    const {GARDEN_ENGINE}=await import('/src/sim/garden-engine.ts');
-    const {createPersona}=await import('/node_modules/@adam0white/lab-client/dist/index.js');
+    const {saveGardenJournal}=await import('/hearsay/src/ui/garden-journal.ts');
+    const {freshGarden}=await import('/hearsay/src/sim/garden4.ts');
+    const {GARDEN_ENGINE}=await import('/hearsay/src/sim/garden-engine.ts');
+    const {createPersona}=await import('/hearsay/node_modules/@adam0white/lab-client/dist/index.js');
     const receipt=await createPersona({format:'hf-persona/1',castId:'hf.cast.riza.voice',castRevision:'1',branchId:'fixture',parentRevision:null,source:{game:'hearsay',build:'fixture',engine:GARDEN_ENGINE,rules:'hearsay-hf4-1'},transfer:{},limitations:[]});
     if (!await saveGardenJournal(freshGarden(17),{fileOrigin:false,fileKey:null,ownedHeads:{[receipt.castId]:receipt},archives:[]})) throw Error('Fixture save failed');
   })()`);
@@ -66,9 +68,11 @@ it.each(['prepareBatch', 'putBatch'])(
   async (failure) => {
     const context = await browser.newContext();
     // Serve actual game modules under their allowed production origin. Only the shelf is a fixture.
-    await context.route('https://hearsay.adamwhite.work/**', async (route) => {
+    await context.route('https://play.adamwhite.work/hearsay/**', async (route) => {
       const url = new URL(route.request().url());
-      const response = await route.fetch({ url: base.slice(0, -1) + url.pathname + url.search });
+      const response = await route.fetch({
+        url: new URL(url.pathname.replace(/^\/hearsay\//, '') + url.search, base).href,
+      });
       await route.fulfill({ response });
     });
     await context.route('https://human.adamwhite.work/**', async (route) => {
@@ -90,13 +94,13 @@ it.each(['prepareBatch', 'putBatch'])(
     const page = await context.newPage();
     await page.addInitScript(() => localStorage.setItem('hf-persona-opt-in', '0'));
     try {
-      await page.goto('https://hearsay.adamwhite.work/');
+      await page.goto('https://play.adamwhite.work/hearsay/');
       await page.locator('.cg-title').waitFor();
       await savedGarden(page);
       const read = () =>
         page.evaluate(`(async()=>{
-        const {loadGardenJournal}=await import('/src/ui/garden-journal.ts');
-        const {exportGarden}=await import('/src/sim/garden4-export.ts');
+        const {loadGardenJournal}=await import('/hearsay/src/ui/garden-journal.ts');
+        const {exportGarden}=await import('/hearsay/src/sim/garden4-export.ts');
         const saved=await loadGardenJournal();return {export:exportGarden(saved.run),...saved.meta};
       })()`);
       await page.getByRole('button', { name: 'Game menu', exact: true }).click();

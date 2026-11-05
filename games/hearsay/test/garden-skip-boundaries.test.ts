@@ -13,11 +13,11 @@ it('refuses malformed native and file metadata before cursor, save or recording 
     const page = await browser.newPage();
     await page.goto(server.resolvedUrls?.local[0] ?? '');
     const native = await page.evaluate(`(async()=>{
-      const {freshGarden,advanceGarden}=await import('/src/sim/garden4.ts');
-      const {exportGarden}=await import('/src/sim/garden4-export.ts');
-      const {saveGardenJournal,loadGardenJournal}=await import('/src/ui/garden-journal.ts');
-      const {get,put}=await import('/src/ui/store.ts');
-      const {GardenRecordingGuard}=await import('/src/ui/garden-recording.ts');
+      const {freshGarden,advanceGarden}=await import('/hearsay/src/sim/garden4.ts');
+      const {exportGarden}=await import('/hearsay/src/sim/garden4-export.ts');
+      const {saveGardenJournal,loadGardenJournal}=await import('/hearsay/src/ui/garden-journal.ts');
+      const {get,put}=await import('/hearsay/src/ui/store.ts');
+      const {GardenRecordingGuard}=await import('/hearsay/src/ui/garden-recording.ts');
       const meta={fileOrigin:false,fileKey:null,ownedHeads:{},archives:[]};
       const g=freshGarden(17,undefined,{version:'hearsay-hf4-batch/1',claims:[],skipped:[]});
       await saveGardenJournal(g,meta);
@@ -57,9 +57,9 @@ it('refuses malformed native and file metadata before cursor, save or recording 
     // The file input appears only after both complete. Measure import effects after that.
     await page.locator('#import-run').waitFor({ state: 'visible' });
     const before = await page.evaluate(`(async()=>{
-      const {get}=await import('/src/ui/store.ts');
-      const {GardenRecordingGuard}=await import('/src/ui/garden-recording.ts');
-      const {lab}=await import('/src/ui/lab.ts');
+      const {get}=await import('/hearsay/src/ui/store.ts');
+      const {GardenRecordingGuard}=await import('/hearsay/src/ui/garden-recording.ts');
+      const {lab}=await import('/hearsay/src/ui/lab.ts');
       window.skipBindings=0;window.skipSaves=0;
       const bind=GardenRecordingGuard.prototype.bind;
       GardenRecordingGuard.prototype.bind=function(...args){window.skipBindings++;return bind.apply(this,args)};
@@ -67,10 +67,10 @@ it('refuses malformed native and file metadata before cursor, save or recording 
       return JSON.stringify((await get('garden-hf4-journal-1')).value);
     })()`);
     const malformed = await page.evaluate(`(async()=>{
-      const {freshGarden}=await import('/src/sim/garden4.ts');
-      const {exportGarden}=await import('/src/sim/garden4-export.ts');
-      const {canonicalPersona}=await import('/node_modules/.vite/deps/@adam0white_lab-client.js');
-      const {hash}=await import('/src/sim/hash.ts');
+      const {freshGarden}=await import('/hearsay/src/sim/garden4.ts');
+      const {exportGarden}=await import('/hearsay/src/sim/garden4-export.ts');
+      const {canonicalPersona}=await import('/hearsay/node_modules/.vite/deps/@adam0white_lab-client.js');
+      const {hash}=await import('/hearsay/src/sim/hash.ts');
       const packet=exportGarden(freshGarden(17));
       packet.state.chapter={version:'hearsay-hf4-batch/1',claims:[],skipped:[null]};
       packet.fingerprint=hash(canonicalPersona(packet.state)).toString(16);
@@ -85,7 +85,7 @@ it('refuses malformed native and file metadata before cursor, save or recording 
       .poll(() => page.locator('[role="status"]').textContent())
       .toMatch(/Keep the original.*Start fresh/);
     const after = await page.evaluate(
-      `(async()=>{const {get}=await import('/src/ui/store.ts');return {native:JSON.stringify((await get('garden-hf4-journal-1')).value),bindings:window.skipBindings,saves:window.skipSaves}})()`,
+      `(async()=>{const {get}=await import('/hearsay/src/ui/store.ts');return {native:JSON.stringify((await get('garden-hf4-journal-1')).value),bindings:window.skipBindings,saves:window.skipSaves}})()`,
     );
     proof.file = { nativeUnchanged: (after as { native: string }).native === before, ...(after as object) };
     expect(after).toEqual({ native: before, bindings: 0, saves: 0 });

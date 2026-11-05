@@ -5,15 +5,17 @@ import { expect, it } from 'vitest';
 it('retains a complete source separately when the active garden is replaced', async () => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false, watch: null } });
   await server.listen();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({
+    proxy: { server: 'http://127.0.0.1:9', bypass: '127.0.0.1,localhost' },
+  });
   try {
     const page = await browser.newPage();
     await page.goto(server.resolvedUrls?.local[0] ?? '');
     const result = (await page.evaluate(`(async () => {
-      const { freshGarden, advanceGarden, chooseGarden } = await import('/src/sim/garden4.ts');
-      const { exportGarden } = await import('/src/sim/garden4-export.ts');
-      const { retainGardenSource } = await import('/src/ui/garden-source-archive.ts');
-      const { saveGardenJournal, loadGardenJournal } = await import('/src/ui/garden-journal.ts');
+      const { freshGarden, advanceGarden, chooseGarden } = await import('/hearsay/src/sim/garden4.ts');
+      const { exportGarden } = await import('/hearsay/src/sim/garden4-export.ts');
+      const { retainGardenSource } = await import('/hearsay/src/ui/garden-source-archive.ts');
+      const { saveGardenJournal, loadGardenJournal } = await import('/hearsay/src/ui/garden-journal.ts');
       const garden = freshGarden(17);
       chooseGarden(garden, { type: 'listen', person: 'riza', approach: 'invite' });
       advanceGarden(garden, 376);
@@ -26,8 +28,8 @@ it('retains a complete source separately when the active garden is replaced', as
     })()`)) as { expected: string; key: string };
     await page.reload();
     const replay = (await page.evaluate(`(async () => {
-      const { exportGarden, importGarden } = await import('/src/sim/garden4-export.ts');
-      const { loadGardenSource } = await import('/src/ui/garden-source-archive.ts');
+      const { exportGarden, importGarden } = await import('/hearsay/src/sim/garden4-export.ts');
+      const { loadGardenSource } = await import('/hearsay/src/ui/garden-source-archive.ts');
       const retained = await loadGardenSource(${JSON.stringify(result.key)});
       const replayed = exportGarden(importGarden(JSON.stringify(retained.export)));
       let rejected = false;
@@ -47,13 +49,15 @@ it('retains a complete source separately when the active garden is replaced', as
 it('opens a valid game file larger than 8 MiB', async () => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false, watch: null } });
   await server.listen();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({
+    proxy: { server: 'http://127.0.0.1:9', bypass: '127.0.0.1,localhost' },
+  });
   try {
     const page = await browser.newPage();
     await page.goto(server.resolvedUrls?.local[0] ?? '');
     const text = (await page.evaluate(`(async () => {
-      const { freshGarden } = await import('/src/sim/garden4.ts');
-      const { exportGarden } = await import('/src/sim/garden4-export.ts');
+      const { freshGarden } = await import('/hearsay/src/sim/garden4.ts');
+      const { exportGarden } = await import('/hearsay/src/sim/garden4-export.ts');
       return JSON.stringify(exportGarden(freshGarden(17)));
     })()`)) as string;
     await page.getByText('Other ways to begin', { exact: true }).click();
@@ -73,12 +77,14 @@ it('opens a valid game file larger than 8 MiB', async () => {
 it('stores immutable records when Blob transactions fail and deduplicates concurrent writes', async () => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false, watch: null } });
   await server.listen();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({
+    proxy: { server: 'http://127.0.0.1:9', bypass: '127.0.0.1,localhost' },
+  });
   try {
     const page = await browser.newPage();
     await page.goto(server.resolvedUrls?.local[0] ?? '');
     const result = await page.evaluate(`(async () => {
-      const { putImmutable, get } = await import('/src/ui/store.ts');
+      const { putImmutable, get } = await import('/hearsay/src/ui/store.ts');
       const add = IDBObjectStore.prototype.add;
       IDBObjectStore.prototype.add = function(value, key) {
         if (value.blob) throw new DOMException('Blob unsupported', 'DataCloneError');

@@ -21,8 +21,8 @@ afterAll(async () => {
 it('uses the active garden entry, scoped group choice and explicit title note without creating a run', async () => {
   await page.goto(server.resolvedUrls?.local[0] ?? '');
   await page.evaluate(`(async () => {
-    const {lab}=await import('/src/ui/lab.ts');
-    const {GardenRecordingGuard}=await import('/src/ui/garden-recording.ts');
+    const {lab}=await import('/hearsay/src/ui/lab.ts');
+    const {GardenRecordingGuard}=await import('/hearsay/src/ui/garden-recording.ts');
     window.gardenChoices=[];window.directGrants=[];
     GardenRecordingGuard.prototype.choose=async value=>{window.gardenChoices.push(value);throw Error('epoch changed');};
     lab.personaRecordingRequired=true;lab.personaRecordingAllowed=false;
@@ -49,8 +49,8 @@ it('keeps the active garden export replayable without any browser consent or own
     keys: string[];
     stateKeys: string[];
   }>(`(async()=>{
-    const {freshGarden,advanceGarden}=await import('/src/sim/garden4.ts');
-    const {exportGarden,importGarden}=await import('/src/sim/garden4-export.ts');
+    const {freshGarden,advanceGarden}=await import('/hearsay/src/sim/garden4.ts');
+    const {exportGarden,importGarden}=await import('/hearsay/src/sim/garden4-export.ts');
     const run=freshGarden(17);advanceGarden(run,375);
     const exported=exportGarden(run);const restored=importGarden(JSON.stringify(exported));
     return {same:JSON.stringify(restored)===JSON.stringify(run),keys:Object.keys(exported),stateKeys:Object.keys(exported.state)};
@@ -81,15 +81,15 @@ it.each([false, true])('shares active garden play only when its one checkbox is 
   await page.reload();
   // A saved local fixture tests Feedback; it is not a shared admission receipt.
   await page.evaluate(`(async()=>{
-    const {saveGardenJournal}=await import('/src/ui/garden-journal.ts');
-    const {freshGarden}=await import('/src/sim/garden4.ts');
+    const {saveGardenJournal}=await import('/hearsay/src/ui/garden-journal.ts');
+    const {freshGarden}=await import('/hearsay/src/sim/garden4.ts');
     if (!await saveGardenJournal(freshGarden(17),{fileOrigin:false,fileKey:null,ownedHeads:{},archives:[]})) throw Error('Fixture save failed');
   })()`);
   await page.reload();
   await page.locator('[data-pace="0"]').click();
   await page.getByRole('button', { name: 'Game menu', exact: true }).click();
   await page.evaluate(`(async()=>{
-    const {lab}=await import('/src/ui/lab.ts');
+    const {lab}=await import('/hearsay/src/ui/lab.ts');
     lab.setTelemetryOff(true);
     lab.sendFeedback=async(note,options)=>{window.gardenFeedback={note,...options};return 'queued';};
   })()`);
@@ -113,7 +113,7 @@ it('offers quiet feedback choices without sending until Submit', async () => {
   page = await browser.newPage();
   await page.goto(server.resolvedUrls?.local[0] ?? '');
   await page.evaluate(`(async()=>{
-    const {lab}=await import('/src/ui/lab.ts');
+    const {lab}=await import('/hearsay/src/ui/lab.ts');
     window.feedbackCalls=[];
     lab.setTelemetryOff(true);
     lab.sendFeedback=async(note,options)=>{window.feedbackCalls.push({note,...options});return 'queued';};

@@ -5,15 +5,17 @@ import { expect, it } from 'vitest';
 it('commits journal chunks with the host state, retries a failed write and restores the exact game', async () => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false, watch: null } });
   await server.listen();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({
+    proxy: { server: 'http://127.0.0.1:9', bypass: '127.0.0.1,localhost' },
+  });
   try {
     const page = await browser.newPage();
     await page.goto(server.resolvedUrls?.local[0] ?? '');
     const result = await page.evaluate(`(async () => {
-      const { freshGarden, advanceGarden } = await import('/src/sim/garden4.ts');
-      const { exportGarden } = await import('/src/sim/garden4-export.ts');
-      const { saveGardenJournal, loadGardenJournal } = await import('/src/ui/garden-journal.ts');
-      const { get } = await import('/src/ui/store.ts');
+      const { freshGarden, advanceGarden } = await import('/hearsay/src/sim/garden4.ts');
+      const { exportGarden } = await import('/hearsay/src/sim/garden4-export.ts');
+      const { saveGardenJournal, loadGardenJournal } = await import('/hearsay/src/ui/garden-journal.ts');
+      const { get } = await import('/hearsay/src/ui/store.ts');
       const meta = { fileOrigin: false, fileKey: null, ownedHeads: {}, archives: [] };
       const g = freshGarden(17);
       const first = await saveGardenJournal(g, meta);
@@ -45,9 +47,9 @@ it('commits journal chunks with the host state, retries a failed write and resto
     });
     await page.reload();
     const cold = await page.evaluate(`(async () => {
-      const { loadGardenJournal } = await import('/src/ui/garden-journal.ts');
-      const { advanceGarden } = await import('/src/sim/garden4.ts');
-      const { saveGardenJournal } = await import('/src/ui/garden-journal.ts');
+      const { loadGardenJournal } = await import('/hearsay/src/ui/garden-journal.ts');
+      const { advanceGarden } = await import('/hearsay/src/sim/garden4.ts');
+      const { saveGardenJournal } = await import('/hearsay/src/ui/garden-journal.ts');
       const saved = await loadGardenJournal();
       const minute = saved.run.minute;
       advanceGarden(saved.run, 370);
@@ -63,12 +65,14 @@ it('commits journal chunks with the host state, retries a failed write and resto
 it('refuses the previous autosave with a plain fresh-start message and retains it', async () => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false, watch: null } });
   await server.listen();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({
+    proxy: { server: 'http://127.0.0.1:9', bypass: '127.0.0.1,localhost' },
+  });
   try {
     const page = await browser.newPage();
     await page.goto(server.resolvedUrls?.local[0] ?? '');
     await page.evaluate(`(async () => {
-      const { put } = await import('/src/ui/store.ts');
+      const { put } = await import('/hearsay/src/ui/store.ts');
       await put('garden-hf4-1', { oldEngine: '4.8.0', retained: true });
     })()`);
     await page.reload();
@@ -76,7 +80,7 @@ it('refuses the previous autosave with a plain fresh-start message and retains i
     expect(await page.locator('.cg-game').count()).toBe(0);
     expect(
       await page.evaluate(`(async () => {
-      const { get } = await import('/src/ui/store.ts');
+      const { get } = await import('/hearsay/src/ui/store.ts');
       return (await get('garden-hf4-1')).value;
     })()`),
     ).toEqual({ oldEngine: '4.8.0', retained: true });
@@ -89,14 +93,16 @@ it('refuses the previous autosave with a plain fresh-start message and retains i
 it('refuses an unmarked journal without changing the occupied save', async () => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false, watch: null } });
   await server.listen();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({
+    proxy: { server: 'http://127.0.0.1:9', bypass: '127.0.0.1,localhost' },
+  });
   try {
     const page = await browser.newPage();
     await page.goto(server.resolvedUrls?.local[0] ?? '');
     const result = await page.evaluate(`(async () => {
-      const { freshGarden } = await import('/src/sim/garden4.ts');
-      const { saveGardenJournal, loadGardenJournal } = await import('/src/ui/garden-journal.ts');
-      const { get, put } = await import('/src/ui/store.ts');
+      const { freshGarden } = await import('/hearsay/src/sim/garden4.ts');
+      const { saveGardenJournal, loadGardenJournal } = await import('/hearsay/src/ui/garden-journal.ts');
+      const { get, put } = await import('/hearsay/src/ui/store.ts');
       const key = 'garden-hf4-journal-1';
       await saveGardenJournal(freshGarden(17), {fileOrigin:false,fileKey:null,ownedHeads:{},archives:[]});
       const old = (await get(key)).value;
@@ -119,7 +125,9 @@ it('refuses an unmarked journal without changing the occupied save', async () =>
 it('starts a fresh garden with current conversations and no choice', async () => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false, watch: null } });
   await server.listen();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({
+    proxy: { server: 'http://127.0.0.1:9', bypass: '127.0.0.1,localhost' },
+  });
   try {
     const page = await browser.newPage();
     await page.goto(server.resolvedUrls?.local[0] ?? '');
@@ -129,7 +137,7 @@ it('starts a fresh garden with current conversations and no choice', async () =>
     await page.getByRole('button', { name: 'Play fourteen days with new local people', exact: true }).click();
     await page.locator('.cg-game').waitFor();
     const config = await page.evaluate(`(async () => {
-      const { loadGardenJournal } = await import('/src/ui/garden-journal.ts');
+      const { loadGardenJournal } = await import('/hearsay/src/ui/garden-journal.ts');
       for (let i = 0; i < 100; i++) {
         const saved = await loadGardenJournal();
         if (saved) return saved.run.config;

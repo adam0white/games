@@ -5,13 +5,15 @@ import { expect, it } from 'vitest';
 it('saves and reloads exact garden receipts when storage rejects compressed Blob writes', async () => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false, watch: null } });
   await server.listen();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({
+    proxy: { server: 'http://127.0.0.1:9', bypass: '127.0.0.1,localhost' },
+  });
   try {
     const page = await browser.newPage();
     await page.goto(server.resolvedUrls?.local[0] ?? '');
     await page.locator('.cg-title').waitFor();
     const result = await page.evaluate<{ saved: boolean; value: unknown; loaded: unknown }>(`(async()=>{
-      const {put,get}=await import('/src/ui/store.ts');
+      const {put,get}=await import('/hearsay/src/ui/store.ts');
       const original=IDBObjectStore.prototype.put;
       IDBObjectStore.prototype.put=function(value,...rest){
         if(value.blob)throw new DOMException('Blob refused','DataCloneError');
@@ -27,7 +29,7 @@ it('saves and reloads exact garden receipts when storage rejects compressed Blob
     await page.reload();
     expect(
       await page.evaluate(
-        `(async()=>{const {get}=await import('/src/ui/store.ts');return (await get('fallback-fixture')).value})()`,
+        `(async()=>{const {get}=await import('/hearsay/src/ui/store.ts');return (await get('fallback-fixture')).value})()`,
       ),
     ).toEqual(result.value);
   } finally {

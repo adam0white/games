@@ -15,7 +15,9 @@ it.each([
     await server.listen();
     const local = server.resolvedUrls?.local[0];
     if (!local) throw Error('Missing local server');
-    const browser = await chromium.launch();
+    const browser = await chromium.launch({
+      proxy: { server: 'http://127.0.0.1:9', bypass: '127.0.0.1,localhost' },
+    });
     const context = await browser.newContext({
       viewport: { width: viewport.width, height: viewport.height },
       acceptDownloads: true,
@@ -62,13 +64,15 @@ it.each([
           });
         } else if (request.method() !== 'GET')
           await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
-        else if (url.origin !== 'https://hearsay.adamwhite.work') await route.abort();
+        else if (url.origin !== 'https://play.adamwhite.work') await route.abort();
         else {
-          const response = await route.fetch({ url: new URL(url.pathname + url.search, local).href });
+          const response = await route.fetch({
+            url: new URL(url.pathname.replace(/^\/hearsay\//, '') + url.search, local).href,
+          });
           await route.fulfill({ response });
         }
       });
-      await page.goto('https://hearsay.adamwhite.work/');
+      await page.goto('https://play.adamwhite.work/hearsay/');
       await page.getByText('Other ways to begin', { exact: true }).click();
       await page
         .getByRole('button', { name: 'Play fourteen days with new local people', exact: true })
