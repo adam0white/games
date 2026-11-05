@@ -1,0 +1,5 @@
+packages:
+  - games/*
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - '@adam0white/*'
