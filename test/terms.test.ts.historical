@@ -1,185 +1,12 @@
 import { writeFileSync } from 'node:fs';
-import { readRunHistory } from '@adam0white/human-framework';
 import { expect, it } from 'vitest';
-import {
-  act,
-  compactRun,
-  type Game,
-  load,
-  newGame,
-  restoreState,
-  save,
-  stateJson,
-  step,
-} from '../src/sim/game.ts';
-import { exportRun, personRun } from '../src/sim/hf.ts';
-import { copyReason, grainWords, helpOf, helpTargets, TERMS, termsVerb } from '../src/sim/terms.ts';
-import { advanceTo, houseOf, makeWorld, personOf, type ValleyState } from '../src/sim/valley.ts';
-import { CastSession, type Shelf } from '../src/ui/cast-session.ts';
-import { hostFixture } from './hf-host-fixture.ts';
+import { act, compactRun, load, newGame, restoreState, save, stateJson, step } from '../src/sim/game.ts';
+import { copyReason, grainWords, helpOf, helpTargets } from '../src/sim/terms.ts';
+import { makeWorld, personOf } from '../src/sim/valley.ts';
+import { CastSession } from '../src/ui/cast-session.ts';
 import { required } from './required.ts';
 
-/** An authored two-person boundary fixture, not a recorded whole Valley term.
- * The room, visit, weather record and initial grain are host authoring.
- * HF owns every subsequent attention, decision, activity and body consequence.
- */
-function termsScene(person = 'zehra', motivated = true) {
-  const at = 870;
-  const f = hostFixture(at, person, undefined, (p) => {
-    p.skills.farming = { level: 0.7, practice: 0, lastPracticed: at };
-    if (motivated)
-      p.agenda.goals.push({
-        id: 'help-by-agreement',
-        label: 'help after agreeing the food terms',
-        serves: ['meaning'],
-        advancedBy: [
-          { action: 'terms-help-assent', amount: 0.4 },
-          { action: 'reap-agha', amount: 0.6 },
-        ],
-        importance: 1,
-        progress: 0,
-        status: 'active',
-        adoptedAt: at,
-      });
-  });
-  const h = required(houseOf(f.s, 'coban'));
-  h.field.standing = 0;
-  h.members = [person];
-  // Fresh authored host starting location and visit, before the first HF step.
-  // This is not a played arrival, an invented native prior journey or whole Game.load.
-  f.s.kahyaState.visit = {
-    house: 'coban',
-    arrive: 860,
-    leave: 960,
-    back: 980,
-    walk: 20,
-    stay: 100,
-    why: 'call',
-    arrivedAt: 860,
-    outboundStarted: true,
-    outboundAt: 840,
-  };
-  f.s.kahyaState.place = 'house:coban';
-  f.c.places = { kahya: 'house:coban', [person]: 'house:coban' };
-  advanceTo(f.s, 871);
-  expect(act(f.game, { verb: 'call', job: 'reap-agha', houses: ['coban'] })).toBe(true);
-  const targets = helpTargets(f.s);
-  const target = required(targets.find((t) => t.person === person));
-  const before = f.s.agha.granary;
-  expect(act(f.game, target)).toBe(true);
-  expect(f.s.agha.granary).toBeCloseTo(before - TERMS.max);
-  return f;
-}
-
-it('component: reserves real grain and requires actual voluntary assent before any useful paid work', () => {
-  const f = termsScene();
-  advanceTo(f.s, 930);
-  const h = required(helpOf(f.s));
-  expect(h.status).toBe('agreed');
-  expect(h.speech?.activity.action).toBe('terms-help-assent');
-  expect(h.speech?.reason).toBe('ended');
-  expect(h.answer?.words).toContain('my own work only');
-  expect(h.earned).toBeGreaterThanOrEqual(0);
-  advanceTo(f.s, 1200);
-  const work = required(helpOf(f.s));
-  expect(work.work.length).toBeGreaterThan(0);
-  expect(work.earned).toBeGreaterThan(0);
-  expect(work.held + work.returned + work.cargo + work.delivered).toBeCloseTo(TERMS.max);
-  f.verify();
-});
-
-function advanceByQuantum(s: ReturnType<typeof termsScene>['s'], to: number) {
-  while (s.minute < to) advanceTo(s, Math.min(to, s.minute + 30));
-}
-it('component: pays only useful interrupted work once and refunds the unearned reservation', () => {
-  const f = termsScene();
-  advanceTo(f.s, 930);
-  const before = required(helpOf(f.s));
-  while (f.s.minute < 1200 && f.person.activity?.affordanceId !== `terms-help-work:${before.id}`)
-    advanceTo(f.s, f.s.minute + 30);
-  expect(f.person.activity?.affordanceId).toBe(`terms-help-work:${before.id}`);
-  advanceTo(f.s, f.s.minute + 30);
-  const activeId = required(f.c.active[f.person.id]).id;
-  expect(act(f.game, { verb: 'help-end', contract: before.id })).toBe(true);
-  advanceTo(f.s, f.s.minute + 30);
-  const h = required(helpOf(f.s));
-  expect(h.work).toHaveLength(1);
-  expect(h.work[0]?.reason).toBe('interrupted');
-  expect(h.minutes).toBeGreaterThan(0);
-  expect(h.minutes).toBeLessThan(120);
-  expect(h.earned).toBeGreaterThan(0);
-  expect(h.earned + h.returned).toBeCloseTo(TERMS.max);
-  const archive = exportRun(required(personRun(f.person)));
-  const inputs = readRunHistory(archive).flatMap((entry) => entry.inputs);
-  const interruption = required(
-    inputs.find((entry) => entry.kind === 'activity.interrupted' && entry.payload.activityId === activeId),
-  );
-  expect(interruption.at - Math.round(required(h.stopAt) * 60000)).toBe(1);
-  expect(
-    inputs.find(
-      (entry) =>
-        entry.kind === 'action.resolved' &&
-        entry.payload.stage === 'interrupt' &&
-        entry.payload.activityId === activeId,
-    ),
-  ).toMatchObject({ payload: { outcome: { status: 'interrupted', end: interruption.at } } });
-  const crop = f.s.agha.reaped,
-    earned = h.earned;
-  const receipt = required(h.work[0]);
-  makeWorld(f.s).resolve(f.person, receipt.activity, receipt.reason);
-  expect(f.s.agha.reaped).toBe(crop);
-  expect(required(helpOf(f.s)).earned).toBe(earned);
-  expect(exportRun(required(personRun(f.person)))).toEqual(archive);
-  f.verify();
-});
-
-it('component: continues a real earned cargo through native restore and deposits only after physical carriage', () => {
-  const f = termsScene();
-  advanceByQuantum(f.s, 1200);
-  expect(required(helpOf(f.s)).earned).toBeCloseTo(TERMS.max);
-  const source = required(helpOf(f.s)).answer;
-  const words = required(source);
-  const body = exportRun(required(personRun(f.person)));
-  expect(act(f.game, { verb: 'keep-words', note: words.id })).toBe(true);
-  expect(act(f.game, { verb: 'keep-words', note: words.id })).toBe(false);
-  expect(exportRun(required(personRun(f.person)))).toEqual(body);
-  advanceByQuantum(f.s, TERMS.deliveryFrom);
-  const id = required(helpOf(f.s)).id;
-  expect(act(f.game, { verb: 'help-deliver', contract: id })).toBe(true);
-  expect(act(f.game, { verb: 'visit', house: 'kara' })).toBe(false);
-  expect(act(f.game, { verb: 'pass', choice: 'depart' })).toBe(false);
-  let cargoAt: number | undefined;
-  for (let t = f.s.minute + 30; t < TERMS.deliveryDue; t += 30) {
-    advanceTo(f.s, t);
-    const h = required(helpOf(f.s));
-    expect(h.held + h.cargo + h.delivered + h.returned).toBeCloseTo(TERMS.max);
-    if (h.cargo > 0) {
-      cargoAt = t;
-      break;
-    }
-  }
-  expect(cargoAt).toBeDefined();
-  expect(required(helpOf(f.s)).delivered).toBe(0);
-  const captured = stateJson(f.s),
-    restored = restoreState(captured);
-  expect(stateJson(restored)).toEqual(captured);
-  const game = { valley: restored, inputs: [] };
-  expect(act(game, { verb: 'help-return', contract: id })).toBe(true);
-  advanceByQuantum(restored, TERMS.deliveryDue);
-  expect(required(helpOf(restored)).delivered).toBe(0);
-  expect(required(helpOf(restored)).held).toBeCloseTo(TERMS.max);
-  advanceByQuantum(f.s, TERMS.deliveryDue);
-  const completed = required(helpOf(f.s));
-  expect(completed.delivered).toBeCloseTo(TERMS.max);
-  expect(completed.delivery?.phase).toBe('home');
-  expect(completed.depositedAt).toBeGreaterThan(required(cargoAt));
-  expect(completed.held + completed.cargo + completed.delivered + completed.returned).toBeCloseTo(TERMS.max);
-  expect(f.s.receivedTerms?.keptWords[0]?.original).toEqual(words);
-  f.verify();
-}, 120000);
-
-/** HISTORICAL d014874 public schedule; current HF4 trajectory remains UNRUN. */
-function opening(at = 450): Game {
+function opening(at = 450) {
   const g = newGame(7, undefined, false, true, 'valley-public-2026-10');
   act(g, {
     verb: 'call',
@@ -190,140 +17,20 @@ function opening(at = 450): Game {
   step(g, at);
   return g;
 }
-const raw = (g: Game): ValleyState => stateJson(g.valley);
-
-function wire<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
-}
-function sameGame(actual: Game, expected: Game) {
-  expect(raw(actual)).toEqual(raw(expected));
-  expect(actual.inputs).toEqual(expected.inputs);
-  expect(exportRun(required(personRun(actual.valley.kahya)))).toEqual(
-    exportRun(required(personRun(expected.valley.kahya))),
-  );
-}
-function checkpointForks(g: Game): [Game, Game] {
-  const full = load(wire(save(g)));
-  const compact = load(wire(compactRun(g)));
-  sameGame(full, g);
-  sameGame(compact, g);
-  return [full, compact];
-}
-const MAPPING_REFUSAL =
-  'These received words and food/work terms have no reviewed continuing-person mapping. Download the complete native game instead.';
-async function refusesPublication(g: Game, cause: string) {
-  // The shelf counts every request. No guard or ownership check is mocked.
-  let requests = 0;
-  const shelf: Shelf = {
-    ready: Promise.resolve(true),
-    enabled: true,
-    setEnabled() {},
-    async request<T>(): Promise<T> {
-      requests++;
-      throw new Error('Publication must refuse before any shelf request.');
-    },
-  };
-  const session = new CastSession(
-    {
-      setPersonaRecording() {},
-      allowPersonaRecording() {},
-      personaRecordingAllowed: false,
-      build: () => ({}),
-    },
-    shelf,
-  );
-  session.game = g;
-  const metadata = session.metadata();
-  const state = raw(g);
-  const inputs = structuredClone(g.inputs);
-  const native = exportRun(required(personRun(g.valley.kahya)));
-  const unchanged = () => {
-    expect(requests).toBe(0);
-    expect(session.game).toBe(g);
-    expect(session.metadata()).toEqual(metadata);
-    expect(raw(g)).toEqual(state);
-    expect(g.inputs).toEqual(inputs);
-    expect(exportRun(required(personRun(g.valley.kahya)))).toEqual(native);
-  };
-  await session.checkpoint(true);
-  const checkpointStatus = session.status;
-  unchanged();
-  await session.alternative('hf.cast.yusuf.well');
-  const alternativeStatus = session.status;
-  unchanged();
-  expect(checkpointStatus).toContain(cause);
-  expect(alternativeStatus).toContain(cause);
-}
-
-it('refuses a genuine public kept-words chapter for unsupported mapping before checkpoint or alternative writes', async () => {
-  // Independent of the long partial-work/delivery test. This is the literal
-  // d014874 opening, not a claimed observed HF4 trajectory or an authored fixture.
-  const g = opening();
-  expect(act(g, { verb: 'give', house: 'coban', kile: 6 })).toBe(true);
-  step(g, 510);
-  const note = g.valley.notes.find((n) => !copyReason(g.valley, n.id));
-  if (!note)
-    throw new Error(
-      'Prerequisite failed: the historical public opening has no eligible received words on this candidate. Publication RED has not been reached.',
-    );
-  expect(act(g, { verb: 'keep-words', note: note.id })).toBe(true);
-  expect(g.valley.receivedTerms?.keptWords[0]?.original).toEqual(note);
-  expect(g.inputs.some((i) => i.verb === 'keep-words')).toBe(true);
-  const [full, compact] = checkpointForks(g);
-  for (const chapter of [g, full, compact]) await refusesPublication(chapter, MAPPING_REFUSAL);
-});
-
-it('keeps the SDK shared-write refusal for a public chapter without food/work terms', async () => {
-  const g = newGame(7, undefined, false, true, 'valley-public-2026-10');
-  expect(g.valley.receivedTerms).toBeUndefined();
-  expect(g.inputs.some((i) => termsVerb(i.verb))).toBe(false);
-  let requests = 0;
-  const session = new CastSession(
-    {
-      setPersonaRecording() {},
-      allowPersonaRecording() {},
-      personaRecordingAllowed: false,
-      build: () => ({}),
-    },
-    {
-      ready: Promise.resolve(true),
-      enabled: true,
-      setEnabled() {},
-      async request<T>(): Promise<T> {
-        requests++;
-        throw new Error('Unexpected shelf request.');
-      },
-    },
-  );
-  session.game = g;
-  const metadata = session.metadata();
-  const before = raw(g);
-  await session.alternative('hf.cast.yusuf.well');
-  expect(session.status).toContain('Yusuf: read-only until');
-  expect(session.status).not.toContain(MAPPING_REFUSAL);
-  expect(requests).toBe(0);
-  expect(session.metadata()).toEqual(metadata);
-  expect(raw(g)).toEqual(before);
-});
-
-// HISTORICAL expectations: assent454, useful work90, grain0.225, deposit4770.
-// Preserve these until root retains actual causal native evidence of a difference.
+const raw = (g: ReturnType<typeof newGame>) => stateJson(g.valley);
 it('keeps actual words and conserves a voluntary partial-work, actual-carriage exchange through native continuation', async () => {
   const g = opening();
-  const targets = helpTargets(g.valley);
-  const target = required(targets.find((t) => t.person === 'recep'));
+  const target = required(helpTargets(g.valley).find((t) => t.person === 'recep'));
   const before = raw(g);
   expect(act(g, { ...target, person: 'danyal' })).toBe(false);
   expect(raw(g)).toEqual(before);
   expect(act(g, target)).toBe(true);
   expect(g.valley.agha.granary).toBeCloseTo(before.agha.granary - 0.3);
   const pending = save(g);
-  const pendingForks = checkpointForks(g);
+  const pendingForks = [load(pending), load(compactRun(g))];
   step(g, 600);
   const h = required(helpOf(g.valley));
   expect(h.status).toBe('agreed');
-  expect(h.speech?.reason).toBe('ended');
-  expect(h.speech?.activity.action).toBe('terms-help-assent');
   expect(h.speech?.activity.startedAt).toBe(454);
   expect(h.earned).toBe(0);
   expect(h.answer?.words).toContain('my own work only');
@@ -332,7 +39,6 @@ it('keeps actual words and conserves a voluntary partial-work, actual-carriage e
     expect(raw(f)).toEqual(raw(g));
   }
   const assent = save(g);
-  checkpointForks(g);
   const stop = load(assent);
   expect(act(stop, { verb: 'help-end', contract: h.id })).toBe(true);
   step(stop, 2880);
@@ -347,12 +53,9 @@ it('keeps actual words and conserves a voluntary partial-work, actual-carriage e
   const work = required(h.work[0]),
     actor = required(personOf(g.valley, h.person));
   const crop = g.valley.agha.reaped;
-  const nativeBeforeRepeat = exportRun(required(personRun(actor)));
   required(makeWorld(g.valley).resolve)(actor, work.activity, work.reason);
   expect(g.valley.agha.reaped).toBe(crop);
   expect(h.earned).toBeCloseTo(0.225);
-  expect(required(helpOf(g.valley)).earned).toBeCloseTo(0.225);
-  expect(exportRun(required(personRun(actor)))).toEqual(nativeBeforeRepeat);
   expect(act(g, { verb: 'give', house: 'coban', kile: 6 })).toBe(true);
   step(g, 2940);
   const source = required(
@@ -365,7 +68,6 @@ it('keeps actual words and conserves a voluntary partial-work, actual-carriage e
   expect(g.valley.receivedTerms?.keptWords[0]?.original).toEqual(source);
   expect(act(g, { verb: 'keep-words', note: source.id })).toBe(false);
   const kept = save(g);
-  checkpointForks(g);
   const forged = structuredClone(kept);
   required(forged.state.receivedTerms?.keptWords[0]).original.words = 'A fabricated promise';
   expect(() => load(forged)).toThrow(/replay/);
@@ -387,7 +89,6 @@ it('keeps actual words and conserves a voluntary partial-work, actual-carriage e
   step(g, 4320);
   expect(act(g, { verb: 'help-deliver', contract: h.id })).toBe(true);
   const dispatch = save(g);
-  checkpointForks(g);
   const beforeTrip = raw(g);
   const inputsBeforeTrip = structuredClone(g.inputs);
   expect(act(g, { verb: 'visit', house: 'kara' })).toBe(false);
@@ -398,13 +99,11 @@ it('keeps actual words and conserves a voluntary partial-work, actual-carriage e
   expect(h.cargo).toBeCloseTo(0.225);
   expect(h.delivered).toBe(0);
   const cargo = save(g);
-  checkpointForks(g);
   const returning = load(cargo);
   expect(act(returning, { verb: 'help-return', contract: h.id })).toBe(true);
   step(returning, 7200);
   expect(helpOf(returning.valley)?.delivered).toBe(0);
   expect(helpOf(returning.valley)?.held).toBeCloseTo(0.225);
-  checkpointForks(returning);
   const returned = raw(returning);
   const returnedInputs = structuredClone(returning.inputs);
   expect(act(returning, { verb: 'help-deliver', contract: h.id })).toBe(false);
@@ -415,19 +114,12 @@ it('keeps actual words and conserves a voluntary partial-work, actual-carriage e
   expect(h.depositedAt).toBe(4770);
   expect(h.delivery?.phase).toBe('home');
   expect(h.held + h.cargo + h.returned + h.delivered).toBeCloseTo(0.3);
-  checkpointForks(g);
-  for (const checkpoint of [pending, assent, kept, dispatch, cargo, save(returning), save(g)]) {
-    const f = load(wire(checkpoint));
-    const reserved = required(helpOf(f.valley));
-    expect(reserved.held + reserved.cargo + reserved.delivered + reserved.returned).toBeCloseTo(0.3);
-    const [full, compact] = checkpointForks(f);
+  for (const checkpoint of [dispatch, cargo, save(g)]) {
+    const f = load(checkpoint);
+    const compact = load(compactRun(f));
     step(f, 8640);
-    step(full, 8640);
     step(compact, 8640);
-    sameGame(full, f);
-    sameGame(compact, f);
-    const exchange = required(helpOf(f.valley));
-    expect(exchange.held + exchange.cargo + exchange.delivered + exchange.returned).toBeCloseTo(0.3);
+    expect(raw(compact)).toEqual(raw(f));
   }
   step(g, 8640);
   expect(g.valley.receivedTerms?.keptWords[0]?.original).toEqual(source);
@@ -447,31 +139,70 @@ it('keeps actual words and conserves a voluntary partial-work, actual-carriage e
           'Full/compact and later8640 continuation compared with every raw value. Cap-only synthetic negative is not a native positive.',
       }),
     );
-  // Same useful public next input on the final nonterminal native/full/compact forks.
-  expect(g.valley.flags.ended).toBeFalsy();
-  const [full, compact] = checkpointForks(g);
-  for (const f of [g, full, compact]) {
-    expect(act(f, { verb: 'give', house: 'coban', kile: 6 })).toBe(true);
-    step(f, 8670);
-  }
-  sameGame(full, g);
-  sameGame(compact, g);
-  for (const packet of [pending, assent, kept, dispatch, cargo, save(returning), save(g)]) {
-    const admitted = load(wire(packet));
-    checkpointForks(admitted);
-    await refusesPublication(admitted, MAPPING_REFUSAL);
+  // The old finite passport is not an adapter for the new source. Refuse before
+  // any shelf envelope/source journal/head write; full native exports still replay.
+  const wordsOnly = opening();
+  act(wordsOnly, { verb: 'give', house: 'coban', kile: 6 });
+  step(wordsOnly, 510);
+  const actualWords = required(wordsOnly.valley.notes.find((n) => !copyReason(wordsOnly.valley, n.id)));
+  expect(act(wordsOnly, { verb: 'keep-words', note: actualWords.id })).toBe(true);
+  for (const packet of [save(wordsOnly), pending, assent, kept, dispatch, cargo, save(returning), save(g)]) {
+    let writes = 0;
+    const session = new CastSession(
+      {
+        setPersonaRecording() {},
+        allowPersonaRecording() {},
+        personaRecordingAllowed: true,
+        build: () => ({}),
+      },
+      {
+        ready: Promise.resolve(true),
+        enabled: true,
+        setEnabled() {},
+        async request<T>() {
+          writes++;
+          return undefined as T;
+        },
+      },
+    );
+    session.game = load(packet);
+    const metadata = session.metadata();
+    await session.checkpoint(true);
+    expect(session.status).toContain('no reviewed continuing-person mapping');
+    await session.alternative('hf.cast.yusuf.well');
+    expect(session.status).toContain('no reviewed continuing-person mapping');
+    expect(writes).toBe(0);
+    expect(session.metadata()).toEqual(metadata);
+    expect(raw(load(save(session.game)))).toEqual(raw(session.game));
   }
   const stripped = structuredClone(cargo);
-  stripped.inputs = stripped.inputs.filter((i) => !termsVerb(i.verb));
+  stripped.inputs = stripped.inputs.filter((i) => !i.verb.startsWith('help-') && i.verb !== 'keep-words');
   delete stripped.state.receivedTerms;
-  // Deliberate NEGATIVE only: retain all changed Persons while removing both copies.
-  expect(() => load(wire(stripped))).toThrow('replay state');
-  const negative: Game = {
-    valley: restoreState(stripped.state),
-    inputs: stripped.inputs,
-    plainEnglish: true,
-  };
-  await refusesPublication(negative, 'replay state');
+  // Complete current Persons (including the route goal) cannot be admitted by
+  // removing both command/archive copies. The ordinary native loader regenerates.
+  expect(() => load(stripped)).toThrow('replay state');
+  let forgedWrites = 0;
+  const forgedSession = new CastSession(
+    {
+      setPersonaRecording() {},
+      allowPersonaRecording() {},
+      personaRecordingAllowed: true,
+      build: () => ({}),
+    },
+    {
+      ready: Promise.resolve(true),
+      enabled: true,
+      setEnabled() {},
+      async request<T>() {
+        forgedWrites++;
+        return undefined as T;
+      },
+    },
+  );
+  forgedSession.game = { valley: restoreState(stripped.state), inputs: stripped.inputs, plainEnglish: true };
+  await forgedSession.checkpoint(true);
+  expect(forgedSession.status).toContain('replay state');
+  expect(forgedWrites).toBe(0);
   expect(grainWords(0.0000001)).toBe('less than 0.001');
   expect(grainWords(0.225)).toBe('0.225');
 });

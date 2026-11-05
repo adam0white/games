@@ -1,0 +1,233 @@
+[
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/alliance.test.ts",
+    "capturePath": "test/alliance.test.ts.historical",
+    "bytes": 10878,
+    "sha256": "ea13d186277ce7b810272b2b8aa3c230bcb0d90fc2e072a8caa2a64cfeee0786"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/cast.test.ts",
+    "capturePath": "test/cast.test.ts.historical",
+    "bytes": 5778,
+    "sha256": "a0a1387ebfe5d87a522fb3d4753738e2edf9a18960b571d281156b3d60e11099"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/clarity.test.ts",
+    "capturePath": "test/clarity.test.ts.historical",
+    "bytes": 3772,
+    "sha256": "dc0e2165f96fc1b9c45f965a95ba12641a2e8f6e380e195c617b7dde3945b819"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/context-visit-ui.test.ts",
+    "capturePath": "test/context-visit-ui.test.ts.historical",
+    "bytes": 6551,
+    "sha256": "17f03043ac1be81ea6c193e0c62793d477cf8d21fe0656c649a3160c4a1eb89c"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/context-visit.test.ts",
+    "capturePath": "test/context-visit.test.ts.historical",
+    "bytes": 10181,
+    "sha256": "044ce1a5d01e7b2815275c52e9a6efc175bfd843f86678428b3d08d9b918e0f6"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/deferred-ui.test.ts",
+    "capturePath": "test/deferred-ui.test.ts.historical",
+    "bytes": 19743,
+    "sha256": "3db6070ce92a34afa35b4f5042b22285c0c38cfb9838553668450fb982fa84d5"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/deferred.test.ts",
+    "capturePath": "test/deferred.test.ts.historical",
+    "bytes": 9580,
+    "sha256": "efd67799e701dcb9a3126821ae8a1ba4a3be4ca0e0a7efc02fc5239b136152ac"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/dialogue.test.ts",
+    "capturePath": "test/dialogue.test.ts.historical",
+    "bytes": 12228,
+    "sha256": "a3c5685f95d6361aee15c7fbf2d7396ae12141d8fd30693c1d6a46bd7b89d2a1"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/edition.test.ts",
+    "capturePath": "test/edition.test.ts.historical",
+    "bytes": 804,
+    "sha256": "5ffdaf6c68b8170deb2e46a42ee3b0e690f1834535963ea6f59bf525d06da1e9"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/entry.test.ts",
+    "capturePath": "test/entry.test.ts.historical",
+    "bytes": 5696,
+    "sha256": "03dd9f820b13ef60ad93154a3edf508cef7b28a56bd4227180987aada7f204aa"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/export.test.ts",
+    "capturePath": "test/export.test.ts.historical",
+    "bytes": 4962,
+    "sha256": "a7bfdb795501b42fdd85d9884dfc057513fb1caa883eb3a8c93561f340ddd0f3"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/game.test.ts",
+    "capturePath": "test/game.test.ts.historical",
+    "bytes": 2372,
+    "sha256": "0d73a92fa29869e077e5168b18da312c2da62e0ddd838a43172e3e36cb0ca9ed"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/hf-narration.test.ts",
+    "capturePath": "test/hf-narration.test.ts.historical",
+    "bytes": 2360,
+    "sha256": "475aadc26ec4963b313b29379d669734315af67eef2d9a47345daa6745e291dd"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/lab-ui.test.ts",
+    "capturePath": "test/lab-ui.test.ts.historical",
+    "bytes": 29800,
+    "sha256": "0c8fdce1cb07ed59ae1b1c202e68b1ada414d2146f31653c302d1fca53cca94c"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/local-log.test.ts",
+    "capturePath": "test/local-log.test.ts.historical",
+    "bytes": 1581,
+    "sha256": "54aec9f00ceabee2971d7502f446dd501358f512574a2741587f2f31feae73c1"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/next.test.ts",
+    "capturePath": "test/next.test.ts.historical",
+    "bytes": 7068,
+    "sha256": "f8ce0dcb6e66d89cc27d48ea652e9007428d4c7d501181f6fdca9288fc3de8da"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/owner-replay.test.ts",
+    "capturePath": "test/owner-replay.test.ts.historical",
+    "bytes": 1334,
+    "sha256": "e8fb2e701d9c0ac566d847bafd181541a515bc0126919623eb6c85e8a24b8112"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/passport.test.ts",
+    "capturePath": "test/passport.test.ts.historical",
+    "bytes": 16084,
+    "sha256": "8013524d4b5fcc99457ebb3a60fb0c488cdafeca8a0d8ddfd8138c8012e90b89"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/plain4.test.ts",
+    "capturePath": "test/plain4.test.ts.historical",
+    "bytes": 3105,
+    "sha256": "e22eadae1d7854231e83b2168ce604dafc5ad7b306697556c5f57ca75e979f57"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/presentation.test.ts",
+    "capturePath": "test/presentation.test.ts.historical",
+    "bytes": 16057,
+    "sha256": "ead43981ae1fed48efd63f7deafbcdf884c7292941c8d2e323aad42fc9aca741"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/press-answers.test.ts",
+    "capturePath": "test/press-answers.test.ts.historical",
+    "bytes": 1397,
+    "sha256": "8791cb1e59aa4345bf9ba9d927ffa62cef0efcb45ffb5c022f350d1895722ee0"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/public-term.test.ts",
+    "capturePath": "test/public-term.test.ts.historical",
+    "bytes": 1834,
+    "sha256": "f3e21e022fccd25c622c8b07abe9d4048c621ef7b6bd91c8fe169633c3e2b46c"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/reply.test.ts",
+    "capturePath": "test/reply.test.ts.historical",
+    "bytes": 6283,
+    "sha256": "b8d2bd3786816a31f7c7f2950948aa2ab22dc1a2f74f513ed2b685122ea1d164"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/scene-context.test.ts",
+    "capturePath": "test/scene-context.test.ts.historical",
+    "bytes": 2752,
+    "sha256": "838ca600977f4a3124bc26e8ecc942b3636ea14fccf806143d84982ea0761323"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/sim.test.ts",
+    "capturePath": "test/sim.test.ts.historical",
+    "bytes": 3927,
+    "sha256": "0508c87645e91b5f88a7a93ad1d8cc859c014ab9e509735ec25588e8ec0029e8"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/simplify.test.ts",
+    "capturePath": "test/simplify.test.ts.historical",
+    "bytes": 9274,
+    "sha256": "81c3c3ed106458da1d6df88cb4a166db2ef9904d68bd709b14b69279e5508af3"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/source-copy.test.ts",
+    "capturePath": "test/source-copy.test.ts.historical",
+    "bytes": 2810,
+    "sha256": "70bcda78a9f045bb2f4f9947c52372d5d9e096d15cbf621d230b1cb9a7dcd281"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/suite-lock.test.ts",
+    "capturePath": "test/suite-lock.test.ts.historical",
+    "bytes": 4489,
+    "sha256": "adc47f55355fab21f595f16114d7ce96b0f61f127ececc63f70dc371c2397607"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/tally.test.ts",
+    "capturePath": "test/tally.test.ts.historical",
+    "bytes": 1155,
+    "sha256": "38dab309e96975a6d4d25bf6a10a67eeed46270247decc11a5a32e3765861815"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/terms-ui.test.ts",
+    "capturePath": "test/terms-ui.test.ts.historical",
+    "bytes": 9795,
+    "sha256": "1bca9a1c0785cbdcd1fcb158a7f017a89965ffb84d3dd128dbb1cd66d8284d3b"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/terms.test.ts",
+    "capturePath": "test/terms.test.ts.historical",
+    "bytes": 8704,
+    "sha256": "86ed333a78177772fc51e54bc698e677faeba481efb4bf176b6a9c0e27e47573"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/ui.test.ts",
+    "capturePath": "test/ui.test.ts.historical",
+    "bytes": 96788,
+    "sha256": "5544e254e8468f1c02927fd6e53fd1629474f24a5213853c221b607a5aa55af0"
+  },
+  {
+    "sourceCommit": "d014874ff3ec1fb02581c5b2713508555b8a74db",
+    "sourcePath": "test/unload-checkpoint.test.ts",
+    "capturePath": "test/unload-checkpoint.test.ts.historical",
+    "bytes": 3102,
+    "sha256": "b37d943404fcbe000e86826acce80271c5727d4cadb4c3a6d1f2813c94b4217b"
+  }
+]

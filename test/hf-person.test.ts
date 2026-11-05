@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createCommunity, tick } from '../src/sim/hf.ts';
+import { createCommunity, promise, tick } from '../src/sim/hf.ts';
 import {
   ageYears,
   authoringOf,
   createPerson,
   frozenArchiveOf,
   frozenPerson,
+  personFromAuthoring,
   personRun,
   readBody,
 } from '../src/sim/hf-person.ts';
@@ -27,6 +28,28 @@ describe('HF4 Person boundary', () => {
     expect(a.identity.birthAt).toBe(-525600 * 30 * 60000);
     expect(a.state.habits[0]?.lastAt).toBe(-3600000);
     expect(personRun(p)).toBeUndefined();
+  });
+  it('preserves pinned authoring while adding opening duties before admission', () => {
+    const original = authoringOf(draft());
+    const pinned = personFromAuthoring(original);
+    promise(pinned, {
+      kind: 'job',
+      toId: 'household',
+      label: 'our own barley',
+      actions: ['reap'],
+      from: 420,
+      until: 1020,
+      importance: 0.75,
+    });
+    const admitted = authoringOf(pinned);
+    expect(admitted.state.agenda.commitments).toHaveLength(original.state.agenda.commitments.length + 1);
+    const added = admitted.state.agenda.commitments.at(-1);
+    expect(added?.label).toBe('our own barley');
+    expect(added?.from).toBe(420 * 60000);
+    expect(added?.until).toBe(1020 * 60000);
+    expect(original.state.agenda.commitments).toHaveLength(0);
+    expect(admitted.identity).toEqual(original.identity);
+    expect(admitted.state.body).toEqual(original.state.body);
   });
   it('reads admitted body and lifecycle only through the public Run', () => {
     const p = draft();

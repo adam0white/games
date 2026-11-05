@@ -164,10 +164,35 @@ function translate(value: unknown, key = '', factor = MS_PER_MINUTE): unknown {
     return value * factor;
   return value;
 }
+function draftCommitments(p: Person) {
+  return p.agenda.commitments.map((c) => {
+    const { status: _status, exempt: _exempt, ...rest } = c;
+    const {
+      createdAt: _createdAt,
+      madeAt: _madeAt,
+      recurEvery,
+      ...data
+    } = rest as typeof rest & { createdAt?: number; madeAt?: number };
+    return {
+      ...(translate(data) as object),
+      ...(recurEvery === undefined ? {} : { recurEveryMs: ms(recurEvery) }),
+    };
+  }) as unknown as PersonAuthoring['state']['agenda']['commitments'];
+}
 export function authoringOf(p: Person): PersonAuthoring {
   if (runs.has(p)) throw new Error('Person authoring is closed after Run admission');
   const exact = authored.get(p);
-  if (exact) return exact;
+  if (exact)
+    return {
+      ...structuredClone(exact),
+      state: {
+        ...structuredClone(exact.state),
+        agenda: {
+          ...structuredClone(exact.state.agenda),
+          commitments: [...structuredClone(exact.state.agenda.commitments), ...draftCommitments(p)],
+        },
+      },
+    } as PersonAuthoring;
   const spec = specs.get(p);
   if (!spec) throw new Error('Unknown Person authoring draft');
   const basis = { kind: 'evidence' as const, id: `valley-opening:${p.id}` };
@@ -233,19 +258,7 @@ export function authoringOf(p: Person): PersonAuthoring {
     voices: p.will.voices.map((v) => ({ voiceId: v.voiceId, trust: v.trust })),
     agenda: {
       exemptions: { traveling: { kind: 'unobserved' }, illnessSeverity: { kind: 'unobserved' } },
-      commitments: p.agenda.commitments.map((c) => {
-        const { status: _status, exempt: _exempt, ...rest } = c;
-        const {
-          createdAt: _createdAt,
-          madeAt: _madeAt,
-          recurEvery,
-          ...data
-        } = rest as typeof rest & { createdAt?: number; madeAt?: number };
-        return {
-          ...(translate(data) as object),
-          ...(recurEvery === undefined ? {} : { recurEveryMs: ms(recurEvery) }),
-        };
-      }),
+      commitments: draftCommitments(p),
       goals: p.agenda.goals.map((g) => {
         const { status: _status, adoptedAt: _adoptedAt, ...rest } = g;
         return {

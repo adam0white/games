@@ -1,9 +1,11 @@
 import { expect, it } from 'vitest';
+import { localEdition } from '../src/sim/edition.ts';
 import { act, compactRun, fingerprint, load, newGame, restoreState, save, step } from '../src/sim/game.ts';
 import { validLocalLog } from '../src/ui/local-log.ts';
 
 it('plays spoken visits with the public grain and pass world and replays the combined term exactly', () => {
   const g = newGame(7, undefined, false, true, 'valley-public-2026-10');
+  expect(localEdition('valley-public-2026-10')).toBe(true); // Keep the cast-region exclusion.
   expect(g.valley.edition).toBeDefined();
   expect(g.valley.pass).toBeDefined();
   expect(g.valley.stewardCare).toBeDefined();
