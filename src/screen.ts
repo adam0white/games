@@ -99,14 +99,14 @@ export function readScreen(g: Game, selected: string) {
     else if (!available.length) guidance = `Tap ${r.name} to approach. Speech becomes available nearby.`;
     else if (available.includes('books')) guidance = 'Choose The books to help tie the bundle.';
     else if (r.id === 'burak' && available.includes('route'))
-      guidance = 'Ask Burak to check the stair, or ask him to follow.';
+      guidance = 'Choose Check the stair, or ask Burak to follow.';
     else if (!g.torch && !r.routeKnown)
-      guidance = 'Show the stair with Torch, or ask them to follow. Thick smoke can stop them.';
+      guidance = 'Turn on Torch and Show the stair, or ask them to follow. Thick smoke can stop them.';
     else if (available.includes('route'))
       guidance =
         r.id === 'burak'
           ? 'Choose Check the stair. Burak can find the way down.'
-          : 'Show the stair, or ask them to follow. Thick smoke can stop them.';
+          : 'Choose Show the stair, or ask them to follow. Thick smoke can stop them.';
     else guidance = 'Choose Walk with me. Listen to the answer before speaking again.';
   }
   return {

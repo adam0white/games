@@ -86,3 +86,28 @@ test('a speech click immediately acknowledges that its request is queued', async
   expect(immediate).toContain('Request queued');
   await expect(page.locator('#line')).toContainText(/tie|bundle/, { timeout: 10000 });
 });
+
+test('a repeated request keeps the actual reply visible after it is checked', async ({ page }) => {
+  await page.goto('/?seed=1');
+  await page.locator('#start').click();
+  await page.locator('[data-id="sevim"]').click();
+  const action = page.locator('[data-action="come"]');
+  await expect(action).toBeEnabled({ timeout: 30000 });
+  await page.locator('#tutorial-skip').click();
+  let sawDeduplicatedReply = false;
+  for (let i = 0; i < 4; i++) {
+    const count = await page.evaluate(() => window.smoke.getState().log.length);
+    await action.click();
+    await expect.poll(() => page.evaluate(() => window.smoke.getState().log.length)).toBeGreaterThan(count);
+    const result = await page.evaluate(() => ({
+      line: document.querySelector('#line')!.textContent!,
+      resident: window.smoke.getState().people.find((p) => p.id === 'sevim')!.line,
+    }));
+    if (result.line.includes('Request checked')) {
+      sawDeduplicatedReply = true;
+      expect(result.line).toContain(result.resident);
+      break;
+    }
+  }
+  expect(sawDeduplicatedReply).toBe(true);
+});

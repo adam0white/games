@@ -401,7 +401,7 @@ function updateDOM() {
   const message =
     speechPending?.id === selected
       ? speechPending.processed
-        ? 'Request checked. No new reply shown.'
+        ? `Request checked. ${p.name}: ${p.line}`
         : 'Request queued. Waiting for a reply…'
       : p.atHome
         ? `${p.name}: ${screen.dialogue}`

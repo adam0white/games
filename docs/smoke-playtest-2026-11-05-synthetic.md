@@ -21,3 +21,11 @@ Guidance was then revised to state that the player may show the stair or ask som
 ## Same-tester guidance retest
 
 After the guidance change, the tester said: “The guidance made the alternatives and the immediate smoke consequence clear.” They chose Sevim, The books, and then Walk with me. They saw the queued-request message and Sevim's reply that she was coming. During thick smoke she stopped and said she could not see the caretaker or stair; her status said she was lost in the smoke. The tester said this showed the stated consequence. They noted that Sevim's own earlier request still sounded sequential. They did not test the Torch route or play to an ending. This was a same-tester retest with prior knowledge, not a fresh-player or human observation.
+
+## Same-tester repeated-request retest
+
+The same tester chose Come now twice. Both clicks displayed “Request queued. Waiting for a reply...” After the first, Sevim said, “Not without the books. Stay and help me bundle them.” After the second, the conversation showed “I will come, but stop pushing me,” followed by “I cannot see you or the stair in this smoke. Show me the stair.” Her status changed to stopped and lost in the smoke. The tester said the repeated reply remained readable in the conversation log, while the smoke message occupied the latest-reply area. They observed the result after a two-second wait and could not establish every intermediate state. This was one synthetic retest with prior knowledge, not human acceptance.
+
+## Same-tester final wording retest
+
+After the bundle was tied, the tester read “Turn on Torch and Show the stair, or ask them to follow. Thick smoke can stop them.” They said it clearly presented both paths and warned of the smoke risk, although Sevim's own words still suggested a sequence. They chose Torch and Show the stair. The game displayed the queued-request message, then Sevim replied, “I can see the stair in your torchlight. Walk with me.” The tester stopped there without testing the other path or observing a smoke interruption. This synthetic retest used prior knowledge and does not establish human acceptance.
