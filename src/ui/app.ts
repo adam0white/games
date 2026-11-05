@@ -116,6 +116,19 @@ const startupReady = new Promise<void>((resolve) => {
 });
 let fast = false;
 let pacing: 'automatic' | 'slow' | 'steady' | 'fast' = 'automatic';
+let tutorial: 'choice' | 'result' | 'off' = localStorage.getItem('murmur-tutorial-done') ? 'off' : 'choice';
+let muted = localStorage.getItem('murmur-warning-muted') === '1';
+let sound: AudioContext | null = null;
+let warnedCard = '';
+// Create or resume audio only after a real user gesture, as browsers require.
+function prepareSound() {
+  if (!muted) {
+    sound ??= new AudioContext();
+    if (sound.state === 'suspended') void sound.resume();
+  }
+}
+document.addEventListener('pointerdown', prepareSound, { passive: true });
+document.addEventListener('keydown', prepareSound);
 let cardVisibleAt = -1e9;
 let screen: 'title' | 'day' | 'evening' | 'end' = 'title';
 let feedbackOpen = false;
@@ -652,6 +665,7 @@ async function newWeek(seed: number, version = GAME_VERSION, useShelf = true) {
   if (attempt !== loadGeneration) return;
   clearSave();
   s = next;
+  warnedCard = '';
   carry = 0;
   if (!useShelf || localDevelopment) s.castScope = 'local';
   await gateContinuity(recordingState(s));
@@ -798,7 +812,7 @@ function frame(t: number) {
   if (!s) return;
   const dt = Math.min(0.25, Math.max(0, (t - last) / 1000));
   last = t;
-  if (menuPausedAt !== null) {
+  if (menuPausedAt !== null || (tutorial === 'result' && !s.card)) {
     raf = requestAnimationFrame(frame);
     return;
   }
@@ -817,6 +831,7 @@ function frame(t: number) {
         const had = !!s.card;
         step(s);
         if (had && !s.card) {
+          if (tutorial === 'choice') tutorial = 'result';
           answeredAt = t;
           carry = 0;
           break;
@@ -1016,6 +1031,15 @@ function drawSheet() {
     el.className = 'sheet open';
     cardVisibleAt = performance.now();
     el.innerHTML = cardHtml(v);
+    if (tutorial === 'choice') {
+      const target = el.querySelector<HTMLButtonElement>('.opt');
+      target?.classList.add('tutorial-target');
+      target?.insertAdjacentHTML(
+        'beforebegin',
+        '<p class="tutorial-prompt" data-tutorial-target>↓ Guide Dilan through her week. Tap to suggest. If time runs out, she decides. <button data-tutorial-skip>Skip guide</button></p>',
+      );
+      el.querySelector('[data-tutorial-skip]')?.addEventListener('click', finishTutorial);
+    }
     for (const b of el.querySelectorAll<HTMLButtonElement>('button.opt')) bindHold(b);
     const silence = document.getElementById('hush');
     if (silence) bindSilence(silence);
@@ -1023,7 +1047,21 @@ function drawSheet() {
   }
   el.className = 'sheet';
   el.innerHTML = skippedPeopleNotice() + gapHtml(s.answer);
+  if (tutorial === 'result' && s.answer) {
+    el.insertAdjacentHTML(
+      'afterbegin',
+      '<p class="tutorial-prompt" data-tutorial-consequence>See what Dilan chose in the journal. <button data-tutorial-skip>Skip guide</button></p>',
+    );
+    el.querySelector('[data-tutorial-skip]')?.addEventListener('click', finishTutorial);
+    const next = document.getElementById('hurry');
+    next?.classList.add('tutorial-target');
+    next?.insertAdjacentHTML(
+      'beforebegin',
+      '<p class="tutorial-prompt" data-tutorial-target>↓ Tap to reach the next choice.</p>',
+    );
+  }
   document.getElementById('hurry')?.addEventListener('click', () => {
+    if (tutorial === 'result') finishTutorial();
     if (s?.card || s?.phase !== 'day') return;
     hurry = true;
     answeredAt = -1e9;
@@ -1045,7 +1083,7 @@ function cardHtml(v: CardView): string {
       (first
         ? 'Tap a choice to suggest it. Hold to insist; this can cost her trust, and she can still say no. If time runs out, she chooses for herself.'
         : undefined));
-  const pull = `<p class="pull notebook-text other-voice${v.borrowed ? ' borrowed' : ''}" style="${pencilStyle(tPull, 6)}">${esc(v.pullLine)}</p>`;
+  const pull = `<p class="voice-label other-label" data-voice="other">${v.borrowed ? 'A voice' : 'Other voice'}</p><p class="pull notebook-text other-voice${v.borrowed ? ' borrowed' : ''}" style="${pencilStyle(tPull, 6)}">${esc(v.pullLine)}</p>`;
   const resolve = v.resolve
     ? `<p class="resolve">${tally(v.resolve.marks, v.id.length)}<span class="notebook-text">${esc(v.resolve.line)}</span></p>`
     : '';
@@ -1060,10 +1098,10 @@ function cardHtml(v: CardView): string {
     <div class="card-text">
       <p class="scene">${esc(sceneWords(s, v.scene, s.card?.openedAt ?? s.minute))}</p>
       ${resolve}${forecast}${pull}${recalled ? `<p class="stayed notebook-text">${esc(attributedWords(recalled))} <span class="who">she thinks.</span></p>` : ''}
-      ${first && !v.borrowed ? '<p class="caption notebook-text other-voice">The pencil handwriting shows the other voice.</p>' : ''}
-      ${hint ? `<p class="hint">${esc(hint)}</p>` : ''}
+      ${first && !v.borrowed && tutorial === 'off' ? '<p class="caption notebook-text other-voice">The pencil handwriting shows the other voice.</p>' : ''}
+      ${hint && (tutorial === 'off' || pushSore) ? `<p class="hint">${esc(hint)}</p>` : ''}
     </div>
-    <div class="opts card-actions">${first ? '<p class="caption right">Below each choice, you can see how she feels about it.</p>' : ''}${opts}
+    <div class="opts card-actions"><p class="voice-label your-label" data-voice="you">Your voice</p>${first && tutorial === 'off' ? '<p class="caption right">Below each choice, you can see how she feels about it.</p>' : ''}${opts}
       <button class="hush" id="hush">Say nothing</button>
     </div>
   </div>`;
@@ -1080,7 +1118,23 @@ function drawStatus() {
   }
   el.setAttribute('stroke-dasharray', `${(left * 100).toFixed(1)} 100`);
   el.closest('svg')?.toggleAttribute('hidden', !s.card);
-  el.classList.toggle('urgent', left * CARD_SECONDS <= 8);
+  el.classList.toggle('urgent', left * CARD_SECONDS <= 10);
+  const cardKey = s.card ? `${s.card.moment}@${s.card.openedAt}` : '';
+  if (cardKey && left * CARD_SECONDS <= 10 && warnedCard !== cardKey && menuPausedAt === null) {
+    warnedCard = cardKey;
+    if (!muted && sound?.state === 'running') {
+      for (const delay of [0, 0.2]) {
+        const tone = sound.createOscillator();
+        const gain = sound.createGain();
+        tone.frequency.value = 660;
+        gain.gain.setValueAtTime(0.035, sound.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, sound.currentTime + delay + 0.09);
+        tone.connect(gain).connect(sound.destination);
+        tone.start(sound.currentTime + delay);
+        tone.stop(sound.currentTime + delay + 0.1);
+      }
+    }
+  }
   words.textContent =
     menuPausedAt !== null
       ? 'Time is paused.'
@@ -1187,6 +1241,7 @@ function bindHold(b: HTMLButtonElement) {
 /** Say nothing, now: she decides with only the pull. */
 function hush(): Answer | null {
   if (menuPausedAt !== null || s?.phase !== 'day' || !s.card) return null;
+  if (tutorial === 'choice') tutorial = 'result';
   queueInput(s, { kind: 'quiet' });
   carry = 0;
   writeSave();
@@ -1197,8 +1252,16 @@ function hush(): Answer | null {
   return a;
 }
 
+function finishTutorial() {
+  tutorial = 'off';
+  localStorage.setItem('murmur-tutorial-done', '1');
+  drawn.sheet = '';
+  drawDay();
+}
+
 function sayIt(option: string, insist: boolean): Answer | null {
   if (menuPausedAt !== null || s?.phase !== 'day' || !s.card) return null;
+  if (tutorial === 'choice') tutorial = 'result';
   queueInput(s, insist ? { kind: 'say', option, insist: true } : { kind: 'say', option });
   carry = 0;
   writeSave();
@@ -1410,6 +1473,8 @@ function backPage() {
     <div class="menu-heading"><h2>Game menu${s && screen !== 'title' ? ` · ${esc(DAY_NAMES[s.day]?.slice(0, 3) ?? '')} ${clock(s.minute)}` : ''}</h2><button data-close aria-label="Close game menu">×</button></div>
     ${screen === 'day' ? '<p class="soft small">Time is paused while this menu is open.</p>' : ''}
     ${`<fieldset class="menu-speed"><legend>Pace between moments</legend><p class="caption">Every choice allows 64 seconds. Slow changes only the time between choices.</p>${(['automatic', 'slow', 'steady', 'fast'] as const).map((value) => `<button class="chip" data-speed="${value}" aria-pressed="${pacing === value}">${value.charAt(0).toUpperCase() + value.slice(1)}</button>`).join('')}</fieldset>`}
+    ${screen === 'day' ? '<button class="row" id="bp-tutorial">Replay guide</button>' : ''}
+    <button class="row" id="bp-sound" aria-pressed="${muted}">Mute timer warning</button>
     <button class="row" id="bp-send">Feedback <span aria-hidden="true">▸</span></button>
     <button class="row" id="bp-fullscreen">Full screen</button>
     <button class="row" id="bp-new">New game</button><div id="bp-confirm" hidden><p>Start a new game? This replaces your saved week.</p><button id="bp-confirm-new">Start new game</button><button id="bp-cancel-new">Cancel</button></div>
@@ -1463,6 +1528,17 @@ function backPage() {
     void newWeek(selectedSeed() ?? randomSeed());
   });
   el.querySelector('#bp-close')?.addEventListener('click', close);
+  el.querySelector('#bp-tutorial')?.addEventListener('click', () => {
+    tutorial = 'choice';
+    close();
+    drawn.sheet = '';
+    drawDay();
+  });
+  el.querySelector('#bp-sound')?.addEventListener('click', (event) => {
+    muted = !muted;
+    localStorage.setItem('murmur-warning-muted', muted ? '1' : '0');
+    (event.currentTarget as HTMLElement).setAttribute('aria-pressed', String(muted));
+  });
   el.querySelector('#bp-send')?.addEventListener('click', () => {
     close();
     feedback(true);
