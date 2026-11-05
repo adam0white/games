@@ -25,8 +25,9 @@ Use an isolated project test browser. Record which checks used a new profile and
 | Direct release | HTTPS 200 without redirect; exact deployed commit; `dirty:false`; expected game, source, HF, app and lab stamps |
 | Fresh start | No imported save or error; first meaningful action reachable; first recording notice visible |
 | Return visit | New-origin progress restores; notice follows the documented once-per-origin policy |
-| Consent off | Ordinary play works; no recording upload before consent |
-| Consent on | A bounded synthetic run reaches the central lab; verify the receipt or stored run identifier, not only a request being sent |
+| Recording policy | First-visit notice covers recording and device linking; ordinary recording is default-on subject to the lab's DNT/GPC policy |
+| Recording off | Turn the menu switch off; ordinary play works and no further recording upload occurs |
+| Recording on | A bounded synthetic run reaches the central lab; verify the receipt or stored run identifier, not only a request being sent |
 | Privacy | Opt-out persists; DNT and GPC follow the lab policy; stop recording when consent is withdrawn |
 | Shelf | Open the central shelf and return to the new game path; any persona transfer is accepted by the actual client and central origin rules |
 | Replay | Export a current run; replay reproduces the pinned result without a model or live telemetry dependency |
