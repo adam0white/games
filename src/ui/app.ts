@@ -210,6 +210,140 @@ let actions: (() => void)[] = [];
 let sheetGeneration = 0;
 let storedLogProblem = false;
 
+// Guidance follows ordinary inputs and native replies; it owns no game state or clock.
+let morningGuide = false;
+let morningGame: Game | null = null;
+let morningAsk: string | null = null;
+let morningReplay = false;
+const MORNING_GUIDE_KEY = 'valley-first-morning-guide-v1';
+function startMorningGuide(force = false) {
+  if (!g) return;
+  morningGame = g;
+  morningAsk = force ? null : (g.valley.asks.at(-1)?.id ?? null);
+  morningGuide = force;
+  if (!force && !FOREIGN_FILE) {
+    try {
+      morningGuide = localStorage.getItem(MORNING_GUIDE_KEY) !== 'done';
+    } catch {
+      morningGuide = true;
+    }
+  }
+}
+function finishMorningGuide() {
+  morningGuide = false;
+  if (!FOREIGN_FILE) {
+    try {
+      localStorage.setItem(MORNING_GUIDE_KEY, 'done');
+    } catch {
+      /* Optional preference. Play remains available. */
+    }
+  }
+  drawSheet(true);
+  (
+    app.querySelector<HTMLButtonElement>('#houses button[aria-pressed="true"]') ??
+    app.querySelector<HTMLButtonElement>('#houses button')
+  )?.focus({ preventScroll: true });
+}
+function mountMorningGuide() {
+  const root = app.querySelector<HTMLElement>('.play');
+  if (!root || !g) return;
+  root.querySelectorAll('.morning-target').forEach((node) => {
+    const description = node
+      .getAttribute('aria-describedby')
+      ?.split(' ')
+      .filter((id) => id !== 'morning-instruction')
+      .join(' ');
+    if (description) node.setAttribute('aria-describedby', description);
+    else node.removeAttribute('aria-describedby');
+    node.classList.remove('morning-target');
+  });
+  const previous = root.querySelector<HTMLElement>('#morning-guide');
+  if (!morningGuide || g.valley.flags.ended) {
+    previous?.remove();
+    const announcement = root.querySelector('#morning-guide-status');
+    if (announcement) announcement.textContent = '';
+    delete root.dataset.morningGuide;
+    return;
+  }
+  const state = g.valley;
+  const ask = morningAsk ? state.asks.find((item) => item.id === morningAsk) : undefined;
+  const answerNote =
+    ask &&
+    state.notes.findLast(
+      (note) => note.kind === 'reply' && note.ask === ask.id && note.at <= state.minute && note.words,
+    );
+  const answerWords = answerNote ? noteWords(answerNote) : undefined;
+  const call = [...root.querySelectorAll<HTMLButtonElement>('#thumbs button')].find((button) =>
+    button.textContent?.startsWith('Call this house'),
+  );
+  const availableCall = call && call.getAttribute('aria-disabled') !== 'true';
+  const step = ask ? (answerNote ? 'reply' : 'waiting') : selected && availableCall ? 'request' : 'house';
+  root.dataset.morningGuide = step;
+  const text =
+    step === 'house'
+      ? selected
+        ? 'This house cannot be called now. Choose another household.'
+        : 'The morning ends at 13:00. Choose a household to ask for harvest help.'
+      : step === 'request'
+        ? confirmCall
+          ? 'This call cannot be taken back. Send it, or choose another household.'
+          : 'Call this household. They may refuse; a request does not make them work.'
+        : step === 'waiting'
+          ? 'The announcer is carrying your request. Wait for the household’s actual answer.'
+          : 'An answer is not finished work. Visits use time; gifts spend grain.';
+  const announcement = root.querySelector('#morning-guide-status');
+  if (announcement && announcement.textContent !== text) announcement.textContent = text;
+  const key = JSON.stringify([step, selected, confirmCall, answerWords]);
+  let cue = previous;
+  if (!cue || cue.dataset.key !== key) {
+    previous?.remove();
+    cue = document.createElement('aside');
+    cue.id = 'morning-guide';
+    cue.dataset.step = step;
+    cue.dataset.key = key;
+    cue.setAttribute('aria-label', 'First morning guide');
+    cue.innerHTML = `${step === 'house' && !selected ? '<div class="morning-flow" aria-label="Household, request, answer">⌂ → ✉ → ❝ <span data-guide-clock></span> → 13:00</div>' : ''}<p id="morning-instruction">${esc(text)}</p>${answerNote ? `<blockquote class="morning-answer" role="status">${esc(answerWords ?? '')}</blockquote>` : ''}<div class="morning-guide-actions">${answerNote ? '<button type="button" data-guide-finish>Continue the morning</button>' : ''}<button type="button" data-guide-skip>Skip guide</button></div>`;
+    cue.querySelector('[data-guide-skip]')?.addEventListener('click', finishMorningGuide);
+    cue.querySelector('[data-guide-finish]')?.addEventListener('click', finishMorningGuide);
+  }
+  const sheet = root.querySelector('#sheet');
+  if (step === 'request') {
+    const verbs = root.querySelector('#thumbs .verb-grid');
+    if (verbs && (cue.parentElement !== verbs.parentElement || cue.nextElementSibling !== verbs))
+      verbs.before(cue);
+  } else if (step === 'house') {
+    const pace = root.querySelector('#pace');
+    if (pace && (cue.parentElement !== pace.parentElement || cue.previousElementSibling !== pace))
+      pace.after(cue);
+  } else if (sheet && (cue.parentElement !== sheet || sheet.firstElementChild !== cue)) {
+    sheet.prepend(cue);
+  }
+  const target =
+    step === 'house'
+      ? root.querySelector<HTMLButtonElement>(
+          `#houses button[data-h]${selected ? ':not([aria-pressed="true"])' : ''}`,
+        )
+      : step === 'request'
+        ? call
+        : step === 'reply'
+          ? cue.querySelector('.morning-answer')
+          : root.querySelector('[data-pace-menu]');
+  target?.classList.add('morning-target');
+  if (target)
+    target.setAttribute(
+      'aria-describedby',
+      [target.getAttribute('aria-describedby'), 'morning-instruction'].filter(Boolean).join(' '),
+    );
+  const clock = cue.querySelector('[data-guide-clock]');
+  if (clock) clock.textContent = clockWords(g.valley.minute);
+  if (!previous || previous !== cue) {
+    if (step === 'waiting' || step === 'reply') {
+      if (sheet) sheet.scrollTop = 0;
+    }
+    target?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+}
+
 const esc = (x: string) =>
   englishText(x).replace(
     /[&<>"]/g,
@@ -610,6 +744,21 @@ export function start() {
     chooseRecording: (allow) => castSession.queryRecording(allow),
     download,
     notebook: openNotebook,
+    replayGuide: () => {
+      if (!g) return;
+      if (g.valley.flags.ended) {
+        morningReplay = true;
+        title();
+      } else {
+        startMorningGuide(true);
+        selected = null;
+        tab = 'notes';
+        drawSheet(true);
+      }
+    },
+    guideAvailable: () => !!g && (!FOREIGN_FILE || !g.valley.flags.ended),
+    guideLabel: () =>
+      g?.valley.flags.ended ? 'Replay guide in a new morning…' : 'Replay first morning guide',
     toTitle: pauseToCover,
     newGame: FOREIGN_FILE ? undefined : title,
     diagnostics: () => {
@@ -767,7 +916,7 @@ function title() {
     ${topbar(`<a href="${HUB}/games/" target="_top">All games</a>`)}
     <section class="title-premise"><h1>The Valley</h1><p class="purpose">${esc(PURPOSE)}</p><p class="soft">People can refuse you, and they remember how you answer.</p></section>
     <div class="vignette" aria-hidden="true"><svg viewBox="0 0 360 140"><path d="M0 95Q80 15 160 90T360 70M0 130Q90 50 180 120T360 95M250 0Q200 70 260 140" fill="none" stroke="currentColor"/><g fill="none" stroke="currentColor" stroke-width="2"><path d="M70 95v-18l12-12 12 12v18zM130 105V87l12-12 12 12v18zM190 90V72l12-12 12 12v18zM280 100V82l12-12 12 12v18z"/></g></svg></div>
-    <footer class="title-actions"><p class="term-description">Play the first morning, from 07:00 to 13:00. Call a household to harvest, read its reply, and choose how to respond. Visits and gifts take real time and grain. Later seasons and journeys are outside this episode.</p>${where ? `<p class="hand">${esc(where)}</p>` : ''}
+    <footer class="title-actions">${morningReplay ? '<p role="status">Begin a new morning to replay the guide.</p>' : ''}<p class="term-description">Play the first morning, from 07:00 to 13:00. Call a household to harvest, read its reply, and choose how to respond. Visits and gifts take real time and grain. Later seasons and journeys are outside this episode.</p>${where ? `<p class="hand">${esc(where)}</p>` : ''}
     ${hasSave ? `${log && log.version === GAME_VERSION ? '<button class="primary" data-go="open">Resume</button>' : ''}<button data-go="new" class="hold">New game<span class="fill"></span></button><p class="soft">This replaces your saved game.</p>` : '<button class="primary" data-go="new">New game</button>'}${mark()}</footer>
     <dialog class="ways-panel" aria-label="Other ways to start"><header><h2>Other ways to start</h2><button data-ways-close aria-label="Close other ways to start">×</button></header><label for="valley-name">A named valley</label><input id="valley-name" placeholder="Kuyulu" maxlength="80"><p>The same name gives the same valley.</p><button data-seed${log ? ' class="hold"' : ''}>Begin this valley${log ? '<span class="fill"></span>' : ''}</button>${log ? '<p class="soft">This replaces your saved game.</p>' : ''}</dialog>
   </div>`;
@@ -874,6 +1023,10 @@ function enter() {
   labScreen('play');
   if (!g) return;
   if (g.valley.flags.ended) return ending();
+  if (morningGame !== g) {
+    startMorningGuide(morningReplay);
+    morningReplay = false;
+  }
   selected = null;
   tab = 'notes';
   carry = 0;
@@ -888,7 +1041,7 @@ function enter() {
   textSizeObserver = null;
   stage?.destroy();
   app.innerHTML = `<div class="play lk-stage" data-sheet="fit">
-    ${topbar('<span id="cap"></span>')}
+    ${topbar('<span id="cap"></span>')}<div id="morning-guide-status" class="morning-announcement" role="status" aria-live="polite" aria-atomic="true"></div>
     <button class="grain-bar" aria-label="Open the landowner’s ledger"><span class="grain-track"><span class="grain-solid"></span><span class="grain-cut"></span><span class="grain-standing"></span><span class="grain-due"></span></span><span class="grain-label"></span></button>
     <div class="map lk-scene"><canvas id="map" aria-label="The valley map"></canvas><p id="now" class="moment"></p><span id="steward"></span></div>
     <nav id="houses" aria-label="Households"></nav>
@@ -1182,6 +1335,7 @@ function order(o: Order) {
   const previous = o.verb === 'insist' ? JSON.stringify(ask?.replies[o.pid]) : '';
   insistReceipt = null;
   if (act(g, o)) {
+    if (morningGuide && o.verb === 'call') morningAsk = g.valley.asks.at(-1)?.id ?? null;
     if (o.verb === 'give') {
       const h = houseOf(g.valley, o.house);
       actionCaption = grainReceipt(
@@ -1776,7 +1930,10 @@ function drawSheet(force = false) {
   if (travel) travel.textContent = englishText(caption(s, ''));
   const receipt = app.querySelector<HTMLElement>('#action-receipt');
   if (receipt && insistReceipt) receipt.textContent = actionWords(s);
-  if (!force && sheetKey === key) return;
+  if (!force && sheetKey === key) {
+    mountMorningGuide();
+    return;
+  }
   sheetKey = key;
   lastSheet = performance.now();
   sheetGeneration++;
@@ -1874,6 +2031,7 @@ function drawSheet(force = false) {
   drawHouses(s);
   if (!force) sheet.scrollTop = top;
   stage?.refresh();
+  mountMorningGuide();
   if (focusKey && focusKey.selected === selected) {
     const candidates = app.querySelectorAll<HTMLElement>(
       `#${focusKey.root} button, #${focusKey.root} summary, #${focusKey.root} select`,

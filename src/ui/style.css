@@ -2537,3 +2537,71 @@ button.hold.armed {
   color: var(--ink);
   white-space: normal;
 }
+
+/* The first morning points at ordinary controls; all actions remain available. */
+#morning-guide {
+  flex: 0 0 auto;
+  margin: 4px 6px;
+  padding: 7px;
+  border: 2px solid #9b642c;
+  border-radius: 8px;
+  background: #fff4d9;
+  color: #322213;
+  font-size: 16px;
+  line-height: 1.3;
+}
+#morning-guide p {
+  margin: 0 0 5px;
+}
+.morning-flow {
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+.morning-guide-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+#morning-guide .morning-guide-actions > button {
+  min-height: 44px;
+  font-size: 15px;
+  padding: 5px 8px;
+}
+.morning-answer {
+  margin: 4px 0;
+  padding: 4px 6px;
+  border-left: 3px solid #9b642c;
+}
+.morning-answer small {
+  display: block;
+}
+.morning-target {
+  outline: 3px solid #9b642c;
+  outline-offset: -3px;
+}
+.play[data-morning-guide="request"] #thumbs {
+  display: block;
+}
+@media (max-width: 767px) {
+  #app > .play.lk-stage[data-morning-guide="waiting"],
+  #app > .play.lk-stage[data-morning-guide="reply"] {
+    grid-template-rows: 44px 36px 100px 52px minmax(0, 1fr);
+  }
+  .play[data-morning-guide] > .map {
+    min-height: 0;
+  }
+  .play[data-morning-guide="waiting"] #thumbs,
+  .play[data-morning-guide="reply"] #thumbs {
+    min-height: 60px;
+    max-height: 120px;
+  }
+}
+
+.morning-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
