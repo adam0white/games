@@ -446,7 +446,9 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
         saveGame(outcomes.state),
       ).ok,
     ).toBe(true);
-    const state = await host.importFile(saveGame(file));
+    const state = await host.importFile(saveGame(outcomes.state));
+    expect(state.inputs).toEqual(outcomes.state.inputs);
+    expect(saveGame(state)).toBe(saveGame(outcomes.state));
     expect(state.castChapter).toBeUndefined();
     expect(controls.request).not.toHaveBeenCalled();
     expect(host.heads).toEqual([]);
