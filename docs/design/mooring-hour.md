@@ -1,10 +1,10 @@
 # Mooring Hour
 
-Status: concept for Astra wildcard review. No game built. Based on the first concept in the approved ideas list; an original small ferry rescue game, with original drawings, authored river and levels. Canvas 2D, TypeScript, current monorepo HF pin, published lab client. No recreation of another game's map, characters, art or rules.
+Status: Astra wildcard review conditionally retained the concept. The requirements below include its corrections. No game built. Based on the first concept in the approved ideas list; an original small ferry rescue game, with original drawings, authored river and levels. Canvas 2D, TypeScript, current monorepo HF pin, published lab client. No recreation of another game's map, characters, art or rules.
 
 ## What the player does
 
-Steer a ferry between three landing points during a rising river. Catch a mooring rope, choose a load, ask passengers to board and make the crossing. One run lasts six minutes. Three trips form a complete loop. Grounding costs boat condition and time. One final safe departure ends the run with the actual people and supplies delivered. Partial delivery is a distinct ending. There is no numerical moral grade.
+Steer a ferry between two landing points during a rising river. Catch a mooring rope, choose a load, ask passengers to board and make the crossing. Departures close after six simulation minutes. Three trips form a complete loop. Grounding costs boat condition and time. A crossing underway can finish after departures close. The run ends with the actual people and supplies delivered. Partial delivery is a distinct ending. There is no numerical moral grade.
 
 The river and hull fill most of the screen. Indigo moving current, cream banks, lit windows and bold paper silhouettes communicate state. The boat turns, passengers walk and cargo visibly tilts. Text is a short speech bubble attached to the speaker; it is never the main play surface. The waterline rises on the actual pier. The player can stop and inspect without losing a choice.
 

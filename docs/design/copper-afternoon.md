@@ -1,10 +1,10 @@
 # Copper Afternoon
 
-Status: concept for Astra wildcard review. No game built. Based on the second approved concept: an original direct-manipulation repair bench, with its own drawings, object layouts and level sequence. Canvas 2D, TypeScript, current monorepo HF and published lab client. Compare against Small Works before building: this game's purpose is tactile inspection and object change, not another dialogue menu for workshop assignments.
+Status: Astra wildcard review conditionally retained the concept. The requirements below include its corrections. No game built. Based on the second approved concept: an original direct-manipulation repair bench, with its own drawings, object layouts and level sequence. Canvas 2D, TypeScript, current monorepo HF and published lab client. Compare against Small Works before building: this game's purpose is tactile inspection and object change, not another dialogue menu for workshop assignments.
 
 ## What the player does
 
-Repair a wind-up desk lamp, a hand bell and a toy cart through an afternoon. These are deliberately fictional low-voltage/mechanical objects, not electrical repair instructions. Rotate each object, expose a fault, choose a part, fit it and test it. Three objects and two waiting visitors form the whole run, about six minutes. Parts are scarce; a rushed test can damage a part. Missed work and honest return of an unrepaired object are real endings. A successful physical fix does not erase a broken promise.
+Repair a wind-up desk lamp, a hand bell and a toy cart through an afternoon. These are deliberately fictional mechanical objects, not electrical repair instructions. Rotate each object, expose a fault, choose a part, fit it and test it. Three objects, one returning visitor and two coworkers form the whole run, about six minutes. Parts are scarce; testing a visibly loose coupling can damage it. Missed work and honest return of an unrepaired object are real endings. A successful physical fix does not erase a broken promise.
 
 The bench fills most of the screen. Warm ochre cutaways, large tools, changing gears, a lit bulb and the waiting people's motion show progress. Unfastened screws remain visibly on the bench. A wrong connection leaves a gap or stops the movement. Text is brief object labels and speech, not a list of repair verbs.
 
