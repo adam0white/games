@@ -229,6 +229,20 @@ it('keeps every first-choice control inside the phone viewport', async () => {
     await page.goto(origin);
     await page.locator('#new').click();
     await page.locator('.opt').first().waitFor();
+    for (const selector of ['[data-tutorial-target]', '.tutorial-target', '[data-tutorial-skip]']) {
+      const visible = await page.locator(selector).evaluate((element) => {
+        const r = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return (
+          r.left >= 0 &&
+          r.top >= 0 &&
+          r.right <= innerWidth &&
+          r.bottom <= innerHeight &&
+          (hit === element || element.contains(hit))
+        );
+      });
+      expect(visible, selector).toBe(true);
+    }
     const bottoms = await page
       .locator('.card button')
       .evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().bottom));
