@@ -471,6 +471,7 @@ function openGameMenu() {
       const fresh = await cast.fresh(seed);
       clearSave();
       s = fresh;
+      beginTeaching(s.phase);
       cast.track();
       const saved = await writeSave();
       dialog.close();

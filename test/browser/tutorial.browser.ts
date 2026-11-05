@@ -1,5 +1,18 @@
 import { expect, test } from '@playwright/test';
 
+// Preserve a seed when a native startup fails before the guide can render.
+test.afterEach(async ({ page }, info) => {
+  if (info.status === info.expectedStatus) return;
+  const seed = await page
+    .evaluate(() => (window as unknown as { __pass?: { state?: { seed: number } } }).__pass?.state?.seed)
+    .catch(() => undefined);
+  if (seed !== undefined)
+    await info.attach('failed-kitchen-seed', {
+      body: JSON.stringify({ seed }),
+      contentType: 'application/json',
+    });
+});
+
 for (const viewport of [
   { width: 360, height: 690 },
   { width: 1280, height: 800 },
@@ -104,3 +117,20 @@ for (const viewport of [
     });
   });
 }
+
+test('starting a new kitchen resets a replayed guide after an earlier skip', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#new').click();
+  await page.locator('[data-tutorial-skip]').click();
+  await page.locator('#open-service').click();
+  await page.locator('#game-menu').click();
+  await page.locator('#menu-tutorial').click();
+  await page.locator('[data-pick]').first().click();
+  await page.locator('[data-v]:not([disabled])').first().click();
+  await expect(page.locator('[data-tutorial-step="result"]')).toBeVisible();
+  await page.locator('#game-menu').click();
+  await page.locator('#menu-new').click();
+  await page.locator('#menu-new-yes').click();
+  await expect(page.locator('[data-tutorial-step="plan"]')).toBeVisible();
+  await page.locator('[data-tutorial-skip]').click();
+});

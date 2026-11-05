@@ -26,7 +26,7 @@ export function teachingBill(due: number, till: number) {
   if (changed && picture) picture.innerHTML = stakesPicture();
 }
 function stakesPicture() {
-  return `<div>🥗 → 🍽 → ₺ → 📅 Saturday</div><meter min="0" max="${Math.max(1, bill)}" value="${Math.max(0, earned)}" aria-label="Money toward the bill"></meter> <b>₺${earned} / ₺${bill}</b><div>⚠ ₺ &lt; ₺${bill} → 🔒 Kitchen closes</div>`;
+  return `<div>🥗 → 🍽 → ₺ → 📅 Saturday</div><meter min="0" max="${Math.max(1, bill)}" value="${Math.max(0, earned)}" aria-label="Money toward the bill"></meter> <b>₺${earned} / ₺${bill}</b><div>Unpaid bill → ⚠ strike + shortfall × 1.10 next week</div><div>⚠⚠ → 🔒 · Unpaid final bill → 🔒</div><small>Broken promises can also add a strike.</small>`;
 }
 const cues: Record<Step, [string, string]> = {
   continue: [
@@ -70,11 +70,14 @@ const cues: Record<Step, [string, string]> = {
 export function beginTeaching(phase: string, replay = false) {
   if (!replay) {
     try {
-      if (step !== 'continue' && localStorage.getItem('pass-teaching-done')) return;
+      if (step === null && localStorage.getItem('pass-teaching-done')) return;
     } catch {
       /* Teaching still works without storage. */
     }
   }
+  requestedCook = null;
+  replyReady = null;
+  latestPlan = '';
   step = phase === 'service' ? 'crew' : phase === 'board' ? 'plan' : 'continue';
 }
 
