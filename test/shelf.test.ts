@@ -43,7 +43,7 @@ describe("shared shelf", () => {
     };
     const session = await freshSession(7, shelf, {
       game: "lefthand",
-      engine: "4.10.0",
+      engine: "4.17.0",
       build: "local",
       rules: "left-hand-5",
     });
@@ -81,7 +81,7 @@ describe("shared shelf", () => {
     const id = "hf.cast.tariq.well";
     const source = {
       game: "lefthand",
-      engine: "4.10.0",
+      engine: "4.17.0",
       build: "local",
       rules: "left-hand-5",
     };

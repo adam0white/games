@@ -1056,7 +1056,7 @@ export function step(s: State, command?: Command): State {
           ? "Dawn came before you reached home. Tonight’s envelope stays with the household."
           : s.envelopePlaced
             ? `Dawn came first. Danyal needed ${collectionSecondsLeft(s)} more seconds to collect the envelope from the well box, so it did not reach Idris and Samira.`
-            : `Dawn came before you left the envelope, so nothing reached Idris and Samira. ${stepsToTarget(s) === 0 ? `You were at the ${s.route === "door" ? "door" : "well"} but did not leave it.` : `You were ${stepsToTarget(s)} steps from the ${s.route === "door" ? "door" : "well"}.`}`,
+            : `Dawn came before you left the envelope, so nothing reached Idris and Samira. ${stepsToTarget(s) === 0 ? `You were at the ${s.route === "door" ? "door" : "well"} but did not leave it.` : `You were ${stepsToTarget(s)} ${stepsToTarget(s) === 1 ? "step" : "steps"} from the ${s.route === "door" ? "door" : "well"}.`}`,
       );
   }
   return s;

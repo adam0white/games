@@ -38,6 +38,19 @@ A full-width Godot village sits between a short spoken line and thumb-sized dire
 
 ## Deferred
 
+Current follow-up checkpoint (2026-11-05): **2026-11-12** replaces expired November 3 review targets below. Recheck unresolved input/clarity causes against current source, and keep actual owner or device acceptance separate from automated delivery. Larger content, sound, movement or difficulty changes need their own authored comparison; cross-game continuation remains outside this upkeep scope. Future targets and historical fixed-result records remain unchanged.
+
+Current item dispositions (owner upkeep, 2026-11-05; prior rows below remain historical):
+
+| Item | Checkpoint or disposition | Reason |
+| --- | --- | --- |
+| Linux WebKit framebuffer | 2026-11-12 | Retest the retained stock-template/blit failure separately; macOS WebKit success does not resolve the Linux presentation issue. |
+| HF4 port review | 2026-11-05 candidate | This source adopts HF4.17; final exact CI, hosted review and clean deployment remain. |
+| F-1621 well delivery drawing | 2026-11-12 | Compare a distinct well-box drawing with existing highlighted tiles before replacing the map symbol. |
+| F-1623/F-1624 positioning and fold | 2026-11-12 | Prior follow-ups report fixes; confirm them on the current deployed port and reopen only a reproduced residual. |
+| Owner/same-tester acceptance | 2026-11-12 | Keep the prior capped panel record; owner feel acceptance requires actual owner play, not another inferred panel pass. |
+| F-2154 singular step wording | 2026-11-05 candidate | A one-step failure now says step; larger counts still say steps. Final delivery gates remain. |
+
 - Completed 2026-10-29: Tariq restored after checking live Well and Warren client 0.5.5+ with per-person skips. The general peer gate remains enforced.
 
 - Iteration 2 (2026-10-26) resolves the overlapping person/well labels, unmarked door, ambiguous lantern, timer drift, duplicate/stale text and mixed clock units. The lantern starts lit and names its state and action. All visible durations use the dawn clock seconds.

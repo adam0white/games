@@ -90,7 +90,7 @@ async function source() {
   } catch {
     /* local build */
   }
-  return { game: "lefthand", engine: "4.10.0", build, rules: "left-hand-5" };
+  return { game: "lefthand", engine: "4.17.0", build, rules: "left-hand-5" };
 }
 async function start(seed: number) {
   preparing = true;
