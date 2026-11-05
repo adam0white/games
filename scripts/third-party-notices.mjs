@@ -25,6 +25,15 @@ for (const installedName of installedPackages) {
   group.set(label, sources);
   groups.set(license, group);
 }
+// These immutable releases declare MIT but omit the license text from their tarballs.
+const sdkLicense = readFileSync('licenses/lab-sdk-MIT.txt', 'utf8');
+const sdkGroup = groups.get(sdkLicense) ?? new Map();
+for (const name of ['@adam0white/lab-client', '@adam0white/lab-kit']) {
+  const metadata = JSON.parse(readFileSync(`node_modules/${name}/package.json`, 'utf8'));
+  if (metadata.name !== name || metadata.license !== 'MIT') throw Error(`Unexpected license for ${name}`);
+  sdkGroup.set(`${name} ${metadata.version} (${metadata.license})`, ['licenses/lab-sdk-MIT.txt']);
+}
+groups.set(sdkLicense, sdkGroup);
 const notices = [
   'Third-party notices',
   '',
