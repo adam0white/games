@@ -13,6 +13,7 @@ interface MenuOptions {
   beforeClose?: () => void;
   onClose?: () => void;
   readNotebook?: () => void;
+  replayTutorial?: () => void;
   title?: () => void;
   newGame?: () => void;
   speed?: () => number | null;
@@ -386,6 +387,8 @@ export function gameMenu(options: MenuOptions): HTMLButtonElement {
         leave(() => openFeedback(options.getRun, () => entry.click(), options.chooseRecording)),
       );
       body.append(feedback);
+      const replayTutorial = options.replayTutorial;
+      if (replayTutorial) body.append(button('Replay tutorial', () => leave(replayTutorial)));
       if (fileMode === 'file') {
         const explanation = document.createElement('p');
         explanation.textContent =
