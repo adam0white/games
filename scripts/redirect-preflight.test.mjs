@@ -9,7 +9,7 @@ import { manifest } from './lib.mjs';
 
 const OLD = 'https://rope.adamwhite.work';
 const PLAY = 'https://play.adamwhite.work';
-const routes = [{ pattern: 'play.adamwhite.work', custom_domain: true }, { pattern: 'rope.adamwhite.work', custom_domain: true }];
+const routes = [{ pattern: 'play.adamwhite.work', custom_domain: true }, { pattern: 'rope.adamwhite.work/*', zone_name: 'adamwhite.work' }];
 function fixture(t) {
   const cwd = mkdtempSync(join(tmpdir(), 'redirect-preflight-test-'));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
@@ -46,6 +46,18 @@ test('initial activation requires direct verified live release and exact configu
   assert.equal(f.fetches.length, 1);
   assert.equal(f.fetches[0].url, `${PLAY}/rope/release.json`);
   assert.equal(f.fetches[0].options.redirect, 'manual');
+  await verifyRedirects({ ...f.args(), routes: [routes[0], { ...routes[1], custom_domain: false }] });
+  for (const invalid of [
+    { pattern: 'rope.adamwhite.work', custom_domain: true },
+    { ...routes[1], custom_domain: true },
+    { ...routes[1], zone_name: 'other.work' },
+    { pattern: 'rope.adamwhite.work/*' },
+    { ...routes[1], pattern: '*.adamwhite.work/*' },
+    { ...routes[1], pattern: 'rope.adamwhite.work/only/*' },
+  ]) {
+    await assert.rejects(verifyRedirects({ ...f.args(), routes: [routes[0], invalid] }), /route/i);
+  }
+  await assert.rejects(verifyRedirects({ ...f.args(), routes: [{ pattern: 'play.adamwhite.work/*', zone_name: 'adamwhite.work' }, routes[1]] }), /route/i);
   await assert.rejects(verifyRedirects({ ...f.args(), routes: routes.slice(0, 1) }), /route/i);
   await assert.rejects(verifyRedirects({ ...f.args(), routes: [...routes, { pattern: '*.adamwhite.work', custom_domain: true }] }), /route/i);
 });

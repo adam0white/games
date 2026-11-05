@@ -36,8 +36,18 @@ export function repositoryEvidence(cwd = process.cwd()) {
 export async function verifyRedirects({ registry, routes, head, expected, evidence = repositoryEvidence(), fetch: fetchRelease = globalThis.fetch }) {
   validateRegistry(registry);
   const enabled = registry.games.filter(game => game.redirectEnabled === true);
-  const hosts = ['play.adamwhite.work', ...enabled.map(game => new URL(game.legacyOrigin).hostname)];
-  if (!Array.isArray(routes) || routes.length !== hosts.length || new Set(routes.map(route => route.pattern)).size !== hosts.length || routes.some(route => route.custom_domain !== true || !hosts.includes(route.pattern))) throw new Error('Worker routes must exactly match play and enabled legacy origins');
+  const legacyPatterns = enabled.map(game => `${new URL(game.legacyOrigin).hostname}/*`);
+  const matchesRoute = route => {
+    if (!route || typeof route !== 'object') return false;
+    if (route.pattern === 'play.adamwhite.work') {
+      return route.custom_domain === true && Object.keys(route).every(key => ['pattern', 'custom_domain'].includes(key));
+    }
+    return legacyPatterns.includes(route.pattern)
+      && route.zone_name === 'adamwhite.work'
+      && (route.custom_domain === undefined || route.custom_domain === false)
+      && Object.keys(route).every(key => ['pattern', 'zone_name', 'custom_domain'].includes(key));
+  };
+  if (!Array.isArray(routes) || routes.length !== legacyPatterns.length + 1 || !routes.every(matchesRoute) || new Set(routes.map(route => route.pattern)).size !== routes.length) throw new Error('Worker routes must be the play custom domain and exact enabled legacy zone routes');
   for (const game of enabled) {
     if (!evidence.ancestor(game.verifiedRelease, head)) throw new Error(`${game.slug}: recorded verification commit is not a known ancestor`);
     const url = `${PLAY}/${game.slug}/release.json`;
