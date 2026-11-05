@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, realpathSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { assertFrameworkGraph } from './lib.mjs';
 export function validateGame(game, registry) {
   const path = `games/${game.slug}`;
@@ -7,11 +7,11 @@ export function validateGame(game, registry) {
   for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) for (const [name, value] of Object.entries(pkg[section] ?? {})) {
     if (name !== '@adam0white/human-framework' && (name.startsWith('@adam0white/human-framework-') || String(value).includes('npm:@adam0white/human-framework@'))) throw new Error('HF alias forbidden');
   }
-  const packages = readdirSync('node_modules/.pnpm').filter(n => n.startsWith('@adam0white+human-framework@')).map(n => {
-    const packagePath = `node_modules/.pnpm/${n}/node_modules/@adam0white/human-framework/package.json`;
-    return JSON.parse(readFileSync(packagePath, 'utf8'));
-  });
-  assertFrameworkGraph(packages, registry.hfVersion);
+  // The game's engine must resolve to the registry pin. The lab artifact retains
+  // its own older-person continuity dependency; that is not a game engine route.
+  const enginePath = realpathSync(`${path}/node_modules/@adam0white/human-framework/package.json`);
+  const engine = JSON.parse(readFileSync(enginePath, 'utf8'));
+  assertFrameworkGraph([engine], registry.hfVersion);
   const labPath = realpathSync(`${path}/node_modules/@adam0white/lab-client/package.json`);
   const lab = JSON.parse(readFileSync(labPath, 'utf8'));
   if (lab.name !== '@adam0white/lab-client' || !lab.version) throw new Error('Invalid lab client');

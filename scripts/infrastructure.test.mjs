@@ -37,3 +37,8 @@ test('release rejects mismatched lineage, version or redirected response', () =>
   assert.throws(() => checkRelease(expected, {...expected, hfVersion:'4.16.3'}, false));
   assert.throws(() => checkRelease(expected, expected, true));
 });
+
+test('scoped headers preserve Cloudflare removal directives', () => {
+  assert.match(scopedHeaders('rope', '/assets/*\n  ! Cache-Control\n  Cache-Control: immutable\n'), /\/rope\/assets\/\*\n  ! Cache-Control/);
+  assert.throws(() => scopedHeaders('rope', '/assets/*\n  ! Cache-Control injected\n'));
+});

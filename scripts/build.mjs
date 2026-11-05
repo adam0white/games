@@ -19,7 +19,7 @@ for (const game of registry.games) {
   const path = `games/${game.slug}`;
   const labVersion = validateGame(game, registry);
   rmSync(`${path}/dist`, { recursive: true, force: true });
-  run('pnpm', ['--dir', path, 'run', 'build'], { stdio: 'inherit' });
+  run('pnpm', ['--filter', `./${path}`, 'run', 'build'], { stdio: 'inherit' });
   rejectRootWorker(`${path}/dist`);
   const target = `dist/${game.slug}`;
   mkdirSync(target, { recursive: true });

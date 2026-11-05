@@ -36,7 +36,7 @@ function scope(slug, path) {
 export function scopedHeaders(slug, text) {
   return text.split('\n').map(line => {
     if (!line.trim() || line.trimStart().startsWith('#')) return line;
-    if (/^\s/.test(line)) { if (!/^\s+[^\s:]+\s*:\s*[^\r\n]*$/.test(line)) throw new Error('Invalid header'); return line; }
+    if (/^\s/.test(line)) { if (!/^\s+!\s+[A-Za-z0-9-]+\s*$/.test(line) && !/^\s+[^\s:]+\s*:\s*[^\r\n]*$/.test(line)) throw new Error('Invalid header'); return line; }
     return scope(slug, line.trim());
   }).join('\n');
 }
