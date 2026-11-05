@@ -1,6 +1,6 @@
 /** Current rules. Older notebooks remain downloadable but cannot continue. */
 export const REMAINDER_EDITION = '0.10.0';
-export const NATIVE_PACKAGE = '@adam0white/human-framework@4.15.1';
+export const NATIVE_PACKAGE = '@adam0white/human-framework@4.17.0';
 
 /** Refuse an older native package before any host replay or activation. */
 export function requireCurrentNativePackage(archive: unknown): void {
