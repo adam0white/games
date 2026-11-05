@@ -4,6 +4,8 @@ Remaining: integrate open Clarity work, qualify HF 4.17 replay and release, and 
 
 The synthetic ownership controls now project their historical person with the actual HF 4.11 engine, installed only for tests. The current 4.17 outgoing claim fails the unchanged 4.11-only chapter guard before shelf publication. The former positive Commonstead-to-workshop claim control is therefore replaced with a refusal control; the earlier positive result remains historical, and current cross-game continuation is not qualified. A separate file-origin control still exercises admission of a real 4.11 projection. No production admission was widened.
 
+Current new workshops start a local fresh cast without claiming or publishing shared heads. Existing source histories remain in their source; the New game confirmation asks players to download the previous workshop before replacing its local save. Same-person automatic carryover is unavailable until native HF 4.17 admission and claim support is qualified. Recheck on 2026-11-12 because the existing source guard accepts older engine stamps and the new claim path has not been qualified. Current local resume and replay remain required.
+
 ## Delivered technical record, 2026-11-04
 
 Remaining: Adam's play and acceptance of the game remain open. The twelve literal player requests and their reasons remain in [Deferred player requests](docs/Deferred.md#final-ordinary-iteration-2026-11-01). The ordinary player-panel gate remains paused; no new panel was run. Recheck the remaining owner and player dependency on 2026-11-05 as an engineering follow-up; this is not an appointment or commitment by Adam.

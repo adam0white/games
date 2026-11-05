@@ -126,6 +126,42 @@ async function ownNoraSource() {
 }
 
 describe('host recording and local ownership guards (synthetic controls)', () => {
+  it('starts and replays a fresh local cast without reading or writing shared heads', async () => {
+    const host = await runtime();
+    const state = await host.freshLocal(42);
+    expect(host.heads).toEqual([]);
+    expect(host.historyNotice).toContain('Any earlier character histories remain');
+    const played = dispatch(state, { type: 'wait', minutes: 5 });
+    expect(played.ok).toBe(true);
+    const saved = saveGame(played.state);
+    const { replayRecordedRun } = await import('../src/game/replay');
+    expect(replayRecordedRun({ ...played.state, inputs: played.state.inputs }, saved).ok).toBe(
+      true,
+    );
+    let current = played.state;
+    host.bind(
+      () => current,
+      () => {},
+      (paused) => {
+        current = paused;
+      },
+    );
+    await host.departLocal();
+    expect(current.chapterPaused).toBe(true);
+    expect(storage.size).toBeGreaterThan(0);
+    await host.checkpointAll();
+    expect(controls.request).not.toHaveBeenCalled();
+    const restored = await runtime();
+    expect(saveGame(restored.loadLocal(host.localSave(played.state)))).toBe(saved);
+    const next = await host.freshLocal(43);
+    const nextPlayed = dispatch(next, { type: 'wait', minutes: 5 });
+    expect(nextPlayed.ok).toBe(true);
+    const nextSaved = saveGame(nextPlayed.state);
+    expect(
+      replayRecordedRun({ ...nextPlayed.state, inputs: nextPlayed.state.inputs }, nextSaved).ok,
+    ).toBe(true);
+    expect(controls.request).not.toHaveBeenCalled();
+  });
   it('refuses a historical Commonstead checkpoint before writing a current workshop claim', async () => {
     const { real, parent: original } = await ownNoraSource();
     const { validatePortablePerson } = await import('@adam0white/human-framework');
