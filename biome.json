@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.5/schema.json",
   "files": {
     "includes": [
       "**",
@@ -29,5 +29,13 @@
         "noNonNullAssertion": "off"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["docs/design.md", "docs/smoke-measurements.md"],
+      "formatter": {
+        "enabled": false
+      }
+    }
+  ]
 }

@@ -1,11 +1,11 @@
-import { preview } from '@adam0white/human-framework';
+import { preview, readRunHistory } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import { createHumanRun, START } from './hf4';
 
 describe('HF4 game host', () => {
   it('creates an archive with the published engine and the authored cast', () => {
     const game = createHumanRun(7);
-    expect(game.archive().engine.package).toBe('@adam0white/human-framework@4.8.0');
+    expect(game.archive().engine.package).toBe('@adam0white/human-framework@4.17.0');
     expect(Object.keys(game.archive().current.people)).toHaveLength(4);
   });
 });
@@ -66,9 +66,8 @@ it('records the observed rescue at an interruption boundary', () => {
   }));
   host.decide('sevim', 1, [{ id: 'follow', label: 'walk', expected: {}, effort: 0.1 }]);
   host.interrupt('sevim', 2, 'reached the street');
-  const receipts = host
-    .archive()
-    .history.flatMap((t) => t.inputs)
+  const receipts = readRunHistory(host.archive())
+    .flatMap((t) => t.inputs)
     .filter((i) => i.kind === 'action.resolved');
   const receipt = receipts.find((i) => i.kind === 'action.resolved' && i.payload.stage === 'interrupt');
   expect(receipt?.kind === 'action.resolved' && receipt.payload.outcome?.actual.psychological?.safety).toBe(

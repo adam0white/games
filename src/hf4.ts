@@ -14,6 +14,7 @@ import {
   type Result,
   type RunArchive,
   type RunSpec,
+  readRunHistory,
   restoreRun,
   type StepResult,
   step,
@@ -233,7 +234,7 @@ export function createHumanRun(
   }
   // The accepted public input journal permits rollback without exporting every tick.
   const initial = saved?.archive.initial ?? exportRun(run).initial;
-  const journal = (saved?.archive.history ?? []).map(({ until, inputs }) => ({
+  const journal = (saved ? readRunHistory(saved.archive) : []).map(({ until, inputs }) => ({
     until,
     inputs: structuredClone(inputs) as Input[],
   }));
@@ -578,13 +579,14 @@ export function restoreHumanRun(data: unknown, actual?: (action: Active) => Actu
     if (!object || typeof object !== 'object' || Array.isArray(object))
       throw new Error('Invalid Smoke HF checkpoint');
   const decoded = need(restoreRun(saved.archive));
+  const history = readRunHistory(saved.archive);
   // Query a disposable restored run; never infer scheduler state from archive internals.
-  if (saved.archive.history.length) {
+  if (history.length) {
     const projected = need(step(decoded, { until: saved.archive.current.at, inputs: [] }));
     if (saved.nextAt !== projected.nextAt) throw new Error('Invalid Smoke HF scheduler boundary');
   } else if (saved.nextAt !== null) throw new Error('Invalid Smoke HF scheduler boundary');
   let highestSerial = 0;
-  for (const transaction of saved.archive.history)
+  for (const transaction of history)
     for (const input of transaction.inputs) {
       const match = /^(?:offers|decision|suggestion|stair|interrupt|interrupt-offers):(\d+)$/.exec(input.id);
       if (match) highestSerial = Math.max(highestSerial, Number(match[1]));
@@ -592,7 +594,7 @@ export function restoreHumanRun(data: unknown, actual?: (action: Active) => Actu
   if (saved.serial !== highestSerial) throw new Error('Invalid Smoke HF input sequence');
   const expectedRevisions: Record<string, number> = {};
   const expectedBooks: Record<string, Offer[]> = {};
-  for (const transaction of saved.archive.history)
+  for (const transaction of history)
     for (const input of transaction.inputs) {
       if (input.kind === 'offers.received') {
         expectedRevisions[input.payload.person] = input.payload.revision;

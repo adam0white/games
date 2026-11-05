@@ -2,7 +2,7 @@ import { replay as replayHuman } from '@adam0white/human-framework';
 import { createHumanRun, restoreHumanRun } from './hf4';
 
 export const WORLD = { width: 360, height: 500, ground: 450, landings: [365, 280, 195, 110] } as const;
-export const ENGINE = '4.8.0';
+export const ENGINE = '4.17.0';
 export type Input =
   | { type: 'move'; x: number; y: number }
   | { type: 'speak'; id: string; line: 'come' | 'books' | 'together' | 'route' }
@@ -62,7 +62,7 @@ export interface Game {
 }
 export interface RunExport {
   format: 'smoke-8';
-  engine: '4.8.0';
+  engine: '4.17.0';
   human: ReturnType<ReturnType<typeof createHumanRun>['checkpoint']>;
   seed: number;
   ticks: number;
