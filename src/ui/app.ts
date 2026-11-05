@@ -2134,6 +2134,15 @@ function renderPanel(el: HTMLElement, html: string) {
 let sheetKey = '';
 let pressingJob = false;
 function drawSheet() {
+  try {
+    drawSheetContents();
+  } finally {
+    // Timers and selection handlers also redraw this panel outside drawAll.
+    refreshTeaching();
+  }
+}
+
+function drawSheetContents() {
   if (!s) return;
   if (pressingJob) return;
   const st = s;
