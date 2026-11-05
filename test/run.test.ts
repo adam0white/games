@@ -95,7 +95,7 @@ describe('runner', () => {
     expect(recording.cost).toEqual({ calls: 4, inputTokens: 5, outputTokens: 6, usd: 0.01 });
   });
 
-  it('writes recordings and a deterministic index through the CLI', async () => {
+  it('writes a deterministic recording and index, and refuses to overwrite either', async () => {
     const directory = await scratchDirectory();
     try {
       const out = join(directory, 'random-8.json');
@@ -103,7 +103,7 @@ describe('runner', () => {
       execFileSync(process.execPath, args);
       const first = await readFile(out, 'utf8');
       const index = await readFile(join(directory, 'index.json'), 'utf8');
-      execFileSync(process.execPath, args);
+      expect(() => execFileSync(process.execPath, args, { stdio: 'pipe' })).toThrow(/EEXIST/);
       expect(await readFile(out, 'utf8')).toBe(first);
       expect(await readFile(join(directory, 'index.json'), 'utf8')).toBe(index);
       expect(JSON.parse(index)).toEqual([
