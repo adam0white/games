@@ -198,17 +198,19 @@ test('file meetings preserve occupied native storage and ordinary import still p
   await page.addInitScript(() => {
     const save = 'his-word-save-v1';
     const notice = 'his-word-notice-v1';
+    const guide = 'his-word-guide-v1';
     localStorage.setItem(save, 'occupied-native-meeting');
     localStorage.setItem(notice, 'occupied-native-notice');
+    localStorage.setItem(guide, 'occupied-guide-preference');
     const trace: string[] = [];
     const read = Storage.prototype.getItem;
     const write = Storage.prototype.setItem;
     Storage.prototype.getItem = function (key) {
-      if (key === save || key === notice) trace.push(`read:${key}`);
+      if (key === save || key === notice || key === guide) trace.push(`read:${key}`);
       return read.call(this, key);
     };
     Storage.prototype.setItem = function (key, value) {
-      if (key === save || key === notice) trace.push(`write:${key}`);
+      if (key === save || key === notice || key === guide) trace.push(`write:${key}`);
       return write.call(this, key, value);
     };
     Object.assign(window, { nativeTrace: trace });
@@ -230,6 +232,9 @@ test('file meetings preserve occupied native storage and ordinary import still p
   const next = view(source).choices.find((item) => item.text.includes('Hear what'));
   if (!next) throw new Error('The continuation choice is missing.');
   act(source, { choice: next.id });
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByRole('button', { name: 'Replay guide' }).click();
+  await page.getByRole('button', { name: 'Skip guide' }).click();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await expect(page.getByRole('button', { name: 'New game', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Replay tools', exact: true })).toHaveCount(0);
@@ -289,8 +294,9 @@ test('file meetings preserve occupied native storage and ordinary import still p
     await page.evaluate(() => [
       localStorage.getItem('his-word-save-v1'),
       localStorage.getItem('his-word-notice-v1'),
+      localStorage.getItem('his-word-guide-v1'),
     ]),
-  ).toEqual(['occupied-native-meeting', 'occupied-native-notice']);
+  ).toEqual(['occupied-native-meeting', 'occupied-native-notice', 'occupied-guide-preference']);
 
   // Ordinary startup reads native storage, and ordinary import writes the save.
   await page.goto('/');

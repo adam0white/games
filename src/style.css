@@ -444,3 +444,42 @@ body[data-surface="notice"] .choice {
 .menu-footer summary {
   cursor: pointer;
 }
+
+.guided .guide {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  border-left: 3px solid var(--red);
+  padding: 8px 10px;
+  background: #fff9;
+  font-size: 15px;
+}
+.guided .guide button {
+  flex: none;
+  background: transparent;
+  border: 1px solid currentColor;
+  padding: 7px;
+  font-size: 13px;
+}
+.guided .choices {
+  margin-top: 8px;
+}
+.guided .choice {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.guided .choice-arrow {
+  top: 10px;
+}
+.guided h1 {
+  margin-bottom: 10px;
+}
+.guided .eyebrow {
+  margin-bottom: 8px;
+}
+@media (min-width: 1000px) {
+  .leaf.guided {
+    transform: none;
+  }
+}
