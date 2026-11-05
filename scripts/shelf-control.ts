@@ -28,7 +28,7 @@ const active = (
 if (active.length) throw Error("Completed chapter still has active routines");
 const sourceInfo = {
   game: "lefthand",
-  engine: "4.10.0",
+  engine: "4.17.0",
   build: "control",
   rules: "left-hand-5",
 };

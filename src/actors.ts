@@ -26,7 +26,7 @@ import {
   validatePortablePerson,
 } from "@adam0white/lab-client";
 
-export const ENGINE = "4.10.0";
+export const ENGINE = "4.17.0";
 export const START = 1200 * 60_000;
 const MINUTE = 60_000;
 const DAY = 86_400_000;
