@@ -1402,7 +1402,7 @@ function renderTutorial(s: GameState, root: HTMLElement) {
   const note = document.createElement('div');
   note.className = 'tutorial-prompt';
   note.dataset.key = key;
-  note.classList.toggle('tutorial-late', overdue || prompt.outcome === 'late');
+  note.classList.toggle('tutorial-late', overdue || prompt.outcome === 'late' || prompt.outcome === 'closed');
   note.setAttribute('role', 'status');
   const message = document.createElement('span');
   message.textContent = overdue
@@ -1419,9 +1419,11 @@ function renderTutorial(s: GameState, root: HTMLElement) {
             ? 'Go: this starts the real trip.'
             : prompt.target === 'travel'
               ? 'The clock moves as you travel.'
-              : prompt.outcome === 'late'
-                ? 'Delivered late. Late deliveries can earn smaller tips.'
-                : 'Delivered on time. Late deliveries can earn smaller tips.';
+              : prompt.outcome === 'closed'
+                ? 'The order closed. Check the journal for what happened.'
+                : prompt.outcome === 'late'
+                  ? 'Delivered late. Late deliveries can earn smaller tips.'
+                  : 'Delivered on time. Late deliveries can earn smaller tips.';
   const skip = document.createElement('button');
   skip.textContent = prompt.target === 'outcome' ? 'Done' : 'Skip tutorial';
   skip.addEventListener('click', () => {

@@ -1,5 +1,7 @@
 # Stairwell
 
+For the 2026-11-05 clarity task, the owner explicitly permits fresh isolated Playwright browsers for local app tests. Do not use the owner profile. Close test-owned browsers after testing.
+
 Start with HANDOFF.md, docs/hf4-native-port.md and docs/cast-adoption.md.
 
 Active branch migration (2026-10-29): source now uses published HF4.14.0 with client0.5.13/kit0.5.30. See HANDOFF and ~/code/.lab-scratch/codex/stairwell-hf414.md for this migration and its hosted-review waiver. Native editions are14 (week),15 (month) and16 (Start work). Source, CI, deployment and remaining proof are recorded in the current scratch report. The private historical workspace preserves HF3 and its tests; older default/version statements below describe that historical delivery. Current HF4.8 delivery receipts are in ~/code/.lab-scratch/codex/smoke-stair-hf48.md. The earlier HF4.6 gates are recorded in ~/code/.lab-scratch/codex/g1-stairwell.md. Do not launch isolated browsers from tests. Browser journeys require the leased existing Chrome profile. This repository owns its game state and priorities. HF framework logic stays in its published package; Stairwell owns fiction, schedules, maps and world consequences.

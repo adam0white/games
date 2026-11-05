@@ -44,4 +44,15 @@ describe('first order tutorial', () => {
       }).outcome,
     ).toBe('late');
   });
+  it('does not call a day-end closure a delivery', () => {
+    expect(
+      tutorialPrompt({
+        task: { ...task, done: 1260 },
+        minute: 1260,
+        ordersOpen: false,
+        selected: false,
+        walking: false,
+      }).outcome,
+    ).toBe('closed');
+  });
 });
