@@ -283,6 +283,26 @@ require generic family custody or an Ada actor.
 
 ## Deferred and acceptance
 
+### Current inspection checkpoints — 2026-11-05
+
+The original November 3 dates and literal reports below are historical. Each item remains open and is due for its next inspection on **2026-11-12**; the HF 4.17 first-action guide does not by itself resolve these separate asks.
+
+- **F-2761:** Check chalk adjacency against actual completed-passage rules; the guide does not establish the reported cause.
+- **F-2762:** Investigate phone camera movement and recovery to the cellar and plan; the movement cause is unknown.
+- **F-2763:** Trace the fresh-plan invitation and stopping-line text before explaining it; do not infer corruption.
+- **F-2764:** Review an available shelter decision during the first-room wait without assuming a clock defect.
+- **F-2765:** Compare the stopping line with the current hill and its actionable context.
+- **F-2766:** Inspect useful choices while marked work waits, preserving workers’ independent needs.
+- **F-2767:** The lab driver owner must investigate the two phone-selection timeouts; no quiet request was sent and the cause remains unknown.
+- **F-2768:** Review available decisions while a door is carved; the observed unfinished door does not prove a timing defect.
+- **F-2769:** Check how rider concern is communicated without inventing an unseen schedule.
+- **F-2770:** Verify remaining chalk marks and unchanged-answer feedback; the report did not show a post-mark screenshot.
+- **F-2771:** Review the actual open-route advice in context; the player did not reach that advice.
+- **F-2772:** Check the digging message for a clear explanation of spoil in its actual context.
+- **F-2773:** Distinguish existing, planned and rider-safe sleeping places using the actual shelter rules.
+- **F-2774:** Inspect how marked-work progress is shown while workers attend to other duties.
+- **F-2775:** Trace the unavailable invitation and stopping line in a fresh game before explaining their decision relevance.
+
 ### Second-cycle dated Deferred — 2026-10-31
 
 The second cycle was collected. These are open inspection leads for 2026-11-03, not established defects or accepted changes. The private sealed packet is at `~/code/.lab-scratch/playtest/light-1030/source-packets/warren-retest2/`; its seal is neither canonical HF import nor game delivery. F-2776–F-2790 are unused. No third ordinary panel or automatic new game-fix cycle follows. The two-iteration rule is separate from technical proof, canonical import, owner acceptance and bug-free status.
