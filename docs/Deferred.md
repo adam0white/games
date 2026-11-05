@@ -1,6 +1,29 @@
 ## Current follow-up — 2026-11-05
 
-Recheck F2974 on 2026-11-12: additional tenancy terms remain unspecified and need a fiction decision. Recheck F2977 on 2026-11-12: the second-week route exists, but the meaning and discoverability of later starts still need player-facing verification. Recheck F2701–F2710, F2712–F2717 and F2719 on 2026-11-12: their historical 2026-11-03 checkpoints passed without recorded consumer, phone or player acceptance; the individual remaining conditions are retained in the table below. No player acceptance is inferred. The other November 10 checkpoints remain unchanged.
+Each is an inspection checkpoint on **2026-11-12**, not a delivery promise. Existing November 10 checkpoints and the original source words remain unchanged.
+
+| Item | Reason for follow-up |
+| --- | --- |
+| F2974 | Additional tenancy terms were not authored; review the remaining fiction before adding facts. |
+| F2977 | The second-week route exists; later-start wording and findability need a player check. |
+| F2701 | Tuesday response and pressure-warning conditions remain untested with Aisha. |
+| F2702 | Letter facts are bounded; Mei has not accepted the remaining terms or trust explanation. |
+| F2703 | Contextual protests exist; Nia has not judged access to new scenes and varied replies. |
+| F2704 | Rosa’s trust explanation remains unanswered despite her stated return intent. |
+| F2705 | Short-stretch continuation lacks consumer proof; no save defect is established. |
+| F2706 | Monday-to-Tuesday change needs current replay and player taste verification. |
+| F2707 | The pressure warning needs a clarity judgment without disclosing hidden trust. |
+| F2708 | Phone scrolling and the entire first-choice explanation remain unverified. |
+| F2709 | The two disclosed fictional facts are not all terms; player and layout judgment remain open. |
+| F2710 | Mei’s question about remaining trust needs a qualitative explanation without a false quantity. |
+| F2712 | Second-week and Resume discoverability remain to be checked by a returning player. |
+| F2713 | The two contextual protests need judgment for variety without changing agency. |
+| F2714 | The full phone page and repeated day text need inspection; partial screenshots do not show total length. |
+| F2715 | Rosa’s question about trust effects remains open without a hidden-state meter. |
+| F2716 | The later choice label needs a clear explanation without promising an outcome. |
+| F2717 | The Skip destination and duration wording need inspection without a fixed-duration claim. |
+| F2719 | The third-week choice needs cold-player clarification; desktop followed phone exposure. |
+
 
 # Murmur Deferred — second retest, 2026-11-01
 
