@@ -2103,6 +2103,8 @@ const ANSWERS: Record<string, [string, string]> = {
 
 /** Update sheet text and attributes in place so clock ticks keep focused and pressed controls. */
 function renderPanel(el: HTMLElement, html: string) {
+  // The guide is not part of the panel markup; don't let it shift keyed control reconciliation.
+  el.querySelector('.teaching-cue')?.remove();
   const template = document.createElement('template');
   template.innerHTML = html;
   const key = (node: Node): string =>
@@ -2134,6 +2136,20 @@ function renderPanel(el: HTMLElement, html: string) {
 let sheetKey = '';
 let pressingJob = false;
 function drawSheet() {
+  const focusedGuideControl = ['data-tutorial-skip', 'data-tutorial-finish'].find((attribute) =>
+    document.activeElement?.hasAttribute(attribute),
+  );
+  try {
+    drawSheetContents();
+  } finally {
+    // Timers and selection handlers also redraw this panel outside drawAll.
+    refreshTeaching();
+    if (focusedGuideControl)
+      document.querySelector<HTMLElement>(`[${focusedGuideControl}]`)?.focus({ preventScroll: true });
+  }
+}
+
+function drawSheetContents() {
   if (!s) return;
   if (pressingJob) return;
   const st = s;

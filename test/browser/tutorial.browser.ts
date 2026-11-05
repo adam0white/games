@@ -1,8 +1,61 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
+
+// Check discoverability before locator clicks can scroll hidden controls into view.
+async function expectPracticeInView(page: Page, step: string) {
+  const cue = page.locator(`[data-tutorial-step="${step}"]`);
+  await expect(cue).toBeInViewport({ ratio: 1 });
+  await expect
+    .poll(() =>
+      cue.evaluate((element) => {
+        const b = element.getBoundingClientRect();
+        const points: [number, number][] = [
+          [b.left + 12, b.top + 12],
+          [b.right - 12, b.top + 12],
+          [b.left + 12, b.bottom - 12],
+          [b.right - 12, b.bottom - 12],
+        ];
+        return points.every(([x, y]) => element.contains(document.elementFromPoint(x, y)));
+      }),
+    )
+    .toBe(true);
+
+  for (const control of [page.locator('.teaching-target'), ...(await cue.locator('p, button').all())]) {
+    await expect(control).toBeInViewport({ ratio: 1 });
+    await expect
+      .poll(() =>
+        control.evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          return element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+        }),
+      )
+      .toBe(true);
+  }
+}
 
 // Preserve a seed when a native startup fails before the guide can render.
 test.afterEach(async ({ page }, info) => {
   if (info.status === info.expectedStatus) return;
+  console.log(
+    'PRACTICE_GEOMETRY',
+    await page.locator('.teaching-cue, .teaching-target, .sheet, .who, .verbs').evaluateAll((elements) =>
+      elements.map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          tag: element.tagName,
+          class: element.className,
+          step: (element as HTMLElement).dataset.tutorialStep,
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+          scrollTop: element.scrollTop,
+          clientHeight: element.clientHeight,
+          scrollHeight: element.scrollHeight,
+          overflow: getComputedStyle(element).overflow,
+        };
+      }),
+    ),
+  );
   const seed = await page
     .evaluate(() => (window as unknown as { __pass?: { state?: { seed: number } } }).__pass?.state?.seed)
     .catch(() => undefined);
@@ -25,28 +78,48 @@ for (const viewport of [
     test('first minute uses only controls to change the real staffing plan', async ({ page }) => {
       await page.goto('/?lab=1');
       await page.locator('#new').click();
-      await expect(page.locator('[data-tutorial-step="plan"]')).toBeVisible();
+      await expectPracticeInView(page, 'plan');
+      await page.screenshot({ path: `test-results/practice-${viewport.width}-plan.png` });
       await page.locator('.board-change').first().click();
-      await expect(page.locator('[data-tutorial-step="station"]')).toBeVisible();
+      await expectPracticeInView(page, 'station');
       await page.locator('[data-field="station"][data-value="cold"]').click();
-      await expect(page.locator('[data-tutorial-step="break"]')).toBeVisible();
+      await expectPracticeInView(page, 'break');
       await page.locator('[data-field="break"][aria-pressed="false"]').first().click();
-      await expect(page.locator('[data-tutorial-step="cover"]')).toBeVisible();
+      await expectPracticeInView(page, 'cover');
       await page.locator('[data-field="cover"][data-value=""]').click();
-      await expect(page.locator('[data-tutorial-step="done"]')).toBeVisible();
+      await expectPracticeInView(page, 'done');
       await expect(page.locator('.tutorial-plan [data-gap="true"]')).toBeVisible();
       await page.locator('#board-done').click();
       await page.locator('#ask-board').click();
-      await expect(page.locator('[data-tutorial-step="open"]')).toBeVisible();
+      await expectPracticeInView(page, 'open');
       await page.locator('#open-service').click();
-      await expect(page.locator('[data-tutorial-step="crew"]')).toBeVisible();
+      await expectPracticeInView(page, 'crew');
       await page.locator('[data-pick]').first().click();
-      await expect(page.locator('[data-tutorial-step="ask"]')).toBeVisible();
+      await expectPracticeInView(page, 'ask');
+      await expect(page.locator('.verbs .h').first()).toBeVisible();
       await page.locator('#close').click();
-      await expect(page.locator('[data-tutorial-step="crew"]')).toBeVisible();
+      await expectPracticeInView(page, 'crew');
       await page.locator('[data-pick]').first().click();
       await page.locator('[data-v]:not([disabled])').first().click();
-      await expect(page.locator('[data-tutorial-step="result"]')).toBeVisible();
+      await expectPracticeInView(page, 'result');
+      if (viewport.width === 360) {
+        await expect
+          .poll(() =>
+            page.evaluate(() => {
+              const till = document.querySelector('#till')?.getBoundingClientRect();
+              const stock = document.querySelector('#kitchen-stock')?.getBoundingClientRect();
+              return !!till && !!stock && till.bottom <= stock.top;
+            }),
+          )
+          .toBe(true);
+        await page.locator('[data-tutorial-skip]').focus();
+        await page.setViewportSize({ width: 820, height: 1180 });
+        await expect(page.locator('[data-tutorial-skip]')).toBeFocused();
+        await expectPracticeInView(page, 'result');
+        await page.setViewportSize(viewport);
+        await expectPracticeInView(page, 'result');
+      }
+      await page.screenshot({ path: `test-results/practice-${viewport.width}-reply.png` });
       await page.evaluate(() => {
         const game = (window as unknown as { __pass: { state: { till: number }; draw(): void } }).__pass;
         game.state.till = 321;
@@ -54,13 +127,13 @@ for (const viewport of [
       });
       await expect(page.locator('.tutorial-stakes meter')).toHaveAttribute('value', '321');
       await page.locator('#close').click();
-      await expect(page.locator('[data-tutorial-step="result"]')).toBeVisible();
+      await expectPracticeInView(page, 'result');
       await expect(page.locator('[data-tutorial-finish]')).toHaveCount(0);
       await page.locator('[data-pick]').first().click();
       await page.locator('[data-tutorial-finish]').click();
       await page.locator('#game-menu').click();
       await page.locator('#menu-tutorial').click();
-      await expect(page.locator('[data-tutorial-step="crew"]')).toBeVisible();
+      await expectPracticeInView(page, 'crew');
       await page.locator('[data-tutorial-skip]').click();
       await expect(page.locator('[data-tutorial-step]')).toHaveCount(0);
     });
@@ -206,4 +279,69 @@ test('replaying practice from the saved-game title points to Resume', async ({ p
   await page.locator('#cont').click();
   await expect(page.locator('[data-tutorial-step="plan"]')).toBeVisible();
   await page.locator('[data-tutorial-skip]').click();
+});
+
+test('phone practice stays visible for the second cook after a late covered break', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 690 });
+  await page.goto('/?lab=1');
+  await page.locator('#new').click();
+  await page.locator('.board-change').first().click();
+  await page.locator('[data-field="station"][data-value="cold"]').click();
+  await page.locator('[data-field="break"]').filter({ hasText: '19:45' }).click();
+  await page.locator('[data-field="cover"][data-value="dilek"]').click();
+  await page.locator('#board-done').click();
+  await page.locator('#ask-board').click();
+  await page.locator('#open-service').click();
+  await expectPracticeInView(page, 'crew');
+  await page.evaluate(() => {
+    const game = (window as unknown as { __pass: { step(minutes: number): void; draw(): void } }).__pass;
+    game.step(8);
+    game.draw();
+  });
+  await page.locator('[data-pick="dilek"]').click();
+  await expectPracticeInView(page, 'ask');
+  await expect(page.locator('.verbs .h').first()).toBeVisible();
+  await page.waitForTimeout(1200);
+  await expectPracticeInView(page, 'ask');
+});
+
+test('speech highlight expiry preserves the active practice cue immediately', async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = window.setTimeout;
+    const callbacks: (() => void)[] = [];
+    (window as unknown as { highlightCallbacks: (() => void)[] }).highlightCallbacks = callbacks;
+    window.setTimeout = ((handler: TimerHandler, delay?: number, ...args: unknown[]) => {
+      if (delay === 4000 && typeof handler === 'function') callbacks.push(() => handler(...args));
+      return original(handler, delay, ...args);
+    }) as typeof window.setTimeout;
+  });
+  await page.goto('/?lab=1');
+  await page.locator('#new').click();
+  await page.locator('#open-service').click();
+  await expectPracticeInView(page, 'crew');
+  const immediateCue = await page.evaluate(() => {
+    const callbacks = (window as unknown as { highlightCallbacks: (() => void)[] }).highlightCallbacks;
+    if (!callbacks.length) throw new Error('No real speech-highlight timer was scheduled');
+    callbacks.at(-1)?.();
+    return !!document.querySelector('[data-tutorial-step="crew"]');
+  });
+  expect(immediateCue).toBe(true);
+  await expectPracticeInView(page, 'crew');
+  await page.locator('[data-pick]').first().click();
+  await expectPracticeInView(page, 'ask');
+  await page.locator('[data-v]:not([disabled])').first().focus();
+  expect(
+    await page.evaluate(() => {
+      const before = document.activeElement;
+      (window as unknown as { highlightCallbacks: (() => void)[] }).highlightCallbacks.at(-1)?.();
+      return before?.isConnected && document.activeElement === before;
+    }),
+  ).toBe(true);
+  await page.locator('[data-tutorial-skip]').focus();
+  expect(
+    await page.evaluate(() => {
+      (window as unknown as { highlightCallbacks: (() => void)[] }).highlightCallbacks.at(-1)?.();
+      return document.activeElement?.hasAttribute('data-tutorial-skip');
+    }),
+  ).toBe(true);
 });

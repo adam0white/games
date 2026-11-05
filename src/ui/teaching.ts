@@ -13,6 +13,7 @@ type Step =
   | 'waiting'
   | 'continue';
 let step: Step | null = null;
+let revealedAnchor: string | null = null;
 let latestPlan = '';
 let requestedCook: string | null = null;
 let replyReady: (() => boolean) | null = null;
@@ -23,10 +24,13 @@ export function teachingBill(due: number, till: number) {
   bill = due;
   earned = till;
   const picture = document.querySelector('.tutorial-stakes');
-  if (changed && picture) picture.innerHTML = stakesPicture();
+  if (changed && picture) picture.innerHTML = stakesPicture(picture.classList.contains('is-compact'));
 }
-function stakesPicture() {
-  return `<div>🥗 → 🍽 → ₺ → 📅 Saturday</div><meter min="0" max="${Math.max(1, bill)}" value="${Math.max(0, earned)}" aria-label="Money toward the bill"></meter> <b>₺${earned} / ₺${bill}</b><div>Unpaid bill → ⚠ strike + shortfall × 1.10 next week</div><div>⚠⚠ → 🔒 · Unpaid final bill → 🔒</div><small>Broken promises can also add a strike.</small>`;
+function stakesPicture(compact = false) {
+  const money = `${compact ? '' : '<div>🥗 → 🍽 → ₺ → 📅 Saturday</div>'}<meter min="0" max="${Math.max(1, bill)}" value="${Math.max(0, earned)}" aria-label="Money toward the bill"></meter> <b>₺${earned} / ₺${bill}</b>`;
+  return compact
+    ? money
+    : `${money}<div>Unpaid bill → ⚠ strike + shortfall × 1.10 next week</div><div>⚠⚠ → 🔒 · Unpaid final bill → 🔒</div><small>Broken promises can also add a strike.</small>`;
 }
 const cues: Record<Step, [string, string]> = {
   continue: [
@@ -57,14 +61,8 @@ const cues: Record<Step, [string, string]> = {
     'Open the doors when you decide. A cook can refuse a changed plan. Empty stations delay meals; late customers leave without paying.',
   ],
   crew: ['[data-pick]', 'The kitchen is running. Choose a cook to ask for a job; they can say no.'],
-  ask: [
-    '[data-v]:not([disabled])',
-    'Choose a real job request. The cook decides; watch the reply and their current job.',
-  ],
-  result: [
-    '.panel-reply',
-    'Your request is sent. The cook’s reply appears here. Keep food moving to earn the bill; an empty station can lose a table.',
-  ],
+  ask: ['[data-v]:not([disabled])', 'Choose a job. Watch the cook’s reply.'],
+  result: ['.panel-reply', 'Watch the reply and current job.'],
 };
 
 export function beginTeaching(phase: string, replay = false) {
@@ -78,6 +76,7 @@ export function beginTeaching(phase: string, replay = false) {
   requestedCook = null;
   replyReady = null;
   latestPlan = '';
+  revealedAnchor = null;
   step = phase === 'service' ? 'crew' : phase === 'board' ? 'plan' : 'continue';
 }
 
@@ -142,8 +141,8 @@ export function mountTeaching(plan = latestPlan) {
   cue.append(line);
   if (['plan', 'open', 'result'].includes(step)) {
     const stakes = document.createElement('div');
-    stakes.className = 'tutorial-stakes';
-    stakes.innerHTML = stakesPicture();
+    stakes.className = step === 'result' ? 'tutorial-stakes is-compact' : 'tutorial-stakes';
+    stakes.innerHTML = stakesPicture(step === 'result');
     cue.append(stakes);
   }
   if (['break', 'cover', 'done'].includes(step) && plan) {
@@ -164,9 +163,24 @@ export function mountTeaching(plan = latestPlan) {
     done.dataset.tutorialFinish = '';
     done.textContent = 'Run the kitchen';
     done.addEventListener('click', finish);
-    cue.prepend(done);
+    cue.insertBefore(done, skip);
   }
-  target.insertAdjacentElement('afterend', cue);
+  // Crew buttons live in a fixed-height horizontal strip; keep the attached cue outside its clipping box.
+  const chips = target.closest('.board-chips');
+  const verbs = target.closest('.verbs');
+  const anchor = target.closest('.crew')?.parentElement ?? target;
+  if (chips) chips.insertAdjacentElement('afterend', cue);
+  else if (verbs) verbs.insertAdjacentElement('beforebegin', cue);
+  else if (target.matches('.panel-reply')) target.insertAdjacentElement('beforebegin', cue);
+  else anchor.insertAdjacentElement('afterend', cue);
+  const anchorKey = `${step}:${target.id}:${target.dataset.pick ?? ''}:${target.dataset.v ?? ''}:${target.matches('.panel-reply')}`;
+  if (anchorKey !== revealedAnchor)
+    requestAnimationFrame(() => {
+      if (!cue.isConnected) return;
+      cue.scrollIntoView({ block: 'nearest' });
+      target.scrollIntoView({ block: 'nearest' });
+      revealedAnchor = anchorKey;
+    });
 }
 
 document.addEventListener(
@@ -208,3 +222,16 @@ export function refreshTeaching() {
     mountTeaching();
   } else if (step && !document.querySelector('.teaching-cue')) mountTeaching();
 }
+
+document.defaultView?.addEventListener('resize', () => {
+  if (!step) return;
+  const focused =
+    document.activeElement instanceof HTMLElement && document.activeElement.closest('.teaching-cue')
+      ? document.activeElement.hasAttribute('data-tutorial-finish')
+        ? '[data-tutorial-finish]'
+        : '[data-tutorial-skip]'
+      : null;
+  revealedAnchor = null;
+  mountTeaching();
+  if (focused) document.querySelector<HTMLElement>(focused)?.focus({ preventScroll: true });
+});
