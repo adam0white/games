@@ -1755,8 +1755,49 @@ body {
 }
 
 /* Reserve enough dock height for the opening control and its attached cue. */
-@media (max-width: 759px) {
+@media (max-width: 759px) and (min-height: 501px) {
   #app:has(.leader-bar .tutorial-cue) {
     grid-template-rows: 44px 56px minmax(80px, 1fr) minmax(216px, 34%) 132px;
+  }
+}
+
+/* The later phone rules must not replace the compact landscape layout. */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 759px) {
+  #app {
+    grid-template-rows: 44px minmax(0, 1fr) 84px;
+  }
+  #app .leader-bar {
+    padding-bottom: 0;
+  }
+  #app .leader-bar .movement-verbs {
+    align-items: start;
+  }
+  #app:has(.leader-bar .tutorial-cue) {
+    grid-template-rows: 44px minmax(0, 1fr) 176px;
+  }
+  #app:has(.sheet .tutorial-cue) {
+    grid-template-rows: 44px minmax(0, 1fr) 84px;
+  }
+  #app:has(.sheet .tutorial-cue) .sheet .targets {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  #app:has(.sheet .tutorial-cue) .sheet .targets .chip {
+    font-size: 14px;
+  }
+  #app:has(.sheet .tutorial-cue) .sheet .targets .chip small {
+    font-size: 11px;
+  }
+  .sheet .forces:has(.tutorial-cue) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sheet .verb-option:has(.tutorial-cue) {
+    grid-column: span 2;
+  }
+  .sheet .verb:has(.tutorial-cue) {
+    height: auto;
+    min-height: 56px;
+  }
+  #app[data-screen="hut"] {
+    grid-template-rows: 44px minmax(0, 1fr) 0;
   }
 }

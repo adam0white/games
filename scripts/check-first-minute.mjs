@@ -120,6 +120,58 @@ async function skipAndReplay(viewport) {
     await context.close();
   }
 }
+async function compactLandscape(dnt) {
+  const page = await browser.newPage({
+    viewport: { width: 690, height: 360 },
+    ...(dnt ? { extraHTTPHeaders: { DNT: '1' } } : {}),
+  });
+  try {
+    await page.goto(`${local}/file/?tutorial=1`);
+    await page.locator('[data-a="go"]').click({ timeout: 30000 });
+    console.log(
+      '690 recording notice',
+      dnt ? 'DNT' : 'default',
+      await page
+        .locator('.recording-footer')
+        .evaluate((el) => ({ text: el.textContent.trim(), height: el.getBoundingClientRect().height })),
+    );
+    const grid = await page.locator('#app').evaluate((el) => getComputedStyle(el).gridTemplateRows);
+    console.log('690 landscape grid', grid);
+    assert.equal(grid.trim().split(/\s+/).length, 3, 'compact landscape retains three grid rows');
+    await exposed(page.locator('.leader-bar .verb.lit'), '690 landscape target');
+    await exposed(page.locator('.leader-bar .verb.lit .tutorial-cue'), '690 landscape cue');
+    await exposed(page.getByRole('button', { name: 'Skip tutorial' }), '690 landscape Skip');
+    await page.locator('.leader-bar .verb.lit').click();
+    await page.waitForTimeout(400);
+    await exposed(page.locator('.sheet .verb.lit'), '690 landscape next target');
+    await exposed(page.locator('.sheet .verb.lit .tutorial-cue'), '690 landscape next cue');
+    await exposed(page.getByRole('button', { name: 'Skip tutorial' }), '690 landscape next Skip');
+    for (const control of await page.locator('.leader-bar button:not([disabled])').all())
+      await exposed(control, '690 landscape next movement control');
+    await page.locator('.sheet .verb.lit').click();
+    await page.waitForTimeout(700);
+    await exposed(page.locator('.forces .force.lit'), '690 landscape request target');
+    await exposed(page.locator('.forces .force.lit .tutorial-cue'), '690 landscape request cue');
+    await exposed(page.getByRole('button', { name: 'Skip tutorial' }), '690 landscape request Skip');
+    for (const control of await page.locator('.leader-bar button:not([disabled])').all())
+      await exposed(control, '690 landscape request movement control');
+    await page.goto(`${local}/file/?tutorial=1`);
+    await page.locator('[data-a="go"]').click({ timeout: 30000 });
+    await page.getByRole('button', { name: 'Skip tutorial' }).click();
+    await page.waitForTimeout(400);
+    console.log(
+      '690 after Skip recording notice',
+      dnt ? 'DNT' : 'default',
+      await page
+        .locator('.recording-footer')
+        .evaluate((el) => ({ text: el.textContent.trim(), height: el.getBoundingClientRect().height })),
+    );
+    for (const control of await page.locator('.leader-bar button:not([disabled])').all())
+      await exposed(control, '690 landscape after Skip movement control');
+  } finally {
+    await page.close();
+  }
+}
 for (const browserType of [chromium, webkit]) {
   browser = await browserType.launch({ headless: true });
   try {
@@ -134,6 +186,8 @@ for (const browserType of [chromium, webkit]) {
       }
       await skipAndReplay(viewport);
     }
+    await compactLandscape(true);
+    await compactLandscape(false);
     console.log(
       `${browserType.name()}: native bridge, practice, fresh Skip and actual replay passed at phone and desktop sizes.`,
     );
