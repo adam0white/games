@@ -110,7 +110,7 @@ it.each(['wrong-parent', 'rejected', 'missing'])(
   'aborts %s preparation without replacing the installed run',
   async (failure) => {
     const { createRun, createPerson, inspect } = await import('@adam0white/human-framework');
-    const { archiveOf, hfRunOf, need } = await import('../src/sim/hf4.ts');
+    const { archiveOf, FRAMEWORK_VERSION, hfRunOf, need } = await import('../src/sim/hf4.ts');
     const { openingParty } = await import('../src/sim/season.ts');
     const { preparePersonaLife } = await import('@adam0white/lab-client');
     const spec = archiveOf(newSeason(7).climb).initial.spec;
@@ -136,10 +136,13 @@ it.each(['wrong-parent', 'rejected', 'missing'])(
       castRevision: '1',
       branchId: 'eligible-reader-control',
       parentRevision: null,
-      source: { game: 'rope', engine: '4.15.0', build: 'synthetic', rules: 'rope-hf4-1' },
+      source: { game: 'rope', engine: FRAMEWORK_VERSION, build: 'synthetic', rules: 'rope-hf4-1' },
       transfer: { castPassport: 'hf-portable-person/2', portable },
       limitations: [],
     });
+    const { portableOf, admitClimber } = await import('../src/sim/passport.ts');
+    expect(() => portableOf(parent)).not.toThrow();
+    expect(() => admitClimber(parent, openingParty(8).find((p) => p.id === 'tamar')!)).not.toThrow();
     const h = await control();
     const old = await h.continuity.fresh(7, true);
     const before = h.continuity.ownership();

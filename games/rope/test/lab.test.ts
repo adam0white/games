@@ -37,11 +37,10 @@ it('the released lab-kit stamp writes public/release.json with the build', () =>
   expect(typeof r.dirty).toBe('boolean');
 });
 
-it('the CSP lets the lab client reach the lab, and the service worker never caches the stamp', () => {
+it('the CSP lets the lab client reach the lab', () => {
   expect(readFileSync('public/_headers', 'utf8')).toMatch(
     /connect-src [^;]*https:\/\/human\.adamwhite\.work/,
   );
-  expect(readFileSync('public/sw.js', 'utf8')).toContain("'/release.json'");
 });
 
 it('the replay CLI reconstructs a downloaded in-progress run at its saved minute', () => {

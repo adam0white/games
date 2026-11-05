@@ -83,3 +83,36 @@ test('navigation cache keeps a clone alive and separates the file entry', async 
   await Promise.all(lifetime);
   assert.deepEqual(writes, [['/rope/file/', 'fresh file entry']]);
 });
+
+test('service worker bypasses Rope release metadata while handling ordinary assets', async () => {
+  const handlers = {};
+  const self = {
+    location: { origin: 'https://play.adamwhite.work' },
+    addEventListener: (name, fn) => {
+      handlers[name] = fn;
+    },
+  };
+  const caches = { open: async () => ({ match: async () => undefined, put: async () => {} }) };
+  runInNewContext(readFileSync('public/sw.js', 'utf8'), {
+    self,
+    caches,
+    URL,
+    fetch: async () => new Response('asset'),
+  });
+  let served;
+  handlers.fetch({
+    request: { method: 'GET', url: 'https://play.adamwhite.work/rope/release.json', mode: 'cors' },
+    respondWith: (p) => {
+      served = p;
+    },
+  });
+  assert.equal(served, undefined, 'metadata is fetched directly by the browser');
+  handlers.fetch({
+    request: { method: 'GET', url: 'https://play.adamwhite.work/rope/icon.svg', mode: 'cors' },
+    waitUntil: () => {},
+    respondWith: (p) => {
+      served = p;
+    },
+  });
+  assert.equal(await (await served).text(), 'asset');
+});
