@@ -18,3 +18,11 @@ The first practice attempt reached the turn-back choice but could not progress b
 > I skimmed the interface, did not inspect source or edit files, and closed the test browser.
 
 The pack cue now names **more requests**. The scripted first-minute check separately exercises ordinary native start at the production origin with the real cross-origin bridge while serving candidate app assets locally, and exercises practice at both 360×690 and 1280×800. It checks actual recorded responses without reading body copy. This is browser evidence, not a human playtest or proof of any personal browser profile.
+
+## Phone layout and replay follow-up
+
+A stricter pre-click control exposed the bottom of the opening **lead on** button behind the recording footer at 360 × 690. The guide dock now reserves room for the button and its attached cue, while the pacing notice remains visible. The rules and timing are unchanged. Before the correction the lower sampled points were obstructed; the earlier test's automatic locator scroll had not proved the whole control reachable.
+
+The same synthetic tester returned to a frozen phone practice build with prior knowledge. They chose noon and said, “Earlier is safer; noon.” Without scrolling, they saw the attached cue, **lead on**, and **Skip tutorial**. They chose **lead on**, saw movement, then asked the group to climb and saw a recorded agreement. In a fresh practice page they used Skip and saw the cue disappear. The file-mode menu opened file selection, so they did not exercise menu replay. This familiar retest is not a new cold test or human acceptance.
+
+The updated no-body-reading script checks the opening, next and request controls, attached cues and Skip with viewport bounds and nine sampled hit points before clicking. It exercises a real response in native and practice modes, then uses fresh native Skip and opens the menu replay link in its actual practice tab before skipping again. Chromium and WebKit cover 360 × 690 and 1280 × 800. The native case preserves the production origin and history bridge while routing only GET/HEAD application assets to local source. These sampled checks are not a full accessibility audit or a personal-profile verification; the original native cold-start and practice-entry negatives above remain.

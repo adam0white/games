@@ -1753,3 +1753,10 @@ body {
   outline: 2px solid var(--rope);
   outline-offset: -2px;
 }
+
+/* Reserve enough dock height for the opening control and its attached cue. */
+@media (max-width: 759px) {
+  #app:has(.leader-bar .tutorial-cue) {
+    grid-template-rows: 44px 56px minmax(80px, 1fr) minmax(216px, 34%) 132px;
+  }
+}
