@@ -3,16 +3,18 @@
  * private knowledge or portable identity mapping. Costs (1 provision, 6 barter,
  * 8 hours each way, two days away, 12 mill-hours/load) are authored conventions.
  */
-import { type Affordance, begin, decide } from '@adam0white/human-framework';
+
 import type { AllianceState } from './alliance.ts';
 import { DAY, HOUR } from './calendar.ts';
 import { allianceEdition, passEdition } from './edition.ts';
-import { interruptStewardRoutine, stewardBusy } from './steward.ts';
+import { begin, decide } from './hf.ts';
+import { interruptStewardRoutine, passDepartureOffer, stewardBusy } from './steward.ts';
 import { deliveryTripReserved } from './terms.ts';
 import { hasOfficeCard, note, V, type ValleyState } from './valley.ts';
 
 export interface PassState {
   alliance?: AllianceState;
+  pendingDeparture?: true;
   stock: number;
   grainReceived: number;
   stone: number;
@@ -22,6 +24,8 @@ export interface PassState {
     leave: number;
     back: number;
     seen?: boolean;
+    outwardArrived?: boolean;
+    homeArrived?: boolean;
     cargo: number;
     grain: number;
     returned?: boolean;
@@ -79,51 +83,53 @@ export function passChoice(s: ValleyState, choice: 'depart' | 'buy' | 'deliver')
     s.agha.granary < 7
   )
     return false;
-  const offer: Affordance = {
-    id: 'cam-journey',
-    action: 'walk',
-    label: 'walk over the pass and carry goods home',
-    duration: s.stewardCare ? 8 * HOUR : 2 * DAY,
-    effort: 0.25,
-    placeId: 'pass',
-    advertises: {},
-    tags: ['work'],
-  };
-  interruptStewardRoutine(s);
-  const record = decide(s.kahya, [offer]);
-  if (record.chosenAffordanceId !== offer.id) return false;
-  if (!begin(s.kahya, offer, record)) return false;
-  s.agha.granary -= 7;
-  if (s.stewardCare) s.stewardCare.grain += 1;
-  p.journey = {
-    from: s.minute,
-    arrive: s.minute + 8 * HOUR,
-    leave: s.minute + 2 * DAY - 8 * HOUR,
-    back: s.minute + 2 * DAY,
-    cargo: 0,
-    grain: 6,
-  };
-  s.kahyaState.visit = {
-    house: 'cam',
-    arrive: p.journey.arrive,
-    leave: p.journey.leave,
-    back: p.journey.back,
-  };
-  note(s, {
-    at: s.minute,
-    kind: 'visit',
-    text: allianceEdition(s.edition?.id)
-      ? 'You took provisions and a sack from the granary and set out over the pass for Çam. You will be away for two days. Stone is available only through the public road agreement: six grain, twelve useful hours of voluntary repairs, and a later journey to collect within fourteen days. You can decline. The fields, households and rider will not wait.'
-      : 'You took provisions and a barter sack from the granary and set out over the pass for Çam. You will be away for two days. The fields, households and rider will not wait. A sack can buy a stone load if the quarry has one when you arrive.',
-    weight: 3,
-  });
-  return true;
+  p.pendingDeparture = true;
+  try {
+    interruptStewardRoutine(s);
+    const offer = passDepartureOffer(s);
+    if (!offer) return false;
+    const record = decide(s.kahya, [offer]);
+    if (record.chosenAffordanceId !== offer.id) return false;
+    if (!begin(s.kahya, offer, record)) return false;
+    // Accepted staging replaces host objects. Settle against the current pass.
+    const current = s.pass;
+    if (!current) throw new Error('The pass changed before departure settlement.');
+    s.agha.granary -= 7;
+    if (s.stewardCare) s.stewardCare.grain += 1;
+    current.journey = {
+      from: s.minute,
+      arrive: s.minute + 8 * HOUR,
+      leave: s.minute + 2 * DAY - 8 * HOUR,
+      back: s.minute + 2 * DAY,
+      cargo: 0,
+      grain: 6,
+    };
+    s.kahyaState.visit = {
+      house: 'cam',
+      arrive: current.journey.arrive,
+      leave: current.journey.leave,
+      back: current.journey.back,
+    };
+    note(s, {
+      at: s.minute,
+      kind: 'visit',
+      text: allianceEdition(s.edition?.id)
+        ? 'You took provisions and a sack from the granary and set out over the pass for Çam. You will be away for two days. Stone is available only through the public road agreement: six grain, twelve useful hours of voluntary repairs, and a later journey to collect within fourteen days. You can decline. The fields, households and rider will not wait.'
+        : 'You took provisions and a barter sack from the granary and set out over the pass for Çam. You will be away for two days. The fields, households and rider will not wait. A sack can buy a stone load if the quarry has one when you arrive.',
+      weight: 3,
+    });
+    return true;
+  } finally {
+    // Clear the published clone as well as intent on an unpublished rejection.
+    delete p.pendingDeparture;
+    if (s.pass) delete s.pass.pendingDeparture;
+  }
 }
 export function passTick(s: ValleyState) {
   const p = s.pass;
   const j = p?.journey;
   if (!p || !j || j.returned) return;
-  if (!j.failed && !j.seen && s.minute >= j.arrive) {
+  if (!j.failed && !j.seen && (s.stewardCare ? j.outwardArrived : s.minute >= j.arrive)) {
     j.seen = true;
     note(s, {
       at: s.minute,
@@ -132,7 +138,7 @@ export function passTick(s: ValleyState) {
       weight: 3,
     });
   }
-  if (s.minute >= j.back) {
+  if (s.stewardCare ? j.homeArrived : s.minute >= j.back) {
     if (j.failed) {
       j.returned = true;
       note(s, {

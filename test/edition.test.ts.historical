@@ -1,0 +1,14 @@
+import { expect, it } from 'vitest';
+import { DAY } from '../src/sim/calendar.ts';
+import { PUBLIC_EDITION } from '../src/sim/edition.ts';
+import { compactRun, fingerprint, load, newGame, save, step } from '../src/sim/game.ts';
+
+it('pins the complete public term through native and input exports', () => {
+  const current = newGame(7);
+  expect(current.valley.edition?.id).toBe(PUBLIC_EDITION);
+  step(current, DAY);
+  const expected = fingerprint(current.valley);
+  expect(save(current).rules).toBe(PUBLIC_EDITION);
+  expect(fingerprint(load(compactRun(current)).valley)).toBe(expected);
+  expect(fingerprint(load(save(current)).valley)).toBe(expected);
+});

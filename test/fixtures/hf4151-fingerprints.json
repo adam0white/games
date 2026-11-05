@@ -1,0 +1,10 @@
+{
+  "framework": "4.17.0",
+  "status": "FIRST_QUANTUM_MEASURED_DAY12_UNQUALIFIED",
+  "day12": null,
+  "firstQuantum": "e7deec85861533140c5bd030bbe339c17bf62d0aef21c74460195e6ad775e9a1",
+  "historicalHF48": {
+    "day12": "80bf0dc3",
+    "firstQuantum": "2ea2408e49510f0b912545b6a68cc4df348201cd784b91732b01d3ebb62d759d"
+  }
+}

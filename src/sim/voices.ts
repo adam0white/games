@@ -8,8 +8,9 @@
  * Covers: the visit, the gift, the seizure, easing. Does not cover: replies to asks (valley.ts `replyWords`), the
  * elders at the end (game.ts), conversation the player steers (deferred).
  */
-import { ageYears, type Episode, type Person } from '@adam0white/human-framework';
+
 import { DAY } from './calendar.ts';
+import { ageYears, type Episode, type Person } from './hf.ts';
 import type { Household } from './people.ts';
 import { KAHYA } from './people.ts';
 import { DRAW, hashUnit, strHash } from './rng.ts';

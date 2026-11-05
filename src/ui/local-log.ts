@@ -2,7 +2,6 @@
  * Does not grant ownership: CastSession still validates exact native receipts.
  */
 
-import { DAY } from '../sim/calendar.ts';
 import {
   allianceEdition,
   dialogueEdition,
@@ -12,12 +11,19 @@ import {
   passEdition,
   replyEdition,
 } from '../sim/edition.ts';
-import { END_DAY, GAME_VERSION, QUANTUM } from '../sim/game.ts';
+import { EPISODE_END, EPISODE_START, GAME_VERSION, QUANTUM, validEpisodeMinute } from '../sim/game.ts';
 
 const object = (x: unknown): x is Record<string, unknown> =>
   !!x && typeof x === 'object' && !Array.isArray(x);
 const integer = (x: unknown, max: number) =>
   typeof x === 'number' && Number.isSafeInteger(x) && x >= 0 && x <= max;
+// HF visit anchors use exact integer milliseconds projected into game minutes.
+const instant = (x: unknown, max: number) =>
+  typeof x === 'number' &&
+  x >= 0 &&
+  x <= max &&
+  Number.isSafeInteger(Math.round(x * 60000)) &&
+  Math.round(x * 60000) / 60000 === x;
 const name = (x: unknown) => typeof x === 'string' && /^[\p{L}\p{N}_-]{1,100}$/u.test(x);
 export function validLocalLog(value: unknown): boolean {
   if (!object(value)) return false;
@@ -26,10 +32,10 @@ export function validLocalLog(value: unknown): boolean {
     v.game !== 'valley' ||
     v.version !== GAME_VERSION ||
     !integer(v.seed, 0xffffffff) ||
-    !integer(v.minute, (END_DAY + 1) * DAY) ||
+    !validEpisodeMinute(v.minute as number) ||
     !integer(v.volume, 100000) ||
     typeof v.plainEnglish !== 'boolean' ||
-    (v.rules !== undefined && !knownEdition(v.rules)) ||
+    !knownEdition(v.rules) ||
     !Array.isArray(v.inputs) ||
     v.inputs.length > 20000
   )
@@ -47,6 +53,8 @@ export function validLocalLog(value: unknown): boolean {
       !object(input) ||
       !integer(input.at, v.minute as number) ||
       (input.at as number) % QUANTUM ||
+      (input.at as number) < EPISODE_START ||
+      (input.at as number) >= EPISODE_END ||
       (input.at as number) < prior
     )
       return false;
@@ -73,7 +81,7 @@ export function validLocalLog(value: unknown): boolean {
               ? !name(input.person) ||
                 !name(input.house) ||
                 !name(input.ask) ||
-                !integer(input.visit, input.at as number)
+                !instant(input.visit, input.at as number)
               : !name(input.contract)
         )
           return false;
@@ -99,7 +107,7 @@ export function validLocalLog(value: unknown): boolean {
                   'after-cut': 'zehra',
                 } as Record<string, string>
               )[input.line as string] ||
-            !integer(input.visit, input.at as number) ||
+            !instant(input.visit, input.at as number) ||
             !integer(input.prior, Number.MAX_SAFE_INTEGER))
         )
           return false;

@@ -1,58 +1,6 @@
-/**
- * The valley as an HF host: world truth (fields, stores, the agha's granary and due, weather), the HF `World` the
- * people decide in, and the day loop that lives them. Two modes, chosen per household at each midnight from sim
- * state only (never from frame timing, so a replay matches):
- *
- * - full: `stepCommunity`, minute-level decisions, for every household with an open ask, a visit in the last week,
- *   hunger, a birth near, a death, or a busy season (harvest and sowing);
- * - routine: `routineDay` (closed form, no decisions) for quiet households and small children, lived at the end of
- *   the day they cover.
- *
- * The kahya's asks are standing suggestions from the `kahya` voice, weighed at each of the person's own decisions
- * against their own day; the reply is that decision's resolution, captured at `beginOptions`.
- */
-import {
-  type Activity,
-  type Affordance,
-  addPerson,
-  adoptVoiceTrust,
-  ageYears,
-  attraction,
-  begin,
-  birth,
-  type Community,
-  type CommunityState,
-  canMarry,
-  compatibility,
-  conceive,
-  conceptionChance,
-  createCommunity,
-  type DecisionRecord,
-  decide,
-  deliver,
-  finish,
-  glimpsePerson,
-  tick as hfTick,
-  MUSLIM_CUSTOM,
-  marry,
-  type Outcome,
-  type Percept,
-  type Person,
-  predictAs,
-  pregnancyDue,
-  promise,
-  readBody,
-  restore,
-  routineDay,
-  type SimEvent,
-  type Suggestion,
-  type SuggestionResolution,
-  snapshot,
-  spousesOf,
-  stepCommunity,
-  successChance,
-  type World,
-} from '@adam0white/human-framework';
+/** Valley owns the physical world and dated host receipts. Every resident and the
+ * steward belongs to one HF4 Run. HF owns choice, body, beliefs, ties and life events. */
+
 import { allianceOffers, allianceSuggestion, allianceTick, resolveAlliance } from './alliance.ts';
 import { type BrokeringState, brokerOffers, brokerTick, brokerVoices, resolveBroker } from './brokering.ts';
 import {
@@ -69,6 +17,7 @@ import {
 } from './calendar.ts';
 import { ALLOCATION, CAST_IDS, DISCLOSURES, localRole } from './cast.ts';
 import { tellValleyDeath } from './death.ts';
+import { departureObligations } from './departure.ts';
 import {
   captureDialogue,
   type DialogueState,
@@ -84,6 +33,7 @@ import {
   dialogueEdition,
   type EditionState,
   millPay,
+  PUBLIC_EDITION,
   passEdition,
   REPLY_EDITION,
   type RulesEdition,
@@ -94,6 +44,52 @@ import {
   termSuggestion,
 } from './edition.ts';
 import {
+  type Activity,
+  type Affordance,
+  abandonGoal,
+  addPerson,
+  adoptGoal,
+  ageYears,
+  archiveCommunity,
+  attraction,
+  birth,
+  type Community,
+  type CommunityState,
+  canMarry,
+  communityForPerson,
+  compatibility,
+  conceive,
+  conceptionChance,
+  createCommunity,
+  type DecisionRecord,
+  deliver,
+  glimpsePerson,
+  lastPlace,
+  MUSLIM_CUSTOM,
+  marry,
+  type Outcome,
+  type Percept,
+  type Person,
+  personFromAuthoring,
+  personRun,
+  portableFromPerson,
+  pregnancyDue,
+  prepareKinScope,
+  previewAnswer,
+  promise,
+  readBody,
+  type SimEvent,
+  type Suggestion,
+  type SuggestionResolution,
+  snapshot,
+  spousesOf,
+  stepCommunity,
+  successChance,
+  voiceAct,
+  type World,
+  withdrawOffers,
+} from './hf.ts';
+import {
   captureIntroduction,
   type IntroductionState,
   introductionOffers,
@@ -102,10 +98,10 @@ import {
   resolveIntroduction,
 } from './introductions.ts';
 import { type PassState, passTick } from './pass.ts';
-import { type CastStart, calendarPassport, lifeFacts, validateCastStart } from './passport.ts';
+import { type CastStart, lifeFacts, validateCastStart } from './passport.ts';
 import { foundValley, type Household, householdLabel, KAHYA, makeKahya, personLabel } from './people.ts';
 import { DRAW, hashUnit, mixSeed, strHash } from './rng.ts';
-import { type StewardCare, stewardTo } from './steward.ts';
+import { captureSteward, resolveSteward, type StewardCare, stewardOffers } from './steward.ts';
 import {
   activeHelpFor,
   deliveryTripReserved,
@@ -276,7 +272,20 @@ export interface Agha {
 export interface KahyaState {
   place: string;
   /** A visit under way: house, arrival and leaving minutes. */
-  visit?: { house: string; arrive: number; leave: number; back: number };
+  visit?: {
+    house: string;
+    arrive: number;
+    leave: number;
+    back: number;
+    walk?: number;
+    stay?: number;
+    outboundStarted?: boolean;
+    returnStarted?: boolean;
+    why?: Knock['what'] | 'call';
+    arrivedAt?: number;
+    outboundAt?: number;
+    returnAt?: number;
+  };
   /** Visit log: house to last minute visited. */
   seen: Record<string, number>;
   /** The kahya's read of each house's jars, as of the last visit (days of bread, world truth at that minute). */
@@ -292,8 +301,8 @@ export interface Flags {
   verbs: Verb[];
   /** Beats of the term already played. */
   beats: string[];
-  ended?: 'term' | 'dismissed' | 'empty';
-  /** What the elders said, fixed at the moment the term ended (recall changes memory, so it is read once). */
+  ended?: 'term' | 'dismissed' | 'empty' | 'episode';
+  /** What the elders said, fixed from recorded deeds and held trust when the term ended. */
   gathering?: { elders: { id: string; name: string; house: string; words: string }[]; letter: string };
 }
 
@@ -307,6 +316,8 @@ export interface ValleyState {
   dialogue?: DialogueState;
   reply?: { id: typeof REPLY_EDITION; visits: string[] };
   castFacts?: Record<string, ReturnType<typeof lifeFacts>>;
+  births?: Record<string, { mother: string; father: string; at: number }>;
+  localWorkGoals?: Record<string, string>;
   castReleaseRequests?: string[];
   castReleased?: Record<string, Person>;
   castDeaths?: Record<string, Person>;
@@ -368,9 +379,11 @@ export function newValley(
   seed: number,
   cast?: CastStart,
   preflight = false,
-  plainEnglish = true,
-  rules?: RulesEdition,
+  _plainEnglish = true,
+  rules: RulesEdition = PUBLIC_EDITION,
 ): ValleyState {
+  if (rules !== PUBLIC_EDITION)
+    throw new Error('This Valley edition is no longer supported. Keep the file and start fresh.');
   if (community && communityFor) syncCommunity(communityFor);
   const { households, people } = foundValley(seed, 0);
   if (cast) {
@@ -379,14 +392,13 @@ export function newValley(
       const index = people.findIndex((p) => p.id === localRole(record.castId));
       const initial = cast.people[record.castId];
       if (!initial || index < 0) throw new Error('Missing pinned cast actor.');
-      people[index] = restore(initial);
+      people[index] = personFromAuthoring(initial);
     }
   }
   const kahya = makeKahya(seed, 0);
-  // Opt in after admission, before any simulation. Full-save restoration bypasses this path.
-  for (const p of [...people, kahya]) p.lexicon = { ...p.lexicon, plainEnglish };
+
   const s: ValleyState = {
-    ...(rules && rules !== REPLY_EDITION && rules !== DIALOGUE_EDITION ? { edition: { id: rules } } : {}),
+    edition: { id: PUBLIC_EDITION },
     ...(replyEdition(rules) ? { reply: { id: REPLY_EDITION, visits: [] } } : {}),
     ...(allianceEdition(rules) ? { stewardCare: { grain: 0, eaten: 0 } } : {}),
     ...(passEdition(rules) ? { pass: { stock: 3, stone: 0, grainReceived: 0 } } : {}),
@@ -409,12 +421,21 @@ export function newValley(
       mill: 0,
       millOpen: false,
     },
-    kahyaState: { place: 'konak', seen: {} },
+    kahyaState: { place: 'residence', seen: {} },
     asks: [],
     knocks: [],
     notes: [],
     nextNote: 1,
-    community: stateOf(createCommunity([])),
+    community: {
+      fidelity: { mode: 'daily', dayMs: 86400000, anchor: 0 },
+      seed,
+      ingress: -1,
+      next: 1,
+      offers: {},
+      revisions: {},
+      active: {},
+      interrupts: {},
+    },
     full: [],
     flags: { upper: false, verbs: ['call'], beats: [] },
     stolen: 0,
@@ -429,17 +450,24 @@ export function newValley(
     if (!CAST_IDS[p.id]) continue;
     const fact = s.castFacts[p.id];
     const action = roleActions(p.id)[fact?.life.assignment ?? 0];
-    if (action)
-      p.agenda.goals.push({
-        id: 'valley-visit-work',
-        label: fact?.assignment ?? 'the agreed visiting work',
-        serves: ['competence'],
-        advancedBy: [{ action, amount: 0.25 }],
-        importance: 0.4,
-        progress: 0,
-        status: 'active',
-        adoptedAt: p.now,
-      });
+    if (action) {
+      if (cast?.people[CAST_IDS[p.id] ?? '']) {
+        // Retained people admit first. A new Valley intention enters through agenda.requested.
+      } else {
+        s.localWorkGoals ??= {};
+        s.localWorkGoals[p.id] = `valley-visit-work:${p.id}`;
+        p.agenda.goals.push({
+          id: `valley-visit-work:${p.id}`,
+          label: fact?.assignment ?? 'the agreed visiting work',
+          serves: ['competence'],
+          advancedBy: [{ action, amount: 0.25 }],
+          importance: 0.4,
+          progress: 0,
+          status: 'active',
+          adoptedAt: p.now,
+        });
+      }
+    }
   }
   s.agha.due = dueFor(s);
   // The reeve has lived among the lower lanes all his life: he has an impression of everyone there (clearest of kin).
@@ -459,13 +487,35 @@ export function newValley(
   if (osman) glimpsePerson(s.kahya, osman, -60 * DAY, 0.5);
   ownFieldDuties(s, 0);
   chooseModes(s, 0);
+  community = createCommunity([...s.people, s.kahya], s.community);
+  communityFor = s;
+  if (cast)
+    for (const p of people) {
+      const incoming = cast.people[CAST_IDS[p.id] ?? ''];
+      if (!incoming) continue;
+      const fact = s.castFacts?.[p.id],
+        action = roleActions(p.id)[fact?.life.assignment ?? 0];
+      if (action) {
+        const goal = adoptGoal(
+          p,
+          {
+            label: fact?.assignment ?? 'the agreed visiting work',
+            serves: ['competence'],
+            advancedBy: [{ action, amount: 0.25 }],
+            importance: 0.4,
+          },
+          p.now,
+        );
+        s.localWorkGoals ??= {};
+        s.localWorkGoals[p.id] = goal.id;
+      }
+    }
   advanceTo(s, START_MINUTE);
   return s;
 }
 
 function stateOf(c: Community): CommunityState {
-  const { people: _p, ...rest } = c;
-  return structuredClone(rest) as CommunityState;
+  return archiveCommunity(c);
 }
 
 /** The agha's due for the year: his own field at a good year plus the houses' shares under your seal. */
@@ -575,6 +625,39 @@ function place(p: Person): string {
   return `house:${p.id}`;
 }
 
+/** One authored work offer for actual asks and explicitly conditional hunches. */
+function askedWorkOffer(
+  s: ValleyState,
+  personId: string,
+  job: 'reap-agha' | 'build-mill',
+  wage: boolean,
+): Affordance {
+  return job === 'reap-agha'
+    ? {
+        id: 'reap-agha',
+        action: 'reap-agha',
+        label: 'reap the agha’s barley',
+        placeId: 'field:agha',
+        duration: 120,
+        effort: 0.7,
+        skill: { id: 'farming', difficulty: 0.3 },
+        advertises: { esteem: 0.03 },
+        material: wage ? 1.2 : 0,
+        tags: ['work', 'outdoors'],
+      }
+    : {
+        id: 'build-mill',
+        action: 'build-mill',
+        label: personId === 'yusuf' ? 'build the mill wall' : 'carry stone for the mill',
+        placeId: 'mill',
+        duration: 120,
+        effort: 0.8,
+        advertises: { esteem: 0.04, meaning: 0.03 },
+        material: wage ? (s.edition ? Math.min(s.agha.granary, 0.3) : 1) : 0,
+        tags: ['work', 'outdoors'],
+      };
+}
+
 /** Affordances a person has at `p.now`. */
 export function offersFor(s: ValleyState, p: Person, at = p.now): Affordance[] {
   const h = houseOfPerson(s, p.id);
@@ -610,6 +693,16 @@ export function offersFor(s: ValleyState, p: Person, at = p.now): Affordance[] {
           },
         ]
       : []),
+    {
+      id: 'relieve',
+      action: 'relieve',
+      label: 'use the privy',
+      placeId: home,
+      duration: 5,
+      effort: 0,
+      advertises: { relief: 1 },
+      tags: ['relief'],
+    },
     {
       id: 'rest',
       action: 'rest',
@@ -679,7 +772,9 @@ export function offersFor(s: ValleyState, p: Person, at = p.now): Affordance[] {
   const pendingActions = p.agenda.commitments
     .filter((c) => c.status === 'pending' && c.from <= at && c.until > at)
     .flatMap((c) => c.actions);
-  const dueActions = actions.filter((action) => action === chosen || pendingActions.includes(action));
+  const dueActions = [
+    ...new Set(actions.filter((action) => action === chosen || pendingActions.includes(action))),
+  ];
   if (light && !weak && !s.castReleased?.[p.id])
     for (const action of dueActions) {
       out.push({
@@ -748,31 +843,10 @@ export function offersFor(s: ValleyState, p: Person, at = p.now): Affordance[] {
   const asks = openAsksFor(s, p.id, at);
   for (const a of asks) {
     if (a.job === 'reap-agha' && !activeHelpFor(s, p.id) && light && !weak && s.agha.standing > 0.5) {
-      out.push({
-        id: 'reap-agha',
-        action: 'reap-agha',
-        label: 'reap the agha’s barley',
-        placeId: 'field:agha',
-        duration: 120,
-        effort: 0.7,
-        skill: { id: 'farming', difficulty: 0.3 },
-        advertises: { esteem: 0.03 },
-        material: a.wage ? 1.2 : 0,
-        tags: ['work', 'outdoors'],
-      });
+      out.push(askedWorkOffer(s, p.id, 'reap-agha', !!a.wage));
     }
     if (a.job === 'build-mill' && light && !weak && s.agha.mill < V.millHours) {
-      out.push({
-        id: 'build-mill',
-        action: 'build-mill',
-        label: p.id === 'yusuf' ? 'build the mill wall' : 'carry stone for the mill',
-        placeId: 'mill',
-        duration: 120,
-        effort: 0.8,
-        advertises: { esteem: 0.04, meaning: 0.03 },
-        material: a.wage ? (s.edition ? Math.min(s.agha.granary, 0.3) : 1) : 0,
-        tags: ['work', 'outdoors'],
-      });
+      out.push(askedWorkOffer(s, p.id, 'build-mill', !!a.wage));
     }
     // A house with nothing in the jar has nothing to carry down: no offer, so no yes that moves nothing.
     if (
@@ -942,13 +1016,12 @@ function pauseCastAtBoundary(s: ValleyState, p: Person): boolean {
   if (!h) return false;
   if (s.castReleaseRequests?.includes(p.id) && !p.activity && p.body.alive) {
     try {
-      const passport = calendarPassport(p);
-      if (
-        passport.calendar.owed.length ||
-        passport.calendar.lapse ||
-        passport.calendar.commitments.some((c) => c.kind !== 'worship')
-      )
-        throw new Error('Unfinished material duty.');
+      if (departureObligations(s, p.id).length) return false;
+      portableFromPerson(
+        p,
+        CAST_IDS[p.id] ?? p.id,
+        ALLOCATION.find((c) => c.castId === CAST_IDS[p.id])?.revision ?? 'valley-local',
+      );
       s.castReleased ??= {};
       s.castReleased[p.id] = snapshot(p);
       h.members = h.members.filter((id) => id !== p.id);
@@ -973,12 +1046,50 @@ function pauseCastAtBoundary(s: ValleyState, p: Person): boolean {
 
 export function makeWorld(s: ValleyState): World {
   return {
+    locationAfter: (p, _activity) => (p.id === KAHYA ? s.kahyaState.place : undefined),
+    allowStart: (p, _offer) =>
+      !(s.castReleaseRequests?.includes(p.id) && !p.body.asleep && !departureObligations(s, p.id).length),
+    boundaryAccepted: () => {
+      for (const id of s.castReleaseRequests ?? []) {
+        const p = personOf(s, id);
+        if (p && !p.activity && p.body.alive) pauseCastAtBoundary(s, p);
+      }
+      for (const p of s.people)
+        if (CAST_IDS[p.id] && !p.body.alive && !p.activity && !s.castDeaths?.[p.id]) {
+          s.castDeaths ??= {};
+          s.castDeaths[p.id] = snapshot(p);
+        }
+    },
+    stage: () => {
+      const { people, kahya, castReleased, castDeaths, community: savedCommunity, ...host } = s;
+      const candidate: ValleyState = {
+        ...structuredClone(host),
+        people,
+        kahya,
+        ...(castReleased ? { castReleased: { ...castReleased } } : {}),
+        ...(castDeaths ? { castDeaths: { ...castDeaths } } : {}),
+        community: savedCommunity,
+      };
+      return {
+        world: makeWorld(candidate),
+        publish: () => {
+          const { people: _people, kahya: _kahya, community: _community, ...accepted } = candidate;
+          Object.assign(s, accepted);
+        },
+      };
+    },
+    colocated: (a, b) => {
+      const ah = a.activity?.affordance.placeId ?? lastPlace(a) ?? `house:${houseOfPerson(s, a.id)?.id}`;
+      const bh = b.activity?.affordance.placeId ?? lastPlace(b) ?? `house:${houseOfPerson(s, b.id)?.id}`;
+      return ah === bh;
+    },
     now: () => s.minute,
-    affordancesFor: (p) => (pauseCastAtBoundary(s, p) ? [] : offersFor(s, p)),
-    perceptsFor: (p, since, until) => {
+    affordancesFor: (p) =>
+      p.id === KAHYA ? stewardOffers(s) : pauseCastAtBoundary(s, p) ? [] : offersFor(s, p),
+    perceptsFor: (p, _since, until) => {
       const q = s.queued[p.id];
       if (!q || q.length === 0) return [];
-      const out = q.filter((x) => x.at <= until).map((x) => ({ ...x, at: Math.max(x.at, since + 1) }));
+      const out = q.filter((x) => x.at <= until);
       s.queued[p.id] = q.filter((x) => x.at > until);
       return out;
     },
@@ -986,14 +1097,22 @@ export function makeWorld(s: ValleyState): World {
       const h = houseOfPerson(s, p.id);
       return h ? scarcityOf(s, h) : 0;
     },
+    decisionObserved: (p, offer, record) => {
+      if (p.id !== KAHYA) captureReply(s, p, offer, record);
+    },
     beginOptions: (p, offer, record) => {
+      if (p.id === KAHYA) {
+        captureSteward(s, offer, record);
+        return;
+      }
       if (termsCapture(s, p, offer, record)) return undefined;
       captureDialogue(s, p, offer, record);
       if (!captureIntroduction(s, p, offer, record) && !captureTermReply(s, p, offer, record))
         captureReply(s, p, offer, record);
       return undefined;
     },
-    resolve: (p, act, reason) => resolveActivity(s, p, act, reason),
+    resolve: (p, act, reason) =>
+      p.id === KAHYA ? resolveSteward(s, act, reason) : resolveActivity(s, p, act, reason),
   };
 }
 
@@ -1040,7 +1159,7 @@ function captureReply(s: ValleyState, p: Person, offer: Affordance, record: Deci
   const h = houseOfPerson(s, p.id);
   const words = replyWords(s, p, ask, reply);
   // An answer is also a look at the person: the kahya's hunch about them moves a little.
-  glimpsePerson(s.kahya, p, Math.max(reply.at, s.kahya.now), 0.5);
+
   // People pressed into it who now will not do it on your word share one line, not one line each.
   if (reply.verdict === 'refused' && reply.reason === 'distrust' && ask.insisted.includes(p.id)) {
     s.notes = s.notes.filter(
@@ -1437,6 +1556,8 @@ function resolveActivity(s: ValleyState, p: Person, act: Activity, reason: 'ende
         needs: { food: (h && daysOfBread(s, h) < 20 ? 0.3 : 0.6) * progress, water: 0.5 * progress },
       };
     }
+    case 'relieve':
+      return { ...base, needs: { relief: 1 } };
     case 'drink':
       return { ...base, needs: { water: 0.6 } };
     case 'chat':
@@ -1554,11 +1675,15 @@ function worldOf(s: ValleyState): World {
 }
 
 function communityOf(s: ValleyState): Community {
+  const admitted = communityForPerson(s.kahya);
+  if (admitted) {
+    community = admitted;
+    communityFor = s;
+    return admitted;
+  }
   if (communityFor !== s || !community) {
-    // Another valley was live in this module: write its community back before taking this one up.
-    if (community && communityFor && communityFor !== s) communityFor.community = stateOf(community);
-    const people = s.full.map((id) => personOf(s, id)).filter((p): p is Person => !!p);
-    community = createCommunity(people, s.community);
+    if (community && communityFor) communityFor.community = stateOf(community);
+    community = createCommunity([...s.people, s.kahya], s.community);
     communityFor = s;
   }
   return community;
@@ -1589,48 +1714,12 @@ export function promote(s: ValleyState, pid: string) {
 }
 
 /** Who lives in full on day `day`: chosen at its midnight from sim state. */
-function chooseModes(s: ValleyState, day: number) {
-  const season = seasonOf(doyOf(day));
-  const busy = season === 'harvest';
-  const at = day * DAY;
-  const ids: string[] = [];
-  for (const h of s.households) {
-    const asked =
-      s.asks.some((a) => !a.closed && a.until > at && a.houses.includes(h.id)) ||
-      s.edition?.requests?.some(
-        (r) => r.house === h.id && r.until > at && (r.status === 'pending' || r.status === 'working'),
-      );
-    const visited = (s.kahyaState.seen[h.id] ?? -1e9) > at - 7 * DAY;
-    const hungry = daysOfBread(s, h) < 40;
-    const birthNear = h.members.some((m) => {
-      const p = personOf(s, m);
-      const due = p?.family?.pregnancy?.dueAt;
-      return due !== undefined && due < at + 5 * DAY;
-    });
-    const hasCast = h.members.some((id) => !!CAST_IDS[id]);
-    const introduced =
-      (s.introduction?.status === 'invited' ||
-        (s.brokering && ['guardian', 'proposal', 'answer', 'ceremony'].includes(s.brokering.phase))) &&
-      h.members.some((id) => ['ali', 'esma', 'omer'].includes(id));
-    const lived =
-      introduced || hasCast || (busy && underSeal(s, h)) || asked || visited || hungry || birthNear;
-    if (!lived) continue;
-    for (const m of h.members) {
-      const p = personOf(s, m);
-      if (p?.body.alive && ageYears(p) >= 12) ids.push(m);
-    }
-  }
-  ids.sort();
-  if (communityFor === s && community) s.community = stateOf(community);
-  s.full = ids;
-  communityFor = null;
-  // Carry host state across the rebuild.
-  const c = createCommunity(
-    ids.map((id) => personOf(s, id)).filter((p): p is Person => !!p),
-    s.community,
-  );
-  community = c;
-  communityFor = s;
+function chooseModes(s: ValleyState, _day: number) {
+  // Every faculty runs for every resident. The old full/routine partition is retired.
+  s.full = s.people
+    .filter((p) => p.body.alive)
+    .map((p) => p.id)
+    .sort();
 }
 
 /** Live the valley to minute `to`. */
@@ -1654,42 +1743,27 @@ export function advanceTo(s: ValleyState, to: number): SimEvent[] {
     }
     const ev = stepCommunity(c, worldOf(s), stepTo, {
       suggestions,
-      lifecourse: { mortality: true },
-      maxEvents: 4000,
-      contagion: false,
     });
     for (const e of ev) if (e.kind === 'died' || e.kind === 'finish') events.push(e);
     dialogueHear(s);
     dialogueTick(s, stepTo, ev);
     termsTick(s, stepTo);
-    kahyaTo(s, stepTo);
+
     s.minute = stepTo;
+    deliverDueBirths(s);
     termsTick(s);
     afterStep(s, ev);
     passTick(s);
+    const man = personOf(s, 'ali'),
+      woman = personOf(s, 'esma');
+    if (passEdition(s.edition?.id) && man && woman) prepareKinScope(man, woman);
     introductionTick(s);
     brokerTick(s);
     allianceTick(s);
     if (stepTo === midnight) endOfDay(s, day);
+    if (passEdition(s.edition?.id) && man && woman) prepareKinScope(man, woman);
   }
   return events;
-}
-
-/** The kahya lives only his walks: time passes, and a walk is a real HF activity so his legs tire. */
-function kahyaTo(s: ValleyState, to: number) {
-  if (s.stewardCare) {
-    stewardTo(s, to);
-    return;
-  }
-  const k = s.kahya;
-  const v = s.kahyaState.visit;
-  const act = k.activity;
-  if (act && v && v.back <= to) {
-    hfTick(k, Math.max(k.now, v.back));
-    finish(k, { affordanceId: act.affordanceId, action: act.action, status: 'completed', at: k.now });
-  }
-  if (k.now < to && !(k.activity && k.activity.endsAt > to)) hfTick(k, to);
-  else if (k.now < to) hfTick(k, to);
 }
 
 function afterStep(s: ValleyState, ev: SimEvent[]) {
@@ -1701,10 +1775,16 @@ function afterStep(s: ValleyState, ev: SimEvent[]) {
     }
   }
   if (s.leaving.length) {
-    const gone = new Set(s.leaving);
+    const gone = new Set<string>();
+    const c = communityOf(s);
+    // A withdrawal can settle another quiet departure. Include every accepted departure before removal.
+    for (const id of s.leaving) {
+      gone.add(id);
+      const person = c.people.find((p) => p.id === id);
+      if (person) withdrawOffers(c, person);
+    }
     s.people = s.people.filter((p) => !gone.has(p.id));
     s.full = s.full.filter((id) => !gone.has(id));
-    const c = communityOf(s);
     c.people = c.people.filter((p) => !gone.has(p.id));
     s.leaving = [];
   }
@@ -1720,7 +1800,7 @@ function dies(s: ValleyState, p: Person, h: Household, at: number) {
   tellValleyDeath(s.people, p, at);
   if (CAST_IDS[p.id]) {
     s.castDeaths ??= {};
-    s.castDeaths[p.id] = snapshot(p);
+    s.castDeaths[p.id] ??= snapshot(p);
   }
   const age = Math.floor(ageYears(p));
   const hungry = daysOfBread(s, h) < 2;
@@ -1778,20 +1858,12 @@ function shareAmongNeighbours(s: ValleyState, day: number) {
 }
 
 function endOfDay(s: ValleyState, day: number) {
-  const at = (day + 1) * DAY;
+  const _at = (day + 1) * DAY;
   // A thirty-day visit is real bounded fiction, not an indefinite landless household.
   if (day >= 29)
     for (const id of ['maryam', 'yusuf-usta', 'meryem-visitor', 'samira', 'danyal'])
       requestCastRelease(s, id);
-  // Routine lives for everyone not lived in full today, for the day just passed.
   const full = new Set(s.full);
-  for (const p of s.people) {
-    if (full.has(p.id) || !p.body.alive) continue;
-    if (p.now >= at) continue;
-    const h = houseOfPerson(s, p.id);
-    const rd = routineDay(p, routineFor(s, p, day), { lifecourse: { mortality: true } });
-    if (rd.died && h) dies(s, p, h, rd.at);
-  }
   afterStep(s, []);
   // Houses nobody lived in full today worked their own field at a plain pace.
   const season = seasonOf(doyOf(day));
@@ -1909,19 +1981,6 @@ function endOfDay(s: ValleyState, day: number) {
       text: `The landowner’s letter says his due for the year is ${s.agha.due} grain measures by ${dateEnglish(s.agha.dueDay)}. This includes his own field and every house’s share${owed ? `, and ${owed} still owed to him from before` : ''}${s.flags.beats.includes('mill-done') ? ', less forty for the mill' : ''}.`,
       weight: 2.5,
     });
-  }
-  // Births.
-  for (const p of [...s.people]) {
-    if (!p.body.alive || !p.family?.pregnancy) continue;
-    if (p.family.pregnancy.dueAt > at + DAY) continue;
-    const h = houseOfPerson(s, p.id);
-    const father = personOf(s, p.family.pregnancy.fatherId);
-    if (!h || !father) {
-      if (p.family.pregnancy.dueAt < at - 30 * DAY) delete p.family.pregnancy;
-      continue;
-    }
-    if (!pregnancyDue(p, Math.max(p.now, p.family.pregnancy.dueAt))) continue;
-    born(s, p, father, h, Math.max(p.now, p.family.pregnancy.dueAt, at - DAY + 4 * 60));
   }
   // Conception: married couples, a draw each new moon (every 29 days).
   if (next % 29 === 0) {
@@ -2198,9 +2257,8 @@ export function ownFieldDuties(s: ValleyState, day: number) {
     for (const m of h.members) {
       const p = personOf(s, m);
       if (!p || !isAdult(p)) continue;
-      p.agenda.commitments = p.agenda.commitments.filter(
-        (c) => !(c.label === 'our own barley' && c.status === 'pending'),
-      );
+      // HF keeps and expires prior commitments. A new day adds a new authored job;
+      // it never deletes an actor's retained duty history.
       promise(p, {
         kind: 'job',
         toId: 'household',
@@ -2214,28 +2272,14 @@ export function ownFieldDuties(s: ValleyState, day: number) {
   }
 }
 
-function routineFor(_s: ValleyState, p: Person, day: number) {
-  const season = seasonOf(doyOf(day));
-  const adult = isAdult(p);
-  if (!adult) {
-    return {
-      activities: [
-        { action: 'play', minutes: 300, valence: 0.2 },
-        { action: 'help', minutes: 120, skill: { id: 'farming', difficulty: 0.2 } },
-      ],
-    };
+function deliverDueBirths(s: ValleyState): void {
+  for (const mother of [...s.people]) {
+    if (!mother.body.alive || !mother.family?.pregnancy || mother.family.pregnancy.dueAt > mother.now)
+      continue;
+    const house = houseOfPerson(s, mother.id),
+      father = personOf(s, mother.family.pregnancy.fatherId);
+    if (house && father && pregnancyDue(mother, mother.now)) born(s, mother, father, house, mother.now);
   }
-  const work =
-    season === 'winter'
-      ? { action: 'tend', minutes: 240 }
-      : {
-          action: season === 'sowing' ? 'sow' : 'tend',
-          minutes: 420,
-          skill: { id: 'farming', difficulty: 0.3 },
-        };
-  return {
-    activities: [work, { action: 'chat', minutes: 60, valence: 0.1 }, { action: 'eat', minutes: 60 }],
-  };
 }
 
 function born(s: ValleyState, mother: Person, father: Person, h: Household, at: number) {
@@ -2286,8 +2330,7 @@ function born(s: ValleyState, mother: Person, father: Person, h: Household, at: 
   const id = `${h.id}-b${s.nextNote}`;
   const d = deliver(mother, { id, name }, Math.max(mother.now, at));
   if (!d) return;
-  const tmp = createCommunity([mother, father]);
-  const child = birth(tmp, mother, father, {
+  const child = birth(communityOf(s), mother, father, {
     id,
     name,
     seed: d.seed,
@@ -2296,13 +2339,13 @@ function born(s: ValleyState, mother: Person, father: Person, h: Household, at: 
     sex: boy ? 'male' : 'female',
   });
   // Preserve this run’s narration choice, including restored runs without the opt-in.
-  if (mother.lexicon?.plainEnglish !== undefined)
-    child.lexicon = { plainEnglish: mother.lexicon.plainEnglish };
-  child.retention = { trace: 0, chronicleDays: 31 };
+
   s.people.push(child);
+  s.births ??= {};
+  s.births[child.id] = { mother: mother.id, father: father.id, at: child.life.bornAt };
   h.members.push(child.id);
   note(s, {
-    at: d.bornAt,
+    at: child.life.bornAt,
     kind: 'birth',
     text: `${residentLabel(mother, h)} had a ${boy ? 'boy' : 'girl'}. The family is calling ${boy ? 'him' : 'her'} ${name}.`,
     who: mother.id,
@@ -2311,12 +2354,12 @@ function born(s: ValleyState, mother: Person, father: Person, h: Household, at: 
   });
   s.knocks.push({
     id: `k${s.nextNote}`,
-    at: d.bornAt,
+    at: child.life.bornAt,
     personId: father.id,
     house: h.id,
     what: 'birth',
     words: 'Come and see the child, steward, if you will.',
-    until: d.bornAt + 3 * DAY,
+    until: child.life.bornAt + 3 * DAY,
   });
 }
 
@@ -2545,7 +2588,7 @@ function thank(s: ValleyState, h: Household, amt: number, summary: string) {
   for (const m of h.members) {
     const p = personOf(s, m);
     if (!p || !isAdult(p)) continue;
-    adoptVoiceTrust(p, KAHYA, 0.9, 0.12);
+    voiceAct(p, KAHYA, 'give', 0.12);
     queuePercept(s, m, {
       at: s.minute,
       channel: 'social',
@@ -2560,11 +2603,11 @@ function thank(s: ValleyState, h: Household, amt: number, summary: string) {
 }
 
 /** What the kahya did to a house, kept in his own book (the house card shows the last of it). */
-function actOn(s: ValleyState, hid: string, what: string) {
+function actOn(s: ValleyState, hid: string, what: string, at = s.minute) {
   const ks = s.kahyaState;
   ks.acts ??= {};
   const list = ks.acts[hid] ?? [];
-  list.push({ day: dayOfMinute(s.minute), what });
+  list.push({ day: dayOfMinute(at), what });
   ks.acts[hid] = list.slice(-4);
 }
 
@@ -2624,7 +2667,7 @@ export function turnAway(s: ValleyState, knockId: string): boolean {
   if (k.what !== 'grain') {
     // Regrets for a wedding, a birth or a mourning: polite, and a little remembered.
     const host = personOf(s, k.personId);
-    if (host?.body.alive) adoptVoiceTrust(host, KAHYA, 0.25, k.what === 'death' ? 0.08 : 0.03);
+    if (host?.body.alive) voiceAct(host, KAHYA, 'decline-visit', k.what === 'death' ? -0.08 : -0.03);
     actOn(s, k.house, k.what === 'wedding' ? 'sent regrets for the wedding' : 'sent word instead of coming');
     note(s, {
       at: s.minute,
@@ -2639,7 +2682,7 @@ export function turnAway(s: ValleyState, knockId: string): boolean {
   for (const m of h?.members ?? []) {
     const p = personOf(s, m);
     if (!p || !isAdult(p)) continue;
-    adoptVoiceTrust(p, KAHYA, 0, m === k.personId ? 0.2 : 0.1);
+    voiceAct(p, KAHYA, 'turn-away', m === k.personId ? -0.2 : -0.1);
     queuePercept(s, m, {
       at: s.minute,
       channel: 'social',
@@ -2670,7 +2713,7 @@ function lapseKnocks(s: ValleyState, upTo: number) {
     if (k.what === 'wedding') {
       // The drum was heard without you: a small slight, said once, and remembered a little.
       const host = personOf(s, k.personId);
-      if (host?.body.alive) adoptVoiceTrust(host, KAHYA, 0.2, 0.04);
+      if (host?.body.alive) voiceAct(host, KAHYA, 'miss-wedding', -0.04);
       actOn(s, k.house, 'stayed away from the wedding');
       note(s, {
         at: k.until,
@@ -2684,7 +2727,7 @@ function lapseKnocks(s: ValleyState, upTo: number) {
     if (k.what !== 'grain') continue;
     const p = personOf(s, k.personId);
     if (p?.body.alive) {
-      adoptVoiceTrust(p, KAHYA, 0, 0.08);
+      voiceAct(p, KAHYA, 'leave-waiting', -0.08);
       queuePercept(s, p.id, {
         at: k.until,
         channel: 'social',
@@ -2723,7 +2766,7 @@ export function seize(s: ValleyState, hid: string): number {
   for (const m of h.members) {
     const p = personOf(s, m);
     if (!p || !isAdult(p)) continue;
-    adoptVoiceTrust(p, KAHYA, 0, 0.35);
+    voiceAct(p, KAHYA, 'seize', -0.35);
     queuePercept(s, m, {
       at: s.minute,
       channel: 'social',
@@ -2751,7 +2794,7 @@ export function seize(s: ValleyState, hid: string): number {
       summary: `the kahya’s men took ${h.name}’s share by force`,
     });
     const hp = personOf(s, head);
-    if (hp) adoptVoiceTrust(hp, KAHYA, 0, 0.06);
+    if (hp) voiceAct(hp, KAHYA, 'seize', -0.06);
   }
   note(s, {
     at: s.minute,
@@ -2773,7 +2816,7 @@ export function ease(s: ValleyState, hid: string): boolean {
   for (const m of h.members) {
     const p = personOf(s, m);
     if (!p || !isAdult(p)) continue;
-    adoptVoiceTrust(p, KAHYA, 0.85, 0.1);
+    voiceAct(p, KAHYA, 'ease', 0.1);
   }
   note(s, {
     at: s.minute,
@@ -2872,14 +2915,34 @@ function houseSpeaks(
 /** Walk to a house and sit with them. Returns the minute the kahya is back, or undefined if busy. */
 export function visit(s: ValleyState, hid: string, why: Knock['what'] | 'call' = 'call'): number | undefined {
   const h = houseOf(s, hid);
-  if (!h || deliveryTripReserved(s)) return undefined;
+  if (!h || deliveryTripReserved(s) || !s.kahya.body.alive || s.kahya.body.asleep) return undefined;
   const ks = s.kahyaState;
-  if (ks.visit && ks.visit.back > s.minute) return undefined;
+  if (ks.visit) return undefined;
   const walk = h.hamlet === 'upper' ? 75 : 20;
   const stay = why === 'wedding' ? 180 : why === 'death' ? 120 : 90;
   const arrive = s.minute + walk;
   const leave = arrive + stay;
-  ks.visit = { house: hid, arrive, leave, back: leave + walk };
+  ks.visit = { house: hid, arrive, leave, back: leave + walk, walk, stay, why };
+  return ks.visit.back;
+}
+
+/** Attendance is published with the accepted outward completion, never with intent. */
+export function recordVisitArrival(s: ValleyState, at: number): void {
+  const ks = s.kahyaState,
+    v = ks.visit;
+  if (!v || v.house === 'cam' || v.arrivedAt !== undefined) return;
+  const h = houseOf(s, v.house);
+  if (!h) return;
+  const hid = h.id,
+    why = v.why ?? 'call';
+  v.arrivedAt = at;
+  note(s, {
+    at,
+    kind: 'visit',
+    text: `You walked down to ${householdLabel(h)}${why === 'wedding' ? ' for the wedding' : why === 'death' ? ' to sit with them' : why === 'birth' ? ' to see the child' : ''}.`,
+    house: hid,
+    weight: 0.6,
+  });
   actOn(
     s,
     hid,
@@ -2890,15 +2953,16 @@ export function visit(s: ValleyState, hid: string, why: Knock['what'] | 'call' =
         : why === 'death'
           ? 'sat with them in mourning'
           : 'sat with them',
+    at,
   );
   const firstTime = ks.seen[hid] === undefined;
   const lastSeen = ks.seen[hid];
-  const since = lastSeen === undefined ? undefined : (arrive - lastSeen) / DAY;
-  ks.seen[hid] = arrive;
+  const since = lastSeen === undefined ? undefined : (at - lastSeen) / DAY;
+  ks.seen[hid] = at;
   houseSpeaks(
     s,
     h,
-    arrive + 20,
+    at,
     (ctx, p) => visitWords(ctx, p, firstTime, why === 'grain' ? 'call' : why, since),
     why === 'wedding' ? 'at the wedding' : 'by the fire',
   );
@@ -2912,13 +2976,13 @@ export function visit(s: ValleyState, hid: string, why: Knock['what'] | 'call' =
           p?.body.alive &&
           DISCLOSURES[p.id] &&
           !s.flags.beats.includes(`cast-disclosed:${p.id}`) &&
-          !openAsksFor(s, p.id, arrive + 45).length,
+          !openAsksFor(s, p.id, at).length,
       );
     if (speaker) {
       const facts = s.castFacts?.[speaker.id];
       if (facts?.contacts.length)
         note(s, {
-          at: arrive + 40,
+          at,
           kind: 'story',
           who: speaker.id,
           house: h.id,
@@ -2927,7 +2991,7 @@ export function visit(s: ValleyState, hid: string, why: Knock['what'] | 'call' =
         });
       s.flags.beats.push(`cast-disclosed:${speaker.id}`);
       note(s, {
-        at: arrive + 45,
+        at,
         kind: 'voice',
         who: speaker.id,
         house: h.id,
@@ -2939,17 +3003,17 @@ export function visit(s: ValleyState, hid: string, why: Knock['what'] | 'call' =
   }
   // What the kahya will remember of their jars: the read is as old as the visit.
   ks.guess ??= {};
-  ks.guess[hid] = { at: arrive, bread: Math.round(daysOfBread(s, h)) };
+  ks.guess[hid] = { at, bread: Math.round(daysOfBread(s, h)) };
   for (const m of h.members) {
     promote(s, m);
     const p = personOf(s, m);
     if (!p) continue;
-    glimpsePerson(s.kahya, p, Math.max(arrive, s.kahya.now), 1);
+    glimpsePerson(s.kahya, p, at, 1);
     if (!isAdult(p)) continue;
     const warm = why === 'death' ? 0.6 : why === 'wedding' || why === 'birth' ? 0.5 : 0.25;
-    adoptVoiceTrust(p, KAHYA, 0.8, why === 'call' ? 0.04 : 0.1);
+    voiceAct(p, KAHYA, 'visit', why === 'call' ? 0.04 : 0.1);
     queuePercept(s, m, {
-      at: arrive,
+      at,
       channel: 'social',
       kind: 'visit',
       actorId: KAHYA,
@@ -2966,22 +3030,17 @@ export function visit(s: ValleyState, hid: string, why: Knock['what'] | 'call' =
               : 'the kahya came and sat with us',
     });
   }
-  for (const k of s.knocks) if (!k.answered && k.house === hid && k.what !== 'grain') k.answered = 'went';
-  // The kahya's own legs: the walk and the sitting are one activity.
-  const k = s.kahya;
-  if (k.now < s.minute) hfTick(k, s.minute);
-  const aff = walkOffer(h, walk, stay);
-  const rec = decide(k, [aff]);
-  if (rec.chosenAffordanceId === aff.id) begin(k, aff, rec);
-  return ks.visit.back;
+  for (const k of s.knocks)
+    if (!k.answered && k.house === hid && k.what !== 'grain' && k.at <= at && at < k.until)
+      k.answered = 'went';
 }
 
-/** The kahya's walk to a house and back, with the sitting. */
-/** A guess, in the observer's own head, at how a person would answer an ask (HF `predictAs`; pure). */
+/** A conditional current answer from the observer's held evidence through public HF preview. */
 export interface Hunch {
-  verdict: SuggestionResolution['verdict'];
+  verdict?: SuggestionResolution['verdict'];
   reason: string;
   confidence: number;
+  knowledgeLimit?: readonly string[];
 }
 
 export function hunchOf(
@@ -2991,38 +3050,37 @@ export function hunchOf(
   job: Job,
   wage = false,
 ): Hunch | undefined {
-  const h = houseOfPerson(s, target.id);
-  if (!h || !target.body.alive) return undefined;
-  const dayStart = dayOfMinute(s.minute) * DAY;
-  const { rise, set } = daylight(doyOf(dayOfMinute(s.minute)));
-  // Asked now, they would weigh it at their next waking hour.
-  let at = Math.max(s.minute, dayStart + rise + HOUR);
-  if (at > dayStart + set - 2 * HOUR) at = dayStart + DAY + rise + 2 * HOUR;
-  const ask: Ask = {
-    id: 'hunch',
-    job,
-    personIds: [target.id],
-    houses: [h.id],
-    from: at,
-    until: at + DAY,
-    wage,
-    insisted: [],
-    replies: {},
-    hours: {},
+  if (observer.id === target.id || !personRun(observer)) return undefined;
+  // This forecast is conditional on the stated work and rest being available now.
+  // Share collection needs the household's unobserved stock; do not inspect it here.
+  if (job === 'bring-share')
+    return { confidence: 0, reason: 'You cannot tell what the household can spare.' };
+  const offer = askedWorkOffer(s, target.id, job, wage);
+  const rest: Affordance = {
+    id: 'rest',
+    action: 'rest',
+    label: 'rest at home',
+    duration: 60,
+    effort: 0,
+    advertises: { rest: 0.3, leisure: 0.1, water: 0.2 },
+    tags: ['rest', 'leisure'],
   };
-  s.asks.push(ask);
-  try {
-    const offers = offersFor(s, target, at);
-    const sug = suggestionFor(s, target, at);
-    if (!sug) return undefined;
-    const r = predictAs(observer, target, offers, sug, {
-      now: Math.max(observer.now, s.minute),
-      scarcity: scarcityOf(s, h),
-    });
-    return { verdict: r.resolution.verdict, reason: r.resolution.reason, confidence: r.confidence };
-  } finally {
-    s.asks.pop();
-  }
+  const { result, resolution } = previewAnswer(observer, target.id, [offer, rest], {
+    voiceId: KAHYA,
+    action: job,
+    strength: V.callStrength,
+    appeal: wage ? 'security' : 'duty',
+    since: observer.now,
+  });
+  // Evidence confidence is not the probability of assent. Preserve that distinction.
+  const cues = result.impression?.cues.filter((cue) => cue.confidence > 0) ?? [];
+  const confidence = cues.length ? Math.min(...cues.map((cue) => cue.confidence)) : 0;
+  return {
+    ...(resolution ? { verdict: resolution.verdict } : {}),
+    confidence,
+    reason: resolution?.reason ?? 'You cannot tell how this person would answer.',
+    knowledgeLimit: result.knowledgeLimit,
+  };
 }
 
 export function walkOffer(h: Household, walk: number, stay: number): Affordance {
@@ -3048,6 +3106,10 @@ export function requestCastRelease(s: ValleyState, id: string): boolean {
   if (id === 'yusuf') return false;
   s.castReleaseRequests ??= [];
   s.castReleaseRequests.push(id);
+  const localGoal =
+    s.localWorkGoals?.[id] ?? p.agenda.goals.find((g) => g.id.startsWith('valley-visit-work'))?.id;
+  if (localGoal && p.agenda.goals.some((g) => g.id === localGoal && g.status === 'active'))
+    abandonGoal(p, localGoal);
   promote(s, id);
   note(s, {
     at: s.minute,

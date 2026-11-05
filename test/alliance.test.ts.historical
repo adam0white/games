@@ -1,27 +1,44 @@
-import { courtshipStage, finish } from '@adam0white/human-framework';
+import { inspect } from '@adam0white/human-framework';
 import { expect, it } from 'vitest';
 import { brokerReady, brokerUnavailable } from '../src/sim/brokering.ts';
 import { DAY, HOUR } from '../src/sim/calendar.ts';
 import { act, compactRun, load, newGame, save, stateJson, step } from '../src/sim/game.ts';
+import { courtshipStage, finish, type Person, personRun } from '../src/sim/hf.ts';
 import { makeWorld, personOf, underSeal } from '../src/sim/valley.ts';
 import { callUnavailable, currentJob, loanReturnWords } from '../src/ui/presentation.ts';
 import { required } from './required.ts';
 
+function meetings(person: Person, otherId = 'esma'): number {
+  const result = inspect(required(personRun(person)), {
+    perspective: { kind: 'person', observer: person.id },
+    people: [person.id],
+    select: [],
+    lifecycle: {
+      kind: 'person',
+      query: { kind: 'held-partnering', person: person.id, other: { kind: 'entity', id: otherId } },
+    },
+  });
+  if (!result.ok) throw new Error(result.error.message);
+  const value = result.value.lifecycle;
+  if (!value || !('courtships' in value)) throw new Error('Missing held courtship evidence');
+  return value.courtships.find((c) => c.withId === otherId)?.meetings ?? 0;
+}
+
 // Catch a host that reuses one attendance as continuing consent or makes repeat meetings free.
 it('costs repeated voluntary meetings and keeps the entire native history without promising marriage', () => {
-  const g = newGame(7, undefined, false, true, 'valley-alliance-2026-10');
+  const g = newGame(7, undefined, false, true, 'valley-public-2026-10');
   expect(act(g, { verb: 'introduce' })).toBe(true);
   step(g, 3 * DAY);
   const a = personOf(g.valley, 'ali');
   if (!a) throw Error('Missing adult');
-  const before = a.bonds?.courtships[0]?.meetings ?? 0;
+  const before = meetings(a);
   expect(act(g, { verb: 'turn-away', knock: 'k10' })).toBe(true);
   const grain = g.valley.agha.granary;
   expect(act(g, { verb: 'broker', choice: 'meeting' })).toBe(true);
   expect(g.valley.agha.granary).toBe(grain - 1);
   expect(act(g, { verb: 'broker', choice: 'meeting' })).toBe(false);
   step(g, 6 * DAY);
-  expect(a.bonds?.courtships[0]?.meetings).toBeGreaterThan(before);
+  expect(meetings(a)).toBeGreaterThan(before);
   expect(courtshipStage(a, 'esma')).toBe('courting');
   expect(act(g, { verb: 'broker', choice: 'ceremony' })).toBe(false);
   expect(stateJson(load(save(g)).valley)).toEqual(stateJson(g.valley));
@@ -30,7 +47,7 @@ it('costs repeated voluntary meetings and keeps the entire native history withou
 
 // Catch stone minted by a promise, unpaid road work, repeated collection, or reservation leakage.
 it('reserves finite stone for a costed road agreement and breaches if the work is withdrawn', () => {
-  const g = newGame(7, undefined, false, true, 'valley-alliance-2026-10');
+  const g = newGame(7, undefined, false, true, 'valley-public-2026-10');
   expect(act(g, { verb: 'alliance', choice: 'accept' })).toBe(false);
   expect(act(g, { verb: 'pass', choice: 'depart' })).toBe(true);
   step(g, 420 + 8 * HOUR);
@@ -51,7 +68,7 @@ it('reserves finite stone for a costed road agreement and breaches if the work i
 });
 
 it('progresses real repeated attendance to independent guardian and adult proposal decisions', () => {
-  const g = newGame(7, undefined, false, true, 'valley-alliance-2026-10');
+  const g = newGame(7, undefined, false, true, 'valley-public-2026-10');
   expect(act(g, { verb: 'introduce' })).toBe(true);
   step(g, 3 * DAY);
   const clear = () => {
@@ -89,7 +106,7 @@ it('progresses real repeated attendance to independent guardian and adult propos
       intro: g.valley.introduction,
       phase: g.valley.brokering?.phase,
       grain: g.valley.agha.granary,
-      meetings: personOf(g.valley, 'ali')?.bonds?.courtships[0]?.meetings,
+      meetings: meetings(required(personOf(g.valley, 'ali'))),
       stage: courtshipStage(required(personOf(g.valley, 'ali')), 'esma', g.valley.minute),
     }),
   );
@@ -156,17 +173,9 @@ it('progresses real repeated attendance to independent guardian and adult propos
   expect(g.valley.kahya.body.alive).toBe(true);
 });
 
-// Catch outright barter bypassing the alliance terms, or the gate disabling reviewed pass barter.
-it('keeps pass barter but requires real alliance work and collection for the same quarry stone', () => {
-  const pass = newGame(7, undefined, false, true, 'valley-pass-2026-10');
-  expect(act(pass, { verb: 'pass', choice: 'depart' })).toBe(true);
-  step(pass, 900);
-  expect(act(pass, { verb: 'pass', choice: 'buy' })).toBe(true);
-  expect(pass.valley.pass?.journey?.grain).toBe(0);
-  expect(pass.valley.pass?.journey?.cargo).toBe(1);
-  expect(pass.valley.pass?.stock).toBe(2);
-  expect(pass.valley.pass?.grainReceived).toBe(6);
-  const g = newGame(7, undefined, false, true, 'valley-alliance-2026-10');
+// Public quarry stone requires real alliance work and collection.
+it('requires real alliance work and collection before quarry stone becomes available', () => {
+  const g = newGame(7, undefined, false, true, 'valley-public-2026-10');
   expect(act(g, { verb: 'pass', choice: 'depart' })).toBe(true);
   step(g, 900);
   const beforeBuy = stateJson(g.valley);

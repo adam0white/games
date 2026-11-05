@@ -424,7 +424,7 @@ it('preserves SDK state before real file startup and reports recording refusal h
       };
     });
   const retain = (name: string, value: unknown) => {
-    const bytes = Buffer.from(JSON.stringify(value, null, 2) + '\n');
+    const bytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
     const path = join(proof, name);
     writeFileSync(path, bytes, { flag: 'wx', mode: 0o600 });
     expect(readFileSync(path).equals(bytes)).toBe(true);
@@ -463,16 +463,16 @@ it('preserves SDK state before real file startup and reports recording refusal h
     page = context.pages()[0] ?? (await context.newPage());
     page.on('request', (request) => {
       if (request.url().startsWith('https://human.adamwhite.work/'))
-        requests.push(request.method() + ' ' + request.url());
+        requests.push(`${request.method()} ${request.url()}`);
     });
     page.setDefaultTimeout(5000);
-    await page.goto(origin + '/icon.svg');
+    await page.goto(`${origin}/icon.svg`);
     const pristine = await snapshot();
     expect(pristine.databases).toEqual([]);
     expect(pristine.localStorage).toEqual({});
     expect(pristine.sessionStorage).toEqual({});
     retain('initial-pristine.json', pristine);
-    await page.goto(origin + '/file/?labRunSource=agent');
+    await page.goto(`${origin}/file/?labRunSource=agent`);
     await page.getByLabel('Open a Valley file').waitFor();
     await expect
       .poll(() => page.locator('[data-recording-status]').textContent())
@@ -482,14 +482,14 @@ it('preserves SDK state before real file startup and reports recording refusal h
     expect(page.url()).not.toContain('labRunSource');
     observations.push({ phase: 'missing-identity', state: await snapshot() });
     // Synthetic occupied origin only after the read-only pristine inventory above.
-    await page.goto(origin + '/icon.svg');
+    await page.goto(`${origin}/icon.svg`);
     await page.evaluate(async () => {
       localStorage.setItem('hf-lab-player', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
       localStorage.setItem('hf-lab-recording-off', '1');
       localStorage.setItem('hf-lab-events-off:valley', '1');
       localStorage.setItem('valley-log-v1', 'occupied-owner-sentinel');
       localStorage.setItem('hf-lab:once:telemetry-notice-v1', '1');
-      sessionStorage.setItem('hf-lab-session:valley', 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:' + Date.now());
+      sessionStorage.setItem('hf-lab-session:valley', `bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:${Date.now()}`);
       sessionStorage.setItem('hf-lab-run:valley', 'cccccccccccccccccccccccccccccccc');
       const request = indexedDB.open('valley', 1);
       request.onupgradeneeded = () => request.result.createObjectStore('volumes');
@@ -515,7 +515,7 @@ it('preserves SDK state before real file startup and reports recording refusal h
     const occupied = await snapshot();
     retain('occupied-before.json', occupied);
     await page.clock.install();
-    await page.goto(origin + '/file/?labRunSource=agent');
+    await page.goto(`${origin}/file/?labRunSource=agent`);
     await page.clock.pauseAt(Date.now() + 50);
     await page.getByLabel('Open a Valley file').waitFor();
     await expect
@@ -526,14 +526,14 @@ it('preserves SDK state before real file startup and reports recording refusal h
       ? readFileSync(process.env.VALLEY_SELECTED_FILE)
       : Buffer.from(
           // Synthetic CI input uses the public export's explicit empty provenance maps.
-          JSON.stringify({ ...save(newGame(7), 0), castHeads: {}, castSources: {} }),
+          JSON.stringify({ ...save(newGame(7), 0), castHeads: {}, castSourceRefs: {} }),
         );
     const selected = JSON.parse(fileBytes.toString('utf8'));
     const importFile = async (bytes: Buffer) => {
       await page
         .getByLabel('Open a Valley file')
         .setInputFiles({ name: 'valley.json', mimeType: 'application/json', buffer: bytes });
-      await expect.poll(() => page.locator('#map').count()).toBe(1);
+      await expect.poll(() => page.locator('#map').count(), { timeout: 30000 }).toBe(1);
     };
     const downloadFile = async (name: string) => {
       const pending = page.waitForEvent('download');
@@ -590,10 +590,10 @@ it('preserves SDK state before real file startup and reports recording refusal h
       replayEquality: 'full JSON wire equality; signed zero is not distinguishable in JSON',
       state: await snapshot(),
     });
-    await page.goto(origin + '/icon.svg');
+    await page.goto(`${origin}/icon.svg`);
     await page.evaluate(() => sessionStorage.setItem('hf-lab-session:valley', 'invalid-existing-session'));
     const incompatible = await snapshot();
-    await page.goto(origin + '/file/');
+    await page.goto(`${origin}/file/`);
     await page.getByLabel('Open a Valley file').waitFor();
     await expect
       .poll(() => page.locator('[data-recording-status]').textContent())
@@ -626,7 +626,7 @@ it('preserves SDK state before real file startup and reports recording refusal h
             await hold('Pending nonzero; HOLD profile even after backup.');
           }
           const digest = retain('complete-final-private-backup.json', { ...backup, pendingCount: 0 });
-          console.log('VALLEY_SDK_COMPLETE_BACKUP=' + proof + ' SHA256=' + digest);
+          console.log(`VALLEY_SDK_COMPLETE_BACKUP=${proof} SHA256=${digest}`);
           await context.close();
           preserveFileBrowser = false;
           break;

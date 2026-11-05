@@ -1,0 +1,723 @@
+import {
+  createRun,
+  exportRun,
+  createPerson as nativeCreatePerson,
+  step as nativeStep,
+  readRunHistory,
+  replay,
+} from '@adam0white/human-framework';
+import { expect, it } from 'vitest';
+import { act, newGame, step } from '../src/sim/game.ts';
+import {
+  communityForPerson,
+  createCommunity,
+  createPerson,
+  decide,
+  finish,
+  personRun,
+  stepCommunity,
+  type World,
+} from '../src/sim/hf.ts';
+import { captureSteward, resolveSteward, stewardOffers } from '../src/sim/steward.ts';
+import { advanceTo, makeWorld } from '../src/sim/valley.ts';
+import { need } from './hf-fixture.ts';
+import { midnightCareFixture } from './hf-host-fixture.ts';
+import { required } from './required.ts';
+
+// Re-execute the recorded native prefix through an already observed interrupt request.
+// This reads its native reason without adding host instrumentation or choosing a cut.
+function nativeInterrupt(archive: ReturnType<typeof exportRun>, requestId: string) {
+  const history = readRunHistory(archive);
+  const boundary = history.findIndex(
+    (entry) =>
+      entry.boundary.type === 'world-required' &&
+      entry.boundary.requests.some((request) => request.id === requestId),
+  );
+  expect(boundary).toBeGreaterThanOrEqual(0);
+  const run = need(createRun(JSON.parse(JSON.stringify(archive.initial.spec))));
+  for (const person of archive.initial.people) need(nativeCreatePerson(run, person));
+  for (const entry of history.slice(0, boundary + 1)) {
+    const reached = need(
+      nativeStep(run, {
+        until: entry.until,
+        inputs: entry.inputs,
+        fidelity: entry.fidelity,
+      }),
+    );
+    expect(reached.at).toBe(entry.reachedAt);
+    expect(reached.boundary).toEqual(entry.boundary);
+  }
+  return required(exportRun(run).current.people.kahya?.activity).interrupt;
+}
+
+// Public-path regression. No replacement people, policy or authored cam offer.
+it('offers a pending public pass departure through the real steward world before accepting its start', () => {
+  const g = newGame(7);
+  const s = g.valley;
+  const c = required(communityForPerson(s.kahya));
+  const world = required(c.world);
+  const grain = s.agha.granary;
+  const packed = required(s.stewardCare).grain;
+  const inputCount = g.inputs.length;
+  const historyCount = readRunHistory(exportRun(required(personRun(s.kahya)))).length;
+  const checked: Array<{ pass: unknown; visit: unknown; grain: number; offers: string[] }> = [];
+  // Keep the actual makeWorld clone/publication. Observe only its start availability check.
+  c.world = {
+    ...world,
+    stage: () => {
+      const staged = required(world.stage)();
+      return {
+        ...staged,
+        world: {
+          ...staged.world,
+          affordancesFor: (p) => {
+            const offers = staged.world.affordancesFor(p);
+            if (p.id === s.kahya.id)
+              checked.push({
+                pass: structuredClone(s.pass),
+                visit: structuredClone(s.kahyaState.visit),
+                grain: s.agha.granary,
+                offers: offers.map((o) => o.id),
+              });
+            return offers;
+          },
+        },
+      };
+    },
+  };
+  let accepted: boolean;
+  try {
+    accepted = act(g, { verb: 'pass', choice: 'depart' });
+  } finally {
+    c.world = world;
+  }
+  const inputs = readRunHistory(exportRun(required(personRun(s.kahya))))
+    .slice(historyCount)
+    .flatMap((entry) => entry.inputs);
+  expect(
+    inputs.filter(
+      (i) => i.kind === 'action.resolved' && i.payload.person === s.kahya.id && i.payload.stage === 'start',
+    ),
+    'V1: the public departure must receive a native accepted start',
+  ).toContainEqual(
+    expect.objectContaining({ payload: expect.objectContaining({ disposition: 'accepted' }) }),
+  );
+  expect(accepted).toBe(true);
+  expect(checked, 'V1: staged revalidation must retain the pending offer before spending').toContainEqual({
+    pass: expect.objectContaining({ pendingDeparture: true }),
+    visit: undefined,
+    grain,
+    offers: expect.arrayContaining(['cam-journey']),
+  });
+  expect(s.kahya.activity?.affordanceId).toBe('cam-journey');
+  expect(s.agha.granary).toBe(grain - 7);
+  expect(s.stewardCare?.grain).toBe(packed + 1);
+  expect(s.pass?.journey).toMatchObject({ grain: 6, cargo: 0 });
+  expect(s.kahyaState.visit).toMatchObject({ house: 'cam' });
+  expect(s.pass).not.toHaveProperty('pendingDeparture');
+  expect(
+    makeWorld(s)
+      .affordancesFor(s.kahya)
+      .some((o) => o.id === 'cam-journey'),
+  ).toBe(false);
+  expect(g.inputs.slice(inputCount)).toEqual([{ at: s.minute, verb: 'pass', choice: 'depart' }]);
+});
+
+// Host start-rejection negative. HF still chooses; this hook only refuses the real start.
+it('cleans up a public pass intent after host start rejection without spending or installing travel', () => {
+  const g = newGame(7);
+  const s = g.valley;
+  const c = required(communityForPerson(s.kahya));
+  const world = required(c.world);
+  const grain = s.agha.granary;
+  const packed = required(s.stewardCare).grain;
+  const pass = structuredClone(s.pass);
+  const inputCount = g.inputs.length;
+  const historyCount = readRunHistory(exportRun(required(personRun(s.kahya)))).length;
+  let rejected = 0;
+  c.world = {
+    ...world,
+    stage: () => {
+      const staged = required(world.stage)();
+      return {
+        ...staged,
+        world: {
+          ...staged.world,
+          allowStart: (p, offer) => {
+            if (p.id === s.kahya.id && offer.id === 'cam-journey') {
+              rejected++;
+              return false;
+            }
+            return staged.world.allowStart?.(p, offer) ?? true;
+          },
+        },
+      };
+    },
+  };
+  try {
+    expect(act(g, { verb: 'pass', choice: 'depart' })).toBe(false);
+  } finally {
+    c.world = world;
+  }
+  expect(rejected, 'V1: reach the real cam start guard, rather than an absent offer').toBeGreaterThan(0);
+  const inputs = readRunHistory(exportRun(required(personRun(s.kahya))))
+    .slice(historyCount)
+    .flatMap((entry) => entry.inputs);
+  expect(inputs).toContainEqual(
+    expect.objectContaining({
+      kind: 'action.resolved',
+      payload: expect.objectContaining({ person: s.kahya.id, stage: 'start', disposition: 'rejected' }),
+    }),
+  );
+  expect(s.agha.granary).toBe(grain);
+  expect(s.stewardCare?.grain).toBe(packed);
+  expect(s.pass).toEqual(pass);
+  expect(s.pass).not.toHaveProperty('pendingDeparture');
+  expect(s.kahyaState.visit).toBeUndefined();
+  expect(s.kahya.activity?.affordanceId).not.toBe('cam-journey');
+  expect(g.inputs).toHaveLength(inputCount);
+  // A later unrelated public visit must not inherit the rejected departure offer.
+  expect(act(g, { verb: 'visit', house: 'coban' })).toBe(true);
+  expect(
+    makeWorld(s)
+      .affordancesFor(s.kahya)
+      .some((o) => o.id === 'cam-journey'),
+  ).toBe(false);
+  const later = required(makeWorld(s).stage)().world.affordancesFor(s.kahya);
+  expect(later.some((o) => o.id === 'cam-journey')).toBe(false);
+});
+
+// Host exception negative, reached only after the actual staged offer passes availability.
+it('cleans up a public pass intent when the host start guard throws', () => {
+  const g = newGame(7);
+  const s = g.valley;
+  const c = required(communityForPerson(s.kahya));
+  const world = required(c.world);
+  const grain = s.agha.granary;
+  const care = structuredClone(s.stewardCare);
+  const pass = structuredClone(s.pass);
+  const inputCount = g.inputs.length;
+  const failure = new Error('V1 host start guard exception');
+  c.world = {
+    ...world,
+    stage: () => {
+      const staged = required(world.stage)();
+      return {
+        ...staged,
+        world: {
+          ...staged.world,
+          allowStart: (p, offer) => {
+            if (p.id === s.kahya.id && offer.id === 'cam-journey') throw failure;
+            return staged.world.allowStart?.(p, offer) ?? true;
+          },
+        },
+      };
+    },
+  };
+  try {
+    expect(() => act(g, { verb: 'pass', choice: 'depart' })).toThrow(failure);
+  } finally {
+    c.world = world;
+  }
+  expect(s.agha.granary).toBe(grain);
+  expect(s.stewardCare).toEqual(care);
+  expect(s.pass).toEqual(pass);
+  expect(s.pass).not.toHaveProperty('pendingDeparture');
+  expect(s.kahyaState.visit).toBeUndefined();
+  expect(s.kahya.activity?.affordanceId).not.toBe('cam-journey');
+  expect(g.inputs).toHaveLength(inputCount);
+  expect(
+    makeWorld(s)
+      .affordancesFor(s.kahya)
+      .some((o) => o.id === 'cam-journey'),
+  ).toBe(false);
+});
+
+it('finishes a late care activity before walking home and eating from the granary', () => {
+  const s = newGame(7, undefined, false, true, 'valley-public-2026-10').valley;
+  const p = createPerson({ id: 'kahya', name: 'Kahya', seed: 1, sex: 'male', bornAt: -10000000 });
+  s.kahya = p;
+  s.stewardCare = { grain: 0, eaten: 0 };
+  s.kahyaState.place = 'house:coban';
+  s.kahyaState.visit = {
+    house: 'coban',
+    arrive: 0,
+    leave: 30,
+    back: 50,
+    walk: 60,
+    outboundStarted: true,
+    arrivedAt: 0,
+  };
+  s.agha.granary = 1;
+  const c = createCommunity([p]);
+  let forceSleep = true;
+  const world: World = {
+    now: () => p.now,
+    affordancesFor: () => {
+      const offers = stewardOffers(s, p.now);
+      return forceSleep ? offers.filter((o) => o.action === 'sleep') : offers;
+    },
+    perceptsFor: () => [],
+    scarcityFor: () => 0,
+    beginOptions: (_p, offer, record) => captureSteward(s, offer, record),
+    resolve: (_p, activity, reason) => resolveSteward(s, activity, reason),
+  };
+  // Force an ordinary HF sleep offer whose completion exceeds the planned return.
+  stepCommunity(c, world, 1);
+  expect(p.activity?.action).toBe('sleep');
+  forceSleep = false;
+  stepCommunity(c, world, 480);
+  expect(s.kahyaState.place).toBe('house:coban');
+  expect(stewardOffers(s, p.now).map((o) => o.action)).toEqual(['walk']);
+  expect(s.agha.granary).toBe(1);
+  stepCommunity(c, world, 481);
+  expect(p.activity?.action).toBe('walk');
+  expect(s.kahyaState.place).toBe('house:coban');
+  expect(s.agha.granary).toBe(1);
+  stepCommunity(c, world, 541);
+  expect(s.kahyaState.place).toBe('residence');
+  expect(stewardOffers(s, p.now).some((o) => o.action === 'eat')).toBe(true);
+});
+
+it('requires accepted pass walks before quarry arrival and cargo settlement', async () => {
+  const { passTick } = await import('../src/sim/pass.ts');
+  const s = newGame(7, undefined, false, true, 'valley-public-2026-10').valley;
+  const p = createPerson({ id: 'kahya', name: 'Kahya', seed: 1, sex: 'male', bornAt: -10000000 });
+  s.kahya = p;
+  s.stewardCare = { grain: 0, eaten: 0 };
+  s.kahyaState.place = 'residence';
+  s.kahyaState.visit = { house: 'cam', arrive: 10, leave: 30, back: 50 };
+  s.pass = {
+    stock: 1,
+    grainReceived: 0,
+    stone: 0,
+    journey: { from: 0, arrive: 10, leave: 30, back: 50, cargo: 1, grain: 6 },
+  };
+  s.agha.granary = 1;
+  s.minute = 60;
+  passTick(s);
+  expect(s.pass.journey?.seen).toBeFalsy();
+  expect(s.pass.journey?.returned).toBeFalsy();
+  expect(s.pass.stone).toBe(0);
+  expect(s.agha.granary).toBe(1);
+});
+
+// Component control: the authored world below cannot prove public departure acceptance.
+it('settles pass cargo only after actual accepted outward and late return walks', async () => {
+  const { passTick } = await import('../src/sim/pass.ts');
+  const s = newGame(7, undefined, false, true, 'valley-public-2026-10').valley;
+  const p = createPerson({ id: 'kahya', name: 'Kahya', seed: 1, sex: 'male', bornAt: -10000000 });
+  s.kahya = p;
+  s.stewardCare = { grain: 0, eaten: 0 };
+  s.kahyaState.place = 'residence';
+  s.kahyaState.visit = { house: 'cam', arrive: 480, leave: 500, back: 520 };
+  s.pass = {
+    stock: 1,
+    grainReceived: 0,
+    stone: 0,
+    journey: { from: 0, arrive: 480, leave: 500, back: 520, cargo: 1, grain: 6 },
+  };
+  s.agha.granary = 1;
+  const c = createCommunity([p]);
+  let phase: 'out' | 'sleep' | 'return' = 'out';
+  const world: World = {
+    now: () => p.now,
+    affordancesFor: () =>
+      phase === 'out' && !s.pass?.journey?.outwardArrived
+        ? [
+            {
+              id: 'cam-journey',
+              action: 'walk',
+              label: 'walk over the pass',
+              duration: 480,
+              effort: 0.25,
+              placeId: 'pass',
+              advertises: {},
+              tags: ['work'],
+            },
+          ]
+        : phase !== 'return'
+          ? stewardOffers(s, 0).filter((o) => o.action === 'sleep')
+          : stewardOffers(s, p.now),
+    perceptsFor: () => [],
+    scarcityFor: () => 0,
+    beginOptions: (_p, offer, record) => captureSteward(s, offer, record),
+    resolve: (_p, activity, reason) => resolveSteward(s, activity, reason),
+  };
+  stepCommunity(c, world, 1);
+  expect(p.activity?.affordanceId).toBe('cam-journey');
+  passTick(s);
+  expect(s.pass.journey?.seen).toBeFalsy();
+  expect(s.kahyaState.place).toBe('residence');
+  expect(s.agha.granary).toBe(1);
+  expect(s.pass.stone).toBe(0);
+  stepCommunity(c, world, 481);
+  phase = 'sleep';
+  s.minute = 481;
+  passTick(s);
+  expect(s.pass.journey?.seen).toBe(true);
+  expect(s.kahyaState.place).toBe('house:cam');
+  stepCommunity(c, world, 482);
+  expect(p.activity?.action).toBe('sleep');
+  phase = 'return';
+  stepCommunity(c, world, 961);
+  s.minute = 961;
+  passTick(s);
+  expect(s.pass.journey?.returned).toBeFalsy();
+  expect(s.agha.granary).toBe(1);
+  expect(s.pass.stone).toBe(0);
+  expect(stewardOffers(s, p.now).map((o) => o.action)).toEqual(['walk']);
+  stepCommunity(c, world, 962);
+  expect(p.activity?.action).toBe('walk');
+  const firstReturn = required(p.activity);
+  finish(p, {
+    at: p.now,
+    affordanceId: firstReturn.affordanceId,
+    action: firstReturn.action,
+    status: 'interrupted',
+  });
+  passTick(s);
+  expect(s.pass.journey?.homeArrived).toBeFalsy();
+  expect(s.pass.journey?.returned).toBeFalsy();
+  expect(s.pass.stone).toBe(0);
+  expect(s.agha.granary).toBe(1);
+  stepCommunity(c, world, 963);
+  expect(p.activity?.action).toBe('walk');
+  const returnEnd = required(p.activity).endsAt;
+  stepCommunity(c, world, returnEnd + 1);
+  s.minute = returnEnd + 1;
+  passTick(s);
+  expect(s.kahyaState.place).toBe('residence');
+  expect(s.pass.journey?.returned).toBe(true);
+  expect(s.pass.stone).toBe(1);
+  expect(s.agha.granary).toBe(7);
+  expect(s.pass.journey).toMatchObject({ grain: 0, cargo: 0 });
+  passTick(s);
+  expect(s.pass.stone).toBe(1);
+  expect(s.agha.granary).toBe(7);
+});
+
+// Host boundary component. Real public cast/world and public interruption; not replay proof.
+it('retries interrupted lane legs and settles the matching outward completion only once', () => {
+  const g = newGame(7);
+  step(g, 540);
+  const s = g.valley;
+  const before = structuredClone(s.kahyaState);
+  expect(act(g, { verb: 'visit', house: 'coban' })).toBe(true);
+  advanceTo(s, 550);
+  const first = required(s.kahya.activity);
+  expect(first.affordanceId).toBe('care:walk:lane:coban:out');
+  finish(s.kahya, {
+    at: s.kahya.now,
+    affordanceId: first.affordanceId,
+    action: first.action,
+    status: 'interrupted',
+  });
+  expect(s.kahyaState.seen).toEqual(before.seen);
+  expect(s.kahyaState.acts).toEqual(before.acts);
+  expect(s.kahyaState.visit?.arrivedAt).toBeUndefined();
+  expect(stewardOffers(s)[0]?.id).toBe('care:walk:lane:coban:out');
+  // The old interrupted completion cannot settle a retry, even at its former end.
+  resolveSteward(s, first, 'ended');
+  expect(s.kahyaState.visit?.arrivedAt).toBeUndefined();
+  advanceTo(s, 580);
+  const arrived = required(s.kahyaState.visit?.arrivedAt);
+  expect(arrived).toBeGreaterThan(first.startedAt);
+  expect(s.kahyaState.seen.coban).toBe(arrived);
+  const c = required(communityForPerson(s.kahya));
+  const completion = required(c.completed?.findLast((r) => r.activity.affordanceId === first.affordanceId));
+  const once = structuredClone({ ks: s.kahyaState, notes: s.notes, queued: s.queued, next: c.next });
+  resolveSteward(s, completion.activity, 'ended');
+  expect({ ks: s.kahyaState, notes: s.notes, queued: s.queued, next: c.next }).toEqual(once);
+  const planned = structuredClone(required(s.kahyaState.visit));
+  advanceTo(s, planned.leave + 5);
+  const care = required(s.kahya.activity);
+  expect(care.affordanceId).toBe('care:rest');
+  expect(care.endsAt).toBeGreaterThan(s.minute);
+  // Fixed component cut from root-operation-01: native rest reconsideration at675.
+  // The old706 cut had already missed the completed return. No adaptive cut or retry.
+  advanceTo(s, 675.5);
+  const returning = required(s.kahya.activity);
+  expect(returning.affordanceId).toBe('care:walk:lane:coban:return');
+  expect(returning.startedAt).toBeLessThan(care.endsAt);
+  expect(c.completed?.some((r) => r.person === s.kahya.id && r.activity.startedAt === care.startedAt)).toBe(
+    false,
+  );
+  // Retain the aggregate occupied-past-back guard while the actual return is busy.
+  expect(returning.endsAt).toBeGreaterThan(planned.back);
+  advanceTo(s, Math.max(s.minute, planned.back + 1));
+  expect(s.minute).toBeGreaterThan(planned.back);
+  expect(s.minute).toBeLessThan(returning.endsAt);
+  expect(s.kahya.activity?.affordanceId).toBe(returning.affordanceId);
+  const occupied = structuredClone(s.kahyaState.visit);
+  expect(act(g, { verb: 'visit', house: 'tepe' })).toBe(false);
+  expect(s.kahyaState.visit).toEqual(occupied);
+  finish(s.kahya, {
+    at: s.kahya.now,
+    affordanceId: returning.affordanceId,
+    action: returning.action,
+    status: 'interrupted',
+  });
+  expect(s.kahyaState.place).toBe('house:coban');
+  expect(s.kahyaState.visit?.arrivedAt).toBe(arrived);
+  expect(stewardOffers(s)[0]?.id).toBe('care:walk:lane:coban:return');
+  advanceTo(s, s.minute + 60);
+  expect(s.kahyaState.place).toBe('residence');
+  expect(s.kahyaState.visit).toBeUndefined();
+  expect(s.kahyaState.seen.coban).toBe(arrived);
+  expect(s.kahyaState.acts?.coban).toHaveLength(1);
+  const native = readRunHistory(exportRun(required(c.run))).flatMap((entry) => entry.inputs);
+  const home = required(c.completed?.findLast((r) => r.activity.affordanceId === returning.affordanceId));
+  expect(home.activity.startedAt).toBeGreaterThan(returning.startedAt);
+  for (const [activity, status] of [
+    [first, 'interrupted'],
+    [completion.activity, 'completed'],
+    [care, 'interrupted'],
+    [returning, 'interrupted'],
+    [home.activity, 'completed'],
+  ] as const) {
+    const settled = required(
+      native.find(
+        (i) =>
+          i.kind === 'action.resolved' &&
+          i.payload.person === s.kahya.id &&
+          i.payload.outcome?.offerId === activity.affordanceId &&
+          i.payload.outcome.start === Math.round(activity.startedAt * 60000) &&
+          i.payload.disposition === status,
+      ),
+    );
+    if (settled.kind !== 'action.resolved') throw new Error('Missing native settlement.');
+    expect(settled.payload.stage).toBe(status === 'interrupted' ? 'interrupt' : 'finish');
+    expect(settled.payload.outcome?.status).toBe(status);
+    expect(native).toContainEqual(
+      expect.objectContaining({
+        kind: 'action.resolved',
+        payload: expect.objectContaining({
+          person: s.kahya.id,
+          activityId: settled.payload.activityId,
+          stage: 'start',
+          disposition: 'accepted',
+        }),
+      }),
+    );
+    if (status === 'completed')
+      expect(settled.payload.outcome?.end).toBe(Math.round(activity.endsAt * 60000));
+  }
+  const rest = required(
+    native.find(
+      (i) =>
+        i.kind === 'action.resolved' &&
+        i.payload.person === s.kahya.id &&
+        i.payload.stage === 'interrupt' &&
+        i.payload.outcome?.offerId === care.affordanceId &&
+        i.payload.outcome.start === Math.round(care.startedAt * 60000),
+    ),
+  );
+  if (rest.kind !== 'action.resolved') throw new Error('Missing native rest interruption.');
+  expect(rest.payload.outcome?.end).toBe(40_500_004);
+  expect(c.completed?.some((r) => r.person === s.kahya.id && r.activity.startedAt === care.startedAt)).toBe(
+    false,
+  );
+  const archive = exportRun(required(c.run));
+  // This fixed cut ends one native millisecond after the requested host cut.
+  expect(archive.current.at).toBe(Math.round(s.minute * 60000) + 1);
+  expect(c.ingress).toBe(archive.current.at);
+  expect(required(archive.current.people[s.kahya.id]).now).toBe(archive.current.at);
+  expect(s.kahya.now).toBe(archive.current.at / 60000);
+  expect(nativeInterrupt(archive, rest.payload.requestId)).toEqual({
+    at: 40_500_004,
+    reason: 'reconsidered',
+  });
+  expect(need(replay(archive)).fullHash).toBe(archive.hashes.full);
+});
+
+// Fresh authored MIDNIGHT component, not natural public New game or game replay.
+// One fixed 23:50 setup, all 53 seed7 people and every real steward alternative.
+it('withholds attendance through an interrupted midnight meal and dates one actual arrival', () => {
+  const { game: g, s, c, authors, at } = midnightCareFixture();
+  expect(s.minute).toBe(1430);
+  expect(s.people).toHaveLength(52);
+  expect(c.people).toHaveLength(53);
+  const initial = exportRun(required(c.run)).initial;
+  expect(initial.spec.start).toBe(at * 60000);
+  expect(initial.spec.seed).toBe(7);
+  expect(initial.people).toEqual(authors);
+  expect(readRunHistory(exportRun(required(c.run))).flatMap((entry) => entry.inputs)).toEqual([]);
+  const base = required(c.world);
+  const alternatives = base.affordancesFor(s.kahya);
+  expect(alternatives.map((o) => o.id)).toEqual(stewardOffers(s).map((o) => o.id));
+  expect(alternatives.map((o) => o.id)).toEqual(
+    expect.arrayContaining(['care:eat', 'care:drink', 'care:relieve', 'care:sleep', 'care:rest']),
+  );
+  decide(s.kahya, alternatives);
+  const meal = required(s.kahya.activity);
+  expect(meal.affordanceId, 'fresh authored meal prerequisite: HF must actually accept eating').toBe(
+    'care:eat',
+  );
+  // The ordinary production meal is 30 minutes. Do not shorten it to the proposed 3.
+  expect(meal.endsAt - meal.startedAt).toBe(30);
+  expect(meal.startedAt).toBeGreaterThanOrEqual(at);
+  expect(meal.endsAt).toBeGreaterThan(1440);
+  const attendance = () => ({
+    seen: s.kahyaState.seen.coban,
+    acts: s.kahyaState.acts?.coban,
+    guess: s.kahyaState.guess?.coban,
+    notes: s.notes.filter((n) => n.house === 'coban' && n.kind === 'visit'),
+    visits: readRunHistory(exportRun(required(c.run)))
+      .flatMap((entry) => entry.inputs)
+      .filter(
+        (i) =>
+          i.kind === 'voice.evidence-received' &&
+          i.payload.evidence.kind === 'act' &&
+          i.payload.evidence.action === 'visit',
+      ),
+  });
+  // An authored host invitation tests the receipt date, not a natural birth.
+  s.knocks.push({
+    id: 'care-midnight-invitation',
+    at: s.minute,
+    until: meal.endsAt + 120,
+    personId: 'yusuf',
+    house: 'coban',
+    what: 'birth',
+    words: 'Come and see the child.',
+  });
+  const waiting = () => ({
+    attendance: attendance(),
+    knocks: s.knocks.filter((k) => k.id === 'care-midnight-invitation'),
+    queued: Object.values(s.queued)
+      .flat()
+      .filter((p) => p.kind === 'visit'),
+    disclosures: s.flags.beats.filter((b) => b.startsWith('cast-disclosed:')),
+  });
+  const careBefore = structuredClone(required(s.stewardCare));
+  const before = structuredClone(attendance());
+  const waitingBefore = structuredClone(waiting());
+  expect(act(g, { verb: 'visit', house: 'coban' })).toBe(true);
+  const requested = structuredClone(required(s.kahyaState.visit));
+  expect(waiting()).toEqual(waitingBefore);
+  expect(requested.walk).toBe(20);
+  // At the fixed pre-midnight cut the same accepted meal is still running.
+  advanceTo(s, 1439);
+  expect(s.kahya.activity).toEqual(meal);
+  expect(waiting()).toEqual(waitingBefore);
+  expect(s.stewardCare).toEqual(careBefore);
+  expect(requested.arrive).toBe(1450);
+  // Retain the original planned deadline: the actual walk has not arrived at1451.
+  advanceTo(s, requested.arrive + 1);
+  expect(s.minute).toBe(1451);
+  expect(waiting()).toEqual(waitingBefore);
+  expect(s.stewardCare).toEqual(careBefore);
+  expect(attendance()).toEqual(before);
+  const walk = required(s.kahya.activity);
+  expect(walk.affordanceId).toBe('care:walk:lane:coban:out');
+  expect(walk.startedAt).toBe(86_400_001 / 60000);
+  expect(walk.startedAt).toBeLessThan(meal.endsAt);
+  expect(walk.endsAt).toBeGreaterThan(s.minute);
+  expect(walk.endsAt - walk.startedAt).toBe(20);
+  expect(s.kahyaState.visit?.arrivedAt).toBeUndefined();
+  expect(attendance()).toEqual(before);
+  advanceTo(s, walk.endsAt + 1);
+  const arrived = required(s.kahyaState.visit?.arrivedAt);
+  expect(arrived).toBe(walk.endsAt);
+  expect(arrived).toBeGreaterThan(1440);
+  expect(s.kahyaState.seen.coban).toBe(arrived);
+  expect(required(s.knocks.find((k) => k.id === 'care-midnight-invitation')).answered).toBe('went');
+  expect(s.kahyaState.guess?.coban?.at).toBe(arrived);
+  expect(s.kahyaState.acts?.coban).toEqual([{ day: 1, what: 'sat with them' }]);
+  expect(s.notes.filter((n) => n.house === 'coban' && n.kind === 'visit')).toEqual([
+    expect.objectContaining({ at: arrived, text: expect.stringContaining('You walked down to') }),
+  ]);
+  expect(required(s.kahyaState.visit).leave - arrived).toBe(requested.leave - requested.arrive);
+  expect(required(s.kahyaState.visit).back - required(s.kahyaState.visit).leave).toBe(requested.walk);
+  const visits = attendance().visits.slice(before.visits.length);
+  expect(visits.length).toBeGreaterThan(0);
+  for (const input of visits) {
+    if (input.kind !== 'voice.evidence-received') throw new Error('Missing visit evidence');
+    expect(input.payload.evidence.occurredAt).toBe(arrived * 60_000);
+  }
+  const native = readRunHistory(exportRun(required(c.run))).flatMap((entry) => entry.inputs);
+  for (const [activity, status] of [
+    [meal, 'interrupted'],
+    [walk, 'completed'],
+  ] as const) {
+    const settled = required(
+      native.find(
+        (i) =>
+          i.kind === 'action.resolved' &&
+          i.payload.person === s.kahya.id &&
+          i.payload.stage === (status === 'interrupted' ? 'interrupt' : 'finish') &&
+          i.payload.outcome?.offerId === activity.affordanceId &&
+          i.payload.outcome.start === activity.startedAt * 60000,
+      ),
+    );
+    if (settled.kind !== 'action.resolved') throw new Error('Missing native completion.');
+    expect(settled.payload.disposition).toBe(status);
+    if (activity === meal) {
+      expect(settled.payload.outcome?.actual.consumed?.food).toBe(0);
+      expect(nativeInterrupt(exportRun(required(c.run)), settled.payload.requestId)).toEqual({
+        at: 86_400_000,
+        reason: 'reconsidered',
+      });
+      expect(
+        c.completed?.some((r) => r.person === s.kahya.id && r.activity.startedAt === meal.startedAt),
+      ).toBe(false);
+    }
+    expect(settled.payload.outcome).toMatchObject({
+      offerId: activity.affordanceId,
+      start: activity.startedAt * 60000,
+      end: status === 'interrupted' ? 86_400_000 : activity.endsAt * 60000,
+      status,
+    });
+    expect(native).toContainEqual(
+      expect.objectContaining({
+        kind: 'action.resolved',
+        payload: expect.objectContaining({
+          person: s.kahya.id,
+          activityId: settled.payload.activityId,
+          stage: 'start',
+          disposition: 'accepted',
+        }),
+      }),
+    );
+  }
+  // The final native clock and the earlier arrival queue drain are distinct cuts.
+  // This fixture retains an exact final clock and all three accepted visit inputs.
+  const arrivalArchive = exportRun(required(c.run));
+  expect(Number.isInteger(arrivalArchive.current.at)).toBe(true);
+  expect(arrivalArchive.current.at).toBe(Math.round(s.minute * 60000) + 1);
+  expect(c.ingress).toBe(arrivalArchive.current.at);
+  expect(required(arrivalArchive.current.people[s.kahya.id]).now).toBe(arrivalArchive.current.at);
+  expect(s.kahya.now).toBe(arrivalArchive.current.at / 60000);
+  expect(visits).toEqual(
+    [
+      ['valley:000000000425', 'yusuf'],
+      ['valley:000000000427', 'zehra'],
+      ['valley:000000000431', 'maryam'],
+    ].map(([id, person]) => ({
+      id,
+      // These reserved inputs drain at the accepted arrival boundary + 1 ms.
+      at: Math.round(arrived * 60000) + 1,
+      source: { type: 'host', id: 'valley' },
+      kind: 'voice.evidence-received',
+      payload: {
+        person,
+        evidenceId: id,
+        voiceId: 'kahya',
+        evidence: { id, occurredAt: Math.round(arrived * 60000), kind: 'act', action: 'visit', felt: 0.04 },
+      },
+    })),
+  );
+  const once = structuredClone(attendance());
+  resolveSteward(s, walk, 'ended');
+  expect(attendance()).toEqual(once);
+  advanceTo(s, s.minute + 30);
+  expect(attendance()).toEqual(once);
+  const archive = exportRun(required(c.run));
+  // This witnessed final cut also drains one native millisecond after the host cut.
+  expect(archive.current.at).toBe(Math.round(s.minute * 60000) + 1);
+  expect(c.ingress).toBe(archive.current.at);
+  expect(required(archive.current.people[s.kahya.id]).now).toBe(archive.current.at);
+  expect(s.kahya.now).toBe(archive.current.at / 60000);
+  expect(need(replay(archive)).fullHash).toBe(archive.hashes.full);
+});

@@ -25,7 +25,7 @@ async function open(page: Page, rules?: string) {
         'valley-log-v1',
         JSON.stringify({
           game: 'valley',
-          version: '0.3.1',
+          version: '0.4.0',
           seed: 7,
           minute: rules ? 1440 : 420,
           inputs: [],
@@ -47,7 +47,7 @@ it('shows the opt-in route and local introduction at both required sizes', async
   ]) {
     const page = await browser.newPage({ viewport });
     try {
-      await open(page, 'valley-pass-2026-10');
+      await open(page, 'valley-public-2026-10');
       expect(await page.evaluate(() => ({ width: innerWidth, height: innerHeight }))).toEqual(viewport);
       await page.getByRole('button', { name: 'Other orders ▸', exact: true }).click();
       expect(
@@ -102,7 +102,7 @@ it('does not offer Resume or discard bytes when the stored log is malformed', as
 it('offers new-edition actions and preserves a readable reply at 320px with enlarged text', async () => {
   const page = await browser.newPage({ viewport: { width: 320, height: 690 } });
   try {
-    await open(page, 'valley-2026-10');
+    await open(page, 'valley-public-2026-10');
     await page.locator('[data-h="coban"]').click();
     expect(await page.getByRole('button', { name: 'Ask for an extra sack', exact: true }).count()).toBe(1);
     await page.evaluate(
@@ -219,7 +219,7 @@ it('keeps music off until chosen and renders a finite procedural cue', async () 
 it('falls back to the exact input log when a recovery snapshot is corrupted', async () => {
   const page = await browser.newPage();
   try {
-    await open(page, 'valley-2026-10');
+    await open(page, 'valley-public-2026-10');
     await page.evaluate(
       `import('/src/ui/app.ts').then(({_debug})=>_debug.order({verb:'term-choice',id:'reserve',choice:'hide'}))`,
     );
@@ -254,7 +254,7 @@ it('falls back to the exact input log when a recovery snapshot is corrupted', as
     await page.close();
   }
 });
-it.each([undefined, 'valley-2026-10'] as const)(
+it.each(['valley-public-2026-10'] as const)(
   'resumes an actually accepted Unicode press without changing its ID (%s)',
   async (rules) => {
     const { newGame, act, step, fingerprint, DAY } = await import('../src/sim/game.ts');
@@ -270,7 +270,7 @@ it.each([undefined, 'valley-2026-10'] as const)(
     const expected = fingerprint(game.valley);
     const log = {
       game: 'valley',
-      version: '0.3.1',
+      version: '0.4.0',
       plainEnglish: true,
       seed: 7,
       minute: game.valley.minute,
@@ -317,7 +317,7 @@ it('offers the explicit alliance configuration and costed hosting at both requir
       await page.route('**/*', (route) =>
         new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort(),
       );
-      await open(page, 'valley-alliance-2026-10');
+      await open(page, 'valley-public-2026-10');
       expect(await page.evaluate(() => ({ width: innerWidth, height: innerHeight }))).toEqual(viewport);
       await page.getByRole('button', { name: 'Other orders ▸', exact: true }).click();
       const route = page.getByRole('region', { name: 'The pass route', exact: true });
@@ -329,7 +329,7 @@ it('offers the explicit alliance configuration and costed hosting at both requir
       expect(await page.getByRole('button', { name: /^Accept Çam’s road terms/ }).isEnabled()).toBe(true);
       expect(await page.getByRole('button', { name: /^Exchange a sack for stone/ }).isEnabled()).toBe(false);
       expect(await route.textContent()).toContain('A sack alone cannot buy a load.');
-      await open(page, 'valley-alliance-2026-10');
+      await open(page, 'valley-public-2026-10');
       await page.getByRole('button', { name: 'Other orders ▸', exact: true }).click();
       const host = page.getByRole('button', { name: /^Host another supervised meeting/ });
       expect(await host.isEnabled()).toBe(true);

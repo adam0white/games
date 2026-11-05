@@ -1,4 +1,3 @@
-import { ageYears } from '@adam0white/human-framework';
 import { dialogueChoices, dialogueStatus, dialogueWords } from '../sim/dialogue.ts';
 import {
   allianceEdition,
@@ -9,6 +8,7 @@ import {
   rulesOf,
   type TermDecision,
 } from '../sim/edition.ts';
+import { ageYears } from '../sim/hf.ts';
 import {
   copyReason,
   deliveryAway,
@@ -47,7 +47,6 @@ import {
 import {
   act,
   type CompactRun,
-  END_DAY,
   fingerprint,
   GAME_VERSION,
   type Game,
@@ -573,6 +572,7 @@ async function reopen(log: Log, onProgress: (m: number) => void): Promise<Game> 
   }
   const pending = log.inputs.slice(game.inputs.length);
   if (pending.length) step(game, game.valley.minute, pending);
+  if (game.valley.minute !== log.minute) throw new Error('Invalid saved episode horizon.');
   if (JSON.stringify(game.inputs) !== JSON.stringify(log.inputs))
     throw new Error('The saved input log contains actions that cannot be replayed. It has been kept.');
   volume = log.volume;
@@ -653,11 +653,11 @@ function infoWords(): string {
   if (!g || app.querySelector('.title-page'))
     return `<h2>The valley</h2><p>Call the households to help with the harvest. Read their replies. Visit them to learn what they need.</p><p>Grain you give leaves less to pay the landowner. Rain can damage uncut barley.</p>`;
   if (g.valley.flags.ended)
-    return `<h2>The tally</h2><p>The elders speak from what they remember. The game counts grain delivered, gifts and unpaid grain separately.</p>`;
+    return `<h2>The tally</h2><p>This six-hour opening episode is over. Read the actual requests and replies in the notebook. The harvest and later years remain outside this episode.</p>`;
   if (selected)
     return `<h2>What you know about a household</h2><p>Your guess comes from what you last saw. The local overseer makes his own guess about a person. Neither guess is certain.</p><p>A visit to the lower hamlet takes a couple of hours. A visit to the upper hamlet takes most of a morning. You can visit again when you return.</p>`;
   const s = g.valley;
-  return `<h2>Your work</h2><p>${esc(nextWords(s))}</p><p>The village announcer carries your requests. People consider their own field work and can refuse. Hold the button beside a refusal, or tap it twice, to insist. They will come, and they will remember. Choose Let them finish first to accept a delay; their reply stays the same.</p><p>A visit takes time to walk there and back. Reduce a household’s grain payment to leave more in its jars. The neighbours will notice.</p><p>The grain bar shows the harvest. The filled part is grain in the granary. The striped part is cut grain waiting to be separated from its stalks. The outline shows uncut grain. The mark shows what the landowner is owed.</p><p>Time slows for replies and knocks at your door. Opening the menu or this information panel stops time. ${esc(limitsWords(s))}</p>${seasonOf(doyOf(dayOfMinute(s.minute))) === 'winter' ? (s.edition ? '<p>Paid mill calls use grain from the granary for completed carrying. Ordinary calls offer no pay.</p>' : '<p>People receive no grain pay for mill work. You can write for grain when the estimate shows that you will have too little.</p>') : ''}<p>You are the steward. You manage the landowner’s grain, which is counted in grain measures.</p>`;
+  return `<h2>Your work</h2><p>${esc(nextWords(s))}</p><p>The village announcer carries your requests. People consider their own field work and can refuse. Hold the button beside a refusal, or tap it twice, to insist. They may still refuse; pressing them can be remembered. Choose Let them finish first to accept a delay; their reply stays the same.</p><p>A visit takes time to walk there and back. Read the reply before choosing whether to press or leave the request alone.</p><p>The grain bar shows the harvest. The filled part is grain in the granary. The striped part is cut grain waiting to be separated from its stalks. The outline shows uncut grain. The mark shows what the landowner is owed.</p><p>Time slows for replies and knocks at your door. Opening the menu or this information panel stops time. ${esc(limitsWords(s))}</p>${seasonOf(doyOf(dayOfMinute(s.minute))) === 'winter' ? (s.edition ? '<p>Paid mill calls use grain from the granary for completed carrying. Ordinary calls offer no pay.</p>' : '<p>People receive no grain pay for mill work. You can write for grain when the estimate shows that you will have too little.</p>') : ''}<p>You are the steward. You manage the landowner’s grain, which is counted in grain measures.</p>`;
 }
 
 function closeFileSession() {
@@ -699,6 +699,7 @@ function fileTitle() {
         'plainEnglish',
         'castHeads',
         'castSources',
+        'castSourceRefs',
         'cast',
         'game',
         'version',
@@ -754,7 +755,7 @@ function title() {
   const where = storedLogProblem
     ? 'This browser’s saved ledger is malformed or incompatible. It is kept here. Starting a new game will replace it.'
     : log && log.version !== GAME_VERSION
-      ? 'This saved game uses an older Valley version. Start a new game to play with the new people. Your old saved game stays here until you start.'
+      ? 'This saved game uses an older Valley version. Download the old game if you want to keep it, then start fresh. Your old saved game stays here until you start.'
       : log
         ? `Your saved place is kept at ${dateWords(dayOfMinute(log.minute))} of year ${yearWord(yearOf(dayOfMinute(log.minute)))}. Resume continues from there.`
         : '';
@@ -766,7 +767,7 @@ function title() {
     ${topbar(`<a href="${HUB}/games/" target="_top">All games</a>`)}
     <section class="title-premise"><h1>The Valley</h1><p class="purpose">${esc(PURPOSE)}</p><p class="soft">People can refuse you, and they remember how you answer.</p></section>
     <div class="vignette" aria-hidden="true"><svg viewBox="0 0 360 140"><path d="M0 95Q80 15 160 90T360 70M0 130Q90 50 180 120T360 95M250 0Q200 70 260 140" fill="none" stroke="currentColor"/><g fill="none" stroke="currentColor" stroke-width="2"><path d="M70 95v-18l12-12 12 12v18zM130 105V87l12-12 12 12v18zM190 90V72l12-12 12 12v18zM280 100V82l12-12 12 12v18z"/></g></svg></div>
-    <footer class="title-actions"><p class="term-description">Visit a household and choose what to say. Grain wages, winter loans, inspections, pass journeys and family arrangements are part of this term. The steward needs food and rest between walks. People stay local to this valley.</p>${where ? `<p class="hand">${esc(where)}</p>` : ''}
+    <footer class="title-actions"><p class="term-description">Play the first morning, from 07:00 to 13:00. Call a household to harvest, read its reply, and choose how to respond. Visits and gifts take real time and grain. Later seasons and journeys are outside this episode.</p>${where ? `<p class="hand">${esc(where)}</p>` : ''}
     ${hasSave ? `${log && log.version === GAME_VERSION ? '<button class="primary" data-go="open">Resume</button>' : ''}<button data-go="new" class="hold">New game<span class="fill"></span></button><p class="soft">This replaces your saved game.</p>` : '<button class="primary" data-go="new">New game</button>'}${mark()}</footer>
     <dialog class="ways-panel" aria-label="Other ways to start"><header><h2>Other ways to start</h2><button data-ways-close aria-label="Close other ways to start">×</button></header><label for="valley-name">A named valley</label><input id="valley-name" placeholder="Kuyulu" maxlength="80"><p>The same name gives the same valley.</p><button data-seed${log ? ' class="hold"' : ''}>Begin this valley${log ? '<span class="fill"></span>' : ''}</button>${log ? '<p class="soft">This replaces your saved game.</p>' : ''}</dialog>
   </div>`;
@@ -2360,11 +2361,12 @@ const REASON: [RegExp, string][] = [
 
 function hunchLine(hc: Hunch | undefined, who: string): string {
   if (!hc) return '';
+  if (!hc.verdict) return `You can’t tell how ${who} would answer from what you have seen.`;
   const sure =
     hc.confidence < 0.15 ? 'You can’t tell yet' : hc.confidence < 0.45 ? 'You think' : 'You are fairly sure';
   if (hc.confidence < 0.15) return `${sure} how ${who} would answer.`;
   const why = hc.verdict === 'assented' ? '' : (REASON.find(([re]) => re.test(hc.reason))?.[1] ?? '');
-  return `${sure} ${who} ${VERDICT[hc.verdict] ?? 'would answer'}${why ? ` because ${why}` : ''}.`;
+  return `${sure} ${who} ${VERDICT[hc.verdict] ?? 'would answer'}${why ? ` because ${why}` : ''}, if the work and rest were both available now. This guess cannot tell what else they need to do.`;
 }
 
 function jobInSeason(s: ValleyState): Job | null {
@@ -3028,7 +3030,7 @@ function ledger(s: ValleyState): string {
         .map((words) => `<p>${esc(words)}</p>`)
         .join('') || '<p>This ledger has no storm damage report to show.</p>'
     }</section>
-    <p class="soft" >The term ends at the elders’ gathering, ${esc(dateWords(END_DAY))} of year three.</p>
+    <p class="soft" >This opening episode ends at 13:00 today. Later seasons are outside this episode.</p>
   </div>`;
 }
 
@@ -3160,12 +3162,15 @@ function ending() {
   releaseWake();
   if (!g) return title();
   const s = g.valley;
-  const { elders, letter } = gathering(g);
+  const episode = s.flags.ended === 'episode';
+  const { elders, letter } = episode
+    ? { elders: [], letter: 'This morning is recorded. The harvest and later years remain unfinished.' }
+    : gathering(g);
   const dismissed = s.flags.ended === 'dismissed';
   app.innerHTML = `<div class="page elders ending-page">
-    ${topbar(dismissed ? 'The second letter' : 'The elders’ gathering')}<div class="ending-body"><h1>${dismissed ? 'The second letter' : 'The elders’ gathering'}</h1>
+    ${topbar(episode ? 'The first morning' : dismissed ? 'The second letter' : 'The elders’ gathering')}<div class="ending-body"><h1>${episode ? 'The first morning' : dismissed ? 'The second letter' : 'The elders’ gathering'}</h1>
     <p class="soft">${esc(dateWords(dayOfMinute(s.minute)))} of year ${yearWord(yearOf(dayOfMinute(s.minute)))}.</p>
-    ${dismissed ? '<p>The landowner’s rider came back with a sealed letter. The elders did not gather for you; they said these things at their own doors, and the local overseer wrote them down.</p>' : '<p>They sat along the wall of the residence, as they do at the end of a steward’s term, and each said one thing.</p>'}
+    ${episode ? `<p>The episode ends at 13:00. You made ${g.inputs.length} recorded ${g.inputs.length === 1 ? 'choice' : 'choices'}. Read Earlier replies for the actual responses and work. A request is not proof that work finished.</p>` : dismissed ? '<p>The landowner’s rider came back with a sealed letter. The elders did not gather for you; they said these things at their own doors, and the local overseer wrote them down.</p>' : '<p>They sat along the wall of the residence, as they do at the end of a steward’s term, and each said one thing.</p>'}
     ${elders
       .map(
         (e) =>
@@ -3182,7 +3187,7 @@ function ending() {
     <p>${esc(letter)}</p>
     ${s.receivedTerms ? receivedTermsView(s) : ''}
     <details class="closing-grain"><summary>See the tally</summary><p data-closing-grain></p></details>
-    </div><footer class="ending-actions"><div class="row"><button data-feedback>Feedback</button><button data-ending-notebook>Earlier replies</button></div><button class="primary" data-go="new">Begin a new term</button>${mark()}${footer()}</footer>
+    </div><footer class="ending-actions"><div class="row"><button data-feedback>Feedback</button><button data-ending-notebook>Earlier replies</button></div><button class="primary" data-go="new">Begin a new morning</button>${mark()}${footer()}</footer>
   </div>`;
   drawClosingGrain();
   app.querySelector('[data-feedback]')?.addEventListener('click', openFeedback);

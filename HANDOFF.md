@@ -1,3 +1,66 @@
+<!-- Current episode continuity disposition, 2026-11-05: New game always starts a fresh local cast. It skips shelf readiness, enablement, preparation and claims. Stored people stay unchanged. Person checkpoint/alternative publication and their UI controls are closed for this edition. Current local game resume and complete game exports remain supported. UPKEEP will review qualified native 4.17 continuing-person support on 2026-11-12; no account transfer is started. -->
+
+# Opening episode — 2026-11-05
+
+Remaining: qualify the actual 07:00–13:00 episode, phone choice/ending/reload/export, exact source review and CI, merge, deployment and live verification. No release is claimed here. UPKEEP accepts engineering; the owner accepts feel.
+
+The owner’s 2026-11-05 instruction to fix or simplify supersedes the old requirement to retain the continuous three-year product. The new episode preserves the complete native cast, ordinary choices and all actual native history; it stops at 13:00 with no invented harvest or elders’ speech. Old saves are refused. The original day-12 and actual881-day gates remain unqualified historical evidence. An earlier current replay/control run passed14 tests in166.03s; the original long run did not qualify, and one process was stopped after42minutes without a result. That is the reason for this product simplification, not a passed performance claim.
+
+Expired follow-ups have these current dispositions (UPKEEP, next review 2026-11-12): physical-phone keyboard/enlarged-text and cold-player layout need actual device evidence; a local browser proxy does not close them. Production compact-notebook receipt remains open because no authorized real recording receipt was observed. Owner feel/F-491/F-492/F-465 acceptance remains open and unclaimed. F-1575 speech-gate/New-game, F-1576 Zehra-gate visibility and F-1294 notebook layout require a current-episode retest before closure. F-1162 storm-loss and midnight/cross-year steward-care tests are outside the six-hour episode and are deferred to a separately proposed longer edition; no weather or long-term care result is claimed. Ordinary positive contribution and broader household/dialogue/source-contract cases need genuine current native fixtures; synthetic controls do not close them. Retained-person admission stays closed wherever the exact released SDK contract cannot validate it. GD is retired; UPKEEP owns these dispositions.
+
+## Historical record below
+
+# HF4.15.1 source composition — 2026-11-01
+
+Remaining: root runtime grant after Well physical return; actual current fingerprint pins;
+mandatory lane; original day12 at120000ms; complete881-day term; full native/game replay
+and useful next input; independent exact CodexCLEAR; exact source/target CI; ordinary
+deployment/live identity. This is uncommitted source preparation, not a completed port.
+Parent accepts the engineering handback. Adam accepts feel separately.
+
+Base: exact fetched origin/main d014874ff3ec1fb02581c5b2713508555b8a74db.
+The bridge is composed as the4c6a57b→f6175c1 delta with7eb682f/f232375 follow-ups.
+Current main differs from that base only by the retained historical budget section.
+Notebook, Zehra, weather, cast, recovery and literal wording fixes precede the base.
+No shared checkout, framework, SDK or lab source was edited.
+
+Source pins: publishedHF4.15.1, released client0.5.15/kit0.5.32, Valley0.4.0.
+The workspace override unifies native client/gameHF4.15.1. Existing strict install
+policy remains. Source uses public readRunHistory for pooled history, current inspection
+for lifecycle and retained semantic-memory evidence, public preview for conditional observer-held hunches, and strict
+current native restore/replay. No old game world or optional old term can be loaded.
+The internal reply/dialogue markers remain content schema tags, not gameplay switches.
+
+Normal New game constructs the complete public term. Daily fidelity retains all
+faculties/clock/people/inputs with the published1e-7 local estimate instead of fine1e-12.
+This changes numerical estimates and can change decision timing and later causal world
+outcomes. No measured Valley4.15.1 speed, exactness or numerical comparison is claimed.
+The original fine failures and partial journal results below remain historical evidence.
+
+Prepared commands (runtime grant required): `pnpm run proof:day12` is the ORIGINAL
+120000ms test with seed406153184/minute17550/unchanged15-input schedule. It retains the
+5KB compact limit. `pnpm run proof:export -- --out ABSOLUTE_PRIVATE_DIRECTORY` separately
+captures full/native/compact files, native replay, full game replay and actual next visit.
+`pnpm run proof:term -- --out ABSOLUTE_PRIVATE_DIRECTORY` uses the same original inputs
+through actual881-day ending. Neither control substitutes for the original day12 test.
+Use a fresh output directory; files refuse overwrites. Launch>=8GB disk, stop<5GB disk.
+Never treat these as RAM limits. All runtime claims remain unproved.
+
+The two null pins in test/fixtures/hf4151-fingerprints.json deliberately prevent a green
+lane before actual current measurements. Historical4.8 hashes are labelled separately.
+Other outcome/timing fixtures also require actual current-version review; do not repin
+by intuition or remove failures. Full savedAt is real save metadata; deterministic state,
+input log, provenance, native hash and game fingerprint are compared separately.
+
+Private source plan/report: ~/code/.lab-scratch/games-deferred/valley-hf4151-port-plan.md
+and worker-valley-hf4151-progress.md/result.md/json. Parent adopts the unmerged source tree
+for ongoing integration; preserve patch/untracked evidence on handback. No commit, push,
+PR, deployment, browser or player acceptance is claimed in this preparation.
+
+---
+
+The dated handoff below is retained as historical source authority.
+
 # HF4 port handoff — 2026-10-28
 
 Remaining: published client Valley bindings (G2, review 2026-11-03), then the Run bridge and exact new-pin game export/replay, CI, deployment and acceptance. HF stays at 3.0.0; see [the concrete refusal receipt](docs/hf4-port-status.md). PR9 merged the exact causal tree 7005dd2 as 2e992a1. The bounded follow-up adopts kit 0.5.22 and its shelf-label constant; no simulation change is claimed.
