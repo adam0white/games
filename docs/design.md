@@ -1,5 +1,33 @@
 # The Pass: design
 
+## Current item follow-ups — 2026-11-05
+
+Each item below has an inspection checkpoint of **2026-11-12**. This does not schedule a player or establish delivery, a cause or acceptance. Future November 10 targets and all sealed source wording below remain unchanged.
+
+| Item | Reason |
+| --- | --- |
+| F2496 | Verify the Nevin follow-up station-gap warning at the actual kitchen-door route; the reached reports differ. |
+| F2498 | Reproduce Selim’s repeated bathroom reply before assigning a cause. |
+| F2500 | Check the real saved-run Resume path; Emre did not try it and progress loss is not proved. |
+| F2501 | Check the early bill and per-night arithmetic in current service; no bank outcome was reached. |
+| F2502 | Assess recovery after an insistence using actual refusal and cost; the 215-minute cause is unverified. |
+| F2503 | Inspect actual response selection and preview/status wording without requiring obedience. |
+| F2505 | Recheck Rosa’s reached insistence and quote wording; the cause and her acceptance remain unverified. |
+| F2506 | The opening arithmetic candidate needs current delivery and player judgment; it is not a success forecast. |
+| F2507 | Inspect Dilek’s real meal-break warning and plan text; an earlier meal does not prove schedule failure. |
+| F2508 | Verify the possible-reply wording and actual meal choices; historic assent cause and player acceptance remain unknown. |
+| F2509 | The bathroom drawing shipped, but Sonia’s historical phone-label cause and judgment remain unknown. |
+| Maya phone talk-another-time | Inspect the button on the actual phone People sheet; it was tapped while the offers were greyed out. |
+| F471 | Selectable topics and costed private invitations need Tomas or another eligible player’s and Adam’s judgment. |
+| F472 | The existing ordinary check-in needs eligible-player and owner judgment in quiet service. |
+| GDI003 | Existing cooks can clear plates; wider front-of-house roles need a host design and owner judgment. |
+| Scheduled prayer and running-review witness | The exact seeded prayer-and-break witness needs a current native trace; earlier controls did not establish that coupled path. |
+| GDI008/009/570 | Generic shared-obligation and work-attention contracts remain with HF; retain current last-cook convention. |
+| GDI571 | A request-outcome source with authority and experienced felt evidence remains unavailable; do not infer it from receipts. |
+| F283/F284 and GDI001/002 | Chef-cooking feel and first-service return require eligible-player and Adam judgment; source controls do not decide taste. |
+| C1 modified learner | The current public modified verdict is unobserved; the historical native negative-credit fixture does not prove it. |
+
+
 **One line.** You inherited your late aunt Nevin's neighbourhood lokanta, and with it three cooks who were loyal to her, not to you. The bank wants the arrears by Saturday close. Six dinner services. Every cook can say no.
 
 **Done for the first playable** (set 2026-10-18 by the coordinator's brief; the owner accepts feel separately): six playable nights with one new pressure each, an ending, a playtest export that replays, tests, a headless balance measure, a late source-unread playtest recorded verbatim, live at https://pass.adamwhite.work.
