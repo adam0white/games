@@ -1,5 +1,7 @@
 # Upkeep candidate — 2026-11-05
 
+[Item-specific open checkpoints](docs/upkeep-checkpoints-2026-11-05.md) retain the original requests and their separate dates.
+
 Remaining: exact-source review, CI, integration and deployment. This source candidate targets HF 4.17.0; it is not a delivery receipt. F-2689 and the remaining open second-retest inspection leads require cause investigation and coordination with the lab. Recheck 2026-11-12; no product or driver cause is yet established. Preserve the original report dates below.
 
 # Retest 1 UI candidate — 2026-10-31
