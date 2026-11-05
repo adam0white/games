@@ -72,7 +72,8 @@ export function bodyForecastHint<W>(run: BuildingRun<W>, loads: readonly BodyFor
     inputs: [],
     bodyForecast: loads,
   });
-  const spans = result.bodyForecast?.spans;
+  const forecast = result.bodyForecast;
+  const spans = forecast?.kind === 'conditional-body' ? forecast.spans : undefined;
   if (!spans?.length) return 'You do not know how this work will feel.';
   const worst = spans.reduce((a, b) => (b.worst > a.worst ? b : a));
   const feeling = { fatigue: 'tired', sleepiness: 'sleepy', hunger: 'hungry', thirst: 'thirsty' }[

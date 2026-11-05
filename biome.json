@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.5/schema.json",
   "files": {
     "includes": [
       "**",
@@ -29,5 +29,18 @@
     "rules": {
       "preset": "recommended"
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "HANDOFF.md",
+        "docs/design.md",
+        "docs/hf-requests.md",
+        "docs/playtests/round-1-2026-10-19.md"
+      ],
+      "formatter": {
+        "enabled": false
+      }
+    }
+  ]
 }
