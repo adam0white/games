@@ -1812,3 +1812,11 @@ body {
 .tutorial-prompt:has([data-tutorial-skip]) button {
   flex: 0 0 auto;
 }
+@media (max-width: 699px) {
+  .card:has(.tutorial-prompt) .card-text {
+    gap: 2px;
+  }
+  .card:has(.tutorial-prompt) .opts {
+    gap: 3px;
+  }
+}

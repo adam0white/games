@@ -137,7 +137,6 @@ let raf = 0;
 let last = 0;
 let carry = 0;
 let answeredAt = -1e9;
-let hurry = false;
 let turnAt = 0;
 let view: { key: string; v: CardView } | null = null;
 let drawn = { log: '', sheet: '' };
@@ -450,7 +449,7 @@ function infoPage() {
             '<p>Trust is how much she believes you. The game shows no number. Your handwriting gets darker as she trusts you more. The pencil handwriting gets larger as she trusts the other voice more.</p>',
             '<p>Insisting does not always cost trust, and it is not a promise she will agree. When she is already tired of being pushed, it can cost trust. A note above the choices says when holding works worse than tapping.</p>',
             '<p>You have 64 seconds to read and answer each choice. If they pass, she chooses for herself, and the day records that time ran out.</p>',
-            '<p>Time passes faster between choices. Skip ahead moves the clock to her next choice, or to the end of the day if none is left. It never skips a choice.</p>',
+            '<p>Time passes faster between choices. Next choice moves the clock to her next choice, or to the end of the day if none is left. It never skips a choice.</p>',
             '<p>Pace in the Game menu changes only the time between choices, not the 64 seconds. The clock stops while that menu is open.</p>',
             '<p class="desktop-only">Press Shift+Enter to insist on the selected choice.</p>',
           ].join('')
@@ -769,7 +768,6 @@ function day() {
   lab.screen(`day ${s.day}`);
   requestWake();
   drawn = { log: '', sheet: '' };
-  hurry = false;
   app.innerHTML = `<div class="day" id="dayroot">
     ${header(true, true)}
     ${toast ? `<div class="toast" id="toast">${esc(toast)}</div>` : ''}
@@ -803,10 +801,10 @@ function rate(nowMs: number): number {
     // The card closes on the window's last step: `win` steps after the one that opened it.
     return win / CARD_SECONDS;
   }
-  if ((nowMs - answeredAt) / 1000 < READ_SECONDS && !hurry) return 1;
+  if ((nowMs - answeredAt) / 1000 < READ_SECONDS) return 1;
   const next = nextCardAt(s);
   const remaining = next === null ? 1 : Math.max(1, next - s.minute);
-  return hurry ? Math.max(60, remaining / 0.5) : Math.max(GAP_FLOOR, remaining / GAP_TAU);
+  return Math.max(GAP_FLOOR, remaining / GAP_TAU);
 }
 
 function frame(t: number) {
@@ -825,7 +823,7 @@ function frame(t: number) {
       carry +=
         dt *
         rate(t) *
-        (s.card || hurry || (t - answeredAt) / 1000 < READ_SECONDS
+        (s.card || (t - answeredAt) / 1000 < READ_SECONDS
           ? 1
           : { automatic: 1, slow: 0.5, steady: 1, fast: 2 }[pacing]);
       while (carry >= 1 && s.phase === 'day') {
@@ -840,7 +838,6 @@ function frame(t: number) {
         }
         if (!had && s.card) {
           carry = 0;
-          hurry = false;
           break;
         }
       }
@@ -1038,7 +1035,7 @@ function drawSheet() {
       target?.classList.add('tutorial-target');
       target?.insertAdjacentHTML(
         'beforebegin',
-        '<p class="tutorial-prompt" data-tutorial-target><span>↓ Guide Dilan’s week. Tap a choice. Time out: she decides.</span><button data-tutorial-skip>Skip guide</button></p>',
+        '<p class="tutorial-prompt" data-tutorial-target><span>↓ Guide Dilan’s week. Tap a choice. Time out: she decides without your advice.</span><button data-tutorial-skip>Skip guide</button></p>',
       );
       el.querySelector('[data-tutorial-skip]')?.addEventListener('click', finishTutorial);
     }
@@ -1065,8 +1062,10 @@ function drawSheet() {
   document.getElementById('hurry')?.addEventListener('click', () => {
     if (tutorial === 'result') finishTutorial();
     if (s?.card || s?.phase !== 'day') return;
-    hurry = true;
-    answeredAt = -1e9;
+    carry = 0;
+    runToCard(s);
+    writeSave();
+    drawDay();
   });
 }
 
@@ -1148,11 +1147,9 @@ function drawStatus() {
             ? left * CARD_SECONDS <= 8
               ? `She decides in ${Math.ceil(left * CARD_SECONDS)} seconds.`
               : `${Math.ceil(left * CARD_SECONDS)} seconds to answer.`
-            : hurry
-              ? 'Time is passing quickly.'
-              : (performance.now() - answeredAt) / 1000 < READ_SECONDS
-                ? 'She is answering.'
-                : '';
+            : (performance.now() - answeredAt) / 1000 < READ_SECONDS
+              ? 'She is answering.'
+              : '';
 }
 
 function gapHtml(a: Answer | null): string {
@@ -1160,7 +1157,7 @@ function gapHtml(a: Answer | null): string {
   if (!a || !journalLines(s).some((line) => line.who === 'scene')) {
     return `<div class="gap"><p class="soft">${s.day === 1 ? 'Her alarm is about to ring.' : 'The day starts.'}</p></div>`;
   }
-  return '<div class="gap-actions"><p class="soft desktop-only">Her day continues. Her next choice will appear here.</p><button class="quiet" id="hurry" aria-label="Skip to the next event">Skip ahead ⏩</button></div>';
+  return '<div class="gap-actions"><p class="soft desktop-only">Her day continues. Her next choice will appear here.</p><button class="quiet" id="hurry" aria-label="Next choice">Next choice ⏩</button></div>';
 }
 
 /** These are her reported thoughts, not a promise to agree next time. */

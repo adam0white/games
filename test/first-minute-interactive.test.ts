@@ -201,3 +201,39 @@ it('starts a new game while the guide is showing a consequence', async () => {
     await page.close();
   }
 }, 30_000);
+
+it('offers a direct next-choice control and explains the cost of letting time run out', async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto(origin);
+    await page.locator('#new').click();
+    await page.locator('.opt').first().waitFor();
+    expect(await page.locator('[data-tutorial-target]').textContent()).toContain('without your advice');
+    await page.waitForTimeout(350);
+    await page.locator('.opt').first().click();
+    const next = page.getByRole('button', { name: 'Next choice' });
+    expect(await next.count()).toBe(1);
+    const start = Date.now();
+    await next.click();
+    await page.locator('.opt').first().waitFor();
+    expect(Date.now() - start).toBeLessThan(2000);
+    expect(await page.evaluate(() => window.__murmur.state?.inputs.length)).toBe(1);
+  } finally {
+    await page.close();
+  }
+}, 30_000);
+
+it('keeps every first-choice control inside the phone viewport', async () => {
+  const page = await browser.newPage({ viewport: { width: 360, height: 690 }, reducedMotion: 'reduce' });
+  try {
+    await page.goto(origin);
+    await page.locator('#new').click();
+    await page.locator('.opt').first().waitFor();
+    const bottoms = await page
+      .locator('.card button')
+      .evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().bottom));
+    expect(Math.max(...bottoms)).toBeLessThanOrEqual(690);
+  } finally {
+    await page.close();
+  }
+}, 30_000);
