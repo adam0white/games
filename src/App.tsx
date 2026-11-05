@@ -420,6 +420,20 @@ export default function App() {
     };
   }, []);
   const [fileError, setFileError] = useState('');
+  useEffect(() => {
+    if (!continuity.fileSession || new URLSearchParams(location.search).get('tutorial') !== '1')
+      return;
+    const selection = ++fileSelection.current;
+    void continuity
+      .importFile(saveGame(createGame(42)))
+      .then((state) => {
+        if (selection === fileSelection.current) setFileState({ state, selection });
+      })
+      .catch(() => {
+        if (selection === fileSelection.current)
+          setFileError('The practice workshop could not open.');
+      });
+  }, []);
   if (!continuity.fileSession) return <Workshop />;
   if (fileState)
     return (
@@ -1499,21 +1513,31 @@ function Workshop({
                     job={job}
                     disabled={jobLocked}
                     testCondition={guided ? undefined : useCondition}
+                    guidePhase={
+                      guided &&
+                      (progress.phase === 'try' ||
+                        progress.phase === 'open' ||
+                        progress.phase === 'power-on')
+                        ? progress.phase
+                        : undefined
+                    }
                     onPower={() => act({ type: 'power', jobId: job.id, on: !job.model.power })}
                     onTry={(condition) => act({ type: 'verify', jobId: job.id, condition })}
                     onOpen={() => {
                       setOpened(true);
                       setPane('object');
-                      // This explicit reveal keeps the cue and parts together on a phone.
+                      // Reveal the first selectable part in the scrolling bench on phones.
                       if (window.matchMedia('(max-width: 900px)').matches)
                         requestAnimationFrame(() =>
                           document
-                            .querySelector('.first-repair-guide')
-                            ?.scrollIntoView({ block: 'start' }),
+                            .querySelector('.device-stage [role=button]')
+                            ?.scrollIntoView({ block: 'nearest' }),
                         );
                     }}
                     opened={opened}
-                    allowOpen={!guided || progress.phase !== 'try'}
+                    allowOpen={
+                      !guided || (progress.phase !== 'try' && progress.phase !== 'power-on')
+                    }
                   />
                   <div className="scene-speech">
                     <RecentConversation
@@ -2998,6 +3022,9 @@ function Workshop({
                     Close file session
                   </button>
                 )}
+                <a href="/file/?tutorial=1" target="_blank" rel="noreferrer">
+                  Replay tutorial in a practice workshop
+                </a>
                 <button className="reading-row" type="button" onClick={() => setSheet('history')}>
                   The workshop's history <span>▸</span>
                 </button>

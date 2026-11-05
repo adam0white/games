@@ -1161,6 +1161,7 @@ details[aria-label="Browser continuity"] {
   animation: guide-pulse 1.8s ease-in-out infinite;
 }
 .guide-try .physical-use-action,
+.guide-power-on .physical-power-switch,
 .guide-open .physical-cover-latch {
   outline: 2px solid #e6b77a;
   animation: guide-pulse 1.8s ease-in-out infinite;
@@ -1173,6 +1174,7 @@ details[aria-label="Browser continuity"] {
 @media (prefers-reduced-motion: reduce) {
   .workshop-shell .guide-target,
   .guide-try .physical-use-action,
+  .guide-power-on .physical-power-switch,
   .guide-open .physical-cover-latch {
     animation: none;
   }

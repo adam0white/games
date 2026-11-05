@@ -13,6 +13,7 @@ interface Props {
   opened?: boolean;
   allowOpen?: boolean;
   testCondition?: TestCondition;
+  guidePhase?: 'try' | 'open' | 'power-on';
 }
 
 function ActionIcon({ action }: { action: 'Carry' | 'Read' | 'Try' | 'Play' | 'Air' }) {
@@ -69,6 +70,7 @@ export function PhysicalObjectScene({
   opened = false,
   allowOpen = true,
   testCondition,
+  guidePhase,
 }: Props) {
   const revision = job.evidence.findLast((entry) => entry.kind === 'work')?.id ?? 0;
   const lastUse = job.evidence.findLast((entry) => entry.kind === 'use' && entry.id > revision);
@@ -183,11 +185,12 @@ export function PhysicalObjectScene({
             aria-label={
               mechanical
                 ? `${job.model.power ? 'Stop' : 'Run'} ${job.title} mechanism`
-                : `Switch ${job.title} ${job.model.power ? 'off' : 'on'}`
+                : `Switch ${job.title} ${job.model.power ? 'off' : 'on'}${guidePhase === 'power-on' ? ', then carry it again' : ''}`
             }
             disabled={disabled}
             onClick={onPower}
           >
+            {guidePhase === 'power-on' && <span>Switch on</span>}
             <span className="physical-switch-mark" aria-hidden="true">
               I
             </span>
@@ -205,12 +208,15 @@ export function PhysicalObjectScene({
               disabled={disabled}
               onClick={onOpen}
               aria-expanded={opened}
-              aria-label={`Look inside ${job.title}`}
+              aria-label={`${guidePhase === 'open' && !opened ? 'Open the cover. ' : ''}Look inside ${job.title}`}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M5 8h14v11H5Zm4 0V5h6v3M9 13h6" />
               </svg>
-              <span>{opened ? 'Inside' : 'Look inside'}</span>
+              <span>
+                {opened ? 'Inside' : 'Look inside'}
+                {guidePhase === 'open' && !opened && <small> ← Open the cover</small>}
+              </span>
             </button>
           )}
         </div>
@@ -222,7 +228,10 @@ export function PhysicalObjectScene({
         onClick={() => onTry(condition)}
       >
         <ActionIcon action={icon} />
-        <span>{action}</span>
+        <span>
+          {action}
+          {guidePhase === 'try' && <small> ← Try it</small>}
+        </span>
         <small>15 min</small>
       </button>
       <p className="physical-observation">{lastUse ? `Last test: ${lastUse.summary}` : ''}</p>

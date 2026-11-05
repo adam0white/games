@@ -71,42 +71,46 @@ export function FirstRepairGuide({
         ? 'repair'
         : 'object';
   const cue =
-    phase === 'try'
-      ? 'Try carrying it.'
-      : phase === 'open'
-        ? opened
-          ? 'Choose a part inside, then examine it.'
-          : 'Open the cover to look inside.'
-        : phase === 'measure-source'
-          ? staleReadings(job)
-            ? 'The repair changed the object. Measure the battery again.'
-            : 'Start at the battery. Put a probe on each marked connection.'
-          : phase === 'measure-path'
-            ? `Now compare both sides of the ${part?.label.toLowerCase() ?? 'next part'} while it moves.`
-            : phase === 'inspect'
-              ? `The reading points to the ${part?.label.toLowerCase() ?? 'connection'}. Examine it before changing anything.`
-              : phase === 'repair'
-                ? repairCue(state, part)
-                : phase === 'check'
-                  ? 'The part has changed. Carry the lantern again to see what changed.'
-                  : 'It stays lit when carried. Give it back to its owner.';
+    phase === 'power-on'
+      ? 'Switch it on, then carry it again.'
+      : phase === 'try'
+        ? 'Try carrying it.'
+        : phase === 'open'
+          ? opened
+            ? 'Choose a part inside, then examine it.'
+            : 'Open the cover to look inside.'
+          : phase === 'measure-source'
+            ? staleReadings(job)
+              ? 'The repair changed the object. Measure the battery again.'
+              : 'Start at the battery. Put a probe on each marked connection.'
+            : phase === 'measure-path'
+              ? `Now compare both sides of the ${part?.label.toLowerCase() ?? 'next part'} while it moves.`
+              : phase === 'inspect'
+                ? `The reading points to the ${part?.label.toLowerCase() ?? 'connection'}. Examine it before changing anything.`
+                : phase === 'repair'
+                  ? repairCue(state, part)
+                  : phase === 'check'
+                    ? 'The part has changed. Carry the lantern again to see what changed.'
+                    : 'It stays lit when carried. Give it back to its owner.';
   const pair = progress.suggestedPair;
   const showPair = pair && (phase === 'measure-source' || phase === 'measure-path');
   return (
     <section className="first-repair-guide" data-phase={phase} aria-label="First repair guide">
-      <div className="guide-cue">
-        <svg
-          viewBox="0 0 24 24"
-          width="24"
-          height="24"
-          fill="none"
-          stroke="currentColor"
-          aria-hidden="true"
-        >
-          <path d="M9 17h6m-5 3h4M8 14c-6-7 2-15 7-10 4 3 2 7-1 10v3H9Z" />
-        </svg>
-        <p>{cue}</p>
-      </div>
+      {phase !== 'try' && phase !== 'power-on' && (phase !== 'open' || opened) && (
+        <div className="guide-cue">
+          <svg
+            viewBox="0 0 24 24"
+            width="24"
+            height="24"
+            fill="none"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M9 17h6m-5 3h4M8 14c-6-7 2-15 7-10 4 3 2 7-1 10v3H9Z" />
+          </svg>
+          <p>{cue}</p>
+        </div>
+      )}
       {showPair && (
         <div
           className="guide-probes"
@@ -138,7 +142,7 @@ export function FirstRepairGuide({
           </small>
         </div>
       )}
-      {target !== pane && phase !== 'try' && phase !== 'open' && (
+      {target !== pane && phase !== 'try' && phase !== 'power-on' && phase !== 'open' && (
         <button
           type="button"
           className="guide-next"
@@ -159,11 +163,9 @@ export function FirstRepairGuide({
           <span aria-hidden="true">→</span>
         </button>
       )}
-      {phase !== 'try' && (
-        <button type="button" className="guide-dismiss" onClick={onSkip}>
-          Explore freely
-        </button>
-      )}
+      <button type="button" className="guide-dismiss" onClick={onSkip}>
+        Skip tutorial
+      </button>
     </section>
   );
 }
