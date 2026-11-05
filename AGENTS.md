@@ -4,7 +4,7 @@ Read README.md, HANDOFF.md, docs/vision.md and docs/mvp.md before resuming. This
 
 ## Current stack and maintenance
 
-2026-10-28: HF4 port targets published HF 4.11.0, immutable lab-client 0.5.11 and lab-kit 0.5.28. The game, client and kit resolve the same physical HF 4.11.0 module. Client 0.5.11 intentionally retains the `hf-legacy` alias at 3.0.0 for its legacy adapter. Use shared Node 26.12.0, TypeScript 7.0.2, React 19.3.1, Vite 8.3.5, Vitest 5.0.5, Biome 2.6.3, Wrangler 4.152.0 and Knip 6.43.0. Run suites through `npm test` and the shared machine lock. Worker compatibility date 2026-10-25. [HF4 adoption](docs/hf4-adoption.md) owns the port; HF3 records are historical.
+Current candidate uses HF 4.17.0 directly, immutable lab-client 0.5.11 and lab-kit 0.5.28. The client's dependency remains HF 4.11.0, and its `hf-legacy` alias remains 3.0.0; do not claim one physical engine or qualified cross-person portability. Use shared Node 26.12.0, TypeScript 7.0.2, React 19.3.1, Vite 8.3.5, Vitest 5.1.0, Biome 2.6.5, Wrangler 4.157.0 and Knip 6.44.1. Run full suites under the shared machine lock. Worker compatibility date 2026-11-05. [HF4 adoption](docs/hf4-adoption.md) records the earlier port; HF3 records are historical.
 
 ## Current authorization
 
@@ -73,6 +73,6 @@ Player-facing copy follows [Plain English](docs/lab/plain-english.md). Keep the 
 
 ## Current installer delivery
 
-Use shared Node 26.12.0 and pnpm 12.14.0 with /opt/homebrew/bin first on PATH. Install with `pnpm install --frozen-lockfile`; keep `pnpm-lock.yaml`. `pnpm-workspace.yaml` owns overrides and exact native build permissions. `npm run` remains valid for scripts. The normal `check:lane` runs lint and typecheck without the machine lock. Hosted CI runs the full check; do not wait on the suite lock for a game commit. Sign commits and include `Co-Authored-By: Codex <noreply@openai.com>`.
+Use shared Node 26.12.0 and pnpm 12.16.1 with /opt/homebrew/bin first on PATH. Install with `pnpm install --frozen-lockfile`; keep `pnpm-lock.yaml`. `pnpm-workspace.yaml` owns overrides and exact native build permissions. `npm run` remains valid for scripts. The normal `check:lane` runs lint and typecheck without the machine lock. Hosted CI runs the full check; do not wait on the suite lock for a game commit. Sign commits and include `Co-Authored-By: Codex <noreply@openai.com>`.
 
 The two fixed historical snapshots retain their original npm locks and `npm ci` reconstruction as a compatibility exception. Preserve `scripts/build-archives.mjs` byte for byte: its hash is embedded in archive provenance. Current installer delivery requires the full lane, identical raw current and archive output including provenance, independent review, signed main and exact green CI. This installer change does not deploy the game or establish game readiness.

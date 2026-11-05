@@ -9,6 +9,7 @@ import {
   preparePersonaLife,
 } from '@adam0white/lab-client';
 import { requireSharedWrite } from '../shared-write.ts';
+import { UnsupportedCastChapter } from './cast-errors.ts';
 import { admitOpeningPerson, exportPersonRun, type Person, projectPerson } from './hf.ts';
 import { loadGame, saveGame } from './persistence.ts';
 import type { GameState } from './types.ts';
@@ -55,9 +56,7 @@ export function admitWorkshop(input: LifePreparation, opening: Person): Person {
     e.transfer.sourceRole !== (commonstead ? e.castId : role) ||
     !same(preparePersonaLife(e, input.clockMs).life, input.life)
   )
-    throw new Error(
-      'This saved person belongs to an unsupported chapter. Keep or export it there; start fresh here.',
-    );
+    throw new UnsupportedCastChapter();
   const person = validatePortablePerson(commonstead ? e.transfer.portable : e.transfer.person);
   if (
     person.version !== 2 ||
@@ -162,7 +161,7 @@ export function validateCastChapter(chapter: CastChapter): void {
       claim.branchId !== input.parent.branchId ||
       claim.parentRevision !== input.parent.revision ||
       claim.source.game !== 'repair' ||
-      claim.source.engine !== '4.11.0' ||
+      claim.source.engine !== '4.17.0' ||
       claim.source.rules !== 'canonical-workshop-3' ||
       claim.terminal ||
       !same(claim.transfer, { ...input.parent.transfer, life: input.life })

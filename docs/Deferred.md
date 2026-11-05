@@ -1,3 +1,7 @@
+## Current follow-up — 2026-11-05
+
+Recheck F3011 on 2026-11-12: Nora's actual availability and an intelligible route to ask remain to be verified without forcing assent. Recheck F3018 and F3021 on 2026-11-12: point-of-use meter interpretation remains to be assessed against the actual circuit. Recheck F3019 on 2026-11-12: the two reached proposal phrases need a clear reading without changing owner agency. Recheck F3022 on 2026-11-12: the mechanical diagnostic explanation needs assessment while keeping the actual ratios. Recheck F3106, F3109 and F3112 on 2026-11-12: the independent-work route, conversation wording and reading explanation candidates need verification; the reports do not prove route absence or a physics defect. Nia's earlier continuity disposition also remains unknown; recheck on 2026-11-12 without inventing a paired result. The November 10 preservation and preference checkpoints remain unchanged. Original player words and historical dates below remain evidence.
+
 # Deferred player requests
 
 These requests are open inspection leads from the 2026-11-01 Small Works partial initial collection continuation. Dates are review targets, not claims of fixes or acceptance. This is not a same-four retest or a reset of the collection cap. Original F1473–F1487 are not bulk resolved. Source: sealed 36-payload packet, manifest SHA-256 `a4fec8252d2be9c6caaca1f80bf6b30b1c7b1cf141ac930a0b9e726d9493e9fd`; root qualification SHA-256 `1247dc866b312ba7165d6260753e6e860be820250f7759de07e8539417b501c0`.

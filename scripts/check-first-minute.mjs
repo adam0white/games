@@ -4,6 +4,15 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const browser = await chromium.launch({ headless: true });
 try {
   for (const viewport of [{ width: 360, height: 690 }, { width: 1280, height: 800 }]) {
+    // Ordinary new-game entry: follow controls, never body text.
+    const ordinary = await browser.newPage({ viewport });
+    await ordinary.goto(process.env.CLARITY_URL || 'http://127.0.0.1:5178');
+    await ordinary.getByRole('button', { name: 'Start repairing', exact: true }).click();
+    await ordinary.locator('.guide-try .physical-use-action').click();
+    await ordinary.locator('.guide-open .physical-cover-latch').waitFor();
+    assert.equal(await ordinary.locator('.physical-scene.has-output').count(), 0, 'ordinary carry visibly fails');
+    await ordinary.close();
+    // Replay opens a separate practice workshop.
     const page = await browser.newPage({ viewport });
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
