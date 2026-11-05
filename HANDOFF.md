@@ -1,3 +1,7 @@
+# Upkeep candidate — 2026-11-05
+
+Remaining: exact-source review, CI, integration and deployment. This source candidate targets HF 4.17.0; it is not a delivery receipt. The open empty-garden, return-time and claim-effect asks require the current Clarity candidate and its review to establish what is resolved. Recheck F-2652 through F-2659 on 2026-11-12; do not infer delivery or owner readiness from this dependency update.
+
 ## Clarity delivered — 2026-11-02
 
 Remaining: other open availability and Stage 4/shared-history requests retain their existing scope and targets. Adam accepts feel separately.

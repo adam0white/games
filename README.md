@@ -6,9 +6,9 @@ A static web game about talk, trust and consequences in an Istanbul tea garden. 
 
 The current canonical edition is documented in [canonical adoption](docs/canonical-adoption.md). It uses Hatice, Derya, Dilan, Nermin, Aylin, Ece, Rıza and Osman. The old engagement and its 32-person household cast are historical. [The original design](docs/design.md) and [playtest records](docs/playtests/README.md) retain that history. Adam accepts the game by playing; technical delivery does not establish owner acceptance.
 
-The current source pins Human Framework 4.12.0 and immutable lab-client 0.5.12 and lab-kit 0.5.29. It keeps current exports replayable and refuses incompatible older files with a Start fresh message. Portable writes stay closed for each person until all peers have verified compatible live readers and per-person skips. The client reads Voice source roles; peer write blockers still skip unsupported shelf heads without replacing them. See [HANDOFF.md](HANDOFF.md) for delivery and owner acceptance.
+The current source pins Human Framework 4.17.0 and immutable lab-client 0.5.12 and lab-kit 0.5.29. It keeps current exports replayable and refuses incompatible older files with a Start fresh message. Portable writes stay closed for each person until all peers have verified compatible live readers and per-person skips. The client reads Voice source roles; peer write blockers still skip unsupported shelf heads without replacing them. See [HANDOFF.md](HANDOFF.md) for delivery and owner acceptance.
 
-Use shared Homebrew Node 26.12.0 and pnpm 12.14.0 pinned by `.node-version` and `packageManager`:
+Use shared Homebrew Node 26.12.0 and pnpm 12.16.1 pinned by `.node-version` and `packageManager`:
 
 ```sh
 PATH=/opt/homebrew/bin:$PATH pnpm install --frozen-lockfile
@@ -36,7 +36,7 @@ Current HF4 exports retain complete pinned initial people, seed, current convers
 
 The current browser tests exercise both 360×690 and 1280×800 through start, a real timed conversation, save and reload. Historical browser tests explicitly load `test/fixtures/legacy.html`; that fixture is not built for production. The `scripts/hf-playtest/adapter.ts` four-call adapter constructs the current HF4 garden, uses its public actions and Hatice’s visible readings, and exports the complete current state. Its bounded headless control covers one offered action, elapsed time and exact cold replay. It establishes no player round, shared-person journey or current full-fortnight proof. The wedding adapter remains only in `test/helpers/historical-hearsay-adapter.ts` for retained regression controls. The old `scripts/drive.ts`, `scripts/policy.ts`, `scripts/measure.ts` and `scripts/verify-browser.ts` remain historical editions 1–5 research. Their output does not describe current gameplay.
 
-The maintained stack is TypeScript 7.0.2, Vite 8.3.5, Vitest 5.0.5, Biome 2.6.3, Playwright 1.64.1 and Wrangler 4.152.0, on shared Node 26.12.0 and pnpm 12.14.0. Worker compatibility date: 2026-10-25. Miniflare retains Undici 7.30.1 because its HTTP 421 guard wraps the legacy dispatcher callbacks; review on 2026-11-03 or the next Miniflare release.
+The maintained stack is TypeScript 7.0.2, Vite 8.3.5, Vitest 5.1.0, Biome 2.6.5, Playwright 1.64.1 and Wrangler 4.157.0, on shared Node 26.12.0 and pnpm 12.16.1. Worker compatibility date: 2026-11-05. Miniflare retains Undici 7.30.1 because its HTTP 421 guard wraps the legacy dispatcher callbacks; review on 2026-11-03 or the next Miniflare release.
 
 The pnpm policy uses isolated hardlinks, strict engines and peers, a 1440-minute release age with only the owned package scope exempt, and reviewed esbuild/workerd lifecycle scripts. Unknown install scripts fail. `pnpm run` and `pnpm exec` reject stale dependencies; retained internal `npm run` script calls bypass that guard, so install the frozen lock first. Existing npm trees must remove root/workspace `node_modules`, install the frozen pnpm lock and delete `dist`, `.types` and `*.tsbuildinfo` before rebuilding.
 
