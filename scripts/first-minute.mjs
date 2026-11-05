@@ -93,16 +93,20 @@ for (const [name, engine] of [
         await page.locator('#morning-guide[data-step="reply"]').waitFor({ state: 'visible', timeout: 30000 });
         await shown(cue);
         await shown(page.locator('.morning-target').first());
-        const publicAnswer = page.locator('.house-response .w').first();
-        await publicAnswer.waitFor({ state: 'attached', timeout: 10000 });
-        {
-          const words = (await publicAnswer.textContent()).replace(/[“”]/g, '').trim();
-          assert.equal(
-            (await page.locator('.morning-answer').textContent()).replace(/[“”]/g, '').trim(),
-            words,
-            'Guide must retain the recorded public answer, not replace it with an internal decision label',
-          );
-        }
+        const publicResult = page.locator('.house-response .note').first();
+        await publicResult.waitFor({ state: 'attached', timeout: 10000 });
+        const result = await publicResult.evaluate((element) => {
+          const copy = element.cloneNode(true);
+          copy.querySelectorAll('.t, .w').forEach((node) => {
+            node.remove();
+          });
+          return copy.textContent.trim();
+        });
+        assert.equal(
+          (await page.locator('.morning-answer').textContent()).trim(),
+          result,
+          'Guide must show the recorded public result, without substituting an ambiguous quotation or another verdict',
+        );
         await page.screenshot({ path: `${output}/${name}-${viewport.width}-reply.png` });
         await retainClockFocus(cue.locator('[data-guide-finish]'));
         await click(cue.locator('[data-guide-finish]'));
@@ -130,7 +134,7 @@ for (const [name, engine] of [
           actualRequestAndReply: true,
           replayAndSkip: true,
           historicalRequestNotReplayed: true,
-          exactPublicQuote: true,
+          exactPublicResult: true,
           clockFocusRetained: true,
           errors,
         });

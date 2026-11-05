@@ -21,6 +21,7 @@ import {
 } from '../sim/terms.ts';
 import { clockWords, grainPreview, grainReceipt, paceWords, skipBlock, travelWords } from './clarity.ts';
 import { validLocalLog } from './local-log.ts';
+import { morningResult } from './morning-guide.ts';
 import { musicEvent } from './music.ts';
 import { automaticRate, type Pace, READING_MS } from './pacing.ts';
 import { zehraScene } from './scene-context.ts';
@@ -267,17 +268,12 @@ function mountMorningGuide() {
   }
   const state = g.valley;
   const ask = morningAsk ? state.asks.find((item) => item.id === morningAsk) : undefined;
-  const answerNote =
-    ask &&
-    state.notes.findLast(
-      (note) => note.kind === 'reply' && note.ask === ask.id && note.at <= state.minute && note.words,
-    );
-  const answerWords = answerNote ? noteWords(answerNote) : undefined;
+  const result = morningResult(state, ask?.id);
   const call = [...root.querySelectorAll<HTMLButtonElement>('#thumbs button')].find((button) =>
     button.textContent?.startsWith('Call this house'),
   );
   const availableCall = call && call.getAttribute('aria-disabled') !== 'true';
-  const step = ask ? (answerNote ? 'reply' : 'waiting') : selected && availableCall ? 'request' : 'house';
+  const step = ask ? (result ? 'reply' : 'waiting') : selected && availableCall ? 'request' : 'house';
   root.dataset.morningGuide = step;
   const text =
     step === 'house'
@@ -293,7 +289,7 @@ function mountMorningGuide() {
           : 'An answer is not finished work. Visits use time; gifts spend grain.';
   const announcement = root.querySelector('#morning-guide-status');
   if (announcement && announcement.textContent !== text) announcement.textContent = text;
-  const key = JSON.stringify([step, selected, confirmCall, answerWords]);
+  const key = JSON.stringify([step, selected, confirmCall, result?.id, result?.at, result?.text]);
   let cue = previous;
   if (!cue || cue.dataset.key !== key) {
     previous?.remove();
@@ -302,7 +298,7 @@ function mountMorningGuide() {
     cue.dataset.step = step;
     cue.dataset.key = key;
     cue.setAttribute('aria-label', 'First morning guide');
-    cue.innerHTML = `${step === 'house' && !selected ? '<div class="morning-flow" aria-label="Household, request, answer">⌂ → ✉ → ❝ <span data-guide-clock></span> → 13:00</div>' : ''}<p id="morning-instruction">${esc(text)}</p>${answerNote ? `<blockquote class="morning-answer" role="status">${esc(answerWords ?? '')}</blockquote>` : ''}<div class="morning-guide-actions">${answerNote ? '<button type="button" data-guide-finish>Continue the morning</button>' : ''}<button type="button" data-guide-skip>Skip guide</button></div>`;
+    cue.innerHTML = `${step === 'house' && !selected ? '<div class="morning-flow" aria-label="Household, request, answer">⌂ → ✉ → ❝ <span data-guide-clock></span> → 13:00</div>' : ''}<p id="morning-instruction">${esc(text)}</p>${result ? `<div class="morning-answer" role="status">${esc(result.text)}</div>` : ''}<div class="morning-guide-actions">${result ? '<button type="button" data-guide-finish>Continue the morning</button>' : ''}<button type="button" data-guide-skip>Skip guide</button></div>`;
     cue.querySelector('[data-guide-skip]')?.addEventListener('click', finishMorningGuide);
     cue.querySelector('[data-guide-finish]')?.addEventListener('click', finishMorningGuide);
   }
