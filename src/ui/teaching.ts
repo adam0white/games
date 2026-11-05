@@ -105,7 +105,17 @@ export function mountTeaching(plan = latestPlan) {
     ['plan', 'station', 'break', 'cover', 'done', 'ask-plan', 'open', 'continue'].includes(step)
   )
     step = 'crew';
-  if (step === 'continue' && document.querySelector('.board-change')) step = 'plan';
+  const boardVisible = !!document.querySelector('.board-change');
+  const serviceVisible = !!document.querySelector('.people-service');
+  if (boardVisible && ['crew', 'ask', 'waiting', 'result', 'continue'].includes(step)) {
+    step = 'plan';
+    requestedCook = null;
+    replyReady = null;
+  } else if (!boardVisible && !serviceVisible) {
+    step = 'continue';
+    requestedCook = null;
+    replyReady = null;
+  }
   if (step === 'continue' && document.querySelector('[data-pick]')) step = 'crew';
   if (['station', 'break', 'cover', 'done'].includes(step) && !document.querySelector('.board-editor'))
     step = 'plan';

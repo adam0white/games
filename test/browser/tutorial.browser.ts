@@ -134,3 +134,41 @@ test('starting a new kitchen resets a replayed guide after an earlier skip', asy
   await expect(page.locator('[data-tutorial-step="plan"]')).toBeVisible();
   await page.locator('[data-tutorial-skip]').click();
 });
+
+// DOM-only phase control: this isolates guide recovery, not native night progression.
+test('unfinished service practice remains dismissible at evening and the next board', async ({ page }) => {
+  await page.goto('/');
+  for (const serviceStep of ['crew', 'waiting', 'result']) {
+    await page.evaluate(async (phase) => {
+      const teachingPath = '/src/ui/teaching.ts';
+      const teaching = await import(teachingPath);
+      document.body.innerHTML =
+        '<main class="people-service"><button data-pick="selim" aria-pressed="true">Selim</button><div class="panel-reply"></div></main>';
+      teaching.beginTeaching('service', true);
+      if (phase !== 'crew') {
+        document.querySelector<HTMLButtonElement>('[data-pick]')?.click();
+        teaching.teachingRequestSent(() => phase === 'result', 'selim');
+      }
+      teaching.refreshTeaching();
+      teaching.mountTeaching();
+    }, serviceStep);
+    await expect(page.locator(`[data-tutorial-step="${serviceStep}"]`)).toBeVisible();
+    await page.evaluate(async () => {
+      const teachingPath = '/src/ui/teaching.ts';
+      const teaching = await import(teachingPath);
+      document.body.innerHTML = '<button id="open">Open on Friday</button>';
+      teaching.mountTeaching();
+    });
+    await expect(page.locator('[data-tutorial-step="continue"]')).toBeVisible();
+    await expect(page.locator('[data-tutorial-skip]')).toBeVisible();
+    await page.evaluate(async () => {
+      const teachingPath = '/src/ui/teaching.ts';
+      const teaching = await import(teachingPath);
+      document.body.innerHTML = '<button class="board-change">Change Selim’s plan</button>';
+      teaching.mountTeaching();
+    });
+    await expect(page.locator('[data-tutorial-step="plan"]')).toBeVisible();
+    await page.locator('[data-tutorial-skip]').click();
+    await expect(page.locator('[data-tutorial-step]')).toHaveCount(0);
+  }
+});
