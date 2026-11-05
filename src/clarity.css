@@ -121,10 +121,6 @@
   }
 }
 @media (max-width: 900px) {
-  /* Explore is also available in Workshop; leave the measurement cue beside its response. */
-  .active-meter .guide-dismiss {
-    display: none;
-  }
   .active-meter .first-repair-guide {
     padding: 8px 12px;
   }

@@ -107,3 +107,31 @@ it('shows the recorded voltage context and the required condition without diagno
   expect(html).toContain('does not identify a faulty part');
   expect(saveGame(measured.state)).toBe(before);
 });
+
+it('offers a way to skip before the first action', () => {
+  const state = createGame(42);
+  const job = state.jobs[0];
+  if (!job) throw new Error('Missing lantern');
+  const guide = FirstRepairGuide({
+    state,
+    job,
+    pane: 'object',
+    opened: false,
+    disabled: false,
+    onOpen: () => {},
+    onSkip: () => {},
+    onPane: () => {},
+    onTest: () => {},
+  });
+  expect(renderToStaticMarkup(guide)).toContain('Skip tutorial');
+});
+
+it('asks for power before treating a powered-off carry as a fault', async () => {
+  const { firstRepairProgress } = await import('../src/ui/first-repair');
+  let state = createGame(42);
+  const id = state.jobs[0]?.id;
+  if (!id) throw new Error('Missing lantern');
+  state = dispatch(state, { type: 'power', jobId: id, on: false }).state;
+  state = dispatch(state, { type: 'verify', jobId: id, condition: 'movement' }).state;
+  expect(firstRepairProgress(state).phase).toBe('power-on');
+});

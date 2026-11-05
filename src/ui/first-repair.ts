@@ -3,6 +3,7 @@ import type { GameState, MeasurementRequest } from '../game/types';
 
 export type FirstRepairPhase =
   | 'try'
+  | 'power-on'
   | 'open'
   | 'measure-source'
   | 'measure-path'
@@ -82,6 +83,8 @@ export function firstRepairProgress(state: GameState): FirstRepairProgress {
       suggestedPart: abnormal.componentId,
       suggestedPair: abnormal.request,
     };
+  if (lastUse?.cues.signal === 'power-off' && !job.inspected.length && !measurements.length)
+    return { ...progress, phase: job.model.power ? 'try' : 'power-on' };
   if (!lastUse && !job.inspected.length && !measurements.length) return progress;
   const condition = requiredChecks(job)[0] ?? 'movement';
   if (
