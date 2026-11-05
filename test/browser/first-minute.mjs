@@ -27,7 +27,18 @@ try {
   await page.locator('[data-action=tutorial-replay]').click();
   assert.equal(await page.locator('#cg-tutorial').count(), 1);
   await page.locator('#cg-tutorial button').click();
-  console.log('First-minute control path, result, skip and replay passed.');
+  const automatic = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await automatic.clock.install();
+  await automatic.goto('http://127.0.0.1:5190/');
+  await automatic.getByText('Other ways to begin').click();
+  await automatic.locator('[data-action=local]').click();
+  await automatic.locator('#cg-tutorial').waitFor();
+  await automatic.locator('.cg-tutorial-target[data-person]').click();
+  await automatic.locator('.cg-tutorial-target[data-action=listen]').click();
+  await automatic.clock.runFor(25000);
+  assert.equal(await automatic.locator('.cg-tutorial-target[data-action=support]').count(), 1);
+  await automatic.close();
+  console.log('First-minute control path, automatic completion, result, skip and replay passed.');
 } finally {
   await browser.close();
 }

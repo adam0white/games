@@ -704,9 +704,18 @@ export async function startGarden() {
         const minutes = Math.floor(carry);
         carry -= minutes;
         const before = run.log.length;
+        const conversation = run.chat;
         advanceGarden(run, Math.min(14 * 1440, run.minute + minutes));
         const stopped = gardenInterruption(run, before);
         if (stopped) notice = stopped;
+        if (tutorial === 'conversation' && conversation && !run.chat) {
+          tutorial =
+            selected === conversation.person &&
+            run.discoveries[selected] &&
+            !run.discoveries[selected]?.response
+              ? 'response'
+              : 'result';
+        }
         if (run.minute % 5 === 0) save();
         if (run.minute % 1440 === 0) void checkpoint();
         render();
