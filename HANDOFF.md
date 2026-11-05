@@ -1,12 +1,10 @@
-## HF 4.17 and opening clarity candidate — 2026-11-05
-
-Remaining: exact combined-source review and CI, normal merge, exact merged-main CI, deployment and owner acceptance. The ordinary first-minute browser path and practice replay path are checked without reading body text. One synthetic skim tester found a hidden first part; the script checks its visibility after the fix. This is not a human playtest.
-
-The receiver records 4.17 for new workshop claims, while the exact incoming passport allowlists remain unchanged. A genuine 4.17 workshop passport is refused on later re-entry before ownership writes, with the original history preserved and a plain explanation. It is not qualified for transfer. The 4.11 synthetic producer fixture and its reproducibility details are in `tests/fixtures/cast-portables-hf411.md`; the Commonstead identity-mapping test is not a producer proof. Historical whole-run saves still receive the existing start-fresh refusal.
-
 ## Upkeep follow-up — 2026-11-05
 
 Remaining: integrate open Clarity work, qualify HF 4.17 replay and release, and obtain Adam's play and acceptance. Recheck on 2026-11-12 because the owner judgment and current source qualification have not been recorded; no appointment or player panel is implied. The dated delivery receipts below remain historical.
+
+The synthetic ownership controls now project their historical person with the actual HF 4.11 engine, installed only for tests. The current 4.17 outgoing claim fails the unchanged 4.11-only chapter guard before shelf publication. The former positive Commonstead-to-workshop claim control is therefore replaced with a refusal control; the earlier positive result remains historical, and current cross-game continuation is not qualified. A separate file-origin control still exercises admission of a real 4.11 projection. No production admission was widened.
+
+Current new workshops start a local fresh cast without claiming or publishing shared heads. Existing source histories remain in their source; the New game confirmation asks players to download the previous workshop before replacing its local save. Same-person automatic carryover is unavailable until native HF 4.17 admission and claim support is qualified. Recheck on 2026-11-12 because the existing source guard accepts older engine stamps and the new claim path has not been qualified. Current local resume and replay remain required.
 
 ## Delivered technical record, 2026-11-04
 

@@ -34,6 +34,7 @@
     "scheduler": "0.28.0"
   },
   "devDependencies": {
+    "@adam0white/hf-fixture-411": "npm:@adam0white/human-framework@4.11.0",
     "@biomejs/biome": "2.6.5",
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",

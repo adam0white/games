@@ -78,7 +78,7 @@ export class WorkshopContinuity {
   private unclaimedCastIds = new Set<string>();
   get historyNotice() {
     return this.unclaimedCastIds.size
-      ? `Earlier character histories were kept in their source. These characters start fresh here: ${[...this.unclaimedCastIds].map((id) => canonicalCast(id).name).join(', ')}. This workshop does not replace those histories.`
+      ? `Any earlier character histories remain in their source. These characters start fresh here: ${[...this.unclaimedCastIds].map((id) => canonicalCast(id).name).join(', ')}. This workshop does not replace those histories.`
       : '';
   }
   loaded = false;
@@ -127,6 +127,15 @@ export class WorkshopContinuity {
       });
     }
     return this.departure;
+  }
+  /** Save the current chapter locally before an explicitly fresh cast is chosen. */
+  async departLocal(): Promise<void> {
+    await this.departure;
+    const current = this.state?.();
+    if (!this.started || !current?.inputs?.length || !this.update) return;
+    const paused = pauseForDeparture(current);
+    this.update(paused);
+    await this.persist(paused, false);
   }
   private async pauseAndCheckpoint() {
     const current = this.state?.();
@@ -395,6 +404,29 @@ export class WorkshopContinuity {
       this.busy = false;
       this.changed();
     }
+  }
+  /** Current HF 4.17 starts a separate local cast; it never claims shared heads. */
+  async freshLocal(seed: number) {
+    if (this.fileSession)
+      throw new Error('Starting a new workshop is unavailable in a file session.');
+    if (this.busy) throw new Error('A chapter is already being prepared.');
+    const state = createGame(seed);
+    this.generation++;
+    this.recordingKey = `workshop:${crypto.randomUUID()}`;
+    lab.setPersonaRecording('local-fresh-cast');
+    this.runId = crypto.randomUUID();
+    this.fileSources = [];
+    this.heads = [];
+    this.unclaimedCastIds = new Set(Object.values(CAST_IDS));
+    this.fileOrigin = false;
+    this.pendingLocal = null;
+    this.loaded = true;
+    this.started = true;
+    this.recordAfterStart = true;
+    this.status =
+      'This workshop starts with a fresh cast. Earlier character histories stay in their source; download your previous workshop before replacing its local save.';
+    this.changed();
+    return state;
   }
   async importFile(text: string) {
     const generation = ++this.generation;

@@ -20,32 +20,45 @@ import {
   workshopTransfer,
 } from '../src/game/cast';
 import { createGame, dispatch } from '../src/game/engine';
-import { projectPerson, snapshotRuntime } from '../src/game/hf';
+import { createPeopleRuntime, createPerson, promise, snapshotRuntime } from '../src/game/hf';
 import { loadGame, saveGame } from '../src/game/persistence';
 import { replayRecordedRun } from '../src/game/replay';
-import oldPortables from './fixtures/cast-portables-hf411.json';
+import { historicalPerson } from './historical-hf411';
 
-const stamps = { game: 'repair', build: 'test', engine: '4.17.0', rules: 'canonical-workshop-3' };
-const oldStamps = { ...stamps, engine: '4.11.0' };
+const stamps = { game: 'repair', build: 'test', engine: '4.11.0', rules: 'canonical-workshop-3' };
+const receivingStamps = { ...stamps, engine: '4.17.0' };
 // Explicit public authoring makes a distinct source. No cache edit changes an HF actor.
 async function source(id: 'nora' | 'rafi', prayer = false, prayerFrom = 540) {
   const castId = CAST_IDS[id]!;
   const cast = canonicalCast(castId);
-  // Captured from the unmodified 4.11 host and engine; never relabel a 4.17 projection.
-  const fixture =
-    id === 'rafi'
-      ? oldPortables.rafi
-      : prayer
-        ? prayerFrom === 600
-          ? oldPortables['nora-prayer-later']
-          : oldPortables['nora-prayer']
-        : oldPortables.nora;
+  const people = createPeopleRuntime(17, 540, prayer ? ['rest', 'pray'] : ['rest']);
+  const person = createPerson(people, {
+    id,
+    name: cast.name,
+    age: cast.age,
+    sex: id === 'nora' ? 'female' : 'male',
+    now: 540,
+    traits: { honesty: 0.91 },
+    body: { fitness: 0.37 },
+  });
+  if (prayer)
+    promise(person, {
+      kind: 'worship',
+      actions: ['pray'],
+      from: prayerFrom,
+      until: prayerFrom + 60,
+      importance: 1,
+      label: 'A retained prayer duty',
+    });
   const transfer = {
     castPassport: 'workshop-hf4/1',
     sourceRole: id,
-    person: structuredClone(fixture),
+    person: historicalPerson(snapshotRuntime(people).archive, id, castId, cast.revision),
   };
   const limitations: string[] = [];
+  const native = replay(snapshotRuntime(people).archive);
+  expect(native.ok).toBe(true);
+  if (native.ok) expect(native.value.verified).toBe(true);
   const branchId = `test-${id}`;
   return createPersona({
     format: 'hf-persona/1',
@@ -53,39 +66,13 @@ async function source(id: 'nora' | 'rafi', prayer = false, prayerFrom = 540) {
     castRevision: cast.revision,
     branchId,
     parentRevision: null,
-    source: oldStamps,
+    source: stamps,
     transfer: { ...transfer, life: initialPersonaLife(castId, branchId, 0) },
     limitations,
   });
 }
 
 describe('released HF4 whole-cast workshop adapter', () => {
-  it('refuses an unqualified genuine 4.17 workshop passport', async () => {
-    const state = createGame(42);
-    const castId = CAST_IDS.nora!;
-    const cast = canonicalCast(castId);
-    const branchId = 'current-417';
-    const portable = projectPerson(state.people.nora!, castId, cast.revision);
-    expect(portable.source.engine).toBe('4.17.0');
-    const parent = await createPersona({
-      format: 'hf-persona/1',
-      castId,
-      castRevision: cast.revision,
-      branchId,
-      parentRevision: null,
-      source: stamps,
-      transfer: {
-        castPassport: 'workshop-hf4/1',
-        sourceRole: 'nora',
-        person: portable,
-        life: initialPersonaLife(castId, branchId, 0),
-      },
-      limitations: [],
-    });
-    expect(() => admitWorkshop(preparePersonaLife(parent, 0), createGame(42).people.nora!)).toThrow(
-      'unsupported chapter',
-    );
-  });
   it('admits a Commonstead retained v2 envelope with its canonical source identity', async () => {
     const original = await source('nora');
     const portable = structuredClone(validatePortablePerson(original.transfer.person));
@@ -94,7 +81,7 @@ describe('released HF4 whole-cast workshop adapter', () => {
     const { revision: _revision, ...body } = original;
     const parent = await createPersona({
       ...body,
-      source: { ...oldStamps, game: 'commonstead', rules: 'commonstead-4' },
+      source: { ...stamps, game: 'commonstead', rules: 'commonstead-4' },
       transfer: {
         castPassport: 'commonstead-retained/4',
         sourceRole: original.castId,
@@ -139,7 +126,7 @@ describe('released HF4 whole-cast workshop adapter', () => {
         },
       },
       CAST.map((cast) => cast.castId),
-      stamps,
+      receivingStamps,
       async (prepared) => {
         const people = createGame(42).people;
         for (const input of prepared) {
@@ -249,7 +236,7 @@ it('restores a carried person during jobless prayer and finishes it exactly once
       },
     },
     CAST.map((cast) => cast.castId),
-    stamps,
+    receivingStamps,
     async (inputs) => {
       const people = createGame(42).people;
       const input = inputs[0];

@@ -60,7 +60,6 @@ describe('opt-in busy workshop', () => {
     expect(replay(state.hf.archive)).toMatchObject({ ok: true, value: { verified: true } });
     expect(replayRecordedRun({ ...state, inputs: state.inputs }, saved).ok).toBe(true);
     expect(createHash('sha256').update(saved).digest('hex')).toBe(
-      // Current HF 4.17 capture after exact restore and both replay checks above.
       'a93babe6ffc34fe74161abade28d3090deafe5e19402134d001bfcd4a0520b80',
     );
   });

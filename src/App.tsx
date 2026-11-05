@@ -1061,8 +1061,8 @@ function Workshop({
     setEntryError('');
     setEntering(true);
     try {
-      await continuity.depart();
-      const base = await continuity.fresh(seed);
+      await continuity.departLocal();
+      const base = await continuity.freshLocal(seed);
       const next = outcomes
         ? dispatch(base, { type: 'start-cast-outcomes' })
         : { ok: true, state: base, message: '' };
@@ -1103,7 +1103,7 @@ function Workshop({
     setEntering(true);
     setEntryError('');
     try {
-      await continuity.depart();
+      await continuity.departLocal();
       const saved = await readFreshWorkshopSave(OUTCOME_LOCAL_KEY);
       if (saved) {
         await readFreshWorkshopSave(SOURCE_JOURNAL_KEY);
@@ -1111,7 +1111,7 @@ function Workshop({
         if (!restored.castOutcomes) throw new Error('This is not the cast-outcome chapter.');
         resetPresentation(await enterRestoredWorkshop(restored), true);
       } else {
-        const base = await continuity.fresh(freshSeed());
+        const base = await continuity.freshLocal(freshSeed());
         const result = dispatch(base, { type: 'start-cast-outcomes' });
         if (!result.ok) throw new Error(result.message);
         resetPresentation(result.state, true);
@@ -3063,7 +3063,11 @@ function Workshop({
                 )}
                 {!continuity.fileSession && newConfirmed && (
                   <div className="inline-confirm">
-                    <p>Replace the saved workshop on this device?</p>
+                    <p>
+                      Start with a fresh cast and replace this device's saved workshop? Earlier
+                      character histories stay in their source. Download this workshop first if you
+                      want to keep it.
+                    </p>
                     <button
                       type="button"
                       disabled={entering}
