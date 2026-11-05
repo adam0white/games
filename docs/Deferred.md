@@ -1,3 +1,7 @@
+## Current follow-up — 2026-11-05
+
+Recheck F2974 on 2026-11-12: additional tenancy terms remain unspecified and need a fiction decision. Recheck F2977 on 2026-11-12: the second-week route exists, but the meaning and discoverability of later starts still need player-facing verification. Recheck F2701–F2710, F2712–F2717 and F2719 on 2026-11-12: their historical 2026-11-03 checkpoints passed without recorded consumer, phone or player acceptance; the individual remaining conditions are retained in the table below. No player acceptance is inferred. The other November 10 checkpoints remain unchanged.
+
 # Murmur Deferred — second retest, 2026-11-01
 
 The owner’s two-iteration rule permits remaining asks to be dated Deferred after two iterations. The second retest is complete with limits; no third ordinary panel is called for. This records inspection leads, not fixes, closure of all blockers, player acceptance or Adam’s fiction acceptance. Causes are unknown. The older record follows unchanged.

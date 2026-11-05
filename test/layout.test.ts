@@ -38,14 +38,14 @@ for (const width of [360, 1280]) {
       expect(await page.locator('#hush').boundingBox()).toEqual(before);
       expect((before?.y ?? 0) + (before?.height ?? 0)).toBeLessThanOrEqual(height);
       expect(await page.evaluate(() => document.scrollingElement!.scrollHeight)).toBeLessThanOrEqual(height);
+      // Before the first decision the journal has no entries; the card uses that space.
+      expect(await page.locator('#journal .journal-entry').count()).toBe(0);
       if (width === 360) {
         const journal = await page.locator('#journal').boundingBox();
-        expect(journal?.height).toBeGreaterThanOrEqual(64);
-        expect(journal?.height).toBeLessThanOrEqual(112);
+        expect(journal?.height).toBe(0);
       } else {
-        const journal = await page.locator('#journal').boundingBox();
         const card = await page.locator('.card').boundingBox();
-        expect((journal?.x ?? 0) + (journal?.width ?? 0)).toBeLessThanOrEqual(card?.x ?? 0);
+        expect((card?.x ?? 0) + (card?.width ?? 0) / 2).toBeCloseTo(width / 2, 0);
       }
     } finally {
       await page.close();

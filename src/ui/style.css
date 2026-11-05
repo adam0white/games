@@ -1739,3 +1739,84 @@ body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.tutorial-prompt {
+  color: var(--ink);
+  padding: 8px;
+  border: 2px solid currentColor;
+  font-size: 16px;
+}
+.tutorial-prompt button {
+  margin-left: 8px;
+}
+.tutorial-target {
+  outline: 3px solid #2875a2;
+  outline-offset: 2px;
+}
+.voice-label {
+  font: 600 14px var(--text);
+  margin: 0;
+}
+.other-label {
+  color: var(--sky);
+}
+.your-label {
+  color: var(--rope);
+}
+.pull {
+  border-left: 3px solid var(--sky);
+}
+@media (min-width: 700px) {
+  .card .scene {
+    font-size: clamp(20px, 1.2vw + 11px, 26px);
+  }
+  .journal .jl {
+    font-size: 17px;
+  }
+}
+@media (max-width: 699px) {
+  .card:has(.tutorial-prompt) .card-actions {
+    max-height: 60%;
+  }
+}
+@media (min-width: 700px) {
+  .day.has-card:not(:has(.journal-entry)) .sheet {
+    grid-column: 1 / -1;
+    width: min(100%, 760px);
+    justify-self: center;
+  }
+}
+@media (max-width: 699px) {
+  .day.has-card:not(:has(.journal-entry)) .journal {
+    flex-basis: 0;
+    height: 0;
+    min-height: 0;
+    padding: 0;
+  }
+}
+@media (max-width: 699px) {
+  .sheet:has([data-tutorial-consequence]) {
+    flex: 0 0 auto;
+    height: auto;
+    max-height: 60%;
+    overflow-y: auto;
+  }
+}
+.tutorial-prompt:has([data-tutorial-skip]) {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  padding: 4px;
+}
+.tutorial-prompt:has([data-tutorial-skip]) button {
+  flex: 0 0 auto;
+}
+@media (max-width: 699px) {
+  .card:has(.tutorial-prompt) .card-text {
+    gap: 2px;
+  }
+  .card:has(.tutorial-prompt) .opts {
+    gap: 3px;
+  }
+}

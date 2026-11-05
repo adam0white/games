@@ -1,3 +1,7 @@
+## Upkeep follow-up — 2026-11-05
+
+Remaining: integrate the open Clarity work, qualify HF 4.17 replay and the exact release, and obtain Adam's fiction acceptance. Recheck on 2026-11-12 because acceptance and current consumer proof are not recorded; this is a follow-up date, not an appointment. The dated delivery receipts below remain historical.
+
 # LIGHT correction 1 — 2026-10-31
 
 Independent review R1–R5 corrected: Info no longer promises protest for every hold; trust cost is conditional; failed-hold line follows verdict and option id; 21 distinct dispositions in docs/design.md; pkill correction in restart-murmur-light-correction1.md. Still open: UI check at both sizes, reviews at an exact SHA, CI, deploy, live proof, Adam's play.

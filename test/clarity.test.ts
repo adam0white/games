@@ -14,6 +14,13 @@ beforeAll(async () => {
   await server.listen();
   origin = server.resolvedUrls?.local[0] ?? '';
   browser = await launchBrowser();
+  // These controls exercise returning play; the first-visit guide has its own browser suite.
+  const newPage = browser.newPage.bind(browser);
+  browser.newPage = async (options) => {
+    const page = await newPage(options);
+    await page.addInitScript(() => localStorage.setItem('murmur-tutorial-done', '1'));
+    return page;
+  };
 }, 30_000);
 
 afterAll(async () => {
