@@ -1,8 +1,8 @@
 # Games consolidation — 2026-11-05
 
-Remaining: two eligible pilot imports, all release gates and live checks, remaining-game imports, two new games. Infrastructure preparation is not a shipped migration. Owner accepts taste after coordinator review.
+Remaining: pilot source/tutorial sync, the path-aware lab artifact, exact CI/review and live pilot checks; remaining-game imports; two new games. Infrastructure preparation is not a shipped migration. Owner accepts taste after coordinator review.
 
-The owner authorized public `adam0white/games`, MIT code, required `ci`, signed commits, `play.adamwhite.work` on the existing `adamwhite.work` zone and old-host redirects after each new path is verified. The public repo exists. Main requires `ci` and signed commits, enforces protection for administrators and disallows force pushes/deletion. The signed bootstrap is on main. No game import or deploy has occurred.
+The owner authorized public `adam0white/games`, MIT code, required `ci`, signed commits, `play.adamwhite.work` on the existing `adamwhite.work` zone and old-host redirects after each new path is verified. The public repo exists. Main requires `ci` and signed commits, enforces protection for administrators and disallows force pushes/deletion. The signed bootstrap is on main. Rope and Hearsay histories are imported without squash on draft PR #1. Both game engines pin HF 4.17.0. No production deployment has occurred.
 
 "Losing saves and progress is totally fine. That's a good direction, keep going."
 
@@ -18,6 +18,14 @@ Keep the games' existing Wrangler stack for consolidation. HF's standing cf tria
 
 ## Coordination and acceptance
 
-The inventory found 20 listed games plus Island, with 18 independent source repositories and three central hosts. All currently belong to UPKEEP or CLARITY. Murmur and Rope are provisional pilots only; do not snapshot over active changes. Import exact merged refs after confirming no open UPKEEP/CLARITY PR and source readiness. Recheck those directors' STATUS immediately before each import. Subtree imports retain original objects without squash and new signed merge commits.
+The inventory found 20 listed games plus Island, with 18 independent source repositories and three central hosts. All currently belong to UPKEEP or CLARITY. Rope and Hearsay were imported from exact refs while neither had an open PR. Their later UPKEEP and CLARITY work must be merged and synchronized before cutover. Import exact merged refs after confirming no open UPKEEP/CLARITY PR and source readiness. Recheck those directors' STATUS immediately before each import. Subtree imports retain original objects without squash and new signed merge commits.
 
-The owner requested two new shipped games after consolidation, then COMPLETE for coordinator taste review. Drafts are Mooring Hour and Copper Afternoon, based on the top two ideas. They have no implemented game code. Astra wildcard review is pending. Owner taste acceptance and technical release are separate.
+The owner requested two new shipped games after consolidation, then COMPLETE for coordinator taste review. Drafts are Mooring Hour and Copper Afternoon, based on the top two ideas. They have no implemented game code. Astra wildcard review conditionally retained both concepts; the required physical rules are now in their design documents. The physical loop and supported HF traces remain unproven. Owner taste acceptance and technical release are separate.
+
+## Pilot validation checkpoint
+
+The assembled build passed; a Wrangler dry run packaged 35 assets and the thin shelf/redirect handler with only the ASSETS binding. Redirect activation remains disabled in code and configuration. Play root will open the existing central shelf. No route has been applied.
+
+Both games opened in isolated Chromium at desktop and phone sizes with scoped assets, manifests and CSP. Rope’s worker did not control Hearsay. Central traffic was blocked during this engineering check, so connected recording, shelf and successful analytics receipt remain unverified. The old lab artifacts request the root release manifest and reject the new play origin; client 0.5.16 with the reviewed HF source is required before release.
+
+The first full CI run exposed missing browser installation and stale test-fixture paths/versions. The browser runtime step is now declared per game. Rope’s preparation controls use a matching current portable source; Hearsay’s browser harness uses the new base and origin. The latter has 29 of 31 affected local browser controls passing; two preserved shelf controls still require the new client. This is not a green complete CI claim.
