@@ -113,3 +113,34 @@ test("loading makes unavailable controls clear until the village is ready", asyn
   );
   await expect(page.locator("#lantern")).toBeEnabled();
 });
+
+test("the game starts and guide controls work when storage is blocked", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "localStorage", {
+      get() {
+        throw new DOMException("blocked", "SecurityError");
+      },
+    });
+    Object.defineProperty(navigator, "doNotTrack", { value: "1" });
+  });
+  await page.route("**/engine.json", (route) =>
+    route.fulfill({
+      json: { executable: "stub", script: "/stub-engine.js", pack: "stub" },
+    }),
+  );
+  await page.route("**/stub-engine.js", (route) =>
+    route.fulfill({
+      contentType: "application/javascript",
+      body: "window.Engine = class { async startGame() { window.HFBridge.ready(); } };",
+    }),
+  );
+  await page.goto("/");
+  await expect(page.locator("#guide")).toBeVisible();
+  await page.locator("#guide-skip").click();
+  await expect(page.locator("#guide")).toBeHidden();
+  await page.locator("#menu-open").click();
+  await page.locator("#guide-replay").click();
+  await expect(page.locator("#guide")).toBeVisible();
+});

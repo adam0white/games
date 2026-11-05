@@ -26,7 +26,12 @@ import {
   type Session,
   saveSession,
 } from "./shelf";
-import { advanceGuide, type GuideState } from "./tutorial.ts";
+import {
+  advanceGuide,
+  type GuideState,
+  readGuideDone,
+  writeGuideDone,
+} from "./tutorial.ts";
 import "./style.css";
 
 const element = <T extends HTMLElement>(id: string): T => {
@@ -114,7 +119,9 @@ async function checkpointNow() {
     checkpointing = false;
   }
 }
-let guide: GuideState = localStorage.getItem("lefthand-guide-done")
+let guide: GuideState = readGuideDone(
+  () => localStorage.getItem("lefthand-guide-done") !== null,
+)
   ? "done"
   : "route";
 let guideReplayPending = false;
@@ -178,7 +185,7 @@ function perform(command?: Command) {
 }
 function finishGuide() {
   guide = "done";
-  localStorage.setItem("lefthand-guide-done", "1");
+  writeGuideDone(() => localStorage.setItem("lefthand-guide-done", "1"));
   update();
 }
 function enqueue(command: Command) {
@@ -563,7 +570,7 @@ element("guide-continue").onclick = () => {
 element("guide-replay").onclick = () => {
   if (state.phase !== "evening" && state.phase !== "night") {
     guideReplayPending = true;
-    localStorage.removeItem("lefthand-guide-done");
+    writeGuideDone(() => localStorage.removeItem("lefthand-guide-done"));
     setText(
       "menu-status",
       state.phase === "ended"
@@ -578,7 +585,7 @@ element("guide-replay").onclick = () => {
       : state.phase === "night"
         ? "move"
         : "route";
-  localStorage.removeItem("lefthand-guide-done");
+  writeGuideDone(() => localStorage.removeItem("lefthand-guide-done"));
   setMenu(false);
   update();
 };

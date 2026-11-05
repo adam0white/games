@@ -11,3 +11,18 @@ export function advanceGuide(
   if (state === "consequence" && action === "continue") return "done";
   return state;
 }
+
+export function readGuideDone(read: () => boolean): boolean {
+  try {
+    return read();
+  } catch {
+    return false;
+  }
+}
+export function writeGuideDone(write: () => void): void {
+  try {
+    write();
+  } catch {
+    /* Guide remains usable without a saved preference. */
+  }
+}
