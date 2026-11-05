@@ -66,7 +66,7 @@ it('pauses native play until the full current archive is durably saved', async (
   d.send({ t: 'lead', dir: 'up' });
   expect(climb.inputs).toHaveLength(0);
   await d.flushSave();
-  const saved = JSON.parse(localStorage.getItem('rope.save.cast.v1')!);
+  const saved = JSON.parse(localStorage.getItem('games-rope.save.cast.v1')!);
   expect(saved.v).toBe(2);
   expect(saved.engine).toBe(FRAMEWORK_VERSION);
   expect(saved.state).toBe(snapshot(climb));
@@ -82,15 +82,15 @@ it('coalesces another save request and persists the latest complete state', asyn
   step(climb);
   d.save();
   await d.flushSave();
-  const saved = JSON.parse(localStorage.getItem('rope.save.cast.v1')!);
+  const saved = JSON.parse(localStorage.getItem('games-rope.save.cast.v1')!);
   expect(saved.state).toBe(snapshot(climb));
   expect(saved.minute).toBe(climb.minute);
 });
 it('preserves a competing native writer and visibly reports unsaved progress', async () => {
   begin(7);
-  localStorage.setItem('rope.save.cast.v1', 'another tab');
+  localStorage.setItem('games-rope.save.cast.v1', 'another tab');
   await d.flushSave();
-  expect(localStorage.getItem('rope.save.cast.v1')).toBe('another tab');
+  expect(localStorage.getItem('games-rope.save.cast.v1')).toBe('another tab');
   expect(document.body.textContent).toContain('This progress was not saved.');
 });
 it('a stale pending save cannot overwrite a replacement run', async () => {
@@ -98,7 +98,7 @@ it('a stale pending save cannot overwrite a replacement run', async () => {
   d.continuity.invalidate();
   const { climb } = begin(8);
   await d.flushSave();
-  const saved = JSON.parse(localStorage.getItem('rope.save.cast.v1')!);
+  const saved = JSON.parse(localStorage.getItem('games-rope.save.cast.v1')!);
   expect(saved.state).toBe(snapshot(climb));
   expect(saved.season.seed).toBe(8);
 });

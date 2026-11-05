@@ -69,7 +69,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 async function open() {
-  history.replaceState(null, '', '/file/?lab=1');
+  history.replaceState(null, '', '/rope/file/?lab=1');
   const root = document.createElement('main');
   document.body.append(root);
   const game = new Game(root);
@@ -185,12 +185,12 @@ it('uses plain refusal text and keeps raw file errors behind lab=1', async () =>
 
 it('refuses the preserved HF3 file without replacing the native season', async () => {
   const owner = 'original native season';
-  localStorage.setItem('rope.save.cast.v1', owner);
+  localStorage.setItem('games-rope.save.cast.v1', owner);
   const { root, active } = await open();
   await choose(root, readFileSync('test/fixtures/rope-hf3-native.json'));
   expect(root.querySelector('[data-file-status]')?.textContent).toMatch(/older|unsupported|start|version/i);
   expect(active.originalFile).toBeNull();
-  expect(localStorage.getItem('rope.save.cast.v1')).toBe(owner);
+  expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(owner);
   expect(control.channels).toBe(0);
 });
 
@@ -198,7 +198,7 @@ it.each([native, publicExport])(
   'refuses a 4.13 file with a start-fresh explanation and keeps native bytes',
   async (fixture) => {
     const owner = 'native season untouched by older file';
-    localStorage.setItem('rope.save.cast.v1', owner);
+    localStorage.setItem('games-rope.save.cast.v1', owner);
     const packet = fixture();
     packet.engine = '4.13.0';
     const original = JSON.stringify(packet);
@@ -207,7 +207,7 @@ it.each([native, publicExport])(
     expect(root.querySelector('[data-file-status]')?.textContent).toMatch(
       /keep.*file.*start a fresh season/i,
     );
-    expect(localStorage.getItem('rope.save.cast.v1')).toBe(owner);
+    expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(owner);
     expect(control.channels).toBe(0);
   },
 );
@@ -216,7 +216,7 @@ it.each([native, publicExport])(
   'retains selected BOM bytes, exact current state and file ownership through download and reimport',
   async (fixture) => {
     const owner = 'owner season untouched';
-    localStorage.setItem('rope.save.cast.v1', owner);
+    localStorage.setItem('games-rope.save.cast.v1', owner);
     const bytes = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(JSON.stringify(fixture()))]);
     const { root, active } = await open();
     await choose(root, bytes);
@@ -226,7 +226,7 @@ it.each([native, publicExport])(
     expect(first.original.sha256).toBe(hash(bytes));
     expect(first.current.state).toBe(snapshot(active.climb));
     expect(first.native.ownership).toMatchObject({ fileOrigin: true, heads: [], sources: [], archives: [] });
-    expect(localStorage.getItem('rope.save.cast.v1')).toBe(owner);
+    expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(owner);
     expect(control.channels).toBe(0);
     active.sentAt = -Infinity;
     active.send({ t: 'lead', dir: 'up' });
@@ -244,7 +244,7 @@ it.each([native, publicExport])(
     expect(JSON.parse(exported)).toEqual(continued);
     await choose(root, exported);
     expect(active.runExport()).toEqual(continued);
-    expect(localStorage.getItem('rope.save.cast.v1')).toBe(owner);
+    expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(owner);
   },
 );
 
@@ -350,14 +350,14 @@ it('keeps recording off under DNT and leaves the native shelf untouched', async 
   await choose(root, JSON.stringify(native()));
   expect(control.lab.telemetryOn).toBe(false);
   expect(control.channels).toBe(0);
-  const owner = localStorage.getItem('rope.save.cast.v1');
+  const owner = localStorage.getItem('games-rope.save.cast.v1');
   root.querySelector<HTMLButtonElement>('.menu-trigger')!.click();
   const toggle = root.querySelector<HTMLInputElement>('[data-recording] input[type=checkbox]')!;
   toggle.click();
   expect(control.lab.telemetryOn).toBe(true);
   toggle.click();
   expect(control.lab.telemetryOn).toBe(false);
-  expect(localStorage.getItem('rope.save.cast.v1')).toBe(owner);
+  expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(owner);
   expect(control.channels).toBe(0);
 });
 
@@ -416,7 +416,7 @@ it.each([false, true])(
     packet.ownership.localOnly = true;
     if (mismatch) packet.minute++;
     const saved = JSON.stringify(packet);
-    localStorage.setItem('rope.save.cast.v1', saved);
+    localStorage.setItem('games-rope.save.cast.v1', saved);
     const root = document.createElement('main');
     document.body.append(root);
     const game = new Game(root);
@@ -425,7 +425,7 @@ it.each([false, true])(
     root.querySelector<HTMLButtonElement>('[data-a="continue"]')!.click();
     if (mismatch) {
       await vi.waitFor(() => expect(root.textContent).toMatch(/could not resume/i));
-      expect(localStorage.getItem('rope.save.cast.v1')).toBe(saved);
+      expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(saved);
     } else {
       await vi.waitFor(() => expect((game as unknown as Driver).climb).toBeTruthy());
       expect(snapshot((game as unknown as Driver).climb)).toBe(packet.state);
@@ -449,7 +449,7 @@ it.each([{ length: 0, unexpected: true }, 0, true, null])(
   'rejects malformed public skip metadata %j before replacing a file',
   async (castSkipped) => {
     const owner = 'native bytes before malformed skip metadata';
-    localStorage.setItem('rope.save.cast.v1', owner);
+    localStorage.setItem('games-rope.save.cast.v1', owner);
     const { root, active } = await open();
     await choose(root, JSON.stringify(publicExport()));
     const before = JSON.stringify(active.runExport());
@@ -457,7 +457,7 @@ it.each([{ length: 0, unexpected: true }, 0, true, null])(
     await choose(root, JSON.stringify({ ...publicExport(), castSkipped }));
     expect(root.querySelector('[data-file-error]')?.textContent).toMatch(/skip|history|histories/i);
     expect(JSON.stringify(active.runExport())).toBe(before);
-    expect(localStorage.getItem('rope.save.cast.v1')).toBe(owner);
+    expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(owner);
   },
 );
 
@@ -492,7 +492,7 @@ it('rejects a public skipped ID overlapping a retained chapter claim before repl
     castSkipped: [{ castId, reason: 'Tamar: a separate local story.' }],
   };
   const owner = 'native bytes before overlap';
-  localStorage.setItem('rope.save.cast.v1', owner);
+  localStorage.setItem('games-rope.save.cast.v1', owner);
   const { root, active } = await open();
   await choose(root, JSON.stringify(publicExport()));
   const before = JSON.stringify(active.runExport());
@@ -500,7 +500,7 @@ it('rejects a public skipped ID overlapping a retained chapter claim before repl
   await choose(root, JSON.stringify(packet));
   expect(root.querySelector('[data-file-error]')?.textContent).toMatch(/skip|histories/i);
   expect(JSON.stringify(active.runExport())).toBe(before);
-  expect(localStorage.getItem('rope.save.cast.v1')).toBe(owner);
+  expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(owner);
 });
 
 it.each([false, true])(
@@ -547,7 +547,7 @@ it.each([false, true])(
     };
     vi.stubGlobal('indexedDB', undefined);
     history.replaceState(null, '', '/');
-    localStorage.setItem('rope.save.cast.v1', JSON.stringify(packet));
+    localStorage.setItem('games-rope.save.cast.v1', JSON.stringify(packet));
     const root = document.createElement('main');
     document.body.append(root);
     const game = new Game(root);
@@ -624,7 +624,7 @@ it.each(['deleted', 'null'])(
     const bytes = JSON.stringify(packet);
     vi.stubGlobal('indexedDB', undefined);
     history.replaceState(null, '', '/');
-    localStorage.setItem('rope.save.cast.v1', bytes);
+    localStorage.setItem('games-rope.save.cast.v1', bytes);
     const root = document.createElement('main');
     document.body.append(root);
     const game = new Game(root);
@@ -643,7 +643,7 @@ it.each(['deleted', 'null'])(
     expect(recording).not.toHaveBeenCalled();
     expect(allow).not.toHaveBeenCalled();
     expect(capture).not.toHaveBeenCalled();
-    expect(localStorage.getItem('rope.save.cast.v1')).toBe(bytes);
+    expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(bytes);
   },
 );
 it('keeps missing-authority save bytes and directs resume to a new game', async () => {
@@ -651,7 +651,7 @@ it('keeps missing-authority save bytes and directs resume to a new game', async 
   history.replaceState(null, '', '/');
   const packet = native();
   const saved = JSON.stringify(packet);
-  localStorage.setItem('rope.save.cast.v1', saved);
+  localStorage.setItem('games-rope.save.cast.v1', saved);
   const root = document.createElement('main');
   document.body.append(root);
   const game = new Game(root);
@@ -660,7 +660,7 @@ it('keeps missing-authority save bytes and directs resume to a new game', async 
   root.querySelector<HTMLButtonElement>('[data-a="continue"]')!.click();
   await vi.waitFor(() => expect(root.textContent).toContain('Start a new game'));
   expect(root.textContent).not.toContain('try again');
-  expect(localStorage.getItem('rope.save.cast.v1')).toBe(saved);
+  expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(saved);
 });
 
 it.each(['inner HF archive', 'replay mismatch', 'transient failure'] as const)(
@@ -674,7 +674,7 @@ it.each(['inner HF archive', 'replay mismatch', 'transient failure'] as const)(
     if (failure === 'replay mismatch') state.minute++;
     packet.state = JSON.stringify(state);
     const saved = JSON.stringify(packet);
-    localStorage.setItem('rope.save.cast.v1', saved);
+    localStorage.setItem('games-rope.save.cast.v1', saved);
     const root = document.createElement('main');
     document.body.append(root);
     const game = new Game(root);
@@ -703,6 +703,6 @@ it.each(['inner HF archive', 'replay mismatch', 'transient failure'] as const)(
     expect(recording).not.toHaveBeenCalled();
     expect(allow).not.toHaveBeenCalled();
     expect(capture).not.toHaveBeenCalled();
-    expect(localStorage.getItem('rope.save.cast.v1')).toBe(saved);
+    expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(saved);
   },
 );

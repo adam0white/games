@@ -1,7 +1,7 @@
 /** Full native HF archives exceed localStorage. Store the exact save string in IndexedDB. */
-const DB = 'rope';
+const DB = 'games-rope-v1';
 const STORE = 'pages';
-const KEY = 'rope.save.cast.v1';
+const KEY = 'games-rope.save.cast.v1';
 type Guard = () => boolean;
 function legacy(): string | null {
   try {

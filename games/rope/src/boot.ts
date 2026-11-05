@@ -8,7 +8,7 @@ if (import.meta.env.DEV) (window as unknown as { game: Game }).game = game;
 
 if (startupEntry === 'native' && 'serviceWorker' in navigator && import.meta.env.PROD) {
   const register = () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/rope/sw.js', { scope: '/rope/' }).catch(() => {});
   };
   if (document.readyState === 'complete') register();
   else window.addEventListener('load', register, { once: true });

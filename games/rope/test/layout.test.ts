@@ -295,9 +295,11 @@ it('keeps one-page note-only Feedback and preserves the stable notice node', asy
 it('a failed real admission keeps the saved season and ownership, without silently substituting a cast', async () => {
   const game = await boot();
   await vi.waitFor(() =>
-    expect(JSON.parse(localStorage.getItem('rope.save.cast.v1') ?? '{}').minute).toBe(game.climb.minute),
+    expect(JSON.parse(localStorage.getItem('games-rope.save.cast.v1') ?? '{}').minute).toBe(
+      game.climb.minute,
+    ),
   );
-  const saved = localStorage.getItem('rope.save.cast.v1');
+  const saved = localStorage.getItem('games-rope.save.cast.v1');
   const ownership = game.continuity.ownership();
   shelf.enabled = true;
   shelf.request.mockRejectedValue(new Error('Shelf unavailable. Use a local file.'));
@@ -307,7 +309,7 @@ it('a failed real admission keeps the saved season and ownership, without silent
   await vi.waitFor(() =>
     expect(document.querySelector('.page-title h1')?.textContent).toBe('The season has not begun'),
   );
-  expect(localStorage.getItem('rope.save.cast.v1')).toBe(saved);
+  expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(saved);
   expect(game.continuity.ownership()).toEqual(ownership);
   expect(document.querySelector('.page-title details')).toBeNull();
   tap('.menu-trigger');
@@ -405,7 +407,7 @@ it('REVIEW disposed pending resume protects replacement save', async () => {
   const old = await boot();
   old.save();
   await old.flushSave();
-  const saved = JSON.parse(localStorage.getItem('rope.save.cast.v1')!);
+  const saved = JSON.parse(localStorage.getItem('games-rope.save.cast.v1')!);
   let finish!: () => void;
   old.continuity.restoreOwnership = () =>
     new Promise<void>((resolve) => {
@@ -413,10 +415,10 @@ it('REVIEW disposed pending resume protects replacement save', async () => {
     });
   const pending = old.resume(saved);
   (old as unknown as Game).destroy();
-  localStorage.setItem('rope.save.cast.v1', 'replacement-save');
+  localStorage.setItem('games-rope.save.cast.v1', 'replacement-save');
   finish();
   await pending;
-  expect(localStorage.getItem('rope.save.cast.v1')).toBe('replacement-save');
+  expect(localStorage.getItem('games-rope.save.cast.v1')).toBe('replacement-save');
 });
 
 it('flushes current progress on destroy but preserves a foreign replacement', async () => {
@@ -425,14 +427,14 @@ it('flushes current progress on destroy but preserves a foreign replacement', as
   const minute = game.climb.minute;
   (game as unknown as Game).destroy();
   await game.flushSave();
-  expect(JSON.parse(localStorage.getItem('rope.save.cast.v1')!).minute).toBe(minute);
+  expect(JSON.parse(localStorage.getItem('games-rope.save.cast.v1')!).minute).toBe(minute);
   const next = await boot(false);
   const state = newSeason(7);
   next.season = state.season;
   next.begin(state.climb, state.season.start ?? snapshot(state.climb));
-  localStorage.setItem('rope.save.cast.v1', 'foreign');
+  localStorage.setItem('games-rope.save.cast.v1', 'foreign');
   (next as unknown as Game).destroy();
-  expect(localStorage.getItem('rope.save.cast.v1')).toBe('foreign');
+  expect(localStorage.getItem('games-rope.save.cast.v1')).toBe('foreign');
 });
 
 it('does not install a pending new season after destroy', async () => {
@@ -445,11 +447,11 @@ it('does not install a pending new season after destroy', async () => {
   tap('[data-a="new"]');
   await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
   (game as unknown as Game).destroy();
-  localStorage.setItem('rope.save.cast.v1', 'replacement');
+  localStorage.setItem('games-rope.save.cast.v1', 'replacement');
   finish(newSeason(4));
   await Promise.resolve();
   await Promise.resolve();
-  expect(localStorage.getItem('rope.save.cast.v1')).toBe('replacement');
+  expect(localStorage.getItem('games-rope.save.cast.v1')).toBe('replacement');
   expect(document.querySelector('.scene')).toBeNull();
 });
 
@@ -460,14 +462,14 @@ it('persists successor progress after boot flushes the live predecessor', async 
   const flushedMinute = old.climb.minute;
   const replacement = new Game(query('#app'));
   await replacement.boot();
-  expect(JSON.parse(localStorage.getItem('rope.save.cast.v1')!).minute).toBe(flushedMinute);
+  expect(JSON.parse(localStorage.getItem('games-rope.save.cast.v1')!).minute).toBe(flushedMinute);
   tap('[data-a="continue"]');
   const next = replacement as unknown as Driver;
   await vi.waitFor(() => expect(next.climb?.minute).toBe(flushedMinute));
   step(next.climb);
   next.save();
   await next.flushSave();
-  expect(JSON.parse(localStorage.getItem('rope.save.cast.v1')!).minute).toBe(next.climb.minute);
+  expect(JSON.parse(localStorage.getItem('games-rope.save.cast.v1')!).minute).toBe(next.climb.minute);
   replacement.destroy();
 });
 
@@ -476,7 +478,7 @@ it('never adopts foreign bytes during predecessor teardown', async () => {
   old.save();
   step(old.climb);
   const replacement = new Game(query('#app'));
-  localStorage.setItem('rope.save.cast.v1', 'foreign');
+  localStorage.setItem('games-rope.save.cast.v1', 'foreign');
   await replacement.boot();
   const next = replacement as unknown as Driver;
   const state = newSeason(9);
@@ -484,7 +486,7 @@ it('never adopts foreign bytes during predecessor teardown', async () => {
   next.begin(state.climb, state.season.start ?? snapshot(state.climb));
   next.save();
   replacement.destroy();
-  expect(localStorage.getItem('rope.save.cast.v1')).toBe('foreign');
+  expect(localStorage.getItem('games-rope.save.cast.v1')).toBe('foreign');
 });
 
 it('moves overlay boundary with measured header typography and releases it on teardown', () => {

@@ -84,7 +84,7 @@ import { skippedMetadata } from './skip-metadata.ts';
 import { RopeStage } from './stage.ts';
 import * as nativeStore from './store.ts';
 
-const SAVE_KEY = 'rope.save.cast.v1';
+const SAVE_KEY = 'games-rope.save.cast.v1';
 const SLOW_MS = PACE.slowMs;
 const BUBBLE_MS = 7500;
 
@@ -2401,7 +2401,7 @@ export class Game {
     const menu = h(
       'div',
       'menu-backdrop',
-      `<section class="game-menu" role="dialog" aria-modal="true" aria-label="Game menu"><div class="menu-header"><h2>Game menu</h2><button class="close" data-menu-close aria-label="Close menu">×</button></div><p class="caption">Time stops while the menu is open.</p><div class="menu-body"><button class="btn" data-menu-send>Feedback</button><button class="btn" data-menu-fullscreen>Full screen</button><a class="menu-link" href="https://human.adamwhite.work/games/">All games</a><div data-recording></div><p role="status" data-continuity-status>${esc(this.continuity.skipped.map((s) => s.reason).join(' '))}</p><button class="btn" data-menu-new>New game</button><div data-menu-confirm hidden><p>Starting a new season replaces your saved season.</p><button class="btn" data-new-yes>Start new game</button><button class="btn" data-new-no>Keep this game</button></div><a class="menu-link" data-cast-shelf href="https://human.adamwhite.work/lab/people/">People across games</a><fieldset class="menu-pacing"><legend>Pace: Automatic</legend>${(['auto', 'slow', 'normal', 'fast'] as const).map((speed) => `<button class="btn" data-pace="${speed}" aria-pressed="${this.speed === speed}">${speed}</button>`).join('')}</fieldset><button class="btn" data-menu-export ${this.climb ? '' : 'disabled'}>Download this run</button><a class="menu-link" href="/file/">Open a run file</a><button class="btn" data-menu-title>Title page</button><div class="privacy-debug"><a href="https://human.adamwhite.work/lab/privacy/">Lab privacy</a><details data-debug><summary>Debug</summary><p>Human Framework ${FRAMEWORK_VERSION}</p>${this.startupError && new URLSearchParams(location.search).get('lab') === '1' ? `<pre>${esc(this.startupError)}</pre>` : ''}</details></div></div><button class="btn go menu-resume" data-menu-close>Resume</button></section>`,
+      `<section class="game-menu" role="dialog" aria-modal="true" aria-label="Game menu"><div class="menu-header"><h2>Game menu</h2><button class="close" data-menu-close aria-label="Close menu">×</button></div><p class="caption">Time stops while the menu is open.</p><div class="menu-body"><button class="btn" data-menu-send>Feedback</button><button class="btn" data-menu-fullscreen>Full screen</button><a class="menu-link" href="https://human.adamwhite.work/games/">All games</a><div data-recording></div><p role="status" data-continuity-status>${esc(this.continuity.skipped.map((s) => s.reason).join(' '))}</p><button class="btn" data-menu-new>New game</button><div data-menu-confirm hidden><p>Starting a new season replaces your saved season.</p><button class="btn" data-new-yes>Start new game</button><button class="btn" data-new-no>Keep this game</button></div><a class="menu-link" data-cast-shelf href="https://human.adamwhite.work/lab/people/">People across games</a><fieldset class="menu-pacing"><legend>Pace: Automatic</legend>${(['auto', 'slow', 'normal', 'fast'] as const).map((speed) => `<button class="btn" data-pace="${speed}" aria-pressed="${this.speed === speed}">${speed}</button>`).join('')}</fieldset><button class="btn" data-menu-export ${this.climb ? '' : 'disabled'}>Download this run</button><a class="menu-link" href="/rope/file/">Open a run file</a><button class="btn" data-menu-title>Title page</button><div class="privacy-debug"><a href="https://human.adamwhite.work/lab/privacy/">Lab privacy</a><details data-debug><summary>Debug</summary><p>Human Framework ${FRAMEWORK_VERSION}</p>${this.startupError && new URLSearchParams(location.search).get('lab') === '1' ? `<pre>${esc(this.startupError)}</pre>` : ''}</details></div></div><button class="btn go menu-resume" data-menu-close>Resume</button></section>`,
     );
     const previousFocus = document.activeElement as HTMLElement | null;
     const close = () => {
@@ -2511,7 +2511,7 @@ export class Game {
     };
     let remembered = '';
     try {
-      remembered = localStorage.getItem('hf-lab-feedback-name') ?? '';
+      remembered = localStorage.getItem('games-rope.feedback-name') ?? '';
     } catch {
       /* storage unavailable */
     }
@@ -2594,8 +2594,8 @@ export class Game {
             const sharePlay = feedbackSharePlay(choice);
             await lab!.sendFeedback(note, { name, run, sharePlay });
             try {
-              if (name) localStorage.setItem('hf-lab-feedback-name', name);
-              else localStorage.removeItem('hf-lab-feedback-name');
+              if (name) localStorage.setItem('games-rope.feedback-name', name);
+              else localStorage.removeItem('games-rope.feedback-name');
             } catch {
               /* storage unavailable */
             }

@@ -113,13 +113,13 @@ it('the retained packets really are rope-hf4-1 starts from the earlier source', 
 
 it('native Resume of a genuine rope-hf4-1 packet shows start-new copy and changes nothing', async () => {
   const text = nativeText();
-  localStorage.setItem('rope.save.cast.v1', text);
+  localStorage.setItem('games-rope.save.cast.v1', text);
   const { root, driver } = await open('/');
   const restoreOwnership = vi.spyOn(driver.continuity, 'restoreOwnership');
   await driver.resume(JSON.parse(text));
   expect(root.textContent).toContain('cannot continue in this version');
   expect(root.textContent).toContain('Start a new game');
-  expect(localStorage.getItem('rope.save.cast.v1')).toBe(text);
+  expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(text);
   expect(restoreOwnership).not.toHaveBeenCalled();
   expect(driver.climb ?? null).toBeNull();
 });
@@ -131,13 +131,13 @@ it.each([
   'the file chooser refuses a genuine rope-hf4-1 %s with the exact message and no side effects',
   async (_n, make) => {
     const owner = 'native season untouched by an older-edition file';
-    localStorage.setItem('rope.save.cast.v1', owner);
-    const { root, driver } = await open('/file/?lab=1');
+    localStorage.setItem('games-rope.save.cast.v1', owner);
+    const { root, driver } = await open('/rope/file/?lab=1');
     const text = make();
     await choose(root, text);
     expect(root.querySelector('[data-file-status]')?.textContent).toBe(OLD_FILE);
     expect(driver.originalFile ?? null).toBeNull();
-    expect(localStorage.getItem('rope.save.cast.v1')).toBe(owner);
+    expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(owner);
   },
 );
 
@@ -149,18 +149,19 @@ it('the file-session wrapper refuses an older-edition original with the exact me
     native: JSON.parse(nativeText()),
     current: JSON.parse(original),
   });
-  const { root, driver } = await open('/file/?lab=1');
+  const { root, driver } = await open('/rope/file/?lab=1');
   await choose(root, session);
   expect(root.querySelector('[data-file-status]')?.textContent).toBe(OLD_FILE);
   expect(driver.originalFile ?? null).toBeNull();
 });
 
 it('a start with no castEdition keeps its old error instead of the edition message', async () => {
-  const raw = JSON.parse(exportText());
+  const { season, climb } = newSeason(7);
+  const raw = exportClimb(season.start!, climb, ENGINE_VERSION, season.chapter, season.past);
   const start = JSON.parse(raw.start);
   delete start.castEdition;
   raw.start = JSON.stringify(start);
-  const { root } = await open('/file/?lab=1');
+  const { root } = await open('/rope/file/?lab=1');
   await choose(root, JSON.stringify(raw));
   expect(root.querySelector('[data-file-status]')?.textContent).toBe(GENERIC);
 });

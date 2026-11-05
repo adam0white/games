@@ -10,9 +10,9 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "stamp-release && vite build",
+    "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run --maxWorkers=2 --testTimeout=30000",
+    "test": "node --test test/monorepo-path.node.mjs && vitest run --maxWorkers=2 --testTimeout=30000",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "biome check .",
     "format": "biome format --write .",
@@ -22,7 +22,7 @@
     "check:lane": "npm run lint && npm run typecheck"
   },
   "dependencies": {
-    "@adam0white/human-framework": "4.15.0",
+    "@adam0white/human-framework": "4.17.0",
     "@adam0white/lab-client": "file:vendor/adam0white-lab-client-0.5.15.tgz",
     "@adam0white/lab-kit": "file:vendor/adam0white-lab-kit-0.5.32.tgz",
     "pixi.js": "8.22.0"

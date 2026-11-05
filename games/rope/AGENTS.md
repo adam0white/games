@@ -8,7 +8,7 @@ You lead five Human Framework (HF) people up a mountain and back. Every one of t
 
 ## Rules
 
-- HF comes only from npm: `@adam0white/human-framework@4.15.0`, exact. Never import sibling source. No game logic goes into HF. A generic HF gap goes into [docs/hf-requests.md](docs/hf-requests.md).
+- HF comes only from npm: `@adam0white/human-framework@4.17.0`, exact. Never import sibling source. No game logic goes into HF. A generic HF gap goes into [docs/hf-requests.md](docs/hf-requests.md).
 - Never fake a verdict. Every refusal, deferral or counter-offer comes from an HF resolution (public Run decision events for actual suggestion inputs).
 - Private condition and trust are not observations. Show actual movement, dated injuries and recorded words. Say when current condition is unavailable.
 - All world randomness is keyed by (seed, kind, place, minute) through `hashUnit`, never by draw order. HF owns person randomness and archives it. Seed + input log + start state is the replay, the playtest export and the debrief substrate.
@@ -23,11 +23,11 @@ You lead five Human Framework (HF) people up a mountain and back. Every one of t
 
 ## Delivery
 
-- Repository `adam0white/rope` (public). Site: https://rope.adamwhite.work (Cloudflare Worker static assets, `wrangler.jsonc`). The owner authorized commit, push and `npm run deploy`. Verify the live site against the commit after each deploy.
+- Rope is being moved into the games workspace at `/rope/`. Root owns the shared lockfile, release and deployment; the original repository remains historical. Use the root release gate and verify the live manifest and gameplay before cutover.
 
 - Player-facing copy follows [Plain English](docs/lab/plain-english.md).
 
-Use the exact pnpm 12.14.0 package-manager pin. Install with `pnpm install --frozen-lockfile`; keep `pnpm-lock.yaml`. Keep npm overrides and native build permissions in `pnpm-workspace.yaml`, not package metadata. `npm run` remains valid for scripts. Run `npm run check:lane` directly; do not acquire the suite lock. The installer conversion requires reviewed source, full lane, byte-identical raw build outputs, signed commit and exact green CI; it does not deploy the app or establish game readiness.
+Use the root pnpm workspace and its frozen lockfile. Keep overrides and native build permissions in the root `pnpm-workspace.yaml`, not package metadata. `npm run` remains valid for scripts. Run `npm run check:lane` directly; do not acquire the suite lock. The installer conversion requires reviewed source, full lane, byte-identical raw build outputs, signed commit and exact green CI; it does not deploy the app or establish game readiness.
 
 ## Public gameplay
 

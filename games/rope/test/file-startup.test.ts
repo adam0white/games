@@ -55,7 +55,7 @@ beforeEach(() => {
   localStorage.setItem('hf-lab-recording-off', '1');
   control.options = [];
   control.status = '';
-  history.replaceState(null, '', '/file/');
+  history.replaceState(null, '', '/rope/file/');
 });
 afterEach(() => {
   (window as unknown as { game?: { destroy(): void } }).game?.destroy();
@@ -69,14 +69,14 @@ afterEach(() => {
 });
 
 it('selects preservation only from the protected path', () => {
-  expect(fileEntry('/file/')).toBe('file');
-  expect(fileEntry('/file')).toBe('file');
+  expect(fileEntry('/rope/file/')).toBe('file');
+  expect(fileEntry('/rope/file')).toBe('file');
   expect(fileEntry('/')).toBe('native');
 });
 
 it('starts the real preserving client under OFF without changing existing native data', async () => {
   localStorage.setItem('hf-lab-player', 'a'.repeat(32));
-  localStorage.setItem('rope.save.cast.v1', 'synthetic-native-sentinel');
+  localStorage.setItem('games-rope.save.cast.v1', 'synthetic-native-sentinel');
   const before = { ...localStorage };
   const runtime = await import('../src/ui/lab.ts');
   expect(runtime.startupEntry).toBe('file');
@@ -97,18 +97,18 @@ it('redirects old file addresses to the protected path before creating the SDK c
   for (const address of ['/?file=1', '/?file=0', '/?file=1&file=1']) {
     const destination = legacyFileDestination(new URL(address, location.href).href);
     if (!destination) throw new Error('Missing redirect');
-    expect(new URL(destination).pathname).toBe('/file/');
+    expect(new URL(destination).pathname).toBe('/rope/file/');
     expect(new URL(destination).searchParams.has('file')).toBe(false);
   }
   expect(control.options).toEqual([]);
-  expect(legacyFileDestination(new URL('/file/', location.href).href)).toBeNull();
+  expect(legacyFileDestination(new URL('/rope/file/', location.href).href)).toBeNull();
 });
 
 it('redirects the actual entry document without loading the game or SDK', async () => {
   const replace = vi.fn();
   vi.stubGlobal('location', { href: 'https://rope.example/?file=1&other=kept#part', replace });
   await import('../src/main.ts');
-  expect(replace).toHaveBeenCalledWith('https://rope.example/file/?other=kept#part');
+  expect(replace).toHaveBeenCalledWith('https://rope.example/rope/file/?other=kept#part');
   expect(control.options).toEqual([]);
   expect(document.querySelector('.menu-trigger')).toBeNull();
 });
@@ -133,7 +133,7 @@ it('disposes real blocked clients before host tracking, including unknown future
 
 it('boots the actual public App chooser without native storage or Shelf effects', async () => {
   localStorage.setItem('hf-lab-player', 'a'.repeat(32));
-  localStorage.setItem('rope.save.cast.v1', 'synthetic-native-sentinel');
+  localStorage.setItem('games-rope.save.cast.v1', 'synthetic-native-sentinel');
   const storage = Object.getPrototypeOf(localStorage) as Storage;
   const reads = vi.spyOn(storage, 'getItem');
   const writes = vi.spyOn(storage, 'setItem');
@@ -148,7 +148,9 @@ it('boots the actual public App chooser without native storage or Shelf effects'
   expect(document.querySelector('.lk-telemetry-notice')).not.toBeNull();
   for (const sink of [reads, writes, removes]) {
     expect(
-      sink.mock.calls.filter(([key]) => key === 'rope.save.cast.v1' || String(key).startsWith('hf-persona')),
+      sink.mock.calls.filter(
+        ([key]) => key === 'games-rope.save.cast.v1' || String(key).startsWith('hf-persona'),
+      ),
     ).toEqual([]);
   }
   expect(control.clients.at(-1)?.trackRun).not.toHaveBeenCalled();

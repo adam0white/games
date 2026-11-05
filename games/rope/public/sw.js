@@ -1,56 +1,63 @@
-// The Rope service worker: offline play. The page is network-first (so a new build arrives), everything else
-// (hashed assets, fonts) is cache-first and stored as it is fetched.
-const CACHE = 'rope-v1';
-const SHELL = ['/', '/manifest.webmanifest', '/icon.svg', '/icon-192.png'];
+// Rope's service worker never claims another game's paths or caches.
+const CACHE_PREFIX = 'games-rope-';
+const CACHE = `${CACHE_PREFIX}v1`;
+const ROOT = '/rope/';
+const SHELL = [ROOT, `${ROOT}manifest.webmanifest`, `${ROOT}icon.svg`, `${ROOT}icon-192.png`];
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(
+self.addEventListener('install', (event) => {
+  event.waitUntil(
     caches
       .open(CACHE)
-      .then((c) => c.addAll(SHELL))
+      .then((cache) => cache.addAll(SHELL))
       .then(() => self.skipWaiting()),
   );
 });
-
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE)
+            .map((key) => caches.delete(key)),
+        ),
+      )
       .then(() => self.clients.claim()),
   );
 });
-
-self.addEventListener('fetch', (e) => {
-  const req = e.request;
-  if (req.method !== 'GET') return;
-  const url = new URL(req.url);
-  // The build stamp must always come from the network, or the lab would report an old build.
-  if (url.pathname.startsWith('/api/') || url.pathname === '/release.json') return;
-  const isPage = req.mode === 'navigate';
-  if (isPage) {
-    e.respondWith(
-      fetch(req)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put('/', copy));
-          return res;
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  const url = new URL(request.url);
+  if (
+    request.method !== 'GET' ||
+    url.origin !== self.location.origin ||
+    !url.pathname.startsWith(ROOT) ||
+    url.pathname === `${ROOT}release.json` ||
+    url.pathname.startsWith(`${ROOT}api/`)
+  )
+    return;
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) caches.open(CACHE).then((cache) => cache.put(ROOT, response.clone()));
+          return response;
         })
-        .catch(() => caches.match('/')),
+        .catch(() => caches.open(CACHE).then((cache) => cache.match(ROOT))),
     );
     return;
   }
-  e.respondWith(
-    caches.match(req).then(
-      (hit) =>
-        hit ||
-        fetch(req).then((res) => {
-          if (res.ok || res.type === 'opaque') {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy));
-          }
-          return res;
-        }),
+  event.respondWith(
+    caches.open(CACHE).then((cache) =>
+      cache.match(request).then(
+        (hit) =>
+          hit ||
+          fetch(request).then((response) => {
+            if (response.ok) cache.put(request, response.clone());
+            return response;
+          }),
+      ),
     ),
   );
 });

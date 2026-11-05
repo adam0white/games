@@ -2,7 +2,7 @@
 export function legacyFileDestination(address: string): string | null {
   const url = new URL(address);
   if (!url.searchParams.has('file')) return null;
-  url.pathname = '/file/';
+  url.pathname = '/rope/file/';
   url.searchParams.delete('file');
   return url.href;
 }

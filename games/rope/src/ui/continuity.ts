@@ -533,5 +533,5 @@ export type Ownership = {
 
 /** Only the protected path selects a file session. */
 export function fileEntry(pathname: string): 'native' | 'file' {
-  return pathname === '/file/' || pathname === '/file' ? 'file' : 'native';
+  return pathname === '/rope/file/' || pathname === '/rope/file' ? 'file' : 'native';
 }

@@ -327,25 +327,25 @@ it('shows the saved climb, mountain and time beside Continue without advancing t
     over: false,
     disclosure: { unlocked: [], seen: [] },
   });
-  localStorage.setItem('rope.save.cast.v1', saved);
+  localStorage.setItem('games-rope.save.cast.v1', saved);
   await boot();
   expect(button('Resume')).toBeTruthy();
   expect(document.querySelector('.continue-summary')?.textContent).toContain('Climb 1 of 3');
   expect(document.querySelector('.continue-summary')?.textContent).toContain('Hollin');
   expect(document.querySelector('.continue-summary')?.textContent).toContain('05:13');
-  expect(localStorage.getItem('rope.save.cast.v1')).toBe(saved);
+  expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(saved);
 });
 
 it('keeps an unsupported HF3 local save and explains it cannot resume', async () => {
   const saved = JSON.stringify({ v: 1, engine: '2.23.0' });
-  localStorage.setItem('rope.save.cast.v1', saved);
+  localStorage.setItem('games-rope.save.cast.v1', saved);
   await boot();
   expect(document.body.textContent).toContain('cannot be opened in this version of Rope');
   expect(document.body.textContent).toContain('It has not been deleted. Start a new game');
   expect([...document.querySelectorAll('button')].some((button) => button.textContent === 'Resume')).toBe(
     false,
   );
-  expect(localStorage.getItem('rope.save.cast.v1')).toBe(saved);
+  expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(saved);
 });
 
 it('keeps extra abilities behind More actions and returns to the same person', async () => {

@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { load, remove, save } from '../src/ui/store.ts';
 
-const key = 'rope.save.cast.v1';
+const key = 'games-rope.save.cast.v1';
 beforeEach(() => {
   vi.stubGlobal('indexedDB', undefined);
   localStorage.clear();
@@ -31,4 +31,11 @@ it('serializes same-document saves and deletion without accepting two writers on
   expect(await Promise.all([save('one', null), save('two', null)])).toEqual([true, false]);
   expect(await Promise.all([save('new', 'one'), remove('one')])).toEqual([true, false]);
   expect(await load()).toBe('new');
+});
+
+it('starts fresh without reading the old origin save key', async () => {
+  localStorage.clear();
+  localStorage.setItem('rope.save.cast.v1', 'old incompatible save');
+  expect(await load()).toBeNull();
+  expect(localStorage.getItem('rope.save.cast.v1')).toBe('old incompatible save');
 });
