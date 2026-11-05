@@ -183,3 +183,21 @@ it('keeps the consequence and next control visible on a phone', async () => {
     await page.close();
   }
 }, 30_000);
+
+it('starts a new game while the guide is showing a consequence', async () => {
+  const page = await browser.newPage();
+  try {
+    await page.goto(origin);
+    await page.locator('#new').click();
+    await page.locator('.opt').first().waitFor();
+    await page.waitForTimeout(350);
+    await page.locator('.opt').first().click();
+    await page.locator('[data-tutorial-consequence]').waitFor();
+    await page.locator('#menu').click();
+    await page.locator('#bp-new').click();
+    await page.locator('#bp-confirm-new').click();
+    await page.locator('.opt').first().waitFor({ timeout: 5000 });
+  } finally {
+    await page.close();
+  }
+}, 30_000);

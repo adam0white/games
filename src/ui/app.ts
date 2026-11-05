@@ -665,6 +665,7 @@ async function newWeek(seed: number, version = GAME_VERSION, useShelf = true) {
   if (attempt !== loadGeneration) return;
   clearSave();
   s = next;
+  if (tutorial === 'result') tutorial = 'choice';
   warnedCard = '';
   carry = 0;
   if (!useShelf || localDevelopment) s.castScope = 'local';
@@ -813,6 +814,7 @@ function frame(t: number) {
   const dt = Math.min(0.25, Math.max(0, (t - last) / 1000));
   last = t;
   if (menuPausedAt !== null || (tutorial === 'result' && !s.card)) {
+    drawStatus();
     raf = requestAnimationFrame(frame);
     return;
   }
@@ -1036,7 +1038,7 @@ function drawSheet() {
       target?.classList.add('tutorial-target');
       target?.insertAdjacentHTML(
         'beforebegin',
-        '<p class="tutorial-prompt" data-tutorial-target>↓ Guide Dilan through her week. Tap to suggest. If time runs out, she decides. <button data-tutorial-skip>Skip guide</button></p>',
+        '<p class="tutorial-prompt" data-tutorial-target><span>↓ Guide Dilan’s week. Tap a choice. Time out: she decides.</span><button data-tutorial-skip>Skip guide</button></p>',
       );
       el.querySelector('[data-tutorial-skip]')?.addEventListener('click', finishTutorial);
     }

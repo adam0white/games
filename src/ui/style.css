@@ -1802,3 +1802,13 @@ body {
     overflow-y: auto;
   }
 }
+.tutorial-prompt:has([data-tutorial-skip]) {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  padding: 4px;
+}
+.tutorial-prompt:has([data-tutorial-skip]) button {
+  flex: 0 0 auto;
+}
