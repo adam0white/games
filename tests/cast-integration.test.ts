@@ -26,6 +26,7 @@ import { replayRecordedRun } from '../src/game/replay';
 import { historicalPerson } from './historical-hf411';
 
 const stamps = { game: 'repair', build: 'test', engine: '4.11.0', rules: 'canonical-workshop-3' };
+const receivingStamps = { ...stamps, engine: '4.17.0' };
 // Explicit public authoring makes a distinct source. No cache edit changes an HF actor.
 async function source(id: 'nora' | 'rafi', prayer = false, prayerFrom = 540) {
   const castId = CAST_IDS[id]!;
@@ -125,7 +126,7 @@ describe('released HF4 whole-cast workshop adapter', () => {
         },
       },
       CAST.map((cast) => cast.castId),
-      stamps,
+      receivingStamps,
       async (prepared) => {
         const people = createGame(42).people;
         for (const input of prepared) {
@@ -235,7 +236,7 @@ it('restores a carried person during jobless prayer and finishes it exactly once
       },
     },
     CAST.map((cast) => cast.castId),
-    stamps,
+    receivingStamps,
     async (inputs) => {
       const people = createGame(42).people;
       const input = inputs[0];
