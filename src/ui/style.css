@@ -1181,3 +1181,42 @@ body {
     text-align: right;
   }
 }
+
+.tutorial-target {
+  outline: 3px solid #f8c952;
+  outline-offset: 2px;
+}
+.tutorial-prompt {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem;
+  background: #fff1bd;
+  color: #241d0d;
+  border: 2px solid #8a6100;
+  border-radius: 0.4rem;
+  font-size: 0.9rem;
+}
+.tutorial-prompt button {
+  flex: none;
+}
+.state-strip .tutorial-prompt {
+  position: fixed;
+  z-index: 10;
+  top: 5.5rem;
+  left: 0.5rem;
+  right: 0.5rem;
+  max-width: calc(100vw - 1rem);
+}
+.tutorial-prompt.tutorial-late {
+  background: #ffded7;
+  border-color: #a52b1a;
+}
+.state-strip .tutorial-prompt {
+  box-sizing: border-box;
+  white-space: normal;
+}
+.tutorial-prompt span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

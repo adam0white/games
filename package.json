@@ -19,7 +19,8 @@
     "measure": "node scripts/measure.ts",
     "check": "npm run lint && npm run typecheck && npm test",
     "deploy": "npm run check && npm run build && wrangler deploy",
-    "check:lane": "npm run lint && npm run typecheck"
+    "check:lane": "npm run lint && npm run typecheck",
+    "test:first-minute": "node test/browser/first-minute.mjs"
   },
   "dependencies": {
     "@adam0white/human-framework": "4.17.0",
