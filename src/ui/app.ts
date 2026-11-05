@@ -938,6 +938,7 @@ async function title() {
       status('Keep the original file and start a fresh game. This file could not be loaded.');
     }
   });
+  mountTeaching();
 }
 
 /** Which night a save is on, without replaying it: the number of 'open' inputs that moved to a new night. */
@@ -2886,6 +2887,7 @@ function evening() {
   document.getElementById('export')?.addEventListener('click', download);
   document.getElementById('send')?.addEventListener('click', sendRun);
   window.scrollTo(0, 0);
+  mountTeaching();
 }
 
 const capital = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
@@ -3101,6 +3103,7 @@ function sunday() {
   document.getElementById('export')?.addEventListener('click', download);
   document.getElementById('send')?.addEventListener('click', sendRun);
   window.scrollTo(0, 0);
+  mountTeaching();
 }
 
 // ---------- the end ----------
@@ -3161,6 +3164,7 @@ function ending() {
   document.getElementById('send')?.addEventListener('click', sendRun);
   document.getElementById('again')?.addEventListener('click', () => title());
   window.scrollTo(0, 0);
+  mountTeaching();
 }
 
 function sendRun() {
@@ -3199,6 +3203,7 @@ function returnPage() {
   document.getElementById('export')?.addEventListener('click', download);
   document.getElementById('send')?.addEventListener('click', sendRun);
   document.getElementById('fresh')?.addEventListener('click', () => title());
+  mountTeaching();
 }
 
 // ---------- phone niceties ----------

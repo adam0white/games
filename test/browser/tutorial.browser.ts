@@ -172,3 +172,38 @@ test('unfinished service practice remains dismissible at evening and the next bo
     await expect(page.locator('[data-tutorial-step]')).toHaveCount(0);
   }
 });
+
+test('native closing time keeps unfinished practice on the evening continuation', async ({ page }) => {
+  await page.addInitScript(() => {
+    Date.now = () => 42;
+    Math.random = () => 0;
+  });
+  await page.goto('/?lab=1');
+  await page.locator('#new').click();
+  await page.locator('#open-service').click();
+  await expect(page.locator('[data-tutorial-step="crew"]')).toBeVisible();
+  // Advance real native minutes, not a fabricated phase or report. The ordinary frame closes service.
+  await page.evaluate(() => {
+    const game = (window as unknown as { __pass: { step(n: number): void } }).__pass;
+    game.step(600);
+  });
+  await expect(page.locator('#open')).toBeVisible();
+  await expect(page.locator('[data-tutorial-step="continue"]')).toBeVisible();
+  await page.locator('#open').click();
+  await expect(page.locator('[data-tutorial-step="plan"]')).toBeVisible();
+  await page.locator('[data-tutorial-skip]').click();
+});
+
+test('replaying practice from the saved-game title points to Resume', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('#new').click();
+  await expect(page.locator('.board-change').first()).toBeVisible();
+  await page.reload();
+  await expect(page.locator('#cont')).toBeVisible();
+  await page.locator('#game-menu').click();
+  await page.locator('#menu-tutorial').click();
+  await expect(page.locator('#cont')).toHaveClass(/teaching-target/);
+  await page.locator('#cont').click();
+  await expect(page.locator('[data-tutorial-step="plan"]')).toBeVisible();
+  await page.locator('[data-tutorial-skip]').click();
+});

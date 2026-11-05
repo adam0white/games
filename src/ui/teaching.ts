@@ -30,8 +30,8 @@ function stakesPicture() {
 }
 const cues: Record<Step, [string, string]> = {
   continue: [
-    '#open, #end, #again, #fresh, #new, [data-key]:not([disabled])',
-    'Continue to the next kitchen plan to replay practice. Your current game stays in place.',
+    '#cont:not([disabled]), #open:not([disabled]), #end, #again, #fresh, #new, [data-jar], [data-key]:not([disabled])',
+    'Choose your next step. Practice returns when a kitchen plan opens.',
   ],
   waiting: ['.panel-reply', 'Your request is waiting for the cook’s answer. The kitchen keeps running.'],
   plan: ['.board-change', 'Keep the kitchen earning enough to pay Saturday’s bill. Choose a cook’s plan.'],
@@ -54,7 +54,7 @@ const cues: Record<Step, [string, string]> = {
   ],
   open: [
     '#open-service',
-    'The cooks have answered. Empty stations delay meals; late customers leave without paying. Open the doors when you decide.',
+    'Open the doors when you decide. A cook can refuse a changed plan. Empty stations delay meals; late customers leave without paying.',
   ],
   crew: ['[data-pick]', 'The kitchen is running. Choose a cook to ask for a job; they can say no.'],
   ask: [

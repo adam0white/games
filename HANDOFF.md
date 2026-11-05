@@ -371,3 +371,7 @@ The speech highlight timer can expire after the public file chooser replaces the
 ## CLARITY tutorial candidate — 2026-11-05
 
 Remaining: exact reviewed PR, green CI, merge and verified clean deployment; owner readiness acceptance remains separate. The first-minute guide uses actual station/break/cover proposals and cook requests, waits for the requested answer, and offers Skip and menu replay. It has a no-body-reading browser check and one synthetic Terra skim tester with retest. See [the playtest record](docs/playtests/2026-11-05-clarity.md). The optional first-party start timeout is a separate unconfirmed performance observation for 2026-11-24; no general speed claim follows.
+
+## Clarity renderer correction — 2026-11-05
+
+Remaining: final exact hosted review, green source and main CI, normal clean deployment and live proof. Combined HF4.17 candidate now passes16 Chromium and16 WebKit controls at the four owner sizes, including actual native closing-time recovery and Resume targeting. The isolated phase control alone did not prove the real evening transition; source review and a red native-close test found and corrected the missing renderer call. Current-person envelopes now inherit the actual projected engine stamp;12 cast/write-gate controls pass with production guards and historical fixtures unchanged. Owner readiness remains separate.
