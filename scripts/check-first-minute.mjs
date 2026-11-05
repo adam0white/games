@@ -120,6 +120,35 @@ async function skipAndReplay(viewport) {
     await context.close();
   }
 }
+async function enlargedHeader() {
+  const page = await browser.newPage({ viewport: { width: 360, height: 690 } });
+  try {
+    await page.goto(`${local}/file/?tutorial=1`);
+    await page.locator('[data-a="go"]').click();
+    await page.evaluate(() => {
+      for (const el of document.querySelectorAll('.where, .clock-rate'))
+        el.style.fontSize = `${parseFloat(getComputedStyle(el).fontSize) * 2}px`;
+    });
+    const bounds = await page.evaluate(() => {
+      const rect = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON();
+      return {
+        top: rect('.top'),
+        where: rect('.where'),
+        day: rect('.day-strip'),
+        clock: rect('.clock-rate'),
+      };
+    });
+    console.log('enlarged header and pacing', JSON.stringify(bounds));
+    assert.ok(bounds.where.top >= bounds.top.top && bounds.where.bottom <= bounds.top.bottom + 1);
+    assert.ok(bounds.day.top >= bounds.top.bottom - 1 && bounds.clock.bottom <= bounds.day.bottom + 1);
+    await exposed(page.getByRole('button', { name: 'Skip tutorial' }), 'enlarged Skip');
+    await exposed(page.locator('.leader-bar .verb.lit'), 'enlarged target');
+    await page.locator('.leader-bar .verb.lit').click();
+    await page.locator('.sheet .verb.lit').waitFor({ state: 'visible' });
+  } finally {
+    await page.close();
+  }
+}
 async function compactLandscape(dnt) {
   const page = await browser.newPage({
     viewport: { width: 690, height: 360 },
@@ -197,6 +226,7 @@ for (const browserType of [chromium, webkit]) {
         await page.close();
       }
     }
+    await enlargedHeader();
     await compactLandscape(true);
     await compactLandscape(false);
     console.log(

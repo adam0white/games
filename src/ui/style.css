@@ -1757,7 +1757,7 @@ body {
 /* Reserve enough dock height for the opening control and its attached cue. */
 @media (max-width: 759px) and (min-height: 501px) {
   #app:has(.leader-bar .tutorial-cue) {
-    grid-template-rows: 44px 56px minmax(48px, 1fr) minmax(192px, 34%) 132px;
+    grid-template-rows: max-content max-content minmax(48px, 1fr) minmax(0, 34%) 132px;
   }
 }
 
