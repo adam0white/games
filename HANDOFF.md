@@ -1,6 +1,6 @@
 # Games consolidation — 2026-11-05
 
-Remaining: pilot source/tutorial sync, the path-aware lab artifact, exact CI/review and live pilot checks; remaining-game imports; two new games. Infrastructure preparation is not a shipped migration. Owner accepts taste after coordinator review.
+Remaining: published path-aware lab artifacts, exact pilot CI/review and live checks; remaining-game imports; two new games. Pilot source and tutorial synchronization is complete locally. Infrastructure preparation is not a shipped migration. Owner accepts taste after coordinator review.
 
 The owner authorized public `adam0white/games`, MIT code, required `ci`, signed commits, `play.adamwhite.work` on the existing `adamwhite.work` zone and old-host redirects after each new path is verified. The public repo exists. Main requires `ci` and signed commits, enforces protection for administrators and disallows force pushes/deletion. The signed bootstrap is on main. Rope and Hearsay histories are imported without squash on draft PR #1. Both game engines pin HF 4.17.0. No production deployment has occurred.
 
@@ -41,3 +41,11 @@ Redirect preflight now validates live manifests, ancestry, initial activation an
 Hearsay UPKEEP source `2fb948bbb6d3ea779e31e93b6dadc32d032085a7` is being imported without squash. The original repository remains authoritative until CLARITY explicitly releases the tutorial. This is preparation, not cutover. The merge retains shared deployment, path and storage isolation, the current browser harness, and the HF3 archive. The upstream game-level HF3 alias is omitted under the root alias gate; the game engine remains pinned to HF 4.17.0. The root owns the lockfile and workspace configuration.
 
 With Node 26.12.0 and pnpm 12.16.1, the frozen workspace install, root lane (19 tests), both game lint/typecheck lanes, and Hearsay current-adapter/guidance tests (14 tests) passed. Both game lanes emitted lint warnings. The full Hearsay suite was not run: two preserved shelf controls await published client 0.5.16 and kit 0.5.33. No deployment or redirect change is authorized by this checkpoint.
+
+## Final pilot source synchronization
+
+The signed subtree merges now preserve Hearsay source `f6737badd333a7e889a8a9abb91653aae04b370a` and Rope source `c69a43cd9237d397ed6ea21031f783932c86046e`, including their merged CLARITY tutorials. Neither source had an open PR at synchronization. Independent public manifest reads confirm both exact source releases on their original hosts with HF 4.17.0 and `dirty:false`.
+
+The complete local bundle and 19 root controls passed after synchronization. Rope's eight tutorial controls and two prefixed practice paths passed; Hearsay's prefixed first-minute paths passed. Rope's preserved native new-origin start still fails because its old client rejects the play persona origin. Practice mode does not establish native start, shelf or recording. Keep that failure and Hearsay's preserved shelf controls until actual immutable client 0.5.16 and kit 0.5.33 are adopted. A local candidate pair is not publication.
+
+HF's first combined PR contains the exact dated owner approval and approved direction. Its qualified local checkpoint passed 1,802 tests, but source CI, review, immutable artifact publication and central deployment remain separate gates. The later cast-role/private-ingest preparation is excluded from that first release. No play route, redirect or repository archival has been applied by MONO.

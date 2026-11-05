@@ -10,7 +10,7 @@ The bench fills most of the screen. Warm ochre cutaways, large tools, changing g
 
 ## First minute
 
-A cart wheel wobbles on the bench before any text. Its axle cap pulses; touching it opens a cutaway. A visible bent pin can be removed with the nearby pliers. A broad ghost shape shows the replacement pin's destination. Fit it and spin the wheel; it rolls straight across the bench and the owner visibly responds. The real first repair is complete. One prompt at a time attaches to the actual object and waits for action. The tutorial can be skipped or replayed. The next object adds a deadline and a part allocation choice; teaching does not lower the later difficulty.
+A cart wheel wobbles on the bench before any text. Its axle cap pulses; touching it opens a cutaway. A visible bent pin can be removed with the nearby pliers. A broad ghost shape shows the replacement pin's destination. Fit it and spin the wheel; it rolls straight across the bench and Sam or Rafi visibly responds after actually receiving the test result. The real first repair is complete. One prompt at a time attaches to the actual object and waits for action. The tutorial can be skipped or replayed. The next object adds a deadline and a part allocation choice; teaching does not lower the later difficulty.
 
 ## Cast and agency
 
