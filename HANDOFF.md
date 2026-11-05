@@ -1,3 +1,9 @@
+# Upkeep candidate — 2026-11-05
+
+[Item-specific open checkpoints](docs/upkeep-checkpoints-2026-11-05.md) retain the original requests and their separate dates.
+
+Remaining: exact-source review, CI, integration and deployment. This source candidate targets HF 4.17.0; it is not a delivery receipt. F-2689 and the remaining open second-retest inspection leads require cause investigation and coordination with the lab. Recheck 2026-11-12; no product or driver cause is yet established. Preserve the original report dates below.
+
 # Retest 1 UI candidate — 2026-10-31
 
 Remaining: exact Opus review stays held; phone/desktop geometry and real pointer journeys are unrun. This unsigned candidate repairs current-state retained order selection and pressed state, and adds actual consumer controls for pending parcels and generic notebook claims. Complete current HF full-hash replay and native checkpoint/next-input receipts belong to `~/code/.lab-scratch/games-deferred/restart-stairwell-retest1-correction1.md`. All 20 routes and the folded table lead remain open in [the game’s Deferred record](docs/design.md#retest-1-deferred--2026-10-31). No commit, delivery, canonical fixed marker, whole-ask closure or owner acceptance is claimed. Root retains this worktree.

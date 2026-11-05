@@ -128,9 +128,9 @@ export function readNativeNotebook(input: unknown): NativeNotebook {
   if (
     !object(archive) ||
     !object(archive.engine) ||
-    archive.engine.package !== '@adam0white/human-framework@4.14.0' ||
-    archive.engine.build !== 'c82ab38fa5565c2afbb976f644a75346316608842deaccdc65c13a4bd4a8c4c0' ||
-    archive.engine.schema !== 'f951128cd79e831ee5225eb0bf04b4d30b61d206f75b85f957a90c475f0665e0'
+    archive.engine.package !== '@adam0white/human-framework@4.17.0' ||
+    archive.engine.build !== '31b2e76cda7c85a9429256be6b75d76bfcb346bf0eb9e3d047884bc0f6755894' ||
+    archive.engine.schema !== '5ccc2e20c0cb082825cb64fd91c7cff7c57c2907e6c93713780f9d0508d27001'
   )
     throw new Error('This save needs an older game version. Keep the original notebook and start fresh.');
   if (
