@@ -15,5 +15,6 @@ allowBuilds:
   workerd@1.20261103.1: true
   fsevents: false
 overrides:
+  "@adam0white/lab-client>@adam0white/human-framework": "4.17.0"
   sharp: 0.35.5
   miniflare>undici: 7.30.1

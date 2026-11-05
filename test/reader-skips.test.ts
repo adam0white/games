@@ -136,7 +136,7 @@ it.each(['wrong-parent', 'rejected', 'missing'])(
       castRevision: '1',
       branchId: 'eligible-reader-control',
       parentRevision: null,
-      source: { game: 'rope', engine: '4.15.0', build: 'synthetic', rules: 'rope-hf4-1' },
+      source: { game: 'rope', engine: '4.17.0', build: 'synthetic', rules: 'rope-hf4-1' },
       transfer: { castPassport: 'hf-portable-person/2', portable },
       limitations: [],
     });
