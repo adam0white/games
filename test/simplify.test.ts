@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { exportRun as frameworkArchive } from '@adam0white/human-framework';
+import { exportRun as frameworkArchive, readRunHistory } from '@adam0white/human-framework';
 import { expect, it } from 'vitest';
 import { runPolicy } from '../scripts/policy.ts';
 import { workerNeed } from '../src/sim/dialogue.ts';
@@ -132,8 +132,8 @@ it('keeps an actual visit observation in report voice and known family speech in
     'You said the worker was patient. Şebnem Eren let the household member finish explaining. The household could follow the agreed routine. You were right about this worker.',
   );
   expect(
-    frameworkArchive(runFor(state))
-      .history.flatMap((transaction) => transaction.inputs)
+    readRunHistory(frameworkArchive(runFor(state)))
+      .flatMap((transaction) => transaction.inputs)
       .some(
         (receipt) =>
           receipt.kind === 'action.resolved' &&

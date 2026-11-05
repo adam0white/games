@@ -1,3 +1,7 @@
+# Upkeep candidate — 2026-11-05
+
+Remaining: exact-source review, CI, integration and deployment. This source candidate targets HF 4.17.0; it is not a delivery receipt. F-2529 and F-2618/F-2619/F-2629 remain open: the existing game does not send the repair letter; a later chapter needs a recipient, delivery event and actor-chosen result. Recheck the fiction decision on 2026-11-12. Existing owner acceptance and original report dates are unchanged.
+
 # Original household requests — source candidate 2026-10-31
 
 GH-ON-1 correction extends the candidate to the automated public-request policy parser and a focused control. The same independent reviewer must follow up; future exact-source Opus review remains. No simulation rule or household text changed by this correction.

@@ -1,5 +1,9 @@
 import { appendFileSync, writeFileSync } from 'node:fs';
-import { exportRun as frameworkArchive, replay as frameworkReplay } from '@adam0white/human-framework';
+import {
+  exportRun as frameworkArchive,
+  replay as frameworkReplay,
+  readRunHistory,
+} from '@adam0white/human-framework';
 import { expect, test, vi } from 'vitest';
 import * as hf4 from '../src/sim/hf4.ts';
 import {
@@ -39,7 +43,7 @@ function archiveBytes(archive: ReturnType<typeof frameworkArchive>) {
   let hostStateBytes = 0,
     hostStates = 0,
     inputs = 0;
-  for (const transaction of archive.history)
+  for (const transaction of readRunHistory(archive))
     for (const input of transaction.inputs) {
       inputs++;
       const change =
@@ -60,13 +64,13 @@ function archiveBytes(archive: ReturnType<typeof frameworkArchive>) {
     hostStateBytes,
     hostStates,
     inputs,
-    transactions: archive.history.length,
+    transactions: readRunHistory(archive).length,
   };
 }
 
 test('the real current Gül interview uses one HF4 Run and both game files replay completely', () => {
   const state = newGame(7);
-  expect(frameworkArchive(runFor(state)).engine.package).toBe('@adam0white/human-framework@4.8.1');
+  expect(frameworkArchive(runFor(state)).engine.package).toBe('@adam0white/human-framework@4.17.0');
   apply(state, { type: 'interview', candidate: 'gul' });
   const scene = view(state).scene!;
   expect(scene.kind).toBe('interview');
@@ -128,8 +132,8 @@ test('placement work is admitted and survives a game checkpoint', () => {
       (a) => a.person === 'gul' && a.actionId === 'placement-work',
     ),
   ).toBe(true);
-  const receipt = frameworkArchive(runFor(state))
-    .history.flatMap((t) => t.inputs)
+  const receipt = readRunHistory(frameworkArchive(runFor(state)))
+    .flatMap((t) => t.inputs)
     .find(
       (i) =>
         i.kind === 'action.resolved' &&
@@ -143,8 +147,8 @@ test('placement work is admitted and survives a game checkpoint', () => {
   }
   expect(worker.skills.childcare!.practice).toBeGreaterThan(0);
   expect(
-    frameworkArchive(runFor(state))
-      .history.flatMap((t) => t.inputs)
+    readRunHistory(frameworkArchive(runFor(state)))
+      .flatMap((t) => t.inputs)
       .filter((i) => i.kind === 'action.resolved' && i.payload.person === 'gul'),
   ).toHaveLength(2);
   decide(worker, [
@@ -165,8 +169,8 @@ test('placement work is admitted and survives a game checkpoint', () => {
     ),
   ).toHaveLength(1);
   expect(
-    frameworkArchive(runFor(state))
-      .history.flatMap((t) => t.inputs)
+    readRunHistory(frameworkArchive(runFor(state)))
+      .flatMap((t) => t.inputs)
       .filter((i) => i.kind === 'action.resolved' && i.payload.outcome?.actionId === 'placement-work'),
   ).toHaveLength(2);
 }, 180000);
@@ -292,8 +296,8 @@ test('a guest receives completion even when another actor advances the shared ru
   stepGuests(state);
   expect(guest.status).toBe('complete');
   expect(actor.agenda.commitments.find((c) => c.id === duty.id)?.status).toBe('kept');
-  const completion = frameworkArchive(runFor(state))
-    .history.flatMap((t) => t.inputs)
+  const completion = readRunHistory(frameworkArchive(runFor(state)))
+    .flatMap((t) => t.inputs)
     .find((i) => i.kind === 'action.resolved' && i.payload.outcome?.actionId === 'cold-food-trial');
   if (completion?.kind === 'action.resolved') expect(completion.payload.outcome?.fulfills).toContain(duty.id);
   else throw new Error('Missing actual trial completion receipt');
@@ -452,7 +456,7 @@ test('same-time care uses one opening batch and preserves every actor receipt', 
   saveFramework(state);
   const archive = frameworkArchive(runFor(state));
   expect(archiveBytes(archive).hostStateBytes).toBeLessThan(100000);
-  const meals = archive.history.filter((t) =>
+  const meals = readRunHistory(archive).filter((t) =>
     t.inputs.some(
       (i) =>
         i.kind === 'offers.received' &&
@@ -483,7 +487,7 @@ test('same-time care uses one opening batch and preserves every actor receipt', 
   ).toEqual(people);
   const nowArchive = frameworkArchive(runFor(state));
   expect(
-    nowArchive.history
+    readRunHistory(nowArchive)
       .flatMap((t) => t.inputs)
       .filter((i) => i.kind === 'action.resolved' && i.payload.outcome?.actionId === 'eat'),
   ).toHaveLength(people.length);
@@ -569,7 +573,7 @@ test('host reconstruction preserves completed failed and interrupted actual rece
   expect(bridge.host.completed.map((a) => a.status).sort()).toEqual(['completed', 'failed', 'interrupted']);
   const checkpoint = saveHost(bridge);
   expect(restoreHost(checkpoint).host).toEqual(bridge.host);
-  const statuses = checkpoint.run.history
+  const statuses = readRunHistory(checkpoint.run)
     .flatMap((t) => t.inputs)
     .flatMap((i) => (i.kind === 'action.resolved' && i.payload.outcome ? [i.payload.outcome.status] : []));
   expect(statuses.sort()).toEqual(['completed', 'failed', 'interrupted']);
@@ -615,8 +619,8 @@ test('a meal at the agreed start does not lose the household shift', () => {
   );
   expect(completed).toHaveLength(1);
   expect(completed[0]!.end).toBe(780 * 60000);
-  const decisions = frameworkArchive(runFor(state))
-    .history.flatMap((t) => t.inputs)
+  const decisions = readRunHistory(frameworkArchive(runFor(state)))
+    .flatMap((t) => t.inputs)
     .filter(
       (i) =>
         i.kind === 'decision.requested' &&

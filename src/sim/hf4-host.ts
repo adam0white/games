@@ -15,6 +15,7 @@ import {
   type Run,
   type RunArchive,
   type RunSpec,
+  readRunHistory,
   replay,
   restoreRun,
   type StepResult,
@@ -177,7 +178,7 @@ function reconstructHost(archive: DeepReadonly<RunArchive>): HostState {
   checkHead(archive.initial.spec.world.hostState, host.revision);
   const books = new Map<string, readonly Offer[]>(),
     requests = new Map<string, DeepReadonly<HostRequest>>();
-  for (const transaction of archive.history) {
+  for (const transaction of readRunHistory(archive)) {
     for (const entry of transaction.inputs) {
       const ordinal = /^goodhands:(\d+)$/.exec(entry.id);
       if (ordinal) host.serial = Math.max(host.serial, Number(ordinal[1]));

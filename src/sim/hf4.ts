@@ -27,7 +27,7 @@ export type CalendarPersonaSnapshot = Old.CalendarPersonaSnapshot;
 export type PersonaProjectionSnapshot = Old.PersonaProjectionSnapshot;
 export type PersonaCalendarMap = Old.PersonaCalendarMap;
 export const DEFAULT_NORMS = HF.DEFAULT_NORMS;
-export const ENGINE_VERSION = '4.8.1';
+export const ENGINE_VERSION = '4.17.0';
 type Opening = Parameters<typeof import('@adam0white/human-framework-legacy3').createPerson>[0];
 type WorkReceipt = { skill?: string; psychological?: HF.ActualConsequences['psychological'] };
 type Context = {
@@ -280,7 +280,7 @@ function bound(state: object): Context {
     authors: new Map(
       [
         ...s.hf4.archive.initial.people,
-        ...s.hf4.archive.history.flatMap((t) =>
+        ...HF.readRunHistory(s.hf4.archive).flatMap((t) =>
           t.inputs.flatMap((i) => (i.kind === 'person.arrived' ? [i.payload.authored] : [])),
         ),
         ...((s.hf4 as any).arrivals ?? []).map((a: { authored: HF.PersonAuthoring }) => a.authored),
