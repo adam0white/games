@@ -24,10 +24,10 @@ export function assertFrameworkGraph(packages, version) {
   const matches = packages.filter(p => /^@adam0white\/human-framework(?:$|-)/.test(p.name));
   if (!matches.some(p => p.name === '@adam0white/human-framework' && p.version === version) || matches.some(p => p.name !== '@adam0white/human-framework' || p.version !== version)) throw new Error('Installed HF graph has an incompatible version or alias');
 }
-export function manifest(registry, game, commit, dirty, labVersion) {
+export function manifest(registry, game, commit, dirty, labVersion, app) {
   validateRegistry(registry);
-  if (!sha.test(commit) || dirty || !registry.games.some(g => g.slug === game.slug) || !labVersion) throw new Error('Refusing unclean or invalid release');
-  return { game: game.slug, commit, dirty: false, source: game.source, hfVersion: registry.hfVersion, frameworkLibrary: registry.hfVersion, labVersion, saveSchema: game.saveSchema };
+  if (!sha.test(commit) || dirty || !registry.games.some(g => g.slug === game.slug) || !labVersion || !app) throw new Error('Refusing unclean or invalid release');
+  return { game: game.slug, commit, dirty: false, source: game.source, hfVersion: registry.hfVersion, framework: registry.hfVersion, app, frameworkLibrary: registry.hfVersion, labVersion, saveSchema: game.saveSchema };
 }
 function scope(slug, path) {
   if (!/^\/(?!\/)[^\s?#]*$/.test(path) || /(?:\.\.|%|\\)/.test(path)) throw new Error('Unsafe rule path');

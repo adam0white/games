@@ -28,7 +28,7 @@ for (const game of registry.games) {
     const source = `${target}/${file}`;
     if (existsSync(source)) { list.push(scope(game.slug, readFileSync(source, 'utf8'))); rmSync(source); }
   }
-  writeFileSync(`${target}/release.json`, JSON.stringify(manifest(registry, game, commit, false, labVersion)) + '\n');
+  writeFileSync(`${target}/release.json`, JSON.stringify(manifest(registry, game, commit, false, labVersion, JSON.parse(readFileSync(`${path}/package.json`, 'utf8')).version)) + '\n');
 }
 if (existsSync('dist/sw.js')) throw new Error('Root service worker forbidden');
 if (headers.length) writeFileSync('dist/_headers', headers.join('\n'));

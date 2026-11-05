@@ -33,7 +33,9 @@ test('headers and redirects are constrained to game prefix', () => {
   assert.throws(() => scopedRedirects('rope', '/old https://evil.example 302\n'));
 });
 test('release rejects mismatched lineage, version or redirected response', () => {
-  const expected=manifest(registry, game, 'b'.repeat(40), false, '0.5.8');
+  const expected=manifest(registry, game, 'b'.repeat(40), false, '0.5.8', '0.2.0');
+  assert.equal(expected.framework, '4.17.0');
+  assert.equal(expected.app, '0.2.0');
   assert.throws(() => checkRelease(expected, {...expected, hfVersion:'4.16.3'}, false));
   assert.throws(() => checkRelease(expected, expected, true));
 });
