@@ -3,10 +3,10 @@ type Phrases = Record<string, readonly string[]>;
 
 const wordings: Phrases = {
   'suggestion.resolved': [
-    'I {verdict}.',
-    'For now, I {verdict}.',
-    'I have {verdict}.',
-    'After considering it, I {verdict}.',
+    'I {verdict}.{reason}',
+    'For now, I {verdict}.{reason}',
+    'I {verdict} after some thought.{reason}',
+    'After considering it, I {verdict}.{reason}',
   ],
   'decision.act': [
     'I will {action}.{why}',
@@ -25,10 +25,10 @@ const wordings: Phrases = {
 const profiles: Record<string, Phrases> = {
   yusuf: {
     'suggestion.resolved': [
-      'I considered your suggestion. I {verdict}.',
-      'I {verdict}. That is my decision.',
-      'I gave it thought. I {verdict}.',
-      'After considering it, I {verdict}.',
+      'I considered your suggestion. I {verdict}.{reason}',
+      'I {verdict}. That is my decision.{reason}',
+      'I gave it thought. I {verdict}.{reason}',
+      'After considering it, I {verdict}.{reason}',
     ],
     'decision.act': [
       'I will {action}.{why}',
@@ -45,10 +45,10 @@ const profiles: Record<string, Phrases> = {
   },
   meryem: {
     'suggestion.resolved': [
-      'I thought about it. I {verdict}.',
-      'After thinking it over, I {verdict}.',
-      'I {verdict}. I have given it some thought.',
-      'I considered your suggestion and {verdict}.',
+      'I thought about it. I {verdict}.{reason}',
+      'After thinking it over, I {verdict}.{reason}',
+      'I {verdict}. I have given it some thought.{reason}',
+      'I considered your suggestion and I {verdict}.{reason}',
     ],
     'decision.act': [
       'I think I will {action}.{why}',
@@ -65,10 +65,10 @@ const profiles: Record<string, Phrases> = {
   },
   maryam: {
     'suggestion.resolved': [
-      'I have considered your suggestion. I {verdict}.',
-      'I {verdict}. Thank you for suggesting it.',
-      'I thought it over and {verdict}.',
-      'I {verdict}, after giving it some thought.',
+      'I have considered your suggestion. I {verdict}.{reason}',
+      'I {verdict}. Thank you for suggesting it.{reason}',
+      'I thought it over and I {verdict}.{reason}',
+      'I {verdict}, after giving it some thought.{reason}',
     ],
     'decision.act': [
       'I will see to it and {action}.{why}',
@@ -85,10 +85,10 @@ const profiles: Record<string, Phrases> = {
   },
   tariq: {
     'suggestion.resolved': [
-      'I {verdict}.',
-      'I thought about it and {verdict}.',
-      'I have {verdict}.',
-      'I considered your suggestion. I {verdict}.',
+      'I {verdict}.{reason}',
+      'I thought about it and I {verdict}.{reason}',
+      'I {verdict} after some thought.{reason}',
+      'I considered your suggestion. I {verdict}.{reason}',
     ],
     'decision.act': [
       'I will go and {action}.{why}',
@@ -105,10 +105,10 @@ const profiles: Record<string, Phrases> = {
   },
   kian: {
     'suggestion.resolved': [
-      'I {verdict}.',
-      'I have {verdict}.',
-      'I considered it and {verdict}.',
-      'After thinking it over, I {verdict}.',
+      'I {verdict}.{reason}',
+      'I {verdict} after some thought.{reason}',
+      'I considered it and I {verdict}.{reason}',
+      'After thinking it over, I {verdict}.{reason}',
     ],
     'decision.act': [
       'I will {action}.{why}',
@@ -120,10 +120,10 @@ const profiles: Record<string, Phrases> = {
   },
   tamar: {
     'suggestion.resolved': [
-      'I considered your suggestion. I {verdict}.',
-      'I {verdict}. That is my decision.',
-      'After considering it, I {verdict}.',
-      'I have {verdict}. I considered it carefully.',
+      'I considered your suggestion. I {verdict}.{reason}',
+      'I {verdict}. That is my decision.{reason}',
+      'After considering it, I {verdict}.{reason}',
+      'I {verdict} after some thought. I considered it carefully.{reason}',
     ],
     'decision.act': [
       'I have decided to {action}.{why}',

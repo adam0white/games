@@ -1,3 +1,11 @@
+# HF 4.17 and first steps candidate — 2026-11-05
+
+Remaining: normal lane, signed commit, exact hosted review and green CI, normal merge and clean deployment verification. Adam accepts game feel separately. This combined local candidate adopts HF 4.17.0 and current dependencies and adds an optional first-action guide to the real chalk controls. It waits for an accepted mark, offers skip and menu replay, and restarts unfinished guidance on resume. Desktop and phone action scripts and six focused port/guide tests passed. The rules and difficulty are unchanged. The authentic HF 4.10 test-only alias replays the immutable old fixtures; current HF refuses them. No human retest, merge or deployment is claimed.
+
+# Upkeep candidate — 2026-11-05
+
+Remaining: run the full lane and review the 4.17 wording and replay results; integrate the current Clarity work before review or deployment. Recheck the unverified peer certificates and source contracts on 2026-11-12: Valley, Watch and Lefthand have not supplied current live certification in this work. F-2761–F-2775 remain open inspection leads; review their current dispositions on 2026-11-12 because this dependency update did not investigate them. Owner feel acceptance remains separate.
+
 # Second-cycle dated Deferred candidate — 2026-10-31
 
 Remaining: root retains this tree for independent Code and future exact Opus review, then owns any integration and proof. Inspect F-2761–F-2775 on 2026-11-03. The second cycle was collected; this documentation candidate is unmerged and unreviewed. No third ordinary panel or automatic new gameplay fix cycle follows. The two-iteration rule does not establish technical proof, canonical HF import, owner acceptance or a bug-free game. Adam's play remains the acceptance of game feel.

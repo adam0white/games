@@ -93,7 +93,7 @@ describe('DL-23 actual control targets', () => {
           JSON.stringify({ play, notebook, card, scene, privacyScene }, null, 2),
         );
         expect(play).toHaveLength(14);
-        expect(notebook).toHaveLength(width >= 900 ? 7 : 8);
+        expect(notebook).toHaveLength(width >= 900 ? 8 : 9);
         expect(card).toHaveLength(1);
         expectTargets([...play, ...notebook, ...card], width, height);
         expect(scene?.height).toBeGreaterThanOrEqual(width === 320 ? 100 : 120);
