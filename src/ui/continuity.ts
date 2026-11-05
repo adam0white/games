@@ -126,7 +126,7 @@ export function continuity(
   const source = () => ({
     game: 'pass',
     build: lab.build().c ?? 'local',
-    engine: '4.12.0',
+    engine: '4.17.0',
     rules: 'pass-19',
   });
   const emit = () => window.dispatchEvent(new Event('pass-continuity'));
@@ -159,7 +159,7 @@ export function continuity(
     }
     return s
       ? {
-          ...exportRun(s, s.version === 'pass@20' ? '4.12.0' : FRAMEWORK_VERSION),
+          ...exportRun(s, s.version === 'pass@20' ? '4.17.0' : FRAMEWORK_VERSION),
           continuity: data(),
           oneCast: structuredClone(rows),
         }

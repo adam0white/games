@@ -1,3 +1,7 @@
+## Upkeep follow-up — 2026-11-05
+
+Remaining: integrate open Clarity work, qualify HF 4.17 replay and release, and obtain Adam's readiness judgment. Recheck F-2509 on 2026-11-12: the delivered bathroom drawing did not reproduce Sonia's historical phone-label cause or establish her judgment. Recheck the current public modified-learner verdict and same-tester return on 2026-11-12: neither was observed in the bounded controls and player rounds remain paused. Recheck shared attention and obligation contracts on 2026-11-12: their generic HF owner must establish the missing authority-bound evidence and reassignment semantics. F-2510 retains its 2026-11-10 recheck. Dates are engineering follow-ups, not appointments. Historical receipts below remain unchanged.
+
 # Week-two production evidence — 2026-11-03
 
 Remaining: F-2510’s historical cause, whole-week success and player acceptance remain open, with a 2026-11-10 recheck while player rounds are paused. Other Pass Deferred asks and Adam’s readiness acceptance remain separate.
@@ -363,3 +367,11 @@ The pre-delivery coordinator audit found current outgoing 2.21.0 envelopes rejec
 ## 2026-10-30 combined reader candidate follow-up
 
 The speech highlight timer can expire after the public file chooser replaces the service view. `drawSheet` now returns when that view has no sheet. Highlight timing and simulation remain unchanged. The browser regression advances the real highlight timer after public navigation; both current-file viewport controls also require zero page errors. Combined patch, hashes, backups and RED/GREEN logs are in `~/code/.lab-scratch/games-deferred/resume-pass-reader-combined-report.md` and its JSON proof. Root owns independent combined review and release; this tree remains uncommitted.
+
+## CLARITY tutorial candidate — 2026-11-05
+
+Remaining: exact reviewed PR, green CI, merge and verified clean deployment; owner readiness acceptance remains separate. The first-minute guide uses actual station/break/cover proposals and cook requests, waits for the requested answer, and offers Skip and menu replay. It has a no-body-reading browser check and one synthetic Terra skim tester with retest. See [the playtest record](docs/playtests/2026-11-05-clarity.md). The optional first-party start timeout is a separate unconfirmed performance observation for 2026-11-24; no general speed claim follows.
+
+## Clarity renderer correction — 2026-11-05
+
+Remaining: final exact hosted review, green source and main CI, normal clean deployment and live proof. Combined HF4.17 candidate now passes16 Chromium and16 WebKit controls at the four owner sizes, including actual native closing-time recovery and Resume targeting. The isolated phase control alone did not prove the real evening transition; source review and a red native-close test found and corrected the missing renderer call. Current-person envelopes now inherit the actual projected engine stamp;12 cast/write-gate controls pass with production guards and historical fixtures unchanged. Owner readiness remains separate.
