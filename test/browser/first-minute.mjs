@@ -38,7 +38,17 @@ try {
   await automatic.clock.runFor(25000);
   assert.equal(await automatic.locator('.cg-tutorial-target[data-action=support]').count(), 1);
   await automatic.close();
-  console.log('First-minute control path, automatic completion, result, skip and replay passed.');
+  const refusal = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await refusal.goto('http://127.0.0.1:5190/');
+  await refusal.getByText('Other ways to begin').click();
+  await refusal.locator('[data-action=local]').click();
+  await refusal.locator('#cg-tutorial').waitFor();
+  await refusal.locator('.cg-tutorial-target[data-person]').click();
+  await refusal.locator('[data-action=pry]').click();
+  assert.equal(await refusal.locator('.cg-tutorial-target.cg-notice').count(), 1);
+  assert.equal(await refusal.locator('[data-action=finish]').count(), 0);
+  await refusal.close();
+  console.log('First-minute choices, refusal, automatic completion, result, skip and replay passed.');
 } finally {
   await browser.close();
 }

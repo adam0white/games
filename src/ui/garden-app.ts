@@ -177,7 +177,7 @@ function input(value: GardenInput) {
     save();
   }
   if (tutorial && accepted) {
-    if (value.type === 'listen') tutorial = 'conversation';
+    if (value.type === 'listen') tutorial = run.chat ? 'conversation' : 'result';
     else if (
       value.type === 'respond' ||
       value.type === 'silence' ||
