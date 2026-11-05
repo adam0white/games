@@ -1244,7 +1244,9 @@ export function hint(s: GameState, id: KeeperId, job: Job, target?: number, insi
  * against the offer's thresholds (`forecastThresholds`, set by `NIGHT_FORECAST`).
  */
 export function forecastWords(p: Person, aff: Affordance): string {
-  const spans = bodyForecast(p, aff).spans.slice(1);
+  const forecast = bodyForecast(p, aff);
+  if (!forecast || !('kind' in forecast) || forecast.kind !== 'conditional-body') return '';
+  const spans = forecast.spans.slice(1);
   if (spans.length === 0) return '';
   const worst = Math.max(...spans.map((x) => x.worst));
   const at = forecastThresholds(aff);

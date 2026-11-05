@@ -248,7 +248,7 @@ describe('F-2203 gate reading against level reading, by written time', () => {
     localStorage.setItem(
       'glance-cast-local-v3',
       JSON.stringify({
-        run: exportRun(saved, '4.14.0'),
+        run: exportRun(saved, '4.17.0'),
         runId: 'test-run',
         heads: [],
         fileOrigin: false,
@@ -375,7 +375,7 @@ describe('F-2350 level tile after Dai reads on his own', () => {
     const later = state.board.level as Report;
     expect(later.at).toBeGreaterThan(1320);
     localStorage['glance-cast-local-v3'] = JSON.stringify({
-      run: exportRun(state, '4.14.0'),
+      run: exportRun(state, '4.17.0'),
       runId: 'test-run',
       heads: [],
       fileOrigin: false,
@@ -533,7 +533,7 @@ describe('F-2349 the existing optional talk, named without answering Morgan', ()
   async function daiSheet(minute: number) {
     const state = replay(7, [], minute);
     localStorage['glance-cast-local-v3'] = JSON.stringify({
-      run: exportRun(state, '4.14.0'),
+      run: exportRun(state, '4.17.0'),
       runId: 'test-run',
       heads: [],
       fileOrigin: false,
@@ -625,7 +625,7 @@ describe('F-2360 the saved lightning drawing on a narrow screen (source candidat
     const state = replay(7, [], 1320 + 120);
     expect(state.flashes.length).toBeGreaterThan(0);
     localStorage['glance-cast-local-v3'] = JSON.stringify({
-      run: exportRun(state, '4.14.0'),
+      run: exportRun(state, '4.17.0'),
       runId: 'test-run',
       heads: [],
       fileOrigin: false,
@@ -760,7 +760,7 @@ describe('RT6 the preview names its target when the gate is fully open', () => {
     );
     expect(state.board.gate?.value).toBe(6);
     localStorage['glance-cast-local-v3'] = JSON.stringify({
-      run: exportRun(state, '4.14.0'),
+      run: exportRun(state, '4.17.0'),
       runId: 'test-run',
       heads: [],
       fileOrigin: false,
@@ -782,7 +782,7 @@ describe('RT7 first-call instruction after a volunteered level report', () => {
     const later = state.board.level as Report;
     expect(later.at).toBeGreaterThan(1320);
     localStorage['glance-cast-local-v3'] = JSON.stringify({
-      run: exportRun(state, '4.14.0'),
+      run: exportRun(state, '4.17.0'),
       runId: 'test-run',
       heads: [],
       fileOrigin: false,

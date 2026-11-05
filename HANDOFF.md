@@ -1,3 +1,9 @@
+# Upkeep candidate — 2026-11-05
+
+[Item-specific open checkpoints](docs/upkeep-checkpoints-2026-11-05.md) retain the original requests and their separate dates.
+
+Remaining: exact-source review, CI, integration and deployment. This source candidate targets HF 4.17.0; it is not a delivery receipt. F-2555 through F-2570 remain open. The chart lead needs investigation, and the other asks need their individual design and source dispositions. Recheck 2026-11-12. Owner choices remain the owner’s decisions. Preserve the original report dates below.
+
 # Glance current checkpoint — 2026-10-31 (read first)
 
 ## Original F-2346 cue — source candidate, 2026-10-31
