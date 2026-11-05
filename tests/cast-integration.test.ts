@@ -20,15 +20,10 @@ import {
   workshopTransfer,
 } from '../src/game/cast';
 import { createGame, dispatch } from '../src/game/engine';
-import {
-  createPeopleRuntime,
-  createPerson,
-  projectPerson,
-  promise,
-  snapshotRuntime,
-} from '../src/game/hf';
+import { createPeopleRuntime, createPerson, promise, snapshotRuntime } from '../src/game/hf';
 import { loadGame, saveGame } from '../src/game/persistence';
 import { replayRecordedRun } from '../src/game/replay';
+import { historicalPerson } from './historical-hf411';
 
 const stamps = { game: 'repair', build: 'test', engine: '4.11.0', rules: 'canonical-workshop-3' };
 // Explicit public authoring makes a distinct source. No cache edit changes an HF actor.
@@ -57,7 +52,7 @@ async function source(id: 'nora' | 'rafi', prayer = false, prayerFrom = 540) {
   const transfer = {
     castPassport: 'workshop-hf4/1',
     sourceRole: id,
-    person: projectPerson(person, castId, cast.revision),
+    person: historicalPerson(snapshotRuntime(people).archive, id, castId, cast.revision),
   };
   const limitations: string[] = [];
   const native = replay(snapshotRuntime(people).archive);
