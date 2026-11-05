@@ -1,0 +1,641 @@
+/** Browser continuity lifecycle. Loaded histories keep their own accepted head. */
+import {
+  createPersona,
+  type PersonaEnvelope,
+  personaChannel,
+  validatePersona,
+  watchPersonaCheckpoint,
+} from '@adam0white/lab-client';
+import { personaControls } from '@adam0white/lab-kit';
+import { newGame } from '../sim/game';
+import type { ContinuityEntry, ContinuityState, OneCastRow } from '../sim/one-cast';
+import {
+  createAuthoredDeryaCheckpoint,
+  createOneCastOpening,
+  createOneCastReturn,
+  ONE_CAST,
+  type OneCastId,
+  prepareOneCastAdmission,
+} from '../sim/one-cast';
+import type { Game } from '../sim/types';
+import { downloadRun } from './feedback';
+import { lab } from './lab';
+import { get, put } from './store';
+export type ContinuityGame = Game & { continuity?: ContinuityState };
+export const shelf = personaChannel();
+let current: () => ContinuityGame | undefined = () => undefined;
+let store: () => void = () => {};
+let pending: Promise<void> = Promise.resolve();
+let bridgeStatus = '';
+// Historical metadata does not create a separate recording choice.
+let _linkageKnown = false;
+let gateSerial = 0;
+let gatedGame: ContinuityGame | undefined;
+let gatedFile = false;
+/** Invalidate before any asynchronous run/load/reset work. Never consult gated playerId. */
+export function invalidateContinuity(): void {
+  ++gateSerial;
+  gatedGame = undefined;
+  gatedFile = false;
+  _linkageKnown = false;
+  lab.setPersonaRecording('pending-history');
+  lab.allowPersonaRecording(false);
+}
+if (typeof window !== 'undefined') {
+  const shelfChanged = () => {
+    const g = gatedGame;
+    const file = gatedFile || Boolean(g?.continuity?.entries.some((e) => e.scope === 'file'));
+    invalidateContinuity();
+    void gateContinuity(g, file).catch(() => {});
+  };
+  window.addEventListener('hf-persona-preference', shelfChanged);
+  window.addEventListener('storage', (event) => {
+    if (event.key === null || event.key === 'hf-persona-opt-in') shelfChanged();
+  });
+}
+let pendingArrival: {
+  admission: import('../sim/one-cast').OneCastAdmission;
+  scope: 'shared' | 'file';
+  seed: number;
+} | null = null;
+let loadArrival: ((game: ContinuityGame) => Promise<void>) | undefined;
+let candidate: PersonaEnvelope | null = null;
+let conflict: {
+  entry?: ContinuityEntry;
+  envelope: PersonaEnvelope;
+  game: ContinuityGame;
+  prefix?: ContinuityGame;
+  checkpoint?: Game['s']['people'][string];
+} | null = null;
+const build = () => lab.build().c ?? 'development';
+const message = (error: unknown) =>
+  error instanceof Error ? error.message : 'Continuity is unavailable. Download a file to keep this game.';
+/** Bind history metadata without consulting recording identity or consent. */
+export async function gateContinuity(g: ContinuityGame | undefined, file = false): Promise<void> {
+  ++gateSerial;
+  gatedGame = g;
+  if (g && file) g.fileHistory ??= crypto.randomUUID();
+  gatedFile = file || Boolean(g?.fileHistory);
+  _linkageKnown = true;
+  lab.setPersonaRecording(null);
+}
+export async function chooseContinuityRecording(_value: boolean): Promise<void> {}
+export async function validateContinuity(g: ContinuityGame): Promise<void> {
+  if (!g.continuity) {
+    if (g.initialPeople || g.initialContinuity)
+      throw new Error('The saved history for the arriving person is missing.');
+    return;
+  }
+  if (
+    (g.s.version !== 4 && g.s.version !== 5) ||
+    !Array.isArray(g.continuity.entries) ||
+    g.continuity.entries.length > 2 ||
+    !Array.isArray(g.continuity.rows) ||
+    g.continuity.rows.length > 128
+  )
+    throw new Error('This saved history cannot be used in this version.');
+  if (g.continuity.source) await validatePersona(g.continuity.source.head);
+  if (g.continuity.entries.length && (!g.initialContinuity || !g.initialPeople))
+    throw new Error('The saved history for the arriving person is missing.');
+  for (const entry of g.continuity.entries) {
+    await validatePersona(entry.head);
+    await validatePersona(entry.admission.envelope);
+    const fresh = newGame(g.s.seed, g.s.version);
+    const base =
+      fresh.s.people[entry.admission.person.id] ??
+      (await import('../sim/one-cast')).makeDilanOpening(g.s.seed, 360);
+    const opening = createOneCastOpening(
+      entry.admission.castId,
+      base,
+      entry.admission.envelope.transfer.person,
+    );
+    const admitted = await prepareOneCastAdmission(entry.admission.envelope, opening, {
+      targetBuild: entry.admission.targetBuild,
+    });
+    if (JSON.stringify(admitted) !== JSON.stringify(entry.admission))
+      throw new Error('The saved person could not be checked.');
+    if (
+      JSON.stringify(
+        g.initialContinuity?.entries.find((e) => e.admission.castId === entry.admission.castId)?.admission,
+      ) !== JSON.stringify(entry.admission)
+    )
+      throw new Error('The person’s arrival does not match the saved game.');
+    if (
+      entry.head.castId !== entry.admission.castId ||
+      !g.initialPeople?.[entry.admission.person.id] ||
+      JSON.stringify(g.initialPeople[entry.admission.person.id]) !== JSON.stringify(entry.admission.person)
+    )
+      throw new Error('The saved person’s arrival is incomplete.');
+  }
+}
+function row(e: ContinuityEntry, envelope: PersonaEnvelope, stage: string): OneCastRow {
+  return {
+    v: 1,
+    probe: ONE_CAST[e.admission.castId].probe,
+    arm: 'continuing',
+    scope: e.scope,
+    castId: envelope.castId,
+    branchId: envelope.branchId,
+    revision: envelope.revision,
+    parentRevision: envelope.parentRevision,
+    stage,
+    outcome: 'accepted',
+  };
+}
+/** This only runs for a new fortnight; it never replaces a loaded Person. */
+export async function arrive(seed: number, fresh = false): Promise<ContinuityGame> {
+  await shelf.ready;
+  lab.setPersonaRecording('pending-history');
+  const opening = newGame(seed, 5);
+  if (fresh || (!shelf.enabled && !candidate)) {
+    await gateContinuity(opening);
+    return opening;
+  }
+  const prepared: ContinuityEntry[] = [];
+  for (const castId of Object.keys(ONE_CAST) as OneCastId[]) {
+    let attemptedAdmission: typeof pendingArrival = null;
+    try {
+      const envelope =
+        candidate?.castId === castId
+          ? candidate
+          : shelf.enabled
+            ? await shelf.request<PersonaEnvelope | null>({
+                action: 'get',
+                castId,
+              })
+            : null;
+      if (!envelope || envelope.source.game !== ONE_CAST[castId].sourceGame) continue;
+      const departure = await get<ContinuityGame>(`persona-departure:${envelope.branchId}`);
+      const oldSource = departure?.value.continuity?.entries.some(
+        (e) => e.admission.envelope.revision === envelope.revision,
+      );
+      if (departure && !oldSource) {
+        bridgeStatus =
+          'This Hearsay chapter has already continued in another game, so it cannot be resumed here. Its earlier history is still saved. Start fourteen days with the original people to play another garden.';
+        continue;
+      }
+      // Dilan's opening is authored by the adapter; Derya uses this edition's nurse.
+      const { makeDilanOpening } = await import('../sim/one-cast');
+      const person = opening.s.people[ONE_CAST[castId].targetId] ?? makeDilanOpening(seed, 360);
+      const compatible = createOneCastOpening(castId, person, envelope.transfer.person);
+      const admission = await prepareOneCastAdmission(envelope, compatible, {
+        targetBuild: build(),
+      });
+      const { revision, ...body } = envelope;
+      const claim = await createPersona({
+        ...body,
+        parentRevision: revision,
+        transfer: {
+          ...body.transfer,
+          admission: {
+            adapter: 'hearsay-one-cast/1',
+            mapping: admission.mapping,
+            openingMinute: 360,
+            targetBuild: build(),
+            claimId: crypto.randomUUID(),
+          },
+        },
+        source: {
+          game: 'hearsay',
+          build: build(),
+          engine: '2.21.0',
+          rules: '5',
+        },
+      });
+      const scope = candidate?.revision === envelope.revision ? 'file' : 'shared';
+      attemptedAdmission = { admission, scope, seed };
+      // Claim before loading. A file also needs an explicit fork when it competes.
+      if (scope === 'file') {
+        const { acceptLocalPersona } = await import('./local-persona');
+        await acceptLocalPersona(claim, { arrival: envelope });
+      } else await shelf.request({ action: 'put', envelope: claim });
+      prepared.push({ admission, head: claim, scope });
+      candidate = null;
+    } catch (error) {
+      bridgeStatus = message(error);
+      if (/conflict/i.test(bridgeStatus) && attemptedAdmission) pendingArrival = attemptedAdmission;
+      lab.milestone('one cast bridgefail');
+    }
+  }
+  const continuity: ContinuityState = {
+    entries: prepared,
+    rows: prepared.map((e) => row(e, e.head, 'admitted')),
+  };
+  const g: ContinuityGame = prepared.length
+    ? newGame(
+        seed,
+        5,
+        Object.fromEntries(prepared.map((e) => [e.admission.person.id, e.admission.person])),
+        continuity,
+      )
+    : opening;
+  await gateContinuity(
+    g,
+    prepared.some((e) => e.scope === 'file'),
+  );
+  if (prepared.length) {
+    lab.milestone('one cast eligible');
+    lab.milestone('one cast import');
+  }
+  return g;
+}
+export function checkpointContinuity(): Promise<void> {
+  const g = current();
+  if (
+    !g ||
+    (g.s.version !== 4 && g.s.version !== 5) ||
+    (!shelf.enabled &&
+      g.continuity?.source?.scope !== 'file' &&
+      !g.continuity?.entries.some((e) => e.scope === 'file'))
+  )
+    return Promise.resolve();
+  const queuedGeneration = gateSerial;
+  pending = pending.then(async () => {
+    if (current() !== g || queuedGeneration !== gateSerial) return;
+    if (
+      g.s.deryaAssignmentReleased &&
+      !g.continuity?.entries.some((e) => e.admission.castId === 'hf.cast.derya.stairwell')
+    ) {
+      let attempted: PersonaEnvelope | undefined;
+      let attemptedPrefix: ContinuityGame | undefined;
+      try {
+        const attempt = gateSerial;
+        const prior = g.continuity?.source?.head;
+        const author = !prior && !g.fileHistory && !gatedFile && current() === g && gatedGame === g;
+        if (attempt !== gateSerial || current() !== g) return;
+        const prefix = structuredClone(g);
+        attemptedPrefix = prefix;
+        const person = prefix.s.people.derya!;
+        const envelope = await createAuthoredDeryaCheckpoint(person, {
+          rules: g.s.version as 4 | 5,
+          targetBuild: build(),
+          branchId: prior?.branchId ?? crypto.randomUUID(),
+          parentRevision: prior?.revision ?? null,
+          assignmentEnded: true,
+        });
+        if (
+          !prior ||
+          JSON.stringify(prior.transfer.checkpoint) !== JSON.stringify(envelope.transfer.checkpoint)
+        ) {
+          if (attempt !== gateSerial || current() !== g) return;
+          attempted = envelope;
+          const scope = g.continuity?.source?.scope ?? 'shared';
+          if (scope === 'file') {
+            const { acceptLocalPersona } = await import('./local-persona');
+            await acceptLocalPersona(envelope);
+          } else {
+            const request = {
+              action: 'put' as const,
+              envelope,
+              authored: Boolean(author && attempt === gateSerial && current() === g && gatedGame === g),
+            };
+            await shelf.request(request);
+          }
+          // A sent write can finish after a reset. Keep its receipt in its local prefix only.
+          const owner = current() === g && attempt === gateSerial;
+          const record = owner ? g : prefix;
+          record.continuity ??= { entries: [], rows: [] };
+          record.continuity.source = {
+            head: envelope,
+            scope,
+            lastCheckpoint: structuredClone(person),
+          };
+          record.continuity.rows.push({
+            v: 1,
+            probe: 'derya',
+            arm: 'fresh',
+            scope: g.fileHistory ? 'file' : scope,
+            castId: envelope.castId,
+            branchId: envelope.branchId,
+            revision: envelope.revision,
+            parentRevision: envelope.parentRevision,
+            stage: 'checkpoint',
+            outcome: 'accepted',
+          });
+          prefix.continuity = structuredClone(record.continuity);
+          await put(`persona-departure:${envelope.branchId}`, prefix);
+          if (owner && current() === g && attempt === gateSerial) await gateContinuity(g, scope === 'file');
+          if (owner && current() === g && gatedGame === g) store();
+          bridgeStatus = 'Derya’s assignment ended. Her chapter is saved. Flat 5 remains her permanent home.';
+        }
+      } catch (error) {
+        bridgeStatus = message(error);
+        if (attempted && /conflict/i.test(bridgeStatus))
+          conflict = {
+            envelope: attempted,
+            game: g,
+            prefix: attemptedPrefix,
+            checkpoint: attemptedPrefix?.s.people.derya,
+          };
+      }
+    }
+
+    for (const entry of g.continuity?.entries ?? []) {
+      if (
+        !entry.encounter ||
+        (entry.admission.castId === 'hf.cast.derya.stairwell' && !g.s.deryaAssignmentReleased)
+      )
+        continue;
+      let attempted: PersonaEnvelope | undefined;
+      let attemptedPrefix: ContinuityGame | undefined;
+      try {
+        const prefix = structuredClone(g);
+        attemptedPrefix = prefix;
+        const person = prefix.s.people[entry.admission.person.id];
+        if (!person) throw new Error('The continuing person is unavailable.');
+        const envelope = await createOneCastReturn(person, entry.admission, {
+          rules: g.s.version as 4 | 5,
+          targetBuild: build(),
+          parentRevision: entry.head.revision,
+          branchId: entry.head.branchId,
+          assignmentEnded: Boolean(g.s.deryaAssignmentReleased),
+          encounter: entry.encounter,
+        });
+        if (
+          entry.head.source.game === 'hearsay' &&
+          JSON.stringify(entry.head.transfer.checkpoint) === JSON.stringify(envelope.transfer.checkpoint)
+        )
+          continue;
+        attempted = envelope;
+        if (entry.scope === 'file') {
+          const { acceptLocalPersona } = await import('./local-persona');
+          await acceptLocalPersona(envelope);
+        } else await shelf.request({ action: 'put', envelope });
+        entry.head = envelope;
+        entry.lastCheckpoint = structuredClone(person);
+        const checkpointRow = row(entry, envelope, 'checkpoint');
+        if (g.fileHistory) checkpointRow.scope = 'file';
+        g.continuity?.rows.push(checkpointRow);
+        prefix.continuity = structuredClone(g.continuity);
+        await put(`persona-departure:${envelope.branchId}`, prefix);
+
+        bridgeStatus =
+          'This person’s chapter is saved in this browser. To continue in their original game, that game must support their return and have the matching saved departure.';
+        conflict = null;
+        if (current() === g) {
+          store();
+          lab.milestone('one cast source completion');
+        }
+      } catch (error) {
+        bridgeStatus = message(error);
+        if (/conflict/i.test(bridgeStatus) && attempted)
+          conflict = {
+            entry,
+            envelope: attempted,
+            game: g,
+            prefix: attemptedPrefix,
+            checkpoint: attemptedPrefix?.s.people[entry.admission.person.id],
+          };
+      }
+    }
+  });
+  return pending;
+}
+export function installContinuity(
+  getGame: () => ContinuityGame | undefined,
+  save: () => void,
+  load?: (game: ContinuityGame) => Promise<void>,
+): void {
+  loadArrival = load;
+  current = getGame;
+  store = save;
+  watchPersonaCheckpoint(checkpointContinuity);
+}
+export function continuityPanel(): HTMLElement {
+  const box = document.createElement('section');
+  box.className = 'continuity-panel';
+  const status = document.createElement('p');
+  const controls = feedbackPersonaControls(status);
+  status.setAttribute('role', 'status');
+  status.textContent =
+    bridgeStatus ||
+    'Continuity lets people continue between games in this browser. You can always start fourteen days with the original people.';
+  box.append(controls, status);
+  const entries = current()?.continuity?.entries ?? [];
+  if (entries.length) {
+    const detail = document.createElement('details');
+    const summary = document.createElement('summary');
+    summary.textContent = 'What continues with this person';
+    detail.append(summary);
+    const policy = document.createElement('p');
+    policy.textContent =
+      'The person’s approved profile and the fact they learned continue here. This chapter sets their current hunger, tiredness and mood. The game does not simulate their travel or recovery. Their routines and relationships stay in their original chapter.';
+    detail.append(policy);
+    for (const entry of entries) {
+      const p = document.createElement('p');
+      p.textContent = entry.admission.limitations.join(' ');
+      detail.append(p);
+    }
+    box.append(detail);
+  }
+  const add = (text: string, action: () => void) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = text;
+    b.onclick = action;
+    box.append(b);
+  };
+  add(
+    'Keep a person file',
+    () =>
+      void (async () => {
+        const entries = current()?.continuity?.entries;
+        if (entries?.length) downloadRun(entries.at(-1)?.head);
+        else if (current()?.continuity?.source) downloadRun(current()?.continuity?.source?.head);
+        else {
+          const g = current();
+          if (!g?.s.deryaAssignmentReleased) {
+            status.textContent =
+              'Derya’s temporary assignment has not ended. Her chapter stays in this game.';
+            return;
+          }
+          const prefix = structuredClone(g);
+          const person = prefix.s.people.derya;
+          if (!person) throw new Error('Derya is unavailable.');
+          const envelope = await createAuthoredDeryaCheckpoint(person, {
+            rules: g.s.version as 4 | 5,
+            targetBuild: build(),
+            branchId: crypto.randomUUID(),
+            parentRevision: null,
+            assignmentEnded: true,
+          });
+          const { acceptLocalPersona } = await import('./local-persona');
+          await acceptLocalPersona(envelope);
+          g.continuity ??= { entries: [], rows: [] };
+          g.continuity.source = {
+            head: envelope,
+            scope: 'file',
+            lastCheckpoint: structuredClone(person),
+          };
+          g.continuity.rows.push({
+            v: 1,
+            probe: 'derya',
+            arm: 'fresh',
+            scope: 'file',
+            castId: envelope.castId,
+            branchId: envelope.branchId,
+            revision: envelope.revision,
+            parentRevision: envelope.parentRevision,
+            stage: 'checkpoint',
+            outcome: 'accepted',
+          });
+          prefix.continuity = structuredClone(g.continuity);
+          await put(`persona-departure:${envelope.branchId}`, prefix);
+          if (current() === g) {
+            await gateContinuity(g, true);
+            if (current() === g) store();
+          }
+          downloadRun(envelope);
+        }
+      })().catch((error) => {
+        status.textContent = message(error);
+      }),
+  );
+  add('Open a person file', () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = async () => {
+      try {
+        const file = input.files?.[0];
+        if (!file) return;
+        if (file.size > 256 * 1024) throw new Error('This person file is larger than the 256 KiB limit.');
+        candidate = await validatePersona(JSON.parse(await file.text()));
+        status.textContent =
+          'The person file has been checked. Begin a new fourteen-day game to include this person. Your current game is unchanged.';
+      } catch (error) {
+        status.textContent = message(error);
+      }
+    };
+    input.click();
+  });
+  add(
+    'Save this person’s chapter',
+    () =>
+      void checkpointContinuity().then(() => {
+        status.textContent = bridgeStatus;
+      }),
+  );
+  if (pendingArrival)
+    add(
+      'Start a separate history for the arriving person',
+      () =>
+        void (async () => {
+          const held = pendingArrival;
+          if (!held || !loadArrival) return;
+          const { revision: _revision, ...body } = held.admission.envelope;
+          const fork = await createPersona({
+            ...body,
+            branchId: crypto.randomUUID(),
+            parentRevision: null,
+          });
+          if (held.scope === 'file') {
+            const { acceptLocalPersona } = await import('./local-persona');
+            await acceptLocalPersona(fork, { fork: true });
+          } else await shelf.request({ action: 'put', envelope: fork, fork: true });
+          const claim = await createPersona({
+            ...body,
+            branchId: fork.branchId,
+            parentRevision: fork.revision,
+            source: {
+              game: 'hearsay',
+              build: build(),
+              engine: '2.21.0',
+              rules: '5',
+            },
+          });
+          if (held.scope === 'file') {
+            const { acceptLocalPersona } = await import('./local-persona');
+            await acceptLocalPersona(claim);
+          } else await shelf.request({ action: 'put', envelope: claim });
+          const admission = { ...held.admission, envelope: fork };
+          const entry: ContinuityEntry = {
+            admission,
+            head: claim,
+            scope: held.scope,
+          };
+          const g = newGame(
+            held.seed,
+            5,
+            { [admission.person.id]: admission.person },
+            { entries: [entry], rows: [row(entry, claim, 'admitted')] },
+          );
+          pendingArrival = null;
+          candidate = null;
+          await gateContinuity(g, held.scope === 'file');
+          await loadArrival(g);
+          status.textContent = 'A separate history for this person has begun in a new fourteen-day game.';
+        })().catch((error) => {
+          status.textContent = message(error);
+        }),
+    );
+  if (conflict)
+    add(
+      'Start a separate history for this person',
+      () =>
+        void (async () => {
+          const held = conflict;
+          if (!held) return;
+          const { revision: _revision, ...body } = held.envelope;
+          const fork = await createPersona({
+            ...body,
+            branchId: crypto.randomUUID(),
+            parentRevision: null,
+          });
+          const scope = held.entry?.scope ?? held.game.continuity?.source?.scope ?? 'shared';
+          if (scope === 'file') {
+            const { acceptLocalPersona } = await import('./local-persona');
+            await acceptLocalPersona(fork, { fork: true });
+          } else await shelf.request({ action: 'put', envelope: fork, fork: true });
+          if (held.entry) {
+            held.entry.head = fork;
+            if (held.checkpoint) held.entry.lastCheckpoint = structuredClone(held.checkpoint);
+            const forkRow = row(held.entry, fork, 'checkpoint');
+            if (held.game.fileHistory) forkRow.scope = 'file';
+            held.game.continuity?.rows.push(forkRow);
+          } else {
+            held.game.continuity ??= { entries: [], rows: [] };
+            held.game.continuity.source = {
+              head: fork,
+              scope,
+              ...(held.checkpoint ? { lastCheckpoint: structuredClone(held.checkpoint) } : {}),
+            };
+            held.game.continuity.rows.push({
+              v: 1,
+              probe: 'derya',
+              arm: 'fresh',
+              scope: held.game.fileHistory ? 'file' : scope,
+              castId: fork.castId,
+              branchId: fork.branchId,
+              revision: fork.revision,
+              parentRevision: null,
+              stage: 'checkpoint',
+              outcome: 'accepted',
+            });
+          }
+          if (held.prefix) {
+            held.prefix.continuity = structuredClone(held.game.continuity);
+            await put(`persona-departure:${fork.branchId}`, held.prefix);
+          }
+          conflict = null;
+          await gateContinuity(current());
+          store();
+          status.textContent = 'A separate history for this person is now saved as their current history.';
+        })().catch((error) => {
+          status.textContent = message(error);
+        }),
+    );
+  return box;
+}
+
+/** Fictional continuity remains a separate menu setting from recording. */
+export function feedbackPersonaControls(_status: HTMLElement): HTMLElement {
+  return personaControls({
+    enabled: shelf.enabled,
+    recordingAllowed: true,
+    allowRecording() {},
+    setEnabled(value) {
+      shelf.setEnabled(value);
+    },
+  });
+}

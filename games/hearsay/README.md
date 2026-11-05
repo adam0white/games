@@ -1,0 +1,49 @@
+# Hearsay
+
+[Play Hearsay](https://hearsay.adamwhite.work).
+
+A static web game about talk, trust and consequences in an Istanbul tea garden. You are Hatice. Open a paid workers’ lunch on Day 13: agree bread and produce on Day 4, agree on Aylin’s paid preparation on Day 8, and earn enough reservations. What people hear changes who comes, what they buy and whether the lunch can open.
+
+The current canonical edition is documented in [canonical adoption](docs/canonical-adoption.md). It uses Hatice, Derya, Dilan, Nermin, Aylin, Ece, Rıza and Osman. The old engagement and its 32-person household cast are historical. [The original design](docs/design.md) and [playtest records](docs/playtests/README.md) retain that history. Adam accepts the game by playing; technical delivery does not establish owner acceptance.
+
+The current source pins Human Framework 4.12.0 and immutable lab-client 0.5.12 and lab-kit 0.5.29. It keeps current exports replayable and refuses incompatible older files with a Start fresh message. Portable writes stay closed for each person until all peers have verified compatible live readers and per-person skips. The client reads Voice source roles; peer write blockers still skip unsupported shelf heads without replacing them. See [HANDOFF.md](HANDOFF.md) for delivery and owner acceptance.
+
+Use shared Homebrew Node 26.12.0 and pnpm 12.14.0 pinned by `.node-version` and `packageManager`:
+
+```sh
+PATH=/opt/homebrew/bin:$PATH pnpm install --frozen-lockfile
+PATH=/opt/homebrew/bin:$PATH pnpm run dev
+PATH=/opt/homebrew/bin:$PATH pnpm run check:lane
+PATH=/opt/homebrew/bin:$PATH pnpm run build
+PATH=/opt/homebrew/bin:$PATH pnpm run preview
+```
+
+On the shared lab machine, run `pnpm run check:lane` directly. It runs lint and types without the machine-wide suite lock. CI runs the full suite on every push.
+
+The seven visitors give replies about their own public work and the actual supply, cooking or lunch status. Paid fees, completed preparation and served meals mean different things; paying late does not complete a missed preparation session. Conversation grants no private knowledge or completed outside outcome. The canonical cast has eight people, including Hatice.
+
+To play, choose Begin, then select someone who is at the garden. Invite a quiet conversation. They may decline. If they agree, let its fifteen game minutes finish to hear a volunteered private fact. Leaving early or pressing for details reveals none. Choose whether to offer practical help, keep it private or repeat it. Hatice can reflect on her own past.
+
+Open “Talk about someone else” to ask what a listener has heard, make a positive or damaging claim, or withdraw your accusation. Choose honesty, keeping promises, kindness or generosity. A claim is not proof. If a disproved claim leads back to you, take responsibility and correct it with each listener, or stand by it and lose a day of tea sales. You can also pour tea without sharing news.
+
+On Day 4, arrange bread and produce. On Day 8, agree on paid preparation with Aylin; pay her before 17:00 on Day 10. Invite visitors to reserve lunch from midday on Day 8 until lunch on Day 13. Four meals cover costs if you paid for the sample immediately; credit raises the cost and requires five. Actual deliveries, preparation, payment and attendance determine the result. Read the garden record to review what you heard and did.
+
+Automatic pace is the default. The garden slows while you read and restores the chosen running pace afterward. Pause, Slow, Normal and Fast remain public; the menu can restore Automatic. Agreement choices, the Game menu and Feedback hold time. No time passes while the page is hidden or closed. The ordinary menu contains Resume, Feedback, Fullscreen, All games, Recording and New game with inline confirmation. Saving is automatic on this device. Replay downloads and Other ways to begin are public. Shared people carry over automatically without an opt-in. Cast controls live on the central shelf. Build, engine, rules and seed diagnostics sit in the collapsed Debug item beside Lab privacy.
+
+One Recording switch controls lab recording and automatic linkage across games on this device. The first-visit notice covers both; DNT/GPC defaults recording off. Character analysis has its own opt-in. Native browser continuity uses the local shelf independently of recording. Feedback offers “I'm stopping” and “I'm confused”. Selection sends nothing and leaves your edited note intact. Submit includes the selected words in the ordinary note. Feedback accepts a note without sharing a run. With recording off, its unticked sharing checkbox enables recording and linked run sharing only when checked on Submit. No separate continuing-person consent gate is required.
+
+Current HF4 exports retain complete pinned initial people, seed, current conversation marker, chapter claims, ordered input history, final state and the full framework archive. Every import reconstructs the complete game and compares every state field. The compact argument remains an alias for this complete format; it does not discard the archive. Replay consults neither current clocks nor shelf heads. Older incompatible exports refuse plainly and their local saves remain stored. Historical HF3 full and compact replay fixtures remain in tests. IndexedDB compresses current saves, and pagehide queues the current snapshot immediately. Local play and file export remain available with recording off.
+
+The current browser tests exercise both 360×690 and 1280×800 through start, a real timed conversation, save and reload. Historical browser tests explicitly load `test/fixtures/legacy.html`; that fixture is not built for production. The `scripts/hf-playtest/adapter.ts` four-call adapter constructs the current HF4 garden, uses its public actions and Hatice’s visible readings, and exports the complete current state. Its bounded headless control covers one offered action, elapsed time and exact cold replay. It establishes no player round, shared-person journey or current full-fortnight proof. The wedding adapter remains only in `test/helpers/historical-hearsay-adapter.ts` for retained regression controls. The old `scripts/drive.ts`, `scripts/policy.ts`, `scripts/measure.ts` and `scripts/verify-browser.ts` remain historical editions 1–5 research. Their output does not describe current gameplay.
+
+The maintained stack is TypeScript 7.0.2, Vite 8.3.5, Vitest 5.0.5, Biome 2.6.3, Playwright 1.64.1 and Wrangler 4.152.0, on shared Node 26.12.0 and pnpm 12.14.0. Worker compatibility date: 2026-10-25. Miniflare retains Undici 7.30.1 because its HTTP 421 guard wraps the legacy dispatcher callbacks; review on 2026-11-03 or the next Miniflare release.
+
+The pnpm policy uses isolated hardlinks, strict engines and peers, a 1440-minute release age with only the owned package scope exempt, and reviewed esbuild/workerd lifecycle scripts. Unknown install scripts fail. `pnpm run` and `pnpm exec` reject stale dependencies; retained internal `npm run` script calls bypass that guard, so install the frozen lock first. Existing npm trees must remove root/workspace `node_modules`, install the frozen pnpm lock and delete `dist`, `.types` and `*.tsbuildinfo` before rebuilding.
+
+### Play a game file without replacing this browser’s garden
+
+Open `?file=1` and choose **Open a game file**. This route opens the file in a separate session in the tab. It does not open or replace the browser’s saved garden or use shared person histories. The complete game file keeps its original eight people and replays their recorded inputs. The current prepared file condition has no browser ownership receipts or source archives; this route does not claim ownership of imported histories.
+
+Play normally. Use **Download this game file** in the game menu to keep progress. **Close file session**, hiding the page, or closing the tab never saves over the browser’s garden. Reloading opens the file chooser again. Closing chapters, starting separate histories, and starting new gardens are unavailable in this mode. The file format, simulation rules and difficulty are unchanged.
+
+Recording uses the normal lab client and the existing browser’s actual privacy and identity settings. File progress still calls recording captureSave. Normal recording can change session/run keys and pending uploads; this mode does not clear queues, reset identities, or change continuity preferences. It does not establish an upload acknowledgment or ingestion receipt. Actual existing-profile preservation and file round-trip evidence remain separate from automated source tests.
