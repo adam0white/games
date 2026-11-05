@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.5/schema.json",
   "files": {
     "includes": [
       "**",
@@ -25,5 +25,23 @@
     "rules": {
       "preset": "recommended"
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "docs/design.md",
+        "docs/findings.md",
+        "docs/hf-requests.md",
+        "docs/playtests/adversarial-2026-10-18.md",
+        "docs/playtests/designer-2026-10-18.md",
+        "docs/playtests/fable-2026-10-18.md",
+        "docs/playtests/guide-2026-10-18.md",
+        "docs/playtests/owner-2026-10-18.md",
+        "docs/probes/hf4-2026-10-28/README.md"
+      ],
+      "formatter": {
+        "enabled": false
+      }
+    }
+  ]
 }

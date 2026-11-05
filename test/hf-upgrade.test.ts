@@ -6,14 +6,14 @@ import { exportClimb, newSeason, replayExport } from '../src/sim/season.ts';
 import { proofHash } from './prose-proof.ts';
 
 it('pins the current published HF runtime in complete replay and source archives', () => {
-  expect(FRAMEWORK_VERSION).toBe('4.15.0');
+  expect(FRAMEWORK_VERSION).toBe('4.17.0');
   const { climb, season } = newSeason(7);
   queueInput(climb, { t: 'lead', dir: 'up' });
   for (let i = 0; i < 3; i++) step(climb);
   const exported = exportClimb(season.start!, climb, FRAMEWORK_VERSION);
   expect(exported.v).toBe(2);
   expect(snapshot(replayExport(exported))).toBe(exported.state);
-  expect(archiveOf(climb).engine.package).toBe('@adam0white/human-framework@4.15.0');
+  expect(archiveOf(climb).engine.package).toBe('@adam0white/human-framework@4.17.0');
 });
 it('refuses old HF3 saves explicitly instead of converting private actors', () => {
   expect(() => restore(JSON.stringify({ v: 1, castEdition: 'one-cast-1', people: [] }))).toThrow(
@@ -30,12 +30,11 @@ it.each(['4.8.1', '4.13.0'])('tells players to start fresh when a %s save is res
   old.hf.engine.package = `@adam0white/human-framework@${version}`;
   expect(() => restore(JSON.stringify(old))).toThrow(/start a fresh season/i);
 });
-// Reviewed new-edition baseline (rope-hf4-2). For this seed-7 three-minute control the state differs from the
-// rope-hf4-1 baseline d50b262d… only in castEdition; no cross-edition equality is claimed.
+// HF 4.17 seed-7 three-minute control. Earlier engine hashes remain historical.
 it('retains current full-state replay hashes', () => {
   const { climb } = newSeason(7);
   for (let i = 0; i < 3; i++) step(climb);
   expect(proofHash(JSON.parse(snapshot(climb)))).toBe(
-    'da842098f93c119f5d8cccf3407eddc574224b6eac99ccf9e02c2b656b1c7310',
+    '01e45383e9d11686e004681ecabd652124b8a09604e6ba3922fd0415abed556a',
   );
 });

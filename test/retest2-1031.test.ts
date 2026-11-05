@@ -156,7 +156,8 @@ it('the file-session wrapper refuses an older-edition original with the exact me
 });
 
 it('a start with no castEdition keeps its old error instead of the edition message', async () => {
-  const raw = JSON.parse(exportText());
+  const { climb, season } = newSeason(7);
+  const raw = exportClimb(season.start!, climb, ENGINE_VERSION, season.chapter, season.past);
   const start = JSON.parse(raw.start);
   delete start.castEdition;
   raw.start = JSON.stringify(start);

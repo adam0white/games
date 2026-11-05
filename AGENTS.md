@@ -8,7 +8,7 @@ You lead five Human Framework (HF) people up a mountain and back. Every one of t
 
 ## Rules
 
-- HF comes only from npm: `@adam0white/human-framework@4.15.0`, exact. Never import sibling source. No game logic goes into HF. A generic HF gap goes into [docs/hf-requests.md](docs/hf-requests.md).
+- HF comes only from npm: `@adam0white/human-framework@4.17.0`, exact. Never import sibling source. No game logic goes into HF. A generic HF gap goes into [docs/hf-requests.md](docs/hf-requests.md).
 - Never fake a verdict. Every refusal, deferral or counter-offer comes from an HF resolution (public Run decision events for actual suggestion inputs).
 - Private condition and trust are not observations. Show actual movement, dated injuries and recorded words. Say when current condition is unavailable.
 - All world randomness is keyed by (seed, kind, place, minute) through `hashUnit`, never by draw order. HF owns person randomness and archives it. Seed + input log + start state is the replay, the playtest export and the debrief substrate.
@@ -27,8 +27,12 @@ You lead five Human Framework (HF) people up a mountain and back. Every one of t
 
 - Player-facing copy follows [Plain English](docs/lab/plain-english.md).
 
-Use the exact pnpm 12.14.0 package-manager pin. Install with `pnpm install --frozen-lockfile`; keep `pnpm-lock.yaml`. Keep npm overrides and native build permissions in `pnpm-workspace.yaml`, not package metadata. `npm run` remains valid for scripts. Run `npm run check:lane` directly; do not acquire the suite lock. The installer conversion requires reviewed source, full lane, byte-identical raw build outputs, signed commit and exact green CI; it does not deploy the app or establish game readiness.
+Use the exact pnpm 12.16.1 package-manager pin. Install with `pnpm install --frozen-lockfile`; keep `pnpm-lock.yaml`. Keep npm overrides and native build permissions in `pnpm-workspace.yaml`, not package metadata. `npm run` remains valid for scripts. Run `npm run check:lane` directly; do not acquire the suite lock. The installer conversion requires reviewed source, full lane, byte-identical raw build outputs, signed commit and exact green CI; it does not deploy the app or establish game readiness.
 
 ## Public gameplay
 
 Every gameplay feature is public. Shared people should carry over automatically through supported admission. Native completed climbs attempt to save eligible histories before next-climb navigation. A refusal is not a publication. File play cannot publish. Cast controls live on the central shelf. Diagnostics sit in one collapsed Debug item beside Lab privacy.
+
+Biome 2.6.5 keeps formatter exclusions only for the historical report paths listed in biome.json, preserving their evidence text and layout. Lint still applies to those files.
+
+Stack (2026-11-05): HF 4.17.0, Node 26.12.0, pnpm 12.16.1, TypeScript 7.0.2, Vite 8.3.5, Vitest 5.1.0, Biome 2.6.5, Wrangler 4.157.0; Worker compatibility date 2026-11-05.

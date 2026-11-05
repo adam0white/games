@@ -57,7 +57,7 @@ Use your browser's install option where supported. Offline use requires an initi
 
 ## Development
 
-Use shared Node 26.12.0 (`.node-version` and `.nvmrc`) and pnpm 12.14.0.
+Use shared Node 26.12.0 (`.node-version` and `.nvmrc`) and pnpm 12.16.1.
 
 ```sh
 pnpm install --frozen-lockfile
