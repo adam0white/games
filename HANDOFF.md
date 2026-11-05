@@ -1,5 +1,7 @@
 # Upkeep candidate — 2026-11-05
 
+[Item-specific open checkpoints](docs/upkeep-checkpoints-2026-11-05.md) retain the original requests and their separate dates.
+
 F-2657 source candidate: shortened the recurring slowed-clock sentence while retaining its rate and reasons. Pace behavior is unchanged. Source review, exact CI, deployment and player response remain open.
 
 Remaining: exact-source review, CI, integration and deployment. This source candidate targets HF 4.17.0; it is not a delivery receipt. The open empty-garden, return-time and claim-effect asks require the current Clarity candidate and its review to establish what is resolved. Recheck F-2652 through F-2659 on 2026-11-12; do not infer delivery or owner readiness from this dependency update.
