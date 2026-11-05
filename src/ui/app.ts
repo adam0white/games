@@ -144,6 +144,66 @@ let state: State | null = null;
 let inputs: LoggedInput[] = [];
 let saved: ReturnType<typeof verifyImport> | null = null;
 let playing = false;
+// Tutorial state is a display preference, never part of the recorded simulation.
+let tutorialStep: 'bench' | 'interview' | 'question' | 'result' | null = null;
+let tutorialClock = '';
+const TUTORIAL_KEY = 'goodhands-tutorial-seen';
+function finishTutorial(): void {
+  tutorialStep = null;
+  try {
+    localStorage.setItem(TUTORIAL_KEY, '1');
+  } catch {
+    /* This tab still remembers. */
+  }
+  render(true);
+}
+function tutorial(v: View): void {
+  root.querySelector('.tutorial-prompt')?.remove();
+  root.querySelectorAll('.tutorial-target').forEach((el) => {
+    el.classList.remove('tutorial-target');
+  });
+  if (!tutorialStep || sheet) return;
+  const selector =
+    tutorialStep === 'bench'
+      ? '[data-candidate]'
+      : tutorialStep === 'interview'
+        ? '[data-action="interview"]:not(:disabled)'
+        : tutorialStep === 'question'
+          ? '[data-testid="scene-choice"]:not(:disabled)'
+          : '.exchange';
+  const target = root.querySelector<HTMLElement>(selector);
+  if (tutorialStep === 'bench')
+    root.querySelectorAll('[data-candidate]').forEach((el) => {
+      el.classList.add('tutorial-target');
+    });
+  else target?.classList.add('tutorial-target');
+  const prompt = document.createElement('aside');
+  prompt.className = 'tutorial-prompt';
+  prompt.setAttribute('role', 'status');
+  const message =
+    tutorialStep === 'bench'
+      ? 'Place workers with families to earn rent. Miss rent twice and the month ends. Choose a person.'
+      : tutorialStep === 'interview'
+        ? 'Their card is open. Interview them.'
+        : tutorialStep === 'question'
+          ? 'Ask a question.'
+          : `${tutorialClock} → Rent ${money(v.rent.amount)} · Fri ${v.rent.label.match(/\d{2}:\d{2}/)?.[0] ?? '17:00'}. People may leave while you decide.`;
+  const text = document.createElement('span');
+  text.textContent = target
+    ? message
+    : 'This step is unavailable now. Continue playing or skip the tutorial.';
+  const dismiss = button(tutorialStep === 'result' ? 'Done' : 'Skip tutorial', finishTutorial);
+  const goal = document.createElement('strong');
+  goal.className = 'tutorial-goal';
+  goal.textContent = 'Worker + family → fee · Rent missed twice → month ends';
+  if (tutorialStep !== 'result') prompt.append(goal);
+  prompt.append(text, dismiss);
+  if (target) {
+    const anchor = target.closest('.bench-strip, .candidate-actions, .scene-choices') ?? target;
+    anchor.insertAdjacentElement(tutorialStep === 'result' ? 'afterend' : 'beforebegin', prompt);
+  } else root.querySelector('[data-content]')?.prepend(prompt);
+}
+
 let selected: string | null = null;
 let tab: 'Bench' | 'Families' | 'Placed' = 'Bench';
 let city = false;
@@ -346,6 +406,17 @@ function send(input: Input): void {
   } else {
     state = sim.apply(state, input);
     inputs.push({ at, input: structuredClone(input) });
+  }
+  if (tutorialStep === 'interview' && input.type === 'interview' && current().scene?.kind === 'interview')
+    tutorialStep = 'question';
+  else if (
+    tutorialStep === 'question' &&
+    previous.scene?.kind === 'interview' &&
+    input.type === 'choose' &&
+    current().now > previous.now
+  ) {
+    tutorialClock = `${clockLabels(previous.now).timeLabel} → ${clockLabels(current().now).timeLabel}`;
+    tutorialStep = 'result';
   }
   changed(previous, current());
   if (input.type === 'wait-for' && current().now > previous.now) {
@@ -790,6 +861,11 @@ async function begin(
   tab = 'Bench';
   city = false;
   playing = true;
+  try {
+    if (!localStorage.getItem(TUTORIAL_KEY) && history.length === 0) tutorialStep = 'bench';
+  } catch {
+    if (history.length === 0) tutorialStep = 'bench';
+  }
   last = performance.now();
   lastHour = Math.floor(current().now / 60);
   notice = '';
@@ -1265,12 +1341,14 @@ function render(force = false): void {
     );
     replacement?.focus({ preventScroll: true });
   }
+  tutorial(v);
   syncStage();
   showNotice();
 }
 function selectCandidate(id: string): void {
   closeSheet(false);
   selected = id;
+  if (tutorialStep === 'bench') tutorialStep = 'interview';
   tab = 'Bench';
   city = false;
   if (current().scene) {
@@ -1790,7 +1868,7 @@ function menu(): void {
   if (state) save();
   const d = openSheet(
     'Game menu',
-    `<button type="button" data-action="send-run">Feedback</button>${state ? '<button type="button" data-action="download-source">Download this run</button>' : ''}<button type="button" data-action="fullscreen">Full screen</button><a href="${ALL_GAMES}" target="_top">All games</a><a href="https://human.adamwhite.work/lab/people/" target="_top">${PEOPLE_ACROSS_GAMES}</a><button type="button" data-new-game>New game</button>${state ? '<button type="button" data-action="day-notes">The day’s notes</button>' : ''}${!fileMode && state?.version === 6 ? '<button type="button" data-action="source-offer">What happens to these people next</button>' : ''}<div class="page-setting">Colours: ${['System', 'Light', 'Dark'].map((theme) => `<button type="button" data-theme-choice="${theme.toLowerCase()}">${theme}</button>`).join(' · ')}</div><div class="pace-setting"><span>Pace</span>${['Automatic', 'Slow', 'Steady', 'Fast'].map((speed) => `<button type="button" data-pace-choice="${speed.toLowerCase()}">${speed}</button>`).join('')}</div><button type="button" data-action="title">To the title page</button><div class="recording-footer"></div><div class="debug-footer" style="display:flex;align-items:baseline;gap:.75rem;flex-wrap:wrap"><a href="https://human.adamwhite.work/lab/privacy/" target="_top">Lab privacy</a><details><summary>Debug</summary><p>Build: ${h(lab?.build().c || 'unavailable')}</p><p>Storage: ${h(preservationStatus)}</p></details></div><div class="file-actions"></div><button type="button" data-open-saved>Open a saved month…</button>`,
+    `<button type="button" data-action="send-run">Feedback</button>${state ? '<button type="button" data-action="download-source">Download this run</button>' : ''}<button type="button" data-action="fullscreen">Full screen</button><button type="button" data-action="tutorial">Replay tutorial</button><a href="${ALL_GAMES}" target="_top">All games</a><a href="https://human.adamwhite.work/lab/people/" target="_top">${PEOPLE_ACROSS_GAMES}</a><button type="button" data-new-game>New game</button>${state ? '<button type="button" data-action="day-notes">The day’s notes</button>' : ''}${!fileMode && state?.version === 6 ? '<button type="button" data-action="source-offer">What happens to these people next</button>' : ''}<div class="page-setting">Colours: ${['System', 'Light', 'Dark'].map((theme) => `<button type="button" data-theme-choice="${theme.toLowerCase()}">${theme}</button>`).join(' · ')}</div><div class="pace-setting"><span>Pace</span>${['Automatic', 'Slow', 'Steady', 'Fast'].map((speed) => `<button type="button" data-pace-choice="${speed.toLowerCase()}">${speed}</button>`).join('')}</div><button type="button" data-action="title">To the title page</button><div class="recording-footer"></div><div class="debug-footer" style="display:flex;align-items:baseline;gap:.75rem;flex-wrap:wrap"><a href="https://human.adamwhite.work/lab/privacy/" target="_top">Lab privacy</a><details><summary>Debug</summary><p>Build: ${h(lab?.build().c || 'unavailable')}</p><p>Storage: ${h(preservationStatus)}</p></details></div><div class="file-actions"></div><button type="button" data-open-saved>Open a saved month…</button>`,
     'menu',
   );
   if (lab) d.querySelector('.recording-footer')?.append(telemetryToggle(lab));
@@ -2414,6 +2492,18 @@ function handleClick(event: Event): void {
       break;
     case 'source-offer':
       sourceOffer();
+      break;
+    case 'tutorial':
+      closeSheet(false);
+      tutorialStep =
+        current().scene?.kind === 'interview'
+          ? 'question'
+          : current().scene
+            ? 'interview'
+            : selected
+              ? 'interview'
+              : 'bench';
+      render(true);
       break;
     case 'menu':
       menu();

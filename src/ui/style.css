@@ -1761,3 +1761,28 @@ body {
     white-space: nowrap;
   }
 }
+
+.tutorial-prompt {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: #fff2c9;
+  color: #30220e;
+  border: 2px solid #845c18;
+  border-radius: 0.4rem;
+  font-weight: 700;
+}
+.tutorial-prompt button {
+  flex: none;
+}
+.tutorial-target {
+  outline: 3px solid #b46e00;
+  outline-offset: 2px;
+}
+.tutorial-prompt {
+  flex-wrap: wrap;
+}
+.tutorial-goal {
+  flex-basis: 100%;
+}
