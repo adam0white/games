@@ -471,3 +471,23 @@ form .choices {
     font-size: 11px;
   }
 }
+#guide {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  border: 2px solid #e6b968;
+  background: #192c3c;
+  color: #fff2d7;
+}
+#guide[hidden] {
+  display: none;
+}
+#guide strong {
+  flex: 1 1 180px;
+  font-size: 15px;
+}
+#guide button {
+  min-height: 44px;
+}

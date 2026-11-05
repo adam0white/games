@@ -26,6 +26,7 @@ import {
   type Session,
   saveSession,
 } from "./shelf";
+import { advanceGuide, type GuideState } from "./tutorial.ts";
 import "./style.css";
 
 const element = <T extends HTMLElement>(id: string): T => {
@@ -39,12 +40,12 @@ app.innerHTML = `<main>
 <header><div><small>THREE WINTER NIGHTS</small><h1>The Left Hand</h1></div><button id="menu-open" aria-expanded="false" aria-controls="menu">Menu</button></header>
 <p id="recording-notice" class="notice" hidden>Play is recorded and linked across the Lab by default. <button id="notice-off">Turn recording off</button> · <a href="${PRIVACY_URL}" target="_blank" rel="noopener">Privacy</a><button id="notice-close" aria-label="Dismiss recording notice">×</button></p>
 <p id="chapter" class="chapter"></p><p id="status" role="status"></p>
-<section id="evening" aria-label="At Yusuf’s table"><p id="table-line">At the table, Yusuf addresses an envelope to Idris and Samira. They need food and fuel. Outside, if any light reaches you (your lantern, a lamp or a neighbour’s lantern), a nearby neighbour can see you. Hiding your lantern helps you stay unseen, but the cold builds. If the warmth bar empties, a neighbour must carry you home.</p><p>Where will you leave it?</p><div class="choices"><button id="route-door">Their door · farther, Samira knows it was you</button><button id="route-well">Well box · closer, Danyal must collect it before dawn</button></div><p class="source">Yusuf understands concealed voluntary giving as preferable; open giving is also good. <a href="https://quran.com/2/271" target="_blank" rel="noopener">Qur’an 2:271</a> · <a href="https://sunnah.com/bukhari:1423" target="_blank" rel="noopener">Bukhari 1423</a></p></section>
+<section id="evening" aria-label="At Yusuf’s table"><p id="table-line">At the table, Yusuf addresses an envelope to Idris and Samira. They need food and fuel. Outside, if any light reaches you (your lantern, a lamp or a neighbour’s lantern), a nearby neighbour can see you. Hiding your lantern helps you stay unseen, but the cold builds. If the warmth bar empties, a neighbour must carry you home.</p><div id="guide" aria-label="First delivery guide"><strong id="guide-text"></strong><button id="guide-continue" hidden>Continue</button><button id="guide-skip">Skip guide</button></div><p>Where will you leave it?</p><div class="choices"><button id="route-door">Their door · farther, Samira knows it was you</button><button id="route-well">Well box · closer, Danyal must collect it before dawn</button></div><p class="source">Yusuf understands concealed voluntary giving as preferable; open giving is also good. <a href="https://quran.com/2/271" target="_blank" rel="noopener">Qur’an 2:271</a> · <a href="https://sunnah.com/bukhari:1423" target="_blank" rel="noopener">Bukhari 1423</a></p></section>
 <div class="village"><canvas id="canvas" tabindex="0" aria-label="Snowy village. Move with arrow keys or WASD, or use the direction buttons."></canvas><p id="loading">Lighting the village… You can choose a route now.</p></div>
 <section id="night" aria-label="Delivery controls" hidden><div id="recovery" hidden><p id="recovery-line"></p><div class="choices"><button id="explain">Explain</button><button id="quiet">Keep quiet</button><button id="joke">Make a joke</button><button id="ask">Ask him not to tell</button></div></div><div id="walking"><div class="action-row"><button id="lantern">Lantern lit · hide (L)</button><button id="act">Leave envelope</button></div><div id="warmth" class="warmth"><span id="cold-warning" role="status"></span><span class="bar" role="meter" aria-label="Warmth" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="warmth-fill"></i></span></div><div class="directions" aria-label="Move"><button data-move="0,-1" class="up" aria-label="Move north">↑</button><button data-move="-1,0" class="left" aria-label="Move west">←</button><button data-move="0,1" class="down" aria-label="Move south">↓</button><button data-move="1,0" class="right" aria-label="Move east">→</button></div><p class="hint">Arrows / WASD move · L lantern · Enter deliver or return home</p></div></section>
 <section id="morning" aria-label="Morning accounts" hidden><div id="morning-lines"></div><button id="next">Next evening</button></section>
 <section id="ending" hidden><h2 id="ending-title"></h2><p id="ending-line"></p><button id="again">Play again</button></section>
-<section id="menu" class="menu" aria-label="Menu" hidden><div class="menu-top"><h2>Paused</h2><button id="menu-close">Return to play</button></div><p><label><input id="recording" type="checkbox"> Recording</label> · <a href="/third-party-notices.txt" target="_blank" rel="noopener">Licenses</a></p><div id="privacy-debug"></div><section aria-label="People tonight"><h3>People tonight</h3><div id="people-tonight"></div></section><div class="menu-actions"><button id="download">Download run</button><button id="feedback-stop">I’m stopping</button><button id="feedback-confused">I’m confused</button><button id="fullscreen">Fullscreen</button><button id="new">New game</button><a href="https://human.adamwhite.work/lab/people/">People across games</a><a id="all-games" href="https://human.adamwhite.work/">All games</a></div><div id="new-confirm" hidden><p>End this run and prepare a new envelope?</p><button id="new-yes">Start new game</button><button id="new-no">Keep this run</button></div><form id="feedback" hidden><label for="note">Add a note, if you like</label><textarea id="note" rows="3" maxlength="4000"></textarea><label><input id="share-run" type="checkbox"> Share this run with the note (turns recording on)</label><div class="choices"><button type="submit" id="feedback-send">Send feedback</button><button type="button" id="feedback-cancel">Cancel</button></div></form><p id="shelf-status" role="status"></p><p id="menu-status" role="status"></p></section>
+<section id="menu" class="menu" aria-label="Menu" hidden><div class="menu-top"><h2>Paused</h2><button id="menu-close">Return to play</button></div><p><label><input id="recording" type="checkbox"> Recording</label> · <a href="/third-party-notices.txt" target="_blank" rel="noopener">Licenses</a></p><div id="privacy-debug"></div><section aria-label="People tonight"><h3>People tonight</h3><div id="people-tonight"></div></section><div class="menu-actions"><button id="guide-replay">Replay first delivery guide</button><button id="download">Download run</button><button id="feedback-stop">I’m stopping</button><button id="feedback-confused">I’m confused</button><button id="fullscreen">Fullscreen</button><button id="new">New game</button><a href="https://human.adamwhite.work/lab/people/">People across games</a><a id="all-games" href="https://human.adamwhite.work/">All games</a></div><div id="new-confirm" hidden><p>End this run and prepare a new envelope?</p><button id="new-yes">Start new game</button><button id="new-no">Keep this run</button></div><form id="feedback" hidden><label for="note">Add a note, if you like</label><textarea id="note" rows="3" maxlength="4000"></textarea><label><input id="share-run" type="checkbox"> Share this run with the note (turns recording on)</label><div class="choices"><button type="submit" id="feedback-send">Send feedback</button><button type="button" id="feedback-cancel">Cancel</button></div></form><p id="shelf-status" role="status"></p><p id="menu-status" role="status"></p></section>
 </main>`;
 
 const replayButton = document.createElement("button");
@@ -113,6 +114,10 @@ async function checkpointNow() {
     checkpointing = false;
   }
 }
+let guide: GuideState = localStorage.getItem("lefthand-guide-done")
+  ? "done"
+  : "route";
+let guideReplayPending = false;
 const queue: Command[] = [];
 let rendererReady = false;
 let menuOpen = false;
@@ -128,6 +133,12 @@ const measurements = {
   rendererReady: false,
 };
 const canvas = element<HTMLCanvasElement>("canvas");
+canvas.addEventListener("focus", () => {
+  if (guide === "route" && state.phase === "evening") {
+    element("guide-skip").focus({ preventScroll: true });
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+});
 // Godot draws inside the page layout; its window resize policy would escape it.
 new ResizeObserver(([entry]) => {
   if (!entry) return;
@@ -143,8 +154,36 @@ const show = (id: string, visible: boolean) => {
   element(id).hidden = !visible;
 };
 const clone = <T>(value: T): T => structuredClone(value);
+function perform(command?: Command) {
+  const before = {
+    phase: state.phase,
+    x: state.player.x,
+    y: state.player.y,
+    lantern: state.player.lantern,
+  };
+  step(state, command);
+  if (
+    command?.type === "plan" &&
+    before.phase === "evening" &&
+    state.phase !== "evening"
+  )
+    guide = advanceGuide(guide, "route");
+  if (
+    command?.type === "move" &&
+    (state.player.x !== before.x || state.player.y !== before.y)
+  )
+    guide = advanceGuide(guide, "move");
+  if (command?.type === "lantern" && state.player.lantern !== before.lantern)
+    guide = advanceGuide(guide, "lantern");
+}
+function finishGuide() {
+  guide = "done";
+  localStorage.setItem("lefthand-guide-done", "1");
+  update();
+}
 function enqueue(command: Command) {
   if (preparing || session.preserveSave) return;
+  if (!rendererReady && state.phase === "night") return;
   if (command.type === "recover") {
     for (let i = queue.length - 1; i >= 0; i--)
       if (
@@ -155,7 +194,7 @@ function enqueue(command: Command) {
         queue.splice(i, 1);
   }
   if (!rendererReady && command.type === "plan" && state.phase === "evening") {
-    step(state, clone(command));
+    perform(clone(command));
     update();
   } else if (queue.length < 16) queue.push(clone(command));
   if (!rendererReady && command.type === "plan")
@@ -166,7 +205,65 @@ function enqueue(command: Command) {
 }
 function update() {
   const phase = state.phase;
+  if (guideReplayPending && phase === "evening") {
+    guide = "route";
+    guideReplayPending = false;
+  }
   const view = projection(state);
+  if (guide !== "done" && phase === "night" && guide === "route")
+    guide = "move";
+  if (phase !== "evening" && phase !== "night" && guide !== "done")
+    guide = "done";
+  const panel = element("guide");
+  const target =
+    guide === "route"
+      ? element("evening").querySelector(".choices")
+      : guide === "move"
+        ? element("walking").querySelector(".directions")
+        : element("walking").querySelector(".action-row");
+  if (guide !== "done" && target && panel.nextElementSibling !== target)
+    target.before(panel);
+  show("guide", guide !== "done" && !state.recoveryPending);
+  show("guide-continue", guide === "consequence");
+  setText(
+    "guide-text",
+    guide === "route"
+      ? "Deliver help on at least two nights. Dawn or cold can stop a delivery. Choose a route."
+      : guide === "move"
+        ? rendererReady
+          ? "Move one step toward the marker."
+          : "The village is loading. Movement and lantern controls will be ready when it appears."
+        : guide === "lantern"
+          ? "Change your lantern using the button."
+          : state.player.lantern
+            ? "The lit lantern restores warmth, but light can reveal you."
+            : "The hidden lantern protects privacy, but your warmth falls.",
+  );
+  const main = element("night").parentElement;
+  const village = document.querySelector<HTMLElement>(".village");
+  if (main && village) {
+    const evening = element("evening");
+    const choices = evening.querySelector(".choices");
+    if (guide === "route" && choices) {
+      evening.prepend(panel);
+      panel.after(choices);
+    }
+    if (
+      guide !== "done" &&
+      element("status").nextElementSibling !== element("morning")
+    )
+      element("morning").before(element("status"));
+    if (guide === "done" && element("status").nextElementSibling !== evening)
+      evening.before(element("status"));
+    if (
+      guide !== "done" &&
+      phase === "night" &&
+      element("night").nextElementSibling !== village
+    )
+      village.before(element("night"));
+    if (guide === "done" && village.nextElementSibling !== element("night"))
+      village.after(element("night"));
+  }
   app?.setAttribute("data-phase", phase);
   show("status", phase === "evening" || phase === "night");
   const dawnSeconds = Math.max(
@@ -224,9 +321,9 @@ function update() {
         : state.status,
   );
   for (const button of document.querySelectorAll<HTMLButtonElement>(
-    "#walking button",
+    "#lantern, #act, .directions button",
   ))
-    button.disabled = state.conversationTicksRemaining > 0;
+    button.disabled = !rendererReady || state.conversationTicksRemaining > 0;
   setText(
     "lantern",
     state.player.lantern
@@ -370,6 +467,8 @@ Object.assign(window, {
       measurements.rendererReady = true;
       lastStep = performance.now();
       show("loading", false);
+      update();
+      if (guide !== "done") window.scrollTo({ top: 0, behavior: "instant" });
     },
     get_frame: () => {
       cachedFrame = projection(state);
@@ -444,7 +543,7 @@ setInterval(() => {
   while (now - lastStep >= 100) {
     lastStep += 100;
     if (state.phase === "night" || queue.length) {
-      step(state, queue.shift());
+      perform(queue.shift());
       update();
     }
   }
@@ -456,6 +555,33 @@ window.addEventListener("pagehide", () => {
 document.addEventListener("visibilitychange", () => {
   lastStep = performance.now();
 });
+element("guide-skip").onclick = finishGuide;
+element("guide-continue").onclick = () => {
+  guide = advanceGuide(guide, "continue");
+  finishGuide();
+};
+element("guide-replay").onclick = () => {
+  if (state.phase !== "evening" && state.phase !== "night") {
+    guideReplayPending = true;
+    localStorage.removeItem("lefthand-guide-done");
+    setText(
+      "menu-status",
+      state.phase === "ended"
+        ? "The guide will start with a new game."
+        : "The guide will start at the next evening.",
+    );
+    return;
+  }
+  guide =
+    state.phase === "evening"
+      ? "route"
+      : state.phase === "night"
+        ? "move"
+        : "route";
+  localStorage.removeItem("lefthand-guide-done");
+  setMenu(false);
+  update();
+};
 element("route-door").onclick = () => enqueue({ type: "plan", route: "door" });
 element("route-well").onclick = () => enqueue({ type: "plan", route: "well" });
 element("lantern").onclick = () => enqueue({ type: "lantern" });
