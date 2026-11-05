@@ -19,6 +19,9 @@ type RunControls = {
   download: () => void;
   bindVolume: () => Promise<void>;
   notebook: () => void;
+  replayGuide?: () => void;
+  guideAvailable?: () => boolean;
+  guideLabel?: () => string;
   toTitle: () => void;
   closeFile?: () => void;
   recordingChanged?: () => void;
@@ -63,6 +66,7 @@ export function mountLab(options: RunControls): void {
   controls.innerHTML = `<dialog class="game-menu-panel" aria-labelledby="valley-menu-title">
     <header class="menu-head"><h2 id="valley-menu-title">Game menu <small data-menu-date></small></h2><button type="button" data-close-menu aria-label="Close menu">×</button></header>
     <div class="menu-body"><button type="button" data-music aria-pressed="false">Music: off</button><p data-save-status role="status"></p><p>Time stops while this menu is open. ${FOREIGN_FILE ? 'This file stays in this tab. Download it to keep your progress.' : 'The game saves your progress as you play.'}</p>
+    <button type="button" data-replay-guide>Replay first morning guide</button>
     <button type="button" data-notebook>The notebook <span aria-hidden="true">▸</span></button>
     <fieldset class="menu-speed"><legend>Time</legend><div role="group" aria-label="Time control">${(['automatic', 'slow', 'steady', 'fast'] as const).map((speed) => `<button type="button" data-speed="${speed}" aria-pressed="false">${speed.charAt(0).toUpperCase() + speed.slice(1)}</button>`).join('')}</div></fieldset>
     <button type="button" data-feedback>Feedback <span aria-hidden="true">▸</span></button>
@@ -147,6 +151,11 @@ export function mountLab(options: RunControls): void {
     if (download) download.disabled = !options.hasRun();
     const notebook = controls.querySelector<HTMLButtonElement>('[data-notebook]');
     if (notebook) notebook.hidden = !options.hasRun();
+    const guide = controls.querySelector<HTMLButtonElement>('[data-replay-guide]');
+    if (guide) {
+      guide.hidden = !options.guideAvailable?.();
+      guide.textContent = options.guideLabel?.() ?? 'Replay first morning guide';
+    }
     find('[data-menu-date]').textContent = options.hasRun() ? `· ${options.date()}` : '';
     find('[data-resume]').textContent = 'Resume';
     for (const button of controls.querySelectorAll<HTMLButtonElement>('[data-speed]'))
@@ -191,6 +200,10 @@ export function mountLab(options: RunControls): void {
   });
   find('[data-close-menu]').addEventListener('click', closeMenu);
   find('[data-resume]').addEventListener('click', closeMenu);
+  find('[data-replay-guide]').addEventListener('click', () => {
+    menu.close();
+    options.replayGuide?.();
+  });
   find('[data-feedback]').addEventListener('click', openFeedback);
   find('[data-close-feedback]').addEventListener('click', closeFeedback);
   find('[data-feedback-back]').addEventListener('click', openMenu);

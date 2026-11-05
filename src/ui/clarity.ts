@@ -52,11 +52,11 @@ export function skipBlock(s: { waiting: boolean; hurrying: boolean; asked?: bool
         : null;
 }
 export function travelWords(v: { arrive: number; leave: number; back: number }, minute: number): string {
-  const home = Math.max(0, v.back - minute);
+  const home = Math.max(0, Math.round(v.back - minute));
   return minute < v.arrive
-    ? `${v.arrive - minute} game minutes until arrival; ${home} until home.`
+    ? `${Math.round(v.arrive - minute)} game minutes until arrival; ${home} until home.`
     : minute < v.leave
-      ? `${v.leave - minute} game minutes left here; ${home} until home.`
+      ? `${Math.round(v.leave - minute)} game minutes left here; ${home} until home.`
       : `${home} game minutes until home.`;
 }
 
