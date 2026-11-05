@@ -19,4 +19,7 @@ Each item remains open. Recheck on **2026-11-12** after the current HF4 and open
 - **F-2962:** Gate confirmation needs a real input-path investigation; its cause is unconfirmed. Recheck 2026-11-12.
 - **F-2963:** News provenance needs to be shown without inventing certainty. Recheck 2026-11-12.
 
+- **Browser access:** The integrated parcel and order controls still need the prescribed leased Chrome pointer, reload and two-viewport checks. Recheck 2026-11-12.
+- **Folded table wording:** The duplicate lead stays under F-2675 and F-2689; verify its map/order wording with that work. Recheck 2026-11-12.
+
 Owner readiness and player acceptance remain with their respective owners; a checkpoint does not substitute for either.
