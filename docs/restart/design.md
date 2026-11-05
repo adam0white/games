@@ -1,5 +1,22 @@
 # Small Works
 
+## Current item follow-ups — 2026-11-05
+
+Each item has a **2026-11-12** engineering or acceptance follow-up. These dates do not schedule a player or claim a delivered outcome. Preserve the dated source and delivery receipts below.
+
+| Item | Reason |
+| --- | --- |
+| F138 / GDI033 | The busy-afternoon route was delivered; Adam’s experience and acceptance are still separate. |
+| GDI034 / 036 / 038 | Outing, stock and duplicate-fan mechanisms need the owner’s judgment in the delivered scenario. |
+| GDI037 | Symptom grouping has a source disposition; the player needs to judge whether it reads clearly. |
+| GDI039 | Seeded starts exist; the player must judge whether the authored opening feels varied enough. |
+| GDI041 / 042 | Continuation order and tool-surface text have source dispositions; the player needs to verify reading and flow. |
+| GDI690 | Feedback controls exist; a selected choice is not a submitted or received note. |
+| F137 / F247 | The honest return account and next-test wording need player judgment in the actual repair. |
+| GDI043 / 044 | UI, recording and cast readiness require the relevant live evidence and owner judgment; no new account-transfer work is implied. |
+| F1481 | Fault variety remains an engineering question; inspect current scenarios and avoid claiming player acceptance from a generator check. |
+
+
 ## Native admission optimization candidate, 2026-10-27
 
 Remaining: one root-arranged independent Codex review of the exact frozen candidate, signed source, exact CI, root merge verification and clean delivery. Adam accepts feel separately. F1481 fault variety, restart acceptance, crew responsibility, management, economy and multiplayer remain separate units; their next engineering review remains 2026-10-29 (F1481: 2026-10-28).
