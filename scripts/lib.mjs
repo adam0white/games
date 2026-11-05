@@ -15,6 +15,7 @@ export function validateRegistry(registry) {
       if (origin.protocol !== 'https:' || origin.origin !== game.legacyOrigin || origin.origin === 'https://play.adamwhite.work' || origins.has(origin.origin)) throw new Error('Invalid or duplicate legacy origin');
       origins.add(origin.origin);
     }
+    if (game.ciBrowsers !== undefined && (!Array.isArray(game.ciBrowsers) || game.ciBrowsers.some(b => !['chromium', 'chromium-headless-shell', 'webkit', 'firefox'].includes(b)))) throw new Error('Invalid CI browser');
     seen.add(game.slug);
   }
   return registry;

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHandler } from '../src/worker.mjs';
+import { Script } from 'node:vm';
 import { validateRegistry } from './lib.mjs';
 
 const games = [{ slug: 'rope', legacyOrigin: 'https://old.example', redirectEnabled: true }, { slug: 'other', legacyOrigin: 'https://off.example', redirectEnabled: false }];
@@ -25,6 +26,7 @@ test('old service worker is a same-origin non-cacheable tombstone', async () => 
   assert.match(response.headers.get('cache-control'), /no-store/);
   assert.equal(response.headers.get('service-worker-allowed'), '/');
   const script = await response.text();
+  assert.doesNotThrow(() => new Script(script));
   assert.match(script, /skipWaiting/); assert.match(script, /unregister/); assert.match(script, /client\.navigate/);
 });
 test('registry rejects activation until verification preflight exists', () => {
