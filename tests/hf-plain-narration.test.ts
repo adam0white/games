@@ -8,14 +8,14 @@ import { replayRecordedRun } from '../src/game/replay';
 describe('published HF narration and provenance', () => {
   it('preserves inspected narration and verifies the current archive replay', () => {
     let state = createGame(42);
-    expect(SAVE_PROVENANCE.framework).toBe('4.11.0');
+    expect(SAVE_PROVENANCE.framework).toBe('4.17.0');
     state = dispatch(state, { type: 'request-lesson' }).state;
     const saved = saveGame(state);
     const archive = JSON.parse(saved).hf.archive;
     expect(archive.format).toBe('hf-run');
     expect(archive.version).toBe(7);
     expect(archive.hashes.full).toBe(
-      '98675c2b347f8d18760e34c5d7a4eb9edc5dcd2bc79c849d0bcd86809f5bbbe2',
+      '8ee129672a48aa6abbacc33181aaa769ac8188e0ec0005f5779206ea16c6b6c4',
     );
     const restored = restoreRun(archive);
     expect(restored.ok).toBe(true);

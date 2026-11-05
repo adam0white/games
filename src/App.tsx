@@ -1073,7 +1073,7 @@ function Workshop({
     } catch (error) {
       continuity.status = error instanceof Error ? error.message : String(error);
       setDebugError(error instanceof Error ? error.message : String(error));
-      setEntryError(workshopStartError());
+      setEntryError(workshopStartError(error));
       console.error('Workshop entry failed:', continuity.status);
       refreshContinuity((n) => n + 1);
     } finally {
@@ -1118,7 +1118,7 @@ function Workshop({
       }
     } catch (error) {
       setDebugError(error instanceof Error ? error.message : String(error));
-      setEntryError(workshopStartError());
+      setEntryError(workshopStartError(error));
     } finally {
       setEntering(false);
     }
@@ -1151,7 +1151,7 @@ function Workshop({
     } catch (error) {
       continuity.status = String(error);
       setDebugError(error instanceof Error ? error.message : String(error));
-      setEntryError(workshopStartError());
+      setEntryError(workshopStartError(error));
       console.error('Workshop entry failed:', continuity.status);
       refreshContinuity((n) => n + 1);
     } finally {
@@ -1176,7 +1176,7 @@ function Workshop({
           })
           .catch((error) => {
             setDebugError(error instanceof Error ? error.message : String(error));
-            setEntryError(workshopStartError());
+            setEntryError(workshopStartError(error));
           });
       }
     };

@@ -1,3 +1,13 @@
+## HF 4.17 and opening clarity candidate — 2026-11-05
+
+Remaining: exact combined-source review and CI, normal merge, exact merged-main CI, deployment and owner acceptance. The ordinary first-minute browser path and practice replay path are checked without reading body text. One synthetic skim tester found a hidden first part; the script checks its visibility after the fix. This is not a human playtest.
+
+The receiver records 4.17 for new workshop claims, while the exact incoming passport allowlists remain unchanged. A genuine 4.17 workshop passport is refused on later re-entry before ownership writes, with the original history preserved and a plain explanation. It is not qualified for transfer. The 4.11 synthetic producer fixture and its reproducibility details are in `tests/fixtures/cast-portables-hf411.md`; the Commonstead identity-mapping test is not a producer proof. Historical whole-run saves still receive the existing start-fresh refusal.
+
+## Upkeep follow-up — 2026-11-05
+
+Remaining: integrate open Clarity work, qualify HF 4.17 replay and release, and obtain Adam's play and acceptance. Recheck on 2026-11-12 because the owner judgment and current source qualification have not been recorded; no appointment or player panel is implied. The dated delivery receipts below remain historical.
+
 ## Delivered technical record, 2026-11-04
 
 Remaining: Adam's play and acceptance of the game remain open. The twelve literal player requests and their reasons remain in [Deferred player requests](docs/Deferred.md#final-ordinary-iteration-2026-11-01). The ordinary player-panel gate remains paused; no new panel was run. Recheck the remaining owner and player dependency on 2026-11-05 as an engineering follow-up; this is not an appointment or commitment by Adam.

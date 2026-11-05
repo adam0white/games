@@ -1,0 +1,7 @@
+# HF 4.11 portable fixture provenance
+
+`cast-portables-hf411.json` has SHA-256 `906bf992ae9136d0fa2459f7afa4f048fd620da395b79cba8ce1d1c81845efd8`. It contains four synthetic people projected by the unmodified Small Works host at `0b043faa34a96d548ea4a69d8d3cc6f67c89b3cd` using the published HF 4.11.0 package. It is not evidence of a human playtest or a Commonstead producer.
+
+To reproduce, place `src/game/hf.ts` and `src/game/hf-authoring.ts` from that commit in an empty directory as `hf.ts` and `hf-authoring.ts`; install the exact published HF 4.11.0 and lab-client 0.5.11 packages there; copy `cast-portables-hf411-generator.mjs` beside them; then run Node 26.12.0: `node cast-portables-hf411-generator.mjs output.json`. The generator checks each native producer archive replay before writing its projection, and refuses any source engine other than 4.11.0. All four native replays returned verified during this capture. Format the resulting JSON with Biome 2.6.5 before comparing the hash. Package versions affect reproducibility.
+
+These are synthetic host projections. The Commonstead identity-mapping unit test modifies a portable to exercise the receiver's shape guard; it is not a real Commonstead producer export. The 4.17 receiving chapter claims are checked separately by save/load and replay. Incoming passport gates remain at their existing exact versions; a real 4.17 workshop projection is refused until that boundary is qualified.
