@@ -39,7 +39,7 @@ The [Human Framework](https://github.com/adam0white/human-framework) supplies th
 
 The exact package pin is `@adam0white/human-framework@4.8.0`. Glance’s package version is `0.1.0`, distinct from its export edition. The immutable lab artifacts are client `0.5.6` and kit `0.5.24`.
 
-Use the shared Node 26.12.0 runtime (`.node-version` and `.nvmrc`), pnpm 12.14.0 and TypeScript 7 or later. Run `pnpm install --frozen-lockfile` before the commands below.
+Use the shared Node 26.12.0 runtime (`.node-version` and `.nvmrc`), pnpm 12.16.1 and TypeScript 7 or later. Run `pnpm install --frozen-lockfile` before the commands below.
 
 - `npm run dev`: play locally.
 - `npm run check:lane`: run this repository’s full lint, typecheck and test lane without the shared suite lock before a commit.

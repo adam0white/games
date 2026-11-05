@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.5/schema.json",
   "files": {
     "includes": [
       "**",
@@ -25,5 +25,20 @@
     "rules": {
       "preset": "recommended"
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "HANDOFF.md",
+        "docs/design.md",
+        "docs/playtests/gwen-2026-10-19.md",
+        "docs/playtests/jade-2026-10-19.md",
+        "docs/playtests/priya-2026-10-19.md",
+        "docs/playtests/tomas-2026-10-19.md"
+      ],
+      "formatter": {
+        "enabled": false
+      }
+    }
+  ]
 }
