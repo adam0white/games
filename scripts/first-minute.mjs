@@ -34,6 +34,20 @@ async function click(locator) {
   const b = await locator.boundingBox();
   await locator.page().mouse.click(b.x + b.width / 2, b.y + b.height / 2);
 }
+async function retainClockFocus(locator) {
+  await locator.focus();
+  const page = locator.page();
+  const before = await page.locator('[data-pace-menu]').textContent();
+  await page.waitForFunction(
+    (value) => document.querySelector('[data-pace-menu]')?.textContent !== value,
+    before,
+    { timeout: 20000 },
+  );
+  assert.ok(
+    await locator.evaluate((element) => document.activeElement === element),
+    'Guide focus must survive a real clock update',
+  );
+}
 for (const [name, engine] of [
   ['chromium', chromium],
   ['webkit', webkit],
@@ -61,6 +75,7 @@ for (const [name, engine] of [
         await cue.waitFor({ state: 'visible', timeout: 30000 });
         await shown(cue);
         await shown(cue.locator('[data-guide-skip]'));
+        await retainClockFocus(cue.locator('[data-guide-skip]'));
         await page.screenshot({ path: `${output}/${name}-${viewport.width}-opening.png` });
         const calledHouse = await page.locator('.morning-target').first().getAttribute('data-h');
         assert.ok(
@@ -89,6 +104,7 @@ for (const [name, engine] of [
           );
         }
         await page.screenshot({ path: `${output}/${name}-${viewport.width}-reply.png` });
+        await retainClockFocus(cue.locator('[data-guide-finish]'));
         await click(cue.locator('[data-guide-finish]'));
         assert.equal(await cue.count(), 0);
         await page.getByRole('button', { name: 'Menu', exact: true }).click();
@@ -115,6 +131,7 @@ for (const [name, engine] of [
           replayAndSkip: true,
           historicalRequestNotReplayed: true,
           exactPublicQuote: true,
+          clockFocusRetained: true,
           errors,
         });
       } finally {

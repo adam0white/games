@@ -307,9 +307,17 @@ function mountMorningGuide() {
     cue.querySelector('[data-guide-finish]')?.addEventListener('click', finishMorningGuide);
   }
   const sheet = root.querySelector('#sheet');
-  if (step === 'request') root.querySelector('#thumbs .verb-grid')?.before(cue);
-  else if (step === 'house') root.querySelector('#pace')?.after(cue);
-  else sheet?.prepend(cue);
+  if (step === 'request') {
+    const verbs = root.querySelector('#thumbs .verb-grid');
+    if (verbs && (cue.parentElement !== verbs.parentElement || cue.nextElementSibling !== verbs))
+      verbs.before(cue);
+  } else if (step === 'house') {
+    const pace = root.querySelector('#pace');
+    if (pace && (cue.parentElement !== pace.parentElement || cue.previousElementSibling !== pace))
+      pace.after(cue);
+  } else if (sheet && (cue.parentElement !== sheet || sheet.firstElementChild !== cue)) {
+    sheet.prepend(cue);
+  }
   const target =
     step === 'house'
       ? root.querySelector<HTMLButtonElement>(
