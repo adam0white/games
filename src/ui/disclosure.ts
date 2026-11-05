@@ -19,6 +19,8 @@ export interface Note {
   id: string;
   /** Margin note in the narrator's voice; **x** marks a control name. */
   text: string;
+  /** Short instruction shown on the actual opening control. */
+  cue?: string;
   /** Control to highlight. */
   lit?: string;
   /** Unlocks this feature when shown. */
@@ -36,7 +38,8 @@ export function nextNote(d: Disclosure, s: ClimbState): Note | null {
   const seen = (id: string) => d.seen.includes(id);
   const mod = s.minute - s.day * 1440;
   const leaderInputs = s.inputs.filter((i) => i.t === 'lead').length;
-  const sayInputs = s.inputs.filter((i) => i.t === 'say').length;
+  const leadUpInputs = s.inputs.filter((i) => i.t === 'lead' && i.dir === 'up').length;
+  const climbInputs = s.inputs.filter((i) => i.t === 'say' && i.act === 'climb').length;
   const refusal = s.lines.find(
     (l) => l.verdict === 'refused' || l.verdict === 'deferred' || l.verdict === 'modified',
   );
@@ -47,17 +50,24 @@ export function nextNote(d: Disclosure, s: ClimbState): Note | null {
       text: 'Someone refused or delayed your request, or offered another action. You can wait, offer rest, change your plan, or **insist**. Insisting can turn “not now” into an unwilling yes. It cannot change a firm refusal. It can damage their trust in you.',
     };
   if (s.climbNo === 1) {
-    if (!seen('lead') && leaderInputs === 0)
+    if (!seen('intro-skip') && leadUpInputs === 0 && climbInputs === 0)
       return {
         id: 'lead',
         lit: 'lead',
         text: 'Tap **Lead on** to walk up the path yourself. It does not move anyone else. Each person decides whether to follow, so ask them with **Climb on**. You stop and wait when half or more of the people still climbing are far behind. At the end of a stretch of path, you stop if nobody still out can hear you. Wind makes hearing distance shorter.',
+        cue: 'You walk; they choose whether to follow.',
       };
-    if (!seen('ask') && sayInputs === 0 && s.members.some((x) => x.homeAt === null && canHear(s, x.id)))
+    if (
+      !seen('intro-skip') &&
+      leadUpInputs > 0 &&
+      climbInputs === 0 &&
+      s.members.some((x) => x.homeAt === null && canHear(s, x.id))
+    )
       return {
         id: 'ask',
         lit: 'climb',
-        text: 'Ask them to join you. You have selected **everyone**. Tap **Climb on**, then **ask**.',
+        text: 'Ask them to join you. You have selected everyone. Tap climb on, then ask.',
+        cue: 'Ask them to climb on.',
       };
     const apart =
       leaderInputs > 0 &&
@@ -116,7 +126,7 @@ export function nextNote(d: Disclosure, s: ClimbState): Note | null {
     return {
       id: 'pack',
       unlock: 'pack',
-      text: `${available.rations === 0 ? `${memberOf(available.id).name} has no food left. ` : ''}Pick ${memberOf(available.id).name}, then open **more actions** to **take their pack** or **share food** from yours. They can refuse.`,
+      text: `${available.rations === 0 ? `${memberOf(available.id).name} has no food left. ` : ''}Pick ${memberOf(available.id).name}, then open **more requests** to **take their pack** or **share food** from yours. They can refuse.`,
     };
   return null;
 }

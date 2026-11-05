@@ -52,6 +52,7 @@ import { MEMBERS, memberOf } from '../sim/party.ts';
 import { checkChapter, portableOf } from '../sim/passport.ts';
 import {
   exportClimb,
+  newSeason,
   nextClimb,
   nextClimbFrames,
   replayExport,
@@ -324,6 +325,25 @@ export class Game {
       { signal: this.lifetime.signal },
     );
     this.titlePage();
+    if (this.entry === 'file' && new URLSearchParams(location.search).get('tutorial') === '1') {
+      const { season, climb } = newSeason(42);
+      const start = season.start ?? snapshot(climb);
+      const text = JSON.stringify(exportClimb(start, climb, FRAMEWORK_VERSION, season.chapter, season.past));
+      const prepared = await decodeFile(text);
+      if (!this.current()) return;
+      const continuity = new Continuity(lab!, null);
+      await continuity.restoreOwnership(
+        { season: prepared.save.season, climb: prepared.climb },
+        prepared.save.ownership,
+        true,
+      );
+      if (!this.current()) return;
+      this.continuity = continuity;
+      this.originalFile = prepared.original;
+      this.season = prepared.save.season;
+      this.disc = prepared.save.disclosure;
+      this.begin(prepared.climb, prepared.start);
+    }
   }
 
   private recordingAllowed(): boolean {
@@ -865,14 +885,22 @@ export class Game {
     if (this.note?.lit) {
       const lit = this.note.lit;
       const matched =
-        (lit === 'lead' && inp.t === 'lead') ||
-        (lit === 'climb' && inp.t === 'say') ||
+        (lit === 'lead' &&
+          ((inp.t === 'lead' && inp.dir === 'up') || (inp.t === 'say' && inp.act === 'climb'))) ||
+        (lit === 'climb' && inp.t === 'say' && inp.act === 'climb') ||
         (lit === 'tell' && inp.t === 'tell') ||
         (lit === 'promise' && inp.t === 'promise') ||
         (lit === 'rope' && inp.t === 'say' && inp.act === 'rope') ||
         (lit === 'fix' && inp.t === 'fix') ||
         (lit === 'with' && inp.t === 'lead' && inp.dir === 'with');
-      if (matched) this.dismissNote();
+      if (matched) {
+        const wasOpening = this.note.id === 'lead' || this.note.id === 'ask';
+        this.dismissNote();
+        if (wasOpening) {
+          const next = nextNote(this.disc, c);
+          if (next) this.showNote(next);
+        }
+      }
     }
     this.verb = null;
     this.partner = null;
@@ -1067,9 +1095,17 @@ export class Game {
   private showNote(n: Note): void {
     this.note = n;
     this.hinting = false;
-    this.noteEl.innerHTML = `<button aria-label="Dismiss this note">×</button><span class="note-copy">${bold(n.text)}</span>`;
+    const opening = n.id === 'lead' || n.id === 'ask';
+    this.noteEl.innerHTML = opening
+      ? '<button class="tutorial-skip" aria-label="Skip tutorial">Skip tutorial</button>'
+      : `<button aria-label="Dismiss this note">×</button><span class="note-copy">${bold(n.text)}</span>`;
     const btn = this.noteEl.querySelector('button');
-    if (btn) btn.onclick = () => this.dismissNote();
+    if (btn)
+      btn.onclick = () => {
+        if (opening && !this.disc.seen.includes('intro-skip')) this.disc.seen.push('intro-skip');
+        this.dismissNote();
+        this.save();
+      };
     if (n.unlock) markSeen(this.disc, { ...n, id: `${n.id}:unlock` });
     if (n.unlock && !this.disc.unlocked.includes(n.unlock)) this.disc.unlocked.push(n.unlock);
     this.slow(PACE.noteSlowMs);
@@ -1440,6 +1476,13 @@ export class Game {
     const b = h('button', 'verb', `${icon(ic)}<span>${esc(label)}</span>`) as HTMLButtonElement;
     b.disabled = !enabled;
     if (this.note?.lit === id || this.verb === id) b.classList.add('lit');
+    if (
+      (this.note?.id === 'lead' && id === 'lead') ||
+      (this.note?.id === 'ask' && id === 'climb' && this.panel === 'main')
+    ) {
+      const cue = h('small', 'tutorial-cue', esc(this.note.cue ?? this.note.text));
+      b.append(cue);
+    }
     b.onclick = onclick;
     const wrap = h('div', 'verb-option');
     wrap.append(b);
@@ -1835,6 +1878,10 @@ export class Game {
     const f = (force: Force, label: string, sub: string, enabled = true) => {
       const b = h('button', 'force task', `${label}<small>${sub}</small>`) as HTMLButtonElement;
       b.disabled = !enabled || !this.heardTarget();
+      if (this.note?.id === 'ask' && v === 'climb' && force === 'ask') {
+        b.classList.add('lit');
+        b.append(h('small', 'tutorial-cue', 'Ask now. They may say no.'));
+      }
       b.onclick = () => {
         const act = v as 'climb' | 'descend' | 'rest' | 'eat' | 'wait' | 'rope' | 'pack' | 'ahead';
         // A rope needs two different people (owner playtest: Nell was once asked to rope up with Nell).
@@ -2401,7 +2448,7 @@ export class Game {
     const menu = h(
       'div',
       'menu-backdrop',
-      `<section class="game-menu" role="dialog" aria-modal="true" aria-label="Game menu"><div class="menu-header"><h2>Game menu</h2><button class="close" data-menu-close aria-label="Close menu">×</button></div><p class="caption">Time stops while the menu is open.</p><div class="menu-body"><button class="btn" data-menu-send>Feedback</button><button class="btn" data-menu-fullscreen>Full screen</button><a class="menu-link" href="https://human.adamwhite.work/games/">All games</a><div data-recording></div><p role="status" data-continuity-status>${esc(this.continuity.skipped.map((s) => s.reason).join(' '))}</p><button class="btn" data-menu-new>New game</button><div data-menu-confirm hidden><p>Starting a new season replaces your saved season.</p><button class="btn" data-new-yes>Start new game</button><button class="btn" data-new-no>Keep this game</button></div><a class="menu-link" data-cast-shelf href="https://human.adamwhite.work/lab/people/">People across games</a><fieldset class="menu-pacing"><legend>Pace: Automatic</legend>${(['auto', 'slow', 'normal', 'fast'] as const).map((speed) => `<button class="btn" data-pace="${speed}" aria-pressed="${this.speed === speed}">${speed}</button>`).join('')}</fieldset><button class="btn" data-menu-export ${this.climb ? '' : 'disabled'}>Download this run</button><a class="menu-link" href="/file/">Open a run file</a><button class="btn" data-menu-title>Title page</button><div class="privacy-debug"><a href="https://human.adamwhite.work/lab/privacy/">Lab privacy</a><details data-debug><summary>Debug</summary><p>Human Framework ${FRAMEWORK_VERSION}</p>${this.startupError && new URLSearchParams(location.search).get('lab') === '1' ? `<pre>${esc(this.startupError)}</pre>` : ''}</details></div></div><button class="btn go menu-resume" data-menu-close>Resume</button></section>`,
+      `<section class="game-menu" role="dialog" aria-modal="true" aria-label="Game menu"><div class="menu-header"><h2>Game menu</h2><button class="close" data-menu-close aria-label="Close menu">×</button></div><p class="caption">Time stops while the menu is open.</p><div class="menu-body"><button class="btn" data-menu-send>Feedback</button><button class="btn" data-menu-fullscreen>Full screen</button><a class="menu-link" href="https://human.adamwhite.work/games/">All games</a><div data-recording></div><p role="status" data-continuity-status>${esc(this.continuity.skipped.map((s) => s.reason).join(' '))}</p><button class="btn" data-menu-new>New game</button><div data-menu-confirm hidden><p>Starting a new season replaces your saved season.</p><button class="btn" data-new-yes>Start new game</button><button class="btn" data-new-no>Keep this game</button></div><a class="menu-link" data-cast-shelf href="https://human.adamwhite.work/lab/people/">People across games</a><fieldset class="menu-pacing"><legend>Pace: Automatic</legend>${(['auto', 'slow', 'normal', 'fast'] as const).map((speed) => `<button class="btn" data-pace="${speed}" aria-pressed="${this.speed === speed}">${speed}</button>`).join('')}</fieldset><a class="menu-link" href="/file/?tutorial=1" target="_blank" rel="noreferrer">Replay tutorial in practice</a><button class="btn" data-menu-export ${this.climb ? '' : 'disabled'}>Download this run</button><a class="menu-link" href="/file/">Open a run file</a><button class="btn" data-menu-title>Title page</button><div class="privacy-debug"><a href="https://human.adamwhite.work/lab/privacy/">Lab privacy</a><details data-debug><summary>Debug</summary><p>Human Framework ${FRAMEWORK_VERSION}</p>${this.startupError && new URLSearchParams(location.search).get('lab') === '1' ? `<pre>${esc(this.startupError)}</pre>` : ''}</details></div></div><button class="btn go menu-resume" data-menu-close>Resume</button></section>`,
     );
     const previousFocus = document.activeElement as HTMLElement | null;
     const close = () => {
@@ -2852,6 +2899,8 @@ export class Game {
           if (plan) this.send(plan);
           this.closePage();
           lab!.screen(climbScreen(c, 'climb'));
+          const opening = nextNote(this.disc, c);
+          if (opening && !this.note) this.showNote(opening);
         });
         for (const b of el.querySelectorAll<HTMLElement>('[data-hour]'))
           b.addEventListener('click', async () => {
@@ -2866,6 +2915,8 @@ export class Game {
             const promise: NewInput = { t: 'promise', hour: Number(b.dataset.hour) };
             if (plan) this.send(plan, promise);
             else this.send(promise);
+            const opening = nextNote(this.disc, c);
+            if (opening && !this.note) this.showNote(opening);
           });
       },
       'hut',
