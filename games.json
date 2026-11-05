@@ -15,7 +15,7 @@
       "slug": "hearsay",
       "source": {
         "repository": "https://github.com/adam0white/hearsay",
-        "commit": "2fb948bbb6d3ea779e31e93b6dadc32d032085a7"
+        "commit": "f6737badd333a7e889a8a9abb91653aae04b370a"
       },
       "saveSchema": "hearsay-hf4/1",
       "ciBrowsers": [

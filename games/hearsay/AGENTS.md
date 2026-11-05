@@ -2,7 +2,7 @@
 
 Read [HANDOFF.md](HANDOFF.md) for current state and acceptance. Follow [the plain-English policy](docs/lab/plain-english.md).
 
-Use the Human Framework managed worktree workflow. Preserve replay and legacy tests. Run `pnpm run check:lane` before each signed commit. This lane runs lint and types without the machine-wide suite lock. Run focused behavior tests and a headless control for the change. Hosted CI runs the full suite. Include `Co-Authored-By: Codex <noreply@openai.com>`. Fetch and rebase on origin/main before every push. Require green CI on the exact source commit. Deploy from a fresh latest-origin managed tree and verify its clean release stamp.
+Use one worktree for the games repository per agent. Do not create a separate nested game worktree. Follow the root workflow and frozen lockfile. Preserve current replay controls and historical evidence. Run root `npm run check:lane`, this game’s lint/types lane and focused behavior controls before each signed commit. Hosted CI runs affected full game suites and builds the complete bundle. Fetch current root main before integration and preserve the subtree merge parents. Require exact-head green CI and hosted Codex clearance before merge. Use the root deployment gate and verify the clean live game manifest.
 
 Do not change the shared checkout, another game's files or setting worktrees. Keep personal acceptance separate from technical verification. The owner accepts by playing.
 

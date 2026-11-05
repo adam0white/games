@@ -18,7 +18,7 @@ You lead five Human Framework (HF) people up a mountain and back. Every one of t
 - Workers AI may voice camp conversation only, from HF decision records and journal facts. It never emits state. Hard caps in the Worker, a kill switch and a labelled deterministic fallback. Budget $5 total; track spend in HANDOFF.md.
 - No server infrastructure beyond one Worker with static assets (no Durable Objects, no databases).
 - Phones first: Galaxy S26 360x780 CSS px, about 690 px visible; thumb actions in the bottom 40%.
-- `npm run check` (lint, typecheck, tests) passes before every commit. shared Node 26.12.0 from `.node-version` / `.nvmrc`, `/opt/homebrew/bin` first on PATH.
+- Follow the root monorepo workflow. Run root `npm run check:lane`, this game’s lint/types lane and focused behavior controls before committing. Hosted CI runs the affected full game suite and the complete bundle build. Require exact-head green CI and hosted Codex clearance before merge. Use shared Node 26.12.0 from the root runtime pin.
 - Deferred work goes into the Deferred section of docs/design.md with a target. Playtesters' words go verbatim into `docs/playtest-*.md`.
 
 ## Delivery

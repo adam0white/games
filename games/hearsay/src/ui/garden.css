@@ -434,3 +434,20 @@ body .hflab :is(input, textarea) {
 .cg-account details {
   margin: 4px 0;
 }
+
+.cg-tutorial-target {
+  outline: 3px solid #e3ad43;
+  outline-offset: 3px;
+}
+.cg-tutorial {
+  margin: 0.5rem;
+  padding: 0.7rem;
+  border: 2px solid #a86d16;
+  border-radius: 0.5rem;
+  background: #fff3cf;
+  color: #30220d;
+  max-width: 24rem;
+}
+.cg-tutorial p {
+  margin: 0 0 0.5rem;
+}
