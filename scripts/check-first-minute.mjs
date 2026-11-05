@@ -186,6 +186,17 @@ for (const browserType of [chromium, webkit]) {
       }
       await skipAndReplay(viewport);
     }
+    for (const height of [501, 520]) {
+      for (const dnt of [true, false]) {
+        const viewport = { width: 360, height };
+        const page = await browser.newPage({
+          viewport,
+          ...(dnt ? { extraHTTPHeaders: { DNT: '1' } } : {}),
+        });
+        await first(page, viewport, true);
+        await page.close();
+      }
+    }
     await compactLandscape(true);
     await compactLandscape(false);
     console.log(
