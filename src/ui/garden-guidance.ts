@@ -157,7 +157,7 @@ export function gardenNext(run: GardenRun): string {
 /** Why the clock is slow right now. Pace buttons and the pace rule are unchanged. */
 export function gardenSlowNote(chosen: number, reasons: string[]): string {
   if (!reasons.length || chosen <= 1) return '';
-  return `The clock is slowed to 1 game minute a second because ${reasons.join(' and ')}.`;
+  return `Clock: 1 game minute per second because ${reasons.join(' and ')}.`;
 }
 
 export function howToPlayHtml(fileSession: boolean): string {
