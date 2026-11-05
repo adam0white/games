@@ -1754,8 +1754,24 @@ body {
   outline-offset: -2px;
 }
 
+/* Keep ordinary portrait controls inside short viewports after the guide closes. */
+@media (max-width: 759px) and (max-height: 500px) and (orientation: portrait) {
+  #app[data-sheet-id] {
+    grid-template-rows: max-content max-content minmax(0, 1fr) minmax(216px, 34%) 84px;
+  }
+  #app[data-sheet-id] .leader-bar {
+    padding-bottom: 0;
+  }
+  #app[data-sheet-id] .leader-bar .movement-verbs {
+    align-items: start;
+  }
+  #app[data-sheet-id][data-screen="hut"] {
+    grid-template-rows: max-content max-content minmax(0, 1fr) 0 0;
+  }
+}
+
 /* Reserve enough dock height for the opening control and its attached cue. */
-@media (max-width: 759px) and (min-height: 501px) {
+@media (max-width: 759px) and (orientation: portrait) {
   #app:has(.leader-bar .tutorial-cue) {
     grid-template-rows: max-content max-content minmax(48px, 1fr) minmax(0, 34%) 132px;
   }

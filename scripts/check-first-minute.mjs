@@ -215,7 +215,7 @@ for (const browserType of [chromium, webkit]) {
       }
       await skipAndReplay(viewport);
     }
-    for (const height of [501, 520]) {
+    for (const height of [480, 500, 501, 520]) {
       for (const dnt of [true, false]) {
         const viewport = { width: 360, height };
         const page = await browser.newPage({
@@ -223,6 +223,14 @@ for (const browserType of [chromium, webkit]) {
           ...(dnt ? { extraHTTPHeaders: { DNT: '1' } } : {}),
         });
         await first(page, viewport, true);
+        if (height <= 500) {
+          await page.goto(`${local}/file/?tutorial=1`);
+          await page.locator('[data-a="go"]').click();
+          await page.getByRole('button', { name: 'Skip tutorial' }).click();
+          await page.waitForTimeout(400);
+          for (const control of await page.locator('.leader-bar button:not([disabled])').all())
+            await exposed(control, `${height} portrait after Skip movement control`);
+        }
         await page.close();
       }
     }
