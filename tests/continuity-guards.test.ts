@@ -162,7 +162,7 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
     ).toBe(true);
     expect(controls.request).not.toHaveBeenCalled();
   });
-  it('refuses a historical Commonstead checkpoint before writing a current workshop claim', async () => {
+  it('refuses an unsupported Commonstead passport before writing a current workshop claim', async () => {
     const { real, parent: original } = await ownNoraSource();
     const { validatePortablePerson } = await import('@adam0white/human-framework');
     const { CAST } = await import('../src/game/cast');
@@ -174,7 +174,7 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
       ...body,
       source: { ...body.source, game: 'commonstead', rules: 'commonstead-4' },
       transfer: {
-        castPassport: 'commonstead-retained/4',
+        castPassport: 'unsupported-commonstead',
         sourceRole: original.castId,
         portable,
         life: original.transfer.life,
@@ -197,9 +197,8 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
       throw new Error('Unexpected request');
     });
     const host = await runtime();
-    // Current claims use HF 4.17, while the preserved cast guard accepts 4.11.
-    // Verify refusal occurs before the shelf can receive the proposed claim.
-    await expect(host.fresh(42)).rejects.toThrow('The saved cast source record is invalid.');
+    // An unsupported source is refused before the shelf can receive a claim.
+    await expect(host.fresh(42)).rejects.toThrow('unsupported chapter');
     expect(controls.request.mock.calls.map(([request]) => request.action)).toEqual([
       'prepareBatch',
     ]);
@@ -430,25 +429,9 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
   });
   it('keeps file-origin nonownership through reload and ignores recording-only identity changes', async () => {
     const host = await runtime();
-    const { real, parent } = await ownNoraSource();
-    const { admitWorkshop } = await import('../src/game/cast');
-    const input = real.preparePersonaLife(parent, 0);
-    const people = createGame(42).people;
-    people.nora = admitWorkshop(input, people.nora!);
-    const { revision, ...body } = parent;
-    // Synthetic shelf claim from an actual HF4 projection; file data never grants local ownership.
-    const claim = await real.createPersona({
-      ...body,
-      parentRevision: revision,
-      source: { game: 'repair', build: 'test', engine: '4.11.0', rules: 'canonical-workshop-3' },
-      transfer: { ...parent.transfer, life: input.life },
-    });
-    const file = createGame(42, 'current', people, {
-      version: 'workshop-cast/1',
-      inputs: [input],
-      claims: [claim],
-    });
-    const outcomes = dispatch(file, { type: 'start-cast-outcomes' });
+    const file = await host.freshLocal(42);
+    expect(controls.request).not.toHaveBeenCalled();
+    const outcomes = dispatch(file, { type: 'power', jobId: file.selectedJobId, on: false });
     expect(outcomes.ok).toBe(true);
     const { replayRecordedRun } = await import('../src/game/replay');
     expect(
@@ -464,11 +447,8 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
       ).ok,
     ).toBe(true);
     const state = await host.importFile(saveGame(file));
-    expect(state.castChapter?.claims[0]?.revision).toBe(claim.revision);
-    // Retained traits age for the actual receiving ingress milliseconds. The
-    // admitted passport, rather than a floating-point frozen cache, proves identity.
-    const admitted = state.hf.archive.initial.people.find((p) => p.id === 'nora')?.portable;
-    expect(admitted?.person).toEqual(input.parent.transfer.person);
+    expect(state.castChapter).toBeUndefined();
+    expect(controls.request).not.toHaveBeenCalled();
     expect(host.heads).toEqual([]);
     await host.recording(true);
     const oldKey = controls.key;

@@ -1,0 +1,3 @@
+# Historical continuity control
+
+`continuity-guards-before-main-merge.test.ts.historical` is the exact test file from commit `956acd237bc8c991063bac82fea59284e000e342`, SHA-256 `db41d74a9f3fea992891d6e6b77c652be0c420fb5ee3a3b1b9bfb7cefba2e786`. Its historical Commonstead refusal and synthetic HF 4.11 claim assertions failed after integrating the current 4.17 outgoing-claim guard. They are retained as evidence, not a current passing or portability claim. The current controls test unsupported passport refusal before writes and fresh local file export, replay, and ownership. General shared transfer remains unqualified.
