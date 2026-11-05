@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.5/schema.json",
   "files": {
     "includes": [
       "**",
@@ -29,6 +29,18 @@
   "overrides": [
     {
       "includes": ["docs/playtests/**"],
+      "formatter": {
+        "enabled": false
+      }
+    },
+    {
+      "includes": [
+        "HANDOFF.md",
+        "docs/design.md",
+        "docs/superpowers/plans/2026-11-02-valley-port-corrections.md",
+        "docs/valley-continuous-term-instructions-2026-11-05.md",
+        "docs/continuous-term-readme-historical.md"
+      ],
       "formatter": {
         "enabled": false
       }

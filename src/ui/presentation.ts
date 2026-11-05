@@ -101,7 +101,7 @@ function riderReceipt(s: ValleyState) {
 }
 
 export const PURPOSE =
-  'You are the valley’s steward. Bring in the landowner’s due, keep the valley fed, and earn its trust. Your term lasts three years; the elders will say what they remember.';
+  'You are the valley’s steward. Bring in the landowner’s due, keep the valley fed, and earn its trust. This opening episode runs from seven in the morning until one in the afternoon. Request help, read an actual reply, and decide how to answer. The full harvest and later years are outside this episode.';
 
 /** Read-only weather and damage readings. Never roll future weather or infer loss from stocks.
  * Notes can be future-dated or pruned; their absence does not establish zero damage. */
@@ -131,7 +131,7 @@ export function stormReportWords(s: ValleyState): string[] {
 
 /** What follows this season, including dates that explain an idle granary. */
 export function nextWords(s: ValleyState): string {
-  if (s.flags.ended) return 'The term is over. The valley keeps its own account of your years here.';
+  if (s.flags.ended) return 'The opening episode is over. Your notebook keeps this morning’s actual record.';
   const day = dayOfMinute(s.minute);
   const doy = doyOf(day);
   const receipt = riderReceipt(s);
@@ -192,6 +192,7 @@ export function currentJob(s: ValleyState): Job | undefined {
 
 /** One immediate direction, in order of urgency. */
 export function nowWords(s: ValleyState): string {
+  if (s.flags.ended === 'episode') return 'Read this morning’s recorded requests and replies.';
   if (s.flags.ended === 'term') return 'Read what the elders remember of your term.';
   if (s.flags.ended) return 'Read the letter that ends your service.';
   const knock = s.knocks.find((k) => !k.answered && k.at <= s.minute && k.until > s.minute);
@@ -224,7 +225,7 @@ export function nowWords(s: ValleyState): string {
 
 /** A missing date means the return depends on an event, not a timer. */
 export function callUnavailable(s: ValleyState, job: Job, house?: Household): string | null {
-  if (s.flags.ended) return 'Your service has ended. You cannot send more requests this term.';
+  if (s.flags.ended) return 'This episode has ended. You cannot send more requests.';
   if (house && !house.members.length)
     return 'This house is empty; calls return only if someone lives here again.';
   if (house && !underSeal(s, house))
@@ -270,7 +271,7 @@ export function callUnavailable(s: ValleyState, job: Job, house?: Household): st
 
 /** Explain actual gates and their renewal, never an invented daily action allowance. */
 export function limitsWords(s: ValleyState, house?: Household): string {
-  if (s.flags.ended) return 'Your service has ended. You no longer have authority here.';
+  if (s.flags.ended) return 'This episode has ended. Read the notebook or begin again.';
   const out: string[] = [];
   if (house && !house.members.length) return 'This house is empty; nobody here can answer a call.';
   if (house && !underSeal(s, house))

@@ -1,8 +1,10 @@
-/** Optional Valley host rules. HF owns every resident's choice; this module owns sacks,
- * completed work, local debts and authored requests. Unmarked runs keep the old term.
+/** Public Valley host rules. HF owns every resident's choice; this module owns sacks,
+ * completed work, local debts and authored requests. New games use the six-hour opening episode.
  * Costs are engineering assumptions: mill 0.15 grain/hour, sacks six, levy buyout twelve.
  * No private biography, inferred confession or new framework faculty is used here.
  */
+
+import { DAY, daylight, dayOfMinute, doyOf, HOUR, minuteOfDay, seasonOf, yearOf } from './calendar.ts';
 import {
   type Activity,
   type Affordance,
@@ -12,8 +14,7 @@ import {
   type Person,
   recall,
   type Suggestion,
-} from '@adam0white/human-framework';
-import { DAY, daylight, dayOfMinute, doyOf, HOUR, minuteOfDay, seasonOf, yearOf } from './calendar.ts';
+} from './hf.ts';
 import { householdLabel, KAHYA, personLabel } from './people.ts';
 import {
   give,
@@ -26,7 +27,7 @@ import {
   underSeal,
   type ValleyState,
 } from './valley.ts';
-export const PUBLIC_EDITION = 'valley-public-2026-10';
+export const PUBLIC_EDITION = 'valley-opening-2026-11';
 export const allianceEdition = (rules: unknown): boolean =>
   rules === ALLIANCE_EDITION || rules === PUBLIC_EDITION;
 export const dialogueEdition = (rules: unknown): boolean =>
@@ -39,8 +40,6 @@ export const rulesOf = (s: ValleyState): RulesEdition | undefined =>
 export const RULES_EDITION = 'valley-2026-10';
 export const PASS_EDITION = 'valley-pass-2026-10';
 export const ALLIANCE_EDITION = 'valley-alliance-2026-10';
-export const localEdition = (rules: unknown): boolean =>
-  rules === DIALOGUE_EDITION || rules === REPLY_EDITION || passEdition(rules);
 export const grainEdition = (rules: unknown): boolean => rules === RULES_EDITION || passEdition(rules);
 export const passEdition = (rules: unknown): boolean => rules === PASS_EDITION || allianceEdition(rules);
 export type RulesEdition =
@@ -50,8 +49,7 @@ export type RulesEdition =
   | typeof ALLIANCE_EDITION
   | typeof REPLY_EDITION
   | typeof DIALOGUE_EDITION;
-export const knownEdition = (rules: unknown): rules is RulesEdition =>
-  rules === RULES_EDITION || rules === DIALOGUE_EDITION || rules === REPLY_EDITION || passEdition(rules);
+export const knownEdition = (rules: unknown): rules is RulesEdition => rules === PUBLIC_EDITION;
 export type HearthTopic = 'person' | 'debt' | 'grievance';
 interface Request {
   id: string;

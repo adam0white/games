@@ -1,3 +1,13 @@
+# Opening episode — 2026-11-05
+
+Remaining: qualify the actual 07:00–13:00 episode, phone choice/ending/reload/export, exact source review and CI, merge, deployment and live verification. No release is claimed here. UPKEEP accepts engineering; the owner accepts feel.
+
+The owner’s 2026-11-05 instruction to fix or simplify supersedes the old requirement to retain the continuous three-year product. The new episode preserves the complete native cast, ordinary choices and all actual native history; it stops at 13:00 with no invented harvest or elders’ speech. Old saves are refused. The original day-12 and actual881-day gates remain unqualified historical evidence. An earlier current replay/control run passed14 tests in166.03s; the original long run did not qualify, and one process was stopped after42minutes without a result. That is the reason for this product simplification, not a passed performance claim.
+
+Expired follow-ups have these current dispositions (UPKEEP, next review 2026-11-12): physical-phone keyboard/enlarged-text and cold-player layout need actual device evidence; a local browser proxy does not close them. Production compact-notebook receipt remains open because no authorized real recording receipt was observed. Owner feel/F-491/F-492/F-465 acceptance remains open and unclaimed. F-1575 speech-gate/New-game, F-1576 Zehra-gate visibility and F-1294 notebook layout require a current-episode retest before closure. F-1162 storm-loss and midnight/cross-year steward-care tests are outside the six-hour episode and are deferred to a separately proposed longer edition; no weather or long-term care result is claimed. Ordinary positive contribution and broader household/dialogue/source-contract cases need genuine current native fixtures; synthetic controls do not close them. Retained-person admission stays closed wherever the exact released SDK contract cannot validate it. GD is retired; UPKEEP owns these dispositions.
+
+## Historical record below
+
 # The Valley: design
 
 **One line.** The agha lives in the city. You are his kahya, his steward in a valley of two hamlets, with his seal, his ledger and his granary, and no kin here. The last kahya left in the night. Three pages are cut from his ledger. The agha's due is fixed; the weather is not. Every household can say no.
@@ -754,3 +764,65 @@ The HF 4.10 candidate journal changes recurring writes, but does not make the te
 The coordinator stopped further tuning. Recheck Valley and Child on **2026-11-24**. The next proposed lever is a daily clock for people outside the player's view, with all faculties retained; its first measured keep/refuse experiment is dated **2026-11-03** in the HF roadmap. No actor, faculty, horizon or deadline was cut to claim success.
 
 The unmerged native-port and journal-storage candidate is preserved at `f23237582689945a0a50aeb811b524d8481d01de` plus the complete `~/code/.lab-scratch/stale-patches/valley-g7-perf.diff`, `.untracked.tar.gz`, `.bundle` and `.inventory.json`. G7's raw evidence and profiles remain under `~/code/.lab-scratch/codex/g7-perf-proof/`. This PR records the blocker on the current HF3 tree; it does not deploy the preserved port.
+
+
+## HF4.15.1 composition source — 2026-11-01
+
+The owner now directs every game onto4.x. The November24 performance recheck above
+preserves evidence; it does not freeze available engineering. The source candidate
+composes the preserved Run bridge on exact current main, including the later shared-write,
+family-receipt and completed-return fixes. This is not a delivered or runtime-qualified port.
+Notebook, all Zehra/context questions, weather reporting, recovery, cast boundaries and
+plain-wording work remain. Fields, reserves, wages, faith, difficulty and initial58people
+are unchanged. Normal construction uses only the complete public term; old game worlds
+refuse with keep-file/start-fresh wording. Retained-person admission is a separate public
+SDK/native-source route, not permission to load an old Valley world.
+
+Published4.15.1 provides public readRunHistory for pooled complete history. Lifecycle
+read caches use public current inspection instead of exporting the whole history just
+to read current kin metadata. Full native/game exports still retain complete source
+history. History pooling is representation, not semantic retention or a G16 proof.
+
+The existing public daily numerical policy is the ordinary host policy for every
+actor in one Run. It keeps the same faculties, clock and semantic boundaries. The
+published local estimate is1e-7, versus fine1e-12; it is not a global error bound.
+Different estimates can change needs/body values, choice timing and subsequent physical
+work, replies and world outcomes. There is no fine/daily gameplay switch, changed
+coefficient or claim that old trajectories remain equal. New exact fingerprints must
+come from actual4.15.1 runs. Seed406153184, all58openingpeople, original15inputs,
+day12minute17550/120000ms and actual881-day term stay unchanged.
+
+Hunches use public other-person preview with current explicit hypothetical work/rest
+offers and the observer's held evidence. The same authored work offer supplies real
+asks and the forecast; it does not read the target's true body/agenda/offers/RNG.
+The display states the current work/rest condition and unknown competing needs.
+Evidence confidence is not a probability of assent. Share-collection hunches state
+that the household's spare grain is unknown. This replaces the old next-waking-hour
+prediction and the old bridge's unavailable placeholder. Preview does not settle work.
+
+Remaining: actual runtime controls after root's grant; mandatory lane; current native
+and complete game replay/next input; original day12; actual881-day ending, history and
+semantic retention; independent exact review/CI/delivery; Adam's separate acceptance.
+No shorter checkpoint benchmark, worker, compressed manifest or version pin meets the
+original gates. Fine failures and partial journal evidence above remain literal.
+
+
+Semantic-memory preservation in this composition: the old bridge had replaced
+memory-selected visit/inspection/gathering lines with host-ledger substitutes.
+Current4.15.1 public host-current inspection supplies actual retained episodes.
+The adapter projects only their time units for existing narrative consumers.
+Current main's visit pools, strongest-deed selection, inspection testimony and
+elders' best/worst-memory wording are preserved through that public read. No
+private snapshot, guessed memory, history truncation or local memory model is added.
+A source control prepares a real attended observation and verifies narration does
+not change the complete native archive; it has not run during the Well window.
+
+
+Deferred — 2026-11-02; recheck2026-11-03: uninterrupted midnight steward care through
+its planned end remains unproved because the actual native Run reconsidered the accepted
+meal at1440, with zero food consumed, before its planned1460 end. The private UNAPPLIED,
+UNRUN component patch covers that interrupted meal and attendance only at accepted walk
+completion; it changes no production policy. The exact fixed public450 Samira positive
+is EXCLUDED by CastSession's existing1MiB complete-journal guard: its measured canonical
+UTF-8 journal is2,886,129 bytes. This is not an exclusion of other Valley futures or proof
+of positive whole-game binding/adoption. The original failed bodies remain private.

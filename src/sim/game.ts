@@ -2,7 +2,7 @@
  * The game around the valley: the player's inputs (each applied at an exact minute, so a run replays), the beats of
  * the term (who brings what, when), the ending at the elders' gathering, saves and the playtest export.
  */
-import { FRAMEWORK_VERSION, type Person, recall, restore, snapshot } from '@adam0white/human-framework';
+
 import { type AllianceChoice, allianceChoice } from './alliance.ts';
 import { type BrokerChoice, brokerChoice } from './brokering.ts';
 import { DAY, dateEnglish, dayOfMinute, doyOf, HOUR, yearOf } from './calendar.ts';
@@ -21,10 +21,11 @@ import {
   rulesOf,
   talkAtHearth,
 } from './edition.ts';
+import { FRAMEWORK_VERSION, frozenArchiveOf, type Person, recall, restore } from './hf.ts';
 import { introduce } from './introductions.ts';
 import { passChoice } from './pass.ts';
 import type { CastStart } from './passport.ts';
-import { householdLabel, KAHYA, personLabel } from './people.ts';
+import { KAHYA, personLabel } from './people.ts';
 import { mixSeed, strHash } from './rng.ts';
 import {
   activeHelpFor,
@@ -64,7 +65,7 @@ import {
 } from './valley.ts';
 import type { Saying } from './voices.ts';
 
-export const GAME_VERSION = '0.3.1';
+export const GAME_VERSION = '0.5.0';
 
 export type Input =
   | (TermsOrder & { at: number })
@@ -100,9 +101,9 @@ export function newGame(
   cast?: CastStart,
   preflight = false,
   plainEnglish = true,
-  rules?: RulesEdition,
+  rules: RulesEdition = PUBLIC_EDITION,
 ): Game {
-  if (rules !== undefined && !knownEdition(rules)) throw new Error('Unknown Valley rules edition.');
+  if (!knownEdition(rules)) throw new Error('Unknown Valley rules edition.');
   const valley = newValley(seed, cast, preflight, plainEnglish, rules);
   const g: Game = { valley, inputs: [], plainEnglish, ...(cast ? { cast: structuredClone(cast) } : {}) };
   beats(g);
@@ -114,6 +115,7 @@ export function newGame(
 export type Order = Input extends infer I ? (I extends Input ? Omit<I, 'at'> : never) : never;
 
 export function act(g: Game, input: Order): boolean {
+  if (g.valley.flags.ended) return false;
   const i = { ...input, at: g.valley.minute } as Input;
   const ok = apply(g, i);
   if (ok) g.inputs.push(i);
@@ -203,14 +205,6 @@ function apply(g: Game, i: Input): boolean {
     case 'visit': {
       const back = visit(s, i.house, i.why ?? 'call');
       if (back === undefined) return false;
-      const h = houseOf(s, i.house);
-      note(s, {
-        at: s.minute,
-        kind: 'visit',
-        text: `You walked down to ${h ? householdLabel(h) : 'the house'}${i.why === 'wedding' ? ' for the wedding' : i.why === 'death' ? ' to sit with them' : i.why === 'birth' ? ' to see the child' : ''}.`,
-        house: i.house,
-        weight: 0.6,
-      });
       return true;
     }
     case 'borrow':
@@ -223,6 +217,13 @@ function apply(g: Game, i: Input): boolean {
 
 /** The sim always moves in these steps, in play and in replay alike, so a run replays exactly. */
 export const QUANTUM = 30;
+export const EPISODE_START = 420;
+export const EPISODE_END = 780;
+export const validEpisodeMinute = (minute: number): boolean =>
+  Number.isSafeInteger(minute) &&
+  minute >= EPISODE_START &&
+  minute <= EPISODE_END &&
+  (minute - EPISODE_START) % QUANTUM === 0;
 
 /**
  * Live the game to minute `to` (rounded down to a quantum) in fixed quanta. With `replay`, logged inputs are applied
@@ -404,16 +405,17 @@ export function beats(g: Game) {
       weight: 3,
     });
   }
-  if (day >= END_DAY && !s.flags.ended) {
-    s.flags.ended = 'term';
+  if (s.minute >= EPISODE_END && !s.flags.ended) {
+    s.flags.ended = 'episode';
     note(s, {
       at: s.minute,
       kind: 'story',
-      text: 'The elders gathered at the residence, as they do at the end of a steward’s term.',
+      text: 'It is one in the afternoon. This opening episode ends here. The notebook keeps the requests, replies and work actually recorded this morning; it does not settle the harvest or the valley’s future.',
       weight: 3,
     });
   }
-  if (s.flags.ended && !s.flags.gathering) s.flags.gathering = readGathering(g);
+  if (s.flags.ended && s.flags.ended !== 'episode' && !s.flags.gathering)
+    s.flags.gathering = readGathering(g);
 }
 
 // ---------- the ending ----------
@@ -425,7 +427,7 @@ export interface ElderWord {
   words: string;
 }
 
-/** What the elders say at the gathering: each line drawn from that person's own memory of you. */
+/** Gathering lines use the host's recorded deeds and HF's current held voice trust. */
 export function gathering(g: Game): { elders: ElderWord[]; letter: string } {
   return g.valley.flags.gathering ?? readGathering(g);
 }
@@ -489,9 +491,6 @@ const COLD = [
   'I said what I thought at the well. I won’t say it twice.',
 ];
 
-const asYou = (summary: string) =>
-  summary.replace(/^(the )?kahya’s /i, 'when your ').replace(/^(the )?kahya /i, 'when you ');
-
 function pickLine(pool: string[], key: string, used: Set<string>): string {
   const start = (strHash(key) >>> 0) % pool.length;
   for (let k = 0; k < pool.length; k++) {
@@ -503,6 +502,9 @@ function pickLine(pool: string[], key: string, used: Set<string>): string {
   }
   return pool[start] ?? '';
 }
+
+const asYou = (summary: string) =>
+  summary.replace(/^(the )?kahya’s /i, 'when your ').replace(/^(the )?kahya /i, 'when you ');
 
 function readGathering(g: Game): { elders: ElderWord[]; letter: string } {
   const s = g.valley;
@@ -581,7 +583,8 @@ export interface SavedGame {
   /** Initial narration choice; omitted current-edition files use the fresh-game default. */
   plainEnglish?: boolean;
   castHeads?: Record<string, import('@adam0white/lab-client').PersonaEnvelope>;
-  castSources?: Record<string, { revision: string; person: Person }>;
+  castSources?: Record<string, { revision: string; person: import('./passport.ts').NativeCastSource }>;
+  castSourceRefs?: Record<string, { revision: string; actorId: string; fullHash: string }>;
   cast?: CastStart;
   game: 'valley';
   version: string;
@@ -599,21 +602,30 @@ export interface SavedGame {
 /** A notebook run is replayed from seed and inputs; downloads retain the full saved state. */
 export type CompactRun = Omit<SavedGame, 'state' | 'savedAt'>;
 
-/** A detached plain-JSON copy of the valley (people through HF `snapshot`). */
+/** The actor archive is authoritative. The host envelope stores only actor references. */
+function actorRef(p: Person): Person {
+  const sourceArchive = frozenArchiveOf(p);
+  return {
+    id: p.id,
+    name: p.name,
+    life: { bornAt: p.life.bornAt, sex: p.life.sex },
+    ...(sourceArchive ? { sourceArchive: structuredClone(sourceArchive) } : {}),
+  } as Person;
+}
 export function stateJson(s: ValleyState): ValleyState {
   syncCommunity(s);
-  const { people, kahya, ...rest } = s;
+  const { people, kahya, castReleased, castDeaths, ...rest } = s;
   return {
     ...structuredClone(rest),
-    people: people.map((p) => tidy(snapshot(p))),
-    kahya: tidy(snapshot(kahya)),
+    people: people.map(actorRef),
+    kahya: actorRef(kahya),
+    ...(castReleased
+      ? { castReleased: Object.fromEntries(Object.entries(castReleased).map(([id, p]) => [id, actorRef(p)])) }
+      : {}),
+    ...(castDeaths
+      ? { castDeaths: Object.fromEntries(Object.entries(castDeaths).map(([id, p]) => [id, actorRef(p)])) }
+      : {}),
   } as ValleyState;
-}
-
-/** HF `restore` drops an empty family record; drop it here too so a save and its restore print the same. */
-function tidy(p: Person): Person {
-  if (p.family && Object.keys(p.family).length === 0) delete p.family;
-  return p;
 }
 
 /** Reply-only state must never activate October mechanics under a reply receipt.
@@ -644,11 +656,16 @@ function validateReplyState(s: ValleyState): void {
   const keys = new Set<string>();
   for (const key of r.visits) {
     if (typeof key !== 'string') throw new Error('Invalid Valley reply visit.');
-    const match = /^([\p{L}\p{N}_-]{1,100}):(0|[1-9][0-9]*)(?::(?:finish|rain))?$/u.exec(key);
+    const match = /^([\p{L}\p{N}_-]{1,100}):((?:0|[1-9][0-9]*)(?:\.[0-9]+)?)(?::(?:finish|rain))?$/u.exec(
+      key,
+    );
     const at = match ? Number(match[2]) : NaN;
     if (
       !match ||
-      !Number.isSafeInteger(at) ||
+      !Number.isFinite(at) ||
+      !Number.isSafeInteger(Math.round(at * 60000)) ||
+      Math.abs(at * 60000 - Math.round(at * 60000)) >= 0.00001 ||
+      String(at) !== match[2] ||
       at < 0 ||
       at > s.minute ||
       !s.households.some((h) => h.id === match[1]) ||
@@ -660,6 +677,9 @@ function validateReplyState(s: ValleyState): void {
 }
 
 export function restoreState(json: ValleyState): ValleyState {
+  if (json.edition?.id !== PUBLIC_EDITION)
+    throw new Error('This run uses an older Valley edition. Export it for safekeeping and start fresh.');
+  if (!validEpisodeMinute(json.minute)) throw new Error('Invalid Valley episode minute.');
   validateTermsState(json);
   if (
     json.edition?.id === PUBLIC_EDITION &&
@@ -672,17 +692,29 @@ export function restoreState(json: ValleyState): ValleyState {
   validateDialogueState(json);
   const { people, kahya, ...rest } = json;
   resetCaches();
-  return {
+  if (!rest.community?.archive)
+    throw new Error('This run lacks its native HF archive. Keep the file and start fresh.');
+  const restored = {
     ...structuredClone(rest),
-    people: people.map((p) => restore(p)),
+    people: people.map(restore),
     kahya: restore(kahya),
   } as ValleyState;
+  restored.castReleased =
+    rest.castReleased &&
+    Object.fromEntries(Object.entries(rest.castReleased).map(([id, p]) => [id, restore(p)]));
+  restored.castDeaths =
+    rest.castDeaths && Object.fromEntries(Object.entries(rest.castDeaths).map(([id, p]) => [id, restore(p)]));
+  syncCommunity(restored);
+  return restored;
 }
 
 /** A short hash of the world truth and every person's state. */
 export function fingerprint(s: ValleyState): string {
+  return fingerprintState(stateJson(s));
+}
+function fingerprintState(state: ReturnType<typeof stateJson>): string {
   // Keys sorted: a restored person may hold the same fields in another order.
-  const json = JSON.stringify(stateJson(s), (_k, v) =>
+  const json = JSON.stringify(state, (_k, v) =>
     v && typeof v === 'object' && !Array.isArray(v)
       ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
       : v,
@@ -720,6 +752,7 @@ export const volumeLabel = (s: ValleyState, n: number) =>
   `Volume ${roman(n + 1)}, ${dateEnglish(dayOfMinute(s.minute))} of year ${['one', 'two', 'three', 'four'][yearOf(dayOfMinute(s.minute)) - 1] ?? yearOf(dayOfMinute(s.minute))}`;
 
 export function save(g: Game, n = 0): SavedGame {
+  const state = stateJson(g.valley);
   return {
     ...(g.cast ? { cast: structuredClone(g.cast) } : {}),
     ...(rulesOf(g.valley) ? { rules: rulesOf(g.valley) } : {}),
@@ -730,8 +763,8 @@ export function save(g: Game, n = 0): SavedGame {
     seed: g.valley.seed,
     minute: g.valley.minute,
     inputs: structuredClone(g.inputs),
-    state: stateJson(g.valley),
-    fingerprint: fingerprint(g.valley),
+    state,
+    fingerprint: fingerprintState(state),
     savedAt: new Date().toISOString(),
     label: volumeLabel(g.valley, n),
   };
@@ -743,6 +776,7 @@ export function compactRun(g: Game | SavedGame, n = 0): CompactRun {
     return {
       ...(g.cast ? { cast: structuredClone(g.cast) } : {}),
       ...(g.castHeads ? { castHeads: structuredClone(g.castHeads) } : {}),
+      ...(g.castSourceRefs ? { castSourceRefs: structuredClone(g.castSourceRefs) } : {}),
       ...(g.rules ? { rules: g.rules } : {}),
       game: g.game,
       version: g.version,
@@ -777,6 +811,18 @@ const exactKeys = (_key: string, value: unknown): unknown =>
 
 export function load(saved: SavedGame | CompactRun): Game {
   if (
+    saved.version !== GAME_VERSION ||
+    saved.framework !== FRAMEWORK_VERSION ||
+    saved.rules !== PUBLIC_EDITION
+  )
+    throw new Error('This run uses an older Valley edition. Export it for safekeeping and start fresh.');
+  if (
+    !validEpisodeMinute(saved.minute) ||
+    ('state' in saved && saved.state.minute !== saved.minute) ||
+    saved.inputs.some((i) => !validEpisodeMinute(i.at) || i.at >= EPISODE_END || i.at > saved.minute)
+  )
+    throw new Error('Invalid Valley episode horizon.');
+  if (
     saved.inputs.some(
       (i) => (i.verb === 'dialogue' || i.verb === 'dialogue-cancel') && !dialogueEdition(saved.rules),
     )
@@ -801,11 +847,9 @@ export function load(saved: SavedGame | CompactRun): Game {
       (saved.state.pass?.alliance && !allianceEdition(saved.rules)))
   )
     throw new Error('The saved alliance world does not match its edition.');
-  if (saved.version !== GAME_VERSION || saved.framework !== FRAMEWORK_VERSION)
-    throw new Error('This run uses an older Valley edition. Export it for safekeeping and start fresh.');
   if (saved.cast) newGame(saved.seed, saved.cast);
-  if ('state' in saved && saved.state.dialogue) {
-    validateDialogueState(saved.state);
+  if ('state' in saved) {
+    if (saved.state.dialogue) validateDialogueState(saved.state);
     const rebuilt = replay(
       saved.seed,
       structuredClone(saved.inputs),
@@ -814,11 +858,13 @@ export function load(saved: SavedGame | CompactRun): Game {
       saved.plainEnglish ?? true,
       saved.rules,
     );
+    const rebuiltState = stateJson(rebuilt.valley);
     if (
-      JSON.stringify(stateJson(rebuilt.valley), exactKeys) !== JSON.stringify(saved.state, exactKeys) ||
-      JSON.stringify(rebuilt.inputs) !== JSON.stringify(saved.inputs)
+      JSON.stringify(rebuiltState, exactKeys) !== JSON.stringify(saved.state, exactKeys) ||
+      JSON.stringify(rebuilt.inputs) !== JSON.stringify(saved.inputs) ||
+      fingerprintState(rebuiltState) !== saved.fingerprint
     )
-      throw new Error('Invalid Valley dialogue replay state.');
+      throw new Error('Invalid Valley complete replay state.');
   }
   if ('state' in saved)
     return {
@@ -853,8 +899,15 @@ export function replay(
   plainEnglish = true,
   rules?: RulesEdition,
 ): Game {
+  if (
+    !validEpisodeMinute(to) ||
+    inputs.some((i) => !validEpisodeMinute(i.at) || i.at >= EPISODE_END || i.at > to)
+  )
+    throw new Error('Invalid Valley episode horizon.');
   const g = newGame(seed, cast, false, plainEnglish, rules);
   step(g, to, inputs);
+  if (g.valley.minute !== to || JSON.stringify(g.inputs) !== JSON.stringify(inputs))
+    throw new Error('Invalid Valley episode input log.');
   return g;
 }
 
