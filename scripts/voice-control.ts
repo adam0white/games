@@ -28,7 +28,7 @@ try {
   const exported = JSON.parse(await readFile(file, 'utf8'));
   const { exportedAt: _date, ...saved } = exported;
   assert.ok(saved.state.answers.length > 0);
-  assert.equal(saved.framework, '4.10.0');
+  assert.equal(saved.framework, '4.17.0');
   assert.deepEqual(save(load(saved)), saved);
   const rebuilt = replay(
     saved.seed,

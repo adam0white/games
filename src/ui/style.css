@@ -1897,3 +1897,39 @@ body {
 #door-alarm-history p {
   overflow-wrap: anywhere;
 }
+
+/* The first guide points to the live tool and stone; it never changes the hill. */
+#first-guide:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.7rem;
+  align-items: center;
+  padding: 0.4rem;
+  background: #fff1c8;
+  color: #30230e;
+}
+#first-guide strong {
+  font-size: 1.1rem;
+}
+#first-guide button {
+  min-height: 44px;
+}
+.guide-highlight {
+  outline: 3px solid #b75e13;
+  outline-offset: 2px;
+}
+#guide-target:not([hidden]) {
+  position: absolute;
+  box-sizing: border-box;
+  border: 3px solid #e16916;
+  background: #ffca4044;
+  pointer-events: none;
+  z-index: 4;
+}
+/* Make room for person and menu sheets; the guide returns when they close. */
+.game:has(#card:not([hidden])) #first-guide,
+.game:has(#drawer:not([hidden])) #first-guide,
+.game:has(#cell-detail:not([hidden])) #first-guide,
+.game:has(#furnish-picker:not([hidden])) #first-guide {
+  display: none;
+}

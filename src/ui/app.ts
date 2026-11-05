@@ -100,6 +100,7 @@ import {
   sleepingRoomWords,
 } from './shelter.ts';
 import * as store from './store.ts';
+import { advanceGuide, type GuideStep } from './tutorial.ts';
 import { activityWords, displayWords, settingWords, speechWords } from './words.ts';
 import {
   journalView,
@@ -135,6 +136,8 @@ function replaceGame(game: Game, expected = ++generation): boolean {
   return true;
 }
 let tool: Tool = 'look';
+let guide: GuideStep = 'done';
+let guideCell: number | null = null;
 let readUntil = 0;
 let disp = 0;
 let last = 0;
@@ -326,6 +329,7 @@ function title(sv: (Saved & { savedAt?: number }) | null, at: number) {
       const elapsed = Number.isFinite(stamp) && stamp > 0 ? Math.max(0, Math.floor(Date.now() - stamp)) : 0;
       catchUp(prepared, elapsed);
       speedIx = 1;
+      startGuideIfUnseen();
       enter();
       if (prepared.s.next?.away) {
         showReading('While you were away', awayWords(prepared.s));
@@ -415,6 +419,7 @@ async function beginNewHill(errorHost?: HTMLElement): Promise<boolean> {
     return false;
   }
   speedIx = 0;
+  startGuideIfUnseen();
   seenHint.clear();
   enter();
   return true;
@@ -461,7 +466,7 @@ function enter() {
     <div class="state-strip"><div class="state-drawing"><button id="shelter-check" aria-label="The village"></button><span id="stock"></span><span id="bell-state" aria-label="Bell quiet">🔔</span></div>
     <div class="pace"><span id="clock-rate"></span><div class="speed" role="group" aria-label="Speed">${SPEEDS.map((_, k) => `<button data-speed="${k}">${SPEED_NAMES[k]}</button>`).join('')}</div></div></div>
     <div class="goal-slot"><button class="goal" id="goal" aria-label="Current work and help"></button><div class="goal" id="raid-warning" hidden></div></div>
-    <div class="scene lk-scene" id="scene"><canvas id="cv" tabindex="0" aria-label="The hill"></canvas>
+    <div class="scene lk-scene" id="scene"><canvas id="cv" tabindex="0" aria-label="The hill"></canvas><span id="guide-target" hidden aria-hidden="true"></span>
       <div class="view-controls" role="group" aria-label="Hill view"><button id="zoom-in" aria-label="Zoom in">+</button><button id="zoom-out" aria-label="Zoom out">−</button><button id="fit-hill" aria-label="Fit hill">⤢</button></div>
       <div class="lag soft" id="lag" hidden>The game is running as fast as this device allows.</div>
     </div>
@@ -472,7 +477,7 @@ function enter() {
       <div id="journal-tail"></div>
     </div>
     <div class="reading-actions"><button id="last-reading"><span id="event-sentence" aria-live="polite">${FIRST_CHALK}</span> ▸</button><button id="completed-work" hidden>Inspect completed digging ▸</button><button class="ticker" id="ticker">Journal ▸</button></div>
-    <div class="lk-commit" id="hill-controls"><div class="tools" role="toolbar" aria-label="Tools">
+    <div class="lk-commit" id="hill-controls"><div id="first-guide" hidden></div><div class="tools" role="toolbar" aria-label="Tools">
       ${toolBtn('look', 'look', '◎')}${toolBtn('chalk', 'chalk', '□')}${toolBtn('erase', 'rub out', '⌫')}
       <button id="furnish" aria-expanded="false">furnish ▾</button><button class="bell" id="bell" title="Call people below. False alarms can weaken trust." aria-label="Bell. Call people below. False alarms can weaken trust.">bell</button></div>
       <div id="furnish-picker" hidden>${(['store', 'beds', 'lamp', 'door'] as const).map((t) => `<button data-tool="${t}">${t}<small>${{ store: 'Mark open ground for grain jars.', beds: 'Mark open ground for sleeping.', lamp: 'Hang a lamp over open ground.', door: 'Use a passage one square wide, open on two opposite sides.' }[t]}</small></button>`).join('')}</div>
@@ -586,6 +591,7 @@ function enter() {
     focusCell = null;
     Object.assign(view, baseView(g.s, view.w, view.h));
     clampView();
+    renderGuide();
   });
   document.getElementById('cellx')?.addEventListener('click', () => {
     if (g?.s.next?.attention) {
@@ -667,11 +673,68 @@ function enter() {
   const guidance = stageRoot.querySelector<HTMLElement>(':scope > .goal-slot');
   if (guidance) sceneObserver.observe(guidance);
   syncButtons();
+  renderGuide();
   chrome();
   last = performance.now();
   cancelAnimationFrame(raf);
   raf = requestAnimationFrame(frame);
   requestWake();
+}
+
+function startGuideIfUnseen() {
+  try {
+    guide = localStorage.getItem('warren.guide.seen') ? 'done' : 'tool';
+  } catch {
+    guide = 'tool';
+  }
+}
+
+function renderGuide() {
+  const box = document.getElementById('first-guide');
+  if (!box || !g) return;
+  box.hidden = guide === 'done';
+  guideCell = null;
+  document.querySelector('[data-tool="chalk"]')?.classList.toggle('guide-highlight', guide === 'tool');
+  if (guide === 'done') {
+    positionGuide();
+    return;
+  }
+  if (guide === 'mark') {
+    const h = g.s.hill;
+    guideCell = h.kind.findIndex(
+      (kind, c) =>
+        yOf(c) > SURF &&
+        xOf(c) < THEIR_X &&
+        diggable(kind) &&
+        !h.chalk[c] &&
+        neighbours(c).some((n) => h.kind[n] === K.open),
+    );
+    if (guideCell < 0) guideCell = null;
+  }
+  box.innerHTML = `<strong>${guide === 'tool' ? 'Choose chalk' : guide === 'mark' ? (guideCell === null ? 'No open edge to mark' : xOf(guideCell) < view.x || xOf(guideCell) + 1 > view.x + view.w / view.cs || yOf(guideCell) < view.y || yOf(guideCell) + 1 > view.y + view.h / view.cs ? 'Choose Fit hill to see the stone' : 'Tap the outlined stone') : 'Chalk marked'}</strong><span>${guide === 'tool' ? 'Make a refuge. Riders can kill people caught outside.' : guide === 'mark' ? 'This plans digging; people choose when to work.' : 'The dashed mark is a plan. People may dig it when they are able.'}</span>${guide === 'result' ? '<button id="guide-done">Continue</button>' : ''}<button id="guide-skip">Skip first steps</button>`;
+  const finish = () => {
+    guide = 'done';
+    try {
+      if (!g?.fileOrigin) localStorage.setItem('warren.guide.seen', '1');
+    } catch {}
+    renderGuide();
+  };
+  box.querySelector('#guide-skip')?.addEventListener('click', finish);
+  box.querySelector('#guide-done')?.addEventListener('click', finish);
+  positionGuide();
+}
+function positionGuide() {
+  const marker = document.getElementById('guide-target');
+  if (!marker) return;
+  if (guide !== 'mark' || guideCell === null) {
+    marker.hidden = true;
+    return;
+  }
+  marker.hidden = false;
+  marker.style.left = `${(canvas?.offsetLeft ?? 0) + (xOf(guideCell) - view.x) * view.cs}px`;
+  marker.style.top = `${(canvas?.offsetTop ?? 0) + (yOf(guideCell) - view.y) * view.cs}px`;
+  marker.style.width = `${view.cs}px`;
+  marker.style.height = `${view.cs}px`;
 }
 
 function toolBtn(t: Tool, label: string, glyph: string) {
@@ -723,7 +786,10 @@ function setTool(t: Tool) {
   document.getElementById('furnish')?.setAttribute('aria-expanded', 'false');
   focusCell = null;
   tool = t;
+  if (t === 'chalk') guide = advanceGuide(guide, 'chalk');
+  else if (guide === 'mark') guide = 'tool';
   syncButtons();
+  renderGuide();
   const hints: Partial<Record<Tool, string>> = {
     chalk: 'A dashed outline marks where people can dig. Each person chooses when to work.',
     erase: 'Drag to erase chalk marks or room markings.',
@@ -928,6 +994,7 @@ function frame(now: number) {
   paint.t = Math.min(disp, s.minute + QUANTUM);
   // The working view moves only through view controls, gestures or explicit person selection.
   draw(ctx, s, view, ink, paint);
+  positionGuide();
   if (Math.floor(now / 250) !== Math.floor((now - dt) / 250)) chrome();
   if (dirty && !g?.fileOrigin && !checkpointPending && now - lastSaved > 30000) automaticCheckpoint();
 }
@@ -1602,6 +1669,10 @@ function commitPaint(entranceConfirmed = false) {
     }
     const accepted = order({ verb: 'chalk', cells, on: true });
     if (accepted) {
+      if (cells.some((c, i) => !beforeChalk[i] && h.chalk[c])) {
+        guide = advanceGuide(guide, 'mark');
+        renderGuide();
+      }
       const reading = planSafety(g.s, cells, 'chalk');
       const ack = chalkFeedback(
         accepted,
@@ -2033,7 +2104,7 @@ function closeBook() {
 }
 
 function menuRows() {
-  return `<p>The game is paused while the menu is open.</p><p>Pace: ${SPEED_NAMES[speedIx]}</p><div class="menu-rows"><button id="send">Feedback</button><button id="fullscreen">Full screen</button><a href="/file/" target="_blank" rel="noopener">Open a saved hill</a><button id="download-run" ${g ? '' : 'disabled'}>Download this run</button><a target="_top" href="https://human.adamwhite.work/games/">All games</a>${g?.fileOrigin ? '<a href="/">Return to your hill</a>' : '<button id="to-title">New game</button>'}</div><div id="menu-new-confirm" hidden><p>Starting a new game replaces this saved hill.</p><button id="menu-new-yes">Start new game</button><button id="menu-new-no">Cancel</button></div><a class="shelf-link" href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noopener">People across games</a><div class="menu-footer"><label><input id="record-play" type="checkbox" ${lab.telemetryOn ? 'checked' : ''}> Recording</label><a href="https://human.adamwhite.work/lab/privacy/" target="_blank" rel="noopener">Lab privacy</a><details class="game-debug"><summary>Debug</summary><p>The Warren ${GAME_VERSION} · HF ${FRAMEWORK_VERSION}</p><div>${continuity.controls()}</div>${g?.s.next?.discussion ? `<details id="cut-discussion-debug"><summary>Loose-cut encounter receipts</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify({ current: g.s.next.discussion, earlier: g.s.cutDiscussionHistory ?? [] }, null, 2))}</pre></details>` : ''}${g?.s.bellAmends ? `<details id="bell-amends-debug"><summary>False bell apology receipts</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(g.s.bellAmends, null, 2))}</pre></details>` : ''}${g?.s.tariqTrial ? `<details id="tariq-trial-debug"><summary>Boat trial receipts</summary><p>Warren supplies this prospective dry balance fixture. Person choices and observation remain separate.</p><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(g.s.tariqTrial, null, 2))}</pre></details>` : ''}${g?.s.newcomerExchanges?.length ? `<details id="newcomer-debug"><summary>Newcomer exchange receipts</summary><p>Scripted dialogue is authored by Warren after completed work. Decision narration is HF output. The keeper is a player office; no HF listener or hearing is claimed.</p><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(g.s.newcomerExchanges, null, 2))}</pre></details>` : ''}</details></div><button class="primary" id="resume">Resume</button>`;
+  return `<p>The game is paused while the menu is open.</p><p>Pace: ${SPEED_NAMES[speedIx]}</p><div class="menu-rows"><button id="replay-guide" ${g ? '' : 'disabled'}>Replay first steps</button><button id="send">Feedback</button><button id="fullscreen">Full screen</button><a href="/file/" target="_blank" rel="noopener">Open a saved hill</a><button id="download-run" ${g ? '' : 'disabled'}>Download this run</button><a target="_top" href="https://human.adamwhite.work/games/">All games</a>${g?.fileOrigin ? '<a href="/">Return to your hill</a>' : '<button id="to-title">New game</button>'}</div><div id="menu-new-confirm" hidden><p>Starting a new game replaces this saved hill.</p><button id="menu-new-yes">Start new game</button><button id="menu-new-no">Cancel</button></div><a class="shelf-link" href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noopener">People across games</a><div class="menu-footer"><label><input id="record-play" type="checkbox" ${lab.telemetryOn ? 'checked' : ''}> Recording</label><a href="https://human.adamwhite.work/lab/privacy/" target="_blank" rel="noopener">Lab privacy</a><details class="game-debug"><summary>Debug</summary><p>The Warren ${GAME_VERSION} · HF ${FRAMEWORK_VERSION}</p><div>${continuity.controls()}</div>${g?.s.next?.discussion ? `<details id="cut-discussion-debug"><summary>Loose-cut encounter receipts</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify({ current: g.s.next.discussion, earlier: g.s.cutDiscussionHistory ?? [] }, null, 2))}</pre></details>` : ''}${g?.s.bellAmends ? `<details id="bell-amends-debug"><summary>False bell apology receipts</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(g.s.bellAmends, null, 2))}</pre></details>` : ''}${g?.s.tariqTrial ? `<details id="tariq-trial-debug"><summary>Boat trial receipts</summary><p>Warren supplies this prospective dry balance fixture. Person choices and observation remain separate.</p><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(g.s.tariqTrial, null, 2))}</pre></details>` : ''}${g?.s.newcomerExchanges?.length ? `<details id="newcomer-debug"><summary>Newcomer exchange receipts</summary><p>Scripted dialogue is authored by Warren after completed work. Decision narration is HF output. The keeper is a player office; no HF listener or hearing is claimed.</p><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(g.s.newcomerExchanges, null, 2))}</pre></details>` : ''}</details></div><button class="primary" id="resume">Resume</button>`;
 }
 let feedbackCleanup: (() => void) | undefined;
 function showFeedback(host: HTMLElement, onBack: () => void) {
@@ -2067,6 +2138,12 @@ function bindMenu(host: HTMLElement, close: () => void) {
     }
   };
 
+  host.querySelector('#replay-guide')?.addEventListener('click', () => {
+    guide = 'tool';
+    setTool('look');
+    close();
+    renderGuide();
+  });
   host.querySelector('#download-run')?.addEventListener('click', download);
   continuity.bind(host);
   host.querySelector('#resume')?.addEventListener('click', close);

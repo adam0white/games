@@ -51,7 +51,7 @@ Package version, rules edition and engine version have different meanings. `pack
 
 ## Development
 
-Use the shared Node 26.12.0 and pnpm 12.14.0. Put `/opt/homebrew/bin` first in PATH. In fish:
+Use the shared Node 26.12.0 and pnpm 12.16.1. Put `/opt/homebrew/bin` first in PATH. In fish:
 
 ```fish
 set -gx PATH /opt/homebrew/bin $PATH

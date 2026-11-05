@@ -23,7 +23,7 @@ import {
 import frameworkPackage from '@adam0white/human-framework/package.json' with { type: 'json' };
 import { castNorms } from './cast-norms.ts';
 import { H, W } from './grid.ts';
-import { phrasebookFor, replyReason } from './voice.ts';
+import { phrasebookFor } from './voice.ts';
 import type { WarrenState } from './warren.ts';
 export const FRAMEWORK_VERSION = frameworkPackage.version;
 /** Diagnostic timings for each actual public step call; excludes host work and archive export. */
@@ -717,16 +717,13 @@ export function heard(p: Person, text: string, at: number): boolean {
       e.data.attention > 0,
   );
 }
-/** Use the actual suggestion event, never a decision motive or a raw reason code.
- * HF records the selected phrase variant; the matching reason uses that same choice.
+/** Use HF's recorded suggestion narration, including its reason, and the actual decision.
  * Rendering adds no RNG draw and cannot change HF's verdict. */
 export function residentReply(p: Person, event: VisibleEvent): string {
   if (event.data.kind !== 'suggestion-resolved') return '';
   if (['dead', 'asleep'].includes(event.data.resolution.reason)) return '';
   const line = event.narration[0];
   if (!line) return '';
-  const index = Number(line.variantId.split(':').at(-1));
-  const reason = replyReason(p.id, event.data.resolution.reason, Number.isInteger(index) ? index : 0);
   const decisionId = event.data.decisionId;
   const decision = p.events.find((e) => e.data.kind === 'decision' && e.data.decision.id === decisionId);
   const verdict = event.data.resolution.verdict;
@@ -734,7 +731,7 @@ export function residentReply(p: Person, event: VisibleEvent): string {
     verdict === 'deferred' || verdict === 'modified'
       ? (decision?.narration.map((l) => l.text).join(' ') ?? '')
       : '';
-  return [line.text, reason, alternative].filter(Boolean).join(' ');
+  return [line.text, alternative].filter(Boolean).join(' ');
 }
 function decisionAt(p: Person, offer: Affordance): DecisionRecord {
   const e = p.events.findLast(

@@ -102,6 +102,7 @@ for (const delay of ['compression', 'open']) {
       SAVE_KEY: 'hill',
       seenHint: new Set(),
       enter() {},
+      startGuideIfUnseen() {},
       startError(error: unknown) {
         throw error;
       },
