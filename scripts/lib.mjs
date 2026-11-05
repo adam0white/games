@@ -2,10 +2,19 @@ const sha = /^[0-9a-f]{40}$/;
 export function validateRegistry(registry) {
   if (!registry || !/^\d+\.\d+\.\d+$/.test(registry.hfVersion) || !Array.isArray(registry.games)) throw new Error('Invalid registry');
   const seen = new Set();
+  const origins = new Set();
   for (const game of registry.games) {
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(game.slug) || seen.has(game.slug)) throw new Error('Invalid or duplicate slug');
     if (!/^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(game.source?.repository ?? '') || !sha.test(game.source?.commit ?? '')) throw new Error('Invalid source lineage');
     if (!game.saveSchema || typeof game.saveSchema !== 'string') throw new Error('Missing save schema');
+    if (game.redirectEnabled !== undefined && typeof game.redirectEnabled !== 'boolean') throw new Error('Invalid redirect flag');
+    if (game.redirectEnabled === true) throw new Error('Redirect activation requires a verified live release and ancestry preflight');
+    if (game.legacyOrigin !== undefined) {
+      let origin;
+      try { origin = new URL(game.legacyOrigin); } catch { throw new Error('Invalid legacy origin'); }
+      if (origin.protocol !== 'https:' || origin.origin !== game.legacyOrigin || origin.origin === 'https://play.adamwhite.work' || origins.has(origin.origin)) throw new Error('Invalid or duplicate legacy origin');
+      origins.add(origin.origin);
+    }
     seen.add(game.slug);
   }
   return registry;
