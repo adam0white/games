@@ -2,12 +2,19 @@
   "name": "games",
   "private": true,
   "type": "module",
-  "engines": { "node": "26.12.0" },
+  "engines": {
+    "node": "26.12.0"
+  },
   "packageManager": "pnpm@12.14.0",
   "scripts": {
     "test": "node --test scripts/*.test.mjs",
     "check:lane": "node --test scripts/*.test.mjs",
     "build": "node scripts/build.mjs",
-    "deploy": "node scripts/deploy.mjs"
+    "deploy": "node scripts/deploy.mjs",
+    "deploy:worker": "wrangler deploy",
+    "deploy:check": "wrangler deploy --dry-run"
+  },
+  "devDependencies": {
+    "wrangler": "4.152.0"
   }
 }

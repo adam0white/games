@@ -6,5 +6,5 @@ if (!base) throw new Error('Base commit required');
 const paths = run('git', ['diff', '--name-only', base, 'HEAD']).split('\n').filter(Boolean);
 const games = affectedGames(registry, paths);
 const matrix = JSON.stringify(games);
-if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `games=${matrix}\ncount=${games.length}\n`);
+if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `games=${matrix}\ncount=${games.length}\ntotal=${registry.games.length}\n`);
 else console.log(matrix);
