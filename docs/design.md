@@ -46,6 +46,19 @@ First test one moving companion and Sevim's refusal before expanding the run. Br
 
 ## Deferred
 
+Current follow-up checkpoint (2026-11-05): **2026-11-12** replaces expired November 3 review targets below. Recheck unresolved input/clarity causes against current source, and keep actual owner or device acceptance separate from automated delivery. Larger content, sound, movement or difficulty changes need their own authored comparison; cross-game continuation remains outside this upkeep scope. Future targets and historical fixed-result records remain unchanged.
+
+Current item dispositions (owner upkeep, 2026-11-05; prior rows below remain historical):
+
+| Item | Checkpoint or disposition | Reason |
+| --- | --- | --- |
+| F-2377/F-2389 neighbour button names | 2026-11-12 | Reproduce the accessible-name change while aiming on current HF4 before changing stable labels; prior tool latency does not establish a pointer defect. |
+| Refusal readability | 2026-11-12 | Compare the current short refusal and available responses after the port; automated wording checks do not establish human comprehension. |
+| Six-minute run and sound | 2026-11-12 | The current three-minute persuasion loop must remain readable first; a longer hazard curve and sound need an authored comparison. |
+| Carrying a downed person | 2026-11-12 | Specify consent, physical effort and rescue consequences before adding a carrying mechanic. |
+| Cross-game continuation | 2026-11-12 | Review the separately required receiving-stage contract; implementation is outside this upkeep and remains absent. |
+| HF fast response | 2026-11-12 | Bind a measured current-HF response trace before proposing a framework change; no local substitute is introduced. |
+
 - 2026-11-10: preferences from the first LIGHT panel, not mechanism faults: faster walk, longer clock, richer death narration, per-person numeric clocks, an empty Feedback draft with an extra Back button, hiding key letters on the phone. Walk speed, clock and difficulty change only after a separate C14 human-speed comparison.
 - 2026-11-10: whether "Show the stair" should unlock the instant a neighbour says she is ready (unproved), and one-tap approach (selection stays two-step; no automatic compliance).
 - 2026-11-03: source/input clarification of stable neighbour button names while aiming, asked by Jonas (F-2377) and Marta (F-2389); stale accessible names and tool latency stay qualified, not a broken-pointer claim. Needs source/input clarification before any change.
