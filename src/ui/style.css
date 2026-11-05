@@ -1622,3 +1622,33 @@ input[type="text"],
     line-clamp: 2;
   }
 }
+
+.tutorial-target {
+  outline: 3px solid #e9b43d;
+  outline-offset: 2px;
+}
+.tutorial-cue {
+  position: fixed;
+  z-index: 30;
+  top: 3.5rem;
+  left: 0.5rem;
+  right: 0.5rem;
+  box-sizing: border-box;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.4rem;
+  background: #fff0bd;
+  color: #241b0c;
+  border: 2px solid #886000;
+  border-radius: 0.35rem;
+  font-size: 0.9rem;
+  white-space: normal;
+}
+.tutorial-cue span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tutorial-cue button {
+  flex: none;
+}
