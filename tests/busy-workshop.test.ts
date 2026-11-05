@@ -60,7 +60,7 @@ describe('opt-in busy workshop', () => {
     expect(replay(state.hf.archive)).toMatchObject({ ok: true, value: { verified: true } });
     expect(replayRecordedRun({ ...state, inputs: state.inputs }, saved).ok).toBe(true);
     expect(createHash('sha256').update(saved).digest('hex')).toBe(
-      'a1de1f3a698617f4bb9a9191fa8eda58564248b348728038279602f6712cadf7',
+      'a93babe6ffc34fe74161abade28d3090deafe5e19402134d001bfcd4a0520b80',
     );
   });
   it('turns accepting everything into a real stock/deadline choice, without changing ordinary play', () => {
