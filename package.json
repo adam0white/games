@@ -22,7 +22,8 @@
     "check:lane": "npm run lint && npm run typecheck",
     "knip": "knip",
     "build:garden-replay": "node scripts/build-garden-replay.ts",
-    "test:garden-replay-consumer": "node scripts/test-garden-replay-consumer.ts"
+    "test:garden-replay-consumer": "node scripts/test-garden-replay-consumer.ts",
+    "test:first-minute": "node test/browser/first-minute.mjs"
   },
   "dependencies": {
     "@adam0white/human-framework": "4.17.0",
