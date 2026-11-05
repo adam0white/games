@@ -10,7 +10,7 @@ for (const viewport of [
     test.use({ viewport });
 
     test('first minute uses only controls to change the real staffing plan', async ({ page }) => {
-      await page.goto('/');
+      await page.goto('/?lab=1');
       await page.locator('#new').click();
       await expect(page.locator('[data-tutorial-step="plan"]')).toBeVisible();
       await page.locator('.board-change').first().click();
@@ -34,6 +34,12 @@ for (const viewport of [
       await page.locator('[data-pick]').first().click();
       await page.locator('[data-v]:not([disabled])').first().click();
       await expect(page.locator('[data-tutorial-step="result"]')).toBeVisible();
+      await page.evaluate(() => {
+        const game = (window as unknown as { __pass: { state: { till: number }; draw(): void } }).__pass;
+        game.state.till = 321;
+        game.draw();
+      });
+      await expect(page.locator('.tutorial-stakes meter')).toHaveAttribute('value', '321');
       await page.locator('#close').click();
       await expect(page.locator('[data-tutorial-step="result"]')).toBeVisible();
       await expect(page.locator('[data-tutorial-finish]')).toHaveCount(0);
@@ -44,6 +50,40 @@ for (const viewport of [
       await expect(page.locator('[data-tutorial-step="crew"]')).toBeVisible();
       await page.locator('[data-tutorial-skip]').click();
       await expect(page.locator('[data-tutorial-step]')).toHaveCount(0);
+    });
+
+    test('menu replay keeps an unsubmitted plan and opening directly still teaches service', async ({
+      page,
+    }) => {
+      await page.goto('/');
+      await page.locator('#new').click();
+      await page.locator('.board-change').first().click();
+      await page.locator('[data-field="station"][data-value="cold"]').click();
+      await page.locator('[data-field="break"][aria-pressed="false"]').first().click();
+      const chosenBreak = await page
+        .locator('[data-field="break"][aria-pressed="true"]')
+        .getAttribute('data-value');
+      await page.locator('#board-done').click();
+      await expect(page.locator('#ask-board')).toBeVisible();
+      await page.locator('#game-menu').click();
+      await page.locator('#menu-tutorial').click();
+      await expect(page.locator('#ask-board')).toBeVisible();
+      await page.locator('.board-change').first().click();
+      await expect(page.locator('[data-field="station"][data-value="cold"]')).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      await expect(page.locator(`[data-field="break"][data-value="${chosenBreak}"]`)).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      await page.locator('#board-done').click();
+      await page.locator('#ask-board').click();
+      await page.locator('#game-menu').click();
+      await page.locator('#menu-tutorial').click();
+      await page.locator('#open-service').click();
+      await expect(page.locator('[data-tutorial-step="crew"]')).toBeVisible();
+      await page.locator('[data-tutorial-skip]').click();
     });
 
     test('practice replay before starting and after dismissing an editor stays visible and skippable', async ({

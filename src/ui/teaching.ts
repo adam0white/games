@@ -19,8 +19,14 @@ let replyReady: (() => boolean) | null = null;
 let bill = 5200;
 let earned = 0;
 export function teachingBill(due: number, till: number) {
+  const changed = bill !== due || earned !== till;
   bill = due;
   earned = till;
+  const picture = document.querySelector('.tutorial-stakes');
+  if (changed && picture) picture.innerHTML = stakesPicture();
+}
+function stakesPicture() {
+  return `<div>🥗 → 🍽 → ₺ → 📅 Saturday</div><meter min="0" max="${Math.max(1, bill)}" value="${Math.max(0, earned)}" aria-label="Money toward the bill"></meter> <b>₺${earned} / ₺${bill}</b><div>⚠ ₺ &lt; ₺${bill} → 🔒 Kitchen closes</div>`;
 }
 const cues: Record<Step, [string, string]> = {
   continue: [
@@ -91,6 +97,11 @@ export function mountTeaching(plan = latestPlan) {
     node.classList.remove('teaching-target');
   });
   if (!step) return;
+  if (
+    document.querySelector('.people-service') &&
+    ['plan', 'station', 'break', 'cover', 'done', 'ask-plan', 'open', 'continue'].includes(step)
+  )
+    step = 'crew';
   if (step === 'continue' && document.querySelector('.board-change')) step = 'plan';
   if (step === 'continue' && document.querySelector('[data-pick]')) step = 'crew';
   if (['station', 'break', 'cover', 'done'].includes(step) && !document.querySelector('.board-editor'))
@@ -119,7 +130,7 @@ export function mountTeaching(plan = latestPlan) {
   if (['plan', 'open', 'result'].includes(step)) {
     const stakes = document.createElement('div');
     stakes.className = 'tutorial-stakes';
-    stakes.innerHTML = `<div>🥗 → 🍽 → ₺ → 📅 Saturday</div><meter min="0" max="${Math.max(1, bill)}" value="${Math.max(0, earned)}" aria-label="Money toward the bill"></meter> <b>₺${earned} / ₺${bill}</b><div>⚠ ₺ &lt; ₺${bill} → 🔒 Kitchen closes</div>`;
+    stakes.innerHTML = stakesPicture();
     cue.append(stakes);
   }
   if (['break', 'cover', 'done'].includes(step) && plan) {

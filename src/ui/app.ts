@@ -449,7 +449,7 @@ function openGameMenu() {
   dialog.querySelector('#menu-tutorial')?.addEventListener('click', () => {
     dialog.close();
     beginTeaching(s?.phase ?? 'title', true);
-    enter();
+    if (s) teachingBill(billNow(s), s.till);
     mountTeaching();
   });
   dialog.querySelector('#menu-new')?.addEventListener('click', () => {
@@ -1002,6 +1002,7 @@ function enter() {
   else if (s.phase === 'sunday') sunday();
   else if (s.phase === 'end') ending();
   else evening();
+  teachingBill(billNow(s), s.till);
   mountTeaching();
 }
 
@@ -1600,6 +1601,7 @@ function drawAll(force = false) {
   drawScene();
   drawCaption();
   drawSheet();
+  teachingBill(billNow(s), s.till);
   refreshTeaching();
 }
 
