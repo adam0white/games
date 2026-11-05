@@ -24,4 +24,6 @@ Each item remains open. Recheck on **2026-11-12** after the current HF4 and open
 - **F-2644:** A player must judge whether the talk-availability explanation is sufficient. Recheck 2026-11-12.
 - **F-2645:** A player must judge lunch pacing and conversational variety. Recheck 2026-11-12.
 
+- **Readiness and later fortnight:** Owner play is needed to assess the complete later fortnight; bounded automated controls do not establish feel. Recheck 2026-11-12.
+
 Owner readiness and player acceptance remain with their respective owners; a checkpoint does not substitute for either.
