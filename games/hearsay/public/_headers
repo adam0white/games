@@ -1,2 +1,2 @@
-/*
-  Content-Security-Policy: frame-src https://human.adamwhite.work
+/hearsay/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://cloudflareinsights.com https://human.adamwhite.work; frame-src https://human.adamwhite.work; object-src 'none'; base-uri 'self'; form-action 'self'

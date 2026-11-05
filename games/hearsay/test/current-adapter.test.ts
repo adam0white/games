@@ -23,7 +23,7 @@ it('controls the current garden through an offered action and replays its comple
   expect(current.minute).toBeGreaterThan(360);
   const full = adapter.export();
   expect(full).toEqual(exportGarden(current));
-  expect(full.state.engine?.archive.engine.package).toBe('@adam0white/human-framework@4.12.0');
+  expect(full.state.engine?.archive.engine.package).toBe('@adam0white/human-framework@4.17.0');
   const restored = importGarden(JSON.stringify(full));
   expect(exportGarden(restored)).toEqual(full);
   advanceGarden(current, current.minute + 5);

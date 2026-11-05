@@ -2,8 +2,9 @@
  * the actual lunch. This module grants no discoveries or completed private
  * outcomes. Selection uses only the pinned run and its attended answer history.
  */
-import type { GardenRun } from './garden.ts';
+
 import type { GardenPerson } from './garden-cast.ts';
+import type { GardenRun } from './garden4.ts';
 export interface GardenConfig {
   dialogue: 'garden-talk/1';
 }

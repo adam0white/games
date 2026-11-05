@@ -16,5 +16,5 @@
     "types": ["node", "vite/client"]
   },
   "include": ["src", "test", "scripts", "vite.config.ts"],
-  "exclude": ["scripts/playtester"]
+  "exclude": ["scripts/playtester", "archive"]
 }

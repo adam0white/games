@@ -2,7 +2,7 @@
 import { feedbackPersonaControl, feedbackSharePlay } from '@adam0white/lab-kit';
 import { lab } from './lab';
 
-const NAME_KEY = 'hf-lab-feedback-name';
+const NAME_KEY = 'mono-hearsay-feedback-name';
 function stored(key: string): string {
   try {
     return localStorage.getItem(key) ?? '';

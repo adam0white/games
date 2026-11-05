@@ -10,7 +10,8 @@
       "!test/fixtures/*.json",
       "!scratch",
       "!docs/playtests/*.json",
-      "!.claude"
+      "!.claude",
+      "!archive"
     ]
   },
   "formatter": {

@@ -6,7 +6,7 @@ import {
   validatePersona,
 } from '@adam0white/lab-client';
 
-const DB = 'hearsay-persona-files';
+const DB = 'mono-hearsay-persona-files-v1';
 const STORE = 'continuity';
 const KEY = 'shelf';
 let connection: Promise<IDBDatabase> | undefined;

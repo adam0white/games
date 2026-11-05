@@ -30,7 +30,7 @@ assert(origin);
 async function readNative(page: Page) {
   return page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('hearsay', 1);
+      const request = indexedDB.open('mono-hearsay-v1', 1);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });

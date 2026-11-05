@@ -1,0 +1,202 @@
+/**
+ * Saves live in IndexedDB as gzip (a year's state is megabytes of JSON; localStorage would not hold it).
+ * Every access is wrapped: a private window or blocked storage gives "no save", never a broken page.
+ */
+import { lab } from './lab';
+
+function captureStored(key: string, text: string): void {
+  // Departure prefixes are local recovery data; the active run owns its gated uploads.
+  if (key.startsWith('persona-departure:')) return;
+  try {
+    lab.captureSave({ key, value: JSON.parse(text) });
+  } catch {}
+}
+
+const DB = 'hearsay';
+const STORE = 'pages';
+let connection: IDBDatabase | null = null;
+const revisions = new Map<string, number>();
+type Row = { blob?: Blob; plain?: string; at: number };
+
+function open(): Promise<IDBDatabase> {
+  if (connection) return Promise.resolve(connection);
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+    r.onsuccess = () => {
+      connection = r.result;
+      connection.onversionchange = () => {
+        connection?.close();
+        connection = null;
+      };
+      res(r.result);
+    };
+    r.onerror = () => rej(r.error);
+  });
+}
+
+async function gzip(text: string): Promise<Blob> {
+  const cs = new CompressionStream('gzip');
+  // A Blob stream belongs to its document; WebKit can reject it during navigation.
+  const input = new Response(text).body;
+  if (!input) throw new Error('Save compression input is unavailable.');
+  return new Response(input.pipeThrough(cs)).blob();
+}
+
+async function gunzip(b: Blob): Promise<string> {
+  const ds = new DecompressionStream('gzip');
+  return new Response(b.stream().pipeThrough(ds)).text();
+}
+
+export async function put(key: string, value: unknown): Promise<boolean> {
+  try {
+    const revision = (revisions.get(key) ?? 0) + 1;
+    revisions.set(key, revision);
+    const text = JSON.stringify(value);
+    const db = await open();
+    const write = async (row: Row): Promise<void> => {
+      if (revisions.get(key) !== revision) return;
+      await new Promise<void>((res, rej) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).put(row, key);
+        tx.oncomplete = () => res();
+        tx.onerror = () => rej(tx.error);
+        tx.onabort = () => rej(tx.error);
+      });
+    };
+    try {
+      await write({ blob: await gzip(text), at: Date.now() });
+    } catch {
+      // Some WebKit storage contexts reject Blob transactions. The reader already
+      // supports plain JSON. Keep the same revision guard and atomic transaction.
+      await write({ plain: text, at: Date.now() });
+    }
+    if (revisions.get(key) !== revision) return true;
+    captureStored(key, text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function get<T>(key: string): Promise<{ value: T; at: number } | null> {
+  try {
+    const db = await open();
+    const row = await new Promise<Row | undefined>((res, rej) => {
+      const r = db.transaction(STORE, 'readonly').objectStore(STORE).get(key);
+      r.onsuccess = () => res(r.result as Row | undefined);
+      r.onerror = () => rej(r.error);
+    });
+    if (!row) return null;
+    return { value: JSON.parse(row.plain ?? (row.blob ? await gunzip(row.blob) : 'null')) as T, at: row.at };
+  } catch {
+    return null;
+  }
+}
+
+/** Queue the latest JSON transaction synchronously while pagehide still owns a live database connection. */
+export function putNow(key: string, value: unknown): boolean {
+  try {
+    if (!connection) return false;
+    revisions.set(key, (revisions.get(key) ?? 0) + 1);
+    const text = JSON.stringify(value);
+    const tx = connection.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put({ plain: text, at: Date.now() }, key);
+    tx.oncomplete = () => captureStored(key, text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Small journal writes complete before their clock is shown; no compression is needed. */
+export function putImmediate(key: string, value: unknown): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      if (!connection) {
+        resolve(false);
+        return;
+      }
+      revisions.set(key, (revisions.get(key) ?? 0) + 1);
+      const text = JSON.stringify(value);
+      const tx = connection.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put({ plain: text, at: Date.now() }, key);
+      tx.oncomplete = () => {
+        captureStored(key, text);
+        resolve(true);
+      };
+      tx.onerror = () => resolve(false);
+      tx.onabort = () => resolve(false);
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+/** Store a recovery record once; an existing key must contain exactly the same data. */
+export async function putImmutable(key: string, value: unknown): Promise<boolean> {
+  try {
+    const text = JSON.stringify(value);
+    const matches = async () => {
+      const existing = await get<unknown>(key);
+      return existing !== null && JSON.stringify(existing.value) === text;
+    };
+    if (await matches()) return true;
+    const db = await open();
+    const add = (row: Row) =>
+      new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).add(row, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+      });
+    try {
+      await add({ blob: await gzip(text), at: Date.now() });
+      return true;
+    } catch {
+      if (await matches()) return true;
+      try {
+        await add({ plain: text, at: Date.now() });
+        return true;
+      } catch {
+        return await matches();
+      }
+    }
+  } catch {
+    return false;
+  }
+}
+
+/** Commit new journal records and their matching head in one transaction. */
+export async function putJournal(
+  records: readonly [string, unknown][],
+  headKey: string,
+  head: unknown,
+): Promise<boolean> {
+  try {
+    const db = await open();
+    const rows = records.map(([key, value]) => [key, JSON.stringify(value)] as const);
+    const headText = JSON.stringify(head);
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      const store = tx.objectStore(STORE);
+      try {
+        for (const [key, text] of rows) store.add({ plain: text, at: Date.now() }, key);
+        store.put({ plain: headText, at: Date.now() }, headKey);
+      } catch (error) {
+        tx.abort();
+        reject(error);
+        return;
+      }
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+    for (const [key, text] of rows) captureStored(key, text);
+    captureStored(headKey, headText);
+    return true;
+  } catch {
+    return false;
+  }
+}

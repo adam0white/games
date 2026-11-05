@@ -17,7 +17,7 @@ it('compresses and restores saves without reading a document-owned Blob stream',
       let saved;
       try { saved=await put('unload-compression',{text:'A saved garden.',ownedHeads:{riza:'exact-receipt'}}); }
       finally { Blob.prototype.stream=original; }
-      const open=indexedDB.open('hearsay',1);
+      const open=indexedDB.open('mono-hearsay-v1',1);
       const db=await new Promise(resolve=>open.onsuccess=()=>resolve(open.result));
       const request=db.transaction('pages','readonly').objectStore('pages').get('unload-compression');
       const row=await new Promise(resolve=>request.onsuccess=()=>resolve(request.result));db.close();

@@ -1,7 +1,5 @@
 /** Public profiles come from the released canonical artifact. Private facts stay author-side. */
 
-import { createPerson, type Person } from '@adam0white/hf-legacy';
-import { canonicalCast, castForGame } from '@adam0white/lab-client';
 export const GARDEN_EDITION = 'hearsay-cast/6';
 export const GARDEN_CAST = {
   hatice: {
@@ -160,33 +158,6 @@ export const GARDEN_CAST = {
 } as const;
 export type GardenPerson = keyof typeof GARDEN_CAST;
 export const GARDEN_IDS = Object.keys(GARDEN_CAST) as GardenPerson[];
-export function gardenOpening(id: GardenPerson, seed: number, now = 360): Person {
-  const c = GARDEN_CAST[id];
-  const canonical = canonicalCast(c.castId);
-  if (!castForGame('hearsay').some((p) => p.castId === c.castId)) throw new Error('Unknown allocation');
-  return createPerson({
-    id,
-    lexicon: { plainEnglish: true },
-    name: c.name,
-    seed,
-    now,
-    bornAt: now - canonical.age * 365 * 1440,
-    sex: c.sex,
-    traits: { ...canonical.traits },
-    values: { ...canonical.values },
-    relationships:
-      id === 'aylin'
-        ? [{ otherId: 'dilan', roles: ['sibling'] }]
-        : id === 'dilan'
-          ? [{ otherId: 'aylin', roles: ['sibling'] }]
-          : [],
-    norms: [
-      { normId: 'backbiting', standing: 'forbidden', conviction: 0.5 },
-      { normId: 'lying', standing: 'forbidden', conviction: 0.8 },
-    ],
-    retention: { trace: 0, chronicleDays: 14 },
-  });
-}
 /** Duties are host facts, not kinship inferred from shared accommodation. */
 export function gardenLocation(id: GardenPerson, minute: number): string {
   const t = minute % 1440;

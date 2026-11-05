@@ -12,7 +12,7 @@ function captureStored(key: string, text: string): void {
   } catch {}
 }
 
-const DB = 'hearsay';
+const DB = 'mono-hearsay-v1';
 const STORE = 'pages';
 let connection: IDBDatabase | null = null;
 const revisions = new Map<string, number>();

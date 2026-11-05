@@ -90,7 +90,7 @@ async function occupied(): Promise<Page> {
     if ((await indexedDB.databases()).length !== 0)
       throw new Error('Test context is not pristine before sentinel setup.');
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('hearsay', 1);
+      const request = indexedDB.open('mono-hearsay-v1', 1);
       request.onupgradeneeded = () => request.result.createObjectStore('pages');
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
@@ -135,7 +135,7 @@ async function occupied(): Promise<Page> {
 }
 async function readOwner(page: Page) {
   return page.evaluate(async () => {
-    const request = indexedDB.open('hearsay', 1);
+    const request = indexedDB.open('mono-hearsay-v1', 1);
     const db = await new Promise<IDBDatabase>((resolve) => {
       request.onsuccess = () => resolve(request.result);
     });
