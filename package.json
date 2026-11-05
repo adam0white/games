@@ -8,7 +8,7 @@
   "engines": {
     "node": "26.12.0"
   },
-  "packageManager": "pnpm@12.14.0+sha512.c18ba6d87993d3d164cb5e8948f32b2c06ee854487e06cd8d86781342fb3e5bb4634367034711e86802baa9c37bea906ce1929ad08d70884c97d801df13389a6",
+  "packageManager": "pnpm@12.16.1",
   "scripts": {
     "dev": "pnpm story && vite --host 127.0.0.1",
     "story": "node scripts/build.ts --story-only",
@@ -24,17 +24,17 @@
     "deploy": "pnpm build && wrangler deploy"
   },
   "dependencies": {
-    "@adam0white/human-framework": "4.0.0",
+    "@adam0white/human-framework": "4.17.0",
     "@adam0white/lab-client": "file:vendor/adam0white-lab-client-0.4.15.tgz",
     "inkjs": "2.4.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.3",
+    "@biomejs/biome": "2.6.5",
     "@playwright/test": "1.64.1",
-    "@types/node": "26.6.5",
+    "@types/node": "26.6.6",
     "typescript": "7.0.2",
     "vite": "8.3.5",
-    "vitest": "5.0.5",
-    "wrangler": "4.152.0"
+    "vitest": "5.1.0",
+    "wrangler": "4.157.0"
   }
 }

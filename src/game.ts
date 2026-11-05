@@ -30,7 +30,7 @@ type Tie = { trust: number; familiarity: number };
 import content from './story.json' with { type: 'json' };
 
 const EDITION = 'word-5';
-const HF = '4.0.0';
+const HF = '4.17.0';
 const PROP = 'floor-reserved-for-morning-repairs';
 const ORDER_PROP = 'order.supports-late-service';
 const ORDER = ['halil', 'riza', 'osman', 'ferda'] as const;
@@ -441,7 +441,7 @@ function ferdaBelievesOrder(s: GameState): boolean {
   );
   const person = view.people[0];
   const part = person?.kind === 'host' ? person.parts.find((p) => p.select === 'beliefs') : undefined;
-  return part?.select === 'beliefs' && part.value.some((b) => b.prop === ORDER_PROP && b.logOdds > 0);
+  return part?.select === 'beliefs' && part.value.some((b) => b.prop === ORDER_PROP && b.credence > 0.5);
 }
 
 function flag(s: GameState, key: string): boolean {
@@ -1207,7 +1207,7 @@ export function replayRun(value: unknown): GameState {
     (hfArchive?.format === 'hf-run' && (hfArchive.version as number) === 3);
   if (fromHf3) throw new Error(EARLIER);
   if (x.edition !== EDITION || x.framework !== HF) throw new Error(OTHER);
-  if (hfArchive?.format !== 'hf-run' || hfArchive.version !== 4)
+  if (hfArchive?.format !== 'hf-run' || hfArchive.version !== 7)
     throw new Error('This run has an invalid Human Framework record.');
   if (!Array.isArray(x.inputs) || typeof x.hash !== 'string' || typeof x.seed !== 'number')
     throw new Error('This run has an invalid input log.');

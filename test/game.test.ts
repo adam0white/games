@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
-import { replay } from '@adam0white/human-framework';
+import { readRunHistory, replay } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import { act, createGame, exportRun, hashState, reading, replayRun, view } from '../src/game';
 import { expectReplay } from './support/replay';
@@ -466,15 +466,11 @@ describe('clarity: why terms and replies change', () => {
     expect(view(s).prose.join(' ')).toContain('It is not a reply to the letter');
     expectReplay(s);
   });
-  it('replays a word-5 export made by 349 after the letter and Ferda, with its stored bytes intact', () => {
+  it('refuses the preserved pre-4.17 word-5 export with a fresh-game instruction', () => {
     const raw = gunzipSync(
       readFileSync(new URL('./fixtures/base349-fetchletter-askferda.json.gz', import.meta.url)),
     ).toString();
-    const original = JSON.parse(raw);
-    const s = replayRun(JSON.parse(raw));
-    expect(JSON.stringify(exportRun(s))).toBe(JSON.stringify(original));
-    expect(s.note).toContain('The letter may tell us whether late work pays');
-    expect(view(s).prose.join(' ')).toContain('It is not a reply to the letter');
+    expect(() => replayRun(JSON.parse(raw))).toThrow(/another version.*Start a fresh game/);
   });
 });
 
@@ -568,7 +564,7 @@ describe('HF 4.0 host contract', () => {
     const settled = archive.current.receipts.communications.map((c) => c.requestId);
     expect(settled).toHaveLength(4);
     expect(new Set(settled).size).toBe(4);
-    const inputs = archive.history.flatMap((t) => t.inputs);
+    const inputs = readRunHistory(archive).flatMap((t) => t.inputs);
     expect(inputs.filter((i) => i.kind === 'conversation.requested')).toHaveLength(4);
     expect(inputs.filter((i) => i.kind === 'communication.resolved')).toHaveLength(4);
     const verified = replay(archive);
@@ -579,7 +575,7 @@ describe('HF 4.0 host contract', () => {
     choose(s, 'in private');
     choose(s, 'Tell Halil');
     choose(s, 'Fetch Nuri');
-    const inputs = exportRun(s).archive.history.flatMap((t) => t.inputs);
+    const inputs = readRunHistory(exportRun(s).archive).flatMap((t) => t.inputs);
     const percepts = inputs.flatMap((i) => (i.kind === 'observation.received' ? i.payload.percepts : []));
     expect(percepts.map((p) => [p.channel, p.provenance])).toEqual([
       ['told', ['nephew']],
@@ -597,8 +593,8 @@ describe('HF 4.0 host contract', () => {
     choose(s, 'Tell Halil');
     choose(s, 'in private');
     choose(s, 'Withdraw your');
-    const contradictions = exportRun(s)
-      .archive.history.flatMap((t) => t.inputs)
+    const contradictions = readRunHistory(exportRun(s).archive)
+      .flatMap((t) => t.inputs)
       .flatMap((i) => (i.kind === 'contradiction.received' ? [i.payload] : []));
     expect(contradictions).toHaveLength(1);
     expect(contradictions[0]).not.toHaveProperty('reporterId');
