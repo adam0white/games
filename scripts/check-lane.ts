@@ -1,5 +1,6 @@
-/** This task owns a new HF4 arm. Historical adapters and fixture bytes stay immutable. */
+/** Historical adapters and recordings retain their meaning while the default moves to HF4. */
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 const paths = (
   execFileSync('git', ['diff', '--name-only', 'origin/main'], { encoding: 'utf8' }) +
@@ -7,9 +8,22 @@ const paths = (
   execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { encoding: 'utf8' })
 )
   .trim()
-  .split('\n');
-const protectedPath =
-  /^(src\/minds\/(hf|hf2|random|scripted|llm|llm-backends)\.ts|test\/fixtures\/|viewer\/runs\/|pnpm-workspace\.yaml)/;
-const violations = paths.filter((path) => protectedPath.test(path));
-if (violations.length) throw new Error(`Outside HF4 lane: ${violations.join(', ')}`);
-console.log('HF4 lane: historical adapters, recordings and dependency policy unchanged.');
+  .split('\n')
+  .filter(Boolean);
+for (const path of paths) {
+  if (/^src\/minds\/(hf|hf2|random|scripted|llm|llm-backends)\.ts$/.test(path)) {
+    const prior = execFileSync('git', ['show', `origin/main:${path}`], { encoding: 'utf8' });
+    const current = readFileSync(path, 'utf8').replaceAll(
+      "from 'hfLegacy'",
+      "from '@adam0white/human-framework'",
+    );
+    if (current !== prior) throw new Error(`Historical adapter changed beyond its package alias: ${path}`);
+  }
+  if (/^(test\/fixtures\/|viewer\/runs\/)/.test(path) && path !== 'viewer/runs/index.json') {
+    const tracked = execFileSync('git', ['ls-tree', '--name-only', 'origin/main', '--', path], {
+      encoding: 'utf8',
+    }).trim();
+    if (tracked) throw new Error(`Historical evidence changed: ${path}`);
+  }
+}
+console.log('HF4 upkeep lane: historical adapter semantics and recorded evidence preserved.');

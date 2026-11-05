@@ -1,6 +1,6 @@
+import { adoptGoal, recall, satisfy } from 'hfLegacy';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { adoptGoal, recall, satisfy } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import hf from '../src/minds/hf.ts';
 import { Hf2Mind } from '../src/minds/hf2.ts';

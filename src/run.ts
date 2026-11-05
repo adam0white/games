@@ -87,6 +87,13 @@ function value(raw: string): string | boolean | number {
 }
 
 async function main(args: string[]) {
+  if (args[0] === '--verify') {
+    if (args.length !== 2 || !args[1]) throw new Error('Use --verify <replay.json>.');
+    const { verifyIsland } = await import('./export.ts');
+    const recording = await verifyIsland(JSON.parse(await readFile(resolve(args[1]), 'utf8')));
+    console.log(`Verified ${recording.frames.length} Island steps on HF ${recording.hf}.`);
+    return;
+  }
   const flags: Record<string, string | number | boolean> = {};
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -104,7 +111,7 @@ async function main(args: string[]) {
           ? value(args[++i] ?? '')
           : true;
   }
-  const name = String(flags.mind ?? 'hf');
+  const name = String(flags.mind ?? 'hf4');
   if (
     ![
       'random',
@@ -126,6 +133,7 @@ async function main(args: string[]) {
   const options: MindOptions = { ...flags, seed, persona: PERSONA };
   delete options.mind;
   delete options.out;
+  delete options['publish-index'];
   if (name === 'hf-no-boredom') options.boredom = false;
   if (name === 'hf2-no-boredom') options.boredom = false;
   if (name === 'hf2-no-memory') options.memory = false;
@@ -137,12 +145,33 @@ async function main(args: string[]) {
     default: MindFactory;
   };
   const mind = module.default(options);
-  const output = resolve(String(flags.out ?? `viewer/runs/${mind.name}-${seed}.json`));
+  const output = resolve(
+    String(
+      flags.out ??
+        `scratch/${mind.name === 'hf4' ? 'current-4.17.0' : 'historical-2.9.0'}/${mind.name}-${seed}.json`,
+    ),
+  );
   if (basename(output) === 'index.json') throw new Error('index.json is reserved for the recording index.');
   const recording = await runIsland(mind, seed);
   const directory = dirname(output);
   await mkdir(directory, { recursive: true });
-  await writeFile(output, `${JSON.stringify(recording, null, 2)}\n`);
+  await writeFile(output, `${JSON.stringify(recording, null, 2)}\n`, { flag: 'wx' });
+  if (mind.name === 'hf4' && 'archive' in mind && typeof mind.archive === 'function') {
+    const { exportIsland } = await import('./export.ts');
+    const { Hf4Mind } = await import('./minds/hf4.ts');
+    if (!(mind instanceof Hf4Mind)) throw new Error('Current Island archive is unavailable.');
+    try {
+      await writeFile(
+        `${output}.replay.json`,
+        `${JSON.stringify(exportIsland(recording, mind.archive()))}\n`,
+        { flag: 'wx' },
+      );
+    } catch (error) {
+      throw new Error(
+        `Viewer recording saved to ${output}, but the complete replay file was not saved. ${String(error)}`,
+      );
+    }
+  }
   const index = [];
   for (const file of (await readdir(directory))
     .filter((file) => file.endsWith('.json') && file !== 'index.json')
@@ -158,7 +187,16 @@ async function main(args: string[]) {
     if (candidate?.format === 'island-recording@1')
       index.push({ file, mind: candidate.mind, seed: candidate.seed, measures: candidate.measures });
   }
-  await writeFile(resolve(directory, 'index.json'), `${JSON.stringify(index, null, 2)}\n`);
+  try {
+    await writeFile(
+      resolve(directory, 'index.json'),
+      `${JSON.stringify(index, null, 2)}\n`,
+      flags['publish-index'] === true ? {} : { flag: 'wx' },
+    );
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    console.warn('Recording files saved; index.json was left unchanged. Use --publish-index to rebuild it.');
+  }
   console.log(output);
 }
 

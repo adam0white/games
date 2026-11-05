@@ -31,7 +31,7 @@ import {
   scoreAll,
   tendencyEmotions,
   tick,
-} from '@adam0white/human-framework';
+} from 'hfLegacy';
 import type { Action, Mind, MindFactory, MindOptions, MindStep, Observation } from '../types.ts';
 
 // SESSION_DEFAULTS, with seconds converted to minutes. No style.ts policy is used.

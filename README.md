@@ -1,6 +1,6 @@
 # Island lab experiment
 
-Island compares an HF person, LLM agents and control policies in the same small simulated island. It is a CLI experiment with a static recording viewer. The retained HF/HF2/HF3 arms pin HF 2.9.0. The separate `hf4` arm pins the published HF 4.5.1 through an npm alias; historical experiment branches are separate. [HF2.md](HF2.md) records the adapters, comparisons and limits.
+Island compares an HF person, LLM agents and control policies in the same small simulated island. It is a CLI experiment with a static recording viewer. The retained HF/HF2/HF3 arms pin HF 2.9.0. The separate `hf4` arm pins the published HF 4.17.0 through an npm alias; historical experiment branches are separate. [HF2.md](HF2.md) records the adapters, comparisons and limits.
 
 Use shared Node 26.12.0 (`.node-version` and `.nvmrc`) and pnpm 12.14.0:
 
@@ -23,3 +23,15 @@ node src/run.ts --mind hf4 --seed 1 --out /absolute/scratch/hf4-1.json
 ```
 
 The batch verifies registry latest before starting, runs seeds 1–10 with the default three free hours plus one task hour, physically replays every recording, verifies every HF archive, runs ten random controls, and independently repeats seed 1. It refuses if the registry has advanced past the exact alias. Update and document a new version deliberately before a later batch. No LLM provider is called. Existing recordings are not rewritten. `npm run check:lane` checks that the HF4 task has not changed retained adapters, recordings or dependency policy.
+
+## Current HF 4 run — 2026-11-05
+
+The default CLI runs published HF 4.17.0. `pnpm run run:hf -- --seed 1 --out scratch/hf417-1.json` writes a viewer recording and `scratch/hf417-1.json.replay.json`. Verify the complete export with `node src/run.ts --verify scratch/hf417-1.json.replay.json`. Verification replays the native person and regenerates every physical action and episode reset. Unsupported exports require a new run.
+
+The `hf`, `hf2` and `hf3` experiment names describe historical arms using the separate HF 2.9.0 alias. They are preserved for earlier evidence. Existing recorded results do not become HF 4.17 results. Island remains a seeded CLI experiment and a recorded-frame viewer.
+
+Default outputs go into version-specific `scratch/` directories. Existing recording or replay files are never overwritten. Current replay imports allow up to 100 free episodes, 10,000 recorded steps and a 16 MiB native archive.
+
+The CLI preserves an existing recording index. Use `--publish-index` only when deliberately rebuilding that directory’s index. Batch reruns require an empty output directory. The historical `compare` command still expects the legacy baselines; the current batch command reports its own current-HF and random controls separately.
+
+`pnpm build` stamps `viewer/release.json` with this repository’s exact commit, dirty state and current HF version. The static viewer is served at the central site’s `/lab/island/` path; its release stamp identifies Island source independently of the central deployment.
