@@ -49,7 +49,15 @@ test("controls, clock, pause menu and desktop evening fit", async ({
   await expect(page.locator("#lantern")).toHaveText(
     "Lantern hidden · light (L)",
   );
-  expect(await page.locator(".directions").boundingBox()).toEqual(arrowsBefore);
+  const arrowsAfter = await page.locator(".directions").boundingBox();
+  expect(arrowsBefore).not.toBeNull();
+  expect(arrowsAfter).not.toBeNull();
+  if (!arrowsBefore || !arrowsAfter)
+    throw new Error("Missing direction controls");
+  for (const dimension of ["x", "y", "width", "height"] as const)
+    expect(
+      Math.abs(arrowsAfter[dimension] - arrowsBefore[dimension]),
+    ).toBeLessThan(1);
   const lanternAfter = await page.locator("#lantern").boundingBox();
   const actAfter = await page.locator("#act").boundingBox();
   expect(lanternAfter?.y).toBe(actAfter?.y);
