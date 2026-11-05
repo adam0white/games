@@ -1161,12 +1161,14 @@ function stable(v: unknown): string {
   return (
     "{" +
     Object.keys(v)
-      .filter((k) => (v as Record<string, unknown>)[k] !== undefined)
       .sort()
-      .map(
-        (k) =>
-          `${JSON.stringify(k)}:${stable((v as Record<string, unknown>)[k])}`,
-      )
+      .flatMap((k) => {
+        // actorsRun is a complete native export getter. Read it once per hash.
+        const value = (v as Record<string, unknown>)[k];
+        return value === undefined
+          ? []
+          : [`${JSON.stringify(k)}:${stable(value)}`];
+      })
       .join(",") +
     "}"
   );

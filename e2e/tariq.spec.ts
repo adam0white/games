@@ -1,6 +1,6 @@
 import { createPersona, preparePersonaLife } from "@adam0white/lab-client";
 import { expect, test } from "@playwright/test";
-import { departure } from "../src/actors.ts";
+import { departure, ENGINE } from "../src/actors.ts";
 import { createGame } from "../src/host.ts";
 
 // Disposable shelf only. The source is an idle synthetic actor, not a completed
@@ -17,7 +17,7 @@ test("Tariq arrives through the ordinary browser shelf and resumes locally", asy
     parentRevision: null,
     source: {
       game: "lefthand",
-      engine: "4.10.0",
+      engine: ENGINE,
       build: "synthetic",
       rules: "left-hand-5",
     },
