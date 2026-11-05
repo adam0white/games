@@ -1,5 +1,6 @@
 import { PEOPLE_ACROSS_GAMES } from '@adam0white/lab-kit';
 import { orderRows } from './order-rows.ts';
+import { tutorialPrompt } from './tutorial.ts';
 /**
  * The Stairwell UI: a page from the kapıcı's notebook. Plain DOM, no framework. The shared native Run owns people.
  * This file reads public projections and queues host inputs. IndexedDB stores complete checkpoints at save boundaries.
@@ -674,6 +675,17 @@ function fileChooser() {
     });
 }
 
+// Tutorial state belongs to the interface, never the saved simulation.
+let tutorialTask: number | null = null;
+let tutorialActive = false;
+function replayTutorial() {
+  const s = ui.s;
+  const task = s && openTasks(s).find((t) => !t.wrongDoor && !t.custody);
+  tutorialTask = task?.id ?? null;
+  tutorialActive = true;
+  if (s) render(false);
+}
+
 // ---------- flow ----------
 
 async function send(inp: NewInput) {
@@ -768,6 +780,8 @@ async function begin(candidate: GameState | (() => Promise<GameState>), file = f
       saves.invalidate();
       promoteOwner(s);
       ui.s = s;
+      tutorialTask = s.inputs.length === 0 ? (openTasks(s)[0]?.id ?? null) : null;
+      tutorialActive = tutorialTask !== null;
       selection = null;
       ui.sheet = 'none';
       ui.sheetFor = null;
@@ -1021,6 +1035,7 @@ function mountMenu(target: Element | null, s: GameState | null) {
         if (fileMode === 'file' && !target.isConnected) return;
         if (ui.s && (fileMode === 'file' || ui.s.phase === 'day')) render(false);
       },
+      replayTutorial: s?.phase === 'day' ? replayTutorial : undefined,
       readNotebook:
         s?.phase === 'day' && ui.s
           ? () => {
@@ -1327,6 +1342,94 @@ function dayView(s: GameState, full: boolean) {
   } else if (ui.sheet === 'notebook') action.innerHTML = '';
   else tripActions(s, action);
   journal(s, requiredUiValue(root.querySelector<HTMLElement>('.journal'), 'day journal'), position);
+  renderTutorial(s, root);
+}
+
+function renderTutorial(s: GameState, root: HTMLElement) {
+  let task = s.tasks.find((t) => t.id === tutorialTask);
+  if (tutorialActive && !task) {
+    task = openTasks(s).find((t) => !t.wrongDoor && !t.custody);
+    tutorialTask = task?.id ?? null;
+  }
+  if (tutorialActive && !selection && !s.k.walk && task?.carried && task.done === undefined) {
+    const first = openTasks(s)
+      .filter((t) => !t.wrongDoor && !t.custody)
+      .sort((a, b) => Number(!!b.carried) - Number(!!a.carried) || a.by - b.by)[0];
+    if (first?.carried) {
+      tutorialTask = first.id;
+      task = first;
+    }
+  }
+  if (!tutorialActive) {
+    root.querySelector('.tutorial-prompt')?.remove();
+    root.querySelector('.tutorial-target')?.classList.remove('tutorial-target');
+    return;
+  }
+  const prompt = task
+    ? tutorialPrompt({
+        task,
+        minute: s.minute,
+        ordersOpen: ui.sheet === 'orders',
+        selected: selection?.task === task.id || (!selection && !!task.carried),
+        walking: !!s.k.walk || s.k.busyTask !== null,
+      })
+    : { target: 'orders' as const };
+  let target =
+    prompt.target === 'orders'
+      ? root.querySelector('[data-tab=orders]')
+      : prompt.target === 'order'
+        ? root.querySelector(`[data-t="${task?.id}"]`)
+        : prompt.target === 'go'
+          ? root.querySelector('[data-a=go], [data-start-work]')
+          : prompt.target === 'travel'
+            ? root.querySelector('.travel-status')
+            : root.querySelector('.order-pips');
+  const fallback = !target;
+  target ??= root.querySelector('[data-tab=orders]');
+  if (!target) return;
+  const overdue = !!task && task.done === undefined && s.minute > task.by;
+  const key = `${prompt.target}:${prompt.outcome ?? ''}:${task?.carried ? 'carried' : ''}:${fallback}:${overdue}`;
+  const existing = root.querySelector<HTMLElement>('.tutorial-prompt');
+  if (
+    existing?.dataset.key === key &&
+    target.classList.contains('tutorial-target') &&
+    existing.previousElementSibling === target
+  )
+    return;
+  existing?.remove();
+  root.querySelector('.tutorial-target')?.classList.remove('tutorial-target');
+  target.classList.add('tutorial-target');
+  const note = document.createElement('div');
+  note.className = 'tutorial-prompt';
+  note.dataset.key = key;
+  note.classList.toggle('tutorial-late', overdue || prompt.outcome === 'late');
+  note.setAttribute('role', 'status');
+  const message = document.createElement('span');
+  message.textContent = overdue
+    ? '⚠ Late. Finish the delivery; late deliveries can earn smaller tips.'
+    : fallback || !task
+      ? 'Choose an available order, or skip the tutorial.'
+      : prompt.target === 'orders'
+        ? 'Deliver on time; earn support at Sunday’s vote. Tap Orders.'
+        : prompt.target === 'order'
+          ? task.carried
+            ? 'Picked up. Tap this order to deliver it.'
+            : 'Tap this order.'
+          : prompt.target === 'go'
+            ? 'Go: this starts the real trip.'
+            : prompt.target === 'travel'
+              ? 'The clock moves as you travel.'
+              : prompt.outcome === 'late'
+                ? 'Delivered late. Late deliveries can earn smaller tips.'
+                : 'Delivered on time. Late deliveries can earn smaller tips.';
+  const skip = document.createElement('button');
+  skip.textContent = prompt.target === 'outcome' ? 'Done' : 'Skip tutorial';
+  skip.addEventListener('click', () => {
+    tutorialActive = false;
+    render(false);
+  });
+  note.append(message, skip);
+  target.insertAdjacentElement('afterend', note);
 }
 
 function sceneChoices(s: GameState, hits: Iterable<SVGElement>) {
@@ -1358,6 +1461,7 @@ function bindSceneChoices(scene: Element | null, getWorld: () => GameState | nul
 function choose(s: GameState, to: Place, person: Rid | null = null, task: number | null = null) {
   if (s.k.walk || s.k.busyTask !== null || s.k.busyUntil > s.minute) return;
   if (task !== null) {
+    if (tutorialActive) tutorialTask = task;
     const current = openTasks(s).find((entry) => entry.id === task);
     if (!current || current.done !== undefined || current.wrongDoor || current.custody) return;
     to = current.carried || !current.pickup ? current.place : current.pickup;
@@ -1444,6 +1548,7 @@ function tripActions(s: GameState, el: HTMLElement) {
     el.querySelector('[data-rest-trip]')?.addEventListener('click', () => send({ kind: 'rest' }));
     el.querySelector('[data-a=go]')?.addEventListener('click', () => {
       const p = selection?.person ?? null;
+      if (tutorialActive && task) tutorialTask = task.id;
       selection = null;
       goTo(s, to, p);
     });
