@@ -43,3 +43,43 @@ test('both entries include analytics and permit its endpoints', () => {
   assert.match(headers, /static\.cloudflareinsights\.com/);
   assert.match(headers, /https:\/\/cloudflareinsights\.com/);
 });
+
+test('navigation cache keeps a clone alive and separates the file entry', async () => {
+  const handlers = {},
+    lifetime = [],
+    writes = [];
+  let releaseCache, served;
+  const open = new Promise((resolve) => {
+    releaseCache = resolve;
+  });
+  const response = new Response('fresh file entry');
+  runInNewContext(readFileSync('public/sw.js', 'utf8'), {
+    self: {
+      location: { origin: 'https://play.adamwhite.work' },
+      addEventListener: (name, fn) => {
+        handlers[name] = fn;
+      },
+    },
+    caches: { open: () => open },
+    URL,
+    fetch: async () => response,
+  });
+  handlers.fetch({
+    request: { method: 'GET', url: 'https://play.adamwhite.work/rope/file/', mode: 'navigate' },
+    respondWith: (promise) => {
+      served = promise;
+    },
+    waitUntil: (promise) => {
+      lifetime.push(promise);
+    },
+  });
+  assert.equal(await (await served).text(), 'fresh file entry');
+  assert.equal(lifetime.length, 1, 'navigation cache write extends worker lifetime');
+  releaseCache({
+    put: async (key, copy) => {
+      writes.push([key, await copy.text()]);
+    },
+  });
+  await Promise.all(lifetime);
+  assert.deepEqual(writes, [['/rope/file/', 'fresh file entry']]);
+});
