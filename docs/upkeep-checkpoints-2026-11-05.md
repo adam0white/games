@@ -32,4 +32,8 @@ Each item remains open. Recheck on **2026-11-12** after the current HF4 and open
 - **F-2614:** A player must judge whether the belief explanation is concise. Recheck 2026-11-12.
 - **F-2615:** A player must judge whether new-game variety supports return. Recheck 2026-11-12.
 
+- **Fresh withdrawal/replacement play:** Player evidence is needed to judge whether high placement counts reflect real behavior; automated counts do not establish human speed. Recheck 2026-11-12.
+- **Round-four phone controls:** A fresh source-unread player must assess callback reasons and household controls; coordinator owns the paused panel. Recheck 2026-11-12.
+- **New family needs:** New authored needs require distinct scenarios and HF/replay controls; owner acceptance is separate. Recheck 2026-11-12.
+
 Owner readiness and player acceptance remain with their respective owners; a checkpoint does not substitute for either.
