@@ -78,16 +78,35 @@ async function ownNoraSource() {
   const real = await import('@adam0white/lab-client');
   const { CAST_IDS } = await import('../src/game/cast');
   const sourcePerson = createGame(41).people.nora!;
-  const { projectPerson } = await import('../src/game/hf');
+  const { exportPersonRun } = await import('../src/game/hf');
+  const historical = await import('@adam0white/hf-fixture-411');
+  const initial = exportPersonRun(sourcePerson).initial;
+  const oldRun = historical.createRun(initial.spec);
+  if (!oldRun.ok) throw new Error(JSON.stringify(oldRun.error));
+  for (const person of initial.people) {
+    const created = historical.createPerson(oldRun.value, person);
+    if (!created.ok) throw new Error(JSON.stringify(created.error));
+  }
+  const oldView = historical.inspect(oldRun.value, {
+    perspective: { kind: 'host' },
+    people: ['nora'],
+    select: ['persona', 'calendar'],
+    portable: {
+      person: 'nora',
+      castId: CAST_IDS.nora!,
+      castRevision: real.canonicalCast(CAST_IDS.nora!).revision,
+    },
+  });
+  if (!oldView.ok) throw new Error(JSON.stringify(oldView.error));
+  const oldPerson = oldView.value.people[0];
+  if (oldPerson?.kind !== 'host') throw new Error('Historical projection unavailable');
+  const oldPart = oldPerson.parts.find((part) => part.select === 'persona');
+  if (oldPart?.select !== 'persona') throw new Error('Historical projection unavailable');
   const projected = {
     transfer: {
       castPassport: 'workshop-hf4/1',
       sourceRole: 'nora',
-      person: projectPerson(
-        sourcePerson,
-        CAST_IDS.nora!,
-        real.canonicalCast(CAST_IDS.nora!).revision,
-      ),
+      person: oldPart.value,
     },
     limitations: [],
   };
@@ -103,11 +122,11 @@ async function ownNoraSource() {
     transfer: { ...projected.transfer, life: real.initialPersonaLife(castId, branchId, 0) },
     limitations: projected.limitations,
   });
-  return { real, sourcePerson, parent };
+  return { real, parent };
 }
 
 describe('host recording and local ownership guards (synthetic controls)', () => {
-  it('admits a Commonstead checkpoint before writing its workshop claim', async () => {
+  it('refuses a historical Commonstead checkpoint before writing a current workshop claim', async () => {
     const { real, parent: original } = await ownNoraSource();
     const { validatePortablePerson } = await import('@adam0white/human-framework');
     const { CAST } = await import('../src/game/cast');
@@ -142,17 +161,11 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
       throw new Error('Unexpected request');
     });
     const host = await runtime();
-    const state = await host.fresh(42);
-    expect(state.castChapter?.inputs[0]?.parent.revision).toBe(parent.revision);
-    expect(state.hf.archive.initial.people.find((p) => p.id === 'nora')?.portable?.person).toEqual(
-      portable,
-    );
-    const saved = saveGame(state);
-    const { loadGame } = await import('../src/game/persistence');
-    expect(saveGame(loadGame(saved))).toBe(saved);
+    // Current claims use HF 4.17, while the preserved cast guard accepts 4.11.
+    // Verify refusal occurs before the shelf can receive the proposed claim.
+    await expect(host.fresh(42)).rejects.toThrow('The saved cast source record is invalid.');
     expect(controls.request.mock.calls.map(([request]) => request.action)).toEqual([
       'prepareBatch',
-      'putBatch',
     ]);
   });
   it('keeps source archives in an isolated file without recording them or changing native saves', async () => {
@@ -381,7 +394,7 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
   });
   it('keeps file-origin nonownership through reload and ignores recording-only identity changes', async () => {
     const host = await runtime();
-    const { real, sourcePerson, parent } = await ownNoraSource();
+    const { real, parent } = await ownNoraSource();
     const { admitWorkshop } = await import('../src/game/cast');
     const input = real.preparePersonaLife(parent, 0);
     const people = createGame(42).people;
