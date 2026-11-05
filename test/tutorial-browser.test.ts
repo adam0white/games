@@ -11,6 +11,9 @@ test('first minute follows highlighted controls without reading body text', asyn
   try {
     const page = await browser.newPage({ viewport: { width: 360, height: 690 } });
     await page.goto(server.resolvedUrls!.local[0]!);
+    await page.getByRole('button', { name: 'Game menu' }).click();
+    expect(await page.getByRole('button', { name: 'Replay tutorial' }).count()).toBe(0);
+    await page.getByRole('button', { name: 'Resume', exact: true }).click();
     const run = exportRun(newGame(7), []);
     await page.evaluate(`import('/src/ui/store.ts').then(({put}) => put('run', ${JSON.stringify(run)}))`);
     await page.reload();
