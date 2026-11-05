@@ -1,4 +1,4 @@
-# Lantern Ford
+# Mooring Hour
 
 Status: concept for Astra wildcard review. No game built. Based on the first concept in the approved ideas list; an original small ferry rescue game, with original drawings, authored river and levels. Canvas 2D, TypeScript, current monorepo HF pin, published lab client. No recreation of another game's map, characters, art or rules.
 
@@ -26,7 +26,7 @@ Keyboard arrows/A-D steer, Space handles the nearby rope or boarding offer. Poin
 
 ## Done and review
 
-Astra wildcard review before code. One playable complete three-trip run; live /lantern-ford/release.json matches exact green signed commit and dirty:false. All three passengers have visible independent decisions; an accepted/refused request and memory-effect control replay. Notice, recording off/on, shelf and lab receipt work on play origin. One cheap synthetic panel round and same-panel retest, labeled synthetic, then default Codex final review and hosted PR gate. Phone and desktop action checks reach the first crossing without reading body text. Owner taste acceptance remains separate; coordinator receives the shipped game for taste review.
+Astra wildcard review before code. One playable complete three-trip run; live /mooring-hour/release.json matches exact green signed commit and dirty:false. All three passengers have visible independent decisions; an accepted/refused request and memory-effect control replay. Notice, recording off/on, shelf and lab receipt work on play origin. One cheap synthetic panel round and same-panel retest, labeled synthetic, then default Codex final review and hosted PR gate. Phone and desktop action checks reach the first crossing without reading body text. Owner taste acceptance remains separate; coordinator receives the shipped game for taste review.
 
 ## Deferred
 
@@ -44,3 +44,5 @@ The river has a west village landing at (120,380) and east clinic at (760,380) i
 The complete run uses this route: village → clinic → village → clinic. The north depot is background scenery only and no claim of three unique landing routes remains. Dilan travels on trip one, asks the player to collect her sister Aylin from the village on trip two, and meets the boat again at the clinic on trip three. Capacity is three visible floor slots: a person uses one and a crate uses two. Trip one teaches Dilan plus medicine, which fit. Aylin and her crate compete with Burak for three slots on the final crossing; the player can carry both people or one person and the crate, and the left-behind option misses the last crossing. The promise is made to Dilan in a public interaction and the kept/broken event is delivered to her on the return. Her later requested help holding the clinic line uses the same public request under matched conditions; inspect the received event and recomputed decision to test memory. A physical cargo difference alone does not count as the memory proof.
 
 At 360 simulation seconds no further departure can start. A crossing already underway may reach a bank; it cannot start another. Three completed trips or an inability to continue gives the corresponding ending. Refusal never blocks time or a required UI step. Inspection and menu both freeze boat, water, deadlines and HF time. Slow speed scales all clocks together. Tick order is held-control update, request input, preconditions, HF decision, scheduled action completion, flood/deadline, render snapshot. On focus loss record a neutral-control input so steering cannot stick. Current-version replay recomputes every HF decision. The fixed-response comparison is a separate experiment, never a replay shortcut.
+
+Naming check, 2026-11-05: the earlier working title is also used for a composition in the [PixelWall Willowmere guide](https://www.pixelwall.dev/guides/willowmere). Mooring Hour is this game’s authored title. The limited search did not establish worldwide name uniqueness. No art, characters or level layout from that project is used.
