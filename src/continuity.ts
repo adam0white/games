@@ -43,7 +43,7 @@ interface LocalMeta {
 const source = () => ({
   game: 'repair',
   build: String(lab.build().c ?? 'local'),
-  engine: '4.11.0',
+  engine: '4.17.0',
   rules: 'canonical-workshop-3',
 });
 /** A failed shared reply may already have committed. Preserve complete source bytes first. */

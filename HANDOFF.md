@@ -1,3 +1,7 @@
+## Upkeep follow-up — 2026-11-05
+
+Remaining: integrate open Clarity work, qualify HF 4.17 replay and release, and obtain Adam's play and acceptance. Recheck on 2026-11-12 because the owner judgment and current source qualification have not been recorded; no appointment or player panel is implied. The dated delivery receipts below remain historical.
+
 ## Delivered technical record, 2026-11-04
 
 Remaining: Adam's play and acceptance of the game remain open. The twelve literal player requests and their reasons remain in [Deferred player requests](docs/Deferred.md#final-ordinary-iteration-2026-11-01). The ordinary player-panel gate remains paused; no new panel was run. Recheck the remaining owner and player dependency on 2026-11-05 as an engineering follow-up; this is not an appointment or commitment by Adam.
