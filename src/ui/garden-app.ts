@@ -49,6 +49,9 @@ import { loadGardenJournal, saveGardenJournal } from './garden-journal.ts';
 import { gardenReadings } from './garden-readings.ts';
 import { GardenRecordingGuard, type RecordingBinding } from './garden-recording.ts';
 import { retainGardenSource } from './garden-source-archive.ts';
+
+type GardenTutorial = 'person' | 'decision' | 'conversation' | 'response' | 'result' | 'plan' | 'ended';
+
 import { gardenPace } from './garden-ui-pace.ts';
 import { lab } from './lab.ts';
 import { get } from './store.ts';
@@ -84,6 +87,7 @@ let readingUntil = 0;
 let lastFrame = 0;
 let carry = 0;
 let notice = '';
+let tutorial: GardenTutorial | null = null;
 let stopTrack: (() => void) | undefined;
 let fileOrigin = false;
 let uiGeneration = 0;
@@ -165,11 +169,22 @@ async function save(): Promise<boolean> {
 function input(value: GardenInput) {
   if (!run) return;
   const before = run.log.length;
-  if (!chooseGarden(run, value)) notice = gardenRefusal(run, value);
+  const accepted = chooseGarden(run, value);
+  if (!accepted) notice = gardenRefusal(run, value);
   else {
     // The result is the host's own new record lines. A refusal says so; nothing is added to them.
     notice = gardenResult(run, before);
     save();
+  }
+  if (tutorial && accepted) {
+    if (value.type === 'listen') tutorial = run.chat ? 'conversation' : 'result';
+    else if (
+      value.type === 'respond' ||
+      value.type === 'silence' ||
+      value.type === 'release' ||
+      value.type === 'plan'
+    )
+      tutorial = 'result';
   }
   render();
   if (value.type === 'ask') {
@@ -240,8 +255,8 @@ function skippedNotice() {
 }
 function menuControls() {
   if (fileSession)
-    return `${run ? button('Resume', 'back') + button('Use automatic pace', 'automatic') : ''}${button('Feedback', 'send')}${button('Fullscreen', 'fullscreen')}<a href="https://human.adamwhite.work/games/" target="_top">All games</a><a href="https://human.adamwhite.work/lab/people/" target="_top">${PEOPLE_ACROSS_GAMES}</a><div id="cg-recording"></div>${fileControls()}`;
-  return `${run ? button('Resume', 'back') + button('Use automatic pace', 'automatic') : ''}${button('Feedback', 'send')}${button('Fullscreen', 'fullscreen')}<a href="https://human.adamwhite.work/games/" target="_top">All games</a><a href="https://human.adamwhite.work/lab/people/" target="_top">${PEOPLE_ACROSS_GAMES}</a><div id="cg-recording"></div>${run ? button('New game', 'new') : ''}${confirmNew ? `<p>Start a new fourteen-day game and replace this device’s saved garden?</p>${button('Start new game', 'restart', starting)}${button('Keep this garden', 'cancel-new', starting)}` : ''}${run ? button('Download this run', 'export') : ''}${otherStarts()}`;
+    return `${run ? button('Resume', 'back') + button('Replay tutorial', 'tutorial-replay') + button('Use automatic pace', 'automatic') : ''}${button('Feedback', 'send')}${button('Fullscreen', 'fullscreen')}<a href="https://human.adamwhite.work/games/" target="_top">All games</a><a href="https://human.adamwhite.work/lab/people/" target="_top">${PEOPLE_ACROSS_GAMES}</a><div id="cg-recording"></div>${fileControls()}`;
+  return `${run ? button('Resume', 'back') + button('Replay tutorial', 'tutorial-replay') + button('Use automatic pace', 'automatic') : ''}${button('Feedback', 'send')}${button('Fullscreen', 'fullscreen')}<a href="https://human.adamwhite.work/games/" target="_top">All games</a><a href="https://human.adamwhite.work/lab/people/" target="_top">${PEOPLE_ACROSS_GAMES}</a><div id="cg-recording"></div>${run ? button('New game', 'new') : ''}${confirmNew ? `<p>Start a new fourteen-day game and replace this device’s saved garden?</p>${button('Start new game', 'restart', starting)}${button('Keep this garden', 'cancel-new', starting)}` : ''}${run ? button('Download this run', 'export') : ''}${otherStarts()}`;
 }
 function renderTitle() {
   root.innerHTML = `<main class="cg-title"><p class="eyebrow">Fourteen days in the neighbourhood</p><h1>Hearsay</h1><p>You are Hatice. You run a tea garden in Istanbul. People visit between shifts, deliveries and appointments.</p><p class="goal">Your goal is to open a paid workers’ lunch on Day 13.</p><details><summary>How to play</summary>${howToPlayHtml(fileSession)}</details>${notice ? `<p role="status">${esc(notice)}</p>` : ''}${fileSession ? '' : button('Begin', 'start', starting)}${menuControls()}</main>`;
@@ -258,6 +273,7 @@ function render() {
   const traitSelected = root.querySelector<HTMLSelectElement>('#cg-trait')?.value;
   const about = root.querySelector<HTMLSelectElement>('#cg-about')?.value;
   const focusedAction = (document.activeElement as HTMLElement | null)?.dataset.action;
+  const focusedTutorial = document.activeElement === root.querySelector('#cg-tutorial button');
   // Read before the page is replaced: the open folds and the record are what slow the clock.
   const slow = gardenSlowNote(pace ?? 4, readingReasons(performance.now()));
   if (!run) {
@@ -314,6 +330,49 @@ function render() {
     root.querySelector<HTMLButtonElement>(`[data-action="${focusedAction}"]`)?.focus({ preventScroll: true });
   if (menu) root.querySelector('#cg-recording')?.append(telemetryToggle(lab));
   bind();
+  renderTutorial();
+  if (focusedTutorial)
+    root.querySelector<HTMLButtonElement>('#cg-tutorial button')?.focus({ preventScroll: true });
+}
+function renderTutorial() {
+  if (!tutorial || menu || !run) return;
+  const stage = tutorial;
+  const selectors = {
+    person: '.cg-person.here:not([data-person=hatice])',
+    plan: '[data-action^=plan-]',
+    ended: '.cg-panel h2',
+    response:
+      '[data-action=keep]:not(:disabled), [data-action=support]:not(:disabled), [data-action=spread]:not(:disabled)',
+    decision: '[data-action=listen]:not(:disabled), [data-action=silence]',
+    conversation: '[data-action=finish], [data-action=chat]',
+    result: '.cg-notice, .cg-confidence + p',
+  };
+  const target =
+    root.querySelector<HTMLElement>(selectors[stage]) ?? root.querySelector<HTMLElement>('.cg-panel');
+  if (!target) return;
+  const messages = {
+    person: 'Open a paid workers’ lunch on Day 13. Select a person in the garden.',
+    plan: 'Choose how to arrange lunch. The lunch can fail to open.',
+    ended: 'This garden has ended. The result is shown here; start a new game to try again.',
+    decision:
+      'Choose a conversation or pour tea. Your decisions affect the garden; the lunch can fail to open.',
+    conversation: 'Let the conversation finish, or leave early. See what happens.',
+    response:
+      'Choose what to do with what you heard. Trust can matter as you arrange lunch; you can keep this private.',
+    result: 'See what happened. Lunch needs supplies, paid preparation and reservations; it can fail.',
+  };
+  target.classList.add('cg-tutorial-target');
+  target.setAttribute('aria-describedby', 'cg-tutorial');
+  const cue = document.createElement('aside');
+  cue.id = 'cg-tutorial';
+  cue.className = 'cg-tutorial';
+  cue.innerHTML = `<p>${messages[stage]}</p><button type="button">${stage === 'result' || stage === 'ended' ? 'Done' : 'Skip tutorial'}</button>`;
+  cue.querySelector('button')!.onclick = () => {
+    tutorial = null;
+    render();
+  };
+  if (stage === 'person') root.querySelector('.cg-scene')?.append(cue);
+  else target.insertAdjacentElement('afterend', cue);
 }
 function bind() {
   const renderGeneration = uiGeneration;
@@ -323,6 +382,7 @@ function bind() {
     b.onclick = () => {
       if (!valid()) return;
       selected = b.dataset.person as GardenPerson;
+      if (tutorial === 'person' && run && gardenHere(run, selected)) tutorial = 'decision';
       readingUntil = performance.now() + 15000;
       notice = '';
       render();
@@ -461,7 +521,10 @@ async function action(key: string) {
         } satisfies GardenChapter;
         receipts = Object.fromEntries(claims.map((h) => [h.castId, h]));
       }
-      if (generation === attempt) await useRun(next, false, undefined, receipts);
+      if (generation === attempt) {
+        await useRun(next, false, undefined, receipts);
+        tutorial = 'person';
+      }
     } catch (e) {
       console.error('Garden start failed', e);
       notice =
@@ -488,6 +551,12 @@ async function action(key: string) {
     return;
   }
   if (!run) return;
+  if (key === 'tutorial-replay') {
+    menu = false;
+    tutorial = run.chat ? 'conversation' : run.lunch.pending ? 'plan' : run.ended ? 'ended' : 'person';
+    render();
+    return;
+  }
   if (key === 'menu' || key === 'back') {
     menu = key === 'menu';
     debug.open = false;
@@ -519,6 +588,8 @@ async function action(key: string) {
     notice = [gardenResult(run, before, ['conversation']), gardenInterruption(run, before)]
       .filter(Boolean)
       .join(' ');
+    if (tutorial)
+      tutorial = run.discoveries[selected] && !run.discoveries[selected]?.response ? 'response' : 'result';
     save();
     render();
     return;
@@ -636,9 +707,18 @@ export async function startGarden() {
         const minutes = Math.floor(carry);
         carry -= minutes;
         const before = run.log.length;
+        const conversation = run.chat;
         advanceGarden(run, Math.min(14 * 1440, run.minute + minutes));
         const stopped = gardenInterruption(run, before);
         if (stopped) notice = stopped;
+        if (tutorial === 'conversation' && conversation && !run.chat) {
+          tutorial =
+            selected === conversation.person &&
+            run.discoveries[selected] &&
+            !run.discoveries[selected]?.response
+              ? 'response'
+              : 'result';
+        }
         if (run.minute % 5 === 0) save();
         if (run.minute % 1440 === 0) void checkpoint();
         render();
