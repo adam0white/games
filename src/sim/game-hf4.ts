@@ -456,7 +456,7 @@ export function step(s: GameState): void {
     const c = ctxOf(s);
     while (s.queue.length > 0) {
       const m = castMoment(s, momentById(s.queue[0] as string, s.version));
-      if (m.when && !m.when(c)) {
+      if (m.when && !m.when(ctxOf(s))) {
         s.queue.shift();
         continue;
       }

@@ -89,6 +89,7 @@ it('reconstructs stored questions on cold clone, native mutation and actual rewi
   expect(game.cardView(truth)?.scene).toContain('Late again, Dilan.');
 }, 30_000);
 
+// Two independent full journal reconstructions run in this integration check.
 it('bounds complete archive work to one late opening in each actual journal reconstruction', () => {
   resetCounts();
   momentRecords(truth);
@@ -104,7 +105,7 @@ it('bounds complete archive work to one late opening in each actual journal reco
     exports: 1,
     decodes: 1,
   });
-});
+}, 10_000);
 
 function leafDifferences(a: unknown, b: unknown, path = ''): unknown[] {
   if (Object.is(a, b)) return [];

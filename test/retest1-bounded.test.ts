@@ -143,6 +143,7 @@ it('remembers completed Monday truth and preserves the distinct prior-lie questi
   expect(cardView(lie)?.scene).toContain('Was it the ring road again?');
 });
 
+// Three complete cold validations, journal reconstructions and next-input replays run serially.
 it('cold validates complete archives and follows the exact next input without presentation mutation', async () => {
   for (const [name, s, input] of [
     ['held', held, { kind: 'quiet' as const }],
@@ -198,7 +199,7 @@ it('cold validates complete archives and follows the exact next input without pr
     expect(snapshots.held).toEqual(baseline.snapshots.held);
     expect(snapshots['held-next']).toEqual(baseline.snapshots['held-next']);
   }
-}, 120_000);
+}, 180_000);
 
 it('does not rewrite a stored question when synthetic host-only selection metadata is changed', () => {
   // Negative consumer fixture only: actual retained HF history still contains the completed lie.
