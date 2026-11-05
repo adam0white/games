@@ -98,3 +98,22 @@ it('gives a bounded walk time and stops saying "Walking" for a fractional pointe
   for (let i = 0; i < 400; i++) step(g);
   expect(readWalk(g)).toBe('You are at the street.');
 });
+
+it('offers the real stair and invitation choices without requiring a torch for Burak', () => {
+  const g = createGame(4);
+  const burak = g.people[1]!;
+  Object.assign(g.player, { x: burak.x, y: burak.y });
+  expect(g.torch).toBe(false);
+  expect(readScreen(g, burak.id).available).toContain('route');
+  expect(readScreen(g, burak.id).guidance).toMatch(/check the stair/i);
+  expect(readScreen(g, burak.id).guidance).toContain('follow');
+});
+
+it('keeps the visible route advice usable by the existing cold control', async () => {
+  const { coldPolicy } = await import('./cold-policy');
+  const g = createGame(4);
+  const person = g.people[3]!;
+  for (const other of g.people.slice(0, 3)) other.status = 'safe';
+  Object.assign(g.player, { x: person.x, y: person.y });
+  expect(coldPolicy(readScreen(g, person.id))).toEqual({ type: 'speech', action: 'torch' });
+});

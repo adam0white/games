@@ -10,6 +10,110 @@ import './style.css';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML = `<header><div class="brand">Lale Apartmanı · Istanbul<strong>Smoke on the Stairs</strong></div><button class="plain" id="menu" aria-label="Pause and open menu">≡</button></header><main class="stage"><aside class="stage-note"><b>06:10 · Istanbul</b>Find who is home.<br>Show them the stair.<br>Ask them to leave.</aside><div class="scene" id="scene" role="img" aria-label="Apartment stairwell. Tap a landing to walk. Tap a neighbour to select them."></div></main><section class="controls" aria-label="Neighbour and action controls"><p id="smoke-clock" class="smoke-clock" role="timer"></p><div class="event-feed" id="event-feed" role="log" aria-label="What everyone says and does" aria-live="polite" aria-relevant="additions"><ol id="events"></ol></div><p class="dialogue" id="line"></p><div class="people" id="people"></div><div class="actions"><button data-action="come">Come now<small>E</small></button><button data-action="books">The books<small>B</small></button><button data-action="together">Walk with me<small>T</small></button><button data-action="route">Show the stair<small>R</small></button><button data-action="torch">Torch<small>F</small></button></div><div class="walk"><button id="street">Street</button><p id="guidance" class="hint"></p></div><p id="walk-status"></p><div class="sr-only" id="landings" aria-label="Walk to a landing"></div></section><div class="veil" id="overlay"></div>`;
+const tutorial = document.createElement('div');
+tutorial.id = 'tutorial';
+tutorial.hidden = true;
+tutorial.setAttribute('aria-live', 'polite');
+document.body.append(tutorial);
+let tutorialStage: 'off' | 'select' | 'approach' | 'speech' | 'waiting' | 'answer' | 'street' | 'arrival' =
+  'off';
+let tutorialEvents = 0;
+let tutorialPerson = '';
+let tutorialNoReply = false;
+let tutorialRender = '';
+let speechPending:
+  | { id: string; action: string; from: number; events: number; processed: boolean }
+  | undefined;
+function showTutorial() {
+  tutorial.hidden = tutorialStage === 'off' || paused || !started || ended || replaying;
+  document.querySelectorAll('.tutorial-target').forEach((el) => {
+    el.classList.remove('tutorial-target');
+  });
+  if (tutorial.hidden) return;
+  const person = game.people.find((p) => p.id === selected);
+  if (tutorialStage === 'approach' && canSpeak(game, selected, 'come')) tutorialStage = 'speech';
+  if (
+    tutorialStage === 'waiting' &&
+    person?.id === tutorialPerson &&
+    game.events.slice(tutorialEvents).some((event) => event.text.startsWith(`${person.name}:`))
+  )
+    tutorialStage = 'answer';
+  if (tutorialStage === 'waiting' && speechPending?.processed && speechPending.id === tutorialPerson) {
+    tutorialNoReply = true;
+    tutorialStage = 'answer';
+  }
+  if (tutorialStage === 'street' && person?.status !== 'following') tutorialStage = 'off';
+  if (tutorialStage === 'off') {
+    tutorial.hidden = true;
+    return;
+  }
+  const target = (
+    tutorialStage === 'select'
+      ? document.querySelector(
+          `[data-id="${game.people.find((p) => p.atHome && !['safe', 'hospital', 'dead'].includes(p.status))?.id ?? ''}"]`,
+        )
+      : tutorialStage === 'approach'
+        ? document.querySelector(`[data-id="${selected}"]`)
+        : tutorialStage === 'speech' || tutorialStage === 'waiting'
+          ? document.querySelector('.actions')
+          : tutorialStage === 'answer'
+            ? tutorialNoReply
+              ? document.querySelector(`[data-id="${selected}"]`)
+              : line
+            : tutorialStage === 'arrival'
+              ? document.querySelector(`[data-id="${selected}"]`)
+              : document.querySelector('#street')
+  ) as HTMLElement | null;
+  if (!target) {
+    tutorial.hidden = true;
+    return;
+  }
+  const text =
+    tutorialStage === 'select'
+      ? 'Get neighbours to Street. Smoke can kill. Tap a neighbour.'
+      : tutorialStage === 'approach'
+        ? 'Walking closer. Wait until you are near.'
+        : tutorialStage === 'speech'
+          ? 'Choose what to say.'
+          : tutorialStage === 'waiting'
+            ? 'Waiting for their answer…'
+            : tutorialStage === 'answer'
+              ? tutorialNoReply
+                ? 'Check their current status.'
+                : 'Read their answer.'
+              : tutorialStage === 'street'
+                ? 'Lead them to Street.'
+                : person?.status === 'safe'
+                  ? `${person.name} reached the street.`
+                  : person?.status === 'dead'
+                    ? `${person.name} died from smoke.`
+                    : person?.status === 'hospital'
+                      ? `${person.name} went to hospital.`
+                      : 'Watch their status as you go.';
+  const renderKey = `${tutorialStage}:${text}`;
+  if (renderKey !== tutorialRender) {
+    tutorialRender = renderKey;
+    tutorial.innerHTML = `<span>${text}</span> ${tutorialStage === 'answer' ? '<button id="tutorial-next">Continue</button>' : tutorialStage === 'arrival' && (person?.status === 'safe' || person?.status === 'dead' || person?.status === 'hospital') ? '<button id="tutorial-next">Finish tutorial</button>' : ''}<button id="tutorial-skip">Skip tutorial</button>`;
+    tutorial.querySelector('#tutorial-skip')?.addEventListener('click', () => {
+      tutorialStage = 'off';
+      showTutorial();
+    });
+    tutorial.querySelector('#tutorial-next')?.addEventListener('click', () => {
+      tutorialStage =
+        tutorialStage === 'answer' && game.people.find((p) => p.id === selected)?.status === 'following'
+          ? 'street'
+          : 'off';
+      showTutorial();
+    });
+  }
+  target.classList.add('tutorial-target');
+  const r = target.getBoundingClientRect();
+  const width = Math.min(230, innerWidth - 16);
+  tutorial.style.width = `${width}px`;
+  tutorial.style.left = `${Math.max(8, Math.min(innerWidth - width - 8, r.left + r.width / 2 - width / 2))}px`;
+  tutorial.style.top = `${Math.max(4, r.top - tutorial.offsetHeight - 5)}px`;
+}
+window.addEventListener('resize', showTutorial);
 const lab = createLab({ game: 'smoke' });
 // A seed selects run data. Query strings never enable gameplay or diagnostics.
 const requestedSeed = new URLSearchParams(location.search).get('seed');
@@ -211,19 +315,59 @@ function enqueue(input: Input) {
   if (started && !paused && game.phase === 'playing' && !replaying) pending.push(input);
 }
 function speak(action: string) {
-  if (action === 'torch') enqueue({ type: 'torch' });
-  else if (canSpeak(game, selected, action as 'come'))
-    enqueue({ type: 'speak', id: selected, line: action as 'come' });
+  if (!started || paused || replaying || game.phase !== 'playing') return;
+  if (action === 'torch') {
+    enqueue({ type: 'torch' });
+    return;
+  }
+  if (!canSpeak(game, selected, action as 'come')) return;
+  if (tutorialStage === 'speech') {
+    tutorialStage = 'waiting';
+    tutorialPerson = selected;
+    tutorialNoReply = false;
+    tutorialEvents = game.events.length;
+  }
+  speechPending = {
+    id: selected,
+    action,
+    from: game.log.length,
+    events: game.events.length,
+    processed: false,
+  };
+  enqueue({ type: 'speak', id: selected, line: action as 'come' });
+  updateDOM();
 }
 function select(id: string) {
   const p = game.people.find((p) => p.id === id);
   if (!p?.atHome) return;
   selected = id;
+  speechPending = undefined;
+  if (tutorialStage !== 'off')
+    tutorialStage = ['safe', 'hospital', 'dead'].includes(p.status) ? 'select' : 'approach';
   if (p && p.status !== 'safe' && p.status !== 'hospital' && p.status !== 'dead')
     enqueue({ type: 'move', x: p.x, y: p.y });
   updateDOM();
 }
 function updateDOM() {
+  if (speechPending) {
+    const person = game.people.find((p) => p.id === speechPending?.id);
+    if (
+      person &&
+      game.events.slice(speechPending.events).some((event) => event.text.startsWith(`${person.name}:`))
+    ) {
+      speechPending = undefined;
+    } else if (
+      game.log
+        .slice(speechPending.from)
+        .some(
+          ({ input }) =>
+            input.type === 'speak' && input.id === speechPending?.id && input.line === speechPending.action,
+        )
+    ) {
+      speechPending.processed = true;
+    }
+  }
+  showTutorial();
   const screen = readScreen(game, selected);
   const clock = document.querySelector<HTMLElement>('#smoke-clock')!;
   if (clock.textContent !== screen.timer) clock.textContent = screen.timer;
@@ -240,6 +384,7 @@ function updateDOM() {
     game.phase,
     game.torch,
     game.events.length,
+    speechPending,
     screen,
     game.people.map((p) => [
       p.line,
@@ -253,7 +398,14 @@ function updateDOM() {
   lastDOMKey = domKey;
   document.querySelector<HTMLElement>('#guidance')!.textContent = screen.guidance;
   const p = game.people.find((p) => p.id === selected)!;
-  const message = p.atHome ? `${p.name}: ${screen.dialogue}` : `${p.name} is away tonight.`;
+  const message =
+    speechPending?.id === selected
+      ? speechPending.processed
+        ? `Request checked. ${p.name}: ${p.line}`
+        : 'Request queued. Waiting for a reply…'
+      : p.atHome
+        ? `${p.name}: ${screen.dialogue}`
+        : `${p.name} is away tonight.`;
   if (line.textContent !== message) line.textContent = message;
   const followingLatest = eventFeed.scrollHeight - eventFeed.scrollTop - eventFeed.clientHeight < 30;
   eventCursor = appendEvents(eventList, game.events, eventCursor);
@@ -359,8 +511,12 @@ async function showMenu() {
   await simulation.fence();
   if (generation !== epoch || ended || simulationError) return;
   showSheet(
-    `<div class="eyebrow">The night is paused</div><h2 id="sheet-title">Paused.</h2><button class="primary" id="resume">Keep going</button><button class="secondary" id="new-game">New game</button><div id="new-confirm" hidden><p>Start a new night? This ends the current night.</p><button class="secondary" id="confirm-new">Start new night</button><button class="secondary" id="cancel-new">Keep this night</button></div><button class="secondary" id="fullscreen">Full screen</button><a class="secondary" href="https://human.adamwhite.work/games/">All games</a><a class="secondary" href="https://human.adamwhite.work/lab/people/">${PEOPLE_ACROSS_GAMES}</a><button class="secondary" id="stopping">I'm stopping</button><button class="secondary" id="confused">I'm confused</button><button class="secondary" id="export">Download this run</button><label><input id="recording" type="checkbox" ${lab.telemetryOn ? 'checked' : ''}>Record this play for the game lab</label><p class="minor">Recorded play is linked to other lab play on this device and kept for 180 days. <a href="https://human.adamwhite.work/lab/privacy/" target="_blank" rel="noopener noreferrer">Privacy</a></p><p class="minor">Feedback opens a draft for you to review. Nothing is sent until you submit.</p><details><summary>Debug</summary><p class="minor">Seed ${game.seed} · Tick ${game.tick} · HF ${ENGINE}</p><button class="secondary" id="debug-replay">Check replay</button><p class="minor" id="debug-result"></p></details>`,
+    `<div class="eyebrow">The night is paused</div><h2 id="sheet-title">Paused.</h2><button class="primary" id="resume">Keep going</button><button class="secondary" id="tutorial-replay">Replay tutorial</button><button class="secondary" id="new-game">New game</button><div id="new-confirm" hidden><p>Start a new night? This ends the current night.</p><button class="secondary" id="confirm-new">Start new night</button><button class="secondary" id="cancel-new">Keep this night</button></div><button class="secondary" id="fullscreen">Full screen</button><a class="secondary" href="https://human.adamwhite.work/games/">All games</a><a class="secondary" href="https://human.adamwhite.work/lab/people/">${PEOPLE_ACROSS_GAMES}</a><button class="secondary" id="stopping">I'm stopping</button><button class="secondary" id="confused">I'm confused</button><button class="secondary" id="export">Download this run</button><label><input id="recording" type="checkbox" ${lab.telemetryOn ? 'checked' : ''}>Record this play for the game lab</label><p class="minor">Recorded play is linked to other lab play on this device and kept for 180 days. <a href="https://human.adamwhite.work/lab/privacy/" target="_blank" rel="noopener noreferrer">Privacy</a></p><p class="minor">Feedback opens a draft for you to review. Nothing is sent until you submit.</p><details><summary>Debug</summary><p class="minor">Seed ${game.seed} · Tick ${game.tick} · HF ${ENGINE}</p><button class="secondary" id="debug-replay">Check replay</button><p class="minor" id="debug-result"></p></details>`,
   );
+  document.querySelector('#tutorial-replay')!.addEventListener('click', () => {
+    tutorialStage = 'select';
+    hideSheet();
+  });
   document.querySelector('#new-game')!.addEventListener('click', () => {
     document.querySelector<HTMLElement>('#new-confirm')!.hidden = false;
     document.querySelector<HTMLButtonElement>('#confirm-new')!.focus();
@@ -395,8 +551,13 @@ async function showMenu() {
     lab.setTelemetryOff(!(e.target as HTMLInputElement).checked);
 }
 menuButton.onclick = showMenu;
-document.querySelector<HTMLButtonElement>('#street')!.onclick = () =>
+document.querySelector<HTMLButtonElement>('#street')!.onclick = () => {
   enqueue({ type: 'move', x: 180, y: 450 });
+  if (tutorialStage === 'street') {
+    tutorialStage = 'arrival';
+    showTutorial();
+  }
+};
 async function resetSimulation(seed: number, playback?: RunExport) {
   const generation = ++epoch;
   resetting = true;
@@ -420,6 +581,8 @@ async function resetSimulation(seed: number, playback?: RunExport) {
 }
 async function restart(newSeed = false) {
   if (resetting) return;
+  tutorialStage = 'off';
+  speechPending = undefined;
   for (const button of overlay.querySelectorAll<HTMLButtonElement>('button')) button.disabled = true;
   attempt++;
   setPaused(true);
@@ -732,6 +895,7 @@ showSheet(
 );
 document.querySelector('#start')!.addEventListener('click', () => {
   started = true;
+  tutorialStage = 'select';
   hideSheet();
   lab.screen('stairwell');
   updateDOM();

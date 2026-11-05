@@ -400,3 +400,26 @@ header .brand strong {
     font-size: 10px;
   }
 }
+#tutorial {
+  position: fixed;
+  z-index: 8;
+  padding: 7px 9px;
+  background: #eee8d8;
+  color: #202521;
+  border: 2px solid #de795d;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+#tutorial button {
+  color: #202521;
+  background: transparent;
+  border: 0;
+  padding: 3px;
+  text-decoration: underline;
+  font-size: 11px;
+}
+.tutorial-target {
+  outline: 3px solid #edba65;
+  outline-offset: 2px;
+}
