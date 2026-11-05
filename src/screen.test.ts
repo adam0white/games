@@ -98,3 +98,13 @@ it('gives a bounded walk time and stops saying "Walking" for a fractional pointe
   for (let i = 0; i < 400; i++) step(g);
   expect(readWalk(g)).toBe('You are at the street.');
 });
+
+it('offers the real stair and invitation choices without requiring a torch for Burak', () => {
+  const g = createGame(4);
+  const burak = g.people[1]!;
+  Object.assign(g.player, { x: burak.x, y: burak.y });
+  expect(g.torch).toBe(false);
+  expect(readScreen(g, burak.id).available).toContain('route');
+  expect(readScreen(g, burak.id).guidance).toContain('check the stair');
+  expect(readScreen(g, burak.id).guidance).toContain('follow');
+});
