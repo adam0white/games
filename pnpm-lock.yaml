@@ -187,9 +187,6 @@ importers:
         specifier: file:vendor/adam0white-lab-kit-0.5.29.tgz
         version: file:games/hearsay/vendor/adam0white-lab-kit-0.5.29.tgz(@adam0white/lab-client@file:games/hearsay/vendor/adam0white-lab-client-0.5.12.tgz)
     devDependencies:
-      '@adam0white/hf-legacy':
-        specifier: npm:@adam0white/human-framework@3.0.0
-        version: '@adam0white/human-framework@3.0.0'
       '@biomejs/biome':
         specifier: 2.6.3
         version: 2.6.3
