@@ -1,5 +1,7 @@
 # Upkeep candidate — 2026-11-05
 
+[Item-specific open checkpoints](docs/upkeep-checkpoints-2026-11-05.md) retain the original requests and their separate dates.
+
 Remaining: exact-source review, CI, integration and deployment. This source candidate targets HF 4.17.0; it is not a delivery receipt. F-2529 and F-2618/F-2619/F-2629 remain open: the existing game does not send the repair letter; a later chapter needs a recipient, delivery event and actor-chosen result. Recheck the fiction decision on 2026-11-12. Existing owner acceptance and original report dates are unchanged.
 
 # Original household requests — source candidate 2026-10-31
