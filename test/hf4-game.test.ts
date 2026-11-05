@@ -239,7 +239,7 @@ test('a current cast passport admits retained history into a new current game', 
     castRevision: CAST.nermin.revision,
     branchId: 'nermin',
     parentRevision: null,
-    source: { game: 'goodhands', build: 'test', engine: '4.8.1', rules: 'goodhands-hf4-2' },
+    source: { game: 'goodhands', build: 'test', engine: '4.17.0', rules: 'goodhands-hf4-2' },
     transfer: { ...transfer, life: initialPersonaLife(CAST.nermin.castId, 'nermin', 0) },
     limitations: [],
   });
