@@ -1200,6 +1200,8 @@ function renderTutorial() {
     existing.dataset.reply === tutorialReply &&
     tutorialAnchor === target
   ) {
+    target.classList.add('tutorial-target');
+    target.setAttribute('aria-describedby', 'tutorial-cue');
     positionTutorial(existing, target);
     return;
   }
@@ -1991,6 +1993,10 @@ function patchSheet(el: HTMLElement, html: string, stable: boolean) {
     }
     if (!(old instanceof HTMLElement) || !(fresh instanceof HTMLElement)) return;
     if (old.tagName !== fresh.tagName) return;
+    if (old === tutorialAnchor && tutorial) {
+      fresh.classList.add('tutorial-target');
+      fresh.setAttribute('aria-describedby', 'tutorial-cue');
+    }
     for (const attr of Array.from(fresh.attributes))
       if (attr.name !== 'open' && old.getAttribute(attr.name) !== attr.value)
         old.setAttribute(attr.name, attr.value);

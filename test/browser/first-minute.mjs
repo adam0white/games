@@ -82,6 +82,18 @@ try {
     .setInputFiles({ name: 'opening.json', mimeType: 'application/json', buffer: Buffer.from(run) });
   await direct.locator('[data-g=gate]').click();
   await direct.locator('.tutorial-cue[data-cue=gate-choice]').waitFor();
+  await direct.evaluate(() => window.__glance.step(1));
+  assert.equal(
+    await direct.locator('[data-job=gate]').first().getAttribute('aria-describedby'),
+    'tutorial-cue',
+  );
+  assert.equal(
+    await direct
+      .locator('[data-job=gate]')
+      .first()
+      .evaluate((el) => el.classList.contains('tutorial-target')),
+    true,
+  );
   await direct.locator('.tutorial-target[data-job=gate]').click();
   console.log('PASS: real requests, newer reports, direct gate risk cue, skip and replay');
 } finally {
