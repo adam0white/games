@@ -10,7 +10,7 @@ test('public playtest adapter uses the current game and replays an offered input
   expect(action).toBeDefined();
   game.apply(action!.id);
   const file = exportRun(game.state, game.state.inputs);
-  expect(file.framework).toBe('4.8.1');
+  expect(file.framework).toBe('4.17.0');
   expect(file.simulation).toBe(6);
   expect(fingerprint(verifyImport(JSON.stringify(file)).state)).toBe(fingerprint(game.state));
 });

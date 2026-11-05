@@ -1,4 +1,4 @@
-import { exportRun as archive, replay as replayHF } from '@adam0white/human-framework';
+import { exportRun as archive, readRunHistory, replay as replayHF } from '@adam0white/human-framework';
 import { createPersona, initialPersonaLife, preparePersonaLife } from '@adam0white/lab-client';
 import { expect, test } from 'vitest';
 import { CAST } from '../src/sim/cast.ts';
@@ -48,7 +48,9 @@ test('a retained visitor arrives mid-run with her original portable input and ex
   tick(state.people.nermin!, arrival + 1);
   saveFramework(state);
   const after = archive(runFor(state));
-  const entry = after.history.flatMap((t) => t.inputs).find((i) => i.kind === 'person.arrived');
+  const entry = readRunHistory(after)
+    .flatMap((t) => t.inputs)
+    .find((i) => i.kind === 'person.arrived');
   expect(entry?.kind).toBe('person.arrived');
   if (entry?.kind === 'person.arrived') {
     expect(entry.at).toBe(arrival * 60_000);

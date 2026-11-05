@@ -1,4 +1,4 @@
-import { exportRun as archive, replay as frameworkReplay } from '@adam0white/human-framework';
+import { exportRun as archive, replay as frameworkReplay, readRunHistory } from '@adam0white/human-framework';
 import { expect, test } from 'vitest';
 import { applyGuest } from '../src/sim/guests.ts';
 import { bindFramework, decide, runFor, saveFramework, schedulePlacement, tick } from '../src/sim/hf4.ts';
@@ -32,8 +32,8 @@ test('withdrawing a placement interrupts its admitted shift', () => {
   saveFramework(state);
   const host = (state.hf4 as { host: HostState }).host;
   expect(host.active.some((a) => a.person === 'gul' && a.offer.actionId === 'placement-work')).toBe(false);
-  const receipt = archive(runFor(state))
-    .history.flatMap((t) => t.inputs)
+  const receipt = readRunHistory(archive(runFor(state)))
+    .flatMap((t) => t.inputs)
     .find(
       (i) =>
         i.kind === 'action.resolved' &&
@@ -96,8 +96,8 @@ test('an accepted guest trial completes its actual duty', () => {
   const duty = actor.agenda.commitments.find((c) => c.kind === 'duty')!;
   expect(duty).toBeDefined();
   tick(actor, state.now + 91);
-  const completed = archive(runFor(state))
-    .history.flatMap((t) => t.inputs)
+  const completed = readRunHistory(archive(runFor(state)))
+    .flatMap((t) => t.inputs)
     .find(
       (i) =>
         i.kind === 'action.resolved' &&
@@ -138,8 +138,8 @@ test('ending with an accepted meal records interruption and permits a cast check
   apply(state, { type: 'pause-cast' });
   expect(state.castPaused).toBe(true);
   saveFramework(state);
-  const receipt = archive(runFor(state))
-    .history.flatMap((t) => t.inputs)
+  const receipt = readRunHistory(archive(runFor(state)))
+    .flatMap((t) => t.inputs)
     .find(
       (i) =>
         i.kind === 'action.resolved' &&
@@ -166,7 +166,7 @@ test('a calm household call records its actual social observation in HF and repl
   expect(state.people['arslans-0']!.affect.mood.valence).toBeGreaterThan(initialMood);
   saveFramework(state);
   const source = archive(runFor(state));
-  const observations = source.history
+  const observations = readRunHistory(source)
     .flatMap((t) => t.inputs)
     .filter((i) => i.kind === 'observation.received' && i.payload.person === 'arslans-0');
   expect(
