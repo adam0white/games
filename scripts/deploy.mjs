@@ -24,7 +24,7 @@ try {
   if (remoteHead() !== commit) throw new Error('main advanced during build');
   // Repeat the live preflight immediately before upload, after the full build.
   run('node', ['scripts/check-redirects.mjs'], opts);
-  run('pnpm', ['run', 'deploy:worker'], opts);
+  run('pnpm', ['exec', 'wrangler', 'deploy'], opts);
   for (const game of registry.games) {
     const expected = JSON.parse(readFileSync(join(checkout, 'dist', game.slug, 'release.json'), 'utf8'));
     const url = `https://play.adamwhite.work/${game.slug}/release.json`;
