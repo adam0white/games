@@ -223,7 +223,7 @@ export function refreshTeaching() {
   } else if (step && !document.querySelector('.teaching-cue')) mountTeaching();
 }
 
-window.addEventListener('resize', () => {
+document.defaultView?.addEventListener('resize', () => {
   if (!step) return;
   const focused =
     document.activeElement instanceof HTMLElement && document.activeElement.closest('.teaching-cue')

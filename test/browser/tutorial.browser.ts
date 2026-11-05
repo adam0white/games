@@ -327,4 +327,21 @@ test('speech highlight expiry preserves the active practice cue immediately', as
   });
   expect(immediateCue).toBe(true);
   await expectPracticeInView(page, 'crew');
+  await page.locator('[data-pick]').first().click();
+  await expectPracticeInView(page, 'ask');
+  await page.locator('[data-v]:not([disabled])').first().focus();
+  expect(
+    await page.evaluate(() => {
+      const before = document.activeElement;
+      (window as unknown as { highlightCallbacks: (() => void)[] }).highlightCallbacks.at(-1)?.();
+      return before?.isConnected && document.activeElement === before;
+    }),
+  ).toBe(true);
+  await page.locator('[data-tutorial-skip]').focus();
+  expect(
+    await page.evaluate(() => {
+      (window as unknown as { highlightCallbacks: (() => void)[] }).highlightCallbacks.at(-1)?.();
+      return document.activeElement?.hasAttribute('data-tutorial-skip');
+    }),
+  ).toBe(true);
 });
