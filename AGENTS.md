@@ -8,6 +8,8 @@ Current candidate uses HF 4.17.0 directly, immutable lab-client 0.5.11 and lab-k
 
 ## Current authorization
 
+2026-11-05: the owner approved public source and an MIT license for this repository. The current release includes notices for the vendored lab packages. This supersedes the older private-hosting and undecided-licensing directions retained below.
+
 2026-10-28: the owner authorizes this HF4 port, public gameplay corrections, one PR, one hosted `@codex review`, fixes in that PR, merge, exact merged CI and deployment. Old saves, old links and HF3 compatibility may be refused. Preserve exact new-pin game export replay. Ordinary design decisions belong to the implementer and must be recorded in the PR. Record a real HF blocker with a date in the design doc and the matching G-row in `../human-framework/docs/hf4-game-needs.md`; do not edit HF. Read the current HANDOFF and [HF4 adoption](docs/hf4-adoption.md) before historical records. Technical delivery and Adam's acceptance remain separate; owner review target 2026-11-03.
 
 Lab-panel rounds on HF3 builds are allowed under the playtest director. Friends' playtests and Show HN stay paused. The Feedback choices “I'm stopping” and “I'm confused” are exposed by the released shared artifacts and this host’s custom Feedback page. Selection sends nothing; ordinary Submit retains the note and optional run boundary. Lab client and kit remain immutable release artifacts. HF's npm package requires TypeScript 7 or later.
