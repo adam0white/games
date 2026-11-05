@@ -5,7 +5,7 @@
       "slug": "rope",
       "source": {
         "repository": "https://github.com/adam0white/rope",
-        "commit": "9989ee495f40e371ec20e3c3d83a068b2783fe57"
+        "commit": "c69a43cd9237d397ed6ea21031f783932c86046e"
       },
       "saveSchema": "rope-hf4/1",
       "legacyOrigin": "https://rope.adamwhite.work",
