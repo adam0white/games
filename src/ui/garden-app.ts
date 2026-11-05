@@ -273,6 +273,7 @@ function render() {
   const traitSelected = root.querySelector<HTMLSelectElement>('#cg-trait')?.value;
   const about = root.querySelector<HTMLSelectElement>('#cg-about')?.value;
   const focusedAction = (document.activeElement as HTMLElement | null)?.dataset.action;
+  const focusedTutorial = document.activeElement === root.querySelector('#cg-tutorial button');
   // Read before the page is replaced: the open folds and the record are what slow the clock.
   const slow = gardenSlowNote(pace ?? 4, readingReasons(performance.now()));
   if (!run) {
@@ -330,6 +331,8 @@ function render() {
   if (menu) root.querySelector('#cg-recording')?.append(telemetryToggle(lab));
   bind();
   renderTutorial();
+  if (focusedTutorial)
+    root.querySelector<HTMLButtonElement>('#cg-tutorial button')?.focus({ preventScroll: true });
 }
 function renderTutorial() {
   if (!tutorial || menu || !run) return;

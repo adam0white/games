@@ -35,7 +35,13 @@ try {
   await automatic.locator('#cg-tutorial').waitFor();
   await automatic.locator('.cg-tutorial-target[data-person]').click();
   await automatic.locator('.cg-tutorial-target[data-action=listen]').click();
-  await automatic.clock.runFor(25000);
+  await automatic.locator('#cg-tutorial button').focus();
+  await automatic.clock.runFor(3000);
+  assert.equal(
+    await automatic.locator('#cg-tutorial button').evaluate((button) => document.activeElement === button),
+    true,
+  );
+  await automatic.clock.runFor(22000);
   assert.equal(await automatic.locator('.cg-tutorial-target[data-action=support]').count(), 1);
   await automatic.close();
   const refusal = await browser.newPage({ viewport: { width: 390, height: 844 } });
