@@ -164,7 +164,6 @@ run `pnpm build`, then `npx wrangler deploy`. Verify the play URL and
 `/release.json`; the release must name that commit and show `dirty: false`.
 Code is MIT licensed. See [docs/design.md](docs/design.md) for scope and design.
 
-
 The cold policy in `test/support/cold-policy.ts` reads only the displayed text,
 choice labels and its own prior choices. It cannot read the seed, actor state,
 agreement fields or exported run. It tries asking before offering and recovering

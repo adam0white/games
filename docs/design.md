@@ -105,6 +105,19 @@ This is a wording change on a five-person panel cohort, not evidence about all p
 
 ## Deferred
 
+Current follow-up checkpoint (2026-11-05): **2026-11-12** replaces expired November 3 review targets below. Recheck unresolved input/clarity causes against current source, and keep actual owner or device acceptance separate from automated delivery. Larger content, sound, movement or difficulty changes need their own authored comparison; cross-game continuation remains outside this upkeep scope. Future targets and historical fixed-result records remain unchanged.
+
+Current item dispositions (owner upkeep, 2026-11-05; prior rows below remain historical):
+
+| Item | Checkpoint or disposition | Reason |
+| --- | --- | --- |
+| Owner feel acceptance | 2026-11-12 | Offer the deployed current-engine candidate for owner play; automated checks do not establish acceptance. |
+| Continuous event time | 2026-11-12 | Compare reading time and costly choices before replacing the appointment clock; this changes the game budget. |
+| F-2441 rewrite/signature cost | 2026-11-12 | Trace current rewrite and signature costs against displayed minutes before changing the preview. |
+| F-2446 agreement row length | 2026-11-12 | Review the current terms note at phone width before shortening binding terms. |
+| F-2447 desktop controls | 2026-11-12 | Reproduce the reported 800px overflow on the upgraded build; the old report did not establish its cause. |
+| F-2450 private-word label | 2026-11-12 | Check the current first private-word choice and its destination before choosing a precise label. |
+
 - 2026-11-03: owner acceptance after lab round 1 and retest. Coordinator owns panel scheduling and central site deployment.
 - 2026-11-15: audience-tuned retelling and rehearsal confidence are HF 4.1 work; HF 4.0 does not deliver them. Adopt them after that release and the named headless control. Request in V3-COORDINATION.md.
 - 2026-11-03: consider continuous event time after reading-speed feedback. First slice advances the appointment through costly choices.
