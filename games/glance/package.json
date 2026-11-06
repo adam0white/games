@@ -18,7 +18,7 @@
     "format": "biome format --write .",
     "measure": "node scripts/measure.ts",
     "check": "npm run lint && npm run typecheck && npm test",
-    "deploy": "pnpm --workspace-root run deploy",
+    "deploy": "cd ../.. && pnpm run deploy",
     "check:lane": "SUITE_LOCK=0 npm run check",
     "test:first-minute": "node test/browser/first-minute.mjs"
   },
