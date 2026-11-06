@@ -13,8 +13,9 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["node", "vite/client"]
+    "types": ["node", "vite/client"],
+    "resolveJsonModule": true
   },
   "include": ["src", "test", "scripts", "vite.config.ts"],
-  "exclude": ["scripts/playtester"]
+  "exclude": ["scripts/playtester", "archive"]
 }

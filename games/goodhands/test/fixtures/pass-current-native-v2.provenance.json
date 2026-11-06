@@ -1,0 +1,19 @@
+{
+  "producer": "34876bebf0ace9667ed8d7f2bf92fb3007e5b3d7",
+  "engine": "4.17.0",
+  "method": "Actual Pass freshCommunity(42) Zeynep -> hf4KitchenTransfer -> released createPersona/validatePersona. Source stamps match actual ui/continuity source helper; build set to exact copied commit. No source relabeling, played journey, live shelf or source-custody claim.",
+  "sourceHost": {
+    "game": "pass",
+    "engine": "4.17.0",
+    "personId": "zeynep"
+  },
+  "hashes": {
+    "src/sim/hf4-person.ts": "38076128c91fb626d50aa570389700095fbb05929d436f8ca34c38816e746331",
+    "src/sim/hf4-cast.ts": "3edb3c4833cce3e8d4fcb88512c8f6d8ee6d909d8a8df2dda1aa9af4aaaf87ba",
+    "src/sim/hf4-authoring.ts": "22674b091b519924c00fd6622efb13a89cc9c9e529398f20f95ad6a0c32cb5e7",
+    "src/sim/hf4-run.ts": "327c8c736de328c93a0f07501a5fafea6345ba76c5cef891914cace70bbda012",
+    "src/sim/cast-chapter.ts": "45254ca8955a0e81139d39683f14daadce86ce0260e6724d95c1d8558c401744",
+    "src/ui/continuity.ts": "9865e2621fa7f1e5f21ca1141c7f9c224522c7d36ff783669c0abc2917b0d4b6"
+  },
+  "fixtureSha256": "f24ac36a07c00282a15ac9e7b02164edeb7d259c1a36344343416b00fce23805"
+}

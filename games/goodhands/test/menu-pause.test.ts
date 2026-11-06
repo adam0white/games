@@ -39,7 +39,9 @@ it('holds the menu and information, then resumes without speed inputs', async ()
   expect(
     await page.getByText('Replace your saved month, or play the file in this tab only?').isVisible(),
   ).toBe(true);
-  expect(await page.getByRole('link', { name: 'Play in this tab only' }).getAttribute('href')).toBe('/file/');
+  expect(await page.getByRole('link', { name: 'Play in this tab only' }).getAttribute('href')).toBe(
+    '/goodhands/file/',
+  );
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   expect(await page.locator('[data-pace-choice]').count()).toBe(4);
   expect(await page.getByRole('link', { name: 'People across games' }).getAttribute('href')).toBe(

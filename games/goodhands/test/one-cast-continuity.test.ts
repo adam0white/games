@@ -47,7 +47,7 @@ test('a receiving claim advances atomically before use, and old saved parents st
     transfer: { person: { later: true } },
   });
   shelfState = acceptPersona(shelfState, newer);
-  await expect(session.publish(book, source.castId, { person: { return: true } })).rejects.toThrow(
+  await expect(session.publish(book, source.castId, { nativeMetadata: true })).rejects.toThrow(
     'Continuity conflict',
   );
   expect(book.heads[0]?.revision).toBe(claim.revision);

@@ -1,8 +1,9 @@
 import { expect, test } from 'vitest';
 import { advance, apply, newGame, replay, view } from '../src/sim/index.ts';
-import { verifyImport as historicalVerify } from '../src/sim/v6/export.ts';
+import type { State } from '../src/sim/types.ts';
 import { exportRun, verifyImport } from '../src/ui/export.ts';
 import { createFileSession } from '../src/ui/file-session.ts';
+import historicalState from './fixtures/historical-refusal-state.json' with { type: 'json' };
 
 test('historical export is refused without replacing the held file', async () => {
   // Existing authored two-input historical envelope, also checked by export.test.ts.
@@ -29,8 +30,43 @@ test('historical export is refused without replacing the held file', async () =>
   expect(() => verifyImport(JSON.stringify(old))).toThrow(/keep.*start a new game/i);
   expect(() => newGame(37, 2)).toThrow(/start a new game/i);
   expect(() => replay(37, [], old.minute, 1)).toThrow(/start a new game/i);
-  const state = historicalVerify(JSON.stringify(old)).state;
+  const state = historicalState as unknown as State;
   expect(() => view(state)).toThrow(/start a new game/i);
   expect(() => apply(state, { type: 'speed', speed: 2 })).toThrow(/start a new game/i);
   expect(() => advance(state, 1)).toThrow(/start a new game/i);
+});
+
+test('an old guest continuity book leaves the selected current file and native storage untouched', async () => {
+  const { validateContinuity } = await import('../src/ui/export.ts');
+  const { emptyContinuity } = await import('../src/ui/continuity.ts');
+  const current = exportRun(newGame(24), []);
+  const session = createFileSession();
+  await session.select(new File([JSON.stringify(current)], 'current.json'));
+  const held = session.snapshot();
+  const bytes = session.original();
+  // Deliberately untrusted arrival: refusal precedes historic preparation or any state restoration.
+  const oldBook = { ...emptyContinuity(), arrivals: [{ initial: { version: historicalState.version } }] };
+  const old = { ...current, continuity: oldBook, oneCast: [] };
+  let writes = 0;
+  const native = globalThis.indexedDB;
+  Object.defineProperty(globalThis, 'indexedDB', {
+    configurable: true,
+    value: {
+      open() {
+        writes++;
+        throw new Error('Unexpected native write');
+      },
+    },
+  });
+  try {
+    await expect(session.select(new File([JSON.stringify(old)], 'old-arrivals.json'))).rejects.toThrow(
+      /keep.*start a new game/i,
+    );
+    await expect(validateContinuity(oldBook as never)).rejects.toThrow(/keep.*start a new game/i);
+    expect(session.snapshot()).toEqual(held);
+    expect(session.original()).toEqual(bytes);
+    expect(writes).toBe(0);
+  } finally {
+    Object.defineProperty(globalThis, 'indexedDB', { configurable: true, value: native });
+  }
 });

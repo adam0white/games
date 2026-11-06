@@ -27,6 +27,7 @@ import {
   emptyContinuity,
 } from './continuity.ts';
 import { continuityError, sourceStatus, unavailablePeople } from './continuity-copy.ts';
+import { nativePublicationTransfer } from './native-transfer.ts';
 import '@adam0white/lab-kit/stage.css';
 import {
   defineTerms,
@@ -54,14 +55,7 @@ import {
   type View,
 } from '../sim/types.ts';
 import { ARCHIVE_LIMIT } from './archive-import.ts';
-import {
-  exportRun,
-  exportWorkingRun,
-  guestCheckpointTransfer,
-  type RunExport,
-  validateContinuity,
-  verifyImport,
-} from './export.ts';
+import { exportRun, exportWorkingRun, type RunExport, validateContinuity, verifyImport } from './export.ts';
 import { createFileSession } from './file-session.ts';
 import { fileMode, lab, preservationStatus } from './lab.ts';
 import { cityFigurePositions, drawCity, MAP_HEIGHT, MAP_WIDTH } from './map.ts';
@@ -121,7 +115,7 @@ import {
 const h = (value: string) => escapeHtml(plainText(value));
 
 try {
-  const theme = localStorage.getItem('goodhands-theme');
+  const theme = localStorage.getItem('games:goodhands:theme');
   if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
 } catch {
   // The current page can still use a colour choice when storage is unavailable.
@@ -147,7 +141,7 @@ let playing = false;
 // Tutorial state is a display preference, never part of the recorded simulation.
 let tutorialStep: 'bench' | 'interview' | 'question' | 'result' | null = null;
 let tutorialClock = '';
-const TUTORIAL_KEY = 'goodhands-tutorial-seen';
+const TUTORIAL_KEY = 'games:goodhands:tutorial-seen';
 function finishTutorial(): void {
   tutorialStep = null;
   try {
@@ -997,26 +991,7 @@ function checkpoint(fork = false, record = false): Promise<void> {
             }
             envelope = await closePersonaBranch(parent, stamps, person.now);
           } else {
-            const transfer: Record<string, unknown> = await agencyTransfer(pinned, id);
-            if (id === 'zeynep-pass' || id === 'selin-voice') {
-              const g = (pinned.guests as Array<Record<string, unknown>>).find((g) => g.id === id);
-              if (g) {
-                const { person: _p, ...meta } = g;
-                transfer.guestMetadata = meta;
-              }
-              const input = continuity.chapter?.inputs.find((p) => p.parent.castId === cast.castId);
-              const original = (parent?.transfer.returnOrigin ?? input?.parent) as
-                | PersonaEnvelope
-                | undefined;
-              if (
-                original &&
-                ((original.source.game === 'voice' && original.source.rules === 'voice-4') ||
-                  original.source.game === 'pass')
-              ) {
-                Object.assign(transfer, await guestCheckpointTransfer(pinned, id as GuestId, original));
-                transfer.returnOrigin = original;
-              }
-            }
+            const transfer = await nativePublicationTransfer(pinned, id);
             const branchId = fork || !parent ? crypto.randomUUID() : parent.branchId;
             const previous = parent?.transfer.life as PersonaLife | undefined;
             transfer.life = previous
@@ -1030,7 +1005,10 @@ function checkpoint(fork = false, record = false): Promise<void> {
               parentRevision: fork ? null : (parent?.revision ?? null),
               source: stamps,
               transfer,
-              limitations: (transfer.limitations as string[]) ?? [],
+              limitations: [
+                ...((transfer.limitations as string[]) ?? []),
+                ...((transfer.currentFormatLimitations as string[]) ?? []),
+              ],
             });
           }
           if (activeGeneration !== generation) return;
@@ -1887,8 +1865,8 @@ function menu(): void {
     const chooser = openSheet(
       'Open a saved month',
       tabOnlyReason
-        ? '<p>This month stays in this tab. Your saved month is not changed. Open a file in this tab only.</p><a href="/file/">Play in this tab only</a><button type="button" data-cancel-file>Cancel</button>'
-        : '<p>Replace your saved month, or play the file in this tab only?</p><button type="button" data-action="import">Replace saved month</button><a href="/file/">Play in this tab only</a><button type="button" data-cancel-file>Cancel</button>',
+        ? '<p>This month stays in this tab. Your saved month is not changed. Open a file in this tab only.</p><a href="/goodhands/file/">Play in this tab only</a><button type="button" data-cancel-file>Cancel</button>'
+        : '<p>Replace your saved month, or play the file in this tab only?</p><button type="button" data-action="import">Replace saved month</button><a href="/goodhands/file/">Play in this tab only</a><button type="button" data-cancel-file>Cancel</button>',
       'file-import',
     );
     if (!tabOnlyReason)
@@ -2375,8 +2353,8 @@ function handleClick(event: Event): void {
     if (b.dataset.themeChoice === 'system') delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = b.dataset.themeChoice;
     try {
-      if (b.dataset.themeChoice === 'system') localStorage.removeItem('goodhands-theme');
-      else localStorage.setItem('goodhands-theme', b.dataset.themeChoice);
+      if (b.dataset.themeChoice === 'system') localStorage.removeItem('games:goodhands:theme');
+      else localStorage.setItem('games:goodhands:theme', b.dataset.themeChoice);
     } catch {
       // Keep the choice for this page when storage is unavailable.
     }

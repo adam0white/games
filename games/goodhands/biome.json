@@ -10,7 +10,8 @@
       "!scratch",
       "!docs/playtests/*.json",
       "!.claude",
-      "!pnpm-lock.yaml"
+      "!pnpm-lock.yaml",
+      "!archive"
     ]
   },
   "formatter": {

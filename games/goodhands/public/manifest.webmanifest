@@ -2,16 +2,17 @@
   "name": "Good Hands",
   "description": "Run a small placement agency in Izmir. Find workers for families for a month.",
   "short_name": "Good Hands",
-  "start_url": "/",
+  "start_url": "/goodhands/",
   "display": "standalone",
   "background_color": "#F3ECDD",
   "theme_color": "#F3ECDD",
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "/goodhands/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     }
-  ]
+  ],
+  "scope": "/goodhands/"
 }

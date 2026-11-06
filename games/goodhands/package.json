@@ -10,24 +10,21 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/stamp-release.ts && vite build",
+    "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run --no-file-parallelism --testTimeout=180000",
+    "test": "node scripts/suite-lock.ts -- vitest run --no-file-parallelism --testTimeout=180000",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "biome check .",
     "format": "biome format --write .",
     "measure": "node scripts/measure.ts",
     "check": "npm run lint && npm run typecheck && npm test",
-    "deploy": "pnpm run check:lane && pnpm run build && pnpm exec wrangler deploy",
+    "deploy": "pnpm --workspace-root run deploy",
     "check:lane": "npm run lint && npm run typecheck"
   },
   "dependencies": {
     "@adam0white/human-framework": "4.17.0",
-    "@adam0white/human-framework-legacy": "npm:@adam0white/human-framework@2.9.0",
-    "@adam0white/human-framework-legacy3": "npm:@adam0white/human-framework@3.0.0",
-    "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.7/adam0white-lab-client-0.5.7.tgz",
-    "@adam0white/lab-client-legacy3": "file:vendor/adam0white-lab-client-0.4.15.tgz",
-    "@adam0white/lab-kit": "https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.24/adam0white-lab-kit-0.5.24.tgz"
+    "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.16/adam0white-lab-client-0.5.16.tgz",
+    "@adam0white/lab-kit": "https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.33/adam0white-lab-kit-0.5.33.tgz"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.5",

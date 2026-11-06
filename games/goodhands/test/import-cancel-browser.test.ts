@@ -86,7 +86,7 @@ for (const scenario of ['before-confirm', 'during-begin', 'back-during-begin', '
       const original = exportRun(newGame(7), []);
       await page.evaluate(async (run) => {
         const store = await (
-          new Function('return import("/src/ui/store.ts")') as () => Promise<
+          new Function('return import("/goodhands/src/ui/store.ts")') as () => Promise<
             typeof import('../src/ui/store.ts')
           >
         )();
@@ -99,7 +99,7 @@ for (const scenario of ['before-confirm', 'during-begin', 'back-during-begin', '
       const inspect = () =>
         page.evaluate(async () => {
           const store = await (
-            new Function('return import("/src/ui/store.ts")') as () => Promise<
+            new Function('return import("/goodhands/src/ui/store.ts")') as () => Promise<
               typeof import('../src/ui/store.ts')
             >
           )();
@@ -115,7 +115,7 @@ for (const scenario of ['before-confirm', 'during-begin', 'back-during-begin', '
       };
       await page.evaluate(async (value) => {
         const store = await (
-          new Function('return import("/src/ui/store.ts")') as () => Promise<
+          new Function('return import("/goodhands/src/ui/store.ts")') as () => Promise<
             typeof import('../src/ui/store.ts')
           >
         )();

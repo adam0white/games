@@ -1,7 +1,21 @@
 /** Current Good Hands runtime. All actor changes pass through HF's public Run protocol. */
 
 import * as HF from '@adam0white/human-framework';
-import type * as Old from '@adam0white/human-framework-legacy3';
+import type {
+  Affordance,
+  Commitment,
+  ConversationReceipt,
+  DecideOptions,
+  ObservedAct,
+  Opening,
+  Percept,
+  Person,
+  SocialEvent,
+  Traits,
+} from './host-types.ts';
+
+export type { Affordance, Person, Traits, Values } from './host-types.ts';
+
 import { canonicalPersona } from '@adam0white/lab-client';
 import { CAST } from './cast.ts';
 import { authoredPerson } from './hf4-author.ts';
@@ -19,16 +33,8 @@ import {
   type World,
   workForAccount,
 } from './hf4-host.ts';
-export type Person = Old.Person;
-export type Traits = Old.Traits;
-export type Values = Old.Values;
-export type Affordance = Old.Affordance;
-export type CalendarPersonaSnapshot = Old.CalendarPersonaSnapshot;
-export type PersonaProjectionSnapshot = Old.PersonaProjectionSnapshot;
-export type PersonaCalendarMap = Old.PersonaCalendarMap;
 export const DEFAULT_NORMS = HF.DEFAULT_NORMS;
 export const ENGINE_VERSION = '4.17.0';
-type Opening = Parameters<typeof import('@adam0white/human-framework-legacy3').createPerson>[0];
 type WorkReceipt = { skill?: string; psychological?: HF.ActualConsequences['psychological'] };
 type Context = {
   work: Map<string, WorkReceipt>;
@@ -42,7 +48,6 @@ type Context = {
   excluded: string[];
   initial: { kind: HF.Input['kind']; payload: HF.Input['payload'] }[];
   state?: { hf4?: unknown };
-  decisions: Map<string, Old.Decision>;
   scheduled: { at: number; offer: HF.Offer }[];
 };
 let constructing: Context | undefined;
@@ -59,7 +64,6 @@ export function beginFramework(seed: number) {
     authors: new Map(),
     offers: new Map(),
     initial: [],
-    decisions: new Map(),
     scheduled: [],
   };
 }
@@ -124,7 +128,7 @@ export function createPerson(spec: Opening): Person {
     lexicon: { plainEnglish: true },
     rng: {},
     skillRetention: {},
-  } as unknown as Person;
+  } satisfies Person;
   constructing.people[p.id] = p;
   contexts.set(p, constructing);
   return p;
@@ -289,7 +293,6 @@ function bound(state: object): Context {
     offers: new Map((s.hf4 as any).offers ?? []),
     initial: [],
     state: s,
-    decisions: new Map(),
     scheduled: structuredClone((s.hf4 as any).scheduled ?? []),
     bridge: restoreBridge({ version: EDITION, run: s.hf4.archive, host: s.hf4.host }),
   };
@@ -379,49 +382,65 @@ function refresh(c: Context) {
   ).people;
   for (const p of Object.values(c.people)) {
     if (!present(c, p.id)) continue;
-    const id = p.id,
-      parts = Object.fromEntries(
-        views.find((v) => v.id === id)!.parts.map((v) => [v.select, v.value]),
-      ) as any;
-    const summary = parts.summary,
-      body = parts.body,
-      traits = parts.traits,
-      skills = parts.skills,
-      needs = parts.needs,
-      agenda = parts.agenda;
+    const id = p.id;
+    const view = views.find((v) => v.id === id);
+    if (!view || view.kind !== 'host') throw new Error('Missing Good Hands host view.');
+    const body = view.parts.find((v) => v.select === 'body');
+    const traits = view.parts.find((v) => v.select === 'traits');
+    const skills = view.parts.find((v) => v.select === 'skills');
+    const needs = view.parts.find((v) => v.select === 'needs');
+    const agenda = view.parts.find((v) => v.select === 'agenda');
+    const beliefs = view.parts.find((v) => v.select === 'beliefs');
+    const sourceTrust = view.parts.find((v) => v.select === 'sourceTrust');
+    const relationships = view.parts.find((v) => v.select === 'relationships');
+    const condition = view.parts.find((v) => v.select === 'condition');
+    if (
+      !body ||
+      !traits ||
+      !skills ||
+      !needs ||
+      !agenda ||
+      !beliefs ||
+      !sourceTrust ||
+      !relationships ||
+      !condition
+    )
+      throw new Error('Incomplete Good Hands host view.');
     p.now = Math.floor(c.bridge.host.at / MINUTE);
-    p.traits = structuredClone(traits);
+    p.traits = structuredClone(traits.value);
     p.body = {
-      ...body.state,
-      sleepDebt: body.state.sleepDebtHours,
-      circadianPeak: body.state.circadianPeakMs / MINUTE,
-    } as Person['body'];
-    p.needs = Object.fromEntries(needs.map((n: any) => [n.id, n.level])) as Person['needs'];
+      ...body.value.state,
+      sleepDebt: body.value.state.sleepDebtHours,
+      circadianPeak: body.value.state.circadianPeakMs / MINUTE,
+    };
+    p.needs = Object.fromEntries(needs.value.map((n) => [n.id, n.level])) as Person['needs'];
     p.skills = Object.fromEntries(
-      skills.map((s: any) => [
+      skills.value.map((s) => [
         s.id,
         { level: s.competence, practice: s.practicedMs / MINUTE, lastPracticed: s.lastPracticed / MINUTE },
       ]),
     );
-    p.memory.beliefs = structuredClone(parts.beliefs);
-    p.memory.sourceTrust = structuredClone(parts.sourceTrust);
-    p.social.relationships = structuredClone(parts.relationships.ties);
-    p.affect.mood = { valence: parts.condition.outwardSigns.mood ?? 0, arousal: 0.3 };
-    p.agenda = structuredClone(agenda);
-    p.agenda.commitments = p.agenda.commitments.map((a) => ({
-      ...a,
-      from: a.from / MINUTE,
-      until: a.until / MINUTE,
-      ...('recurEveryMs' in a ? { recurEvery: Number(a.recurEveryMs) / MINUTE } : {}),
-    }));
+    p.memory.beliefs = structuredClone(beliefs.value);
+    p.memory.sourceTrust = structuredClone(sourceTrust.value);
+    p.social.relationships = structuredClone(relationships.value.ties);
+    p.affect.mood = { valence: condition.value.outwardSigns.mood ?? 0, arousal: 0.3 };
+    p.agenda = {
+      ...structuredClone(agenda.value),
+      commitments: agenda.value.commitments.map((a) => ({
+        ...a,
+        from: a.from / MINUTE,
+        until: a.until / MINUTE,
+        ...('recurEveryMs' in a ? { recurEvery: Number(a.recurEveryMs) / MINUTE } : {}),
+      })),
+    };
     const active = c.bridge.host.active.find((a) => a.person === id);
     p.activity = active
-      ? ({
+      ? {
           id: active.id,
           startedAt: active.startedAt / MINUTE,
           endsAt: (active.startedAt + active.offer.durationMs) / MINUTE,
           affordance: fromOffer(active.offer),
-        } as unknown as Person['activity'])
+        }
       : null;
   }
 }
@@ -641,7 +660,7 @@ export function believe(
 export function confirm(p: Person, prop: string, value: boolean, at: number) {
   send(p, 'fact.confirmed', { prop, value, observationId: `observed:${p.id}:${prop}:${at}` }, at);
 }
-export function socialEvent(p: Person, event: Old.SocialEvent) {
+export function socialEvent(p: Person, event: SocialEvent) {
   send(
     p,
     'social.received',
@@ -652,7 +671,7 @@ export function socialEvent(p: Person, event: Old.SocialEvent) {
 export function observeAct(
   p: Person,
   actor: string,
-  act: Old.ObservedAct,
+  act: ObservedAct,
   table: Record<string, Partial<Traits>> = {},
 ) {
   send(
@@ -672,7 +691,7 @@ export function observeAct(
     for (const [trait, value] of Object.entries(table[tag] ?? {}))
       hear(p, actor, `trait:${trait}`, value!, act.at, 0.5);
 }
-export function perceive(p: Person, percepts: Old.Percept[]) {
+export function perceive(p: Person, percepts: Percept[]) {
   for (const e of percepts)
     send(
       p,
@@ -815,11 +834,7 @@ function fromOffer(a: HF.Offer): Affordance {
     advertises: a.expected.needs,
   };
 }
-export function decide(
-  p: Person,
-  offers: Affordance[],
-  options?: Old.DecideOptions,
-): ReturnType<typeof import('@adam0white/human-framework-legacy3').decide> {
+export function decide(p: Person, offers: Affordance[], options?: DecideOptions) {
   const c = context(p),
     mapped = offers.map((a) => toOffer(p, a)),
     revision = (c.bridge?.host.serial ?? 0) + 1;
@@ -859,9 +874,7 @@ export function decide(
   const decision = result.events.find((e) => e.person === p.id && e.data.kind === 'decision');
   if (!decision || decision.data.kind !== 'decision')
     throw new Error('HF did not record a Good Hands decision.');
-  return decision.data.decision as unknown as ReturnType<
-    typeof import('@adam0white/human-framework-legacy3').decide
-  >;
+  return decision.data.decision;
 }
 export function begin(_p: Person, _a: Affordance, _d: unknown) {} // decision.requested and accepted start already own the activity
 export function finish(p: Person, _outcome: unknown) {
@@ -905,10 +918,7 @@ export function interruptEndingActivity(p: Person, minute: number) {
   interruptActive(p, minute, 'agency chapter ended');
 }
 
-export function promise(
-  p: Person,
-  commitment: Parameters<typeof import('@adam0white/human-framework-legacy3').promise>[1],
-) {
+export function promise(p: Person, commitment: Commitment) {
   const c = context(p);
   const d = {
     ...commitment,
@@ -942,7 +952,7 @@ export function converse(
   speaker: Person,
   listener: Person,
   options: { at: number; placeId?: string; topics: string[]; maxClaims: number },
-): ReturnType<typeof import('@adam0white/human-framework-legacy3').converse> {
+): ConversationReceipt {
   emitted = [];
   conversationPair = { speaker: speaker.id, listener: listener.id };
   try {
@@ -981,7 +991,7 @@ export function converse(
         ]
       : [],
     socialEvents: { speaker: [], listener: [] },
-  } as unknown as ReturnType<typeof import('@adam0white/human-framework-legacy3').converse>;
+  };
 }
 /** An authored reaction to actual social evidence. HF owns trust updates. */
 export function sourceResponse(

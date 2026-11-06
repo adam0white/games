@@ -15,7 +15,9 @@ test('first minute follows highlighted controls without reading body text', asyn
     expect(await page.getByRole('button', { name: 'Replay tutorial' }).count()).toBe(0);
     await page.getByRole('button', { name: 'Resume', exact: true }).click();
     const run = exportRun(newGame(7), []);
-    await page.evaluate(`import('/src/ui/store.ts').then(({put}) => put('run', ${JSON.stringify(run)}))`);
+    await page.evaluate(
+      `import('/goodhands/src/ui/store.ts').then(({put}) => put('run', ${JSON.stringify(run)}))`,
+    );
     await page.reload();
     await page.getByRole('button', { name: 'Resume', exact: true }).click();
     const targets = page.locator('.tutorial-target');

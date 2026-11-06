@@ -57,7 +57,7 @@ try {
         headers: { 'access-control-allow-origin': '*' },
       });
     });
-    await page.goto('http://127.0.0.1:48729/');
+    await page.goto('http://127.0.0.1:48729/goodhands/');
     await page.locator('[data-action="menu"]').click();
     await page.getByRole('button', { name: 'Feedback', exact: true }).click();
     const choices = page.locator('[data-feedback-choice]');

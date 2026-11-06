@@ -12,7 +12,7 @@ it('retains phases across reload and preserves a changed active save', async () 
     const page = await browser.newPage();
     await page.goto(server.resolvedUrls!.local[0]!);
     const first = await page.evaluate(async () => {
-      const path = '/src/ui/store.ts';
+      const path = '/goodhands/src/ui/store.ts';
       const store = await (
         new Function('path', 'return import(path)') as (
           path: string,
@@ -40,7 +40,7 @@ it('retains phases across reload and preserves a changed active save', async () 
     expect(first).toBe(true);
     await page.reload();
     const result = await page.evaluate(async () => {
-      const path = '/src/ui/store.ts';
+      const path = '/goodhands/src/ui/store.ts';
       const store = await (
         new Function('path', 'return import(path)') as (
           path: string,
@@ -72,7 +72,7 @@ it('retains phases across reload and preserves a changed active save', async () 
     await fresh.goto(server.resolvedUrls!.local[0]!);
     const fullRun = exportRun(newGame(4), []);
     const success = await fresh.evaluate(async (run) => {
-      const path = '/src/ui/store.ts';
+      const path = '/goodhands/src/ui/store.ts';
       const store = await (
         new Function('path', 'return import(path)') as (
           path: string,
@@ -137,7 +137,7 @@ it('retains phases across reload and preserves a changed active save', async () 
     await fresh.reload();
     const restored = await fresh.evaluate(async () => {
       const store = await (
-        new Function('return import("/src/ui/store.ts")') as () => Promise<
+        new Function('return import("/goodhands/src/ui/store.ts")') as () => Promise<
           typeof import('../src/ui/store.ts')
         >
       )();
@@ -148,7 +148,7 @@ it('retains phases across reload and preserves a changed active save', async () 
     const beforeAdvance = replayed.state.now;
     expect(advance(replayed.state, 10).now).toBe(beforeAdvance + 10);
     const failures = await page.evaluate(async (run) => {
-      const path = '/src/ui/store.ts';
+      const path = '/goodhands/src/ui/store.ts';
       const store = await (
         new Function('path', 'return import(path)') as (
           path: string,
@@ -156,7 +156,7 @@ it('retains phases across reload and preserves a changed active save', async () 
       )(path);
       // This page has an acknowledged journal; use another database key state after clearing it directly.
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open('goodhands', 1);
+        const request = indexedDB.open('games:goodhands', 1);
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
       });
@@ -267,7 +267,7 @@ it('synthetic acknowledged recovery canceled after validation preserves both mon
     const journal = await page.evaluate(
       async ({ native, accepted }) => {
         const store = await (
-          new Function('return import("/src/ui/store.ts")') as () => Promise<
+          new Function('return import("/goodhands/src/ui/store.ts")') as () => Promise<
             typeof import('../src/ui/store.ts')
           >
         )();
@@ -309,7 +309,7 @@ it('synthetic acknowledged recovery canceled after validation preserves both mon
     await page.waitForTimeout(300);
     const saved = await page.evaluate(async () => {
       const store = await (
-        new Function('return import("/src/ui/store.ts")') as () => Promise<
+        new Function('return import("/goodhands/src/ui/store.ts")') as () => Promise<
           typeof import('../src/ui/store.ts')
         >
       )();

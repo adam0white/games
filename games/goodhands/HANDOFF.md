@@ -1,3 +1,9 @@
+# Monorepo preparation — 2026-11-05
+
+Remaining: full local qualification, shared-game checks, complete clean-root bundle, review/CI and live gates. Published client0.5.16/kit0.5.33 URLs are pinned and frozen-installed; this does not establish root adoption or live acceptance. This copy is an uncommitted port preparation after signed unsquashed import9e978193 of sourceb54fd432. It has not been pushed, deployed, redirected or accepted. The authoritative director report is `.lab-scratch/w1105/mono/goodhands-sdk16-prep.md` outside this repository.
+
+Current production code uses one HF4.17.0 Run and local host view/cache types. Historical engine code/tests are preserved byte-for-byte as evidence under archive/historical with explicit tool exclusions. Current guest play and supported-v2 chapters stay active. Publication retains the native supported-v2 transfer and complete source transactions; the old HF3 return projection is removed and explicitly marked unsupported. Source claims below describe the standalone repository at their recorded time.
+
 # Upkeep candidate — 2026-11-05
 
 [Item-specific open checkpoints](docs/upkeep-checkpoints-2026-11-05.md) retain the original requests and their separate dates.

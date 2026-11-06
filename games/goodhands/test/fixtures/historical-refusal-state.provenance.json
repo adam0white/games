@@ -1,0 +1,8 @@
+{
+  "source": "b54fd4326954e5a74f5b9bd6ec1d08f07055cb6d",
+  "module": "src/sim/v6/export.ts verifyImport",
+  "envelope": "authored seed37 two-input historical envelope in current-only.test.ts",
+  "fingerprint": "ef02eb7b",
+  "sha256": "62d42f7d9a4cb67b32ba820682225b5424af5d78cd0d54245c67ed8563ed385c",
+  "capturedBeforeArchiving": true
+}

@@ -10,7 +10,6 @@ import {
   type State,
   type View,
 } from '../src/sim/index.ts';
-import * as historical from '../src/sim/v6/index.ts';
 
 export type Policy = 'careful' | 'reckless' | 'cunning';
 export const MONTH_END = 27 * 1440 + 1140;
@@ -66,8 +65,8 @@ export function runPolicy(
 ): State {
   if (!Number.isFinite(until) || until < 510)
     throw new Error('Policy end must be a finite minute at or after 08:30.');
-  // Versions 1–4 are retained only for the historical policy controls.
-  const engine = version === 6 ? current : historical;
+  if (version !== 6) throw new Error('Keep the original saved game and start a new game.');
+  const engine = current;
   const { advance, apply, view } = engine;
   let state = engine.newGame(seed, version);
   const match = (c: CandidateView, r: RequestView) => matches(c, r, version >= 3);

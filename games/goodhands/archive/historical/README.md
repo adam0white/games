@@ -1,0 +1,5 @@
+# Historical evidence
+
+These source, test, script and fixture bytes come from Good Hands b54fd4326954e5a74f5b9bd6ec1d08f07055cb6d (the unsquashed import parent). Historical dependencies and golden behavior are preserved as evidence, not supported execution. The current game uses one HF4.17.0 Run. Old saves are refused without replacing the held file. TypeScript excludes archive; Biome excludes archive; Vitest includes only test/**/*.test.ts and explicitly excludes archive. No current source/test/script may import this directory. No nested package manifest installs a second engine here.
+
+Current guest gameplay remains in src/sim/guests.ts. Original mixed guest/calendar/projector modules are preserved here. Current policy code keeps its ordinary HF4 route; the original mixed policy script is preserved here. Tests moved by direct historical engine/module dependency and transitive test dependency, not by name. Current hf4-game, hf4-review, hf481-arrival, native-checkpoint, receiving and current-only controls remain active. Historical refusal fixture provenance remains alongside its current regression test.

@@ -53,7 +53,7 @@ try {
       );
     await page.clock.install();
     await page.clock.pauseAt(new Date());
-    await page.goto(`http://127.0.0.1:${port}/`);
+    await page.goto(`http://127.0.0.1:${port}/goodhands/`);
     await page.getByRole('button', { name: 'Open the office', exact: true }).waitFor();
     await page.evaluate(() => document.fonts.ready);
     const fits = async (name: string) => {

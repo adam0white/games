@@ -3,15 +3,9 @@
  * The separately retained actual month proves full-length ending and cold reconstruction.
  * Fixture shelf only; no live journey or publication. */
 import assert from 'node:assert/strict';
-import {
-  acceptPersona,
-  type PersonaRequest,
-  type PersonaShelfState,
-  portableWriteBlockers,
-} from '@adam0white/lab-client';
+import { acceptPersona, type PersonaRequest, type PersonaShelfState } from '@adam0white/lab-client';
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
-import { ALLOCATION } from '../src/sim/cast.ts';
 import { prepareAgencyChapter } from '../src/sim/cast-chapter.ts';
 import { newGame } from '../src/sim/index.ts';
 import { emptyContinuity } from '../src/ui/continuity.ts';
@@ -22,7 +16,7 @@ function phase(stage: string) {
   console.log(JSON.stringify({ stage, milliseconds: Math.round(performance.now() - phaseStart) }));
 }
 const port = Number(process.argv[2] ?? 48837);
-let certified = false;
+let publicCatalog = false;
 const server = await createServer({
   server: { host: '127.0.0.1', port, strictPort: true, hmr: false, watch: null },
   plugins: [
@@ -47,7 +41,8 @@ const server = await createServer({
 });
 await server.listen();
 const browser = await chromium.launch({ channel: process.env.HF_BROWSER_CHANNEL });
-const origin = 'https://goodhands.adamwhite.work';
+const origin = 'https://play.adamwhite.work';
+const gameUrl = `${origin}/goodhands/`;
 phase('prepare untouched opening');
 const chapter = await prepareAgencyChapter([], 7);
 const book = emptyContinuity();
@@ -63,7 +58,7 @@ try {
     { width: 361, height: 690 },
     { width: 362, height: 690 },
   ].filter((v) => !process.env.FAULT_ONLY || v.width === 361 || v.width === 362)) {
-    certified = viewport.width === 361 || viewport.width === 362;
+    publicCatalog = viewport.width === 361 || viewport.width === 362;
     phase(`viewport ${viewport.width}`);
     const context = await browser.newContext({ viewport });
     let shelf: PersonaShelfState = { heads: {}, revisions: [] };
@@ -82,25 +77,21 @@ try {
     await context.route('**/*', async (route) => {
       const url = new URL(route.request().url());
       if (url.origin === origin) {
-        if (url.pathname === '/fixture')
+        if (url.pathname === '/goodhands/fixture')
           return route.fulfill({
             contentType: 'text/html',
             body: '<!doctype html><body>Synthetic fixture</body>',
           });
         const response = await route.fetch({ url: `http://127.0.0.1:${port}${url.pathname}${url.search}` });
-        if (certified && url.pathname.endsWith('/@adam0white_lab-client.js')) {
-          const readers = Object.fromEntries(
-            ALLOCATION.flatMap((person) => portableWriteBlockers(person.castId, 'goodhands')).map((game) => [
-              game,
-              { client: '0.5.7', perPersonSkips: true },
-            ]),
-          );
+        // Negative gate controls explicitly remove reader certifications. Positive
+        // native App cases below use the untouched published SDK16 catalog.
+        if (!publicCatalog && url.pathname.endsWith('/@adam0white_lab-client.js')) {
           const source = await response.text();
           const modified = source.replace(
+            /var PORTABLE_READERS = \{[\s\S]*?\n\};/,
             'var PORTABLE_READERS = {};',
-            `var PORTABLE_READERS = ${JSON.stringify(readers)};`,
           );
-          assert.notEqual(modified, source);
+          assert.notEqual(modified, source, 'negative reader-gate injection must match the SDK bundle');
           return route.fulfill({ response, body: modified });
         }
         return route.fulfill({ response });
@@ -130,14 +121,14 @@ try {
     await page.clock.pauseAt(new Date());
     async function seed(run: ReturnType<typeof exportRun>, fixture: 'met' | 'ended' | null = null) {
       phase(`seed ${fixture ?? 'untouched opening'}`);
-      await page.goto(`${origin}/fixture`);
+      await page.goto(`${gameUrl}fixture`);
       await page.evaluate(
         async ({ run, fixture }) => {
           if (fixture) sessionStorage.setItem('goodhands-app-world-fixture', fixture);
           else sessionStorage.removeItem('goodhands-app-world-fixture');
           localStorage.setItem('hf-lab-recording-off', '1');
           await new Promise<void>((resolve, reject) => {
-            const request = indexedDB.open('goodhands', 1);
+            const request = indexedDB.open('games:goodhands', 1);
             request.onupgradeneeded = () => request.result.createObjectStore('pages');
             request.onerror = () => reject(request.error);
             request.onsuccess = () => {
@@ -154,7 +145,7 @@ try {
         },
         { run, fixture },
       );
-      await page.goto(origin);
+      await page.goto(gameUrl);
       await page.getByRole('button', { name: /^Resume/ }).click();
       phase(`resumed ${fixture ?? 'untouched opening'}`);
     }
@@ -264,7 +255,7 @@ try {
     phase('untouched opening full/compact replay verified');
     if (viewport.width === 360) {
       for (const lab of [false, true, false]) {
-        await page.goto(`${origin}/${lab ? '?lab=1' : ''}`);
+        await page.goto(`${gameUrl}${lab ? '?lab=1' : ''}`);
         await page.getByRole('button', { name: /^Resume/ }).click();
         await page.locator('[data-action="menu"]').click();
         await page.getByRole('button', { name: 'What happens to these people next', exact: true }).click();
@@ -356,7 +347,7 @@ try {
     );
     const finalSave = await page.evaluate(async () => {
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open('goodhands', 1);
+        const request = indexedDB.open('games:goodhands', 1);
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
       });

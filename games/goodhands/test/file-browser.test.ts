@@ -18,7 +18,7 @@ it('uses the full game in /file/ without native DB or Shelf, and retains ordinar
       (window as typeof window & { nativeFileCalls: number }).nativeFileCalls = 0;
       const original = indexedDB.open.bind(indexedDB);
       indexedDB.open = (...args: Parameters<IDBFactory['open']>) => {
-        if (location.pathname.startsWith('/file/') && args[0] === 'goodhands') {
+        if (location.pathname.startsWith('/goodhands/file/') && args[0] === 'games:goodhands') {
           (window as typeof window & { nativeFileCalls: number }).nativeFileCalls++;
           throw new Error('NATIVE DB IN FILE MODE');
         }
@@ -26,7 +26,10 @@ it('uses the full game in /file/ without native DB or Shelf, and retains ordinar
       };
       const post = window.postMessage.bind(window);
       window.postMessage = ((message: unknown, ...rest: unknown[]) => {
-        if (location.pathname.startsWith('/file/') && JSON.stringify(message).includes('hf-persona'))
+        if (
+          location.pathname.startsWith('/goodhands/file/') &&
+          JSON.stringify(message).includes('hf-persona')
+        )
           throw new Error('SHELF IN FILE MODE');
         return Reflect.apply(post, window, [message, ...rest]);
       }) as typeof window.postMessage;
@@ -38,7 +41,9 @@ it('uses the full game in /file/ without native DB or Shelf, and retains ordinar
     const base = server.resolvedUrls!.local[0]!;
     await page.goto(base);
     expect(
-      await page.evaluate(`import('/src/ui/store.ts').then(({put}) => put('run', ${JSON.stringify(run)}))`),
+      await page.evaluate(
+        `import('/goodhands/src/ui/store.ts').then(({put}) => put('run', ${JSON.stringify(run)}))`,
+      ),
     ).toBe(true);
     const custody = await page.evaluate<{
       key: unknown;
@@ -50,7 +55,7 @@ it('uses the full game in /file/ without native DB or Shelf, and retains ordinar
       retainedAgain: unknown;
     }>(`(async () => {
       const source = ${JSON.stringify(run)};
-      const storage = await import('/src/ui/store.ts');
+      const storage = await import('/goodhands/src/ui/store.ts');
       const key = await storage.retainSourceArchive(source);
       const retained = key ? await storage.get(key) : null;
       const originalAdd = IDBObjectStore.prototype.add;
@@ -164,13 +169,15 @@ it('uses the full game in /file/ without native DB or Shelf, and retains ordinar
     // Native positive: actual row, ordinary Resume and pagehide still persist replayable state.
     await page.goto(base);
     expect(
-      await page.evaluate("import('/src/ui/store.ts').then(async ({get}) => (await get('run'))?.value)"),
+      await page.evaluate(
+        "import('/goodhands/src/ui/store.ts').then(async ({get}) => (await get('run'))?.value)",
+      ),
     ).toEqual(run);
     await page.getByRole('button', { name: 'Resume', exact: true }).click({ timeout: 5000 });
     await page.getByTestId('office').waitFor();
     await page.evaluate(() => dispatchEvent(new Event('pagehide')));
     const saved = await page.evaluate(
-      "import('/src/ui/store.ts').then(async ({get}) => (await get('run'))?.value)",
+      "import('/goodhands/src/ui/store.ts').then(async ({get}) => (await get('run'))?.value)",
     );
     expect(saved).toMatchObject({
       inputs: [...run.inputs, { at: run.minute, input: { type: 'resume-cast' } }],

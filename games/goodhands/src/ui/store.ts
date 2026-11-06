@@ -4,7 +4,8 @@ import { type NativeSnapshot, RECEIVING_KEY, type ReceivingJournal } from './rec
  * Saves live in IndexedDB as gzip (state and replay history can exceed localStorage limits).
  * Every access is wrapped: a private window or blocked storage gives "no save", never a broken page.
  */
-const DB = 'goodhands';
+export const DATABASE_NAME = 'games:goodhands';
+const DB = DATABASE_NAME;
 const STORE = 'pages';
 let connection: IDBDatabase | null = null;
 let opening: Promise<IDBDatabase> | null = null;

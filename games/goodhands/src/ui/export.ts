@@ -1,4 +1,3 @@
-import type { CalendarPersonaSnapshot, PersonaProjectionSnapshot } from '@adam0white/human-framework-legacy3';
 import {
   boundedPersonaJson,
   canonicalPersona,
@@ -8,7 +7,6 @@ import {
 } from '@adam0white/lab-client';
 import { CAST, CAST_EDITION } from '../sim/cast.ts';
 import { type AgencyChapter, validateAgencyChapter } from '../sim/cast-chapter.ts';
-import { exportGuest, type GuestId, prepareGuest } from '../sim/guests.ts';
 import { ENGINE_VERSION, saveFramework } from '../sim/hf4.ts';
 import { fingerprint, replay, view } from '../sim/index.ts';
 import { type Input, type LoggedInput, QUALITIES, type State } from '../sim/types.ts';
@@ -30,59 +28,6 @@ export interface RunExport {
   fingerprint: string;
 }
 export type CompactRunExport = Omit<RunExport, 'state'>;
-
-function projectionBody(projection: PersonaProjectionSnapshot | CalendarPersonaSnapshot) {
-  return projection.format === 'hf-persona-calendar/1' ? projection.person : projection;
-}
-function calendarTransfer(projected: {
-  projection: PersonaProjectionSnapshot | CalendarPersonaSnapshot;
-  targetOpening?: number;
-  calendarHost?: unknown;
-  sourceRevision?: string;
-  sourceCheckpointDigest?: string;
-}) {
-  if (projected.projection.format !== 'hf-persona-calendar/1') return {};
-  if (
-    !Number.isInteger(projected.targetOpening) ||
-    !projected.calendarHost ||
-    !projected.sourceRevision ||
-    !projected.sourceCheckpointDigest
-  )
-    throw new Error('Calendar return needs its pinned host clock.');
-  return {
-    targetOpening: projected.targetOpening,
-    calendarHost: projected.calendarHost,
-    sourceRevision: projected.sourceRevision,
-    sourceCheckpointDigest: projected.sourceCheckpointDigest,
-  };
-}
-/** The same pinned wire is constructed for publication and deterministic load validation. */
-export async function guestCheckpointTransfer(state: State, id: GuestId, origin: PersonaEnvelope) {
-  const projected = await exportGuest(state, id);
-  const body = projectionBody(projected.projection);
-  const checkpoint = origin.transfer.checkpoint as { checkpointDigest?: string } | undefined;
-  if (!checkpoint?.checkpointDigest) throw new Error('Original source checkpoint is missing.');
-  const calendar = calendarTransfer(projected);
-  if (
-    'sourceRevision' in calendar &&
-    (calendar.sourceRevision !== origin.revision ||
-      calendar.sourceCheckpointDigest !== checkpoint.checkpointDigest)
-  )
-    throw new Error('Calendar return changed the original source binding.');
-  return {
-    person: projected.projection,
-    history: projected.history,
-    checkpoint: projected.checkpoint,
-    ...calendar,
-    admission: {
-      adapter: 'goodhands/1',
-      sourceRevision: origin.revision,
-      sourceCheckpointDigest: checkpoint.checkpointDigest,
-      mapping: body.mappingVersion,
-      opening: body.source.now,
-    },
-  };
-}
 
 export function exportRun(state: State, inputs: LoggedInput[], continuity?: ContinuityBook): RunExport {
   return { ...exportWorkingRun(state, inputs, continuity), state: structuredClone(state) };
@@ -362,6 +307,10 @@ function readContinuity(value: unknown, rows: unknown): ContinuityBook {
   if (value.fileUnlinked !== undefined && typeof value.fileUnlinked !== 'boolean')
     throw new Error('Invalid file recording state.');
   const book = value as unknown as ContinuityBook;
+  if (book.arrivals.length)
+    throw new Error(
+      'This older guest history cannot continue here. Keep the original file and start a new game.',
+    );
   if (
     book.publications !== undefined &&
     (!Array.isArray(book.publications) ||
@@ -473,6 +422,10 @@ export async function validateContinuity(
   savedState?: State,
   inputs: LoggedInput[] = [],
 ): Promise<void> {
+  if (book.arrivals.length)
+    throw new Error(
+      'This older guest history cannot continue here. Keep the original file and start a new game.',
+    );
   for (const report of book.publications ?? []) {
     if (
       !savedState ||
@@ -565,62 +518,8 @@ export async function validateContinuity(
     }
     return;
   }
-  for (const arrival of book.arrivals) {
-    await validatePersona(arrival.source);
-    await validatePersona(arrival.claim);
-    if (
-      arrival.claim.source.game !== 'goodhands' ||
-      arrival.claim.source.rules !== 'goodhands-6' ||
-      arrival.claim.parentRevision !== arrival.source.revision ||
-      arrival.claim.branchId !== arrival.source.branchId ||
-      !book.heads.some((h) => h.castId === arrival.source.castId)
-    )
-      throw new Error('Invalid pinned admission head.');
-    const prepared = await prepareGuest(arrival.source);
-    if (canonicalPersona(prepared) !== canonicalPersona(arrival.initial))
-      throw new Error('Pinned initial person does not match the source admission.');
-  }
-  for (const head of book.heads) {
-    await validatePersona(head);
-    const arrival = book.arrivals.find((a) => a.source.castId === head.castId);
-    if (!arrival) throw new Error('Pinned head has no admitted arrival.');
-    if (head.revision === arrival.claim.revision) {
-      if (canonicalPersona(head) !== canonicalPersona(arrival.claim))
-        throw new Error('Pinned claim changed.');
-      continue;
-    }
-    const row = book.rows.find(
-      (r) =>
-        r.revision === head.revision &&
-        r.castId === head.castId &&
-        r.branchId === head.branchId &&
-        r.stage === 'checkpoint' &&
-        r.parentRevision === head.parentRevision,
+  if (book.arrivals.length || book.heads.length || book.rows.length)
+    throw new Error(
+      'This older person history or arrival head cannot continue here. Keep the original file and start a new game.',
     );
-    if (!row || head.source.game !== 'goodhands' || head.source.rules !== 'goodhands-6')
-      throw new Error('Pinned head has no accepted target checkpoint.');
-    requireClaimLineage(book, head, arrival.claim);
-    const checkpoint = head.transfer.checkpoint as Record<string, unknown> | undefined;
-    if (
-      !savedState ||
-      !checkpoint ||
-      typeof checkpoint.sourceNow !== 'number' ||
-      checkpoint.sourceNow > view(savedState).now
-    )
-      throw new Error('Pinned head needs its validated source replay.');
-    const at = checkpoint.sourceNow;
-    const source = replay(
-      view(savedState).seed,
-      inputs.filter((entry) => entry.at <= at),
-      at,
-      6,
-      book.arrivals.map((a) => a.initial),
-    );
-    const expected = await guestCheckpointTransfer(source, arrival.initial.id, arrival.source);
-    const forkOf = (head.transfer.admission as Record<string, unknown> | undefined)?.forkOf;
-    const transfer =
-      typeof forkOf === 'string' ? { ...expected, admission: { ...expected.admission, forkOf } } : expected;
-    if (canonicalPersona(head.transfer) !== canonicalPersona(transfer))
-      throw new Error('Pinned head does not match the source checkpoint.');
-  }
 }

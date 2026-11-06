@@ -161,7 +161,7 @@ try {
     );
   };
   const open = async () => {
-    await page.goto(`http://127.0.0.1:${port}/`);
+    await page.goto(`http://127.0.0.1:${port}/goodhands/`);
     await tap('New month');
     await page.evaluate(() => {
       document.addEventListener('click', (event) => {

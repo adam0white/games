@@ -28,13 +28,15 @@ for (const viewport of [
       const page = await browser.newPage({ viewport });
       const base = server.resolvedUrls!.local[0]!;
       await page.goto(base);
-      await page.evaluate(`import('/src/ui/store.ts').then(({put}) => put('run', ${JSON.stringify(old)}))`);
+      await page.evaluate(
+        `import('/goodhands/src/ui/store.ts').then(({put}) => put('run', ${JSON.stringify(old)}))`,
+      );
       await page.reload();
       await page
         .getByText('This saved month uses an older version. Keep the saved month and start a new game.')
         .waitFor();
       expect(await page.getByRole('button', { name: 'Resume', exact: true }).count()).toBe(0);
-      const stored = await page.evaluate(`import('/src/ui/store.ts').then(({get}) => get('run'))`);
+      const stored = await page.evaluate(`import('/goodhands/src/ui/store.ts').then(({get}) => get('run'))`);
       expect((stored as { value: unknown }).value).toEqual(old);
     } finally {
       await browser.close();
@@ -53,13 +55,13 @@ test('an incompatible current cast keeps the occupied native month and names pre
   try {
     const page = await browser.newPage({ viewport: { width: 360, height: 690 } });
     await page.goto(server.resolvedUrls!.local[0]!);
-    await page.evaluate(`import('/src/ui/store.ts').then(({put}) => put('run', ${bytes}))`);
+    await page.evaluate(`import('/goodhands/src/ui/store.ts').then(({put}) => put('run', ${bytes}))`);
     await page.reload();
     await page
       .getByText('This saved month uses an older version. Keep the saved month and start a new game.')
       .waitFor();
     expect(await page.getByRole('button', { name: 'Resume', exact: true }).count()).toBe(0);
-    const stored = await page.evaluate(`import('/src/ui/store.ts').then(({get}) => get('run'))`);
+    const stored = await page.evaluate(`import('/goodhands/src/ui/store.ts').then(({get}) => get('run'))`);
     expect(JSON.stringify((stored as { value: unknown }).value)).toBe(bytes);
   } finally {
     await browser.close();

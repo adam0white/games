@@ -1,5 +1,4 @@
 /** Browser transport only. Simulation admissions and encounter semantics stay in sim/guests. */
-import type { CalendarPersonaSnapshot, PersonaProjectionSnapshot } from '@adam0white/human-framework-legacy3';
 import {
   createPersona,
   type Lab,
@@ -158,16 +157,16 @@ export class ContinuitySession {
     const prior = book.heads.find((p) => p.castId === castId);
     if (!prior) throw new Error('No accepted source revision in this run.');
     const { revision, ...body } = prior;
-    const projection = transfer.person as PersonaProjectionSnapshot | CalendarPersonaSnapshot | undefined;
+    if (transfer.person !== undefined)
+      throw new Error(
+        'This older return format cannot be published. Keep the source file; current portable history remains available.',
+      );
     const envelope = await createPersona({
       ...body,
       branchId: fork ? crypto.randomUUID() : prior.branchId,
       parentRevision: fork ? null : revision,
       source: agencySource(typeof this.build === 'function' ? this.build() : this.build),
-      limitations:
-        (projection?.format === 'hf-persona-calendar/1'
-          ? projection.person.limitations
-          : projection?.limitations) ?? prior.limitations,
+      limitations: prior.limitations,
       transfer: fork
         ? {
             ...transfer,

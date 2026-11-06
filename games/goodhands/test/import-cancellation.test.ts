@@ -45,7 +45,7 @@ it('keeps the occupied native month when pagehide cancels a confirmed import dur
     await page.locator('[data-action="menu"]').click();
     // Wait for the real native save made by the menu before taking its complete baseline.
     const nativeRun = () =>
-      page.evaluate("import('/src/ui/store.ts').then(async ({get}) => (await get('run'))?.value)");
+      page.evaluate("import('/goodhands/src/ui/store.ts').then(async ({get}) => (await get('run'))?.value)");
     await expect.poll(nativeRun).toBeTruthy();
     const original = await nativeRun();
     await page.evaluate(() => {

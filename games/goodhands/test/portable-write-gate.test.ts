@@ -13,20 +13,20 @@ test('portable writes follow the SDK peer gate while legacy writes remain availa
   }
 });
 
-test('the default reader gate stops publication before a shelf request and leaves the book unchanged', async () => {
+test('an actual missing peer reader stops publication before a shelf request and leaves the book unchanged', async () => {
   const { createPersona } = await import('@adam0white/lab-client');
   const { ContinuitySession, emptyContinuity } = await import('../src/ui/continuity.ts');
   const parent = await createPersona({
     format: 'hf-persona/1',
-    castId: CAST.hatice.castId,
-    castRevision: CAST.hatice.revision,
+    castId: CAST.derya.castId,
+    castRevision: CAST.derya.revision,
     branchId: 'gate-control',
     parentRevision: null,
     source: { game: 'goodhands', build: 'test', engine: '4.8.1', rules: 'goodhands-6' },
     transfer: {},
     limitations: [],
   });
-  expect(portableWriteBlockers(parent.castId, 'goodhands').length).toBeGreaterThan(0);
+  expect(portableWriteBlockers(parent.castId, 'goodhands')).toEqual(['neighbours']);
   const book = emptyContinuity();
   book.heads = [parent];
   const before = structuredClone(book);
