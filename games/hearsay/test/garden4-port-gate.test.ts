@@ -1,19 +1,43 @@
-import { portableWriteBlockers } from '@adam0white/lab-client';
+import type { LifeBatchPreparation } from '@adam0white/lab-client';
 import { expect, it } from 'vitest';
 import { eligibleGardenBatch } from '../src/sim/garden4-continuity.ts';
 
-it('skips only people whose portable writes are blocked', () => {
+it('preserves an explicitly blocked preparation head while other garden roles open', async () => {
+  const { freshGarden } = await import('../src/sim/garden4.ts');
+  const { admitGardenBatch } = await import('../src/sim/garden4-continuity.ts');
   const castId = 'hf.cast.riza.voice';
-  expect(portableWriteBlockers(castId, 'hearsay').length).toBeGreaterThan(0);
+  const revision = 'a'.repeat(64);
   const batch = {
-    expectedHeads: { [castId]: 'rev', local: null },
-    inputs: [{ parent: { castId, transfer: { castPassport: 'hf-portable-person/2' } }, life: {} }],
-    blocked: [],
-  } as never;
+    expectedHeads: { [castId]: revision, 'hf.cast.osman.voice': null },
+    inputs: [],
+    blocked: [{ castId, reason: 'The saved head is unavailable.' }],
+  } satisfies LifeBatchPreparation;
+  const before = JSON.stringify(batch);
   const eligible = eligibleGardenBatch(batch);
   expect(eligible.inputs).toEqual([]);
-  expect(eligible.expectedHeads).toEqual({ [castId]: 'rev', local: null });
-  expect(eligible.skipped.map((entry) => entry.castId)).toEqual([castId]);
+  expect(eligible.blocked).toEqual([]);
+  expect(eligible.expectedHeads).toEqual(batch.expectedHeads);
+  expect(eligible.expectedHeads[castId]).toBe(revision);
+  expect(eligible.skipped).toEqual([
+    {
+      castId,
+      revision,
+      reason:
+        'Their saved history is unavailable here. This garden uses a local person. The saved history stays unchanged.',
+    },
+  ]);
+  const authors = admitGardenBatch(eligible);
+  expect(authors.find((person) => person.id === 'riza')?.portable).toBeUndefined();
+  const garden = freshGarden(17, authors, {
+    version: 'hearsay-hf4-batch/1',
+    claims: [],
+    skipped: eligible.skipped,
+  });
+  expect(garden.people.osman).toBeDefined();
+  const { requireGardenWrite } = await import('../src/sim/garden4-continuity.ts');
+  expect(() => requireGardenWrite(garden, castId)).toThrow('skipped');
+  expect(() => requireGardenWrite(garden, 'hf.cast.osman.voice')).not.toThrow();
+  expect(JSON.stringify(batch)).toBe(before);
 });
 
 it('retains only refusal metadata through useful play and replay and prevents source capture', async () => {

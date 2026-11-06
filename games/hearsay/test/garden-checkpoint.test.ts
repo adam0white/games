@@ -78,9 +78,11 @@ it('stays quiet at the first natural daily boundary, where nobody can close a ch
   expect(calls).toEqual({ save: 0, put: 0, bind: 0, rebind: 0 });
 });
 
-it('treats a deliberate local skip and the peer-game writer gate as expected, and a missing skip record as real', () => {
+it('projects a supported person, refuses a deliberate local skip, and reports a missing skip record', () => {
   const g = eligible();
-  expect(() => captureGardenSource(g, 'riza')).toThrow(GardenChapterUnavailable);
+  const captured = captureGardenSource(g, 'riza');
+  expect(captured.transfer.castPassport).toBe('hf-portable-person/2');
+  expect(validatePortablePerson(captured.transfer.portable).castId).toBe('hf.cast.riza.voice');
   const skipped = freshEmptyShelfGarden(17);
   skipped.chapter = {
     version: 'hearsay-hf4-batch/1',

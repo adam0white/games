@@ -248,9 +248,9 @@ it('finishes one ordinary host opportunity without restarting a stale offer', as
   expect(session.offers.riza).toEqual([]);
 });
 
-// The released client reads Voice roles, but its peer write gate still blocks this shelf head.
-it('skips a Voice portable head while the other garden roles open', async () => {
-  const { createPersona } = await import('@adam0white/lab-client');
+// Public projection fixture with Voice provenance; no departure or shelf-write claim.
+it('admits a supported Voice portable head without changing its saved history', async () => {
+  const { createPersona, initialPersonaLife } = await import('@adam0white/lab-client');
   const { admitGardenBatch, eligibleGardenBatch } = await import('../src/sim/garden4-continuity.ts');
   const { GARDEN_ENGINE } = await import('../src/sim/garden-engine.ts');
   const captured = engineeringPassport(freshGarden(17));
@@ -271,13 +271,21 @@ it('skips a Voice portable head while the other garden roles open', async () => 
   const batch = {
     expectedHeads: { [parent.castId]: parent.revision },
     blocked: [],
-    inputs: [{ parent, life: {}, clockMs: 0 }],
-  } as unknown as import('@adam0white/lab-client').LifeBatchPreparation;
+    inputs: [{ parent, life: initialPersonaLife(parent.castId, parent.branchId, 0), clockMs: 0 }],
+  } satisfies import('@adam0white/lab-client').LifeBatchPreparation;
   expect(admitGardenBatch(batch).find((person) => person.id === 'riza')?.portable?.person).toEqual(portable);
   const eligible = eligibleGardenBatch(batch);
-  expect(eligible.inputs).toEqual([]);
+  expect(eligible.inputs).toEqual(batch.inputs);
   expect(eligible.expectedHeads).toEqual(batch.expectedHeads);
-  expect(eligible.skipped.map((entry) => entry.castId)).toEqual([parent.castId]);
-  expect(freshGarden(18, admitGardenBatch(eligible)).people.osman).toBeDefined();
+  expect(eligible.skipped).toEqual([]);
+  const authors = admitGardenBatch(eligible);
+  expect(authors.find((person) => person.id === 'riza')?.portable?.person).toEqual(portable);
+  const opened = freshGarden(18, authors);
+  const retained = engineeringPassport(opened).transfer.portable;
+  expect(retained.castId).toBe(parent.castId);
+  expect(retained.castRevision).toBe(parent.castRevision);
+  expect(retained.state.traits).toEqual(portable.state.traits);
+  expect(retained.state.values).toEqual(portable.state.values);
+  expect(opened.people.osman).toBeDefined();
   expect(JSON.stringify(parent)).toBe(before);
 });
