@@ -1,0 +1,28 @@
+{
+  "hfVersion": "4.17.0",
+  "games": [
+    {
+      "slug": "rope",
+      "source": {
+        "repository": "https://github.com/adam0white/rope",
+        "commit": "c563ac3c03b0798ca69dc12711fa1469b31aadad"
+      },
+      "saveSchema": "rope-hf4/1",
+      "legacyOrigin": "https://rope.adamwhite.work",
+      "redirectEnabled": false
+    },
+    {
+      "slug": "hearsay",
+      "source": {
+        "repository": "https://github.com/adam0white/hearsay",
+        "commit": "f6737badd333a7e889a8a9abb91653aae04b370a"
+      },
+      "saveSchema": "hearsay-hf4/1",
+      "ciBrowsers": [
+        "chromium-headless-shell"
+      ],
+      "legacyOrigin": "https://hearsay.adamwhite.work",
+      "redirectEnabled": false
+    }
+  ]
+}

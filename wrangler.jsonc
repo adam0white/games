@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "games-static",
+  "main": "src/worker.mjs",
+  "account_id": "a20259cba74e506296745f9c67c1f3bc",
+  "compatibility_date": "2026-11-05",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "play.adamwhite.work", "custom_domain": true }],
+  "assets": { "directory": "./dist", "binding": "ASSETS", "run_worker_first": true, "not_found_handling": "none" }
+}

@@ -1,0 +1,22 @@
+packages:
+  - games/*
+linkWorkspacePackages: true
+hoist: false
+engineStrict: true
+strictPeerDependencies: true
+resolutionMode: highest
+verifyDepsBeforeRun: error
+dedupePeerDependents: true
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - '@adam0white/*'
+packageImportMethod: hardlink
+allowBuilds:
+  esbuild@0.28.2: true
+  workerd@1.20261103.1: true
+  fsevents: false
+overrides:
+  vite: 8.3.5
+  miniflare>undici: 7.30.1
+
+  "@adam0white/human-framework": "4.17.0"

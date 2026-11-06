@@ -1,0 +1,38 @@
+# The Rope: project workflow
+
+You lead five Human Framework (HF) people up a mountain and back. Every one of them can say no.
+
+- Start a resumed task with [HANDOFF.md](HANDOFF.md), then [docs/design.md](docs/design.md).
+- **Done means (owner, 2026-10-18):** every player input gets a visible, person-voiced answer within a few seconds of game time at normal speed; each climb's debrief attributes at least one outcome to one input; Adam climbs with a party he recognises and says the people were the point. Adam accepts feel.
+- **First acceptance test:** within ten minutes the player makes a plan, meets a reasonable objection, changes something concrete and sees a consequence they care about.
+
+## Rules
+
+- HF comes only from npm: `@adam0white/human-framework@4.17.0`, exact. Never import sibling source. No game logic goes into HF. A generic HF gap goes into [docs/hf-requests.md](docs/hf-requests.md).
+- Never fake a verdict. Every refusal, deferral or counter-offer comes from an HF resolution (public Run decision events for actual suggestion inputs).
+- Private condition and trust are not observations. Show actual movement, dated injuries and recorded words. Say when current condition is unavailable.
+- All world randomness is keyed by (seed, kind, place, minute) through `hashUnit`, never by draw order. HF owns person randomness and archives it. Seed + input log + start state is the replay, the playtest export and the debrief substrate.
+- The sim core (`src/sim`) is headless, deterministic and free of DOM, renderer and LLM code. State is plain JSON.
+- Visual language: Field Notebook (`human-framework/docs/design-language.md`). Only `--rope` is loud.
+- Faith stays quiet: a prayer at dusk is a journal line, never a mechanic.
+- Workers AI may voice camp conversation only, from HF decision records and journal facts. It never emits state. Hard caps in the Worker, a kill switch and a labelled deterministic fallback. Budget $5 total; track spend in HANDOFF.md.
+- No server infrastructure beyond one Worker with static assets (no Durable Objects, no databases).
+- Phones first: Galaxy S26 360x780 CSS px, about 690 px visible; thumb actions in the bottom 40%.
+- Follow the root monorepo workflow. Run root `npm run check:lane`, this game’s lint/types lane and focused behavior controls before committing. Hosted CI runs the affected full game suite and the complete bundle build. Require exact-head green CI and hosted Codex clearance before merge. Use shared Node 26.12.0 from the root runtime pin.
+- Deferred work goes into the Deferred section of docs/design.md with a target. Playtesters' words go verbatim into `docs/playtest-*.md`.
+
+## Delivery
+
+- Rope is being moved into the games workspace at `/rope/`. Root owns the shared lockfile, release and deployment; the original repository remains historical. Use the root release gate and verify the live manifest and gameplay before cutover.
+
+- Player-facing copy follows [Plain English](docs/lab/plain-english.md).
+
+Use the root pnpm workspace and its frozen lockfile. Keep overrides and native build permissions in the root `pnpm-workspace.yaml`, not package metadata. `npm run` remains valid for scripts. Run `npm run check:lane` directly; do not acquire the suite lock. The installer conversion requires reviewed source, full lane, byte-identical raw build outputs, signed commit and exact green CI; it does not deploy the app or establish game readiness.
+
+## Public gameplay
+
+Every gameplay feature is public. Shared people should carry over automatically through supported admission. Native completed climbs attempt to save eligible histories before next-climb navigation. A refusal is not a publication. File play cannot publish. Cast controls live on the central shelf. Diagnostics sit in one collapsed Debug item beside Lab privacy.
+
+Biome 2.6.5 keeps formatter exclusions only for the historical report paths listed in biome.json, preserving their evidence text and layout. Lint still applies to those files.
+
+Stack (2026-11-05): HF 4.17.0, Node 26.12.0, pnpm 12.16.1, TypeScript 7.0.2, Vite 8.3.5, Vitest 5.1.0, Biome 2.6.5, Wrangler 4.157.0; Worker compatibility date 2026-11-05.

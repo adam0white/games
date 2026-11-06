@@ -1,0 +1,362 @@
+// @vitest-environment happy-dom
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { type ClimbState, distance, type Line, MOUNTAINS, snapshot, step } from '../src/sim/climb.ts';
+import { ENGINE_VERSION } from '../src/sim/hf4.ts';
+import { newSeason } from '../src/sim/season.ts';
+import { Game } from '../src/ui/game.ts';
+import { displayText } from '../src/ui/plain-english.ts';
+
+vi.mock('../src/ui/scene.ts', () => ({
+  Scene: class {
+    at = new Map();
+    mount = async () => {};
+    draw = () => {};
+  },
+}));
+vi.mock('@adam0white/lab-client', async (original) => ({
+  ...(await original<typeof import('@adam0white/lab-client')>()),
+  personaChannel: () => ({ ready: Promise.resolve(true), enabled: false, setEnabled() {}, request: vi.fn() }),
+  watchPersonaCheckpoint: () => () => {},
+}));
+vi.mock('../src/ui/lab.ts', () => ({
+  lab: {
+    setPersonaRecording() {},
+    allowPersonaRecording() {},
+    build() {
+      return { c: 'test' };
+    },
+    screen() {},
+    milestone() {},
+    trackRun() {
+      return () => {};
+    },
+    captureSave() {},
+    telemetryOn: false,
+    setTelemetryOff() {},
+  },
+}));
+
+interface Driver {
+  climb: ClimbState;
+  resume(save: unknown): Promise<void>;
+  flushSave(): Promise<void>;
+  renderSheet(ifChanged?: boolean): void;
+}
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+  vi.stubGlobal('requestAnimationFrame', () => 0);
+  vi.stubGlobal('indexedDB', undefined);
+  vi.spyOn(Date, 'now').mockReturnValue(20261018);
+  localStorage.clear();
+  document.body.innerHTML = '<div id="app"></div>';
+});
+let active: Driver | undefined;
+afterEach(async () => {
+  await vi.advanceTimersByTimeAsync(1);
+  await active?.flushSave();
+  active = undefined;
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+const button = (text: string) => {
+  const found = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+    (b) =>
+      b.textContent === text ||
+      b.getAttribute('aria-label') === text ||
+      b.querySelector('span')?.textContent === text ||
+      (b.classList.contains('chip') && b.textContent?.startsWith(text)),
+  );
+  if (!found) throw new Error(`Missing button: ${text}`);
+  return found;
+};
+
+async function boot(all = false, seed = 20261018) {
+  const game = new Game(document.querySelector('#app') as HTMLElement);
+  await game.boot();
+  if (all) {
+    const { season, climb } = newSeason(seed);
+    await (game as unknown as Driver).resume({
+      v: 2,
+      ownership: {
+        runId: 'local-test-fixture',
+        heads: [],
+        sources: [],
+        archives: [],
+        fileOrigin: false,
+        localOnly: true,
+      },
+      engine: ENGINE_VERSION,
+      state: snapshot(climb),
+      season,
+      start: season.start,
+      inputs: [],
+      minute: climb.minute,
+      over: false,
+      disclosure: { unlocked: ['insist', 'tell', 'promise', 'rope', 'fix', 'pack', 'share'], seen: [] },
+    });
+  }
+  const driver = game as unknown as Driver;
+  active = driver;
+  await vi.advanceTimersByTimeAsync(1);
+  await driver.flushSave();
+  return driver;
+}
+
+it('keeps mandatory opening story across title and hut below forty words, with context on request', async () => {
+  await boot();
+  const words = (title = false) => {
+    const copy = document.querySelector('.page .inner')?.cloneNode(true) as HTMLElement;
+    for (const el of copy.querySelectorAll(
+      'details, [popover], button, .footer, .caption, svg, h1, .lk-telemetry-notice',
+    ))
+      el.remove();
+    if (!title) copy.querySelector('.sub')?.remove();
+    return (copy.textContent ?? '').trim().split(/\s+/).filter(Boolean).length;
+  };
+  const title = words(true);
+  button('About this part of the climb').click();
+  expect(document.querySelector('.info-popover')?.textContent).toContain('eleven summers');
+  button('Close information').click();
+  document.querySelector<HTMLButtonElement>('.page [data-a="new"]')!.click();
+  await vi.advanceTimersByTimeAsync(1);
+  await vi.waitFor(() => expect(document.querySelector('[data-hour]')).not.toBeNull(), { timeout: 15000 });
+  expect(document.querySelector('[data-hour]'), document.body.textContent ?? '').not.toBeNull();
+  expect(title + words()).toBeLessThanOrEqual(40);
+  button('About this part of the climb').click();
+  expect(document.querySelector('.info-popover')?.textContent).toContain(
+    'They remember whether you keep that promise.',
+  );
+  button('Close information').click();
+  expect(document.querySelectorAll('[data-hour]')).toHaveLength(3);
+});
+
+it('gives every unavailable verb an adjacent readable reason and updates changed circumstances', async () => {
+  const driver = await boot(true);
+  for (const b of document.querySelectorAll<HTMLButtonElement>('.sheet .verb:disabled')) {
+    const reason = document.getElementById(b.getAttribute('aria-describedby') ?? '');
+    expect(reason?.textContent?.trim(), b.textContent ?? '').toBeTruthy();
+    expect(reason?.parentElement).toBe(b);
+  }
+  expect(button('go down').parentElement?.textContent).toContain('hut');
+  button('Nell').click();
+  expect(button('eat').disabled).toBe(false);
+  const nell = driver.climb.members.find((x) => x.id === 'nell');
+  if (!nell) throw new Error('Nell missing');
+  nell.rations = 0;
+  nell.pos = { place: null, leg: MOUNTAINS[driver.climb.mountain]?.legs[0]?.id ?? null, t: 0 };
+  driver.renderSheet(true);
+  expect(button('eat').disabled).toBe(true);
+  expect(button('eat').parentElement?.textContent).toContain('food');
+});
+
+it('shows target, selected request and commit without repeating unrelated verb grids', async () => {
+  await boot();
+  document.querySelector<HTMLButtonElement>('.page [data-a="new"]')!.click();
+  await vi.advanceTimersByTimeAsync(1);
+  await vi.waitFor(() => expect(document.querySelector('[data-hour]')).not.toBeNull(), { timeout: 15000 });
+  button("We'll see").click();
+  await vi.waitFor(() => expect(document.querySelector('[data-hour]')).toBeNull(), { timeout: 15000 });
+  vi.advanceTimersByTime(500);
+  button('rest').click();
+  document.querySelector<HTMLButtonElement>('.request-tone')?.click();
+  expect(document.querySelector('.request-summary')?.textContent).toContain('rest');
+  expect(document.querySelectorAll('.sheet .verbs')).toHaveLength(0);
+  expect(document.querySelectorAll('.forces button')).toHaveLength(3);
+  expect(document.querySelector('.target-hint')).toBeNull();
+  expect(document.querySelectorAll('.targets .chip')).toHaveLength(0);
+  const insist = document.querySelector<HTMLButtonElement>('.forces button:last-child');
+  expect(insist?.textContent).toContain('can harm trust');
+  expect(insist?.disabled).toBe(false);
+  expect(document.querySelector('.force:not(:disabled)')?.classList.contains('task')).toBe(true);
+  expect(document.querySelector('.chip[aria-pressed="true"]')).toBeNull();
+});
+
+it('retains authentic HF words through the explicit pressure control and a later answer', async () => {
+  const driver = await boot(true);
+  button('rest').click();
+  const refusals = driver.climb.lines.filter((l) => ['refused', 'deferred', 'modified'].includes(l.verdict));
+  expect(refusals.length).toBeGreaterThan(0);
+  const refusal = refusals[0] as Line;
+  vi.advanceTimersByTime(8000);
+  driver.renderSheet(true);
+  expect(document.querySelector('.request-replies')?.textContent).toContain(displayText(refusal.says));
+  document.querySelector<HTMLButtonElement>('.request-tone')?.click();
+  expect(document.querySelector<HTMLButtonElement>('.forces button:last-child')?.disabled).toBe(false);
+  expect(driver.climb.inputs).toHaveLength(1);
+  await vi.advanceTimersByTimeAsync(1);
+  await driver.flushSave();
+  document.querySelector<HTMLButtonElement>('.forces button:last-child')?.click();
+  step(driver.climb);
+  const latest = driver.climb.lines.filter((l) => l.who === refusal.who).at(-1) as Line;
+  expect(latest.input).not.toBe(refusal.input);
+  document.querySelector<HTMLButtonElement>('.all-answers')?.click();
+  expect(document.querySelector('.answers-sheet')?.textContent).toContain(displayText(latest.says));
+  if (latest.says !== refusal.says)
+    expect(document.querySelector('.answers-sheet')?.textContent).not.toContain(displayText(refusal.says));
+});
+
+it('updates an open request when the target leaves earshot and when they return', async () => {
+  const driver = await boot(true);
+  button('Nell').click();
+  button('rest').click();
+  document.querySelector<HTMLButtonElement>('.request-tone')?.click();
+  const nell = driver.climb.members.find((x) => x.id === 'nell');
+  if (!nell) throw new Error('Nell missing');
+  const near = { ...nell.pos };
+  nell.pos = { place: MOUNTAINS[driver.climb.mountain]?.summit ?? null, leg: null, t: 0 };
+  driver.renderSheet(true);
+  expect([...document.querySelectorAll<HTMLButtonElement>('.forces button')].every((b) => b.disabled)).toBe(
+    true,
+  );
+  expect(document.querySelector('.force-reason')?.textContent).toContain('too far away to hear you');
+  nell.pos = near;
+  driver.renderSheet(true);
+  expect([...document.querySelectorAll<HTMLButtonElement>('.forces button')].every((b) => !b.disabled)).toBe(
+    true,
+  );
+  expect(document.querySelector('.force-reason')).toBeNull();
+});
+
+it('updates take-pack availability at the actual forty-metre boundary', async () => {
+  const driver = await boot(true);
+  button('Nell').click();
+  const c = driver.climb;
+  const nell = c.members.find((x) => x.id === 'nell');
+  const leg = MOUNTAINS[c.mountain]?.legs[0];
+  if (!nell || !leg) throw new Error('Missing trail fixture');
+  const standAt = (metres: number) => {
+    let low = 0;
+    let high = 1;
+    for (let i = 0; i < 40; i++) {
+      const t = (low + high) / 2;
+      c.leader.pos = { place: null, leg: leg.id, t };
+      if (distance(c, nell.pos, c.leader.pos) < metres) low = t;
+      else high = t;
+    }
+    driver.renderSheet(true);
+  };
+  standAt(39);
+  expect(button('take pack').disabled).toBe(false);
+  standAt(41);
+  expect(button('take pack').disabled).toBe(true);
+  expect(button('take pack').parentElement?.textContent).toContain('Walk to her first');
+});
+
+it('keeps eating available without carried rations at the hut, for one person or the group', async () => {
+  const driver = await boot(true);
+  const c = driver.climb;
+  const m = MOUNTAINS[c.mountain];
+  if (!m?.legs[0]) throw new Error('Missing mountain');
+  const nell = c.members.find((x) => x.id === 'nell');
+  if (!nell) throw new Error('Nell missing');
+  for (const person of c.members) {
+    person.rations = 0;
+    person.pos = { place: null, leg: m.legs[0].id, t: 0 };
+  }
+  c.leader.rations = 0;
+  button('Nell').click();
+  expect(button('eat').disabled).toBe(true);
+  expect(button('eat').parentElement?.textContent).toContain('hut');
+  nell.pos = { place: m.hut, leg: null, t: 0 };
+  driver.renderSheet(true);
+  expect(button('eat').disabled).toBe(false);
+  button('everyone').click();
+  expect(button('eat').disabled).toBe(false);
+  nell.pos = { place: null, leg: m.legs[0].id, t: 0 };
+  driver.renderSheet(true);
+  expect(button('eat').disabled).toBe(true);
+});
+
+it('retains both rope partners’ HF answers after bubble expiry and when the pair is reversed', async () => {
+  const driver = await boot(true, 1);
+  button('Nell').click();
+  button('rope up').click();
+  button('Oskar').click();
+  vi.advanceTimersByTime(500);
+  document.querySelector<HTMLButtonElement>('.forces button')?.click();
+  const nell = driver.climb.lines.find((l) => l.who === 'nell') as Line;
+  const oskar = driver.climb.lines.find((l) => l.who === 'oskar') as Line;
+  expect(nell.verdict).toBe('assented');
+  expect(oskar.verdict).toBe('deferred');
+  vi.advanceTimersByTime(8500);
+  driver.renderSheet(true);
+  const replies = () => document.querySelector('.request-replies');
+  expect(replies()?.querySelector('p')?.textContent).toContain(displayText(oskar.says));
+  document.querySelector<HTMLButtonElement>('.all-answers')?.click();
+  expect(document.querySelector('.answers-sheet')?.textContent).toContain(displayText(nell.says));
+  button('Back to requests').click();
+  button('rope up').click();
+  button('Oskar').click();
+  expect(replies()?.querySelector('p')?.textContent).toContain(displayText(oskar.says));
+  expect(replies()?.textContent).toContain(displayText(nell.says));
+  button('Back to requests').click();
+  button('Oskar').click();
+  button('rope up').click();
+  button('Nell').click();
+  expect(replies()?.querySelector('p')?.textContent).toContain(displayText(oskar.says));
+  expect(replies()?.textContent).toContain(displayText(nell.says));
+  // Another pair must not inherit the Nell/Oskar answer.
+  button('Back to requests').click();
+  button('rope up').click();
+  button('Tamar').click();
+  expect(replies()).toBeNull();
+});
+
+it('shows the saved climb, mountain and time beside Continue without advancing the save', async () => {
+  const { season, climb } = newSeason(23);
+  for (let i = 0; i < 13; i++) step(climb);
+  const saved = JSON.stringify({
+    v: 2,
+    ownership: {
+      runId: 'local-test-fixture',
+      heads: [],
+      sources: [],
+      archives: [],
+      fileOrigin: false,
+      localOnly: true,
+    },
+    engine: ENGINE_VERSION,
+    state: snapshot(climb),
+    season,
+    start: season.start,
+    inputs: climb.inputs,
+    minute: climb.minute,
+    over: false,
+    disclosure: { unlocked: [], seen: [] },
+  });
+  localStorage.setItem('games-rope.save.cast.v1', saved);
+  await boot();
+  expect(button('Resume')).toBeTruthy();
+  expect(document.querySelector('.continue-summary')?.textContent).toContain('Climb 1 of 3');
+  expect(document.querySelector('.continue-summary')?.textContent).toContain('Hollin');
+  expect(document.querySelector('.continue-summary')?.textContent).toContain('05:13');
+  expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(saved);
+});
+
+it('keeps an unsupported HF3 local save and explains it cannot resume', async () => {
+  const saved = JSON.stringify({ v: 1, engine: '2.23.0' });
+  localStorage.setItem('games-rope.save.cast.v1', saved);
+  await boot();
+  expect(document.body.textContent).toContain('cannot be opened in this version of Rope');
+  expect(document.body.textContent).toContain('It has not been deleted. Start a new game');
+  expect([...document.querySelectorAll('button')].some((button) => button.textContent === 'Resume')).toBe(
+    false,
+  );
+  expect(localStorage.getItem('games-rope.save.cast.v1')).toBe(saved);
+});
+
+it('keeps extra abilities behind More actions and returns to the same person', async () => {
+  await boot(true);
+  button('Oskar').click();
+  button('More requests to people').click();
+  expect(document.querySelector('.sheet')?.classList.contains('sheet-more')).toBe(true);
+  expect(button('rope up').closest('.secondary-action')).not.toBeNull();
+  expect(button('scout').closest('.secondary-action')).not.toBeNull();
+  button('Back to requests').click();
+  expect(document.querySelector('.sheet')?.classList.contains('sheet-main')).toBe(true);
+  expect(button('Oskar').getAttribute('aria-pressed')).toBe('true');
+  expect(button('walk to Oskar').closest('.secondary-action')).toBeNull();
+});
