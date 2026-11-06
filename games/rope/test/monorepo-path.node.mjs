@@ -33,12 +33,7 @@ test('manifest remains within Rope path', () => {
   assert.ok(manifest.icons.every((icon) => icon.src.startsWith('/rope/')));
 });
 
-test('both entries include analytics and permit its endpoints', () => {
-  for (const file of ['index.html', 'file/index.html']) {
-    const page = readFileSync(file, 'utf8');
-    assert.match(page, /https:\/\/static\.cloudflareinsights\.com\/beacon\.min\.js/);
-    assert.match(page, /16c78483308e46519c2eb1ab552fe0d2/);
-  }
+test('CSP permits zone-injected analytics and its endpoints', () => {
   const headers = readFileSync('public/_headers', 'utf8');
   assert.match(headers, /static\.cloudflareinsights\.com/);
   assert.match(headers, /https:\/\/cloudflareinsights\.com/);
