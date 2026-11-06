@@ -23,6 +23,19 @@
       ],
       "legacyOrigin": "https://hearsay.adamwhite.work",
       "redirectEnabled": false
+    },
+    {
+      "slug": "goodhands",
+      "source": {
+        "repository": "https://github.com/adam0white/goodhands",
+        "commit": "b54fd4326954e5a74f5b9bd6ec1d08f07055cb6d"
+      },
+      "saveSchema": "goodhands-hf4/2",
+      "ciBrowsers": [
+        "chromium-headless-shell"
+      ],
+      "legacyOrigin": "https://goodhands.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }
