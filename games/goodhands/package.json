@@ -1,0 +1,42 @@
+{
+  "name": "goodhands",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Good Hands: a month running a small placement agency, where nobody is quite who they say at interview.",
+  "license": "MIT",
+  "engines": {
+    "node": "26.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/stamp-release.ts && vite build",
+    "preview": "vite preview",
+    "test": "vitest run --no-file-parallelism --testTimeout=180000",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "measure": "node scripts/measure.ts",
+    "check": "npm run lint && npm run typecheck && npm test",
+    "deploy": "pnpm run check:lane && pnpm run build && pnpm exec wrangler deploy",
+    "check:lane": "npm run lint && npm run typecheck"
+  },
+  "dependencies": {
+    "@adam0white/human-framework": "4.17.0",
+    "@adam0white/human-framework-legacy": "npm:@adam0white/human-framework@2.9.0",
+    "@adam0white/human-framework-legacy3": "npm:@adam0white/human-framework@3.0.0",
+    "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.7/adam0white-lab-client-0.5.7.tgz",
+    "@adam0white/lab-client-legacy3": "file:vendor/adam0white-lab-client-0.4.15.tgz",
+    "@adam0white/lab-kit": "https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.24/adam0white-lab-kit-0.5.24.tgz"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.5",
+    "@types/node": "26.6.6",
+    "playwright-core": "1.64.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.1.0",
+    "wrangler": "4.157.0"
+  },
+  "packageManager": "pnpm@12.16.1"
+}
