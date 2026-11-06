@@ -393,12 +393,12 @@ export function start() {
     if (lab.preservationStatus !== 'existing-local') {
       lab.dispose();
       app.innerHTML =
-        '<p>File play cannot start with this browser’s recording profile. No native save was opened. Use a compatible existing lab profile or return to the Glance page at glance.adamwhite.work.</p>';
+        '<p>File play cannot start with this browser’s recording profile. No native save was opened. Use a compatible existing lab profile or return to the Glance page at play.adamwhite.work/glance/.</p>';
       return;
     }
   }
   if (entryMode === 'invalid') {
-    app.innerHTML = '<p>This file address is invalid. Use /file/ to choose a saved file.</p>';
+    app.innerHTML = '<p>This file address is invalid. Use /glance/file/ to choose a saved file.</p>';
     return;
   }
   if (fileMode) {
@@ -410,7 +410,7 @@ export function start() {
     'serviceWorker' in navigator &&
     !['localhost', '127.0.0.1'].includes(location.hostname)
   )
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/glance/sw.js', { scope: '/glance/' }).catch(() => {});
   title();
   const notice = telemetryNotice();
   if (notice) {
@@ -595,7 +595,7 @@ function fileChooser() {
 }
 
 function debugFooter() {
-  return `<div class="debug-footer"><a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a><details id="debug"><summary>Debug</summary>${s ? '<button id="debug-download">Download this run</button>' : ''}<a href="/file/">Play a saved file without replacing the local week</a><small>HF ${FRAMEWORK_VERSION}</small></details></div>`;
+  return `<div class="debug-footer"><a href="${PRIVACY}" target="_blank" rel="noopener">Lab privacy</a><details id="debug"><summary>Debug</summary>${s ? '<button id="debug-download">Download this run</button>' : ''}<a href="/glance/file/">Play a saved file without replacing the local week</a><small>HF ${FRAMEWORK_VERSION}</small></details></div>`;
 }
 
 async function beginWeek(localOnly = false, chosen?: WatchRules) {

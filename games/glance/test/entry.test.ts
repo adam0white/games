@@ -69,7 +69,7 @@ async function boot(path: string) {
   return { native, replace };
 }
 it('actual canonical startup selects preserving SDK and chooser without native sinks', async () => {
-  const { native, replace } = await boot('/file/?labRunSource=agent');
+  const { native, replace } = await boot('/glance/file/?labRunSource=agent');
   expect(sinks.sdk).toHaveBeenCalledWith({ game: 'glance', preservation: 'preserve' });
   expect(sinks.shelf).not.toHaveBeenCalled();
   expect(native).toEqual([]);
@@ -77,14 +77,19 @@ it('actual canonical startup selects preserving SDK and chooser without native s
   expect(document.getElementById('file')).not.toBeNull();
 });
 it('actual legacy startup redirects before SDK/App/native effects and preserves attribution', async () => {
-  const { native, replace } = await boot('/?file=1&labRunSource=agent&other=keep#section');
-  expect(replace).toHaveBeenCalledWith('/file/?labRunSource=agent&other=keep#section');
+  const { native, replace } = await boot('/glance/?file=1&labRunSource=agent&other=keep#section');
+  expect(replace).toHaveBeenCalledWith('/glance/file/?labRunSource=agent&other=keep#section');
   expect(sinks.sdk).not.toHaveBeenCalled();
   expect(sinks.shelf).not.toHaveBeenCalled();
   expect(native).toEqual([]);
 });
 it('actual malformed and duplicate legacy startup refuses before SDK/native effects', async () => {
-  for (const path of ['/?file=0', '/?file=', '/?file=1&file=1', '/file/?file=1&file=other']) {
+  for (const path of [
+    '/glance/?file=0',
+    '/glance/?file=',
+    '/glance/?file=1&file=1',
+    '/glance/file/?file=1&file=other',
+  ]) {
     const { native, replace } = await boot(path);
     expect(document.body.textContent).toContain('file address is invalid');
     expect(sinks.sdk).not.toHaveBeenCalled();

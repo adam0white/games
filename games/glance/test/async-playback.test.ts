@@ -97,7 +97,11 @@ it.each([
   [1280, 800, 'about'],
   [360, 690, 'replacement'],
 ])('drops Skip carry when %s by %s playback is held by %s', async (width, height, action) => {
-  browser = new Window({ url: 'http://localhost:3000/file/', width: Number(width), height: Number(height) });
+  browser = new Window({
+    url: 'http://localhost:3000/glance/file/',
+    width: Number(width),
+    height: Number(height),
+  });
   for (const key of [
     'window',
     'document',

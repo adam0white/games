@@ -59,7 +59,7 @@ beforeEach(async () => {
   localStorage.clear();
   localStorage.setItem('hf-lab-player', 'a'.repeat(32));
   localStorage.setItem('hf-lab:once:telemetry-notice-v1', 'synthetic existing notice');
-  window.history.replaceState({}, '', '/file/');
+  window.history.replaceState({}, '', '/glance/file/');
   document.body.innerHTML = '<div id="app"></div>';
   const app = await import('../src/ui/app.ts');
   debug = app._debug;

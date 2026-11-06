@@ -18,7 +18,7 @@ try {
     localStorage.setItem('hf-lab-player', '1234567890abcdef1234567890abcdef');
     localStorage.setItem('hf-lab-recording-off', '1');
   });
-  await page.goto(process.env.GLANCE_TEST_URL ?? 'http://127.0.0.1:5189/?file=1');
+  await page.goto(process.env.GLANCE_TEST_URL ?? 'http://127.0.0.1:5189/glance/?file=1');
   await page
     .locator('#file')
     .setInputFiles({ name: 'opening.json', mimeType: 'application/json', buffer: Buffer.from(run) });
@@ -61,7 +61,7 @@ try {
     localStorage.setItem('hf-lab-player', 'abcdef0123456789abcdef0123456789');
     localStorage.setItem('hf-lab-recording-off', '1');
   });
-  await early.goto(process.env.GLANCE_TEST_URL ?? 'http://127.0.0.1:5189/?file=1');
+  await early.goto(process.env.GLANCE_TEST_URL ?? 'http://127.0.0.1:5189/glance/?file=1');
   await early
     .locator('#file')
     .setInputFiles({ name: 'opening.json', mimeType: 'application/json', buffer: Buffer.from(run) });
@@ -76,7 +76,7 @@ try {
     localStorage.setItem('hf-lab-player', 'fedcba9876543210fedcba9876543210');
     localStorage.setItem('hf-lab-recording-off', '1');
   });
-  await direct.goto(process.env.GLANCE_TEST_URL ?? 'http://127.0.0.1:5189/?file=1');
+  await direct.goto(process.env.GLANCE_TEST_URL ?? 'http://127.0.0.1:5189/glance/?file=1');
   await direct
     .locator('#file')
     .setInputFiles({ name: 'opening.json', mimeType: 'application/json', buffer: Buffer.from(run) });

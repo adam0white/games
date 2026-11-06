@@ -1,7 +1,8 @@
 // The Glance service worker: offline play. The page is network-first (so a new build arrives), everything else
 // same-origin game assets are cache-first and stored as they are fetched.
-const CACHE = 'glance-v1';
-const SHELL = ['/', '/manifest.webmanifest', '/icon.svg', '/icon-192.png'];
+const CACHE = 'glance-v2';
+const PREFIX = '/glance/';
+const SHELL = [PREFIX, `${PREFIX}manifest.webmanifest`, `${PREFIX}icon.svg`, `${PREFIX}icon-192.png`];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
@@ -16,7 +17,9 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) =>
+        Promise.all(keys.filter((k) => k.startsWith('glance-') && k !== CACHE).map((k) => caches.delete(k))),
+      )
       .then(() => self.clients.claim()),
   );
 });
@@ -26,33 +29,36 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   // The browser owns cross-origin CORS, integrity checks and third-party caching.
-  if (url.origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin || !url.pathname.startsWith(PREFIX)) return;
   // Release metadata must describe the deployed build, never an earlier offline cache.
-  if (url.pathname.startsWith('/api/') || url.pathname === '/release.json') return;
+  if (url.pathname === `${PREFIX}release.json`) return;
   const isPage = req.mode === 'navigate';
   if (isPage) {
     e.respondWith(
       fetch(req)
         .then((res) => {
           const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put('/', copy));
+          caches.open(CACHE).then((c) => c.put(PREFIX, copy));
           return res;
         })
-        .catch(() => caches.match('/')),
+        .catch(() => caches.open(CACHE).then((c) => c.match(PREFIX))),
     );
     return;
   }
   e.respondWith(
-    caches.match(req).then(
-      (hit) =>
-        hit ||
-        fetch(req).then((res) => {
-          if (res.ok || res.type === 'opaque') {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy));
-          }
-          return res;
-        }),
-    ),
+    caches
+      .open(CACHE)
+      .then((c) => c.match(req))
+      .then(
+        (hit) =>
+          hit ||
+          fetch(req).then((res) => {
+            if (res.ok || res.type === 'opaque') {
+              const copy = res.clone();
+              caches.open(CACHE).then((c) => c.put(req, copy));
+            }
+            return res;
+          }),
+      ),
   );
 });

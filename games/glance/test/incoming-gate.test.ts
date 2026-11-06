@@ -71,7 +71,7 @@ it('refuses a historical gate-closed prepared CAS while preserving the exact old
   });
 });
 
-it('uses the published default gate to admit Callum and name all four blocked peers before actual CAS', async () => {
+it('uses the published default gate to admit Callum and Wren and name the three blocked peers before actual CAS', async () => {
   vi.stubGlobal('indexedDB', new IDBFactory());
   const { inputs } = historicalEvent('focused-3', 'all-five-actual-Run') as { inputs: LifePreparation[] };
   expect(inputs.map((i) => portablePersonRole(i.parent, 'glance'))).toEqual([
@@ -82,7 +82,8 @@ it('uses the published default gate to admit Callum and name all four blocked pe
     'wren',
   ]);
   expect(portableWriteBlockers('hf.cast.callum.glance', 'glance')).toEqual([]);
-  for (const id of ['hf.cast.dai.glance', 'hf.cast.nerys.glance', 'hf.cast.bilal.rope', 'hf.cast.wren.rope'])
+  expect(portableWriteBlockers('hf.cast.wren.rope', 'glance')).toEqual([]);
+  for (const id of ['hf.cast.dai.glance', 'hf.cast.nerys.glance', 'hf.cast.bilal.rope'])
     expect(portableWriteBlockers(id, 'glance').length).toBeGreaterThan(0);
   let store = inputs.reduce((state, input) => acceptPersona(state, input.parent), {
     revisions: [],
@@ -103,12 +104,12 @@ it('uses the published default gate to admit Callum and name all four blocked pe
           expectedHeads: Object.fromEntries(ALLOCATION.map((p) => [p.castId, store.heads[p.castId] ?? null])),
         } as T;
       if (q.action !== 'putBatch') throw Error('Unexpected actual transport');
-      expect(q.envelopes?.map((e) => e.castId)).toEqual(['hf.cast.callum.glance']);
+      expect(q.envelopes?.map((e) => e.castId)).toEqual(['hf.cast.callum.glance', 'hf.cast.wren.rope']);
       const [record] = await c.preparations.list();
       const chapter = JSON.parse(record!.candidate).run.state.chapter;
-      expect(chapter.blocked).toHaveLength(4);
+      expect(chapter.blocked).toHaveLength(3);
       expect(record!.phase).toBe('unknown');
-      for (const name of ['Dai', 'Nerys', 'Bilal', 'Wren'])
+      for (const name of ['Dai', 'Nerys', 'Bilal'])
         expect(
           chapter.blocked.some(
             (b: { reason: string }) => b.reason.includes(name) && b.reason.includes('read-only'),
@@ -121,11 +122,16 @@ it('uses the published default gate to admit Callum and name all four blocked pe
     },
   } as never);
   const state = await c.fresh(7);
-  expect(state.chapter?.inputs.map((i) => i.parent.castId)).toEqual(['hf.cast.callum.glance']);
+  expect(state.chapter?.inputs.map((i) => i.parent.castId)).toEqual([
+    'hf.cast.callum.glance',
+    'hf.cast.wren.rope',
+  ]);
   expect(state.people.map((p) => p.id)).toEqual(['dai', 'callum', 'nerys', 'bilal', 'wren']);
-  for (const name of ['Dai', 'Nerys', 'Bilal', 'Wren'])
+  for (const name of ['Dai', 'Nerys', 'Bilal'])
     expect(state.chapter?.blocked?.some((b) => b.reason.includes(name))).toBe(true);
-  for (const parent of inputs.filter((i) => i.parent.castId !== 'hf.cast.callum.glance'))
+  for (const parent of inputs.filter(
+    (i) => !['hf.cast.callum.glance', 'hf.cast.wren.rope'].includes(i.parent.castId),
+  ))
     expect(store.heads[parent.parent.castId]).toBe(original.heads[parent.parent.castId]);
   capture('installed-current-gated-native', {
     native: c.localSave(state),
