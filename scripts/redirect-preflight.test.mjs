@@ -115,3 +115,15 @@ test('first activation rejects a new shared engine version even with unchanged g
   f.registry.hfVersion = '4.18.0'; f.setHead(f.commit());
   await assert.rejects(verifyRedirects(f.args()), /full current release metadata/i);
 });
+
+test('historical release reads exact public SDK pins and rejects ambiguous URLs', t => {
+  const f = fixture(t);
+  const url = 'https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.16/adam0white-lab-client-0.5.16.tgz';
+  const release = value => {
+    writeFileSync(join(f.cwd, 'games/rope/package.json'), JSON.stringify({ version: '1.0.0', dependencies: { '@adam0white/human-framework': '4.17.0', '@adam0white/lab-client': value } }));
+    const sha = f.commit();
+    return repositoryEvidence(f.cwd).release(sha, f.registry, f.game);
+  };
+  assert.equal(release(url).labVersion, '0.5.16');
+  for (const invalid of [url.replace('github.com', 'example.com'), url.replace('/lab-client-v0.5.16/', '/lab-client-v0.5.15/'), `${url}?download=1`, url.replace('https:', 'http:')]) assert.throws(() => release(invalid), /artifact/i);
+});

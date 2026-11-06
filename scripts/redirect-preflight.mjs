@@ -23,9 +23,16 @@ export function repositoryEvidence(cwd = process.cwd()) {
       const pkg = read(commit, `${path}/package.json`);
       if (pkg.dependencies?.['@adam0white/human-framework'] !== registry.hfVersion) throw new Error('Historical game HF pin mismatch');
       const archive = pkg.dependencies?.['@adam0white/lab-client'];
-      if (!/^file:vendor\/[A-Za-z0-9_.-]+\.tgz$/.test(archive ?? '')) throw new Error('Historical lab artifact must be a pinned vendor archive');
-      const bytes = git('show', `${commit}:${path}/${archive.slice(5)}`);
-      const lab = JSON.parse(execFileSync('tar', ['-xOzf', '-', 'package/package.json'], { input: bytes, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }));
+      // Public artifact bytes are qualified during adoption and the clean build.
+      // Here read only the committed immutable URL, without a network dependency.
+      const publicPin = /^https:\/\/github\.com\/adam0white\/human-framework\/releases\/download\/lab-client-v(\d+\.\d+\.\d+)\/adam0white-lab-client-\1\.tgz$/.exec(archive ?? '');
+      let lab;
+      if (publicPin) lab = { name: '@adam0white/lab-client', version: publicPin[1] };
+      else {
+        if (!/^file:vendor\/[A-Za-z0-9_.-]+\.tgz$/.test(archive ?? '')) throw new Error('Historical lab artifact must be an exact public URL or pinned vendor archive');
+        const bytes = git('show', `${commit}:${path}/${archive.slice(5)}`);
+        lab = JSON.parse(execFileSync('tar', ['-xOzf', '-', 'package/package.json'], { input: bytes, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }));
+      }
       if (lab.name !== '@adam0white/lab-client' || !/^\d+\.\d+\.\d+$/.test(lab.version)) throw new Error('Invalid historical lab artifact');
       return manifest(registry, game, commit, false, lab.version, pkg.version);
     },

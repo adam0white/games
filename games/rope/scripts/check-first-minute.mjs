@@ -44,18 +44,20 @@ async function exposed(locator, label) {
   console.log(label, JSON.stringify(result));
   assert.ok(result.inside && result.hits.every(Boolean), `${label}: ${JSON.stringify(result)}`);
 }
+async function testPage(options) {
+  const page = await browser.newPage(options);
+  await page.context().route(`${native.origin}/**`, async (route) => {
+    if (!['GET', 'HEAD'].includes(route.request().method())) return route.continue();
+    const url = new URL(route.request().url());
+    const response = await route.fetch({ url: local.origin + url.pathname + url.search });
+    await route.fulfill({ response });
+  });
+  return page;
+}
 async function first(page, viewport, practice) {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  if (!practice) {
-    await page.context().route(`${native.origin}/**`, async (route) => {
-      if (!['GET', 'HEAD'].includes(route.request().method())) return route.continue();
-      const url = new URL(route.request().url());
-      const response = await route.fetch({ url: local.origin + url.pathname + url.search });
-      await route.fulfill({ response });
-    });
-  }
-  await page.goto(practice ? new URL('file/?tutorial=1', local).href : native.href);
+  await page.goto(practice ? new URL('file/?tutorial=1', native).href : native.href);
   if (!practice) await page.locator('[data-a="new"]').click();
   await page.locator('[data-a="go"]').click({ timeout: 30000 });
   const target = page.locator('.leader-bar .verb.lit');
@@ -123,9 +125,9 @@ async function skipAndReplay(viewport) {
   }
 }
 async function enlargedHeader() {
-  const page = await browser.newPage({ viewport: { width: 360, height: 690 } });
+  const page = await testPage({ viewport: { width: 360, height: 690 } });
   try {
-    await page.goto(new URL('file/?tutorial=1', local).href);
+    await page.goto(new URL('file/?tutorial=1', native).href);
     await page.locator('[data-a="go"]').click();
     await page.evaluate(() => {
       for (const el of document.querySelectorAll('.where, .clock-rate'))
@@ -152,12 +154,12 @@ async function enlargedHeader() {
   }
 }
 async function compactLandscape(dnt) {
-  const page = await browser.newPage({
+  const page = await testPage({
     viewport: { width: 690, height: 360 },
     ...(dnt ? { extraHTTPHeaders: { DNT: '1' } } : {}),
   });
   try {
-    await page.goto(new URL('file/?tutorial=1', local).href);
+    await page.goto(new URL('file/?tutorial=1', native).href);
     await page.locator('[data-a="go"]').click({ timeout: 30000 });
     console.log(
       '690 recording notice',
@@ -186,7 +188,7 @@ async function compactLandscape(dnt) {
     await exposed(page.getByRole('button', { name: 'Skip tutorial' }), '690 landscape request Skip');
     for (const control of await page.locator('.leader-bar button:not([disabled])').all())
       await exposed(control, '690 landscape request movement control');
-    await page.goto(new URL('file/?tutorial=1', local).href);
+    await page.goto(new URL('file/?tutorial=1', native).href);
     await page.locator('[data-a="go"]').click({ timeout: 30000 });
     await page.getByRole('button', { name: 'Skip tutorial' }).click();
     await page.waitForTimeout(400);
@@ -211,7 +213,7 @@ for (const browserType of [chromium, webkit]) {
       { width: 1280, height: 800 },
     ]) {
       for (const practice of [false, true]) {
-        const page = await browser.newPage({ viewport, extraHTTPHeaders: { DNT: '1' } });
+        const page = await testPage({ viewport, extraHTTPHeaders: { DNT: '1' } });
         await first(page, viewport, practice);
         await page.close();
       }
@@ -220,13 +222,13 @@ for (const browserType of [chromium, webkit]) {
     for (const height of [480, 500, 501, 520]) {
       for (const dnt of [true, false]) {
         const viewport = { width: 360, height };
-        const page = await browser.newPage({
+        const page = await testPage({
           viewport,
           ...(dnt ? { extraHTTPHeaders: { DNT: '1' } } : {}),
         });
         await first(page, viewport, true);
         if (height <= 500) {
-          await page.goto(new URL('file/?tutorial=1', local).href);
+          await page.goto(new URL('file/?tutorial=1', native).href);
           await page.locator('[data-a="go"]').click();
           await page.getByRole('button', { name: 'Skip tutorial' }).click();
           await page.waitForTimeout(400);
