@@ -36,6 +36,19 @@
       ],
       "legacyOrigin": "https://goodhands.adamwhite.work",
       "redirectEnabled": false
+    },
+    {
+      "slug": "glance",
+      "source": {
+        "repository": "https://github.com/adam0white/glance",
+        "commit": "6971b4d72ff0bdb3ac11b6f55119a9ebab90ec8a"
+      },
+      "saveSchema": "glance-run/1",
+      "ciBrowsers": [
+        "chromium"
+      ],
+      "legacyOrigin": "https://glance.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }

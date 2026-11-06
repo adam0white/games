@@ -1,0 +1,1654 @@
+/* Field Notebook tokens (human-framework docs/design-language.md). Only --rope is loud. */
+:root {
+  --paper: #f3ecdd;
+  --paper-2: #e9dfcb;
+  --ink: #23201b;
+  --ink-soft: #6e665a;
+  --rope: #c2412d;
+  --moss: #4f6b3a;
+  --sky: #3d5a73;
+  --text: "Literata", Georgia, serif;
+  --hand: "Caveat", "Bradley Hand", cursive;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1e1b16;
+    --paper-2: #29251e;
+    --ink: #e8dfcc;
+    --ink-soft: #9a9080;
+    --rope: #e2614a;
+    --moss: #8daa6e;
+    --sky: #7fa2c0;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1e1b16;
+  --paper-2: #29251e;
+  --ink: #e8dfcc;
+  --ink-soft: #9a9080;
+  --rope: #e2614a;
+  --moss: #8daa6e;
+  --sky: #7fa2c0;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--text);
+  font-size: 17px;
+  line-height: 1.4;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+a {
+  color: var(--ink);
+}
+button {
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper-2);
+  border: 1.5px solid var(--ink);
+  border-radius: 10px 12px 9px 11px;
+  padding: 10px 14px;
+  min-height: 48px;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+button.primary {
+  border-color: var(--rope);
+  color: var(--rope);
+  font-weight: 600;
+}
+:where(.desk-tools) button {
+  font-size: 15px;
+  min-height: 44px;
+  padding: 6px 10px;
+}
+button:disabled {
+  opacity: 0.45;
+}
+.hand {
+  font-family: var(--hand);
+  font-size: 1.25em;
+  line-height: 1.15;
+}
+.soft {
+  color: var(--ink-soft);
+}
+.mark {
+  align-self: flex-start;
+  font-size: 14px;
+  text-decoration: none;
+  color: var(--ink-soft);
+}
+
+/* ---------- dawn ---------- */
+.week-end {
+  border-block: 2px solid var(--rope);
+  padding-block: 12px;
+  font-weight: 600;
+}
+.chart {
+  width: 100%;
+  display: block;
+}
+.legend {
+  font-size: 13px;
+}
+.key {
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  vertical-align: middle;
+  margin: 0 4px 0 8px;
+}
+.key.red {
+  border-top: 2px solid var(--rope);
+}
+.key.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+.houses {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.houses .soft {
+  margin: 0 4px 0 8px;
+}
+.house {
+  width: 16px;
+  height: 16px;
+}
+.house.flooded {
+  color: var(--sky);
+}
+.misses {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 15px;
+}
+.misses .t {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.caught {
+  color: var(--moss);
+  font-weight: 600;
+}
+.keeperline {
+  border-top: 1.5px solid var(--ink-soft);
+  padding-top: 8px;
+}
+.keeperline p {
+  margin: 2px 0 0;
+}
+.week {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 15px;
+}
+.w {
+  white-space: nowrap;
+}
+
+.verbs button.nudge .h {
+  color: var(--rope);
+}
+
+/* The desk has fixed observation zones. Only its lower sheet changes. */
+html,
+body {
+  overflow: hidden;
+}
+#app {
+  max-width: 1180px;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+button,
+a,
+summary {
+  min-height: 44px;
+  min-width: 44px;
+}
+button {
+  background: transparent;
+  padding: 6px 10px;
+}
+button.primary {
+  background: var(--rope);
+  color: var(--paper);
+  min-height: 52px;
+  border-color: var(--rope);
+}
+button[aria-pressed="true"] {
+  outline: 2px solid var(--rope);
+  outline-offset: -3px;
+}
+[hidden] {
+  display: none !important;
+}
+.topbar {
+  height: 44px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  font-size: 15px;
+  min-width: 0;
+}
+.topbar > :first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topbar a {
+  display: flex;
+  align-items: center;
+}
+.topbar-actions {
+  display: flex;
+  flex: none;
+}
+.topbar-actions button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  font-size: 23px;
+}
+.topbar-actions .info {
+  font:
+    italic 20px Georgia,
+    serif;
+}
+.watch {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.state-strip {
+  height: 64px;
+  flex: none;
+  padding: 0 8px;
+}
+#concern {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+}
+#concern button,
+#concern .chip {
+  min-height: 44px;
+  max-width: 100%;
+  padding: 4px 8px;
+  font-size: 13px;
+  flex: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#concern .radio-out,
+.not-answering {
+  color: var(--rope);
+}
+#clock-rate {
+  height: 20px;
+  line-height: 20px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.desk-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.desk-picture {
+  flex: none;
+}
+.scene-zone {
+  position: relative;
+  height: 170px;
+}
+.scene {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: manipulation;
+}
+#latest-radio {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 0;
+  max-height: 46px;
+  overflow: hidden;
+  pointer-events: none;
+  font-size: 19px;
+  line-height: 1.15;
+}
+.board {
+  height: 96px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 6px;
+  padding: 0 8px;
+}
+.gauge {
+  height: 96px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2px;
+  gap: 0;
+  opacity: var(--fade, 1);
+  overflow: hidden;
+  background: var(--paper-2);
+}
+.gauge svg {
+  width: 48px;
+  height: 26px;
+  flex: none;
+}
+.gauge .lab {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--ink-soft);
+}
+.gauge .num {
+  font-size: 16px;
+  line-height: 19px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.gauge .by {
+  font-size: 10px;
+  line-height: 13px;
+  color: var(--ink-soft);
+}
+.gauge .was {
+  font-size: 10px;
+  line-height: 12px;
+}
+.gauge.not-read {
+  border-color: var(--rope);
+}
+.gauge .needle {
+  animation: tremble 0.9s ease-in-out infinite alternate;
+}
+@keyframes tremble {
+  from {
+    rotate: calc(-1 * var(--tremble, 0deg));
+  }
+  to {
+    rotate: var(--tremble, 0deg);
+  }
+}
+.desk-context {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sheet {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 8px 6px;
+  border-top: 1px solid var(--ink-soft);
+  font-size: 13px;
+}
+.sheet .who {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.sheet .who b {
+  flex: none;
+}
+.sheet .who .soft {
+  flex: 1;
+  font-size: 11px;
+  line-height: 14px;
+}
+.sheet .x {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  margin-left: auto;
+}
+.sheet p {
+  margin: 4px 0;
+}
+.sheet .hint,
+.sheet .fore {
+  font-size: 12px;
+  line-height: 16px;
+  margin: 4px 0;
+  color: var(--ink-soft);
+}
+.sheet summary {
+  cursor: pointer;
+  padding: 4px 0;
+  line-height: 20px;
+  min-height: 28px;
+}
+.sheet .crew {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+.crew button {
+  flex: 1;
+  min-height: 44px;
+  font-size: 12px;
+  padding: 2px 4px;
+}
+.verbs {
+  display: grid;
+  gap: 6px;
+}
+.verbs.grid,
+.verbs.two {
+  grid-template-columns: 1fr 1fr;
+}
+.verbs.turns {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.verbs button {
+  position: relative;
+  overflow: hidden;
+  min-height: 60px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4px 7px;
+  font-size: 13px;
+  line-height: 16px;
+}
+.verbs.turns button {
+  min-height: 52px;
+  font-size: 12px;
+  padding: 3px 5px;
+}
+.verbs .h {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--ink-soft);
+  position: relative;
+}
+.verbs .h.no,
+.verbs .nudge .h {
+  color: var(--rope);
+}
+.verbs button > span {
+  position: relative;
+}
+.verbs button .fill {
+  position: absolute;
+  inset: 0;
+  background: var(--rope);
+  opacity: 0.18;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.verbs button.holding .fill {
+  transform: scaleX(1);
+  transition: transform 0.5s linear;
+}
+.log {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  padding-top: 6px;
+}
+.line .t {
+  color: var(--ink-soft);
+  font-size: 11px;
+  margin-right: 5px;
+}
+.line.n {
+  color: var(--ink-soft);
+  font-style: italic;
+}
+.line.r {
+  color: var(--sky);
+}
+.first-call {
+  padding: 6px 0;
+}
+.first-call button {
+  width: 100%;
+}
+.actionbar {
+  flex: none;
+  padding: 6px 8px calc(6px + var(--safe-b));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.actionbar > button {
+  width: 100%;
+  min-height: 52px;
+}
+#skip-bar {
+  height: 64px;
+  position: relative;
+}
+#skip-bar:has(.skip-caption:not(:empty)) {
+  height: 80px;
+}
+.skip-caption {
+  text-align: center;
+  font-size: 11px;
+  line-height: 14px;
+  margin: 0;
+  color: var(--ink-soft);
+}
+.page.screen {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.page-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.page-body h1 {
+  font-size: 40px;
+  line-height: 48px;
+  margin: 0;
+}
+.page-body h2 {
+  font-size: 23px;
+  margin: 0;
+}
+.page-body h3 {
+  font-size: 17px;
+  margin: 0;
+}
+.page-body p {
+  margin: 0;
+}
+.title-page .page-body {
+  padding: 0 16px;
+  gap: 8px;
+}
+.subtitle {
+  font-size: 15px;
+}
+.sample-morning {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 200px;
+  flex: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+.sample-morning canvas {
+  width: 100%;
+  height: 100%;
+}
+.sample-morning .caption {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  font-size: 13px;
+  text-align: left;
+}
+#goal {
+  font-size: 15px;
+  line-height: 20px;
+}
+#other-ways {
+  min-height: 52px;
+  width: 100%;
+  text-align: left;
+}
+.footer {
+  font-size: 11px;
+  line-height: 20px;
+  color: var(--ink-soft);
+  text-align: center;
+  white-space: nowrap;
+}
+.save-time {
+  font-size: 12px;
+  text-align: center;
+}
+.confirm {
+  font-size: 13px;
+}
+.confirm button {
+  min-height: 44px;
+}
+.end-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.end-actions .primary {
+  grid-column: 1 / -1;
+}
+.end-actions button {
+  font-size: 14px;
+}
+dialog {
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--ink-soft);
+  border-radius: 12px 12px 0 0;
+}
+dialog::backdrop {
+  background: #0008;
+}
+.game-dialog {
+  padding: 0;
+  margin: 0;
+  position: fixed;
+  inset: auto 0 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: calc(100dvh - 44px);
+  display: none;
+  overflow: hidden;
+}
+.game-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.dialog-head {
+  display: flex;
+  min-height: 44px;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+}
+.dialog-head h2 {
+  flex: 1;
+  font-size: 19px;
+  margin: 0;
+}
+.dialog-head button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+}
+.dialog-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dialog-body p {
+  margin: 0;
+  font-size: 14px;
+}
+.dialog-body > button,
+.dialog-body > a {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.dialog-actions {
+  padding: 8px 12px calc(8px + var(--safe-b));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: none;
+}
+.dialog-actions button {
+  width: 100%;
+  min-height: 52px;
+}
+.menu-row {
+  width: 100%;
+  min-height: 52px;
+  text-align: left;
+}
+.menu-speeds {
+  display: flex;
+  gap: 4px;
+}
+.menu-speeds button {
+  flex: 1;
+  font-size: 13px;
+}
+.record-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.record-row label {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+.record-row a {
+  display: flex;
+  align-items: center;
+}
+input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+}
+textarea,
+input[type="text"] {
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--paper-2);
+  width: 100%;
+  border: 1px solid var(--ink-soft);
+  border-radius: 6px;
+  padding: 8px;
+}
+input[type="text"] {
+  min-height: 44px;
+}
+textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+.verdicts {
+  display: flex;
+  gap: 4px;
+}
+.verdicts button {
+  flex: 1;
+  font-size: 13px;
+  padding: 4px;
+}
+#feedback {
+  height: calc(100dvh - 44px);
+}
+#feedback summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+}
+#feedback small {
+  font-size: 11px;
+  line-height: 14px;
+}
+#about {
+  position: fixed;
+  inset: 44px 8px auto;
+  margin: 0 auto;
+  padding: 12px;
+  max-height: 60dvh;
+  width: calc(100% - 16px);
+  overflow: auto;
+  border: 1px solid var(--ink-soft);
+  background: var(--paper);
+  color: var(--ink);
+}
+#about h2 {
+  font-size: 19px;
+  margin: 0;
+}
+#about p {
+  font-size: 14px;
+  margin: 6px 0;
+}
+#close-about {
+  float: right;
+  width: 44px;
+  height: 44px;
+}
+@media (min-width: 900px) {
+  .topbar {
+    height: 56px;
+    font-size: 17px;
+  }
+  .watch {
+    position: relative;
+    padding-top: 56px;
+  }
+  .watch .topbar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding-right: 88px;
+  }
+  .watch .topbar-actions {
+    position: absolute;
+    right: 0;
+  }
+  .watch .state-strip {
+    position: absolute;
+    top: 0;
+    left: 300px;
+    right: 88px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #concern {
+    flex: 1;
+  }
+  #clock-rate {
+    font-size: 11px;
+    max-width: 110px;
+    height: auto;
+    line-height: 14px;
+  }
+  .desk-main {
+    display: grid;
+    grid-template-columns: minmax(0, 720px) minmax(400px, 420px);
+    gap: 24px;
+  }
+  .desk-picture {
+    min-width: 0;
+  }
+  .scene-zone {
+    height: auto;
+    aspect-ratio: 360 / 236;
+  }
+  .board {
+    height: 120px;
+    padding: 0;
+  }
+  .gauge {
+    height: 120px;
+  }
+  .gauge svg {
+    width: 64px;
+    height: 36px;
+  }
+  .gauge .lab {
+    font-size: 13px;
+  }
+  .gauge .by {
+    font-size: 12px;
+    line-height: 17px;
+  }
+  .gauge .was {
+    font-size: 11px;
+    line-height: 15px;
+  }
+  .desk-context {
+    height: 100%;
+  }
+  .sheet {
+    font-size: 15px;
+    padding: 8px;
+  }
+  .sheet .hint,
+  .sheet .fore {
+    font-size: 14px;
+    line-height: 20px;
+  }
+  .verbs button {
+    font-size: 15px;
+  }
+  .page-body,
+  .page.screen > .actionbar {
+    width: 640px;
+    margin-inline: auto;
+  }
+  .title-page .page-body {
+    padding-top: 16px;
+  }
+  .sample-morning {
+    height: 300px;
+  }
+  .game-dialog {
+    inset: 56px 0 0 auto;
+    width: 400px;
+    height: calc(100dvh - 56px);
+    max-height: none;
+    border-radius: 0;
+  }
+  .dialog-body {
+    flex: 1;
+  }
+  #feedback {
+    inset: 56px 0 0;
+    margin: auto;
+    width: 560px;
+    height: min(720px, calc(100dvh - 56px));
+    border-radius: 12px;
+  }
+  #about {
+    top: 56px;
+    width: min(640px, calc(100% - 16px));
+  }
+  .phone-only {
+    display: none !important;
+  }
+}
+
+.title-screen .page-body {
+  padding: 0 16px;
+  gap: 8px;
+}
+.sample-morning > span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  font-size: 13px;
+  line-height: 17px;
+  text-align: left;
+}
+.credit {
+  font-size: 11px;
+  line-height: 20px;
+  margin: 0;
+  text-align: center;
+  color: var(--ink-soft);
+}
+.title-actions p {
+  margin: 0;
+}
+.reading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  text-align: left;
+}
+#skip-caption {
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+  min-height: 0;
+}
+#skip-bar:has(#skip-caption:not(:empty)) {
+  height: 80px;
+}
+#skip-bar:has(#skip-caption:empty) {
+  height: 64px;
+}
+.sheet summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+.segmented .segment-label {
+  font-size: 11px;
+  width: 43px;
+  flex: none;
+}
+.segmented button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.previous-reading {
+  font-size: 11px;
+}
+.gauge.unread {
+  border-color: var(--rope);
+  opacity: 1;
+}
+.radio-chip {
+  color: var(--rope);
+  padding: 4px;
+  font-size: 13px;
+}
+.pace-setting {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+.pace-setting legend {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.pace-setting button {
+  flex: 1;
+  font-size: 12px;
+  padding: 4px;
+}
+.menu-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.record-switch {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 12px;
+  gap: 4px;
+}
+.menu-footer a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 12px;
+}
+.ending-actions > div {
+  display: flex;
+  gap: 6px;
+}
+.ending-actions > div > button {
+  flex: 1;
+  min-height: 52px;
+  font-size: 14px;
+}
+#restart-confirm p {
+  font-size: 13px;
+}
+#restart-confirm button {
+  min-height: 44px;
+}
+#feedback .dialog-body > label {
+  font-size: 13px;
+}
+#feedback .dialog-body > .soft {
+  font-size: 11px;
+  line-height: 14px;
+}
+#feedback textarea {
+  display: block;
+}
+#feedback-name {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  font: inherit;
+  background: var(--paper-2);
+  color: var(--ink);
+  border: 1px solid var(--ink-soft);
+  padding: 6px;
+}
+@media (max-width: 899px) {
+  .gauge .was {
+    display: none;
+  }
+  .gauge .was.other-reader {
+    display: block;
+  }
+  #feedback .dialog-body {
+    gap: 5px;
+  }
+  #feedback .dialog-body > p {
+    font-size: 12px;
+    line-height: 16px;
+  }
+  #feedback textarea {
+    height: 94px;
+    min-height: 94px;
+  }
+  #feedback .dialog-actions {
+    padding-top: 4px;
+  }
+  #feedback .dialog-actions > #feedback-back {
+    min-height: 44px;
+  }
+}
+.sample-morning {
+  overflow: hidden;
+}
+
+#feedback-back {
+  font-size: 14px;
+  width: auto;
+}
+.save-warning {
+  margin: 0;
+  padding: 4px 8px;
+  color: var(--rope);
+  font-size: 12px;
+}
+#feedback .dialog-body {
+  flex: 1;
+}
+@media (max-width: 899px) {
+  .gauge .as-written {
+    display: none;
+  }
+}
+
+/* Width-based type and layout. These sizes apply to the text itself, including fixed-size descendants. */
+:root {
+  --body-size: clamp(16px, 1.35vw + 7px, 22px);
+  --small-size: clamp(14px, 1vw + 10.5px, 20px);
+}
+html,
+body {
+  font-size: var(--body-size);
+}
+body {
+  display: flex;
+  flex-direction: column;
+}
+#app {
+  width: 100%;
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+#lab-notice {
+  flex: none;
+  font-size: var(--small-size);
+}
+#lab-notice > * {
+  margin: 0 auto;
+  max-width: 1180px;
+}
+.topbar {
+  height: auto;
+  min-height: 48px;
+  font-size: var(--small-size);
+}
+.subtitle,
+#goal,
+.dialog-body p,
+#about p,
+.sheet,
+.log,
+.verbs button,
+.verbs.turns button,
+.page-body h3,
+textarea,
+input[type="text"],
+.week,
+.misses,
+.ending-actions > div > button {
+  font-size: var(--body-size);
+  line-height: 1.45;
+}
+.gauge .lab,
+.gauge .by,
+.gauge .was,
+.sheet .hint,
+.sheet .fore,
+.sheet .who .soft,
+.crew button,
+.verbs .h,
+#clock-rate,
+#concern button,
+#concern .chip,
+.line .t,
+#skip-caption,
+.segmented .segment-label,
+.previous-reading,
+.legend,
+.houses,
+.record-switch,
+.menu-footer a,
+.save-time,
+#restart-confirm p,
+#feedback .dialog-body > label,
+#feedback .dialog-body > .soft,
+#feedback .dialog-body > p,
+.sample-morning > span,
+.verdicts button,
+.misses .t,
+#feedback small,
+.save-warning {
+  font-size: var(--small-size);
+  line-height: 1.4;
+}
+.gauge .num {
+  font-size: clamp(18px, 1.5vw + 7px, 25px);
+  line-height: 1.3;
+}
+.gauge .by {
+  font-family: var(--text);
+}
+.state-strip {
+  height: auto;
+}
+#concern {
+  height: auto;
+  min-height: 44px;
+}
+#clock-rate {
+  height: auto;
+  line-height: 1.4;
+}
+.board {
+  height: auto;
+  align-items: stretch;
+  grid-auto-columns: minmax(0, 1fr);
+}
+.gauge {
+  height: auto;
+  min-height: 108px;
+  overflow: visible;
+}
+.gauge .by {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.gauge .was {
+  white-space: normal;
+}
+.sheet .who {
+  height: auto;
+  min-height: 44px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.sheet .who .soft {
+  min-width: 0;
+}
+.sheet .crew {
+  flex-wrap: wrap;
+}
+.segmented .segment-label {
+  width: auto;
+}
+.verbs.turns {
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+}
+.verbs button,
+.verbs.turns button {
+  height: auto;
+  min-height: 64px;
+  overflow: visible;
+}
+#latest-radio {
+  position: static;
+  max-height: none;
+  overflow: visible;
+  padding: 4px 10px;
+  font-size: var(--body-size);
+  line-height: 1.35;
+}
+.scene-zone {
+  height: auto;
+  display: flex;
+  flex-direction: column-reverse;
+}
+.scene {
+  height: clamp(120px, 20vw, 300px);
+  flex: none;
+}
+#skip-bar,
+#skip-bar:has(#skip-caption:not(:empty)),
+#skip-bar:has(#skip-caption:empty) {
+  height: auto;
+  min-height: 64px;
+}
+.sample-morning {
+  height: auto;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+}
+.sample-morning > span {
+  position: static;
+}
+.sample-morning canvas {
+  min-height: 140px;
+}
+.page-body,
+.page.screen > .actionbar {
+  width: min(100%, 760px);
+  margin-inline: auto;
+}
+.game-dialog {
+  max-height: calc(100dvh - 16px);
+}
+#feedback {
+  height: auto;
+  max-height: calc(100dvh - 16px);
+}
+.dialog-body {
+  overflow-y: auto;
+}
+.dialog-head h2 {
+  font-size: clamp(20px, 2vw, 26px);
+}
+#feedback textarea {
+  height: auto;
+  min-height: 100px;
+}
+#feedback .dialog-actions {
+  padding-top: 8px;
+}
+#about {
+  max-height: 80dvh;
+}
+@media (min-width: 768px) {
+  .desk-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 1fr);
+    gap: clamp(8px, 2vw, 24px);
+    grid-template-rows: minmax(0, 1fr);
+    overflow: auto;
+  }
+  /* The row is exactly the height left under the header. The radio line and the gauges keep their own
+     height; the map takes what remains, down to a floor, so the gauges stay inside the stage. */
+  .desk-picture {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+  }
+  .scene-zone {
+    display: contents;
+  }
+  #latest-radio {
+    order: 0;
+    flex: none;
+  }
+  .board {
+    order: 2;
+    flex: none;
+  }
+  .desk-context {
+    min-width: 0;
+    height: 100%;
+  }
+  .board {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 6px;
+  }
+  .gauge {
+    min-height: 132px;
+  }
+  .gauge .was,
+  .gauge .as-written {
+    display: block;
+  }
+  .scene-zone {
+    aspect-ratio: auto;
+  }
+  .watch {
+    padding-top: 0;
+  }
+  .watch .topbar {
+    position: static;
+    padding-right: 8px;
+  }
+  .watch .topbar-actions {
+    position: static;
+  }
+  .watch .state-strip {
+    position: static;
+    height: auto;
+    display: block;
+  }
+  #clock-rate {
+    max-width: none;
+    font-size: var(--small-size);
+  }
+  .game-dialog {
+    inset: auto 0;
+    margin: 0 auto;
+    width: min(760px, 100%);
+    height: auto;
+    border-radius: 12px;
+  }
+  #feedback {
+    inset: auto 0;
+    width: min(760px, 100%);
+    height: auto;
+  }
+  .phone-only {
+    display: block !important;
+  }
+}
+/* Phone: the header, map, gauges, sheet and Skip share one column of the remaining height. The map and the
+   notes under the header shrink first, each to a floor. The sheet keeps a floor that holds the first call.
+   Below those floors the desk scrolls as a whole, so nothing ends up behind another control. */
+@media (max-width: 767px) {
+  .watch {
+    overflow-y: auto;
+  }
+  .desk-main,
+  .desk-picture,
+  .scene-zone,
+  .desk-context {
+    display: contents;
+  }
+  .watch > .topbar {
+    order: 1;
+    min-height: 44px;
+  }
+  .state-strip {
+    order: 2;
+    flex: none;
+  }
+  .desk-reminder {
+    order: 3;
+    /* Keep the notes at their natural height; the map shrinks to its floor before they do. */
+    flex: 0 0 auto;
+  }
+  #latest-radio {
+    order: 6;
+    flex: none;
+    padding-block: 2px;
+  }
+  .scene {
+    order: 4;
+    flex: 0 1 clamp(120px, 20vw, 300px);
+    height: auto;
+    min-height: 96px;
+  }
+  .board {
+    order: 5;
+    flex: none;
+    gap: 3px;
+    padding: 0 4px;
+  }
+  .gauge {
+    min-height: 5.75rem;
+  }
+  .gauge svg {
+    width: 38px;
+    height: 22px;
+  }
+  .sheet {
+    order: 7;
+    flex: 1 1 0;
+    min-height: 6.5rem;
+  }
+  .first-call {
+    padding: 2px 0;
+  }
+  .first-call p {
+    margin: 2px 0;
+  }
+  #mornings {
+    order: 8;
+    flex: none;
+  }
+  #skip-bar,
+  #skip-bar:has(#skip-caption:not(:empty)),
+  #skip-bar:has(#skip-caption:empty) {
+    order: 9;
+    flex: none;
+    min-height: 0;
+    padding-block: 4px calc(4px + var(--safe-b));
+    gap: 2px;
+  }
+  #skip-caption {
+    line-height: 1.25;
+  }
+  .save-warning {
+    order: 10;
+    flex: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .scene {
+    order: 1;
+    flex: 0 1 auto;
+    height: auto;
+    aspect-ratio: 360 / 236;
+    min-height: clamp(96px, 9vw, 140px);
+  }
+}
+
+/* The goal, Compare and the carry notice are notes under the header. Their height varies (a saved-history
+   notice, an opened disclosure), so they take only the room left and scroll inside their own box. */
+.desk-reminder {
+  flex: 0 1 auto;
+  min-height: 72px;
+  max-height: 30dvh;
+  overflow-y: auto;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--ink-soft);
+  font-size: var(--small-size);
+}
+@media (max-width: 767px) {
+  .desk-reminder {
+    flex-shrink: 0;
+    padding-block: 2px;
+  }
+}
+.desk-reminder p {
+  margin: 0 0 4px;
+}
+.desk-reminder button {
+  width: 100%;
+}
+#observation svg {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  font-size: 13px;
+  fill: var(--ink);
+}
+
+.debug-footer {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  font-size: 0.8rem;
+}
+.debug-footer details {
+  min-width: 0;
+}
+.debug-footer summary {
+  cursor: pointer;
+}
+.debug-footer details[open] {
+  flex: 1;
+}
+.debug-footer details button,
+.debug-footer details a,
+.debug-footer small {
+  display: block;
+}
+
+/* Keep the optional sky inspection's map fixed while its costed actions update.
+   The sheet contains the complete status and observations; compact chips remain links. */
+.watch:has(section[aria-label="Watch the sky"]) #latest-radio {
+  display: none;
+}
+.watch:has(section[aria-label="Watch the sky"]) .scene {
+  height: clamp(120px, 20vw, 180px);
+}
+.watch:has(section[aria-label="Watch the sky"]) .desk-picture {
+  overflow: hidden;
+}
+.watch:has(section[aria-label="Watch the sky"]) #concern .keeper-chip {
+  width: 145px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Keep the map steady while the received rota inspection changes its status. */
+.watch:has(section[aria-label="Received keeper rota"]) #latest-radio {
+  display: none;
+}
+.watch:has(section[aria-label="Received keeper rota"]) .scene {
+  height: clamp(120px, 20vw, 180px);
+}
+.watch:has(section[aria-label="Received keeper rota"]) .desk-picture {
+  overflow: hidden;
+}
+.watch:has(section[aria-label="Received keeper rota"]) #concern {
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
+}
+.watch:has(section[aria-label="Received keeper rota"]) #concern .keeper-chip {
+  width: 145px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Phone: a keeper chip may wrap to two lines inside the same 44px band, so the status shows in full when
+   it is short and ends with an ellipsis only after two lines. The keeper's own sheet holds the complete
+   status, and the chip's title carries it. This is a source candidate; the phone fit is not measured. */
+@media (max-width: 767px) {
+  #concern .keeper-chip {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 58%;
+    min-height: 0;
+    height: 44px;
+    padding-block: 2px;
+    line-height: 1.15;
+    text-align: left;
+    white-space: normal;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+}
+
+.tutorial-target {
+  outline: 3px solid #e9b43d;
+  outline-offset: 2px;
+}
+.tutorial-cue {
+  position: fixed;
+  z-index: 30;
+  top: 3.5rem;
+  left: 0.5rem;
+  right: 0.5rem;
+  box-sizing: border-box;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.4rem;
+  background: #fff0bd;
+  color: #241b0c;
+  border: 2px solid #886000;
+  border-radius: 0.35rem;
+  font-size: 0.9rem;
+  white-space: normal;
+}
+.tutorial-cue span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tutorial-cue button {
+  flex: none;
+}
