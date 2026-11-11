@@ -2,14 +2,12 @@ import { createLab, FEEDBACK_LABELS } from '@adam0white/lab-client';
 import { feedbackPersonaControl, feedbackSharePlay, PEOPLE_ACROSS_GAMES } from '@adam0white/lab-kit';
 import { fileEntry } from '../entry.ts';
 import type { SavedGame } from '../sim/game.ts';
+import { fileLab } from './file-lab.ts';
 import { toggleMusic } from './music.ts';
 
 export const entryMode = fileEntry(location.search, location.pathname);
 export const FOREIGN_FILE = entryMode !== 'native';
-export const lab = createLab({
-  game: 'valley',
-  ...(FOREIGN_FILE ? { preservation: 'preserve' as const } : {}),
-});
+export const lab = FOREIGN_FILE ? fileLab('valley') : createLab({ game: 'valley' });
 lab.setPersonaRecording(`valley-startup-${crypto.randomUUID()}`);
 export type GameSpeed = 'automatic' | 'slow' | 'steady' | 'fast';
 type RunControls = {

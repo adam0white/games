@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "node"],
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src", "test", "e2e", "*.ts"],
+  "exclude": ["worker", "worker-configuration.d.ts", "test/worker.test.ts"]
+}

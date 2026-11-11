@@ -1,3 +1,4 @@
+import { neighboursSource } from './history.mjs';
 const sha = /^[0-9a-f]{40}$/;
 export function validateRegistry(registry) {
   if (!registry || !/^\d+\.\d+\.\d+$/.test(registry.hfVersion) || !Array.isArray(registry.games)) throw new Error('Invalid registry');
@@ -6,7 +7,11 @@ export function validateRegistry(registry) {
   for (const game of registry.games) {
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(game.slug) || seen.has(game.slug)) throw new Error('Invalid or duplicate slug');
     if (!/^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(game.source?.repository ?? '') || !sha.test(game.source?.commit ?? '')) throw new Error('Invalid source lineage');
+    const history = game.source.history;
+    if (game.slug === 'neighbours' && history === undefined) throw new Error('Missing retained source history');
+    if (history !== undefined && (!history || game.slug !== 'neighbours' || game.source.repository !== neighboursSource.repository || game.source.commit !== neighboursSource.commit || Object.keys(history).sort().join(',') !== 'importCommit,mode,tree' || history.mode !== 'original-repository' || history.importCommit !== neighboursSource.importCommit || history.tree !== neighboursSource.tree)) throw new Error('Invalid retained source history');
     if (!game.saveSchema || typeof game.saveSchema !== 'string') throw new Error('Missing save schema');
+    if (game.kind !== undefined && !['game', 'recorded-viewer'].includes(game.kind)) throw new Error('Invalid game kind');
     if (game.redirectMode !== undefined && !['worker', 'zone'].includes(game.redirectMode)) throw new Error('Invalid redirect mode');
     if (game.redirectEnabled !== undefined && typeof game.redirectEnabled !== 'boolean') throw new Error('Invalid redirect flag');
     if (game.verifiedRelease !== undefined && (typeof game.verifiedRelease !== 'string' || !sha.test(game.verifiedRelease))) throw new Error('Invalid verified release commit');
@@ -36,10 +41,30 @@ export function assertFrameworkGraph(packages, version) {
   const matches = packages.filter(p => /^@adam0white\/human-framework(?:$|-)/.test(p.name));
   if (!matches.some(p => p.name === '@adam0white/human-framework' && p.version === version) || matches.some(p => p.name !== '@adam0white/human-framework' || p.version !== version)) throw new Error('Installed HF graph has an incompatible version or alias');
 }
-export function manifest(registry, game, commit, dirty, labVersion, app) {
+export function packageReleaseMetadata(pkg, read) {
+  if (pkg.releaseMetadata === undefined) return undefined;
+  if (pkg.releaseMetadata !== 'release-metadata.json') throw new Error('Invalid release metadata path');
+  const metadata = read(pkg.releaseMetadata);
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata) || typeof metadata.app !== 'string' || !metadata.app) throw new Error('Invalid release metadata');
+  const keys = Object.keys(metadata).sort().join(',');
+  const python = keys === 'app,concordiaUpstream,pyodide,pythonBundle,runtime' &&
+    sha.test(metadata.concordiaUpstream ?? '') && /^[0-9a-f]{64}$/.test(metadata.pythonBundle ?? '') &&
+    /^\d+\.\d+\.\d+$/.test(metadata.pyodide ?? '') && typeof metadata.runtime === 'string' && !!metadata.runtime;
+  const godot = keys === 'app,engine,godot' && /^\d+\.\d+\.\d+$/.test(metadata.engine ?? '') && /^\d+\.\d+\.\d+$/.test(metadata.godot ?? '');
+  if (!python && !godot) throw new Error('Invalid release metadata');
+  return metadata;
+}
+export function manifest(registry, game, commit, dirty, labVersion, app, metadata) {
   validateRegistry(registry);
-  if (!sha.test(commit) || dirty || !registry.games.some(g => g.slug === game.slug) || !labVersion || !app) throw new Error('Refusing unclean or invalid release');
-  return { game: game.slug, commit, dirty: false, source: game.source, hfVersion: registry.hfVersion, framework: registry.hfVersion, app, frameworkLibrary: registry.hfVersion, labVersion, saveSchema: game.saveSchema };
+  const validLab = game.kind === 'recorded-viewer' ? labVersion === null : typeof labVersion === 'string' && /^\d+\.\d+\.\d+$/.test(labVersion);
+  if (!sha.test(commit) || dirty || !registry.games.some(g => g.slug === game.slug) || !validLab || !app) throw new Error('Refusing unclean or invalid release');
+  const release = { game: game.slug, commit, dirty: false, source: game.source, hfVersion: registry.hfVersion, framework: registry.hfVersion, app, frameworkLibrary: registry.hfVersion, labVersion, saveSchema: game.saveSchema };
+  if (metadata !== undefined) {
+    const checked = packageReleaseMetadata({ releaseMetadata: 'release-metadata.json' }, () => metadata);
+    if (checked.engine !== undefined && checked.engine !== registry.hfVersion) throw new Error('Release metadata engine differs from registry HF');
+    return { ...release, ...checked, ...(checked.concordiaUpstream !== undefined ? { hf: registry.hfVersion } : {}) };
+  }
+  return release;
 }
 function scope(slug, path) {
   if (!/^\/(?!\/)[^\s?#]*$/.test(path) || /(?:\.\.|%|\\)/.test(path)) throw new Error('Unsafe rule path');
@@ -65,4 +90,16 @@ export function checkRelease(expected, actual, redirected) {
 }
 export function checkMainCI(commit, remote, runs, jobs) {
   if (commit !== remote || !runs.some(r => r.head_sha === commit && r.head_branch === 'main' && r.event === 'push' && r.status === 'completed' && r.conclusion === 'success') || !jobs.some(j => j.name === 'ci' && j.status === 'completed' && j.conclusion === 'success')) throw new Error('Latest main CI is not green');
+}
+
+// Direct manifest declarations only. A source/build audit still establishes that
+// a recorded viewer contains no bundled or transitive recording implementation.
+export function assertNoLabDependencies(pkg) {
+  for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
+    for (const [name, value] of Object.entries(pkg[section] ?? {})) {
+      if (/^@adam0white\/lab-(?:client|kit)$/.test(name)
+        || /^npm:@adam0white\/lab-(?:client|kit)(?:@|$)/.test(String(value))
+        || /(?:lab-(?:client|kit)-v|adam0white-lab-(?:client|kit)-).*\.tgz(?:$|[?#])/.test(String(value))) throw new Error('Recorded viewer must not declare an unused Lab client');
+    }
+  }
 }

@@ -1,0 +1,1284 @@
+@import "@adam0white/lab-kit/tokens.css";
+:root {
+  font-family: Georgia, "Times New Roman", serif;
+  color: #23201b;
+  background: #f3ecdd;
+  font-size: 17px;
+  font-synthesis: none;
+  --accent: #c2412d;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  color: #23201b;
+  background: #f3ecdd;
+  margin: 0;
+}
+button,
+input,
+textarea {
+  font: inherit;
+}
+button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1.5px solid #6e665a;
+  border-radius: 3px;
+  background: #f3ecdd;
+  color: #23201b;
+  cursor: pointer;
+}
+button:hover {
+  background: #e9dfcb;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #c2412d;
+  outline-offset: 2px;
+}
+button[aria-pressed="true"],
+.primary {
+  background: #c2412d;
+  color: #fff6e8;
+  border-color: #c2412d;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+a {
+  color: #574b38;
+}
+h1,
+h2,
+p {
+  margin: 0 0 12px;
+}
+h1 {
+  font-size: clamp(2.8rem, 7vw, 5rem);
+  font-weight: 400;
+  letter-spacing: -0.05em;
+}
+h2 {
+  font-weight: 400;
+  font-size: 1.6rem;
+}
+.small,
+small {
+  font-size: 0.83rem;
+  line-height: 1.35;
+  color: #6e665a;
+}
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.72rem;
+  margin-bottom: 20px;
+}
+.title {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: max(16px, env(safe-area-inset-top)) 24px max(16px, env(safe-area-inset-bottom));
+  overflow: auto;
+}
+.title header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 44px;
+}
+.title-body {
+  max-width: 640px;
+  margin: auto;
+  width: 100%;
+  padding: 20px 0;
+}
+.title-body h1 {
+  overflow-wrap: anywhere;
+}
+.title-art {
+  height: 130px;
+  width: 100%;
+  border-block: 1px solid #bbb09b;
+  margin: 22px 0;
+}
+.title .primary {
+  width: 100%;
+  margin-top: 12px;
+}
+.title footer {
+  font-size: 0.8rem;
+  max-width: 65ch;
+}
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.game {
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: 44px auto 1fr;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  overflow: hidden;
+}
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #b8ad98;
+  padding-left: 12px;
+}
+.top span {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.86rem;
+}
+.top .row {
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  gap: 0;
+}
+.top button {
+  border: 0;
+  border-left: 1px solid #b8ad98;
+  border-radius: 0;
+}
+.stock {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 10px 14px;
+  background: #e9dfcb;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+.stock b {
+  font-weight: 400;
+  color: #6e665a;
+}
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+  min-height: 0;
+}
+.map-wrap {
+  position: relative;
+  min-height: 0;
+  background: #d7d5b4;
+  overflow: hidden;
+}
+.map-wrap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+.map-caption {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  font-size: 0.76rem;
+  background: #f3ecddd9;
+  padding: 4px 8px;
+  pointer-events: none;
+}
+.side {
+  border-left: 1px solid #b8ad98;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #f3ecdd;
+}
+.objective {
+  padding: 16px;
+  border-bottom: 1px solid #b8ad98;
+}
+.objective p {
+  font-size: 0.87rem;
+  margin: 7px 0 0;
+}
+.deadline {
+  color: #c2412d;
+}
+.speed {
+  display: flex;
+  margin-top: 12px;
+}
+.speed button {
+  flex: 1;
+  font-size: 0.82rem;
+  border-radius: 0;
+  padding: 5px;
+}
+.sheet {
+  overflow: auto;
+  flex: 1;
+  padding: 16px;
+}
+.sheet h2 {
+  font-size: 1.2rem;
+}
+.unit-list {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.unit-list button {
+  font-size: 0.85rem;
+  flex: 1;
+  padding: 6px;
+}
+.speech {
+  font-style: italic;
+  color: #574b38;
+  line-height: 1.35;
+  border-left: 2px solid #c2412d;
+  padding-left: 10px;
+  margin: 10px 0;
+}
+.task {
+  font-size: 0.86rem;
+}
+.actions {
+  padding: 12px;
+  border-top: 1px solid #b8ad98;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+.actions button {
+  font-size: 0.82rem;
+  padding: 7px 3px;
+}
+.actions .wide {
+  grid-column: span 3;
+}
+.notice {
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  min-height: 30px;
+  color: #574b38;
+}
+.modal {
+  position: fixed;
+  inset: 0;
+  background: #23201b70;
+  z-index: 20;
+  display: flex;
+  justify-content: flex-end;
+}
+.panel {
+  width: 400px;
+  max-width: 100%;
+  height: 100%;
+  background: #f3ecdd;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+}
+.panel > button,
+.panel > .primary {
+  width: 100%;
+}
+.panel .spacer {
+  flex: 1;
+  min-height: 8px;
+}
+.panel p {
+  line-height: 1.4;
+  font-size: 0.9rem;
+}
+.panel label {
+  font-size: 0.9rem;
+}
+.panel textarea,
+.panel input[type="text"] {
+  width: 100%;
+  padding: 10px;
+  background: #fffaf0;
+  border: 1px solid #6e665a;
+  border-radius: 2px;
+}
+.panel textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+.panel .verdicts {
+  display: flex;
+  gap: 6px;
+}
+.verdicts button {
+  font-size: 0.78rem;
+  flex: 1;
+  padding: 6px;
+}
+.info-panel {
+  height: auto;
+  max-height: 75%;
+  margin-top: 48px;
+  margin-right: 8px;
+  border: 1px solid #6e665a;
+}
+.end-card {
+  max-width: 650px;
+  margin: auto;
+}
+.status {
+  min-height: 24px;
+  font-size: 0.85rem;
+}
+.muted {
+  color: #6e665a;
+}
+.telemetry-notice {
+  font-size: 0.8rem;
+}
+input[type="file"] {
+  max-width: 100%;
+}
+.end-card .row {
+  margin-top: 16px;
+}
+@media (max-width: 700px) {
+  .game {
+    grid-template-rows: 44px 44px 1fr;
+  }
+  .stock {
+    padding: 7px 10px;
+    gap: 6px 12px;
+    font-size: 0.8rem;
+  }
+  .layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .map-wrap {
+    flex: 1;
+    min-height: 160px;
+    max-height: none;
+  }
+  .map-caption {
+    font-size: 0.7rem;
+    bottom: 5px;
+    left: 6px;
+  }
+  .side {
+    height: 410px;
+    flex: none;
+    border-left: 0;
+    border-top: 1px solid #b8ad98;
+  }
+  .objective {
+    padding: 8px 12px;
+  }
+  .objective strong {
+    font-size: 0.88rem;
+  }
+  .objective p {
+    font-size: 0.76rem;
+    margin: 3px 0 0;
+  }
+  .objective .details {
+    display: none;
+  }
+  .speed {
+    margin-top: 5px;
+  }
+  .speed button {
+    min-height: 44px;
+  }
+  .sheet {
+    padding: 8px 12px;
+  }
+  .sheet h2 {
+    display: none;
+    font-size: 1rem;
+    margin-bottom: 5px;
+  }
+  .unit-list {
+    margin: 5px 0;
+    gap: 4px;
+  }
+  .unit-list button {
+    font-size: 0.78rem;
+    padding: 4px;
+    min-width: 44px;
+  }
+  .speech {
+    font-size: 0.84rem;
+    margin: 5px 0;
+  }
+  .task {
+    font-size: 0.77rem;
+    margin: 3px 0;
+  }
+  .actions {
+    padding: 7px 10px;
+    gap: 5px;
+  }
+  .actions button {
+    font-size: 0.77rem;
+    min-height: 44px;
+  }
+  .notice {
+    padding: 3px 12px;
+    min-height: 25px;
+    font-size: 0.74rem;
+  }
+  .panel {
+    width: 100%;
+    height: auto;
+    max-height: 90dvh;
+    margin-top: auto;
+    padding: 16px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    gap: 9px;
+  }
+  .panel h2 {
+    margin: 0;
+  }
+  .panel p {
+    margin: 0;
+  }
+  .info-panel {
+    margin: 48px 8px auto;
+    max-height: 65dvh;
+  }
+  .title {
+    padding-inline: 20px;
+  }
+  .title-body {
+    padding-block: 12px;
+  }
+  .title-art {
+    height: 100px;
+    margin: 15px 0;
+  }
+  h1 {
+    font-size: 3.4rem;
+  }
+  .title-body h1 {
+    font-size: clamp(2.4rem, 11vw, 3.4rem);
+  }
+  .title footer {
+    font-size: 0.73rem;
+  }
+  .eyebrow {
+    margin-bottom: 12px;
+  }
+}
+@media (max-height: 620px) and (max-width: 700px) {
+  .side {
+    height: 300px;
+  }
+  .map-wrap {
+    min-height: 100px;
+  }
+  .objective .speed {
+    position: absolute;
+    right: 8px;
+    top: 45px;
+  }
+  .objective .speed button {
+    padding: 3px;
+  }
+  .objective {
+    padding: 6px 10px;
+  }
+  .title-art {
+    display: none;
+  }
+}
+
+.unit-list button {
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .top span {
+    font-size: 0.74rem;
+  }
+  .top button {
+    padding: 7px 10px;
+  }
+  .unit-list {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+  .unit-list button {
+    flex: none;
+  }
+  .map-wrap {
+    min-height: 130px;
+  }
+  .sheet {
+    flex-shrink: 0;
+    min-height: 100px;
+  }
+  .title header span {
+    max-width: 130px;
+    text-align: right;
+  }
+}
+
+.game {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+.layout,
+.side,
+.sheet {
+  min-width: 0;
+}
+
+.panel:has(.feedback-body) {
+  width: 560px;
+  height: min(850px, 90dvh);
+  margin: auto;
+  overflow: hidden;
+}
+.feedback-body {
+  min-height: 0;
+  overflow: auto;
+  flex: 1;
+}
+.feedback-body > * {
+  margin-bottom: 10px;
+}
+.feedback-body label {
+  display: block;
+}
+.feedback-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  flex: none;
+}
+.feedback-actions #send {
+  grid-column: span 2;
+  grid-row: 1;
+}
+.feedback-actions button {
+  font-size: 0.85rem;
+}
+.panel label:has(input[type="checkbox"]) {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+summary {
+  min-height: 44px;
+  padding-block: 10px;
+  cursor: pointer;
+}
+.unit-list button {
+  flex: none;
+}
+@media (max-width: 700px) {
+  .panel:has(.feedback-body) {
+    width: 100%;
+    margin-top: auto;
+    margin-bottom: 0;
+  }
+}
+
+.end-card h1 {
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  line-height: 1.05;
+  margin-block: 16px;
+}
+.end-card .row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.end-card .row .primary {
+  grid-column: span 2;
+}
+@media (max-width: 700px) {
+  .end-card {
+    width: 100%;
+  }
+  .end-card .speech {
+    margin-block: 9px;
+  }
+}
+
+/* Keep the header, stock and map visible while resident notes scroll. */
+@media (max-width: 700px) {
+  .side {
+    height: calc(100dvh - 218px);
+  }
+  .sheet {
+    min-height: 0;
+    flex-shrink: 1;
+  }
+  .objective,
+  .actions,
+  .notice {
+    flex-shrink: 0;
+  }
+  .notice {
+    max-height: 40px;
+    overflow: auto;
+  }
+}
+
+/* The shared menu and feedback controls follow the same selected paper and ink. */
+.panel {
+  background: var(--paper);
+  color: var(--ink);
+}
+.panel button,
+.panel textarea,
+.panel input[type="text"] {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--ink-soft);
+}
+.panel button:hover {
+  background: var(--paper-2);
+}
+.panel button.primary,
+.panel button[aria-pressed="true"] {
+  background: var(--rope);
+  color: var(--paper);
+  border-color: var(--rope);
+}
+.panel .small,
+.panel a {
+  color: var(--ink-soft);
+}
+
+/* Text grows with available width, including descendants with their own sizes. */
+:root {
+  font-size: clamp(17px, 1.25vw + 7px, 22px);
+  line-height: 1.4;
+}
+body {
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+#app {
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+}
+.title,
+.game {
+  height: 100%;
+}
+.small,
+small,
+.panel p,
+.panel label,
+.status,
+.task,
+.notice,
+.objective p,
+.speed button,
+.unit-list button,
+.actions button,
+.verdicts button,
+.feedback-actions button,
+.map-caption {
+  font-size: 1.235rem;
+  line-height: 1.4;
+}
+.layout {
+  grid-template-columns: minmax(0, 1fr) clamp(360px, 38vw, 490px);
+}
+.side {
+  overflow: auto;
+}
+.sheet {
+  min-height: 150px;
+  flex-shrink: 0;
+}
+.objective,
+.actions,
+.notice {
+  flex-shrink: 0;
+}
+.notice {
+  max-height: none;
+}
+.panel {
+  width: min(560px, 100%);
+}
+.panel:has(.feedback-body) {
+  max-height: 95dvh;
+}
+.feedback-actions #cancel-feedback {
+  grid-column: 1 / -1;
+}
+@media (max-width: 760px) {
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 145px minmax(0, 1fr);
+  }
+  .map-wrap {
+    min-height: 0;
+  }
+  .side {
+    height: auto;
+    min-height: 0;
+    display: block;
+  }
+  .sheet {
+    overflow: visible;
+    min-height: 0;
+  }
+  .objective {
+    padding: 6px 12px;
+  }
+  .objective .details {
+    display: none;
+  }
+  .objective strong {
+    font-size: 0.94rem;
+  }
+  .objective .speed {
+    position: static;
+  }
+  .unit-list {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--paper, #f3ecdd);
+  }
+  .notice {
+    max-height: none;
+  }
+  .title header span {
+    font-size: 13px;
+  }
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(240px, 34dvh) minmax(0, 1fr);
+  }
+  .side {
+    border-left: 0;
+    border-top: 1px solid #b8ad98;
+  }
+  .sheet {
+    flex: 1 0 auto;
+  }
+}
+
+/* Keep the deadline outside the scrolling resident sheet at every width. */
+.game {
+  grid-template-rows: minmax(44px, auto) auto minmax(0, 1fr);
+}
+.side {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  overflow: hidden;
+}
+.sheet {
+  min-height: 0;
+  overflow: auto;
+}
+.notice {
+  max-height: 3.8em;
+  overflow: auto;
+}
+.actions {
+  position: static;
+}
+@media (max-width: 760px) {
+  .layout {
+    grid-template-rows: 120px minmax(0, 1fr);
+  }
+  .side {
+    display: grid;
+  }
+  .sheet {
+    overflow: auto;
+  }
+  .actions {
+    position: static;
+  }
+}
+
+.map-wrap .speed {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: min(240px, calc(100% - 16px));
+  margin: 0;
+  z-index: 1;
+  background: var(--paper);
+}
+
+/* The game starts at17px; keep the shared notice14px and scale it with enlarged text. */
+.lab-footer .lk-telemetry-notice {
+  font-size: max(14px, 0.8rem) !important;
+  padding: 4px 8px !important;
+}
+
+/* Settlement controls retain focus and provide complete named alternatives to map gestures. */
+.day-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-block: 10px;
+}
+.day-controls button {
+  min-height: 44px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#settlement-controls p,
+#settlement-controls li {
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+#settlement-controls summary {
+  padding-block: 8px;
+  cursor: pointer;
+}
+button:focus-visible,
+summary:focus-visible,
+a:focus-visible {
+  outline: 3px solid #9c301e;
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms;
+    transition-duration: 0.01ms;
+  }
+}
+@media (prefers-contrast: more) {
+  .speech,
+  .details,
+  .small,
+  .notice {
+    color: #17130e;
+  }
+  button {
+    border-width: 2px;
+  }
+}
+
+/* R1: selection stays explicit; placement keeps ground and counted costs together. */
+/* Scale the whole font with the root; keep the enlarged side content scrollable. */
+.side {
+  grid-template-rows: auto minmax(150px, 1fr) auto auto;
+  overflow: auto;
+}
+.notice {
+  min-height: 1.6em;
+}
+.map-wrap .speed {
+  width: min(540px, calc(100% - 16px));
+}
+.actions {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+}
+.actions .wide {
+  grid-column: 1 / -1;
+}
+.selection-help,
+.work-help {
+  margin-block: 8px;
+}
+.unit-list button[aria-pressed="true"] {
+  font-weight: bold;
+  box-shadow: inset 0 0 0 2px currentColor;
+}
+.sheet h2 {
+  display: block;
+}
+.game.placing .sheet,
+.game.placing .map-caption,
+.game.placing .speed,
+.game.placing .objective strong,
+.game.placing .objective .details {
+  display: none;
+}
+.game.placing .side {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.game.placing .notice {
+  max-height: none;
+  height: max-content;
+  overflow: visible;
+}
+@media (max-width: 760px) {
+  .small,
+  small,
+  .panel p,
+  .panel label,
+  .status,
+  .task,
+  .notice,
+  .objective p,
+  .speed button,
+  .unit-list button,
+  .actions button,
+  .verdicts button,
+  .feedback-actions button,
+  .map-caption {
+    font-size: 1.021rem;
+  }
+  .layout {
+    grid-template-rows: 190px minmax(0, 1fr);
+  }
+  .game.placing .layout {
+    grid-template-rows: minmax(0, 1fr) minmax(0, 42%);
+  }
+  .game.placing .side {
+    grid-template-rows: auto auto auto;
+    overflow: auto;
+  }
+  .game.placing .actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--paper, #f3ecdd);
+  }
+  .game.placing .notice {
+    font-size: 0.88rem;
+  }
+  .map-caption {
+    max-width: calc(100% - 12px);
+  }
+  .actions button {
+    overflow-wrap: anywhere;
+  }
+  .sheet h2 {
+    font-size: 1rem;
+  }
+}
+@media (max-width: 760px) {
+  /* Names stay on the map; the scrolling sheet starts with the current task. */
+  .sheet {
+    display: flex;
+    flex-direction: column;
+  }
+  .sheet #task {
+    order: -3;
+  }
+  .sheet #said {
+    order: -2;
+  }
+  .sheet #selection {
+    display: none;
+  }
+  .sheet > * {
+    flex-shrink: 0;
+  }
+}
+
+/* Placement alone keeps the map separate from scrolling instructions and Cancel. */
+.game.placing .side {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+.game.placing .notice {
+  min-height: 0;
+  height: auto;
+  overflow: auto;
+}
+.game.placing .actions {
+  position: static;
+}
+@media (max-width: 760px) {
+  .game.placing .layout {
+    grid-template-rows: minmax(240px, 1fr) minmax(0, 44%);
+  }
+  .game.placing .notice {
+    font-size: 1rem;
+  }
+}
+/* At enlarged text sizes the placement page scrolls instead of clipping Cancel. */
+.game.placing {
+  overflow: auto;
+}
+.game.placing .objective {
+  min-height: 0;
+  max-height: 5em;
+  overflow: auto;
+}
+@media (max-width: 760px) {
+  .game.placing .layout {
+    min-height: 28rem;
+  }
+  .game.placing .side {
+    grid-template-rows: auto minmax(3em, 1fr) auto;
+  }
+}
+
+/* This is one view of the existing host state, including residents off this map. */
+.work-overview li {
+  margin-block: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.work-overview ol {
+  padding-inline-start: 1.25rem;
+}
+
+/* Retest 2026-10-27 (phone map and resident panel too small): outside placement the map keeps a
+ * real height, and the side column is one scroll with the resident sheet at its natural height,
+ * instead of a two-line strip nested inside another scroll. The work buttons scroll with it. */
+@media (max-width: 760px) {
+  .game:not(.placing) .layout {
+    grid-template-rows: minmax(230px, 40dvh) minmax(0, 1fr);
+  }
+  .game:not(.placing) .side {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .game:not(.placing) .side > *,
+  .game:not(.placing) .sheet > * {
+    flex: none;
+  }
+  /* The sheet's parts join the side column so names, the last event and the work buttons come
+   * first, and longer resident notes follow below them. */
+  .game:not(.placing) .sheet {
+    display: contents;
+  }
+  .game:not(.placing) .sheet > * {
+    margin-inline: 12px;
+    order: 9;
+  }
+  .game:not(.placing) .objective {
+    order: 1;
+  }
+  .game:not(.placing) #selection,
+  .game:not(.placing) .selection-help,
+  .game:not(.placing) #units {
+    order: 2;
+  }
+  .game:not(.placing) #notice {
+    order: 3;
+  }
+  .game:not(.placing) #actions {
+    order: 4;
+  }
+  .game:not(.placing) #task {
+    order: 5;
+  }
+  .game:not(.placing) #finish-day {
+    order: 6;
+  }
+  .game:not(.placing) #said {
+    order: 7;
+  }
+  .game:not(.placing) #resident,
+  .game:not(.placing) #settlement-controls {
+    order: 8;
+  }
+  .game:not(.placing) .notice {
+    max-height: none;
+  }
+}
+
+/* Host diagnostics share one compact row with the privacy link. */
+.menu-footer {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.debug {
+  min-width: 0;
+}
+.debug summary {
+  cursor: pointer;
+}
+.debug input {
+  max-width: 100%;
+}
+
+/* Current reading unit: the map has its own rows; all resident words and controls share one
+ * side scroll. Selecting or reading a resident never resizes the working map. */
+.game {
+  grid-template-rows: minmax(44px, auto) auto minmax(0, 1fr);
+}
+.stock-plan {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  background: #e9dfcb;
+}
+.stock-plan:empty {
+  display: none;
+}
+#storm-meals {
+  color: #92301f;
+}
+.map-wrap {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.map-wrap .speed {
+  position: static;
+  width: 100%;
+  margin: 0;
+  background: #f3ecdd;
+}
+.map-caption {
+  position: static;
+  margin: 0;
+  min-height: 2.6em;
+  max-height: 2.6em;
+  overflow: auto;
+  pointer-events: auto;
+}
+.game:not(.placing) .side {
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.game:not(.placing) .sheet {
+  display: contents;
+  overflow: visible;
+}
+.game:not(.placing) .side > *,
+.game:not(.placing) .sheet > * {
+  flex: none;
+  order: 9;
+}
+.game:not(.placing) .sheet > * {
+  margin-inline: 12px;
+}
+.game:not(.placing) .objective {
+  order: 1;
+}
+.game:not(.placing) #selection,
+.game:not(.placing) #units {
+  order: 2;
+}
+.game:not(.placing) #selection {
+  display: block;
+  margin-top: 12px;
+}
+.game:not(.placing) #task {
+  order: 3;
+}
+.game:not(.placing) #said {
+  order: 4;
+}
+.game:not(.placing) #resident {
+  order: 5;
+}
+.game:not(.placing) #settlement-controls {
+  order: 6;
+}
+.game:not(.placing) #notice {
+  order: 7;
+  max-height: none;
+}
+.game:not(.placing) #actions {
+  order: 8;
+}
+.game:not(.placing) .selection-help {
+  order: 9;
+}
+.unit-list {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+.unit-list button {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.resident-conversation > button,
+#personal-replies > button {
+  width: 100%;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  margin-bottom: 8px;
+}
+.disclosed-story {
+  margin-top: 12px;
+  line-height: 1.45;
+}
+@media (max-width: 760px) {
+  .game:not(.placing) .layout {
+    grid-template-rows: 320px minmax(0, 1fr);
+  }
+  .map-caption {
+    font-size: 0.85rem;
+  }
+  .stock {
+    padding: 6px 12px;
+    gap: 4px 12px;
+  }
+}
+
+/* The optional long-day reading joins the existing side scroll, beside the goal in reading order. */
+.game:not(.placing) #goal-reading {
+  order: 1;
+  padding: 8px 12px;
+  border: 1px solid #b8ad98;
+}
+#goal-reading-open {
+  margin: 4px 12px;
+}
+
+/* Static recorded storm has the same text facts and no motion-dependent information. */
+.storm-scene {
+  width: 100%;
+  max-height: 24rem;
+  height: auto;
+}
+
+.tutorial-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  color: #30220e;
+  background: #fff2c9;
+  border: 2px solid #845c18;
+  border-radius: 6px;
+}
+.tutorial-prompt strong {
+  flex-basis: 100%;
+}
+.tutorial-target {
+  outline: 3px solid #b46e00;
+  outline-offset: 2px;
+}
+.game:not(.placing) .tutorial-prompt {
+  order: 8;
+}
+.game:not(.placing) .tutorial-prompt[data-step="select"] {
+  order: 2;
+}
+.game:not(.placing) .tutorial-prompt[data-step="done"],
+.game:not(.placing) .tutorial-prompt[data-step="unavailable"] {
+  order: 1;
+}
+.actions .tutorial-prompt {
+  grid-column: 1 / -1;
+}
+.game:not(.placing) .actions .tutorial-prompt {
+  order: -1;
+}

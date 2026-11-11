@@ -1,0 +1,42 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.5/schema.json",
+  "files": {
+    "includes": ["**", "!**/node_modules", "!runs", "!viewer/runs", "!scratch", "!dist", "!pnpm-lock.yaml"]
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 110
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single"
+    }
+  },
+  "linter": {
+    "rules": {
+      "preset": "recommended"
+    }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "src/minds/hf.ts",
+        "src/minds/hf2.ts",
+        "src/minds/random.ts",
+        "src/minds/scripted.ts",
+        "src/minds/llm.ts",
+        "src/minds/llm-backends.ts"
+      ],
+      "formatter": {
+        "enabled": false
+      }
+    },
+    {
+      "includes": ["HF2.md", "HF4.md"],
+      "formatter": {
+        "enabled": false
+      }
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 packages:
   - games/*
+  - games/neighbours/neighbours
 linkWorkspacePackages: true
 hoist: false
 engineStrict: true
@@ -14,9 +15,11 @@ packageImportMethod: hardlink
 allowBuilds:
   esbuild@0.28.2: true
   workerd@1.20261103.1: true
+  workerd@1.20261019.1: true
   fsevents: false
 overrides:
   vite: 8.3.5
   miniflare>undici: 7.30.1
+  "@cloudflare/config>zod": 4.6.7
 
   "@adam0white/human-framework": "4.17.0"

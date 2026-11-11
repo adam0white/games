@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHandler } from '../src/worker.mjs';
 import { Script, runInNewContext } from 'node:vm';
 import { validateRegistry } from './lib.mjs';
+import { gzipSync, gunzipSync } from 'node:zlib';
 
 const base = { source: { repository: 'https://github.com/adam0white/rope', commit: 'a'.repeat(40) }, saveSchema: 'v1' };
 const games = [{ ...base, slug: 'rope', legacyOrigin: 'https://rope.adamwhite.work', redirectEnabled: true, verifiedRelease: 'b'.repeat(40) }, { ...base, slug: 'other', legacyOrigin: 'https://off.adamwhite.work', redirectEnabled: false }];
@@ -73,4 +74,31 @@ test('zone-managed aliases serve only their old worker retirement response', asy
   assert.equal(response.status, 200);
   assert.match(await response.text(), /unregister/);
   assert.throws(() => validateRegistry({ hfVersion: '4.17.0', games: [{ ...games[0], redirectMode: 'unknown' }] }), /mode/i);
+});
+
+
+test('Lefthand serves one precompressed WASM layer only on its scoped engine route', async () => {
+  const compressed = gzipSync(Buffer.from([0, 97, 115, 109]));
+  const seen = [];
+  const env = { ASSETS: { fetch: async request => { seen.push(request); return new Response(compressed, { headers: { 'Content-Length': String(compressed.length) } }); } } };
+  const response = await handler.fetch(new Request('https://play.adamwhite.work/lefthand/engine/game-abcd.wasm?x=1', { headers: { Range: 'bytes=0-2', 'If-Range': 'x' } }), env);
+  assert.equal(new URL(seen[0].url).pathname, '/lefthand/engine/game-abcd.wasm.gz');
+  assert.equal(new URL(seen[0].url).search, '?x=1');
+  assert.equal(seen[0].headers.get('Accept-Encoding'), 'identity');
+  assert.equal(seen[0].headers.has('Range'), false);
+  assert.equal(seen[0].headers.has('If-Range'), false);
+  assert.equal(response.headers.get('Content-Encoding'), 'gzip');
+  assert.equal(response.headers.get('Content-Type'), 'application/wasm');
+  assert.match(response.headers.get('Cache-Control'), /immutable, no-transform/);
+  assert.equal(response.headers.has('Content-Length'), false);
+  assert.deepEqual(gunzipSync(Buffer.from(await response.arrayBuffer())), Buffer.from([0, 97, 115, 109]));
+  const head = await handler.fetch(new Request('https://play.adamwhite.work/lefthand/engine/game-abcd.wasm', { method: 'HEAD' }), env);
+  assert.equal(head.body, null);
+  assert.equal((await handler.fetch(new Request('https://play.adamwhite.work/lefthand/engine/game-abcd.wasm', { method: 'POST' }), env)).status, 405);
+  const missing = new Response('missing', { status: 404 });
+  assert.equal(await handler.fetch(new Request('https://play.adamwhite.work/lefthand/engine/game-abcd.wasm'), { ASSETS: { fetch: async () => missing } }), missing);
+  const untouched = [];
+  const other = { ASSETS: { fetch: async request => { untouched.push(new URL(request.url).pathname); return new Response('other'); } } };
+  for (const path of ['/other/engine/game-abcd.wasm', '/lefthand/engine/game-ABCD.wasm', '/lefthand/engine/../game-abcd.wasm', '/lefthand/engine/game-abcd.js']) await handler.fetch(new Request(`https://play.adamwhite.work${path}`), other);
+  assert.deepEqual(untouched, ['/other/engine/game-abcd.wasm', '/lefthand/engine/game-ABCD.wasm', '/lefthand/game-abcd.wasm', '/lefthand/engine/game-abcd.js']);
 });

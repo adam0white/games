@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { registry, head } from './context.mjs';
-import { manifest } from './lib.mjs';
+import { manifest, packageReleaseMetadata } from './lib.mjs';
 import { validateGame } from './game.mjs';
 import { verifyRedirects } from './redirect-preflight.mjs';
 
@@ -13,6 +13,7 @@ await verifyRedirects({
   head: commit,
   expected: game => {
     const pkg = JSON.parse(readFileSync(`games/${game.slug}/package.json`, 'utf8'));
-    return manifest(registry, game, commit, false, validateGame(game, registry), pkg.version);
+    const metadata = packageReleaseMetadata(pkg, file => JSON.parse(readFileSync(`games/${game.slug}/${file}`, 'utf8')));
+    return manifest(registry, game, commit, false, validateGame(game, registry), pkg.version, metadata);
   },
 });

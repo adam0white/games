@@ -1,0 +1,30 @@
+# Three Days
+
+A daughter returns to Istanbul after her father's death. She has three days of leave, an incomplete notebook and neighbours who remember different men.
+
+A short Ink game in an illustrated PixiJS room. Human Framework 4.17.0 supplies the people and portable continuity bridge. Published Lab client 0.5.18 carries the shelf protocol; kit 0.5.35 provides the shared menu label. The choices concern the living: an uncertain account, a promise, privacy and help. Worship is never a score. Bereavement and estrangement feature throughout; violence is not shown.
+
+[Play](https://days.adamwhite.work) · [Design](docs/design.md)
+
+Use Node 26.12.0 and pnpm 12.16.1.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm dev
+pnpm check:lane
+pnpm build
+pnpm exec playwright install chromium webkit
+pnpm e2e
+```
+
+After changing `src/story.ink`, run `pnpm story` and commit the Ink source and compiled JSON. The build rejects a stale compiled story.
+
+Menu offers playtest export and download to everyone. The /days/file/ view opens a current export without using device storage, recording, or the shared shelf. Replay checks sit in the initially collapsed Debug item beside Lab privacy. Export includes the original seed, ordered input log, final Ink state, the HF 4 run archive and final hash. Replay re-runs both the Ink story and HF, and HF checks its own archive. Saves and exports from the earlier HF 3.2 build are refused with a start-fresh message. Recording can be turned off in Menu. Feedback sends only when submitted.
+
+When shared continuity is on, a fresh play checks Hacer, Burak and Selin on the shared shelf. Portable writes stay closed when the current client reports that a peer is not qualified; unsupported histories are skipped without replacement. The play records the opening inputs and claim receipts so replay does not consult the shelf. Continuity and play recording are separate choices; turning continuity off keeps the play local.
+
+If someone cannot carry over, their shared history stays on the shelf while the other available people can continue in Days. The play names anyone who could not join from the shelf.
+
+Older saved plays that attempted a delivery or an estate record lack the new agreement facts and require a fresh play.
+
+Code is MIT. Religious source records remain in the HF repository; this game supplies no religious rulings.

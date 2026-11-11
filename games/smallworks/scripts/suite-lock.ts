@@ -55,7 +55,7 @@ function code(error: unknown): string | undefined {
 export async function acquireSuiteLock(options: LockOptions = {}): Promise<() => void> {
   const env = options.env ?? process.env;
   if (env.CI !== undefined || env.SUITE_LOCK === '0') return () => {};
-  const directory = options.directory ?? join(homedir(), 'code/.lab-scratch/locks/full-suite');
+  const directory = options.directory ?? env.HF_SUITE_LOCK_DIR ?? join(homedir(), 'code/.lab-scratch/locks/full-suite');
   const ownerPath = join(directory, 'owner.json');
   const log = options.log ?? console.log;
   const wait = options.wait ?? (() => new Promise<void>((done) => setTimeout(done, 5000)));

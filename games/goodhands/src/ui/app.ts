@@ -2617,7 +2617,7 @@ function feedback(): void {
   if (!body) return;
   let name = '';
   try {
-    name = localStorage.getItem('hf-lab-feedback-name') ?? '';
+    name = localStorage.getItem('hf-lab-feedback-name:goodhands') ?? '';
   } catch {}
   body.innerHTML = `<p>Recording follows your choice in the menu. Keep a local copy or send feedback when you choose.</p><div class="verdict-chips">${[
     ['keep', 'I’d keep playing'],
@@ -2693,7 +2693,7 @@ function feedback(): void {
             sharePlay,
           });
           try {
-            localStorage.setItem('hf-lab-feedback-name', who);
+            localStorage.setItem('hf-lab-feedback-name:goodhands', who);
           } catch {}
           sent = true;
           status.textContent = 'Sent. Your note is stored.';

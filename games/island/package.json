@@ -1,0 +1,29 @@
+{
+  "name": "island",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Two minds, one island: an HF person and an LLM agent on the same small Eko-style island (lab experiment, not a game)",
+  "type": "module",
+  "engines": {
+    "node": "26.12.0"
+  },
+  "scripts": {
+    "check": "pnpm run check:lane && pnpm run test",
+    "test": "vitest run",
+    "run:hf": "node src/run.ts",
+    "check:lane": "biome check . && tsc --noEmit && node scripts/check-lane.ts",
+    "rerun:hf4": "node scripts/rerun-hf4.ts",
+    "build": "node scripts/build-viewer.ts",
+    "deploy": "cd ../.. && pnpm run deploy"
+  },
+  "dependencies": {
+    "@adam0white/human-framework": "4.17.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.5",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  },
+  "packageManager": "pnpm@12.16.1"
+}

@@ -68,9 +68,9 @@ async function boot(path: string) {
   if (sinks.sdk.mock.calls.length) dispose = (await import('../src/ui/lab.ts')).lab.dispose;
   return { native, replace };
 }
-it('actual canonical startup selects preserving SDK and chooser without native sinks', async () => {
+it('actual canonical startup leaves the SDK idle and opens the chooser without native sinks', async () => {
   const { native, replace } = await boot('/glance/file/?labRunSource=agent');
-  expect(sinks.sdk).toHaveBeenCalledWith({ game: 'glance', preservation: 'preserve' });
+  expect(sinks.sdk).not.toHaveBeenCalled();
   expect(sinks.shelf).not.toHaveBeenCalled();
   expect(native).toEqual([]);
   expect(replace).not.toHaveBeenCalled();

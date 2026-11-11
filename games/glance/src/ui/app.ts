@@ -390,12 +390,6 @@ export function start() {
   if (fileMode) {
     const notice = telemetryNotice(undefined, { preservation: 'preserve' });
     if (notice) document.body.append(notice);
-    if (lab.preservationStatus !== 'existing-local') {
-      lab.dispose();
-      app.innerHTML =
-        '<p>File play cannot start with this browser’s recording profile. No native save was opened. Use a compatible existing lab profile or return to the Glance page at play.adamwhite.work/glance/.</p>';
-      return;
-    }
   }
   if (entryMode === 'invalid') {
     app.innerHTML = '<p>This file address is invalid. Use /glance/file/ to choose a saved file.</p>';
@@ -860,7 +854,7 @@ function mornings() {
 }
 function feedbackName() {
   try {
-    return localStorage.getItem('hf-lab-feedback-name') ?? '';
+    return localStorage.getItem('hf-lab-feedback-name:glance') ?? '';
   } catch {
     return '';
   }
@@ -949,7 +943,7 @@ function sendWord() {
           : await lab.sendFeedback(message, options);
       const sentMessage = `Sent. Your note is stored. Reference ${receipt}.`;
       try {
-        localStorage.setItem('hf-lab-feedback-name', who);
+        localStorage.setItem('hf-lab-feedback-name:glance', who);
       } catch {
         /* The note was stored even when this device cannot remember its name. */
       }

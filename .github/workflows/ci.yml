@@ -39,6 +39,7 @@ jobs:
           if [ -z "$BASE" ] || [ "$BASE" = 0000000000000000000000000000000000000000 ]; then BASE=$(git hash-object -t tree /dev/null); fi
           node scripts/affected.mjs "$BASE"
   games:
+    timeout-minutes: ${{ matrix.game == 'neighbours' && 45 || 360 }}
     needs: changes
     if: needs.changes.outputs.count != '0'
     strategy:
@@ -57,6 +58,12 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .node-version
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        if: matrix.game == 'neighbours'
+        with:
+          python-version: '3.12.13'
+      - run: python -m pip install -r games/neighbours/neighbours/native-gm-requirements.txt
+        if: matrix.game == 'neighbours'
       - run: pnpm install --frozen-lockfile
       - run: node scripts/prepare-game.mjs "$GAME"
         env:
@@ -64,6 +71,49 @@ jobs:
       - run: node scripts/check-game.mjs "$GAME"
         env:
           GAME: ${{ matrix.game }}
+          NEIGHBOURS_PROOF_DIR: ${{ runner.temp }}/neighbours-proof
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always() && matrix.game == 'neighbours'
+        with:
+          name: neighbours-public-six-native
+          path: ${{ runner.temp }}/neighbours-proof/
+          retention-days: 7
+  neighbours-browser:
+    needs: changes
+    if: contains(fromJSON(needs.changes.outputs.games), 'neighbours')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      NEIGHBOURS_NO_SCREENSHOTS: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+        with:
+          run_install: false
+          cache: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12.13'
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/prepare-game.mjs neighbours
+      - run: pnpm --filter alder-quay-neighbours exec playwright test --shard=${{ matrix.shard }}/4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: failure()
+        with:
+          name: neighbours-browser-failure-${{ matrix.shard }}
+          path: |
+            games/neighbours/neighbours/playwright-report/
+            games/neighbours/neighbours/test-results/
+          retention-days: 7
   build:
     needs: changes
     if: needs.changes.outputs.total != '0'
@@ -81,9 +131,45 @@ jobs:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - run: node scripts/build.mjs
+  lefthand-browser:
+    needs: changes
+    if: contains(needs.changes.outputs.games, '"lefthand"')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            browser: chromium
+            projects: --project=chromium-phone --project=chromium-desktop
+          - os: macos-latest
+            browser: webkit
+            projects: --project=webkit-phone --project=webkit-desktop
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+        with:
+          run_install: false
+          cache: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter ./games/lefthand build
+      - run: pnpm --filter ./games/lefthand exec playwright install --with-deps ${{ matrix.browser }}
+      - run: pnpm --filter ./games/lefthand exec playwright test ${{ matrix.projects }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: failure()
+        with:
+          name: lefthand-browser-failure-${{ matrix.os }}-${{ matrix.browser }}
+          path: games/lefthand/test-results/
+          retention-days: 3
   ci:
     if: always()
-    needs: [tools, changes, games, build]
+    needs: [tools, changes, games, build, neighbours-browser, lefthand-browser]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -92,7 +178,9 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .node-version
-      - run: node scripts/aggregate.mjs
+      - run: |
+          node scripts/aggregate.mjs
+          node -e "if (process.env.NEIGHBOURS_BROWSER !== (process.env.NEIGHBOURS_AFFECTED === 'true' ? 'success' : 'skipped')) throw Error('Neighbours browser gate did not pass')"
         env:
           TOOLS: ${{ needs.tools.result }}
           CHANGES: ${{ needs.changes.result }}
@@ -100,3 +188,7 @@ jobs:
           BUILD: ${{ needs.build.result }}
           COUNT: ${{ needs.changes.outputs.count }}
           TOTAL: ${{ needs.changes.outputs.total }}
+          NEIGHBOURS_AFFECTED: ${{ contains(fromJSON(needs.changes.outputs.games), 'neighbours') }}
+          NEIGHBOURS_BROWSER: ${{ needs.neighbours-browser.result }}
+          LEFTHAND_REQUIRED: ${{ contains(needs.changes.outputs.games, '"lefthand"') }}
+          LEFTHAND_BROWSER: ${{ needs.lefthand-browser.result }}

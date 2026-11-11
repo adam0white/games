@@ -1,0 +1,166 @@
+{
+  "purpose": "Required fixture contract for the Child 4.x move; not a completed death-seed survey.",
+  "status": "blocked-before-seed-initialization",
+  "sourceCommit": "32bbf87",
+  "patch": {
+    "path": "~/code/.lab-scratch/stale-patches/child-hf4-child.diff",
+    "sha256": "a4cb5096a4bb7e9e6ba6174494c647828719c4b7dd42ba5ce86d92e3cb6989e5",
+    "engine": "4.0.0",
+    "observedFailure": "Model import fails: no export named DAYS_PER_YEAR. The patch changes only the package pin and lockfile."
+  },
+  "observedDeathRuns": [],
+  "migrationMust": [
+    "Replace the removed 3.x API with a runnable 4.x Child host before seed discovery.",
+    "Keep always-on natural mortality and the authored starting ages; never force a death through health, age or RNG edits.",
+    "Populate observedDeathRuns with at least one Maryam natural death before Elif turns eighteen; use the recorded seed and full input log in a pinned headless regression test.",
+    "Record exact engine version, death evidence and simulation time, Elif age, first visible chapter, text and choices, crisis result, yearbook and ending.",
+    "Check for fresh lessons or choices involving the deceased teacher and record the actual presentation.",
+    "Keep one headless control and verify current-version export replay; no matrix or panel run."
+  ],
+  "deathRunRequiredFields": [
+    "seed",
+    "inputs",
+    "engine",
+    "personId",
+    "deathEvidence",
+    "deathAt",
+    "elifAgeAtDeath",
+    "firstVisibleChapter",
+    "visibleText",
+    "availableChoices",
+    "crisisOutcome",
+    "yearbook",
+    "ending",
+    "export",
+    "replayHash"
+  ],
+  "currentVersionControl": {
+    "seed": 21,
+    "slice": false,
+    "engine": "3.2.0",
+    "edition": 4,
+    "inputs": [
+      {
+        "type": "teach",
+        "practice": "count"
+      },
+      {
+        "type": "teach",
+        "practice": "count"
+      },
+      {
+        "type": "teach",
+        "practice": "count"
+      },
+      {
+        "type": "crisis"
+      },
+      {
+        "type": "reveal"
+      },
+      {
+        "type": "arrange",
+        "practice": "count"
+      },
+      {
+        "type": "teach",
+        "practice": "look"
+      },
+      {
+        "type": "teach",
+        "practice": "look"
+      },
+      {
+        "type": "teach",
+        "practice": "look"
+      },
+      {
+        "type": "crisis"
+      },
+      {
+        "type": "reveal"
+      },
+      {
+        "type": "arrange",
+        "practice": "look"
+      },
+      {
+        "type": "teach",
+        "practice": "refuse"
+      },
+      {
+        "type": "teach",
+        "practice": "refuse"
+      },
+      {
+        "type": "teach",
+        "practice": "refuse"
+      },
+      {
+        "type": "crisis"
+      },
+      {
+        "type": "reveal"
+      },
+      {
+        "type": "arrange",
+        "practice": "refuse"
+      },
+      {
+        "type": "teach",
+        "practice": "look"
+      },
+      {
+        "type": "teach",
+        "practice": "look"
+      },
+      {
+        "type": "teach",
+        "practice": "look"
+      },
+      {
+        "type": "crisis"
+      },
+      {
+        "type": "reveal"
+      },
+      {
+        "type": "arrange",
+        "practice": "look"
+      },
+      {
+        "type": "teach",
+        "practice": "look"
+      },
+      {
+        "type": "teach",
+        "practice": "look"
+      },
+      {
+        "type": "teach",
+        "practice": "look"
+      },
+      {
+        "type": "crisis"
+      },
+      {
+        "type": "reveal"
+      },
+      {
+        "type": "arrange",
+        "practice": "look"
+      }
+    ],
+    "expected": {
+      "phase": "ending",
+      "age": 18,
+      "months": 180,
+      "maryamAlive": true,
+      "success": true,
+      "action": "look",
+      "finalHash": "c0e90d29",
+      "replayHash": "c0e90d29"
+    }
+  },
+  "revisit": "2026-11-03"
+}
