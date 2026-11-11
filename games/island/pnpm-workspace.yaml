@@ -1,0 +1,14 @@
+# Use the shared runtime; do not download one per worktree.
+engineStrict: true
+strictPeerDependencies: true
+hoist: false
+resolutionMode: highest
+verifyDepsBeforeRun: error
+dedupePeerDependents: true
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - "@adam0white/*"
+packageImportMethod: hardlink
+# The npm lock has no required lifecycle builds. Deny its optional native watcher.
+allowBuilds:
+  fsevents: false
