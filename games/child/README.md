@@ -4,7 +4,7 @@ The current candidate uses published HF 4.17.0 and game edition 6. It retains fi
 
 Download includes every visited episode's complete native archive plus the seed, ordered player inputs and complete host state. Import verifies all native archives, reconstructs all chapters and requires exact complete export equality. Old saves need a fresh upbringing. The original continuous fifteen-year simulation and its 36-month/180-month/2-second budgets remain unqualified historical work. This episode edition does not pass or claim those budgets. Exact source CI, hosted review and deployment remain pending.
 
-Stack: Node 26.12.0, pnpm 12.16.1, TypeScript 7.0.2, Vitest 5.1.0, Biome 2.6.5, Wrangler 4.157.0. Use frozen installs and the 1440-minute release-age policy. The monorepo uses published lab client 0.5.17 and kit 0.5.34, and one game engine at HF 4.17.0. Historical fixtures remain unchanged. The /child/file/ view opens an export without native storage or Lab access.
+Stack: Node 26.12.0, pnpm 12.16.1, TypeScript 7.0.2, Vitest 5.1.0, Biome 2.6.5, Wrangler 4.157.0. Use frozen installs and the 1440-minute release-age policy. The monorepo uses published lab client 0.5.18 and kit 0.5.35, and one game engine at HF 4.17.0. Historical fixtures remain unchanged. The /child/file/ view opens an export without native storage or Lab access.
 
 ## Historical design and release evidence
 

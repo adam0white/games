@@ -2,7 +2,7 @@
 
 A daughter returns to Istanbul after her father's death. She has three days of leave, an incomplete notebook and neighbours who remember different men.
 
-A short Ink game in an illustrated PixiJS room. Human Framework 4.17.0 supplies the people and portable continuity bridge. Published Lab client 0.5.17 carries the shelf protocol; kit 0.5.34 provides the shared menu label. The choices concern the living: an uncertain account, a promise, privacy and help. Worship is never a score. Bereavement and estrangement feature throughout; violence is not shown.
+A short Ink game in an illustrated PixiJS room. Human Framework 4.17.0 supplies the people and portable continuity bridge. Published Lab client 0.5.18 carries the shelf protocol; kit 0.5.35 provides the shared menu label. The choices concern the living: an uncertain account, a promise, privacy and help. Worship is never a score. Bereavement and estrangement feature throughout; violence is not shown.
 
 [Play](https://days.adamwhite.work) · [Design](docs/design.md)
 

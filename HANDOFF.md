@@ -1,6 +1,6 @@
 # MIGRATE — current owner goal, 2026-11-10
 
-Remaining: deploy the merged Glance fix with the corrected SDK, complete the 14 requested game moves, activate and verify old-host redirects, merge cloud deployment, verify owner-secret activation, and finish archive/storage evidence. New-game prototypes wait. The migration pace is no longer one step per day.
+Remaining: finish public-SDK file-viewer checks, qualify the integrated eighteen-game PR, deploy the merged Glance fix and all imported games, activate and verify old-host redirects, update the central shelf, verify owner-secret activation, and finish archive/storage evidence. New-game prototypes wait. The migration pace is no longer one step per day.
 
 Owner direction dated 2026-11-11, verbatim: "I need you to prioritize the migration to monorepo, which will allow me to move this workload entirely to cloud, freeing us from storage concerns here, and freeing storage for other things here."
 
@@ -8,6 +8,12 @@ Cloud workflow is prepared in `.github/workflows/deploy.yml`; it is not evidence
 
 The completion target is each requested game live with a clean exact green-main release, current replay, retained history and notices, one npm HF version, path CI, and working old-host redirects. The owner retains archive decisions and secret entry. Record each game's actual outcome; imported source and a passing build are preparation. Earlier prototype and pending-pilot entries below are historical and do not override this goal.
 
+
+## SDK publication and final integration — 2026-11-11
+
+HF PR126 merged as `7605561564998230d2632fb8209f7c6a902d9e09` after exact-head clear review and green CI; merged-main CI42976945997, Bench and CodeQL passed. Signed public client0.5.18 and kit0.5.35 releases retain the qualified source tree. All eight assets and 68 tar members were verified; separate root public downloads and signed-tag checks agree. Games now pin this pair, including the active nested Neighbours app. Signed file-adapter candidate `205a81fb` passed 45 facade controls, nine typechecks/scoped lint checks, nine actual-route queue controls and Word unshared-note/explicit-recording controls against the public packages. Root integration independently passed the same 45 facade controls and all 32 infrastructure controls. The clean complete build, hosted review/CI, deployment and cutover remain pending. Client18 requires preservation mode for deferred recording and scopes remembered feedback names by game. The nine lazy file facades preserve zero Lab initialization on idle file pages; the SDK deferred mode separately protects feedback after a client is created. An unshared file note must not deliver old recordings. The Neighbours copy guard refuses mismatched outer/nested HF/client/kit pins before replacing build output. Game engines remain npm HF4.17.0; the SDK's existing npm HF3.0 coarse-life dependency is separate and disclosed.
+
+The initial draft6152c234 complete Linux build, both required Lefthand Linux/macOS browser jobs and all four Neighbours browser shards passed. These are preliminary platform receipts, not final integrated-head review or deployment.
 
 ## Migration batch preparation — 2026-11-10
 

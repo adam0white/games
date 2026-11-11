@@ -4,7 +4,7 @@
 
 Read HANDOFF.md and docs/design.md before changing the game. Follow [the plain-English policy](docs/lab/plain-english.md) for player-facing text.
 
-Stack: HF 4.17.0, lab-client 0.5.17, lab-kit 0.5.34, TypeScript 7.0.2, Vite 8.3.5, Vitest 5.1.0, Biome 2.6.5, Wrangler 4.157.0, Playwright 1.64.1 and Knip 6.44.1. Worker compatibility date: 2026-11-05.
+Stack: HF 4.17.0, lab-client 0.5.18, lab-kit 0.5.35, TypeScript 7.0.2, Vite 8.3.5, Vitest 5.1.0, Biome 2.6.5, Wrangler 4.157.0, Playwright 1.64.1 and Knip 6.44.1. Worker compatibility date: 2026-11-05.
 
 Use the shared Node 26.12.0 and pnpm 12.16.1, with `/opt/homebrew/bin` first in PATH. Use managed worktrees. Run the game’s normal check:lane directly. Give the current HF release train priority; do not add an external lock or remove a foreign lock. Run check:lane before every signed commit. Rebase origin/main before pushing. Preserve simulation, save and replay contracts. Adam accepts game feel by playing; technical delivery is separate.
 

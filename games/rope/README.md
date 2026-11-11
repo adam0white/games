@@ -45,9 +45,9 @@ The script reports whether the saved answers and journal text match. It is not a
 
 ## What Human Framework contributes
 
-The game pins the published npm package `@adam0white/human-framework` to exactly **3.0.0**. That package reports engine **2.23.0**; the package version and engine stamp are different values. Fresh climbs use Rope simulation rules **2**. The native history format uses `rope-cast/1`, rules stamp `rope-cast-1` and calendar mapping `rope-calendar/1`.
+The current game pins the published npm package `@adam0white/human-framework` to exactly **4.17.0**. Its current export is `rope-hf4/1`. Native history uses `rope-hf4-cast/1`, rules stamp `rope-hf4-1` and calendar mapping `rope-hf4-calendar/1`. Older incompatible exports are refused; retain their original files.
 
-The host uses immutable lab-client **0.4.15** and lab-kit **0.5.17** release artifacts.
+The host uses immutable lab-client **0.5.18** and lab-kit **0.5.35** release artifacts.
 
 HF supplies each person's traits, values, bodily needs, goals, relationships, memories, decisions and decision-based replies. Rope supplies the mountains, weather, movement, ropes, available actions and physical consequences. Rope presents offers to HF rather than writing a person's refusal itself. The simulation runs locally and deterministically from its starting state and input log. The deployed configuration has `CAMP_AI` off. The debrief uses the labelled deterministic journal fallback. Optional Workers AI conversation, when enabled, does not decide what happens in the climb.
 

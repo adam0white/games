@@ -81,8 +81,8 @@ Only the current `word-5` edition with HF 4.17.0 is accepted. An earlier export
 or save, including every HF 3 run, is refused before any state changes, with a
 message to start a fresh meeting. Old saves are not migrated.
 
-The monorepo uses the published **@adam0white/lab-client 0.5.17** and
-**@adam0white/lab-kit 0.5.34** artifacts. The original vendored client remains
+The monorepo uses the published **@adam0white/lab-client 0.5.18** and
+**@adam0white/lab-kit 0.5.35** artifacts. The original vendored client remains
 in the source archive.
 Recording attempts uploads of decisions, run snapshots and event/error logs.
 Use **Record my play for the lab** on first visit or in Menu to change it.
@@ -121,17 +121,17 @@ when you return to it. A continued export contains the current state; its JSON
 formatting can differ from the original file. No people, logs or provenance are
 trimmed to meet the size limit.
 
-File mode uses client 0.5.17 preserving initialization. It reuses an existing
-usable local recording identity and leaves stored identity and preferences
-unchanged during initialization. Missing identity, incompatible session or an
-identity mismatch blocks recording and is shown explicitly. File mode never
-creates or copies a player identity as a fallback. Recording respects the
-existing privacy signal and preferences. The switch remains disabled while
-identity/session preservation is blocked. An explicit switch change, where
-available, changes the recording preference as on ordinary play. There is no
-temporary tab-only recording control. This informational notice does not claim
-the ordinary notice key. The existing feedback buttons explicitly submit notes;
-selecting them is not a local preview.
+File mode starts with recording off. Client 0.5.18 uses preserving, deferred
+initialization after an explicit feedback or recording action. It leaves stored
+identity, preferences and queued recordings unchanged before recording opt-in.
+An unshared feedback note is sent alone, unlinked; it does not start delivery of
+old recordings. Turning Recording on or selecting Share play explicitly enables
+recording after the existing identity/session checks. Missing identity,
+incompatible session or an identity mismatch blocks recording and is shown
+explicitly. File mode never creates or copies a player identity as a fallback.
+The switch becomes disabled when preservation is blocked. This informational
+notice does not claim the ordinary notice key. Selecting a feedback choice only
+prefills the note; Submit sends it.
 
 An agent can explicitly open `/word/file/?labRunSource=agent`. The public SDK marker
 labels newly captured linked records; it does not change imported authorship,

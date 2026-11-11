@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { validateGame } from './game.mjs';
@@ -91,4 +91,26 @@ test('a recorded viewer still requires the exact npm HF game engine and forbids 
     delete deps['@adam0white/lab-client']; deps.alias = 'npm:@adam0white/lab-client@0.5.17'; pkg();
     assert.throws(() => validateGame(viewer, viewers), /unused Lab/i);
   } finally { process.chdir(cwd); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('Neighbours cannot stamp a different nested runtime SDK as the outer game version', () => {
+  const cwd = process.cwd(), fixture = mkdtempSync(join(tmpdir(), 'neighbours-runtime-pins-'));
+  const script = join(cwd, 'games/neighbours/scripts/copy-dist.mjs');
+  const dependencies = { '@adam0white/human-framework': '4.17.0', '@adam0white/lab-client': 'client18', '@adam0white/lab-kit': 'kit35' };
+  const write = (path, value) => writeFileSync(join(fixture, path), JSON.stringify(value));
+  try {
+    mkdirSync(join(fixture, 'neighbours/dist'), { recursive: true });
+    mkdirSync(join(fixture, 'dist'));
+    write('dist/previous.json', { retain: true });
+    write('neighbours/dist/current.json', { built: true });
+    write('package.json', { dependencies });
+    write('neighbours/package.json', { dependencies: { ...dependencies, '@adam0white/lab-client': 'client17' } });
+    const refused = spawnSync(process.execPath, [script], { cwd: fixture, encoding: 'utf8' });
+    assert.notEqual(refused.status, 0, 'A stale nested client must refuse before copying');
+    assert.match(refused.stderr, /nested runtime pin mismatch.*lab-client/i);
+    assert.deepEqual(JSON.parse(readFileSync(join(fixture, 'dist/previous.json'), 'utf8')), { retain: true });
+    write('neighbours/package.json', { dependencies });
+    const accepted = spawnSync(process.execPath, [script], { cwd: fixture, encoding: 'utf8' });
+    assert.equal(accepted.status, 0, accepted.stderr);
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
 });

@@ -1,23 +1,26 @@
 import { createLab } from "@adam0white/lab-client";
 import { telemetryNotice } from "@adam0white/lab-kit";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { fileLab } from "./file-lab";
 
 const fileEntry =
 	typeof location !== "undefined" && location.pathname === "/neighbours/file/";
-export const lab = createLab({
-	game: "neighbours",
-	...(fileEntry ? { preservation: "preserve" as const } : {}),
-});
+export const lab = fileEntry
+	? fileLab("neighbours")
+	: createLab({ game: "neighbours" });
 // Fail closed before any trackRun registration. Keep the real client; never fall back.
 export function fileRecordingAllowed() {
 	if (!fileEntry || lab.preservationStatus === "existing-local") return true;
+	if (lab.preservationStatus === "standard") return false;
 	lab.dispose();
 	return false;
 }
 fileRecordingAllowed();
 
 function recordingStatus() {
-	return fileEntry && !fileRecordingAllowed()
+	return fileEntry &&
+		lab.preservationStatus !== "standard" &&
+		!fileRecordingAllowed()
 		? `Recording unavailable: ${lab.preservationStatus}. You can play this file in memory and download a copy.`
 		: "";
 }

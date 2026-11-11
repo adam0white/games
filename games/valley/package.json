@@ -28,8 +28,8 @@
   },
   "dependencies": {
     "@adam0white/human-framework": "4.17.0",
-    "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.17/adam0white-lab-client-0.5.17.tgz",
-    "@adam0white/lab-kit": "https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.34/adam0white-lab-kit-0.5.34.tgz"
+    "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.18/adam0white-lab-client-0.5.18.tgz",
+    "@adam0white/lab-kit": "https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.35/adam0white-lab-kit-0.5.35.tgz"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.5",

@@ -16,7 +16,7 @@ pnpm check:lane
 
 Run the preparation command before checks; it installs each game's declared browser runtimes and OS dependencies. On Linux, installation may require the session's package-manager privileges. Neighbours additionally requires Python 3.12.13 and `python -m pip install -r games/neighbours/neighbours/native-gm-requirements.txt` before its native checks. Lefthand requires Python 3.11 or later and downloads checksum-pinned Godot tools; its required hosted matrix covers Linux Chromium and macOS WebKit. Preserve the pinned versions when choosing a cloud image.
 
-`games.json` lists every imported game, original source commit, old origin, save schema, and the single exact HF version. Every game consumes HF from npm. Lab packages are immutable published artifacts or checked-in vendor archives with notices. Original source history remains reachable through unsquashed subtree imports.
+`games.json` lists every imported game, original source commit, old origin, save schema, and the single exact game-engine HF version. Every game consumes HF from npm. Lab packages are immutable published artifacts or checked-in vendor archives with notices. Original source history remains reachable through unsquashed subtree imports. The Lab SDK separately retains its published npm HF 3.0 alias for the existing coarse-life clock; no current game engine uses that alias. The lockfile therefore contains both versions.
 
 The registry also supports `kind: "recorded-viewer"` for a CLI experiment and static recording viewer such as Island. This kind still requires the exact npm HF engine for native replay and declares no direct Lab client dependency. The source/build audit must establish that no recording implementation is bundled; the manifest check alone does not establish that. Its release reports `labVersion: null`. Interactive games continue to require their immutable Lab client artifact.
 
@@ -28,7 +28,7 @@ After CI succeeds for a push to `main`, `.github/workflows/deploy.yml` checks ou
 
 The owner must add the repository Actions secret before automatic deployment can succeed:
 
-1. Create a Cloudflare API token scoped to the account in `wrangler.jsonc`, with Workers Scripts Edit and Account Settings Read; scope Zone Read and Workers Routes Edit to `adamwhite.work` for its custom domain/routes. Use the [Cloudflare deployment guide](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/) to confirm the token scope.
+1. Create a Cloudflare API token scoped to the account in `wrangler.jsonc`, with Workers Scripts Edit and Account Settings Read; scope Zone Read and Workers Routes Edit to `adamwhite.work` for its custom domain/routes. See [Cloudflare deployment](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/) and [route permissions](https://developers.cloudflare.com/workers/authorization/workers/) for the token scope.
 2. Open [games Actions secrets](https://github.com/adam0white/games/settings/secrets/actions). Choose **New repository secret**. Name it `CLOUDFLARE_API_TOKEN`. Paste the token there. Never paste it in chat, source, or STATUS.
 3. Re-run the latest successful main CI workflow. Its successful completion triggers Deploy. Read the Deploy result and verify every live release manifest. A successful CI run alone does not prove deployment.
 

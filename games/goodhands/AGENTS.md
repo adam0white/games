@@ -4,7 +4,7 @@
 
 This copy lives at games/goodhands. Root AGENTS.md and docs/migration.md govern the port. Use one registry HF4.17.0 engine. Historical source/tests are evidence under archive/historical and are excluded from production, TypeScript, lint and Vitest. Do not restore historical engine/client aliases. The older standalone directions below are historical where they require those aliases or old replay execution.
 
-Preserve current full/compact replay, supported portable-v2 admission, named unavailable people and complete source custody. Current source publication produces the native portable-v2 transfer. It does not generate the older Voice/Pass return-wire sidecar. Old current saves and legacy guest continuity refuse without replacing the original file. This preparation pins the published client0.5.17/kit0.5.34 immutable release URLs with strict frozen workspace installation. Local qualification and root adoption remain separate from pilot/live acceptance. A source import, local checks, CI, deployment and receiving acceptance are separate outcomes.
+Preserve current full/compact replay, supported portable-v2 admission, named unavailable people and complete source custody. Current source publication produces the native portable-v2 transfer. It does not generate the older Voice/Pass return-wire sidecar. Old current saves and legacy guest continuity refuse without replacing the original file. This preparation pins the published client0.5.18/kit0.5.35 immutable release URLs with strict frozen workspace installation. Local qualification and root adoption remain separate from pilot/live acceptance. A source import, local checks, CI, deployment and receiving acceptance are separate outcomes.
 
 # Good Hands
 

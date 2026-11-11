@@ -8,7 +8,7 @@ The simplify increment ends with source changes, focused tests and replay tests,
 
 Use managed worktrees. Run `npm run check:lane` before every signed commit. Keep signing enabled and include `Co-Authored-By: Codex <noreply@openai.com>`. Rebase on origin before each push. Preserve deterministic current replay. Retired-edition tests remain in archive/historical-tests and original source history.
 
-Current stack: npm HF 4.17.0 for pass@20; immutable lab-client 0.5.17 / lab-kit 0.5.34. The game does not execute the historical HF3 engine. Public new games use one HF4 behavior, with no legacy engine or edition selector. Incompatible old saves may refuse clearly while their originals remain stored. Shared Node 26.12.0 / pnpm 12.16.1; Worker compatibility_date 2026-11-05.
+Current stack: npm HF 4.17.0 for pass@20; immutable lab-client 0.5.18 / lab-kit 0.5.35. The game does not execute the historical HF3 engine. Public new games use one HF4 behavior, with no legacy engine or edition selector. Incompatible old saves may refuse clearly while their originals remain stored. Shared Node 26.12.0 / pnpm 12.16.1; Worker compatibility_date 2026-11-05.
 
 ## Current policy clarification — 2026-10-25
 
