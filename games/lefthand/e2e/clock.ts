@@ -7,4 +7,6 @@ export async function pauseClock(page: Page) {
   await page.clock.setFixedTime(now);
   await page.clock.pauseAt(now);
   await page.clock.setSystemTime(now);
+  // Match the original pauseAt(now + 100) one-shot timer advancement.
+  await page.clock.fastForward(100);
 }
