@@ -20,7 +20,7 @@ it('leaves the release stamp to the network even when an old stamp is cached', a
   });
   const handleFetch = handlers.fetch;
   if (!handleFetch) throw new Error('The worker did not register its fetch handler.');
-  for (const path of ['/murmur/release.json', '/murmur/release.json?recheck=1']) {
+  for (const path of ['/murmur/release.json', '/murmur/release.json?recheck=1', '/glance/assets/game.js']) {
     const respondWith = vi.fn();
     handleFetch({
       request: new Request(`https://game.example${path}`, { cache: 'no-store' }),
