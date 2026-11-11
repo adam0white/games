@@ -196,6 +196,20 @@
       ],
       "legacyOrigin": "https://word.adamwhite.work",
       "redirectEnabled": false
+    },
+    {
+      "slug": "smoke",
+      "source": {
+        "repository": "https://github.com/adam0white/smoke",
+        "commit": "63c801e71381fc4cc4673329653a1ccc0439ff64"
+      },
+      "saveSchema": "smoke-8",
+      "ciBrowsers": [
+        "chromium",
+        "webkit"
+      ],
+      "legacyOrigin": "https://smoke.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }
