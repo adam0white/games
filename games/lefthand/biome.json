@@ -1,0 +1,35 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.5/schema.json",
+  "files": {
+    "includes": [
+      "src/**",
+      "test/**",
+      "e2e/**",
+      "*.ts",
+      "*.json",
+      "scripts/*.mjs",
+      "index.html",
+      "!pnpm-lock.yaml",
+      "worker/**",
+      "!worker-configuration.d.ts"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended"
+    }
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  }
+}

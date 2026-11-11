@@ -1,0 +1,493 @@
+:root {
+  font-family: Georgia, "Times New Roman", serif;
+  color: #e1ddd1;
+  background: #0b1420;
+  font-synthesis: none;
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+main {
+  max-width: 760px;
+  margin: auto;
+  padding: 20px 24px 32px;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+small,
+.chapter,
+.hint,
+.source {
+  font-family: system-ui, sans-serif;
+}
+small {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: #a7b4bd;
+}
+h1 {
+  font-size: clamp(28px, 5vw, 42px);
+  font-weight: normal;
+  margin: 6px 0 12px;
+}
+h2 {
+  font-size: 23px;
+  font-weight: normal;
+}
+p {
+  font-size: 17px;
+  line-height: 1.5;
+  margin: 10px 0;
+}
+.chapter {
+  font-size: 12px;
+  color: #b7c4cb;
+  letter-spacing: 0.04em;
+}
+[data-phase="night"] p {
+  margin-block: 4px;
+}
+#status {
+  min-height: 50px;
+  color: #e6d7b8;
+}
+button,
+a,
+input,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  font:
+    500 14px system-ui,
+    sans-serif;
+  color: #e6d3a8;
+  background: #443a28;
+  border: 1px solid #786748;
+  border-radius: 4px;
+  padding: 11px 15px;
+  min-height: 44px;
+  cursor: pointer;
+}
+button:hover {
+  background: #574a32;
+}
+button:active {
+  background: #6a593b;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+button:focus-visible,
+a:focus-visible,
+canvas:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #f0cf86;
+  outline-offset: 3px;
+}
+a {
+  color: #d5bd86;
+  text-underline-offset: 3px;
+}
+header button,
+.menu-top button {
+  background: transparent;
+  border-color: #4c5b64;
+}
+.choices,
+.action-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.choices button {
+  flex: 1;
+}
+.source {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #a9b2b7;
+  margin-top: 14px;
+}
+.village {
+  position: relative;
+  margin: 16px 0 12px;
+  background: #091222;
+}
+canvas {
+  display: block;
+  width: 100%;
+  height: clamp(330px, 65vh, 600px);
+  touch-action: none;
+}
+#loading {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 12px;
+  padding: 8px 12px;
+  background: #0b1420e8;
+  font-size: 14px;
+  color: #c8cdd0;
+}
+#evening {
+  padding-bottom: 3px;
+}
+.hint {
+  font-size: 11px;
+  color: #9eadb8;
+  text-align: center;
+}
+.action-row {
+  justify-content: center;
+}
+.action-row button {
+  min-width: 135px;
+}
+.warmth {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 420px;
+  margin: 8px auto 0;
+}
+#cold-warning {
+  flex: 1;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  font:
+    12px / 1.35 system-ui,
+    sans-serif;
+  color: #c8cdd0;
+}
+.warmth .bar {
+  flex: 0 0 34%;
+  height: 10px;
+  border: 1px solid #786748;
+  border-radius: 5px;
+  background: #0b1420;
+  overflow: hidden;
+}
+.warmth .bar i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: #e4a74a;
+  transition: width 0.1s linear;
+}
+.warmth[data-level="low"] .bar i {
+  background: #8fb3c9;
+}
+.warmth[data-level="low"] #cold-warning {
+  color: #d7e6f0;
+}
+.warmth[data-level="danger"] .bar i {
+  background: #d9e9f5;
+}
+.warmth[data-level="danger"] #cold-warning {
+  color: #ffffff;
+  font-weight: 600;
+}
+.directions {
+  display: grid;
+  grid-template-columns: 56px 56px 56px;
+  grid-template-rows: 48px 48px;
+  gap: 6px;
+  justify-content: center;
+  margin: 12px 0;
+}
+.directions button {
+  font-size: 24px;
+  padding: 4px;
+}
+.up {
+  grid-column: 2;
+  grid-row: 1;
+}
+.left {
+  grid-column: 1;
+  grid-row: 2;
+}
+.down {
+  grid-column: 2;
+  grid-row: 2;
+}
+.right {
+  grid-column: 3;
+  grid-row: 2;
+}
+strong {
+  font-weight: normal;
+  color: #e3bf7c;
+}
+.menu {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  overflow: auto;
+  background: #101c29;
+  padding: 24px max(24px, calc((100vw - 700px) / 2));
+  font-family: system-ui, sans-serif;
+}
+.menu-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.menu p {
+  font-size: 14px;
+}
+#recovery p {
+  color: #e8d4a2;
+}
+#morning-lines p {
+  margin: 14px 0;
+}
+.menu-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 25px 0;
+}
+.menu-actions a {
+  padding: 12px;
+}
+label {
+  display: block;
+  font-size: 14px;
+  line-height: 1.6;
+}
+input[type="checkbox"] {
+  accent-color: #c8ac72;
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  margin-right: 7px;
+}
+textarea {
+  display: block;
+  width: 100%;
+  font:
+    16px system-ui,
+    sans-serif;
+  background: #0b1420;
+  color: #e1ddd1;
+  border: 1px solid #647078;
+  border-radius: 3px;
+  padding: 10px;
+  margin: 8px 0 14px;
+}
+form .choices {
+  margin-top: 16px;
+}
+.notice {
+  font:
+    12px / 1.6 system-ui,
+    sans-serif;
+  color: #bfc9ce;
+  border-block: 1px solid #3b4851;
+  padding: 10px 0;
+}
+.notice button {
+  padding: 3px 7px;
+  font-size: 12px;
+  min-height: 32px;
+  background: transparent;
+}
+#notice-close {
+  float: right;
+  font-size: 18px;
+}
+/* HTML hidden must override layout display rules, including flex menus. */
+[hidden] {
+  /* biome-ignore lint/complexity/noImportantStyles: preserve native hidden semantics. */
+  display: none !important;
+}
+@media (max-width: 480px) {
+  main {
+    padding: 14px 15px 24px;
+  }
+  header {
+    gap: 10px;
+  }
+  h1 {
+    margin-bottom: 6px;
+  }
+  p {
+    font-size: 15px;
+  }
+  #status {
+    min-height: 44px;
+  }
+  canvas {
+    height: 330px;
+  }
+  .choices button {
+    padding: 10px 8px;
+  }
+  .village {
+    margin-top: 12px;
+  }
+  .menu {
+    padding: 18px;
+  }
+  .source {
+    font-size: 10px;
+  }
+  .chapter {
+    font-size: 11px;
+  }
+  .notice {
+    font-size: 11px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto;
+  }
+}
+
+@media (min-width: 481px) {
+  [data-phase="evening"] canvas {
+    height: clamp(260px, calc(100dvh - 410px), 480px);
+  }
+  [data-phase="night"] canvas {
+    height: clamp(260px, calc(100dvh - 430px), 480px);
+  }
+}
+@media (min-width: 900px) {
+  [data-phase="evening"] main {
+    max-width: 1040px;
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    column-gap: 24px;
+    grid-template-areas:
+      "header header"
+      "notice notice"
+      "chapter chapter"
+      "status status"
+      "evening village";
+  }
+  [data-phase="evening"] header {
+    grid-area: header;
+  }
+  [data-phase="evening"] #recording-notice {
+    grid-area: notice;
+  }
+  [data-phase="evening"] #chapter {
+    grid-area: chapter;
+  }
+  [data-phase="evening"] #status {
+    grid-area: status;
+  }
+  [data-phase="evening"] #evening {
+    grid-area: evening;
+  }
+  [data-phase="evening"] .village {
+    grid-area: village;
+    align-self: start;
+    margin-top: 10px;
+  }
+  [data-phase="evening"] canvas {
+    height: clamp(300px, calc(100dvh - 320px), 480px);
+  }
+}
+
+/* Reserve the controls before allocating map height, including the first-visit
+   notice. Lantern labels share one row, so toggling never moves the arrows. */
+[data-phase="night"] main {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+[data-phase="night"] main > * {
+  flex-shrink: 0;
+}
+[data-phase="night"] h1 {
+  margin-bottom: 4px;
+}
+[data-phase="night"] #status {
+  height: 76px;
+  min-height: 0;
+  overflow: auto;
+}
+[data-phase="night"] .village {
+  flex: 1 1 0;
+  min-height: 120px;
+  margin-block: 6px;
+}
+[data-phase="night"] canvas {
+  height: 100%;
+}
+.action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.action-row button {
+  min-width: 0;
+  white-space: nowrap;
+  padding-inline: 6px;
+}
+[data-phase="night"] .directions {
+  margin-block: 6px;
+}
+.privacy-debug {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-block: 12px;
+  font-size: 14px;
+}
+#debug summary {
+  cursor: pointer;
+  color: #d5bd86;
+}
+#debug .menu-actions {
+  margin-block: 10px;
+}
+@media (max-width: 480px) {
+  .action-row button {
+    font-size: 12px;
+  }
+  [data-phase="night"] .notice {
+    line-height: 1.4;
+    padding-block: 6px;
+  }
+  [data-phase="night"] #cold-warning {
+    font-size: 11px;
+  }
+}
+#guide {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  border: 2px solid #e6b968;
+  background: #192c3c;
+  color: #fff2d7;
+}
+#guide[hidden] {
+  display: none;
+}
+#guide strong {
+  flex: 1 1 180px;
+  font-size: 15px;
+}
+#guide button {
+  min-height: 44px;
+}

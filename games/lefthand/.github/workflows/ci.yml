@@ -1,0 +1,54 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            browser: chromium
+            projects: --project=chromium-phone --project=chromium-desktop
+          - os: macos-latest
+            browser: webkit
+            projects: --project=webkit-phone --project=webkit-desktop
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.16.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: actions/cache@v4
+        with:
+          path: .godot-tools
+          key: godot-4.7.2-${{ runner.os }}-web-nothreads-v1
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - run: pnpm e2e ${{ matrix.projects }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failure-${{ matrix.os }}-${{ matrix.browser }}
+          path: test-results/
+          retention-days: 3
+  ci:
+    if: always()
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.verify.result }}" = success

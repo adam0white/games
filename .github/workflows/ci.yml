@@ -131,9 +131,45 @@ jobs:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - run: node scripts/build.mjs
+  lefthand-browser:
+    needs: changes
+    if: contains(needs.changes.outputs.games, '"lefthand"')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            browser: chromium
+            projects: --project=chromium-phone --project=chromium-desktop
+          - os: macos-latest
+            browser: webkit
+            projects: --project=webkit-phone --project=webkit-desktop
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+        with:
+          run_install: false
+          cache: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter ./games/lefthand build
+      - run: pnpm --filter ./games/lefthand exec playwright install --with-deps ${{ matrix.browser }}
+      - run: pnpm --filter ./games/lefthand exec playwright test ${{ matrix.projects }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: failure()
+        with:
+          name: lefthand-browser-failure-${{ matrix.os }}-${{ matrix.browser }}
+          path: games/lefthand/test-results/
+          retention-days: 3
   ci:
     if: always()
-    needs: [tools, changes, games, build, neighbours-browser]
+    needs: [tools, changes, games, build, neighbours-browser, lefthand-browser]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -154,3 +190,5 @@ jobs:
           TOTAL: ${{ needs.changes.outputs.total }}
           NEIGHBOURS_AFFECTED: ${{ contains(fromJSON(needs.changes.outputs.games), 'neighbours') }}
           NEIGHBOURS_BROWSER: ${{ needs.neighbours-browser.result }}
+          LEFTHAND_REQUIRED: ${{ contains(needs.changes.outputs.games, '"lefthand"') }}
+          LEFTHAND_BROWSER: ${{ needs.lefthand-browser.result }}
