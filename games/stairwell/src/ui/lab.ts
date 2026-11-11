@@ -5,7 +5,10 @@ import './lab.css';
 import { fileMode } from './session-route.ts';
 
 export { fileMode } from './session-route.ts';
-export const lab = createLab({ game: 'stairwell' });
+export const lab = createLab({
+  game: 'stairwell',
+  ...(fileMode === 'file' ? { preservation: 'preserve' } : {}),
+});
 
 interface MenuOptions {
   getRun: () => unknown;
@@ -25,7 +28,7 @@ interface MenuOptions {
   chooseRecording?: (allow: boolean) => Promise<void>;
 }
 
-const NAME_KEY = 'hf-lab-feedback-name';
+const NAME_KEY = 'stairwell-hf-lab-feedback-name';
 /** SDK0.5.2 owns the single Recording gate. A complete replay archive cannot
  * be partially redacted while retaining its verification contract. */
 async function feedbackRun(getRun: () => unknown): Promise<unknown> {

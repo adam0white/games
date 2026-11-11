@@ -250,7 +250,7 @@ const ui: Ui = {
   readUntil: 0,
 };
 
-const notice = telemetryNotice();
+const notice = telemetryNotice(undefined, fileMode === 'file' ? { preservation: 'preserve' } : {});
 // Use portable footer metrics without changing the shared node, type size or body typography.
 if (notice) {
   notice.style.paddingInline = '2px';
@@ -648,7 +648,7 @@ function fileChooser() {
   stage = null;
   // A rejected replacement file must leave the current memory run available.
   invalidateContinuity();
-  app().innerHTML = `<div class="page title">${topbar('', true)}<main class="page-body"><h1>Play a saved file</h1><p>Your saved game stays unchanged. Progress stays in this page. Download this run before closing the page. Reload returns here.</p><label>Choose a saved file<input type="file" accept="application/json,.json,.txt"></label><p role="status" data-file-status></p>${ui.s ? '<button data-file-resume>Resume current file</button>' : ''}<p>To leave file play and open your saved local game, use the link below. That game uses this browser’s saved notebook.</p><a href="/">Leave file play and open my saved local game</a></main></div>`;
+  app().innerHTML = `<div class="page title">${topbar('', true)}<main class="page-body"><h1>Play a saved file</h1><p>Your saved game stays unchanged. Progress stays in this page. Download this run before closing the page. Reload returns here.</p><label>Choose a saved file<input type="file" accept="application/json,.json,.txt"></label><p role="status" data-file-status></p>${ui.s ? '<button data-file-resume>Resume current file</button>' : ''}<p>To leave file play and open your saved local game, use the link below. That game uses this browser’s saved notebook.</p><a href="/stairwell/">Leave file play and open my saved local game</a></main></div>`;
   mountMenu(app().querySelector('.menu-slot'), null);
   app()
     .querySelector('[data-file-resume]')
@@ -858,7 +858,7 @@ export async function start() {
   });
   requestAnimationFrame(loop);
   if (fileMode !== 'file' && 'serviceWorker' in navigator && !import.meta.env.DEV)
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/stairwell/sw.js', { scope: '/stairwell/' }).catch(() => {});
 }
 
 function canAdvance(world: GameState) {
@@ -1178,7 +1178,7 @@ async function titlePage() {
     ?.addEventListener('click', () => {
       const dialog = document.createElement('dialog');
       dialog.className = 'other-ways';
-      dialog.innerHTML = `<div class="who"><b>Other ways to begin</b><button class="x" data-a="close" aria-label="Close other ways in">×</button></div><div class="sheet-body"><a href="/file/">Play a saved file</a><a href="https://human.adamwhite.work/lab/people/">${PEOPLE_ACROSS_GAMES} (Hacer and Sevim can transfer here)</a></div>`;
+      dialog.innerHTML = `<div class="who"><b>Other ways to begin</b><button class="x" data-a="close" aria-label="Close other ways in">×</button></div><div class="sheet-body"><a href="/stairwell/file/">Play a saved file</a><a href="https://human.adamwhite.work/lab/people/">${PEOPLE_ACROSS_GAMES} (Hacer and Sevim can transfer here)</a></div>`;
       document.body.append(dialog);
       dialog.showModal();
       const authored = document.createElement('button');
