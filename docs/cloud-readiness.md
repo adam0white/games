@@ -10,7 +10,7 @@ Deployment runs only after successful same-repo push CI on main. It checks curre
 
 ## Human Framework
 
-Read-only audit of remote main `2ecdd895552546537541f1058202249660c5894a`, fetched in this session. Its existing CI already uses Linux setup-node/pnpm. The following operational assumptions remain; this audit does not claim they are fixed.
+Read-only audit of remote main `2ecdd895552546537541f1058202249660c5894a`, fetched in this session. Rechecked against merged `33ed47e7822abb52064d940807ec44699cce3b26`: only the queue fix, client/kit versions, client tests/docs and lock changed; the operational files below are unchanged, and that delta adds no Mac path assumption. Its existing CI already uses Linux setup-node/pnpm. The following operational assumptions remain; this audit does not claim they are fixed.
 
 | Location | Confirmed local assumption | Proposed cloud replacement |
 | --- | --- | --- |
