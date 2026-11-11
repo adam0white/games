@@ -103,6 +103,20 @@
       "saveSchema": "pass-hf4/2",
       "legacyOrigin": "https://pass.adamwhite.work",
       "redirectEnabled": false
+    },
+    {
+      "slug": "warren",
+      "source": {
+        "repository": "https://github.com/adam0white/warren",
+        "commit": "e6bec0f4fc86d1b465e08e7c076e80ab8cdb19bb"
+      },
+      "saveSchema": "warren-rest/2",
+      "ciBrowsers": [
+        "chromium",
+        "webkit"
+      ],
+      "legacyOrigin": "https://warren.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }
