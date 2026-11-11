@@ -1,6 +1,6 @@
 # MIGRATE — current owner goal, 2026-11-10
 
-Remaining: finish public-SDK file-viewer checks, qualify the integrated eighteen-game PR, deploy the merged Glance fix and all imported games, activate and verify old-host redirects, update the central shelf, verify owner-secret activation, and finish archive/storage evidence. New-game prototypes wait. The migration pace is no longer one step per day.
+Remaining: finish the Neighbours real-navigation lifecycle repair, obtain fresh exact-head PR review and CI, deploy the merged Glance fix and all eighteen games, activate and verify old-host redirects, update the central shelf, and finish archive/storage evidence. Automatic Actions deployment also needs the owner-provided secret; its exact setup is in README. New-game prototypes wait. The migration pace is no longer one step per day.
 
 Owner direction dated 2026-11-11, verbatim: "I need you to prioritize the migration to monorepo, which will allow me to move this workload entirely to cloud, freeing us from storage concerns here, and freeing storage for other things here."
 

@@ -8,6 +8,27 @@ import { spawnSync } from 'node:child_process';
 import { validateRegistry, affectedGames, checkResults, manifest, assertFrameworkGraph, scopedHeaders, scopedRedirects, checkRelease, checkMainCI } from './lib.mjs';
 const game = { slug: 'rope', source: { repository: 'https://github.com/adam0white/rope', commit: 'a'.repeat(40) }, saveSchema: 'v1' };
 const registry = { hfVersion: '4.17.0', games: [game] };
+test('interactive cloud suites honor one shared configured lock without a home checkout', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'games-cloud-lock-'));
+  const env = { ...process.env, HOME: join(fixture, 'empty-home'), HF_SUITE_LOCK_DIR: join(fixture, 'shared', 'full-suite') };
+  delete env.CI; delete env.SUITE_LOCK;
+  try {
+    for (const slug of ['glance', 'commonstead', 'goodhands', 'hearsay', 'smallworks', 'valley']) {
+      const helper = new URL(`../games/${slug}/scripts/suite-lock.ts`, import.meta.url).href;
+      const source = `import { acquireSuiteLock } from ${JSON.stringify(helper)};
+import { existsSync, readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const directory = process.env.HF_SUITE_LOCK_DIR;
+const release = await acquireSuiteLock({repo:'cloud-control', branch:'control'});
+try { assert.equal(JSON.parse(readFileSync(directory+'/owner.json')).pid, process.pid); }
+finally { release(); }
+assert.equal(existsSync(directory), false);
+assert.equal(existsSync(process.env.HOME+'/code'), false);`;
+      const result = spawnSync(process.execPath, ['--input-type=module', '-e', source], { env, encoding: 'utf8', timeout: 10000 });
+      assert.equal(result.status, 0, `${slug}: ${result.stderr}`);
+    }
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});
 test('rejects unsafe lineage and catches shared paths', () => {
   assert.throws(() => validateRegistry({ ...registry, games: [{...game, slug:'../bad'}] }));
   assert.deepEqual(affectedGames(registry, ['scripts/lib.mjs']), ['rope']);

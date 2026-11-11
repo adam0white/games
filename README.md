@@ -7,12 +7,15 @@ Original games built with [Human Framework](https://github.com/adam0white/human-
 Clone `adam0white/games` with full history in the session workspace. If the provider created a shallow checkout, run `git fetch --unshallow origin` before checks. Use the Node version in `.node-version` and pnpm version in `package.json`. No local Mac checkout or sibling Human Framework repository is needed.
 
 ```sh
+export HF_SUITE_LOCK_DIR="${TMPDIR:-/tmp}/adamwhite-full-suite"
 pnpm install --frozen-lockfile
 pnpm --filter ./games/rope dev
 node scripts/prepare-game.mjs rope
 node scripts/check-game.mjs rope
 pnpm check:lane
 ```
+
+All agents sharing a cloud machine must use the same `HF_SUITE_LOCK_DIR`. It serializes full suites without a home checkout. Do not disable the lock. Without this setting, the six imported lock helpers retain the existing Mac lock location for coordination with other local projects.
 
 Run the preparation command before checks; it installs each game's declared browser runtimes and OS dependencies. On Linux, installation may require the session's package-manager privileges. Neighbours additionally requires Python 3.12.13 and `python -m pip install -r games/neighbours/neighbours/native-gm-requirements.txt` before its native checks. Lefthand requires Python 3.11 or later and downloads checksum-pinned Godot tools; its required hosted matrix covers Linux Chromium and macOS WebKit. Preserve the pinned versions when choosing a cloud image.
 

@@ -19,7 +19,7 @@
     "measure": "node scripts/measure.ts",
     "check": "npm run lint && npm run typecheck && npm test",
     "deploy": "cd ../.. && pnpm run deploy",
-    "check:lane": "SUITE_LOCK=0 npm run check",
+    "check:lane": "npm run check",
     "test:first-minute": "node test/browser/first-minute.mjs"
   },
   "dependencies": {

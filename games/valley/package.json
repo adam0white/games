@@ -19,7 +19,7 @@
     "measure": "node scripts/measure.ts",
     "check": "pnpm run lint && pnpm run typecheck && pnpm test",
     "deploy": "cd ../.. && pnpm run deploy",
-    "check:lane": "pnpm run lint && pnpm run typecheck && pnpm exec vitest run --maxWorkers=1 --testTimeout=120000",
+    "check:lane": "pnpm run lint && pnpm run typecheck && node scripts/suite-lock.ts -- pnpm exec vitest run --maxWorkers=1 --testTimeout=120000",
     "check:unused": "knip",
     "proof:day12": "vitest run test/export-term.test.ts --testTimeout=120000",
     "proof:term": "node scripts/hf4151-proof.ts --term",

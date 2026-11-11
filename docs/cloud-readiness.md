@@ -6,6 +6,8 @@ Games implementation is staged on MIGRATE cloud branch. Automatic production dep
 
 The build, checks and deployment resolve packages inside the workspace. All game engines pin the registry npm version. The former Homebrew Node PATH override in root deployment is removed; setup-node supplies Node in Actions. Build output, deployment checkouts and package dependencies are regenerable. Original repos, evidence and exports are not.
 
+Interactive cloud sessions set `HF_SUITE_LOCK_DIR` to one shared writable session path, as shown in README. All six imported lock helpers honor it before their legacy Mac default. Glance and Valley lane checks retain their existing tests and caps while taking this same lock outside CI. An isolated-home control verifies acquisition and release for all six helpers; it does not launch a full game suite. CI retains its existing lock bypass.
+
 Deployment runs only after successful same-repo push CI on main. It checks current main again before upload, builds all games, and compares every live manifest. See root README for owner setup and cloud commands. A green build is not a live verification. The old-host redirect configuration is separate from automatic asset deployment and must be checked per game.
 
 ## Human Framework
