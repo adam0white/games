@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.godot-tools/
+godot/.godot/
+public/game*
+playwright-report/
+test-results/
