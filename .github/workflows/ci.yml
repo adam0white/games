@@ -111,6 +111,12 @@ jobs:
       - run: pnpm --filter ./games/lefthand build
       - run: pnpm --filter ./games/lefthand exec playwright install --with-deps ${{ matrix.browser }}
       - run: pnpm --filter ./games/lefthand exec playwright test ${{ matrix.projects }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: failure()
+        with:
+          name: lefthand-browser-failure-${{ matrix.os }}-${{ matrix.browser }}
+          path: games/lefthand/test-results/
+          retention-days: 3
   ci:
     if: always()
     needs: [tools, changes, games, build, lefthand-browser]
