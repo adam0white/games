@@ -356,7 +356,7 @@ it('sends linked feedback with verdict and trimmed remembered name', async () =>
     '[keep] I wanted another reading.',
     expect.objectContaining({ name: 'owner', run: expect.any(Object) }),
   );
-  expect(localStorage.getItem('glance-hf-lab-feedback-name')).toBe('owner');
+  expect(localStorage.getItem('hf-lab-feedback-name:glance')).toBe('owner');
   expect(localStorage.getItem('hf-lab-feedback-name')).toBe('legacy');
   expect(localStorage.getItem('goodhands-hf-lab-feedback-name')).toBe('other game');
 });

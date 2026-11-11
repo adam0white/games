@@ -14,7 +14,7 @@ node scripts/check-game.mjs rope
 pnpm check:lane
 ```
 
-Run the preparation command before checks; it installs each game's declared browser runtimes and OS dependencies. On Linux, installation may require the session's package-manager privileges. Neighbours additionally requires Python 3.12.13 and `python -m pip install -r games/neighbours/neighbours/native-gm-requirements.txt` before its native checks. Lefthand downloads checksum-pinned Godot tools; its required hosted matrix covers Linux Chromium and macOS WebKit. Preserve the pinned versions when choosing a cloud image.
+Run the preparation command before checks; it installs each game's declared browser runtimes and OS dependencies. On Linux, installation may require the session's package-manager privileges. Neighbours additionally requires Python 3.12.13 and `python -m pip install -r games/neighbours/neighbours/native-gm-requirements.txt` before its native checks. Lefthand requires Python 3.11 or later and downloads checksum-pinned Godot tools; its required hosted matrix covers Linux Chromium and macOS WebKit. Preserve the pinned versions when choosing a cloud image.
 
 `games.json` lists every imported game, original source commit, old origin, save schema, and the single exact HF version. Every game consumes HF from npm. Lab packages are immutable published artifacts or checked-in vendor archives with notices. Original source history remains reachable through unsquashed subtree imports.
 

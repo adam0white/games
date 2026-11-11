@@ -12,7 +12,7 @@ it('reads only this game’s remembered feedback name and leaves old and other k
     await page.evaluate(() => {
       localStorage.setItem('hf-lab-feedback-name', 'legacy');
       localStorage.setItem('glance-hf-lab-feedback-name', 'other game');
-      localStorage.setItem('goodhands-hf-lab-feedback-name', 'own name');
+      localStorage.setItem('hf-lab-feedback-name:goodhands', 'own name');
     });
     await page.getByRole('button', { name: 'Open the office', exact: true }).click();
     await page.getByRole('button', { name: 'Game menu', exact: true }).click();
