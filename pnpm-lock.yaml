@@ -175,6 +175,43 @@ importers:
         specifier: 4.157.0
         version: 4.157.0(@types/node@26.6.6)
 
+  games/child:
+    dependencies:
+      '@adam0white/human-framework':
+        specifier: 4.17.0
+        version: 4.17.0
+      '@adam0white/lab-client':
+        specifier: https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.17/adam0white-lab-client-0.5.17.tgz
+        version: https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.17/adam0white-lab-client-0.5.17.tgz
+      '@adam0white/lab-kit':
+        specifier: https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.34/adam0white-lab-kit-0.5.34.tgz
+        version: https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.34/adam0white-lab-kit-0.5.34.tgz(@adam0white/lab-client@https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.17/adam0white-lab-client-0.5.17.tgz)
+      pixi.js:
+        specifier: 8.22.0
+        version: 8.22.0
+    devDependencies:
+      '@biomejs/biome':
+        specifier: 2.6.5
+        version: 2.6.5
+      '@playwright/test':
+        specifier: 1.64.1
+        version: 1.64.1
+      '@types/node':
+        specifier: 26.6.6
+        version: 26.6.6
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vite:
+        specifier: 8.3.5
+        version: 8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@26.6.6)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+      wrangler:
+        specifier: 4.157.0
+        version: 4.157.0(@types/node@26.6.6)
+
   games/glance:
     dependencies:
       '@adam0white/human-framework':
@@ -337,6 +374,10 @@ packages:
     resolution: {integrity: sha512-/2RM7ZzJu/oNWIowBeHLZGCOwYJHx+9H2VlCmmRCVvejn/Ivq9Xjw71M/Ibv5WRXKhDWB/c5JoFECS2AfJ+b/w==, tarball: https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.16/adam0white-lab-client-0.5.16.tgz}
     version: 0.5.16
 
+  '@adam0white/lab-client@https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.17/adam0white-lab-client-0.5.17.tgz':
+    resolution: {integrity: sha512-a4iOFnLVcM+5/PDm+5n3qG5/YNz5+1oXnWjK3wGlR0NdgvIt9qp7EKTi4rrJBqJSxwdcmRDmC05huOZYM6uj/A==, tarball: https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.17/adam0white-lab-client-0.5.17.tgz}
+    version: 0.5.17
+
   '@adam0white/lab-kit@https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.33/adam0white-lab-kit-0.5.33.tgz':
     resolution: {integrity: sha512-S4bgWWi3OyUGtg9sjY00o3aIxgR9IswLXmtBtjkoiRXTWLrIr0HfVBKdeQX8mGAeNGNwZzLWCQp/pVOgkOQ7cw==, tarball: https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.33/adam0white-lab-kit-0.5.33.tgz}
     version: 0.5.33
@@ -344,6 +385,17 @@ packages:
     hasBin: true
     peerDependencies:
       '@adam0white/lab-client': 0.4.11 || 0.4.12 || 0.4.13 || 0.4.14 || 0.4.15 || 0.5.0 || 0.5.1 || 0.5.2 || 0.5.3 || 0.5.4 || 0.5.5 || 0.5.6 || 0.5.7 || 0.5.8 || 0.5.9 || 0.5.10 || 0.5.11 || 0.5.12 || 0.5.13 || 0.5.14 || 0.5.15 || 0.5.16
+    peerDependenciesMeta:
+      '@adam0white/lab-client':
+        optional: true
+
+  '@adam0white/lab-kit@https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.34/adam0white-lab-kit-0.5.34.tgz':
+    resolution: {integrity: sha512-plE3MeUXZS+ZFl7oyNOGTnvKm2PgwYsGA56UMz/gJcRfkPeC6ldbTwgk3aI7Uh+u2BIl7w4j3T1KftdMCdgUug==, tarball: https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.34/adam0white-lab-kit-0.5.34.tgz}
+    version: 0.5.34
+    engines: {node: '>=24'}
+    hasBin: true
+    peerDependencies:
+      '@adam0white/lab-client': 0.4.11 || 0.4.12 || 0.4.13 || 0.4.14 || 0.4.15 || 0.5.0 || 0.5.1 || 0.5.2 || 0.5.3 || 0.5.4 || 0.5.5 || 0.5.6 || 0.5.7 || 0.5.8 || 0.5.9 || 0.5.10 || 0.5.11 || 0.5.12 || 0.5.13 || 0.5.14 || 0.5.15 || 0.5.16 || 0.5.17
     peerDependenciesMeta:
       '@adam0white/lab-client':
         optional: true
@@ -1047,6 +1099,11 @@ packages:
 
   '@pixi/colord@2.9.6':
     resolution: {integrity: sha512-nezytU2pw587fQstUu1AsJZDVEynjskwOL+kibwcdxsMBFqPsFFNA7xl0ii/gXuDi6M0xj3mfRJj8pBSc2jCfA==}
+
+  '@playwright/test@1.64.1':
+    resolution: {integrity: sha512-IaYGml/nSOiZWROfPtuIL7neuu9qDOZ3TNvNljUIrhDMxiGTgPjzj/g9p9RxpS2tSepPDRY+UwAaEeiKtUvIAg==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   '@poppinss/colors@4.1.6':
     resolution: {integrity: sha512-H9xkIdFswbS8n1d6vmRd8+c10t2Qe+rZITbbDHHkQixH5+2x1FDGmi/0K+WgWiqQFKPSlIYB7jlH6Kpfn6Fleg==}
@@ -1795,9 +1852,18 @@ snapshots:
       '@adam0white/hf-legacy': '@adam0white/human-framework@3.0.0'
       '@adam0white/human-framework': 4.17.0
 
+  '@adam0white/lab-client@https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.17/adam0white-lab-client-0.5.17.tgz':
+    dependencies:
+      '@adam0white/hf-legacy': '@adam0white/human-framework@3.0.0'
+      '@adam0white/human-framework': 4.17.0
+
   '@adam0white/lab-kit@https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.33/adam0white-lab-kit-0.5.33.tgz(@adam0white/lab-client@https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.16/adam0white-lab-client-0.5.16.tgz)':
     optionalDependencies:
       '@adam0white/lab-client': https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.16/adam0white-lab-client-0.5.16.tgz
+
+  '@adam0white/lab-kit@https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.34/adam0white-lab-kit-0.5.34.tgz(@adam0white/lab-client@https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.17/adam0white-lab-client-0.5.17.tgz)':
+    optionalDependencies:
+      '@adam0white/lab-client': https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.17/adam0white-lab-client-0.5.17.tgz
 
   '@biomejs/biome@2.6.5':
     optionalDependencies:
@@ -2218,6 +2284,10 @@ snapshots:
     optional: true
 
   '@pixi/colord@2.9.6': {}
+
+  '@playwright/test@1.64.1':
+    dependencies:
+      playwright: 1.64.1
 
   '@poppinss/colors@4.1.6':
     dependencies:
