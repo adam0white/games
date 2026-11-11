@@ -1,0 +1,233 @@
+/* Width, rather than device identity, controls text and workspace size. */
+:root {
+  font-size: clamp(16px, 14px + 0.35vw, 19px);
+}
+.workshop-shell p,
+.workshop-shell label,
+.workshop-shell .shell-sheet button,
+.workshop-shell .shell-sheet a,
+.workshop-shell .opening-quote,
+.workshop-shell .guide-cue p,
+.workshop-shell .physical-observation,
+.workshop-shell .tool-panel p,
+.workshop-shell .tool-panel label {
+  font-size: clamp(16px, 14px + 0.3vw, 19px);
+  line-height: 1.5;
+}
+.workshop-shell button,
+.workshop-shell select,
+.workshop-shell input,
+.workshop-shell summary {
+  min-height: 44px;
+}
+.workshop-shell .shell-sheet {
+  overflow-y: auto;
+}
+.workshop-shell .shell-sheet .inline-confirm {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--muted);
+}
+.workshop-shell .focused-tools {
+  min-width: 0;
+}
+@media (min-width: 768px) {
+  .workshop-shell .tool-tabs button,
+  .workshop-shell .view-chips button,
+  .workshop-shell .component-picker button,
+  .workshop-shell .device-controls button,
+  .workshop-shell .focused-tools button,
+  .workshop-shell .focused-tools label,
+  .workshop-shell .focused-tools select,
+  .workshop-shell .focused-tools small,
+  .workshop-shell .notes-pane,
+  .workshop-shell .where-when {
+    font-size: clamp(16px, 14px + 0.3vw, 19px);
+  }
+}
+@media (min-width: 901px) {
+  .workshop-shell .focused-object,
+  .workshop-shell.is-guided .focused-object {
+    min-width: 0;
+    flex: 1 1 55%;
+  }
+  .workshop-shell .focused-tools {
+    flex: 0 1 clamp(350px, 38vw, 480px);
+  }
+}
+
+/* Keep the first-visit footer in flow without covering the game's controls. */
+body {
+  display: flex;
+  flex-direction: column;
+}
+#root {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+.workshop-shell {
+  height: 100%;
+}
+.lab-notice-footer {
+  flex: none;
+  display: block;
+  padding: 0;
+}
+.lab-notice-footer:not(:has(.lk-telemetry-notice)) {
+  display: none;
+}
+
+.workshop-shell .physical-observation {
+  position: relative;
+  inset: auto;
+  height: auto;
+  min-height: 1.5em;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  padding: 0 8px;
+}
+
+.workshop-shell .focused-bench .focused-workspace .physical-scene {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
+.workshop-shell .focused-bench .focused-workspace .physical-stage {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  width: 100%;
+}
+.workshop-shell .physical-use-action {
+  position: static;
+  align-self: flex-end;
+  flex-shrink: 0;
+}
+.workshop-shell .physical-observation {
+  flex-shrink: 0;
+}
+
+/* These action-bar selectors override older fixed 11px/9px descendants. */
+.workshop-shell .bench-action-bar .bench-verbs button {
+  font-size: clamp(16px, 14px + 0.3vw, 19px);
+}
+.workshop-shell .bench-action-bar .bench-verbs button small {
+  font-size: clamp(14px, 12px + 0.3vw, 17px);
+}
+/* Keep the complete shared sentence on one line at 360px with system fonts. */
+.lab-notice-footer .lk-telemetry-notice {
+  padding-inline: 2px !important;
+}
+
+/* Show the work performed, without exposing a fault or claiming a successful test. */
+.workshop-shell .component.worked-clean > rect:not(:first-child),
+.workshop-shell .component.worked-replace > rect:not(:first-child) {
+  stroke: #f2dfab;
+  stroke-width: 3px;
+}
+.workshop-shell .component-work-mark {
+  stroke: #f2dfab;
+  fill: #3b493d;
+  stroke-width: 2px;
+  pointer-events: none;
+}
+.workshop-shell .part-work-reading {
+  margin: 8px 12px;
+  color: #f0eedb;
+}
+.workshop-shell .bench-feedback {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 12px;
+}
+.workshop-shell .bench-feedback .focused-result {
+  flex: 1 1 220px;
+  margin: 0;
+}
+.workshop-shell .bench-feedback > button {
+  flex: 1 0 140px;
+  padding: 8px;
+}
+@media (max-width: 900px) {
+  .workshop-shell .focused-tools:has(.pane-repair) .first-repair-guide {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+  }
+  .workshop-shell .focused-tools:has(.pane-repair) .guide-dismiss {
+    display: none;
+  }
+  .workshop-shell .focused-tools:has(.pane-repair) .device-stage > svg {
+    max-height: 160px;
+  }
+}
+.workshop-shell .bench-feedback > button small {
+  display: block;
+  color: inherit;
+  font-size: 14px;
+}
+
+/* Column layout must not inherit the old row-wrap and 100% flex-basis rules. */
+.workshop-shell .focused-bench .focused-workspace .physical-scene {
+  flex-wrap: nowrap;
+}
+.workshop-shell .physical-observation {
+  flex-basis: auto;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Notes use light text on the same dark tool surface as their measurements. */
+.workshop-shell .reading-comparison table,
+.workshop-shell .reading-comparison td,
+.workshop-shell .reading-comparison th,
+.workshop-shell .reading-comparison caption,
+.workshop-shell .reading-comparison small {
+  color: #e2dfd2;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.workshop-shell .reading-comparison td,
+.workshop-shell .reading-comparison th {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+.workshop-shell .reading-comparison td small {
+  display: block;
+  color: #c6d3c7;
+}
+.workshop-shell .replacement-source {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+}
+.workshop-shell .busy-workshop-choice {
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--muted);
+}
+
+.privacy-tools {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+}
+.workshop-debug {
+  font-size: 0.85rem;
+}
+.workshop-debug summary {
+  cursor: pointer;
+}
+.debug-tools {
+  display: grid;
+  gap: 0.5rem;
+  padding-block: 0.5rem;
+}

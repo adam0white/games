@@ -1,0 +1,49 @@
+{
+  "name": "repair-game",
+  "version": "4.3.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "26.12.0"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "node scripts/third-party-notices.mjs && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "build:archives": "node scripts/build-archives.mjs",
+    "test": "node scripts/suite-lock.ts -- vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests vite.config.ts",
+    "format": "biome check --write src tests vite.config.ts",
+    "check": "npm run lint && npm run typecheck && npm test && npm run build",
+    "deploy": "cd ../.. && pnpm run deploy",
+    "deploy:check": "cd ../.. && pnpm run deploy:check",
+    "check:lane": "npm run lint && npm run typecheck",
+    "knip": "knip"
+  },
+  "dependencies": {
+    "@adam0white/human-framework": "4.17.0",
+    "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.16/adam0white-lab-client-0.5.16.tgz",
+    "@adam0white/lab-kit": "https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.33/adam0white-lab-kit-0.5.33.tgz",
+    "@fontsource/dm-sans": "5.3.0",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@fontsource/libre-baskerville": "5.3.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "scheduler": "0.28.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.5",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.2.1",
+    "fake-indexeddb": "6.2.7",
+    "knip": "6.44.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.1.0",
+    "wrangler": "4.157.0"
+  },
+  "packageManager": "pnpm@12.16.1+sha512.091d1dee7927575661b25dab3c2ae31cafc1c54d6b71ed6a6600cf0c1cb10434a447eae14015f1b23e2e6bedeed79df94a932e2164d2832280dce3fb32f656d1"
+}

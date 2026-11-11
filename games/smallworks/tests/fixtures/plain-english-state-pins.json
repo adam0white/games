@@ -1,0 +1,110 @@
+[
+  {
+    "seed": 7,
+    "policy": "repair",
+    "day": 8,
+    "ended": true,
+    "steps": 239,
+    "accepted": 181,
+    "state": "07bfcea7b4c36f6f70dc2db95cdeac86d6f647d7e1e23945381fcd7a66df3284",
+    "people": "e2a97472e2959a71d04e84b99ee56e70c8c8bdde4d900de70c334520242cd11e",
+    "replay": true,
+    "trace": "94f88ad7369c9a06b4a83bf2cdfa24baf3f46b65f0d5026c0474cd5206f39332"
+  },
+  {
+    "seed": 7,
+    "policy": "explore",
+    "day": 8,
+    "ended": true,
+    "steps": 226,
+    "accepted": 184,
+    "state": "2127f9bb4dde5fc6aa35a94ed10c81851bc1b59fb006ac379cdf38a5f3cd03c4",
+    "people": "1f2c8a3cb9dfc7478aa9ea8a1f68377bda2c461871e696a16dc09c30d8e41723",
+    "replay": true,
+    "trace": "d597646e2890ba38828a07c519e8f8abb2740288e3868054eab522f7a826f266"
+  },
+  {
+    "seed": 7,
+    "policy": "mentor",
+    "day": 8,
+    "ended": true,
+    "steps": 292,
+    "accepted": 211,
+    "state": "7c2ecada2b72b5a9be4a6cbbf12b11fee9de950033dbea8e6fad6e97e7806d6c",
+    "people": "fcdb829cc2f5e47b8c0c93fb468d36e417db27e0c71aed1b18ab140cc362ba54",
+    "replay": true,
+    "trace": "01e8ffca508ac2fec21e7e1734a8ef1148a4c02cf2d14d32f6c686cf01438eb5"
+  },
+  {
+    "seed": 42,
+    "policy": "repair",
+    "day": 8,
+    "ended": true,
+    "steps": 239,
+    "accepted": 181,
+    "state": "23be8e8835beadcfa4c8556748e7125fbd8f95e013281f709c678b86a4cb5969",
+    "people": "efef2d14c53f1b612727b537fe6c2b9fe3242bf26f7dcf873b866f6e1dc09d7b",
+    "replay": true,
+    "trace": "b86214065e7259ad9ebf26b5eff00804fb33ad0efd3df2206a94ad779562732f"
+  },
+  {
+    "seed": 42,
+    "policy": "explore",
+    "day": 8,
+    "ended": true,
+    "steps": 208,
+    "accepted": 160,
+    "state": "2a1f1fd8ab2d1a530583b6583d9307ca53eb289856d48611c06e7aeab42a679c",
+    "people": "888dd798cd9cc2eb74dcd568cb3fdceac482f952f02bb9aa9f861b3e65b36579",
+    "replay": true,
+    "trace": "e98c07fcf0c9925e585566784df10ee2b9e3b498898e5f52ae33cedddc4a65f2"
+  },
+  {
+    "seed": 42,
+    "policy": "mentor",
+    "day": 8,
+    "ended": true,
+    "steps": 292,
+    "accepted": 211,
+    "state": "99adfa940bdd379549ece9b0903656f821bfd414c2b06f0209d9983c72192680",
+    "people": "081c6b71f8b3df9e6060d6fc32b469d4fdf644843a64576cba0c5d1c5ab7cf42",
+    "replay": true,
+    "trace": "53d310cb8d121fcf0cc21078ac4b2f5fca52b4605a30a300ceb25cdf8d3de5db"
+  },
+  {
+    "seed": 1001,
+    "policy": "repair",
+    "day": 8,
+    "ended": true,
+    "steps": 239,
+    "accepted": 181,
+    "state": "13a63c3ccb1ff3179a83f9dbcec7bef96db8bf379c2167e40dc67539b4d46563",
+    "people": "ad625a42bbd56f2b401011913f78ef441aea45e640728b8448f9ecc6fb6227c5",
+    "replay": true,
+    "trace": "330b1871e9f200661c20a5b4713736934cf2a91d6d5b9f99bc53ef4c3a6ff849"
+  },
+  {
+    "seed": 1001,
+    "policy": "explore",
+    "day": 8,
+    "ended": true,
+    "steps": 226,
+    "accepted": 184,
+    "state": "ae3bf5f62fde2734be5a3ee11c1330f113b5184e8f25cf2ee4798eaf90097007",
+    "people": "479a792085f5b86715470afcfc5f6c526686413d2d478228c59c500faaae6bcc",
+    "replay": true,
+    "trace": "87e9d5a463756c0a15d4f45d241f06f2e9789f2d0ef343522129f70c49fbf140"
+  },
+  {
+    "seed": 1001,
+    "policy": "mentor",
+    "day": 8,
+    "ended": true,
+    "steps": 292,
+    "accepted": 211,
+    "state": "c62fc6ff704de15bfaa53d1a6d27dfd27a82a0369fc9e2d7892e6c264ac4d5c6",
+    "people": "a615c2d78fd8f2af612d846c8fe888d5152cd2b081dfb2ee3e2e18f8ab17db8c",
+    "replay": true,
+    "trace": "07346275d841ad27f4723d18a0364544e98c853194f3bf72a579aadbd9f6cb90"
+  }
+]
