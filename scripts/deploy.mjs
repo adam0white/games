@@ -2,17 +2,13 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { registry, run, head, clean } from './context.mjs';
-import { checkMainCI, checkRelease } from './lib.mjs';
+import { checkRelease } from './lib.mjs';
+import { checkLatestMainCI } from './deploy-preflight.mjs';
 import { buildEnvironment } from './deploy-env.mjs';
 if (!registry.games.length) throw new Error('Cannot deploy an empty registry');
 if (!clean()) throw new Error('Deploy requires clean source');
 const commit = head();
-const remoteHead = () => run('git', ['ls-remote', 'origin', 'refs/heads/main']).split(/\s/)[0];
-const runs = JSON.parse(run('gh', ['api', `repos/{owner}/{repo}/actions/workflows/ci.yml/runs?head_sha=${commit}&event=push&per_page=100`])).workflow_runs;
-const latest = runs[0];
-if (!latest) throw new Error('No CI run');
-const pages = JSON.parse(run('gh', ['api', '--paginate', '--slurp', `repos/{owner}/{repo}/actions/runs/${latest.id}/jobs?per_page=100`]));
-checkMainCI(commit, remoteHead(), [latest], pages.flatMap(p => p.jobs));
+checkLatestMainCI(commit, run);
 const temporary = mkdtempSync(join(tmpdir(), 'games-release-'));
 const checkout = join(temporary, 'source');
 let added = false;
@@ -22,9 +18,9 @@ try {
   const opts = { cwd: checkout, stdio: 'inherit', env: buildEnvironment(process.env) };
   run('pnpm', ['install', '--frozen-lockfile'], opts);
   run('node', ['scripts/build.mjs'], opts);
-  if (remoteHead() !== commit) throw new Error('main advanced during build');
   // Repeat the live preflight immediately before upload, after the full build.
   run('node', ['scripts/check-redirects.mjs'], opts);
+  checkLatestMainCI(commit, run);
   run('pnpm', ['exec', 'wrangler', 'deploy'], { ...opts, env: process.env });
   for (const game of registry.games) {
     const expected = JSON.parse(readFileSync(join(checkout, 'dist', game.slug, 'release.json'), 'utf8'));
