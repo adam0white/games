@@ -20,8 +20,13 @@ test("published lab client requests scoped release metadata", async ({ page, bas
     const response = await route.fetch({ url: `${baseURL}${url.pathname}${url.search}` });
     return route.fulfill({ response });
   });
-  await page.goto("https://play.adamwhite.work/days/");
-  await expect(page.getByRole("button", { name: "Menu", exact: true })).toBeEnabled();
-  await expect.poll(() => manifests.length).toBeGreaterThan(0);
-  expect(manifests).toEqual(["/days/release.json"]);
+  try {
+    await page.goto("https://play.adamwhite.work/days/");
+    await expect(page.getByRole("button", { name: "Menu", exact: true })).toBeEnabled();
+    await expect.poll(() => manifests.length).toBeGreaterThan(0);
+    expect(manifests).toEqual(["/days/release.json"]);
+  } finally {
+    // Finish in-flight fetch/fulfill handlers before Playwright disposes their responses.
+    await page.unrouteAll({ behavior: "wait" });
+  }
 });
