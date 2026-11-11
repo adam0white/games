@@ -2,7 +2,7 @@ import { FEEDBACK_LABELS, type FeedbackLabel, type Lab, PRIVACY_URL } from '@ada
 import { feedbackPersonaControl, feedbackSharePlay } from '@adam0white/lab-kit';
 import './feedback.css';
 
-const NAME_KEY = 'hf-lab-feedback-name';
+const NAME_KEY = 'pass-lab-feedback-name';
 const readLocal = (key: string) => {
   try {
     return localStorage.getItem(key) ?? '';

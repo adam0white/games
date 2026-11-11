@@ -10,7 +10,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "stamp-release && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",
@@ -18,7 +18,7 @@
     "format": "biome format --write .",
     "measure": "node scripts/measure.ts",
     "check": "npm run lint && npm run typecheck && npm test",
-    "deploy": "npm run check:lane && npm run build && wrangler deploy",
+    "deploy": "cd ../.. && pnpm run deploy",
     "test:ui": "playwright test",
     "check:lane": "npm run lint && npm run typecheck"
   },

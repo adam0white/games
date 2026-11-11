@@ -693,7 +693,7 @@ export async function start() {
   cast.track();
   cast.startWatching();
   if ('serviceWorker' in navigator && location.hostname !== 'localhost')
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/pass/sw.js', { scope: '/pass/' }).catch(() => {});
   title();
 }
 
