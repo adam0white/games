@@ -101,11 +101,11 @@ for (const viewport of [
             const dynamicImport = new Function('path', 'return import(path)') as (
               path: string,
             ) => Promise<any>;
-            const { cloneState, fingerprint } = await dynamicImport('/src/sim/game.ts');
-            const { readSourceArchive } = await dynamicImport('/src/ui/source-archive.ts');
-            const { castDigest } = await dynamicImport('/src/sim/cast-source.ts');
-            const { saveCastPerson } = await dynamicImport('/src/ui/cast-chapter.ts');
-            const { shelf } = await dynamicImport('/src/ui/continuity.ts');
+            const { cloneState, fingerprint } = await dynamicImport('/murmur/src/sim/game.ts');
+            const { readSourceArchive } = await dynamicImport('/murmur/src/ui/source-archive.ts');
+            const { castDigest } = await dynamicImport('/murmur/src/sim/cast-source.ts');
+            const { saveCastPerson } = await dynamicImport('/murmur/src/ui/cast-chapter.ts');
+            const { shelf } = await dynamicImport('/murmur/src/ui/continuity.ts');
             const emit = (stage: string) =>
               (
                 window as unknown as { __fullProofProgress: (stage: string) => Promise<void> }

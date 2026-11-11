@@ -12,10 +12,10 @@ it('commits one complete browser source value and preserves it after a real tran
     const result = await page.evaluate(async () => {
       // Native browser import must survive Vitest's server-side callback transform.
       const load = new Function('path', 'return import(path)') as (path: string) => Promise<any>;
-      const { newGame, cloneState } = await load('/src/sim/game.ts');
-      const { compactNotebook } = await load('/src/ui/notebook.ts');
-      const { storeSourceArchive, readSourceArchive } = await load('/src/ui/source-archive.ts');
-      const { castDigest } = await load('/src/sim/cast-source.ts');
+      const { newGame, cloneState } = await load('/murmur/src/sim/game.ts');
+      const { compactNotebook } = await load('/murmur/src/ui/notebook.ts');
+      const { storeSourceArchive, readSourceArchive } = await load('/murmur/src/ui/source-archive.ts');
+      const { castDigest } = await load('/murmur/src/sim/cast-source.ts');
       const notebook = { state: cloneState(newGame(17)) };
       const compact = await compactNotebook(notebook);
       const receipt = await storeSourceArchive('atomic-fixture', compact);

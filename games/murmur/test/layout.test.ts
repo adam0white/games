@@ -83,7 +83,7 @@ for (const mode of ['linked', 'off', 'privacy'] as const) {
       }, mode);
       await page.goto(`${url}`);
       await page.evaluate(async () => {
-        const path = '/src/ui/lab.ts';
+        const path = '/murmur/src/ui/lab.ts';
         const { lab } = await new Function('path', 'return import(path)')(path);
         const calls: unknown[] = [];
         Object.assign(window, { feedbackCalls: calls });
