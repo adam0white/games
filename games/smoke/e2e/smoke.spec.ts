@@ -28,7 +28,7 @@ declare global {
 test('speech is contextual, all events persist, and pause has navigation', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  const response = await page.goto('/?seed=1');
+  const response = await page.goto('/smoke/?seed=1');
   expect(response?.headers()['content-security-policy']).toContain("script-src 'self'");
   await page.getByRole('button', { name: 'Enter the stairwell' }).click();
   await expect(page.locator('canvas')).toBeVisible();
@@ -98,7 +98,7 @@ test('keyboard climbs, export replays and a complete loss names the outcome', as
   test.setTimeout(60000);
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
-  await page.goto('/?seed=4');
+  await page.goto('/smoke/?seed=4');
   await expect(page.getByText('People left inside may die.')).toBeVisible();
   await page.getByRole('button', { name: 'Enter the stairwell' }).click();
   await page.keyboard.down('ArrowUp');
@@ -192,7 +192,7 @@ test('keyboard climbs, export replays and a complete loss names the outcome', as
 });
 
 test('WebGL loss pauses with a recovery and export', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/smoke/');
   await page.getByRole('button', { name: 'Enter the stairwell' }).click();
   await page.locator('canvas').dispatchEvent('webglcontextlost');
   await expect(page.getByRole('heading', { name: 'The picture was interrupted.' })).toBeVisible();
@@ -204,7 +204,7 @@ test('Chromium frame CPU stays below16ms at fourfold slowdown', async ({ page, b
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   // Match the profiled workload: seed 4 has all four residents at home.
-  await page.goto('/?seed=4');
+  await page.goto('/smoke/?seed=4');
   await page.getByRole('button', { name: 'Enter the stairwell' }).click();
   await page.waitForTimeout(2500);
   const times = await page.evaluate(() =>
@@ -243,7 +243,7 @@ test('Chromium frame CPU stays below16ms at fourfold slowdown', async ({ page, b
 });
 
 test('screen teaches an escort and exposes smoke timing in words', async ({ page }) => {
-  await page.goto('/?seed=1');
+  await page.goto('/smoke/?seed=1');
   await page.getByRole('button', { name: 'Enter the stairwell' }).click();
   await expect(page.locator('#smoke-clock')).toContainText(/smoke.*in.*Stair closes in/);
   await expect(page.locator('#guidance')).toContainText('approach');
@@ -279,7 +279,7 @@ for (const leaveDerya of [false, true]) {
       : 'cold policy wins using rendered text and enabled controls only',
     async ({ page }) => {
       test.setTimeout(60000);
-      await page.goto('/?seed=4');
+      await page.goto('/smoke/?seed=4');
       await page.getByRole('button', { name: 'Enter the stairwell' }).click();
       for (let second = 0; second < 160; second++) {
         if (await page.getByRole('heading', { name: /Everyone is out|walked out with you/ }).isVisible())
@@ -352,7 +352,7 @@ for (const leaveDerya of [false, true]) {
 }
 
 test('worker batches export the exact direct-core replay and reset starts fresh', async ({ page }) => {
-  await page.goto('/?seed=4');
+  await page.goto('/smoke/?seed=4');
   await expect(page.getByRole('button', { name: 'Enter the stairwell' })).toBeVisible();
   // Leave the welcome dialog open: manual ticks have no wall-clock ticks mixed in.
   await page.evaluate(async () => {
@@ -388,7 +388,7 @@ test.describe('a landing tap', () => {
   test('walks the caretaker there, says so, and a second tap retargets without resetting progress', async ({
     page,
   }, info) => {
-    await page.goto('/?seed=1');
+    await page.goto('/smoke/?seed=1');
     await page.getByRole('button', { name: 'Enter the stairwell' }).click();
     const canvas = page.locator('canvas');
     const box = (await canvas.boundingBox())!;

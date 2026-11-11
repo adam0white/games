@@ -4,11 +4,11 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   timeout: 30000,
-  use: { baseURL: 'http://127.0.0.1:4177', trace: 'retain-on-failure' },
+  use: { baseURL: 'http://127.0.0.1:5283', trace: 'retain-on-failure' },
   webServer: {
-    command: 'pnpm build && pnpm preview --port 4177',
-    url: 'http://127.0.0.1:4177',
-    reuseExistingServer: !process.env.CI,
+    command: 'pnpm build && pnpm preview --port 5283 --strictPort',
+    url: 'http://127.0.0.1:5283',
+    reuseExistingServer: false,
   },
   projects: [
     { name: 'chromium-phone', use: { browserName: 'chromium', viewport: { width: 360, height: 690 } } },

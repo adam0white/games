@@ -35,7 +35,7 @@ with the same seed. **Watch this run** plays back the completed run.
 
 ## People and rescue rules
 
-[Human Framework](https://human.adamwhite.work) **4.8.0** supplies each person's
+[Human Framework](https://human.adamwhite.work) **4.17.0** supplies each person's
 state, needs, decisions, trust in your voice, and assent or refusal of requests.
 Smoke supplies the offered choices and their conditions, the words shown,
 movement, smoke, torchlight, time and breath limits, and rescue outcomes.
@@ -86,3 +86,5 @@ pnpm dev
 Run `pnpm check:lane` before committing. `pnpm build` builds the site;
 `pnpm e2e` runs browser checks. See [the design](docs/design.md) for scope.
 Code is MIT licensed.
+
+This game is part of the games monorepo. Use the root workspace and deployment workflow.

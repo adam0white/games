@@ -23,7 +23,7 @@ async function visibleTogether(cue: Locator, target: Locator) {
 }
 
 test('tutorial follows real choices and can be skipped and replayed', async ({ page }) => {
-  await page.goto('/?seed=1');
+  await page.goto('/smoke/?seed=1');
   await page.locator('#start').click();
   const cue = page.locator('#tutorial');
   const resident = page.locator('.people button:not(:disabled)').first();
@@ -58,7 +58,7 @@ test('tutorial follows real choices and can be skipped and replayed', async ({ p
 });
 
 test('interrupting the guide does not reset the run or strand another selection', async ({ page }) => {
-  await page.goto('/?seed=1');
+  await page.goto('/smoke/?seed=1');
   await page.locator('#start').click();
   await page.locator('[data-id="sevim"]').click();
   await expect(page.locator('#tutorial')).toContainText('near');
@@ -75,7 +75,7 @@ test('interrupting the guide does not reset the run or strand another selection'
 });
 
 test('a speech click immediately acknowledges that its request is queued', async ({ page }) => {
-  await page.goto('/?seed=1');
+  await page.goto('/smoke/?seed=1');
   await page.locator('#start').click();
   await page.locator('[data-id="sevim"]').click();
   await expect(page.locator('[data-action="books"]')).toBeEnabled({ timeout: 30000 });
@@ -88,7 +88,7 @@ test('a speech click immediately acknowledges that its request is queued', async
 });
 
 test('a repeated request keeps the actual reply visible after it is checked', async ({ page }) => {
-  await page.goto('/?seed=1');
+  await page.goto('/smoke/?seed=1');
   await page.locator('#start').click();
   await page.locator('[data-id="sevim"]').click();
   const action = page.locator('[data-action="come"]');
