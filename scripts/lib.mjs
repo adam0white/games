@@ -37,11 +37,28 @@ export function assertFrameworkGraph(packages, version) {
   const matches = packages.filter(p => /^@adam0white\/human-framework(?:$|-)/.test(p.name));
   if (!matches.some(p => p.name === '@adam0white/human-framework' && p.version === version) || matches.some(p => p.name !== '@adam0white/human-framework' || p.version !== version)) throw new Error('Installed HF graph has an incompatible version or alias');
 }
-export function manifest(registry, game, commit, dirty, labVersion, app) {
+export function packageReleaseMetadata(pkg, read) {
+  if (pkg.releaseMetadata === undefined) return undefined;
+  if (pkg.releaseMetadata !== 'release-metadata.json') throw new Error('Invalid release metadata path');
+  const metadata = read(pkg.releaseMetadata);
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata) ||
+      Object.keys(metadata).sort().join(',') !== 'app,concordiaUpstream,pyodide,pythonBundle,runtime' ||
+      typeof metadata.app !== 'string' || !metadata.app ||
+      !sha.test(metadata.concordiaUpstream ?? '') || !/^[0-9a-f]{64}$/.test(metadata.pythonBundle ?? '') ||
+      !/^\d+\.\d+\.\d+$/.test(metadata.pyodide ?? '') ||
+      typeof metadata.runtime !== 'string' || !metadata.runtime) throw new Error('Invalid release metadata');
+  return metadata;
+}
+export function manifest(registry, game, commit, dirty, labVersion, app, metadata) {
   validateRegistry(registry);
   const validLab = game.kind === 'recorded-viewer' ? labVersion === null : typeof labVersion === 'string' && /^\d+\.\d+\.\d+$/.test(labVersion);
   if (!sha.test(commit) || dirty || !registry.games.some(g => g.slug === game.slug) || !validLab || !app) throw new Error('Refusing unclean or invalid release');
-  return { game: game.slug, commit, dirty: false, source: game.source, hfVersion: registry.hfVersion, framework: registry.hfVersion, app, frameworkLibrary: registry.hfVersion, labVersion, saveSchema: game.saveSchema };
+  const release = { game: game.slug, commit, dirty: false, source: game.source, hfVersion: registry.hfVersion, framework: registry.hfVersion, app, frameworkLibrary: registry.hfVersion, labVersion, saveSchema: game.saveSchema };
+  if (metadata !== undefined) {
+    const checked = packageReleaseMetadata({ releaseMetadata: 'release-metadata.json' }, () => metadata);
+    return { ...release, ...checked, hf: registry.hfVersion };
+  }
+  return release;
 }
 function scope(slug, path) {
   if (!/^\/(?!\/)[^\s?#]*$/.test(path) || /(?:\.\.|%|\\)/.test(path)) throw new Error('Unsafe rule path');

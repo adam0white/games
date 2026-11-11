@@ -1,0 +1,28 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.6.5/schema.json",
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"indentWidth": 2
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"preset": "recommended"
+		}
+	},
+	"assist": {
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	},
+	"root": true,
+	"overrides": [
+		{
+			"includes": ["tests/fixtures/pass-rafi-453be903.json"],
+			"formatter": { "enabled": false }
+		}
+	]
+}
