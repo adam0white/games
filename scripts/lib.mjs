@@ -7,6 +7,7 @@ export function validateRegistry(registry) {
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(game.slug) || seen.has(game.slug)) throw new Error('Invalid or duplicate slug');
     if (!/^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(game.source?.repository ?? '') || !sha.test(game.source?.commit ?? '')) throw new Error('Invalid source lineage');
     if (!game.saveSchema || typeof game.saveSchema !== 'string') throw new Error('Missing save schema');
+    if (game.redirectMode !== undefined && !['worker', 'zone'].includes(game.redirectMode)) throw new Error('Invalid redirect mode');
     if (game.redirectEnabled !== undefined && typeof game.redirectEnabled !== 'boolean') throw new Error('Invalid redirect flag');
     if (game.verifiedRelease !== undefined && (typeof game.verifiedRelease !== 'string' || !sha.test(game.verifiedRelease))) throw new Error('Invalid verified release commit');
     if (game.redirectEnabled === true && (!game.legacyOrigin || !sha.test(game.verifiedRelease ?? ''))) throw new Error('Redirect activation requires an origin and verified release commit');

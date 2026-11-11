@@ -64,3 +64,10 @@ test('tombstone unregisters and navigates every matching window despite one fail
     'https://play.adamwhite.work/rope//evil.example/x',
   ]);
 });
+
+test('zone-managed aliases stay outside Worker host handling', async () => {
+  const managed = createHandler([{ ...games[0], redirectMode: 'zone' }]);
+  assert.equal((await managed.fetch(new Request('https://rope.adamwhite.work/experiments/'), assets)).status, 404);
+  assert.equal((await managed.fetch(new Request('https://rope.adamwhite.work/'), assets)).status, 404);
+  assert.throws(() => validateRegistry({ hfVersion: '4.17.0', games: [{ ...games[0], redirectMode: 'unknown' }] }), /mode/i);
+});

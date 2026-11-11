@@ -29,3 +29,16 @@ Observed local installed scheduler: `work.adamwhite.lab-wai-play` runs daily at 
 The current HF publish workflows already exist. HF production-site deployment still uses a guarded CLI script; add an analogous green-main Actions deployment if cloud operation of the central site is desired. Keep its Lab R2 bindings, identity allowlists and privacy gates intact. Games asset deployment does not migrate central telemetry, budget state, or the scheduler.
 
 References: [Cloudflare Actions](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/), [GitHub workflow_run](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run).
+
+| Location | Mac/local assumption | Cloud replacement |
+| --- | --- | --- |
+| `apps/site/scripts/watch-phone-layout.ts:23,27` | Absolute Playwright import from an unrelated scratch checkout; phone artifacts under home/code scratch | Import declared Playwright package; write test-owned output to a configurable runner artifact directory. |
+| `packages/playtester/adapters/{pass,glance,voices,warren}.ts` and examples | Default game source checkouts under home/code; environment variables can override | Point `PASS_DIR`, `GLANCE_DIR`, `MURMUR_DIR`, `WARREN_DIR`, `SMALLWORKS_DIR` and `NEIGHBOURS_DIR` at the monorepo subdirectories in a cloud checkout. Record source SHA. Qualify each adapter against the current game's edition instead of assuming old adapters work. |
+| `packages/playtester/README.md` | Old instructions symlink node_modules from local repo and read historical refs in that repo | Use isolated immutable source worktrees or repository archives and frozen installs; never borrow a Mac sibling dependency tree. |
+| Root README | Homebrew PATH guidance | Add portable pinned Node/pnpm setup alongside optional Mac guidance. |
+| `packages/lab-kit/test/lab-inbox.test.ts:179` | Budget test directory under a mocked home/code scratch location | Use test-owned temporary directories and explicit cleanup. |
+| Curated historical Lab records and voice blocker notes | Local artifact links and old absolute extraction paths | Preserve provenance; upload approved artifacts to durable private storage, store stable receipt identifiers and export hashes. Do not erase original notes merely because they contain a local path. |
+
+The installed Mac scheduler and its persistent budget/admission state are documented separately. Current local Git signing uses SSH format; no key was read. A cloud session must supply signing that satisfies branch protection without depending on this Mac's key paths. The presence of local signing configuration does not prove a chosen cloud provider already supports it.
+
+Small Works retains the old Repair experiments archive on its existing origin. Its eventual redirect uses a selective zone rule, excluding `/experiments` and descendants. Set `redirectMode: "zone"` only with a directly verified release; the same live-release gate applies, but the asset Worker must not claim that host. The zone rule and retained archive need independent live checks. All other aliases use exact Worker host routes, including their old service-worker retirement response.

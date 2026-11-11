@@ -6,7 +6,7 @@ const SHELF = 'https://human.adamwhite.work/games/';
 
 export function createHandler(games) {
   validateRegistry({ hfVersion: '0.0.0', games });
-  const legacy = new Map(games.filter(game => game.redirectEnabled === true && game.legacyOrigin).map(game => [game.legacyOrigin, game.slug]));
+  const legacy = new Map(games.filter(game => game.redirectEnabled === true && game.redirectMode !== 'zone' && game.legacyOrigin).map(game => [game.legacyOrigin, game.slug]));
   return {
     async fetch(request, env) {
       const url = new URL(request.url);

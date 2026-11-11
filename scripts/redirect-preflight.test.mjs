@@ -127,3 +127,13 @@ test('historical release reads exact public SDK pins and rejects ambiguous URLs'
   assert.equal(release(url).labVersion, '0.5.16');
   for (const invalid of [url.replace('github.com', 'example.com'), url.replace('/lab-client-v0.5.16/', '/lab-client-v0.5.15/'), `${url}?download=1`, url.replace('https:', 'http:')]) assert.throws(() => release(invalid), /artifact/i);
 });
+
+test('zone redirects require live evidence but cannot claim a Worker host route', async t => {
+  const f = fixture(t);
+  f.game.redirectMode = 'zone'; f.setHead(f.commit());
+  await verifyRedirects({ ...f.args(), routes: routes.slice(0, 1) });
+  assert.equal(f.fetches.length, 1);
+  await assert.rejects(verifyRedirects(f.args()), /route/i);
+  f.live.dirty = true;
+  await assert.rejects(verifyRedirects({ ...f.args(), routes: routes.slice(0, 1) }), /clean/i);
+});
