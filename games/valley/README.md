@@ -8,8 +8,8 @@ The episode ends before the harvest is settled. It does not simulate the followi
 
 ## Run and verify
 
-Use Node26.12.0 and pnpm12.16.1. Install with `pnpm install --frozen-lockfile`; run `pnpm dev`, `pnpm check:lane` and `pnpm build`. Current episode tests are under `test/episode/`; prior tests retain their bytes as `*.test.ts.historical`.
+From the [games workspace root](../../README.md), install with `pnpm install --frozen-lockfile`. Run `pnpm --filter ./games/valley dev`, `pnpm --filter ./games/valley check:lane` and root `pnpm check:lane`. The root builds and deploys the complete games bundle. The Valley path is `/valley/`; the separate file session is `/valley/file/`. Current episode tests are under `test/episode/`; prior tests retain their bytes as `*.test.ts.historical`.
 
-The [first-morning guide record](docs/playtests/2026-11-05-clarity.md) documents the scripted opening and synthetic skim. With a local server running, set `FIRST_MINUTE_URL` and run `node scripts/first-minute.mjs` for phone/desktop request/reply controls, or `node scripts/guide-preservation.mjs` for reload, denied preference storage and file isolation.
+The [first-morning guide record](docs/playtests/2026-11-05-clarity.md) documents the scripted opening and synthetic skim. With a local server running, set `FIRST_MINUTE_URL` to the server origin followed by `/valley` and run `node scripts/first-minute.mjs` for phone/desktop request/reply controls, or `node scripts/guide-preservation.mjs` for reload, denied preference storage and file isolation.
 
 The [older continuous-term description](docs/continuous-term-readme-historical.md) is historical. Winter loans, quarry journeys, later harvests and the three-year gathering are outside this edition.

@@ -49,6 +49,16 @@
       ],
       "legacyOrigin": "https://glance.adamwhite.work",
       "redirectEnabled": false
+    },
+    {
+      "slug": "valley",
+      "source": {
+        "repository": "https://github.com/adam0white/valley",
+        "commit": "f30f3f2391b2d677e0b5950fdb6ec96dac911aed"
+      },
+      "saveSchema": "valley-opening-2026-11",
+      "legacyOrigin": "https://valley.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }

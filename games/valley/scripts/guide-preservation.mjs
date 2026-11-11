@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium, webkit } from 'playwright-core';
 
-const base = process.env.FIRST_MINUTE_URL ?? 'http://127.0.0.1:52310';
+const base = (process.env.FIRST_MINUTE_URL ?? 'http://127.0.0.1:52310/valley').replace(/\/$/, '');
 const output = process.env.FIRST_MINUTE_OUTPUT ?? '/tmp/valley-guide-preservation';
 const preference = 'valley-first-morning-guide-v1';
 mkdirSync(output, { recursive: true });
@@ -25,11 +25,13 @@ for (const [name, engine] of [
       const set = Storage.prototype.setItem;
       window.guidePreferenceAccess = { reads: 0, writes: 0 };
       Storage.prototype.getItem = function (item) {
-        if (location.pathname.startsWith('/file') && item === key) window.guidePreferenceAccess.reads++;
+        if (location.pathname.startsWith('/valley/file') && item === key)
+          window.guidePreferenceAccess.reads++;
         return get.call(this, item);
       };
       Storage.prototype.setItem = function (item, value) {
-        if (location.pathname.startsWith('/file') && item === key) window.guidePreferenceAccess.writes++;
+        if (location.pathname.startsWith('/valley/file') && item === key)
+          window.guidePreferenceAccess.writes++;
         return set.call(this, item, value);
       };
     }, preference);
@@ -37,7 +39,7 @@ for (const [name, engine] of [
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     try {
-      await page.goto(base);
+      await page.goto(`${base}/`);
       await page.locator('[data-go="new"]').click();
       await page.locator('#morning-guide').waitFor({ state: 'visible', timeout: 30000 });
       await page.locator('#houses .morning-target').click();
@@ -115,7 +117,7 @@ for (const [name, engine] of [
       const page = await blocked.newPage();
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
-      await page.goto(base);
+      await page.goto(`${base}/`);
       await page.locator('[data-go="new"]').click();
       await page.locator('#morning-guide').waitFor({ state: 'visible', timeout: 30000 });
       await page.locator('[data-guide-skip]').click();

@@ -2,5 +2,7 @@
 export function fileEntry(search: string, pathname = '/'): 'native' | 'file' | 'invalid' {
   const values = new URLSearchParams(search).getAll('file');
   if (values.length > 1 || (values.length === 1 && values[0] !== '1')) return 'invalid';
-  return values.length === 1 || pathname === '/file/' || pathname === '/file' ? 'file' : 'native';
+  return values.length === 1 || pathname === '/valley/file/' || pathname === '/valley/file'
+    ? 'file'
+    : 'native';
 }

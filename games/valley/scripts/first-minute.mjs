@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { chromium, webkit } from 'playwright-core';
 
-const base = process.env.FIRST_MINUTE_URL ?? 'http://127.0.0.1:52310';
+const base = (process.env.FIRST_MINUTE_URL ?? 'http://127.0.0.1:52310/valley').replace(/\/$/, '');
 const output = process.env.FIRST_MINUTE_OUTPUT ?? '/tmp/valley-first-minute';
 mkdirSync(output, { recursive: true });
 const receipts = [];
@@ -69,7 +69,7 @@ for (const [name, engine] of [
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));
       try {
-        await page.goto(base);
+        await page.goto(`${base}/`);
         await page.locator('[data-go="new"]').click();
         const cue = page.locator('#morning-guide');
         await cue.waitFor({ state: 'visible', timeout: 30000 });

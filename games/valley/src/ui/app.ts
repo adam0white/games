@@ -713,7 +713,7 @@ async function reopen(log: Log, onProgress: (m: number) => void): Promise<Game> 
 
 export function start() {
   if (entryMode === 'invalid') {
-    app.textContent = 'This file address is invalid. Use /file/ to choose a saved file.';
+    app.textContent = 'This file address is invalid. Use /valley/file/ to choose a saved file.';
     return;
   }
   lab.trackRun(
@@ -786,7 +786,7 @@ export function start() {
     },
   });
   if (!FOREIGN_FILE && 'serviceWorker' in navigator && location.hostname !== 'localhost')
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/valley/sw.js', { scope: '/valley/' }).catch(() => {});
   title();
 }
 
