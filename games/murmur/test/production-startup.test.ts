@@ -76,9 +76,9 @@ it('sends complete in-progress native notebooks through automatic recording and 
     }[] = [];
     const recordListeners = new Set<() => void>();
     // A reserved synthetic HTTPS origin makes normal recording eligible without changing the client.
-    await context.route('https://murmur.fixture/**', async (route) => {
+    await context.route('https://play.adamwhite.work/**', async (route) => {
       const url = new URL(route.request().url());
-      const response = await route.fetch({ url: `${origin}${url.pathname}${url.search}` });
+      const response = await route.fetch({ url: new URL(`${url.pathname}${url.search}`, origin).href });
       await route.fulfill({ response });
     });
     await context.route('https://human.adamwhite.work/**', async (route) => {
@@ -106,7 +106,7 @@ it('sends complete in-progress native notebooks through automatic recording and 
     await page.clock.install();
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    await page.goto('https://murmur.fixture/');
+    await page.goto('https://play.adamwhite.work/murmur/');
     await page.evaluate(async () => {
       await window.__murmur.ready;
       window.__murmur.fast = true;
