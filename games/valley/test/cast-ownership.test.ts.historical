@@ -1,0 +1,530 @@
+import { createPerson, createRun, exportRun, inspect } from '@adam0white/human-framework';
+import {
+  acceptPersona,
+  acceptPersonaBatch,
+  canonicalCast,
+  canonicalPersona,
+  createPersona,
+  initialPersonaLife,
+  type PersonaEnvelope,
+  type PersonaRequest,
+  type PersonaShelfState,
+  portablePersonOwner,
+  portablePersonRole,
+  preparePersonaLife,
+  validatePersona,
+} from '@adam0white/lab-client';
+import { expect, it } from 'vitest';
+import { ALLOCATION } from '../src/sim/cast.ts';
+import { PUBLIC_EDITION } from '../src/sim/edition.ts';
+import { CastSession, type Shelf } from '../src/ui/cast-session.ts';
+import { authoredPerson, exampleSpec, MINUTE, need, START } from './hf-fixture.ts';
+import { required } from './required.ts';
+
+async function source() {
+  const cast = canonicalCast('hf.cast.yusuf.well');
+  const spec = exampleSpec();
+  spec.host.id = 'lefthand';
+  spec.definitions.sources = spec.definitions.sources.map((s) =>
+    s.type === 'host' ? { ...s, id: 'lefthand' } : s,
+  );
+  const run = need(createRun(spec));
+  const person = authoredPerson('yusuf', 'Yusuf', 'male');
+  person.identity.castId = cast.castId;
+  person.biography = [
+    {
+      id: 'e1',
+      at: START - MINUTE,
+      kind: 'observation',
+      valence: 0,
+      salience: 0.5,
+      summary: 'Yusuf watched the source work.',
+      tags: [],
+      basis: { kind: 'authored', author: 'lefthand' },
+      provenance: ['lefthand'],
+    },
+  ];
+  person.state.sourceTrust = [{ sourceId: 'player', trust: 0.6 }];
+  need(createPerson(run, person));
+  const projected = need(
+    inspect(run, {
+      perspective: { kind: 'host' },
+      people: ['yusuf'],
+      select: ['persona'],
+      portable: { person: 'yusuf', castId: cast.castId, castRevision: cast.revision },
+    }),
+  );
+  const portable = projected.people[0]?.parts.find((p) => p.select === 'persona')?.value;
+  return createPersona({
+    format: 'hf-persona/1',
+    castId: cast.castId,
+    castRevision: cast.revision,
+    branchId: 'valley-arrival-control',
+    parentRevision: null,
+    source: { game: 'lefthand', build: 'test', engine: '4.15.1', rules: 'test' },
+    transfer: {
+      castPassport: 'hf-portable-person/2',
+      portable,
+      life: initialPersonaLife(cast.castId, 'valley-arrival-control', 0),
+    },
+    limitations: [],
+  });
+}
+const lab = () => ({
+  setPersonaRecording() {},
+  allowPersonaRecording() {},
+  personaRecordingAllowed: false,
+  build() {
+    return {};
+  },
+});
+function shelfFor(parent: PersonaEnvelope, conflict = false) {
+  let state: PersonaShelfState = acceptPersona({ revisions: [], heads: {} }, parent);
+  let writes = 0;
+  const shelf: Shelf = {
+    ready: Promise.resolve(true),
+    enabled: true,
+    setEnabled() {},
+    async request<T>(request: PersonaRequest): Promise<T> {
+      if (request.action === 'prepareBatch')
+        return {
+          expectedHeads: Object.fromEntries(ALLOCATION.map((p) => [p.castId, state.heads[p.castId] ?? null])),
+          inputs: [preparePersonaLife(parent, 0)],
+          blocked: [],
+        } as T;
+      if (request.action === 'put') {
+        writes++;
+        throw new Error('Unexpected shared write');
+      }
+      if (request.action === 'putBatch') {
+        writes++;
+        if (conflict) throw new Error('The source head changed.');
+        state = acceptPersonaBatch(state, request.envelopes ?? [], request.expectedHeads);
+        return true as T;
+      }
+      throw new Error(`Unexpected shelf request ${request.action}`);
+    },
+  };
+  return { shelf, writes: () => writes, state: () => state };
+}
+it('refuses nonempty arrival writes without replacing the current game', async () => {
+  const parent = await source();
+  const fixture = shelfFor(parent);
+  const session = new CastSession(lab(), fixture.shelf);
+  const previous = await session.fresh(6, true, PUBLIC_EDITION);
+  await expect(session.fresh(7, false, PUBLIC_EDITION)).rejects.toThrow('Yusuf: read-only until');
+  expect(fixture.writes()).toBe(0);
+  expect(session.game).toBe(previous);
+  expect(fixture.state().heads[parent.castId]).toBe(parent.revision);
+});
+
+it('refuses alternative shared writes for the named blocked person', async () => {
+  const parent = await source();
+  const fixture = shelfFor(parent);
+  const session = new CastSession(lab(), fixture.shelf);
+  await session.fresh(7, true, PUBLIC_EDITION);
+  session.heads[parent.castId] = parent;
+  await session.alternative(parent.castId);
+  expect(session.status).toContain('Yusuf: read-only until');
+  expect(fixture.writes()).toBe(0);
+});
+
+it('blocks the terminal write for a genuinely deceased HF person', async () => {
+  const { bridgeAt, bridgeInput, createCommunity, createPerson, serve } = await import('../src/sim/hf.ts');
+  const { frozenPerson, personRun } = await import('../src/sim/hf-person.ts');
+  const { newGame } = await import('../src/sim/game.ts');
+  const dead = createPerson({ id: 'yusuf', name: 'Yusuf', seed: 1, now: 0, bornAt: -10000000, sex: 'male' });
+  const listener = createPerson({
+    id: 'listener',
+    name: 'Listener',
+    seed: 2,
+    now: 0,
+    bornAt: -10000000,
+    sex: 'female',
+  });
+  const community = createCommunity([dead, listener]);
+  const stamp = bridgeAt(community, 60);
+  serve(community, stamp, [
+    bridgeInput(
+      community,
+      'lifecycle.received',
+      {
+        type: 'death',
+        person: { kind: 'actor', id: dead.id },
+        basis: { evidence: { kind: 'evidence', id: 'death-at-60' }, worldRevision: community.revision ?? 0 },
+      },
+      stamp,
+    ),
+  ]);
+  expect(dead.body.alive).toBe(false);
+  const frozen = frozenPerson(dead);
+  const archive = exportRun(required(personRun(frozen)));
+  const parent = await source();
+  const fixture = shelfFor(parent);
+  const session = new CastSession(lab(), fixture.shelf);
+  const game = newGame(7, undefined, false, true, PUBLIC_EDITION);
+  game.valley.castDeaths = { yusuf: frozen };
+  session.game = game;
+  session.heads[parent.castId] = parent;
+  // This component fixture is not a replayable Valley death; isolate the write gate.
+  let validations = 0;
+  (session as unknown as { publicationGuard: () => () => void }).publicationGuard = () => {
+    validations++;
+    return () => {};
+  };
+  await session.checkpoint();
+  expect(validations).toBe(0);
+  await session.checkpoint(true);
+  expect(validations).toBe(1);
+  expect(session.status).toContain('Yusuf: read-only until');
+  expect(fixture.writes()).toBe(0);
+  expect(session.heads[parent.castId]).toEqual(parent);
+  expect(session.heads[parent.castId]?.terminal).toBeUndefined();
+  expect(exportRun(required(personRun(frozen)))).toEqual(archive);
+});
+
+it('allows an empty arrival acknowledgment', async () => {
+  const requests: PersonaRequest[] = [];
+  const shelf: Shelf = {
+    ready: Promise.resolve(true),
+    enabled: true,
+    setEnabled() {},
+    async request<T>(request: PersonaRequest): Promise<T> {
+      requests.push(request);
+      if (request.action === 'prepareBatch')
+        return {
+          expectedHeads: Object.fromEntries(ALLOCATION.map((p) => [p.castId, null])),
+          inputs: [],
+          blocked: [],
+        } as T;
+      return true as T;
+    },
+  };
+  const session = new CastSession(lab(), shelf);
+  const game = await session.fresh(7, false, PUBLIC_EDITION);
+  expect(game.cast?.inputs ?? []).toEqual([]);
+  expect(requests.some((r) => r.action === 'putBatch' && r.envelopes?.length === 0)).toBe(true);
+});
+
+it('keeps native source out of local metadata and reconstructs only its exact frozen receipt', async () => {
+  // Component fixture only: receipt and outer-map guards, not a played Valley departure
+  // or whole public Game.load/adoption proof. All native sources use the real SDK.
+  const { bindPerson, frozenPerson, personFromAuthoring, personRun } = await import(
+    '../src/sim/hf-person.ts'
+  );
+  const { checkpointTransfer, HOST_RULES } = await import('../src/sim/passport.ts');
+  const { newGame, save } = await import('../src/sim/game.ts');
+  const cast = canonicalCast('hf.cast.samira.well');
+  const spec = exampleSpec();
+  spec.host.id = 'valley';
+  spec.definitions.sources = spec.definitions.sources.map((s) =>
+    s.type === 'host' ? { ...s, id: 'valley' } : s,
+  );
+  const authored = authoredPerson('samira', 'Samira');
+  authored.identity.castId = cast.castId;
+  const run = need(createRun(spec));
+  need(createPerson(run, authored));
+  const view = personFromAuthoring(authored);
+  bindPerson(view, run);
+  const frozen = frozenPerson(view);
+  const session = new CastSession(lab(), null);
+  const stamps = { game: 'valley', build: 'test', engine: '4.16.2', rules: HOST_RULES };
+  const prepared = await checkpointTransfer(frozen, cast.castId, stamps);
+  const envelope = await createPersona({
+    format: 'hf-persona/1',
+    castId: cast.castId,
+    castRevision: cast.revision,
+    branchId: 'source-ref-control',
+    parentRevision: null,
+    source: stamps,
+    transfer: { ...prepared.transfer, hostRun: session.runId },
+    limitations: [],
+  });
+  session.heads[cast.castId] = envelope;
+  session.sources[cast.castId] = { revision: envelope.revision, person: prepared.source };
+  const metadata = JSON.parse(JSON.stringify(session.metadata()));
+  expect(metadata.sources).toEqual({});
+  expect(metadata.sourceRefs).toEqual({
+    [cast.castId]: {
+      revision: envelope.revision,
+      actorId: 'samira',
+      fullHash: prepared.source.archive.hashes.full,
+    },
+  });
+  expect(JSON.stringify(metadata)).not.toContain('hf-run');
+  const game = newGame(7, undefined, false, true, PUBLIC_EDITION);
+  game.valley.castReleased = { samira: frozen };
+  const resumed = new CastSession(lab(), null);
+  await resumed.loaded(game, metadata);
+  expect(resumed.heads).toEqual(session.heads);
+  expect(resumed.sources).toEqual(session.sources);
+  const altered = structuredClone(metadata);
+  altered.sourceRefs[cast.castId].fullHash = '0'.repeat(64);
+  const rejected = new CastSession(lab(), null);
+  await expect(rejected.loaded(game, altered)).rejects.toThrow('differs from the played game');
+  expect(rejected.game).toBeNull();
+  expect(session.heads[cast.castId]).toEqual(envelope);
+  const nativeBytes = JSON.stringify(prepared.source.archive);
+  const heldGame = resumed.game;
+  const heldGameBytes = () => {
+    const saved = save(required(resumed.game));
+    saved.savedAt = 'component-held-time';
+    return JSON.stringify(resumed.exportRun(saved));
+  };
+  const heldBytes = heldGameBytes();
+  const held = canonicalPersona({
+    metadata: resumed.metadata(),
+    heads: resumed.heads,
+    archiveHeads: resumed.archiveHeads,
+    sources: resumed.sources,
+  });
+  const unchanged = () => {
+    expect(resumed.game).toBe(heldGame);
+    expect(heldGameBytes()).toBe(heldBytes);
+    expect(
+      canonicalPersona({
+        metadata: resumed.metadata(),
+        heads: resumed.heads,
+        archiveHeads: resumed.archiveHeads,
+        sources: resumed.sources,
+      }),
+    ).toBe(held);
+    expect(JSON.stringify(exportRun(required(personRun(frozen))))).toBe(nativeBytes);
+  };
+  // Both outer-map surfaces refuse with refs and without refs before installation.
+  for (const withRefs of [false, true]) {
+    const meta = structuredClone(metadata);
+    meta.sources = session.sources;
+    if (!withRefs) meta.sourceRefs = {};
+    await expect(resumed.loaded(game, meta)).rejects.toThrow(
+      'Outer source archives are not supported. Keep the full native game.',
+    );
+    unchanged();
+    const file = {
+      castHeads: metadata.heads,
+      castSources: session.sources,
+      castSourceRefs: withRefs ? metadata.sourceRefs : {},
+    };
+    await expect(resumed.loaded(game, undefined, true, file)).rejects.toThrow(
+      'Outer source archives are not supported. Keep the full native game.',
+    );
+    unchanged();
+  }
+  await expect(resumed.loaded(game, altered)).rejects.toThrow('differs from the played game');
+  unchanged();
+  const wrongReceipt = structuredClone(metadata);
+  wrongReceipt.sourceRefs[cast.castId].revision = 'different-receipt';
+  await expect(resumed.loaded(game, wrongReceipt)).rejects.toThrow('Source archive lacks its exact receipt.');
+  unchanged();
+  // A new host container points to the same real frozen source. No native state changes.
+  const changing = newGame(7, undefined, false, true, PUBLIC_EDITION);
+  const released = { samira: frozen };
+  let removedDuringAwait = false;
+  Object.defineProperty(changing.valley, 'castReleased', {
+    configurable: true,
+    get() {
+      if (!removedDuringAwait)
+        queueMicrotask(() => {
+          delete (released as { samira?: typeof frozen }).samira;
+          removedDuringAwait = true;
+        });
+      return released;
+    },
+  });
+  await expect(resumed.loaded(changing, metadata)).rejects.toThrow(
+    'The frozen source changed during local load.',
+  );
+  expect(removedDuringAwait).toBe(true);
+  unchanged();
+});
+
+it('refuses the fixed full public 450 chapter excluded by the complete-journal size guard', async () => {
+  const { act, load, newGame, save, step } = await import('../src/sim/game.ts');
+  const { personRun } = await import('../src/sim/hf-person.ts');
+  const { checkpointTransfer, HOST_RULES, validateCheckpointSource } = await import('../src/sim/passport.ts');
+  const cast = canonicalCast('hf.cast.samira.well');
+  const stamps = { game: 'valley', build: 'test', engine: '4.16.2', rules: HOST_RULES };
+  const original = newGame(7, undefined, false, true, PUBLIC_EDITION);
+  // Fork the complete public opening before either accepted input.
+  const other = load(JSON.parse(JSON.stringify(save(original))));
+  expect(act(other, { verb: 'call', job: 'reap-agha', houses: ['coban'] })).toBe(true);
+  for (const game of [original, other]) {
+    expect(act(game, { verb: 'release-cast', person: 'samira' })).toBe(true);
+    step(game, 420);
+    expect(game.valley.minute).toBe(420);
+    // Advance one public quantum after the release request.
+    step(game, 450);
+    expect(game.valley.minute).toBe(450);
+    expect(game.valley.castReleased?.samira, '450 frozen source prerequisite').toBeDefined();
+  }
+  const originalSource = await checkpointTransfer(
+    required(original.valley.castReleased?.samira),
+    cast.castId,
+    stamps,
+  );
+  const otherSource = await checkpointTransfer(
+    required(other.valley.castReleased?.samira),
+    cast.castId,
+    stamps,
+  );
+  const makeHead = (transfer: Record<string, unknown>, runId: string) =>
+    createPersona({
+      format: 'hf-persona/1',
+      castId: cast.castId,
+      castRevision: cast.revision,
+      branchId: 'full-world-source-control',
+      parentRevision: null,
+      source: stamps,
+      transfer: { ...transfer, hostRun: runId },
+      limitations: [],
+    });
+  let writes = 0;
+  const shelf: Shelf = {
+    ready: Promise.resolve(true),
+    enabled: true,
+    setEnabled() {},
+    async request<T>(): Promise<T> {
+      writes++;
+      throw new Error('Unexpected shelf request');
+    },
+  };
+  const session = new CastSession(lab(), shelf);
+  const head = await makeHead(originalSource.transfer, session.runId);
+  const otherHead = await makeHead(otherSource.transfer, session.runId);
+  for (const envelope of [head, otherHead]) {
+    expect(await validatePersona(envelope)).toEqual(envelope);
+    expect(portablePersonRole(envelope, 'valley')).toBe('samira');
+    expect(portablePersonOwner(envelope)).toBeUndefined();
+    expect(envelope.castId).toBe(cast.castId);
+    expect(envelope.castRevision).toBe(cast.revision);
+    expect(envelope.transfer.hostRun).toBe(session.runId);
+  }
+  expect(originalSource.source.archive.initial.people).toHaveLength(53);
+  // Establish native validity separately: a failure here is a fixture blocker, not V3 RED.
+  await validateCheckpointSource(originalSource.source, head);
+  await validateCheckpointSource(otherSource.source, otherHead);
+  expect(otherSource.source.archive.hashes.full).not.toBe(originalSource.source.archive.hashes.full);
+  expect(otherSource.source.archive.initial.people).toEqual(originalSource.source.archive.initial.people);
+  session.heads[cast.castId] = head;
+  session.sources[cast.castId] = { revision: head.revision, person: originalSource.source };
+  const metadata = session.metadata();
+  const packet = JSON.parse(JSON.stringify(session.exportRun(save(original))));
+  const journal = { [cast.castId]: { revision: head.revision, person: originalSource.source } };
+  const nativeBytes = [originalSource, otherSource].map((s) => JSON.stringify(s.source.archive));
+  // EXCLUDED: this exact fixed positive exceeds the existing complete-journal guard.
+  expect(new TextEncoder().encode(canonicalPersona(journal)).byteLength).toBeGreaterThan(1_048_576);
+  // Strict full host replay precedes the size refusal; this is not positive adoption.
+  const replayed = load(packet);
+  const installed = new CastSession(lab(), shelf);
+  const held = newGame(7, undefined, false, true, PUBLIC_EDITION);
+  installed.game = held;
+  const snapshot = () =>
+    canonicalPersona({
+      metadata: installed.metadata(),
+      heads: installed.heads,
+      sources: installed.sources,
+      game: { ...save(held), savedAt: packet.savedAt },
+      export: installed.exportRun({ ...save(held), savedAt: packet.savedAt }),
+    });
+  const before = snapshot();
+  await expect(installed.loaded(replayed, metadata)).rejects.toThrow(
+    'The source receipts are too large. Keep the full native game.',
+  );
+  expect(installed.game).toBe(held);
+  expect(snapshot()).toBe(before);
+  expect(writes).toBe(0);
+  expect([originalSource, otherSource].map((s) => JSON.stringify(s.source.archive))).toEqual(nativeBytes);
+  expect(
+    [original, other].map((g) =>
+      JSON.stringify(exportRun(required(personRun(required(g.valley.castReleased?.samira))))),
+    ),
+  ).toEqual(nativeBytes);
+}, 120000);
+
+it('refuses the oversized full public 480 source journal before installation', async () => {
+  const { act, load, newGame, save, step } = await import('../src/sim/game.ts');
+  const { personRun } = await import('../src/sim/hf-person.ts');
+  const { checkpointTransfer, HOST_RULES, validateCheckpointSource } = await import('../src/sim/passport.ts');
+  const cast = canonicalCast('hf.cast.samira.well');
+  const stamps = { game: 'valley', build: 'test', engine: '4.16.2', rules: HOST_RULES };
+  const original = newGame(7, undefined, false, true, PUBLIC_EDITION);
+  // Fork the complete public opening before either accepted input.
+  const other = load(JSON.parse(JSON.stringify(save(original))));
+  expect(act(other, { verb: 'call', job: 'reap-agha', houses: ['coban'] })).toBe(true);
+  for (const game of [original, other]) {
+    expect(act(game, { verb: 'release-cast', person: 'samira' })).toBe(true);
+    step(game, 480);
+  }
+  const originalSource = await checkpointTransfer(
+    required(original.valley.castReleased?.samira),
+    cast.castId,
+    stamps,
+  );
+  const otherSource = await checkpointTransfer(
+    required(other.valley.castReleased?.samira),
+    cast.castId,
+    stamps,
+  );
+  const makeHead = (transfer: Record<string, unknown>, runId: string) =>
+    createPersona({
+      format: 'hf-persona/1',
+      castId: cast.castId,
+      castRevision: cast.revision,
+      branchId: 'full-world-source-control',
+      parentRevision: null,
+      source: stamps,
+      transfer: { ...transfer, hostRun: runId },
+      limitations: [],
+    });
+  const session = new CastSession(lab(), null);
+  const head = await makeHead(originalSource.transfer, session.runId);
+  const otherHead = await makeHead(otherSource.transfer, session.runId);
+  // Establish native validity separately: a failure here is a fixture blocker, not V3 RED.
+  await validateCheckpointSource(originalSource.source, head);
+  await validateCheckpointSource(otherSource.source, otherHead);
+  expect(otherSource.source.archive.hashes.full).not.toBe(originalSource.source.archive.hashes.full);
+  expect(otherSource.source.archive.initial.people).toEqual(originalSource.source.archive.initial.people);
+  session.heads[cast.castId] = head;
+  session.sources[cast.castId] = { revision: head.revision, person: originalSource.source };
+  const metadata = session.metadata();
+  const packet = JSON.parse(JSON.stringify(session.exportRun(save(original))));
+  const journal = { [cast.castId]: { revision: head.revision, person: originalSource.source } };
+  const nativeBytes = [originalSource, otherSource].map((s) => JSON.stringify(s.source.archive));
+  expect(new TextEncoder().encode(canonicalPersona(journal)).byteLength).toBeGreaterThan(1_048_576);
+  // Strict full host replay precedes the size refusal; this is not positive adoption.
+  const replayed = load(packet);
+  let writes = 0;
+  const shelf: Shelf = {
+    ready: Promise.resolve(true),
+    enabled: true,
+    setEnabled() {},
+    async request<T>(): Promise<T> {
+      writes++;
+      throw new Error('Unexpected shelf request');
+    },
+  };
+  const installed = new CastSession(lab(), shelf);
+  const held = newGame(7, undefined, false, true, PUBLIC_EDITION);
+  installed.game = held;
+  const snapshot = () =>
+    canonicalPersona({
+      metadata: installed.metadata(),
+      heads: installed.heads,
+      sources: installed.sources,
+      game: { ...save(held), savedAt: packet.savedAt },
+      export: installed.exportRun({ ...save(held), savedAt: packet.savedAt }),
+    });
+  const before = snapshot();
+  await expect(installed.loaded(replayed, metadata)).rejects.toThrow(
+    'The source receipts are too large. Keep the full native game.',
+  );
+  expect(installed.game).toBe(held);
+  expect(snapshot()).toBe(before);
+  expect(writes).toBe(0);
+  expect([originalSource, otherSource].map((s) => JSON.stringify(s.source.archive))).toEqual(nativeBytes);
+  expect(
+    [original, other].map((g) =>
+      JSON.stringify(exportRun(required(personRun(required(g.valley.castReleased?.samira))))),
+    ),
+  ).toEqual(nativeBytes);
+}, 120000);

@@ -1,0 +1,145 @@
+/** Authorized-runtime control. This is NOT the original 120-second day-12 test.
+ * --term runs the unchanged owner schedule through the actual 881-day ending.
+ * No worker, shortened horizon, history truncation or private framework route.
+ */
+import { deepStrictEqual, equal, ok } from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { mkdirSync, realpathSync, statfsSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
+import { exportRun, readRunHistory, replay as replayNative, restoreRun } from '@adam0white/human-framework';
+import { DAY } from '../src/sim/calendar.ts';
+import { PUBLIC_EDITION } from '../src/sim/edition.ts';
+import {
+  act,
+  compactRun,
+  END_DAY,
+  fingerprint,
+  GAME_VERSION,
+  load,
+  newGame,
+  replay,
+  save,
+  stateJson,
+  step,
+} from '../src/sim/game.ts';
+import { FRAMEWORK_VERSION, need } from '../src/sim/hf.ts';
+import { ownerInputs } from './owner-schedule.ts';
+
+const term = process.argv.includes('--term');
+if (term === process.argv.includes('--day12')) throw Error('Select exactly one of --term or --day12.');
+const outIndex = process.argv.indexOf('--out');
+if (outIndex < 0 || !process.argv[outIndex + 1]) throw Error('Provide --out ABSOLUTE_PRIVATE_DIRECTORY.');
+const out = resolve(process.argv[outIndex + 1] as string);
+mkdirSync(out, { recursive: true });
+const freeBytes = () => {
+  const disk = statfsSync(out);
+  return disk.bavail * disk.bsize;
+};
+ok(freeBytes() >= 8_000_000_000, 'Launch requires at least 8GB disk free.');
+const checkDisk = () => ok(freeBytes() >= 5_000_000_000, 'Stop: disk free is below 5GB.');
+const persist = (name: string, value: unknown) => {
+  checkDisk();
+  const raw = JSON.stringify(value);
+  writeFileSync(resolve(out, name), raw, { flag: 'wx' });
+  return { bytes: Buffer.byteLength(raw), sha256: createHash('sha256').update(raw).digest('hex') };
+};
+const require = createRequire(import.meta.url);
+const started = performance.now();
+const game = newGame(406153184);
+const opening = save(game);
+const initial = opening.state.community.archive;
+ok(initial, 'Missing full native opening.');
+equal(initial.initial.people.length, 58, 'Keep all actual opening people, including the steward.');
+persist('opening.full.json', opening);
+const target = term ? (END_DAY + 1) * DAY : 17550;
+equal(END_DAY, 881);
+// Step at daily host boundaries only for progress/disk checks. Export no checkpoint
+// here: daily checkpoint benchmarks are a separate workload.
+while (game.valley.minute < target && !game.valley.flags.ended) {
+  checkDisk();
+  const at = game.valley.minute;
+  step(
+    game,
+    Math.min(target, (Math.floor(at / DAY) + 1) * DAY),
+    ownerInputs.filter((i) => i.at >= at),
+  );
+  console.log(
+    JSON.stringify({
+      stage: 'progress',
+      minute: game.valley.minute,
+      inputs: game.inputs.length,
+      ms: performance.now() - started,
+    }),
+  );
+}
+const wholeHostMs = performance.now() - started;
+const full = JSON.parse(JSON.stringify(save(game))) as ReturnType<typeof save>;
+const compact = compactRun(full);
+const archive = full.state.community.archive;
+ok(archive, 'Missing full native archive.');
+const files = {
+  full: persist('current.full.json', full),
+  compact: persist('current.compact.json', compact),
+  native: persist('current.native.json', archive),
+};
+equal(
+  game.valley.minute,
+  term ? END_DAY * DAY : 17550,
+  'A shortened or early dismissed run does not qualify.',
+);
+if (term) equal(game.valley.flags.ended, 'term');
+deepStrictEqual(game.inputs, ownerInputs, 'Retain the complete original accepted schedule.');
+checkDisk();
+const restoredNative = need(restoreRun(archive));
+deepStrictEqual(exportRun(restoredNative), archive);
+const nativeReplay = need(replayNative(archive));
+equal(nativeReplay.verified, true);
+equal(nativeReplay.fullHash, archive.hashes.full);
+const copies = [
+  load(full),
+  load(compact),
+  replay(full.seed, structuredClone(full.inputs), full.minute, full.cast, full.plainEnglish, full.rules),
+];
+for (const copy of copies) deepStrictEqual(JSON.parse(JSON.stringify(stateJson(copy.valley))), full.state);
+// A real public input at a nonterminal checkpoint, applied independently after
+// native/full/compact recovery. The original day-12 world is never overwritten.
+let nextInput: unknown = null;
+if (!term) {
+  const input = { verb: 'visit', house: 'coban' } as const;
+  const accepted = [game, ...copies].map((copy) => act(copy, input));
+  ok(accepted.every(Boolean), 'The useful next visit must actually be accepted.');
+  for (const copy of [game, ...copies]) step(copy, full.minute + 180);
+  const next = JSON.parse(JSON.stringify(stateJson(game.valley)));
+  for (const copy of copies) deepStrictEqual(JSON.parse(JSON.stringify(stateJson(copy.valley))), next);
+  const nextFull = save(game);
+  const nextArchive = nextFull.state.community.archive;
+  ok(nextArchive);
+  equal(need(replayNative(nextArchive)).fullHash, nextArchive.hashes.full);
+  nextInput = {
+    order: input,
+    minute: game.valley.minute,
+    fingerprint: fingerprint(game.valley),
+    fullHash: nextArchive.hashes.full,
+    file: persist('next.full.json', nextFull),
+  };
+}
+persist('result.json', {
+  status: 'RUNTIME_CONTROL_PASSED',
+  mode: term ? 'actual-881-day-term' : 'day12-full-export-control-not-original-test',
+  framework: FRAMEWORK_VERSION,
+  gameVersion: GAME_VERSION,
+  rules: PUBLIC_EDITION,
+  seed: full.seed,
+  initialPeople: initial.initial.people.length,
+  minute: full.minute,
+  ended: full.state.flags.ended ?? null,
+  wholeHostMs,
+  fingerprint: full.fingerprint,
+  fullHash: archive.hashes.full,
+  transactions: readRunHistory(archive).length,
+  source: { hf: realpathSync(require.resolve('@adam0white/human-framework')), engine: archive.engine },
+  inputs: full.inputs,
+  files,
+  nextInput,
+});
