@@ -3,7 +3,7 @@ import { feedbackPersonaControl, feedbackSharePlay } from '@adam0white/lab-kit';
 import { required } from './dom.ts';
 import type { lab as gameLab } from './lab.ts';
 
-const NAME_KEY = 'hf-lab-feedback-name';
+const NAME_KEY = 'murmur-lab-feedback-name';
 const esc = (text: string) =>
   text.replace(
     /[&<>"']/g,

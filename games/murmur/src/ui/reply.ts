@@ -1,6 +1,4 @@
-import { tick } from '@adam0white/human-framework-legacy';
-import { replyWords as historicalReplyWords } from '../legacy/ui/reply.ts';
-import { DAY0 } from '../sim/dilan.ts';
+import { DAY0 } from '../sim/dilan-content.ts';
 import { cardView, ctxOf, HOLD_NOT_CARRIED, insistCarries, listens, optionsOf, replay } from '../sim/game.ts';
 import { momentById } from '../sim/moments.ts';
 import type { Answer, GameState } from '../sim/types.ts';
@@ -182,7 +180,6 @@ function mightHear(before: GameState, a: Answer): string {
 
 /** Her reply plus a way forward. Reconstruct the decision without changing the run or its export. */
 export function replyWords(s: GameState, a: Answer): string | undefined {
-  if (!('hf' in s)) return historicalReplyWords(s as unknown as import('../legacy/types.ts').GameState, a);
   if (!a.said) return a.says;
   if (a.said === a.chosen) return a.insisted ? heldAssentWords(s, a) : assentWords(s, a);
 
@@ -204,16 +201,7 @@ export function replyWords(s: GameState, a: Answer): string | undefined {
       (input.insist === true) === (a.insisted === true),
   );
   if (index >= 0) {
-    const before = replay(
-      s.seed,
-      s.inputs.slice(0, index),
-      a.at,
-      s.version,
-      s.castChapter,
-      'hf' in s
-        ? s.plainEnglish
-        : ((s as unknown as import('../legacy/types.ts').GameState).person.lexicon?.plainEnglish ?? false),
-    );
+    const before = replay(s.seed, s.inputs.slice(0, index), a.at, s.version, s.castChapter, s.plainEnglish);
     if (listens(s)) {
       const chosen = optionsOf(before, momentById(a.moment, before.version)).find((o) => o.id === a.chosen);
       if (!chosen) return a.says;
@@ -266,8 +254,6 @@ export function replyWords(s: GameState, a: Answer): string | undefined {
       return a.says;
     }
     // resolve() advances her body to the input minute before deciding. Forecast that same state.
-    const historical = before as unknown as import('../legacy/types.ts').GameState;
-    if (historical.person.now < a.at) tick(historical.person, a.at);
     const view = cardView(before);
     if (view?.id === a.moment) {
       const said = view.options.find((option) => option.id === a.said);

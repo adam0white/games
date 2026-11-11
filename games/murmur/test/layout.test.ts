@@ -147,7 +147,7 @@ for (const mode of ['linked', 'off', 'privacy'] as const) {
         );
       else expect(extra.run).toBeUndefined();
       expect(calls[0][1]).toContain('Verdict: keep');
-      expect(await page.evaluate(() => localStorage.getItem('hf-lab-feedback-name'))).toBe('tester');
+      expect(await page.evaluate(() => localStorage.getItem('murmur-lab-feedback-name'))).toBe('tester');
       await page.locator('#feedback-send').click();
       await page.locator('#bp-send').click();
       expect(await page.locator('#feedback-name').inputValue()).toBe('tester');

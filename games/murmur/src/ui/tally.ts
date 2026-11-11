@@ -1,5 +1,5 @@
 /** Optional final-page count of player inputs, never Dilan's inner life or actions. */
-import { dayStart } from '../sim/dilan.ts';
+import { dayStart } from '../sim/dilan-content.ts';
 import { weekOf } from '../sim/game.ts';
 import type { GameState } from '../sim/types.ts';
 
