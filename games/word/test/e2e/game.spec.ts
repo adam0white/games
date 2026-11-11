@@ -217,8 +217,11 @@ test('file meetings preserve occupied native storage and ordinary import still p
   });
   await page.goto('/word/file/?labRunSource=agent');
   await expect(page.getByRole('heading', { name: 'Open a His Word file' })).toBeVisible();
+  const recording = page.getByRole('checkbox', { name: 'Record my play for the lab' });
+  await expect(recording).not.toBeChecked();
+  await recording.click();
   await expect(page.getByText(/Recording is blocked/)).toBeVisible();
-  await expect(page.getByRole('checkbox', { name: 'Record my play for the lab' })).toBeDisabled();
+  await expect(recording).toBeDisabled();
   await expect(page.locator('[data-choice]')).toHaveCount(0);
   expect(await page.locator('iframe').count()).toBe(0);
   const input = page.getByLabel('Choose a playtest file');
@@ -390,7 +393,10 @@ test('pagehide captures the complete changed file meeting with the real SDK', as
   act(source, { choice: first.id });
   const initial = exportRun(source);
   await page.goto(`${origin}/word/file/?labRunSource=agent`);
-  await expect(page.getByRole('checkbox', { name: 'Record my play for the lab' })).toBeChecked();
+  const recording = page.getByRole('checkbox', { name: 'Record my play for the lab' });
+  await expect(recording).not.toBeChecked();
+  await recording.check();
+  await expect(recording).toBeChecked();
   await page.getByLabel('Choose a playtest file').setInputFiles({
     name: 'meeting.json',
     mimeType: 'application/json',
