@@ -1,3 +1,15 @@
+# MIGRATE — current owner goal, 2026-11-10
+
+Remaining: finish Glance PR4, migrate the 14 requested remaining games, activate and verify old-host redirects, merge cloud deployment, verify owner-secret activation, and finish archive/storage evidence. New-game prototypes wait. The migration pace is no longer one step per day.
+
+Owner direction dated 2026-11-11, verbatim: "I need you to prioritize the migration to monorepo, which will allow me to move this workload entirely to cloud, freeing us from storage concerns here, and freeing storage for other things here."
+
+Cloud workflow is prepared in `.github/workflows/deploy.yml`; it is not evidence of a successful Actions deployment. The owner must add `CLOUDFLARE_API_TOKEN` as described in README. The agent must not handle credentials. `docs/cloud-readiness.md` lists remaining HF Mac assumptions and proposed replacements. No original repository has been archived by MIGRATE and no original checkout has been deleted.
+
+The completion target is each requested game live with a clean exact green-main release, current replay, retained history and notices, one npm HF version, path CI, and working old-host redirects. The owner retains archive decisions and secret entry. Record each game's actual outcome; imported source and a passing build are preparation. Earlier prototype and pending-pilot entries below are historical and do not override this goal.
+
+---
+
 # Games consolidation — 2026-11-05
 
 Remaining: published path-aware lab artifacts, exact pilot CI/review and live checks; remaining-game imports; two new games. Pilot source and tutorial synchronization is complete locally. Infrastructure preparation is not a shipped migration. Owner accepts taste after coordinator review.
