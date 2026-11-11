@@ -323,6 +323,40 @@ importers:
         specifier: 4.157.0
         version: 4.157.0(@types/node@26.6.6)
 
+  games/pass:
+    dependencies:
+      '@adam0white/human-framework':
+        specifier: 4.17.0
+        version: 4.17.0
+      '@adam0white/lab-client':
+        specifier: https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.16/adam0white-lab-client-0.5.16.tgz
+        version: https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.16/adam0white-lab-client-0.5.16.tgz
+      '@adam0white/lab-kit':
+        specifier: https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.33/adam0white-lab-kit-0.5.33.tgz
+        version: https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.33/adam0white-lab-kit-0.5.33.tgz(@adam0white/lab-client@https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.16/adam0white-lab-client-0.5.16.tgz)
+    devDependencies:
+      '@biomejs/biome':
+        specifier: 2.6.5
+        version: 2.6.5
+      '@playwright/test':
+        specifier: 1.64.1
+        version: 1.64.1
+      '@types/node':
+        specifier: 26.6.6
+        version: 26.6.6
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vite:
+        specifier: 8.3.5
+        version: 8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@26.6.6)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+      wrangler:
+        specifier: 4.157.0
+        version: 4.157.0(@types/node@26.6.6)
+
   games/rope:
     dependencies:
       '@adam0white/human-framework':
@@ -1231,6 +1265,11 @@ packages:
 
   '@pixi/colord@2.9.6':
     resolution: {integrity: sha512-nezytU2pw587fQstUu1AsJZDVEynjskwOL+kibwcdxsMBFqPsFFNA7xl0ii/gXuDi6M0xj3mfRJj8pBSc2jCfA==}
+
+  '@playwright/test@1.64.1':
+    resolution: {integrity: sha512-IaYGml/nSOiZWROfPtuIL7neuu9qDOZ3TNvNljUIrhDMxiGTgPjzj/g9p9RxpS2tSepPDRY+UwAaEeiKtUvIAg==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   '@poppinss/colors@4.1.6':
     resolution: {integrity: sha512-H9xkIdFswbS8n1d6vmRd8+c10t2Qe+rZITbbDHHkQixH5+2x1FDGmi/0K+WgWiqQFKPSlIYB7jlH6Kpfn6Fleg==}
@@ -2447,6 +2486,10 @@ snapshots:
     optional: true
 
   '@pixi/colord@2.9.6': {}
+
+  '@playwright/test@1.64.1':
+    dependencies:
+      playwright: 1.64.1
 
   '@poppinss/colors@4.1.6':
     dependencies:

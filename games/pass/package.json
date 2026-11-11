@@ -1,0 +1,40 @@
+{
+  "name": "pass",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The Pass: six dinner services in your late aunt's lokanta. Every cook can say no.",
+  "license": "MIT",
+  "engines": {
+    "node": "26.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "measure": "node scripts/measure.ts",
+    "check": "npm run lint && npm run typecheck && npm test",
+    "deploy": "cd ../.. && pnpm run deploy",
+    "test:ui": "playwright test",
+    "check:lane": "npm run lint && npm run typecheck"
+  },
+  "dependencies": {
+    "@adam0white/human-framework": "4.17.0",
+    "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.16/adam0white-lab-client-0.5.16.tgz",
+    "@adam0white/lab-kit": "https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.33/adam0white-lab-kit-0.5.33.tgz"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.5",
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.6",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.1.0",
+    "wrangler": "4.157.0"
+  },
+  "packageManager": "pnpm@12.16.1+sha512.091d1dee7927575661b25dab3c2ae31cafc1c54d6b71ed6a6600cf0c1cb10434a447eae14015f1b23e2e6bedeed79df94a932e2164d2832280dce3fb32f656d1"
+}

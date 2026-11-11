@@ -1,0 +1,178 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import {
+  boardDefaults,
+  type GameState,
+  helpOptions,
+  newGame,
+  queueInput,
+  replay,
+  staffingOptions,
+  step,
+} from '../src/sim/kitchen.ts';
+import { automaticClockPlayback, clockPlayback, inspectingCook } from '../src/ui/clock.ts';
+import { legacyHash } from './hash.ts';
+
+const fixture = JSON.parse(
+  readFileSync(new URL('./fixtures/clarity-counter-save.json', import.meta.url), 'utf8'),
+);
+const baseline = JSON.parse(
+  readFileSync(new URL('./fixtures/clock-replay-hashes.json', import.meta.url), 'utf8'),
+);
+const hash = (s: GameState) => legacyHash(s, '2.8.0');
+
+describe('clock playback', () => {
+  it('keeps Fast through an unanswered chef offer while Slow and Steady still slow down', () => {
+    const s = newGame(42, 'pass@9');
+    queueInput(s, { kind: 'board', rows: boardDefaults(s) });
+    queueInput(s, { kind: 'open' });
+    while (!s.chefGrace?.some((claim) => claim.until > s.minute)) step(s);
+    const offer = s.chefGrace.find((claim) => claim.until > s.minute);
+    if (!offer) throw new Error('Expected a chef offer');
+    const before = JSON.stringify(s);
+    const reason = 'A cook is saving a portion for you to cook. Time is slowed so you can answer.';
+    expect(clockPlayback(s, 0)).toMatchObject({ rate: 0.1, label: 'Slow · 0.1 minutes per second', reason });
+    expect(clockPlayback(s, 1)).toMatchObject({ rate: 0.1, label: 'Slow · 0.1 minutes per second', reason });
+    expect(clockPlayback(s, 2)).toMatchObject({ rate: 3.5, label: 'Fast · 3.5 minutes per second', reason });
+    expect(JSON.stringify(s)).toBe(before);
+    expect(helpOptions(s)).toContainEqual(
+      expect.objectContaining({ ticket: offer.ticket, station: offer.station }),
+    );
+    queueInput(s, { kind: 'help', ticket: offer.ticket, station: offer.station });
+    expect(s.help).toMatchObject({ ticket: offer.ticket, station: offer.station });
+  });
+
+  it('names the actual chosen and clear-rail rates without changing state', () => {
+    const s = newGame(42, 'pass@4');
+    for (const t of s.tickets) t.at += 30;
+    const before = JSON.stringify(s);
+    expect(clockPlayback(s, 1)).toMatchObject({
+      rate: 6,
+      label: 'Steady · 6 minutes per second',
+      reason: 'No orders are waiting.',
+    });
+    expect(JSON.stringify(s)).toBe(before);
+    const first = s.tickets[0];
+    if (!first) throw new Error('Expected a seeded ticket');
+    first.status = 'open';
+    first.grill = 0;
+    first.cold = 0;
+    expect(clockPlayback(s, 2)).toMatchObject({
+      rate: 3.5,
+      label: 'Fast · 3.5 minutes per second',
+      reason: 'Your chosen speed.',
+    });
+    // Policy calls are reads, including a first-service unanswered request.
+    const request = newGame(42, 'pass@4');
+    request.request = { kind: 'phone', who: 'dilek', state: 'asking', at: request.minute };
+    const snapshot = JSON.stringify(request);
+    expect(clockPlayback(request, 2)).toMatchObject({ rate: 0.1, reason: 'Dilek needs an answer.' });
+    expect(JSON.stringify(request)).toBe(snapshot);
+  });
+
+  it('slows first-service missing coverage until the player requests a cook', () => {
+    const s = newGame(42, 'pass@4');
+    while (s.minute < 1131) step(s);
+    expect(clockPlayback(s, 2)).toMatchObject({ rate: 0.1, reason: 'A station needs a cook.' });
+    queueInput(s, { kind: 'ask', cook: 'selim', verb: 'grill' });
+    expect(clockPlayback(s, 2).rate).toBe(3.5);
+  });
+
+  it('keeps a consequential request slow after a queued answer until it resolves', () => {
+    const s = newGame(42, 'pass@4');
+    s.request = { kind: 'phone', who: 'dilek', state: 'asking', at: s.minute };
+    queueInput(s, { kind: 'answer', choice: 'yes' });
+    expect(clockPlayback(s, 2).rate).toBe(0.1);
+    step(s);
+    expect(clockPlayback(s, 2).rate).toBe(3.5);
+  });
+
+  it('keeps the chosen speed during an agreed uncovered board interval', () => {
+    const s = newGame(42, 'pass@5');
+    s.phase = 'service';
+    s.board = {
+      rows: [{ cook: 'selim', station: 'grill', breakAt: s.minute, cover: null, accepted: true }],
+      agreed: true,
+    };
+    const ticket = s.tickets[0];
+    if (!ticket) throw new Error('Expected seeded ticket');
+    ticket.status = 'open';
+    expect(clockPlayback(s, 2).rate).toBe(3.5);
+    s.staffing = [
+      {
+        id: 1,
+        who: 'selim',
+        station: 'grill',
+        until: s.minute + 20,
+        reason: 'I need to eat.',
+        state: 'asking',
+      },
+    ];
+    expect(clockPlayback(s, 2)).toMatchObject({ rate: 0.1, reason: 'Selim needs someone to take over.' });
+    const staffing = s.staffing[0];
+    if (!staffing) throw new Error('Expected staffing decision');
+    staffing.state = 'left';
+    expect(clockPlayback(s, 2).rate).toBe(3.5);
+  });
+
+  it('preserves exact replay and continuation of the pre-change pass@3 save across playback policies', () => {
+    const s = replay(fixture.seed, fixture.inputs, fixture.minute, 'pass@3');
+    expect(hash(s)).toBe(baseline.at);
+    for (let i = 0; i < 60 && s.phase === 'service'; i++) {
+      clockPlayback(s, i % 3);
+      step(s);
+    }
+    expect(hash(s)).toBe(baseline.after60);
+  });
+});
+
+it('automatically protects a current decision, conversation and cook account without mutating state', () => {
+  const s = newGame(42, 'pass@4');
+  const before = JSON.stringify(s);
+  const quiet = automaticClockPlayback(s);
+  expect(automaticClockPlayback(s, { reading: true }).rate).toBe(0.1);
+  expect(automaticClockPlayback(s, { inspecting: true }).rate).toBeLessThan(quiet.rate);
+  expect(JSON.stringify(s)).toBe(before);
+  s.request = { kind: 'phone', who: 'dilek', state: 'asking', at: s.minute };
+  expect(automaticClockPlayback(s)).toMatchObject({ rate: 0.1, reason: 'Dilek needs an answer.' });
+});
+
+it('a selected cook slows the clock only while they have something for you to read', () => {
+  const s = newGame(42, 'pass@4');
+  expect(inspectingCook(s, null, true)).toBe(false);
+  expect(inspectingCook(s, 'dilek', false)).toBe(false);
+  expect(inspectingCook(s, 'dilek', true)).toBe(true);
+  s.request = { kind: 'phone', who: 'dilek', state: 'asking', at: s.minute };
+  expect(inspectingCook(s, 'dilek', false)).toBe(true);
+  expect(inspectingCook(s, 'selim', false)).toBe(false);
+  s.request = null;
+  s.lastAnswer = { at: s.minute, who: 'selim', verb: 'grill', verdict: 'countered', text: 'I will.' };
+  expect(inspectingCook(s, 'selim', false)).toBe(true);
+  s.minute += 11;
+  expect(inspectingCook(s, 'selim', false)).toBe(false);
+});
+
+it('restores selected speed when nobody can cover, then slows when cover becomes available', () => {
+  const s = newGame(42, 'pass@16');
+  s.phase = 'service';
+  const ticket = s.tickets[0];
+  if (!ticket) throw new Error('Expected a ticket');
+  s.tickets = [{ ...ticket, status: 'open' }];
+  s.staffing = [
+    { id: 0, who: 'selim', station: 'cold', until: s.minute + 20, reason: 'I need to eat.', state: 'asking' },
+  ];
+  for (const c of s.cooks) c.here = false;
+  const before = JSON.stringify(s);
+  expect(automaticClockPlayback(s, {}, 2).rate).toBe(3.5);
+  expect(automaticClockPlayback(s, {}, 1).rate).toBe(1.5);
+  expect(JSON.stringify(s)).toBe(before);
+  const gaps = s.staffing;
+  s.staffing = [];
+  expect(automaticClockPlayback(s, {}, 2).rate).toBe(3.5);
+  s.staffing = gaps;
+  for (const c of s.cooks) c.here = true;
+  const decision = s.staffing[0];
+  if (!decision) throw new Error('Expected a staffing decision');
+  expect(staffingOptions(s, decision).length).toBeGreaterThan(0);
+  expect(automaticClockPlayback(s, {}, 2).rate).toBe(0.1);
+});

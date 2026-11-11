@@ -1,0 +1,32 @@
+/** HISTORICAL NATIVE UNIT TEST — not a current C1 public-replay witness.
+ * The negative-credit handler is exercised on a genuine R3 pass@20 / HF4.12 ordinary-input witness: seed 7, 62 public
+ * inputs to minute 2670, a real invite and five steps (actual private disclosure), checkpointed BEFORE any teacher or
+ * learner request. The complete native HF archive was written by the immutable R3 source (generator, source hashes and
+ * the actual R3 outcome are in the fixture's `meta`). Nothing in it is edited, and no verdict is written by hand.
+ * It is restored only here; the production reader has no legacy fallback and the old public export is refused below.
+ * Whether the current C1 seed-plus-public-input path reaches a `modified` verdict is UNOBSERVED (Deferred, 2026-11-03).
+ */
+it('does not credit food work when the learner modifies the ordinary request (historical native unit)', () => {
+  // One real cold restore of the R3 native archive and the same ordinary requests. The behavior assertions below are the evidence.
+  // The single final verifyCommunity replays the whole archive (R3 prefix plus this suffix). Current replay/cold-restore equality and
+  // continuation live in 'records real guidance…'; the archive is not re-verified here before the suffix, and no twin restore is made.
+  const s = restoreState(structuredClone(native.checkpoint) as unknown as ReturnType<typeof cloneState>);
+  expect(native.meta.archiveVerified).toBe(true);
+  expect(s.privateAccounts?.selim).toBeDefined();
+  expect(grillLessonAvailable(s, 'rafi')).toBe(true);
+  queueInput(s, { kind: 'grill-lesson', learner: 'rafi' });
+  queueInput(s, { kind: 'ask', cook: 'rafi', verb: 'grill', insist: false });
+  expect(s.grillLessons?.[0]?.teacherVerdict).toBe('assented');
+  for (let i = 0; i < 6; i++) step(s);
+  expect(s.cooks.find((cook) => cook.id === 'rafi')?.night.events.at(-1)).toMatchObject({
+    verb: 'grill',
+    verdict: 'modified',
+    insisted: false,
+  });
+  expect(s.grillLessons?.[0]?.learnerActivity).toBeUndefined();
+  expect(s.grillLessons?.[0]?.guidedWork).toBe(0);
+  expect(s.grillLessons?.[0]?.food).toBeUndefined();
+  expect(s.grillLessons?.[0]?.state).toBe('no-food-work');
+  expect(verifyCommunity(s.chef).verified).toBe(true);
+}, 120000);
+

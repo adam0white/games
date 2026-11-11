@@ -1,0 +1,95 @@
+{
+  "schema": "pass-week-two-evidence/1",
+  "date": "2026-11-03",
+  "sourceCommit": "ec91243815b1750240ecd09d131bd27437b34134",
+  "seed": 42,
+  "game": "pass@20",
+  "framework": "4.12.0",
+  "until": 14039,
+  "night": 7,
+  "inputCount": 61,
+  "inputsSha256": "1fafabae5563256138c7e3c8ff0614c0d45cd2d3679c9a13f30868a4e2aeadf2",
+  "nativeFullHash": "618a903a623b3b9b15b8e1994c32cec360e5ad0ec82098c7c9ffc69983e44c19",
+  "nativeTransactions": 7177,
+  "hostFullCloneReplayEqual": true,
+  "nativeVerified": true,
+  "ask": {
+    "minute": 14012,
+    "night": 7,
+    "phase": "service",
+    "cook": "selim",
+    "crewOrder": ["selim", "dilek", "rafi"],
+    "station": "grill",
+    "priorEventCount": 0,
+    "input": {
+      "kind": "ask",
+      "cook": "selim",
+      "verb": "oven",
+      "insist": false
+    }
+  },
+  "reply": {
+    "positive": true,
+    "event": {
+      "at": 14012,
+      "verb": "oven",
+      "verdict": "assented",
+      "insisted": false,
+      "crewRule": false
+    },
+    "answer": {
+      "at": 14012,
+      "who": "selim",
+      "verb": "oven",
+      "verdict": "assented",
+      "text": "I am willing to do that. I will work at the oven until 22:00.",
+      "insisted": false
+    }
+  },
+  "production": {
+    "total": 1,
+    "tickets": [
+      {
+        "id": 50,
+        "doneOvenBefore": 0,
+        "doneOvenAfter": 1
+      }
+    ],
+    "stockBefore": 15,
+    "stockAfter": 14,
+    "usedBefore": 0,
+    "usedAfter": 1,
+    "heatAfter": 0.9631855756744495,
+    "workBefore": 5.089472134046394,
+    "workAfter": 0.7784066486915648,
+    "gainedWork": 1.688934514645171,
+    "selectedMadeDelta": 0.15381049116753231,
+    "validation": {
+      "ordinaryAsk": true,
+      "selectedContribution": true,
+      "realTicket": true,
+      "ingredients": true,
+      "heat": true,
+      "work": true
+    }
+  },
+  "collection": {
+    "parentSeconds": 128.8824136670155,
+    "toolExit": 0,
+    "parentExit": 0,
+    "runnerExit": 0,
+    "ownedIdentitiesNonlive": 1,
+    "sourceFilesStable": 270,
+    "dependencyEntriesStable": 3695,
+    "artifactCount": 41,
+    "artifactBytes": 278798156
+  },
+  "limits": [
+    "Technical author control, not a player round",
+    "Selected contribution after assent; not exclusive causality",
+    "No whole-service or whole-week success claim",
+    "Historical Sonia mismatch and player acceptance remain open",
+    "inputs.json is an input log, not a standalone full playtest export"
+  ],
+  "inputsFile": "inputs.json.txt"
+}
