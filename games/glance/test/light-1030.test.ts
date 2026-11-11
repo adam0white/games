@@ -1,6 +1,10 @@
 // @vitest-environment happy-dom
 
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { discoveriesFor } from '../src/sim/cast.ts';
 import type { Report } from '../src/sim/dam.ts';
 import { clock, exportRun, keeperOf, newGame, queueInput, replay, step } from '../src/sim/dam.ts';
 import { PRIVATE_PREMISE } from '../src/sim/private-scenes.ts';
@@ -530,10 +534,15 @@ describe('F-2348 opening notes and the Dai strip (source candidates, geometry no
 });
 
 describe('F-2349 the existing optional talk, named without answering Morgan', () => {
-  async function daiSheet(minute: number) {
-    const state = replay(7, [], minute);
+  // Seed 7's native run first records the question at minute 1511. The current
+  // export is stored to avoid generating it twice; Continue still replays it.
+  const askedRun = () =>
+    JSON.parse(
+      gunzipSync(readFileSync('test/fixtures/dai-morgan-seed7-1511.json.gz')).toString(),
+    ) as ReturnType<typeof exportRun>;
+  async function daiSheet(minute: number, run = exportRun(replay(7, [], minute), '4.17.0')) {
     localStorage['glance-cast-local-v3'] = JSON.stringify({
-      run: exportRun(state, '4.17.0'),
+      run,
       runId: 'test-run',
       heads: [],
       fileOrigin: false,
@@ -543,15 +552,35 @@ describe('F-2349 the existing optional talk, named without answering Morgan', ()
     await click('cont');
     (document.querySelector('#concern [data-k="dai"]') as HTMLElement).click();
     await settle();
-    return state;
   }
+  it('the question fixture is the exact native current-engine replay', () => {
+    const bytes = readFileSync('test/fixtures/dai-morgan-seed7-1511.json.gz');
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(
+      'fa056d78a89355b450cc209449d0d23745689b769874f7ba7141807c203a6a37',
+    );
+    const state = replay(7, [], 1510);
+    const asked = () =>
+      state.said.some((line) => line.who === 'dai' && line.text.includes('Where has Morgan gone'));
+    expect(asked()).toBe(false);
+    step(state);
+    expect(state.minute).toBe(1511);
+    expect(asked()).toBe(true);
+    expect(state.discoveries.dai).toBeFalsy();
+    expect(discoveriesFor(state)).toContain('dai');
+    expect(gunzipSync(bytes).toString()).toBe(JSON.stringify(exportRun(state, '4.17.0')));
+    while (state.minute < 1520) step(state);
+    expect(asked()).toBe(true);
+    expect(state.discoveries.dai).toBeFalsy();
+    expect(discoveriesFor(state)).toContain('dai');
+  });
   it('after Dai asks about Morgan the sheet says there is no answer and states the real talk availability', async () => {
-    await daiSheet(1320 + 200);
+    await daiSheet(1511, askedRun());
     const cue = document.querySelector('.sheet .talk-cue')?.textContent ?? '';
     expect(cue).toContain('Dai asked where Morgan went. This game has no answer to that.');
     expect(cue).toContain('does not answer it');
     const talk = document.querySelector<HTMLButtonElement>('.sheet [data-talk="dai"]');
     expect(talk).not.toBeNull();
+    expect(talk?.disabled).toBe(false);
     expect(cue.includes('He is free to talk now.')).toBe(!talk?.disabled);
     if (talk?.disabled) expect(cue).toContain('only if he trusts you enough');
     expect(document.querySelector('.sheet details.fore summary')?.textContent).toContain('Talk with Dai');
