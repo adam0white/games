@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { coldPolicy } from '../src/cold-policy';
 import type { Screen } from '../src/screen';
 import { exportRun, type Game, type Input, type RunExport, replayRun } from '../src/sim';
@@ -272,6 +272,56 @@ test('screen teaches an escort and exposes smoke timing in words', async ({ page
   expect(hashes[0]).toBe(hashes[1]);
 });
 
+type VisibleScreen = Screen & { walking: boolean };
+
+async function visibleScreen(page: Page): Promise<VisibleScreen> {
+  return (await page.evaluate(() => ({
+    walking: document.querySelector('#walk-status')!.textContent!.includes(' Walking to '),
+    phase: 'playing',
+    dialogue: document.querySelector('#line')!.textContent!,
+    torch: document.querySelector('[data-action="torch"]')!.getAttribute('aria-pressed') === 'true',
+    timer: document.querySelector('#smoke-clock')!.textContent!,
+    guidance: document.querySelector('#guidance')!.textContent!,
+    selected: (document.querySelector('.people .active') as HTMLElement).dataset.id!,
+    people: Array.from(document.querySelectorAll<HTMLElement>('.people button')).map((button) => ({
+      id: button.dataset.id!,
+      name: button.querySelector('span')!.textContent!,
+      status: button.querySelector('small')!.textContent!,
+    })),
+    available: Array.from(document.querySelectorAll<HTMLButtonElement>('[data-action]'))
+      .filter((button) => !button.disabled && button.dataset.action !== 'torch')
+      .map((button) => button.dataset.action!),
+  }))) as VisibleScreen;
+}
+
+function visiblePolicy(screen: VisibleScreen, approaching?: string) {
+  const command = coldPolicy(screen);
+  // A successful select set this walk; the visible status says it is still in progress.
+  if (
+    command?.type === 'select' &&
+    command.id === screen.selected &&
+    command.id === approaching &&
+    screen.walking
+  )
+    return;
+  return command;
+}
+
+test('cold policy does not reselect a neighbour while the visible walk is in progress', async ({ page }) => {
+  await page.goto('/smoke/?seed=4');
+  await page.locator('#start').click();
+  await page.locator('[data-id="sevim"]').click({ timeout: 1000 });
+  await page.evaluate(() => window.smoke.advance(1));
+  const screen = await visibleScreen(page);
+  expect(screen.selected).toBe('sevim');
+  expect(screen.walking).toBe(true);
+  expect(coldPolicy(screen)).toEqual({ type: 'select', id: 'sevim' });
+  expect(visiblePolicy(screen, 'sevim')).toBeUndefined();
+  expect(visiblePolicy(screen)).toEqual({ type: 'select', id: 'sevim' });
+  expect(visiblePolicy(screen, 'derya')).toEqual({ type: 'select', id: 'sevim' });
+  expect(visiblePolicy({ ...screen, walking: false }, 'sevim')).toEqual({ type: 'select', id: 'sevim' });
+});
+
 for (const leaveDerya of [false, true]) {
   test(
     leaveDerya
@@ -281,25 +331,11 @@ for (const leaveDerya of [false, true]) {
       test.setTimeout(60000);
       await page.goto('/smoke/?seed=4');
       await page.getByRole('button', { name: 'Enter the stairwell' }).click();
+      let approaching: string | undefined;
       for (let second = 0; second < 160; second++) {
         if (await page.getByRole('heading', { name: /Everyone is out|walked out with you/ }).isVisible())
           break;
-        const screen = (await page.evaluate(() => ({
-          phase: 'playing',
-          dialogue: document.querySelector('#line')!.textContent!,
-          torch: document.querySelector('[data-action="torch"]')!.getAttribute('aria-pressed') === 'true',
-          timer: document.querySelector('#smoke-clock')!.textContent!,
-          guidance: document.querySelector('#guidance')!.textContent!,
-          selected: (document.querySelector('.people .active') as HTMLElement).dataset.id!,
-          people: Array.from(document.querySelectorAll<HTMLElement>('.people button')).map((button) => ({
-            id: button.dataset.id!,
-            name: button.querySelector('span')!.textContent!,
-            status: button.querySelector('small')!.textContent!,
-          })),
-          available: Array.from(document.querySelectorAll<HTMLButtonElement>('[data-action]'))
-            .filter((button) => !button.disabled && button.dataset.action !== 'torch')
-            .map((button) => button.dataset.action!),
-        }))) as Screen;
+        const screen = await visibleScreen(page);
         if (leaveDerya) {
           screen.people = screen.people.filter((p) => p.id !== 'derya');
           // Once all intended rescues are visibly outside, there are no more inputs.
@@ -310,12 +346,16 @@ for (const leaveDerya of [false, true]) {
             break;
           }
         }
-        const command = coldPolicy(screen);
+        const command = visiblePolicy(screen, approaching);
         try {
-          if (command?.type === 'select')
+          if (command?.type === 'select') {
             await page.locator(`[data-id="${command.id}"]`).click({ timeout: 1000 });
-          if (command?.type === 'street')
+            approaching = command.id;
+          }
+          if (command?.type === 'street') {
             await page.getByRole('button', { name: 'Street', exact: true }).click({ timeout: 1000 });
+            approaching = undefined;
+          }
           if (command?.type === 'speech')
             await page.locator(`[data-action="${command.action}"]`).click({ timeout: 1000 });
         } catch (error) {
