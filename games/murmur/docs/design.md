@@ -1,0 +1,425 @@
+# The Two Voices: design
+
+**Current premise.** Dilan, 33, delivers parcels from a courier depot in Istanbul. You suggest what she should do; she decides.
+
+**Historical premise.** The one-line premise below records the earlier fiction.
+
+**One line.** You are the inner voice of Dilan, 33, a dispatcher at a courier depot in the town she moved back to eight months ago. Her own pull speaks at the same moments, louder. You can only nudge. Each night she looks back over the day in her own words. Nothing is graded until then.
+
+**Done for the first playable** (set 2026-10-19 by the coordinator's brief; the owner accepts feel separately): five played weekdays and a Saturday morning, an ending, a playtest export that replays, tests, a headless measure, at least three source-unread playtests recorded verbatim with their findings applied, live at https://murmur.adamwhite.work and listed in the HF games collection.
+
+## Current HF 4 implementation — 2026-10-29
+
+Application0.9.3 uses released HF4.9.0, client0.5.8 and kit0.5.25. The default simulation is0.9.0. Client and kit use the exact GitHub release tar URLs in package.json. Optional 0.9.1 adds the third week; 0.9.2 is the separate outcomes edition. Historical editions retain the original HF 3.0.0 simulation under an explicit alias and `src/legacy`. Historical raw golden fixtures stay unchanged. Current public replay forwards both retained chapter and plain-English setting.
+
+One HF run owns the four people. Current reads use public inspection; choices, promptings, learned responses, review-style changes and practice decay use public framework inputs/tuning. The host authors scenes, physical actions and settlement. Companion offers are authored per slot and recorded before ordinary independent decisions. A request alone does not establish private disclosure, a joint repair, a visit agreement or a fulfilled promise. Current option previews keep the supported person perspective.
+
+Retained portable-person v2 admission captures source identity and life clocks and clears receiving defaults that could overwrite incoming norms, goals or duties. The full detached opening validates before an atomic whole-cast claim. Provenance-bearing opening facts declare local host places and historical vocabulary. Foreign historical places/actions/sources use explicit namespaces and calendar maps; they do not create source people or assert present co-location. Unsupported pending source references refuse. A supported incoming duty remains a duty.
+
+Current snapshots preserve every complete JSON value without rounding or omission. Saves synchronously record an exact input-reconstruction checkpoint and then compress the complete notebook. The local save also retains the fractional simulation minute already shown, so Resume does not grant extra answer time. This presentation clock does not alter native HF state. Reload verifies complete host values and the HF full hash. The title reads validated host metadata for its saved-location label; full Resume still validates the archive and replay. Complete source prefixes enter one IndexedDB store. The write transaction must commit before localStorage receives a small receipt or publication starts. Abort/failure preserves prior custody and the current save and refuses publication. Old unsupported source-prefix formats refuse explicitly; they are not silently migrated or deleted.
+
+Only the host's unused recent-completion diagnostic list is bounded to 64 names. Complete accepted action inputs and settlements remain in the authoritative archive. Actual action completion and full replay controls cover that distinction. Source checkpoint projection observes a completed Saturday and an idle person; it never advances time or clears purposes to make export succeed. Files retain file origin and no branch ownership. Exact-parent conflicts never fork implicitly.
+
+Historical HF4.8 port evidence (the sizes and source identity below do not describe the current HF4.9 archive): the actual default two-week and optional 0.9.1 three-week controls passed complete JSON cold restore, complete host replay and HF replay. Final three-week JSON is 20,205,038 bytes; two-week JSON is 13,270,626 bytes. Complete three-week WebKit save/normal Resume and exact source readback passed at 360×690 and 1280×800. A native transaction abort preserved the prior complete source and save and made zero publication calls. The controlled transport rejected publication; this is not shared acceptance or a genuine cross-origin journey. Reviewed candidate HF/client file bytes match the official released artifacts, allowing that evidence to carry forward. Kit0.5.21 adds the shared `PEOPLE_ACROSS_GAMES` caption/export; the installed release gets a separate short load/label check.
+
+A later normal-gate repair corrected a real host-validator defect: it added an absent ownership field and dropped explicit false metadata. The validator now preserves captured field presence and values exactly. A fast strict complete-snapshot regression failed before that fix and passed afterward; the actual current week-two Debug replay case also passed afterward. This is a changed validator path, separate from the unchanged HF/gameplay payload behind the earlier whole-game proofs.
+
+Limits: both WebKit probes accepted a second complete compressed notebook, correcting the earlier quota-exceeded hypothesis; maximum quota is unmeasured. Highest observed WebKit RSS was 4,458,688 KiB (~4.57 GB decimal / 4.25 GiB), not an instrumented absolute peak. The full browser check took 961.21 seconds; responsiveness and low-memory behavior are unproved. No whole-game0.9.2 outcomes proof is claimed. Exact CI/deployment receipts are delivery work; the root verified central deployment `6f88bd0a5aa5118ae7457689fd491c34d42ec80b` with HF 4.7.0 and dirty:false (`hf-unblock-b-published/receipt.json`). A genuine cross-origin journey and Adam's 2026-11-03 fiction acceptance remain separate.
+
+### Historical HF 4.5.1 contract probe — superseded
+
+The following block records the original4.5.1 findings and then-current pins. The blocker status and November17 recheck were superseded by released4.7.0 and the implementation above. Preserve the probes as history, not as current refusal or delivery status.
+
+#### Original HF 4 port probe — 2026-10-28
+
+Remaining: HF needs runtime inputs for learning prompting responses and changing review style, plus supported fast practice decay, before this game can move from HF 3.0.0. Recheck the published contracts on **2026-11-17**. Adam accepts fiction and feel separately.
+
+The target checked is published HF 4.5.1. Matching client 0.5.2 retains its intentional HF 4.4.0 portable bridge dependency. Neither is adopted here: the game retains HF 3.0.0 / client 0.4.15 / kit 0.5.17.
+
+`src/sim/game.ts` learns a phrase only after the actual choice (`learnPhrase`), changes review style when she writes and after three writing nights (`resolve` / evening handling), and decays unreinforced phrase practice nightly (`fadePhrases`). The public three-week editions also use `PRACTICE_HALF_LIFE_DAYS = 3.1062837195053903`. HF 4.5.1 authors responses and review style in initial state, but its public input union has no response-learning input; `review.requested` takes only person and reason. A candidate style field is rejected at `$.inputs[0].payload.style` as unknown. A candidate response-learning variant is rejected as unknown. The 3.106-day tuning is rejected at `$.tuning.promptings.practiceHalfLifeDays` as outside the supported range. Both input refusals preserve the complete run archive.
+
+Preauthoring every learned response would grant it before the choice. Fixing one review style would remove a consequence of writing. Local decay or response/review mutation would keep HF-owned faculty logic in the game, contrary to the port recipe. These are framework contract blockers. Evidence: `~/code/.lab-scratch/codex/pass-murmur-evidence/murmur-contract451.ts` and `.json`. The candidate probes test missing routes; they are not proposed public APIs.
+
+HF 4.5.1 now has retained portable admission, sourced norms, source-trust reads and bodily forecasts. Old blanket G2/G3/G4 claims are not a reason to retain 3.x. Prompting/review/day events can support a journal; no general narration blocker is claimed. The eventual bridge must convert minutes once, settle requests atomically, preserve finite cast provenance and prove complete current-game export replay on its new exact pin.
+
+The last query switch selected the next seed. This diagnostic now lives in collapsed Debug beside Lab privacy. Browser fixtures select seeds there or through explicit tester starts. Simulation and export rules remain unchanged.
+
+## How it was chosen (2026-10-19)
+
+The brief (concept 2 of `human-framework/docs/game-taste-2026-10-19.md`) went with three candidate loops to two consultants who read no source.
+
+- **Game-design expert (Opus):** loop A (moment cards on a running day) as the spine, with C's evening as a scene you take part in. "B: timing inside one moment turns into watching a bar build … C: you plant advice, then watch the day play out fast. That is the silent, low-agency expedition he rejected." The pull writes in pencil, you in ink; its strength is the size of its writing, not a meter; "some of [its wins] should be right … The game breaks if the player's rule becomes 'always oppose the pencil.'" Five weekdays and a Saturday page. Biggest risk: the player becomes a nag, and she says no to a nag. Wild idea: on Thursday, if she trusts you, the pull starts writing in your ink.
+- **Wildcard (Sonnet; Leyla, an ER triage nurse and former stand-up who plays on the night bus):** the same hybrid. "Silence has to be a legit move that gets me information, or it's just waiting." Each day adds a new kind of choice, not more difficulty; "Wednesday the loud voice starts agreeing with you, which is the scariest thing." Phone-down list: a tutorial popup, words like "journey" or "mindfulness", any meter, waiting on a timer, an obviously Good option, a first card over two lines, streaks, preachiness in either voice, a sad tone ("make me laugh once in the first minute"). Wild idea: the week ends as her voice note to Mum, written from her review lines; sending it is her call.
+
+Taken: A + the evening scene, five weekdays + Saturday, pencil vs ink, size of hand instead of meters, a pull that is sometimes right, the borrowed ink (Thursday on), the voice note ending, the shelf and the cropped photo. Not taken: a cap of three insists a day (an arbitrary cap; AGENTS.md wants limits from capabilities). Trust is the limit: insisting works, and it costs.
+
+## The core loop
+
+1. **The day runs.** The clock moves from 06:40 to bed. Between moments Dilan lives through HF (commute, work, meals) and the journal writes a line. A day is about three minutes.
+2. **A moment arrives** (8 a day): one line of scene, her pull in pencil, and 2 or 3 things she could do, in your ink. Time slows while the card is open (no pause).
+3. **You choose:** tap an option to say it, press and hold to insist, or say nothing. If the card's few minutes pass, she decides with only the pull in her ear.
+4. **She decides** (HF `decide` with both voices: `you` and `pull`, each with its own trust). She answers in her own words: yes, fine-if-you-insist, after this, something like it, or no, with a reason. The pull can win.
+5. **Evening.** The last card is in bed: write it down, scroll, or sleep. Writing makes tonight's review an accounting (HF review style `accounting`); otherwise she goes over it (`ruminating`, her default: weaker resolves, a little distress).
+6. **The review page.** Her review line (HF `reviewLine`), what she kept and missed, one line about you, any new phrase of her own in the margin, and tomorrow's resolves as underlines.
+7. **Tomorrow** carries it: a resolve prints on its card in her hand and pulls in HF (`review:resolve`); lost sleep makes the pull louder in the morning; a lie or a word at lunch comes back.
+
+### After the first playtests (2026-10-19, see docs/playtests/)
+
+Four source-unread testers and the HF-character harness agreed on these. They changed the rules:
+- **Holding is a capability, not a free override.** It carries only while she trusts you enough (`INSIST_FROM`, 0.45). Each hold costs trust. Below that line a hold carries less than a tap, and she says so: "You keep pushing me. I'm not listening to that today." Always holding now loses more moments than plain speaking.
+- **Her phrases fade unless you say them again.** Each night a phrase you did not say again that day loses a fifth of its practice. This is host-side, because HF's 60-day half-life is too slow for one week (HF request 5). Training and then coasting no longer works. She still turns the pull away on her own sometimes.
+- **The hints are honest (edition 0.2.1).** Her will runs at temperature 0, so the mood words on each option ("she's willing", "only with a push") are what HF predicts she will do. Runs differ through the seed's small differences in her habits.
+- **Honesty and kindness are not free.** Her convictions against lying and backbiting are lower, so the pull wins at those too. The first lie at the depot works ("Nobody checked."). The second time she owns up to being late, Murat writes it down in pen.
+- **Threads close.** Ece's "after six" becomes a Thursday scene. Saturday closes Ece, Murat, the shelf and the lock-screen photo in a line each.
+- **Repeats vary.** The coffee, bus and bed cards have a different line each day. The journal keeps each card's scene and pull line, so a card that closed while the player was away still reads.
+- **Bodily lines.** Routine hours now give water (tea at the desk), so she no longer reaches dinner "too thirsty". The forecast speaks only when an exertion would really cost her.
+
+### After the first-timer playtest (2026-10-19, Claude Haiku)
+
+A first-timer could not tell her replies from the pencil, read the mood words as odds, and saw "Later" quietly hand the moment to the pencil. Fixes, none of which change a decision:
+- **Three hands, three looks.** Your ink is the serif; the pencil is graphite blue-grey handwriting; her replies are quoted handwriting marked "she says".
+- **Mood, not odds.** The small words are her mood: she's willing, she'd grumble, only with a push, she'd put it off, she's against it.
+- **Say when she didn't.** When she does not do what you said, a line says so before the narrator line: "She put yours off, so the pencil's way, for now." or "She didn't. She went the pencil's way."
+- **Every refusal has a reason.** When HF gives her no words, the host gives her a true one: tiredness, the easier way, or a plain no.
+
+### Edges we keep (owner, 2026-10-19)
+
+The owner wants the edges playtesters find "a bit fun and slightly in our calculations" kept, not closed. The measure's `edge` policy plays them: it sides with the pull where the pull is right (the coffee when she is tired, the first lie), holds only where a hold carries and beats a tap, and speaks on borrowed cards. Over 8 seeds it lets the pull win 1.9 of 18.6 prompts and keeps 9.8 commitments, against 4.3 and 8.8 for the honest reader. It is the best policy but not a rout, so the edges stay.
+
+### What saying nothing does
+
+It is a real move. You see who she is without you. A turning-away she learned from you (below) only shows as hers when she uses it unprompted, and the evening notes it: "I did that one myself." Saying nothing costs no trust and lets voice pressure fade. It does let her phrases fade. A "say nothing" control on each card makes silence a visible move.
+
+### Two voices, made concrete
+
+- `pull` is an HF voice with its own trust (starts higher than yours: it has been with her longer). Its suggestion goes into the same decision as yours. When giving in felt good, she trusts it more (HF `learnFromVoice`). Its handwriting grows and shrinks with that trust.
+- Your ink darkens or fades with her trust in you. No meter for either.
+- The pull is sometimes right: the coffee before the 15:00 rush, skipping the run when she is spent. Those moments carry no held norm against the pull.
+- **Promptings:** tempting options carry a `temptation` tag and a norm from the HF catalog (punctuality, lying, backbiting, kindness-to-parents). HF records each as a prompt that passed, turned or won.
+- **Turning away:** when she follows you away from a prompt, she keeps your words as her own phrase (an HF prompting response, `redirect` or `leave`, low practice). Practice grows whenever it holds and fades with disuse. On later days the margin shows her phrases; by Friday she may turn before you speak.
+- **Borrowed ink** (Thursday and Friday, when she trusts you more than the pull): some pull lines arrive in your ink with a slightly wrong slant ("You said rest matters."). Mechanically the pull's suggestion then comes under your voice id, so her trust in _you_ pays for it if it goes badly. Saying something real on that card drowns it out. The evening may notice: "Some of what I heard today wasn't you."
+
+### Progressive disclosure, one new kind of choice a day
+
+- **Monday:** tap to suggest, hold to insist, or say nothing. The first alarm offers a hold with its trust cost beside the suggestion; holding fills the ink and acknowledges insistence. The pull, the lie at the depot (only if she was late), the gossip at lunch, Mum.
+- **Tuesday:** Monday's resolve prints on its card.
+- **Wednesday:** bodily forecast: Murat asks her to cover Ece's evening route, the night of Aylin's birthday dinner ("I can do the route, but I'll be spent for Aylin's."). Mum's message if she missed two calls.
+- **Thursday:** borrowed ink. The shelf.
+- **Friday:** the gym renewal ("We miss you! Your plan renews Friday"). The week's last bus home.
+- **Saturday morning:** the voice note to Mum, made from her review lines. Sending it is her decision; you can whisper. Then the last page.
+
+### Achievement, without a scoreboard
+
+- A good week: on Thursday or Friday she turns before you speak; her phrases fill the margin; the call to Mum happens; the last page is short and plain.
+- A hard week: pressed handwriting, crossings-out, many weak resolves; still one honest line she means.
+- The last page: her own phrases, what she now does unasked, the two hands side by side, and the week strip.
+
+## The back story (implied, never told)
+
+Dilan moved back to her hometown eight months ago after something ended. Objects that imply it: her lock screen is a beach photo with one person cropped out; a half-built shelf in the corner with the screws still in the bag; the gym email; her sister Aylin's voice notes ("Mum's asking again. Just ring her, it's ten minutes."). Murat runs the depot floor. Ece is the new driver.
+
+## HF use (pinned exactly: 2.7.0 at start, 2.8.0 since 2026-10-19)
+
+One `Person` (Dilan). Voices `you` and `pull`. Opt-ins: fatigue store, promptings (reading `inclination`, never shown), review (style `ruminating`, 22:00). Commitments via `promise`: her alarm (to herself, daily), calling Mum (to Mum, evening window, daily), Aylin's dinner (Wednesday). Norms from the HF catalog only; no invented rulings. `predict` gives each option a faint lean (pure). `bodyForecast` on offers with `followedBy`.
+
+## Rules
+
+- Inputs are stamped with the sim minute; replay of seed + input log rebuilds the state exactly.
+- No meters or percentages for Dilan's inner state. Money is not in this game; the clock is.
+- Faith stays quiet and unnamed. The prompting reading is never shown.
+- Short lines, at most two lines of scene per card. One laugh in the first minute.
+
+## Clarity follow-up (2026-10-20, F-229)
+
+The delivery artifact for this round is the implementation report at `human-framework/scratch/followups/murmur-report.md`, with tests, rendered phone/desktop evidence, a signed commit and a matching clean live release. The Opus driver accepts the follow-up; the owner accepts feel separately.
+
+- **DL-15:** one line beside the running day reports the current simulation minutes per real second and why it is slow (a waiting choice or reading her reply). The existing playback rates, minute steps, decisions and exports stay unchanged. The game menu keeps the clock running.
+- **DL-26:** the menu button's accessible name and panel title are “Game menu”. Local export is “Download this run” in both menu and ending; the collection link is “All games”.
+- **DL-4/DL-5:** a declined suggestion keeps her original reply and adds a possible response in her words. A pure reconstruction of that exact decision forecasts whether insisting could have carried. If so, she names pressing and holding a future suggestion. If pushing no longer carries, she asks for a plain word or silence. Otherwise she can name an alternative she was willing to hear. Every line makes clear that the resolved moment stays resolved; agreement is never promised.
+- **Verification:** deterministic refusal tests, a pre-change 0.2.1 full-state replay/continuation hash fixture generated from commit `60e926d`, browser rate/menu/download tests, and touch-emulated 360×690 plus 1280×800 renders. Long refusal plus completed narration fits; the response control keeps its position when narration arrives. No simulation or HF dependency change.
+- **Acceptance limit:** this is builder verification. Leyla's willingness to return needs another source-unread playtest; this round does not claim to establish it.
+
+## Round 4 (2026-10-20, Farah retest)
+
+What remains: Opus driver acceptance and a fresh source-unread retest of whether early insistence and distinct refusals sustain engagement. The delivery artifact is the appended Round 4 section of `human-framework/scratch/followups/murmur-report.md`, with tests, touch phone/desktop renders, a signed commit and a matching clean live release. The owner accepts feel separately.
+
+- The first alarm exposes the real hold gesture beside a suggestion whose forecast improves when insisted. The player can hold it immediately, see ink fill and “insisting…”, and hear the existing simulation response. A plain tap and silence remain available. Its trust cost appears before acting. Cues no longer conceal a useful hold until Tuesday.
+- Refusal recovery uses the exact pre-decision state. Monday's alarm, Aylin, Murat, Ece, lunch and Mum responses differ in her words and describe possible future changes. Tiredness, lateness, lost trust and willing alternatives determine the response. A resolved moment stays resolved.
+- Each resolved moment keeps “You suggested” beside “She chose” in the journal. Explicit silence and timeout are distinguished. The same reconstructed labels appear below the current reply after import; conditional wording comes from the original moment. Narration appears only when the simulation clock reaches completion.
+- Simulation, input schema, playback policy, framework pin and old exports stay unchanged. Exact legacy replay and continuation remain acceptance checks.
+
+## Design change 2026-10-20 (owner may veto)
+
+New runs start on edition **0.3.0**. Farah (F-245): “this sequence of taps felt too much like watching her follow the other voice.” Lina (F-253): “I wanted influence through suggestions, and I had not felt that influence yet.” Her request: “Let a gentle suggestion produce a noticeable response early, even when she refuses.”
+
+A plain suggestion can now carry against her leaning. HF draws from its own scores with temperature 0.14 and the RNG in her state. Trust raises the suggestion's score; pressure lowers it; a smaller score gap makes listening likelier. HF still vetoes real incapacity and held convictions. Holds retain deterministic resolution, capability limits and trust costs. Her starting bed and phone habits are slightly less settled, making Monday's first choices close calls. No opening win is scripted.
+
+A gentle refusal can remain as HF standing advice when she was listening, trusts the voice, and has not been pressed too far. HF owns its decay, score and discharge; repeated advice refreshes one entry rather than stacking. She acknowledges the thought immediately. Its next related card, reply and journal can name it; the evening can remember the original refusal. The trace records retained advice, not a promise to comply. A live repetition replaces that source's remembered term, as HF already specifies.
+
+**The hints are honest in this edition:** “she leans toward it, but hasn't decided” means probability at least one half; “she's against it, but she's listening” means one tenth to below one half; “she's firmly against it; a small chance she'll listen” means above zero to below one tenth. “She can't” / “she won't” only appear for zero chance; “she's willing” only for certainty. These bands are builder checks, never shown as feeling numbers. The new forecast reads the actual input minute without changing state or RNG. The card shows remaining real response seconds. A release belongs to the exact card and control pressed; an expired or replaced card receives no input from it.
+
+Cost and risk: more uncertainty makes her less predictable. Retained words add reading. Some suggestions are forgotten or have no related moment before Saturday. The same eight-seed measurement compares both editions and includes silence, opposition, holds, pull, reader and edge policies; it is evidence about those policies, not owner acceptance of feel. No requested part of this change is deferred. The lead designer keeps final taste review and owner acceptance.
+
+**Replay and revert:** 0.2.1 saves and exports stay on 0.2.1, including unversioned historical saves. Creation and replay take an explicit edition; stored metadata and journal reconstruction preserve it. Canonical full-state hashes were captured from commit `a9447c2` before simulation edits: 12 complete runs across three seeds and four policies, plus 36 checkpoint replays/restored continuations. New runs use `GAME_VERSION` in `src/sim/game.ts`. To revert the default, set it to `'0.2.1'` and deploy. Keep `LISTENING_EDITION` and both supported branches so existing 0.3.0 runs still replay.
+
+## Remaining acceptance and dependencies —2026-10-29
+
+The full original clause map and current mechanisms are in [the remainder record](remainder-2026-10-29.md). Historical reports below retain their original source versions. New behavior is opt-in with exact legacy continuation. Served HF4.9 editions0.9.0/.1/.2 retain397 rules and opening catalogs; old books must resume and replay. Optional0.10.0/.1/.2 carry the remainder changes with source rules0.10.0. The default stays0.9.0. See [HF4.9 edition boundaries](hf49-editions.md).
+
+- Week-two difficulty: the default keeps the costly attention, arrival and bedtime promises and the existing weekly standing threshold. The0.6.1 measurements below are historical; they are not current-HF4 odds. Adam accepts difficulty and feel on2026-11-03.
+- Friday coffee: the explicit0.10 opt-in offers checking the handover sheet versus coffee and Dilan’s own red board. Dilan makes the ordinary HF choice. Joint checking is narrated only after Ece independently chooses and completes it; being busy, choosing her own time or interruption establishes no joint result. The Monday lesson and Thursday walk remain. Player interest/conditional return remains untested, owner2026-11-03.
+- More campaigns: the public three-week checkbox starts0.9.1 with fresh local people; days15–20 carry the complete earlier run. The separate outcomes checkbox starts0.9.2. These routes already exist; no proposal-only engineering gate remains. Adam accepts whether the campaign earns its length,2026-11-03. A Sunday aim remains conditional on the actual Saturday2 player finding, not an unconditional new-week requirement.
+- Ece is already a canonical person. Mum remains background. Adam must decide any finite foreground allocation change,2026-11-03; this batch adds no person.
+- DL27: complete current snapshots and saved-location text already exist. The reproduced missing fractional answer clock is now saved locally in both synchronous and compressed saves. Resume validates full state and hash; no latest heads are loaded. Unsupported/malformed originals remain untouched.
+- DL28: automatic run/save recording and explicit Feedback receive lossless complete notebooks, including in-progress native host/HF/RNG. Local file export retains the complete native JSON. Synthetic production transport and actual horizon-size controls are technical proof only; a note receipt does not prove optional run delivery. No history is pruned or private compact kernel introduced.
+- Deniz’s conditional renewal-reading request: every current route now offers reading before deciding. Reading takes ten actual HF action minutes. A later signature choice requires completed reading; signing is never automatic. No tenancy terms, private motives or prior reading are invented. Weekday-specific bus/bed suggestions also apply in every current route.
+- Phrase practice: current HF4 owns cue matching, learning and continuous3.106-day decay through public inputs/tuning. Every current learned morning remains an HF choice; the old optional-route host override is removed. Old min-maxer/HF2.8 observations remain historical, not current difficulty results.
+- Genuine cross-origin reading/custody/formal retirement/re-entry still needs the released SDK/peer owners’ supported reader and custody contract. On2026-10-29 client0.5.8 has no certified portable readers for the blocked peers. Whole-cast refusal and exactCAS remain mandatory. Recheck2026-11-03; no forged certification or partial cast is allowed.
+- Follow-up b, pinned answers, pacing/Skip, recording linkage, plain English and tablet readability have current mechanisms. Their actual source-unread/Adam acceptance remains2026-11-03. No new player round is authorized. Player/friends/ShowHN remain paused.
+
+### Follow-up b (2026-10-20; owner may veto)
+
+What remains: lead designer acceptance and a fresh source-unread check of feel. The delivery artifact is the `Follow-up b` section of `human-framework/scratch/design-round/murmur-report.md`; the lead designer accepts the round and the owner accepts feel.
+
+Priya's fresh retest: “I thought on with the day meant the day was waiting for me” and “Still thinking about it is now the same reassurance twice.” Her result was a keep: “I would return voluntarily for a short session.” These fresh reports have no new ledger IDs; the earlier request remains F-245/F-253. The fun review also saw the same alarm recall on Tuesday and Wednesday and a final hold that the ending did not acknowledge.
+
+The existing live-card replacement and slowdown are now covered by normal-playback browser tests at both fixture sizes. We could not reproduce a hidden next card on 052ad26: twelve seed/answer probes, including assent and refusal, all showed it. The reply control now says “Let time pass faster”; beside it, “The clock keeps running.” It describes acceleration rather than a waiting transition.
+
+Retained words use action-specific acknowledgments. Their first related card can recall them once; that answer reports the new result rather than repeating the recall. A completed action gets past-tense acknowledgment only when its narration is due. Later related cards and bedtime leave that thought alone. The journal preserves the exchange. One actual learned phrase appears quietly beneath the clock during the day. Saturday distinguishes a suggestion, an insistence she followed, an insistence she refused, explicit silence and timeout using the final moment's own record.
+
+All changes are presentation-only. Edition **0.3.0** and the HF **2.8.0** pin stay exact. Before editing, we captured 12 final canonical full-state hashes plus 36 checkpoints and restored continuations from 052ad26, alongside the existing 0.2.1 fixtures. Retiring a displayed thought does not discharge or change HF advice. It can still influence later choices while HF retains it; the UI stops repeating it.
+
+Cost: a single quiet phrase does not show every word she has learned. The player's earlier exchange remains in the journal, so a sentence can persist as history after leaving the reply; it is not announced again as a new recall. Reversal: revert this follow-up's UI changes and tests; keep both replay fixtures. No new-run edition switch is needed.
+
+## The second week (edition 0.4.0, 2026-10-20; owner may veto)
+
+What remains: owner acceptance of feel. The Protocol 2 retest ran on 2026-10-20 (human-framework `docs/lab/reviews/murmur-week2-2026-10-20/`, ledger F-367 to F-377). The delivery artifact is a deployed 0.4.0 whose Saturday page offers a second week; the lead designer accepts the slice, the owner accepts feel.
+
+Owner, 2026-10-20: "We both need more of the same as well as other campaigns." "I am her. I want to keep pushing her to do better." The lab's named trap: "more weeks whose state persists while the decisions repeat." A Codex wildcard pass proposed the theme; an adversarial review (Claude, contrarian narrative designer) cut and reshaped it. Both texts: `~/code/.lab-scratch/murmur-more/` (local).
+
+**Theme: getting better causes trouble.** Last week Dilan got a little more dependable. This week somebody starts depending on her. Ece's title for it: "Leave it with me."
+
+- **The same person goes on.** After Saturday's last page, "Another week" (now the main button; "Start over", a new run, is the quiet one) continues the same run: her trust in both voices, her phrases and their practice, habits, tiredness, and every open thread. Finished 0.3.0 runs can continue too: week one under 0.4.0 is rule-for-rule and line-for-line 0.3.0, so the old inputs replay as 0.4.0 and go on. The 0.3.0 export itself still replays as 0.3.0.
+- **Week one's last page is canon.** Its thread lines and closing line ("On Sunday she rang anyway", "Ece has her own columns now", "Aylin came round on Saturday for the shelf", the lock screen) are true in week two. Nothing in week two contradicts them.
+- **More of the same, at the same density.** Five or six cards a day: the alarm, the bus home (the call to Mum), bed, and three new situations. Habits she built show as lines she does unasked. While "Feet on the floor" is strong she gets up alone and the journal says so.
+- **One new kind of choice a day:**
+  - Monday, _accept help_: Ece offers to clear the returns. Let her, or redo them herself. Mum's answer to Saturday opens the day; a tenancy renewal letter arrives. The 2026-10-31 bounded candidate discloses two newly authored facts only after completed reading (see below).
+  - Tuesday, _your words in her mouth_: Ece asks Dilan how to handle something, and Dilan answers with a phrase she learned from you. It may be wrong for Ece. Let it stand, soften it, or tell her to ask Ece what she thinks. Ece also asks for practice on the board: Dilan promises twenty minutes, Thursday evening, or nothing (an HF promise to Ece).
+  - Wednesday, _correct your own advice_: the pull quotes her own learned phrase, bent ("Just say it plainly. In front of everyone."). Then Ece makes a mistake: correct her privately or across the room. The evening is family.
+  - Thursday, _let another method stand_: Ece runs the board her own way. It works, and Dilan can't read it. Leave it, change it together, or put it back. Any promise to Ece falls due on the same evening as Dilan's own thread.
+  - Friday, _take back a promise_: she wants the early bus, and something is in her bag. Ece asks her to stay. Stay, withdraw a promise openly (HF `release`), or slip out.
+  - Saturday: Ece's message about the week, then the last page with both weeks.
+- **Kept unresolved for good:** who was cropped out of the photo, what ended, the subscription, what is in her bag on Friday. The tenancy letter was originally deliberately unexplained; the 2026-10-31 owner direction replaces that mystery only with a newly authored one-year renewal and a signed-copy return date of Friday17:00. These were not recovered contract facts. Other terms and consequences remain unspecified. Two facts do not establish complete informed consent. No rent, penalty, eviction, benefit, landlord motive, legal interpretation or deadline enforcement is added.
+- **The edge we keep:** leaving can be selfish and still work. Staying can help Ece and cost Dilan something she won't explain. Kindness gets no guaranteed reward. The week-two pull is harder, because it uses her own phrases.
+
+Cut after review: a Sunday "aim for the week" (it read as a quest log with a pass/fail stamp), and a Tuesday double booking that repeated Wednesday of week one. HF pin stays 2.8.0 (`promise`, `release` and promptings cover the slice).
+
+**Replay and revert:** 0.2.1 and 0.3.0 saves stay on their editions and end on Saturday as before. New runs use `GAME_VERSION` 0.4.0. To revert the default, set it to `'0.3.0'` and deploy; keep the 0.4.0 branch so existing week-two runs replay.
+
+Deferred (target 2026-11-03): another person's week (Aylin); replay-variety Tuesdays; a Sunday aim, if Saturday of week two feels aimless; Ece and Mum as HF persons.
+
+### What is new in 0.4.0, as built (2026-10-20)
+
+- **Another week** on Saturday continues the same Dilan into Monday (day 8). Sunday passes offstage: two nights of fading phrases, and her daily promises (alarm, call to Mum) renew.
+- **Begin at the second week**, on the cover, for players who already know week one: a quiet voice plays week one for you (her likeliest answer each time, never the pull), and you start on Monday of the second week. (The first build showed week one's Saturday page first, with "You suggested" lines the player never said; the first retest caught it, fixed the same day.)
+- **Getting up alone.** When "Feet on the floor" has enough practice (0.45), she skips the alarm card and gets up by herself, and the journal says so. Measured over 8 seeds: about 4 of 5 mornings for players who argued for it, none for players who stayed silent.
+- **Your advice travels.** What you told Dilan in week one comes back in Ece's mouth. "Walk away from it" and "Feet on the floor" fit Dilan and fit Ece badly; Thursday shows the result.
+- **The pull has listened too.** In week two it is a little louder (+0.1) and quotes her own phrases back bent.
+- **Friday** can release a promise openly (HF `releaseCommitment`); the early bus really is earlier.
+- **The last page** shows both weeks side by side, and the two-hands line reaches back a fortnight.
+
+**Honest difficulty note.** Week two's pull is only a little louder. Engaged players still win most prompts (8 seeds, week two only: an insisting player lets the pull win 0 of 7 prompts; a reader 1 of 10.5; a silent player 8.4 of 13.3; a pull-follower 11.1 of 14.5). Week two's difficulty is in trade-offs, not in the pull: helping Ece costs Dilan's evenings and her own promises, and advice that worked for her goes wrong for someone else. Not tuned further on purpose; if the owner wants it harder, the pull bonus is one constant (`WEEK_TWO_PULL`).
+
+**Retest, 2026-10-20 (Protocol 2, phone).** Every valid tester's best moment was the same: Dilan handing Ece the advice the player gave her ("Feet on the floor. Drive it round yourself."). The worst was the routine cards (alarm, bus call, bedtime), which repeat each day with the same answers; two of three first wishes to leave came there (4:09 free, 10:55 floor; a third tester stopped satisfied at 3:03 and would return). Fixed the same day: the cover shortcut now opens Monday of the second week, and week-two labels speak in Dilan's first person.
+
+Deferred from the retest (target 2026-11-03): week-two routine cards offer a different answer or turn on most nights; "say nothing" stays above 690 px on three-answer cards; plain words for "the pencil's way" after a refusal. The routines are "more of the same" by design, so whether to vary them is the owner's call.
+
+### Week-two routine variation (0.4.1, 2026-10-21)
+
+Owner direction resolves the routine-card deferral above: vary two routines and keep one steady. The bus call and bedtime now offer different wording on each weekday, tied to that day's photograph, missed call, family evening, board, or Friday bag. The alarm keeps “Feet on the floor” and “Five more” as the steady habit; learned independent waking still applies. Actions, consequences, timing, HF 2.8.0, and background faith stay as before.
+
+New runs, including the second-week shortcut, use 0.4.1. Existing 0.4.0 exports replay and continue with their original words; 0.2.1 and 0.3.0 replay unchanged. Finished 0.3.0 runs can continue into 0.4.1. Delivery ends with a signed commit on main, green CI, a deployment whose release metadata matches that clean commit, and the requested scratch report. Owner acceptance of feel remains outstanding.
+
+## Other-voice typography audit — F-404 (2026-10-21)
+
+Owner direction, verbatim and in order:
+
+1. 'I think it would be clearer if the handwritten font in the two voices is only for the other voice, or descriptions about it. We can be consistent about this and that would reduce the cognitive load'
+2. 'Or the slightly diagonal style of handwritten font. We just need to adapt a consistency'
+3. SOFTENED: 'I must say that handwritten is growing on me and the color and slanted style is almost consistent, so I'm softening my direction. We still need to check and stay consistent to make things easier though, so the investigation is afoot'
+
+The resulting rule keeps Caveat, the existing blue-grey pencil colours, and the slight rotation together on the other voice and text about it. `.other-voice` owns all three. Its default angle is −2°; trust-dependent pull and comparison angles remain −1.2° to −2.8° through `--other-voice-angle`. Dilan, the player, narration, headings and controls use Literata upright. Spacing, practice opacity, trust-dependent player ink, and existing type sizes remain except for the fit corrections below. The other-voice caption uses 17px so the handwritten face remains legible.
+
+This supersedes the older “three hands” presentation and the visual disguise in “borrowed ink” above. Borrowed lines still use their authored words and the same HF voice attribution, trust, decisions and replay edition; they now identify their source visually. This is the owner's explicit consistent-marker rule, not a change to the simulation.
+
+The audit covers all renderer branches in `src/ui/app.ts`, every font, colour and slant rule in `src/ui/style.css`, and text/font references in `src`, `index.html`, and `public`. Repeated runtime instances count once per renderer place below; the two pencil refusal descriptions share one place. **40 live style inconsistencies found; 40 fixed.** Dormant declarations and shared infrastructure are listed separately and excluded from that count.
+
+| Place                                                               | Current style before audit                     | Verdict              | Change                                                                                            |
+| ------------------------------------------------------------------- | ---------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------- |
+| Cover, “The other got there first.” (`title`)                       | Caveat, ink-soft override, −2°                 | Fix                  | Keep face/slant; restore pencil colour.                                                           |
+| Ordinary pull card (`cardHtml`)                                     | Caveat, pencil, trust-sized/rotated            | Keep                 | Route unchanged values through `.other-voice`.                                                    |
+| Borrowed pull card (`cardHtml`)                                     | Literata, your ink, skew −9° / rotation +0.4°  | Fix                  | Use the same other-voice marker and trust sizing as other pull lines.                             |
+| Journal pull (`drawJournal`, who=pull)                              | Caveat, pencil, upright                        | Fix                  | Add shared slant.                                                                                 |
+| First-card explanation, “the pencil is the other voice”             | Literata italic, ink-soft                      | Fix                  | Add shared marker; 17px keeps Caveat legible.                                                     |
+| Refusal/defer descriptions naming the pencil (`recordHtml`)         | Literata italic, pencil                        | Fix                  | Add handwritten face and shared slant.                                                            |
+| “She didn’t. She did something else.” (`recordHtml`)                | Literata italic, pencil                        | Fix                  | Plain ink and upright; it does not identify the pull.                                             |
+| Saturday “the pencil” comparisons (`handsHtml`)                     | Caveat, ink-soft override, trust-sized/rotated | Fix                  | Restore pencil colour; preserve size and angle.                                                   |
+| Evening “Some of what I heard today wasn’t you.” (`pageHtml`)       | Caveat, ink, upright                           | Fix                  | Apply complete marker to this borrowed-voice description only.                                    |
+| Header weekday (`header`)                                           | Caveat, ink-soft                               | Fix                  | Literata; preserve size/line height.                                                              |
+| Kept words beneath clock (`header`)                                 | Caveat, ink-soft                               | Fix                  | Literata; these are her learned words.                                                            |
+| Journal heading (`drawJournal`)                                     | Caveat, ink-soft                               | Fix                  | Literata; preserve size.                                                                          |
+| Journal Dilan speech (`drawJournal`, who=dilan)                     | Caveat, ink                                    | Fix                  | Literata; preserve size.                                                                          |
+| Recorded reply and “she says” (`recordHtml`)                        | Caveat reply, Literata attribution             | Fix                  | Literata reply; keep attribution.                                                                 |
+| Recorded learned phrase (`recordHtml`, margin)                      | Caveat, ink                                    | Fix                  | Literata; preserve size.                                                                          |
+| Card resolve (`cardHtml`)                                           | Caveat, ink                                    | Fix                  | Literata; preserve size and tally.                                                                |
+| Card bodily forecast (`cardHtml`)                                   | Caveat, ink-soft                               | Fix                  | Literata; preserve size.                                                                          |
+| Option mood (`cardHtml`, lean)                                      | Caveat, ink-soft                               | Fix                  | Literata at 14px so the wider serif mood labels retain the phone-card fit.                        |
+| Card recalled thought (`cardHtml`, stayed)                          | Caveat, ink                                    | Fix                  | Literata at 17px to preserve phone-card fit.                                                      |
+| Reported retained/completed thought (`thoughtHtml`)                 | Caveat, ink                                    | Fix                  | Literata at the same 17px as card thoughts.                                                       |
+| “say nothing” control (`.hush`)                                     | Caveat, ink-soft                               | Fix                  | Inherit Literata; preserve control dimensions.                                                    |
+| Evening resolve (`pageHtml`)                                        | Caveat, ink                                    | Fix                  | Literata; preserve size and tally.                                                                |
+| Evening learned phrases (`pageHtml`)                                | Caveat, ink, −1.5°                             | Fix                  | Literata upright; preserve practice opacity and size.                                             |
+| Evening independent-action speech (`pageHtml`, alone)               | Caveat, ink                                    | Fix                  | Literata; preserve size.                                                                          |
+| Evening heading (`pageHtml`)                                        | Caveat, ink                                    | Fix                  | Literata; preserve size.                                                                          |
+| Evening review (`pageHtml`)                                         | Caveat, ink                                    | Fix                  | Literata; preserve size.                                                                          |
+| Evening herLine (`pageHtml`)                                        | Caveat, ink                                    | Fix                  | Literata; preserve size.                                                                          |
+| Evening aboutYou, all other branches (`pageHtml`)                   | Caveat, ink                                    | Fix                  | Literata; preserve size. These describe you, not the pull.                                        |
+| Continuation notice (`ending`)                                      | Caveat, ink-soft                               | Fix                  | Literata; preserve size.                                                                          |
+| Week-strip weekday labels (`stripHtml`, both weeks)                 | Caveat, ink                                    | Fix                  | Literata; preserve size.                                                                          |
+| Final learned phrases (`finalHtml`)                                 | Caveat, ink, −1.5°                             | Fix                  | Literata upright; preserve practice opacity and size.                                             |
+| Final independent actions (`finalHtml`)                             | Caveat, ink                                    | Fix                  | Literata; preserve size.                                                                          |
+| Saturday heading (`finalHtml`)                                      | Caveat, ink                                    | Fix                  | Literata; preserve size.                                                                          |
+| Final input reflection (`finalHtml`)                                | Caveat, ink                                    | Fix                  | Literata; preserve size.                                                                          |
+| Toast (`.toast`)                                                    | Literata italic, sky                           | Fix                  | Upright; preserve sky status colour.                                                              |
+| Journal scene (`.jscene`)                                           | Literata italic, ink-soft                      | Fix                  | Upright; preserve colour.                                                                         |
+| Other captions: timer, mood explanation, running clock (`.caption`) | Literata italic, ink-soft                      | Fix                  | Upright; preserve size and colour.                                                                |
+| Gameplay hints (`.hint`)                                            | Literata italic, ink-soft                      | Fix                  | Upright; preserve size and colour.                                                                |
+| Your recorded input/silence (`.record-yours`)                       | Literata italic, ink                           | Fix                  | Upright.                                                                                          |
+| Chosen action (`.record-chosen`)                                    | Literata, pencil                               | Fix                  | Normal ink; a chosen action is not a pull utterance.                                              |
+| Voice note to Mum (`.voicenote .note`)                              | Literata italic, ink                           | Fix                  | Upright; Dilan is speaking.                                                                       |
+| Dormant `.herchoice` and `.yousaid .ink` rules                      | Pencil colour / italic; no rendered uses       | Remove dormant rules | Remove marker declarations; not counted as live inconsistencies.                                  |
+| Shared typography infrastructure                                    | `.hand` applies Caveat plus size/line-height   | Consolidate          | Rename size/line-height helper `.notebook-text`; only `.other-voice` owns face, colour, rotation. |
+| Theme tokens / Google font loading                                  | Caveat plus light #5f6b78 / dark #9fb0c2       | Keep                 | Keep original assets and theme colours. No other text rule consumes hand or pencil.               |
+| SVG tick rotation / wobbled rules and tally strokes                 | Rotated tick geometry; ink-soft/moss strokes   | Keep                 | Non-text geometry does not mark a voice.                                                          |
+| Other-voice metadata in index.html description                      | Nonvisual plain metadata                       | Keep                 | No rendered text to mark.                                                                         |
+
+### Screenshot comparison and acceptance evidence
+
+Playwright comparisons use the same seed (42), fonts loaded, light theme and reduced motion, at **1280×900** and **360×690**. Before is clean `origin/main` at `b038891`; after is this audit. Both an insisting run and a plain-speaking run cover the open cover, first card, journal, evening, resolve, forecast and ending; the plain-speaking run also reaches a borrowed card. Screenshots and computed-style inventories stay outside the repository at `/Users/abdul/code/.lab-scratch/codex/murmur-font/` (`before-*` / `after-*`, and `before-reader-*` / `after-reader-*`).
+
+Comparison: the ordinary pull preserves its face, colour, size and trust rotation. The cover and Saturday pencil labels regain the pencil colour. Journal pull and descriptions gain the missing marker components. Dilan's pages and the controls change only the leaked face/slant/colour; Literata wraps differently, so evening and ending pages can grow vertically. The first repo check caught the wider serif labels pushing the three-option fixture below 690px. Mood labels now use 14px and retained thoughts 17px to restore that fit. At 360×690 the card retains its internal scroll and journal space; all fixture options and the silence control fit without scrolling. No new layout or palette is introduced. Computed-style checks cover 320 states across both weeks, two themes and both viewports (including 16 borrowed cards); the dark screenshot run also checks the borrowed evening description (`after-dark-*-borrowed-evening.png`). The original light/dark pencil colours remain. Before/after contact sheets are `comparison-phone.jpg` and `comparison-desktop.jpg`.
+
+Done for this audit: this table, desktop and phone screenshot comparison, repo checks, signed commit on main, green CI, deployment with matching `/release.json` and `dirty:false`, and the five-line scratch report requested by the owner. Owner acceptance of feel remains separate.
+
+### Owner intake polish (0.4.2, 2026-10-21)
+
+The owner's two-week run is recorded verbatim in [the intake](playtests/owner-2026-10-21.md). New runs vary the first-week call completions, explain arrival at Aylin's after the extra route, quote unprompted phrases only beside their own action, and use clear cancellation and parcel replies. Both phone header labels fit at 360×690 and 412×891. Decision weights, insistence costs, and difficulty stay as before: the player can already finish ahead of the pencil through selective plain suggestions and silence. Existing editions remain replayable; finished 0.3.0 runs still upgrade to 0.4.1 so their first-week fingerprint stays identical. Delivery ends with signed main, green CI, a clean matching live release, and the eight-line scratch report. The [third-week proposal](week-three-proposal.md) awaits owner approval; no third week is implemented. Owner acceptance of feel remains separate from technical checks.
+
+
+## Historical optional third-week candidate — 2026-10-26
+
+Historical candidate status follows. It is superseded by the current public0.9.1 route above; the old pending-delivery wording is not a current engineering deferral. Genuine source→target custody and Adam fiction acceptance remain separate.
+
+The widened owner instruction authorizes the remaining campaign engineering. It supersedes the old proposal-only sequencing; owner taste is still an input. Default0.6.0 retains its two-week story and exact rules. Selecting the three-week edition starts0.7.0 with fresh local canonical people. It never migrates a loaded0.6 notebook or silently claims latest browser heads.
+
+Friday's repeated coffee card becomes an Ece handover versus Dilan's unfinished board. The third week carries the actual people, promises, practices, fatigue, choices and both earlier weeks' pages. Monday checks a board instruction against the loading floor. Tuesday photographs compete with shelf work. Wednesday an arrival promise has a six-o'clock window; a paid route takes ninety actual minutes and misses it. Thursday quiet repair and stopping the van have different time and public consequences. Friday closing practice costs Dilan her evening. Saturday remembers actual outcomes and lets her keep, revise or share her advice. Routine alarms remain steady; buses and bedtimes refer to that day's events.
+
+Only0.7 uses public HF3.0 multi-commitment fulfillment for one actual birthday dinner, scoped prompting cues, and continuous practiceHalfLifeDays=log(0.5)/log(0.8), about3.106days. It removes the synthetic second call and nightly practice mutation in this edition. This continuous decay differs from the old reinforcement-gated nightly rule. No difficulty success or assent is scripted.
+
+Current full saves already held complete state. The new murmur-save/2 wrapper checks its header and preserves the exact minute, unanswered deadline and state; old input-only saves retain their historical next-choice branch and disclose that limit. Resume names the actual saved location. Both run send paths now use murmur-notebook/1: lossless gzip/base64 of the entire notebook with byte count and SHA256. It reconstructs complete histories, Person/RNG and source archives; it prunes nothing. A malformed or future format refuses. Ordinary information reading slows time; the Game menu pauses it.
+
+Client0.4.11 and kit0.5.12 use the exact verified immutable release artifacts on the single HF3.0 graph. Quiet Feedback choices select literal note labels and send nothing before Submit. Recording-off remains note-only unless the player chooses sharing. A note receipt does not prove optional run delivery. npm publication is excluded by HF owner policy and is not a missing dependency.
+
+GDI702 is a separate explicit murmur-cast/2 / murmur-calendar/2 source projection from supported0.6 Aylin only. It maps the last eight actual source episodes, preserves source references and declares a zero producer clock offset. It archives and discloses omitted episode IDs and unsupported stores. The actual92cdebd source has200episodes and empty beliefs/commitments/debt; nonempty transport is not proved. Oldv1 is unchanged. No source reference awards trust, acquaintance, skills, work or public knowledge. The original92cdebd notebook/build remains historical; a later signed producer commit implements this dialect. The offline export script requires that signed clean producer. Good Hands receiver work and genuine cross-origin proof remain separate.
+
+Deferred reconciliation: a second week and canonical Ece already exist. Do not build them again. Mum remains an unnamed background parent; there is no41st maintained person. Foreground allocation and real owner/player taste remain Adam's inputs for2026-11-03. GDI027/028/030/031/032/574/575/576/689/702 are implemented in this candidate pending review/delivery; this does not close their delivery or taste acceptance. No new player/model round, outreach, service or allocation change occurred.
+
+## Week-two promises (edition 0.6.1, 2026-10-27)
+
+Technical done: signed main, exact green CI, normal guarded deployment and a matching clean live release. Adam accepts feel; his 2026-11-03 acceptance stays separate. HF remains pinned to 3.0.0. No playtest is part of this change.
+
+The coordinator's 75–92.5% and 5/20 figures describe **weeks that slipped**, not individual missed promises (`~/code/.lab-scratch/claude-builds/pmg-followups.md`). The standing reader slips a week when no more than 55% of its promises were kept. This edition leaves that threshold and week one's rules intact.
+
+Cause from source: `renewDailyPromises` renews only alarm and Mum, with two Ece promises added only when chosen. A learned Feet phrase bypassed the whole second-week alarm decision and completed its promise automatically. Calling Mum had four hours of slack, and starting the ordinary call fulfilled the whole obligation. Week two inherited habits, phrases and resolves, then offered recovery without a bedtime obligation. Consequently random play could keep promises through the host's automatic actions and one good selection. Narrowing the call window made matters easier by raising HF deadline pressure; a larger pull term was not a reliable difficulty control.
+
+The new rules keep the first week's difficulty edge:
+
+- A learned phrase still participates in HF, but never removes a week-two alarm decision. The player can suggest getting up; Dilan can also choose it herself through HF.
+- Mum expects twenty minutes of attention. Dialling takes three action minutes; a concrete video distraction then offers listening for the remaining seventeen, ending early, or watching while she talks. Only listening completes the promise and grants the call's former benefits. Thursday's full call at home remains a valid way to keep it. The original 17:30–21:30 window remains.
+- Five daily bedtime promises accept either writing or lights out, from 21:30 to 21:55. Rest is a valid choice. Continued video watching takes 150 rather than 75 minutes, reducing sleep before the next alarm.
+- A late night can cross midnight. Its evening page uses the authored day's review, so missed promises cannot disappear merely because the host clock passed midnight.
+
+Replay and continuity: only 0.6.1 gets these rules. Existing editions retain their complete simulation paths. New local and shared canonical starts use 0.6.1; a resumed source keeps its original edition. The finite cast/passport projection stays 0.6.0; the full notebook retains its actual simulation edition, and native returns replay that edition rather than relabelling it. This does not upgrade the optional 0.7/0.8 campaigns.
+
+Measurement: `node scripts/measure-promises.ts 0.6.0,0.6.1 /absolute/result.json`, seeds 2000–2019, twenty runs per policy and edition, both weeks in each run. Careless makes a seeded random option choice, with 15% silence and 30% insistence. Its host LCG is reset from the seed for each week and never uses Dilan's RNG. Careful calls the existing `scripts/measure.ts` edge driver on the same ticked decision clone as the original measure. The original coordinator's random sampler was not retained; these are paired measurements with a documented sampler, not a claim of byte-identical reproduction of its 5/20.
+
+| Edition | Policy   | Week | Slipped weeks | Missed / all promises | Missed share |
+| ------- | -------- | ---: | ------------: | --------------------: | -----------: |
+| 0.6.0   | careless |    1 |         16/20 |               114/220 |        51.8% |
+| 0.6.0   | careless |    2 |          3/20 |                76/234 |        32.5% |
+| 0.6.0   | careful  |    1 |          0/20 |                16/220 |         7.3% |
+| 0.6.0   | careful  |    2 |          0/20 |                11/236 |         4.7% |
+| 0.6.1   | careless |    1 |         16/20 |               114/220 |        51.8% |
+| 0.6.1   | careless |    2 |         18/20 |               192/333 |        57.7% |
+| 0.6.1   | careful  |    1 |          0/20 |                16/220 |         7.3% |
+| 0.6.1   | careful  |    2 |          0/20 |                77/339 |        22.7% |
+
+All forty paired first-week complete-state hashes matched. Careless second-week slipped weeks rose from 3/20 to 18/20; careful stayed at 0/20. Careless missed most individual second-week promises (57.7%); careful kept 77.3%. Those are separate metrics.
+
+The first-week full-state hashes are compared across editions after normalizing only the edition field. The two focused tests pin first-week equality, the second-week rules and complete replay, plus one careful headless control. Existing legacy exports and a new-edition native source return remain covered. No test matrix is added. These driver results establish rule separation, not human acceptance.
+
+Tradeoff: five extra promises change the denominator, and a connected call adds one decision. Keeping a bedtime is not a score for Dilan's worth. Older notebooks retain their old difficulty. Revert fresh starts by restoring GAME_VERSION and package version to 0.6.0; retain the 0.6.1 branch for existing notebooks.
+
+## LIGHT 2026-10-31 source plan (display words only; no rules, edition, HF or log change)
+
+Source: the seven LIGHT reports (five people; Aisha and Mei each returned once with a separate diagnostic). Only Monday and Tuesday were visited. Several ordinary taps stalled about 31.5 s in the test driver while the game clock ran, so Tuesday refusals, missed choices and pace are qualified, not proof. A held choice is the real game input; the originals that could only tap are untested for holds. A refusal stays a refusal, and nothing here changes difficulty, trust or the 64-second window.
+
+Built (display words only; corrected 2026-10-31 after independent review): the Information page explains the four feeling labels. “She would agree only if you insist” says a hold may be plain agreement or giving in with a protest, and she may still say no. Insisting is described as conditional: it can cost trust, it is not a promise, and a hold counts only as a weak suggestion when she trusts you too little. The first card says the same briefly and that time running out lets her choose. “She wants to do it later.” adds that a hold will not change that now. After a hold she did not follow, the journal says by the recorded result: refused “She turned that down.”, deferred “She put it off.”, modified “She chose something close instead.”, compared by option id, never by display ink. Refusal words count recorded prior holds. Protest wording appears only for an actual complied result. Stored refusal text, simulation and serialization are unchanged.
+
+Per-ask disposition (owner · date · reason). “Words” means buildable plain cues from existing public eligibility; a literal meter, new scenes and difficulty are owner choices.
+- F2316 · OPEN: canonical promotion of the later private native-hold returns · lab/director · 2026-11-03 · the private driver ability question is answered; the original reports stay un-held.
+- F2317 · owner/player scene preference · Adam · 2026-11-10 · only Tuesday’s alarm was seen; new-device Mondays repeat by method; any new scene is Adam’s call.
+- F2318 · partial · Murmur writer + lead designer · 2026-11-03 · first-card and Info cost/eligibility words built; per-choice reasons through existing cues stay active.
+- F2319 · partial · Murmur writer · 2026-11-03 · hold meaning and conditional cost built; never a guaranteed assent or fixed deduction.
+- F2320 · owner/player preference · Adam · 2026-11-10 · a kind first option may not mean universal willingness; refusal and tradeoffs stay.
+- F2321 · partial · Murmur writer + root UI owner · 2026-11-03 · expiry and pace scope stated; discoverability and fit at 360×690 and 1280×800 unmeasured.
+- F2322 · owner/player scene preference · Adam · 2026-11-10 · Tuesday alarm only; no whole-week repetition established.
+- F2323 · instrument-qualified, open · lab/director · 2026-11-03 · taps stalled about 31.5 s; the source formula is not a human-speed measurement; no speed change.
+- F2324 · open diagnosis · root UI owner + Murmur writer · 2026-11-03 · long journal and repeated refusal differ; no faded/plain duplicate reproduced.
+- F2325 · partial · Murmur writer · 2026-11-03 · handwriting and weak-hold explanation built; zero/budget/reset guesses not adopted.
+- F2326 · partial · Murmur writer + root UI owner · 2026-11-03 · label meanings corrected; “later” means no uptake now, not a future promise; layout unverified.
+- F2327 · built, verification open · root UI owner · 2026-11-03 · Skip runs to the next choice or day end; fit unmeasured.
+- F2328 · literal number/bar is an owner decision · Adam + lead designer · 2026-11-03 · qualitative cues (handwriting, labels, weak-hold note) stay active for the writer.
+- F2329 · partial · Murmur writer · 2026-11-03 · deferral kept distinct from refusal; Tuesday observations are stall-qualified.
+- F2330 · open diagnosis · root UI owner + Murmur writer · 2026-11-03 · only the stored refusal repeat reproduced and was varied; no DOM duplicate shown.
+- F2333 · partial · Murmur writer + lead designer · 2026-11-03 · below-line note built; qualitative readiness cues from public eligibility remain; no recovery promise.
+- F2334 · built, feel open · Murmur writer + Adam · 2026-11-03 · refusal wording counts recorded holds and the chosen action; no new acts.
+- F2335 · owner/player scene preference · Adam · 2026-11-10 · second device required a NEW Monday; the coffee memory was noticed.
+- F2336 · partial · Murmur writer + lead designer · 2026-11-03 · two paths do not prove a budget; current eligibility cue buildable.
+- F2337 · partial, NOT fully fixed · Murmur writer + root UI owner · 2026-11-03 · first-card and Info cost words built; fit of the longer card is unverified.
+- F2338 · built, UI verification open · Murmur writer + root UI owner · 2026-11-03 · the result line follows the recorded verdict and option id.
+
+
+## Retest1 bounded candidate — 2026-10-31 (not delivered or accepted)
+
+Root adopted the completed read-only investigation on source9e. This candidate adds the new bounded letter summary after an actual completed ten-minute reading action and repeats it at the later unsigned decision. The initial unread-sign option remains. All numerical durations, options, agency, trust, difficulty and the clock remain unchanged. Other terms and consequences are not shown, and later outcomes are unknown. The summary is not a full contract or a promise about a safe choice.
+
+The two reached complied holds, lunch-1/outside and slump-1/walk, receive contextual display protests only when recorded speech is absent. Actual speech and weak-hold/refused/deferred/modified/silence/timeout branches remain. The journal is the actual consumer; the gap panel contains only next-choice/Skip text. Tuesday's late question may recall Monday truth only from retained completed native action outcomes. The derived context is not a saved flag or a notebook schema change. Prior-lie and no-completed-truth branches remain.
+
+All nineteen literal routes, quotes, reasons, owners, dates and open candidate dispositions are retained in [Deferred](Deferred.md). F2708 has no geometry or wording change; scroll/phone proof at360×690 and1280×800 is UNRUN. No trust meter, forecast or timer tuning is added. Exact Opus review at signed SHA is required and HELD. Root owns later delivery and Adam owns fiction acceptance; neither is established by focused controls.
+
+
+### Bounded correction1 after independent review — 2026-10-31
+
+MR1-1 moves the completed Monday truth read out of ordinary context/options/preview reads. It derives the same exact accepted completed person/day/action fact once when late-2 actually opens, after advancing to its opening boundary. Later card views reuse that opening's stored scene. Cold restore keeps the validated stored scene; replay and journal reconstruction derive it at their own opening. No saved flag, persisted cache, kernel change or seed/day cache is added. Independent re-review and future exact Opus remain required; this candidate is not clear.
+
+MR1-2 corrects the protest fixture: ece-1 now deliberately receives a real quiet input. Ordinary submitted choices assert actual card/option availability. Earlier bounded held/held-next evidence contains an unavailable map no-op followed by quiet. Those native outcomes remain actual, but the old host prefix was not all-ordinary. Original artifacts are preserved and qualified in the correction1 packet. New ordinary source9e/candidate state and fullHash/next-input evidence uses correction1 filenames. The letter fiction, numerical rules, difficulty, agency and all nineteen open routes remain as above. F2708 remains UNRUN.
+
+The prior three non-reading cases retain30s each: their aggregate possible allowance is90s, versus30s for the former combined case. This is not a measured speedup. No full suite, browser, timing/trust retune, signing or delivery is established by these focused corrections.
+
+
+## Second retest record — 2026-11-01
+
+The two-iteration panel record is qualified with limits; [Deferred](Deferred.md) contains all fourteen literal F2971–F2984 asks, sources, routes, dates and return intentions.
+
+F2974 and F2977 have 2026-11-03 checkpoints; the other twelve have 2026-11-10 checkpoints. Buildable engineering remains active. No third ordinary panel or bulk fixed designation follows. At 2026-11-01 19:00 UTC, HF 4.15.1 migration source has merged in PR17 at dd56d905c99b5145d2b173a6b0a8060a0a29a901 after exact independent CLEAR review and green source CI. The earlier failed CI and measured diagnostic remain historical evidence; they establish neither CI cause nor an uninstrumented speedup. Target CI, normal deployment, clean live release, cross-origin proof at both required sizes, and Adam’s fiction acceptance remain pending at this checkpoint. This documentation change has its own exact review, CI and integration gates.
