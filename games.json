@@ -49,6 +49,16 @@
       ],
       "legacyOrigin": "https://glance.adamwhite.work",
       "redirectEnabled": false
+    },
+    {
+      "slug": "pass",
+      "source": {
+        "repository": "https://github.com/adam0white/pass",
+        "commit": "c7bebaffd00a2e5b64d971d62c73b60ed3ada6c4"
+      },
+      "saveSchema": "pass-hf4/2",
+      "legacyOrigin": "https://pass.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }
