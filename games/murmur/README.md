@@ -57,7 +57,7 @@ The unchanged artifact from signed Good Hands source `509386298dfd89026c10bc6011
 
 ## Development and delivery
 
-Use shared Node 26.12.0 (`.node-version` and `.nvmrc`) and pnpm 12.14.0 with `/opt/homebrew/bin` first on PATH. Install with `pnpm install --frozen-lockfile`; run `npm run dev`. Application release and default rules are 0.10.0. HF is pinned to registry package 4.17.0. Client 0.5.16 and kit 0.5.33 use exact GitHub release tar URLs in package.json; neither SDK pin claims npm publication or npm provenance. The HF 3.0.0 alias supports archival tests only. TypeScript 7 or later is required; this checkout pins 7.0.2. SDK archives remain immutable release artifacts.
+Use shared Node 26.12.0 (`.node-version` and `.nvmrc`) and pnpm 12.16.1 with `/opt/homebrew/bin` first on PATH. Install with `pnpm install --frozen-lockfile`; run `npm run dev`. Application release and default rules are 0.10.0. HF is pinned to registry package 4.17.0. Client 0.5.16 and kit 0.5.33 use exact GitHub release tar URLs in package.json; neither SDK pin claims npm publication or npm provenance. The HF3 source and its tests are retained as archives and are not run by the current workspace. TypeScript 7 or later is required; this checkout pins 7.0.2. SDK archives remain immutable release artifacts.
 
 Before each commit, run the normal lane directly:
 
@@ -65,6 +65,6 @@ Before each commit, run the normal lane directly:
 npm run check:lane
 ```
 
-App deployment uses `npm run deploy` directly. Deploy only clean signed exact main with exact green CI. Verify the resulting live `/release.json`. Source-only docs need no deployment. See [AGENTS](AGENTS.md) for delivery rules and [HANDOFF](HANDOFF.md) for the current receipt, browser limits and remaining owner acceptance. [Design](docs/design.md) records design history; it is not a current delivery receipt. Follow the [plain-English rules](docs/lab/plain-english.md).
+App deployment uses the monorepo root `pnpm deploy` command. Deploy only clean signed exact main with exact green CI. Verify the resulting live `/murmur/release.json`. Source-only docs need no deployment. See [AGENTS](AGENTS.md) for delivery rules and [HANDOFF](HANDOFF.md) for the current receipt, browser limits and remaining owner acceptance. [Design](docs/design.md) records design history; it is not a current delivery receipt. Follow the [plain-English rules](docs/lab/plain-english.md).
 
 Dependency changes use pnpm and the committed `pnpm-lock.yaml`. The npm lock was imported with exact dependency versions preserved. Do not regenerate an npm lock or install a runtime per worktree. The policy uses strict engines/peers, no hoisting, hardlinks, a 24-hour third-party release delay and an owned `@adam0white/*` exemption.

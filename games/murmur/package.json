@@ -16,7 +16,6 @@
     "typecheck": "tsc -p tsconfig.json",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "measure": "node scripts/measure.ts",
     "check": "npm run lint && npm run typecheck && npm test",
     "deploy": "cd ../.. && pnpm run deploy",
     "check:lane": "npm run lint && npm run typecheck",
