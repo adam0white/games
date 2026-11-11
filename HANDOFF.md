@@ -1,12 +1,21 @@
 # MIGRATE — current owner goal, 2026-11-10
 
-Remaining: finish Glance PR4, migrate the 14 requested remaining games, activate and verify old-host redirects, merge cloud deployment, verify owner-secret activation, and finish archive/storage evidence. New-game prototypes wait. The migration pace is no longer one step per day.
+Remaining: deploy the merged Glance fix with the corrected SDK, complete the 14 requested game moves, activate and verify old-host redirects, merge cloud deployment, verify owner-secret activation, and finish archive/storage evidence. New-game prototypes wait. The migration pace is no longer one step per day.
 
 Owner direction dated 2026-11-11, verbatim: "I need you to prioritize the migration to monorepo, which will allow me to move this workload entirely to cloud, freeing us from storage concerns here, and freeing storage for other things here."
 
 Cloud workflow is prepared in `.github/workflows/deploy.yml`; it is not evidence of a successful Actions deployment. The owner must add `CLOUDFLARE_API_TOKEN` as described in README. The agent must not handle credentials. `docs/cloud-readiness.md` lists remaining HF Mac assumptions and proposed replacements. No original repository has been archived by MIGRATE and no original checkout has been deleted.
 
 The completion target is each requested game live with a clean exact green-main release, current replay, retained history and notices, one npm HF version, path CI, and working old-host redirects. The owner retains archive decisions and secret entry. Record each game's actual outcome; imported source and a passing build are preparation. Earlier prototype and pending-pilot entries below are historical and do not override this goal.
+
+
+## Migration batch preparation — 2026-11-10
+
+Glance PR4 merged normally as `e581cc0`; its exact-main CI passed. The five-second test cap and exact assertions remain. This branch adds full histories for Small Works, Valley, Murmur, Stairwell and Pass. Current local suites passed 420, 31, 162, 227 and 141 tests respectively; Murmur has three disclosed gated skips. Pass's locked Node26 timing controls passed 17 tests at unchanged five-second caps. Retired engine-specific tests remain identifiable as historical; long-week/performance, actual-death and peer-journey gaps are not newly qualified by this migration.
+
+All nine imported games now pin client0.5.17/kit0.5.34 public GitHub artifacts from signed green HF main `33ed47e`. All eight public release assets and 68 tar members were hash-verified. The queue fix binds retries to their original game, preserves foreign bytes and retains the shared capacity bound. Kit only admits the corrected peer version. No npm publication, central update, live game deployment or existing-tab refresh follows from publication alone.
+
+Root lane passed 23 tests and the clean nine-game assembled build passed with these SDK pins. Exact-head hosted review/CI, merged-main CI, deployment and direct live release/replay/redirect checks remain. All registry redirects are still disabled. Original source repositories and checkouts remain; unique local evidence and the Mac daily scheduler are additional retention conditions. Other requested imports continue in separate worker branches.
 
 ---
 
