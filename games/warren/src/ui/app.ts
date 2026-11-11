@@ -81,7 +81,7 @@ import {
   readyMark,
   waterHelpWords,
 } from './known-work.ts';
-import { lab } from './lab.ts';
+import { fileMode, lab } from './lab.ts';
 import { invitationWords, personHelpWords } from './person-help.ts';
 import { type PlanSafety, planSafety } from './plan-safety.ts';
 import {
@@ -185,7 +185,7 @@ let planCell: number | null = null;
 let lastReading: { title: string; words: string; context?: string; cell?: number } | null = null;
 let pendingEntrance: number[] | null = null;
 
-const notice = telemetryNotice();
+const notice = fileMode ? null : telemetryNotice();
 // Keep the shared notice readable on platforms with wider system font metrics.
 if (notice) {
   notice.style.fontFamily = 'Arial, "Liberation Sans", sans-serif';
@@ -236,7 +236,7 @@ function topbar(titlePage = false) {
 // ---------- start ----------
 
 export async function start() {
-  if (location.pathname === '/file/') {
+  if (fileMode) {
     openFilePage();
     return;
   }
@@ -269,7 +269,7 @@ export async function start() {
     },
   );
   if ('serviceWorker' in navigator && location.hostname !== 'localhost')
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/warren/sw.js', { scope: '/warren/' }).catch(() => {});
   ink = readInk();
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
     ink = readInk();
@@ -370,7 +370,7 @@ function title(sv: (Saved & { savedAt?: number }) | null, at: number) {
 
 function openFilePage() {
   ink = readInk();
-  app().innerHTML = `<main class="title"><h1>Open a saved hill</h1><p>Choose a Warren run you downloaded. It plays here without replacing the hill saved on this device or changing shared people.</p><p>Keep your original file. Older versions may need a fresh hill.</p><input id="hill-file" type="file" accept=".json,application/json"><p id="file-status" role="status"></p><details hidden id="file-debug"><summary>Debug</summary><pre id="file-detail"></pre></details><a href="/">Return to your hill</a></main>`;
+  app().innerHTML = `<main class="title"><h1>Open a saved hill</h1><p>Choose a Warren run you downloaded. It plays here without replacing the hill saved on this device or changing shared people. Recording and Feedback are unavailable in this view.</p><p>Keep your original file. Older versions may need a fresh hill.</p><input id="hill-file" type="file" accept=".json,application/json"><p id="file-status" role="status"></p><details hidden id="file-debug"><summary>Debug</summary><pre id="file-detail"></pre></details><a href="/warren/">Return to your hill</a></main>`;
   document.getElementById('hill-file')?.addEventListener('change', async (event) => {
     const input = event.target as HTMLInputElement,
       file = input.files?.[0];
@@ -2104,7 +2104,7 @@ function closeBook() {
 }
 
 function menuRows() {
-  return `<p>The game is paused while the menu is open.</p><p>Pace: ${SPEED_NAMES[speedIx]}</p><div class="menu-rows"><button id="replay-guide" ${g ? '' : 'disabled'}>Replay first steps</button><button id="send">Feedback</button><button id="fullscreen">Full screen</button><a href="/file/" target="_blank" rel="noopener">Open a saved hill</a><button id="download-run" ${g ? '' : 'disabled'}>Download this run</button><a target="_top" href="https://human.adamwhite.work/games/">All games</a>${g?.fileOrigin ? '<a href="/">Return to your hill</a>' : '<button id="to-title">New game</button>'}</div><div id="menu-new-confirm" hidden><p>Starting a new game replaces this saved hill.</p><button id="menu-new-yes">Start new game</button><button id="menu-new-no">Cancel</button></div><a class="shelf-link" href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noopener">People across games</a><div class="menu-footer"><label><input id="record-play" type="checkbox" ${lab.telemetryOn ? 'checked' : ''}> Recording</label><a href="https://human.adamwhite.work/lab/privacy/" target="_blank" rel="noopener">Lab privacy</a><details class="game-debug"><summary>Debug</summary><p>The Warren ${GAME_VERSION} · HF ${FRAMEWORK_VERSION}</p><div>${continuity.controls()}</div>${g?.s.next?.discussion ? `<details id="cut-discussion-debug"><summary>Loose-cut encounter receipts</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify({ current: g.s.next.discussion, earlier: g.s.cutDiscussionHistory ?? [] }, null, 2))}</pre></details>` : ''}${g?.s.bellAmends ? `<details id="bell-amends-debug"><summary>False bell apology receipts</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(g.s.bellAmends, null, 2))}</pre></details>` : ''}${g?.s.tariqTrial ? `<details id="tariq-trial-debug"><summary>Boat trial receipts</summary><p>Warren supplies this prospective dry balance fixture. Person choices and observation remain separate.</p><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(g.s.tariqTrial, null, 2))}</pre></details>` : ''}${g?.s.newcomerExchanges?.length ? `<details id="newcomer-debug"><summary>Newcomer exchange receipts</summary><p>Scripted dialogue is authored by Warren after completed work. Decision narration is HF output. The keeper is a player office; no HF listener or hearing is claimed.</p><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(g.s.newcomerExchanges, null, 2))}</pre></details>` : ''}</details></div><button class="primary" id="resume">Resume</button>`;
+  return `<p>The game is paused while the menu is open.</p><p>Pace: ${SPEED_NAMES[speedIx]}</p><div class="menu-rows"><button id="replay-guide" ${g ? '' : 'disabled'}>Replay first steps</button><button id="send" ${fileMode ? 'disabled' : ''}>Feedback</button><button id="fullscreen">Full screen</button><a href="/warren/file/" target="_blank" rel="noopener">Open a saved hill</a><button id="download-run" ${g ? '' : 'disabled'}>Download this run</button><a target="_top" href="https://human.adamwhite.work/games/">All games</a>${g?.fileOrigin ? '<a href="/warren/">Return to your hill</a>' : '<button id="to-title">New game</button>'}</div><div id="menu-new-confirm" hidden><p>Starting a new game replaces this saved hill.</p><button id="menu-new-yes">Start new game</button><button id="menu-new-no">Cancel</button></div><a class="shelf-link" href="https://human.adamwhite.work/lab/people/" target="_blank" rel="noopener">People across games</a><div class="menu-footer"><label><input id="record-play" type="checkbox" ${fileMode ? 'disabled' : ''} ${lab.telemetryOn ? 'checked' : ''}> Recording</label><a href="https://human.adamwhite.work/lab/privacy/" target="_blank" rel="noopener">Lab privacy</a><details class="game-debug"><summary>Debug</summary><p>The Warren ${GAME_VERSION} · HF ${FRAMEWORK_VERSION}</p><div>${continuity.controls()}</div>${g?.s.next?.discussion ? `<details id="cut-discussion-debug"><summary>Loose-cut encounter receipts</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify({ current: g.s.next.discussion, earlier: g.s.cutDiscussionHistory ?? [] }, null, 2))}</pre></details>` : ''}${g?.s.bellAmends ? `<details id="bell-amends-debug"><summary>False bell apology receipts</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(g.s.bellAmends, null, 2))}</pre></details>` : ''}${g?.s.tariqTrial ? `<details id="tariq-trial-debug"><summary>Boat trial receipts</summary><p>Warren supplies this prospective dry balance fixture. Person choices and observation remain separate.</p><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(g.s.tariqTrial, null, 2))}</pre></details>` : ''}${g?.s.newcomerExchanges?.length ? `<details id="newcomer-debug"><summary>Newcomer exchange receipts</summary><p>Scripted dialogue is authored by Warren after completed work. Decision narration is HF output. The keeper is a player office; no HF listener or hearing is claimed.</p><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(g.s.newcomerExchanges, null, 2))}</pre></details>` : ''}</details></div><button class="primary" id="resume">Resume</button>`;
 }
 let feedbackCleanup: (() => void) | undefined;
 function showFeedback(host: HTMLElement, onBack: () => void) {

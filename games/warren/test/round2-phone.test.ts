@@ -212,7 +212,7 @@ it('keeps full mixed/open-door, bed and door readings accessible by scrolling ab
   try {
     await page.locator('[data-tool="chalk"]').click();
     await page.evaluate(`(async()=>{
-      const {idx,K,SURF,USE}=await import('/src/sim/grid.ts');
+      const {idx,K,SURF,USE}=await import('/warren/src/sim/grid.ts');
       const s=window.__warren.game.s;
       s.hill.kind.fill(K.rock);s.hill.use.fill(USE.none);s.hill.chalk.fill(0);
       for(let y=SURF;y<=SURF+2;y++)s.hill.kind[idx(18,y)]=K.open;
@@ -245,7 +245,7 @@ it('keeps full mixed/open-door, bed and door readings accessible by scrolling ab
     await page.locator('#watch-raid').click();
     await page.locator('[data-tool="look"]').click();
     await page.evaluate(`(async()=>{
-      const {idx,K,SURF,USE}=await import('/src/sim/grid.ts');const s=window.__warren.game.s;
+      const {idx,K,SURF,USE}=await import('/warren/src/sim/grid.ts');const s=window.__warren.game.s;
       s.hill.kind[idx(19,SURF+3)]=K.open;s.hill.use[idx(19,SURF+3)]=USE.beds;
       s.hill.kind[idx(18,SURF+3)]=K.open;s.hill.chalk.fill(0);
     })()`);
@@ -292,7 +292,7 @@ it('keeps mixed door conditions scrollable while marking and full route details 
   const page = await start();
   try {
     await page.evaluate(`(async()=>{
-      const {idx,K,SURF,USE}=await import('/src/sim/grid.ts');
+      const {idx,K,SURF,USE}=await import('/warren/src/sim/grid.ts');
       const s=window.__warren.game.s,h=s.hill;
       h.kind.fill(K.rock);h.use.fill(USE.none);h.chalk.fill(0);h.shut.fill(0);h.doorWork.fill(0);
       for(const x of [18,22]) {
@@ -361,7 +361,7 @@ it('keeps the actual connection cell through repeated Look and compact receipt r
     expect(await page.locator('#cell-detail').isVisible()).toBe(false);
     expect(await page.locator('#event-sentence').innerText()).toContain('square marked');
     const expected = await page.evaluate(`(async()=>{
-      const {selectedPlan}=await import('/src/ui/selected-plan.ts');
+      const {selectedPlan}=await import('/warren/src/ui/selected-plan.ts');
       return selectedPlan(window.__warren.game.s, 11 * 34 + 20).words;
     })()`);
     const assertReopen = async () => {

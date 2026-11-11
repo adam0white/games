@@ -28,7 +28,7 @@ async function enter(width = 360, height = 690) {
   await page.goto(url);
   await page.locator('#new').waitFor();
   await page.evaluate(
-    `(async () => { const {put} = await import('/src/ui/store.ts'); await put('hill', ${JSON.stringify(save(newGame(7)))}); })()`,
+    `(async () => { const {put} = await import('/warren/src/ui/store.ts'); await put('hill', ${JSON.stringify(save(newGame(7)))}); })()`,
   );
   await page.reload();
   await page.locator('#cont').click();

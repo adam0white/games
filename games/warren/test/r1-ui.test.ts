@@ -22,7 +22,7 @@ it('keeps a phone working view and makes the pending invitation visible beside c
     await page.clock.install();
     await page.goto(`${url}?lab=1`);
     await page.evaluate(
-      `(async()=>{const{newGame,save}=await import('/src/sim/game.ts');const{put}=await import('/src/ui/store.ts');await put('hill',save(newGame(7,'0.7.0')));})()`,
+      `(async()=>{const{newGame,save}=await import('/warren/src/sim/game.ts');const{put}=await import('/warren/src/ui/store.ts');await put('hill',save(newGame(7,'0.7.0')));})()`,
     );
     await page.reload();
     await page.locator('#cont').click();
@@ -54,7 +54,7 @@ it('recognizes a new chalk tap connected through an earlier mark to the cellar',
     await page.clock.install();
     await page.goto(`${url}?lab=1`);
     await page.evaluate(
-      `(async()=>{const{newGame,save}=await import('/src/sim/game.ts');const{put}=await import('/src/ui/store.ts');await put('hill',save(newGame(7,'0.7.0')));})()`,
+      `(async()=>{const{newGame,save}=await import('/warren/src/sim/game.ts');const{put}=await import('/warren/src/ui/store.ts');await put('hill',save(newGame(7,'0.7.0')));})()`,
     );
     await page.reload();
     await page.locator('#cont').click();

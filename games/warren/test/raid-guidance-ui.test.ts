@@ -42,7 +42,7 @@ for (const [width, height] of [
       await page.goto(url);
       await page.locator('#new').waitFor();
       await page.evaluate(`(async () => {
-        const { put } = await import('/src/ui/store.ts');
+        const { put } = await import('/warren/src/ui/store.ts');
         await put('hill', ${JSON.stringify(saved)});
       })()`);
       await page.reload();

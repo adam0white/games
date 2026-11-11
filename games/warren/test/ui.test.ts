@@ -47,7 +47,7 @@ async function enter(page: Page) {
   await page.goto(url);
   await page.clock.install();
   await page.evaluate(`(async () => {
-    const { put } = await import('/src/ui/store.ts');
+    const { put } = await import('/warren/src/ui/store.ts');
     await put('hill', ${JSON.stringify(save(newGame(7)))});
   })()`);
   await page.reload();

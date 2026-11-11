@@ -1,12 +1,11 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
-import { replay as replayHF } from 'hf410';
 import { expect, it } from 'vitest';
 import { load, replay, type Saved } from '../src/sim/game.ts';
 import binding from './fixtures/f4-rest1/binding.json';
 
-// Historical source evidence is verified but cannot be played in current Warren.
+// Preserve immutable historical bytes and verify current Warren refuses them. The archived HF4.10 verifier remains in archive/.
 for (const row of binding.fixtures) {
   it(`preserves and refuses ${row.file}`, () => {
     const bytes = readFileSync(new URL(`./fixtures/f4-rest1/${row.file}`, import.meta.url));
@@ -16,9 +15,6 @@ for (const row of binding.fixtures) {
     const saved = JSON.parse(body.toString()) as Saved;
     const original = JSON.stringify(saved);
     expect(saved.framework).toBe('4.10.0');
-    const verified = replayHF(saved.state.hf);
-    expect(verified.ok && verified.value.verified).toBe(true);
-    if (verified.ok) expect(verified.value.fullHash).toBe(saved.state.hf.hashes.full);
     expect(() => load(saved)).toThrow(/keep.*start fresh/i);
     expect(() =>
       replay(saved.seed, saved.inputs, saved.minute, saved.game, saved.chapter, saved.config, saved.phase),

@@ -121,12 +121,12 @@ it('resumes current hills and preserves an unsupported hill until replacement is
       catchUp(original, 0);
       const expected = JSON.stringify(save(original));
       await page.evaluate(
-        `(async()=>{const {put}=await import('/src/ui/store.ts');await put('hill',{...${raw},savedAt:Date.now()+86400000});})()`,
+        `(async()=>{const {put}=await import('/warren/src/ui/store.ts');await put('hill',{...${raw},savedAt:Date.now()+86400000});})()`,
       );
       await page.reload();
       await page.locator('#cont').click();
       const actual = await page.evaluate<string>(
-        `(async()=>{const {save}=await import('/src/sim/game.ts');return JSON.stringify(save(window.__warren.game));})()`,
+        `(async()=>{const {save}=await import('/warren/src/sim/game.ts');return JSON.stringify(save(window.__warren.game));})()`,
       );
       const actualSave = JSON.parse(actual) as Saved;
       const expectedSave = JSON.parse(expected) as Saved;
@@ -145,9 +145,10 @@ it('resumes current hills and preserves an unsupported hill until replacement is
     await page.goto(url);
     const unsupported = { ...save(newGame(7)), framework: 'unsupported-test-version' };
     await page.evaluate(
-      `(async()=>{const {put}=await import('/src/ui/store.ts');await put('hill',${JSON.stringify(unsupported)});})()`,
+      `(async()=>{const {put}=await import('/warren/src/ui/store.ts');await put('hill',${JSON.stringify(unsupported)});})()`,
     );
     await page.reload();
+    await page.locator('.title-actions').waitFor();
     expect(await page.locator('.title-actions').count()).toBe(1);
     expect(await page.locator('.page').textContent()).toContain('cannot open here');
     expect(await page.locator('#cont').count()).toBe(0);
@@ -157,7 +158,7 @@ it('resumes current hills and preserves an unsupported hill until replacement is
     await page.locator('#new-no').click();
     expect(
       await page.evaluate(
-        `(async()=>{const {get}=await import('/src/ui/store.ts');return (await get('hill'))?.value;})()`,
+        `(async()=>{const {get}=await import('/warren/src/ui/store.ts');return (await get('hill'))?.value;})()`,
       ),
     ).toEqual(unsupported);
     await page.locator('#new').click();
@@ -166,7 +167,7 @@ it('resumes current hills and preserves an unsupported hill until replacement is
     expect(await page.locator('#start-error').count()).toBe(0);
     expect(
       await page.evaluate(
-        `(async()=>{const {get}=await import('/src/ui/store.ts');return (await get('hill'))?.value;})()`,
+        `(async()=>{const {get}=await import('/warren/src/ui/store.ts');return (await get('hill'))?.value;})()`,
       ),
     ).not.toEqual(unsupported);
     await page.close();

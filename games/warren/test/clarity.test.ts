@@ -111,7 +111,7 @@ describe('F-213 first-minute clarity', () => {
       expect(act(game, { verb: 'bell' })).toBe(true);
       const saved = save(game);
       await page.evaluate(`(async () => {
-        const { put } = await import('/src/ui/store.ts');
+        const { put } = await import('/warren/src/ui/store.ts');
         await put('hill', ${JSON.stringify(saved)});
       })()`);
       await page.reload();
@@ -158,7 +158,7 @@ describe('F-213 first-minute clarity', () => {
       // Fresh authored date; no thirteen-day simulated history is implied.
       const game = authoredGame(7, 13 * DAY);
       await page.evaluate(`(async () => {
-        const { put } = await import('/src/ui/store.ts');
+        const { put } = await import('/warren/src/ui/store.ts');
         await put('hill', ${JSON.stringify(save(game))});
       })()`);
       await page.clock.setSystemTime(await page.evaluate(() => Date.now() + 60000));

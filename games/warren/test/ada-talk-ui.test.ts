@@ -49,7 +49,7 @@ it('actual App synthetic control: publicly asks Kian, sees heard speech, downloa
     };
     const opening = newGame(7, '0.7.0', chapter);
     const stored = await page.evaluate(`(async () => {
-      const { put } = await import('/src/ui/store.ts');
+      const { put } = await import('/warren/src/ui/store.ts');
       return put('hill', ${JSON.stringify(save(opening))});
     })()`);
     expect(stored).toBe(true);
@@ -64,7 +64,7 @@ it('actual App synthetic control: publicly asks Kian, sees heard speech, downloa
     expect(await page.locator('#ada-talk-status').textContent()).toContain('still pending');
     expect(await page.evaluate(() => window.__warren.game!.inputs.at(-1)?.verb)).toBe('ask-ada');
     await page.evaluate(`(async () => {
-      const { advance } = await import('/src/sim/game.ts');
+      const { advance } = await import('/warren/src/sim/game.ts');
       const g = window.__warren.game;
       for (let n = 0; n < 160 && !g.s.adaTalks?.[0]?.endedAt; n++) advance(g, g.s.minute + 30);
     })()`);

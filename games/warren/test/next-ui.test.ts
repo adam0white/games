@@ -29,8 +29,8 @@ for (const [width, height] of [
       await page.goto(`${url}?lab=1`);
       expect(await page.locator('.title-actions input, .title-actions select').count()).toBe(0);
       await page.evaluate(`(async()=>{
-        const {newGame,save,catchUp,stateJson}=await import('/src/sim/game.ts');
-        const {put}=await import('/src/ui/store.ts');
+        const {newGame,save,catchUp,stateJson}=await import('/warren/src/sim/game.ts');
+        const {put}=await import('/warren/src/ui/store.ts');
         const g = newGame(7,'0.7.0',undefined,'warren-rest/2');
         const raid=g.s.raids[0];raid.smoke=g.s.minute+60;raid.riders=raid.smoke+60;raid.leave=raid.riders+60;
         const prepared=newGame(7,'0.7.0',{version:'warren-hf4-cast/1',inputs:[],claims:[],initial:stateJson(g.s)},'warren-rest/2');
@@ -49,7 +49,7 @@ for (const [width, height] of [
       expect(await page.evaluate('window.__warren.game.s.next.attention')).toBeUndefined();
       expect(
         await page.evaluate(
-          `(async()=>{const{save,replay,fingerprint}=await import('/src/sim/game.ts'); const s=save(window.__warren.game); return fingerprint(replay(s.seed,s.inputs,s.minute,s.game,s.chapter,s.config,s.phase).s)===s.fingerprint})()`,
+          `(async()=>{const{save,replay,fingerprint}=await import('/warren/src/sim/game.ts'); const s=save(window.__warren.game); return fingerprint(replay(s.seed,s.inputs,s.minute,s.game,s.chapter,s.config,s.phase).s)===s.fingerprint})()`,
         ),
       ).toBe(true);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
@@ -68,9 +68,9 @@ it('keeps ordinary next-config journal reading slow through an actual new note',
     await page.clock.install();
     await page.goto(`${url}?lab=1`);
     await page.evaluate(`(async()=>{
-      const {newGame,save,act}=await import('/src/sim/game.ts');
-      const {idx,SURF}=await import('/src/sim/grid.ts');
-      const {put}=await import('/src/ui/store.ts');
+      const {newGame,save,act}=await import('/warren/src/sim/game.ts');
+      const {idx,SURF}=await import('/warren/src/sim/grid.ts');
+      const {put}=await import('/warren/src/ui/store.ts');
       const g=newGame(7,'0.7.0',undefined,'warren-rest/2');
       act(g,{verb:'chalk',cells:[idx(15,SURF+3)],on:true});
       await put('hill',save(g));
@@ -89,7 +89,7 @@ it('keeps ordinary next-config journal reading slow through an actual new note',
     expect(newNote).toBe(true);
     const before = await page.evaluate<number>('window.__warren.game.s.minute');
     const note = await page.evaluate(`(async()=>{
-      const {displayWords}=await import('/src/ui/words.ts');
+      const {displayWords}=await import('/warren/src/ui/words.ts');
       return displayWords(window.__warren.game.s.notes.at(-1).text);
     })()`);
     expect(before).toBeGreaterThan(openingMinute);

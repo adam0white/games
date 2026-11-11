@@ -21,7 +21,7 @@ it('writes exact values and receipts without document-owned Blob input and reads
   try {
     await page.goto(url);
     const result = (await page.evaluate(`(async () => {
-      const { put, get } = await import('/src/ui/store.ts');
+      const { put, get } = await import('/warren/src/ui/store.ts');
       const value = { value: { minute: 120, words: 'Yusuf Usta' }, receipts: [{ head: 'accepted' }] };
       const stream = Blob.prototype.stream;
       const arrayBuffer = Blob.prototype.arrayBuffer;
@@ -67,8 +67,12 @@ it('writes exact values and receipts without document-owned Blob input and reads
 
 for (const recording of [true, false]) {
   it(`reloads an active controlled hill without errors with Recording ${recording ? 'on' : 'off'}`, async () => {
-    const page = await browser.newPage();
+    const page = await browser.newPage({ serviceWorkers: 'block' });
     const errors: string[] = [];
+    // The localhost SDK asks for the old root manifest; the assembled play build supplies its own path.
+    await page.route('**/release.json*', (route) =>
+      route.fulfill({ json: { app: '0.7.0', framework: '4.17.0', commit: '0'.repeat(40), dirty: false } }),
+    );
     page.on('pageerror', (error) => errors.push(error.message));
     page.on('console', (message) => {
       if (message.type() === 'error') errors.push(message.text());
@@ -78,8 +82,8 @@ for (const recording of [true, false]) {
       await page.goto(url);
       await page.locator('#new').waitFor();
       await page.evaluate(`(async () => {
-        const { newGame, save } = await import('/src/sim/game.ts');
-        const { put } = await import('/src/ui/store.ts');
+        const { newGame, save } = await import('/warren/src/sim/game.ts');
+        const { put } = await import('/warren/src/ui/store.ts');
         await put('hill', save(newGame(7)));
       })()`);
       await page.reload();
@@ -89,13 +93,13 @@ for (const recording of [true, false]) {
       await page.locator('#record-play').setChecked(recording);
       await page.locator('#resume').click();
       const expected = await page.evaluate(`(async () => {
-        const { save } = await import('/src/sim/game.ts');
+        const { save } = await import('/warren/src/sim/game.ts');
         return JSON.parse(JSON.stringify(save(window.__warren.game)));
       })()`);
       await page.reload();
       await page.locator('#cont').waitFor();
       const stored = await page.evaluate(`(async () => {
-        const { get } = await import('/src/ui/store.ts');
+        const { get } = await import('/warren/src/ui/store.ts');
         const row = await get('hill');
         if (row) delete row.value.savedAt;
         return row?.value;

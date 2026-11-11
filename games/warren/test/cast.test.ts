@@ -375,8 +375,8 @@ it('admits Watch care with the retained return duty and replays the visit', asyn
     const page = await browser.newPage();
     await page.goto(server.resolvedUrls!.local[0]!);
     const result = await page.evaluate(`(async () => {
-      const { newGame } = await import('/src/sim/game.ts');
-      const { authoringFor } = await import('/src/sim/cast.ts');
+      const { newGame } = await import('/warren/src/sim/game.ts');
+      const { authoringFor } = await import('/warren/src/sim/cast.ts');
       const game = newGame(8, '0.7.0', undefined, 'warren-rest/2', authoringFor([${JSON.stringify(incoming)}], 300 * 60000));
       return { returnBy: game.s.adaVisit?.returnBy, guardian: game.s.adaVisit?.dependent.guardian };
     })()`);

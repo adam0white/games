@@ -28,7 +28,7 @@ The ordinary menu contains Resume, Feedback, Full screen, All games, Recording a
 
 Feedback’s optional **I'm stopping** and **I'm confused** choices change only the local draft. Tap the selected choice again to clear it. They leave the note field unchanged and send nothing until you choose **Submit**. Submit includes the selected choice with any verdict and note through the existing sharing path.
 
-The menu offers a link to the central browser shelf for cast controls. Shared people continue automatically on a fresh hill. Resume keeps the people, history and local receipts saved in that hill; it does not replace them from the shelf. **Download this run** is public in the menu. Status sits in **Debug**, which starts collapsed beside **Lab privacy**. Feedback keeps its version/run preview and download in the same collapsed Debug position. **Open a saved hill** opens `/file/`. The file must replay exactly before play. This separate page never writes the hill saved on this device. Imported files do not establish shared-history ownership.
+The menu offers a link to the central browser shelf for cast controls. Shared people continue automatically on a fresh hill. Resume keeps the people, history and local receipts saved in that hill; it does not replace them from the shelf. **Download this run** is public in the menu. Status sits in **Debug**, which starts collapsed beside **Lab privacy**. Feedback keeps its version/run preview and download in the same collapsed Debug position. **Open a saved hill** opens `/warren/file/`. The file must replay exactly before play. This separate page never writes the hill saved on this device. Imported files do not establish shared-history ownership.
 
 HF4 uses supported available portable people automatically. Occupied, terminal or older unsupported shelf records stay unchanged; a new story cannot overwrite them. Imports have no shelf publication authority. Actor state stays in HF, including retained history and duties. The receiving game validates calendar and reference mappings.
 
@@ -42,35 +42,16 @@ The [Human Framework](https://human.adamwhite.work/) supplies people’s needs, 
 | ---------------------------------------- | -------------------------- |
 | App package                              | 0.7.0                      |
 | Ordinary new-hill rules / configuration  | 0.7.0 / warren-rest/2      |
-| HF npm package                           | 4.7.0                      |
-| HF engine                                | 4.7.0                      |
-| Immutable lab-client / lab-kit artifacts | 0.5.3 / 0.5.21             |
+| HF npm package                           | 4.17.0                     |
+| Immutable lab-client / lab-kit artifacts | 0.5.17 / 0.5.34            |
 | TypeScript                               | 7.0.2; support requires 7+ |
 
-Package version, rules edition and engine version have different meanings. `package.json` and the lockfile pin dependencies. `/release.json` identifies a deployed build. See [HANDOFF](HANDOFF.md) for dated deployment evidence and remaining owner review.
+Package version, rules edition and engine version have different meanings. `package.json` and the lockfile pin dependencies. `/warren/release.json` identifies a monorepo build. See [HANDOFF](HANDOFF.md) for dated deployment evidence and remaining owner review.
 
 ## Development
 
-Use the shared Node 26.12.0 and pnpm 12.16.1. Put `/opt/homebrew/bin` first in PATH. In fish:
+From the monorepo root, use the pinned Node and pnpm versions, then run `pnpm install --frozen-lockfile`. Start the game with `pnpm --filter warren dev`. The game `check:lane` runs lint, typecheck and its full test suite. The root build assembles every game and writes release metadata.
 
-```fish
-set -gx PATH /opt/homebrew/bin $PATH
-pnpm install --frozen-lockfile
-pnpm run dev
-```
-
-`pnpm run build` stamps release metadata and builds with Vite. `pnpm run preview` serves the build. `pnpm run lint`, `pnpm run typecheck` and `pnpm run check:unused` run Biome, TypeScript and Knip. `pnpm test` runs Vitest with the repository’s 60-second test timeout. `pnpm run check:lane` runs lint, typecheck and the full test suite in this repository.
-
-Use managed worktrees. Run full suites and check:lane through the machine-wide shared lock, without nesting locks:
-
-```fish
-node /Users/abdul/code/human-framework/scripts/suite-lock.ts -- pnpm run check:lane
-```
-
-Run check:lane before each signed commit. Fetch and rebase origin/main before pushing; require green CI on the exact commit. `pnpm run deploy` runs check, build and Wrangler deployment and also needs the shared wrapper. Source-only documentation requires no app deployment.
-
-The exact Node pin is `.node-version`; private-root engines and strict engine checks enforce it. Use the existing shared `/opt/homebrew/bin/node`; do not download a project runtime. `pnpm-workspace.yaml` disables hoisting, uses shared-store hardlinks, enforces strict peers and a 1440-minute release age, exempts only owned `@adam0white/*` packages, and owns the exact install-script approvals and overrides. `verifyDepsBeforeRun: error` rejects stale modules. Normal `npm run` wrappers still work but bypass this pnpm guard.
-
-After updating an existing npm tree, preserve dirty source changes, remove only that tree's root and workspace `node_modules`, run `pnpm install --frozen-lockfile`, and delete `dist`, `.types` and `*.tsbuildinfo`. Preserve the immutable local SDK archives. This installer migration requires no deployment.
+Use an isolated worktree. Run the game and root lanes before a signed commit; require exact-head green CI and review before integration. The monorepo root `pnpm deploy` deploys the full bundle.
 
 Read [AGENTS](AGENTS.md), [HANDOFF](HANDOFF.md), [design](docs/design.md) and the [plain-English policy](docs/lab/plain-english.md) before changing the game. Preserve simulation, save and replay contracts. Adam accepts game feel by playing; technical delivery is separate. Lab-panel rounds belong to the playtest director. Friends’ playtests and Show HN remain paused.

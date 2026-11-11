@@ -46,7 +46,7 @@ for (const [width, height] of [
       Object.assign(game.s.raids[1]!, { smoke: 840, riders: 900, leave: 960 });
       game.chapter = { version: 'warren-hf4-cast/1', inputs: [], claims: [], initial: stateJson(game.s) };
       await page.evaluate(
-        `(async () => {const {put}=await import('/src/ui/store.ts');await put('hill',${JSON.stringify(save(game))});})()`,
+        `(async () => {const {put}=await import('/warren/src/ui/store.ts');await put('hill',${JSON.stringify(save(game))});})()`,
       );
       await page.reload();
       await page.locator('#cont').click();
@@ -80,7 +80,7 @@ for (const [width, height] of [
       await assertStage();
       const advanceTo = async (target: string) => {
         await page.evaluate(
-          `(async () => {const {advance}=await import('/src/sim/game.ts');const g=window.__warren.game;advance(g,${target});})()`,
+          `(async () => {const {advance}=await import('/warren/src/sim/game.ts');const g=window.__warren.game;advance(g,${target});})()`,
         );
         await page.clock.runFor(300);
       };
@@ -98,7 +98,7 @@ for (const [width, height] of [
         /renew|six game hours/,
       );
       const before = await page.evaluate(
-        `(async () => {const {fingerprint}=await import('/src/sim/game.ts');return fingerprint(window.__warren.game.s);})()`,
+        `(async () => {const {fingerprint}=await import('/warren/src/sim/game.ts');return fingerprint(window.__warren.game.s);})()`,
       );
       const bell = await page.locator('#bell').boundingBox();
       if (!bell) throw new Error('Missing bell button');
@@ -107,7 +107,7 @@ for (const [width, height] of [
       await page.clock.runFor(300);
       expect(
         await page.evaluate(
-          `(async () => {const {fingerprint}=await import('/src/sim/game.ts');return fingerprint(window.__warren.game.s);})()`,
+          `(async () => {const {fingerprint}=await import('/warren/src/sim/game.ts');return fingerprint(window.__warren.game.s);})()`,
         ),
       ).toBe(before);
       expect(await page.evaluate('window.__warren.game.inputs.filter(i=>i.verb==="bell").length')).toBe(1);

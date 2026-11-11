@@ -22,7 +22,7 @@ async function begin(): Promise<Page> {
   await page.clock.install();
   await page.goto(url);
   await page.evaluate(`(async () => {
-    const { put } = await import('/src/ui/store.ts');
+    const { put } = await import('/warren/src/ui/store.ts');
     await put('hill', ${JSON.stringify(save(newGame(7)))});
   })()`);
   await page.reload();
@@ -87,7 +87,7 @@ describe('Game menu and person return paths', () => {
       await page.locator('#cardx').click();
       await page.locator('#bookx').click();
       const point = await page.evaluate<{ x: number; y: number }>(`(async () => {
-        const { personAt } = await import('/src/ui/draw.ts');
+        const { personAt } = await import('/warren/src/ui/draw.ts');
         const { game, view } = window.__warren;
         for (let y = 4; y < view.h; y += 4) {
           for (let x = 4; x < view.w; x += 4) {
@@ -111,7 +111,7 @@ describe('Game menu and person return paths', () => {
     const page = await begin();
     try {
       await page.evaluate(`(async () => {
-        const { lab } = await import('/src/ui/lab.ts');
+        const { lab } = await import('/warren/src/ui/lab.ts');
         lab.sendFeedback = async () => { throw new Error('Sending is forbidden in this test'); };
       })()`);
       await page.locator('#book').click();

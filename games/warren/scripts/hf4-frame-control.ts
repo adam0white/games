@@ -22,9 +22,9 @@ try {
   );
   await page.goto(`${url}__hf4_frame_control`);
   const result = await page.evaluate(async () => {
-    const gamePath = '/src/sim/game.ts';
+    const gamePath = '/warren/src/sim/game.ts';
     const { newGame, advance, save } = await import(gamePath);
-    const worldPath = '/src/sim/warren.ts';
+    const worldPath = '/warren/src/sim/warren.ts';
     const { advanceFrame } = await import(worldPath);
     const game = newGame(7, '0.7.0', undefined, 'warren-rest/1');
     advance(game, 1020);

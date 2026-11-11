@@ -32,7 +32,7 @@ async function enter(width: number, height: number) {
   act(g, { verb: 'use', cells: [idx(18, SURF + 3), idx(19, SURF + 3)], use: 'beds' });
   act(g, { verb: 'bell' });
   await page.evaluate(
-    `(async () => { const {put} = await import('/src/ui/store.ts'); await put('hill', ${JSON.stringify(save(g))}); })()`,
+    `(async () => { const {put} = await import('/warren/src/ui/store.ts'); await put('hill', ${JSON.stringify(save(g))}); })()`,
   );
   await page.reload();
   await page.locator('#cont').click();

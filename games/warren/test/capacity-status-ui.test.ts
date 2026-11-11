@@ -30,7 +30,7 @@ for (const [width, height] of [
       await localHill(page);
       await page.locator('#cv').waitFor();
       await page.evaluate(`(async () => {
-        const { idx, USE } = await import('/src/sim/grid.ts');
+        const { idx, USE } = await import('/warren/src/sim/grid.ts');
         const s = window.__warren.game.s;
         s.stats.dug = 3;
         s.hill.chalk.fill(0);

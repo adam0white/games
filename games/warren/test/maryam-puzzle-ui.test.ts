@@ -26,7 +26,7 @@ it('phone and wide public controls create a real exercise, download complete nat
         await page.goto(url);
         const g = newGame(7, '0.7.0', undefined, 'warren-rest/2');
         await page.evaluate(
-          `(async()=>{const {put}=await import('/src/ui/store.ts');return put('hill',${JSON.stringify(save(g))});})()`,
+          `(async()=>{const {put}=await import('/warren/src/ui/store.ts');return put('hill',${JSON.stringify(save(g))});})()`,
         );
         await page.reload();
         await page.locator('#cont').click();
@@ -45,7 +45,7 @@ it('phone and wide public controls create a real exercise, download complete nat
         await control.click();
         expect(await page.evaluate('window.__warren.game.inputs.at(-1).verb')).toBe('try-maryam-puzzle');
         await page.evaluate(
-          `(async()=>{const {advance}=await import('/src/sim/game.ts');const g=window.__warren.game;for(let n=0;n<12&&!g.s.maryamPuzzle.result;n++)advance(g,g.s.minute+30);advance(g,g.s.minute+30);})()`,
+          `(async()=>{const {advance}=await import('/warren/src/sim/game.ts');const g=window.__warren.game;for(let n=0;n<12&&!g.s.maryamPuzzle.result;n++)advance(g,g.s.minute+30);advance(g,g.s.minute+30);})()`,
         );
         await page.clock.runFor(300);
         expect(await page.locator('#maryam-puzzle-status').innerText()).toContain('slack');

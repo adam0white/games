@@ -34,7 +34,7 @@ it('keeps an old hill downloadable, starts with shared records present, and open
     });
     await page.route('**/*', async (route) => {
       const url = new URL(route.request().url());
-      if (url.origin === 'https://warren.adamwhite.work') {
+      if (url.origin === 'https://play.adamwhite.work') {
         const response = await route.fetch({ url: new URL(url.pathname + url.search, local).href });
         return route.fulfill({ response });
       }
@@ -58,7 +58,7 @@ it('keeps an old hill downloadable, starts with shared records present, and open
       });
     });
     await page.clock.install();
-    await page.goto('https://warren.adamwhite.work/');
+    await page.goto('https://play.adamwhite.work/warren/');
     await page.locator('#new').waitFor();
     // Genuine served rest/1 data must survive the native and file refusals.
     const old = JSON.parse(
@@ -67,7 +67,7 @@ it('keeps an old hill downloadable, starts with shared records present, and open
       ).toString(),
     );
     const written = await page.evaluate(`(async () => {
-      const store = await import('/src/ui/store.ts');
+      const store = await import('/warren/src/ui/store.ts');
       return store.put('hill', ${JSON.stringify(old)});
     })()`);
     expect(written).toBe(true);
@@ -82,7 +82,9 @@ it('keeps an old hill downloadable, starts with shared records present, and open
     await page.locator('#new').click();
     await page.locator('#new-no').click();
     expect(
-      await page.evaluate(`(async () => (await (await import('/src/ui/store.ts')).get('hill'))?.value)()`),
+      await page.evaluate(
+        `(async () => (await (await import('/warren/src/ui/store.ts')).get('hill'))?.value)()`,
+      ),
     ).toEqual(old);
     await page.locator('#new').click();
     await page.locator('#new-yes').click();

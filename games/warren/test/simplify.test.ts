@@ -36,7 +36,7 @@ it('starts a local hill when individual shared records cannot be read, without t
     await page.locator('#book').click();
     await page.locator('#to-title').click();
     const before = await page.evaluate(`(async () => {
-      const {get} = await import('/src/ui/store.ts'); const row = await get('hill'); if (row) delete row.value.savedAt; return JSON.stringify(row?.value);
+      const {get} = await import('/warren/src/ui/store.ts'); const row = await get('hill'); if (row) delete row.value.savedAt; return JSON.stringify(row?.value);
     })()`);
     await page.locator('#menu-new-yes').click();
     await page.locator('#menu-new-confirm').waitFor({ state: 'detached' });
@@ -45,7 +45,7 @@ it('starts a local hill when individual shared records cannot be read, without t
     expect(await page.evaluate('Object.keys(window.__warren.game.ownedHeads).length')).toBe(0);
     expect(
       await page.evaluate(`(async () => {
-      const {get} = await import('/src/ui/store.ts'); const row = await get('hill'); if (row) delete row.value.savedAt; return JSON.stringify(row?.value);
+      const {get} = await import('/warren/src/ui/store.ts'); const row = await get('hill'); if (row) delete row.value.savedAt; return JSON.stringify(row?.value);
     })()`),
     ).not.toBe(before);
   } finally {
@@ -130,7 +130,7 @@ it('reads a legacy gzip Blob row as well as the new ArrayBuffer rows', async () 
   try {
     await page.goto(url);
     const restored = await page.evaluate(`(async () => {
-      const {put,get} = await import('/src/ui/store.ts');
+      const {put,get} = await import('/warren/src/ui/store.ts');
       if (!await put('legacy-check', {kept:'exact old content'})) throw Error('Fixture write failed');
       const db = await new Promise((resolve,reject)=>{const r=indexedDB.open('warren',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)});
       const tx=db.transaction('pages','readwrite');
@@ -179,7 +179,7 @@ it('keeps an occupied native hill byte-exact through public Debug and pagehide, 
   try {
     await page.goto(url);
     const before = await page.evaluate<string>(
-      `(async()=>{const {newGame,save}=await import('/src/sim/game.ts');const {put,get}=await import('/src/ui/store.ts');await put('hill',save(newGame(111)));return JSON.stringify((await get('hill')).value);})()`,
+      `(async()=>{const {newGame,save}=await import('/warren/src/sim/game.ts');const {put,get}=await import('/warren/src/ui/store.ts');await put('hill',save(newGame(111)));return JSON.stringify((await get('hill')).value);})()`,
     );
     await page.reload();
     await page.locator('#book').click();
@@ -191,7 +191,7 @@ it('keeps an occupied native hill byte-exact through public Debug and pagehide, 
     expect(await page.locator('input[type="file"], #cast-file').count()).toBe(0);
     await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
     const after = await page.evaluate<string>(
-      `(async()=>{const {get}=await import('/src/ui/store.ts');return JSON.stringify((await get('hill')).value);})()`,
+      `(async()=>{const {get}=await import('/warren/src/ui/store.ts');return JSON.stringify((await get('hill')).value);})()`,
     );
     expect(after).toBe(before);
   } finally {

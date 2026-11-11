@@ -32,12 +32,15 @@ it('actual App synthetic phone/wide route shows real request and alarm records w
     await page.goto(url);
     expect(
       await page.evaluate(`(async () => {
-      const { put } = await import('/src/ui/store.ts');
+      const { put } = await import('/warren/src/ui/store.ts');
       return put('hill', ${JSON.stringify(save(g))});
     })()`),
     ).toBe(true);
     await page.reload();
+    // The first-visit notice dismisses on a click after four seconds; let Resume dismiss it before measuring the map.
+    await page.clock.runFor(4000);
     await page.locator('#cont').click();
+    await page.clock.runFor(100);
     if (await page.locator('#cellx').isVisible()) await page.locator('#cellx').click();
     await page.locator('[data-tool="look"]').click();
     const point = await page.evaluate(() => {
@@ -50,7 +53,7 @@ it('actual App synthetic phone/wide route shows real request and alarm records w
     await page.locator('#test-door').click();
     expect(await page.evaluate(() => window.__warren.game!.inputs.at(-1)?.verb)).toBe('test-door');
     await page.evaluate(`(async () => {
-      const { advance } = await import('/src/sim/game.ts');
+      const { advance } = await import('/warren/src/sim/game.ts');
       const g = window.__warren.game;
       for (let n=0; n<12 && !g.s.next?.requests?.door?.endedAt; n++) advance(g, g.s.minute+30);
     })()`);
@@ -61,7 +64,7 @@ it('actual App synthetic phone/wide route shows real request and alarm records w
     await page.locator('#bell').click();
     await page.locator('#confirm-bell').click();
     await page.evaluate(`(async () => {
-      const { advance } = await import('/src/sim/game.ts');
+      const { advance } = await import('/warren/src/sim/game.ts');
       const g = window.__warren.game;
       advance(g,g.s.minute+360);
     })()`);
@@ -155,7 +158,7 @@ it('actual App separates the Yusuf invitation note from each selected chalk at p
         await page.clock.install();
         await page.goto(url);
         await page.evaluate(`(async () => {
-          const { put } = await import('/src/ui/store.ts');
+          const { put } = await import('/warren/src/ui/store.ts');
           await put('hill', ${JSON.stringify(save(g))});
         })()`);
         await page.reload();

@@ -59,7 +59,7 @@ describe('safety before calling people below', () => {
           g.s.pos.meryem = bed;
           g.s.trips = {};
           await page.evaluate(
-            `(async () => {const {put} = await import('/src/ui/store.ts'); await put('hill', ${JSON.stringify(save(g))});})()`,
+            `(async () => {const {put} = await import('/warren/src/ui/store.ts'); await put('hill', ${JSON.stringify(save(g))});})()`,
           );
           await page.reload();
           await page.locator('#cont').click();
@@ -220,7 +220,7 @@ describe('safety before calling people below', () => {
           g.s.hill.use[idx(23, SURF + 4)] = USE.beds;
           for (const p of g.s.people) g.s.pos[p.id] = idx(18, SURF - 1);
           await page.evaluate(
-            `(async () => {const {put} = await import('/src/ui/store.ts');await put('hill',${JSON.stringify(save(g))});})()`,
+            `(async () => {const {put} = await import('/warren/src/ui/store.ts');await put('hill',${JSON.stringify(save(g))});})()`,
           );
           await page.reload();
           await page.locator('#cont').click();

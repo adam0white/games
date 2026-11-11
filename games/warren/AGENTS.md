@@ -2,11 +2,11 @@
 
 Read HANDOFF.md and docs/design.md before changing the game. Follow [the plain-English policy](docs/lab/plain-english.md) for player-facing text.
 
-Stack: HF 4.17.0, lab-client 0.5.15, lab-kit 0.5.32, TypeScript 7.0.2, Vite 8.3.5, Vitest 5.1.0, Biome 2.6.5, Wrangler 4.157.0, Playwright 1.64.1 and Knip 6.44.1. Worker compatibility date: 2026-11-05.
+Stack: HF 4.17.0, lab-client 0.5.17, lab-kit 0.5.34, TypeScript 7.0.2, Vite 8.3.5, Vitest 5.1.0, Biome 2.6.5, Wrangler 4.157.0, Playwright 1.64.1 and Knip 6.44.1. Worker compatibility date: 2026-11-05.
 
 Use the shared Node 26.12.0 and pnpm 12.16.1, with `/opt/homebrew/bin` first in PATH. Use managed worktrees. Run the game’s normal check:lane directly. Give the current HF release train priority; do not add an external lock or remove a foreign lock. Run check:lane before every signed commit. Rebase origin/main before pushing. Preserve simulation, save and replay contracts. Adam accepts game feel by playing; technical delivery is separate.
 
-App package and constructor default are 0.7.0. Ordinary new hills use rules0.7.0 with warren-rest/2. Only warren-rest/2 hills are admitted. Older or unknown configurations are refused; keep the original and start fresh. There is no gameplay feature selector. HF is pinned exactly to 4.17.0. Older HF3 saves and Watch links are refused explicitly. TypeScript support requires 7+. Lab client/kit remain immutable release artifacts; do not replace archives in place or adopt an npm SDK route. Read current HANDOFF before copying historical status.
+App package and constructor default are 0.7.0. Ordinary new hills use rules0.7.0 with warren-rest/2. Only warren-rest/2 hills are admitted. Older or unknown configurations are refused; keep the original and start fresh. There is no gameplay feature selector. HF is pinned exactly to 4.17.0. Older HF3 saves and Watch links are refused explicitly. TypeScript support requires 7+. Lab client/kit remain immutable release artifacts; do not replace archives in place or adopt an npm SDK route. Historical HF4.10 verifier source and fixtures remain archival; the current suite checks their bytes and explicit refusal without loading the older engine. Read current HANDOFF before copying historical status.
 
 Lab-panel rounds on HF 3 builds are allowed under the playtest director. Friends’ playtests and Show HN remain paused. Owner readiness remains unaccepted; recheck on 2026-11-12 because the owner has not yet judged the current HF 4.17 opening. Technical delivery does not establish acceptance.
 

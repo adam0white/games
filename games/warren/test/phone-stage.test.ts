@@ -114,8 +114,8 @@ it('frames a selected traveller at the current trip cell instead of the departur
   const page = await startPhone();
   try {
     const cells = await page.evaluate<{ current: number; departure: number }>(`(async () => {
-      const { idx, SURF } = await import('/src/sim/grid.ts');
-      const { positionAt } = await import('/src/sim/warren.ts');
+      const { idx, SURF } = await import('/warren/src/sim/grid.ts');
+      const { positionAt } = await import('/warren/src/sim/warren.ts');
       const s = window.__warren.game?.s;
       if (!s) throw new Error('Missing game');
       const departure = idx(2, SURF - 1);
@@ -141,7 +141,7 @@ it('frames a selected traveller at the current trip cell instead of the departur
       width: number;
       height: number;
     }>(`(async () => {
-      const { xOf, yOf } = await import('/src/sim/grid.ts');
+      const { xOf, yOf } = await import('/warren/src/sim/grid.ts');
       const view = window.__warren.view;
       const cell = ${cells.current};
       return {
@@ -171,7 +171,7 @@ it('shows complete bed and door remedies inside the sheet and acknowledges stora
     await localHill(page);
     await page.locator('#cv').waitFor();
     await page.evaluate(`(async () => {
-      const {idx,K,SURF,USE}=await import('/src/sim/grid.ts');
+      const {idx,K,SURF,USE}=await import('/warren/src/sim/grid.ts');
       const s=window.__warren.game.s, x=s.hill.surface.entrance;
       const door=idx(x,SURF+2), bed=idx(x+1,SURF+3), store=idx(x-1,SURF+3);
       s.hill.kind[door]=K.open; s.hill.use[door]=USE.door; s.hill.doorWork[door]=0; s.hill.lamp[door]=1;

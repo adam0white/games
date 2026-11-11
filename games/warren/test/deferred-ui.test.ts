@@ -71,7 +71,7 @@ it('resumes a current hill with slowed readings and a paused menu, without chang
     await page.clock.install();
     await page.goto(url);
     await page.evaluate(
-      `(async()=>{const {newGame,save}=await import('/src/sim/game.ts');const {put}=await import('/src/ui/store.ts');await put('hill',save(newGame(7,'0.7.0')));})()`,
+      `(async()=>{const {newGame,save}=await import('/warren/src/sim/game.ts');const {put}=await import('/warren/src/ui/store.ts');await put('hill',save(newGame(7,'0.7.0')));})()`,
     );
     await page.reload();
     await page.locator('#cont').click();
@@ -93,7 +93,7 @@ it('resumes a current hill with slowed readings and a paused menu, without chang
     await page.locator('[data-tool="store"]').click();
     // This is a controlled local fixture, entered through the supported save path.
     const point = await page.evaluate<{ x: number; y: number; cell: number }>(`(async()=>{
-      const {K,USE,W,SURF}=await import('/src/sim/grid.ts');
+      const {K,USE,W,SURF}=await import('/warren/src/sim/grid.ts');
       const {view,game}=window.__warren;
       for(let cell=0;cell<game.s.hill.kind.length;cell++) {
         const x=(cell%W-view.x+.5)*view.cs,y=(Math.floor(cell/W)-view.y+.5)*view.cs;
@@ -137,7 +137,7 @@ it('lets a short portrait title scroll to the new-hill confirmation', async () =
     await page.clock.install();
     await page.goto(url);
     await page.evaluate(
-      `(async()=>{const {newGame,save}=await import('/src/sim/game.ts');const {put}=await import('/src/ui/store.ts');await put('hill',save(newGame(7)));})()`,
+      `(async()=>{const {newGame,save}=await import('/warren/src/sim/game.ts');const {put}=await import('/warren/src/ui/store.ts');await put('hill',save(newGame(7)));})()`,
     );
     await page.reload();
     await page.locator('#new').click();
@@ -156,7 +156,7 @@ it('slows Journal and growth while village-opened person readings and the Game m
     await page.clock.install();
     await page.goto(url);
     await page.evaluate(
-      `(async()=>{const {newGame,save}=await import('/src/sim/game.ts');const {put}=await import('/src/ui/store.ts');await put('hill',save(newGame(7,'0.7.0')));})()`,
+      `(async()=>{const {newGame,save}=await import('/warren/src/sim/game.ts');const {put}=await import('/warren/src/ui/store.ts');await put('hill',save(newGame(7,'0.7.0')));})()`,
     );
     await page.reload();
     await page.locator('#cont').click();

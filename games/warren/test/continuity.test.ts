@@ -24,6 +24,7 @@ const mock = vi.hoisted(() => ({
   handle: null as null | ((r: PersonaRequest) => Promise<unknown>),
 }));
 vi.mock('../src/ui/lab.ts', () => ({
+  fileMode: false,
   lab: { setPersonaRecording: vi.fn(), allowPersonaRecording: vi.fn() },
 }));
 vi.mock('@adam0white/lab-client', async (original) => {

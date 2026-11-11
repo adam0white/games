@@ -2,7 +2,7 @@ import { type Build, FEEDBACK_LABELS, PRIVACY_URL } from '@adam0white/lab-client
 
 import { feedbackPersonaControl, feedbackSharePlay } from '@adam0white/lab-kit';
 
-const NAME_KEY = 'hf-lab-feedback-name';
+const NAME_KEY = 'warren-lab-feedback-name';
 
 /** The feedback surface accepts a lab stub without starting a live lab client. */
 export type FeedbackLab = {

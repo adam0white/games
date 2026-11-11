@@ -151,7 +151,7 @@ it('headless actual-app control: resumes an authored current hill and publicly r
     await page.clock.install();
     await page.goto(url);
     const stored = await page.evaluate(`(async () => {
-      const { put } = await import('/src/ui/store.ts');
+      const { put } = await import('/warren/src/ui/store.ts');
       return put('hill', ${JSON.stringify(save(heldHill()))});
     })()`);
     expect(stored).toBe(true);
@@ -171,7 +171,7 @@ it('headless actual-app control: resumes an authored current hill and publicly r
     expect(await page.evaluate(() => window.__warren.game!.inputs.at(-1)?.verb)).toBe('test-door');
     // Only the ordinary simulation clock advances; no state/Person edits or forced resolution.
     await page.evaluate(`(async () => {
-      const { advance } = await import('/src/sim/game.ts');
+      const { advance } = await import('/warren/src/sim/game.ts');
       const g = window.__warren.game;
       for (let n = 0; n < 12 && !g.s.next?.requests?.door?.results.length; n++) advance(g, g.s.minute + 30);
     })()`);

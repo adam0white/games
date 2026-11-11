@@ -28,7 +28,7 @@ for (const width of [360, 1280]) {
       await page.clock.runFor(300);
       const point = await page.evaluate<{ x: number; y: number }>(`(async () => {
         const d = window.__warren;
-        const {idx,SURF,USE,xOf,yOf}=await import('/src/sim/grid.ts');
+        const {idx,SURF,USE,xOf,yOf}=await import('/warren/src/sim/grid.ts');
         const s=d.game.s, c=idx(s.hill.surface.entrance-1,SURF+3);
         s.hill.use[c]=USE.none; s.hill.lamp[c]=0; s.hill.lampsSpare=2;
         const v=d.view,b=document.querySelector('#cv').getBoundingClientRect();

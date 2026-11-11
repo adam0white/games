@@ -17,7 +17,7 @@ try {
   await page.locator('#new').click();
   await page.locator('#shelter-check').waitFor();
   const minute = () =>
-    page.evaluate(`(async () => (await import('/src/ui/app.ts'))._debug.game?.s.minute)()`);
+    page.evaluate(`(async () => (await import('/warren/src/ui/app.ts'))._debug.game?.s.minute)()`);
   const start = (await minute()) as number | undefined;
   await page.locator('#shelter-check').click();
   await page.locator('[data-who="meryem"]').click();
@@ -29,7 +29,7 @@ try {
   if (await page.locator('#bookx').isVisible()) await page.locator('#bookx').click();
   await page.locator('[data-tool="chalk"]').click();
   const point = (await page.evaluate(`(async () => {
-    const { view } = (await import('/src/ui/app.ts'))._debug;
+    const { view } = (await import('/warren/src/ui/app.ts'))._debug;
     const box = document.querySelector('#cv').getBoundingClientRect();
     return { x: box.x + (15.5 - view.x) * view.cs, y: box.y + (11.5 - view.y) * view.cs };
   })()`)) as { x: number; y: number };

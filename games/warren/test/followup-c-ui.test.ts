@@ -61,7 +61,7 @@ for (const [width, height] of [
         game.s.hill.chalk[c] = 0;
       }
       await page.evaluate(
-        `(async () => {const {put}=await import('/src/ui/store.ts');await put('hill',${JSON.stringify(save(game))});})()`,
+        `(async () => {const {put}=await import('/warren/src/ui/store.ts');await put('hill',${JSON.stringify(save(game))});})()`,
       );
       await page.reload();
       await page.locator('#cont').click();

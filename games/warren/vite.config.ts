@@ -3,6 +3,7 @@ import { copyFileSync, mkdirSync } from 'node:fs';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  base: '/warren/',
   plugins: [
     {
       name: 'file-page',

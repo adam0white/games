@@ -35,7 +35,7 @@ async function enter(width = 360, height = 690) {
   await page.goto(`${url}?lab=1`);
   await page.locator('#new').waitFor();
   await page.evaluate(`(async () => {
-    const { put } = await import('/src/ui/store.ts');
+    const { put } = await import('/warren/src/ui/store.ts');
     await put('hill', ${JSON.stringify(saved)});
   })()`);
   await page.reload();

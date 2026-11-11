@@ -18,10 +18,14 @@ import { archiveOf, FRAMEWORK_VERSION } from '../sim/hf4.ts';
 import type { NativeReturnId } from '../sim/native-return.ts';
 import { CAST_IDS } from '../sim/people.ts';
 import { assertReplay, sourceReceipt, validateIncoming, validateSource } from '../sim/source-history.ts';
-import { lab } from './lab.ts';
+import { fileMode, lab } from './lab.ts';
 import { sourceBuild } from './source-build.ts';
 
-const shelf = personaChannel();
+const channel = fileMode ? undefined : personaChannel();
+function shelf() {
+  if (!channel) throw Error('Shared people are unavailable in file mode.');
+  return channel;
+}
 let generation = 0;
 let busy = false;
 let current: () => Game | null = () => null;
@@ -64,11 +68,11 @@ export function controls() {
   return `<p data-cast-status role="status">${esc(continuityStatus)}</p>`;
 }
 async function readyShelf(token: number) {
-  await shelf.ready;
+  await shelf().ready;
   unchanged(token);
-  if (!shelf.enabled) {
-    shelf.setEnabled(true);
-    await shelf.ready;
+  if (!shelf().enabled) {
+    shelf().setEnabled(true);
+    await shelf().ready;
   }
   unchanged(token);
 }
@@ -85,7 +89,7 @@ export async function fresh(
   const heads = await Promise.all(
     ids.map(async (castId) => {
       try {
-        return [castId, await shelf.request<PersonaEnvelope | null>({ action: 'get', castId })] as const;
+        return [castId, await shelf().request<PersonaEnvelope | null>({ action: 'get', castId })] as const;
       } catch {
         skipped.add(castId);
         return [castId, null] as const;
@@ -150,7 +154,7 @@ export async function fresh(
   if (claims.length) {
     if (claims.some((claim) => portableWriteBlockers(claim.castId, 'warren').length))
       throw Error('The shared records changed while this hill was being prepared. Try again.');
-    await shelf.request({
+    await shelf().request({
       action: 'putBatch',
       envelopes: claims,
       expectedHeads: Object.fromEntries(claims.map((claim) => [claim.castId, claim.parentRevision])),
@@ -193,7 +197,7 @@ export async function fileLoad(file: File): Promise<Game> {
 }
 export async function checkpoint(): Promise<void> {
   const game = current();
-  if (busy || !game || game.fileOrigin || !shelf.enabled) return;
+  if (busy || !game || game.fileOrigin || !shelf().enabled) return;
   const token = generation;
   busy = true;
   try {
@@ -228,7 +232,7 @@ export async function checkpoint(): Promise<void> {
         if (current() !== game || !sourceUnchanged()) return;
         if (portableWriteBlockers(castId, 'warren').length) continue;
         const receipt = sourceReceipt(game, envelope);
-        await shelf.request({
+        await shelf().request({
           action: 'putBatch',
           envelopes: [envelope],
           expectedHeads: { [castId]: parent.revision },

@@ -22,7 +22,7 @@ async function mount(privacy = false, off = false, failRun = false): Promise<Pag
   const page = await browser.newPage({ viewport: { width: 360, height: 690 } });
   await page.goto(`${url}?lab=1`);
   await page.evaluate(`(async () => {
-    const {openFeedback} = await import('/src/ui/feedback.ts');
+    const {openFeedback} = await import('/warren/src/ui/feedback.ts');
     if (${off}) localStorage.setItem('hf-lab-recording-off', '1');
     else localStorage.removeItem('hf-lab-recording-off');
     window.feedbackCalls = [];
