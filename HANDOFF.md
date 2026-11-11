@@ -21,6 +21,8 @@ Word browser controls now explicitly opt in before recording assertions. Days te
 
 A later hosted run exposed a Days WebKit route-teardown race and a Smoke held-pointer race. Days now waits for its owned routes before teardown, with manifest assertions and caps unchanged. Smoke keeps neighbour label/status nodes connected while updating their text; a real held-pointer control requires a rendered update between press and release and passes across four browser/layout profiles. Scoped checks and the 33 root controls pass; fresh exact-head hosted review and CI remain required.
 
+Warren's viewport control now declares a returning-player notice fixture, waits for fonts, and tests a controlled footer resize through the real observer before taking its stability snapshot. Both original full-view stability assertions remain, with exact pan/scale preservation across the 29-pixel resize. This reproduces the hosted height-only failure shape; it does not identify the exact hosted cause or qualify the asynchronous first-visit notice. Focused controls, scoped checks, independent review and all 33 root controls pass.
+
 ## Migration batch preparation — 2026-11-10
 
 Glance PR4 merged normally as `e581cc0`; its exact-main CI passed. The five-second test cap and exact assertions remain. This branch adds full histories for Small Works, Valley, Murmur, Stairwell and Pass. Current local suites passed 420, 31, 162, 227 and 141 tests respectively; Murmur has three disclosed gated skips. Pass's locked Node26 timing controls passed 17 tests at unchanged five-second caps. Retired engine-specific tests remain identifiable as historical; long-week/performance, actual-death and peer-journey gaps are not newly qualified by this migration.
