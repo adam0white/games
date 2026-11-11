@@ -494,21 +494,24 @@ async function queuedPieces(page: Page) {
 		);
 	});
 }
-async function finalQueuedRun(page: Page) {
+async function finalQueuedRun(page: Page, prior: Set<string>) {
+	let pieces: {
+		data: { upload: string; total: number; index: number; text: string };
+	}[] = [];
 	await expect
-		.poll(
-			async () =>
-				(await queuedPieces(page)).filter((r) => r.kind === "run").length,
-		)
-		.toBeGreaterThan(0);
-	// Explicit opt-in may already have queued a snapshot. Decode one complete
-	// upload at a time; the final snapshot is the most recently queued upload.
-	const runs = (await queuedPieces(page)).filter((r) => r.kind === "run");
-	const latest = runs.reduce((a, b) => (a.at > b.at ? a : b));
-	const pieces = runs.filter((r) => r.data.upload === latest.data.upload);
-	expect(pieces).toHaveLength(latest.data.total);
+		.poll(async () => {
+			const runs = (await queuedPieces(page)).filter(
+				(r) => r.kind === "run" && !prior.has(r.data.upload),
+			);
+			const upload = runs[0]?.data.upload;
+			pieces = runs.filter((r) => r.data.upload === upload);
+			return !!upload && pieces.length === pieces[0]?.data.total;
+		})
+		.toBe(true);
+	const first = pieces[0];
+	if (!first) throw new Error("Missing final upload");
 	expect(pieces.map((r) => r.data.index).sort((a, b) => a - b)).toEqual(
-		Array.from({ length: latest.data.total }, (_, index) => index),
+		Array.from({ length: first.data.total }, (_, index) => index),
 	);
 	return recordedCheckpoint(
 		pieces
@@ -517,6 +520,7 @@ async function finalQueuedRun(page: Page) {
 			.join(""),
 	);
 }
+
 async function lifecycleFile({
 	browser,
 	request,
@@ -531,6 +535,11 @@ async function lifecycleFile({
 	await context.route("**/*", async (route) => {
 		const u = new URL(route.request().url());
 		if (u.origin !== origin) return route.abort();
+		if (u.pathname === "/navigation-probe")
+			return route.fulfill({
+				contentType: "text/html",
+				body: "<!doctype html><title>Navigation probe</title>",
+			});
 		await route.fulfill({
 			response: await request.get(`${baseURL}${u.pathname}${u.search}`),
 		});
@@ -560,7 +569,24 @@ async function lifecycleFile({
 		window.addEventListener("pagehide", () => (p.hidden = true));
 		const W = Worker;
 		window.Worker = class extends W {
+			postMessage(
+				message: unknown,
+				options?: StructuredSerializeOptions | Transferable[],
+			) {
+				if (p.hidden && (message as { type?: string }).type === "save-journal")
+					sessionStorage.setItem(
+						"review-navigation-order",
+						`${sessionStorage.getItem("review-navigation-order") ?? ""}snapshot,`,
+					);
+				if (Array.isArray(options)) super.postMessage(message, options);
+				else super.postMessage(message, options);
+			}
 			terminate() {
+				if (p.hidden)
+					sessionStorage.setItem(
+						"review-navigation-order",
+						`${sessionStorage.getItem("review-navigation-order") ?? ""}terminate,`,
+					);
 				p.terminated++;
 				super.terminate();
 			}
@@ -645,17 +671,86 @@ async function lifecycleFile({
 		.click();
 	return { context, page, runtime };
 }
+async function changedFileAndBaseline(page: Page) {
+	await expect
+		.poll(async () => (await queuedPieces(page)).some((r) => r.kind === "run"))
+		.toBe(true);
+	const prior = new Set<string>(
+		(await queuedPieces(page))
+			.filter((r) => r.kind === "run")
+			.map((r) => r.data.upload),
+	);
+	await page
+		.getByRole("button", { name: "Walk somewhere", exact: true })
+		.click();
+	await page
+		.getByRole("button", { name: "Market kitchen about 30 min", exact: true })
+		.click();
+	await (await import("./session-helpers")).openDebug(page);
+	await page
+		.getByRole("button", { name: "Keep a copy of this run", exact: true })
+		.click();
+	const link = page.getByRole("link", { name: "Download save", exact: true });
+	await expect(link).toBeVisible();
+	const href = await link.getAttribute("href");
+	if (!href) throw new Error("Expected a download URL");
+	const expected = await page.evaluate(
+		async (href) =>
+			JSON.parse(
+				await new Response(
+					(await (await fetch(href)).blob())
+						.stream()
+						.pipeThrough(new DecompressionStream("gzip")),
+				).text(),
+			),
+		href,
+	);
+	await page
+		.getByRole("button", { name: "Close Game menu", exact: true })
+		.click();
+	return { prior, expected };
+}
+test("real navigation requests the final file snapshot before retiring its runtime", async ({
+	browser,
+	request,
+	baseURL,
+}) => {
+	const { context, page } = await lifecycleFile({ browser, request, baseURL });
+	try {
+		await expect
+			.poll(async () =>
+				(await queuedPieces(page)).some((r) => r.kind === "run"),
+			)
+			.toBe(true);
+		await page
+			.getByRole("button", { name: "Walk somewhere", exact: true })
+			.click();
+		await page
+			.getByRole("button", { name: "Market kitchen about 30 min", exact: true })
+			.click();
+		await page.evaluate(() => window.addEventListener("unload", () => {}));
+		await page.goto("https://neighbours.test/navigation-probe");
+		expect(
+			await page.evaluate(() =>
+				sessionStorage.getItem("review-navigation-order"),
+			),
+		).toMatch(/^snapshot,/);
+	} finally {
+		await context.close();
+	}
+});
 test("regression: pending export must not publish after file pagehide while final snapshot waits", async ({
 	browser,
 	request,
 	baseURL,
 }, info) => {
-	const { context, page, runtime } = await lifecycleFile({
+	const { context, page } = await lifecycleFile({
 		browser,
 		request,
 		baseURL,
 	});
 	try {
+		const { prior, expected } = await changedFileAndBaseline(page);
 		await (await import("./session-helpers")).openDebug(page);
 		await page.evaluate(
 			() => ((window as unknown as ProbeWindow).reviewProbe.holdExport = true),
@@ -670,6 +765,8 @@ test("regression: pending export must not publish after file pagehide while fina
 				),
 			)
 			.toBe(true);
+		for (const row of await queuedPieces(page))
+			if (row.kind === "run") prior.add(row.data.upload);
 		await page.evaluate(() =>
 			window.dispatchEvent(new PageTransitionEvent("pagehide")),
 		);
@@ -720,17 +817,19 @@ test("regression: pending export must not publish after file pagehide while fina
 			.toBe(1);
 		expect(before).toBe(0);
 		expect(result.hidden).toBe(true);
+		expect(result.download).toBeUndefined();
 		expect(
-			result.download,
-			"retired export callback published a new download after pagehide",
-		).toBeUndefined();
+			await page
+				.getByRole("link", { name: "Download save", exact: true })
+				.count(),
+		).toBe(before);
 		const { restoreRuntime } = await import("../src/core/index.ts");
 		expect(
-			restoreRuntime((await finalQueuedRun(page)).runtime).export(),
-		).toEqual(runtime);
+			restoreRuntime((await finalQueuedRun(page, prior)).runtime).export(),
+		).toEqual(restoreRuntime(expected.runtime).export());
 		await expect(
 			page.getByRole("link", { name: "Download save", exact: true }),
-		).toHaveCount(0);
+		).toHaveCount(before);
 	} finally {
 		await context.close();
 	}
@@ -804,6 +903,12 @@ test("regression: pending player reply must not enqueue a checkpoint after pageh
 		baseURL,
 	});
 	try {
+		await expect
+			.poll(async () =>
+				(await queuedPieces(page)).some((r) => r.kind === "run"),
+			)
+			.toBe(true);
+		const prior = new Set<string>();
 		await page.evaluate(
 			() => ((window as unknown as ProbeWindow).reviewProbe.holdState = true),
 		);
@@ -820,6 +925,8 @@ test("regression: pending player reply must not enqueue a checkpoint after pageh
 				),
 			)
 			.toBe(true);
+		for (const row of await queuedPieces(page))
+			if (row.kind === "run") prior.add(row.data.upload);
 		await page.evaluate(() =>
 			window.dispatchEvent(new PageTransitionEvent("pagehide")),
 		);
@@ -864,7 +971,7 @@ test("regression: pending player reply must not enqueue a checkpoint after pageh
 			after,
 			"retired player reply enqueued SDK checkpoint after pagehide",
 		).toBe(before);
-		const final = await finalQueuedRun(page);
+		const final = await finalQueuedRun(page, prior);
 		expect(final.runtime.physical.people).toHaveLength(
 			runtime.physical.people.length,
 		);

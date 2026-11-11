@@ -547,13 +547,17 @@ export function useVisitorSession({
 			runRequests.current.clear();
 			setPlaying(false);
 			cancelPrepared?.();
-			// The file Lab client may have been initialized after this listener. Let
-			// its pagehide handler request the final snapshot before retiring.
-			queueMicrotask(() => {
-				if (!telemetryRequests.size) retireRuntime();
-			});
+			if (!telemetryRequests.size) retireRuntime();
 		};
 		window.addEventListener("pagehide", hideFile);
+		// The deferred client installs its pagehide listener on recording opt-in.
+		// Put the host after it so the final snapshot is requested first.
+		const orderFileHide = () => {
+			if (!fileSession) return;
+			window.removeEventListener("pagehide", hideFile);
+			window.addEventListener("pagehide", hideFile);
+		};
+		window.addEventListener("hf-lab-preference", orderFileHide);
 		let initialSavedPacket: unknown = fileSession ? filePacket : undefined;
 		let savedReadFailed = false;
 		let firstReady = true;
@@ -1419,6 +1423,7 @@ export function useVisitorSession({
 				window.removeEventListener(name, lifecycle);
 			tracing.end(traceOwner);
 			window.removeEventListener("pagehide", hideFile);
+			window.removeEventListener("hf-lab-preference", orderFileHide);
 			if (fileSession) {
 				fileRetired.current = true;
 				replacementIntent.current++;
