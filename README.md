@@ -1,18 +1,36 @@
 # Games
 
-Original games built with [Human Framework](https://github.com/adam0white/human-framework).
+Original games built with [Human Framework](https://github.com/adam0white/human-framework). Games live at `https://play.adamwhite.work/<slug>/`. The central shelf, identity service, and Lab remain in Human Framework.
 
-Games move to `https://play.adamwhite.work/<slug>/`. The central shelf and lab remain in Human Framework. Rope, Hearsay and Good Hands are live on the new origin; Glance is being prepared.
+## Work from a cloud session
 
-| Game | Workspace | Target path | Engine |
-| --- | --- | --- | --- |
-| The Rope | [games/rope](games/rope) | `/rope/` | HF 4.17.0 |
-| Hearsay | [games/hearsay](games/hearsay) | `/hearsay/` | HF 4.17.0 |
-| Good Hands | [games/goodhands](games/goodhands) | `/goodhands/` | HF 4.17.0 |
-| The Glance | [games/glance](games/glance) | `/glance/` | HF 4.17.0 |
+Clone `adam0white/games` in the session workspace. Use the Node version in `.node-version` and pnpm version in `package.json`. No local Mac checkout or sibling Human Framework repository is needed.
 
-Use Node 26.12.0 and pnpm 12.16.1. Install once with `pnpm install --frozen-lockfile`. Run a game with `pnpm --filter rope dev` or `pnpm --filter hearsay dev`. Use the root `pnpm deploy` gate for the complete bundle. Each live game has its own release manifest.
+```sh
+pnpm install --frozen-lockfile
+pnpm --filter ./games/rope dev
+node scripts/check-game.mjs rope
+pnpm check:lane
+```
 
-Original source history remains reachable through unsquashed subtree imports. Original repositories are retained. Old-origin saves are not transferred; play starts fresh on the new origin. [HANDOFF.md](HANDOFF.md) records remaining release gates. [AGENTS.md](AGENTS.md) records work rules.
+`games.json` lists every imported game, original source commit, old origin, save schema, and the single exact HF version. Every game consumes HF from npm. Lab packages are immutable published artifacts or checked-in vendor archives with notices. Original source history remains reachable through unsquashed subtree imports.
 
-Code is MIT licensed. Imported games retain their source history and attribution.
+Work on a signed branch. Run the affected game checks and root lane. Open one combined PR for independent changes. Obtain green required CI and a clear hosted Codex review on the exact head. Merge normally. Shared files and the lockfile trigger all game checks. CI always builds the entire deployment bundle.
+
+## Production deployment
+
+After CI succeeds for a push to `main`, `.github/workflows/deploy.yml` checks out that exact commit. It serializes production deploys and runs `pnpm deploy`. The deploy script rejects stale main or unsuccessful CI, builds the complete bundle in a clean temporary checkout, uploads `games-static`, then verifies every live `/<slug>/release.json` against the complete expected manifest and `dirty:false`. It deletes its temporary checkout on exit. PR and fork runs cannot deploy.
+
+The owner must add the repository Actions secret before automatic deployment can succeed:
+
+1. Create a Cloudflare API token scoped to the account in `wrangler.jsonc`, with Workers Scripts Edit and Account Settings Read; scope Zone Read and Workers Routes Edit to `adamwhite.work` for its custom domain/routes. Use the [Cloudflare deployment guide](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/) to confirm the token scope.
+2. Open [games Actions secrets](https://github.com/adam0white/games/settings/secrets/actions). Choose **New repository secret**. Name it `CLOUDFLARE_API_TOKEN`. Paste the token there. Never paste it in chat, source, or STATUS.
+3. Re-run the latest successful main CI workflow. Its successful completion triggers Deploy. Read the Deploy result and verify every live release manifest. A successful CI run alone does not prove deployment.
+
+The account ID is committed non-secret configuration. GitHub supplies the read-only `GH_TOKEN` used to verify CI. No credential file or local OAuth session is needed in Actions. For a manual recovery deployment from a cloud checkout, use `pnpm deploy` on current clean green main with the same token supplied privately in the environment and an authenticated read-only GitHub CLI.
+
+## Data and recovery
+
+Old-origin saves are not automatically transferred. The new origin starts fresh; retain original data and exports. A path is not an isolation boundary: all games share the play origin. Each game's storage keys and service-worker scope must remain distinct. Validate native export/replay, recording and privacy behavior before enabling an old-host redirect. Preserve old hosts and source until the owner decides to retire them. Archiving and deleting source directories require the owner's decision.
+
+Code is MIT licensed. Imported games retain their attribution and third-party notices. [AGENTS.md](AGENTS.md) defines work rules. [HANDOFF.md](HANDOFF.md) records release state.

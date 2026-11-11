@@ -1,0 +1,23 @@
+Concordia local engine probe, 2026-10-16
+Source: https://github.com/google-deepmind/concordia
+Commit: 6fbfbc58f324aa74f78568c488713210889a801e (checkout clean)
+Host: Apple Silicon macOS; Python 3.12.13 in isolated uv venv.
+Installed editable source with its base dependencies plus pytest and pytest-xdist.
+No model API, embedding service, HF adapter or new simulation was invoked.
+
+Command (from Concordia checkout):
+python -m pytest -n 0 concordia/environment/engine_test.py concordia/environment/engines/sequential_test.py concordia/environment/engines/simultaneous_test.py concordia/environment/engines/checkpoint_test.py
+
+============================= test session starts ==============================
+platform darwin -- Python 3.12.13, pytest-9.1.1, pluggy-1.7.0
+rootdir: /private/tmp/hf-concordia-audit-20261016
+configfile: pyproject.toml
+plugins: xdist-3.8.0
+collected 19 items
+
+concordia/environment/engine_test.py .........                           [ 47%]
+concordia/environment/engines/sequential_test.py .                       [ 52%]
+concordia/environment/engines/simultaneous_test.py .                     [ 57%]
+concordia/environment/engines/checkpoint_test.py ........                [100%]
+
+============================== 19 passed in 2.91s ==============================

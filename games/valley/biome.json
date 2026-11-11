@@ -1,0 +1,49 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.5/schema.json",
+  "files": {
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/node_modules",
+      "!.wrangler",
+      "!test/fixtures/*.json",
+      "!scratch",
+      "!pnpm-lock.yaml"
+    ]
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 110
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single"
+    }
+  },
+  "linter": {
+    "rules": {
+      "preset": "recommended"
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["docs/playtests/**"],
+      "formatter": {
+        "enabled": false
+      }
+    },
+    {
+      "includes": [
+        "HANDOFF.md",
+        "docs/design.md",
+        "docs/superpowers/plans/2026-11-02-valley-port-corrections.md",
+        "docs/valley-continuous-term-instructions-2026-11-05.md",
+        "docs/continuous-term-readme-historical.md"
+      ],
+      "formatter": {
+        "enabled": false
+      }
+    }
+  ]
+}

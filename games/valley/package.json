@@ -1,0 +1,52 @@
+{
+  "name": "valley",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "description": "The Valley: a six-hour opening episode. Every household can say no.",
+  "license": "MIT",
+  "engines": {
+    "node": "26.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node scripts/suite-lock.ts -- vitest run --testTimeout=120000",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "biome check . --error-on-warnings",
+    "format": "biome format --write .",
+    "measure": "node scripts/measure.ts",
+    "check": "pnpm run lint && pnpm run typecheck && pnpm test",
+    "deploy": "cd ../.. && pnpm run deploy",
+    "check:lane": "pnpm run lint && pnpm run typecheck && pnpm exec vitest run --maxWorkers=1 --testTimeout=120000",
+    "check:unused": "knip",
+    "proof:day12": "vitest run test/export-term.test.ts --testTimeout=120000",
+    "proof:term": "node scripts/hf4151-proof.ts --term",
+    "proof:export": "node scripts/hf4151-proof.ts --day12",
+    "deploy:check": "cd ../.. && pnpm run deploy:check"
+  },
+  "dependencies": {
+    "@adam0white/human-framework": "4.17.0",
+    "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.17/adam0white-lab-client-0.5.17.tgz",
+    "@adam0white/lab-kit": "https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.34/adam0white-lab-kit-0.5.34.tgz"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.5",
+    "@types/node": "26.6.6",
+    "knip": "6.44.1",
+    "playwright-core": "1.64.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.1.0",
+    "wrangler": "4.157.0"
+  },
+  "overrides": {
+    "sharp": "0.35.5",
+    "miniflare": {
+      "undici": "7.30.1"
+    },
+    "@adam0white/human-framework": "$@adam0white/human-framework"
+  },
+  "packageManager": "pnpm@12.16.1"
+}

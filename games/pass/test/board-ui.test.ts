@@ -1,0 +1,125 @@
+import { describe, expect, it } from 'vitest';
+import { boardDefaults, cloneState, newGame, queueInput } from '../src/sim/kitchen.ts';
+import {
+  boardMoneyEstimate,
+  boardReplies,
+  breakSlots,
+  earlyCoverageWarnings,
+  openingBoard,
+} from '../src/ui/board.ts';
+
+describe('board presentation choices', () => {
+  it('counts tonight pay and an already recorded surcharge in the current board gap', () => {
+    // Host-only accounting inputs. This does not claim a played week-two native run.
+    const opening = newGame(42, 'pass@20');
+    const before = cloneState(opening);
+    const founders = opening.crew.map((m) => ({ ...m, founder: true }));
+    const hired = founders.map((m, i) => (i === 0 ? { ...m, founder: false, wage: 40 } : m));
+    expect
+      .soft(
+        boardMoneyEstimate({
+          ...opening,
+          night: 10,
+          till: 3000,
+          carry: 0,
+          wagesDue: 120,
+          seen: 0,
+          crew: hired,
+        }),
+      )
+      .toEqual({ bill: 3160, nights: 1, need: 160, average: 160 });
+    expect
+      .soft(
+        boardMoneyEstimate({
+          ...opening,
+          night: 7,
+          till: 3000,
+          carry: 0,
+          wagesDue: 0,
+          seen: 500,
+          crew: founders,
+        }),
+      )
+      .toEqual({ bill: 3500, nights: 4, need: 500, average: 130 });
+    expect(
+      boardMoneyEstimate({
+        ...opening,
+        night: 7,
+        till: 4000,
+        carry: 0,
+        wagesDue: 0,
+        seen: 500,
+        crew: founders,
+      }),
+    ).toMatchObject({ need: 0, average: 0 });
+    expect(cloneState(opening)).toEqual(before);
+  });
+  it('names the default break that leaves the grill empty for the 18:12 table (F-2168)', () => {
+    const s = newGame(42, 'pass@20');
+    const rows = openingBoard(s);
+    const warnings = earlyCoverageWarnings(s, rows);
+    // The default plan is unchanged: someone still has a break that overlaps the early table.
+    expect(rows.some((row) => row.breakAt === 1090)).toBe(true);
+    expect(warnings.length).toBeGreaterThan(0);
+    for (const line of warnings)
+      expect(line).toMatch(/meal break \(\d\d:\d\d\u2013\d\d:\d\d\) leaves the (grill|cold side) empty/);
+    expect(warnings.join(' ')).toMatch(/Selim|Dilek/);
+    // Moving every break past the early table, or choosing a cover, removes the warning.
+    const moved = rows.map((row) => ({ ...row, breakAt: 1185 + (row.cook === 'selim' ? 0 : 25) }));
+    expect(earlyCoverageWarnings(s, moved)).toEqual([]);
+    const covered = rows.map((row) => ({ ...row, cover: row.cook === 'selim' ? 'dilek' : 'selim' }));
+    expect(earlyCoverageWarnings(s, covered)).toEqual([]);
+    // Historical editions and Thursday onward keep their own words.
+    expect(earlyCoverageWarnings({ ...s, version: 'pass@17' }, rows)).toEqual([]);
+    expect(earlyCoverageWarnings({ ...s, night: 4 }, rows)).toEqual([]);
+  });
+  it('names the time the station really empties when a break starts after 18:12 (F-2168)', () => {
+    const s = newGame(42, 'pass@20');
+    const rows = openingBoard(s).map((row) => ({ ...row, breakAt: row.cook === 'selim' ? 1095 : 1185 }));
+    const late = earlyCoverageWarnings(s, rows).join(' ');
+    expect(late).toContain(
+      '(18:15\u201318:35) leaves the grill empty from 18:15, while the early table is still waiting.',
+    );
+    expect(late).not.toContain('18:12');
+    // A break that already covers 18:12 keeps the arrival wording.
+    const early = openingBoard(s).map((row) => ({ ...row, breakAt: row.cook === 'selim' ? 1090 : 1185 }));
+    expect(earlyCoverageWarnings(s, early).join(' ')).toContain('when the early table arrives at 18:12.');
+    // A break from 18:24 no longer overlaps the early table.
+    const none = openingBoard(s).map((row) => ({ ...row, breakAt: 1104 + (row.cook === 'selim' ? 0 : 100) }));
+    expect(earlyCoverageWarnings(s, none)).toEqual([]);
+  });
+  it('offers named 24-hour slots within the existing allowed interval, retaining a saved time', () => {
+    expect(breakSlots(1115)).toEqual([
+      { minute: 1090, label: '18:10 before the rush' },
+      { minute: 1115, label: '18:35 during the rush' },
+      { minute: 1185, label: '19:45 during the rush' },
+      { minute: 1260, label: '21:00 after the rush' },
+    ]);
+    expect(breakSlots(1260).some((slot) => slot.minute === 1115)).toBe(true);
+    for (const time of [1050, 1295]) {
+      expect(breakSlots(time).some((slot) => slot.minute === time)).toBe(true);
+      expect(breakSlots(time).every((slot) => slot.minute >= 1050 && slot.minute <= 1295)).toBe(true);
+    }
+  });
+  it('keeps pass@20 opening relief as an explicit player choice', () => {
+    const s = newGame(42, 'pass@20');
+    s.previousBoard = boardDefaults(s).slice(0, -1);
+    expect(openingBoard(s).every((row) => row.cover === null)).toBe(true);
+  }, 120000);
+  it('previews real answers without changing a notebook and matches the committed answers', () => {
+    const s = newGame(42, 'pass@20');
+    const before = cloneState(s);
+    const replies = boardReplies(s);
+    expect(cloneState(s)).toEqual(before);
+    queueInput(s, { kind: 'board', rows: openingBoard(s) });
+    expect(s.board?.rows).toEqual(replies);
+    expect(boardReplies(s)).toEqual(replies);
+  });
+  it('preserves an intentional uncovered board when the same crew returns', () => {
+    // Host-state fixture: the same crew and saved board at the second opening.
+    const s = newGame(42, 'pass@20');
+    s.night = 2;
+    s.previousBoard = boardDefaults(s).map((row) => ({ ...row, cover: null }));
+    expect(openingBoard(s).every((row) => row.cover === null)).toBe(true);
+  });
+});

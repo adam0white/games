@@ -1,0 +1,15 @@
+<!-- Current episode continuity disposition, 2026-11-05: New game always starts a fresh local cast. It skips shelf readiness, enablement, preparation and claims. Stored people stay unchanged. Person checkpoint/alternative publication and their UI controls are closed for this edition. Current local game resume and complete game exports remain supported. UPKEEP will review qualified native 4.17 continuing-person support on 2026-11-12; no account transfer is started. -->
+
+# Valley
+
+Follow the [games workspace instructions](../../AGENTS.md) and [handoff](../../HANDOFF.md) first. The workspace registry and lockfile own package pins, builds and deployment. This file retains game-specific episode requirements.
+
+Current goal (owner, 2026-11-05): port to published HF 4.17.0. The owner explicitly permits simplifying blockers and sacrificing old saves. This supersedes the old continuous-term/no-shortening and Well-window restrictions preserved in docs/valley-continuous-term-instructions-2026-11-05.md.
+
+The public product is edition valley-opening-2026-11, version 0.5.0: one morning from 07:00 to 13:00. Keep the complete founded cast and all native history in one public HF Run. Keep real requests, replies and work distinct. No future harvest, elders’ gathering, three-year completion or later relationship outcome is implied. Reject old saves with the keep-file/start-fresh message. Multiplayer and account transfer remain out of scope.
+
+Stack: Node 26.12.0; pnpm 12.16.1; HF 4.17.0; immutable lab-client 0.5.17 / lab-kit 0.5.34; TypeScript 7.0.2; Vite 8.3.5; Vitest 5.1.0; Biome 2.6.5; Wrangler 4.157.0; Worker compatibility_date 2026-11-05. Preserve frozen installs, strict engines/peers, no hoisting, store hardlinks, 1440-minute third-party release age and exact native build approvals.
+
+Done means signed source, current-episode lint/types/tests, complete native and host cold replay, full/compact restore and same-next equality, corruption/time/edition rejection, a phone choice/ending/reload/download check, exact green source and merged CI, clear exact hosted review, normal merge, clean deployment and matching live release.json. UPKEEP accepts engineering delivery. The owner accepts feel separately. The previous 12-day/58-person/120-second, 5 KB and 881-day gates are superseded acceptance for the older product, and remain unqualified historical evidence; never call them passed. Original continuous-world test bytes remain as *.test.ts.historical; compatible native boundary, lifecycle, hunch, voice, death and pacing controls remain active and the proof script as *.ts.historical.
+
+Run the root and game check:lane before each signed commit. Game deploy and deploy:check forward to the root. Serialize full suites through the central suite lock. Use public HF APIs and preserve every native faculty. Read docs/design.md for historical work and the current disposition first. Public tester references say human playtester.

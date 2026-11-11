@@ -7,6 +7,7 @@ const SHELF = 'https://human.adamwhite.work/games/';
 export function createHandler(games) {
   validateRegistry({ hfVersion: '0.0.0', games });
   const legacy = new Map(games.filter(game => game.redirectEnabled === true && game.legacyOrigin).map(game => [game.legacyOrigin, game.slug]));
+  const zoneManaged = new Set(games.filter(game => game.redirectEnabled === true && game.redirectMode === 'zone').map(game => game.legacyOrigin));
   return {
     async fetch(request, env) {
       const url = new URL(request.url);
@@ -32,6 +33,7 @@ self.addEventListener('activate', event => event.waitUntil((async () => {
 `;
         return new Response(script, { headers: { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-store, no-cache, must-revalidate', 'Service-Worker-Allowed': '/' } });
       }
+      if (zoneManaged.has(url.origin)) return new Response('Not found', { status: 404 });
       return Response.redirect(`${PLAY}/${slug}${url.pathname}${url.search}`, 302);
     }
   };

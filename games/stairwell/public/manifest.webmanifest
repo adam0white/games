@@ -1,0 +1,30 @@
+{
+  "name": "The Stairwell",
+  "short_name": "The Stairwell",
+  "description": "You are the new caretaker of a building with seven flats. Everyone tells you things.",
+  "start_url": "/stairwell/",
+  "scope": "/stairwell/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F3ECDD",
+  "theme_color": "#F3ECDD",
+  "icons": [
+    {
+      "src": "/stairwell/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/stairwell/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/stairwell/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

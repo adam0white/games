@@ -1,0 +1,3804 @@
+{
+  "baselineCommit": "d26fc06603596b63014fd5ac28630bd168faaaad",
+  "rows": [
+    {
+      "edition": "pass@3",
+      "seed": 42,
+      "policy": "idle",
+      "inputs": [
+        {
+          "kind": "open",
+          "at": 1390
+        },
+        {
+          "kind": "open",
+          "at": 2830
+        },
+        {
+          "kind": "jar",
+          "choice": "talk",
+          "at": 4270
+        },
+        {
+          "kind": "open",
+          "at": 4270
+        },
+        {
+          "kind": "open",
+          "at": 5710
+        },
+        {
+          "kind": "answer",
+          "choice": "yes",
+          "at": 6941
+        },
+        {
+          "kind": "open",
+          "at": 7150
+        },
+        {
+          "kind": "open",
+          "at": 8590
+        }
+      ],
+      "checkpoints": [
+        {
+          "night": 1,
+          "minute": 1150,
+          "inputCount": 0,
+          "hash": "d4313df2007c886b684787bd46961d5c4d6060312ce36e25345601318a9615bb",
+          "restoredAfter30": "1edf686de3507bbf5659feeb70c55108d9f3152f36bcb8a4168ec95e7985e69b"
+        },
+        {
+          "night": 3,
+          "minute": 4030,
+          "inputCount": 2,
+          "hash": "e1a35e8a93a3fd3f825c5d18de6864fb071e26dbd72f389c6402488b40f40d4a",
+          "restoredAfter30": "59a00ad06a2f2a682b41f76babfa0b7863ea3b96d835454413b84ef8355107aa"
+        },
+        {
+          "night": 6,
+          "minute": 8350,
+          "inputCount": 7,
+          "hash": "ecefe3bd0d00cb5a09e4c657dec413e12ac25c0387b5b2fc7200d1208d69eeca",
+          "restoredAfter30": "c1117130ca94320c36be7c36083d39f38bd0e663c684a3a35cf17dbaa4c0e06c"
+        }
+      ]
+    },
+    {
+      "edition": "pass@3",
+      "seed": 42,
+      "policy": "plain",
+      "inputs": [
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 1135
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 1165
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 1170
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 1200
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 1205
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 1210
+        },
+        {
+          "kind": "open",
+          "at": 1390
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 2575
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 2615
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 2615
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 2620
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 2645
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 2645
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 2650
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 2685
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 2685
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 2685
+        },
+        {
+          "kind": "open",
+          "at": 2830
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 3980
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 4010
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 4045
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 4055
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 4075
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 4080
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 4085
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 4085
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 4110
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 4115
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 4115
+        },
+        {
+          "kind": "jar",
+          "choice": "talk",
+          "at": 4270
+        },
+        {
+          "kind": "open",
+          "at": 4270
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5455
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5485
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5490
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 5495
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5520
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5525
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 5525
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 5550
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5555
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 5555
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 5580
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5585
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 5585
+        },
+        {
+          "kind": "open",
+          "at": 5710
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 6925
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 6930
+        },
+        {
+          "kind": "answer",
+          "choice": "yes",
+          "at": 6941
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 6960
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 6965
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 6985
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 6995
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 7015
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 7025
+        },
+        {
+          "kind": "open",
+          "at": 7150
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 8275
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8325
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8355
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8360
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8390
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8395
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8400
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 8400
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8430
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 8430
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 8430
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8460
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 8460
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 8460
+        },
+        {
+          "kind": "open",
+          "at": 8590
+        }
+      ],
+      "checkpoints": [
+        {
+          "night": 1,
+          "minute": 1150,
+          "inputCount": 1,
+          "hash": "1661cbe942a9d9fe9ae5c8069ef0028db6311f4cd2d06a3b5c58358e2937382b",
+          "restoredAfter30": "4e0541f9c7a0b528f14ab26fa70dbad90bdd68dda57ce073601bb5fbd1e76f4e"
+        },
+        {
+          "night": 3,
+          "minute": 4030,
+          "inputCount": 20,
+          "hash": "9d44adcbc7c86348489195aafa3a39a21d53b2cee008d5fc80d8f1627bb14769",
+          "restoredAfter30": "1cd6e5d9c339b3bd0644c8e80db9fa3560863c4b65c35df4800c4ca19e09b369"
+        },
+        {
+          "night": 6,
+          "minute": 8350,
+          "inputCount": 57,
+          "hash": "38f01398dc1ab95ffe34db0a7114806fd9bb3e78ed26a369b023130e930ad63b",
+          "restoredAfter30": "bbf43ddb4d183978f4c3a3394f256f25e17fd59d194c0ef8f356e02388612d6b"
+        }
+      ]
+    },
+    {
+      "edition": "pass@3",
+      "seed": 42,
+      "policy": "insist",
+      "inputs": [
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 1135
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 1165
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 1195
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 1205
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 1225
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 1235
+        },
+        {
+          "kind": "open",
+          "at": 1390
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2555
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2585
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2590
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2595
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2600
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 2615
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2630
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 2645
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 2645
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2660
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 2685
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 2685
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2690
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2695
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2700
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2705
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2710
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2715
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 2715
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 2715
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2720
+        },
+        {
+          "kind": "open",
+          "at": 2830
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 3980
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4010
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4040
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4045
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 4055
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4075
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4080
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4085
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 4085
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4090
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4095
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4100
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 4110
+        },
+        {
+          "kind": "jar",
+          "choice": "talk",
+          "at": 4270
+        },
+        {
+          "kind": "open",
+          "at": 4270
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5445
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5475
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5480
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 5495
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5510
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 5525
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5540
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5545
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5550
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 5550
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5555
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 5555
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5560
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5565
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5570
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 5580
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 5585
+        },
+        {
+          "kind": "open",
+          "at": 5710
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 6915
+        },
+        {
+          "kind": "answer",
+          "choice": "yes",
+          "at": 6941
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 6945
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 6960
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 6975
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 6990
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7005
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7010
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7015
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7020
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 7020
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7025
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7030
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7035
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7040
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7045
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7050
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 7050
+        },
+        {
+          "kind": "open",
+          "at": 7150
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 8275
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 8305
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8325
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8355
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8385
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8415
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 8425
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 8435
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8445
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8450
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8455
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 8455
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8460
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8465
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 8465
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8470
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8475
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 8485
+        },
+        {
+          "kind": "open",
+          "at": 8590
+        }
+      ],
+      "checkpoints": [
+        {
+          "night": 1,
+          "minute": 1150,
+          "inputCount": 1,
+          "hash": "ee0f4999d6c20aadfcfc5b359c3df22a3fd86630fbb1a5dd71861fc98cc55e57",
+          "restoredAfter30": "97fdb6d0e7371739bf5fd607b109c527c72f2577dd1a644a92efd63c650cd11a"
+        },
+        {
+          "night": 3,
+          "minute": 4030,
+          "inputCount": 31,
+          "hash": "f849c2f43e6533bb9f5c7f9909cabb6ac37491003c408ff44f1f5354c031612a",
+          "restoredAfter30": "4f07160f5350606dcc9124a0c55116611704f944988525d8e453fe0dd51437d7"
+        },
+        {
+          "night": 6,
+          "minute": 8350,
+          "inputCount": 84,
+          "hash": "14687376ecc549c181f3a574b3b331cd76303abf9a73490d22811f1d0115db64",
+          "restoredAfter30": "68caaeb4059048edc68115e1386a3ee68b39c5e0a8ef62577a74993572ca5b55"
+        }
+      ]
+    },
+    {
+      "edition": "pass@3",
+      "seed": 1001,
+      "policy": "idle",
+      "inputs": [
+        {
+          "kind": "open",
+          "at": 1390
+        },
+        {
+          "kind": "open",
+          "at": 2830
+        },
+        {
+          "kind": "jar",
+          "choice": "talk",
+          "at": 4270
+        },
+        {
+          "kind": "open",
+          "at": 4270
+        },
+        {
+          "kind": "open",
+          "at": 5710
+        },
+        {
+          "kind": "answer",
+          "choice": "yes",
+          "at": 6941
+        },
+        {
+          "kind": "open",
+          "at": 7150
+        },
+        {
+          "kind": "open",
+          "at": 8590
+        }
+      ],
+      "checkpoints": [
+        {
+          "night": 1,
+          "minute": 1150,
+          "inputCount": 0,
+          "hash": "738a11055110d8d1f24b7882905ff138bccc07a83746938f5be08c2dc94cc98a",
+          "restoredAfter30": "2574317c62cf7ce7616dd679fbb77eb1c0e90ba0ebf2b219b2d7a972f4feec29"
+        },
+        {
+          "night": 3,
+          "minute": 4030,
+          "inputCount": 2,
+          "hash": "4116a6d89ffee9560062437a2444d5016ce8db6c3feb467252a0c859b485348c",
+          "restoredAfter30": "6c890cf5f3b3c1392abca80c8336fffaea371049e1e6e001a487c06197bba5a6"
+        },
+        {
+          "night": 6,
+          "minute": 8350,
+          "inputCount": 7,
+          "hash": "2319182b9355bf907536dc52ce09e8183256564432f66ef1a79b2d6a2f99ec16",
+          "restoredAfter30": "d2a14625368d8c5fc43523f10baeee1daa617e0ffecc33f4ee5266608daaa532"
+        }
+      ]
+    },
+    {
+      "edition": "pass@3",
+      "seed": 1001,
+      "policy": "plain",
+      "inputs": [
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 1100
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 1135
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 1140
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 1170
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 1175
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 1205
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 1210
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 1230
+        },
+        {
+          "kind": "open",
+          "at": 1390
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 2595
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 2615
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 2625
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 2645
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 2645
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 2655
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 2675
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 2675
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 2685
+        },
+        {
+          "kind": "open",
+          "at": 2830
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 3955
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 3980
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 4010
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 4040
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 4045
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 4055
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 4080
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 4085
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 4085
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 4110
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 4115
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 4115
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 4140
+        },
+        {
+          "kind": "jar",
+          "choice": "talk",
+          "at": 4270
+        },
+        {
+          "kind": "open",
+          "at": 4270
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5445
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5475
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5480
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 5495
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5510
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5515
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 5525
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5545
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 5555
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5575
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 5575
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 5585
+        },
+        {
+          "kind": "open",
+          "at": 5710
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 6835
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 6915
+        },
+        {
+          "kind": "answer",
+          "choice": "yes",
+          "at": 6941
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 6945
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 6950
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 6960
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 6980
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 6990
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 7010
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 7020
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 7040
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 7050
+        },
+        {
+          "kind": "open",
+          "at": 7150
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8325
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8355
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8360
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8390
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8395
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8425
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 8425
+        },
+        {
+          "kind": "open",
+          "at": 8590
+        }
+      ],
+      "checkpoints": [
+        {
+          "night": 1,
+          "minute": 1150,
+          "inputCount": 3,
+          "hash": "1b1bfd51777c046b8b55147e1382b2f9920af4f4c89a9ca467c3e910ed8259c9",
+          "restoredAfter30": "e54c23c04fff2eac4658e9ece731ece96129a04f735d4d01c8e54236d903807a"
+        },
+        {
+          "night": 3,
+          "minute": 4030,
+          "inputCount": 22,
+          "hash": "b72e97b5e5934603c5cb018ec0224a1930d77569d81a28827266185226778e2a",
+          "restoredAfter30": "6475bfa8e06857a899db6e5a5eedf2d29d8328aaa6a4f32ed524f0efb6b461a6"
+        },
+        {
+          "night": 6,
+          "minute": 8350,
+          "inputCount": 61,
+          "hash": "4be96dc766cb5d31fb127b73847625d858e308f3896ca213200ee59541de4f4a",
+          "restoredAfter30": "facae0c2096c3d7fa9475518a270709d0c21ea9cbda48e22df705e561318aa3f"
+        }
+      ]
+    },
+    {
+      "edition": "pass@3",
+      "seed": 1001,
+      "policy": "insist",
+      "inputs": [
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 1100
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 1135
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 1165
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 1195
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 1205
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 1225
+        },
+        {
+          "kind": "open",
+          "at": 1390
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2580
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2610
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 2615
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2640
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 2645
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 2645
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2670
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 2675
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 2675
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2700
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2705
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 2705
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 2705
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2710
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2715
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2720
+        },
+        {
+          "kind": "open",
+          "at": 2830
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 3955
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 3980
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 3985
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4010
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4040
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4045
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 4055
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4075
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4080
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4085
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 4085
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4090
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4095
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4100
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 4115
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 4115
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4130
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4135
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4140
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4145
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 4145
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 4145
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4150
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4155
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4160
+        },
+        {
+          "kind": "jar",
+          "choice": "talk",
+          "at": 4270
+        },
+        {
+          "kind": "open",
+          "at": 4270
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5445
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5475
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5480
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 5495
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5510
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 5525
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5540
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5545
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5550
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 5550
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5555
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 5555
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5560
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5565
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5570
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5575
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 5580
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 5585
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5605
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5610
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 5610
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5615
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 5615
+        },
+        {
+          "kind": "open",
+          "at": 5710
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 6835
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 6865
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 6915
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 6935
+        },
+        {
+          "kind": "answer",
+          "choice": "yes",
+          "at": 6941
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 6945
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 6965
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 6975
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 6995
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7005
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7010
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7015
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7020
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7025
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 7025
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7030
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7035
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7040
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 7055
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 7060
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 7065
+        },
+        {
+          "kind": "open",
+          "at": 7150
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8325
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8355
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 8375
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8385
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8415
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 8430
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8445
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8450
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8455
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 8455
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8460
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 8460
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8465
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8470
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8475
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8480
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 8485
+        },
+        {
+          "kind": "open",
+          "at": 8590
+        }
+      ],
+      "checkpoints": [
+        {
+          "night": 1,
+          "minute": 1150,
+          "inputCount": 2,
+          "hash": "13a06afaf11cde239f22fea0e1b08df2177c55a2e743f1b05889d51ab5035f4f",
+          "restoredAfter30": "6884344f3fd1711f72d728ef7549391efc23e18cb3d0ca5cf843db7b69308b6d"
+        },
+        {
+          "night": 3,
+          "minute": 4030,
+          "inputCount": 28,
+          "hash": "262d28b98b50e3a280f671358059057d7805625257eb1127e7208889689569b5",
+          "restoredAfter30": "f51403e3e882bff14a4dc552089662b5fd5426f466b91b18ec3d13eb38ad9ab0"
+        },
+        {
+          "night": 6,
+          "minute": 8350,
+          "inputCount": 98,
+          "hash": "1a0ca29f5d786d5aa5e406e3c0b0416e2e0f98b00c20156d4d98f8d1eae75b7c",
+          "restoredAfter30": "2032f94fa22b7e79b17a59ffbf98d1f9bf63c1c409535d22b381b8434a76a7d5"
+        }
+      ]
+    },
+    {
+      "edition": "pass@4",
+      "seed": 42,
+      "policy": "idle",
+      "inputs": [
+        {
+          "kind": "open",
+          "at": 1390
+        },
+        {
+          "kind": "open",
+          "at": 2830
+        },
+        {
+          "kind": "jar",
+          "choice": "talk",
+          "at": 4270
+        },
+        {
+          "kind": "open",
+          "at": 4270
+        },
+        {
+          "kind": "open",
+          "at": 5710
+        },
+        {
+          "kind": "answer",
+          "choice": "yes",
+          "at": 6941
+        },
+        {
+          "kind": "open",
+          "at": 7150
+        },
+        {
+          "kind": "open",
+          "at": 8590
+        }
+      ],
+      "checkpoints": [
+        {
+          "night": 1,
+          "minute": 1150,
+          "inputCount": 0,
+          "hash": "d731e1d7b0f83eef6d3d16ba44f8a18869be335f5ddac4913a41c6c1d4ccdf13",
+          "restoredAfter30": "b8fcdc50a0dd5d9342fc5644b7faaa28243d5a816841a7257cc59ee51816d082"
+        },
+        {
+          "night": 3,
+          "minute": 4030,
+          "inputCount": 2,
+          "hash": "8db760c77d350353753de472155b3942124d5b64a458f577180aaf8790a6d1a4",
+          "restoredAfter30": "adef94e71d1efc8572ddaf34aba13c40093262a03eb6ee972ac86af217bc4382"
+        },
+        {
+          "night": 6,
+          "minute": 8350,
+          "inputCount": 7,
+          "hash": "2d72af03494c440bfcb0d7443fba242c61b6c897608c0c5770f52b9334c98aed",
+          "restoredAfter30": "5a1e97ebb38e3a0e9e7a18d76b721433ef5a4fad6d74fb989273a634c2afdcfe"
+        }
+      ]
+    },
+    {
+      "edition": "pass@4",
+      "seed": 42,
+      "policy": "plain",
+      "inputs": [
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 1135
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 1205
+        },
+        {
+          "kind": "open",
+          "at": 1390
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 2555
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 2560
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 2620
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 2645
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 2685
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 2685
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 2695
+        },
+        {
+          "kind": "open",
+          "at": 2830
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 3980
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 4060
+        },
+        {
+          "kind": "jar",
+          "choice": "talk",
+          "at": 4270
+        },
+        {
+          "kind": "open",
+          "at": 4270
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5445
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 5495
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 5550
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5555
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 5555
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5560
+        },
+        {
+          "kind": "open",
+          "at": 5710
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 6915
+        },
+        {
+          "kind": "answer",
+          "choice": "yes",
+          "at": 6941
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 6960
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 6995
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 7000
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 7010
+        },
+        {
+          "kind": "open",
+          "at": 7150
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 8275
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8325
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 8405
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8445
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 8445
+        },
+        {
+          "kind": "open",
+          "at": 8590
+        }
+      ],
+      "checkpoints": [
+        {
+          "night": 1,
+          "minute": 1150,
+          "inputCount": 1,
+          "hash": "32b63e3e8a99d5fe01e8f5f38f7a28c330832db2733b518a71372ad1207ba3f2",
+          "restoredAfter30": "54239dd961de14b6ecb0810c12768599ca81f87fd187bd19ae847ce49466ec09"
+        },
+        {
+          "night": 3,
+          "minute": 4030,
+          "inputCount": 12,
+          "hash": "31b1b02b7e312679a9262109dd5fc7fed2c1203294830cb93a2287400608bf43",
+          "restoredAfter30": "32abf775ef077b5bda1f53834eee50a3621d387bde8a0d61fe6578c84ecc8810"
+        },
+        {
+          "night": 6,
+          "minute": 8350,
+          "inputCount": 31,
+          "hash": "c34661c1412475e7b7b5be0cf063565ebf62f6f0ac383c2153b9fa2398aa5f0a",
+          "restoredAfter30": "046464f24716c959db856198771d4c63e25b0f31c4cd691228d47b6b9bcc2132"
+        }
+      ]
+    },
+    {
+      "edition": "pass@4",
+      "seed": 42,
+      "policy": "insist",
+      "inputs": [
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 1135
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 1205
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 1235
+        },
+        {
+          "kind": "open",
+          "at": 1390
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2555
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 2620
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 2645
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2675
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 2675
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 2695
+        },
+        {
+          "kind": "open",
+          "at": 2830
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 3980
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 4060
+        },
+        {
+          "kind": "jar",
+          "choice": "talk",
+          "at": 4270
+        },
+        {
+          "kind": "open",
+          "at": 4270
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5445
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 5495
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 5550
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5555
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 5555
+        },
+        {
+          "kind": "open",
+          "at": 5710
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 6935
+        },
+        {
+          "kind": "answer",
+          "choice": "yes",
+          "at": 6941
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 6975
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 6995
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7025
+        },
+        {
+          "kind": "open",
+          "at": 7150
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 8275
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8325
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 8400
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8435
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 8435
+        },
+        {
+          "kind": "open",
+          "at": 8590
+        }
+      ],
+      "checkpoints": [
+        {
+          "night": 1,
+          "minute": 1150,
+          "inputCount": 1,
+          "hash": "e89cd3141c1b986ae0970255f345612916373015df8d65094b0653779d43a4e8",
+          "restoredAfter30": "20e485650a415673ab917c11bfae9a4ddad695b0ca6c989d4f0244dc3bfb3147"
+        },
+        {
+          "night": 3,
+          "minute": 4030,
+          "inputCount": 12,
+          "hash": "1c905427190244d351a32af99d4601254375fdb671c34f093e6e8fcf9c180439",
+          "restoredAfter30": "8e713c1589b8c02d248fcaa11c5d3c0fde4b439c3acec26412b193b0f68a3c97"
+        },
+        {
+          "night": 6,
+          "minute": 8350,
+          "inputCount": 29,
+          "hash": "4b728d03dcf3ff3b16fd06f6d273ae2ca19456e5850f52b75695957a9fe73440",
+          "restoredAfter30": "5f162cfe0c39584474ed057667665d413a0e6070e68d5da10380ae607b763d37"
+        }
+      ]
+    },
+    {
+      "edition": "pass@4",
+      "seed": 1001,
+      "policy": "idle",
+      "inputs": [
+        {
+          "kind": "open",
+          "at": 1390
+        },
+        {
+          "kind": "open",
+          "at": 2830
+        },
+        {
+          "kind": "jar",
+          "choice": "talk",
+          "at": 4270
+        },
+        {
+          "kind": "open",
+          "at": 4270
+        },
+        {
+          "kind": "open",
+          "at": 5710
+        },
+        {
+          "kind": "answer",
+          "choice": "yes",
+          "at": 6941
+        },
+        {
+          "kind": "open",
+          "at": 7150
+        },
+        {
+          "kind": "open",
+          "at": 8590
+        }
+      ],
+      "checkpoints": [
+        {
+          "night": 1,
+          "minute": 1150,
+          "inputCount": 0,
+          "hash": "ec75a7f7d0a90837eb6f1999adf8d4a020a09a352d1100b964c8e600055a1290",
+          "restoredAfter30": "92238820d91b870fa383393d3b9ae9919755414fc66cd93aa6b2f8a7ae3d4a68"
+        },
+        {
+          "night": 3,
+          "minute": 4030,
+          "inputCount": 2,
+          "hash": "90414b16be7c13447bfb4e031e4874e5ac70d1ca5d80126063a7f43223ee7931",
+          "restoredAfter30": "3cfec76bf1a1fddfe7961851961cca8bba99afa20a91846966570cb7ecc65a2a"
+        },
+        {
+          "night": 6,
+          "minute": 8350,
+          "inputCount": 7,
+          "hash": "5048317eab54478da57aa33fab40026e77120df2b7f58851d6a2e15b1851fea8",
+          "restoredAfter30": "76efde7f488b3d076b1b67acc1c82f9546b640857815b4f3f63fbd5fb5120050"
+        }
+      ]
+    },
+    {
+      "edition": "pass@4",
+      "seed": 1001,
+      "policy": "plain",
+      "inputs": [
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 1135
+        },
+        {
+          "kind": "open",
+          "at": 1390
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 2595
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 2615
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 2620
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 2675
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 2675
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 2675
+        },
+        {
+          "kind": "open",
+          "at": 2830
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 3955
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 3980
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 4115
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 4115
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 4135
+        },
+        {
+          "kind": "jar",
+          "choice": "talk",
+          "at": 4270
+        },
+        {
+          "kind": "open",
+          "at": 4270
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5445
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 5470
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 5525
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 5555
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 5555
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 5575
+        },
+        {
+          "kind": "open",
+          "at": 5710
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 6835
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 6915
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 6935
+        },
+        {
+          "kind": "answer",
+          "choice": "yes",
+          "at": 6941
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 6995
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 6995
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 7045
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 7045
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 7050
+        },
+        {
+          "kind": "open",
+          "at": 7150
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8325
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 8375
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": false,
+          "at": 8430
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": false,
+          "at": 8435
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": false,
+          "at": 8435
+        },
+        {
+          "kind": "open",
+          "at": 8590
+        }
+      ],
+      "checkpoints": [
+        {
+          "night": 1,
+          "minute": 1150,
+          "inputCount": 1,
+          "hash": "5a4a62db543f465ac19e470a51c64e9c458ce2849931d39aa715138bef096456",
+          "restoredAfter30": "d4fc57ab566e07a569ddf8010f151a341500315c59b33fd8bac0d045a1bcc866"
+        },
+        {
+          "night": 3,
+          "minute": 4030,
+          "inputCount": 11,
+          "hash": "79bc8d6115bb9c77a5e8668202c0b315e783d98cf7b93fb8e63952be6511d084",
+          "restoredAfter30": "a5a9c112ec3089c1ab7432f3b4ec98fe57917ddc1c4dc003e641cdb042468193"
+        },
+        {
+          "night": 6,
+          "minute": 8350,
+          "inputCount": 34,
+          "hash": "bffcdc35efb628c395e284a2884b719a60d4df9e1ef6d9674a19aaf4e856fc3f",
+          "restoredAfter30": "fa4c39c0f2c4a2345efafeaaf53a725ead661620ffef7035e0d4456f1e6332d2"
+        }
+      ]
+    },
+    {
+      "edition": "pass@4",
+      "seed": 1001,
+      "policy": "insist",
+      "inputs": [
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 1135
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 1205
+        },
+        {
+          "kind": "open",
+          "at": 1390
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2595
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 2615
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 2645
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 2675
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 2675
+        },
+        {
+          "kind": "open",
+          "at": 2830
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 3955
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 3980
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 4115
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 4115
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 4135
+        },
+        {
+          "kind": "jar",
+          "choice": "talk",
+          "at": 4270
+        },
+        {
+          "kind": "open",
+          "at": 4270
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5445
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 5470
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5555
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 5555
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 5575
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 5605
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 5605
+        },
+        {
+          "kind": "open",
+          "at": 5710
+        },
+        {
+          "kind": "ask",
+          "cook": "dilek",
+          "verb": "cold",
+          "insist": true,
+          "at": 6835
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 6915
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 6935
+        },
+        {
+          "kind": "answer",
+          "choice": "yes",
+          "at": 6941
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 6995
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 7020
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 7045
+        },
+        {
+          "kind": "open",
+          "at": 7150
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8325
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 8375
+        },
+        {
+          "kind": "ask",
+          "cook": "selim",
+          "verb": "grill",
+          "insist": true,
+          "at": 8435
+        },
+        {
+          "kind": "ask",
+          "cook": "rafi",
+          "verb": "dish",
+          "insist": true,
+          "at": 8435
+        },
+        {
+          "kind": "open",
+          "at": 8590
+        }
+      ],
+      "checkpoints": [
+        {
+          "night": 1,
+          "minute": 1150,
+          "inputCount": 1,
+          "hash": "2105c8109d0d830bda29c8393d10461d15e8e5949805218311bec06d23183e48",
+          "restoredAfter30": "26a761242ce2b97556835c61b8ca1c7fdfc2f8afd772d51d5060656f247941d8"
+        },
+        {
+          "night": 3,
+          "minute": 4030,
+          "inputCount": 11,
+          "hash": "8713bb2854666874d575c0e9b29db4245e63b382bd16dd46dc5cf15b0c19da2b",
+          "restoredAfter30": "f88752322f7dbc846553408f4dbaf4988017f378766ff22f77e5d56c43924de8"
+        },
+        {
+          "night": 6,
+          "minute": 8350,
+          "inputCount": 33,
+          "hash": "f43c4aeac30b9925e9a830cd3303ea53f22e92c984b1a6d91c172261fac87c01",
+          "restoredAfter30": "34a1a1bf36db95ef5d7466bd1592019c248b3943f729b90e15b9676587995e85"
+        }
+      ]
+    }
+  ]
+}

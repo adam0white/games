@@ -1,0 +1,137 @@
+
+commuter seed 1: quit after 14 min at Day 3 · 10:40 (emotion:joy:novel)
+  reached day 3; returns 4 (0 late), unfinished 0, unchecked 0, still open 2; cash £96; inputs 92 (0 refused)
+  engagement 0.59; time {"watch":0.67,"input":0.33}; longest lull 87s from Day 3 · 09:40 (workshop); looked away 0x
+  14:00 Day 3 · 10:40 stopped: put it down (emotion:joy:novel)
+  rewarded 8x, first: 0:54 (Day 1 · 10:20): Mum’s walking lantern: Bright and steady while carried. | 1:03 (Day 1 · 10:30): Mum: Mum’s walking lantern is back in use. | 5:00 (Day 1 · 15:30): Evan’s small desk fan: A steady breeze under load.
+  left open: Sam’s winding toy: return by Day 4 · 17:00 (Evidence retained; not fully checked); Evan’s path lantern: return by Day 4 · 17:00 (Evidence retained; not fully checked); Sam's lesson request is requested
+
+commuter seed 2: agenda after 14 min at Day 3 · 09:40 (commitment:c1)
+  reached day 3; returns 4 (0 late), unfinished 0, unchecked 0, still open 2; cash £96; inputs 92 (0 refused)
+  engagement 0.63; time {"watch":0.67,"input":0.33}; longest lull 66s from Day 1 · 14:55 (workshop); looked away 0x
+  14:00 Day 3 · 09:40 stopped: had to stop (commitment:c1)
+  rewarded 8x, first: 3:06 (Day 1 · 13:25): Mum’s walking lantern: Bright and steady while carried. | 3:12 (Day 1 · 13:35): Mum: Mum’s walking lantern is back in use. | 5:54 (Day 1 · 16:40): Evan’s small desk fan: A steady breeze under load.
+  left open: Evan’s path lantern: return by Day 4 · 17:00 (Evidence retained; not fully checked); The community room fan: return by Day 4 · 15:00 (Evidence retained; not fully checked); Sam's lesson request is requested
+
+unwinder seed 1: quit after 22 min at Day 3 · 16:31 (emotion:joy:novel)
+  reached day 3; returns 4 (0 late), unfinished 0, unchecked 0, still open 3; cash £39; inputs 123 (1 refused)
+  engagement 0.54; time {"watch":0.63,"input":0.28,"look-away":0.09}; longest lull 87s from Day 3 · 16:31 (workshop); looked away 1x
+  20:00 Day 3 · 16:31 looked-away: looked away (emotion:joy:novel)
+  22:00 Day 3 · 16:31 stopped: put it down (emotion:joy:novel)
+  rewarded 8x, first: 1:18 (Day 1 · 10:40): Mum’s walking lantern: Bright and steady while carried. | 1:24 (Day 1 · 10:50): Mum: Mum’s walking lantern is back in use. | 5:48 (Day 1 · 15:40): Evan’s small desk fan: A steady breeze under load.
+  left open: Sam’s winding toy: return by Day 4 · 17:00 (Evidence retained; not fully checked); Evan’s path lantern: return by Day 4 · 17:00 (Evidence retained; not fully checked); The community room fan: return by Day 4 · 15:00 (Sam has responsibility)
+
+unwinder seed 2: quit after 21 min at Day 3 · 15:46 (emotion:joy:novel)
+  reached day 3; returns 4 (0 late), unfinished 0, unchecked 0, still open 3; cash £48; inputs 120 (2 refused)
+  engagement 0.62; time {"watch":0.67,"input":0.29,"look-away":0.05}; longest lull 60s from Day 3 · 15:46 (workshop); looked away 1x
+  20:00 Day 3 · 15:46 looked-away: looked away (emotion:joy:novel)
+  21:00 Day 3 · 15:46 stopped: put it down (emotion:joy:novel)
+  rewarded 8x, first: 2:51 (Day 1 · 12:45): Mum’s walking lantern: Bright and steady while carried. | 2:57 (Day 1 · 12:55): Mum: Mum’s walking lantern is back in use. | 5:00 (Day 1 · 14:45): Nora’s reading light: Bright and steady under load.
+  left open: Evan’s path lantern: return by Day 4 · 17:00 (Evidence retained; not fully checked); The meeting-room fan: return by Day 4 · 17:00 (Evidence retained; not fully checked); The community room fan: return by Day 4 · 15:00 (Evidence retained; not fully checked)
+
+completionist seed 1: quit after 21 min at Day 3 · 14:27 (emotion:joy:novel)
+  reached day 3; returns 4 (1 late), unfinished 0, unchecked 0, still open 2; cash £40; inputs 126 (0 refused)
+  engagement 0.69; time {"watch":0.65,"input":0.3,"look-away":0.05}; longest lull 57s from Day 3 · 14:27 (workshop); looked away 1x
+  11:48 Day 3 · 09:00 setback: Nora’s keepsake music box is past its return time (Day 2 · 17:00)
+  14:00 Day 3 · 11:00 frustrated: The little paper theatre: The melody hurries a little under load.
+  20:00 Day 3 · 14:27 looked-away: looked away (emotion:joy:novel)
+  21:00 Day 3 · 14:27 stopped: put it down (emotion:joy:novel)
+  rewarded 7x, first: 1:36 (Day 1 · 11:35): Mum’s walking lantern: Bright and steady while carried. | 1:42 (Day 1 · 11:45): Mum: Mum’s walking lantern is back in use. | 7:15 (Day 2 · 10:35): Evan’s small desk fan: A steady breeze under load.
+  left open: Sam’s winding toy: return by Day 4 · 17:00 (Evidence retained; not fully checked); The community room fan: return by Day 4 · 15:00 (Evidence retained; not fully checked); Sam's lesson request is requested
+
+completionist seed 2: quit after 51 min at Day 10 · 16:00 (emotion:distress:rest)
+  reached day 10 (week account seen); returns 8 (2 late), unfinished 1, unchecked 0, still open 2; cash £69; inputs 305 (7 refused)
+  engagement 0.71; time {"watch":0.68,"input":0.3,"look-away":0.02}; longest lull 48s from Day 3 · 15:06 (workshop); looked away 1x
+  20:00 Day 3 · 15:06 looked-away: looked away (emotion:joy:novel)
+  27:15 Day 5 · 09:00 setback: Evan’s path lantern is past its return time (Day 4 · 17:00)
+  27:15 Day 5 · 09:00 setback: The meeting-room fan is past its return time (Day 4 · 17:00)
+  28:00 Day 5 · 09:10 frustrated: Evan: You said Day 4 · 17:00 for my path lantern. I’m still waiting. If it can’t be done, tell me and give it back.; Mum: You said Day 4 · 17:00 for the meeting-room fan. I’m still waiting. If it can’t be done, tell me and give it back.; Evan’s path lantern is past its return time (Day 4 · 17:00); The meeting-room fan is past its return time (Day 4 · 17:00)
+  34:18 Day 6 · 09:00 setback: Sam’s winding toy is past its return time (Day 5 · 17:00)
+  48:00 Day 10 · 12:35 frustrated: Nora’s reading light commission 2: The light goes out under load.
+  51:00 Day 10 · 16:00 stopped: put it down (emotion:distress:rest)
+  rewarded 16x, first: 2:33 (Day 1 · 12:45): Mum’s walking lantern: Bright and steady while carried. | 2:42 (Day 1 · 12:55): Mum: Mum’s walking lantern is back in use. | 5:57 (Day 1 · 16:30): Evan’s small desk fan: A steady breeze under load.
+  left open: Nora’s music-box commission 2: return by Day 10 · 17:00 (Sam has responsibility); Nora’s reading light commission 2: return by Day 11 · 17:00 (Evidence retained; not fully checked); Sam has put Nora’s music-box commission 2 aside: I saw “Spring: The outside looks intact.” I have not learned a next step for these observations.
+
+restless seed 1: quit after 5 min at Day 1 · 14:45 (emotion:boredom:novel)
+  reached day 1; returns 1 (0 late), unfinished 0, unchecked 0, still open 3; cash £24; inputs 31 (0 refused)
+  engagement 0.44; time {"watch":0.69,"input":0.31}; longest lull 81s from Day 1 · 13:10 (workshop); looked away 0x
+  5:00 Day 1 · 14:45 stopped: put it down (emotion:boredom:novel)
+  rewarded 2x, first: 1:03 (Day 1 · 10:20): Mum’s walking lantern: Bright and steady while carried. | 1:09 (Day 1 · 10:30): Mum: Mum’s walking lantern is back in use.
+  left open: Nora’s reading light: return by Day 2 · 17:00 (Evidence retained; not fully checked); Evan’s small desk fan: return by Day 2 · 17:00 (Evidence retained; not fully checked); Nora’s keepsake music box: return by Day 2 · 17:00 (Evidence retained; not fully checked)
+
+restless seed 2: quit after 6 min at Day 1 · 15:25 (emotion:boredom:novel)
+  reached day 1; returns 1 (0 late), unfinished 0, unchecked 0, still open 3; cash £24; inputs 35 (0 refused)
+  engagement 0.5; time {"watch":0.71,"input":0.29}; longest lull 87s from Day 1 · 14:15 (workshop); looked away 0x
+  6:00 Day 1 · 15:25 stopped: put it down (emotion:boredom:novel)
+  rewarded 2x, first: 3:36 (Day 1 · 13:25): Mum’s walking lantern: Bright and steady while carried. | 3:42 (Day 1 · 13:35): Mum: Mum’s walking lantern is back in use.
+  left open: Nora’s reading light: return by Day 2 · 17:00 (Evidence retained; not fully checked); Evan’s small desk fan: return by Day 2 · 17:00 (Not yet investigated); Nora’s keepsake music box: return by Day 2 · 17:00 (Evidence retained; not fully checked)
+
+mischief seed 1: game-over after 14.2 min at Day 8 · 09:00 (the game ended)
+  reached day 8 (week account seen); returns 0 (0 late), unfinished 7, unchecked 0, still open 0; cash £0; inputs 86 (16 refused)
+  engagement 0.59; time {"watch":0.69,"input":0.31}; longest lull 72s from Day 3 · 09:00 (workshop); looked away 0x
+  0:24 Day 1 · 09:00 answered: they rose to it: can't: Check restored use under movement before returning it, or explicitly return unfinished.
+  1:09 Day 1 · 10:55 answered: they rose to it: Returned unfinished.
+  1:57 Day 1 · 11:15 answered: they rose to it: can't: Check restored use under load before returning it, or explicitly return unfinished.
+  2:06 Day 1 · 11:15 answered: they rose to it: can't: Check restored use under load before returning it, or explicitly return unfinished.
+  2:39 Day 1 · 11:45 answered: they rose to it: can't: Check restored use under load before returning it, or explicitly return unfinished.
+  2:48 Day 1 · 11:45 answered: they rose to it: can't: Check restored use under load before returning it, or explicitly return unfinished.
+  3:33 Day 1 · 13:15 answered: they rose to it: Returned unfinished.
+  4:12 Day 1 · 13:35 answered: they rose to it: can't: Check restored use under load before returning it, or explicitly return unfinished.
+  rewarded 0x, first: 
+
+mischief seed 2: game-over after 12.8 min at Day 8 · 09:00 (the game ended)
+  reached day 8 (week account seen); returns 1 (0 late), unfinished 7, unchecked 0, still open 0; cash £0; inputs 78 (5 refused)
+  engagement 0.57; time {"watch":0.69,"input":0.31}; longest lull 81s from Day 3 · 09:00 (workshop); looked away 0x
+  0:30 Day 1 · 09:40 answered: they rose to it: Returned unfinished.
+  1:48 Day 1 · 10:45 answered: they rose to it: can't: Check restored use under load before returning it, or explicitly return unfinished.
+  2:09 Day 1 · 10:55 answered: they rose to it: can't: Check restored use under load before returning it, or explicitly return unfinished.
+  2:45 Day 1 · 11:35 answered: they rose to it: Returned unfinished.
+  2:54 Day 1 · 11:45 answered: they rose to it: Returned unfinished.
+  5:54 Day 3 · 10:05 answered: they rose to it: can't: Check restored use under load before returning it, or explicitly return unfinished.
+  6:03 Day 3 · 10:05 answered: they rose to it: can't: Check restored use under load before returning it, or explicitly return unfinished.
+  6:12 Day 3 · 10:15 answered: they rose to it: Returned unfinished.
+  rewarded 0x, first: 
+
+exploiter seed 1: quit after 10 min at Day 3 · 13:10 (emotion:boredom:novel)
+  reached day 3; returns 0 (0 late), unfinished 6, unchecked 0, still open 1; cash £2; inputs 69 (2 refused)
+  engagement 0.39; time {"watch":0.66,"input":0.35}; longest lull 231s from Day 3 · 09:00 (workshop); looked away 0x
+  8:12 Day 3 · 10:30 frustrated: can't: Check restored use under movement before returning it, or explicitly return unfinished.
+  10:00 Day 3 · 13:10 stopped: put it down (emotion:boredom:novel)
+  rewarded 0x, first: 
+  left open: Evan’s path lantern: return by Day 4 · 17:00 (Evidence retained; not fully checked); the gathering at Day 4 · 15:00, 0 prepared
+
+exploiter seed 2: game-over after 13.4 min at Day 8 · 09:00 (the game ended)
+  reached day 8 (week account seen); returns 0 (0 late), unfinished 7, unchecked 0, still open 0; cash £0; inputs 81 (4 refused)
+  engagement 0.55; time {"watch":0.69,"input":0.31}; longest lull 117s from Day 1 · 12:35 (workshop); looked away 0x
+  8:33 Day 4 · 10:20 frustrated: The little paper theatre: The melody hurries a little under load.
+  13:24 Day 8 · 09:00 finished: the game ended
+  rewarded 1x, first: 12:06 (Day 5 · 09:00): Neighbourhood: Nobody used what you prepared. Mum: spend 30 minutes on: visit a neighbour instead. Nora: take a break instead. Sam: have food and water instead. Evan: take a break instead.
+
+rulesLawyer seed 1: quit after 10 min at Day 3 · 13:00 (emotion:distress:rest)
+  reached day 3; returns 1 (0 late), unfinished 4, unchecked 0, still open 2; cash £10; inputs 69 (8 refused)
+  engagement 0.47; time {"watch":0.66,"input":0.35}; longest lull 66s from Day 1 · 12:35 (workshop); looked away 0x
+  7:00 Day 3 · 09:20 frustrated: Sam: Thank you for telling me what remains. I’ll make another plan.
+  10:00 Day 3 · 13:00 stopped: put it down (emotion:distress:rest)
+  rewarded 2x, first: 5:21 (Day 1 · 15:15): Evan’s small desk fan: A steady breeze under load. | 5:45 (Day 1 · 15:35): Evan: Evan’s small desk fan is back in use. Received £32.
+  left open: Evan’s path lantern: return by Day 4 · 17:00 (Evidence retained; not fully checked); The community room fan: return by Day 4 · 15:00 (Evidence retained; not fully checked); the gathering at Day 4 · 15:00, 0 prepared
+
+rulesLawyer seed 2: quit after 15 min at Day 10 · 10:00 (emotion:distress:rest)
+  reached day 10 (week account seen); returns 0 (0 late), unfinished 11, unchecked 0, still open 0; cash £0; inputs 91 (8 refused)
+  engagement 0.5; time {"watch":0.7,"input":0.3}; longest lull 90s from Day 10 · 09:00 (workshop); looked away 0x
+  7:30 Day 4 · 09:25 frustrated: can't: Check restored use under load before returning it, or explicitly return unfinished.
+  15:00 Day 10 · 10:00 stopped: put it down (emotion:distress:rest)
+  rewarded 2x, first: 0:36 (Day 1 · 10:15): Mum’s walking lantern: Bright and steady while carried. | 9:03 (Day 5 · 09:00): Neighbourhood: Nobody used what you prepared. Mum: spend 30 minutes on: visit a neighbour instead. Nora: take a break instead. Sam: have food and water instead. Evan: take a break instead.
+
+returner seed 1: agenda after 13 min at Day 3 · 10:30 (commitment:c1)
+  reached day 3; returns 4 (0 late), unfinished 0, unchecked 0, still open 2; cash £96; inputs 82 (0 refused)
+  engagement 0.56; time {"watch":0.68,"input":0.32}; longest lull 78s from Day 3 · 09:40 (workshop); looked away 0x
+  13:00 Day 3 · 10:30 stopped: had to stop (commitment:c1)
+  rewarded 8x, first: 1:18 (Day 1 · 10:40): Mum’s walking lantern: Bright and steady while carried. | 1:24 (Day 1 · 10:50): Mum: Mum’s walking lantern is back in use. | 5:33 (Day 1 · 15:25): Evan’s small desk fan: A steady breeze under load.
+  left open: Sam’s winding toy: return by Day 4 · 17:00 (Evidence retained; not fully checked); Evan’s path lantern: return by Day 4 · 17:00 (Evidence retained; not fully checked); Sam's repair request is requested
+
+returner seed 2: agenda after 14 min at Day 3 · 11:15 (commitment:c1)
+  reached day 3; returns 4 (0 late), unfinished 0, unchecked 0, still open 2; cash £96; inputs 91 (0 refused)
+  engagement 0.6; time {"watch":0.67,"input":0.32}; longest lull 60s from Day 1 · 14:15 (workshop); looked away 0x
+  14:00 Day 3 · 11:15 stopped: had to stop (commitment:c1)
+  rewarded 8x, first: 2:51 (Day 1 · 12:45): Mum’s walking lantern: Bright and steady while carried. | 2:57 (Day 1 · 12:55): Mum: Mum’s walking lantern is back in use. | 5:33 (Day 1 · 15:50): Evan’s small desk fan: A steady breeze under load.
+  left open: Evan’s path lantern: return by Day 4 · 17:00 (Evidence retained; not fully checked); The meeting-room fan: return by Day 4 · 17:00 (Evidence retained; not fully checked); the gathering at Day 4 · 15:00, 0 prepared

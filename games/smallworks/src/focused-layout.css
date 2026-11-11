@@ -1,0 +1,846 @@
+.focused-workshop {
+  max-width: 1500px;
+  margin: auto;
+  padding: 0 32px 40px;
+}
+.focused-header {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: relative;
+  z-index: 5;
+  border-bottom: 1px solid #53605855;
+}
+.focused-header nav {
+  display: flex;
+  gap: 8px;
+}
+.focused-header button {
+  border: 0;
+  background: transparent;
+  padding: 10px 15px;
+}
+.focused-header button[aria-current="page"] {
+  color: #eedab4;
+  border-bottom: 2px solid #dcb46e;
+}
+.workshop-menu {
+  margin-left: auto;
+  position: relative;
+}
+.workshop-menu > summary {
+  padding: 14px;
+  cursor: pointer;
+  list-style: none;
+  color: #d6d9ce;
+}
+.workshop-menu > summary span {
+  margin-left: 15px;
+}
+.workshop-menu-content {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  width: min(360px, 85vw);
+  padding: 20px;
+  background: #24322d;
+  border: 1px solid #6a786b;
+  box-shadow: 0 20px 70px #0008;
+  display: grid;
+  gap: 8px;
+  max-height: 80vh;
+  overflow: auto;
+}
+.workshop-menu-content button {
+  text-align: left;
+  background: #33443b;
+}
+.workshop-menu-content small {
+  color: #b5c0b5;
+}
+.workshop-menu-content details {
+  margin-top: 12px;
+}
+.workshop-menu-content details p {
+  border-top: 1px solid #ffffff20;
+  padding-top: 10px;
+  font-size: 0.8rem;
+}
+.focused-owner {
+  max-width: 760px;
+  margin: 28px auto 20px;
+  text-align: center;
+}
+.focused-owner .eyebrow {
+  margin-bottom: 6px;
+}
+.focused-owner h1 {
+  font:
+    normal clamp(1.6rem, 3vw, 2.5rem) "Libre Baskerville",
+    serif;
+  color: #efe3c6;
+  margin: 0 0 12px;
+}
+.focused-owner > p:last-child {
+  color: #c4c9bd;
+  max-width: 640px;
+  margin: auto;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+.focused-workspace {
+  display: grid;
+  gap: 28px;
+  align-items: start;
+}
+.focused-workspace.tools-open {
+  grid-template-columns: minmax(0, 1fr) minmax(430px, 0.95fr);
+}
+.focused-workspace.object-only {
+  max-width: 850px;
+  margin: auto;
+}
+.focused-object {
+  min-width: 0;
+}
+.focused-object .physical-object {
+  margin: 0;
+}
+.focused-shelf {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin: 12px 0 20px;
+  color: #b5bfae;
+  font-size: 0.8rem;
+}
+.focused-shelf label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.focused-shelf select {
+  max-width: 360px;
+}
+.focused-tools {
+  min-width: 0;
+  background: #24332c;
+  border: 1px solid #5c6c5c;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.focused-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: #17261f;
+  border-bottom: 1px solid #526450;
+}
+.focused-tabs button {
+  border: 0;
+  border-radius: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 8px;
+  text-transform: capitalize;
+  background: transparent;
+  color: #b8c4b7;
+}
+.focused-tabs svg {
+  width: 21px;
+  height: 21px;
+}
+.focused-tabs button[aria-selected="true"] {
+  color: #ffe6af;
+  background: #33483b;
+  box-shadow: inset 0 -3px #d8b570;
+}
+.focused-pane {
+  padding: 18px;
+}
+.focused-pane .device-stage {
+  margin: 0 0 12px;
+  min-height: 0;
+  border: 0;
+  background: #182820;
+}
+.focused-pane .device-stage > svg {
+  max-height: 270px;
+  width: 100%;
+  display: block;
+}
+.focused-pane .device-stage .silhouette,
+.focused-pane .device-stage .observed-light,
+.focused-pane .device-stage .observed-motion {
+  display: none;
+}
+.focused-pane .device-stage > p,
+.focused-pane .device-stage .observed-function {
+  display: none;
+}
+.focused-pane .component-picker {
+  gap: 4px;
+  padding: 7px;
+}
+.focused-pane .component-picker button {
+  font-size: 0.7rem;
+  padding: 7px;
+  min-height: 32px;
+}
+.focused-pane h2 {
+  font-size: 1.05rem;
+  margin: 12px 0;
+  color: #ead9af;
+}
+.focused-action {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.focused-action button,
+.focused-repairs button {
+  background: #3e6452;
+  border: 1px solid #718a66;
+  color: #f2ecd7;
+  padding: 12px 18px;
+}
+.focused-repairs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.focused-repairs button {
+  text-transform: capitalize;
+}
+.focused-repairs small,
+.focused-action small {
+  display: block;
+  font-size: 0.68rem;
+  margin-top: 5px;
+  color: #d2d8c6;
+  text-transform: none;
+}
+.focused-repairs em {
+  font-size: 0.65rem;
+  display: block;
+}
+.focused-pane .meter-screen {
+  margin: 10px 0;
+  padding: 13px 18px;
+  min-height: 100px;
+}
+.focused-pane .meter-screen strong {
+  font-size: 2.3rem;
+}
+.focused-pane .segmented {
+  margin: 12px 0;
+}
+.focused-conditions {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.focused-conditions button {
+  flex: 1;
+  padding: 9px 4px;
+  font-size: 0.72rem;
+}
+.focused-conditions button[aria-pressed="true"] {
+  background: #527358;
+  border-color: #c0be83;
+  color: #fff4d1;
+}
+.focused-pane .probe-tabs {
+  margin: 8px 0;
+}
+.focused-pane .terminal-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.focused-pane .terminal-strip button {
+  width: 38px;
+  height: 38px;
+  padding: 4px;
+}
+.focused-pane .measure-button {
+  margin: 10px 0 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+}
+.focused-pane .power-hint {
+  color: #f0cc92;
+  font-size: 0.8rem;
+}
+.focused-result {
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  border-left: 3px solid #d9ba76;
+  background: #d9c79810;
+  color: #f0e4c6;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+.focused-result p {
+  margin: 0;
+}
+.focused-result small {
+  display: block;
+  color: #bfcdb6;
+  margin-top: 8px;
+}
+.focused-pane details {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #60705c;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+.focused-pane details summary {
+  cursor: pointer;
+}
+.focused-pane details p {
+  line-height: 1.6;
+  border-top: 1px solid #ffffff15;
+  padding-top: 8px;
+}
+.focused-pane .teaching-record {
+  margin-top: 12px;
+}
+.focused-return {
+  width: 100%;
+  margin-top: 16px;
+}
+.focused-sam {
+  margin-top: 18px;
+  padding: 14px 18px;
+  background: #23392c;
+  border: 1px solid #586c4e;
+  border-radius: 8px;
+}
+.focused-sam > summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.focused-lock {
+  color: #d1bd90;
+  padding: 14px;
+  text-align: center;
+}
+.is-guided .focused-header {
+  border-color: transparent;
+}
+.is-guided .focused-owner {
+  margin-top: 8px;
+}
+.focused-workshop button:focus-visible,
+.focused-workshop summary:focus-visible {
+  outline: 3px solid #f2d490;
+  outline-offset: 3px;
+}
+@media (max-width: 900px) {
+  .focused-workshop {
+    padding: 0 16px 30px;
+  }
+  .focused-workspace.tools-open {
+    grid-template-columns: 1fr;
+    max-width: 700px;
+    margin: auto;
+  }
+  .focused-owner {
+    margin-top: 14px;
+  }
+  .tools-open .focused-object .physical-object {
+    min-height: 0;
+  }
+  .tools-open .physical-object svg {
+    max-height: 270px;
+  }
+  .focused-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+  }
+  .focused-shelf {
+    flex-wrap: wrap;
+  }
+  .focused-shelf select {
+    max-width: 65vw;
+  }
+  .focused-header nav {
+    gap: 0;
+  }
+  .focused-header nav button {
+    padding: 10px 8px;
+    font-size: 0.75rem;
+  }
+  .focused-pane {
+    padding: 12px;
+  }
+  .focused-workspace {
+    gap: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .focused-workshop * {
+    scroll-behavior: auto;
+    animation: none !important;
+    transition: none !important;
+  }
+}
+.tools-visible .focused-owner {
+  margin: 14px auto 12px;
+}
+.tools-visible .focused-owner h1 {
+  font-size: 1.65rem;
+  margin-bottom: 8px;
+}
+.tools-visible .focused-owner > p:last-child {
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.focused-pane .device-stage > svg {
+  max-height: 210px;
+}
+.focused-pane .meter-screen {
+  min-height: 0;
+  padding: 10px 14px;
+}
+.focused-pane .meter-screen strong {
+  font-size: 2rem;
+  line-height: 1.25;
+}
+.focused-pane .component-picker button {
+  padding: 5px;
+}
+.focused-workspace.tools-open .physical-stage {
+  height: 360px;
+}
+@media (max-width: 900px) {
+  .tools-visible .focused-owner > p:last-child {
+    font-size: 0.78rem;
+  }
+  .focused-workspace.tools-open .physical-stage {
+    height: 230px;
+  }
+  .tools-visible .physical-scene {
+    padding: 6px 10px 12px;
+  }
+  .tools-visible .physical-use-action {
+    min-height: 40px;
+  }
+  .focused-pane .device-stage > svg {
+    max-height: 210px;
+  }
+  .focused-header {
+    min-height: 62px;
+  }
+  .focused-tabs button {
+    padding: 12px 6px;
+    font-size: 0.8rem;
+  }
+}
+.probe-hint-ring {
+  fill: none;
+  stroke: #f8d68b;
+  stroke-width: 2;
+  animation: probe-hint 1.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes probe-hint {
+  50% {
+    stroke-width: 4;
+    opacity: 0.45;
+  }
+}
+.focused-repairs .guided-replace {
+  background: #dcb571;
+  color: #172b21;
+  border-color: #fff0b4;
+  box-shadow: 0 0 0 2px #e9ca8b44;
+}
+.focused-repairs .guided-replace small {
+  color: #29402c;
+}
+.guide-component > rect {
+  stroke: #e8c47d;
+  stroke-width: 2;
+}
+@media (min-width: 901px) {
+  .tools-visible .first-repair-guide {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 12px 18px;
+  }
+  .tools-visible .guide-cue p {
+    max-width: 52ch;
+    font-size: 0.88rem;
+  }
+  .tools-visible .guide-probes {
+    padding: 0;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+  .tools-visible .guide-dismiss,
+  .tools-visible .guide-next {
+    margin: 0;
+    white-space: nowrap;
+  }
+  .tools-visible .guide-probes strong {
+    width: 1.7rem;
+    height: 1.7rem;
+  }
+  .focused-pane .device-stage > svg {
+    max-height: 230px;
+  }
+  .focused-header {
+    min-height: 64px;
+  }
+}
+/* Instruments take the work area; the object keeps its physical switch nearby. */
+.focused-workspace.instrument-focused {
+  grid-template-columns: minmax(190px, 0.27fr) minmax(0, 1fr);
+  gap: 20px;
+}
+.instrument-focused .physical-scene {
+  padding: 8px 10px 14px;
+}
+.instrument-focused.tools-open .physical-stage {
+  height: 220px;
+}
+.instrument-focused .physical-use-action {
+  min-width: 120px;
+  min-height: 42px;
+  padding: 8px 12px;
+}
+.instrument-focused .physical-cover-latch {
+  left: calc(50% + 26px);
+  font-size: 10px;
+}
+.instrument-focused .focused-return {
+  font-size: 0.85rem;
+}
+.instrument-focused .return-receipt {
+  font-size: 0.8rem;
+}
+.pane-meter {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(260px, 0.9fr);
+  gap: 16px;
+  align-items: start;
+}
+.pane-meter > .device-stage {
+  grid-column: 1;
+  grid-row: 1;
+}
+.pane-meter .meter-controls {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+.pane-meter > .focused-result,
+.pane-meter > .teaching-record,
+.pane-meter > .lesson-overrun {
+  grid-column: 1 / -1;
+}
+.pane-meter .device-stage > svg {
+  max-height: 350px;
+}
+.focused-pane .alternative-parts {
+  padding: 8px 10px;
+  margin: 0;
+  border: 0;
+  background: #ffffff05;
+  font-size: 0.72rem;
+}
+.focused-pane .alternative-parts summary {
+  color: #b5c6ad;
+}
+.focused-pane .alternative-parts .component-picker {
+  margin-top: 10px;
+}
+.focused-pane .alternative-parts:not([open]) {
+  margin-bottom: 4px;
+}
+.meter-controls .meter-screen {
+  margin-top: 0;
+}
+.meter-controls .segmented,
+.meter-controls .probe-tabs {
+  margin: 9px 0;
+}
+.meter-controls .focused-conditions {
+  gap: 4px;
+}
+.meter-controls .focused-conditions button {
+  font-size: 0.68rem;
+  padding: 10px 3px;
+}
+.meter-controls .probe-tabs button {
+  padding: 9px 5px;
+}
+.use-conditions {
+  border: 1px solid #637159;
+  padding: 12px;
+  border-radius: 6px;
+  margin: 12px 0;
+}
+.use-conditions legend {
+  color: #e5d0a2;
+  font-size: 0.85rem;
+  padding: 0 6px;
+}
+.use-conditions > div {
+  display: flex;
+  gap: 6px;
+}
+.use-conditions button {
+  flex: 1;
+  padding: 10px 5px;
+  font-size: 0.8rem;
+}
+.use-conditions button[aria-pressed="true"] {
+  background: #527358;
+  border-color: #c0be83;
+  color: #fff4d1;
+}
+.use-conditions button small {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.65rem;
+  color: #cdd3b8;
+}
+.use-conditions p {
+  font-size: 0.75rem;
+  color: #b6c3af;
+  margin: 12px 0 0;
+  line-height: 1.5;
+}
+.drive-reference ol {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.drive-reference li {
+  background: #15271c;
+  padding: 12px 8px;
+  text-align: center;
+  border: 1px solid #52644b;
+  border-radius: 5px;
+}
+.drive-reference li strong {
+  display: block;
+  color: #e1c992;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+}
+.drive-reference li span {
+  color: #cbd3bb;
+  font-size: 0.75rem;
+}
+.drive-reference table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 0.8rem;
+}
+.drive-reference th,
+.drive-reference td {
+  padding: 8px;
+  border: 1px solid #52644b;
+  text-align: center;
+}
+.drive-reference caption {
+  text-align: left;
+  margin-bottom: 8px;
+  color: #d4c399;
+}
+@media (max-width: 1100px) {
+  .focused-workspace.instrument-focused {
+    grid-template-columns: minmax(170px, 0.28fr) minmax(0, 1fr);
+  }
+  .pane-meter {
+    grid-template-columns: 1fr;
+  }
+  .pane-meter > .device-stage {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .pane-meter .meter-controls {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .pane-meter .device-stage > svg {
+    max-height: 250px;
+  }
+}
+@media (max-width: 900px) {
+  .focused-workspace.instrument-focused {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .instrument-focused.tools-open .physical-stage {
+    height: 145px;
+  }
+  .instrument-focused .physical-scene {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+  }
+  .instrument-focused .physical-stage {
+    flex: 1;
+    width: 65%;
+    margin: 0;
+  }
+  .instrument-focused .physical-use-action {
+    min-width: 105px;
+    min-height: 42px;
+    margin: 0;
+  }
+  .instrument-focused .physical-cover-latch {
+    left: calc(50% + 18px);
+    font-size: 9px;
+    padding: 4px;
+  }
+  .instrument-focused .physical-cover-latch svg {
+    width: 15px;
+    height: 15px;
+  }
+  .instrument-focused .physical-power-switch {
+    scale: 0.9;
+  }
+  .pane-meter {
+    display: block;
+  }
+  .pane-meter .device-stage > svg {
+    max-height: 250px;
+  }
+  .meter-controls .meter-screen {
+    margin-top: 10px;
+  }
+  .drive-reference ol {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .drive-reference th,
+  .drive-reference td {
+    padding: 7px 3px;
+  }
+}
+.screen-reader-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.focused-pane .measure-button small,
+.focused-object .physical-use-action small {
+  color: #304128;
+  font-weight: 600;
+  opacity: 1;
+}
+.hf-mark,
+.hf-notebooks a {
+  color: inherit;
+  opacity: 0.6;
+  text-decoration: none;
+  font-size: 0.8rem;
+}
+.hf-mark {
+  white-space: nowrap;
+}
+.hf-mark:hover,
+.hf-notebooks a:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+.hf-notebooks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  justify-content: center;
+  padding: 14px 8px;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+.workshop-crises {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.workshop-crises button {
+  border: 1px solid #dcb46e66;
+  border-radius: 6px;
+  background: #2d2a2280;
+  color: #eedab4;
+  padding: 8px 12px;
+  text-align: left;
+  font: inherit;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+.workshop-crises .is-urgent button {
+  border-color: #e08a6a;
+  color: #f4c7b4;
+}
+.word-reading {
+  font-style: italic;
+  opacity: 0.85;
+}
+.todays-words {
+  margin: 10px 0 0;
+  display: grid;
+  gap: 4px;
+  font-size: 0.92rem;
+}
+.todays-words p {
+  margin: 0;
+  opacity: 0.9;
+}
+.todays-words p:first-child {
+  opacity: 1;
+}
+.todays-words strong {
+  color: #eedab4;
+  margin-right: 4px;
+}
+.todays-words time {
+  opacity: 0.6;
+  font-size: 0.8rem;
+  margin-left: 6px;
+}
+.todays-words .is-warning {
+  color: #f4c7b4;
+}
+.todays-words button {
+  margin-left: 8px;
+  border: 1px solid #dcb46e66;
+  border-radius: 6px;
+  background: transparent;
+  color: #eedab4;
+  padding: 2px 10px;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}

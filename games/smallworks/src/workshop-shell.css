@@ -1,0 +1,1414 @@
+/* The workshop clock moves only when an engine command spends minutes. */
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+.workshop-shell {
+  height: 100dvh;
+  max-width: 1180px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.workshop-shell button,
+.workshop-shell summary,
+.workshop-shell input:not([type="checkbox"]),
+.workshop-shell .reading-row {
+  min-height: 44px;
+  min-width: 44px;
+}
+.workshop-shell button {
+  touch-action: manipulation;
+}
+.workshop-shell .primary-action {
+  background: #b9d5bb;
+  color: #172e26;
+  border-color: #c6e1c4;
+  min-height: 52px;
+  width: 100%;
+}
+.workshop-shell .primary-action small {
+  color: #264439;
+}
+.shell-topbar {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  padding: 0 8px 0 16px;
+  position: relative;
+  z-index: 30;
+  border-bottom: 1px solid #536058;
+  gap: 8px;
+}
+.shell-topbar > a,
+.where-when {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.shell-topbar > a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+.topbar-controls {
+  display: flex;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.topbar-controls button {
+  border: 0;
+  background: transparent;
+  padding: 4px 10px;
+}
+.desktop-menu-label {
+  display: none;
+}
+.state-strip {
+  position: absolute;
+  top: 44px;
+  left: 0;
+  right: 0;
+  height: 88px;
+  display: grid;
+  grid-template-columns: 1fr 54px;
+  grid-template-rows: 44px 44px;
+  background: #1c2a25;
+  border-bottom: 1px solid #536058;
+}
+.workshop-shell .workday-button {
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  padding: 0 8px 0 16px;
+}
+.workday-track {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-size: 10px;
+  font-family: "IBM Plex Mono", monospace;
+}
+.workday-rail {
+  height: 9px;
+  background: #526052;
+  position: relative;
+  flex: 1;
+  border-radius: 4px;
+}
+.workday-fill {
+  height: 100%;
+  background: #b4c88b;
+  border-radius: 4px;
+  transition: width 300ms;
+}
+.workday-marker {
+  position: absolute;
+  width: 3px;
+  background: #ffdc9a;
+  top: -4px;
+  height: 17px;
+  transition: left 300ms;
+}
+.promise-tick {
+  position: absolute;
+  color: #f5d3a0;
+  top: -6px;
+  transform: translateX(-50%);
+  font-size: 17px;
+}
+.cash {
+  font-size: 14px;
+  align-self: center;
+  text-align: center;
+}
+.view-chips {
+  grid-column: 1 / -1;
+  display: flex;
+  padding: 0 12px;
+  gap: 0;
+}
+.view-chips button {
+  flex: 1;
+  border-radius: 0;
+  padding: 4px;
+  background: transparent;
+  border-color: #536058;
+  text-transform: none;
+}
+.view-chips button[aria-current="page"] {
+  color: #f7dfaf;
+  background: #38483a;
+  border-bottom-color: #e7c18a;
+}
+.is-guided .state-strip {
+  height: 44px;
+  grid-template-rows: 44px;
+}
+.play-content {
+  flex: 1;
+  min-height: 0;
+  margin-top: 88px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+.is-guided .play-content {
+  margin-top: 44px;
+}
+.crisis-banner {
+  flex: 0 0 auto;
+  font-size: 12px;
+  background: #623f30;
+  color: #fff0cf;
+  border: 0;
+  border-radius: 0;
+  padding: 4px 12px;
+  width: 100%;
+  text-align: left;
+  max-height: 44px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.workshop-shell .focused-bench {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+}
+.workshop-shell .focused-workspace,
+.workshop-shell .focused-workspace.tools-open,
+.workshop-shell .focused-workspace.instrument-focused,
+.workshop-shell .focused-workspace.object-only {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 0;
+  min-height: 0;
+}
+.workshop-shell .focused-object {
+  flex: 0 0 168px;
+  height: 168px;
+  min-height: 0;
+  width: 100%;
+  position: relative;
+  padding: 0;
+  border: 0;
+}
+.workshop-shell.is-guided .focused-object {
+  flex-basis: 212px;
+  height: 212px;
+}
+.workshop-shell .physical-scene {
+  height: calc(100% - 44px);
+  min-height: 0;
+  padding: 0 8px 18px;
+  border: 0;
+  border-radius: 0;
+}
+.workshop-shell .physical-stage {
+  height: calc(100% - 16px);
+  width: 100%;
+  max-width: 480px;
+}
+.workshop-shell .physical-object {
+  max-width: none;
+  width: 100%;
+}
+.workshop-shell .physical-silhouette {
+  min-height: 0;
+}
+.workshop-shell .physical-use-action {
+  position: absolute;
+  right: 8px;
+  bottom: 22px;
+  margin: 0;
+  width: auto;
+  padding: 4px 9px;
+  min-height: 44px;
+  max-width: 150px;
+  font-size: 12px;
+  gap: 5px;
+}
+.workshop-shell .physical-use-action svg {
+  width: 20px;
+  height: 20px;
+}
+.workshop-shell .physical-use-action small {
+  margin: 0;
+}
+.workshop-shell .physical-power-switch {
+  left: 8px;
+  bottom: 10px;
+  min-width: 44px;
+  min-height: 44px;
+}
+.workshop-shell .physical-cover-latch {
+  bottom: 10px;
+  left: 64px;
+  min-height: 44px;
+  max-width: 100px;
+  padding: 3px;
+}
+.workshop-shell .physical-observation {
+  position: absolute;
+  bottom: 0;
+  left: 8px;
+  right: 8px;
+  height: 18px;
+  line-height: 18px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.scene-speech {
+  position: absolute;
+  top: 0;
+  left: 8px;
+  right: 8px;
+  z-index: 3;
+  pointer-events: none;
+}
+.speech-line {
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 16px;
+  background: #18251cdb;
+  border-radius: 0 0 6px 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sam-chip {
+  position: absolute;
+  top: 34px;
+  right: 8px;
+  z-index: 4;
+  font-size: 10px;
+  padding: 4px;
+}
+.job-header {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 0;
+  border-radius: 0;
+  padding: 4px 16px;
+  font-size: 14px;
+}
+.workshop-shell .focused-tools {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: #1d2b26;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.workshop-shell .focused-tabs {
+  flex: 0 0 44px;
+  padding: 0 8px;
+  margin: 0;
+  gap: 0;
+  border-bottom: 1px solid #65705b;
+  display: flex;
+}
+.workshop-shell .focused-tabs button {
+  min-height: 44px;
+  padding: 5px;
+  font-size: 12px;
+  flex: 1;
+}
+.workshop-shell .focused-tabs svg {
+  display: none;
+}
+.workshop-shell .focused-pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 12px;
+  margin: 0;
+}
+.workshop-shell .focused-pane > * {
+  max-width: 100%;
+}
+.workshop-shell .device-stage {
+  margin: 0;
+  width: 100%;
+}
+.workshop-shell .device-stage > svg {
+  display: block;
+  width: 100%;
+  height: 150px;
+  max-height: 200px;
+}
+.workshop-shell .alternative-parts {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.workshop-shell .component-picker {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  overflow-x: auto;
+}
+.workshop-shell .component-picker button {
+  flex: 1 0 auto;
+  font-size: 10px;
+  padding: 4px 6px;
+}
+.workshop-shell .component-picker button span {
+  display: none;
+}
+.workshop-shell .component-picker button[aria-pressed="true"] {
+  background: #526a47;
+  border-color: #d8c28b;
+}
+.workshop-shell .focused-pane h2 {
+  font-size: 14px;
+  margin-top: 8px;
+}
+.workshop-shell .focused-result {
+  flex: 0 1 auto;
+  max-height: 84px;
+  overflow: auto;
+  padding: 6px 12px;
+  margin: 0;
+  border-radius: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  width: 100%;
+}
+.workshop-shell .bench-action-bar {
+  flex: 0 0 auto;
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  background: #17231e;
+  border-top: 1px solid #65705b;
+}
+.bench-action-bar.notes-bar:not(:has(.focused-return)) {
+  display: none;
+}
+.workshop-shell .bench-verbs,
+.workshop-shell .focused-repairs {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+}
+.workshop-shell .focused-repairs {
+  display: contents;
+}
+.workshop-shell .bench-verbs > button {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 3px;
+  text-transform: capitalize;
+  font-size: 11px;
+  min-height: 52px;
+}
+.workshop-shell .bench-verbs > button small {
+  font-size: 9px;
+  margin-top: 3px;
+}
+.workshop-shell .focused-return {
+  position: static;
+  margin: 0 0 8px;
+  padding: 6px;
+  min-height: 52px;
+}
+.workshop-shell .focused-return small {
+  display: inline;
+  margin-left: 6px;
+}
+.workshop-shell .first-repair-guide {
+  flex: 0 0 auto;
+  max-height: 110px;
+  min-height: 56px;
+  padding: 5px 8px;
+  margin: 0;
+  border-radius: 0;
+  gap: 4px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  overflow: auto;
+}
+.workshop-shell .guide-cue {
+  flex: 1 1 200px;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.workshop-shell .guide-cue svg {
+  display: none;
+}
+.workshop-shell .guide-probes {
+  margin: 0;
+  padding: 0;
+  gap: 4px;
+  font-size: 11px;
+}
+.workshop-shell .guide-next {
+  width: auto;
+  font-size: 11px;
+  padding: 4px 7px;
+  margin: 0;
+}
+.workshop-shell .guide-dismiss {
+  min-width: 78px;
+  width: auto;
+  margin: 0;
+  padding: 4px;
+  text-decoration: underline;
+  font-size: 11px;
+}
+.workshop-shell .opening-quote {
+  padding: 14px 20px;
+  font-size: 14px;
+  flex: 1;
+  overflow: auto;
+}
+.workshop-shell .focused-lock {
+  margin: 0;
+  padding: 8px 12px;
+}
+.workshop-shell .meter-controls {
+  gap: 6px;
+}
+.workshop-shell .meter-screen {
+  padding: 8px 12px;
+  margin: 0;
+  min-height: 86px;
+}
+.workshop-shell .meter-screen > strong {
+  font-size: 30px;
+}
+.workshop-shell .meter-settings,
+.workshop-shell .focused-conditions,
+.workshop-shell .probe-tabs {
+  margin: 0;
+  gap: 4px;
+}
+.workshop-shell .meter-settings button,
+.workshop-shell .focused-conditions button,
+.workshop-shell .probe-tabs button {
+  font-size: 11px;
+  padding: 4px 6px;
+  min-height: 44px;
+}
+.workshop-shell .terminal-strip {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  margin: 0;
+  gap: 4px;
+}
+.workshop-shell .terminal-strip button {
+  flex: 0 0 44px;
+  padding: 4px;
+}
+.workshop-shell .use-conditions {
+  margin: 8px 0;
+  padding: 4px;
+}
+.workshop-shell .use-conditions button {
+  font-size: 10px;
+  padding: 3px;
+}
+.workshop-shell .use-conditions p {
+  font-size: 11px;
+}
+.workshop-shell .board-page,
+.workshop-shell .people-page {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  margin: 0;
+}
+.workshop-shell .page-heading {
+  margin: 0 0 12px;
+  padding: 0;
+}
+.workshop-shell .page-heading h1 {
+  font-size: 22px;
+}
+.workshop-shell .page-heading > p:last-child {
+  display: none;
+}
+.workshop-shell .page-action-bar {
+  flex: 0 0 auto;
+  border-top: 1px solid #65705b;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+}
+.page-action-bar > div:last-child {
+  display: flex;
+  gap: 8px;
+}
+.page-action-bar > div:last-child > button {
+  flex: 1;
+  min-height: 52px;
+  font-size: 12px;
+}
+.workshop-shell .workboard-columns {
+  display: block;
+}
+.workshop-shell .board-column {
+  min-width: 0;
+}
+.workshop-shell .board-column > summary {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  border-bottom: 1px solid #536058;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.workshop-shell .board-column:not([open]) > summary::after {
+  content: " ▸";
+  margin-left: auto;
+}
+.workshop-shell .job-paper {
+  padding: 10px 12px;
+  margin: 8px 0;
+  min-height: 88px;
+}
+.workshop-shell .job-paper h3 {
+  font-size: 16px;
+  margin: 4px 0;
+}
+.workshop-shell .job-paper > p:not(.eyebrow):not(.readiness):not(.personal-completion) {
+  display: none;
+}
+.workshop-shell .promise {
+  padding: 4px 0;
+  margin: 0;
+}
+.workshop-shell .readiness {
+  padding: 4px 0;
+  margin: 0;
+  font-size: 11px;
+}
+.workshop-shell .paper-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+.workshop-shell .paper-actions button {
+  font-size: 11px;
+  min-height: 44px;
+  padding: 5px 8px;
+}
+.job-more {
+  position: relative;
+}
+.job-more summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 8px;
+  border: 1px solid #65705b;
+  font-size: 11px;
+  cursor: pointer;
+}
+.job-more[open] {
+  width: 100%;
+}
+.job-more > div {
+  display: grid;
+  gap: 5px;
+  padding: 8px 0;
+}
+.workshop-shell .people-supplies {
+  display: block;
+}
+.workshop-shell .person {
+  margin: 10px 0;
+  padding: 12px;
+  gap: 8px;
+}
+.workshop-shell .person > div {
+  min-width: 0;
+}
+.workshop-shell .person .avatar {
+  display: none;
+}
+.workshop-shell .person h3 {
+  font-size: 18px;
+}
+.workshop-shell .person p {
+  font-size: 13px;
+}
+.workshop-shell .stock-section {
+  margin-top: 20px;
+}
+.workshop-shell .stock-list > div {
+  padding: 10px 0;
+  gap: 8px;
+}
+.workshop-shell .stock-list button {
+  padding: 6px;
+  font-size: 11px;
+}
+.title-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 20px 20px;
+}
+.title-art {
+  flex: 0 1 260px;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #d9c495;
+}
+.title-art svg {
+  height: 190px;
+  min-height: 88px;
+  max-height: 76%;
+  width: 100%;
+}
+.title-art h1 {
+  font-size: 28px;
+  letter-spacing: 3px;
+}
+.title-goal {
+  flex: 0 0 64px;
+  padding: 12px 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+.reading-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid #536058;
+  background: transparent;
+  text-align: left;
+  font-size: 14px;
+}
+.title-actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.title-actions > button {
+  min-height: 52px;
+}
+.title-actions > small {
+  text-align: center;
+  padding: 4px;
+  color: #bec7b9;
+}
+.inline-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+}
+.inline-confirm > p {
+  flex-basis: 100%;
+}
+.inline-confirm > button {
+  flex: 1;
+}
+.sheet-backdrop {
+  position: fixed;
+  inset: 44px 0 0;
+  background: #07120cc7;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 40;
+}
+.shell-sheet {
+  position: relative;
+  width: 100%;
+  max-height: 100%;
+  background: #25372d;
+  border: 1px solid #66735e;
+  padding: 12px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -10px 80px #0005;
+}
+details[aria-label="Browser continuity"] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.shell-sheet > h2 {
+  min-height: 32px;
+  padding-right: 44px;
+  font-size: 20px;
+}
+.shell-sheet > p {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.shell-sheet .reading-row {
+  flex: 0 0 52px;
+}
+.workshop-shell .close-sheet {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  border: 0;
+  background: transparent;
+  font-size: 25px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+}
+.sheet-menu {
+  gap: 0;
+}
+.sheet-menu > p {
+  padding: 0 0 8px;
+  font-size: 12px;
+}
+.sheet-menu > .primary-action {
+  margin-top: 8px;
+}
+.recording-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11px;
+}
+.recording-footer > label {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+}
+.recording-footer input {
+  width: 22px;
+  height: 22px;
+  margin-right: 6px;
+}
+.recording-footer > a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: underline;
+}
+.sheet-ways > label {
+  display: grid;
+  gap: 8px;
+}
+.sheet-ways input {
+  border: 1px solid #8e9d7b;
+  background: #17251f;
+  color: #eee6d4;
+  padding: 8px;
+}
+.day-sheet-actions {
+  display: flex;
+  gap: 8px;
+}
+.day-sheet-actions > button {
+  flex: 1;
+}
+.workday-track.large {
+  min-height: 50px;
+}
+.bench-picker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #536058;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.info-backdrop {
+  position: fixed;
+  inset: 44px 0 0;
+  opacity: 0;
+  z-index: 41;
+}
+.info-popover {
+  position: fixed;
+  top: 52px;
+  left: 8px;
+  right: 8px;
+  max-height: 60dvh;
+  overflow: auto;
+  z-index: 42;
+  padding: 18px;
+  border: 1px solid #9fa68b;
+  background: #e8e1cf;
+  color: #273b36;
+  border-radius: 6px;
+  box-shadow: 0 12px 50px #0008;
+}
+.info-popover h2 {
+  padding-right: 32px;
+  margin-bottom: 12px;
+}
+.info-popover p {
+  margin: 8px 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.info-popover .close-sheet {
+  color: #273b36;
+}
+.end-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.end-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.end-body > h2 {
+  font-size: 24px;
+}
+.end-body .community-scene {
+  min-height: 180px;
+}
+.end-actions {
+  flex: 0 0 auto;
+  padding: 16px 20px calc(20px + env(safe-area-inset-bottom));
+  display: grid;
+  gap: 10px;
+}
+.end-actions > div {
+  display: flex;
+  gap: 8px;
+}
+.end-actions > div button {
+  flex: 1;
+  min-height: 52px;
+  font-size: 12px;
+}
+.end-body .tally-fold {
+  order: 10;
+}
+.end-body summary {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.workshop-shell .return-receipt {
+  overflow: auto;
+  min-height: 0;
+  padding: 16px;
+}
+.workshop-shell .return-receipt h2 {
+  font-size: 20px;
+}
+@media (min-width: 901px) {
+  .shell-topbar {
+    height: 56px;
+    min-height: 56px;
+    padding: 0 12px;
+  }
+  .desktop-menu-label {
+    display: inline;
+  }
+  .state-strip,
+  .is-guided .state-strip {
+    position: static;
+    height: 44px;
+    display: flex;
+    flex: 1;
+    align-items: center;
+    background: none;
+    border: 0;
+    gap: 12px;
+  }
+  .workday-button {
+    flex: 1;
+    max-width: 280px;
+  }
+  .view-chips {
+    padding: 0;
+    flex: 1;
+    max-width: 280px;
+  }
+  .where-when {
+    min-width: 140px;
+  }
+  .cash {
+    padding-right: 8px;
+  }
+  .play-content,
+  .is-guided .play-content {
+    margin-top: 0;
+  }
+  .workshop-shell .focused-workspace,
+  .workshop-shell .focused-workspace.tools-open,
+  .workshop-shell .focused-workspace.instrument-focused,
+  .workshop-shell .focused-workspace.object-only {
+    flex-direction: row;
+  }
+  .workshop-shell .focused-object,
+  .workshop-shell.is-guided .focused-object {
+    flex: 1;
+    min-width: 640px;
+    height: 100%;
+  }
+  .workshop-shell .focused-tools {
+    flex: 0 0 440px;
+    height: 100%;
+    border-left: 1px solid #536058;
+  }
+  .workshop-shell .physical-stage {
+    height: calc(100% - 30px);
+    max-width: 680px;
+  }
+  .workshop-shell .physical-scene {
+    padding: 40px 12px 20px;
+  }
+  .workshop-shell .physical-use-action {
+    right: 30px;
+    bottom: 50px;
+    padding: 10px 20px;
+    font-size: 16px;
+    max-width: none;
+  }
+  .workshop-shell .physical-observation {
+    left: 24px;
+    bottom: 15px;
+    height: 24px;
+    font-size: 13px;
+  }
+  .workshop-shell .physical-power-switch {
+    left: 24px;
+    bottom: 30px;
+  }
+  .workshop-shell .physical-cover-latch {
+    left: 90px;
+    bottom: 30px;
+    max-width: 140px;
+  }
+  .job-header {
+    padding: 8px 24px;
+    font-size: 18px;
+  }
+  .scene-speech {
+    top: 12px;
+    left: 24px;
+    right: 24px;
+  }
+  .speech-line {
+    font-size: 14px;
+    line-height: 22px;
+  }
+  .sam-chip {
+    top: 65px;
+    right: 24px;
+    font-size: 12px;
+  }
+  .workshop-shell .device-stage > svg {
+    height: 200px;
+  }
+  .workshop-shell .focused-pane {
+    padding: 16px;
+  }
+  .workshop-shell .bench-verbs > button {
+    font-size: 12px;
+    min-height: 56px;
+  }
+  .workshop-shell .bench-verbs > button small {
+    font-size: 10px;
+  }
+  .sheet-backdrop {
+    inset: 56px 0 0;
+    justify-content: flex-end;
+    align-items: stretch;
+  }
+  .shell-sheet {
+    max-width: 560px;
+    border-radius: 0;
+  }
+  .sheet-menu {
+    width: 400px;
+    justify-content: flex-start;
+    padding: 24px 20px;
+  }
+  .sheet-menu > .primary-action {
+    margin-top: auto;
+  }
+  .fullscreen-row {
+    display: none;
+  }
+  .info-backdrop {
+    top: 56px;
+  }
+  .info-popover {
+    top: 64px;
+    width: 560px;
+    left: auto;
+    right: max(8px, calc((100vw - 1180px) / 2));
+  }
+  .title-page {
+    max-width: 620px;
+    width: 100%;
+    margin: auto;
+    padding-bottom: 32px;
+  }
+  .title-art {
+    flex-basis: 380px;
+  }
+  .title-art svg {
+    height: 260px;
+  }
+  .title-art h1 {
+    font-size: 38px;
+  }
+  .title-goal {
+    text-align: center;
+  }
+  .workshop-shell .board-page {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 16px;
+  }
+  .board-page > .page-heading {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .board-page > .workboard-columns {
+    grid-column: 1;
+    grid-row: 2 / 5;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .board-page > .sam-request,
+  .board-page > .community-panel,
+  .board-page > .community-preview {
+    grid-column: 2;
+  }
+  .workshop-shell .people-supplies {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 24px;
+  }
+  .workshop-shell .stock-section {
+    margin-top: 0;
+  }
+  .end-page {
+    max-width: 850px;
+    width: 100%;
+    margin: auto;
+  }
+  .end-actions {
+    padding-bottom: 24px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workday-fill,
+  .workday-marker {
+    transition: none;
+  }
+}
+.sheet-dismiss {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+.workshop-shell .guide-target {
+  outline: 2px solid #e6b77a;
+  outline-offset: -3px;
+  animation: guide-pulse 1.8s ease-in-out infinite;
+}
+.guide-try .physical-use-action,
+.guide-power-on .physical-power-switch,
+.guide-open .physical-cover-latch {
+  outline: 2px solid #e6b77a;
+  animation: guide-pulse 1.8s ease-in-out infinite;
+}
+@keyframes guide-pulse {
+  50% {
+    box-shadow: 0 0 0 3px #e6b77a88;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workshop-shell .guide-target,
+  .guide-try .physical-use-action,
+  .guide-power-on .physical-power-switch,
+  .guide-open .physical-cover-latch {
+    animation: none;
+  }
+}
+/* Override the former compact instrument layout, including its phone-only hiding rules. */
+.workshop-shell .focused-bench .focused-workspace {
+  max-width: none;
+  margin: 0;
+}
+.workshop-shell .focused-workspace:has(.pane-meter) > .focused-object {
+  display: block;
+}
+.workshop-shell .focused-bench .focused-workspace .physical-scene {
+  display: block;
+}
+.workshop-shell .focused-bench .focused-workspace .physical-stage {
+  width: 100%;
+  height: calc(100% - 16px);
+  margin: 0 auto;
+}
+.workshop-shell .focused-bench .focused-workspace .physical-cover-latch {
+  display: flex;
+  left: 64px;
+  bottom: 10px;
+}
+.workshop-shell .focused-bench .focused-workspace .physical-power-switch {
+  top: auto;
+  bottom: 10px;
+  scale: 1;
+}
+.workshop-shell .focused-bench .focused-workspace .focused-tools {
+  border-radius: 0;
+}
+.workshop-shell .focused-bench .focused-workspace .focused-pane {
+  display: block;
+}
+.workshop-shell .guide-cue p {
+  font-size: 12px;
+  line-height: 1.3;
+}
+@media (min-width: 901px) {
+  .workshop-shell .focused-bench .focused-workspace .physical-stage {
+    height: calc(100% - 30px);
+  }
+  .workshop-shell .focused-bench .focused-workspace .physical-cover-latch {
+    left: 90px;
+    bottom: 30px;
+  }
+  .workshop-shell .focused-bench .focused-workspace .physical-power-switch {
+    bottom: 30px;
+  }
+}
+.workshop-shell .bench-action-bar .bench-verbs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(44px, 1fr));
+}
+.workshop-shell .bench-action-bar .bench-verbs:has(> .measure-button),
+.workshop-shell
+  .bench-action-bar
+  .bench-verbs:not(:has(.focused-repairs)):not(:has(> button:nth-of-type(2))) {
+  grid-template-columns: minmax(44px, 1fr);
+}
+.workshop-shell
+  .bench-action-bar
+  .bench-verbs:not(:has(.focused-repairs)):has(> button:nth-of-type(2)) {
+  grid-template-columns: repeat(2, minmax(44px, 1fr));
+}
+.workshop-shell .bench-action-bar .bench-verbs button {
+  width: 100%;
+  min-width: 44px;
+  min-height: 52px;
+  padding: 5px 3px;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.workshop-shell .bench-action-bar .bench-verbs button small {
+  font-size: 9px;
+  line-height: 1.3;
+}
+/* A promise stays a short row; its full context and responsibility decisions live in More. */
+.workshop-shell .board-column .job-paper {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 116px;
+  grid-template-rows: 14px 30px 18px 18px;
+  gap: 0 8px;
+  height: 100px;
+  min-height: 100px;
+  max-height: 100px;
+  padding: 8px;
+  overflow: hidden;
+}
+.workshop-shell .board-column .job-paper > .eyebrow {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 9px;
+  line-height: 14px;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.workshop-shell .board-column .job-paper > h3 {
+  grid-column: 1;
+  grid-row: 2;
+  font-size: 12px;
+  line-height: 15px;
+  margin: 0;
+  overflow: hidden;
+}
+.workshop-shell .board-column .job-paper > .promise {
+  grid-column: 1;
+  grid-row: 3;
+  display: flex;
+  justify-content: space-between;
+  gap: 3px;
+  font-size: 9px;
+  padding: 0;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.workshop-shell .board-column .job-paper > .readiness {
+  grid-column: 1;
+  grid-row: 4;
+  padding: 0;
+  font-size: 9px;
+  line-height: 18px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.workshop-shell .board-column .job-paper > .paper-actions {
+  grid-column: 2;
+  grid-row: 1 / 5;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: repeat(2, minmax(44px, 1fr));
+  gap: 4px;
+}
+.workshop-shell .board-column .job-paper > .paper-actions button {
+  width: 100%;
+  padding: 3px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+.workshop-shell
+  .board-column
+  .job-paper
+  > :not(.eyebrow):not(h3):not(.promise):not(.readiness):not(.paper-actions) {
+  display: none;
+}
+.responsibility-actions {
+  display: grid;
+  gap: 8px;
+}
+@media (min-width: 901px) {
+  .workshop-shell .board-page > .workboard-columns {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+  }
+  .workshop-shell .board-column .job-paper {
+    grid-template-columns: minmax(0, 1fr) 200px;
+  }
+  .workshop-shell .board-column .job-paper > h3 {
+    font-size: 14px;
+  }
+  .workshop-shell .board-column .job-paper > .promise,
+  .workshop-shell .board-column .job-paper > .readiness {
+    font-size: 11px;
+  }
+}
+@media (min-width: 901px) {
+  .workshop-shell .board-page > .workboard-columns {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .workshop-shell .board-column .job-paper {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    height: auto;
+    min-height: 170px;
+    max-height: none;
+  }
+  .workshop-shell .board-column .job-paper > h3 {
+    flex: 1;
+    min-height: 36px;
+  }
+  .workshop-shell .board-column .job-paper > .paper-actions {
+    display: flex;
+    margin-top: auto;
+  }
+  .workshop-shell .board-column .job-paper > .paper-actions button {
+    min-width: 0;
+    font-size: 10px;
+  }
+}
+@media (max-width: 900px) {
+  .workshop-shell .board-column .job-paper {
+    height: 88px;
+    min-height: 88px;
+    max-height: 88px;
+    padding: 0 8px;
+    grid-template-rows: 14px 32px 21px 21px;
+  }
+  .workshop-shell .board-column .job-paper > .paper-actions {
+    gap: 0;
+  }
+}
+/* Legacy promise typography must not add extra lines inside the compact row. */
+.workshop-shell .board-column .job-paper > .promise strong {
+  display: inline;
+  margin: 0;
+  font-size: 10px;
+  line-height: 18px;
+}
+.workshop-shell .board-column .job-paper > .readiness {
+  margin: 0;
+}
+
+/* Desktop workboard: use its existing scroll area above the in-flow day controls.
+   Give each status a row so three offers need not stack below the visible area. */
+@media (min-width: 901px) {
+  .workshop-shell .board-page {
+    display: block;
+  }
+  .workshop-shell .board-page > .workboard-columns {
+    display: block;
+  }
+  .workshop-shell .board-column[open] {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+    align-items: start;
+    gap: 8px 12px;
+  }
+  .workshop-shell .board-column > summary {
+    grid-column: 1 / -1;
+  }
+}
