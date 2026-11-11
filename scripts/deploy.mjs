@@ -18,7 +18,7 @@ let added = false;
 try {
   run('git', ['worktree', 'add', '--detach', checkout, commit], { stdio: 'inherit' });
   added = true;
-  const opts = { cwd: checkout, stdio: 'inherit', env: { ...process.env, PATH: `/opt/homebrew/opt/node@26/bin:${process.env.PATH}` } };
+  const opts = { cwd: checkout, stdio: 'inherit', env: process.env };
   run('pnpm', ['install', '--frozen-lockfile'], opts);
   run('node', ['scripts/build.mjs'], opts);
   if (remoteHead() !== commit) throw new Error('main advanced during build');
