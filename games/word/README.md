@@ -45,10 +45,8 @@ current place. Browser storage keeps your place when available. A collapsed **De
 
 ## What Human Framework supplies
 
-[Human Framework](https://human.adamwhite.work) is pinned to exactly **4.0.0**
-(since 2026-10-27; registry integrity
-`sha512-8jqvoc25pw1psbiAZnsRH2LfbxhcJ8y3+qhj9L75/qtZOJtqKmnW+eSVfL/pg0QChY3RaSENdkA0DjAiquvu5w==`).
-The game is a 4.0 host: it creates one HF run with five people and sends every
+[Human Framework](https://human.adamwhite.work) is pinned to exactly **4.17.0**.
+The game creates one HF run with five people and sends every
 change as a timed input to `step`. It reads people back only through `inspect`
 and the run export. This game demonstrates testimony with sources, learned
 beliefs, changes in trust in a source, and relationships.
@@ -79,13 +77,13 @@ general autonomous simulation. It starts fresh people, with no imported saves.
 **Export playtest** downloads the seed, input log, complete state, edition and
 HF pin. Open **Menu → Debug → Replay tools → Import a playtest export** to
 reconstruct a run and check its state and hash. **Resume replay** returns to play.
-Only the current `word-5` edition with HF 4.0.0 is accepted. An earlier export
+Only the current `word-5` edition with HF 4.17.0 is accepted. An earlier export
 or save, including every HF 3 run, is refused before any state changes, with a
 message to start a fresh meeting. Old saves are not migrated.
 
-The client is pinned to **@adam0white/lab-client 0.4.15**, the vendored artifact
-`vendor/adam0white-lab-client-0.4.15.tgz` (SHA-256
-`a317b83fdbf9239a9fea729d9ec7a95cf5b2c54d87d70d780148720a7e2a2eb7`).
+The monorepo uses the published **@adam0white/lab-client 0.5.17** and
+**@adam0white/lab-kit 0.5.34** artifacts. The original vendored client remains
+in the source archive.
 Recording attempts uploads of decisions, run snapshots and event/error logs.
 Use **Record my play for the lab** on first visit or in Menu to change it.
 Browser privacy signals default recording to off. **Feedback** offers
@@ -105,7 +103,7 @@ See the [recording and privacy notice](https://human.adamwhite.work/lab/privacy/
 
 ### Open a file without replacing your browser save
 
-Open **Menu → Open a file** (the `/file` route) and choose a complete current `word-5` / HF 4.0.0 export.
+Open **Menu → Open a file** (the `/word/file/` route) and choose a complete current `word-5` / HF 4.17.0 export.
 This route opens the chooser before reading your saved meeting or creating a
 new one. It does not read or write the Word save or notice keys. The opened
 meeting and its complete five-person state stay in memory. Continue playing,
@@ -123,7 +121,7 @@ when you return to it. A continued export contains the current state; its JSON
 formatting can differ from the original file. No people, logs or provenance are
 trimmed to meet the size limit.
 
-File mode uses client 0.4.15 preserving initialization. It reuses an existing
+File mode uses client 0.5.17 preserving initialization. It reuses an existing
 usable local recording identity and leaves stored identity and preferences
 unchanged during initialization. Missing identity, incompatible session or an
 identity mismatch blocks recording and is shown explicitly. File mode never
@@ -135,7 +133,7 @@ temporary tab-only recording control. This informational notice does not claim
 the ordinary notice key. The existing feedback buttons explicitly submit notes;
 selecting them is not a local preview.
 
-An agent can explicitly open `/file?labRunSource=agent`. The public SDK marker
+An agent can explicitly open `/word/file/?labRunSource=agent`. The public SDK marker
 labels newly captured linked records; it does not change imported authorship,
 turn recording on, change prior queued records or prove delivery. File mode
 makes no fictional-person Shelf request. Pending recording is retained until
@@ -144,7 +142,7 @@ owner-profile admission, a production receipt, panel readiness or acceptance.
 
 ## Develop
 
-Use Node **26.12.0** and pnpm **12.14.0**.
+Use Node **26.12.0** and pnpm **12.16.1**.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -159,9 +157,8 @@ The four projects cover Chromium and WebKit at 360×690 and 1280×800.
 
 ## Release
 
-Commit and push. Wait for green GitHub CI on the exact commit. From a clean tree,
-run `pnpm build`, then `npx wrangler deploy`. Verify the play URL and
-`/release.json`; the release must name that commit and show `dirty: false`.
+Use the root monorepo workflow for release and deployment. Verify the scoped
+`/word/release.json` after deployment.
 Code is MIT licensed. See [docs/design.md](docs/design.md) for scope and design.
 
 The cold policy in `test/support/cold-policy.ts` reads only the displayed text,

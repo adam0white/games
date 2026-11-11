@@ -14,7 +14,7 @@ export default defineConfig({
     { name: 'desktop-webkit', use: { browserName: 'webkit', viewport: { width: 1280, height: 800 } } },
   ],
   webServer: {
-    command: 'pnpm preview --port 4173 --strictPort',
+    command: 'pnpm build && pnpm preview --port 4173 --strictPort',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env.CI,
   },

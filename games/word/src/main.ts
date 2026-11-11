@@ -6,7 +6,7 @@ import './style.css';
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('The reading surface is missing.');
 const root = app;
-const fileMode = location.pathname.replace(/\/$/, '') === '/file';
+const fileMode = ['/word/file', '/word/file/index.html'].includes(location.pathname.replace(/\/$/, ''));
 const lab = createLab({ game: 'word', ...(fileMode ? { preservation: 'preserve' as const } : {}) });
 const selection = new NativeFileSelection();
 let acceptedFile: AcceptedNativeFile | null = null;
@@ -189,7 +189,7 @@ function menu(leaf: HTMLElement): void {
   options.append(all);
   if (!fileMode) {
     const openFile = element('a', 'Open a file');
-    openFile.href = '/file';
+    openFile.href = '/word/file/';
     options.append(openFile);
   }
   leaf.append(options, recording());

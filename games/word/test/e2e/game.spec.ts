@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 async function takeSeat(page: import('@playwright/test').Page) {
-  await page.goto('/');
+  await page.goto('/word/');
   await expect(page.getByRole('heading', { name: 'A note about recording' })).toBeVisible();
   await page.getByRole('checkbox', { name: 'Record my play for the lab' }).uncheck();
   await page.getByRole('button', { name: 'Take a seat' }).click();
@@ -20,7 +20,7 @@ test('the table, notebook and menu work with public, collapsed diagnostics', asy
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await expect(page.locator('.menu-footer details')).not.toHaveAttribute('open', '');
   await expect(page.getByRole('button', { name: 'Replay tools' })).toBeHidden();
-  await expect(page.getByRole('link', { name: 'Open a file' })).toHaveAttribute('href', '/file');
+  await expect(page.getByRole('link', { name: 'Open a file' })).toHaveAttribute('href', '/word/file/');
   await expect(page.getByRole('checkbox', { name: 'Record my play for the lab' })).not.toBeChecked();
   await page.getByRole('button', { name: 'Feedback', exact: true }).click();
   await expect(page.getByRole('button', { name: "I'm stopping", exact: true })).toBeVisible();
@@ -40,7 +40,7 @@ test('the table, notebook and menu work with public, collapsed diagnostics', asy
 test('lab replay rejects malformed imports and retains the current meeting', async ({ page }) => {
   await takeSeat(page);
   const title = await page.locator('main h1').textContent();
-  await page.goto('/');
+  await page.goto('/word/');
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByText('Debug', { exact: true }).click();
   await page.getByRole('button', { name: 'Replay tools', exact: true }).click();
@@ -215,7 +215,7 @@ test('file meetings preserve occupied native storage and ordinary import still p
     };
     Object.assign(window, { nativeTrace: trace });
   });
-  await page.goto('/file?labRunSource=agent');
+  await page.goto('/word/file/?labRunSource=agent');
   await expect(page.getByRole('heading', { name: 'Open a His Word file' })).toBeVisible();
   await expect(page.getByText(/Recording is blocked/)).toBeVisible();
   await expect(page.getByRole('checkbox', { name: 'Record my play for the lab' })).toBeDisabled();
@@ -299,7 +299,7 @@ test('file meetings preserve occupied native storage and ordinary import still p
   ).toEqual(['occupied-native-meeting', 'occupied-native-notice', 'occupied-guide-preference']);
 
   // Ordinary startup reads native storage, and ordinary import writes the save.
-  await page.goto('/');
+  await page.goto('/word/');
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByText('Debug', { exact: true }).click();
   await page.getByRole('button', { name: 'Replay tools', exact: true }).click();
@@ -389,7 +389,7 @@ test('pagehide captures the complete changed file meeting with the real SDK', as
   if (!first) throw new Error('The opening choice is missing.');
   act(source, { choice: first.id });
   const initial = exportRun(source);
-  await page.goto(`${origin}/file?labRunSource=agent`);
+  await page.goto(`${origin}/word/file/?labRunSource=agent`);
   await expect(page.getByRole('checkbox', { name: 'Record my play for the lab' })).toBeChecked();
   await page.getByLabel('Choose a playtest file').setInputFiles({
     name: 'meeting.json',

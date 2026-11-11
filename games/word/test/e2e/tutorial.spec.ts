@@ -28,7 +28,7 @@ test('first decisions show a real reply without reading story text', async ({ pa
   await page.addInitScript(() => {
     localStorage.setItem('his-word-notice-v1', '1');
   });
-  await page.goto('/');
+  await page.goto('/word/');
   let step = 0;
   for (const name of [
     'Put the notebook on the table',
@@ -52,7 +52,7 @@ test('skip and menu replay guide on a fresh meeting', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('his-word-notice-v1', '1');
   });
-  await page.goto('/');
+  await page.goto('/word/');
   await page.getByRole('button', { name: 'Skip guide' }).click();
   await expect(page.getByRole('button', { name: 'Skip guide' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
@@ -63,7 +63,7 @@ test('skip and menu replay guide on a fresh meeting', async ({ page }) => {
 
 test('guide controls remain keyboard reachable', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('his-word-notice-v1', '1'));
-  await page.goto('/');
+  await page.goto('/word/');
   await page.keyboard.press('Tab');
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Skip guide' })).toBeFocused();
@@ -75,7 +75,7 @@ test('guide controls remain keyboard reachable', async ({ page }) => {
 
 test('back from guide replay does not change a later new game', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('his-word-notice-v1', '1'));
-  await page.goto('/');
+  await page.goto('/word/');
   await page.getByRole('button', { name: 'Skip guide' }).click();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('button', { name: 'Replay guide' }).click();
@@ -88,7 +88,7 @@ test('back from guide replay does not change a later new game', async ({ page })
 
 test('alternate agreement path restores story before choices', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('his-word-notice-v1', '1'));
-  await page.goto('/');
+  await page.goto('/word/');
   await page.getByRole('button', { name: /Put the notebook/ }).click();
   await page.getByRole('button', { name: /Write an agreement/ }).click();
   await expect(page.getByRole('button', { name: 'Skip guide' })).toHaveCount(0);
