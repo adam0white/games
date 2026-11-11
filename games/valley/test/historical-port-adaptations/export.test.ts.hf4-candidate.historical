@@ -1,0 +1,289 @@
+import { exportRun, readRunHistory } from '@adam0white/human-framework';
+import { describe, expect, it } from 'vitest';
+import { act, compactRun, fingerprint, load, newGame, replay, save, step } from '../src/sim/game.ts';
+import { communityForPerson, personRun } from '../src/sim/hf.ts';
+import { deliveryTripReserved } from '../src/sim/terms.ts';
+import { advanceTo } from '../src/sim/valley.ts';
+import { required } from './required.ts';
+
+describe('notebook run exports', () => {
+  it('keeps full-state downloads compatible and detaches the notebook input log', () => {
+    const g = replay(7, [], 0);
+    const full = save(g, 2);
+    const run = compactRun(g, 2);
+    expect(full).toHaveProperty('state');
+    expect(full).toHaveProperty('savedAt');
+    expect(run.label).toBe(full.label);
+    expect(fingerprint(load(JSON.parse(JSON.stringify(full))).valley)).toBe(full.fingerprint);
+    g.inputs.push({ verb: 'visit', house: 'dere', at: 0 });
+    expect(run.inputs).toEqual([]);
+  });
+
+  it('compacts the captured export without reading a later game or changing the download', () => {
+    const g = replay(7, [], 0);
+    const full = save(g, 2);
+    const json = JSON.stringify(full);
+    g.inputs.push({ verb: 'visit', house: 'dere', at: 0 });
+    const compact = compactRun(full);
+    expect(compact).not.toHaveProperty('state');
+    expect(compact).not.toHaveProperty('savedAt');
+    expect(compact.inputs).toEqual([]);
+    expect(compact.label).toBe(full.label);
+    expect(fingerprint(load(compact).valley)).toBe(full.fingerprint);
+    expect(JSON.stringify(full)).toBe(json);
+    full.inputs.push({ verb: 'visit', house: 'dere', at: 0 });
+    expect(compact.inputs).toEqual([]);
+  });
+
+  it('rejects a compact run whose replay does not match its fingerprint', () => {
+    const run = compactRun(replay(7, [], 0));
+    expect(() => load({ ...run, fingerprint: '00000000' })).toThrow(/Start a new game instead/i);
+  });
+
+  it('refuses an HF3 compact export with a keep-file and start-fresh message', () => {
+    const legacy = {
+      ...compactRun(replay(7, [], 0)),
+      version: '0.3.1',
+      framework: '3.0.0',
+      fingerprint: '065eac42',
+    };
+    expect(() => load(legacy)).toThrow(/export it for safekeeping and start fresh/i);
+  });
+
+  it('detaches loaded inputs from compact and full exports', () => {
+    const g = newGame(7, undefined, false, true, 'valley-public-2026-10');
+    expect(act(g, { verb: 'call', job: 'reap-agha', houses: ['coban'] })).toBe(true);
+    const originalAt = g.inputs[0]?.at;
+    expect(originalAt).toBeDefined();
+    for (const run of [compactRun(g), save(g)]) {
+      const loaded = load(run);
+      const input = run.inputs[0];
+      expect(input).toBeDefined();
+      if (input) input.at = 30;
+      expect(loaded.inputs[0]?.at).toBe(originalAt);
+    }
+  });
+});
+
+// Fixed public opening. Capture the actual visit guards at both times for any prerequisite failure.
+function visitOpening() {
+  const g = newGame(7);
+  const guards = () => ({
+    minute: g.valley.minute,
+    house: g.valley.households.some((h) => h.id === 'coban'),
+    reservedPass: deliveryTripReserved(g.valley),
+    alive: g.valley.kahya.body.alive,
+    asleep: g.valley.kahya.body.asleep,
+    visit: g.valley.kahyaState.visit ?? null,
+    activityId: g.valley.kahya.activity?.affordanceId ?? null,
+    activityEnd: g.valley.kahya.activity?.endsAt ?? null,
+  });
+  const at420 = guards();
+  expect(at420.minute).toBe(420);
+  // The steward is separate from the 52 household people and visitors.
+  expect(g.valley.people.length).toBe(52);
+  expect(new Set([...g.valley.people.map((p) => p.id), g.valley.kahya.id]).size).toBe(53);
+  step(g, 540);
+  const at540 = guards();
+  expect(at540.minute, `Visit prerequisite: ${JSON.stringify({ at420, at540 })}`).toBe(540);
+  return { g, diagnostic: JSON.stringify({ at420, at540 }) };
+}
+
+it('replays an introductory visit followed by a household call with the usual travel cost', () => {
+  const { g, diagnostic } = visitOpening();
+  const start = g.valley.minute;
+  expect(act(g, { verb: 'visit', house: 'coban' }), `Visit admission prerequisite: ${diagnostic}`).toBe(true);
+  expect(g.valley.kahyaState.visit).toMatchObject({
+    arrive: start + 20,
+    leave: start + 110,
+    back: start + 130,
+  });
+  expect(act(g, { verb: 'visit', house: 'ak' })).toBe(false);
+  step(g, start + 150);
+  expect(act(g, { verb: 'call', job: 'reap-agha', houses: ['coban'] })).toBe(true);
+  step(g, start + 360);
+  const exported = compactRun(g);
+  expect(fingerprint(load(JSON.parse(JSON.stringify(exported))).valley)).toBe(fingerprint(g.valley));
+});
+
+it('preserves the complete public-edition state across native and compact exports and rejects native archive corruption', () => {
+  const g = newGame(7, undefined, false, true, 'valley-public-2026-10');
+  expect(act(g, { verb: 'call', job: 'reap-agha', houses: ['coban'] })).toBe(true);
+  const full = JSON.parse(JSON.stringify(save(g))) as ReturnType<typeof save>;
+  const compact = JSON.parse(JSON.stringify(compactRun(g))) as ReturnType<typeof compactRun>;
+  expect(compact.inputs).toEqual(g.inputs);
+  const fullReload = load(full);
+  const compactReload = load(compact);
+  expect(save(fullReload).state).toEqual(full.state);
+  expect(save(compactReload).state).toEqual(full.state);
+  const altered = structuredClone(full);
+  const archive = altered.state.community.archive;
+  if (!archive) throw new Error('Missing native Run archive');
+  Object.assign(archive.current, { at: archive.current.at + 1 });
+  expect(() => load(altered)).toThrow();
+}, 60_000);
+
+// V2 source preparation: public game controls, not the authored steward components.
+// No execution or natural native choice is claimed by these source assertions.
+function visitAttendance(g: ReturnType<typeof newGame>) {
+  const s = g.valley;
+  const c = required(communityForPerson(s.kahya));
+  const visitVoice = readRunHistory(exportRun(required(personRun(s.kahya))))
+    .flatMap((entry) => entry.inputs)
+    .filter(
+      (i) =>
+        i.kind === 'voice.evidence-received' &&
+        i.payload.voiceId === s.kahya.id &&
+        i.payload.evidence.kind === 'act' &&
+        i.payload.evidence.action === 'visit',
+    );
+  return structuredClone({
+    acts: s.kahyaState.acts?.coban ?? [],
+    seen: s.kahyaState.seen.coban,
+    guess: s.kahyaState.guess?.coban,
+    notes: s.notes.filter(
+      (n) =>
+        n.house === 'coban' &&
+        (n.kind === 'visit' ||
+          n.text.includes('speaks by the fire:') ||
+          n.text.includes('speaks after sitting with you again:') ||
+          n.text.includes('tells you about public work notes')),
+    ),
+    disclosures: s.flags.beats.filter((b) => b.startsWith('cast-disclosed:')),
+    queued: Object.values(s.queued)
+      .flat()
+      .filter((p) => p.kind === 'visit'),
+    invitations: s.knocks.filter((k) => k.house === 'coban' && k.what !== 'grain'),
+    glimpses: c.glimpses ?? [],
+    deferred: c.deferred ?? [],
+    visitVoice,
+  });
+}
+
+function visitForks(g: ReturnType<typeof newGame>) {
+  const forks = [load(JSON.parse(JSON.stringify(save(g)))), load(JSON.parse(JSON.stringify(compactRun(g))))];
+  for (const fork of forks) {
+    expect(save(fork).state).toEqual(save(g).state);
+    expect(fork.inputs).toEqual(g.inputs);
+    expect(visitAttendance(fork)).toEqual(visitAttendance(g));
+  }
+  return forks;
+}
+
+it('keeps a public visit as intent until its accepted physical arrival', () => {
+  const { g, diagnostic } = visitOpening();
+  const before = visitAttendance(g);
+  const at = g.valley.minute;
+  expect(act(g, { verb: 'visit', house: 'coban' }), `Visit admission prerequisite: ${diagnostic}`).toBe(true);
+  expect(g.inputs).toEqual([{ at, verb: 'visit', house: 'coban' }]);
+  expect(g.valley.kahyaState.visit).toMatchObject({ house: 'coban', arrive: at + 20 });
+  expect(g.valley.kahyaState.place).toBe('residence');
+  // Planned times, queued native evidence and future-dated speech are not attendance.
+  expect(visitAttendance(g)).toEqual(before);
+  visitForks(g);
+});
+
+// Host boundary component: subquantum advanceTo is not public game-step/replay proof.
+// It retains the real opening people, world, offers, staging and voluntary HF choice.
+it('gives no physical visit credit while the real outward walk is still running', () => {
+  const { g, diagnostic } = visitOpening();
+  const before = visitAttendance(g);
+  const at = g.valley.minute;
+  const c = required(communityForPerson(g.valley.kahya));
+  expect(act(g, { verb: 'visit', house: 'coban' }), `Visit admission prerequisite: ${diagnostic}`).toBe(true);
+  advanceTo(g.valley, at + 10);
+  const walking = required(g.valley.kahya.activity);
+  expect(walking.affordanceId, 'V2 prerequisite: native HF must start the real walk').toBe(
+    'care:walk:lane:coban:out',
+  );
+  expect(walking.endsAt).toBeGreaterThan(g.valley.minute);
+  expect(g.valley.kahyaState.place).toBe('residence');
+  expect((c.completed ?? []).some((r) => r.activity.affordanceId === walking.affordanceId)).toBe(false);
+  expect(visitAttendance(g)).toEqual(before);
+  advanceTo(g.valley, walking.endsAt);
+  expect(g.valley.kahyaState.place).toBe('house:coban');
+  const arrived = visitAttendance(g);
+  expect(arrived.seen).toBe(walking.endsAt);
+  expect(arrived.guess?.at).toBe(walking.endsAt);
+  expect(arrived.acts).toEqual([{ day: 0, what: 'sat with them' }]);
+  expect(arrived.notes.filter((n) => n.kind === 'visit')).toHaveLength(1);
+});
+
+it('records one public visit at actual walk completion across continuation, cold restore and replay', () => {
+  const { g, diagnostic } = visitOpening();
+  const before = visitAttendance(g);
+  const at = g.valley.minute;
+  const c = required(communityForPerson(g.valley.kahya));
+  const priorCompleted = c.completed?.length ?? 0;
+  const priorHistory = readRunHistory(exportRun(required(personRun(g.valley.kahya)))).length;
+  expect(act(g, { verb: 'visit', house: 'coban' }), `Visit admission prerequisite: ${diagnostic}`).toBe(true);
+  const requestedForks = visitForks(g);
+  expect(visitAttendance(g)).toEqual(before);
+
+  // The lower-lane walk is shorter than the ordinary 30-minute public step.
+  // Inspect the real accepted completion; the planned minute is not its receipt.
+  step(g, at + 30);
+  const outward = (c.completed ?? [])
+    .slice(priorCompleted)
+    .filter((r) => r.person === g.valley.kahya.id && r.activity.affordanceId === 'care:walk:lane:coban:out');
+  expect(outward, 'V2 prerequisite: real public outward walk must complete naturally').toHaveLength(1);
+  const arrival = required(outward[0]);
+  const native = readRunHistory(exportRun(required(personRun(g.valley.kahya))))
+    .slice(priorHistory)
+    .flatMap((entry) => entry.inputs);
+  expect(native).toContainEqual(
+    expect.objectContaining({
+      kind: 'action.resolved',
+      payload: expect.objectContaining({
+        person: g.valley.kahya.id,
+        stage: 'finish',
+        disposition: 'completed',
+        outcome: expect.objectContaining({
+          evidenceId: arrival.evidenceId,
+          offerId: 'care:walk:lane:coban:out',
+          end: arrival.endedAt * 60_000,
+        }),
+      }),
+    }),
+  );
+  expect(arrival.endedAt).toBeGreaterThan(at);
+  expect(arrival.endedAt).toBeLessThanOrEqual(g.valley.minute);
+  expect(g.valley.kahyaState.place).toBe('house:coban');
+  const attended = visitAttendance(g);
+  expect(attended.seen).toBe(arrival.endedAt);
+  expect(attended.guess?.at).toBe(arrival.endedAt);
+  expect(attended.acts).toEqual([...before.acts, { day: 0, what: 'sat with them' }]);
+  expect(attended.notes.filter((n) => n.kind === 'visit')).toHaveLength(1);
+  expect(required(attended.notes.find((n) => n.kind === 'visit')).at).toBe(arrival.endedAt);
+  expect(attended.visitVoice.length).toBeGreaterThan(before.visitVoice.length);
+  for (const input of attended.visitVoice.slice(before.visitVoice.length)) {
+    if (input.kind !== 'voice.evidence-received') throw new Error('Missing native visit evidence');
+    expect(input.payload.evidence.occurredAt).toBe(arrival.endedAt * 60_000);
+  }
+  const arrivedForks = visitForks(g);
+  for (const fork of requestedForks) {
+    step(fork, at + 30);
+    expect(save(fork).state).toEqual(save(g).state);
+    expect(fork.inputs).toEqual(g.inputs);
+  }
+  // Continue through the ordinary stay and home walk; do not manufacture completion.
+  step(g, at + 180);
+  expect(g.valley.kahyaState.place).toBe('residence');
+  const returnedForks = visitForks(g);
+  const forks = [...requestedForks, ...arrivedForks, ...returnedForks];
+  step(g, at + 210);
+  const continued = visitAttendance(g);
+  expect(continued.acts).toEqual(attended.acts);
+  expect(continued.seen).toBe(attended.seen);
+  expect(continued.guess).toEqual(attended.guess);
+  expect(continued.notes).toEqual(attended.notes);
+  expect(continued.visitVoice).toEqual(attended.visitVoice);
+  for (const fork of forks) {
+    step(fork, at + 210);
+    expect(save(fork).state).toEqual(save(g).state);
+    expect(fork.inputs).toEqual(g.inputs);
+  }
+  const replayed = replay(7, structuredClone(g.inputs), g.valley.minute);
+  expect(save(replayed).state).toEqual(save(g).state);
+  expect(replayed.inputs).toEqual(g.inputs);
+});
