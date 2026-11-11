@@ -8,7 +8,7 @@ test("guides actual choices without reading the story", async ({ page }) => {
       await page.getByRole("button", { name: "Continue", exact: true }).click();
     },
   );
-  await page.goto("/");
+  await page.goto("/child/");
   await expect(page.locator("html")).toHaveAttribute("data-ready", "true");
   const cue = page.locator("[data-guide-cue]");
   const target = page.locator("[data-guide-target]");

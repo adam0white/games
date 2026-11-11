@@ -4,7 +4,7 @@ The current candidate uses published HF 4.17.0 and game edition 6. It retains fi
 
 Download includes every visited episode's complete native archive plus the seed, ordered player inputs and complete host state. Import verifies all native archives, reconstructs all chapters and requires exact complete export equality. Old saves need a fresh upbringing. The original continuous fifteen-year simulation and its 36-month/180-month/2-second budgets remain unqualified historical work. This episode edition does not pass or claim those budgets. Exact source CI, hosted review and deployment remain pending.
 
-Stack: Node 26.12.0, pnpm 12.16.1, TypeScript 7.0.2, Vitest 5.1.0, Biome 2.6.5, Wrangler 4.157.0. Use frozen installs and the 1440-minute release-age policy. Current lab client 0.5.15 and kit 0.5.32 are immutable artifacts; their current HF runtime resolves to 4.17.0 while the historical alias remains separate.
+Stack: Node 26.12.0, pnpm 12.16.1, TypeScript 7.0.2, Vitest 5.1.0, Biome 2.6.5, Wrangler 4.157.0. Use frozen installs and the 1440-minute release-age policy. The monorepo uses published lab client 0.5.17 and kit 0.5.34, and one game engine at HF 4.17.0. Historical fixtures remain unchanged. The /child/file/ view opens an export without native storage or Lab access.
 
 ## Historical design and release evidence
 
@@ -58,7 +58,7 @@ Central delivery remains pending: the deployed central `00d` build rejects new `
 
 Node26.12.0 and pnpm12.14.0. `pnpm install --frozen-lockfile`, then `pnpm dev`.
 
-`pnpm check:lane` runs lint, strict typecheck, headless tests and the production build. `pnpm e2e` checks Chromium and WebKit at360×690 and1280×800. Install their runtimes with `pnpm exec playwright install chromium webkit` when needed.
+`pnpm check:lane` runs lint, strict typecheck, headless tests, Chromium and WebKit browser tests, and the production build. `pnpm e2e` checks both browsers at 360×690 and 1280×800. Install their runtimes with `pnpm exec playwright install chromium webkit` when needed.
 
 The released HF3 game used the published HF3.2.0 package. Game code owns settlement resources and consequences. No framework source is vendored. The HF4 candidate pins lab-client 0.5.8 and lab-kit 0.5.25 release assets. The game and current lab-client resolve to the same HF 4.16.3 installation.
 

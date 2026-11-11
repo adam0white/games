@@ -11,7 +11,20 @@ export interface GameLab {
 }
 
 /** Keep transport, privacy preferences and stored-note receipts in the lab SDK. */
-export function initLab(getRun: () => Run, getExport: () => unknown): GameLab {
+export function initLab(
+  getRun: () => Run,
+  getExport: () => unknown,
+  fileMode = false,
+): GameLab {
+  if (fileMode)
+    return {
+      feedback: () => false,
+      recording: () => false,
+      setRecording: () => {},
+      event: () => {},
+      captureSave: () => {},
+      destroy: () => {},
+    };
   // Localhost remains off. Do not enable sendFromLocalhost for agent playtests.
   const lab = createLab({ game: "child" });
   const generations = new WeakMap<Run, number>();

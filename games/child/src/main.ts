@@ -19,6 +19,7 @@ import { createRenderer } from "./render";
 
 const app = document.querySelector<HTMLElement>("#app");
 if (!app) throw Error("Page is missing.");
+const fileMode = /^\/child\/file(?:\/|$)/.test(location.pathname);
 let game = createGame(21);
 let saveWarning = "";
 let autosaveBlocked = false;
@@ -52,8 +53,10 @@ function preserveRefusedSave(raw: string): boolean {
 let saved: string | null = null;
 let guide = false;
 try {
-  saved = localStorage.getItem("child-run");
-  guide = saved === null && localStorage.getItem("child-guide-done") !== "1";
+  if (!fileMode) {
+    saved = localStorage.getItem("child-run");
+    guide = saved === null && localStorage.getItem("child-guide-done") !== "1";
+  }
 } catch {
   autosaveBlocked = true;
   guide = true;
@@ -74,6 +77,7 @@ if (autosaveBlocked) {
 const lab = initLab(
   () => game.run,
   () => exportRun(game),
+  fileMode,
 );
 let timer: ReturnType<typeof setTimeout> | undefined;
 let feedbackOpen = false;
@@ -95,6 +99,12 @@ choices.className = "choices";
 const status = document.createElement("p");
 status.className = "status";
 app.append(header, top, scene, story, choices, status);
+if (fileMode) {
+  const explanation = document.createElement("p");
+  explanation.textContent =
+    "File view: open a playtest from the menu. Changes stay in this page; export to keep them.";
+  app.prepend(explanation);
+}
 let renderer = await createRenderer(scene, false);
 function button(title: string, detail: string, fn: () => void) {
   const b = document.createElement("button");
@@ -115,14 +125,14 @@ function button(title: string, detail: string, fn: () => void) {
 function stopGuide() {
   guide = false;
   try {
-    localStorage.setItem("child-guide-done", "1");
+    if (!fileMode) localStorage.setItem("child-guide-done", "1");
   } catch {
     // The guide also works without storage.
   }
   draw();
 }
 function save() {
-  if (autosaveBlocked || game.slice) return;
+  if (fileMode || autosaveBlocked || game.slice) return;
   let run: ReturnType<typeof exportRun>;
   try {
     run = exportRun(game);
@@ -352,6 +362,8 @@ function recordingLabel() {
   recording.setAttribute("aria-pressed", String(lab.recording()));
 }
 recordingLabel();
+recording.disabled = fileMode;
+feedbackButton.disabled = fileMode;
 recording.onclick = () => {
   lab.setRecording(!lab.recording());
   recordingLabel();
@@ -364,6 +376,12 @@ const all = document.createElement("a");
 all.href = "https://human.adamwhite.work";
 all.textContent = "All games";
 menu.append(all);
+if (!fileMode) {
+  const viewer = document.createElement("a");
+  viewer.href = "/child/file/";
+  viewer.textContent = "Open a playtest in file view";
+  menu.append(viewer);
+}
 menuButton("New game", () => {
   if (confirm("Start a new upbringing?")) {
     clearTimeout(timer);

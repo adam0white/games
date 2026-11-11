@@ -10,7 +10,7 @@ const historicalSave = readFileSync(
 );
 
 async function beginAtSix(page: Page) {
-  await page.goto("/");
+  await page.goto("/child/");
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByText("Other ways to begin", { exact: true }).click();
   page.once("dialog", (dialog) => dialog.accept());
@@ -123,7 +123,7 @@ test("full upbringing reaches an ending, saves, and exports a replay", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
+  await page.goto("/child/");
   await expect(page.locator("html")).toHaveAttribute("data-ready", "true");
   const notice = page.getByRole("complementary", { name: "Play recording" });
   if (await notice.isVisible())
@@ -190,7 +190,7 @@ test("full upbringing reaches an ending, saves, and exports a replay", async ({
 test("ordinary menu exposes public tools and keeps Canvas diagnostics collapsed", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/child/");
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Export playtest" }),
@@ -274,7 +274,7 @@ test("repeated unsuitable raising leaves a visible final loss after earlier shor
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
+  await page.goto("/child/");
   await expect(page.locator("html")).toHaveAttribute("data-ready", "true");
   const notice = page.getByRole("complementary", { name: "Play recording" });
   if (await notice.isVisible())
@@ -318,7 +318,7 @@ test("repeated unsuitable raising leaves a visible final loss after earlier shor
 test("age-six day preserves the full upbringing and New game returns to age three", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/child/");
   await page.getByRole("button", { name: /Go with Maryam/ }).click();
   const saved = await page.evaluate(() => localStorage.getItem("child-run"));
   await beginAtSix(page);
@@ -348,7 +348,7 @@ test("refused save keeps old and malformed bytes in durable non-overwriting back
     },
     { old, earlier },
   );
-  await page.goto("/");
+  await page.goto("/child/");
   for (const raw of [old, malformed]) {
     await expect(page.locator(".status")).toContainText("A fresh upbringing");
     await page.getByRole("button", { name: /Go with Maryam/ }).click();
@@ -413,7 +413,7 @@ for (const failure of ["write", "read"] as const) {
       },
       { raw, failure },
     );
-    await page.goto("/");
+    await page.goto("/child/");
     const protectedSave = async () => {
       expect(await page.evaluate(() => localStorage.getItem("child-run"))).toBe(
         raw,
@@ -462,7 +462,7 @@ test("refused save blocks replacement when the initial saved bytes cannot be rea
       return getItem.call(this, key);
     };
   }, raw);
-  await page.goto("/");
+  await page.goto("/child/");
   const protectedSave = async () => {
     expect(await page.evaluate(() => localStorage.getItem("child-run"))).toBe(
       raw,
@@ -510,7 +510,7 @@ test("Feedback controls work while movement stays paused until Resume", async ({
     await route.abort();
   });
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("/?labRunSource=agent");
+  await page.goto("/child/?labRunSource=agent");
   await expect(page.locator("html")).toHaveAttribute("data-ready", "true");
   for (let i = 0; i < 3; i++)
     await page.getByRole("button", { name: /Go with Yusuf/ }).click();
