@@ -54,6 +54,63 @@ it("publishes an eligible person while leaving blocked and skipped people untouc
   expect(Object.keys(request?.expectedHeads ?? {})).toEqual([eligible]);
 });
 
+it("does not report an old checkpoint after the play is replaced", async () => {
+  const blocked = sharedCast[1]!;
+  expect(portableWriteBlockers(blocked, "days")).toContain("commonstead");
+  const game = createGame(42);
+  game.chapter = { claims: [], skipped: [sharedCast[2]!], startedAt: 1, completed: false };
+  game.outcome = "won";
+  let current = true;
+  let resolveRequest!: () => void;
+  let requestStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    requestStarted = resolve;
+  });
+  const pending = new Promise<void>((resolve) => {
+    resolveRequest = resolve;
+  });
+  const reported: string[][] = [];
+  const checkpoint = checkpointContinuity(
+    {
+      request: async () => {
+        requestStarted();
+        await pending;
+      },
+    } as never,
+    game,
+    () => current,
+    (ids) => reported.push(ids),
+  );
+  await started;
+  current = false;
+  resolveRequest();
+  await checkpoint;
+  expect(reported).toEqual([]);
+});
+
+it("does not report a blocked-only checkpoint for a replaced play", async () => {
+  const game = createGame(42);
+  game.chapter = {
+    claims: [],
+    skipped: [sharedCast[0]!, sharedCast[2]!],
+    startedAt: 1,
+    completed: false,
+  };
+  game.outcome = "won";
+  const reported: string[][] = [];
+  await checkpointContinuity(
+    {
+      request: async () => {
+        throw Error("unexpected write");
+      },
+    } as never,
+    game,
+    () => false,
+    (ids) => reported.push(ids),
+  );
+  expect(reported).toEqual([]);
+});
+
 it("skips a Voice source without replacing its saved head", async () => {
   const { inspect, restoreRun } = await import("@adam0white/human-framework");
   const { canonicalCast, createPersona, initialPersonaLife, preparePersonaLife } = await import(

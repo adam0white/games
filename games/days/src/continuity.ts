@@ -132,7 +132,7 @@ export async function checkpointContinuity(
   );
   const skippedBlocked = blocked.filter((id) => !chapter.skipped?.includes(id));
   if (!eligible.length) {
-    onBlocked?.(skippedBlocked);
+    if (isCurrent()) onBlocked?.(skippedBlocked);
     return;
   }
   const now = Date.now();
@@ -183,5 +183,5 @@ export async function checkpointContinuity(
       eligible.map((id) => [id, chapter.claims.find((p) => p.castId === id)?.revision ?? null]),
     ),
   });
-  onBlocked?.(skippedBlocked);
+  if (isCurrent()) onBlocked?.(skippedBlocked);
 }

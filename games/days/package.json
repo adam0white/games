@@ -19,7 +19,8 @@
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "check:lane": "pnpm story && pnpm lint && pnpm typecheck && pnpm test && pnpm e2e && pnpm build",
     "story": "node scripts/compile-story.ts",
-    "deploy": "node scripts/deploy.ts"
+    "deploy": "cd ../.. && pnpm run deploy",
+    "deploy:check": "cd ../.. && pnpm run deploy:check"
   },
   "dependencies": {
     "@adam0white/human-framework": "4.17.0",
