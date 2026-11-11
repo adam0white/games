@@ -336,7 +336,7 @@ it('shows save failure without adding a manual Save action', async () => {
 
 it('sends linked feedback with verdict and trimmed remembered name', async () => {
   localStorage.setItem('hf-lab-feedback-name', 'legacy');
-  localStorage.setItem('goodhands-hf-lab-feedback-name', 'other game');
+  localStorage.setItem('hf-lab-feedback-name:goodhands', 'other game');
   await boot();
   await click('new');
   await click('menu');
@@ -358,7 +358,7 @@ it('sends linked feedback with verdict and trimmed remembered name', async () =>
   );
   expect(localStorage.getItem('hf-lab-feedback-name:glance')).toBe('owner');
   expect(localStorage.getItem('hf-lab-feedback-name')).toBe('legacy');
-  expect(localStorage.getItem('goodhands-hf-lab-feedback-name')).toBe('other game');
+  expect(localStorage.getItem('hf-lab-feedback-name:goodhands')).toBe('other game');
 });
 
 it('allows feedback while recording is off without another recording choice', async () => {
