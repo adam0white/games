@@ -36,6 +36,7 @@ test('the explicit retained-repository exception is limited to Neighbours', () =
   const source = { repository: neighboursSource.repository, commit: neighboursSource.commit, history: { mode: 'original-repository', importCommit: neighboursSource.importCommit, tree: neighboursSource.tree } };
   const registry = { hfVersion: '4.17.0', games: [{ slug: 'neighbours', source, saveSchema: 'v1' }] };
   validateRegistry(registry);
+  assert.throws(() => validateRegistry({ ...registry, games: [{ ...registry.games[0], source: { repository: source.repository, commit: 'a'.repeat(40) } }] }), /history/);
   for (const history of [{ ...source.history, mode: 'anything' }, { ...source.history, importCommit: 'bad' }, { ...source.history, tree: 'bad' }]) {
     assert.throws(() => validateRegistry({ ...registry, games: [{ ...registry.games[0], source: { ...source, history } }] }), /history/);
   }

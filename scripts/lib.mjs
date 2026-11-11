@@ -8,6 +8,7 @@ export function validateRegistry(registry) {
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(game.slug) || seen.has(game.slug)) throw new Error('Invalid or duplicate slug');
     if (!/^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(game.source?.repository ?? '') || !sha.test(game.source?.commit ?? '')) throw new Error('Invalid source lineage');
     const history = game.source.history;
+    if (game.slug === 'neighbours' && history === undefined) throw new Error('Missing retained source history');
     if (history !== undefined && (!history || game.slug !== 'neighbours' || game.source.repository !== neighboursSource.repository || game.source.commit !== neighboursSource.commit || Object.keys(history).sort().join(',') !== 'importCommit,mode,tree' || history.mode !== 'original-repository' || history.importCommit !== neighboursSource.importCommit || history.tree !== neighboursSource.tree)) throw new Error('Invalid retained source history');
     if (!game.saveSchema || typeof game.saveSchema !== 'string') throw new Error('Missing save schema');
     if (game.kind !== undefined && !['game', 'recorded-viewer'].includes(game.kind)) throw new Error('Invalid game kind');
