@@ -756,7 +756,8 @@ describe('RT6 the preview names its target when the gate is fully open', () => {
         { at: 1321, kind: 'ask', keeper: 'dai', job: 'level', insist: false },
         { at: 1335, kind: 'ask', keeper: 'dai', job: 'gate', target: 6, insist: false },
       ],
-      1500,
+      // The first reported six turns; later minutes only add replay work.
+      1377,
     );
     expect(state.board.gate?.value).toBe(6);
     localStorage['glance-cast-local-v3'] = JSON.stringify({
