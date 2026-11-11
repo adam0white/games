@@ -1,4 +1,5 @@
 import { createLab, PRIVACY_URL } from '@adam0white/lab-client';
+import { fileLab } from './file-lab';
 import { act, createGame, exportRun, type GameState, hashState, replayRun, view } from './game';
 import { type AcceptedNativeFile, NativeFileSelection } from './native-file';
 import './style.css';
@@ -7,7 +8,7 @@ const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('The reading surface is missing.');
 const root = app;
 const fileMode = ['/word/file', '/word/file/index.html'].includes(location.pathname.replace(/\/$/, ''));
-const lab = createLab({ game: 'word', ...(fileMode ? { preservation: 'preserve' as const } : {}) });
+const lab = fileMode ? fileLab('word') : createLab({ game: 'word' });
 const selection = new NativeFileSelection();
 let acceptedFile: AcceptedNativeFile | null = null;
 let stopTracking: (() => void) | null = null;
@@ -112,7 +113,8 @@ function recording(): HTMLElement {
   const input = element('input');
   input.type = 'checkbox';
   input.checked = lab.telemetryOn;
-  input.disabled = fileMode && lab.preservationStatus !== 'existing-local';
+  input.disabled =
+    fileMode && lab.preservationStatus !== 'standard' && lab.preservationStatus !== 'existing-local';
   input.addEventListener('change', () => {
     lab.setTelemetryOff(!input.checked);
     if (fileMode) render(false);
@@ -207,6 +209,8 @@ function menu(leaf: HTMLElement): void {
 }
 
 function recordingStatus(): string {
+  if (fileMode && lab.preservationStatus === 'standard')
+    return 'Recording is off for this file. Turn it on to record this meeting.';
   if (lab.preservationStatus !== 'existing-local') {
     const reasons = {
       'missing-identity': 'No existing recording identity is available on this site.',

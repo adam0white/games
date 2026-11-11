@@ -1,6 +1,7 @@
 import { personaChannel, watchPersonaCheckpoint } from '@adam0white/lab-client';
 import { CAST, DISCOVERIES } from './cast.ts';
 import { Continuity, LOCAL_KEY, resumeForPlay, watchShelfPreference } from './continuity.ts';
+import { fileLab } from './file-lab';
 import { createFileSession } from './file-session.ts';
 import { morningWorkshopEligibility, morningWorkshopView } from './morning-workshop.ts';
 import { MAPS, type Place } from './paths.ts';
@@ -76,13 +77,8 @@ function nativeSaveStatus(message: string) {
   }
   el.textContent = message;
 }
-const candidateLab = createLab({
-  game: 'commonstead',
-  ...(fileMode ? { preservation: 'preserve' as const } : {}),
-});
-const recordingStatus = candidateLab.preservationStatus;
-const lab = fileMode && recordingStatus !== 'existing-local' ? null : candidateLab;
-if (!lab) candidateLab.dispose();
+const lab = fileMode ? fileLab('commonstead') : createLab({ game: 'commonstead' });
+const recordingStatus = lab?.preservationStatus ?? 'standard';
 const continuity = fileMode
   ? null
   : new Continuity(
@@ -1833,7 +1829,7 @@ function mountFileTools() {
   fileTools = tools;
   tools.className = 'sheet';
   tools.setAttribute('aria-label', 'File session');
-  tools.innerHTML = `<label>Choose a run <input id="file-load" type="file" accept="application/json,.json,.gz"></label><button id="file-cancel">Cancel loading</button><button id="file-original">Download original file</button><button id="file-metadata">Download original file details</button><button id="file-current">Download current run</button><p id="file-status" role="status" data-preservation-status="${recordingStatus}">${lab ? 'Recording follows your Recording setting.' : 'Recording is unavailable. You can still play and download this file.'}</p><p>Files that are too large to open or save will be refused.</p>`;
+  tools.innerHTML = `<label>Choose a run <input id="file-load" type="file" accept="application/json,.json,.gz"></label><button id="file-cancel">Cancel loading</button><button id="file-original">Download original file</button><button id="file-metadata">Download original file details</button><button id="file-current">Download current run</button><p id="file-status" role="status" data-preservation-status="${recordingStatus}">${fileMode ? 'Recording is off for this file. You can play and download it.' : 'Recording follows your Recording setting.'}</p><p>Files that are too large to open or save will be refused.</p>`;
   root.querySelector('.title-body')?.append(tools);
   const input = document.getElementById('file-load') as HTMLInputElement;
   input.addEventListener('cancel', () => {
@@ -1854,7 +1850,7 @@ function mountFileTools() {
       start(fileSession!.state()!);
       const status = document.getElementById('file-status');
       if (status)
-        status.textContent = `${fileSession!.compact ? 'Compact input was reconstructed. ' : ''}File opened and paused. Select Resume to play. ${lab ? 'Recording follows your Recording setting.' : 'Recording is unavailable.'}`;
+        status.textContent = `${fileSession!.compact ? 'Compact input was reconstructed. ' : ''}File opened and paused. Select Resume to play. ${fileMode && lab.preservationStatus === 'standard' ? 'Recording is off for this file.' : lab ? 'Recording follows your Recording setting.' : 'Recording is unavailable.'}`;
       save();
     } catch (error) {
       if (epoch === fileSession!.epoch) fileError(error);

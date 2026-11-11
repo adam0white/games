@@ -2,13 +2,11 @@ import { createLab, FEEDBACK_LABELS, type FeedbackLabel, PRIVACY_URL } from '@ad
 import { feedbackPersonaControl, feedbackSharePlay } from '@adam0white/lab-kit';
 import './lab.css';
 
+import { fileLab } from './file-lab.ts';
 import { fileMode } from './session-route.ts';
 
 export { fileMode } from './session-route.ts';
-export const lab = createLab({
-  game: 'stairwell',
-  ...(fileMode === 'file' ? { preservation: 'preserve' } : {}),
-});
+export const lab = fileMode === 'file' ? fileLab('stairwell') : createLab({ game: 'stairwell' });
 
 interface MenuOptions {
   getRun: () => unknown;

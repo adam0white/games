@@ -454,7 +454,9 @@ export function useVisitorSession({
 			}
 		>();
 		const stopRecording =
-			!fileSession || fileRecordingAllowed()
+			!fileSession ||
+			lab.preservationStatus === "standard" ||
+			fileRecordingAllowed()
 				? lab.trackRun(
 						async () => {
 							if (

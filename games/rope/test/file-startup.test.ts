@@ -74,16 +74,15 @@ it('selects preservation only from the protected path', () => {
   expect(fileEntry('/')).toBe('native');
 });
 
-it('starts the real preserving client under OFF without changing existing native data', async () => {
+it('keeps the SDK idle under OFF without changing existing native data', async () => {
   localStorage.setItem('hf-lab-player', 'a'.repeat(32));
   localStorage.setItem('games-rope.save.cast.v1', 'synthetic-native-sentinel');
   const before = { ...localStorage };
   const runtime = await import('../src/ui/lab.ts');
   expect(runtime.startupEntry).toBe('file');
-  expect(control.options).toEqual([{ game: 'rope', preservation: 'preserve' }]);
-  expect(runtime.lab?.preservationStatus).toBe('existing-local');
+  expect(control.options).toEqual([]);
+  expect(runtime.lab?.preservationStatus).toBe('standard');
   expect(runtime.lab?.telemetryOn).toBe(false);
-  expect(runtime.lab?.dispose).not.toHaveBeenCalled();
   expect({ ...localStorage }).toEqual(before);
 });
 
@@ -113,21 +112,14 @@ it('redirects the actual entry document without loading the game or SDK', async 
   expect(document.querySelector('.menu-trigger')).toBeNull();
 });
 
-it('disposes real blocked clients before host tracking, including unknown future statuses', async () => {
+it('does not initialize the SDK for any existing file profile', async () => {
   for (const status of ['missing-identity', 'incompatible-session', 'identity-mismatch', 'future-status']) {
     vi.resetModules();
-    localStorage.clear();
-    sessionStorage.clear();
-    localStorage.setItem('hf-lab-recording-off', '1');
-    if (status !== 'missing-identity') localStorage.setItem('hf-lab-player', 'a'.repeat(32));
-    if (status === 'incompatible-session') sessionStorage.setItem('hf-lab-session:rope', 'invalid');
-    if (status === 'identity-mismatch') localStorage.setItem('hf-lab-top-level-player', 'b'.repeat(32));
-    control.status = status === 'future-status' ? status : '';
+    control.status = status;
+    control.options = [];
     const runtime = await import('../src/ui/lab.ts');
-    expect(runtime.lab?.preservationStatus).toBe(status);
-    expect(runtime.lab?.dispose).toHaveBeenCalledOnce();
-    expect(runtime.lab?.trackRun).not.toHaveBeenCalled();
-    expect(runtime.lab?.telemetryOn).toBe(false);
+    expect(control.options).toEqual([]);
+    expect(runtime.lab.telemetryOn).toBe(false);
   }
 });
 
@@ -153,7 +145,7 @@ it('boots the actual public App chooser without native storage or Shelf effects'
       ),
     ).toEqual([]);
   }
-  expect(control.clients.at(-1)?.trackRun).not.toHaveBeenCalled();
+  expect(control.options).toEqual([]);
   window.dispatchEvent(new Event('load'));
   expect(register).not.toHaveBeenCalled();
   if (originalSW) Object.defineProperty(navigator, 'serviceWorker', originalSW);
