@@ -4,7 +4,7 @@ Original games built with [Human Framework](https://github.com/adam0white/human-
 
 ## Work from a cloud session
 
-Clone `adam0white/games` in the session workspace. Use the Node version in `.node-version` and pnpm version in `package.json`. No local Mac checkout or sibling Human Framework repository is needed.
+Clone `adam0white/games` with full history in the session workspace. If the provider created a shallow checkout, run `git fetch --unshallow origin` before checks. Use the Node version in `.node-version` and pnpm version in `package.json`. No local Mac checkout or sibling Human Framework repository is needed.
 
 ```sh
 pnpm install --frozen-lockfile
