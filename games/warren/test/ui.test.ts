@@ -133,10 +133,10 @@ describe('owner viewport regression', () => {
       await page.mouse.move(180, 320);
       await page.mouse.down();
       await page.mouse.move(220, 350, { steps: 4 });
-      await page.mouse.up();
       const beforeResize = await page.evaluate(() => ({
         ...(window as unknown as { __warren: Debug }).__warren.view,
       }));
+      await page.mouse.up();
       await expect
         .poll(async () => {
           await page.clock.runFor(100);
