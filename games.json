@@ -168,6 +168,20 @@
       ],
       "legacyOrigin": "https://lefthand.adamwhite.work",
       "redirectEnabled": false
+    },
+    {
+      "slug": "days",
+      "source": {
+        "repository": "https://github.com/adam0white/days",
+        "commit": "b6371b31786d2f72ed863ddcfd1be592cade81fa"
+      },
+      "saveSchema": "three-days-5",
+      "ciBrowsers": [
+        "chromium",
+        "webkit"
+      ],
+      "legacyOrigin": "https://days.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }
