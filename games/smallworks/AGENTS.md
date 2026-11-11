@@ -1,10 +1,10 @@
 # Project instructions
 
-Read README.md, HANDOFF.md, docs/vision.md and docs/mvp.md before resuming. This repository owns the game; ../human-framework owns the framework.
+Follow the [games workspace instructions](../../AGENTS.md) and [workspace handoff](../../HANDOFF.md) first. Read this game’s README, HANDOFF, vision and MVP for game-specific context. Historical instructions below do not override the workspace workflow.
 
 ## Current stack and maintenance
 
-Current candidate uses HF 4.17.0 directly, immutable lab-client 0.5.11 and lab-kit 0.5.28. The client's dependency remains HF 4.11.0, and its `hf-legacy` alias remains 3.0.0; do not claim one physical engine or qualified cross-person portability. Use shared Node 26.12.0, TypeScript 7.0.2, React 19.3.1, Vite 8.3.5, Vitest 5.1.0, Biome 2.6.5, Wrangler 4.157.0 and Knip 6.44.1. Run full suites under the shared machine lock. Worker compatibility date 2026-11-05. [HF4 adoption](docs/hf4-adoption.md) records the earlier port; HF3 records are historical.
+The workspace registry and lockfile own the current HF and lab package pins. Use the root pnpm workspace and shared full-suite lock. The client retains its own historical continuity dependencies; do not claim one physical engine or qualified cross-person portability. [HF4 adoption](docs/hf4-adoption.md) records earlier port evidence.
 
 ## Current authorization
 
@@ -69,12 +69,12 @@ Historical milestone (2026-10-10): the school-break campaign and released-HF tea
 - For gameplay implementation, define one milestone's missing capability, causal check and stopping condition. Do not activate the whole roadmap.
 - Adam is the MVP acceptor. Deliver a runnable local build at the first real playtesting dependency. Tests and reviewer opinions cannot accept the player's experience for him. Any later generic HF extension follows HF's own release workflow.
 - Run `npm run check:lane` before every commit. The coordinator's 2026-10-28 13:40Z ruling makes this a lock-free lint/typecheck gate. Hosted CI runs the full check. Validate documentation links before a documentation commit. Once code exists, establish and run the appropriate lint, typecheck, tests and build before every code commit. Do not claim tests or deployment that have not run.
-- Keep this repository and its documents private on GitHub; do not make source public until public visibility and licensing have been decided. Local commits and integration are authorized for this work. HF changes require a demonstrated generic capability need, not repair-game convenience.
+- The owner approved public source and MIT licensing on 2026-11-05. HF changes require a demonstrated generic capability need, not repair-game convenience.
 
 Player-facing copy follows [Plain English](docs/lab/plain-english.md). Keep the few diagnostic and replay controls in collapsed Debug beside Lab privacy. Every gameplay feature is public.
 
-## Current installer delivery
+## Workspace delivery
 
-Use shared Node 26.12.0 and pnpm 12.16.1 with /opt/homebrew/bin first on PATH. Install with `pnpm install --frozen-lockfile`; keep `pnpm-lock.yaml`. `pnpm-workspace.yaml` owns overrides and exact native build permissions. `npm run` remains valid for scripts. The normal `check:lane` runs lint and typecheck without the machine lock. Hosted CI runs the full check; do not wait on the suite lock for a game commit. Sign commits and include `Co-Authored-By: Codex <noreply@openai.com>`.
+Install from the workspace root with `pnpm install --frozen-lockfile`. Run the root `pnpm check:lane` and this game’s `pnpm --filter ./games/smallworks check:lane` before committing. Run the full game checks appropriate to the change. Root scripts own the complete build and deployment. The game’s `deploy` and `deploy:check` commands forward to the root. Follow the root release gates; game-local scripts do not deploy independently.
 
-The two fixed historical snapshots retain their original npm locks and `npm ci` reconstruction as a compatibility exception. Preserve `scripts/build-archives.mjs` byte for byte: its hash is embedded in archive provenance. Current installer delivery requires the full lane, identical raw current and archive output including provenance, independent review, signed main and exact green CI. This installer change does not deploy the game or establish game readiness.
+The two historical snapshots retain their original npm locks and `npm ci` reconstruction as a compatibility exception. `scripts/build-archives.mjs` is historical and must remain byte-for-byte unchanged because its hash is embedded in archive provenance. The current workspace build does not run it. Preserving old-host `/experiments/` routing requires separate verification.

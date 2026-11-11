@@ -17,7 +17,7 @@
     "format": "biome check --write src tests vite.config.ts",
     "check": "npm run lint && npm run typecheck && npm test && npm run build",
     "deploy": "cd ../.. && pnpm run deploy",
-    "deploy:check": "node scripts/deploy.mjs --dry-run",
+    "deploy:check": "cd ../.. && pnpm run deploy:check",
     "check:lane": "npm run lint && npm run typecheck",
     "knip": "knip"
   },

@@ -2,7 +2,7 @@
 
 A single-player repair strategy game. Investigate familiar electrical and mechanical objects at a home bench. Choose measurements, compare results, repair actual components and check the object under its owner's use. Time, stock and cash limit what the workshop can promise.
 
-The current source pins `@adam0white/human-framework` to exactly **4.11.0**. The source game version is 4.3.0. Check the live [release manifest](https://repair.adamwhite.work/release.json) for the deployed commit and versions. [HF4 adoption](docs/hf4-adoption.md) records the port boundary and verification requirements. Earlier HF3 receipts remain historical. Adam accepts readability and game feel through play.
+The workspace pins `@adam0white/human-framework` to exactly **4.17.0**. The source game version is 4.3.0. Check the live [release manifest](https://repair.adamwhite.work/release.json) for the deployed commit and versions. [HF4 adoption](docs/hf4-adoption.md) records the port boundary and verification requirements. Earlier HF3 receipts remain historical. Adam accepts readability and game feel through play.
 
 ## How to play
 
@@ -51,18 +51,18 @@ The historical October19 game was `3.1.0-alpha.3`, with schema and engine `small
 
 ## Run locally
 
-Use the shared Node 26.12.0 runtime and pnpm 12.14.0.
+From the [games workspace root](../../README.md), use its pinned Node and pnpm versions:
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm run dev
+pnpm --filter ./games/smallworks dev
+pnpm --filter ./games/smallworks check:lane
+pnpm check:lane
 ```
 
-Open the address printed by the development server. `npm run check` runs lint, types, tests and the production build. Run `npm run check:lane` before each commit. In this repository it runs lint and typecheck without the machine lock; hosted CI runs the full check. `npm test` uses the shared machine suite lock.
+Open the printed `/smallworks/` address. The game’s full test command uses the shared suite lock. Root scripts build and deploy the complete games bundle; both game deployment commands forward to the workspace. See the root instructions for release gates.
 
-Current installation uses `pnpm-lock.yaml` and the strict isolated dependency policy in `pnpm-workspace.yaml`. `npm run` remains valid for scripts. When updating an old npm tree, remove its root and workspace `node_modules`, install frozen with pnpm, and delete `dist`, `.types` and `*.tsbuildinfo` before rebuilding.
-
-`npm run build:archives` reconstructs two fixed historical snapshots. Its historical `npm ci` calls are a compatibility exception: their original npm locks and build provenance stay intact. The current installer migration preserves `scripts/build-archives.mjs` byte for byte and compares all raw output, including both archives and their provenance manifests. It does not deploy the game.
+`pnpm --filter ./games/smallworks build:archives` is a historical reconstruction command, not part of the workspace build or deployment. It uses original snapshot npm locks and preserves the archive builder byte for byte. The live historical versions remain on the old host; retaining access after routing changes requires separate verification.
 
 ### Save and replay tools
 
@@ -86,7 +86,7 @@ The title offers a separate local cast-outcome chapter. Sam can correct his copi
 
 ## Open a workshop file without replacing the browser’s workshop
 
-Use **Open a workshop file** at `/file/`. This route does not open the saved workshop, source journal or shared character channel. A complete supported file supplies all five people and its recorded state. This is foreign file play, not ownership of the imported characters. Source archives are unsupported on this route and are refused before replacing the session.
+Use **Open a workshop file** at `/smallworks/file/`. This route does not open the saved workshop, source journal or shared character channel. A complete supported file supplies all five people and its recorded state. This is foreign file play, not ownership of the imported characters. Source archives are unsupported on this route and are refused before replacing the session.
 
 Progress stays in the tab. The menu offers **Download this game file**, **Verify the recorded replay** and **Close file session**. Download before closing or reloading. New/outcome workshops, shared checkpoints and forks are unavailable. The ordinary action-costed clock and recorded pause/resume remain unchanged. Guide choices stay in memory.
 
@@ -96,4 +96,4 @@ Normal recording and actual privacy preferences still apply through the existing
 
 The public tools baseline merged in PR 7 before the HF4 port. Adam's acceptance remains separate. Gameplay editions and scenes remain public. The Workshop menu offers download and opening a saved workshop. Its collapsed Debug beside Lab privacy contains replay verification, seed and startup error detail. The title retains privacy without Debug. The workshop history is public. Cast controls link to the central shelf; local enable/disable, fork and per-person checkpoint controls are removed. Fresh ordinary and cast-outcome chapters automatically enable same-person carryover through the released SDK and existing strict admission. Loaded chapters keep their recorded people. The outcome edition keeps its authored scene terms and carried-person availability guards; no imported obligations are erased.
 
-Open a workshop file through the public **Open a workshop file** link at `/file/`. The ordinary menu link opens that isolated route; it never replaces the native workshop. Pending selections and validation are invalidated on empty selection, pagehide, navigation and unmount. That route remains separate from the saved browser workshop and shared ownership. No query-string gate remains in current source. Workshop time advances through costed actions; there is no hidden speed control to expose. The HF4 port preserves those public routes. [HF4 adoption](docs/hf4-adoption.md) records the current dependencies, save boundary and delivery gates.
+Open a workshop file through the public **Open a workshop file** link at `/smallworks/file/`. The ordinary menu link opens that isolated route; it never replaces the native workshop. Pending selections and validation are invalidated on empty selection, pagehide, navigation and unmount. That route remains separate from the saved browser workshop and shared ownership. No query-string gate remains in current source. Workshop time advances through costed actions; there is no hidden speed control to expose. The HF4 port preserves those public routes. [HF4 adoption](docs/hf4-adoption.md) records the current dependencies, save boundary and delivery gates.
