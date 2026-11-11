@@ -1,0 +1,112 @@
+name: CI
+on:
+  push:
+    branches: [main, codex/workshop-restart]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 12.16.1
+          run_install: false
+          cache: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level=high
+      - run: pnpm run lint
+      - run: pnpm run typecheck
+      - run: pnpm run build
+  tests:
+    name: tests (${{ matrix.part }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - part: generator
+            shard: 0
+          - part: remainder-1
+            shard: 1
+          - part: remainder-2
+            shard: 2
+          - part: remainder-3
+            shard: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 12.16.1
+          run_install: false
+          cache: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Keep every test and its timeout. Give the long generator file its own worker.
+      - name: Run the complete assigned file set
+        env:
+          PART: ${{ matrix.part }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          if [ "$PART" = generator ]; then
+            pnpm run test tests/generator.test.ts --maxWorkers=1
+          else
+            pnpm run test --exclude=tests/generator.test.ts --shard="$SHARD/3" --maxWorkers=1
+          fi
+  archives:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 12.16.1
+          run_install: false
+          cache: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - run: pnpm run build:archives
+  ci:
+    if: ${{ always() }}
+    needs: [quality, tests, archives]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Require quality, every test partition and both historical archives
+        env:
+          QUALITY: ${{ needs.quality.result }}
+          TESTS: ${{ needs.tests.result }}
+          ARCHIVES: ${{ needs.archives.result }}
+        run: |
+          test "$QUALITY" = success
+          test "$TESTS" = success
+          test "$ARCHIVES" = success

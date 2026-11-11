@@ -1,0 +1,16 @@
+.DS_Store
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.worktrees/
+.superpowers/
+.review/
+.wrangler/
+public/release.json
+public/third-party-notices.txt
+
+*.tsbuildinfo
+
+.playwright-mcp/

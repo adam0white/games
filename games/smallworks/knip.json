@@ -1,0 +1,8 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["scripts/*.{mjs,ts}", "tests/**/*.test.ts"],
+  "project": ["src/**/*.{ts,tsx}", "scripts/*.{mjs,ts}", "tests/**/*.ts"],
+  "ignoreExportsUsedInFile": true,
+  "ignoreDependencies": ["@fontsource/*", "wrangler"],
+  "ignoreUnresolved": ["/src/lab.ts", "/src/continuity.ts"]
+}

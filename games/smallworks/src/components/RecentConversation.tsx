@@ -1,0 +1,100 @@
+import { useEffect, useState } from 'react';
+import { accountParts } from '../game/cast-content';
+import { dayTime } from '../game/engine';
+import type { SpokenLine } from '../ui/crises';
+import { lessonWords } from '../ui/workshop-feedback';
+
+type ConversationState = { open: boolean; acknowledgedThrough: number };
+const latestId = (lines: SpokenLine[]) => Math.max(0, ...lines.map((line) => line.id));
+
+/** Session-only UI state. Existing speech starts quiet, including imported runs. */
+export function initialConversation(lines: SpokenLine[]): ConversationState {
+  return { open: false, acknowledgedThrough: latestId(lines) };
+}
+
+export function acknowledgeConversation(
+  previous: ConversationState,
+  lines: SpokenLine[],
+  open: boolean,
+): ConversationState {
+  return {
+    open,
+    acknowledgedThrough: Math.max(previous.acknowledgedThrough, latestId(lines)),
+  };
+}
+
+export function conversationCue(state: ConversationState, lines: SpokenLine[]): string {
+  if (state.open) return '';
+  const unread = lines.filter((line) => line.id > state.acknowledgedThrough);
+  if (!unread.length) return '';
+  return ` · ${unread.length} new · ${[...new Set(unread.map((line) => line.speaker))].join(', ')}`;
+}
+
+export function RecentConversation({
+  lines,
+  canAskSam,
+  onAskSam,
+  overlay = false,
+}: {
+  lines: SpokenLine[];
+  overlay?: boolean;
+  canAskSam: boolean;
+  onAskSam: () => void;
+}) {
+  const [conversation, setConversation] = useState(() => initialConversation(lines));
+  const [visible, setVisible] = useState(true);
+  const newest = lines.reduce<SpokenLine | undefined>(
+    (latest, line) => (!latest || line.id > latest.id ? line : latest),
+    undefined,
+  );
+  useEffect(() => {
+    if (!overlay || newest?.id === undefined) return;
+    setVisible(true);
+    const timeout = window.setTimeout(() => setVisible(false), 8000);
+    return () => window.clearTimeout(timeout);
+  }, [overlay, newest?.id]);
+  if (!lines.length) return null;
+  if (overlay)
+    return visible && newest ? (
+      <p className="speech-line">
+        <strong>{newest.speaker}:</strong>{' '}
+        {lessonWords(newest.speaker, accountParts(newest.text).words)}
+      </p>
+    ) : null;
+  return (
+    <details
+      className="recent-conversation"
+      open={conversation.open}
+      onToggle={(event) => {
+        const open = event.currentTarget.open;
+        setConversation((previous) => acknowledgeConversation(previous, lines, open));
+      }}
+    >
+      <summary>Recent conversation{conversationCue(conversation, lines)}</summary>
+      <section className="todays-words" aria-label="What people said today">
+        {lines.map((line) => (
+          <div key={line.id} className={line.tone === 'warning' ? 'is-warning' : undefined}>
+            <p>
+              <strong>{line.speaker}</strong>{' '}
+              {lessonWords(line.speaker, accountParts(line.text).words)}{' '}
+              <time>{dayTime(line.at)}</time>
+            </p>
+            {accountParts(line.text).limits && (
+              <details>
+                <summary>Narrator limits</summary>
+                <p>{accountParts(line.text).limits}</p>
+              </details>
+            )}
+            {line.speaker === 'Sam' &&
+              line.text.includes('see how you find the fault') &&
+              canAskSam && (
+                <button type="button" onClick={onAskSam}>
+                  Ask Sam to watch
+                </button>
+              )}
+          </div>
+        ))}
+      </section>
+    </details>
+  );
+}
