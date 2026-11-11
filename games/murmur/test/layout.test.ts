@@ -102,7 +102,7 @@ for (const mode of ['linked', 'off', 'privacy'] as const) {
       // The SDK deliberately disables recording on localhost. Model its on state for this form-only test.
       if (mode === 'linked')
         await page.evaluate(async () => {
-          const { lab } = await new Function('return import("/src/ui/lab.ts")')();
+          const { lab } = await new Function('return import("/murmur/src/ui/lab.ts")')();
           Object.defineProperty(lab, 'telemetryOn', { get: () => true });
         });
       await page.locator('#bp-send').click();
@@ -141,7 +141,7 @@ for (const mode of ['linked', 'off', 'privacy'] as const) {
       if (mode === 'linked')
         expect((await expandNotebook(extra.run)).state).toEqual(
           await page.evaluate(async () => {
-            const { cloneState } = await new Function('return import("/src/sim/game.ts")')();
+            const { cloneState } = await new Function('return import("/murmur/src/sim/game.ts")')();
             return cloneState(window.__murmur.state!);
           }),
         );
@@ -206,7 +206,7 @@ it('refreshes Send when the shared recording preference changes after the form o
     await page.locator('#bp-send').click();
     expect(await page.locator('#feedback-send').isDisabled()).toBe(false);
     await page.evaluate(async () => {
-      const { lab } = await new Function('return import("/src/ui/lab.ts")')();
+      const { lab } = await new Function('return import("/murmur/src/ui/lab.ts")')();
       lab.setEventsOff(false);
     });
     expect(await page.locator('#feedback-send').isDisabled()).toBe(false);
@@ -301,7 +301,7 @@ it('opts into sharing through one unchecked checkbox and sends the note', async 
     await page.addInitScript(() => localStorage.setItem('hf-lab-recording-off', '1'));
     await page.goto(`${url}`);
     await page.evaluate(async () => {
-      const { lab } = await new Function('return import("/src/ui/lab.ts")')();
+      const { lab } = await new Function('return import("/murmur/src/ui/lab.ts")')();
       lab.setPersonaRecording('legacy-title-fixture');
       const calls: unknown[] = [];
       Object.assign(window, { scopedFeedbackCalls: calls });

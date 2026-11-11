@@ -122,7 +122,7 @@ it('preserves the saved week and explains a failed production admission', async 
     await page.goto('https://murmur.adamwhite.work/');
     await page.locator('#new').waitFor();
     await page.evaluate(async () => {
-      const { shelf } = await new Function('return import("/src/ui/continuity.ts")')();
+      const { shelf } = await new Function('return import("/murmur/src/ui/continuity.ts")')();
       Object.defineProperty(shelf, 'enabled', { get: () => true });
       shelf.request = async () => {
         throw new Error('Shelf unavailable. The response was lost.');

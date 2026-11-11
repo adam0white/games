@@ -36,7 +36,7 @@ it('renders quiet choices without sending; ordinary Submit keeps recording-off p
     expect(await page.evaluate(() => window.__murmur.state?.version)).toBe('0.10.1');
     await page.locator('#hush').waitFor();
     const raw = await page.evaluate(async () => {
-      const { cloneState } = await new Function('return import("/src/sim/game.ts")')();
+      const { cloneState } = await new Function('return import("/murmur/src/sim/game.ts")')();
       return cloneState(window.__murmur.state!);
     });
     expect(JSON.parse(JSON.stringify(cloneState(await validateRun(raw))))).toEqual(raw);
@@ -106,7 +106,7 @@ for (const compression of ['gzip', 'checkpoint'])
       const remaining = await page.locator('#timer').getAttribute('stroke-dasharray');
       const before = await page.evaluate(async () => {
         window.dispatchEvent(new PageTransitionEvent('pagehide'));
-        const { cloneState } = await new Function('return import("/src/sim/game.ts")')();
+        const { cloneState } = await new Function('return import("/murmur/src/sim/game.ts")')();
         return cloneState(window.__murmur.state!);
       });
       await page.reload();
@@ -117,7 +117,7 @@ for (const compression of ['gzip', 'checkpoint'])
       await page.locator('#cont').click();
       await page.locator('#hush').waitFor();
       const after = await page.evaluate(async () => {
-        const { cloneState } = await new Function('return import("/src/sim/game.ts")')();
+        const { cloneState } = await new Function('return import("/murmur/src/sim/game.ts")')();
         return cloneState(window.__murmur.state!);
       });
       expect(after).toEqual(before);

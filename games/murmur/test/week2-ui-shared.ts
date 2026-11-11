@@ -217,7 +217,7 @@ export function registerWeekTwoViewport(viewport: { width: number; height: numbe
         );
         expect(
           await page.evaluate(async () => {
-            const { cloneState } = await new Function('return import("/src/sim/game.ts")')();
+            const { cloneState } = await new Function('return import("/murmur/src/sim/game.ts")')();
             return cloneState(window.__murmur.state!);
           }),
         ).toEqual({

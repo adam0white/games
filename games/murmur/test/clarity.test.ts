@@ -500,7 +500,7 @@ describe('round 4 early insistence', { timeout: 30_000 }, () => {
       expect(run.answer.chosen).toBe('up');
       expect(await page.locator('.record-yours').innerText()).toContain('You insisted');
       const snapshot = await page.evaluate(async () => {
-        const { cloneState } = await new Function('return import("/src/sim/game.ts")')();
+        const { cloneState } = await new Function('return import("/murmur/src/sim/game.ts")')();
         return cloneState(window.__murmur.state!);
       });
       expect(cloneState(replay(run.seed, run.inputs, run.minute, '0.10.0'))).toEqual(snapshot);
@@ -776,7 +776,7 @@ describe('edition persistence in the browser', { timeout: 30_000 }, () => {
         const state = window.__murmur.state!.version;
         const saved = JSON.parse(localStorage.getItem('murmur-save-v1') ?? '{}');
         if (saved.format === 'murmur-replay-save/1') return { state, save: saved.host.version };
-        const { expandNotebook } = await new Function('return import("/src/ui/notebook.ts")')();
+        const { expandNotebook } = await new Function('return import("/murmur/src/ui/notebook.ts")')();
         return { state, save: (await expandNotebook(saved)).state.version };
       });
       expect(editions.save).toBe(editions.state);
@@ -848,7 +848,7 @@ describe('silent edition exports', { timeout: 120_000 }, () => {
       );
       expect(
         await page.evaluate(async () => {
-          const { cloneState } = await new Function('return import("/src/sim/game.ts")')();
+          const { cloneState } = await new Function('return import("/murmur/src/sim/game.ts")')();
           return cloneState(window.__murmur.state!);
         }),
       ).toEqual({ ...cloneState(state), fileHistory: true, castScope: 'file', castHeadScopes: {} });
