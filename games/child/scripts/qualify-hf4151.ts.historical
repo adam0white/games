@@ -1,0 +1,348 @@
+/** Public-command evidence for the real Child host. No seed search or clock edits.
+ * Runtime permission belongs to root; do not run during an active panel hold.
+ */
+
+import { deepStrictEqual, equal } from "node:assert/strict";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { loadavg } from "node:os";
+import { isAbsolute, join } from "node:path";
+import { readRunHistory } from "@adam0white/human-framework";
+import { preparationChoices } from "../src/choices.ts";
+import * as HF from "../src/hf.ts";
+import {
+  createGame,
+  exportRun,
+  type Game,
+  hash,
+  type Input,
+  type Practice,
+  replay,
+  restore,
+  step,
+} from "../src/model.ts";
+import {
+  type CoverageCheckpoint,
+  type QualificationCoverage,
+  qualificationVerdicts,
+} from "./child-qualification-coverage.ts";
+
+const args = process.argv.slice(2);
+const option = (key: string) => args[args.indexOf(key) + 1];
+const mode = option("--mode");
+const directory = option("--out");
+if (
+  !args.includes("--mode") ||
+  !["control", "budget", "death"].includes(mode ?? "") ||
+  !args.includes("--out") ||
+  !directory ||
+  !isAbsolute(directory)
+)
+  throw Error(
+    "Use --mode control|budget|death --out /absolute/path [--seed KNOWN_SEED --provenance RECORDED_SOURCE]",
+  );
+if (
+  mode === "death" &&
+  (!args.includes("--seed") || !args.includes("--provenance"))
+)
+  throw Error(
+    "Death evidence consumes one previously recorded seed and its provenance; no search is permitted.",
+  );
+const seed = mode === "death" ? Number(option("--seed")) : 21;
+if (!Number.isSafeInteger(seed))
+  throw Error("A safe integer seed is required.");
+mkdirSync(directory, { recursive: true });
+const write = (name: string, value: unknown) =>
+  writeFileSync(join(directory, name), `${JSON.stringify(value)}\n`, {
+    flag: "wx",
+  });
+const log = (value: unknown) => console.log(JSON.stringify(value));
+/** Private evidence only: bounded phase logs add no export, input or clock step. */
+function phase<T>(name: string, operation: () => T): T {
+  const started = performance.now();
+  log({ stage: "phase-start", name });
+  try {
+    return operation();
+  } finally {
+    log({
+      stage: "phase-end",
+      name,
+      milliseconds: performance.now() - started,
+    });
+  }
+}
+const practices: Practice[] = ["count", "look", "refuse", "look", "look"];
+type CheckpointEvidence = CoverageCheckpoint & {
+  sameNext: { status: string; input?: Input; finalHash?: string };
+  [key: string]: unknown;
+};
+const snapshots: CheckpointEvidence[] = [];
+let terminalCheckpoint: CheckpointEvidence | undefined;
+let firstGap: QualificationCoverage["firstGap"] = null;
+let authoritative: Game | undefined;
+let pending:
+  | {
+      restored: Game;
+      hostReplay: Game;
+      evidence: CheckpointEvidence;
+    }
+  | undefined;
+
+/** Preserve archives before proof work, including partial and terminal states.
+ * Partial checkpoints retain actual endpoints and fail milestone coverage.
+ * Terminal reconciliation is separate from the five coverage checkpoints. */
+function checkpoint(g: Game, name: string, coverage = true) {
+  const exported = phase(`${name}:host-export`, () => exportRun(g));
+  write(`${name}-host.json`, exported);
+  write(`${name}-native.json`, exported.native);
+  const parsed = phase(
+    `${name}:json-roundtrip`,
+    () => JSON.parse(JSON.stringify(exported)) as typeof exported,
+  );
+  // Parsed-native restore only: no parsing, logging, host replay or copy queries.
+  const start = performance.now();
+  const native = HF.need(HF.nativeRestore(parsed.native));
+  const restoreMs = performance.now() - start;
+  const current = HF.current(g.run);
+  const evidence: CheckpointEvidence = {
+    milestoneDay: Math.floor(current.at / HF.DAY),
+    chapter: g.chapter,
+    age: g.age,
+    months: g.months,
+    at: current.at,
+    restoreMs,
+    restoreBudgetMs: 2000,
+    restoreWithinBudget:
+      Number.isFinite(restoreMs) && restoreMs >= 0 && restoreMs <= 2000,
+    finalHash: exported.finalHash,
+    nativeHashes: exported.native.hashes,
+    nativeRestoreEqual: false,
+    nativeReplayEqual: false,
+    wholeHostReplayEqual: false,
+    coldHostEqual: false,
+    sameNext: {
+      status:
+        g.phase === "ending"
+          ? "UNAVAILABLE: terminal; no next input"
+          : !coverage
+            ? "UNAVAILABLE: budget horizon; no next scheduled input executed"
+            : "PENDING: next scheduled lesson",
+    },
+    people: Object.fromEntries(
+      Object.entries(current.people).map(([id, p]) => [
+        id,
+        {
+          alive: p.body.alive,
+          now: p.now,
+          birthAt: p.life.bornAt,
+          health: p.body.health,
+          sleepDebtHours: p.body.sleepDebtHours,
+        },
+      ]),
+    ),
+    losses: structuredClone(g.losses),
+    phase: g.phase,
+    lastLesson: g.lastLesson,
+    choices: g.phase === "prepare" ? preparationChoices(g) : [],
+    outcome: structuredClone(g.outcome),
+    yearbook: structuredClone(g.history),
+  };
+  if (coverage) snapshots.push(evidence);
+  else terminalCheckpoint = evidence;
+  deepStrictEqual(HF.nativeExport(native), parsed.native);
+  evidence.nativeRestoreEqual = true;
+  const nativeReplayed = phase(`${name}:native-replay`, () =>
+    HF.need(HF.nativeReplay(parsed.native)),
+  );
+  equal(nativeReplayed.verified, true);
+  deepStrictEqual(HF.nativeExport(nativeReplayed.run), parsed.native);
+  evidence.nativeReplayEqual = true;
+  const hostReplay = phase(`${name}:host-replay`, () => replay(parsed));
+  const restored = phase(`${name}:host-restore`, () => restore(parsed));
+  deepStrictEqual(exportRun(hostReplay), exported);
+  evidence.wholeHostReplayEqual = true;
+  deepStrictEqual(exportRun(restored), exported);
+  evidence.coldHostEqual = true;
+  log({ stage: "checkpoint", name, ...evidence });
+  return { restored, hostReplay, evidence };
+}
+
+/** The caller consumes this exact scheduled input from its existing loop.
+ * Authoritative execution happens once. Copy work never enters its timers. */
+function scheduledStep(g: Game, input: Input, name: string) {
+  phase(name, () => step(g, input));
+  if (!pending) return;
+  const proof = pending;
+  phase(`${name}:cold-same-next`, () => step(proof.restored, input));
+  phase(`${name}:replayed-same-next`, () => step(proof.hostReplay, input));
+  const actual = exportRun(g);
+  deepStrictEqual(exportRun(proof.restored), actual);
+  deepStrictEqual(exportRun(proof.hostReplay), actual);
+  proof.evidence.sameNext = {
+    status: "VERIFIED: authoritative/cold/replayed complete exports",
+    input,
+    finalHash: actual.finalHash,
+  };
+  log({
+    stage: "same-next",
+    milestoneDay: proof.evidence.milestoneDay,
+    ...proof.evidence.sameNext,
+  });
+  pending = undefined;
+}
+try {
+  const g = phase("create-game", () => createGame(seed));
+  authoritative = g;
+  log({
+    stage: "start",
+    mode,
+    seed,
+    node: process.version,
+    load: loadavg(),
+    engine: HF.nativeExport(g.run).engine,
+    horizon:
+      mode === "budget"
+        ? "36 months / 1096 days / six people, plus checkpoint restore/replay"
+        : "180 months / five chapters / ages 3 to 18, one seed only",
+    originalStepBudgetMs: 2000,
+    originalRestoreBudgetMs: 2000,
+  });
+  pending = checkpoint(g, "milestone-0");
+  for (let chapter = 0; chapter < (mode === "budget" ? 1 : 5); chapter++) {
+    const practice = practices[chapter] ?? "look";
+    for (let i = 0; i < 3; i++) {
+      const input: Input =
+        HF.isAlive(g.run, "elif") &&
+        HF.isAlive(
+          g.run,
+          { count: "Maryam", look: "Yusuf", wait: "Danyal", refuse: "Zehra" }[
+            practice
+          ],
+        )
+          ? { type: "teach", practice }
+          : { type: "work" };
+      scheduledStep(g, input, `chapter-${chapter}:lesson-${i}`);
+    }
+    phase(`chapter-${chapter}:crisis`, () => step(g, { type: "crisis" }));
+    phase(`chapter-${chapter}:reveal`, () => step(g, { type: "reveal" }));
+    // Native stepping is diagnostic. Preserve the entire earlier S1 query term.
+    // Only native pre-gap time is drained; conditional time is NOT reset here.
+    HF.takeStepMilliseconds(g.run);
+    const before = HF.current(g.run).at;
+    const beforeMonths = g.months;
+    const arrange: Input = { type: "arrange", practice };
+    const start = performance.now();
+    step(g, arrange);
+    const hostGapMs = performance.now() - start;
+    const nativeStepMs = HF.takeStepMilliseconds(g.run);
+    const conditionalQueryMs = HF.takeConditionalMilliseconds(g.run);
+    const reachedAt = HF.current(g.run).at;
+    const gap = {
+      months: g.months - beforeMonths,
+      reachedAt,
+      nativeStepMs,
+      hostGapMs,
+      conditionalQueryMs,
+      beforeAt: before,
+      beforeMonths,
+      afterMonths: g.months,
+      days: (reachedAt - before) / HF.DAY,
+      civilDay: Math.floor(reachedAt / HF.DAY),
+    };
+    // Query precedes arrange; add its entire duration conservatively ONCE.
+    // No query/restore/replay work on separate proof copies is charged to g.
+    if (chapter === 0) firstGap = gap;
+    log({ stage: "arrange", chapter, ...gap });
+    if (chapter < 4) {
+      const proof = checkpoint(
+        g,
+        `reached-${Math.floor(reachedAt / HF.DAY)}-months-${g.months}`,
+      );
+      if (g.phase !== "ending" && mode !== "budget") pending = proof;
+      else if (g.phase !== "ending")
+        proof.evidence.sameNext = {
+          status:
+            "UNAVAILABLE: budget horizon; no next scheduled input executed",
+        };
+    }
+    if (g.phase === "ending") break;
+  }
+  // Final publication is checked separately; never duplicate milestone 5479.
+  checkpoint(g, "terminal-reconciliation", false);
+  const archived = HF.nativeExport(g.run);
+  const acceptedInputs = readRunHistory(archived).flatMap((tx) => tx.inputs);
+  const deaths = g.losses.map((loss) => ({
+    ...loss,
+    deathEvidence: loss.evidence,
+    externallyAuthoredDeath: acceptedInputs.some(
+      (input) =>
+        input.kind === "lifecycle.received" &&
+        input.payload.type === "death" &&
+        input.payload.person.kind === "actor" &&
+        input.payload.person.id === loss.person,
+    ),
+    causeStatus:
+      "UNESTABLISHED: retained death events alone do not establish natural mortality.",
+    seed,
+    inputs: g.inputs,
+    engine: HF.nativeExport(g.run).engine,
+    elifAgeAtDeath: (loss.at - g.child.life.bornAt) / HF.YEAR,
+    provenance: mode === "death" ? option("--provenance") : `seed21-${mode}`,
+    checkpoints: snapshots,
+  }));
+  const coverage: QualificationCoverage = {
+    firstGap,
+    checkpoints: snapshots,
+    months: g.months,
+    finalAt: HF.current(g.run).at,
+    completedChapters: g.history.length,
+  };
+  const verdicts = qualificationVerdicts(coverage);
+  const result = {
+    status: verdicts.fullRunComplete ? "MEASURED" : "INCOMPLETE",
+    mode,
+    seed,
+    firstGap,
+    stepBudgetMs: 2000,
+    ...verdicts,
+    coverage,
+    restoreBudgetMs: 2000,
+    terminalCheckpoint,
+    finalHash: hash(g),
+    phase: g.phase,
+    age: g.age,
+    months: g.months,
+    observedDeathRuns: deaths,
+    maryamDeathBeforeEighteen: deaths.some(
+      (d) => d.person === "Maryam" && d.elifAgeAtDeath < 18,
+    ),
+    snapshots,
+  };
+  write("result.json", result);
+  log(result);
+} catch (error) {
+  // Keep the original failure even if export reconciliation itself fails.
+  let archiveFailure: string | undefined;
+  if (authoritative) {
+    try {
+      write("failure-native.json", HF.nativeExport(authoritative.run));
+      write("failure-host.json", exportRun(authoritative));
+    } catch (archiveError) {
+      archiveFailure =
+        archiveError instanceof Error
+          ? archiveError.message
+          : String(archiveError);
+    }
+  }
+  write("failure.json", {
+    status: "FAILED",
+    coverageStatus: "INCOMPLETE",
+    archiveFailure,
+    terminalCheckpoint,
+    mode,
+    seed,
+    message: error instanceof Error ? error.message : String(error),
+    snapshots,
+    firstGap,
+  });
+  throw error;
+}

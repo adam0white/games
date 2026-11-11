@@ -1,0 +1,28 @@
+{
+  "producerCommit": "5368920550dc2c9ef9825d9b4bfd4919edc507c9",
+  "sourceSha256": {
+    "src/model.ts": "d78f6187091feeb722703ac20d24787f6713803fa251acffb0437288e52a3143",
+    "package.json": "805e6cc0480198d54dc87f41fd092e790803960cd254ff80b653a4ff29a7d99d",
+    "pnpm-lock.yaml": "bbef9f2b52f818d31a594b012fabe3d30a1c03364f6414953f200c8f6f76525e"
+  },
+  "engine": "3.2.0",
+  "registryIntegrity": "sha512-I/smuEJWiQPYd9rUEE4uhMNd48rEDX4VHDJxlixwQ/kAQJITNO3SCvKOJwlvsJXcqUjDstqUFeZnDifQFAWW4A==",
+  "verifiedPublishedFiles": 201,
+  "tarSha256": "f5fc2d4829e03e43bbcff7d3df2d3cfbf619cf2758a54d12f44ae3bb7b7e8370",
+  "scope": "Historical source and actual installed published dependency identity; not an old player artifact",
+  "createdAt": "2026-11-02T14:08:10.645Z",
+  "label": "Historical-version export reproduced now from exact producer source; NOT a real-player save or an originally retained artifact",
+  "node": "v26.12.0",
+  "inputs": [
+    {
+      "type": "teach",
+      "practice": "look"
+    }
+  ],
+  "fixtureBytes": 11585,
+  "fixtureSha256": "89a7cc892471cf0a96231a31a02f011aa2c72cdda509fa8ae434029acd241b3c",
+  "sameVersionReplayByteExact": true,
+  "archiveEdition": 3,
+  "archiveEngine": "3.2.0",
+  "producerSource": "https://github.com/adam0white/child/tree/5368920550dc2c9ef9825d9b4bfd4919edc507c9"
+}
