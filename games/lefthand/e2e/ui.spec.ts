@@ -36,6 +36,7 @@ test("controls, clock, pause menu and desktop evening fit", async ({
   });
   await page.locator("#route-door").click();
   await page.clock.runFor(100);
+  await expect(page.locator("#night")).toBeVisible();
   await expect(page.locator("#lantern")).toHaveText("Lantern lit · hide (L)");
   const arrowsBefore = await page.locator(".directions").boundingBox();
   expect(arrowsBefore).not.toBeNull();
