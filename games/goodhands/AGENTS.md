@@ -1,3 +1,5 @@
+> Current workflow: follow the repository-root AGENTS.md and README.md. Use the root workspace lockfile and `node scripts/prepare-game.mjs <slug>` / `node scripts/check-game.mjs <slug>` from the root. Imported standalone setup, sibling-checkout, Homebrew and Mac scratch instructions below are historical; they are not prerequisites for the current build or CI. Game rules and evidence requirements below still apply.
+
 # Monorepo port policy
 
 This copy lives at games/goodhands. Root AGENTS.md and docs/migration.md govern the port. Use one registry HF4.17.0 engine. Historical source/tests are evidence under archive/historical and are excluded from production, TypeScript, lint and Vitest. Do not restore historical engine/client aliases. The older standalone directions below are historical where they require those aliases or old replay execution.

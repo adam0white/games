@@ -1,3 +1,5 @@
+> Current workflow: follow the repository-root AGENTS.md and README.md. Use the root workspace lockfile and `node scripts/prepare-game.mjs <slug>` / `node scripts/check-game.mjs <slug>` from the root. Imported standalone setup, sibling-checkout, Homebrew and Mac scratch instructions below are historical; they are not prerequisites for the current build or CI. Game rules and evidence requirements below still apply.
+
 # Child
 
 Current goal (owner, 2026-11-05): deliver the current published HF4 port, simplifying blocked continuous simulation and sacrificing old saves. The current episode edition keeps all five crises and explicit year skips. Read the current README before the historical design.

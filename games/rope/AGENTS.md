@@ -1,3 +1,5 @@
+> Current workflow: follow the repository-root AGENTS.md and README.md. Use the root workspace lockfile and `node scripts/prepare-game.mjs <slug>` / `node scripts/check-game.mjs <slug>` from the root. Imported standalone setup, sibling-checkout, Homebrew and Mac scratch instructions below are historical; they are not prerequisites for the current build or CI. Game rules and evidence requirements below still apply.
+
 # The Rope: project workflow
 
 You lead five Human Framework (HF) people up a mountain and back. Every one of them can say no.

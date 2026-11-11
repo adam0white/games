@@ -1,3 +1,5 @@
+> Current workflow: follow the repository-root AGENTS.md and README.md. Use the root workspace lockfile and `node scripts/prepare-game.mjs <slug>` / `node scripts/check-game.mjs <slug>` from the root. Imported standalone setup, sibling-checkout, Homebrew and Mac scratch instructions below are historical; they are not prerequisites for the current build or CI. Game rules and evidence requirements below still apply.
+
 # smoke: project instructions
 
 Read README.md and docs/design.md. HF owns actor state and choices; the host owns the world and consequences. Keep seeded behavior and complete current-export replay. Refuse unsupported saves with a start-fresh explanation.

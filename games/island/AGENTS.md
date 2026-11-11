@@ -1,3 +1,5 @@
+> Current workflow: follow the repository-root AGENTS.md and README.md. Use the root workspace lockfile and `node scripts/prepare-game.mjs <slug>` / `node scripts/check-game.mjs <slug>` from the root. Imported standalone setup, sibling-checkout, Homebrew and Mac scratch instructions below are historical; they are not prerequisites for the current build or CI. Game rules and evidence requirements below still apply.
+
 ## Monorepo migration, 2026-11-11
 
 This copy uses the games workspace and the exact npm HF 4.17.0 package. The retired HF 2.9 arms are archived as historical source and are explicitly refused by the current CLI. Their recordings are unchanged. The viewer is a non-recording static site at `/island/`; keep the central `/lab/island/` routes and data untouched. The monorepo `AGENTS.md` governs checks, commits and deployment. Historical instructions below describe the original repository and do not restore its separate engine alias.

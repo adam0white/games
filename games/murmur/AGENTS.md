@@ -1,3 +1,5 @@
+> Current workflow: follow the repository-root AGENTS.md and README.md. Use the root workspace lockfile and `node scripts/prepare-game.mjs <slug>` / `node scripts/check-game.mjs <slug>` from the root. Imported standalone setup, sibling-checkout, Homebrew and Mac scratch instructions below are historical; they are not prerequisites for the current build or CI. Game rules and evidence requirements below still apply.
+
 # Murmur delivery
 
 Current upkeep, 2026-11-05: HF 4.17 source and replay shipped in PR19; live release 7ab344bf is clean. Adam’s fiction acceptance remains open; recheck on 2026-11-12 because his play and judgment have not been recorded. Cross-game transfer is outside this upkeep scope. Earlier dated delivery directions below remain historical.

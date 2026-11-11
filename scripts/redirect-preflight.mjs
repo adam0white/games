@@ -48,6 +48,9 @@ export function repositoryEvidence(cwd = process.cwd()) {
 export async function verifyRedirects({ registry, routes, head, expected, evidence = repositoryEvidence(), fetch: fetchRelease = globalThis.fetch }) {
   validateRegistry(registry);
   const enabled = registry.games.filter(game => game.redirectEnabled === true);
+  for (const game of enabled) {
+    if (new URL(game.legacyOrigin).hostname === 'repair.adamwhite.work' && game.redirectMode !== 'zone') throw new Error('Small Works requires a zone redirect to preserve its experiments archive');
+  }
   const legacyPatterns = enabled.map(game => `${new URL(game.legacyOrigin).hostname}/${game.redirectMode === 'zone' ? 'sw.js' : '*'}`);
   const matchesRoute = route => {
     if (!route || typeof route !== 'object') return false;

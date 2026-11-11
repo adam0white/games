@@ -187,3 +187,15 @@ test('historical optional runtime metadata round-trips from the exact commit and
   assert.throws(() => evidence.release(wrongEngine, f.registry, f.game), /engine/i);
   assert.equal(evidence.release(godotCommit, f.registry, f.game).engine, f.registry.hfVersion);
 });
+
+
+test('Small Works archive protection rejects initial and already-active catch-all aliases', async t => {
+  const f = fixture(t);
+  f.game.legacyOrigin = 'https://repair.adamwhite.work';
+  const catchAll = [routes[0], { pattern: 'repair.adamwhite.work/*', zone_name: 'adamwhite.work' }];
+  await assert.rejects(verifyRedirects({ ...f.args(), routes: catchAll }), /experiments archive/);
+  f.game.redirectMode = 'zone';
+  const active = f.commit(); f.setHead(active); f.live.commit = active;
+  delete f.game.redirectMode;
+  await assert.rejects(verifyRedirects({ ...f.args(), routes: catchAll }), /experiments archive/);
+});
