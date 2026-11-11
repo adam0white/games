@@ -83,6 +83,16 @@
       ],
       "legacyOrigin": "https://murmur.adamwhite.work",
       "redirectEnabled": false
+    },
+    {
+      "slug": "stairwell",
+      "source": {
+        "repository": "https://github.com/adam0white/stairwell",
+        "commit": "8ff83b59bb3149b19f0ce9a061dd0ce992937043"
+      },
+      "saveSchema": "stairwell@14/15/16",
+      "legacyOrigin": "https://stairwell.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }
