@@ -133,7 +133,7 @@ for (const outcome of ["win", "loss"] as const) {
       });
     });
     await page.clock.install();
-    await page.goto("/");
+    await page.goto("/lefthand/");
     await expect
       .poll(
         () => page.evaluate(() => window.Lefthand?.metrics().rendererReady),
@@ -228,7 +228,7 @@ for (const outcome of ["win", "loss"] as const) {
 test("ordinary menu exposes export beside collapsed diagnostics", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/lefthand/");
   await page.locator("#menu-open").click();
   await expect(page.locator("#download")).toBeVisible();
   await expect(page.locator("#new")).toBeVisible();

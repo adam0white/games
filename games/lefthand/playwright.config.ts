@@ -4,14 +4,15 @@ export default defineConfig({
   timeout: 120000,
   workers: 1,
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:4173",
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:5279",
     screenshot: "only-on-failure",
   },
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
-        command: "pnpm exec vite preview --host 127.0.0.1 --port 4173",
-        url: "http://127.0.0.1:4173",
+        command:
+          "pnpm exec vite preview --host 127.0.0.1 --port 5279 --strictPort",
+        url: "http://127.0.0.1:5279",
         reuseExistingServer: false,
       },
   projects: [

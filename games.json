@@ -127,6 +127,20 @@
       "saveSchema": "commonstead-current/2-schema14",
       "legacyOrigin": "https://commonstead.adamwhite.work",
       "redirectEnabled": false
+    },
+    {
+      "slug": "lefthand",
+      "source": {
+        "repository": "https://github.com/adam0white/lefthand",
+        "commit": "6b4e2c28edaa58579e4c4ff1544ee1c74f9c0db3"
+      },
+      "saveSchema": "left-hand-run@5",
+      "ciBrowsers": [
+        "chromium",
+        "webkit"
+      ],
+      "legacyOrigin": "https://lefthand.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }

@@ -9,7 +9,7 @@ Godot version: 4.7.2-stable (official)
 Godot commit: ed1daf0bf001b61586d9930840f2f1394092c079
 
 ==============================================================================
-Human Framework — @adam0white/human-framework 3.2.0
+Human Framework — @adam0white/human-framework 4.17.0
 
 MIT License
 
@@ -34,7 +34,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ==============================================================================
-lab-client — @adam0white/lab-client 0.4.15
+lab-client — @adam0white/lab-client 0.5.17
 
 MIT License
 
@@ -2704,3 +2704,5 @@ NVIDIA SOFTWARE, HOWEVER CAUSED AND WHETHER UNDER THEORY OF CONTRACT,
 TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY OR OTHERWISE, EVEN IF
 NVIDIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+
+Lab kit 0.5.34 is MIT licensed under the Human Framework repository license above.

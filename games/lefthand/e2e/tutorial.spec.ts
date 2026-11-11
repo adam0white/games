@@ -49,7 +49,7 @@ test("first delivery guide waits for real choices and can replay", async ({
       }),
     );
   }
-  await page.goto("/");
+  await page.goto("/lefthand/");
   const guide = page.locator("#guide");
   const skip = page.locator("#guide-skip");
   await expect(page.locator("#loading")).toBeHidden();
@@ -102,7 +102,7 @@ test("loading makes unavailable controls clear until the village is ready", asyn
       body: "window.Engine = class { async startGame() { window.finishLoading = () => window.HFBridge.ready(); } };",
     }),
   );
-  await page.goto("/");
+  await page.goto("/lefthand/");
   await page.locator("#route-door").click();
   await expect(page.locator("#lantern")).toBeDisabled();
   await expect(page.locator('[data-move="0,-1"]')).toBeDisabled();
@@ -136,7 +136,7 @@ test("the game starts and guide controls work when storage is blocked", async ({
       body: "window.Engine = class { async startGame() { window.HFBridge.ready(); } };",
     }),
   );
-  await page.goto("/");
+  await page.goto("/lefthand/");
   await expect(page.locator("#guide")).toBeVisible();
   await page.locator("#guide-skip").click();
   await expect(page.locator("#guide")).toBeHidden();

@@ -20,7 +20,7 @@ test("controls, clock, pause menu and desktop evening fit", async ({
     }),
   );
   await page.clock.install();
-  await page.goto("/");
+  await page.goto("/lefthand/");
   await expect(page.locator("#loading")).toBeHidden();
   if ((page.viewportSize()?.width ?? 0) > 480) {
     const bottom = await page
@@ -124,7 +124,7 @@ test("Play again describes a different seeded opening", async ({ page }) => {
     }),
   );
   await page.clock.install();
-  await page.goto("/");
+  await page.goto("/lefthand/");
   await expect(page.locator("#loading")).toBeHidden();
   await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
   const before = await page.evaluate(() => window.Lefthand.snapshot().seed);

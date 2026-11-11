@@ -7,3 +7,5 @@ Current goal (owner, 2026-11-05): adopt current published HF 4.x, update depende
 Use managed isolated worktrees. Run check:lane before commits. Use Node 26.12.0 and pnpm 12.16.1. Install with pnpm install --frozen-lockfile. Commit the lockfile after dependency changes. Keep no hoisting, strict peers, explicit native build permissions and a 1440-minute release-age delay; only @adam0white/* bypasses that delay. Public files identify a human playtester only with those words.
 
 Stack: TypeScript 7.0.2, Vite 8.3.5, Vitest 5.1.0, Biome 2.6.5, Wrangler 4.157.0, HF 4.17.0.
+
+This game is part of the games monorepo. Follow root AGENTS.md and workspace deployment and CI workflow.

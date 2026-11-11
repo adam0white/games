@@ -30,9 +30,9 @@ for (const f of fs.readdirSync("dist"))
 fs.writeFileSync(
   "dist/engine.json",
   JSON.stringify({
-    executable: `engine/${name}`,
-    script: `/engine/${name}.js`,
-    pack: `engine/${name}.pck`,
+    executable: `/lefthand/engine/${name}`,
+    script: `/lefthand/engine/${name}.js`,
+    pack: `/lefthand/engine/${name}.pck`,
   }),
 );
 const commit = execFileSync("git", ["rev-parse", "HEAD"], {

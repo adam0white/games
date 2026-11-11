@@ -57,7 +57,7 @@ test("Tariq arrives through the ordinary browser shelf and resumes locally", asy
           event.ports[0].postMessage(reply);
         });</script>`,
       });
-    } else if (url.hostname === "lefthand.adamwhite.work") {
+    } else if (url.hostname === "play.adamwhite.work") {
       const response = await route.fetch({
         url: `${baseURL}${url.pathname}${url.search}`,
       });
@@ -66,7 +66,7 @@ test("Tariq arrives through the ordinary browser shelf and resumes locally", asy
     else await route.continue();
   });
   // The SDK intentionally permits continuity only at registered game origins.
-  await page.goto("https://lefthand.adamwhite.work/");
+  await page.goto("https://play.adamwhite.work/lefthand/");
   await page.waitForFunction(
     () => window.Lefthand?.snapshot().carryover.inputs.length === 1,
   );
