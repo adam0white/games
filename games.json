@@ -58,7 +58,8 @@
       },
       "saveSchema": "murmur-replay-save/1",
       "ciBrowsers": [
-        "chromium"
+        "chromium",
+        "webkit"
       ],
       "legacyOrigin": "https://murmur.adamwhite.work",
       "redirectEnabled": false
