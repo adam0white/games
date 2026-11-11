@@ -49,6 +49,19 @@
       ],
       "legacyOrigin": "https://glance.adamwhite.work",
       "redirectEnabled": false
+    },
+    {
+      "slug": "neighbours",
+      "source": {
+        "repository": "https://github.com/adam0white/concordia",
+        "commit": "ec3c015fda5afb0854c07f61d901107dad644ddb"
+      },
+      "saveSchema": "neighbours/concordia@2",
+      "ciBrowsers": [
+        "chromium"
+      ],
+      "legacyOrigin": "https://neighbours.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }

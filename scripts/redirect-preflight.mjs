@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { isDeepStrictEqual } from 'node:util';
-import { validateRegistry, manifest } from './lib.mjs';
+import { validateRegistry, manifest, packageReleaseMetadata } from './lib.mjs';
 
 const PLAY = 'https://play.adamwhite.work';
 const SHA = /^[0-9a-f]{40}$/;
@@ -34,7 +34,8 @@ export function repositoryEvidence(cwd = process.cwd()) {
         lab = JSON.parse(execFileSync('tar', ['-xOzf', '-', 'package/package.json'], { input: bytes, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }));
       }
       if (lab.name !== '@adam0white/lab-client' || !/^\d+\.\d+\.\d+$/.test(lab.version)) throw new Error('Invalid historical lab artifact');
-      return manifest(registry, game, commit, false, lab.version, pkg.version);
+      const metadata = packageReleaseMetadata(pkg, file => read(commit, `${path}/${file}`));
+      return manifest(registry, game, commit, false, lab.version, pkg.version, metadata);
     },
   };
 }

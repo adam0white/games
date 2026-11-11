@@ -124,6 +124,27 @@ test('historical release reads exact public SDK pins and rejects ambiguous URLs'
     const sha = f.commit();
     return repositoryEvidence(f.cwd).release(sha, f.registry, f.game);
   };
-  assert.equal(release(url).labVersion, '0.5.16');
+  const historical = release(url);
+  assert.equal(historical.labVersion, '0.5.16');
+  assert.equal('hf' in historical, false, 'existing manifests retain their exact shape');
   for (const invalid of [url.replace('github.com', 'example.com'), url.replace('/lab-client-v0.5.16/', '/lab-client-v0.5.15/'), `${url}?download=1`, url.replace('https:', 'http:')]) assert.throws(() => release(invalid), /artifact/i);
+});
+
+test('historical optional runtime metadata round-trips from the exact commit and rejects extra identity fields', t => {
+  const f = fixture(t);
+  const path = join(f.cwd, 'games/rope');
+  const url = 'https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.16/adam0white-lab-client-0.5.16.tgz';
+  const metadata = { app: 'town@1', concordiaUpstream: 'b'.repeat(40), pythonBundle: 'c'.repeat(64), runtime: 'Browser-local Python', pyodide: '314.0.7' };
+  writeFileSync(join(path, 'package.json'), JSON.stringify({ version: '1.0.0', releaseMetadata: 'release-metadata.json', dependencies: { '@adam0white/human-framework': '4.17.0', '@adam0white/lab-client': url } }));
+  writeFileSync(join(path, 'release-metadata.json'), JSON.stringify(metadata));
+  const first = f.commit();
+  const evidence = repositoryEvidence(f.cwd);
+  assert.deepEqual(evidence.release(first, f.registry, f.game), manifest(f.registry, f.game, first, false, '0.5.16', '1.0.0', metadata));
+  writeFileSync(join(path, 'release-metadata.json'), JSON.stringify({ ...metadata, pythonBundle: 'd'.repeat(64) }));
+  f.commit();
+  assert.equal(evidence.release(first, f.registry, f.game).pythonBundle, metadata.pythonBundle);
+  writeFileSync(join(path, 'release-metadata.json'), JSON.stringify({ ...metadata, commit: 'e'.repeat(40) }));
+  const tampered = f.commit();
+  assert.throws(() => evidence.release(tampered, f.registry, f.game), /invalid release metadata/i);
+  assert.throws(() => manifest(f.registry, f.game, first, false, '0.5.16', '1.0.0', { ...metadata, hf: '2.0.0' }), /invalid release metadata/i);
 });
