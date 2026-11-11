@@ -12,7 +12,7 @@ function qualify(lane, check) {
     mkdirSync(join(dir, 'scripts'));
     mkdirSync(join(dir, 'games/fixture'), { recursive: true });
     writeFileSync(join(dir, 'package.json'), '{"type":"module"}');
-    for (const file of ['check-game.mjs', 'qualification.mjs']) {
+    for (const file of ['check-game.mjs', 'qualification.mjs', 'history.mjs']) {
       if (existsSync(new URL(file, import.meta.url))) copyFileSync(new URL(file, import.meta.url), join(dir, 'scripts', file));
     }
     writeFileSync(join(dir, 'scripts/game.mjs'), 'export function validateGame() {}');

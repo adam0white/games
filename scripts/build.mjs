@@ -1,3 +1,4 @@
+import { assertSourceHistory } from './history.mjs';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { registry, run, head, clean } from './context.mjs';
 import { manifest, packageReleaseMetadata, scopedHeaders, scopedRedirects } from './lib.mjs';
@@ -16,7 +17,7 @@ function rejectRootWorker(dir) {
   }
 }
 for (const game of registry.games) {
-  run('git', ['merge-base', '--is-ancestor', game.source.commit, 'HEAD']);
+  assertSourceHistory(game, run);
   const path = `games/${game.slug}`;
   const labVersion = validateGame(game, registry);
   rmSync(`${path}/dist`, { recursive: true, force: true });
