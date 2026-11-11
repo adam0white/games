@@ -210,6 +210,17 @@
       ],
       "legacyOrigin": "https://smoke.adamwhite.work",
       "redirectEnabled": false
+    },
+    {
+      "slug": "island",
+      "kind": "recorded-viewer",
+      "source": {
+        "repository": "https://github.com/adam0white/island",
+        "commit": "736c4b4a74adbac62633bd69ffd0e093e63df69e"
+      },
+      "saveSchema": "island-replay@1",
+      "legacyOrigin": "https://island.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }
