@@ -1,6 +1,6 @@
 /** Explicit authoring adapted from HF 4's minimal example. No public authoring helper is exported.
  * Openness/stimulation 0.9 express Island's curious persona; other values are example engineering priors. */
-import type { PersonAuthoring } from 'hf4';
+import type { PersonAuthoring } from '@adam0white/human-framework';
 export const MINUTE = 60_000;
 export const DAY = 86_400_000;
 export const START = 12 * 60 * MINUTE;

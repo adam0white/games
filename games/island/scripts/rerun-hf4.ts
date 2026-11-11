@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { replay } from 'hf4';
+import { replay } from '@adam0white/human-framework';
 import { exactPermutation, holmAdjust, median } from '../src/compare.ts';
 import { measureRecording } from '../src/measures.ts';
 import { Hf4Mind } from '../src/minds/hf4.ts';
@@ -68,7 +68,7 @@ export async function batch(directory: string) {
     encoding: 'utf8',
   }).trim();
   if (latest !== '4.17.0')
-    throw new Error(`Registry latest is ${latest}; update the exact alias before starting this batch.`);
+    throw new Error(`Registry latest is ${latest}; update the exact npm pin before starting this batch.`);
   const startedAt = new Date().toISOString();
   const rows = [],
     controls: Recording[] = [],

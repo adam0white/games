@@ -3,3 +3,5 @@ scratch
 .env
 
 /viewer/release.json
+
+/dist

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { exportRun, readRunHistory, replay, restoreRun } from 'hf4';
+import { exportRun, readRunHistory, replay, restoreRun } from '@adam0white/human-framework';
 import { describe, expect, it } from 'vitest';
 import { physicalReplay, statisticsFor } from '../scripts/rerun-hf4.ts';
 import { Hf4Mind } from '../src/minds/hf4.ts';

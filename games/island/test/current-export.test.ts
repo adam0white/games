@@ -3,12 +3,32 @@ import { exportIsland, verifyIsland } from '../src/export.ts';
 import { Hf4Mind } from '../src/minds/hf4.ts';
 import { runIsland } from '../src/run.ts';
 import { PERSONA } from '../src/types.ts';
+import '../viewer/viewer.js';
 
 describe('current complete Island export', () => {
   it('replays HF and every host action across a reset and rejects changed evidence', async () => {
     const mind = new Hf4Mind({ seed: 7, persona: PERSONA });
     const recording = await runIsland(mind, 7, { freeEpisodes: 1, stepsPerEpisode: 3, taskSteps: 3 });
     const file = JSON.parse(JSON.stringify(exportIsland(recording, mind.archive())));
+    const viewer = Reflect.get(globalThis, 'IslandReplay') as {
+      validateRecording: (value: unknown) => unknown;
+    };
+    expect(viewer.validateRecording(recording)).toEqual(recording);
+    const task = recording.frames
+      .flatMap((frame) => frame.inner?.goals ?? [])
+      .find((goal) => goal.id === 'island-task');
+    expect(task).toBeDefined();
+    expect(Number.isInteger(task?.minute)).toBe(false);
+    for (const invalidMinute of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const invalid = structuredClone(recording);
+      const invalidTask = invalid.frames
+        .flatMap((frame) => frame.inner?.goals ?? [])
+        .find((goal) => goal.id === 'island-task');
+      if (!invalidTask) throw new Error('Expected actual task goal');
+      invalidTask.minute = invalidMinute;
+      expect(() => viewer.validateRecording(invalid)).toThrow();
+    }
+
     expect((await verifyIsland(file)).frames).toHaveLength(6);
     const changed = structuredClone(file);
     changed.recording.frames[0].events.push('invented outcome');

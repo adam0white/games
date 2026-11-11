@@ -1,3 +1,7 @@
+## Monorepo migration, 2026-11-11
+
+This copy uses the games workspace and the exact npm HF 4.17.0 package. The retired HF 2.9 arms are archived as historical source and are explicitly refused by the current CLI. Their recordings are unchanged. The viewer is a non-recording static site at `/island/`; keep the central `/lab/island/` routes and data untouched. The monorepo `AGENTS.md` governs checks, commits and deployment. Historical instructions below describe the original repository and do not restore its separate engine alias.
+
 # Island
 
 Read [README.md](README.md) and [HF2.md](HF2.md). This main branch is a CLI lab experiment, not a browser game. The default arm uses exact published HF 4.17.0. Retained historical arms use HF 2.9.0 through the explicitly historical hfLegacy alias. Historical recordings are not current HF runs. Preserve simulation semantics, adapters and recorded evidence. Historical branches do not replace origin/main.

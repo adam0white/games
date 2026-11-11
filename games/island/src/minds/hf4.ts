@@ -12,7 +12,7 @@ import {
   type Result,
   type RunSpec,
   step,
-} from 'hf4';
+} from '@adam0white/human-framework';
 import type { Cell, Inner, Mind, MindFactory, MindOptions, Observation } from '../types.ts';
 import { authoredPerson, DAY, MINUTE, START } from './hf4-authoring.ts';
 

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import random from '../src/minds/random.ts';
+import scripted from '../src/minds/scripted.ts';
 import { runIsland } from '../src/run.ts';
 import { type Mind, type Observation, PERSONA } from '../src/types.ts';
 import { apply, createWorld } from '../src/world.ts';
@@ -17,6 +18,7 @@ describe('runner', () => {
     const a = await runIsland(random({ seed: 23, persona: PERSONA }), 23);
     const b = await runIsland(random({ seed: 23, persona: PERSONA }), 23);
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    expect(a.hf).toBe('none');
     expect(a.frames).toHaveLength(240);
     expect(a.frames.map((f) => f.e)).toEqual([
       ...Array(60).fill(0),
@@ -28,6 +30,14 @@ describe('runner', () => {
     expect(a.notes).toEqual(['', '', '', '']);
     expect(a.cost).toEqual({ calls: 0, inputTokens: 0, outputTokens: 0, usd: 0 });
     expect(Object.keys(a.measures).length).toBeGreaterThan(0);
+  });
+
+  it('labels new scripted controls as using no HF engine', async () => {
+    const recording = await runIsland(scripted({ seed: 23, persona: PERSONA }), 23, {
+      freeEpisodes: 0,
+      taskSteps: 1,
+    });
+    expect(recording.hf).toBe('none');
   });
 
   it('passes prior events and remaining steps and records post-action frames', async () => {
@@ -114,21 +124,32 @@ describe('runner', () => {
     }
   });
 
-  it('loads all four HF2 arms through the CLI', async () => {
+  it('refuses historical engine arms without writing a recording', async () => {
     const directory = await scratchDirectory();
     try {
-      for (const arm of ['hf2', 'hf2-no-boredom', 'hf2-no-memory', 'hf2-no-goals']) {
+      for (const arm of [
+        'hf',
+        'hf-no-boredom',
+        'hf2',
+        'hf2-no-boredom',
+        'hf2-no-memory',
+        'hf2-no-goals',
+        'hf3',
+      ]) {
         const out = join(directory, `${arm}-1.json`);
-        execFileSync(process.execPath, ['src/run.ts', `--mind=${arm}`, '--seed=1', `--out=${out}`]);
-        const run = JSON.parse(await readFile(out, 'utf8'));
-        expect(run.mind).toBe(arm);
-        expect(run.frames).toHaveLength(240);
-        expect(run.cost.calls).toBe(0);
+        const result = spawnSync(
+          process.execPath,
+          ['src/run.ts', `--mind=${arm}`, '--seed=1', `--out=${out}`],
+          { encoding: 'utf8' },
+        );
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('Keep its recordings; start a new HF4 run');
       }
+      expect(await readdir(directory)).toEqual([]);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
-  }, 15000);
+  });
 
   it('preserves the complete inline output path when it contains equals signs', async () => {
     const directory = await scratchDirectory();

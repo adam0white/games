@@ -127,7 +127,7 @@ export interface Recording {
   format: 'island-recording@1';
   mind: string;
   seed: number;
-  hf: string; // exact HF package version, '2.9.0'
+  hf: string; // exact HF package version, or 'none' for a non-HF controller
   world: { size: number; height: number[][]; spire: Cell };
   config: { freeEpisodes: number; stepsPerEpisode: number; taskSteps: number; task: string };
   frames: Frame[];

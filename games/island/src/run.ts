@@ -28,7 +28,7 @@ export async function runIsland(
     format: 'island-recording@1',
     mind: mind.name,
     seed,
-    hf: mind.hfVersion ?? '2.9.0',
+    hf: mind.hfVersion ?? 'none',
     world: { size: state.size, height: structuredClone(state.height), spire: { ...state.spire } },
     config: settings,
     frames: [],
@@ -128,27 +128,23 @@ async function main(args: string[]) {
     ].includes(name)
   )
     throw new Error(`Unknown mind: ${name}`);
+  if (name === 'hf' || name === 'hf-no-boredom' || name === 'hf3' || name.startsWith('hf2'))
+    throw new Error(
+      'This historical arm requires the retired HF 2.9 engine. Keep its recordings; start a new HF4 run.',
+    );
   const seed = Number(flags.seed ?? 1);
   if (!Number.isSafeInteger(seed)) throw new Error('seed must be an integer.');
   const options: MindOptions = { ...flags, seed, persona: PERSONA };
   delete options.mind;
   delete options.out;
   delete options['publish-index'];
-  if (name === 'hf-no-boredom') options.boredom = false;
-  if (name === 'hf2-no-boredom') options.boredom = false;
-  if (name === 'hf2-no-memory') options.memory = false;
-  if (name === 'hf3') options.consequences = true;
-  if (name === 'hf2-no-goals') options.goals = false;
-  const module = (await import(
-    `./minds/${name.startsWith('hf2') || name === 'hf3' ? 'hf2' : name === 'hf-no-boredom' ? 'hf' : name}.ts`
-  )) as {
+  const module = (await import(`./minds/${name}.ts`)) as {
     default: MindFactory;
   };
   const mind = module.default(options);
   const output = resolve(
     String(
-      flags.out ??
-        `scratch/${mind.name === 'hf4' ? 'current-4.17.0' : 'historical-2.9.0'}/${mind.name}-${seed}.json`,
+      flags.out ?? `scratch/${mind.name === 'hf4' ? 'current-4.17.0' : 'non-hf'}/${mind.name}-${seed}.json`,
     ),
   );
   if (basename(output) === 'index.json') throw new Error('index.json is reserved for the recording index.');

@@ -1,6 +1,6 @@
 /** Current Island exports verify both the physical world and the HF person. */
 import { isDeepStrictEqual } from 'node:util';
-import { type DeepReadonly, type RunArchive, replay } from 'hf4';
+import { type DeepReadonly, type RunArchive, replay } from '@adam0white/human-framework';
 import { Hf4Mind } from './minds/hf4.ts';
 import { runIsland } from './run.ts';
 import { PERSONA, type Recording } from './types.ts';

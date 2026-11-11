@@ -1,3 +1,13 @@
+# Island in the games workspace
+
+Island is a CLI experiment and a static viewer of recorded frames. Its current `hf4` arm uses published Human Framework 4.17.0; a current run writes a complete replay file that `node src/run.ts --verify <file>` checks against both native HF and the physical host. The viewer is built for `/island/` and does not run an engine or collect new recordings.
+
+The retired HF 2.9 arms cannot be run from this workspace. Their original adapters and tests are retained byte-for-byte in `archive/historical/`, and all historical viewer recordings remain unchanged. Asking the CLI to start a retired arm refuses before writing a file. New random, scripted and LLM controls record `hf: none` and default to `scratch/non-hf`; historical labels are unchanged. The central `/lab/island/` viewer and recordings are independent of this migration. This monorepo path has not yet been deployed.
+
+From the monorepo root, use `pnpm install --frozen-lockfile`, `pnpm --filter ./games/island run check`, and `pnpm --filter ./games/island run build`. Previous source notes below describe historical workflows; the workspace lock and this section govern the current migration.
+
+---
+
 # Island lab experiment
 
 Island compares an HF person, LLM agents and control policies in the same small simulated island. It is a CLI experiment with a static recording viewer. The retained HF/HF2/HF3 arms pin HF 2.9.0. The separate `hf4` arm pins the published HF 4.17.0 through an npm alias; historical experiment branches are separate. [HF2.md](HF2.md) records the adapters, comparisons and limits.
