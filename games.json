@@ -49,6 +49,19 @@
       ],
       "legacyOrigin": "https://glance.adamwhite.work",
       "redirectEnabled": false
+    },
+    {
+      "slug": "murmur",
+      "source": {
+        "repository": "https://github.com/adam0white/murmur",
+        "commit": "de1f39829026888a4e5fba180cc6901d57fcea0a"
+      },
+      "saveSchema": "murmur-replay-save/1",
+      "ciBrowsers": [
+        "chromium"
+      ],
+      "legacyOrigin": "https://murmur.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }

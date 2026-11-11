@@ -286,6 +286,43 @@ importers:
         specifier: 4.157.0
         version: 4.157.0(@types/node@26.6.6)
 
+  games/murmur:
+    dependencies:
+      '@adam0white/human-framework':
+        specifier: 4.17.0
+        version: 4.17.0
+      '@adam0white/lab-client':
+        specifier: https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.8/adam0white-lab-client-0.5.8.tgz
+        version: https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.8/adam0white-lab-client-0.5.8.tgz
+      '@adam0white/lab-kit':
+        specifier: https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.25/adam0white-lab-kit-0.5.25.tgz
+        version: https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.25/adam0white-lab-kit-0.5.25.tgz(@adam0white/lab-client@https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.8/adam0white-lab-client-0.5.8.tgz)
+    devDependencies:
+      '@biomejs/biome':
+        specifier: 2.6.5
+        version: 2.6.5
+      '@types/node':
+        specifier: 26.6.6
+        version: 26.6.6
+      knip:
+        specifier: 6.44.1
+        version: 6.44.1
+      playwright:
+        specifier: 1.64.1
+        version: 1.64.1
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vite:
+        specifier: 8.3.5
+        version: 8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@26.6.6)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+      wrangler:
+        specifier: 4.157.0
+        version: 4.157.0(@types/node@26.6.6)
+
   games/rope:
     dependencies:
       '@adam0white/human-framework':
@@ -336,6 +373,21 @@ packages:
   '@adam0white/lab-client@https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.16/adam0white-lab-client-0.5.16.tgz':
     resolution: {integrity: sha512-/2RM7ZzJu/oNWIowBeHLZGCOwYJHx+9H2VlCmmRCVvejn/Ivq9Xjw71M/Ibv5WRXKhDWB/c5JoFECS2AfJ+b/w==, tarball: https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.16/adam0white-lab-client-0.5.16.tgz}
     version: 0.5.16
+
+  '@adam0white/lab-client@https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.8/adam0white-lab-client-0.5.8.tgz':
+    resolution: {integrity: sha512-b9ZFrBEtGGBC6r20nD35jQMp+0M3/91u8yuX3cq9AyaFZF4d1MnxkMYlzmWXZVxZX/qiyKt17DFSkuIRhXNjaw==, tarball: https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.8/adam0white-lab-client-0.5.8.tgz}
+    version: 0.5.8
+
+  '@adam0white/lab-kit@https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.25/adam0white-lab-kit-0.5.25.tgz':
+    resolution: {integrity: sha512-MDg0a1CUfKXJnZfXDpMTV4Ao/Nkoib+IL/wSlf77XZqSzcdHIE1s6t+xzaoqFaT6yGnzamMsRKNCoEgXc+yyrQ==, tarball: https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.25/adam0white-lab-kit-0.5.25.tgz}
+    version: 0.5.25
+    engines: {node: '>=24'}
+    hasBin: true
+    peerDependencies:
+      '@adam0white/lab-client': 0.4.11 || 0.4.12 || 0.4.13 || 0.4.14 || 0.4.15 || 0.5.0 || 0.5.1 || 0.5.2 || 0.5.3 || 0.5.4 || 0.5.5 || 0.5.6 || 0.5.7 || 0.5.8
+    peerDependenciesMeta:
+      '@adam0white/lab-client':
+        optional: true
 
   '@adam0white/lab-kit@https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.33/adam0white-lab-kit-0.5.33.tgz':
     resolution: {integrity: sha512-S4bgWWi3OyUGtg9sjY00o3aIxgR9IswLXmtBtjkoiRXTWLrIr0HfVBKdeQX8mGAeNGNwZzLWCQp/pVOgkOQ7cw==, tarball: https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.33/adam0white-lab-kit-0.5.33.tgz}
@@ -1794,6 +1846,15 @@ snapshots:
     dependencies:
       '@adam0white/hf-legacy': '@adam0white/human-framework@3.0.0'
       '@adam0white/human-framework': 4.17.0
+
+  '@adam0white/lab-client@https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.8/adam0white-lab-client-0.5.8.tgz':
+    dependencies:
+      '@adam0white/hf-legacy': '@adam0white/human-framework@3.0.0'
+      '@adam0white/human-framework': 4.17.0
+
+  '@adam0white/lab-kit@https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.25/adam0white-lab-kit-0.5.25.tgz(@adam0white/lab-client@https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.8/adam0white-lab-client-0.5.8.tgz)':
+    optionalDependencies:
+      '@adam0white/lab-client': https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.8/adam0white-lab-client-0.5.8.tgz
 
   '@adam0white/lab-kit@https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.33/adam0white-lab-kit-0.5.33.tgz(@adam0white/lab-client@https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.16/adam0white-lab-client-0.5.16.tgz)':
     optionalDependencies:
