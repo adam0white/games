@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { pauseClock } from "./clock";
 
 // Exercise DOM and host scheduling without starting a Godot renderer.
 test("controls, clock, pause menu and desktop evening fit", async ({
@@ -28,7 +29,7 @@ test("controls, clock, pause menu and desktop evening fit", async ({
       .evaluate((node) => node.getBoundingClientRect().bottom);
     expect(bottom).toBeLessThanOrEqual(page.viewportSize()?.height ?? 0);
   }
-  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
+  await pauseClock(page);
   // The first-visit notice is part of the height budget at both retest sizes.
   await page.locator("#recording-notice").evaluate((node) => {
     (node as HTMLElement).hidden = false;
@@ -126,7 +127,7 @@ test("Play again describes a different seeded opening", async ({ page }) => {
   await page.clock.install();
   await page.goto("/lefthand/");
   await expect(page.locator("#loading")).toBeHidden();
-  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
+  await pauseClock(page);
   const before = await page.evaluate(() => window.Lefthand.snapshot().seed);
   for (let night = 1; night <= 3; night++) {
     await page.locator("#route-well").click();

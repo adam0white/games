@@ -1,5 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 import type { Command, Run, State } from "../src/host";
+import { pauseClock } from "./clock";
 
 type Lab = {
   snapshot(): State;
@@ -167,7 +168,7 @@ for (const outcome of ["win", "loss"] as const) {
       width: overflow.viewport,
     });
     console.log("Godot renderer ready", outcome);
-    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
+    await pauseClock(page);
     for (let night = 1; night <= 3; night++) {
       await expect(page.locator("#evening")).toBeVisible();
       await page.locator("#route-door").click({ force: true });
