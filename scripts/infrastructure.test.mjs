@@ -44,6 +44,8 @@ test('only latest successful push and ci job permit release', () => {
   const sha='b'.repeat(40);
   assert.throws(() => checkMainCI(sha, 'c'.repeat(40), [{head_sha:sha, head_branch:'main', event:'push', status:'completed', conclusion:'success'}], [{name:'ci', conclusion:'success'}]));
   assert.throws(() => checkMainCI(sha, sha, [{head_sha:sha, head_branch:'main', event:'push', status:'completed', conclusion:'success'}], [{name:'ci', status:'completed', conclusion:'skipped'}]));
+  assert.throws(() => checkMainCI(sha, sha, [{head_sha:sha, head_branch:'main', event:'pull_request', status:'completed', conclusion:'success'}], [{name:'ci', status:'completed', conclusion:'success'}]));
+  assert.throws(() => checkMainCI(sha, sha, [{head_sha:sha, head_branch:'main', event:'push', status:'completed', conclusion:'failure'}], [{name:'ci', status:'completed', conclusion:'success'}]));
   assert.doesNotThrow(() => checkMainCI(sha, sha, [{head_sha:sha, head_branch:'main', event:'push', status:'completed', conclusion:'success'}], [{name:'ci', status:'completed', conclusion:'success'}]));
 });
 test('rejects HF legacy aliases and transitive different versions', () => {
@@ -134,4 +136,13 @@ test('Neighbours cannot stamp a different nested runtime SDK as the outer game v
     const accepted = spawnSync(process.execPath, [script], { cwd: fixture, encoding: 'utf8' });
     assert.equal(accepted.status, 0, accepted.stderr);
   } finally { rmSync(fixture, { recursive: true, force: true }); }
+});
+
+test('manual deploy selects main and keeps the exact-main CI preflight', () => {
+  const workflow = readFileSync('.github/workflows/deploy.yml', 'utf8');
+  assert.match(workflow, /\n  workflow_dispatch:/);
+  assert.match(workflow, /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /ref: \$\{\{ github\.event\.workflow_run\.head_sha \|\| github\.sha \}\}/);
+  const deploy = readFileSync('scripts/deploy.mjs', 'utf8');
+  assert.match(deploy, /checkLatestMainCI\(commit, run\)/);
 });
