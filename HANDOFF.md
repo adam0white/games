@@ -15,6 +15,8 @@ Glance PR4 merged normally as `e581cc0`; its exact-main CI passed. The five-seco
 
 All nine imported games now pin client0.5.17/kit0.5.34 public GitHub artifacts from signed green HF main `33ed47e`. All eight public release assets and 68 tar members were hash-verified. The queue fix binds retries to their original game, preserves foreign bytes and retains the shared capacity bound. Kit only admits the corrected peer version. No npm publication, central update, live game deployment or existing-tab refresh follows from publication alone.
 
+The first hosted batch run passed build, tools, Hearsay, Rope, Stairwell, Valley and Glance, but Pass hit eight five-second timeouts. Its test command now uses one worker to avoid competing CPU-bound files; all 33 tests in the six affected files pass locally with unchanged assertions and caps. The current synthetic feedback export correctly labels its freshly created HF4 run as 4.17.0. Hosted requalification is required. Public ancestry checks for all five new source heads are recorded in `docs/migration-lineage.md`.
+
 Root lane passed 23 tests and the clean nine-game assembled build passed with these SDK pins. Exact-head hosted review/CI, merged-main CI, deployment and direct live release/replay/redirect checks remain. All registry redirects are still disabled. Original source repositories and checkouts remain; unique local evidence and the Mac daily scheduler are additional retention conditions. Other requested imports continue in separate worker branches.
 
 ---
