@@ -127,6 +127,20 @@
       "saveSchema": "commonstead-current/2-schema14",
       "legacyOrigin": "https://commonstead.adamwhite.work",
       "redirectEnabled": false
+    },
+    {
+      "slug": "child",
+      "source": {
+        "repository": "https://github.com/adam0white/child",
+        "commit": "5d9f5564100cacda1d8481f5a37c6ed45c811a51"
+      },
+      "saveSchema": "child-episode/6",
+      "ciBrowsers": [
+        "chromium",
+        "webkit"
+      ],
+      "legacyOrigin": "https://child.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }
