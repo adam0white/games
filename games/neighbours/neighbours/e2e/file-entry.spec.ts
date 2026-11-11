@@ -52,6 +52,8 @@ test("built entry refuses invalid selectors and preserves missing-identity memor
 	await page.goto("/neighbours/?file=1&source=agent#kept");
 	await expect(page).toHaveURL(/\/file\/\?source=agent#kept$/);
 	await expect(page.getByLabel("Town file", { exact: true })).toBeVisible();
+	await (await import("./session-helpers")).openSaves(page);
+	await page.getByRole("switch", { name: "Recording", exact: true }).click();
 	await expect(
 		page.getByText(/Recording unavailable: missing-identity/),
 	).toBeVisible();
@@ -427,6 +429,8 @@ test("real SDK preserves existing session, OFF and statuses; final pagehide capt
 			localStorage.setItem("hf-lab-top-level-player", "d".repeat(32)),
 		);
 		await page.reload();
+		await (await import("./session-helpers")).openSaves(page);
+		await page.getByRole("switch", { name: "Recording", exact: true }).click();
 		await expect(
 			page.getByText(/Recording unavailable: identity-mismatch/),
 		).toBeVisible();
@@ -436,6 +440,8 @@ test("real SDK preserves existing session, OFF and statuses; final pagehide capt
 			sessionStorage.setItem("hf-lab-session:neighbours", "invalid-session");
 		});
 		await page.reload();
+		await (await import("./session-helpers")).openSaves(page);
+		await page.getByRole("switch", { name: "Recording", exact: true }).click();
 		await expect(
 			page.getByText(/Recording unavailable: incompatible-session/),
 		).toBeVisible();
@@ -495,8 +501,15 @@ async function finalQueuedRun(page: Page) {
 				(await queuedPieces(page)).filter((r) => r.kind === "run").length,
 		)
 		.toBeGreaterThan(0);
-	const pieces = (await queuedPieces(page)).filter((r) => r.kind === "run");
-	expect(pieces).toHaveLength(pieces[0].data.total);
+	// Explicit opt-in may already have queued a snapshot. Decode one complete
+	// upload at a time; the final snapshot is the most recently queued upload.
+	const runs = (await queuedPieces(page)).filter((r) => r.kind === "run");
+	const latest = runs.reduce((a, b) => (a.at > b.at ? a : b));
+	const pieces = runs.filter((r) => r.data.upload === latest.data.upload);
+	expect(pieces).toHaveLength(latest.data.total);
+	expect(pieces.map((r) => r.data.index).sort((a, b) => a - b)).toEqual(
+		Array.from({ length: latest.data.total }, (_, index) => index),
+	);
 	return recordedCheckpoint(
 		pieces
 			.sort((a, b) => a.data.index - b.data.index)
@@ -625,6 +638,11 @@ async function lifecycleFile({
 	});
 	// Cold file replay correctness; not a startup latency acceptance.
 	await expect(page.locator(".town-ready")).toBeVisible({ timeout: 60000 });
+	await (await import("./session-helpers")).openSaves(page);
+	await page.getByRole("switch", { name: "Recording", exact: true }).check();
+	await page
+		.getByRole("button", { name: "Close Game menu", exact: true })
+		.click();
 	return { context, page, runtime };
 }
 test("regression: pending export must not publish after file pagehide while final snapshot waits", async ({

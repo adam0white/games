@@ -547,7 +547,11 @@ export function useVisitorSession({
 			runRequests.current.clear();
 			setPlaying(false);
 			cancelPrepared?.();
-			if (!telemetryRequests.size) retireRuntime();
+			// The file Lab client may have been initialized after this listener. Let
+			// its pagehide handler request the final snapshot before retiring.
+			queueMicrotask(() => {
+				if (!telemetryRequests.size) retireRuntime();
+			});
 		};
 		window.addEventListener("pagehide", hideFile);
 		let initialSavedPacket: unknown = fileSession ? filePacket : undefined;
