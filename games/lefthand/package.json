@@ -20,7 +20,7 @@
     "check:lane": "pnpm lint && pnpm typecheck",
     "deploy": "cd ../.. && pnpm run deploy",
     "deploy:check": "cd ../.. && pnpm run deploy:check",
-    "ci:check": "python3 scripts/test_setup_godot.py"
+    "ci:check": "python3 -B scripts/test_setup_godot.py"
   },
   "dependencies": {
     "@adam0white/human-framework": "4.17.0",
