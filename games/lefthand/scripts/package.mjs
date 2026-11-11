@@ -3,6 +3,26 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import zlib from "node:zlib";
 
+const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+const metadata = JSON.parse(fs.readFileSync("release-metadata.json", "utf8"));
+const godotBinary =
+  process.platform === "darwin"
+    ? ".godot-tools/Godot.app/Contents/MacOS/Godot"
+    : ".godot-tools/Godot_v4.7.2-stable_linux.x86_64";
+const godotVersion = execFileSync(godotBinary, ["--version"], {
+  encoding: "utf8",
+}).trim();
+if (
+  Object.keys(metadata).sort().join(",") !== "app,engine,godot" ||
+  metadata.app !== "lefthand" ||
+  metadata.engine !== pkg.dependencies["@adam0white/human-framework"] ||
+  metadata.godot !== "4.7.2" ||
+  !godotVersion.startsWith(`${metadata.godot}.`)
+)
+  throw new Error(
+    "Release metadata does not match the game and verified engine versions",
+  );
+
 const artifacts = fs
   .readdirSync("dist")
   .filter((file) => file.startsWith("game.") && file !== "game.html")
@@ -44,14 +64,8 @@ const dirty =
 fs.writeFileSync(
   "dist/release.json",
   JSON.stringify({
-    app: "lefthand",
-    framework: JSON.parse(fs.readFileSync("package.json", "utf8")).dependencies[
-      "@adam0white/human-framework"
-    ],
-    engine: JSON.parse(fs.readFileSync("package.json", "utf8")).dependencies[
-      "@adam0white/human-framework"
-    ],
-    godot: "4.7.2",
+    ...metadata,
+    framework: pkg.dependencies["@adam0white/human-framework"],
     commit,
     dirty,
   }),
