@@ -1,0 +1,232 @@
+import { chromium } from 'playwright-core';
+import { createServer } from 'vite';
+import { expect, it } from 'vitest';
+import { act, advance, newGame, save, stateJson } from '../src/sim/game.ts';
+import { idx, SURF, USE } from '../src/sim/grid.ts';
+import type { _debug } from '../src/ui/app.ts';
+import { eventHistory } from '../src/ui/event-history.ts';
+import { authoredGame } from './authored-opening.ts';
+
+declare global {
+  interface Window {
+    __warren: typeof _debug;
+  }
+}
+
+it('actual App synthetic phone/wide route shows real request and alarm records while the working map stays fixed', async () => {
+  const g = newGame(10, '0.7.0');
+  const cell = idx(18, SURF + 1);
+  // Authored physical fixture: a finished door; its test and alarm are actual inputs.
+  g.s.hill.use[cell] = USE.door;
+  g.s.hill.doorWork[cell] = 0;
+  g.chapter = { version: 'warren-hf4-cast/1', inputs: [], claims: [], initial: stateJson(g.s) };
+  const server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false, watch: null } });
+  let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+  try {
+    await server.listen();
+    const url = server.resolvedUrls!.local[0]!;
+    browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage({ viewport: { width: 360, height: 690 }, hasTouch: true });
+    await page.route('**/*', (r) => (r.request().url().startsWith(url) ? r.continue() : r.abort()));
+    await page.clock.install();
+    await page.goto(url);
+    expect(
+      await page.evaluate(`(async () => {
+      const { put } = await import('/src/ui/store.ts');
+      return put('hill', ${JSON.stringify(save(g))});
+    })()`),
+    ).toBe(true);
+    await page.reload();
+    await page.locator('#cont').click();
+    if (await page.locator('#cellx').isVisible()) await page.locator('#cellx').click();
+    await page.locator('[data-tool="look"]').click();
+    const point = await page.evaluate(() => {
+      const v = window.__warren.view;
+      const b = document.querySelector('#cv')!.getBoundingClientRect();
+      return { x: b.x + (18.5 - v.x) * v.cs, y: b.y + (9.5 - v.y) * v.cs };
+    });
+    await page.mouse.click(point.x, point.y);
+    await page.locator('#door-tester').selectOption('yusuf');
+    await page.locator('#test-door').click();
+    expect(await page.evaluate(() => window.__warren.game!.inputs.at(-1)?.verb)).toBe('test-door');
+    await page.evaluate(`(async () => {
+      const { advance } = await import('/src/sim/game.ts');
+      const g = window.__warren.game;
+      for (let n=0; n<12 && !g.s.next?.requests?.door?.endedAt; n++) advance(g, g.s.minute+30);
+    })()`);
+    expect(await page.evaluate(() => !!window.__warren.game!.s.next?.requests?.door?.opened)).toBe(true);
+    await page.clock.runFor(300);
+    await page.locator('#cellx').click();
+    // The existing public Bell button records a real call, not a synthetic history row.
+    await page.locator('#bell').click();
+    await page.locator('#confirm-bell').click();
+    await page.evaluate(`(async () => {
+      const { advance } = await import('/src/sim/game.ts');
+      const g = window.__warren.game;
+      advance(g,g.s.minute+360);
+    })()`);
+    await page.clock.runFor(300);
+    if (await page.locator('#cellx').isVisible()) await page.locator('#cellx').click();
+    const camera = () =>
+      page.evaluate(() => {
+        const r = document.querySelector('#cv')!.getBoundingClientRect();
+        return { ...window.__warren.view, left: r.left, top: r.top, width: r.width, height: r.height };
+      });
+    for (const viewport of [
+      { width: 360, height: 690 },
+      { width: 1280, height: 800 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.clock.runFor(300);
+      const scaleBefore = (await camera()).cs;
+      await page.locator('#zoom-in').click();
+      expect((await camera()).cs).toBeGreaterThan(scaleBefore);
+      const before = await camera();
+      await page.locator('#ticker').click();
+      await page.locator('#door-alarm-records > summary').click();
+      const text = await page.locator('#door-alarm-history').innerText();
+      expect(text).toContain('Completed door test: shut');
+      expect(text).toContain('reopened');
+      const answers = await page.evaluate(() => window.__warren.game!.s.answers);
+      expect(answers.length).toBeGreaterThan(0);
+      for (const answer of answers) {
+        expect(text).toContain(answer.verdict);
+        expect(text).toContain(answer.says);
+      }
+      if (!answers.some((answer) => answer.verdict === 'refused')) expect(text).not.toContain('refused');
+      expect(text).toContain('Bell reply');
+      expect(text).toContain('No riders came.');
+      expect(text).toContain('unknown');
+      expect(text).toContain('Year 1');
+      expect(text).toMatch(/\d\d:\d\d/);
+      await page.locator('#sheet-body').evaluate((el) => {
+        el.scrollTop = el.scrollHeight;
+      });
+      await page.clock.runFor(300);
+      expect(await camera()).toEqual(before);
+      await page.locator('#bookx').click();
+      await page.locator('#shelter-check').click();
+      const people = page.locator('[data-who]');
+      for (const el of await people.all()) {
+        expect((await el.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      }
+      expect(await page.locator('[data-who="tamar"]').textContent()).toBe('Tamar of the Wall');
+      await page.locator('[data-who="yusuf"]').click();
+      const selected = await camera();
+      // Public Look drag deliberately pans while the card stays open.
+      const box = (await page.locator('#cv').boundingBox())!;
+      await page.mouse.move(box.x + 12, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width - 12, box.y + box.height / 2, { steps: 8 });
+      await page.mouse.up();
+      const moved = await camera();
+      expect(moved.x).not.toBe(selected.x);
+      await page.clock.runFor(1000);
+      expect(await camera()).toEqual(moved);
+      await page.locator('#cardx').click();
+      await page.locator('#bookx').click();
+      expect((await camera()).x).toBe(moved.x);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
+    }
+  } finally {
+    await browser?.close();
+    await server.close();
+  }
+}, 60000);
+
+it('actual App separates the Yusuf invitation note from each selected chalk at phone/wide sizes and keeps missing history unknown', async () => {
+  const g = authoredGame(7, 360, 'warren-rest/2');
+  expect(act(g, { verb: 'visit', who: 'yusuf' })).toBe(true);
+  expect(g.s.flags['visit:yusuf']).toBeTruthy();
+  const cells = [idx(15, SURF + 3), idx(20, SURF + 3)];
+  expect(act(g, { verb: 'chalk', cells, on: true })).toBe(true);
+  const server = await createServer({ server: { host: '127.0.0.1', port: 0, hmr: false, watch: null } });
+  const browser = await chromium.launch({ headless: true });
+  try {
+    await server.listen();
+    const url = server.resolvedUrls!.local[0]!;
+    for (const viewport of [
+      { width: 360, height: 690 },
+      { width: 1280, height: 800 },
+    ]) {
+      const page = await browser.newPage({ viewport });
+      try {
+        await page.route('**/*', (r) => (r.request().url().startsWith(url) ? r.continue() : r.abort()));
+        await page.clock.install();
+        await page.goto(url);
+        await page.evaluate(`(async () => {
+          const { put } = await import('/src/ui/store.ts');
+          await put('hill', ${JSON.stringify(save(g))});
+        })()`);
+        await page.reload();
+        await page.locator('#cont').click();
+        if (await page.locator('#cellx').isVisible()) await page.locator('#cellx').click();
+        await page.locator('[data-tool="look"]').click();
+        const raw = await page.evaluate(() => JSON.stringify(window.__warren.game));
+        const select = async (x: number) => {
+          const point = await page.evaluate((x) => {
+            const v = window.__warren.view;
+            const b = document.querySelector('#cv')!.getBoundingClientRect();
+            return { x: b.x + (x + 0.5 - v.x) * v.cs, y: b.y + (11.5 - v.y) * v.cs };
+          }, x);
+          await page.mouse.click(point.x, point.y);
+        };
+        await select(15);
+        let text = await page.locator('#cell-words').innerText();
+        expect(text).toContain('Retained Yusuf invitation note');
+        expect(text).toContain('A mark must show others when they can stop me.');
+        expect(text).toContain('Year 1');
+        expect(text).toContain('06:00');
+        expect(text).toContain('Current chalk selection: 3 squares left');
+        expect(text).toContain('No endpoints');
+        expect(text).toContain('Use Rub out');
+        await page.locator('#connections').click();
+        expect(await page.locator('#connection-words').innerText()).toContain('First connecting stone');
+        await page.locator('#cellx').click();
+        await select(20);
+        text = await page.locator('#cell-words').innerText();
+        expect(text).toContain('Current chalk selection: 2 squares right');
+        expect(text).toContain('A mark must show others when they can stop me.');
+        expect(await page.evaluate(() => JSON.stringify(window.__warren.game))).toBe(raw);
+        // Synthetic historical omission only; never infer the original note from the surviving flag.
+        await page.evaluate(() => {
+          const s = window.__warren.game!.s;
+          s.notes = s.notes.filter((n) => !(n.kind === 'story' && n.who === 'yusuf' && n.weight === 2));
+        });
+        await page.locator('#cellx').click();
+        await select(15);
+        expect(await page.locator('#cell-words').innerText()).toContain('words and date are unknown');
+        expect(await page.locator('#cell-words').innerText()).not.toContain('A mark must show others');
+        const minute = await page.evaluate(() => window.__warren.game!.s.minute);
+        await page.clock.runFor(12000);
+        const later = await page.evaluate(() => window.__warren.game!.s.minute);
+        expect(later).toBeGreaterThan(minute);
+        expect(later - minute).toBeLessThan(12 * 72);
+        await page.locator('#book').click();
+        const menuMinute = await page.evaluate(() => window.__warren.game!.s.minute);
+        await page.clock.runFor(12000);
+        expect(await page.evaluate(() => window.__warren.game!.s.minute)).toBe(menuMinute);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+}, 60000);
+
+// A separate public call captures a real refusal; its record must retain the actual words.
+it('retains a real bell refusal without inventing an outcome', () => {
+  const g = newGame(7, '0.7.0');
+  expect(act(g, { verb: 'bell' })).toBe(true);
+  advance(g, g.s.minute + 360);
+  const refusal = g.s.answers.find((answer) => answer.verdict === 'refused');
+  expect(refusal).toBeDefined();
+  expect(
+    eventHistory(g).some(
+      (row) => row.kind === 'reply' && row.text.includes('refused') && row.text.includes(refusal!.says),
+    ),
+  ).toBe(true);
+});
