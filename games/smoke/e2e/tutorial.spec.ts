@@ -111,3 +111,22 @@ test('a repeated request keeps the actual reply visible after it is checked', as
   }
   expect(sawDeduplicatedReply).toBe(true);
 });
+
+test('a neighbour press survives a simulation update before release', async ({ page }) => {
+  await page.goto('/smoke/?seed=1');
+  await page.locator('#start').click();
+  const label = page.locator('[data-id="sevim"] span');
+  const handle = await label.elementHandle();
+  if (!handle) throw new Error('Missing neighbour label');
+  const box = await label.boundingBox();
+  if (!box) throw new Error('Neighbour label is not visible');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  const tick = await page.evaluate(() => window.smoke.getState().tick);
+  const clock = await page.locator('#smoke-clock').textContent();
+  await expect.poll(() => page.evaluate(() => window.smoke.getState().tick)).toBeGreaterThan(tick);
+  await expect(page.locator('#smoke-clock')).not.toHaveText(clock!);
+  await page.mouse.up();
+  await expect(page.locator('#tutorial')).toContainText('near');
+  expect(await handle.evaluate((node) => node.isConnected)).toBe(true);
+});

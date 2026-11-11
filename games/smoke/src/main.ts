@@ -415,12 +415,11 @@ function updateDOM() {
     button.classList.toggle('active', button.dataset.id === selected);
     button.setAttribute('aria-pressed', String(button.dataset.id === selected));
     const visible = screen.people.find((p) => p.id === resident.id)!;
-    button.replaceChildren();
-    const name = document.createElement('span');
-    name.textContent = `${game.people.indexOf(resident) + 1} ${resident.name}`;
-    const state = document.createElement('small');
-    state.textContent = visible.status;
-    button.append(name, state);
+    const name = button.querySelector('span')!;
+    const state = button.querySelector('small')!;
+    const nameText = `${game.people.indexOf(resident) + 1} ${resident.name}`;
+    if (name.textContent !== nameText) name.textContent = nameText;
+    if (state.textContent !== visible.status) state.textContent = visible.status;
     button.disabled = !resident.atHome;
   }
   for (const button of document.querySelectorAll<HTMLButtonElement>('[data-action]')) {
@@ -441,7 +440,9 @@ function updateDOM() {
 }
 for (const [i, p] of game.people.entries()) {
   const b = document.createElement('button');
-  b.textContent = `${i + 1} ${p.name}`;
+  const name = document.createElement('span');
+  name.textContent = `${i + 1} ${p.name}`;
+  b.append(name, document.createElement('small'));
   b.dataset.id = p.id;
   b.onclick = () => select(p.id);
   people.append(b);
