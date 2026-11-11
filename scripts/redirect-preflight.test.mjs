@@ -139,3 +139,15 @@ test('zone redirects require live evidence and only an exact worker retirement r
   f.live.dirty = true;
   await assert.rejects(verifyRedirects({ ...f.args(), routes: retirement }), /clean/i);
 });
+
+test('historical recorded-viewer releases truthfully have no Lab artifact', t => {
+  const f = fixture(t); f.game.kind = 'recorded-viewer';
+  writeFileSync(join(f.cwd, 'games/rope/package.json'), JSON.stringify({ version: '0.1.0', dependencies: { '@adam0white/human-framework': '4.17.0' } }));
+  const sha = f.commit();
+  assert.equal(repositoryEvidence(f.cwd).release(sha, f.registry, f.game).labVersion, null);
+  for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
+    writeFileSync(join(f.cwd, 'games/rope/package.json'), JSON.stringify({ version: '0.1.0', dependencies: { '@adam0white/human-framework': '4.17.0' }, [section]: { ...(section === 'dependencies' ? { '@adam0white/human-framework': '4.17.0' } : {}), alias: 'npm:@adam0white/lab-client@0.5.17' } }));
+    const aliasSha = f.commit();
+    assert.throws(() => repositoryEvidence(f.cwd).release(aliasSha, f.registry, f.game), /Lab client/i);
+  }
+});

@@ -7,6 +7,7 @@ export function validateRegistry(registry) {
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(game.slug) || seen.has(game.slug)) throw new Error('Invalid or duplicate slug');
     if (!/^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(game.source?.repository ?? '') || !sha.test(game.source?.commit ?? '')) throw new Error('Invalid source lineage');
     if (!game.saveSchema || typeof game.saveSchema !== 'string') throw new Error('Missing save schema');
+    if (game.kind !== undefined && !['game', 'recorded-viewer'].includes(game.kind)) throw new Error('Invalid game kind');
     if (game.redirectMode !== undefined && !['worker', 'zone'].includes(game.redirectMode)) throw new Error('Invalid redirect mode');
     if (game.redirectEnabled !== undefined && typeof game.redirectEnabled !== 'boolean') throw new Error('Invalid redirect flag');
     if (game.verifiedRelease !== undefined && (typeof game.verifiedRelease !== 'string' || !sha.test(game.verifiedRelease))) throw new Error('Invalid verified release commit');
@@ -38,7 +39,8 @@ export function assertFrameworkGraph(packages, version) {
 }
 export function manifest(registry, game, commit, dirty, labVersion, app) {
   validateRegistry(registry);
-  if (!sha.test(commit) || dirty || !registry.games.some(g => g.slug === game.slug) || !labVersion || !app) throw new Error('Refusing unclean or invalid release');
+  const validLab = game.kind === 'recorded-viewer' ? labVersion === null : typeof labVersion === 'string' && /^\d+\.\d+\.\d+$/.test(labVersion);
+  if (!sha.test(commit) || dirty || !registry.games.some(g => g.slug === game.slug) || !validLab || !app) throw new Error('Refusing unclean or invalid release');
   return { game: game.slug, commit, dirty: false, source: game.source, hfVersion: registry.hfVersion, framework: registry.hfVersion, app, frameworkLibrary: registry.hfVersion, labVersion, saveSchema: game.saveSchema };
 }
 function scope(slug, path) {
@@ -65,4 +67,16 @@ export function checkRelease(expected, actual, redirected) {
 }
 export function checkMainCI(commit, remote, runs, jobs) {
   if (commit !== remote || !runs.some(r => r.head_sha === commit && r.head_branch === 'main' && r.event === 'push' && r.status === 'completed' && r.conclusion === 'success') || !jobs.some(j => j.name === 'ci' && j.status === 'completed' && j.conclusion === 'success')) throw new Error('Latest main CI is not green');
+}
+
+// Direct manifest declarations only. A source/build audit still establishes that
+// a recorded viewer contains no bundled or transitive recording implementation.
+export function assertNoLabDependencies(pkg) {
+  for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
+    for (const [name, value] of Object.entries(pkg[section] ?? {})) {
+      if (/^@adam0white\/lab-(?:client|kit)$/.test(name)
+        || /^npm:@adam0white\/lab-(?:client|kit)(?:@|$)/.test(String(value))
+        || /(?:lab-(?:client|kit)-v|adam0white-lab-(?:client|kit)-).*\.tgz(?:$|[?#])/.test(String(value))) throw new Error('Recorded viewer must not declare an unused Lab client');
+    }
+  }
 }

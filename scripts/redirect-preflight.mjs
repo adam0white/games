@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { isDeepStrictEqual } from 'node:util';
-import { validateRegistry, manifest } from './lib.mjs';
+import { validateRegistry, manifest, assertNoLabDependencies } from './lib.mjs';
 
 const PLAY = 'https://play.adamwhite.work';
 const SHA = /^[0-9a-f]{40}$/;
@@ -22,6 +22,10 @@ export function repositoryEvidence(cwd = process.cwd()) {
       const path = `games/${game.slug}`;
       const pkg = read(commit, `${path}/package.json`);
       if (pkg.dependencies?.['@adam0white/human-framework'] !== registry.hfVersion) throw new Error('Historical game HF pin mismatch');
+      if (game.kind === 'recorded-viewer') {
+        assertNoLabDependencies(pkg);
+        return manifest(registry, game, commit, false, null, pkg.version);
+      }
       const archive = pkg.dependencies?.['@adam0white/lab-client'];
       // Public artifact bytes are qualified during adoption and the clean build.
       // Here read only the committed immutable URL, without a network dependency.

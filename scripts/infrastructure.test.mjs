@@ -1,3 +1,7 @@
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { validateGame } from './game.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -43,4 +47,36 @@ test('release rejects mismatched lineage, version or redirected response', () =>
 test('scoped headers preserve Cloudflare removal directives', () => {
   assert.match(scopedHeaders('rope', '/assets/*\n  ! Cache-Control\n  Cache-Control: immutable\n'), /\/rope\/assets\/\*\n  ! Cache-Control/);
   assert.throws(() => scopedHeaders('rope', '/assets/*\n  ! Cache-Control injected\n'));
+});
+
+test('recorded viewers explicitly omit a Lab client without weakening game manifests', () => {
+  const viewer = { ...game, slug: 'island', kind: 'recorded-viewer' };
+  const viewers = { ...registry, games: [viewer] };
+  assert.equal(manifest(viewers, viewer, 'b'.repeat(40), false, null, '0.1.0').labVersion, null);
+  assert.throws(() => manifest(registry, game, 'b'.repeat(40), false, null, '0.1.0'));
+  assert.throws(() => manifest(viewers, viewer, 'b'.repeat(40), false, '0.5.17', '0.1.0'));
+  assert.throws(() => validateRegistry({ ...registry, games: [{ ...game, kind: 'unknown' }] }));
+});
+
+test('a recorded viewer still requires the exact npm HF game engine and forbids aliases', () => {
+  const cwd = process.cwd(), root = mkdtempSync(join(tmpdir(), 'viewer-graph-'));
+  const viewer = { ...game, slug: 'island', kind: 'recorded-viewer' };
+  const viewers = { ...registry, games: [viewer] };
+  const deps = { '@adam0white/human-framework': '4.17.0' };
+  mkdirSync(join(root, 'games/island/node_modules/@adam0white/human-framework'), { recursive: true });
+  writeFileSync(join(root, 'games/island/node_modules/@adam0white/human-framework/package.json'), JSON.stringify({ name: '@adam0white/human-framework', version: '4.17.0' }));
+  const pkg = () => writeFileSync(join(root, 'games/island/package.json'), JSON.stringify({ dependencies: deps }));
+  try {
+    process.chdir(root); pkg();
+    assert.equal(validateGame(viewer, viewers), null);
+    assert.throws(() => validateGame({ ...viewer, kind: 'game' }, viewers));
+    deps.hfLegacy = 'npm:@adam0white/human-framework@2.9.0'; pkg();
+    assert.throws(() => validateGame(viewer, viewers), /alias/i);
+    delete deps.hfLegacy; deps['@adam0white/human-framework'] = '3.0.0'; pkg();
+    assert.throws(() => validateGame(viewer, viewers), /pin/i);
+    deps['@adam0white/human-framework'] = '4.17.0'; deps['@adam0white/lab-client'] = '0.5.17'; pkg();
+    assert.throws(() => validateGame(viewer, viewers), /unused Lab/i);
+    delete deps['@adam0white/lab-client']; deps.alias = 'npm:@adam0white/lab-client@0.5.17'; pkg();
+    assert.throws(() => validateGame(viewer, viewers), /unused Lab/i);
+  } finally { process.chdir(cwd); rmSync(root, { recursive: true, force: true }); }
 });

@@ -15,6 +15,8 @@ pnpm check:lane
 
 `games.json` lists every imported game, original source commit, old origin, save schema, and the single exact HF version. Every game consumes HF from npm. Lab packages are immutable published artifacts or checked-in vendor archives with notices. Original source history remains reachable through unsquashed subtree imports.
 
+The registry also supports `kind: "recorded-viewer"` for a CLI experiment and static recording viewer such as Island. This kind still requires the exact npm HF engine for native replay and declares no direct Lab client dependency. The source/build audit must establish that no recording implementation is bundled; the manifest check alone does not establish that. Its release reports `labVersion: null`. Interactive games continue to require their immutable Lab client artifact.
+
 Work on a signed branch. Run the affected game checks and root lane. Open one combined PR for independent changes. Obtain green required CI and a clear hosted Codex review on the exact head. Merge normally. Shared files and the lockfile trigger all game checks. CI always builds the entire deployment bundle.
 
 ## Production deployment
