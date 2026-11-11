@@ -15,7 +15,7 @@ async function exposed(page: Page, selector: string) {
 
 test("opening controls fit with expanded text metrics", async ({ page }, testInfo) => {
   test.skip(!testInfo.project.name.endsWith("phone"));
-  await page.goto("/");
+  await page.goto("/days/");
   await page.addStyleTag({ content: ".stage { letter-spacing: 0.06em !important; }" });
   if (await page.locator("#begin-off").isVisible()) await page.locator("#begin-off").click();
   await exposed(page, '[data-guide="opening"]');
@@ -26,7 +26,7 @@ test("opening controls fit with expanded text metrics", async ({ page }, testInf
 });
 
 test("first choices and their real aftermath remain visible and skippable", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/days/");
   const begin = page.locator("#begin-off");
   if (await begin.isVisible()) await begin.click();
   await exposed(page, '[data-guide="opening"]');
@@ -62,7 +62,7 @@ test("first choices and their real aftermath remain visible and skippable", asyn
 });
 
 test("an unfinished guide survives reloading the current run", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/days/");
   if (await page.locator("#begin-off").isVisible()) await page.locator("#begin-off").click();
   await exposed(page, '[data-guide="opening"]');
   await page.reload();
@@ -77,7 +77,7 @@ test("an agreed delivery is not described as a completed visit", async ({ page }
       return array;
     }) as typeof crypto.getRandomValues;
   });
-  await page.goto("/");
+  await page.goto("/days/");
   if (await page.locator("#begin-off").isVisible()) await page.locator("#begin-off").click();
   for (const action of [
     "welcome",
@@ -105,7 +105,7 @@ test("an agreed delivery is not described as a completed visit", async ({ page }
 test("a decision leaves its new scene in view before the player moves to choices", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/days/");
   if (await page.locator("#begin-off").isVisible()) await page.locator("#begin-off").click();
   await exposed(page, "[data-guide-target]");
   await page.locator("[data-guide-target]").first().click();

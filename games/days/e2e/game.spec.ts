@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 test("a complete run, menu and lab tools fit this screen", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/");
+  await page.goto("/days/");
   await page.getByRole("button", { name: "Begin the three days" }).click();
   await expect(page.locator("#scene")).toBeVisible();
   for (
@@ -38,7 +38,7 @@ test("feedback selection sends nothing and errors remain visible", async ({ page
     submissions++;
     await route.abort();
   });
-  await page.goto("/");
+  await page.goto("/days/");
   await page.getByRole("button", { name: "Begin the three days" }).click();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("button", { name: "Feedback", exact: true }).click();
@@ -55,7 +55,7 @@ test("feedback selection sends nothing and errors remain visible", async ({ page
 test("ordinary play offers export and collapses diagnostics; recording has one switch", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/days/");
   await page.getByRole("button", { name: "Begin the three days" }).click();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await expect(page.getByRole("button", { name: "Export this play" })).toBeVisible();
@@ -74,7 +74,7 @@ test("ordinary play offers export and collapses diagnostics; recording has one s
 test("feedback explains the Recording switch and has no separate play consent", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/days/");
   await page.getByRole("button", { name: "Begin with Recording off" }).click();
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("button", { name: "Feedback", exact: true }).click();
@@ -88,7 +88,7 @@ test("feedback explains the Recording switch and has no separate play consent", 
 });
 
 test("New game starts a distinct recorded attempt", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/days/");
   await page.getByRole("button", { name: "Begin the three days" }).click();
   const previous = await page.evaluate(() => sessionStorage.getItem("hf-lab-run:days"));
   await page.getByRole("button", { name: "Menu", exact: true }).click();
@@ -118,7 +118,7 @@ test("story and menu work while the renderer waits or fails", async ({ page }) =
     await route.continue();
   });
   try {
-    await page.goto("/", { waitUntil: "commit" });
+    await page.goto("/days/", { waitUntil: "commit" });
     await expect.poll(() => rendererRequested).toBe(true);
     await page.getByRole("button", { name: "Begin the three days" }).click({ timeout: 3000 });
     await page.getByRole("button", { name: "Menu", exact: true }).click();
@@ -146,7 +146,7 @@ test("story and menu work while the renderer waits or fails", async ({ page }) =
 });
 
 test("room objects expose their action and cost before activation", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/days/");
   await page.getByRole("button", { name: "Begin with Recording off" }).click();
   const choices = page.locator("#choices .choice");
   await expect(choices).toHaveCount(2);
@@ -178,7 +178,7 @@ test("the opening offers a whole first choice without scrolling", async ({ page 
         array instanceof Uint32Array && array.length === 1 ? array.fill(0) : random(array),
     });
   });
-  await page.goto("/");
+  await page.goto("/days/");
   await page.getByRole("button", { name: "Begin with Recording off" }).click();
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
   const first = page.locator("#choices .choice").first();
@@ -197,7 +197,7 @@ test("the opening offers a whole first choice without scrolling", async ({ page 
 });
 
 test("each decision names distinct objects", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/days/");
   await page.getByRole("button", { name: "Begin with Recording off" }).click();
   for (let step = 0; step < 12; step++) {
     const names = await page.locator("#choices .object-name").allTextContents();

@@ -10,7 +10,9 @@ function get<T extends HTMLElement>(id: string): T {
   if (!element) throw new Error(`Missing element: ${id}`);
   return element as T;
 }
+const fileMode = /^\/days\/file(?:\/|$)/.test(location.pathname);
 function read(key: string): string | null {
+  if (fileMode) return null;
   try {
     return localStorage.getItem(key);
   } catch {
@@ -18,19 +20,34 @@ function read(key: string): string | null {
   }
 }
 function store(key: string, value: string) {
+  if (fileMode) return;
   try {
     localStorage.setItem(key, value);
   } catch {
     /* Private browsing can deny storage. */
   }
 }
-const lab = createLab({ game: "days" });
-const shelf = personaChannel();
+const lab = fileMode ? null : createLab({ game: "days" });
+const shelf = fileMode ? null : personaChannel();
 const menu = get<HTMLDialogElement>("menu-dialog");
 const peopleLink = document.createElement("a");
 peopleLink.href = "https://human.adamwhite.work/lab/people/";
 peopleLink.textContent = PEOPLE_ACROSS_GAMES;
-get("menu-home").append(peopleLink);
+if (!fileMode) get("menu-home").append(peopleLink);
+else {
+  get<HTMLButtonElement>("feedback").disabled = true;
+  get<HTMLInputElement>("recording").disabled = true;
+  get("recording-status").textContent = "File view does not record or use this device’s saves.";
+  get("notice").querySelector("p:nth-of-type(3)")?.remove();
+  get("begin-off").hidden = true;
+  get("notice").querySelector("a")?.remove();
+}
+if (!fileMode) {
+  const link = document.createElement("a");
+  link.href = "/days/file/";
+  link.textContent = "Open a play in file view";
+  get("menu-home").append(link);
+}
 const notice = get<HTMLDialogElement>("notice");
 const recording = get<HTMLInputElement>("recording");
 const feedbackNote = get<HTMLTextAreaElement>("feedback-note");
@@ -86,7 +103,9 @@ async function fresh(focus = false) {
   const seed = newSeed();
   let retained = false;
   try {
-    if (focus) {
+    if (!shelf) {
+      game = createGame(seed);
+    } else if (focus) {
       const restart = await restartFreshGame(shelf, game, seed, () => current === generation);
       game = restart.game;
       retained = restart.retained;
@@ -113,12 +132,24 @@ async function fresh(focus = false) {
   return !retained;
 }
 async function checkpoint() {
-  if (!game.chapter || game.chapter.completed || game.outcome === "playing") return;
+  if (!shelf || !game.chapter || game.chapter.completed || game.outcome === "playing") return;
   const finished = game;
   const current = generation;
   busy = true;
   try {
-    await checkpointContinuity(shelf, finished, () => current === generation && game === finished);
+    await checkpointContinuity(
+      shelf,
+      finished,
+      () => current === generation && game === finished,
+      (blocked) => {
+        if (blocked.length) {
+          const names = blocked.map(
+            (id) => ["Hacer", "Burak", "Selin"][sharedCast.indexOf(id)] ?? "A character",
+          );
+          loadNotice = `${names.join(", ")} could not be saved to the shared shelf because another game is not ready. This play remains open here.`;
+        }
+      },
+    );
     finished.chapter!.completed = true;
     save();
   } catch (error) {
@@ -397,19 +428,21 @@ function render(focus = false) {
     }
   }
   room?.update(current);
-  lab.screen(current.outcome === "playing" ? `day ${current.day}` : "ending");
-  if (current.outcome !== "playing") lab.milestone("ending reached");
+  lab?.screen(current.outcome === "playing" ? `day ${current.day}` : "ending");
+  if (current.outcome !== "playing") lab?.milestone("ending reached");
   if (focus) {
     get("title").focus({ preventScroll: true });
     scene.scrollIntoView({ block: "start", behavior: "instant" });
   }
 }
-const stopTracking = lab.trackRun(() => exportRun(game), { runKey: () => game.seed });
+const stopTracking = lab?.trackRun(() => exportRun(game), { runKey: () => game.seed });
 function recordingState() {
-  recording.checked = lab.telemetryOn;
-  get("recording-status").textContent = lab.telemetryOn
-    ? "Play is recorded on this device."
-    : "Play recording is off. You can still send feedback.";
+  recording.checked = lab?.telemetryOn ?? false;
+  get("recording-status").textContent = fileMode
+    ? "File view does not record or use this device’s saves."
+    : lab?.telemetryOn
+      ? "Play is recorded on this device."
+      : "Play recording is off. You can still send feedback.";
 }
 function home() {
   get("menu-home").hidden = false;
@@ -441,8 +474,8 @@ get("confused").addEventListener("click", () => {
   feedbackStatus.textContent = "";
 });
 recording.addEventListener("change", () => {
-  if (recording.checked) lab.setPrivacyOverride(true);
-  lab.setTelemetryOff(!recording.checked);
+  if (recording.checked) lab?.setPrivacyOverride(true);
+  lab?.setTelemetryOff(!recording.checked);
   recordingState();
 });
 get("fullscreen").addEventListener("click", async () => {
@@ -464,7 +497,7 @@ get("restart").addEventListener("click", () => {
   loadNotice = "";
   menu.close();
   void fresh(true).then((started) => {
-    if (started) lab.captureSave(exportRun(game));
+    if (started) lab?.captureSave(exportRun(game));
   });
 });
 get("submit-feedback").addEventListener("click", async () => {
@@ -477,7 +510,7 @@ get("submit-feedback").addEventListener("click", async () => {
   submit.disabled = true;
   feedbackStatus.textContent = "Sending your note…";
   try {
-    const receipt = await lab.sendFeedback(note);
+    const receipt = await lab!.sendFeedback(note);
     feedbackStatus.textContent = `Your note was stored. Receipt: ${receipt}`;
   } catch {
     feedbackStatus.textContent =
@@ -487,7 +520,7 @@ get("submit-feedback").addEventListener("click", async () => {
   }
 });
 function begin(off = false) {
-  if (off) lab.setTelemetryOff(true);
+  if (off) lab?.setTelemetryOff(true);
   store("days-notice-v1", "1");
   notice.close();
   save();
@@ -546,6 +579,30 @@ get("begin-off").addEventListener("click", () => begin(true));
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
+  if (fileMode) {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.setAttribute("aria-label", "Open saved play");
+    const fileStatus = document.createElement("p");
+    fileStatus.setAttribute("role", "status");
+    input.addEventListener("change", async () => {
+      try {
+        const file = input.files?.[0];
+        if (!file) return;
+        game = replay(JSON.parse(await file.text()));
+        generation++;
+        busy = false;
+        loadNotice = "File view: changes stay in this page; export to keep them.";
+        menu.close();
+        render();
+      } catch (error) {
+        fileStatus.textContent =
+          error instanceof Error ? error.message : "This play could not be opened.";
+      }
+    });
+    tools.append(input, fileStatus);
+  }
   tools.append(exportButton, data, download);
   diagnostics.append(check, status);
 }
@@ -559,12 +616,12 @@ if (restored) {
 if (read("days-notice-v1") !== "1") notice.showModal();
 window.addEventListener("pagehide", () => {
   save();
-  lab.flush();
+  lab?.flush();
 });
 window.addEventListener(
   "beforeunload",
   () => {
-    stopTracking();
+    stopTracking?.();
     disposed = true;
     room?.destroy();
   },

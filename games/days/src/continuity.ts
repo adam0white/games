@@ -118,6 +118,7 @@ export async function checkpointContinuity(
   shelf: CastShelf,
   game: Game,
   isCurrent: () => boolean,
+  onBlocked?: (ids: string[]) => void,
 ): Promise<void> {
   if (!game.chapter || game.chapter.completed || game.outcome === "playing") return;
   const chapter = game.chapter;
@@ -129,7 +130,11 @@ export async function checkpointContinuity(
   const eligible = sharedCast.filter(
     (id) => !chapter.skipped?.includes(id) && !blocked.includes(id),
   );
-  if (!eligible.length) return;
+  const skippedBlocked = blocked.filter((id) => !chapter.skipped?.includes(id));
+  if (!eligible.length) {
+    onBlocked?.(skippedBlocked);
+    return;
+  }
   const now = Date.now();
   const envelopes = await Promise.all(
     eligible.map(async (castId) => {
@@ -178,4 +183,5 @@ export async function checkpointContinuity(
       eligible.map((id) => [id, chapter.claims.find((p) => p.castId === id)?.revision ?? null]),
     ),
   });
+  onBlocked?.(skippedBlocked);
 }
