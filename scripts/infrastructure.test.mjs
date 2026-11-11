@@ -44,6 +44,18 @@ test('release rejects mismatched lineage, version or redirected response', () =>
   assert.throws(() => checkRelease(expected, expected, true));
 });
 
+test('Godot release metadata preserves its runtime version and refuses a different HF engine', () => {
+  const metadata = { app: 'lefthand', engine: '4.17.0', godot: '4.7.2' };
+  const release = manifest(registry, game, 'b'.repeat(40), false, '0.5.17', '0.1.0', metadata);
+  assert.equal(release.app, 'lefthand');
+  assert.equal(release.godot, '4.7.2');
+  assert.equal(release.engine, registry.hfVersion);
+  assert.deepEqual(release.source, game.source);
+  assert.throws(() => manifest(registry, game, 'b'.repeat(40), false, '0.5.17', '0.1.0', { ...metadata, engine: '4.16.3' }), /engine/i);
+  assert.throws(() => manifest(registry, game, 'b'.repeat(40), false, '0.5.17', '0.1.0', { ...metadata, godot: 'latest' }), /metadata/i);
+  assert.throws(() => manifest(registry, game, 'b'.repeat(40), false, '0.5.17', '0.1.0', { ...metadata, commit: 'c'.repeat(40) }), /metadata/i);
+});
+
 test('scoped headers preserve Cloudflare removal directives', () => {
   assert.match(scopedHeaders('rope', '/assets/*\n  ! Cache-Control\n  Cache-Control: immutable\n'), /\/rope\/assets\/\*\n  ! Cache-Control/);
   assert.throws(() => scopedHeaders('rope', '/assets/*\n  ! Cache-Control injected\n'));

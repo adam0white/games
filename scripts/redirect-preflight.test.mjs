@@ -176,4 +176,14 @@ test('historical optional runtime metadata round-trips from the exact commit and
   writeFileSync(join(path, 'release-metadata.json'), JSON.stringify(metadata));
   const viewer = f.commit();
   assert.deepEqual(evidence.release(viewer, f.registry, f.game), manifest(f.registry, f.game, viewer, false, null, '1.0.0', metadata));
+  delete f.game.kind;
+  const godot = { app: 'lefthand', engine: '4.17.0', godot: '4.7.2' };
+  writeFileSync(join(path, 'package.json'), JSON.stringify({ version: '0.1.0', releaseMetadata: 'release-metadata.json', dependencies: { '@adam0white/human-framework': '4.17.0', '@adam0white/lab-client': url } }));
+  writeFileSync(join(path, 'release-metadata.json'), JSON.stringify(godot));
+  const godotCommit = f.commit();
+  assert.deepEqual(evidence.release(godotCommit, f.registry, f.game), manifest(f.registry, f.game, godotCommit, false, '0.5.16', '0.1.0', godot));
+  writeFileSync(join(path, 'release-metadata.json'), JSON.stringify({ ...godot, engine: '4.16.3' }));
+  const wrongEngine = f.commit();
+  assert.throws(() => evidence.release(wrongEngine, f.registry, f.game), /engine/i);
+  assert.equal(evidence.release(godotCommit, f.registry, f.game).engine, f.registry.hfVersion);
 });

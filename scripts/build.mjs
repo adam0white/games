@@ -34,7 +34,7 @@ for (const game of registry.games) {
   if (metadata) {
     const built = JSON.parse(readFileSync(`${target}/release.json`, 'utf8'));
     for (const [key, value] of Object.entries(metadata)) if (built[key] !== value) throw new Error(`${game.slug}: built release metadata mismatch: ${key}`);
-    if (built.commit !== commit || built.dirty !== false || built.framework !== registry.hfVersion || built.hf !== registry.hfVersion) throw new Error(`${game.slug}: built release identity mismatch`);
+    if (built.commit !== commit || built.dirty !== false || built.framework !== registry.hfVersion || (metadata.concordiaUpstream !== undefined && built.hf !== registry.hfVersion) || (metadata.engine !== undefined && built.engine !== registry.hfVersion)) throw new Error(`${game.slug}: built release identity mismatch`);
   }
   writeFileSync(`${target}/release.json`, JSON.stringify(manifest(registry, game, commit, false, labVersion, pkg.version, metadata)) + '\n');
 }

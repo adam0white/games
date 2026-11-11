@@ -41,12 +41,13 @@ export function packageReleaseMetadata(pkg, read) {
   if (pkg.releaseMetadata === undefined) return undefined;
   if (pkg.releaseMetadata !== 'release-metadata.json') throw new Error('Invalid release metadata path');
   const metadata = read(pkg.releaseMetadata);
-  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata) ||
-      Object.keys(metadata).sort().join(',') !== 'app,concordiaUpstream,pyodide,pythonBundle,runtime' ||
-      typeof metadata.app !== 'string' || !metadata.app ||
-      !sha.test(metadata.concordiaUpstream ?? '') || !/^[0-9a-f]{64}$/.test(metadata.pythonBundle ?? '') ||
-      !/^\d+\.\d+\.\d+$/.test(metadata.pyodide ?? '') ||
-      typeof metadata.runtime !== 'string' || !metadata.runtime) throw new Error('Invalid release metadata');
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata) || typeof metadata.app !== 'string' || !metadata.app) throw new Error('Invalid release metadata');
+  const keys = Object.keys(metadata).sort().join(',');
+  const python = keys === 'app,concordiaUpstream,pyodide,pythonBundle,runtime' &&
+    sha.test(metadata.concordiaUpstream ?? '') && /^[0-9a-f]{64}$/.test(metadata.pythonBundle ?? '') &&
+    /^\d+\.\d+\.\d+$/.test(metadata.pyodide ?? '') && typeof metadata.runtime === 'string' && !!metadata.runtime;
+  const godot = keys === 'app,engine,godot' && /^\d+\.\d+\.\d+$/.test(metadata.engine ?? '') && /^\d+\.\d+\.\d+$/.test(metadata.godot ?? '');
+  if (!python && !godot) throw new Error('Invalid release metadata');
   return metadata;
 }
 export function manifest(registry, game, commit, dirty, labVersion, app, metadata) {
@@ -56,7 +57,8 @@ export function manifest(registry, game, commit, dirty, labVersion, app, metadat
   const release = { game: game.slug, commit, dirty: false, source: game.source, hfVersion: registry.hfVersion, framework: registry.hfVersion, app, frameworkLibrary: registry.hfVersion, labVersion, saveSchema: game.saveSchema };
   if (metadata !== undefined) {
     const checked = packageReleaseMetadata({ releaseMetadata: 'release-metadata.json' }, () => metadata);
-    return { ...release, ...checked, hf: registry.hfVersion };
+    if (checked.engine !== undefined && checked.engine !== registry.hfVersion) throw new Error('Release metadata engine differs from registry HF');
+    return { ...release, ...checked, ...(checked.concordiaUpstream !== undefined ? { hf: registry.hfVersion } : {}) };
   }
   return release;
 }
