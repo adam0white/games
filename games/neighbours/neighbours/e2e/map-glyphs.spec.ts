@@ -1,0 +1,94 @@
+import { expect, type Page, step, test } from "./clock-fixture";
+import { enterLocalTown } from "./local-fixture";
+import { showTab } from "./session-helpers";
+
+async function enter(page: Page) {
+	await page.goto("/");
+	await enterLocalTown(page);
+	await expect(page.locator(".town-ready")).toBeVisible({ timeout: 60_000 });
+}
+
+test("clicking a neighbour chip never closes that neighbour's panel", async ({
+	page,
+}) => {
+	// Desktop width: below 900px the strip is hidden while a drawer is open.
+	await enter(page);
+	const chip = page.locator(".neighbour-strip [data-person-id]").first();
+	await chip.click();
+	await expect(page.locator(".person-panel")).toBeVisible();
+	await expect(chip).toHaveAttribute("aria-pressed", "true");
+	await chip.click();
+	await expect(page.locator(".person-panel")).toBeVisible();
+	await page.locator(".neighbour-strip [data-person-id]").nth(1).click();
+	await expect(page.locator(".person-panel")).toBeVisible();
+});
+
+test("the you marker stays whole at the left-edge quay on phone widths", async ({
+	page,
+}) => {
+	test.setTimeout(180_000);
+	await enter(page);
+	await page.locator('[data-map-place="quay"]').press("Enter");
+	await page.getByRole("button", { name: /Walk to Quay ·/ }).click();
+	for (
+		let i = 0;
+		i < 40 &&
+		!(await page.locator(".place-response").textContent())?.includes(
+			"You are here.",
+		);
+		i++
+	)
+		await step(page);
+	await expect(page.locator(".place-response")).toContainText("You are here.");
+	await showTab(page, "Town");
+	for (const width of [320, 360, 390]) {
+		await page.setViewportSize({ width, height: 780 });
+		const marker = page.locator(".map-you");
+		await expect(marker).toHaveCount(1);
+		await expect
+			.poll(async () => {
+				const map = await page.locator(".town-map").boundingBox();
+				const box = await marker.boundingBox();
+				return Boolean(
+					map &&
+						box &&
+						box.x >= map.x - 0.5 &&
+						box.x + box.width <= map.x + map.width + 0.5,
+				);
+			})
+			.toBe(true);
+	}
+	// × is the death marker only: neither the workshop nor the player draws one.
+	await expect(page.locator(".map-you .you-mark")).toHaveCount(1);
+	await expect(
+		page.locator('[data-map-place="workshop"] .tool-mark'),
+	).toHaveCount(1);
+});
+
+test("a departing traveller cannot block a phone place-count button", async ({
+	page,
+}) => {
+	// Keep all24 real rounds to14:00 before checking pointer geometry.
+	test.setTimeout(600000);
+	await page.setViewportSize({ width: 390, height: 844 });
+	await enter(page);
+	await page
+		.getByRole("button", { name: "Nora: Free to choose", exact: true })
+		.click();
+	await step(page, 120000);
+	for (let i = 0; i < 23; i++) await step(page, 120000);
+	await expect(page.locator(".town-time strong")).toHaveText("14:00");
+	await expect(page.locator(".town-ready")).toBeVisible();
+	await page.getByRole("button", { name: "Close person details" }).click();
+	const homes = page.getByRole("button", {
+		name: "4 neighbours at Riverside homes",
+		exact: true,
+	});
+	await expect(homes).toBeVisible();
+	// A normal pointer click must reach the count, even when a journey starts here.
+	await homes.click({ timeout: 5_000 });
+	await expect(homes).toHaveAttribute("aria-expanded", "true");
+	await expect(
+		page.getByRole("region", { name: "Neighbours at Riverside homes" }),
+	).toBeVisible();
+});
