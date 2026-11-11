@@ -168,6 +168,20 @@
       ],
       "legacyOrigin": "https://lefthand.adamwhite.work",
       "redirectEnabled": false
+    },
+    {
+      "slug": "word",
+      "source": {
+        "repository": "https://github.com/adam0white/word",
+        "commit": "06866be5b594313f2ca71864dc81b8f78234464d"
+      },
+      "saveSchema": "word-5",
+      "ciBrowsers": [
+        "chromium",
+        "webkit"
+      ],
+      "legacyOrigin": "https://word.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }
