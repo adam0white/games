@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createGame, dispatch } from '../src/game/engine';
 import { saveGame } from '../src/game/persistence';
@@ -77,36 +78,17 @@ async function runtime() {
 async function ownNoraSource() {
   const real = await import('@adam0white/lab-client');
   const { CAST_IDS } = await import('../src/game/cast');
-  const sourcePerson = createGame(41).people.nora!;
-  const { exportPersonRun } = await import('../src/game/hf');
-  const historical = await import('@adam0white/hf-fixture-411');
-  const initial = exportPersonRun(sourcePerson).initial;
-  const oldRun = historical.createRun(initial.spec);
-  if (!oldRun.ok) throw new Error(JSON.stringify(oldRun.error));
-  for (const person of initial.people) {
-    const created = historical.createPerson(oldRun.value, person);
-    if (!created.ok) throw new Error(JSON.stringify(created.error));
-  }
-  const oldView = historical.inspect(oldRun.value, {
-    perspective: { kind: 'host' },
-    people: ['nora'],
-    select: ['persona', 'calendar'],
-    portable: {
-      person: 'nora',
-      castId: CAST_IDS.nora!,
-      castRevision: real.canonicalCast(CAST_IDS.nora!).revision,
-    },
-  });
-  if (!oldView.ok) throw new Error(JSON.stringify(oldView.error));
-  const oldPerson = oldView.value.people[0];
-  if (oldPerson?.kind !== 'host') throw new Error('Historical projection unavailable');
-  const oldPart = oldPerson.parts.find((part) => part.select === 'persona');
-  if (oldPart?.select !== 'persona') throw new Error('Historical projection unavailable');
+  const oldPerson = JSON.parse(
+    readFileSync(
+      new URL('./fixtures/hf411-projections/repair-hf411-nora-source.fixture', import.meta.url),
+      'utf8',
+    ),
+  );
   const projected = {
     transfer: {
       castPassport: 'workshop-hf4/1',
       sourceRole: 'nora',
-      person: oldPart.value,
+      person: oldPerson,
     },
     limitations: [],
   };
@@ -205,7 +187,7 @@ describe('host recording and local ownership guards (synthetic controls)', () =>
   });
   it('keeps source archives in an isolated file without recording them or changing native saves', async () => {
     const previous = globalThis.location;
-    vi.stubGlobal('location', { pathname: '/file/' });
+    vi.stubGlobal('location', { pathname: '/smallworks/file/' });
     try {
       storage.set('small-works-cast-local-v2', 'native-kept');
       const host = await runtime();

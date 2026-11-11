@@ -1,0 +1,5 @@
+# HF 4.11 test projections
+
+These JSON projections were generated from source commit `7f0ac33eaffd4c5394f2604a255320d190a61716` using the original `@adam0white/hf-fixture-411` alias for `@adam0white/human-framework@4.11.0`. The original `historical-hf411.ts` and `ownNoraSource` test helpers generated them by running and inspecting the actual 4.11 engine. Four named SHA-256 keys cover the full JSON-serialized input archive, person ID, cast ID and cast revision. The Nora fixture is the original `createGame(41)` Nora initial archive projected by 4.11. The original source and generator are preserved in repository history. These are historical projections, not 4.17 output.
+
+Captured on 2026-11-10 by running the original `cast-integration.test.ts` and `continuity-guards.test.ts` against their original dependency; all 25 tests passed. The keyed loader fails if its current source inputs differ. Tests continue to exercise admission, refusal, and current-engine replay using the unmodified captured people.

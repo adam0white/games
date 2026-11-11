@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "build": "node scripts/third-party-notices.mjs && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "build:archives": "node scripts/build-archives.mjs",
     "test": "node scripts/suite-lock.ts -- vitest run",
@@ -16,16 +16,15 @@
     "lint": "biome check src tests vite.config.ts",
     "format": "biome check --write src tests vite.config.ts",
     "check": "npm run lint && npm run typecheck && npm test && npm run build",
-    "prebuild": "node scripts/stamp-release.mjs",
-    "deploy": "node scripts/deploy.mjs",
+    "deploy": "cd ../.. && pnpm run deploy",
     "deploy:check": "node scripts/deploy.mjs --dry-run",
     "check:lane": "npm run lint && npm run typecheck",
     "knip": "knip"
   },
   "dependencies": {
     "@adam0white/human-framework": "4.17.0",
-    "@adam0white/lab-client": "file:vendor/adam0white-lab-client-0.5.11.tgz",
-    "@adam0white/lab-kit": "file:vendor/adam0white-lab-kit-0.5.28.tgz",
+    "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.16/adam0white-lab-client-0.5.16.tgz",
+    "@adam0white/lab-kit": "https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.33/adam0white-lab-kit-0.5.33.tgz",
     "@fontsource/dm-sans": "5.3.0",
     "@fontsource/ibm-plex-mono": "5.3.0",
     "@fontsource/libre-baskerville": "5.3.0",
@@ -34,7 +33,6 @@
     "scheduler": "0.28.0"
   },
   "devDependencies": {
-    "@adam0white/hf-fixture-411": "npm:@adam0white/human-framework@4.11.0",
     "@biomejs/biome": "2.6.5",
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",

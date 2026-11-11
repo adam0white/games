@@ -1,6 +1,6 @@
 import { FEEDBACK_LABELS, type FeedbackLabel, type Lab } from '@adam0white/lab-client';
 
-export const FEEDBACK_NAME_KEY = 'hf-lab-feedback-name';
+export const FEEDBACK_NAME_KEY = 'small-works-hf-lab-feedback-name';
 export const LAB_PRIVACY = 'https://human.adamwhite.work/lab/privacy/';
 export function storedPreference(key: string): string {
   try {

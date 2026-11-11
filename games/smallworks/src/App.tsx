@@ -3022,7 +3022,7 @@ function Workshop({
                     Close file session
                   </button>
                 )}
-                <a href="/file/?tutorial=1" target="_blank" rel="noreferrer">
+                <a href="/smallworks/file/?tutorial=1" target="_blank" rel="noreferrer">
                   Replay tutorial in a practice workshop
                 </a>
                 <button className="reading-row" type="button" onClick={() => setSheet('history')}>
@@ -3042,7 +3042,7 @@ function Workshop({
                   Download this workshop
                 </button>
                 {!continuity.fileSession && (
-                  <a href="/file/" onClick={(event) => void goToGames(event)}>
+                  <a href="/smallworks/file/" onClick={(event) => void goToGames(event)}>
                     Open a saved workshop
                   </a>
                 )}
@@ -3107,7 +3107,10 @@ function Workshop({
                   </label>
                   {privacyTools()}
                 </div>
-                <a href="/experiments/" onClick={(event) => void goToGames(event)}>
+                <a
+                  href="https://repair.adamwhite.work/experiments/"
+                  onClick={(event) => void goToGames(event)}
+                >
                   Older versions of this game
                 </a>
                 <button

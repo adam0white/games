@@ -6,7 +6,7 @@ import { initializeWorkshopStorage } from './workshop-storage';
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing application root');
 async function start() {
-  if (!/^\/file\/?$/.test(location.pathname)) await initializeWorkshopStorage();
+  if (!/^\/smallworks\/file\/?$/.test(location.pathname)) await initializeWorkshopStorage();
   createRoot(root!).render(
     <StrictMode>
       <App />
@@ -24,7 +24,7 @@ void start().catch((error) => {
   retry.textContent = 'Try again';
   retry.onclick = () => location.reload();
   const file = document.createElement('a');
-  file.href = '/file/';
+  file.href = '/smallworks/file/';
   file.textContent = 'Open a workshop file';
   root!.replaceChildren(message, retry, file);
 });

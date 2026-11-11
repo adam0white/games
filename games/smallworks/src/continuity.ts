@@ -70,7 +70,8 @@ async function journalSnapshot(state: GameState, runId: string, envelopes: Perso
 }
 /** One source of ownership and recording permission. Local receipts never replace initial replay actors. */
 export class WorkshopContinuity {
-  readonly fileSession = typeof location !== 'undefined' && /^\/file\/?$/.test(location.pathname);
+  readonly fileSession =
+    typeof location !== 'undefined' && /^\/smallworks\/file\/?$/.test(location.pathname);
   readonly shelf = this.fileSession ? undefined : personaChannel();
   generation = 0;
   heads: PersonaEnvelope[] = [];

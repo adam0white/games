@@ -49,6 +49,16 @@
       ],
       "legacyOrigin": "https://glance.adamwhite.work",
       "redirectEnabled": false
+    },
+    {
+      "slug": "smallworks",
+      "source": {
+        "repository": "https://github.com/adam0white/repair-game",
+        "commit": "7f0ac33eaffd4c5394f2604a255320d190a61716"
+      },
+      "saveSchema": "small-works@5",
+      "legacyOrigin": "https://repair.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }
