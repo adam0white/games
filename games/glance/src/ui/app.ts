@@ -860,7 +860,7 @@ function mornings() {
 }
 function feedbackName() {
   try {
-    return localStorage.getItem('hf-lab-feedback-name') ?? '';
+    return localStorage.getItem('glance-hf-lab-feedback-name') ?? '';
   } catch {
     return '';
   }
@@ -949,7 +949,7 @@ function sendWord() {
           : await lab.sendFeedback(message, options);
       const sentMessage = `Sent. Your note is stored. Reference ${receipt}.`;
       try {
-        localStorage.setItem('hf-lab-feedback-name', who);
+        localStorage.setItem('glance-hf-lab-feedback-name', who);
       } catch {
         /* The note was stored even when this device cannot remember its name. */
       }
