@@ -86,7 +86,10 @@ describe('owner viewport regression', () => {
   it('holds the working view as rooms open and changes it only with explicit view controls', async () => {
     const page = await browser.newPage({ viewport: { width: 360, height: 780 } });
     try {
+      // A returning player has already seen the notice; the controlled footer below tests its resize separately.
+      await page.addInitScript(() => localStorage.setItem('hf-lab:once:telemetry-notice-v1', '1'));
       await enter(page);
+      await page.evaluate(() => document.fonts.ready);
       const early = await page.evaluate(() => (window as unknown as { __warren: Debug }).__warren.view.cs);
       await page.evaluate(() => {
         const { game } = (window as unknown as { __warren: Debug }).__warren;
@@ -107,13 +110,43 @@ describe('owner viewport regression', () => {
         await page.evaluate(() => (window as unknown as { __warren: Debug }).__warren.view.cs),
       ).toBeLessThan(wide);
 
+      const originalHeight = await page.evaluate(
+        () => (window as unknown as { __warren: Debug }).__warren.view.h,
+      );
+      // A footer can disappear on the frame after input, as the Lab notice does.
+      await page.evaluate(() => {
+        const footer = document.querySelector<HTMLElement>('#notice-footer');
+        if (!footer) throw new Error('Missing notice footer');
+        const transient = document.createElement('div');
+        transient.style.height = '29px';
+        footer.append(transient);
+        document.addEventListener('mouseup', () => requestAnimationFrame(() => transient.remove()), {
+          once: true,
+        });
+      });
+      await expect
+        .poll(async () => {
+          await page.clock.runFor(100);
+          return page.evaluate(() => (window as unknown as { __warren: Debug }).__warren.view.h);
+        })
+        .toBe(originalHeight - 29);
       await page.mouse.move(180, 320);
       await page.mouse.down();
       await page.mouse.move(220, 350, { steps: 4 });
       await page.mouse.up();
+      const beforeResize = await page.evaluate(() => ({
+        ...(window as unknown as { __warren: Debug }).__warren.view,
+      }));
+      await expect
+        .poll(async () => {
+          await page.clock.runFor(100);
+          return page.evaluate(() => (window as unknown as { __warren: Debug }).__warren.view.h);
+        })
+        .toBe(originalHeight);
       const panned = await page.evaluate(() => ({
         ...(window as unknown as { __warren: Debug }).__warren.view,
       }));
+      expect(panned).toEqual({ ...beforeResize, h: beforeResize.h + 29 });
       await page.clock.runFor(1000);
       expect(
         await page.evaluate(() => ({
