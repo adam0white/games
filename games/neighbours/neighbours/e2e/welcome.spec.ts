@@ -17,7 +17,7 @@ test("title starts no runtime and keeps keyboard entry visible", async ({
 		{ width: 1280, height: 800 },
 	]) {
 		await page.setViewportSize(viewport);
-		await page.goto("/");
+		await page.goto("/neighbours/");
 		const scene = await page.locator(".welcome-scene").boundingBox();
 		const premise = await page.locator(".welcome-premise").boundingBox();
 		expect(scene).not.toBeNull();
@@ -65,7 +65,7 @@ test("title starts no runtime and keeps keyboard entry visible", async ({
 test("a new seed is durably saved while paused before its first round", async ({
 	page,
 }) => {
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".town-ready")).toBeVisible();
 	await openSaves(page);
@@ -109,7 +109,7 @@ test("one top-bar information panel supports keyboard and Escape", async ({
 	page,
 }) => {
 	await page.setViewportSize({ width: 360, height: 690 });
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	const info = page.getByRole("button", { name: "Information", exact: true });
 	await expect(info).toHaveCount(1);
 	await info.focus();

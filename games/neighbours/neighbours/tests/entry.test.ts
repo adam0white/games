@@ -7,7 +7,7 @@ describe("public file entry", () => {
 			classifyEntry(new URL("https://example.test/?file=1&source=agent#saved")),
 		).toEqual({
 			kind: "redirect",
-			href: "/file/?source=agent#saved",
+			href: "/neighbours/file/?source=agent#saved",
 		});
 	});
 	it("refuses ambiguous file values before either startup", () => {
@@ -15,19 +15,21 @@ describe("public file entry", () => {
 			"/?file=0",
 			"/?file=",
 			"/?file=1&file=1",
-			"/file/?file=1&file=0",
+			"/neighbours/file/?file=1&file=0",
 		])
 			expect(classifyEntry(new URL(path, "https://example.test")).kind).toBe(
 				"refuse",
 			);
 	});
 	it("admits canonical file entry and preserves ordinary native entry", () => {
-		expect(classifyEntry(new URL("https://example.test/file/"))).toEqual({
+		expect(
+			classifyEntry(new URL("https://example.test/neighbours/file/")),
+		).toEqual({
 			kind: "file",
 		});
 		expect(
-			classifyEntry(new URL("https://example.test/file/index.html")),
-		).toEqual({ kind: "redirect", href: "/file/" });
+			classifyEntry(new URL("https://example.test/neighbours/file/index.html")),
+		).toEqual({ kind: "redirect", href: "/neighbours/file/" });
 		expect(
 			classifyEntry(new URL("https://example.test/?source=agent")),
 		).toEqual({ kind: "native" });

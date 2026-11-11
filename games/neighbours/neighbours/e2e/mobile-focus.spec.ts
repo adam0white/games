@@ -5,7 +5,7 @@ import { closeSelection, openSaves, showTab } from "./session-helpers";
 for (const width of [360, 1280])
 	test(`one sheet and pinned actions at ${width}`, async ({ page }) => {
 		await page.setViewportSize({ width, height: width === 360 ? 690 : 800 });
-		await page.goto("/");
+		await page.goto("/neighbours/");
 		await enterLocalTown(page);
 		await expect(page.locator(".town-ready")).toBeVisible({ timeout: 120000 });
 		await expect(page.locator(".game-sheet")).toHaveCount(1);

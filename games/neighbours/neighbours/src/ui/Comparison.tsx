@@ -154,7 +154,7 @@ export function InspectionStudy({ report }: { report: InspectionReport }) {
 					The original file lists limits that apply only to the baseline. The
 					full report’s limits apply to this comparison.
 				</p>
-				<a href="./experiments/inspection-comparison.json" download>
+				<a href="/neighbours/experiments/inspection-comparison.json" download>
 					Download recorded measurements ↓
 				</a>
 			</details>
@@ -166,7 +166,7 @@ export default function Comparison() {
 	const [error, setError] = useState(false);
 	useEffect(() => {
 		const controller = new AbortController();
-		fetch("./experiments/inspection-comparison.json", {
+		fetch("/neighbours/experiments/inspection-comparison.json", {
 			signal: controller.signal,
 		})
 			.then(async (response) => {

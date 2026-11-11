@@ -10,7 +10,9 @@ function SavedStudy({ kind }: { kind: StudyKind }) {
 	useEffect(() => {
 		const controller = new AbortController();
 		const spec = studySpecs[kind];
-		fetch(`./experiments/${spec.file}.json`, { signal: controller.signal })
+		fetch(`/neighbours/experiments/${spec.file}.json`, {
+			signal: controller.signal,
+		})
 			.then(async (response) => {
 				if (!response.ok) throw Error("Report unavailable");
 				setResult(projectStudy(kind, await response.json()));
@@ -53,7 +55,10 @@ function SavedStudy({ kind }: { kind: StudyKind }) {
 								{limit}
 							</p>
 						))}
-						<a href={`./experiments/${studySpecs[kind].file}.json`} download>
+						<a
+							href={`/neighbours/experiments/${studySpecs[kind].file}.json`}
+							download
+						>
 							Download full report ↓
 						</a>
 					</details>

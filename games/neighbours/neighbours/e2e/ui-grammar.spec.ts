@@ -113,7 +113,7 @@ for (const width of [360, 1280]) {
 				throw Error("Native confirmation forbidden");
 			};
 		});
-		await page.goto("/");
+		await page.goto("/neighbours/");
 		await expect(
 			page.getByRole("button", { name: "Enter Mill Bridge", exact: true }),
 		).toBeInViewport();
@@ -325,7 +325,10 @@ for (const width of [360, 1280]) {
 					value: true,
 					configurable: true,
 				});
-				localStorage.setItem("hf-lab-feedback-name", "Earlier tester");
+				localStorage.setItem(
+					"neighbours-hf-lab-feedback-name",
+					"Earlier tester",
+				);
 			});
 			await page.route("**/lab/api/**", async (route) => {
 				// Linked uploads retire only on a receipt for that exact piece.
@@ -346,9 +349,9 @@ for (const width of [360, 1280]) {
 			});
 			const configured =
 				process.env.NEIGHBOURS_LIVE_URL ?? "http://127.0.0.1:5286";
-			let entry = "/";
+			let entry = "/neighbours/";
 			if (!configured.startsWith("https://")) {
-				entry = "https://neighbours-ui-test.invalid/";
+				entry = "https://neighbours-ui-test.invalid/neighbours/";
 				await page.route(
 					"https://neighbours-ui-test.invalid/**",
 					async (route) => {
@@ -430,7 +433,9 @@ for (const width of [360, 1280]) {
 				).toBe(true);
 			}
 			expect(
-				await page.evaluate(() => localStorage.getItem("hf-lab-feedback-name")),
+				await page.evaluate(() =>
+					localStorage.getItem("neighbours-hf-lab-feedback-name"),
+				),
 			).toBe("QA named tester");
 		});
 	}
@@ -451,7 +456,7 @@ for (const width of [360, 1280]) {
 				body: JSON.stringify({ id: "qa-title-note", ok: true }),
 			});
 		});
-		await page.goto("/");
+		await page.goto("/neighbours/");
 		await expect(
 			page.getByRole("button", { name: "Enter Mill Bridge", exact: true }),
 		).toBeVisible();

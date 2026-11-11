@@ -4,7 +4,7 @@ import { openSaves } from "./session-helpers";
 
 test("entry stays visible and one menu holds the town", async ({ page }) => {
 	await page.setViewportSize({ width: 360, height: 690 });
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	const enter = page.getByRole("button", {
 		name: "Enter Mill Bridge",
 		exact: true,

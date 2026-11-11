@@ -36,7 +36,11 @@ test("built entry refuses invalid selectors and preserves missing-identity memor
 			return open(name, version);
 		};
 	});
-	for (const path of ["/?file=0", "/?file=1&file=1", "/file/?file=wrong"]) {
+	for (const path of [
+		"/neighbours/?file=0",
+		"/neighbours/?file=1&file=1",
+		"/neighbours/file/?file=wrong",
+	]) {
 		await page.goto(path);
 		await expect(page.getByText(/^Invalid file entry/)).toBeVisible();
 		expect(
@@ -45,7 +49,7 @@ test("built entry refuses invalid selectors and preserves missing-identity memor
 			),
 		).toEqual([]);
 	}
-	await page.goto("/?file=1&source=agent#kept");
+	await page.goto("/neighbours/?file=1&source=agent#kept");
 	await expect(page).toHaveURL(/\/file\/\?source=agent#kept$/);
 	await expect(page.getByLabel("Town file", { exact: true })).toBeVisible();
 	await expect(
@@ -65,7 +69,7 @@ test("built entry refuses invalid selectors and preserves missing-identity memor
 		),
 	).toEqual([]);
 	// Actual native positive: ordinary construction and Welcome still run.
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await expect(
 		page.getByRole("button", { name: /^Other ways in/ }),
 	).toBeVisible();
@@ -77,14 +81,14 @@ test("built entry refuses invalid selectors and preserves missing-identity memor
 	await page.getByRole("button", { name: /^Other ways in/ }).click();
 	await expect(
 		page.getByRole("link", { name: "Open a saved town in memory" }),
-	).toHaveAttribute("href", "/file/");
+	).toHaveAttribute("href", "/neighbours/file/");
 	// Literal build artifact, served by a static server too.
 	expect(await readFile("dist/file/index.html", "utf8")).toBe(
 		await readFile("dist/index.html", "utf8"),
 	);
 });
 
-// Real production App + immutable SDK15, served under a synthetic secure origin.
+// Real production App + immutable SDK17, served under a synthetic secure origin.
 // All requests remain local or are refused. Queued chunks are not delivery receipts.
 test("real SDK preserves existing session, OFF and statuses; final pagehide captures the complete file", async ({
 	browser,
@@ -244,7 +248,7 @@ test("real SDK preserves existing session, OFF and statuses; final pagehide capt
 		);
 	};
 	try {
-		await page.goto(`${origin}/file/?labRunSource=agent`);
+		await page.goto(`${origin}/neighbours/file/?labRunSource=agent`);
 		await expect(page.getByLabel("Town file", { exact: true })).toBeVisible();
 		expect(await identity()).toEqual([player, sid, run]);
 		await page.getByLabel("Town file", { exact: true }).setInputFiles({
@@ -613,7 +617,7 @@ async function lifecycleFile({
 		rounds: runtime.physical.round,
 		runtime,
 	};
-	await page.goto(`${origin}/file/?labRunSource=agent`);
+	await page.goto(`${origin}/neighbours/file/?labRunSource=agent`);
 	await page.getByLabel("Town file", { exact: true }).setInputFiles({
 		name: "full.json",
 		mimeType: "application/json",
@@ -717,7 +721,7 @@ test("regression: pending export must not publish after file pagehide while fina
 test("regression: pagehide invalidates an outstanding canonical file read", async ({
 	page,
 }) => {
-	await page.goto("/file/");
+	await page.goto("/neighbours/file/");
 	await page.evaluate(() => {
 		const text = Blob.prototype.text;
 		const p: SelectionProbe = { read: false, release: () => {}, workers: 0 };

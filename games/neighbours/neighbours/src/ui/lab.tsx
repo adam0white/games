@@ -3,7 +3,7 @@ import { telemetryNotice } from "@adam0white/lab-kit";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 const fileEntry =
-	typeof location !== "undefined" && location.pathname === "/file/";
+	typeof location !== "undefined" && location.pathname === "/neighbours/file/";
 export const lab = createLab({
 	game: "neighbours",
 	...(fileEntry ? { preservation: "preserve" as const } : {}),

@@ -75,7 +75,7 @@ test("actual current-cast evening is readable through the ordinary file App and 
 
 	await page.clock.install();
 	await page.clock.pauseAt(new Date());
-	await page.goto("/file/");
+	await page.goto("/neighbours/file/");
 	await page.getByLabel("Town file", { exact: true }).setInputFiles({
 		name: "actual.json.gz",
 		mimeType: "application/gzip",
@@ -294,7 +294,7 @@ test("held snapshot replies cannot republish after close, time advance or file r
 
 	await page.clock.install();
 	await page.clock.pauseAt(new Date());
-	await page.goto("/file/");
+	await page.goto("/neighbours/file/");
 	const file = {
 		name: "actual.json.gz",
 		mimeType: "application/gzip",

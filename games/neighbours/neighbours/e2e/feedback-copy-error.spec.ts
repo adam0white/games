@@ -19,7 +19,7 @@ for (const width of [360, 1280]) {
 				},
 			});
 		});
-		await page.goto("/");
+		await page.goto("/neighbours/");
 		await page.getByRole("button", { name: /^Other ways in/ }).click();
 		await page.getByLabel("Start from a seed number").fill("42");
 		await enterLocalTown(page);

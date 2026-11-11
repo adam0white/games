@@ -11,7 +11,7 @@ for (const width of [360, 1280]) {
 				? route.abort()
 				: route.continue(),
 		);
-		await page.goto("/");
+		await page.goto("/neighbours/");
 		await enterLocalTown(page);
 		await expect(page.locator(".town-ready")).toBeVisible({ timeout: 120000 });
 		await page.locator('.neighbour-strip [data-person-id="ada"]').click();

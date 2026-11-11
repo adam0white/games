@@ -45,7 +45,7 @@ for (const size of [
 			};
 		});
 		await page.route("https://**", (route) => route.abort());
-		await page.goto("/");
+		await page.goto("/neighbours/");
 		await enterLocalTown(page);
 		await expect(page.locator(".town-ready")).toBeVisible();
 		await closeSaves(page);

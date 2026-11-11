@@ -29,7 +29,7 @@ for (const width of [360, 1280]) {
 		page,
 	}, info) => {
 		await page.setViewportSize({ width, height: width === 360 ? 690 : 800 });
-		await page.goto("/");
+		await page.goto("/neighbours/");
 		const enter = page.getByRole("button", { name: /^Enter Mill Bridge/ });
 		await exposed(enter);
 		await enter.click();
@@ -84,7 +84,7 @@ for (const width of [360, 1280]) {
 	}, info) => {
 		test.setTimeout(180_000);
 		await page.setViewportSize({ width, height: width === 360 ? 690 : 800 });
-		await page.goto("/");
+		await page.goto("/neighbours/");
 		const enter = page.getByRole("button", { name: /^Enter Mill Bridge/ });
 		await exposed(enter);
 		await enter.click();

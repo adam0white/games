@@ -9,17 +9,17 @@ export function classifyEntry(url: URL): Entry {
 		return { kind: "refuse" };
 	if (
 		values.length ||
-		url.pathname === "/file" ||
-		url.pathname === "/file/index.html"
+		url.pathname === "/neighbours/file" ||
+		url.pathname === "/neighbours/file/index.html"
 	) {
 		const target = new URL(url);
-		target.pathname = "/file/";
+		target.pathname = "/neighbours/file/";
 		target.searchParams.delete("file");
 		return {
 			kind: "redirect",
 			href: target.pathname + target.search + target.hash,
 		};
 	}
-	if (url.pathname === "/file/") return { kind: "file" };
+	if (url.pathname === "/neighbours/file/") return { kind: "file" };
 	return { kind: "native" };
 }

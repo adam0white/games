@@ -51,7 +51,7 @@ async function exportFile(page: Page, info: TestInfo, name: string) {
 	};
 }
 async function startPaused(page: Page) {
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await closeSaves(page);
 	await expect(page.locator(".town-ready")).toBeVisible();

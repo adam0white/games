@@ -60,7 +60,7 @@ export default function InspectionSituation({
 		if (!open || report) return;
 		const abort = new AbortController();
 		setError("");
-		void fetch("/experiments/gm-director.json", {
+		void fetch("/neighbours/experiments/gm-director.json", {
 			signal: abort.signal,
 			cache: attempt ? "reload" : "default",
 		})

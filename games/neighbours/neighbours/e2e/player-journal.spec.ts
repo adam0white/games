@@ -43,7 +43,7 @@ test("the player walks, speaks with a promise and keeps it; the journal records 
 	page,
 }, info) => {
 	test.setTimeout(180_000);
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".town-ready")).toBeVisible({ timeout: 60_000 });
 
@@ -211,7 +211,7 @@ test("an answered request is on the device before it is shown and survives an im
 	test.setTimeout(300_000);
 	const errors: string[] = [];
 	page.on("pageerror", (error) => errors.push(error.message));
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".town-ready")).toBeVisible({ timeout: 60_000 });
 	await page.locator('[data-map-place="hall"] .place-hit-area').click();

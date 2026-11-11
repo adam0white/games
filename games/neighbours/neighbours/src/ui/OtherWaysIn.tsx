@@ -42,7 +42,7 @@ export default function OtherWaysIn({
 				</button>
 			</div>
 			<div className="sheet-scroll">
-				<a href="/file/">Open a saved town in memory</a>
+				<a href="/neighbours/file/">Open a saved town in memory</a>
 				{onLocal && (
 					<>
 						<button type="button" disabled={busy} onClick={onLocal}>

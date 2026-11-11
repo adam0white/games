@@ -141,7 +141,7 @@ export function ReceivedRouteResults({
 					{report.dirty ? " · source files modified" : " · source files clean"}
 				</p>
 				<pre>{JSON.stringify(trial.parameters, null, 2)}</pre>
-				<a href="./experiments/received-routes.json" download>
+				<a href="/neighbours/experiments/received-routes.json" download>
 					Download full report ↓
 				</a>
 			</details>
@@ -154,7 +154,9 @@ export default function ReceivedRouteStudy() {
 	const [domain, setDomain] = useState(0);
 	useEffect(() => {
 		const controller = new AbortController();
-		fetch("./experiments/received-routes.json", { signal: controller.signal })
+		fetch("/neighbours/experiments/received-routes.json", {
+			signal: controller.signal,
+		})
 			.then(async (r) => {
 				if (!r.ok) throw Error("Unavailable");
 				setReport(receivedRouteReport(await r.json()));

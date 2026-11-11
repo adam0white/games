@@ -57,10 +57,11 @@ async function boot() {
 		type: "progress",
 		message: "Loading the town. The first download is about 13 MB.",
 	});
-	const url = new URL("/runtime/pyodide.mjs", self.location.origin).href;
+	const url = new URL("/neighbours/runtime/pyodide.mjs", self.location.origin)
+		.href;
 	const { loadPyodide } = await import(/* @vite-ignore */ url);
 	py = await loadPyodide({
-		indexURL: new URL("/runtime/", self.location.origin).href,
+		indexURL: new URL("/neighbours/runtime/", self.location.origin).href,
 		stdout: () => {},
 		stderr: (message: string) => console.warn(message),
 	});
@@ -69,8 +70,8 @@ async function boot() {
 		message: "Your neighbours are getting ready…",
 	});
 	const [manifestResponse, wheelResponse] = await Promise.all([
-		fetch("/runtime/python-files.json", { cache: "no-cache" }),
-		fetch("/runtime/absl.whl"),
+		fetch("/neighbours/runtime/python-files.json", { cache: "no-cache" }),
+		fetch("/neighbours/runtime/absl.whl"),
 	]);
 	if (!manifestResponse.ok || !wheelResponse.ok)
 		throw Error("The town files could not load. Reload to try again.");

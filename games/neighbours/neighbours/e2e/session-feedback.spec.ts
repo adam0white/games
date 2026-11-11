@@ -104,7 +104,7 @@ test("world replacement clears feedback and rejects delayed exports and supersed
 	page,
 }, info) => {
 	await installGate(page);
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await closeSaves(page);
 	await expect(page.locator(".town-ready")).toBeVisible();
@@ -215,7 +215,7 @@ test("exports survive rejected imports and exports from a replacement survive it
 	page,
 }, info) => {
 	await installGate(page);
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await closeSaves(page);
 	await expect(page.locator(".town-ready")).toBeVisible();
@@ -345,7 +345,7 @@ test("exports survive rejected imports and exports from a replacement survive it
 test("a rejected local JSON file resumes automatic time without another action", async ({
 	page,
 }) => {
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".town-ready")).toBeVisible({ timeout: 120000 });
 	await openOtherWays(page);

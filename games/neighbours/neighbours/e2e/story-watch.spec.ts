@@ -5,7 +5,7 @@ import { closeSaves, openSaves } from "./session-helpers";
 test("automatic pacing hides clock controls and the menu holds", async ({
 	page,
 }) => {
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".state-words")).toBeVisible({ timeout: 60000 });
 	await expect(
@@ -61,7 +61,7 @@ test("the menu drains an in-flight story round and preserves its remaining readi
 			}
 		};
 	});
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".state-words")).toBeVisible({ timeout: 60000 });
 	// Current HF4 seed42 has no story through09:00. Its first actual

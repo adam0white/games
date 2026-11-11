@@ -3,7 +3,7 @@ import { enterLocalTown } from "./local-fixture";
 import { showTab } from "./session-helpers";
 
 async function enter(page: Page) {
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".town-ready")).toBeVisible({ timeout: 60_000 });
 }

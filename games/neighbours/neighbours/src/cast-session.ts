@@ -35,7 +35,7 @@ export interface TownPacket {
 	};
 }
 export const shelf =
-	typeof location !== "undefined" && location.pathname === "/file/"
+	typeof location !== "undefined" && location.pathname === "/neighbours/file/"
 		? null
 		: personaChannel();
 export async function sendFeedbackWithoutRun(

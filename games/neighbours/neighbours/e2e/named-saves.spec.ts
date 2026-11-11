@@ -40,7 +40,7 @@ test("named records retain complete packets and reject stale, retired and failed
 	await context.addInitScript(() => {
 		Object.defineProperty(window, "BroadcastChannel", { value: undefined });
 	});
-	await page.goto("/__test/slots");
+	await page.goto("/neighbours/__test/slots");
 	const packet = {
 		schema: "synthetic",
 		runtime: { seed: 73, people: [], obligations: ["kept"] },
@@ -56,7 +56,7 @@ test("named records retain complete packets and reject stale, retired and failed
 		Object.assign(window, { owner, a, b });
 	}, packet);
 	const other = await context.newPage();
-	await other.goto("/__test/slots");
+	await other.goto("/neighbours/__test/slots");
 	await other.evaluate(async () => {
 		const { DeviceSaves } = await import(String("/__test/persistence.js"));
 		const owner = new DeviceSaves(() => {});
@@ -305,7 +305,7 @@ test("public saved towns retain complete checkpoints, deterministic continuation
 	const started = Date.now();
 	const stage = (name: string) =>
 		console.log("named-checkpoint-stage", name, Date.now() - started);
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".town-ready")).toBeVisible();
 	await openSaves(page);
@@ -439,7 +439,7 @@ test("public saved towns retain complete checkpoints, deterministic continuation
 			return nativeOpen(name, version);
 		};
 	});
-	await page.goto("/?file=1");
+	await page.goto("/neighbours/?file=1");
 	await page.getByLabel("Town file").setInputFiles({
 		name: "synthetic-town.json",
 		mimeType: "application/json",
@@ -473,7 +473,7 @@ test("public saved towns retain complete checkpoints, deterministic continuation
 test("source invalidation and named load stay consistent across the real commit boundary", async ({
 	page,
 }) => {
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".town-ready")).toBeVisible();
 	await openSaves(page);

@@ -56,7 +56,7 @@ test("foreign file preserves occupied native slots through full export and reimp
 		);
 		await page.clock.install();
 		await page.clock.pauseAt(new Date());
-		await page.goto("/?file=1");
+		await page.goto("/neighbours/?file=1");
 		await page.evaluate(async () => {
 			localStorage.setItem("alder-follow", "occupied-owner-selection");
 			localStorage.setItem("foreign-test-sentinel", "occupied-owner-data");

@@ -8,7 +8,7 @@ for (const width of [360, 1280]) {
 		await page.addInitScript(() =>
 			localStorage.setItem("hf-lab-recording-off", "1"),
 		);
-		await page.goto("/");
+		await page.goto("/neighbours/");
 		const notice = page.locator(".lk-telemetry-notice");
 		await expect(notice).toHaveText(
 			"We record and link play across games on this device.",

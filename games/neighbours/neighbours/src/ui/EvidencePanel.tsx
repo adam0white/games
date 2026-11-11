@@ -14,34 +14,38 @@ const reports: {
 	{
 		kind: "social",
 		title: "Social episode measurements",
-		url: "/experiments/social-episodes.json",
+		url: "/neighbours/experiments/social-episodes.json",
 		schema: "neighbours/evening-profile@1",
 	},
 	{
 		kind: "native",
 		title: "Native run with one LLM neighbour",
-		url: "/experiments/native-mixed-town.json",
+		url: "/neighbours/experiments/native-mixed-town.json",
 		schema: "native-mixed-town@1",
 	},
 	{
 		kind: "cart",
 		title: "Rafi’s cart choice study",
-		url: "/experiments/cart-choice-probe.json",
+		url: "/neighbours/experiments/cart-choice-probe.json",
 		schema: "neighbours/cart-choice-probe@1",
 	},
 	{
 		kind: "gm",
 		title: "Concordia game-master proposal",
-		url: "/experiments/gm-director.json",
+		url: "/neighbours/experiments/gm-director.json",
 		schema: "native-concordia-gm@1",
 	},
 	{
 		kind: "config",
 		title: "Effects of HF settings",
-		url: "/experiments/hf-config.json",
+		url: "/neighbours/experiments/hf-config.json",
 		schema: "neighbours/hf-config-probe@1",
 	},
-	{ kind: "release", title: "Published build metadata", url: "/release.json" },
+	{
+		kind: "release",
+		title: "Published build metadata",
+		url: "/neighbours/release.json",
+	},
 ];
 function record(value: unknown): Record<string, unknown> {
 	return value && typeof value === "object" && !Array.isArray(value)

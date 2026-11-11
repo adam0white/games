@@ -1,4 +1,4 @@
-/** Scope: current receiving preparation. Published client0.5.15 has Neighbours identity roles, but this host
+/** Scope: current receiving preparation. Published client0.5.17 has Neighbours identity roles, but this host
  * has no Run admission mapping. A valid source passport is preserved and refused before any write.
  * Historical calendar/person mutation adapters are archived with their HF3 science.
  */

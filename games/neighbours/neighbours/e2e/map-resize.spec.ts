@@ -39,7 +39,7 @@ test("phone-to-desktop resize keeps map marker targets at their screen size", as
 	page,
 }) => {
 	await page.setViewportSize({ width: 360, height: 690 });
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".town-ready")).toBeVisible();
 	const widths = () =>
@@ -72,7 +72,7 @@ test("shared measurements follow current map lifetime without owning focus or hi
 	page,
 }) => {
 	await page.setViewportSize({ width: 360, height: 690 });
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".town-ready")).toBeVisible();
 	await measuredMap(page);

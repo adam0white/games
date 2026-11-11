@@ -36,7 +36,7 @@ for (const width of [360, 1280])
 		page,
 	}) => {
 		await page.setViewportSize({ width, height: width === 360 ? 690 : 800 });
-		await page.goto("/");
+		await page.goto("/neighbours/");
 		await enterLocalTown(page);
 		await expect(page.locator(".town-ready")).toBeVisible({ timeout: 120000 });
 		await page.locator('.neighbour-strip [data-person-id="ada"]').click();

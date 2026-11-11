@@ -47,7 +47,9 @@ type Entry =
 	| { kind: "import"; file: File };
 
 export default function App() {
-	const [fileSession] = useState(() => location.pathname === "/file/");
+	const [fileSession] = useState(
+		() => location.pathname === "/neighbours/file/",
+	);
 	const [filePacket, setFilePacket] = useState<unknown>();
 	const [fileError, setFileError] = useState("");
 	const fileIntent = useRef(0);

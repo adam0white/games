@@ -6,7 +6,7 @@ import { showTab } from "./session-helpers";
 test.use({ actionTimeout: 15000 });
 
 async function enter(page: Page) {
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".town-ready")).toBeVisible({ timeout: 60000 });
 	await showTab(page, "Compare");
@@ -82,7 +82,7 @@ test("320px recorded studies show actual case outcomes, honest LLM limits and ke
 	).toBe(true);
 	await page.getByRole("combobox", { name: /^Study/ }).selectOption("cart");
 	const cartReport = await (
-		await page.request.get("/experiments/cart-choice-probe.json")
+		await page.request.get("/neighbours/experiments/cart-choice-probe.json")
 	).json();
 	// The regenerated canonical run searched actual decisions without finding a matched opportunity.
 	expect(cartReport.opportunity).toBeNull();

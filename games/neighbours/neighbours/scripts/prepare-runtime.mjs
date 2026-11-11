@@ -63,6 +63,24 @@ await writeFile(
 	resolve(output, "python-files.json"),
 	JSON.stringify({ schema: 1, digest, files }),
 );
+const releaseMetadata = JSON.parse(
+	await readFile(resolve(root, "release-metadata.json"), "utf8"),
+);
+const pyodide = JSON.parse(
+	await readFile(resolve(app, "node_modules/pyodide/package.json"), "utf8"),
+);
+if (
+	releaseMetadata.pythonBundle !== digest ||
+	releaseMetadata.pyodide !== pyodide.version ||
+	releaseMetadata.pyodide !== manifest.dependencies.pyodide ||
+	releaseMetadata.app !== "neighbours@1" ||
+	releaseMetadata.concordiaUpstream !==
+		"6fbfbc58f324aa74f78568c488713210889a801e" ||
+	releaseMetadata.runtime !== "Browser-local Python Concordia and released HF"
+)
+	throw Error(
+		"Committed release metadata does not match the built Python runtime",
+	);
 let commit = "development",
 	dirty = true;
 try {
@@ -81,13 +99,13 @@ await writeFile(
 		{
 			commit,
 			dirty,
-			app: "neighbours@1",
+			app: releaseMetadata.app,
 			framework: FRAMEWORK_VERSION,
 			hf: FRAMEWORK_VERSION,
-			concordiaUpstream: "6fbfbc58f324aa74f78568c488713210889a801e",
+			concordiaUpstream: releaseMetadata.concordiaUpstream,
 			pythonBundle: digest,
-			runtime: "Browser-local Python Concordia and released HF",
-			pyodide: "314.0.7",
+			runtime: releaseMetadata.runtime,
+			pyodide: releaseMetadata.pyodide,
 		},
 		null,
 		2,
@@ -98,7 +116,12 @@ await cp(
 	resolve(app, "public/concordia-license.txt"),
 );
 const notices = [
+	["Neighbours owner-authored game (MIT)", resolve(app, "LICENSE")],
 	["Concordia (Apache-2.0)", resolve(root, "LICENSE")],
+	[
+		"Lab client and lab kit (MIT)",
+		resolve(app, "node_modules/@adam0white/lab-client/LICENSE"),
+	],
 	[
 		`Human Framework ${FRAMEWORK_VERSION} (MIT)`,
 		resolve(app, "node_modules/@adam0white/human-framework/LICENSE"),
@@ -128,6 +151,15 @@ const noticeParts = [
 ];
 for (const [name, path] of notices)
 	noticeParts.push(`${name}\n${await readFile(path, "utf8")}`);
+const hfReadme = await readFile(
+	resolve(app, "node_modules/@adam0white/human-framework/README.md"),
+	"utf8",
+);
+const fdlibm = hfReadme.match(
+	/## fdlibm notices[\s\S]*?```text\n([\s\S]*?)```/,
+);
+if (!fdlibm) throw Error("Missing published HF fdlibm notices");
+noticeParts.push(`Human Framework fdlibm notices\n${fdlibm[1]}`);
 // The pinned wheel carries its original Apache-2.0 license. Extract without Python.
 const { loadPyodide } = await import("pyodide");
 const py = await loadPyodide({

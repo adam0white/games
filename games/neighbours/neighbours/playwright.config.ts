@@ -30,7 +30,7 @@ export default defineConfig({
 		: {
 				command:
 					"npm run build && npx vite preview --host 127.0.0.1 --port 5286 --strictPort",
-				url: "http://127.0.0.1:5286",
+				url: "http://127.0.0.1:5286/neighbours/",
 				reuseExistingServer: false,
 				timeout: 120_000,
 			},

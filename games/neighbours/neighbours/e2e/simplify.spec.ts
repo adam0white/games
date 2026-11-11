@@ -39,7 +39,7 @@ for (const [width, height] of [
 				};
 			});
 		}, packet);
-		await page.goto("/");
+		await page.goto("/neighbours/");
 		await expect(
 			page.getByRole("button", { name: /Other ways in/ }),
 		).toBeVisible();

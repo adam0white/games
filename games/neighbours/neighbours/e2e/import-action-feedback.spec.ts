@@ -57,7 +57,7 @@ async function importPacket(page: Page, value: unknown) {
 test("worker rejects JSON arrays and invalid objects with truthful recovery and exact continuation", async ({
 	page,
 }, info) => {
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".town-ready")).toBeVisible();
 	const original = await exportPacket(page, info, "original");
@@ -146,7 +146,7 @@ test("one pending intervention spends one credit and a later deliberate repeat r
 			}
 		};
 	});
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".town-ready")).toBeVisible();
 	const original = await exportPacket(page, info, "before-tools");

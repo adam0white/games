@@ -86,7 +86,7 @@ for (const viewport of [
 		page,
 	}) => {
 		await page.setViewportSize(viewport);
-		await page.goto("/");
+		await page.goto("/neighbours/");
 		await enterLocalTown(page);
 		await expect(page.locator(".town-ready")).toBeVisible();
 		await expectStandaloneTarget(

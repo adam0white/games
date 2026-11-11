@@ -5,7 +5,7 @@ import { useLabRecording } from "./lab";
 import type { useVisitorSession } from "./useVisitorSession";
 
 type Session = ReturnType<typeof useVisitorSession>;
-const NAME_KEY = "hf-lab-feedback-name";
+const NAME_KEY = "neighbours-hf-lab-feedback-name";
 const verdicts = [
 	{ label: "I'd keep playing", value: "keep" },
 	{ label: "Not sure", value: "mixed" },

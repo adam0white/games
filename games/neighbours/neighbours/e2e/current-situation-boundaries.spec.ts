@@ -8,7 +8,7 @@ import { enterLocalTown } from "./local-fixture";
 test("a fresh public town keeps the damaged hall closed and exposes ordinary controls", async ({
 	page,
 }) => {
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".town-ready")).toBeVisible();
 	await expect(

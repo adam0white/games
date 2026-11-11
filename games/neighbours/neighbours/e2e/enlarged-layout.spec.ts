@@ -55,7 +55,7 @@ test("doubled computed text keeps town controls and scrolled Journal reachable",
 }) => {
 	await page.setViewportSize({ width: 360, height: 690 });
 	await page.emulateMedia({ colorScheme: "light" });
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".town-ready")).toBeVisible();
 	const base = await page

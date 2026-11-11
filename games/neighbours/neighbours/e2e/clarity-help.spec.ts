@@ -14,7 +14,7 @@ test("a player can offer and complete a real hour and see Nora remember it", asy
 	page,
 }, info) => {
 	const started = Date.now();
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	await expect(page.locator(".town-ready")).toBeVisible({ timeout: 60000 });
 	await page.locator('[data-map-place="hall"]').tap();

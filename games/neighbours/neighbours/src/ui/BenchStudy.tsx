@@ -90,7 +90,7 @@ export function BenchStudyResults({
 					<br />
 					{report.sourceFingerprint}
 				</p>
-				<a href="./experiments/bench-choices.json" download>
+				<a href="/neighbours/experiments/bench-choices.json" download>
 					Download all cases and matched controls ↓
 				</a>
 			</details>
@@ -103,7 +103,9 @@ export default function BenchStudy() {
 	const [index, setIndex] = useState(0);
 	useEffect(() => {
 		const c = new AbortController();
-		fetch("./experiments/bench-choices-summary.json", { signal: c.signal })
+		fetch("/neighbours/experiments/bench-choices-summary.json", {
+			signal: c.signal,
+		})
 			.then(async (r) => {
 				if (!r.ok) throw Error("Unavailable");
 				setReport(benchStudyReport(await r.json()));

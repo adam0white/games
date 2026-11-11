@@ -6,15 +6,18 @@ import { expect, test } from "./clock-fixture";
 test("worker rejects an invalid queued advance in command order and preserves the preceding step", async ({
 	page,
 }) => {
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	const asset = (await readdir("dist/assets")).find(
 		(name) => name.startsWith("runtime.worker-") && name.endsWith(".js"),
 	);
 	if (!asset) throw Error("Built worker asset missing");
 	const replies = await page.evaluate(async (path) => {
-		const worker = new Worker(new URL(`/assets/${path}`, location.href), {
-			type: "module",
-		});
+		const worker = new Worker(
+			new URL(`/neighbours/assets/${path}`, location.href),
+			{
+				type: "module",
+			},
+		);
 		const replies: {
 			type: string;
 			now?: number;

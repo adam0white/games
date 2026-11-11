@@ -1,6 +1,7 @@
 /** Verify the served build's identity against this checkout and installed HF. */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -15,6 +16,26 @@ assert.equal(
 	installed.version,
 	declared,
 	"Installed HF differs from the exact game pin",
+);
+const metadata = read(resolve(root, "release-metadata.json"));
+const pythonFiles = read(resolve(app, "public/runtime/python-files.json"));
+const pythonDigest = createHash("sha256")
+	.update(JSON.stringify(pythonFiles.files))
+	.digest("hex");
+assert.equal(
+	pythonFiles.digest,
+	pythonDigest,
+	"Built Python file manifest is altered",
+);
+assert.equal(
+	pythonDigest,
+	metadata.pythonBundle,
+	"Built Python bundle does not match committed metadata",
+);
+assert.equal(
+	read(resolve(app, "node_modules/pyodide/package.json")).version,
+	metadata.pyodide,
+	"Installed Pyodide differs from committed metadata",
 );
 const git = (...args) =>
 	execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
@@ -34,6 +55,8 @@ for (const path of paths) {
 	assert.equal(release.hf, installed.version, "Built HF stamp is stale");
 	assert.equal(release.commit, commit, "Built source commit is stale");
 	assert.equal(release.dirty, dirty, "Built source cleanliness is stale");
+	for (const [key, value] of Object.entries(metadata))
+		assert.equal(release[key], value, `Built release metadata differs: ${key}`);
 }
 console.log(
 	`Verified ${paths.length} built release record(s): ${commit}, HF ${installed.version}, dirty:${dirty}`,

@@ -17,7 +17,7 @@ test("an explicit conversation holds time and closing it resumes the automatic t
 }) => {
 	// Full initialization and walking correctness; not a latency acceptance.
 	test.setTimeout(600000);
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page, 60000);
 	await expect(page.locator(".state-words")).toBeVisible({ timeout: 60000 });
 	await page.locator('.neighbour-strip [data-person-id="ravi"]').click();

@@ -33,7 +33,7 @@ test("walking acknowledges without duplicate inputs and clears after replacement
 			}
 		};
 	});
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	const play = page.getByRole("button", { name: /^Game menu(?: · day \d+)?$/ });
 	await expect(page.locator(".town-ready")).toBeVisible({ timeout: 120000 });
@@ -90,7 +90,7 @@ test("a held worker reply shows pending immediately without moving the menu", as
 			}
 		};
 	});
-	await page.goto("/");
+	await page.goto("/neighbours/");
 	await enterLocalTown(page);
 	const play = page.getByRole("button", { name: /^Game menu(?: · day \d+)?$/ });
 	await expect(page.locator(".town-ready")).toBeVisible({ timeout: 120000 });
