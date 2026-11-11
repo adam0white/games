@@ -82,7 +82,19 @@ it('an answered "leave it empty" is not re-asked as a duplicate while that absen
 }, 120000);
 
 it('seed 7: a real HF takeover rejection is a cook answer; the host stale notice is separate', () => {
-  const { s } = night('first', 1180);
+  const s = newGame(7, 'pass@20');
+  queueInput(s, { kind: 'board', rows: boardDefaults(s) });
+  queueInput(s, { kind: 'open' });
+  const answered = new Set<number>();
+  for (let i = 0; i < 900 && s.night === 1 && s.minute < 1180; i++) {
+    step(s);
+    for (const d of s.staffing ?? []) {
+      if (d.state === 'asking' && !answered.has(d.id)) {
+        answered.add(d.id);
+        queueInput(s, { kind: 'staff', id: d.id, cover: staffingOptions(s, d)[0] ?? null });
+      }
+    }
+  }
   const old = s.said.find((l) => l.who !== 'narrator' && /I cannot take over that station\./.test(l.text));
   expect(old, 'the played night contains a real takeover rejection').toBeDefined();
   expect(old?.kind).toBe('answer');
@@ -147,12 +159,13 @@ it('seed 42: an actual accepted takeover works the agreed station and ends at it
   expect(!held || held.until <= (taken?.until ?? 0) || held.station !== taken?.station).toBe(true);
 }, 120000);
 
-it('a retired HF4 edition never reaches the HF3 constructors; supported editions still build', () => {
-  expect(() => newGame(7, 'pass@19')).toThrow('not supported');
-  expect(() => replay(7, [], undefined, 'pass@19')).toThrow('not supported');
+it('retired editions refuse while the current edition still builds and replays', () => {
+  for (const edition of ['pass@10', 'pass@13', 'pass@19']) {
+    expect(() => newGame(7, edition)).toThrow('Keep this file and start a new game');
+    expect(() => replay(7, [], undefined, edition)).toThrow('Keep this file and start a new game');
+  }
   expect(isHF4(newGame(7, 'pass@20').chef)).toBe(true);
-  expect(isHF4(newGame(7, 'pass@13').chef)).toBe(false);
-  expect(isHF4(replay(7, [], undefined, 'pass@10').chef)).toBe(false);
+  expect(isHF4(replay(7, [], undefined, 'pass@20').chef)).toBe(true);
 });
 
 it('replays the staffing night exactly and keeps later inputs equal', async () => {

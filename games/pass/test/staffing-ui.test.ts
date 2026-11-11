@@ -1,12 +1,12 @@
-import { begin, decide } from '@adam0white/human-framework-legacy';
 import { describe, expect, it } from 'vitest';
+import { begin, decide } from '../src/sim/hf4-person.ts';
 import { boardDefaults, cookOf, newGame, personOf, queueInput, stationOf, step } from '../src/sim/kitchen.ts';
 import { automaticClockPlayback, clockPlayback } from '../src/ui/clock.ts';
 import { actionableStaffing, availableStaffing } from '../src/ui/staffing.ts';
 import { serviceStatus } from '../src/ui/status.ts';
 
 function movedCook() {
-  const s = newGame(42, 'pass@13');
+  const s = newGame(42, 'pass@20');
   s.phase = 'service';
   s.tickets = [];
   s.board = {
@@ -61,19 +61,22 @@ describe('staffing prompts after an accepted station change', () => {
   }, 120000);
 
   it('suppresses the follow-up after an actual current-edition accepted chef ask', () => {
-    const s = newGame(1, 'pass@13');
+    const s = newGame(1, 'pass@20');
     queueInput(s, { kind: 'board', rows: boardDefaults(s) });
     queueInput(s, { kind: 'open' });
-    while (s.minute < 1111) step(s);
-    queueInput(s, { kind: 'ask', cook: 'selim', verb: 'cold' });
-    step(s);
+    for (const at of [1060, 1080, 1100, 1120, 1140, 1160]) {
+      while (s.minute < at) step(s);
+      queueInput(s, { kind: 'ask', cook: 'selim', verb: 'cold' });
+      step(s);
+    }
     expect(s.lastAnswer?.verdict).toBe('assented');
     expect(stationOf(s, 'selim')).toBe('cold');
     expect(s.staffing?.some((d) => d.who === 'selim' && d.state === 'asking')).toBe(true);
     const before = JSON.stringify(s);
     expect(actionableStaffing(s)).toEqual([]);
     expect(serviceStatus(s).needsResponse).toBe(false);
-    expect(automaticClockPlayback(s).rate).toBe(6);
+    // This current witness has an open order, so steady speed is 1.5 rather than the empty-room rate.
+    expect(automaticClockPlayback(s).rate).toBe(1.5);
     expect(JSON.stringify(s)).toBe(before);
   });
 

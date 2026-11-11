@@ -4,8 +4,9 @@
  * reviews and chronicle; these lines are chosen from what actually happened tonight (who refused what, at what
  * time, who was pushed), never at random, and a line is not repeated for the same cook.
  */
-import type { Activity, Person, SuggestionResolution } from '@adam0white/human-framework-legacy';
+
 import { isHF4 } from './hf4-person.ts';
+import type { Activity, Person, SuggestionResolution } from './historical-display.ts';
 import { hashUnit } from './rng.ts';
 
 export const VERB_WORD: Record<string, string> = {

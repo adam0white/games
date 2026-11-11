@@ -6,9 +6,8 @@ import {
 } from '@adam0white/lab-client';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { required } from '../src/required.ts';
-import { freshActor, kitchenTransfer } from '../src/sim/cast-chapter.ts';
-import { hf4ReleaseProjection } from '../src/sim/hf4-cast.ts';
-import { tick } from '../src/sim/hf4-person.ts';
+import { hf4KitchenTransfer, hf4ReleaseProjection } from '../src/sim/hf4-cast.ts';
+import { freshCommunity, tick } from '../src/sim/hf4-person.ts';
 import {
   boardDefaults,
   cloneState,
@@ -59,16 +58,15 @@ beforeEach(() => {
   mocks.lab.personaRecordingAllowed = false;
 });
 const envelope = async () => {
-  const p = freshActor('hulya', 42, 540);
-  p.agenda.commitments = [];
-  const transfer = await kitchenTransfer(p);
+  const p = required(freshCommunity(42).people.find((person) => person.id === 'hulya'));
+  const transfer = await hf4KitchenTransfer(p);
   return createPersona({
     format: 'hf-persona/1',
     castId: 'hf.cast.hulya.pass',
     castRevision: '1',
     branchId: 'fixture-branch',
     parentRevision: null,
-    source: { game: 'pass', build: 'fixture', engine: '2.17.0', rules: 'pass-13' },
+    source: { game: 'pass', build: 'fixture', engine: transfer.portable.source.engine, rules: 'pass-20' },
     transfer: { ...transfer, life: initialPersonaLife('hf.cast.hulya.pass', 'fixture-branch', 0) },
     limitations: transfer.limitations,
   });
@@ -91,7 +89,12 @@ it('title and local reload do not claim a new chapter; file receipt stays nonown
   );
 });
 it('skips an old incomplete passport without claiming its head', async () => {
-  const e = await envelope();
+  const { revision: _revision, ...source } = await envelope();
+  const e = await createPersona({
+    ...source,
+    source: { ...source.source, engine: '2.17.0', rules: 'pass-13' },
+    transfer: { ...source.transfer, castPassport: 'pass-kitchen/1' },
+  });
   mocks.shelf.request.mockImplementation(async (r) => {
     if (r.action === 'prepareBatch')
       return {
@@ -139,7 +142,7 @@ it('checkpoint CAS never retries against a newer head and imported files never p
   required(s.people.find((p) => p.id === 'selim')).agenda.commitments = [];
   mocks.shelf.request.mockRejectedValue(new Error('stale'));
   const c = continuity(() => s, vi.fn(), vi.fn());
-  await c.restore(undefined, true, true);
+  await c.restore({ authority: 'pass-authority/1', skipped: [], envelope: null, oneCast: [] }, true, true);
   await c.checkpoint();
   expect(mocks.shelf.request).not.toHaveBeenCalled();
 });
@@ -148,7 +151,14 @@ it('Sunday rewind discards later ownership rather than requiring its future sour
     s = newGame(42),
     c = continuity(() => s, vi.fn(), vi.fn());
   await c.restore(
-    { envelope: null, oneCast: [], ownedHeads: { [e.castId]: e }, recordingGroup: [e] },
+    {
+      authority: 'pass-authority/1',
+      skipped: [],
+      envelope: null,
+      oneCast: [],
+      ownedHeads: { [e.castId]: e },
+      recordingGroup: [e],
+    },
     true,
     true,
     s,
@@ -156,14 +166,22 @@ it('Sunday rewind discards later ownership rather than requiring its future sour
   expect(c.data().ownedHeads).toEqual({});
   expect(c.data().fileOrigin).toBe(true);
 });
+// Synthetic host readout: this tests custody of an observed death, not an HF death event.
 it('an owned unreleased death publishes terminal and its local save reloads without a release', async () => {
   const e = await envelope(),
     s = newGame(42),
-    p = freshActor('hulya', 42, 540);
+    p = required(freshCommunity(42).people.find((person) => person.id === 'hulya'));
   p.body.alive = false;
   s.people.push(p);
   const c = continuity(() => s, vi.fn(), vi.fn());
-  await c.restore({ envelope: null, oneCast: [], ownedHeads: { [e.castId]: e }, recordingGroup: [e] });
+  await c.restore({
+    authority: 'pass-authority/1',
+    skipped: [],
+    envelope: null,
+    oneCast: [],
+    ownedHeads: { [e.castId]: e },
+    recordingGroup: [e],
+  });
   mocks.shelf.request.mockImplementation(async (r) =>
     r.action === 'recordingBatch'
       ? {

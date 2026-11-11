@@ -1,3 +1,7 @@
+# Monorepo migration candidate — 2026-11-10
+
+Remaining: finish and pass current game and shared checks, review the source and local migration, validate the assembled build and replay, and obtain the required integration and release approvals. The original site remains authoritative. No monorepo deployment or data migration is claimed. The game-owned runtime now targets only npm HF 4.17.0 and pass@20; old notebooks are refused and historical tests are retained under archive/historical-tests. Current HF4 replay and continuity have focused local evidence; see the migration report for the remaining gates.
+
 ## Upkeep follow-up — 2026-11-05
 
 Remaining: integrate open Clarity work, qualify HF 4.17 replay and release, and obtain Adam's readiness judgment. Recheck F-2509 on 2026-11-12: the delivered bathroom drawing did not reproduce Sonia's historical phone-label cause or establish her judgment. Recheck the current public modified-learner verdict and same-tester return on 2026-11-12: neither was observed in the bounded controls and player rounds remain paused. Recheck shared attention and obligation contracts on 2026-11-12: their generic HF owner must establish the missing authority-bound evidence and reassignment semantics. F-2510 retains its 2026-11-10 recheck. Dates are engineering follow-ups, not appointments. Historical receipts below remain unchanged.

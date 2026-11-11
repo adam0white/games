@@ -898,9 +898,7 @@ async function title() {
         !canReplay(ex.game) ||
         (typeof ex.framework === 'string' && ex.framework !== FRAMEWORK_VERSION)
       ) {
-        status(
-          'This file comes from a different version of The Pass. It cannot be loaded. Start a new game instead.',
-        );
+        status('This file comes from a different version of The Pass. Keep it and start a new game.');
         return;
       }
       const r = await validateReplayFile(ex);

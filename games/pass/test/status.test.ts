@@ -1,12 +1,13 @@
-import { begin, decide } from '@adam0white/human-framework-legacy';
 import { describe, expect, it } from 'vitest';
 import { NIGHT_PLANS, nightStart } from '../src/sim/campaign.ts';
 import type { Station } from '../src/sim/cooks.ts';
+import { begin, decide } from '../src/sim/hf4-person.ts';
 import { cookOf, newGame, personOf, queueInput, type Ticket } from '../src/sim/kitchen.ts';
 import { journalWords, serviceStatus, tableAboutToLeave } from '../src/ui/status.ts';
 
 function setup() {
-  const s = newGame(42, 'pass@4');
+  const s = newGame(42, 'pass@20');
+  s.phase = 'service';
   s.tickets = [];
   for (const c of s.cooks) {
     c.here = true;
@@ -305,7 +306,7 @@ describe('display-only service cues', () => {
 });
 
 it('explains a current staffing gap with no willing cover without demanding a response', () => {
-  const s = newGame(42, 'pass@16');
+  const s = newGame(42, 'pass@20');
   s.staffing = [
     { id: 0, who: 'selim', station: 'cold', until: s.minute + 20, reason: 'I need to eat.', state: 'asking' },
   ];

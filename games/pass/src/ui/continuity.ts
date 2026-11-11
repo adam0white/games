@@ -1,5 +1,4 @@
 /** Whole kitchen ownership and pinned exports. Title entry is read-only; files never acquire ownership. */
-import { FRAMEWORK_VERSION, snapshot } from '@adam0white/human-framework-legacy';
 import {
   anchorPersonaLife,
   canonicalCast,
@@ -21,9 +20,7 @@ import {
   AUTHORITY,
   AUTHORITY_REFUSAL,
   CAST,
-  digest,
   keyOf,
-  kitchenTransfer,
   requireChapterAuthority,
   validateKitchenChapter,
 } from '../sim/cast-chapter.ts';
@@ -150,6 +147,7 @@ export function continuity(
   });
   const run = (): ContinuityExport | null => {
     const s = getState();
+    if (s && s.version !== 'pass@20') return null;
     if (s?.version === 'pass@20') {
       try {
         assertActive(s);
@@ -159,7 +157,7 @@ export function continuity(
     }
     return s
       ? {
-          ...exportRun(s, s.version === 'pass@20' ? '4.17.0' : FRAMEWORK_VERSION),
+          ...exportRun(s, '4.17.0'),
           continuity: data(),
           oneCast: structuredClone(rows),
         }
@@ -266,10 +264,10 @@ export function continuity(
             ? person.body.alive
             : !state.releasedCast?.includes(person.id) ||
               receipt?.checkpointDigest !==
-                (isHF4(person)
-                  ? (await hf4KitchenTransfer(person, releaseProjection(state, person.id))).checkpoint
-                      .checkpointDigest
-                  : await digest(snapshot(person))))
+                (!isHF4(person)
+                  ? null
+                  : (await hf4KitchenTransfer(person, releaseProjection(state, person.id))).checkpoint
+                      .checkpointDigest))
         )
           throw new Error('Saved receipt does not match the played kitchen checkpoint.');
       }
@@ -415,23 +413,16 @@ export function continuity(
         }
         continue;
       }
-      if (
-        !s.releasedCast?.includes(id) ||
-        (!isHF4(p) && (!['evening', 'sunday', 'end'].includes(s.phase) || p.activity))
-      )
-        continue;
+      if (!s.releasedCast?.includes(id) || !isHF4(p)) continue;
       try {
-        if (isHF4(p) && !canWritePortable(cast)) continue;
-        const transfer = isHF4(p)
-          ? await hf4KitchenTransfer(p, releaseProjection(s, id))
-          : await kitchenTransfer(snapshot(p));
+        if (!canWritePortable(cast)) continue;
+        const transfer = await hf4KitchenTransfer(p, releaseProjection(s, id));
         if (
           epoch !== generation ||
           getState() !== s ||
           s.minute !== minute ||
-          (isHF4(p)
-            ? (await hf4KitchenTransfer(p, releaseProjection(s, id))).checkpoint.checkpointDigest
-            : await digest(snapshot(p))) !== transfer.checkpoint.checkpointDigest
+          (await hf4KitchenTransfer(p, releaseProjection(s, id))).checkpoint.checkpointDigest !==
+            transfer.checkpoint.checkpointDigest
         )
           return;
         const old = parent?.transfer.checkpoint as { checkpointDigest?: string } | undefined;

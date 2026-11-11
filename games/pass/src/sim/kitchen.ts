@@ -142,7 +142,7 @@ import {
 import { releaseZeynepStint } from './one-cast.ts';
 import { hashUnit } from './rng.ts';
 
-export const GAME_VERSION = 'pass@13';
+export const GAME_VERSION = 'pass@20';
 export { PANEL_EDITION } from './narration-edition.ts';
 /** New services run through the crew. Historical inputs keep their original rules until migration. */
 export const peopleRun = (s: Pick<GameState, 'version' | 'peopleRun'>) =>
@@ -596,7 +596,8 @@ export function newGame(
     ),
 ): GameState {
   // Retired editions (including the old HF4 pass@19) never fall through to the HF3 constructors.
-  if (!canReplay(edition)) throw new Error(`Pass edition ${edition} is not supported.`);
+  if (!canReplay(edition))
+    throw new Error('Keep this file and start a new game. This kitchen uses an older version.');
   if (edition === 'pass@20') {
     chapter ??= {
       version: 'pass-cast/2',
@@ -3802,24 +3803,7 @@ export function replay(
 }
 
 /** Whether an export or save can be replayed by this edition of the game. */
-export const canReplay = (game: string | undefined): boolean =>
-  game === 'pass@20' ||
-  game === 'pass@18' ||
-  game === PANEL_EDITION ||
-  game === 'pass@16' ||
-  game === 'pass@15' ||
-  game === 'pass@14' ||
-  game === 'pass@13' ||
-  game === 'pass@12' ||
-  game === 'pass@11' ||
-  game === 'pass@10' ||
-  game === 'pass@9' ||
-  game === 'pass@8' ||
-  game === 'pass@7' ||
-  game === 'pass@6' ||
-  game === 'pass@5' ||
-  game === 'pass@4' ||
-  game === 'pass@3';
+export const canReplay = (game: string | undefined): boolean => game === GAME_VERSION;
 
 /** A compact fingerprint of everything that matters, for replay checks. */
 export function fingerprint(s: GameState): string {

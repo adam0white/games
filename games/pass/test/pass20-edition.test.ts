@@ -21,7 +21,7 @@ it('refuses a real pass@19 notebook through both replay entries', async () => {
   expect(canReplay('pass@19')).toBe(false);
   expect(canReplay('pass@20')).toBe(true);
   const file = pass19 as unknown as Parameters<typeof replayExport>[0];
-  expect(() => replayExport(file)).toThrow('not a supported Pass notebook');
+  expect(() => replayExport(file)).toThrow('Keep this file and start a new game');
   await expect(validateReplayFile(file)).rejects.toThrow();
   // Relabelling grants no continuation: a pass@20 file that still carries the old full state is refused.
   const relabelled = { ...file, game: 'pass@20', state: { version: 'pass@19', minute: file.minute } };
@@ -42,7 +42,7 @@ it('replays pass@20 exactly across a finished bathroom visit and the next inputs
   }
   expect(visited, 'a cook must go to the bathroom in the played prefix').toBe(true);
   for (let i = 0; i < 8; i++) step(s);
-  const file = exportRun(s, '4.12.0');
+  const file = exportRun(s, '4.17.0');
   const replayed = await validateReplayFile(file);
   expect(raw(replayed)).toEqual(raw(s));
   for (let i = 0; i < 40; i++) {

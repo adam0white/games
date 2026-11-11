@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boardDefaults, cloneState, newGame, queueInput, step } from '../src/sim/kitchen.ts';
+import { boardDefaults, cloneState, newGame, queueInput } from '../src/sim/kitchen.ts';
 import {
   boardMoneyEstimate,
   boardReplies,
@@ -7,15 +7,6 @@ import {
   earlyCoverageWarnings,
   openingBoard,
 } from '../src/ui/board.ts';
-
-function tuesday() {
-  const s = newGame(42);
-  queueInput(s, { kind: 'board', rows: boardDefaults(s) });
-  queueInput(s, { kind: 'open' });
-  while (s.phase === 'service') step(s);
-  queueInput(s, { kind: 'open' });
-  return s;
-}
 
 describe('board presentation choices', () => {
   it('counts tonight pay and an already recorded surcharge in the current board gap', () => {
@@ -110,27 +101,13 @@ describe('board presentation choices', () => {
       expect(breakSlots(time).every((slot) => slot.minute >= 1050 && slot.minute <= 1295)).toBe(true);
     }
   });
-  it('leaves Monday gaps explicit and fills carried gaps when relief joins on Tuesday', () => {
-    const monday = newGame(42);
-    expect(openingBoard(monday).every((row) => row.cover === null)).toBe(true);
-    const s = tuesday();
-    const before = cloneState(s);
-    const rows = openingBoard(s);
-    expect(rows.filter((row) => row.cook !== 'rafi').every((row) => row.cover === 'rafi')).toBe(true);
-    expect(cloneState(s)).toEqual(before);
-    queueInput(s, { kind: 'board', rows });
-    for (const row of s.board?.rows.filter((row) => row.cover === 'rafi') ?? []) {
-      expect(row.answer).toContain('Rafi:');
-      expect(typeof row.coverAccepted).toBe('boolean');
-    }
-  });
   it('keeps pass@20 opening relief as an explicit player choice', () => {
     const s = newGame(42, 'pass@20');
     s.previousBoard = boardDefaults(s).slice(0, -1);
     expect(openingBoard(s).every((row) => row.cover === null)).toBe(true);
   }, 120000);
   it('previews real answers without changing a notebook and matches the committed answers', () => {
-    const s = tuesday();
+    const s = newGame(42, 'pass@20');
     const before = cloneState(s);
     const replies = boardReplies(s);
     expect(cloneState(s)).toEqual(before);
@@ -139,7 +116,9 @@ describe('board presentation choices', () => {
     expect(boardReplies(s)).toEqual(replies);
   });
   it('preserves an intentional uncovered board when the same crew returns', () => {
-    const s = tuesday();
+    // Host-state fixture: the same crew and saved board at the second opening.
+    const s = newGame(42, 'pass@20');
+    s.night = 2;
     s.previousBoard = boardDefaults(s).map((row) => ({ ...row, cover: null }));
     expect(openingBoard(s).every((row) => row.cover === null)).toBe(true);
   });

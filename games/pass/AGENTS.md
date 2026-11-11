@@ -4,9 +4,9 @@ Read [HANDOFF.md](HANDOFF.md) first. Follow [player text rules](docs/lab/plain-e
 
 The simplify increment ends with source changes, focused tests and replay tests, one independent Codex review, signed commits, exact green CI, deployment from a fresh managed worktree and Chromium/WebKit verification at the four owner sizes. The owner accepts game readiness. Friends’ playtests and Show HN remain paused until that acceptance. Do not run new playtests in this increment. Keep the Turkish setting and person/place names. Render common Turkish nouns in plain English. At most two flavour words may remain, each explained in its first sentence. The setting increment requires independent review, signed source, exact green CI, fresh managed deployment and live checks at 360x690 and 820x1180; Adam accepts readiness.
 
-Use managed worktrees. Run `npm run check:lane` before every signed commit. Keep signing enabled and include `Co-Authored-By: Codex <noreply@openai.com>`. Rebase on origin before each push. Preserve deterministic replay and legacy tests.
+Use managed worktrees. Run `npm run check:lane` before every signed commit. Keep signing enabled and include `Co-Authored-By: Codex <noreply@openai.com>`. Rebase on origin before each push. Preserve deterministic current replay. Retired-edition tests remain in archive/historical-tests and original source history.
 
-Current stack: HF 4.17.0 for pass@20; immutable lab-client 0.5.12 / lab-kit 0.5.29. Historical replay tests retain HF package 3.0.0 / Person engine 2.23.0. Public new games use one HF4 behavior, with no legacy engine or edition selector. Incompatible old saves may refuse clearly while their originals remain stored. Shared Node 26.12.0 / pnpm 12.16.1; Worker compatibility_date 2026-11-05.
+Current stack: npm HF 4.17.0 for pass@20; immutable lab-client 0.5.16 / lab-kit 0.5.33. The game does not execute the historical HF3 engine. Public new games use one HF4 behavior, with no legacy engine or edition selector. Incompatible old saves may refuse clearly while their originals remain stored. Shared Node 26.12.0 / pnpm 12.16.1; Worker compatibility_date 2026-11-05.
 
 ## Current policy clarification — 2026-10-25
 

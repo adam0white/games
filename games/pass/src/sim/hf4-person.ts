@@ -9,14 +9,6 @@ import type {
   StepResult,
 } from '@adam0white/human-framework';
 import { validatePortablePerson } from '@adam0white/human-framework';
-import type {
-  Affordance,
-  DecisionRecord,
-  Person,
-  Suggestion,
-  SuggestionResolution,
-} from '@adam0white/human-framework-legacy';
-import * as historical from '@adam0white/human-framework-legacy';
 import {
   type KitchenOffer,
   kitchenOffer,
@@ -25,8 +17,25 @@ import {
   kitchenSpec,
 } from './hf4-authoring.ts';
 import { type KitchenCheckpoint, KitchenRun, type KitchenWorld, MINUTE_MS } from './hf4-run.ts';
+import type * as historical from './historical-api.ts';
+import type {
+  Affordance,
+  DecisionRecord,
+  Person,
+  Suggestion,
+  SuggestionResolution,
+} from './historical-display.ts';
 
-export * from '@adam0white/human-framework-legacy';
+export type {
+  Activity,
+  Affordance,
+  DecisionRecord,
+  Lexicon,
+  Outcome,
+  Person,
+  Suggestion,
+  SuggestionResolution,
+} from './historical-display.ts';
 
 type Community = {
   run: KitchenRun;
@@ -36,6 +45,15 @@ type Community = {
   settled?: () => void;
 };
 const communities = new WeakMap<Person, Community>();
+const unsupported = (): never => {
+  throw new Error('Keep this file and start a new game. This person uses an older version.');
+};
+export const adoptVoiceTrust: typeof historical.adoptVoiceTrust = unsupported;
+export const diffChronicle: typeof historical.diffChronicle = unsupported;
+export const enablePromptings: typeof historical.enablePromptings = unsupported;
+export const promptingLine: typeof historical.promptingLine = unsupported;
+export const restore: typeof historical.restore = unsupported;
+export const snapshot: typeof historical.snapshot = unsupported;
 export const isHF4 = (p: Person) => communities.has(p);
 const needCommunity = (p: Person) => {
   const c = communities.get(p);
@@ -309,7 +327,7 @@ export function decide(
   offers: readonly Affordance[],
   options: Parameters<typeof historical.decide>[2] & { settleForeground?: boolean } = {},
 ): DecisionRecord {
-  if (!isHF4(p)) return historical.decide(p, offers, options);
+  if (!isHF4(p)) return unsupported();
   const c = needCommunity(p),
     previousActivityId = c.run.active.find((a) => a.person === p.id)?.id,
     received = options.suggestion
@@ -339,39 +357,39 @@ export function decide(
   return d;
 }
 export function begin(p: Person, a: Affordance, d: DecisionRecord) {
-  if (!isHF4(p)) return historical.begin(p, a, d);
+  if (!isHF4(p)) return unsupported();
   return p.activity?.affordanceId === a.id && d.chosenAffordanceId === a.id;
 }
 export function tick(p: Person, at: number) {
-  if (!isHF4(p)) return historical.tick(p, at);
+  if (!isHF4(p)) return unsupported();
   const c = needCommunity(p),
     until = Math.round(at * MINUTE_MS);
   if (until > c.run.now) c.run.advance(until, [], c.world);
   refresh(c);
 }
 export function interrupt(p: Person, at: number, reason: string) {
-  if (!isHF4(p)) return historical.interrupt(p, at, reason);
+  if (!isHF4(p)) return unsupported();
   const c = needCommunity(p),
     a = c.run.active.find((a) => a.person === p.id);
   if (a) submit(p, 'activity.interrupted', { person: p.id, activityId: a.id, reason }, at);
 }
 export function finish(p: Person, out: Parameters<typeof historical.finish>[1]) {
-  if (!isHF4(p)) return historical.finish(p, out);
+  if (!isHF4(p)) return unsupported();
   // HF owns natural completion. Ending an earlier span is an actual host interruption.
   const c = needCommunity(p),
     a = c.run.active.find((a) => a.person === p.id && a.offer.id === out.affordanceId);
   if (a) interrupt(p, out.at, 'kitchen ended this work span');
 }
 export function readPerson(p: Person) {
-  if (!isHF4(p)) return historical.readPerson(p);
+  if (!isHF4(p)) return unsupported();
   return { body: (p as any).hf4Readout } as ReturnType<typeof historical.readPerson>;
 }
 export function reviewed(p: Person) {
   if (isHF4(p)) throw new Error('HF4 reviews through its public decision input.');
-  return historical.reviewed(p);
+  return unsupported();
 }
 export function promise(p: Person, value: Parameters<typeof historical.promise>[1]) {
-  if (!isHF4(p)) return historical.promise(p, value);
+  if (!isHF4(p)) return unsupported();
   const c = needCommunity(p),
     { recurEvery, ...rest } = value;
   submit(p, 'agenda.requested', {
@@ -389,14 +407,14 @@ export function promise(p: Person, value: Parameters<typeof historical.promise>[
   });
 }
 export function releaseCommitment(p: Person, id: string) {
-  if (!isHF4(p)) return historical.releaseCommitment(p, id);
+  if (!isHF4(p)) return unsupported();
   submit(p, 'agenda.requested', {
     person: p.id,
     request: { type: 'release', commitmentId: id, authority: 'chef' },
   });
 }
 export function socialEvent(p: Person, e: Parameters<typeof historical.socialEvent>[1]) {
-  if (!isHF4(p)) return historical.socialEvent(p, e);
+  if (!isHF4(p)) return unsupported();
   submit(
     p,
     'social.received',
@@ -410,7 +428,7 @@ export function socialEvent(p: Person, e: Parameters<typeof historical.socialEve
   );
 }
 export function acquaintPerson(observer: Person, target: Person, familiarity: number, at: number) {
-  if (!isHF4(observer)) return historical.acquaintPerson(observer, target, familiarity, at);
+  if (!isHF4(observer)) return unsupported();
   submit(
     observer,
     'acquaintance.received',
@@ -425,7 +443,7 @@ export function acquaintPerson(observer: Person, target: Person, familiarity: nu
   );
 }
 export function glimpsePerson(observer: Person, target: Person, at: number, clarity: number) {
-  if (!isHF4(observer)) return historical.glimpsePerson(observer, target, at, clarity);
+  if (!isHF4(observer)) return unsupported();
   const c = needCommunity(observer),
     view = c.run.inspect({ perspective: { kind: 'host' }, people: [target.id], select: ['condition'] })
       .people[0];
@@ -519,19 +537,19 @@ export function predictAs(
   suggestion: Suggestion,
   options?: Parameters<typeof historical.predictAs>[4],
 ) {
-  if (!isHF4(observer)) return historical.predictAs(observer, target, offers, suggestion, options);
+  if (!isHF4(observer)) return unsupported();
   return predicted(observer, target, offers, suggestion);
 }
 export function predict(p: Person, offers: Affordance[], suggestion: Suggestion) {
-  if (!isHF4(p)) return historical.predict(p, offers, suggestion);
+  if (!isHF4(p)) return unsupported();
   return predicted(p, p, offers, suggestion).resolution;
 }
 export function reviewLine(p: Person, options?: Parameters<typeof historical.reviewLine>[1]) {
-  if (!isHF4(p)) return historical.reviewLine(p, options);
+  if (!isHF4(p)) return unsupported();
   return narration(p, 'review').at(-1) ?? '';
 }
 export function perceive(p: Person, percepts: Parameters<typeof historical.perceive>[1]) {
-  if (!isHF4(p)) return historical.perceive(p, percepts);
+  if (!isHF4(p)) return unsupported();
   submit(p, 'observation.received', {
     person: p.id,
     evidenceId: `pass:observation:${needCommunity(p).run.now}`,
@@ -621,7 +639,7 @@ export function narration(p: Person, kind: 'review' | 'prompting' | 'day-closed'
 }
 
 export function visibleFatigue(observer: Person, target: Person) {
-  if (!isHF4(observer)) return historical.readPerson(target).body.perceived.fatigue;
+  if (!isHF4(observer)) return unsupported();
   const view = needCommunity(observer).run.inspect({
     perspective: { kind: 'person', observer: observer.id },
     people: [target.id],

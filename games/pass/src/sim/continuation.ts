@@ -1,15 +1,19 @@
 /** Return visits start after a locally replayed departure. The shelf is never read during replay. */
-import {
-  type Person,
-  restore,
-  snapshot,
-  validatePersonaProjection,
-} from '@adam0white/human-framework-legacy';
+
 import { canonicalPersona, type PersonaEnvelope, validatePersona } from '@adam0white/lab-client';
 import { requireChapterAuthority, validateKitchenChapter } from './cast-chapter.ts';
 import { HF4_HOST } from './hf4-run.ts';
+import type * as legacy from './historical-api.ts';
+import type { Person } from './historical-display.ts';
 import { canReplay, cloneState, type Export, type GameState, personOf, replay } from './kitchen.ts';
 import { returnedZeynep, zeynepDepartureStatus } from './one-cast.ts';
+
+const unsupportedLegacy = (): never => {
+  throw new Error('Keep this file and start a new game. This chapter uses an older version.');
+};
+const restore: typeof legacy.restore = unsupportedLegacy;
+const snapshot: typeof legacy.snapshot = unsupportedLegacy;
+const validatePersonaProjection: typeof legacy.validatePersonaProjection = unsupportedLegacy;
 
 export interface ReturnChapter {
   v: 1;
@@ -119,6 +123,8 @@ export async function prepareReturn(envelope: PersonaEnvelope, prefix: Export): 
 }
 
 export function replayExport(ex: ReplayFile): GameState {
+  if (ex.game !== 'pass@20')
+    throw new Error('Keep this file and start a new game. This notebook uses an older version.');
   if (ex.game === 'pass@20') {
     requireChapterAuthority(ex.castChapter ?? ex.state?.castChapter);
     const host = ex.state?.hf4?.archive.host;
@@ -138,16 +144,8 @@ export function replayExport(ex: ReplayFile): GameState {
   }
   if (!canReplay(ex.game) || !Number.isSafeInteger(ex.seed) || !Array.isArray(ex.inputs))
     throw new Error('That is not a supported Pass notebook.');
-  const header = ex.returnChapter ?? ex.state?.returnChapter;
-  if (header) {
-    if (ex.game !== 'pass@12') throw new Error('This edition has no return chapter.');
-    const state = returnState(header);
-    if (ex.seed !== state.seed || canonicalJson(ex.inputs) !== canonicalJson(state.inputs))
-      throw new Error('The return chapter has an unexpected input suffix.');
-    if (ex.state && canonicalJson(ex.state) !== canonicalJson(state))
-      throw new Error('The return chapter does not match its pinned replay.');
-    return state;
-  }
+  if (ex.returnChapter || ex.state?.returnChapter)
+    throw new Error('Keep this file and start a new game. This notebook uses an older chapter.');
   return replay(
     ex.seed,
     ex.inputs,
@@ -160,12 +158,12 @@ export function replayExport(ex: ReplayFile): GameState {
 
 /** Validate portable checksums before a file or saved chapter can affect upload consent or a loaded run. */
 export async function validateReplayFile(ex: ReplayFile): Promise<GameState> {
+  if (ex.game !== 'pass@20')
+    throw new Error('Keep this file and start a new game. This notebook uses an older version.');
   const chapter = ex.castChapter ?? ex.state?.castChapter;
   if (chapter) await validateKitchenChapter(chapter);
-  const header = ex.returnChapter ?? ex.state?.returnChapter;
-  if (header) {
-    await prepareReturn(header.envelope, header.prefix);
-  }
+  if (ex.returnChapter || ex.state?.returnChapter)
+    throw new Error('Keep this file and start a new game. This notebook uses an older chapter.');
   const state = replayExport(ex);
   if (Object.hasOwn(ex, 'state') && canonicalJson(cloneState(state)) !== canonicalJson(ex.state))
     throw new Error('The full notebook does not match its replay.');

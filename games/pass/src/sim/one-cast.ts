@@ -1,21 +1,22 @@
 /** Zeynep's explicit chapter boundary. Full kitchen checkpoints stay in local replays. */
-import {
-  admitPersona,
-  type Commitment,
-  createAgenda,
-  type Episode,
-  type Person,
-  type PersonaProjection,
-  type PersonaProjectionSnapshot,
-  projectPersona,
-  releaseCommitment,
-  restore,
-  snapshot,
-  validatePersonaProjection,
-} from '@adam0white/human-framework-legacy';
+
 import { canonicalPersona, type PersonaEnvelope } from '@adam0white/lab-client';
 import { required } from '../required.ts';
+import type * as legacy from './historical-api.ts';
+import type { Commitment, Episode, Person } from './historical-display.ts';
+import type { PersonaProjection, PersonaProjectionSnapshot } from './historical-persona.ts';
 import type { GameState } from './kitchen.ts';
+
+const unsupportedLegacy = (): never => {
+  throw new Error('Keep this file and start a new game. This chapter uses an older version.');
+};
+const admitPersona: typeof legacy.admitPersona = unsupportedLegacy;
+const createAgenda: typeof legacy.createAgenda = unsupportedLegacy;
+const projectPersona: typeof legacy.projectPersona = unsupportedLegacy;
+const releaseCommitment: typeof legacy.releaseCommitment = unsupportedLegacy;
+const restore: typeof legacy.restore = unsupportedLegacy;
+const snapshot: typeof legacy.snapshot = unsupportedLegacy;
+const validatePersonaProjection: typeof legacy.validatePersonaProjection = unsupportedLegacy;
 
 export const ZEYNEP_CAST = 'hf.cast.zeynep.pass';
 export const ZEYNEP_MAPPING = 'pass-zeynep/1';

@@ -1,17 +1,7 @@
 /** Finite kitchen calendar maps. No source duty settlement, qualification transfer or biography discovery.
  * Good Hands accepts only actual paused baking/cold-food people. Unknown dialects refuse before CAS.
  */
-import {
-  admitCalendarPersona,
-  DEFAULT_NORMS,
-  isContinuingCommitment,
-  MINUTES_PER_YEAR,
-  type Person,
-  projectCalendarPersona,
-  snapshot,
-  tick,
-  validateCalendarPersona,
-} from '@adam0white/human-framework-legacy';
+
 import {
   canonicalPersona,
   castForGame,
@@ -23,6 +13,20 @@ import {
 } from '@adam0white/lab-client';
 import { required } from '../required.ts';
 import { HIRES, makeCook, makeHire } from './cooks.ts';
+import type * as legacy from './historical-api.ts';
+import type { Person } from './historical-display.ts';
+
+const unsupportedLegacy = (): never => {
+  throw new Error('Keep this file and start a new game. This chapter uses an older version.');
+};
+const admitCalendarPersona: typeof legacy.admitCalendarPersona = unsupportedLegacy;
+const isContinuingCommitment: typeof legacy.isContinuingCommitment = unsupportedLegacy;
+const projectCalendarPersona: typeof legacy.projectCalendarPersona = unsupportedLegacy;
+const snapshot: typeof legacy.snapshot = unsupportedLegacy;
+const tick: typeof legacy.tick = unsupportedLegacy;
+const validateCalendarPersona: typeof legacy.validateCalendarPersona = unsupportedLegacy;
+const DEFAULT_NORMS = [] as unknown as typeof legacy.DEFAULT_NORMS;
+const MINUTES_PER_YEAR = Number.NaN as unknown as typeof legacy.MINUTES_PER_YEAR;
 
 export const CAST = castForGame('pass');
 export const keyOf = (castId: string) => {
