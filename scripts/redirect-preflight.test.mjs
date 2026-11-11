@@ -124,7 +124,9 @@ test('historical release reads exact public SDK pins and rejects ambiguous URLs'
     const sha = f.commit();
     return repositoryEvidence(f.cwd).release(sha, f.registry, f.game);
   };
-  assert.equal(release(url).labVersion, '0.5.16');
+  const historical = release(url);
+  assert.equal(historical.labVersion, '0.5.16');
+  assert.equal('hf' in historical, false, 'existing manifests retain their exact shape');
   for (const invalid of [url.replace('github.com', 'example.com'), url.replace('/lab-client-v0.5.16/', '/lab-client-v0.5.15/'), `${url}?download=1`, url.replace('https:', 'http:')]) assert.throws(() => release(invalid), /artifact/i);
 });
 
@@ -138,4 +140,62 @@ test('zone redirects require live evidence and only an exact worker retirement r
   await assert.rejects(verifyRedirects({ ...f.args(), routes: routes.slice(0, 1) }), /route/i);
   f.live.dirty = true;
   await assert.rejects(verifyRedirects({ ...f.args(), routes: retirement }), /clean/i);
+});
+
+test('historical recorded-viewer releases truthfully have no Lab artifact', t => {
+  const f = fixture(t); f.game.kind = 'recorded-viewer';
+  writeFileSync(join(f.cwd, 'games/rope/package.json'), JSON.stringify({ version: '0.1.0', dependencies: { '@adam0white/human-framework': '4.17.0' } }));
+  const sha = f.commit();
+  assert.equal(repositoryEvidence(f.cwd).release(sha, f.registry, f.game).labVersion, null);
+  for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
+    writeFileSync(join(f.cwd, 'games/rope/package.json'), JSON.stringify({ version: '0.1.0', dependencies: { '@adam0white/human-framework': '4.17.0' }, [section]: { ...(section === 'dependencies' ? { '@adam0white/human-framework': '4.17.0' } : {}), alias: 'npm:@adam0white/lab-client@0.5.17' } }));
+    const aliasSha = f.commit();
+    assert.throws(() => repositoryEvidence(f.cwd).release(aliasSha, f.registry, f.game), /Lab client/i);
+  }
+});
+
+test('historical optional runtime metadata round-trips from the exact commit and rejects extra identity fields', t => {
+  const f = fixture(t);
+  const path = join(f.cwd, 'games/rope');
+  const url = 'https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.16/adam0white-lab-client-0.5.16.tgz';
+  const metadata = { app: 'town@1', concordiaUpstream: 'b'.repeat(40), pythonBundle: 'c'.repeat(64), runtime: 'Browser-local Python', pyodide: '314.0.7' };
+  writeFileSync(join(path, 'package.json'), JSON.stringify({ version: '1.0.0', releaseMetadata: 'release-metadata.json', dependencies: { '@adam0white/human-framework': '4.17.0', '@adam0white/lab-client': url } }));
+  writeFileSync(join(path, 'release-metadata.json'), JSON.stringify(metadata));
+  const first = f.commit();
+  const evidence = repositoryEvidence(f.cwd);
+  assert.deepEqual(evidence.release(first, f.registry, f.game), manifest(f.registry, f.game, first, false, '0.5.16', '1.0.0', metadata));
+  writeFileSync(join(path, 'release-metadata.json'), JSON.stringify({ ...metadata, pythonBundle: 'd'.repeat(64) }));
+  f.commit();
+  assert.equal(evidence.release(first, f.registry, f.game).pythonBundle, metadata.pythonBundle);
+  writeFileSync(join(path, 'release-metadata.json'), JSON.stringify({ ...metadata, commit: 'e'.repeat(40) }));
+  const tampered = f.commit();
+  assert.throws(() => evidence.release(tampered, f.registry, f.game), /invalid release metadata/i);
+  assert.throws(() => manifest(f.registry, f.game, first, false, '0.5.16', '1.0.0', { ...metadata, hf: '2.0.0' }), /invalid release metadata/i);
+  f.game.kind = 'recorded-viewer';
+  writeFileSync(join(path, 'package.json'), JSON.stringify({ version: '1.0.0', releaseMetadata: 'release-metadata.json', dependencies: { '@adam0white/human-framework': '4.17.0' } }));
+  writeFileSync(join(path, 'release-metadata.json'), JSON.stringify(metadata));
+  const viewer = f.commit();
+  assert.deepEqual(evidence.release(viewer, f.registry, f.game), manifest(f.registry, f.game, viewer, false, null, '1.0.0', metadata));
+  delete f.game.kind;
+  const godot = { app: 'lefthand', engine: '4.17.0', godot: '4.7.2' };
+  writeFileSync(join(path, 'package.json'), JSON.stringify({ version: '0.1.0', releaseMetadata: 'release-metadata.json', dependencies: { '@adam0white/human-framework': '4.17.0', '@adam0white/lab-client': url } }));
+  writeFileSync(join(path, 'release-metadata.json'), JSON.stringify(godot));
+  const godotCommit = f.commit();
+  assert.deepEqual(evidence.release(godotCommit, f.registry, f.game), manifest(f.registry, f.game, godotCommit, false, '0.5.16', '0.1.0', godot));
+  writeFileSync(join(path, 'release-metadata.json'), JSON.stringify({ ...godot, engine: '4.16.3' }));
+  const wrongEngine = f.commit();
+  assert.throws(() => evidence.release(wrongEngine, f.registry, f.game), /engine/i);
+  assert.equal(evidence.release(godotCommit, f.registry, f.game).engine, f.registry.hfVersion);
+});
+
+
+test('Small Works archive protection rejects initial and already-active catch-all aliases', async t => {
+  const f = fixture(t);
+  f.game.legacyOrigin = 'https://repair.adamwhite.work';
+  const catchAll = [routes[0], { pattern: 'repair.adamwhite.work/*', zone_name: 'adamwhite.work' }];
+  await assert.rejects(verifyRedirects({ ...f.args(), routes: catchAll }), /experiments archive/);
+  f.game.redirectMode = 'zone';
+  const active = f.commit(); f.setHead(active); f.live.commit = active;
+  delete f.game.redirectMode;
+  await assert.rejects(verifyRedirects({ ...f.args(), routes: catchAll }), /experiments archive/);
 });

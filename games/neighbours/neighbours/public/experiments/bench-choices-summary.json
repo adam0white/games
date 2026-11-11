@@ -1,0 +1,386 @@
+{
+  "schema": "neighbours/bench-choice-probe@1",
+  "recordedAt": "2026-10-27T16:38:36.532Z",
+  "hf": "3.0.0",
+  "modelCalls": 0,
+  "sourceCommit": "ae15c028a951a92d5136dacbe7767480c8ef0c85",
+  "sourceFingerprint": "01c46a77a890964d92de940cac7298c489941c7319f97bc841a73db59c04a8ef",
+  "sourceWorktreeClean": false,
+  "limitations": [
+    "Fresh fixed-seed captures contain six canonical and two generated HF residents. They are not forced-success fixtures, population averages or evidence of realism.",
+    "This probe runs the actual TypeScript physical host and published HF under Node. It does not run Python Concordia or a live model; native/WASM parity is a separate check.",
+    "Three natural complete checkpoints and nine lawful complete proposal starts are frozen before any outcome evaluation. Seed 101 now has a natural case under Phase D and is included again; no seed was substituted. Proposal admission occurs before prepareRound, as in the browser. Each case scores the real next Rafi turn after earlier actors choose normally.",
+    "Each bench-active checkpoint file is the exact complete start of its physical proposal branch, including actual retained HF knowledge. admissionAt records the complete-boundary notice; decisionAt/startAt records Rafi's later actual decision.",
+    "The physical proposal/no-proposal contrast combines temporal-goal opt-in, received knowledge, one spent allowance and possible legal request-window changes. It does not isolate knowledge causally.",
+    "The person-only intact/removed comparison holds actual legal offers, the entire physical state and temporal goals fixed. Removed deletes structured prospection after actual receipt; no withheld arm was executed.",
+    "Full-offer decision records retain only HF's top-ranked alternatives. An unrecorded offer was not necessarily unevaluated. perOfferDiagnostics separately supplies each same actual cart offer alone to a fresh person clone to expose its terms; those diagnostic choices are not enacted or presented as full-choice decisions.",
+    "Mode-off retains received knowledge while removing temporal valuation. Goal-removed abandons only Rafi's cart goal. These are different controls, not knowledge-only contrasts.",
+    "Two-day Node continuations record events after every completed round to avoid the host's rolling-event pruning. They cover this interval only; jobs may span its boundaries.",
+    "Returned is a new handover receipt within the interval; its absence is not proof that the cart can never be returned. Asking, agreement, work and delivery are separate observed outcomes.",
+    "Successor chance0.5 and confidence0.8 are frozen engineering assumptions, not a Nora-consent model or fitted psychological estimates. Current learned action success and source trust are reported separately."
+  ],
+  "cases": [
+    {
+      "seed": 42,
+      "slot": "soon",
+      "noProposal": {
+        "endAt": 15015,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": false,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": true,
+          "adaPaidMinutesCompleted": 240
+        }
+      },
+      "proposal": {
+        "endAt": 15015,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": true,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": true,
+          "adaPaidMinutesCompleted": 240
+        }
+      }
+    },
+    {
+      "seed": 42,
+      "slot": "tomorrow",
+      "noProposal": {
+        "endAt": 15015,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": false,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": true,
+          "adaPaidMinutesCompleted": 240
+        }
+      },
+      "proposal": {
+        "endAt": 15015,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": true,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": true,
+          "adaPaidMinutesCompleted": 240
+        }
+      }
+    },
+    {
+      "seed": 42,
+      "slot": "brief",
+      "noProposal": {
+        "endAt": 15015,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": false,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": true,
+          "adaPaidMinutesCompleted": 240
+        }
+      },
+      "proposal": {
+        "endAt": 15015,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": true,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": true,
+          "adaPaidMinutesCompleted": 240
+        }
+      }
+    },
+    {
+      "seed": 73,
+      "slot": "soon",
+      "noProposal": {
+        "endAt": 26580,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": false,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": true,
+          "adaPaidMinutesCompleted": 240
+        }
+      },
+      "proposal": {
+        "endAt": 26580,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": true,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": true,
+          "adaPaidMinutesCompleted": 240
+        }
+      }
+    },
+    {
+      "seed": 73,
+      "slot": "tomorrow",
+      "noProposal": {
+        "endAt": 26580,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": false,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": true,
+          "adaPaidMinutesCompleted": 240
+        }
+      },
+      "proposal": {
+        "endAt": 26580,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": true,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": true,
+          "adaPaidMinutesCompleted": 240
+        }
+      }
+    },
+    {
+      "seed": 73,
+      "slot": "brief",
+      "noProposal": {
+        "endAt": 26580,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": false,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": true,
+          "adaPaidMinutesCompleted": 240
+        }
+      },
+      "proposal": {
+        "endAt": 26580,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": true,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": true,
+          "adaPaidMinutesCompleted": 240
+        }
+      }
+    },
+    {
+      "seed": 101,
+      "slot": "soon",
+      "noProposal": {
+        "endAt": 22155,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": false,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": false,
+          "adaPaidMinutesCompleted": 240
+        }
+      },
+      "proposal": {
+        "endAt": 22155,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": true,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": true,
+          "adaPaidMinutesCompleted": 240
+        }
+      }
+    },
+    {
+      "seed": 101,
+      "slot": "tomorrow",
+      "noProposal": {
+        "endAt": 22155,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": false,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": false,
+          "adaPaidMinutesCompleted": 240
+        }
+      },
+      "proposal": {
+        "endAt": 22155,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": true,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": true,
+          "adaPaidMinutesCompleted": 240
+        }
+      }
+    },
+    {
+      "seed": 101,
+      "slot": "brief",
+      "noProposal": {
+        "endAt": 22155,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": false,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": false,
+          "adaPaidMinutesCompleted": 240
+        }
+      },
+      "proposal": {
+        "endAt": 22155,
+        "fullIntervalMinutes": 2880,
+        "chain": {
+          "receivedNotice": true,
+          "raviFirstDecision": {
+            "chosen": "cart-slow"
+          },
+          "receivedReplies": []
+        },
+        "outcome": {
+          "newRequests": 0,
+          "newReceivedAgreements": 0,
+          "mainBenchWorkPeriods": 0,
+          "returned": true,
+          "adaPaidMinutesCompleted": 240
+        }
+      }
+    }
+  ],
+  "noNaturalCase": [],
+  "rawReportSha256": "b053ae5225bbc29d67ca8d98af8b4309d2225d75a26ef3bd9cb9f291c5a2e7e4"
+}

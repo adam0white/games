@@ -350,6 +350,7 @@ export class Game {
     if (this.entry === 'native') return true;
     if (this.entry !== 'file' || this.recordingBlocked) return false;
     if (lab!.preservationStatus === 'existing-local') return true;
+    if (lab!.preservationStatus === 'standard') return false;
     this.recordingBlocked = true;
     lab!.dispose();
     return false;
@@ -358,7 +359,7 @@ export class Game {
   private trackRun(): void {
     this.untrack?.();
     const generation = ++this.recordingGeneration;
-    if (!this.current() || !this.recordingAllowed()) return;
+    if (!this.current() || (lab!.preservationStatus !== 'standard' && !this.recordingAllowed())) return;
     const current = () =>
       this.current() && generation === this.recordingGeneration && this.recordingAllowed();
     this.untrack = lab!.trackRun(
@@ -2773,7 +2774,7 @@ export class Game {
   private filePage(): void {
     const recording = this.recordingAllowed();
     this.openPage(
-      `<div class="page-body file-controls"><h1>Choose a Rope file</h1><p>Your saved climb is not changed. This file plays in this tab only. Download it before you close the tab.</p><div data-recording></div><p data-file-recording-status>${recording ? 'Recording follows your current privacy and Recording choices.' : 'Recording is unavailable because the existing local Lab session could not be preserved. You can play in memory.'}</p><label data-file-label>${this.climb ? 'Choose another file' : 'Choose a file'}<input type="file" accept="application/json" data-file-input></label><p data-file-status role="status"></p>${new URLSearchParams(location.search).get('lab') === '1' ? '<details><summary>Debug</summary><pre data-file-error></pre></details>' : ''}</div><div class="page-actions">${this.climb ? '<button class="btn" data-file-export>Download this file session</button><button class="btn go" data-file-resume>Resume current file</button>' : ''}</div>`,
+      `<div class="page-body file-controls"><h1>Choose a Rope file</h1><p>Your saved climb is not changed. This file plays in this tab only. Download it before you close the tab.</p><div data-recording></div><p data-file-recording-status>${recording ? 'Recording follows your current privacy and Recording choices.' : lab!.preservationStatus === 'standard' ? 'Recording is off for this file. You can play in memory.' : 'Recording is unavailable because the existing local Lab session could not be preserved. You can play in memory.'}</p><label data-file-label>${this.climb ? 'Choose another file' : 'Choose a file'}<input type="file" accept="application/json" data-file-input></label><p data-file-status role="status"></p>${new URLSearchParams(location.search).get('lab') === '1' ? '<details><summary>Debug</summary><pre data-file-error></pre></details>' : ''}</div><div class="page-actions">${this.climb ? '<button class="btn" data-file-export>Download this file session</button><button class="btn go" data-file-resume>Resume current file</button>' : ''}</div>`,
       (el) => {
         el.querySelector('[data-recording]')?.append(telemetryToggle(lab!));
         el.querySelector('[data-file-resume]')?.addEventListener('click', () => this.closePage());

@@ -1,3 +1,5 @@
+> Current workflow: follow the repository-root AGENTS.md and README.md. Use the root workspace lockfile and `node scripts/prepare-game.mjs <slug>` / `node scripts/check-game.mjs <slug>` from the root. Imported standalone setup, sibling-checkout, Homebrew and Mac scratch instructions below are historical; they are not prerequisites for the current build or CI. Game rules and evidence requirements below still apply.
+
 <!-- Current episode continuity disposition, 2026-11-05: New game always starts a fresh local cast. It skips shelf readiness, enablement, preparation and claims. Stored people stay unchanged. Person checkpoint/alternative publication and their UI controls are closed for this edition. Current local game resume and complete game exports remain supported. UPKEEP will review qualified native 4.17 continuing-person support on 2026-11-12; no account transfer is started. -->
 
 # Valley
@@ -8,7 +10,7 @@ Current goal (owner, 2026-11-05): port to published HF 4.17.0. The owner explici
 
 The public product is edition valley-opening-2026-11, version 0.5.0: one morning from 07:00 to 13:00. Keep the complete founded cast and all native history in one public HF Run. Keep real requests, replies and work distinct. No future harvest, elders’ gathering, three-year completion or later relationship outcome is implied. Reject old saves with the keep-file/start-fresh message. Multiplayer and account transfer remain out of scope.
 
-Stack: Node 26.12.0; pnpm 12.16.1; HF 4.17.0; immutable lab-client 0.5.17 / lab-kit 0.5.34; TypeScript 7.0.2; Vite 8.3.5; Vitest 5.1.0; Biome 2.6.5; Wrangler 4.157.0; Worker compatibility_date 2026-11-05. Preserve frozen installs, strict engines/peers, no hoisting, store hardlinks, 1440-minute third-party release age and exact native build approvals.
+Stack: Node 26.12.0; pnpm 12.16.1; HF 4.17.0; immutable lab-client 0.5.18 / lab-kit 0.5.35; TypeScript 7.0.2; Vite 8.3.5; Vitest 5.1.0; Biome 2.6.5; Wrangler 4.157.0; Worker compatibility_date 2026-11-05. Preserve frozen installs, strict engines/peers, no hoisting, store hardlinks, 1440-minute third-party release age and exact native build approvals.
 
 Done means signed source, current-episode lint/types/tests, complete native and host cold replay, full/compact restore and same-next equality, corruption/time/edition rejection, a phone choice/ending/reload/download check, exact green source and merged CI, clear exact hosted review, normal merge, clean deployment and matching live release.json. UPKEEP accepts engineering delivery. The owner accepts feel separately. The previous 12-day/58-person/120-second, 5 KB and 881-day gates are superseded acceptance for the older product, and remain unqualified historical evidence; never call them passed. Original continuous-world test bytes remain as *.test.ts.historical; compatible native boundary, lifecycle, hunch, voice, death and pacing controls remain active and the proof script as *.ts.historical.
 

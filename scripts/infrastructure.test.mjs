@@ -1,9 +1,34 @@
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { validateGame } from './game.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { validateRegistry, affectedGames, checkResults, manifest, assertFrameworkGraph, scopedHeaders, scopedRedirects, checkRelease, checkMainCI } from './lib.mjs';
 const game = { slug: 'rope', source: { repository: 'https://github.com/adam0white/rope', commit: 'a'.repeat(40) }, saveSchema: 'v1' };
 const registry = { hfVersion: '4.17.0', games: [game] };
+test('interactive cloud suites honor one shared configured lock without a home checkout', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'games-cloud-lock-'));
+  const env = { ...process.env, HOME: join(fixture, 'empty-home'), HF_SUITE_LOCK_DIR: join(fixture, 'shared', 'full-suite') };
+  delete env.CI; delete env.SUITE_LOCK;
+  try {
+    for (const slug of ['glance', 'commonstead', 'goodhands', 'hearsay', 'smallworks', 'valley']) {
+      const helper = new URL(`../games/${slug}/scripts/suite-lock.ts`, import.meta.url).href;
+      const source = `import { acquireSuiteLock } from ${JSON.stringify(helper)};
+import { existsSync, readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+const directory = process.env.HF_SUITE_LOCK_DIR;
+const release = await acquireSuiteLock({repo:'cloud-control', branch:'control'});
+try { assert.equal(JSON.parse(readFileSync(directory+'/owner.json')).pid, process.pid); }
+finally { release(); }
+assert.equal(existsSync(directory), false);
+assert.equal(existsSync(process.env.HOME+'/code'), false);`;
+      const result = spawnSync(process.execPath, ['--input-type=module', '-e', source], { env, encoding: 'utf8', timeout: 10000 });
+      assert.equal(result.status, 0, `${slug}: ${result.stderr}`);
+    }
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});
 test('rejects unsafe lineage and catches shared paths', () => {
   assert.throws(() => validateRegistry({ ...registry, games: [{...game, slug:'../bad'}] }));
   assert.deepEqual(affectedGames(registry, ['scripts/lib.mjs']), ['rope']);
@@ -40,7 +65,73 @@ test('release rejects mismatched lineage, version or redirected response', () =>
   assert.throws(() => checkRelease(expected, expected, true));
 });
 
+test('Godot release metadata preserves its runtime version and refuses a different HF engine', () => {
+  const metadata = { app: 'lefthand', engine: '4.17.0', godot: '4.7.2' };
+  const release = manifest(registry, game, 'b'.repeat(40), false, '0.5.17', '0.1.0', metadata);
+  assert.equal(release.app, 'lefthand');
+  assert.equal(release.godot, '4.7.2');
+  assert.equal(release.engine, registry.hfVersion);
+  assert.deepEqual(release.source, game.source);
+  assert.throws(() => manifest(registry, game, 'b'.repeat(40), false, '0.5.17', '0.1.0', { ...metadata, engine: '4.16.3' }), /engine/i);
+  assert.throws(() => manifest(registry, game, 'b'.repeat(40), false, '0.5.17', '0.1.0', { ...metadata, godot: 'latest' }), /metadata/i);
+  assert.throws(() => manifest(registry, game, 'b'.repeat(40), false, '0.5.17', '0.1.0', { ...metadata, commit: 'c'.repeat(40) }), /metadata/i);
+});
+
 test('scoped headers preserve Cloudflare removal directives', () => {
   assert.match(scopedHeaders('rope', '/assets/*\n  ! Cache-Control\n  Cache-Control: immutable\n'), /\/rope\/assets\/\*\n  ! Cache-Control/);
   assert.throws(() => scopedHeaders('rope', '/assets/*\n  ! Cache-Control injected\n'));
+});
+
+test('recorded viewers explicitly omit a Lab client without weakening game manifests', () => {
+  const viewer = { ...game, slug: 'island', kind: 'recorded-viewer' };
+  const viewers = { ...registry, games: [viewer] };
+  assert.equal(manifest(viewers, viewer, 'b'.repeat(40), false, null, '0.1.0').labVersion, null);
+  assert.throws(() => manifest(registry, game, 'b'.repeat(40), false, null, '0.1.0'));
+  assert.throws(() => manifest(viewers, viewer, 'b'.repeat(40), false, '0.5.17', '0.1.0'));
+  assert.throws(() => validateRegistry({ ...registry, games: [{ ...game, kind: 'unknown' }] }));
+});
+
+test('a recorded viewer still requires the exact npm HF game engine and forbids aliases', () => {
+  const cwd = process.cwd(), root = mkdtempSync(join(tmpdir(), 'viewer-graph-'));
+  const viewer = { ...game, slug: 'island', kind: 'recorded-viewer' };
+  const viewers = { ...registry, games: [viewer] };
+  const deps = { '@adam0white/human-framework': '4.17.0' };
+  mkdirSync(join(root, 'games/island/node_modules/@adam0white/human-framework'), { recursive: true });
+  writeFileSync(join(root, 'games/island/node_modules/@adam0white/human-framework/package.json'), JSON.stringify({ name: '@adam0white/human-framework', version: '4.17.0' }));
+  const pkg = () => writeFileSync(join(root, 'games/island/package.json'), JSON.stringify({ dependencies: deps }));
+  try {
+    process.chdir(root); pkg();
+    assert.equal(validateGame(viewer, viewers), null);
+    assert.throws(() => validateGame({ ...viewer, kind: 'game' }, viewers));
+    deps.hfLegacy = 'npm:@adam0white/human-framework@2.9.0'; pkg();
+    assert.throws(() => validateGame(viewer, viewers), /alias/i);
+    delete deps.hfLegacy; deps['@adam0white/human-framework'] = '3.0.0'; pkg();
+    assert.throws(() => validateGame(viewer, viewers), /pin/i);
+    deps['@adam0white/human-framework'] = '4.17.0'; deps['@adam0white/lab-client'] = '0.5.17'; pkg();
+    assert.throws(() => validateGame(viewer, viewers), /unused Lab/i);
+    delete deps['@adam0white/lab-client']; deps.alias = 'npm:@adam0white/lab-client@0.5.17'; pkg();
+    assert.throws(() => validateGame(viewer, viewers), /unused Lab/i);
+  } finally { process.chdir(cwd); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('Neighbours cannot stamp a different nested runtime SDK as the outer game version', () => {
+  const cwd = process.cwd(), fixture = mkdtempSync(join(tmpdir(), 'neighbours-runtime-pins-'));
+  const script = join(cwd, 'games/neighbours/scripts/copy-dist.mjs');
+  const dependencies = { '@adam0white/human-framework': '4.17.0', '@adam0white/lab-client': 'client18', '@adam0white/lab-kit': 'kit35' };
+  const write = (path, value) => writeFileSync(join(fixture, path), JSON.stringify(value));
+  try {
+    mkdirSync(join(fixture, 'neighbours/dist'), { recursive: true });
+    mkdirSync(join(fixture, 'dist'));
+    write('dist/previous.json', { retain: true });
+    write('neighbours/dist/current.json', { built: true });
+    write('package.json', { dependencies });
+    write('neighbours/package.json', { dependencies: { ...dependencies, '@adam0white/lab-client': 'client17' } });
+    const refused = spawnSync(process.execPath, [script], { cwd: fixture, encoding: 'utf8' });
+    assert.notEqual(refused.status, 0, 'A stale nested client must refuse before copying');
+    assert.match(refused.stderr, /nested runtime pin mismatch.*lab-client/i);
+    assert.deepEqual(JSON.parse(readFileSync(join(fixture, 'dist/previous.json'), 'utf8')), { retain: true });
+    write('neighbours/package.json', { dependencies });
+    const accepted = spawnSync(process.execPath, [script], { cwd: fixture, encoding: 'utf8' });
+    assert.equal(accepted.status, 0, accepted.stderr);
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
 });

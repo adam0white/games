@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { isDeepStrictEqual } from 'node:util';
-import { validateRegistry, manifest } from './lib.mjs';
+import { validateRegistry, manifest, assertNoLabDependencies, packageReleaseMetadata } from './lib.mjs';
 
 const PLAY = 'https://play.adamwhite.work';
 const SHA = /^[0-9a-f]{40}$/;
@@ -22,6 +22,11 @@ export function repositoryEvidence(cwd = process.cwd()) {
       const path = `games/${game.slug}`;
       const pkg = read(commit, `${path}/package.json`);
       if (pkg.dependencies?.['@adam0white/human-framework'] !== registry.hfVersion) throw new Error('Historical game HF pin mismatch');
+      const metadata = packageReleaseMetadata(pkg, file => read(commit, `${path}/${file}`));
+      if (game.kind === 'recorded-viewer') {
+        assertNoLabDependencies(pkg);
+        return manifest(registry, game, commit, false, null, pkg.version, metadata);
+      }
       const archive = pkg.dependencies?.['@adam0white/lab-client'];
       // Public artifact bytes are qualified during adoption and the clean build.
       // Here read only the committed immutable URL, without a network dependency.
@@ -34,7 +39,7 @@ export function repositoryEvidence(cwd = process.cwd()) {
         lab = JSON.parse(execFileSync('tar', ['-xOzf', '-', 'package/package.json'], { input: bytes, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }));
       }
       if (lab.name !== '@adam0white/lab-client' || !/^\d+\.\d+\.\d+$/.test(lab.version)) throw new Error('Invalid historical lab artifact');
-      return manifest(registry, game, commit, false, lab.version, pkg.version);
+      return manifest(registry, game, commit, false, lab.version, pkg.version, metadata);
     },
   };
 }
@@ -43,6 +48,9 @@ export function repositoryEvidence(cwd = process.cwd()) {
 export async function verifyRedirects({ registry, routes, head, expected, evidence = repositoryEvidence(), fetch: fetchRelease = globalThis.fetch }) {
   validateRegistry(registry);
   const enabled = registry.games.filter(game => game.redirectEnabled === true);
+  for (const game of enabled) {
+    if (new URL(game.legacyOrigin).hostname === 'repair.adamwhite.work' && game.redirectMode !== 'zone') throw new Error('Small Works requires a zone redirect to preserve its experiments archive');
+  }
   const legacyPatterns = enabled.map(game => `${new URL(game.legacyOrigin).hostname}/${game.redirectMode === 'zone' ? 'sw.js' : '*'}`);
   const matchesRoute = route => {
     if (!route || typeof route !== 'object') return false;

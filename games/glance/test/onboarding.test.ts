@@ -335,10 +335,13 @@ it('shows save failure without adding a manual Save action', async () => {
 });
 
 it('sends linked feedback with verdict and trimmed remembered name', async () => {
+  localStorage.setItem('hf-lab-feedback-name', 'legacy');
+  localStorage.setItem('hf-lab-feedback-name:goodhands', 'other game');
   await boot();
   await click('new');
   await click('menu');
   await click('send-word');
+  expect((document.getElementById('feedback-name') as HTMLInputElement).value).toBe('');
   (document.querySelector('[data-verdict="keep"]') as HTMLElement).click();
   (document.getElementById('feedback-note') as HTMLTextAreaElement).value = 'I wanted another reading.';
   (document.getElementById('feedback-name') as HTMLInputElement).value = '  owner  ';
@@ -353,7 +356,9 @@ it('sends linked feedback with verdict and trimmed remembered name', async () =>
     '[keep] I wanted another reading.',
     expect.objectContaining({ name: 'owner', run: expect.any(Object) }),
   );
-  expect(localStorage.getItem('hf-lab-feedback-name')).toBe('owner');
+  expect(localStorage.getItem('hf-lab-feedback-name:glance')).toBe('owner');
+  expect(localStorage.getItem('hf-lab-feedback-name')).toBe('legacy');
+  expect(localStorage.getItem('hf-lab-feedback-name:goodhands')).toBe('other game');
 });
 
 it('allows feedback while recording is off without another recording choice', async () => {

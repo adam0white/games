@@ -1,0 +1,88 @@
+# Canonical adoption — content phase
+
+## Current shared-write capability (2026-10-29)
+
+The composed candidate uses one physical published HF4.8.1 with immutable client0.5.7 and kit0.5.24. The released SDK portableWriteBlockers gate owns peer policy; Unknown peer status blocks portable writes. Admission checks each person independently and preserves the port's per-person skips. Rejected histories keep their existing heads. The host awaits durable preparation before forwarding any accepted claim and retains source/build/generation and ownership CAS checks. A failed or uncertain claim keeps the previous complete game and prepared candidate. Exact-current-head recovery reads without resending a claim.
+
+Every living and terminal checkpoint checks the same released peer gate before body evaluation, projection, closure or writes. File/local continuations and role/source reads remain available. Empty acknowledged shelf CAS still creates the ordinary authored New game. A package pin is not a live peer certificate. Historical positive mechanism controls isolate the peer gate and do not establish current live write readiness. Recheck actual peer adoption and unavailable source/role contracts with the shared owner by2026-10-29; act earlier on verified evidence.
+
+Already-forwarded durable intents may still reconcile exact current heads through read-only recovery. Recovery never resends a put, and history alone never grants current custody. Unknown, advanced, mixed or stale current heads remain unresolved with both complete saves held. Historical mechanism tests explicitly mock only this capability boundary to retain downstream CAS assertions; separate unmocked controls prove the current refusal. This slice has no authored lethal event; the shared producer guard is before both living and terminal branches, without a fake dead Person or a claim of played death.
+
+The older adoption/departure descriptions below are historical contracts and bounded mechanism evidence. They do not override this current refusal.
+
+The historical canonical edition pins HF 3.0.0 / engine 2.23.0, immutable lab-client 0.4.11 and lab-kit 0.5.12. Technical release and browser journey receipts are kept in `~/code/.lab-scratch/cast/commonstead.md`. Owner acceptance follows playing; agent controls are not human acceptance.
+
+## Exhaustive foreground census
+
+Before: origin/main `7103af9753c0c6bcaf45556d383d762580db00ad`, `src/sim.ts:62–80`, `createGame` and training completion. Five opening people, everyone age 25, ordinal sex/profile, and a nine-name cycle. These are replacement roles, not migrations or claims that the old people shared a life.
+
+| Source local ID / name                        | New canonical person       | Age | Workshop role                                         |
+| --------------------------------------------- | -------------------------- | --: | ----------------------------------------------------- |
+| v1 Amina                                      | hf.cast.nora.smallworks    |  28 | Resident repair designer                              |
+| v2 Yusuf                                      | hf.cast.sam.smallworks     |  18 | Repair apprentice; fictional resident game playtester |
+| v3 Meryem                                     | hf.cast.dai.glance         |  63 | Guest maintenance mentor, with dam cover arranged     |
+| v4 Idris                                      | hf.cast.nerys.glance       |  47 | Guest host, with inn cover arranged                   |
+| v5 Leyla                                      | hf.cast.dilek.pass         |  34 | Shared-kitchen resident; cold-station cook            |
+| v6 Samir, if trained                          | hf.cast.burak.stairwell    |  31 | Resident treasurer; accountant                        |
+| v7 Hana, if trained                           | hf.cast.sevim.stairwell    |  69 | Guest tutor and records reader                        |
+| v8 Omar, if trained                           | hf.cast.oskar.rope         |  34 | Guest photographer; amateur climber                   |
+| v9 Nura, if trained                           | commonstead.episode.SEED.9 |  30 | Unnamed episode helper                                |
+| Every vN, N ≥ 10; old nine-name cycle repeats | commonstead.episode.SEED.N |  30 | Unique episode helper, no canonical branch            |
+
+After: all eight allocated people open together. `src/cast.ts` consumes the released `castForGame('commonstead')` profiles and pins local roles/family facts. All six traits and ten values come from the canonical artifact, whose engineering baseline is exactly 0.5 plus registry overrides. `src/sim.ts` constructs actual HF people; local vN IDs serve selection and geometry only. The old name pool is removed. Episode helpers retain deterministic arrival, food reservation and housing rules, with capacity raised from 7 to 10 for the eight-person opening. They gain light-task orientation, never a job licence. No other foreground identity exists. No generated crowd existed; none was added.
+
+The scene is a contemporary residential workshop near Mill Bridge. Meal crates, prepared boards, small ballast bags, trolleys and hand tools replace berry picking, logging and quarrying. Internal resource keys remain food/wood/stone for the bounded simulation; player labels use meals/boards/ballast. The kit store holds supplies; preparing an existing guest cabin makes room. No structural, electrical, powered-tool or height work is offered. Roles do not imply qualifications. Different loads are chosen by the residents; HF determines personal capacity and willingness.
+
+## Playable private encounters
+
+Ordinary path: spend one simulation minute together; select one person; offer Rest; wait five seconds; open About this resident; Invite conversation. HF can refuse after remembered pressure. If accepted, Offer a small collaboration is optional during the break. No intro, biography import or public profile grants a discovery. The deterministic input log reproduces the exact disclosure and outcome flag. A manual break alone is insufficient.
+
+| Person | Discoverable private fact                                      | Actual bounded collaboration                                                       |
+| ------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Nora   | Dropped an accessibility feature without asking the user       | Marks handle drawing unfinished and restores the grip for a future resident trial  |
+| Sam    | Copied an unverified bug description into a report             | Labels today's workshop note not reproduced and records the actual attempt         |
+| Dai    | Kept checks in his head, including an obsolete workaround      | Writes a workshop inspection card with uncertainty and room for challenge          |
+| Nerys  | Keeps amateur astronomy outside inn advertising                | Marks an optional dark courtyard corner; promises no sighting                      |
+| Dilek  | Privately records kitchen sounds, excluding unconsented voices | Makes a private loose-lid recording; no voices, upload or publication              |
+| Burak  | Makes paper mechanisms for pleasure                            | Leaves an unfinished paper ferry at the shared table with permission               |
+| Sevim  | Misjudged a pupil who cared for a sick parent                  | Asks a learner before revising an equipment card; drafts a private acknowledgement |
+| Oskar  | His photo story implied labour the volunteer did not perform   | Drafts an accurate workshop caption, respecting refusals and unfinished work       |
+
+These short authored workshop scenes do not simulate a full accessibility trial, dam succession, corrected past publication, sent correspondence, family visit, telescope evening, romance or forgiveness. The opt-in settlement day implements the later fictional events as a separate engineering candidate described in concept.md and settlement-plan.md; review and delivery are pending. The default ten-minute scenes retain these narrower meanings. The flags establish only the words and narrow actions above. Nora and Sam are fictional residents, never lab reviewers or actual playtest evidence.
+
+## Current evidence
+
+Content tests first failed for the missing eight-person opening, unique helper identity and choice-gated discoveries. They passed after implementation. Review regressions first failed for instant disclosure and pressure bypass; they now pass with canonical HF event targets, a minimum observed chapter, a brief pause and HF invitation refusal. Existing deterministic replay, tamper rejection, HF fatigue/willingness, meals, construction, housing, arrival and storm tests remain.
+
+A preliminary full `npm run ci` passed under the machine-wide HF suite-lock wrapper before the review fixes. The final content-phase `npm run check:lane` (which runs ci here) passed under the same wrapper on Node 26.12.0: lint, typecheck, 16 tests and build. It is local evidence, not exact-commit remote CI.
+
+Builder phone checks at 360×690 found header clipping and low contrast under the kit's dark body colors. Moving encounter actions into the scrollable resident sheet, bounding phone panels and explicitly setting ink/paper corrected the observed layout. Final viewport checks and screenshots remain before publication; local content checks do not count as cross-origin journeys.
+
+Seed 418 headless control, 600 one-second steps: direct placement 78/completion 117, growth placement 78/completion 113, rotation placement 78/completion 121; all keep supplies dry. Growth invites one helper at tick 0 and puts v9 on boards at tick 15. Four opening people prepare boards and four prepare ballast. All switch to the store when stocks suffice. Rotation rests one person every 90 ticks. Eight residents make the objective easier than the old five-person edition; this is a measured change, not an expert balance claim. Difficulty changes await owner play.
+
+One independent Codex reviewer (gpt-6.1-sol, low effort) reviewed the complete content diff and a fix continuation. All four findings were addressed; the continuation found no further concrete content-phase issue. The same reviewer continued through integration and the recording-group/terminal ownership fixes; no additional review panel was used.
+
+Browser-control limitation: the local Chrome new-run confirmation blocked the extension command and subsequent dialog retrieval timed out. No alternative profile was launched. Earlier local phone evidence covers opening, Nora disclosure/collaboration, save/reload and measured header/action containment before the latest invitation prerequisite; it does not prove final desktop, export/import UI or live journeys. Those remain required.
+
+## Finite passport and life contract
+
+Fresh play awaits shelf readiness, checks every applicable allocated head, prepares all actual HF admissions, then accepts one atomic expected-head transaction for all eight allocations including absent heads. Loaded games never consult a newer shelf. Current exports pin complete initial people, source envelopes, life inputs, claims, clocks, mapping and rules; import repeats semantic admission and deterministic tick replay. Local wrappers separately retain exact accepted owned heads. Files acquire no ownership from embedded receipts and remain file-origin after local reload.
+
+Small Works native Nora/Sam are supported from `repair` using `workshop-cast/1`, sourceRole `nora`/`sam`, `workshop-calendar/1`, engine 2.17.0 or 2.21.0 and a schema/sourceMinute/full-RNG/SHA256 checkpoint receipt. The receiver validates exact identity, canonical age provenance, trusted DEFAULT_NORMS, healthy compatible body/family state and supported personal calendars before claiming. Work methods, objects, finances, customer promises and source social memories stay in the full source archive; repair skills never become structural or other qualifications. No public profile is accepted in place of a passport. A Commonstead claim under exact `commonstead-3` may retain this finite historical donor dialect until a native source checkpoint replaces it, including successive current 2.23.0 claims. Current Repair 2.23.0 is refused; its actual Nora source carries obligations this workshop cannot support. Native Glance 4 Nerys is supported only under engine 2.23.0, `glance-cast/1`, sourceRole `nerys` and `glance-calendar/1`. Its portable source engine must also be 2.23.0. A current Commonstead claim can retain that exact projection until a native Commonstead checkpoint replaces it; repeated claims still replay exactly. Other Glance edition/engine pairs refuse. Glance rules `glance-3`, engine 2.17.0 or 2.21.0 may forward Nerys’s unchanged `commonstead-cast/1` passport with canonical sourceRole and `commonstead-calendar/1`; all native semantic checks still apply. Other native Glance dialects and forwarded residents are not registered.
+
+The explicit zero-duration calendar map translates the source departure to Commonstead minute 480 and preserves age, RNG, actual traits/values and supported health/fitness/circadian state. It does not claim elapsed travel or healing. Duties retain their windows under the offset. Only rest/eat/drink obligation actions are currently supported; other duties refuse. Family/bond or clinical conflicts refuse through HF. Life assignment and public-note encounters are visible in the resident panel. Carried place sets actual starting geometry. A resident keeping time for their own routine refuses extra light-task orders until 0:30; this does not complete or clear a source obligation. Contacts are one-sided public-note evidence, never reciprocal acquaintance or trust.
+
+Native source controls: perform real play, Menu → People between chapters → Pause chapter for departure. Current acts reach their natural completion before new acts stop. The storm actually interrupts remaining acts; interruption never counts as duty completion. A resident with unfinished shared assembly work still refuses departure. Save a person publishes the last accepted parent under CAS; a conflict offers export or an explicit alternative branch, never a latest-head retry. Dead owned branches publish terminal closure instead of a living projection. The slice has no authored lethal event; terminal behavior is covered by synthetic protocol controls rather than a claim of played death.
+
+Native sender dialect: `commonstead-cast/1`, `commonstead-calendar/1`, sourceRole and HF Person ID equal the canonical cast ID. Source game `commonstead`, rules `commonstead-3`, engine 2.23.0. `residentTransfer` captures the full actual idle HF snapshot and SHA256/schema/sourceMinute/full RNG receipt. The calendar map uses offset zero and explicit continuing commitment/make-up/chain/action/entity/norm references with exact DEFAULT_NORMS. Source lives are anchored only after successful checkpoint. Full raw snapshots and unsupported world/body/social state stay in a bounded source-local archive and download, never automatic telemetry or shelf transfer. The receiving game must register its own finite adapter; publication alone does not establish a return route.
+
+Recording starts closed before hooks. The group includes all pinned initial history branches plus later owned receipts, so saving one file-derived person cannot waive another person's history. Exact-envelope epoch queries and run/preference/identity generations guard acknowledgements. Explicit denial closes locally immediately and removes only the selected group's central associations. Group changes reclose recording. File-origin permission stays local to its loaded run; continuity and character analysis remain separate choices. Pagehide/visibility checkpoints are best effort and use the same eligibility/CAS rules.
+
+
+## Automatic native editions (2026-10-27)
+
+All native starts enable the central shelf and use the same supported whole-cast admission. There is no local-only native start or game-specific cast preference. Unavailable shelf reads permit local play without claims; semantic refusal and uncertain ownership writes do not fall back. Loaded chapters retain their pinned people. File sessions never acquire shelf ownership.
+
+Settlement, reply, peer, short-yield and roof exports retain pinned chapters and complete source archives in full, compact and local replay. Existing no-chapter exports keep their original shape and state hashes. Departure requires actual simulated time and a paused or ended action boundary. Native jobs, carried supplies, pending requests, conversations, route disputes and continuing host commitments prevent living departure. Unsupported calendar duties still refuse; finite prayers must be genuinely completed. Burak keeps the released portable projector's strict duty/health guards. A new calendar checkpoint must pass the existing receiver before publication. Episode omission notices use one envelope summary; the finite projection and complete local source retain the original details. End publication follows these same guards, including an already paused ending.
+
+Focused causal controls follow an admitted person through actual native play, guarded departure, source retention and the exact next admission. They are engineering controls, not a human browser-owner acceptance receipt. Owner acceptance remains playing the game.
