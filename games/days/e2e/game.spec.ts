@@ -87,11 +87,21 @@ test("feedback explains the Recording switch and has no separate play consent", 
   await expect(page.getByRole("checkbox")).toHaveCount(0);
 });
 
-test("New game starts a distinct recorded attempt", async ({ page }) => {
-  await page.goto("/days/");
+test("New game starts a distinct recorded attempt", async ({ page, baseURL }) => {
+  // Recording is intentionally disabled on localhost. Serve the same test build
+  // under a non-local origin while keeping all Lab traffic inside the test.
+  await page.route("**/*", (route) => route.abort());
+  await page.route("http://days.test/**", async (route) => {
+    const url = new URL(route.request().url());
+    const target = new URL(`${url.pathname}${url.search}`, baseURL);
+    await route.fulfill({ response: await route.fetch({ url: target.href }) });
+  });
+  await page.goto("http://days.test/days/");
   await page.getByRole("button", { name: "Begin the three days" }).click();
   const previous = await page.evaluate(() => sessionStorage.getItem("hf-lab-run:days"));
+  expect(previous).toMatch(/^[a-f0-9]{32}$/);
   await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await expect(page.getByRole("checkbox", { name: "Recording" })).toBeChecked();
   await page.getByRole("button", { name: "New game", exact: true }).click();
   await page.getByRole("button", { name: "Yes, start again", exact: true }).click();
   await expect
