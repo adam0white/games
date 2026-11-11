@@ -24,7 +24,7 @@ vi.mock('@adam0white/lab-client', async (original) => {
   return {
     ...actual,
     portableWriteBlockers: (id: string, game: string) =>
-      policy.allow ? [] : actual.portableWriteBlockers(id, game),
+      policy.allow ? [] : [`${id} in ${game}: synthetic blocked reader`],
     personaChannel: () => fake,
     watchPersonaCheckpoint: () => () => {},
   };
