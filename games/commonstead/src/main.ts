@@ -413,7 +413,7 @@ function title() {
   canvas = null;
   paused = false;
   lab?.screen('title');
-  root.innerHTML = `<main class="title"><header><a href="https://human.adamwhite.work/games/">All games</a></header><section class="title-body"><p class="eyebrow">The residents share a workshop near Mill Bridge.</p><h1>Commonstead</h1><p>Finish a storehouse before the storm.<br>Work with eight residents. Each person has limits.</p><svg class="title-art" viewBox="0 0 600 140" role="img" aria-label="A storehouse and the people building it"><path d="M0 120 Q160 85 300 115 T600 113" fill="none" stroke="#aaa38c"/><path d="M239 65 L300 17 L361 65 Z" fill="#a97659" stroke="#574b38" stroke-width="2"/><path d="M250 66 H350 V116 H250Z" fill="#e9dfcb" stroke="#574b38" stroke-width="2"/><path d="M290 116 V87 H310 V116" fill="#6e665a"/><g fill="#4f6b3a" stroke="#23201b" stroke-width="2"><path d="M174 84 h16 v29 h-16Z"/><circle cx="182" cy="74" r="8" fill="#d5b48d"/><path d="M399 80 h16 v29 h-16Z"/><circle cx="407" cy="70" r="8" fill="#d5b48d"/></g></svg><p class="small">Use prepared boards, small ballast bags, and hand tools. The ballast bags serve as weights. Use trolleys to carry loads. Residents choose what they can manage. Open the menu to pause.</p>${stored(SAVE) ? '<button class="primary" id="continue">Resume</button>' : ''}<button class="${stored(SAVE) ? '' : 'primary'}" id="new">Start a short storm day</button><h2>Choose a scenario</h2><details><summary>A full day and night</summary><p>Thirty minutes at Steady, with a full day and night for eight residents. Supported saved histories carry over automatically. The storm arrives at 20:00. Supplies, travel, private replies, trolley conversations and sleep take time. Conversations depend on what actually happens in this day. Your saved chapter is replaced only after this day is ready.</p><button id="new-day">Start a settlement day</button></details><button id="title-feedback">Feedback</button><a href="/file/">Open a saved file</a><div class="menu-footer"><a href="${PRIVACY_URL}">Lab privacy</a></div><a href="https://human.adamwhite.work/lab/people/">${PEOPLE_ACROSS_GAMES}</a><div id="prepared-recovery"></div><p id="load-status" class="status" role="status"></p></section></main>`;
+  root.innerHTML = `<main class="title"><header><a href="https://human.adamwhite.work/games/">All games</a></header><section class="title-body"><p class="eyebrow">The residents share a workshop near Mill Bridge.</p><h1>Commonstead</h1><p>Finish a storehouse before the storm.<br>Work with eight residents. Each person has limits.</p><svg class="title-art" viewBox="0 0 600 140" role="img" aria-label="A storehouse and the people building it"><path d="M0 120 Q160 85 300 115 T600 113" fill="none" stroke="#aaa38c"/><path d="M239 65 L300 17 L361 65 Z" fill="#a97659" stroke="#574b38" stroke-width="2"/><path d="M250 66 H350 V116 H250Z" fill="#e9dfcb" stroke="#574b38" stroke-width="2"/><path d="M290 116 V87 H310 V116" fill="#6e665a"/><g fill="#4f6b3a" stroke="#23201b" stroke-width="2"><path d="M174 84 h16 v29 h-16Z"/><circle cx="182" cy="74" r="8" fill="#d5b48d"/><path d="M399 80 h16 v29 h-16Z"/><circle cx="407" cy="70" r="8" fill="#d5b48d"/></g></svg><p class="small">Use prepared boards, small ballast bags, and hand tools. The ballast bags serve as weights. Use trolleys to carry loads. Residents choose what they can manage. Open the menu to pause.</p>${stored(SAVE) ? '<button class="primary" id="continue">Resume</button>' : ''}<button class="${stored(SAVE) ? '' : 'primary'}" id="new">Start a short storm day</button><h2>Choose a scenario</h2><details><summary>A full day and night</summary><p>Thirty minutes at Steady, with a full day and night for eight residents. Supported saved histories carry over automatically. The storm arrives at 20:00. Supplies, travel, private replies, trolley conversations and sleep take time. Conversations depend on what actually happens in this day. Your saved chapter is replaced only after this day is ready.</p><button id="new-day">Start a settlement day</button></details><button id="title-feedback">Feedback</button><a href="/commonstead/file/">Open a saved file</a><div class="menu-footer"><a href="${PRIVACY_URL}">Lab privacy</a></div><a href="https://human.adamwhite.work/lab/people/">${PEOPLE_ACROSS_GAMES}</a><div id="prepared-recovery"></div><p id="load-status" class="status" role="status"></p></section></main>`;
   void continuity!.admissions
     .read()
     .then((intent) => {
@@ -654,7 +654,7 @@ function start(s: State) {
   update();
   if (fileSession) {
     paused = !fileSession.running;
-    if (s.ended) end();
+    if (s.ended) end(true);
     else if (paused) menu();
     else scheduleFileFrame();
   } else if (s.ended) end();
@@ -1347,7 +1347,7 @@ async function saveAndTitle(id: string) {
 }
 function menu() {
   sheet(
-    `<h2>Paused</h2><p>${fileSession ? 'This file session stays in memory. Download it before leaving.' : esc(nativeSaveMessage || 'Saving this game on this device…')}</p><button class="primary" id="resume">Resume</button><button id="feedback">Feedback</button><button id="replay-tutorial">Replay tutorial</button><button id="fullscreen">Full screen</button><a href="https://human.adamwhite.work/games/">All games</a><div id="toggle"></div><button id="new-menu">New game</button><div id="menu-confirm"></div><button id="menu-title">Back to the title page</button><a href="https://human.adamwhite.work/lab/people/">${PEOPLE_ACROSS_GAMES}</a><button id="download">Download this run</button><a href="/file/">Open a saved file</a><div class="menu-footer"><a href="${PRIVACY_URL}">Lab privacy</a><details class="debug"><summary>Debug</summary><div id="compact-download"></div></details></div>`,
+    `<h2>Paused</h2><p>${fileSession ? 'This file session stays in memory. Download it before leaving.' : esc(nativeSaveMessage || 'Saving this game on this device…')}</p><button class="primary" id="resume">Resume</button><button id="feedback">Feedback</button><button id="replay-tutorial">Replay tutorial</button><button id="fullscreen">Full screen</button><a href="https://human.adamwhite.work/games/">All games</a><div id="toggle"></div><button id="new-menu">New game</button><div id="menu-confirm"></div><button id="menu-title">Back to the title page</button><a href="https://human.adamwhite.work/lab/people/">${PEOPLE_ACROSS_GAMES}</a><button id="download">Download this run</button><a href="/commonstead/file/">Open a saved file</a><div class="menu-footer"><a href="${PRIVACY_URL}">Lab privacy</a><details class="debug"><summary>Debug</summary><div id="compact-download"></div></details></div>`,
   );
   if (state?.shortYield) save();
   if (lab) document.getElementById('toggle')?.append(telemetryToggle(lab));
@@ -1543,7 +1543,7 @@ function feedback() {
     }
   };
 }
-function end() {
+function end(importedEnded = false) {
   assemblyObservation.reset();
   if (!state) return;
   fileTools?.remove();
@@ -1551,7 +1551,7 @@ function end() {
   canvas = null;
   lab?.screen('storm outcome');
   if (fileSession) {
-    fileSession.pauseAtEnd();
+    if (!importedEnded) fileSession.pauseAtEnd();
     state = fileSession.state()!;
   } else {
     if (!state.chapterPaused) apply(state, { kind: 'pause-chapter' });
@@ -1817,7 +1817,7 @@ function fileTitle() {
   selected = [];
   paused = true;
   root.innerHTML =
-    '<main class="title"><section class="title-body"><h1>Commonstead · file session</h1><p>Choose a Commonstead run below. It stays in memory. Your saved game is unchanged. Download the current run before leaving or reloading.</p><a href="/">Back to Commonstead</a></section></main>';
+    '<main class="title"><section class="title-body"><h1>Commonstead · file session</h1><p>Choose a Commonstead run below. It stays in memory. Your saved game is unchanged. Download the current run before leaving or reloading.</p><a href="/commonstead/">Back to Commonstead</a></section></main>';
   if (fileTools) root.querySelector('.title-body')?.append(fileTools);
 }
 function fileBlob(name: string, blob: Blob) {
@@ -1833,7 +1833,7 @@ function mountFileTools() {
   fileTools = tools;
   tools.className = 'sheet';
   tools.setAttribute('aria-label', 'File session');
-  tools.innerHTML = `<label>Choose a run <input id="file-load" type="file" accept="application/json,.json,.gz"></label><button id="file-cancel">Cancel loading</button><button id="file-original">Download original file</button><button id="file-metadata">Download original file details</button><button id="file-current">Download current run</button><p id="file-status" role="status">${lab ? 'Recording follows your Recording setting.' : 'Recording is unavailable. You can still play and download this file.'}</p><p>Files that are too large to open or save will be refused.</p>`;
+  tools.innerHTML = `<label>Choose a run <input id="file-load" type="file" accept="application/json,.json,.gz"></label><button id="file-cancel">Cancel loading</button><button id="file-original">Download original file</button><button id="file-metadata">Download original file details</button><button id="file-current">Download current run</button><p id="file-status" role="status" data-preservation-status="${recordingStatus}">${lab ? 'Recording follows your Recording setting.' : 'Recording is unavailable. You can still play and download this file.'}</p><p>Files that are too large to open or save will be refused.</p>`;
   root.querySelector('.title-body')?.append(tools);
   const input = document.getElementById('file-load') as HTMLInputElement;
   input.addEventListener('cancel', () => {
@@ -1854,7 +1854,7 @@ function mountFileTools() {
       start(fileSession!.state()!);
       const status = document.getElementById('file-status');
       if (status)
-        status.textContent = `File opened and paused. Select Resume to play. ${lab ? 'Recording follows your Recording setting.' : 'Recording is unavailable.'}`;
+        status.textContent = `${fileSession!.compact ? 'Compact input was reconstructed. ' : ''}File opened and paused. Select Resume to play. ${lab ? 'Recording follows your Recording setting.' : 'Recording is unavailable.'}`;
       save();
     } catch (error) {
       if (epoch === fileSession!.epoch) fileError(error);

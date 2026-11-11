@@ -1,10 +1,16 @@
 // HF4 current-policy controls use the single canonical long scenario. Historical source stays frozen at c98.
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach } from 'vitest';
+import { PORTABLE_READERS } from '../node_modules/@adam0white/lab-client/dist/portable-readers.js';
 import * as writeCapability from '../src/shared-write-capability';
+
+// Synthetic reader declarations isolate downstream CAS behavior; they do not certify peers.
+const syntheticReaders = PORTABLE_READERS as Record<string, { client: string; perPersonSkips: boolean }>;
 
 beforeEach(() => {
   globalThis.indexedDB = new IDBFactory();
+  syntheticReaders.repair = { client: '0.5.5', perPersonSkips: true };
+  syntheticReaders.neighbours = { client: '0.5.5', perPersonSkips: true };
   // Downstream admission/CAS mechanism fixture only: retain every existing assertion.
   // This mock proves no real current-pair write capability or reader certification.
   // Unmocked current refusal is exercised in shared-write-capability.test.ts.
@@ -12,6 +18,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  delete syntheticReaders.repair;
+  delete syntheticReaders.neighbours;
   vi.restoreAllMocks();
   rollout.enforce = false;
 });
@@ -482,11 +490,15 @@ test('recording metadata and checkpoint publication do not query historical reco
 test.each([false, true])(
   'failed admission preserves installed save and receipts; accepted before lost reply: %s',
   async (accepted) => {
-    const h = harness([await source()]);
+    const h = harness([await source(CAST[1]!.castId)]);
     const c = new Continuity(h.lab, h.shelf);
     const state = await c.fresh(418);
     const saved = c.localSave(state);
     const receipts = structuredClone(c.heads);
+    expect(receipts).toHaveLength(1);
+    // Introduce an available parent after the installed chapter, so this request claims it.
+    const parent = await source();
+    await h.shelf.request({ action: 'put', envelope: parent });
     const request = h.shelf.request.bind(h.shelf);
     h.shelf.request = async (r) => {
       if (r.action === 'putBatch') {
@@ -499,7 +511,7 @@ test.each([false, true])(
     expect(c.heads).toEqual(receipts);
     expect(c.localSave(state)).toBe(saved);
     expect(h.requests.filter((r) => r.action === 'putBatch')).toHaveLength(accepted ? 2 : 1);
-    if (accepted) expect(h.data.heads[receipts[0]!.castId]).not.toBe(receipts[0]!.revision);
+    if (accepted) expect(h.data.heads[parent.castId]).not.toBe(parent.revision);
   },
 );
 
@@ -1101,6 +1113,8 @@ test('durable public admission recovers an acknowledged claim with lost return w
   expect(staged).toBeTruthy();
   const puts = h.requests.filter((r) => r.action === 'putBatch').length;
   vi.mocked(writeCapability.requireSharedWriteCapability).mockRestore();
+  delete syntheticReaders.repair;
+  delete syntheticReaders.neighbours;
   rollout.enforce = true;
   expect(() => writeCapability.requireSharedWriteCapability(CAST[0]!.castId)).toThrow(/saved history/);
   const recovered = await c.recoverPrepared();

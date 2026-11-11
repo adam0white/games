@@ -755,16 +755,20 @@ export class Continuity {
       state = this.state,
       runId = this.runId;
     const current = () => generation === this.generation && state === this.state && runId === this.runId;
+    let firstError: string | undefined;
     for (const c of CAST) {
       if (!current()) return;
       try {
         await this.checkpoint(c.castId);
       } catch (error) {
         if (!current()) return;
-        this.status = String(error);
+        firstError ??= String(error);
       }
     }
-    if (current()) this.changed();
+    if (current()) {
+      if (firstError) this.status = firstError;
+      this.changed();
+    }
   }
 }
 

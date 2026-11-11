@@ -5,6 +5,7 @@ import {
   initialPersonaLife,
   type Lab,
   type PersonaRequest,
+  portableWriteBlockers,
   preparePersonaLife,
 } from '@adam0white/lab-client';
 import { IDBFactory } from 'fake-indexeddb';
@@ -100,7 +101,7 @@ for (const blocked of [false, true])
   });
 
 for (const automatic of [false, true])
-  test(`${automatic ? 'automatic batch' : 'manual living'} checkpoint has no current shared-write capability`, async () => {
+  test(`${automatic ? 'automatic batch' : 'manual living'} checkpoint respects per-person shared-write capability`, async () => {
     const h = harness(),
       s = await h.c.fresh(418);
     step(s);
@@ -113,11 +114,29 @@ for (const automatic of [false, true])
     if (automatic) {
       await h.c.checkpointAll();
       expect(h.c.status).toMatch(refusal);
-    } else await expect(h.c.checkpoint(CAST[0]!.castId)).rejects.toThrow(refusal);
-    expect(h.requests).toEqual([]);
-    expect(h.c.localSave(s)).toBe(before);
+      const blocked: string[] = CAST.filter((c) => portableWriteBlockers(c.castId, 'commonstead').length).map(
+        (c) => c.castId,
+      );
+      expect(blocked).toContain(CAST[0]!.castId);
+      expect(blocked).not.toContain('hf.cast.oskar.rope');
+      expect(h.requests.filter((r) => r.action === 'put').map((r) => r.envelope!.castId)).toContain(
+        'hf.cast.oskar.rope',
+      );
+      expect(
+        h.requests.filter((r) => r.action === 'put').every((r) => !blocked.includes(r.envelope!.castId)),
+      ).toBe(true);
+      expect(h.c.heads.every((head) => !blocked.includes(head.castId))).toBe(true);
+      expect(h.c.sources.every((source) => h.c.heads.some((head) => head.revision === source.revision))).toBe(
+        true,
+      );
+      expect(exportRun(s)).toEqual(JSON.parse(before).run);
+    } else {
+      await expect(h.c.checkpoint(CAST[0]!.castId)).rejects.toThrow(refusal);
+      expect(h.requests).toEqual([]);
+      expect(h.c.localSave(s)).toBe(before);
+      expect(h.c.sources).toEqual([]);
+    }
     expect(await h.c.store.read()).toBe(before);
-    expect(h.c.sources).toEqual([]);
   });
 
 test('dead-terminal and living producers share the refusal before body evaluation, projection, close or put (source control)', () => {

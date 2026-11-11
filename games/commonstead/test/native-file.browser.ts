@@ -174,7 +174,7 @@ export async function control(browser: Browser, url: string) {
     const chooser = await blocked.newPage();
     await chooser.goto(`${url}/file/`);
     await chooser.locator('#file-load').waitFor();
-    assert.match(await chooser.locator('#file-status').innerText(), new RegExp(status));
+    assert.equal(await chooser.locator('#file-status').getAttribute('data-preservation-status'), status);
     assert.equal(await chooser.locator('iframe').count(), 0);
     await blocked.close();
   }
@@ -197,7 +197,7 @@ export async function control(browser: Browser, url: string) {
       saved,
     });
     const nativePage = await nativeContext.newPage();
-    await nativePage.goto(url);
+    await nativePage.goto(`${url}/`);
     await nativePage.locator('#continue').click();
     await nativePage.locator('#map').waitFor();
     await nativePage.locator('#menu').click();
@@ -249,7 +249,7 @@ export async function navigationControl(browser: Browser, url: string, prefix: s
   }
 
   try {
-    await page.goto(url);
+    await page.goto(`${url}/`);
     await page.locator('#new').click();
     await page.locator('#map').waitFor();
     await page.waitForTimeout(2100);
@@ -320,7 +320,7 @@ export async function endingNavigationControl(browser: Browser, url: string, pre
         JSON.stringify({ run, runId: 'actual599-ending-control', fileOrigin: false, heads: [], sources: [] }),
       );
     }, raw);
-    await page.goto(url);
+    await page.goto(`${url}/`);
     await page.locator('#continue').click();
     await page.locator('#map').waitFor();
     await delayNativeSave(page);
@@ -420,7 +420,7 @@ export async function recoveryDownloadControl(browser: Browser, url: string, pre
       },
       { previous, candidate, sources },
     );
-    await page.goto(url);
+    await page.goto(`${url}/`);
     await page.locator('#download-prepared').waitFor();
     for (const [id, run] of [
       ['download-prepared', candidate],

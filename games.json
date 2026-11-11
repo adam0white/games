@@ -49,6 +49,16 @@
       ],
       "legacyOrigin": "https://glance.adamwhite.work",
       "redirectEnabled": false
+    },
+    {
+      "slug": "commonstead",
+      "source": {
+        "repository": "https://github.com/adam0white/commonstead",
+        "commit": "4daa46e5a0ab070f4a4a6be584366ab488092718"
+      },
+      "saveSchema": "commonstead-current/2-schema14",
+      "legacyOrigin": "https://commonstead.adamwhite.work",
+      "redirectEnabled": false
     }
   ]
 }
