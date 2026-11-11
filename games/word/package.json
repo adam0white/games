@@ -1,0 +1,42 @@
+{
+  "name": "word",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "His Word: negotiate practical promises after a tailor dies.",
+  "license": "MIT",
+  "engines": {
+    "node": "26.12.0"
+  },
+  "packageManager": "pnpm@12.16.1",
+  "scripts": {
+    "dev": "pnpm story && vite --host 127.0.0.1",
+    "story": "node scripts/build.ts --story-only",
+    "build": "pnpm story && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "pnpm story && tsc -p tsconfig.json",
+    "test": "pnpm story && vitest run",
+    "e2e": "playwright test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "check:lane": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm e2e",
+    "deploy": "cd ../.. && pnpm run deploy",
+    "deploy:check": "cd ../.. && pnpm run deploy:check"
+  },
+  "dependencies": {
+    "@adam0white/human-framework": "4.17.0",
+    "@adam0white/lab-client": "https://github.com/adam0white/human-framework/releases/download/lab-client-v0.5.17/adam0white-lab-client-0.5.17.tgz",
+    "inkjs": "2.4.0",
+    "@adam0white/lab-kit": "https://github.com/adam0white/human-framework/releases/download/lab-kit-v0.5.34/adam0white-lab-kit-0.5.34.tgz"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.5",
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.6",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.1.0",
+    "wrangler": "4.157.0"
+  }
+}
