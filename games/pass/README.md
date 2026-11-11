@@ -1,0 +1,35 @@
+# The Pass
+
+Run Nevin’s neighbourhood restaurant kitchen in Turkey for four weeks. Every cook can say no. [Play The Pass](https://pass.adamwhite.work).
+
+## How to play
+
+1. On **Tonight’s plan**, choose each cook’s station and 20-minute meal break. A relief cook leaves their own station empty while covering a break. Ask about changed plans before opening. Each cook can agree or refuse.
+2. During service, tap a cook, then tap a job. Hold the job button to insist, or open **Insist on a job** for tap and keyboard controls. The words below a job are your guess at the cook’s answer. A refusal can stand; insisting can cost trust.
+3. Watch the tickets and ready dishes. The pass is the counter where finished food waits to be served. A dot marks a dish ready to serve. The crew cooks and sends dishes automatically. Answer requests and choose who covers an empty station. Time slows while someone needs an answer. Nevin’s pace, selectable before New game, lets tables wait longer before leaving.
+4. Read the crew’s evening accounts. Saturday’s bill is paid from the till. Sunday choices affect the next week, including staffing and promises.
+
+The campaign has 18 services: Monday–Saturday in week one, then Wednesday–Saturday in weeks two through four. Each week adds pressures and a bill. The [design history](docs/design.md) preserves the original six-service first playable.
+
+## What the Human Framework does
+
+HF supplies the people: their decisions and predictions, perceptions, needs, trust and other social state. Their persisted experience affects later answers. The game owns the physical kitchen, stations, dishes, tickets, money, calendar and consequences of kitchen work. It also owns the situations and wording that connect those systems. People conversations, work offers and releases are gameplay.
+
+## Saves, Feedback and recording
+
+The game saves your notebook on this device. It replays the seed and your inputs with pinned chapter data. Resume continues it; New game asks before replacing it. The menu also offers Feedback, Full screen, All games and Recording. Opening the menu pauses play.
+
+Ordinary Feedback includes **Keep a copy of this run**, which works with recording off. It also offers a note, an optional name and an optional verdict. The shipped verdicts are “I’d keep playing”, “Not sure” and “I’d stop here”. The current source also offers “I'm stopping” and “I'm confused”. Choosing one puts
+those words in the note and sends nothing. Changing or clearing the choice removes only
+its unchanged generated prefix; your edited text stays. **Submit** sends the current
+note with any optional verdict. See HANDOFF for live-delivery status.
+
+The Recording switch controls linked lab recording under the existing notice and [Lab privacy policy](https://human.adamwhite.work/lab/privacy/). Feedback shows what will be sent. With recording off, the optional sharing choice can enable it; without sharing, the note can be sent alone. Fictional continuity is automatic and separate from recording. Local replay or a downloaded file does not establish ownership of a continuing person. Imports and Sunday rewinds do not acquire native ownership. Alternate starts are public. Export, import, replay verification and seed are in the menu’s collapsed Debug item beside Lab privacy. Cast controls belong to the central shelf.
+
+## Development and status
+
+Use the shared Node 26.12.0 runtime (`.node-version` and `.nvmrc`), pnpm 12.14.0 and TypeScript 7 or later. Run `pnpm install --frozen-lockfile`, then `npm run dev`. Before committing, run `PATH=/opt/homebrew/bin:$PATH npm run check:lane` for lint and typechecking. Do not wait on the shared suite lock. Hosted CI runs the full check. [AGENTS.md](AGENTS.md) records delivery rules; [player text rules](docs/lab/plain-english.md) govern wording.
+
+The app package is `0.1.0`; ordinary new games use `pass@19` with HF `4.12.0`, immutable lab-client `0.5.12` and lab-kit `0.5.29`. There is one current HF4 behavior. Historical packages remain replay-test dependencies. Unsupported older saves may refuse clearly while their originals remain stored. See HANDOFF for the signed app source, CI, deployed receipt and browser-check limits. Adam’s game-readiness acceptance remains separate. Friends’ playtests and Show HN remain paused.
+
+Dependency changes use pnpm and the committed `pnpm-lock.yaml`. The npm lock was imported with exact dependency versions preserved. Do not regenerate an npm lock or install a separate runtime per worktree. The pnpm policy uses strict engines/peers, no hoisting, hardlinks, a 24-hour third-party release delay and a scoped exemption for owned `@adam0white/*` packages.
