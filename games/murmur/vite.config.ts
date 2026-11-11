@@ -7,6 +7,7 @@ const packagePath = createRequire(import.meta.url).resolve('@adam0white/human-fr
 const frameworkVersion = (JSON.parse(readFileSync(packagePath, 'utf8')) as { version: string }).version;
 
 export default defineConfig({
+  base: '/murmur/',
   define: {
     __HUMAN_FRAMEWORK_VERSION__: JSON.stringify(frameworkVersion),
     __MURMUR_BUILD__: JSON.stringify(

@@ -504,7 +504,7 @@ const randomSeed = () => (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0;
 
 export async function start() {
   if ('serviceWorker' in navigator && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1')
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/murmur/sw.js', { scope: '/murmur/' }).catch(() => {});
   await initOneCast();
   // Do not allow the title's autosend hook to capture a cached continuing run.
   await gateContinuity(recordingState(s));

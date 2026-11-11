@@ -10,17 +10,17 @@ it('leaves the release stamp to the network even when an old stamp is cached', a
   runInNewContext(readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8'), {
     URL,
     self: {
-      location: new URL('https://game.example/sw.js'),
+      location: new URL('https://game.example/murmur/sw.js'),
       addEventListener: (type: string, handler: (event: FetchRequest) => void) => {
         handlers[type] = handler;
       },
     },
-    caches: { match },
+    caches: { open: async () => ({ match }) },
     fetch: vi.fn(),
   });
   const handleFetch = handlers.fetch;
   if (!handleFetch) throw new Error('The worker did not register its fetch handler.');
-  for (const path of ['/release.json', '/release.json?recheck=1']) {
+  for (const path of ['/murmur/release.json', '/murmur/release.json?recheck=1']) {
     const respondWith = vi.fn();
     handleFetch({
       request: new Request(`https://game.example${path}`, { cache: 'no-store' }),
@@ -33,7 +33,7 @@ it('leaves the release stamp to the network even when an old stamp is cached', a
   // Offline assets still use the existing cache policy.
   let response: Promise<Response> | undefined;
   handleFetch({
-    request: new Request('https://game.example/assets/game.js'),
+    request: new Request('https://game.example/murmur/assets/game.js'),
     respondWith: (value: Promise<Response>) => {
       response = value;
     },
