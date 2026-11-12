@@ -3,6 +3,7 @@ import copy
 import json
 import hashlib
 import runpy
+import shutil
 from pathlib import Path
 import sys
 import tempfile
@@ -12,7 +13,7 @@ from unittest import mock
 from concordia.components.game_master import make_observation
 from concordia.contrib.neighbours.gm_director import (
     ProviderUsageLimit, ReplayModel, bounded_cli_output, checkpoint_context, digest, parse_proposal, replay_report, run_director,
-    runtime_sources, validate_proposal, UPSTREAM_SHA)
+    runtime_sources, validate_proposal, verify_upstream_sources, UPSTREAM_SHA)
 from concordia.typing import entity
 
 GOOD = {'schema': 'neighbours-gm-proposal@1', 'kind': 'inspection-request',
@@ -33,7 +34,52 @@ class RecordingModel(ReplayModel):
     return self.raw
 
 
+# A source-only export has these components but no original Git object database.
+UPSTREAM_FILES = tuple(f'concordia/components/game_master/{name}' for name in (
+    'event_resolution.py', 'make_observation.py', 'switch_act.py', 'next_acting.py'))
+
+
+def copy_upstream_sources(directory):
+  source = Path(__file__).resolve().parents[3]
+  root = Path(directory)
+  for path in UPSTREAM_FILES:
+    target = root / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source / path, target)
+  return root
+
+
 class GmDirectorTest(unittest.TestCase):
+  def test_upstream_verification_accepts_source_export_without_git(self):
+    with tempfile.TemporaryDirectory() as directory:
+      root = copy_upstream_sources(directory)
+      self.assertFalse((root / '.git').exists())
+      verify_upstream_sources(root)
+
+  def test_upstream_verification_refuses_one_byte_tamper_in_each_component(self):
+    with tempfile.TemporaryDirectory() as directory:
+      root = copy_upstream_sources(directory)
+      for path in UPSTREAM_FILES:
+        with self.subTest(path=path):
+          target = root / path
+          original = target.read_bytes()
+          target.write_bytes(bytes([original[0] ^ 1]) + original[1:])
+          with self.assertRaisesRegex(ValueError, 'Upstream component differs'):
+            verify_upstream_sources(root)
+          target.write_bytes(original)
+
+  def test_upstream_verification_refuses_each_missing_component(self):
+    with tempfile.TemporaryDirectory() as directory:
+      root = copy_upstream_sources(directory)
+      for path in UPSTREAM_FILES:
+        with self.subTest(path=path):
+          target = root / path
+          original = target.read_bytes()
+          target.unlink()
+          with self.assertRaises(FileNotFoundError):
+            verify_upstream_sources(root)
+          target.write_bytes(original)
+
   def test_proposal_utf8_byte_limit_rejects_before_json_parsing(self):
     # A syntactically valid allowed object plus whitespace must still reject.
     raw = json.dumps(GOOD) + ' ' * 4096

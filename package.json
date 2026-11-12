@@ -11,7 +11,8 @@
     "check:lane": "node --test scripts/*.test.mjs",
     "build": "node scripts/build.mjs",
     "deploy": "node scripts/deploy.mjs",
-    "deploy:check": "wrangler deploy --dry-run"
+    "deploy:check": "wrangler deploy --dry-run",
+    "check": "node scripts/check-all.mjs"
   },
   "devDependencies": {
     "wrangler": "4.157.0"

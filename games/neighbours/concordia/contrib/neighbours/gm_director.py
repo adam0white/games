@@ -20,6 +20,21 @@ from concordia.language_model import language_model
 from concordia.typing import entity
 
 UPSTREAM_SHA = '6fbfbc58f324aa74f78568c488713210889a801e'
+# These pins were checked against both the public raw files and GitHub's
+# contents API at this exact commit on 2026-11-12. The signed monorepo import
+# deliberately omits unsigned upstream Git objects; verification needs no Git
+# database or network. Update only after independently checking the pinned bytes.
+UPSTREAM_SOURCE_URL = f'https://raw.githubusercontent.com/adam0white/concordia/{UPSTREAM_SHA}'
+UPSTREAM_SOURCE_SHA256 = {
+    'concordia/components/game_master/event_resolution.py':
+        '1833e3b8c5d73f6166ae52936df530d865ae31e1ca94f34a47aa744b24b52bd9',
+    'concordia/components/game_master/make_observation.py':
+        'de3158258221cb61e627987b0472155a0e227ee74da76d53edbb1d67483e9f23',
+    'concordia/components/game_master/switch_act.py':
+        'c9e1da7a832cf8e766f4913b4aba79097d35be283768a3c782b87664e7a370c3',
+    'concordia/components/game_master/next_acting.py':
+        '298ae9a292022c330826bc8aaaf45eaafb99749ff5ecb400563ab4fd5f97b93e',
+}
 SCHEMA = 'neighbours-gm-proposal@1'
 KEYS = {'schema', 'kind', 'target', 'cue', 'windowMinutes'}
 MAX_PROPOSAL_BYTES = 4096
@@ -313,12 +328,10 @@ def runtime_sources(root):
 
 
 def verify_upstream_sources(root):
-  """Check critical upstream components against the pinned Git objects."""
-  for name in ('event_resolution.py', 'make_observation.py', 'switch_act.py', 'next_acting.py'):
-    path = f'concordia/components/game_master/{name}'
-    pinned = subprocess.check_output(['git', 'show', f'{UPSTREAM_SHA}:{path}'], cwd=root)
-    if pinned != (root / path).read_bytes():
-      raise ValueError(f'Upstream component differs from pinned source: {path}')
+  """Verify critical upstream bytes in a source export or fresh monorepo clone."""
+  for path, expected in UPSTREAM_SOURCE_SHA256.items():
+    if hashlib.sha256((root / path).read_bytes()).hexdigest() != expected:
+      raise ValueError(f'Upstream component differs from pinned source: {UPSTREAM_SOURCE_URL}/{path}')
 
 
 def replay_report(report, root):

@@ -1,3 +1,5 @@
+> Historical game handoff: source and CI links below refer to original repositories and may be private or archived. Current game source is in this monorepo.
+
 <!-- Current public simplification, 2026-11-05: UPKEEP implements the owner's fix-or-simplify instruction with a six-resident browser fresh/restart default. No native faculty is disabled and no time horizon is shortened. Core/CLI206 and existing206 imports remain unchanged research scope; their original budgets remain open and unqualified. Current public CI requires complete six-person96-round file replay, native/WASM parity, all current native contracts and browser export/recovery. The previous required206 research workflow/source is preserved under neighbours/archive/hf417-public206-source; the exact206 stress/continuation/parity scripts run separately through manual Neighbours research with their original45-minute job bound. This supersedes treating unqualified206 research acceptance as public-game delivery acceptance; it never awards an old scientific gate a pass. Review research/export limits again on2026-11-12. -->
 
 ## Current fresh-start boundary — 2026-11-05
@@ -458,6 +460,7 @@ The five deterministic studies were genuinely regenerated from clean signed sour
 Adam accepts feel separately. This section records the source implementation; hosted CI and the live release manifest establish publication. Implementation `7839c5f` replaces the older controls below with automatic pacing, optional menu pace choices and Skip ⏩. It puts the map first, pins context actions, moves saves to the title, studies to the menu, and adds named Send word. Simulation, Python, published HF 2.8.0, contracts and replay/save formats are unchanged. Independent review fixes and regenerated-source evidence are recorded in [UI grammar delivery](docs/neighbours/ui-grammar-2026-10-22.md). Local validation covers 517 unit tests, all 67 browser cases across the full sweep and focused retests, 37 native controls, actual 208-person native/WASM parity, three exact zero-call tape replays and regenerated source provenance. The live `/release.json` remains authoritative.
 
 ## Player clock controls (2026-10-22)
+
 Remaining: Adam accepts feel. Play/pause, one-round Step and the four previous playback speeds return. Step waits while busy or a conversation is open. Opening a conversation still holds time; active work retains its minimum interval and new stories retain reading time. Game menu preserves both a running and a player-paused clock. Unsafe Next controls remain absent. Native information help, simulation rules, HF pin, saves and replay stay unchanged.
 
 

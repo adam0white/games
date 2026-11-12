@@ -154,7 +154,7 @@ Root's local engine-4 UI smoke checked keyboard component selection, export/impo
 
 ## Engine-4 main integration and public verification, 13:36 UTC
 
-Main was integrated and privately pushed at **38cbae0694006cd5157add4e144b35cea686aa61**. Branch CI [38573311512](https://github.com/adam0white/repair-game/actions/runs/38573311512) and main CI [38573313495](https://github.com/adam0white/repair-game/actions/runs/38573313495) passed. Deployment reran **233 tests**, build, dry-run and deployment. Cloudflare version **6be98973-b6d4-4336-a136-60e4402bf81b** serves the exact clean manifest: alpha.4, engine 4, HF 2.2.1, `38cbae0`, dirty false. Earlier public-engine-3 statements above are historical checkpoints.
+Main was integrated and privately pushed at **38cbae0694006cd5157add4e144b35cea686aa61**. Branch CI [38573311512](https://github.com/adam0white/repair-game/actions/runs/38573311512) (archived private source) and main CI [38573313495](https://github.com/adam0white/repair-game/actions/runs/38573313495) (archived private source) passed. Deployment reran **233 tests**, build, dry-run and deployment. Cloudflare version **6be98973-b6d4-4336-a136-60e4402bf81b** serves the exact clean manifest: alpha.4, engine 4, HF 2.2.1, `38cbae0`, dirty false. Earlier public-engine-3 statements above are historical checkpoints.
 
 Actual public UI smoke at `/tmp/smallworks-alpha4-public-smoke.log` found zero runtime errors and no overflow at width 390. Chrome exposed Select Switch as a non-ignored button. Keyboard Enter and Inspect worked. One input replayed exactly through export/import; invalid JSON did not change the clock. All seven WOFF2 requests used the repair domain, with no CSP error. Secret scans found staged 471 KB and distribution 629 KB clean.
 
@@ -174,7 +174,7 @@ Later UI-only work names recorded Sam contributions and courier completion, keep
 
 ## Final presentation delivery before the run deadline
 
-The latest UI code is privately pushed on main at **0e80d89be803a9625dcd07974ed6c85396fa71ec**; the checked gameplay core remains `38cbae0`. [CI 38576890933](https://github.com/adam0white/repair-game/actions/runs/38576890933) passed. Deployment reran lint, types, **233 tests** and build. Cloudflare **6c8c45de-c057-4223-aed7-fe3a47afb86b** serves the exact clean UI manifest: `0e80d89`, alpha.4, engine 4, HF 2.2.1. Subsequent documentation-only commits may change the repository tip without changing this published UI code.
+The latest UI code is privately pushed on main at **0e80d89be803a9625dcd07974ed6c85396fa71ec**; the checked gameplay core remains `38cbae0`. [CI 38576890933](https://github.com/adam0white/repair-game/actions/runs/38576890933) (archived private source) passed. Deployment reran lint, types, **233 tests** and build. Cloudflare **6c8c45de-c057-4223-aed7-fe3a47afb86b** serves the exact clean UI manifest: `0e80d89`, alpha.4, engine 4, HF 2.2.1. Subsequent documentation-only commits may change the repository tip without changing this published UI code.
 
 Root legally continued the actual 48-input mentor save through seven next-day commands to Day 8, preserving its facts and producing 55 inputs. Raw and UI replay were exact. The public account records Nora's object received, Contact inspected, Contact measured under movement and the object returned. It reports zero independent repairs. An actual 40-input prefix exposed pending instructions with history closed and no false baseline warning. The 390-width ending fits; paused export and return to workshop work with zero errors. This is replay-based presentation verification, not a new natural whole-handoff run.
 
@@ -202,7 +202,7 @@ Fresh mobile play is underway on immutable assets: JS `192ceeb71bb78d03ac7739329
 
 ## Focused renewal public delivery and mobile evidence, 2026-10-15
 
-Clean source **39793cd92dcea494a3bf64df8098aeb19cf0a6b9** is privately pushed on main. Deployment repeated lint, types, **241 tests across 25 files**, build and dry-run. CI [38679966443](https://github.com/adam0white/repair-game/actions/runs/38679966443) passed. Cloudflare **cdf74c5d-0a25-49e1-9b31-07756effb16f** serves the exact clean manifest. Final assets retain the recorded JS/CSS hashes. No code or further deployment remains selected.
+Clean source **39793cd92dcea494a3bf64df8098aeb19cf0a6b9** is privately pushed on main. Deployment repeated lint, types, **241 tests across 25 files**, build and dry-run. CI [38679966443](https://github.com/adam0white/repair-game/actions/runs/38679966443) (archived private source) passed. Cloudflare **cdf74c5d-0a25-49e1-9b31-07756effb16f** serves the exact clean manifest. Final assets retain the recorded JS/CSS hashes. No code or further deployment remains selected.
 
 Public desktop replayed the visitor's 48 inputs exactly, checked End/Home keyboard tabs, and found no overflow or runtime errors. Root's width-390 public check verified actual switch Off/On. Both prior mentor and visitor 48-input packets replay exactly on the frozen candidate.
 
@@ -222,4 +222,4 @@ Guidance supplied measurement pairs; independent diagnosis is not proven. The te
 - **Round 2:** four testers played a frozen build. All four exports replay exactly at `ce71918`.
 - **HF-character harness:** 8 personas × 2 seeds at `ce71918`, exit 0.
 - **Not acted on:** listed in playtest 10. The main item is natural difficulty.
-- **Published:** `5623597` passed [CI 39320840965](https://github.com/adam0white/repair-game/actions/runs/39320840965) and was deployed as Cloudflare `cdda086b-e9e0-44b2-afbf-adf84b2d97e5`. The live manifest shows that commit, dirty false, framework 2.8.0, engine `small-works@5`.
+- **Published:** `5623597` passed [CI 39320840965](https://github.com/adam0white/repair-game/actions/runs/39320840965) (archived private source) and was deployed as Cloudflare `cdda086b-e9e0-44b2-afbf-adf84b2d97e5`. The live manifest shows that commit, dirty false, framework 2.8.0, engine `small-works@5`.

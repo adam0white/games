@@ -56,7 +56,7 @@ The opt-in command and `busyWorkshop.edition` are saved and replayed. Without th
 
 ## Verified delivery, 2026-10-26
 
-App source [`7ad0c204b79bdc9bc2a3fe620b870fa2be23eb1a`](https://github.com/adam0white/repair-game/commit/7ad0c204b79bdc9bc2a3fe620b870fa2be23eb1a) passed the one independent review after its bench-reservation correction, the normal 341-test lane and [exact CI](https://github.com/adam0white/repair-game/actions/runs/40247182903). A fresh clean managed deployment reports that exact source and `dirty:false` in the [live manifest](https://repair.adamwhite.work/release.json). Builder checks covered both required Chrome sizes and controlled WebKit Feedback choices. The owner’s existing save was preserved. No new player round or owner acceptance is claimed.
+App source [`7ad0c204b79bdc9bc2a3fe620b870fa2be23eb1a`](https://github.com/adam0white/repair-game/commit/7ad0c204b79bdc9bc2a3fe620b870fa2be23eb1a) (archived private source) passed the one independent review after its bench-reservation correction, the normal 341-test lane and [exact CI](https://github.com/adam0white/repair-game/actions/runs/40247182903) (archived private source). A fresh clean managed deployment reports that exact source and `dirty:false` in the [live manifest](https://repair.adamwhite.work/release.json). Builder checks covered both required Chrome sizes and controlled WebKit Feedback choices. The owner’s existing save was preserved. No new player round or owner acceptance is claimed.
 
 ## B2+B4 conversation and attendance candidate, 2026-10-27
 

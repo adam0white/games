@@ -1,3 +1,5 @@
+> Historical game handoff: source and CI links below refer to original repositories and may be private or archived. Current game source is in this monorepo.
+
 <!-- Current episode continuity disposition, 2026-11-05: New game always starts a fresh local cast. It skips shelf readiness, enablement, preparation and claims. Stored people stay unchanged. Person checkpoint/alternative publication and their UI controls are closed for this edition. Current local game resume and complete game exports remain supported. UPKEEP will review qualified native 4.17 continuing-person support on 2026-11-12; no account transfer is started. -->
 
 # Opening episode — 2026-11-05
@@ -352,7 +354,7 @@ edition. HF owns individual choices and courtship readiness; Valley owns these p
 terms, travel, attendance, accounts and finite inventory. See [README](README.md).
 
 The delivery record reports signature G with the Codex trailer, normal lane 164 passed
-and one existing skip, and [exact CI 40277549475](https://github.com/adam0white/valley/actions/runs/40277549475)
+and one existing skip, and [exact CI 40277549475](https://github.com/adam0white/valley/actions/runs/40277549475) (archived private source)
 succeeded. Clean deployment `a966c302-2498-492d-9712-57ccd9204cee` reports that exact
 commit and `dirty:false`. Valley 0.3.0, HF package 3.0.0, Person engine 2.23.0,
 client 0.4.11 and kit 0.5.12 remain unchanged. These are existing delivery receipts,
@@ -375,7 +377,7 @@ Signed source `a0096a1786c902322c1226ff24f943370eab740b` adopts immutable client
 and kit 0.5.12. Valley 0.3.0, HF 3.0.0 and Person engine 2.23.0 are unchanged.
 TypeScript is 7.0.2; Node 24 or later is required. This Feedback adoption is technically
 delivered: signature G with the Codex trailer, normal lane 153 passed and one skipped,
-and [exact CI 40255296917](https://github.com/adam0white/valley/actions/runs/40255296917)
+and [exact CI 40255296917](https://github.com/adam0white/valley/actions/runs/40255296917) (archived private source)
 succeeded. Its clean deployment is `ec64fd88-3af3-48d9-8475-acbadb77ca7a`;
 release.json reports app 0.3.0, framework 3.0.0, that exact a009 commit and `dirty:false`.
 This source-only documentation update does not deploy the app.
@@ -408,7 +410,7 @@ The press adapter captures the actual next-morning answer during each simulation
 this is an adapter correction, not a new cohort result.
 
 The completed batch passed the normal lane: 151 passed, one skipped, with lint and types
-green. [Exact CI 40245290814](https://github.com/adam0white/valley/actions/runs/40245290814)
+green. [Exact CI 40245290814](https://github.com/adam0white/valley/actions/runs/40245290814) (archived private source)
 succeeded on that source. Its clean deployment is Cloudflare
 `73f6fbbd-e818-4c0e-83fe-a70bb0ddb753`; release.json reports app 0.3.0,
 framework 3.0.0, that exact commit and `dirty:false`. Later documentation commits do not
