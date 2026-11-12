@@ -23,6 +23,8 @@ Run the preparation command before checks; it installs each game's declared brow
 
 The registry also supports `kind: "recorded-viewer"` for a CLI experiment and static recording viewer such as Island. This kind still requires the exact npm HF engine for native replay and declares no direct Lab client dependency. The source/build audit must establish that no recording implementation is bundled; the manifest check alone does not establish that. Its release reports `labVersion: null`. Interactive games continue to require their immutable Lab client artifact.
 
+Cloud commits must retain verified signatures. One supported option is [GitHub Codespaces GPG verification](https://docs.github.com/en/codespaces/managing-your-codespaces/managing-gpg-verification-for-github-codespaces): in GitHub **Settings → Codespaces**, enable **GPG verification**, choose **Selected repositories**, and add `adam0white/games`. Create a new codespace, or restart an existing one after enabling it. Codespaces supplies the signer; do not copy Mac signing-key paths into the cloud workspace. Confirm the pushed commit is verified on GitHub. For another cloud runner, configure its verified signer before committing. Fix signing errors without disabling signing.
+
 Work on a signed branch. Run the affected game checks and root lane. Open one combined PR for independent changes. Obtain green required CI and a clear hosted Codex review on the exact head. Merge normally. Shared files and the lockfile trigger all game checks. CI always builds the entire deployment bundle.
 
 ## Production deployment

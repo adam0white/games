@@ -9,7 +9,8 @@
       },
       "saveSchema": "rope-hf4/1",
       "legacyOrigin": "https://rope.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "hearsay",
@@ -22,7 +23,8 @@
         "chromium-headless-shell"
       ],
       "legacyOrigin": "https://hearsay.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "goodhands",
@@ -35,7 +37,8 @@
         "chromium-headless-shell"
       ],
       "legacyOrigin": "https://goodhands.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "glance",
@@ -48,7 +51,8 @@
         "chromium"
       ],
       "legacyOrigin": "https://glance.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "smallworks",
@@ -58,7 +62,9 @@
       },
       "saveSchema": "small-works@5",
       "legacyOrigin": "https://repair.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc",
+      "redirectMode": "zone"
     },
     {
       "slug": "valley",
@@ -68,7 +74,8 @@
       },
       "saveSchema": "valley-opening-2026-11",
       "legacyOrigin": "https://valley.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "murmur",
@@ -82,7 +89,8 @@
         "webkit"
       ],
       "legacyOrigin": "https://murmur.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "stairwell",
@@ -92,7 +100,8 @@
       },
       "saveSchema": "stairwell@14/15/16",
       "legacyOrigin": "https://stairwell.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "pass",
@@ -102,7 +111,8 @@
       },
       "saveSchema": "pass-hf4/2",
       "legacyOrigin": "https://pass.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "warren",
@@ -116,7 +126,8 @@
         "webkit"
       ],
       "legacyOrigin": "https://warren.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "commonstead",
@@ -126,7 +137,8 @@
       },
       "saveSchema": "commonstead-current/2-schema14",
       "legacyOrigin": "https://commonstead.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "child",
@@ -140,7 +152,8 @@
         "webkit"
       ],
       "legacyOrigin": "https://child.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "neighbours",
@@ -158,7 +171,8 @@
         "chromium"
       ],
       "legacyOrigin": "https://neighbours.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "lefthand",
@@ -172,7 +186,8 @@
         "webkit"
       ],
       "legacyOrigin": "https://lefthand.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "days",
@@ -186,7 +201,8 @@
         "webkit"
       ],
       "legacyOrigin": "https://days.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "word",
@@ -200,7 +216,8 @@
         "webkit"
       ],
       "legacyOrigin": "https://word.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "smoke",
@@ -214,7 +231,8 @@
         "webkit"
       ],
       "legacyOrigin": "https://smoke.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "island",
@@ -225,7 +243,8 @@
       },
       "saveSchema": "island-replay@1",
       "legacyOrigin": "https://island.adamwhite.work",
-      "redirectEnabled": false
+      "redirectEnabled": true,
+      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     }
   ]
 }
