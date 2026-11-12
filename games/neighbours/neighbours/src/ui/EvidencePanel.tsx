@@ -315,11 +315,11 @@ export default function EvidencePanel() {
 			)}
 			<p>
 				<a
-					href="https://github.com/adam0white/concordia/actions?query=branch%3Aneighbours"
+					href="https://github.com/adam0white/games/actions"
 					target="_blank"
 					rel="noreferrer"
 				>
-					CI runs for the neighbours branch ↗
+					Games CI runs ↗
 				</a>
 			</p>
 		</details>

@@ -1,3 +1,5 @@
+> Historical game handoff: source and CI links below refer to original repositories and may be private or archived. Current game source is in this monorepo.
+
 <!-- Current public simplification, 2026-11-05: UPKEEP implements the owner's fix-or-simplify instruction with a six-resident browser fresh/restart default. No native faculty is disabled and no time horizon is shortened. Core/CLI206 and existing206 imports remain unchanged research scope; their original budgets remain open and unqualified. Current public CI requires complete six-person96-round file replay, native/WASM parity, all current native contracts and browser export/recovery. The previous required206 research workflow/source is preserved under neighbours/archive/hf417-public206-source; the exact206 stress/continuation/parity scripts run separately through manual Neighbours research with their original45-minute job bound. This supersedes treating unqualified206 research acceptance as public-game delivery acceptance; it never awards an old scientific gate a pass. Review research/export limits again on2026-11-12. -->
 
 ## Current fresh-start boundary — 2026-11-05

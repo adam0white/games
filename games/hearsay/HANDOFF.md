@@ -1,3 +1,5 @@
+> Historical game handoff: source and CI links below refer to original repositories and may be private or archived. Current game source is in this monorepo.
+
 # Upkeep candidate — 2026-11-05
 
 [Item-specific open checkpoints](docs/upkeep-checkpoints-2026-11-05.md) retain the original requests and their separate dates.
@@ -102,7 +104,7 @@ The current candidate pins Human Framework 4.6.0, immutable lab-client 0.5.2 and
 
 ## Current source and live receipt — 2026-10-25
 
-The Feedback delivery source is signed `99a30092fa4eed1c76f3787a40e7a64a77f45241`. [Exact CI 40250286119](https://github.com/adam0white/hearsay/actions/runs/40250286119) succeeded on that SHA. The final Feedback report records clean deployment `33ad2cba-d838-4d87-a433-ca2d8e1655bc` and matching [live release.json](https://hearsay.adamwhite.work/release.json): app `0.1.0`, framework `3.0.0`, exact source and `dirty:false`. Its normal lane passed 316 tests in 48 files, lint and types, with 508 existing warnings. These are recorded delivery receipts, not a new docsweb live check. Earlier mechanics source `df6beed03d7ad4dae8110ec341cbe237c40a1bba` and helper source `6658092cfe04b212271efed3d049be05485f8434` retain their separate receipts. Source-only documentation requires no app deployment.
+The Feedback delivery source is signed `99a30092fa4eed1c76f3787a40e7a64a77f45241`. [Exact CI 40250286119](https://github.com/adam0white/hearsay/actions/runs/40250286119) (archived private source) succeeded on that SHA. The final Feedback report records clean deployment `33ad2cba-d838-4d87-a433-ca2d8e1655bc` and matching [live release.json](https://hearsay.adamwhite.work/release.json): app `0.1.0`, framework `3.0.0`, exact source and `dirty:false`. Its normal lane passed 316 tests in 48 files, lint and types, with 508 existing warnings. These are recorded delivery receipts, not a new docsweb live check. Earlier mechanics source `df6beed03d7ad4dae8110ec341cbe237c40a1bba` and helper source `6658092cfe04b212271efed3d049be05485f8434` retain their separate receipts. Source-only documentation requires no app deployment.
 
 The source pins HF 3.0.0, engine 2.23.0, immutable lab-client 0.4.11 and lab-kit 0.5.12 from signed SDK source `569bfeed8042607e3b0357277e280e8bc1af01f5`. This host adopted those release artifacts; SDK npm publication remains excluded by the owner guardrail. The maintained stack is TypeScript 7.0.2, Vite 8.3.5, Vitest 5.0.5, Biome 2.6.3, Playwright 1.64.1 and Wrangler 4.152.0, with shared Node 26.12.0 and pnpm 12.14.0 and Worker compatibility date 2026-10-25. Miniflare retains Undici 7.30.1 for its legacy HTTP 421 dispatcher callbacks; review on 2026-11-03 or the next Miniflare release.
 

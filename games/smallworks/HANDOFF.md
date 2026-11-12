@@ -1,3 +1,5 @@
+> Historical game handoff: source and CI links below refer to original repositories and may be private or archived. Current game source is in this monorepo.
+
 ## Upkeep follow-up — 2026-11-05
 
 Remaining: integrate open Clarity work, qualify HF 4.17 replay and release, and obtain Adam's play and acceptance. Recheck on 2026-11-12 because the owner judgment and current source qualification have not been recorded; no appointment or player panel is implied. The dated delivery receipts below remain historical.
@@ -54,7 +56,7 @@ Remaining: focused controls, final lane, signed push, independent exact-SHA revi
 
 Remaining: restore GitHub Actions billing, rerun PR11 CI, merge on exact green CI, require exact green merged CI, deploy and verify the clean live manifest. GitHub refused to start run 40892397613: recent account payments failed or the spending limit needs increasing. No merge or deployment is claimed. Adam accepts feel separately.
 
-Signed candidate `d8bce61f2fab33367380cdc69c11eb6644a93f73` is in [PR11](https://github.com/adam0white/repair-game/pull/11). Local check:lane, production build, deployment dry run including both historical archives, 12 focused save/replay checks and headless native replay/save roundtrip passed. The first full suite had 397 passes and 6 synthetic passport failures while the stamp correction was being made; the fresh exact-candidate full suite passed all 403 tests across 59 files in 540.63s. The dependency audit found no known vulnerabilities. The live repo URL remains `https://repair.adamwhite.work`, clean commit `d48782129bbf015e2b2bf1475d144838c095c93f`, HF 4.8.0. The task report at `~/code/.lab-scratch/codex/smallworks-hf411.md` owns final verification and cleanup receipts.
+Signed candidate `d8bce61f2fab33367380cdc69c11eb6644a93f73` is in [PR11](https://github.com/adam0white/repair-game/pull/11) (archived private source). Local check:lane, production build, deployment dry run including both historical archives, 12 focused save/replay checks and headless native replay/save roundtrip passed. The first full suite had 397 passes and 6 synthetic passport failures while the stamp correction was being made; the fresh exact-candidate full suite passed all 403 tests across 59 files in 540.63s. The dependency audit found no known vulnerabilities. The live repo URL remains `https://repair.adamwhite.work`, clean commit `d48782129bbf015e2b2bf1475d144838c095c93f`, HF 4.8.0. The task report at `~/code/.lab-scratch/codex/smallworks-hf411.md` owns final verification and cleanup receipts.
 
 Adopts published HF 4.11.0, client 0.5.11 and kit 0.5.28. Read HF CHANGELOG 4.8.1–4.11.0. History consumers use `readRunHistory`; native exports remain complete format-7 archives. IndexedDB autosaves atomically commit journal chunks, opening, matching host snapshot and head. Restoration verifies the whole journal. The storage adapter restores and compares the incoming full archive and committed prefix before appending; this reduces repeated writes, not replay CPU or read costs. The no-IndexedDB fallback keeps native saves.
 
@@ -109,11 +111,11 @@ Remaining: Adam accepts readability, game feel, canonical receiving journeys and
 
 ### Source and deployed receipt
 
-The fetched source baseline is `29218f50717a926bf4d4e1dd22f8a2b76bbb6f6d`, signed G with the Codex trailer; exact [CI 40252310186](https://github.com/adam0white/repair-game/actions/runs/40252310186) passed. It pins released HF **3.0.0**, whose person engine is **2.23.0**, and immutable lab-client **0.4.11** / lab-kit **0.5.12**. The game package is **4.1.0**; save provenance is **4.1.0+hf3**, scenario **canonical-workshop@2**, workshop engine/schema **small-works@5**. These values describe different contracts.
+The fetched source baseline is `29218f50717a926bf4d4e1dd22f8a2b76bbb6f6d`, signed G with the Codex trailer; exact [CI 40252310186](https://github.com/adam0white/repair-game/actions/runs/40252310186) (archived private source) passed. It pins released HF **3.0.0**, whose person engine is **2.23.0**, and immutable lab-client **0.4.11** / lab-kit **0.5.12**. The game package is **4.1.0**; save provenance is **4.1.0+hf3**, scenario **canonical-workshop@2**, workshop engine/schema **small-works@5**. These values describe different contracts.
 
 The maintenance delivery report verifies the live [release manifest](https://repair.adamwhite.work/release.json) at `29218f5`, `dirty:false`, game/app 4.1.0, framework 3.0.0 and engine `small-works@5`; Cloudflare version `e874b71d-7950-4c2d-b60c-731de2c5cac0`. Its normal lane and deployment checks passed **341 tests across 46 files**, lint, types, build and both historical archive builds. The bounded maintenance removed five production non-null assertions with exact raw save/continuation/replay comparisons and no UI change. **239 lint warnings remain**; this is not completion of the maintenance sweep.
 
-Gameplay delivery `7ad0c204b79bdc9bc2a3fe620b870fa2be23eb1a` / [CI 40247182903](https://github.com/adam0white/repair-game/actions/runs/40247182903) / Cloudflare `6a1ea231-443c-4885-a568-c231b3eef21a` and docs-only receipt `8dc26c0` / [CI 40248151180](https://github.com/adam0white/repair-game/actions/runs/40248151180) are earlier receipts. The gameplay delivery checked Chrome at 360×690 and 1280×800 and controlled WebKit Feedback behavior. These are older scoped browser checks, not fresh browser proof of `29218f5`, all-device acceptance or a player round. This source-only documentation update deploys nothing.
+Gameplay delivery `7ad0c204b79bdc9bc2a3fe620b870fa2be23eb1a` / [CI 40247182903](https://github.com/adam0white/repair-game/actions/runs/40247182903) (archived private source) / Cloudflare `6a1ea231-443c-4885-a568-c231b3eef21a` and docs-only receipt `8dc26c0` / [CI 40248151180](https://github.com/adam0white/repair-game/actions/runs/40248151180) (archived private source) are earlier receipts. The gameplay delivery checked Chrome at 360×690 and 1280×800 and controlled WebKit Feedback behavior. These are older scoped browser checks, not fresh browser proof of `29218f5`, all-device acceptance or a player round. This source-only documentation update deploys nothing.
 
 [HF3 adoption](docs/hf3-adoption.md) records replay controls and the dated Undici exception. Current delivery reports are `~/code/.lab-scratch/games-deferred/repair-report.md` and `~/code/.lab-scratch/v3/smallworks-null-maint/report.md`. Their source/deploy trees and branches were cleaned. Technical receipts do not establish owner acceptance, human learning/control acceptance, an ordinary shared-shelf journey or completion of other games.
 
@@ -211,7 +213,7 @@ Deferred 2026-10-19 under the owner's soft stop. Each item below is deferred to 
 ## HF 2.8.0 and engine 5 (2026-10-19)
 
 - **Delivered:** clean `5623597aba2310112c2294cfff9c686404e95f59`, pushed on main.
-- **CI:** [CI 39320840965](https://github.com/adam0white/repair-game/actions/runs/39320840965) passed.
+- **CI:** [CI 39320840965](https://github.com/adam0white/repair-game/actions/runs/39320840965) (archived private source) passed.
 - **Deploy:** repeated lint, types, **259 tests across 29 files** and build. Cloudflare version `cdda086b-e9e0-44b2-afbf-adf84b2d97e5`.
 - **Live `/release.json`:** commit `5623597…`, dirty false, game 3.1.0-alpha.3, framework 2.8.0, engine `small-works@5`.
 - **Live smoke:** a driver smoke on the live site clicked "Ask Sam to watch" and opened the Workboard, with no page errors. It is not a playtest.
@@ -234,7 +236,7 @@ Deferred 2026-10-19 under the owner's soft stop. Each item below is deferred to 
 
 ## Previous focused UX delivery
 
-Adam accepts feel personally. The focused first-repair UX renewal is delivered locally and publicly at clean `39793cd92dcea494a3bf64df8098aeb19cf0a6b9`, privately pushed on main. Deployment repeated lint, types, **241 tests across 25 files** and build. [CI 38679966443](https://github.com/adam0white/repair-game/actions/runs/38679966443) passed. Cloudflare version is `cdf74c5d-0a25-49e1-9b31-07756effb16f`; the exact clean live manifest was verified. Later documentation-only commits do not change this published UI.
+Adam accepts feel personally. The focused first-repair UX renewal is delivered locally and publicly at clean `39793cd92dcea494a3bf64df8098aeb19cf0a6b9`, privately pushed on main. Deployment repeated lint, types, **241 tests across 25 files** and build. [CI 38679966443](https://github.com/adam0white/repair-game/actions/runs/38679966443) (archived private source) passed. Cloudflare version is `cdf74c5d-0a25-49e1-9b31-07756effb16f`; the exact clean live manifest was verified. Later documentation-only commits do not change this published UI.
 
 [Desktop and mobile first-visitor evidence](docs/restart/playtest-9.md) supports a purposeful opening and completed guided repair. Desktop retained 48 exact-replay inputs; mobile retained 14. Existing mentor and visitor 48-input saves also replay exactly. Public desktop keyboard tabs and 390-width layout/switch checks pass without runtime errors. These guided runs do not prove independent diagnosis. Small meter terminals, meter scrolling and the electrical reason for measuring across the switch remain limits. No additional implementation queue is selected.
 
@@ -242,7 +244,7 @@ Adam accepts feel personally. The focused first-repair UX renewal is delivered l
 
 ## Earlier five-hour delivered build
 
-Play [Small Works](https://repair.adamwhite.work). Published UI code is clean `0e80d89be803a9625dcd07974ed6c85396fa71ec`; gameplay core is `38cbae0`. The game is `3.0.0-alpha.4`, engine/schema `small-works@4`, with exactly published HF `2.2.1`. Main is privately pushed. [CI 38576890933](https://github.com/adam0white/repair-game/actions/runs/38576890933) passed. Deployment repeated lint, types, **233 tests across 23 files** and build; Cloudflare version is `6c8c45de-c057-4223-aed7-fe3a47afb86b`. The exact clean public manifest was verified. Later documentation-only commits need not change this UI code hash.
+Play [Small Works](https://repair.adamwhite.work). Published UI code is clean `0e80d89be803a9625dcd07974ed6c85396fa71ec`; gameplay core is `38cbae0`. The game is `3.0.0-alpha.4`, engine/schema `small-works@4`, with exactly published HF `2.2.1`. Main is privately pushed. [CI 38576890933](https://github.com/adam0white/repair-game/actions/runs/38576890933) (archived private source) passed. Deployment repeated lint, types, **233 tests across 23 files** and build; Cloudflare version is `6c8c45de-c057-4223-aed7-fe3a47afb86b`. The exact clean public manifest was verified. Later documentation-only commits need not change this UI code hash.
 
 Public checks cover keyboard component selection, accessible buttons, direct probes, narrow layout, export/import/replay, rejected malformed input without clock change and self-hosted licensed fonts. Zero runtime/CSP errors were recorded. The paired mentoring follow-up also verified clearer pending instructions, actual contribution rows and paused export. Its replay-based account is not fresh whole-repair play.
 
@@ -256,7 +258,7 @@ Earlier playtests and manifests remain unchanged under their original versions. 
 
 ## Compatibility and authority
 
-Autosaves use `small-works-save-v4`, preserving older keys. Earlier campaign and Small Works engines 1–3 are intentionally unsupported. Source remains private at [adam0white/repair-game](https://github.com/adam0white/repair-game). Static publication and private pushes are authorized; public source and licensing remain undecided. This repository owns the game. HF owns people through released public APIs.
+Autosaves use `small-works-save-v4`, preserving older keys. Earlier campaign and Small Works engines 1–3 are intentionally unsupported. At this historical checkpoint, source was private at [adam0white/repair-game](https://github.com/adam0white/repair-game) (archived private source). At that time static publication and private pushes were authorized, while public source and licensing were undecided. The later public-source and MIT decision and monorepo migration supersede those statements. This repository owns the game. HF owns people through released public APIs.
 
 On **2026-10-15**, contingent on Adam playing, review natural whole-handoff usability and teaching burden before selecting more world scope. This is a review priority, not scheduled unattended work.
 

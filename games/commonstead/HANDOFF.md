@@ -1,3 +1,5 @@
+> Historical game handoff: source and CI links below refer to original repositories and may be private or archived. Current game source is in this monorepo.
+
 # Upkeep candidate — 2026-11-05
 
 Remaining: qualify the 4.17 history-reader port with the full suite, review, integration of current Clarity work and exact CI before deployment. Recheck F-763, F-765, F-776 and F-778 on 2026-11-12: their compound source, delivery and next-day clauses remain open and this dependency update did not prove them. Recheck peer certification and the unavailable source/role contracts on 2026-11-12; a dependency pin does not certify live peers. Owner feel and accessibility remain separate.
@@ -58,7 +60,7 @@ Remaining: hosted review, exact CI, clean deployment and Adam's separate play ac
 
 # HF4 port candidate — 2026-10-28
 
-Remaining: final normal lane, the same PR's exact source CI, matched merge, exact merged CI and a clean deployment. [PR14](https://github.com/adam0white/commonstead/pull/14) carries this port and the coordinator's menu cleanup. Technical delivery ends with that merged PR and a live release manifest on its merged commit with `dirty:false`. Adam accepts the game by playing; that acceptance stays separate.
+Remaining: final normal lane, the same PR's exact source CI, matched merge, exact merged CI and a clean deployment. [PR14](https://github.com/adam0white/commonstead/pull/14) (archived private source) carries this port and the coordinator's menu cleanup. Technical delivery ends with that merged PR and a live release manifest on its merged commit with `dirty:false`. Adam accepts the game by playing; that acceptance stays separate.
 
 Current source pins published HF4.6.0 directly and through the immutable client override. The shared eight-person Run owns decisions, action starts, actual outcomes, retained history and sourced worship duties. Host rules retain materials, routes, physical work and authored conversation boundaries. Full-source files preserve exact game and HF history; native receiving validates the supported source and engine before admission. No acceptance of worship is computed.
 
