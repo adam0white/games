@@ -371,6 +371,8 @@ export async function createRenderer(
   let kind = "canvas2d";
   if (!forceCanvas) {
     try {
+      // Pixi installs static shader and buffer paths for strict Content Security Policy.
+      await import("pixi.js/unsafe-eval");
       const { Application, Graphics } = await import("pixi.js");
       app = new Application();
       await app.init({

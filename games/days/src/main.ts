@@ -100,6 +100,7 @@ let generation = 0;
 async function fresh(focus = false) {
   const current = ++generation;
   busy = true;
+  render();
   const seed = newSeed();
   let retained = false;
   try {
@@ -136,6 +137,7 @@ async function checkpoint() {
   const finished = game;
   const current = generation;
   busy = true;
+  render();
   try {
     await checkpointContinuity(
       shelf,
@@ -270,6 +272,7 @@ function render(focus = false) {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "choice";
+      button.disabled = busy;
       const object = objects[choice.id] ?? { name: "In the room", shape: "paper" };
       button.dataset.object = object.shape;
       button.dataset.action = choice.id;
@@ -303,10 +306,10 @@ function render(focus = false) {
           game = choose(game, choice.id);
           loadNotice = "";
           save();
-          render(true);
         } finally {
           busy = false;
         }
+        render(true);
         if (game.outcome !== "playing") void checkpoint();
       });
       return button;
