@@ -34,7 +34,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ==============================================================================
-lab-client — @adam0white/lab-client 0.5.18
+lab-client — @adam0white/lab-client 0.5.19
 
 MIT License
 
@@ -2705,4 +2705,4 @@ TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY OR OTHERWISE, EVEN IF
 NVIDIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-Lab kit 0.5.35 is MIT licensed under the Human Framework repository license above.
+Lab kit 0.5.36 is MIT licensed under the Human Framework repository license above.

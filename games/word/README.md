@@ -81,8 +81,8 @@ Only the current `word-5` edition with HF 4.17.0 is accepted. An earlier export
 or save, including every HF 3 run, is refused before any state changes, with a
 message to start a fresh meeting. Old saves are not migrated.
 
-The monorepo uses the published **@adam0white/lab-client 0.5.18** and
-**@adam0white/lab-kit 0.5.35** artifacts. The original vendored client remains
+The monorepo uses the published **@adam0white/lab-client 0.5.19** and
+**@adam0white/lab-kit 0.5.36** artifacts. The original vendored client remains
 in the source archive.
 Recording attempts uploads of decisions, run snapshots and event/error logs.
 Use **Record my play for the lab** on first visit or in Menu to change it.
@@ -121,7 +121,7 @@ when you return to it. A continued export contains the current state; its JSON
 formatting can differ from the original file. No people, logs or provenance are
 trimmed to meet the size limit.
 
-File mode starts with recording off. Client 0.5.18 uses preserving, deferred
+File mode starts with recording off. Client 0.5.19 uses preserving, deferred
 initialization after an explicit feedback or recording action. It leaves stored
 identity, preferences and queued recordings unchanged before recording opt-in.
 An unshared feedback note is sent alone, unlinked; it does not start delivery of

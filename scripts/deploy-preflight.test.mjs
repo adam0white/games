@@ -22,5 +22,5 @@ test('each preflight re-reads main, latest push run and its jobs', () => {
 
 test('deployment checks latest CI again after redirects immediately before upload', () => {
   const source = readFileSync('scripts/deploy.mjs', 'utf8');
-  assert.match(source, /checkLatestMainCI\(commit, run\);[\s\S]*check-redirects\.mjs[^\n]*\n\s*checkLatestMainCI\(commit, run\);\n\s*run\('pnpm', \['exec', 'wrangler', 'deploy'\]/);
+  assert.match(source, /checkLatestMainCI\(commit, run\);[\s\S]*check-redirects\.mjs[\s\S]*retainDeployBundle\([\s\S]*checkLatestMainCI\(commit, run\);\n\s*run\('pnpm', \['exec', 'wrangler', 'deploy'\]/);
 });

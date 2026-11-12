@@ -47,4 +47,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GAMES_DEPLOY_BUNDLE_DIR: ${{ runner.temp }}/games-uploaded-bundle
         run: pnpm deploy
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: games-static-${{ github.event.workflow_run.head_sha || github.sha }}
+          path: ${{ runner.temp }}/games-uploaded-bundle/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
