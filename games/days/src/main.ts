@@ -612,6 +612,7 @@ get("begin-off").addEventListener("click", () => begin(true));
 render();
 if (restored) {
   busy = false;
+  render();
   void checkpoint();
 } else {
   void fresh();

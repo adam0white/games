@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("opening choices wait for continuity and record the first action", async ({
+test("choices wait for continuity and remain usable after actions and reload", async ({
   page,
   baseURL,
 }) => {
@@ -43,6 +43,15 @@ test("opening choices wait for continuity and record the first action", async ({
     await page.getByRole("button", { name: "Export this play" }).click();
     const run = JSON.parse(await page.locator("#export-data").inputValue());
     expect(run.inputs).toEqual([action, nextAction]);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    const restoredChoice = page.locator("#choices .choice").first();
+    await expect(restoredChoice).toBeEnabled();
+    const restoredAction = await restoredChoice.getAttribute("data-action");
+    await restoredChoice.click();
+    await page.getByRole("button", { name: "Menu", exact: true }).click();
+    await page.getByRole("button", { name: "Export this play" }).click();
+    const continued = JSON.parse(await page.locator("#export-data").inputValue());
+    expect(continued.inputs).toEqual([action, nextAction, restoredAction]);
   } finally {
     releaseIdentity();
   }
