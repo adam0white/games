@@ -43,7 +43,7 @@ The [Human Framework](https://human.adamwhite.work/) supplies people’s needs, 
 | App package                              | 0.7.0                      |
 | Ordinary new-hill rules / configuration  | 0.7.0 / warren-rest/2      |
 | HF npm package                           | 4.17.0                     |
-| Immutable lab-client / lab-kit artifacts | 0.5.18 / 0.5.35            |
+| Immutable lab-client / lab-kit artifacts | 0.5.19 / 0.5.36            |
 | TypeScript                               | 7.0.2; support requires 7+ |
 
 Package version, rules edition and engine version have different meanings. `package.json` and the lockfile pin dependencies. `/warren/release.json` identifies a monorepo build. See [HANDOFF](HANDOFF.md) for dated deployment evidence and remaining owner review.

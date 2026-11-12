@@ -1,3 +1,7 @@
+# SDK19 adoption candidate — 2026-11-11
+
+Public client0.5.19 and kit0.5.36 packages from signed green HF9159de3e replace the SDK HF3 clock dependency with exact npm HF4.17.0. All18 consumer manifests (17 games plus nested Neighbours) frozen-install with public SHA512 integrity, and every installed SDK member matches the public archives. The complete installed graph contains only HF4.17.0. This candidate also retains the exact Actions-uploaded deployment bundle for subsequent live byte checks. Exact-head review/CI, deployment, native live checks and aliases remain pending. Earlier checkpoints below are historical evidence.
+
 # MIGRATE — current owner goal, 2026-11-10
 
 Remaining: obtain fresh exact-head PR review and CI, deploy the merged Glance fix and all eighteen games, activate and verify old-host redirects, update the central shelf, and finish archive/storage evidence. Automatic Actions deployment also needs the owner-provided secret; its exact setup is in README. New-game prototypes wait. The migration pace is no longer one step per day.
