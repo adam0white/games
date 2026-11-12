@@ -60,3 +60,7 @@ git rev-parse e99d8771a8bc0a752b00e7f1499a23833f7f1a46:games/neighbours
 ```
 
 The last command must return `59e20f83c4ba6353431ad42d5eb0f1a5460994e4`. Fetching history is an inspection step, not an install or build dependency. No archive decision, live release or redirect follows from source retention alone.
+
+## Native source verification without upstream Git objects
+
+The signed Neighbours import intentionally excludes unsigned upstream Git history. The native GM replay verifier formerly used `git show` on upstream commit `6fbfbc58f324aa74f78568c488713210889a801e`, so a clean Games clone could not run it. It now checks SHA256 pins for the same four critical components in `gm_director.py`, with no Git database or network dependency. On 2026-11-12 all four files independently matched both the pinned public Concordia raw URLs and GitHub contents API, including their Git blob identities. The verifier retains the original upstream SHA in report identity and refuses changed or missing bytes. It does not weaken the signed-import rule or import unsigned history. Source-only, one-byte tamper and missing-file controls cover the boundary; historical source fingerprints are not rewritten.
