@@ -1,3 +1,7 @@
+# Verified deployment update — 2026-11-11
+
+The owner supplied the stored `CLOUDFLARE_API_TOKEN` Actions secret. Exact main `fd4e4ad80580939e3903213950bd5b3a3b2e63cc` passed CI 43145052808 and automatic Deploy 43146023622. Actual artifact 13912390010, its 372 receipt files, all 18 live manifests and public bundle bytes were verified. This establishes asset deployment; alias activation and the Human Framework scheduler cutover are separate. The dated audit below is historical. No credential was read.
+
 # Cloud readiness audit — 2026-11-10
 
 Games implementation is staged on MIGRATE cloud branch. Automatic production deployment cannot succeed until the owner adds the named Actions secret. No token was read or installed. An Actions deployment has not yet been verified.
