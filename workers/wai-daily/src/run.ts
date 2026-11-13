@@ -123,7 +123,10 @@ export async function runScheduled(deps: RunDeps): Promise<RunOutcome> {
       } finally {
         await browser?.close().catch(() => {});
       }
-      const status = result.failure ? 'incomplete' : result.stop ? 'model-report' : 'incomplete';
+      // A stop without a written report is not a model report: the evidence the task asked for is missing.
+      const reported = typeof result.stop?.report === 'string' && result.stop.report.trim() !== '';
+      const failure = result.failure ?? (result.stop && !reported ? 'Model stopped without a final report' : null);
+      const status = !failure && reported ? 'model-report' : 'incomplete';
       sessions.push({ game: session.game, status });
       for (const entry of result.liveText) liveText.push({ game: session.game, url: session.url, ...entry });
       await put(
@@ -133,7 +136,7 @@ export async function runScheduled(deps: RunDeps): Promise<RunOutcome> {
             session,
             stop: result.stop,
             status,
-            failure: result.failure,
+            failure,
             feedback: 'Not submitted; report retained privately',
             timing: { started: result.started, ended: result.ended },
             turns: result.turns,

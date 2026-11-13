@@ -59,6 +59,16 @@ it('does nothing outside the 16:00 Chicago window, in either season', async () =
   expect((await runScheduled(d.value)).status).toBe('ran');
 });
 
+it('records a stop without a final report as incomplete', async () => {
+  const b = bucket();
+  const d = deps(b, [stopOp(''), stopOp('Control report.')]);
+  const outcome = await runScheduled(d.value);
+  if (outcome.status !== 'ran') throw new Error('unreachable');
+  expect(outcome.sessions.map((s) => s.status)).toEqual(['incomplete', 'model-report']);
+  const key = b.keys().find((k) => k.includes('/0-') && k.endsWith('report.json'));
+  expect(b.json<{ failure: string }>(key ?? '').failure).toBe('Model stopped without a final report');
+});
+
 it('plays the focused game and the control once, and keeps every receipt privately', async () => {
   const b = bucket();
   const d = deps(b, [...play, stopOp('Control report.')]);
