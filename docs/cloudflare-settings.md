@@ -18,7 +18,7 @@ Owner decision, 2026-11-13: Workers Builds serves pull request previews only; th
 | Production deploy command | `npx wrangler deploy` | `npx wrangler versions upload`                                     |
 | Preview build command     | `pnpm run build`      | `git fetch --unshallow origin \|\| git fetch origin; pnpm run build` |
 
-The first two preview builds failed at the redirect preflight, which needs full Git history; their logs do not state the clone depth. The new preview build command fetches full history first, and the third preview build passed its build step. Its deploy step failed because `wrangler preview` requires a `previews` block in `wrangler.jsonc`; that block is now present and empty. Not yet observed as of this commit: a deployed preview.
+The first two preview builds failed at the redirect preflight, which needs full Git history; their logs do not state the clone depth. The new preview build command fetches full history first, and the third preview build passed its build step. Its deploy step failed because `wrangler preview` requires a `previews` block in `wrangler.jsonc`; that block is now present and empty. The fourth build deployed a preview without a URL, because `preview_urls` was `false`; it is now `true`. That also gives production versions a public `workers.dev` preview URL once this configuration is deployed. Not yet observed as of this commit: a reachable preview URL.
 
 Cloudflare documents no switch that stops production-branch builds while keeping previews; `versions upload` is its documented way to build without deploying. A push to `main` therefore still starts a Workers Builds run, which uploads an inactive version or fails. Neither changes what is served. The production build command is unchanged, so it fails at the redirect preflight like the first preview build did, which needs full Git history. Not verified by observation: a push to `main` after the change.
 
@@ -26,7 +26,7 @@ The `cf` CLI can read the Builds API; `wrangler` OAuth cannot.
 
 ## In repository config already
 
-`games-static`: name, routes, custom domain, assets binding, `workers_dev` and `preview_urls` off (`wrangler.jsonc`). It has no secrets, variables or cron triggers.
+`games-static`: name, routes, custom domain, assets binding, `workers_dev` off and `preview_urls` on (`wrangler.jsonc`). It has no secrets, variables or cron triggers.
 
 ## Deferred
 
