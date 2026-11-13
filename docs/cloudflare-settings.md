@@ -6,12 +6,20 @@ Read-only audit, 2026-11-13, from the owner's Mac with the local `wrangler` and 
 
 | Worker            | Setting                 | Value on 2026-11-13                                                                                                                                                       |
 | ----------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `games-static`    | Workers Builds          | Created 2026-11-13. Repository `adam0white/games`, branch `main`, root `/`, build `pnpm run build`, deploy `npx wrangler deploy`, previews on (`npx wrangler preview`), watch paths `*`, no build variables. No build had run. |
+| `games-static`    | Workers Builds          | As created 2026-11-13, before the changes below. Repository `adam0white/games`, branch `main`, root `/`, build `pnpm run build`, deploy `npx wrangler deploy`, previews on (`npx wrangler preview`), watch paths `*`, no build variables. No build had run. |
 | `human-framework` | Secret `WAI_BUDGET_KEY` | Present. Its only caller was the Mac's daily job; see `workers/wai-daily/README.md`.                                                                                      |
 | `human-framework` | Workers Builds          | None. Deployed by hand with `wrangler`.                                                                                                                                   |
 | 16 old per-game Workers and `repair-game` | Existence, custom domains | Still present. Routes on `games-static` take precedence for the old hosts.                                                                              |
 
-Workers Builds on `games-static` conflicts with the guarded deploy in `.github/workflows/deploy.yml`: it would upload on every push to `main` without green CI, the live-manifest check or the retained artifact. **Open owner decision, 2026-11-13:** one production deployer per Worker.
+Owner decision, 2026-11-13: Workers Builds serves pull request previews only; the guarded deploy in `.github/workflows/deploy.yml` is the only production deployer. Change made that day with `cf builds workers update` (Worker tag `26188500443f4ca59b5e0d3033ee2ffa`):
+
+| Setting                   | Before                | After                          |
+| ------------------------- | --------------------- | ------------------------------ |
+| Production deploy command | `npx wrangler deploy` | `npx wrangler versions upload` |
+
+Preview builds do not pass yet. The first one failed at the redirect preflight, which needs full Git history; the build log does not state the clone depth. Proposed and not applied as of 2026-11-13: preview build command `git fetch --unshallow origin || git fetch origin; pnpm run build`.
+
+Cloudflare documents no switch that stops production-branch builds while keeping previews; `versions upload` is its documented way to build without deploying. A push to `main` therefore still starts a Workers Builds run, which uploads an inactive version or fails. Neither changes what is served. The production build command is unchanged, so it fails at the redirect preflight like the first preview build did, which needs full Git history. Not verified by observation: a push to `main` after the change.
 
 The `cf` CLI can read the Builds API; `wrangler` OAuth cannot.
 
