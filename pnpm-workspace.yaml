@@ -1,6 +1,7 @@
 packages:
   - games/*
   - games/neighbours/neighbours
+  - workers/*
 linkWorkspacePackages: true
 hoist: false
 engineStrict: true
