@@ -11,13 +11,14 @@ Read-only audit, 2026-11-13, from the owner's Mac with the local `wrangler` and 
 | `human-framework` | Workers Builds          | None. Deployed by hand with `wrangler`.                                                                                                                                   |
 | 16 old per-game Workers and `repair-game` | Existence, custom domains | Still present. Routes on `games-static` take precedence for the old hosts.                                                                              |
 
-Owner decision, 2026-11-13: Workers Builds serves pull request previews only; the guarded deploy in `.github/workflows/deploy.yml` is the only production deployer. Change made that day with `cf builds workers update` (Worker tag `26188500443f4ca59b5e0d3033ee2ffa`):
+Owner decision, 2026-11-13: Workers Builds serves pull request previews only; the guarded deploy in `.github/workflows/deploy.yml` is the only production deployer. Changes made that day with `cf builds workers update` (Worker tag `26188500443f4ca59b5e0d3033ee2ffa`):
 
-| Setting                   | Before                | After                          |
-| ------------------------- | --------------------- | ------------------------------ |
-| Production deploy command | `npx wrangler deploy` | `npx wrangler versions upload` |
+| Setting                   | Before                | After                                                              |
+| ------------------------- | --------------------- | ------------------------------------------------------------------ |
+| Production deploy command | `npx wrangler deploy` | `npx wrangler versions upload`                                     |
+| Preview build command     | `pnpm run build`      | `git fetch --unshallow origin \|\| git fetch origin; pnpm run build` |
 
-Preview builds do not pass yet. The first one failed at the redirect preflight, which needs full Git history; the build log does not state the clone depth. Proposed and not applied as of 2026-11-13: preview build command `git fetch --unshallow origin || git fetch origin; pnpm run build`.
+The first two preview builds failed at the redirect preflight, which needs full Git history; their logs do not state the clone depth. The new preview build command fetches full history first. Not yet observed as of this commit: a passing preview build.
 
 Cloudflare documents no switch that stops production-branch builds while keeping previews; `versions upload` is its documented way to build without deploying. A push to `main` therefore still starts a Workers Builds run, which uploads an inactive version or fails. Neither changes what is served. The production build command is unchanged, so it fails at the redirect preflight like the first preview build did, which needs full Git history. Not verified by observation: a push to `main` after the change.
 
