@@ -29,11 +29,13 @@ export function validateRegistry(registry) {
 }
 export function affectedGames(registry, paths) {
   validateRegistry(registry);
+  // Standalone Workers have their own CI job and never enter a game's build.
+  paths = paths.filter(path => !path.startsWith('workers/'));
   if (paths.some(path => !path.startsWith('games/') || !registry.games.some(g => path.startsWith(`games/${g.slug}/`)))) return registry.games.map(g => g.slug);
   return registry.games.filter(g => paths.some(p => p.startsWith(`games/${g.slug}/`))).map(g => g.slug);
 }
 export function checkResults(results, count, total = count) {
-  for (const job of ['tools', 'changes']) if (results[job] !== 'success') throw new Error(`${job} ${results[job]}`);
+  for (const job of ['tools', 'changes', 'workers']) if (results[job] !== 'success') throw new Error(`${job} ${results[job]}`);
   if (results.games !== (count === 0 ? 'skipped' : 'success')) throw new Error(`games ${results.games}`);
   if (results.build !== (total === 0 ? 'skipped' : 'success')) throw new Error(`build ${results.build}`);
 }
