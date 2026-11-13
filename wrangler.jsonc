@@ -6,6 +6,8 @@
   "compatibility_date": "2026-11-05",
   "workers_dev": false,
   "preview_urls": false,
+  // Required by `wrangler preview`, which Workers Builds runs for pull requests. Previews need no separate settings.
+  "previews": {},
   "routes": [
     {
       "pattern": "play.adamwhite.work",
