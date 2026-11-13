@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .wrangler/
+.cloudflare/
 .env*
 !.env.example
 .superpowers/

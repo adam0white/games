@@ -5,11 +5,16 @@ import { validateGame } from './game.mjs';
 import { verifyRedirects } from './redirect-preflight.mjs';
 
 const commit = head();
-// The current file uses strict JSON (a subset of JSONC); fail closed on parse errors.
-const config = JSON.parse(readFileSync('wrangler.jsonc', 'utf8'));
+// Read the same typed config that `cf` builds from, and present it in the route shape the preflight checks.
+const { worker } = (await import('../cloudflare.config.ts')).default;
+const routes = [
+  ...worker.domains.map(pattern => ({ pattern, custom_domain: true })),
+  ...worker.triggers.filter(trigger => trigger.type === 'fetch').map(trigger => ({ pattern: trigger.pattern, zone_name: trigger.zone })),
+];
+if (routes.length !== worker.domains.length + worker.triggers.length) throw new Error('Unexpected non-fetch trigger in cloudflare.config.ts');
 await verifyRedirects({
   registry,
-  routes: config.routes,
+  routes,
   head: commit,
   expected: game => {
     const pkg = JSON.parse(readFileSync(`games/${game.slug}/package.json`, 'utf8'));

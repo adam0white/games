@@ -20,11 +20,19 @@ try {
   run('pnpm', ['install', '--frozen-lockfile'], opts);
   run('node', ['scripts/build.mjs'], opts);
   run('node', ['scripts/check-redirects.mjs'], opts);
+  // Build once: Vite bundles the Worker and copies dist/ into the output that `cf deploy --prebuilt` uploads.
+  run('pnpm', ['exec', 'vite', 'build'], opts);
+  const uploaded = join(checkout, '.cloudflare', 'output', 'v0', 'workers', 'default', 'assets');
   const bundle = process.env.GAMES_DEPLOY_BUNDLE_DIR === undefined ? null : retainDeployBundle({ checkout, dist: join(checkout, 'dist'), output: process.env.GAMES_DEPLOY_BUNDLE_DIR, sourceRoot: process.cwd(), commit, slugs: registry.games.map(game => game.slug) });
   // Repeat the live preflight immediately before upload, after the full build.
   checkLatestMainCI(commit, run);
-  run('pnpm', ['exec', 'wrangler', 'deploy'], { ...opts, env: process.env });
-  if (bundle) verifyDeployBundle({ dist: join(checkout, 'dist'), output: process.env.GAMES_DEPLOY_BUNDLE_DIR, receipt: bundle });
+  // The bytes about to be uploaded must equal the retained bundle, before and after the upload.
+  if (bundle) verifyDeployBundle({ dist: uploaded, output: process.env.GAMES_DEPLOY_BUNDLE_DIR, receipt: bundle });
+  run('pnpm', ['exec', 'cf', 'deploy', '--prebuilt', '--mode', 'production'], { ...opts, env: { ...process.env, CF_SEND_TELEMETRY: 'false' } });
+  if (bundle) {
+    verifyDeployBundle({ dist: join(checkout, 'dist'), output: process.env.GAMES_DEPLOY_BUNDLE_DIR, receipt: bundle });
+    verifyDeployBundle({ dist: uploaded, output: process.env.GAMES_DEPLOY_BUNDLE_DIR, receipt: bundle });
+  }
   for (const game of registry.games) {
     const expected = JSON.parse(readFileSync(join(checkout, 'dist', game.slug, 'release.json'), 'utf8'));
     const url = `https://play.adamwhite.work/${game.slug}/release.json`;
