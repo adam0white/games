@@ -28,7 +28,9 @@ try {
   checkLatestMainCI(commit, run);
   // The bytes about to be uploaded must equal the retained bundle, before and after the upload.
   if (bundle) verifyDeployBundle({ dist: uploaded, output: process.env.GAMES_DEPLOY_BUNDLE_DIR, receipt: bundle });
-  run('pnpm', ['exec', 'cf', 'deploy', '--prebuilt', '--mode', 'production'], { ...opts, env: { ...process.env, CF_SEND_TELEMETRY: 'false' } });
+  // GAMES_DEPLOYER=wrangler is the rollback: it uploads dist/ through wrangler.jsonc, as before 2026-11-13.
+  if (process.env.GAMES_DEPLOYER === 'wrangler') run('pnpm', ['exec', 'wrangler', 'deploy'], { ...opts, env: process.env });
+  else run('pnpm', ['exec', 'cf', 'deploy', '--prebuilt', '--mode', 'production'], { ...opts, env: { ...process.env, CF_SEND_TELEMETRY: 'false' } });
   if (bundle) {
     verifyDeployBundle({ dist: join(checkout, 'dist'), output: process.env.GAMES_DEPLOY_BUNDLE_DIR, receipt: bundle });
     verifyDeployBundle({ dist: uploaded, output: process.env.GAMES_DEPLOY_BUNDLE_DIR, receipt: bundle });

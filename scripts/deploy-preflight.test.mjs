@@ -22,5 +22,15 @@ test('each preflight re-reads main, latest push run and its jobs', () => {
 
 test('deployment checks latest CI again after redirects immediately before upload', () => {
   const source = readFileSync('scripts/deploy.mjs', 'utf8');
-  assert.match(source, /checkLatestMainCI\(commit, run\);[\s\S]*check-redirects\.mjs[\s\S]*retainDeployBundle\([\s\S]*checkLatestMainCI\(commit, run\);\n\s*\/\/[^\n]*\n\s*if \(bundle\) verifyDeployBundle\(\{ dist: uploaded[^\n]*\n\s*run\('pnpm', \['exec', 'cf', 'deploy', '--prebuilt', '--mode', 'production'\]/);
+  assert.match(source, /checkLatestMainCI\(commit, run\);[\s\S]*check-redirects\.mjs[\s\S]*retainDeployBundle\([\s\S]*checkLatestMainCI\(commit, run\);\n\s*\/\/[^\n]*\n\s*if \(bundle\) verifyDeployBundle\(\{ dist: uploaded[^\n]*\n\s*\/\/[^\n]*\n\s*if \(process\.env\.GAMES_DEPLOYER === 'wrangler'\) run\('pnpm', \['exec', 'wrangler', 'deploy'\][^\n]*\n\s*else run\('pnpm', \['exec', 'cf', 'deploy', '--prebuilt', '--mode', 'production'\]/);
+});
+
+test('the Wrangler rollback config matches the cf config', async () => {
+  const legacy = JSON.parse(readFileSync('wrangler.jsonc', 'utf8'));
+  const { worker } = (await import('../cloudflare.config.ts')).default;
+  assert.equal(legacy.name, worker.name);
+  assert.equal(legacy.compatibility_date, worker.compatibilityDate);
+  assert.deepEqual(legacy.routes.filter(route => route.custom_domain).map(route => route.pattern), worker.domains);
+  assert.deepEqual(legacy.routes.filter(route => !route.custom_domain).map(route => [route.pattern, route.zone_name]), worker.triggers.map(trigger => [trigger.pattern, trigger.zone]));
+  assert.deepEqual([legacy.assets.run_worker_first, legacy.assets.not_found_handling], [worker.assets.runWorkerFirst, worker.assets.notFoundHandling]);
 });
