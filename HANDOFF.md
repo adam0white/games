@@ -69,7 +69,7 @@ Old-origin saves are not migrated. New-origin games start fresh without an error
 
 ## Hosting
 
-`wrangler.jsonc` prepares the inherited static-assets workflow for Worker `games-static` and custom domain `play.adamwhite.work`, under the same account as the existing games. Compatibility date is 2026-11-05. It has no R2, AI, telemetry or other server bindings. Central shelf, identity and lab telemetry remain in HF; no game code enters HF.
+`cloudflare.config.ts` (the Cloudflare `cf` CLI config; it replaced `wrangler.jsonc` on 2026-11-13) prepares the inherited static-assets workflow for Worker `games-static` and custom domain `play.adamwhite.work`, under the same account as the existing games. Compatibility date is 2026-11-05. It has no R2, AI, telemetry or other server bindings. Central shelf, identity and lab telemetry remain in HF; no game code enters HF.
 
 Cloudflare zone state read-only: `play.adamwhite.work` DNS query returned an empty list. No route, DNS record, Worker or old-host redirect has been changed by MONO. The domain configuration is prepared, not deployed. Verify the binding and release manifests after the gated deployment, then record actual API/deploy receipts here and in HF HANDOFF.md.
 

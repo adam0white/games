@@ -1,0 +1,34 @@
+version: 2
+
+# Weekly, grouped, with a cooldown so a freshly published (possibly compromised) release is not proposed on day one.
+# Mirrors human-framework's policy so both repos move together.
+# Note: pnpm-workspace.yaml pins vite and other packages in `overrides`, and `allowBuilds` pins esbuild and workerd
+# by exact version. A bump of any of those needs its entry updated after review, or the install fails.
+# pip has no entry here: Dependabot security updates for games/neighbours keep arriving without one.
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+    groups:
+      npm-dev:
+        dependency-type: development
+        update-types: [minor, patch]
+      npm-prod:
+        dependency-type: production
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]

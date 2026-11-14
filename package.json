@@ -11,10 +11,13 @@
     "check:lane": "node --test scripts/*.test.mjs",
     "build": "node scripts/build.mjs",
     "deploy": "node scripts/deploy.mjs",
-    "deploy:check": "wrangler deploy --dry-run",
+    "deploy:check": "vite build && cf deploy --prebuilt --mode production --dry-run",
     "check": "node scripts/check-all.mjs"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "2.0.0-beta.v.15",
+    "cf": "1.0.0-beta.30",
+    "vite": "8.3.5",
     "wrangler": "4.157.0"
   }
 }

@@ -145,6 +145,10 @@ jobs:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile
       - run: node scripts/build.mjs
+      - name: Bundle the Worker and validate the exact upload without credentials
+        env:
+          CF_SEND_TELEMETRY: 'false'
+        run: pnpm run deploy:check
   lefthand-browser:
     needs: changes
     if: contains(needs.changes.outputs.games, '"lefthand"')

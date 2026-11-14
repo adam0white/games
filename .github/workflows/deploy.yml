@@ -1,6 +1,12 @@
 name: Deploy
 on:
   workflow_dispatch:
+    inputs:
+      deployer:
+        description: cf is the default. wrangler is the rollback path.
+        type: choice
+        options: [cf, wrangler]
+        default: cf
   workflow_run:
     workflows: [CI]
     types: [completed]
@@ -48,6 +54,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           GAMES_DEPLOY_BUNDLE_DIR: ${{ runner.temp }}/games-uploaded-bundle
+          GAMES_DEPLOYER: ${{ inputs.deployer || 'cf' }}
         run: pnpm deploy
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
