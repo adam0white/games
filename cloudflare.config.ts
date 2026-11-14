@@ -8,7 +8,7 @@ export default defineConfig({
 		compatibilityDate,
 		entrypoint: "src/worker.mjs",
 		workersDev: false,
-		previewUrls: false,
+		previewUrls: true,
 		// Static assets come from dist/ through Vite's publicDir (vite.config.ts).
 		assets,
 		domains,
