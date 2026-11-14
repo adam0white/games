@@ -28,6 +28,10 @@ Cloud commits must retain verified signatures. One supported option is [GitHub C
 
 Work on a signed branch. Run the affected game checks and root lane. Open one combined PR for independent changes. Obtain green required CI and a clear hosted Codex review on the exact head. Merge normally. Shared files and the lockfile trigger all game checks. CI always builds the entire deployment bundle.
 
+## Workers
+
+`workers/<name>` holds standalone Workers that use the games rather than serve them. Each has its own `wrangler.jsonc` and its own `check` script, which the CI `workers` job runs. A change under `workers/` alone starts no game lane. `pnpm deploy` does not deploy them. [`workers/wai-daily`](workers/wai-daily/README.md) is the daily Workers AI playtester cron; it is not deployed yet. Cloudflare settings that no repository file records are in [docs/cloudflare-settings.md](docs/cloudflare-settings.md).
+
 ## Production deployment
 
 After CI succeeds for a push to `main`, `.github/workflows/deploy.yml` checks out that exact commit. It serializes production deploys and runs `pnpm deploy`. The deploy script rejects stale main or unsuccessful CI, builds the complete bundle in a clean temporary checkout, uploads `games-static`, then verifies every live `/<slug>/release.json` against the complete expected manifest and `dirty:false`. It deletes its temporary checkout on exit. After Wrangler returns, the deploy script verifies both the upload input and retained copy against the in-memory receipt before checking live manifests. It assumes no concurrent writer during upload; it does not defend against transient same-user races. After a successful deploy step, Actions retains the assembled dist and prepared-byte receipt as `games-static-<commit>` for 14 days. Download the artifact from the exact successful Deploy run, verify its artifact digest, receipt commit and per-file hashes, then compare live assets to those bytes. Godot PCK output can differ between builds, so a separate local build is not the deployed-byte reference. Artifact creation alone does not prove deployment. PR and fork runs cannot deploy.
