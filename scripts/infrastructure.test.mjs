@@ -32,12 +32,15 @@ assert.equal(existsSync(process.env.HOME+'/code'), false);`;
 test('rejects unsafe lineage and catches shared paths', () => {
   assert.throws(() => validateRegistry({ ...registry, games: [{...game, slug:'../bad'}] }));
   assert.deepEqual(affectedGames(registry, ['scripts/lib.mjs']), ['rope']);
+  assert.deepEqual(affectedGames(registry, ['workers/wai-daily/src/run.ts']), []);
+  assert.deepEqual(affectedGames(registry, ['workers/wai-daily/src/run.ts', 'pnpm-lock.yaml']), ['rope']);
 });
 test('required CI results cannot be skipped or fail', () => {
-  assert.throws(() => checkResults({ tools:'success', changes:'failure', games:'success', build:'success' }, 1));
-  assert.throws(() => checkResults({ tools:'success', changes:'success', games:'skipped', build:'success' }, 1));
-  assert.doesNotThrow(() => checkResults({ tools:'success', changes:'success', games:'skipped', build:'skipped' }, 0));
-  const actual = spawnSync(process.execPath, ['scripts/aggregate.mjs'], { env: {...process.env, TOOLS:'failure', CHANGES:'success', GAMES:'skipped', BUILD:'skipped', COUNT:'0', TOTAL:'0'} });
+  assert.throws(() => checkResults({ tools:'success', changes:'failure', workers:'success', games:'success', build:'success' }, 1));
+  assert.throws(() => checkResults({ tools:'success', changes:'success', workers:'success', games:'skipped', build:'success' }, 1));
+  assert.doesNotThrow(() => checkResults({ tools:'success', changes:'success', workers:'success', games:'skipped', build:'skipped' }, 0));
+  assert.throws(() => checkResults({ tools:'success', changes:'success', workers:'skipped', games:'skipped', build:'skipped' }, 0));
+  const actual = spawnSync(process.execPath, ['scripts/aggregate.mjs'], { env: {...process.env, TOOLS:'failure', CHANGES:'success', WORKERS:'success', GAMES:'skipped', BUILD:'skipped', COUNT:'0', TOTAL:'0'} });
   assert.notEqual(actual.status, 0);
 });
 test('only latest successful push and ci job permit release', () => {

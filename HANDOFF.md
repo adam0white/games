@@ -1,3 +1,7 @@
+# Daily Workers AI cron — 2026-11-13
+
+Owner direction, 2026-11-13: Human Framework's repository and Worker hold the framework; usage such as the Workers AI cron lives here. The owner chose a separate Worker in this repository. `workers/wai-daily` (`games-wai-daily`) is source only: not deployed, no live run verified. Remaining: owner go-ahead to deploy, the ledger seed, one qualified scheduled run, then the reading, variants and inbox stages (target 2026-11-20). Its README gives the deploy order. `docs/cloudflare-settings.md` records the 2026-11-13 dashboard audit and an open decision on Workers Builds against the guarded Actions deploy.
+
 # SDK19 adoption candidate — 2026-11-11
 
 Public client0.5.19 and kit0.5.36 packages from signed green HF9159de3e replace the SDK HF3 clock dependency with exact npm HF4.17.0. All18 consumer manifests (17 games plus nested Neighbours) frozen-install with public SHA512 integrity, and every installed SDK member matches the public archives. The complete installed graph contains only HF4.17.0. This candidate also retains the exact Actions-uploaded deployment bundle for subsequent live byte checks. Exact-head review/CI, deployment, native live checks and aliases remain pending. Earlier checkpoints below are historical evidence.

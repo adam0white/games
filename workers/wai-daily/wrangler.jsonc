@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // The daily Workers AI player. A separate Worker so its browser library, Node compatibility flag and
+  // failures never touch games-static, which serves play.adamwhite.work. It serves no requests.
+  "name": "games-wai-daily",
+  "account_id": "a20259cba74e506296745f9c67c1f3bc",
+  "main": "./src/index.ts",
+  "compatibility_date": "2026-11-05",
+  // Required by @cloudflare/playwright.
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  // Inference is authenticated by the binding. No API token or secret is configured.
+  "ai": { "binding": "AI" },
+  "browser": { "binding": "BROWSER" },
+  // The lab's private bucket: receipts under private/wai-daily/, budget under ai-budget/.
+  "r2_buckets": [{ "binding": "LAB", "bucket_name": "hf-lab" }],
+  // 16:00 America/Chicago is 21:00 UTC in CDT and 22:00 UTC in CST. Both fire; the runner's local-time
+  // gate and the once-per-UTC-day claim admit exactly one.
+  "triggers": { "crons": ["0 21,22 * * *"] },
+  // The protocol and persona briefs in ./docs are bundled as text.
+  "rules": [{ "type": "Text", "globs": ["**/*.md"], "fallthrough": true }],
+  // Status lines only: the runner never logs page text, prompts or model output.
+  "observability": { "enabled": true }
+}
