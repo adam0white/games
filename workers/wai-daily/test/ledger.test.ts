@@ -22,6 +22,17 @@ it('continues the archived Mac ledger and refunds a completed request down to it
   expect(budget.receipts.map((r) => r.status)).toEqual(['reserved', 'complete']);
 });
 
+it('turns Qwen thinking off with the /no_think switch, which the binding honours, and no other field', async () => {
+  const fake = ai(['{"ok":1}']);
+  const budget = createBudget({ LAB: bucket().api, AI: fake.binding }, at);
+  const system = { role: 'system', content: 'rules' };
+  await budget.infer(QWEN, [system, ...messages], 768, DAY, 'control');
+  const input = fake.calls[0]?.input as { messages: { role: string; content: string }[] };
+  expect(input.messages[0]).toEqual(system);
+  expect(input.messages.at(-1)?.content).toBe(`${'x'.repeat(2000)} /no_think`);
+  expect(input).not.toHaveProperty('enable_thinking');
+});
+
 it('keeps the whole reservation when the request fails or its usage cannot be read', async () => {
   const b = bucket();
   const fake = ai([
