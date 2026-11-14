@@ -139,6 +139,7 @@ export function turnPrompt(
   closing: boolean,
   reply: DriverReply,
 ): string {
+  const names = actionableNames(reply.controls ?? '');
   return JSON.stringify({
     elapsed_minutes: elapsed,
     floor: session.floor,
@@ -147,8 +148,11 @@ export function turnPrompt(
       ? 'Closing: log stop with your final report. No more gameplay or feedback submission.'
       : 'Play',
     snapshot: reply,
-    actionableNames: actionableNames(reply.controls ?? ''),
+    actionableNames: names,
     instruction:
+      (names.length
+        ? ''
+        : 'This page exposes no named controls. Tap words you can see instead: {"op":{"op":"tap","text":"EXACT VISIBLE WORDS"}}. Do not send name. ') +
       'Return exactly one JSON object for the next operation, not a diary or report. For named taps use only the exact inner name from actionableNames: if controls show button "Begin", send name: "Begin", never name: "button \\"Begin\\"". Do not include the role in name. Example: {"op":{"op":"tap","name":"EXACT CURRENT CONTROL"},"report":null}. Replace the example name with an actual current control, or choose another documented operation. Do not claim a future input, result or elapsed checkpoint. A final report is allowed only with a stop operation. First-minute notes require actual elapsed_minutes >= 1; pulses require actual elapsed time, never invented future times.',
   });
 }

@@ -1,6 +1,6 @@
 # Daily Workers AI player (Worker cron)
 
-Worker `games-wai-daily` replaces the Mac LaunchAgent `work.adamwhite.lab-wai-play`. **Status, 2026-11-13: source only. It has not been deployed, and no live run has been verified.** It is a separate Worker from `games-static`; the static site keeps no server bindings.
+Worker `games-wai-daily` replaces the Mac LaunchAgent `work.adamwhite.lab-wai-play`. **Status, 2026-11-14: deployed; the first scheduled run worked as infrastructure but produced no model report (see Operating it).** It is a separate Worker from `games-static`; the static site keeps no server bindings.
 
 Each day at 16:00 America/Chicago it plays one rotating game and the A Dark Room control with a Workers AI model, under [Protocol 2](docs/playtester-prompt.md). The model receives only the page's visible text and accessible controls. This is synthetic playtest evidence; see [the instrument's limits](https://github.com/adam0white/human-framework/blob/main/docs/lab/wai-playtesters.md). The games come from the root `games.json`; a `recorded-viewer` entry is not played.
 
@@ -49,7 +49,9 @@ Deploying is an owner decision, and nothing deploys this Worker automatically. O
    pnpm exec wrangler r2 object get hf-lab/private/wai-daily/<UTC-date>/summary.json --remote --pipe
    ```
 
-The token needs Workers Scripts Edit, Workers R2 Storage Edit, Workers AI Read and Browser Rendering Edit on the account. To stop the job, delete the Worker or remove its cron triggers. Qualification still owed after the first deploy: one scheduled run with its receipts, the ledger before and after, and no second spend from the other cron of that day. Not yet verified against the live binding: the `usage` fields Qwen3 returns, and that it accepts `response_format` with `enable_thinking`.
+The token needs Workers Scripts Edit, Workers R2 Storage Edit, Workers AI Read and Browser Rendering Edit on the account. To stop the job, delete the Worker or remove its cron triggers.
+
+First live run, 2026-11-14 (version `f50390ef`): the 21:00 UTC cron exited `not-due` and spent nothing; the 22:00 UTC cron ran 117 s without exceptions, made 11 requests for 594 neurons ($0.0065), and stored every receipt. Both sessions ended `incomplete` ("model returned invalid operation twice"). Cause, measured the same day with five direct requests: the binding ignores a top-level `enable_thinking: false`, so Qwen3 spent its token allowance reasoning. Only ` /no_think` at the end of the user message returned the answer in `content` with no reasoning; `chat_template_kwargs` moved the answer into `reasoning_content`. The Worker now sends `/no_think`. A Dark Room exposes no named controls, so the prompt now tells the model to tap visible words there. Still owed: a run that ends with a model report, and a live refusal of a duplicate claim (only one cron per day is due, so it has not occurred).
 
 After the owner accepts the cutover, the lab Worker's `WAI_BUDGET_KEY` secret and `/lab/api/wai-budget` route have no remaining caller and can be removed (review 2026-11-27).
 

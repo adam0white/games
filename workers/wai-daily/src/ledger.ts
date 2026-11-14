@@ -124,11 +124,17 @@ export function createBudget(
       if (model.includes('vision')) throw new Error('Vision models are not supported by the cron Worker');
       const patience = Math.min(60_000, deadline - now());
       if (patience < 5_000) throw new Error('STOP: run deadline reached');
+      // Qwen3 on Workers AI ignores a top-level enable_thinking; measured 2026-11-14, only the
+      // /no_think soft switch in the user message returns the answer in content without reasoning.
+      const last = messages.at(-1);
+      const sent =
+        model.includes('/qwen/') && last?.role === 'user'
+          ? [...messages.slice(0, -1), { ...last, content: `${last.content} /no_think` }]
+          : messages;
       const body = {
-        messages,
+        messages: sent,
         max_tokens: maxTokens,
         response_format: { type: 'json_object' },
-        ...(model.includes('/qwen/') ? { enable_thinking: false } : {}),
       };
       const reserve = textReservation(model, body);
       const reserved = await mutate(day, (ledger, today) => {
