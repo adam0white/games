@@ -242,7 +242,12 @@ export async function playSession(options: SessionOptions): Promise<SessionResul
       const bounded =
         op.op === 'wait' ? { ...op, s: Math.max(0, Math.min(op.s, Math.floor(left / 1000))) } : op;
       reply = await driver.send(bounded as unknown as Record<string, unknown>);
-      history = [...history, { role: 'user', content: user }, { role: 'assistant', content: raw }].slice(-8);
+      // Keep only the operation: an echoed report in the history invites more of the same.
+      history = [
+        ...history,
+        { role: 'user', content: user },
+        { role: 'assistant', content: JSON.stringify({ op: parsed.op }) },
+      ].slice(-8);
       await sleep(1500);
     }
   } catch (error) {
