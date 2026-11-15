@@ -88,16 +88,50 @@ export interface ModelAnswer {
   op: unknown;
   report?: string;
 }
+/** The leading `"op"` object of a reply whose later text was cut off or is not JSON. */
+function leadingOp(text: string): unknown {
+  const head = /^\s*\{\s*"op"\s*:\s*/u.exec(text);
+  if (!head || text[head[0].length] !== '{') throw new Error('No operation');
+  let depth = 0;
+  let quoted = false;
+  for (let i = head[0].length; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '\\') i++;
+      else if (c === '"') quoted = false;
+    } else if (c === '"') quoted = true;
+    else if (c === '{') depth++;
+    else if (c === '}' && --depth === 0) return JSON.parse(text.slice(head[0].length, i + 1));
+  }
+  throw new Error('Operation cut off');
+}
 export function answer(text: string): ModelAnswer {
-  const parsed = JSON.parse(text.replace(/^```(?:json)?\s*/u, '').replace(/\s*```$/u, '')) as ModelAnswer;
-  const op = validatePlayOp(parsed.op);
+  const body = text.replace(/^```(?:json)?\s*/u, '').replace(/\s*```$/u, '');
+  let parsed: { op?: unknown; report?: unknown };
+  try {
+    parsed = JSON.parse(body) as { op?: unknown; report?: unknown };
+  } catch {
+    // The model sometimes appends a long report that hits the token limit; the operation is still whole.
+    parsed = { op: leadingOp(body) };
+  }
+  // The model often writes the stop as its own operation instead of a log entry.
+  const raw = parsed.op as Record<string, unknown> | null;
+  const shaped =
+    raw && typeof raw === 'object' && raw.op === 'stop'
+      ? { op: 'log', kind: 'stop', reason: raw.reason, reaction: raw.reaction }
+      : parsed.op;
+  const op = validatePlayOp(shaped);
   if (['open', 'resize'].includes(op.op)) throw new Error('Player may not reset the session');
   if (op.op === 'shot' && !/^[a-zA-Z0-9_-]+\.png$/u.test(op.file)) throw new Error('Invalid screenshot name');
   if (op.op === 'wait' && (op.s < 1 || op.s > 30)) throw new Error('Wait must be 1–30 seconds');
-  return {
-    op,
-    report: typeof parsed.report === 'string' ? parsed.report : undefined,
-  };
+  const stopping = op.op === 'log' && op.kind === 'stop';
+  const report =
+    typeof parsed.report === 'string'
+      ? parsed.report
+      : parsed.report && typeof parsed.report === 'object'
+        ? JSON.stringify(parsed.report)
+        : undefined;
+  return { op, report: stopping ? report : undefined };
 }
 /** Same UTC date as the Chicago afternoon, with at least 30 minutes before reset. */
 export function scheduledDue(now = new Date()): boolean {
@@ -145,7 +179,7 @@ export function turnPrompt(
     floor: session.floor,
     ceiling: session.ceiling,
     stage: closing
-      ? 'Closing: log stop with your final report. No more gameplay or feedback submission.'
+      ? 'Closing: reply now with the stop operation and your final report, in the stop format given in the instruction. No more gameplay or feedback submission.'
       : 'Play',
     snapshot: reply,
     actionableNames: names,
@@ -153,6 +187,6 @@ export function turnPrompt(
       (names.length
         ? ''
         : 'This page exposes no named controls. Tap words you can see instead: {"op":{"op":"tap","text":"EXACT VISIBLE WORDS"}}. Do not send name. ') +
-      'Return exactly one JSON object for the next operation, not a diary or report. For named taps use only the exact inner name from actionableNames: if controls show button "Begin", send name: "Begin", never name: "button \\"Begin\\"". Do not include the role in name. Example: {"op":{"op":"tap","name":"EXACT CURRENT CONTROL"},"report":null}. Replace the example name with an actual current control, or choose another documented operation. Do not claim a future input, result or elapsed checkpoint. A final report is allowed only with a stop operation. First-minute notes require actual elapsed_minutes >= 1; pulses require actual elapsed time, never invented future times.',
+      'Return exactly one JSON object for the next operation, not a diary or report. For named taps use only the exact inner name from actionableNames: if controls show button "Begin", send name: "Begin", never name: "button \\"Begin\\"". Do not include the role in name. Example: {"op":{"op":"tap","name":"EXACT CURRENT CONTROL"}}. Replace the example name with an actual current control, or choose another documented operation. Never copy this message into your reply. Do not claim a future input, result or elapsed checkpoint. Leave out the report key unless you stop. When the game shows an ending or your task is done, stop: {"op":{"op":"log","kind":"stop","reason":"FINISHED","reaction":"ONE SENTENCE"},"report":"YOUR FINAL REPORT AS PLAIN TEXT, UNDER 300 WORDS"}. First-minute notes require actual elapsed_minutes >= 1; pulses require actual elapsed time, never invented future times.',
   });
 }
