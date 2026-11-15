@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#05080f">
+<title>Lantern</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05080f; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; }
+  canvas { display: block; width: 100vw; height: 100dvh; }
+  #card { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; font: 16px/1.5 Georgia, 'Times New Roman', serif; color: #f3e6cf; text-align: center; transition: opacity .5s; }
+  #card div { max-width: 19em; padding: 1.5em; }
+  h1 { font-weight: normal; font-size: 2.6em; letter-spacing: .12em; margin: 0 0 .3em; color: #ffd9a0; text-shadow: 0 0 28px #ff9a3c88; }
+  p { margin: .4em 0; opacity: .85; }
+  small { display: block; margin-top: 1.4em; opacity: .55; letter-spacing: .08em; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="card"><div><h1 id="title">Lantern</h1><p id="line">Carry the light down the river to dawn.</p><p id="sub">Drag to steer. Embers feed the flame.</p><small id="go">touch to begin</small></div></div>
+<script type="module">
+import { create, step, centre, half, reach, DT, GOAL } from './sim.js';
+
+const canvas = document.getElementById('c'), g = canvas.getContext('2d');
+const card = document.getElementById('card'), $ = id => document.getElementById(id);
+let W = 0, H = 0, unit = 1, left = 0, dpr = 1;
+function resize() {
+  dpr = Math.min(2, devicePixelRatio || 1);
+  W = canvas.width = Math.round(innerWidth * dpr); H = canvas.height = Math.round(innerHeight * dpr);
+  unit = Math.min(W, H * 0.62); left = (W - unit) / 2; // the river is one unit wide
+}
+addEventListener('resize', resize); resize();
+
+let s = create(1), playing = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = 0;
+let best = 0; try { best = Number(localStorage.getItem('lantern-best') || 0); } catch {}
+const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
+
+// Sound: all synthesized, started by the first touch.
+let ac, water, drone, droneGain, streak = 0;
+function audio() {
+  if (ac) return; ac = new (window.AudioContext || window.webkitAudioContext)();
+  const len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  const n = ac.createBufferSource(); n.buffer = buf; n.loop = true;
+  water = ac.createBiquadFilter(); water.type = 'bandpass'; water.frequency.value = 500; water.Q.value = 0.6;
+  const wg = ac.createGain(); wg.gain.value = 0.05; n.connect(water).connect(wg).connect(ac.destination); n.start();
+  drone = ac.createOscillator(); drone.type = 'sine'; drone.frequency.value = 55;
+  droneGain = ac.createGain(); droneGain.gain.value = 0; drone.connect(droneGain).connect(ac.destination); drone.start();
+}
+function tone(freq, dur, vol, type = 'sine') {
+  if (!ac) return; const o = ac.createOscillator(), v = ac.createGain(), t = ac.currentTime;
+  o.type = type; o.frequency.setValueAtTime(freq, t); v.gain.setValueAtTime(vol, t); v.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(v).connect(ac.destination); o.start(t); o.stop(t + dur);
+}
+const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
+
+function begin() {
+  audio(); if (ac.state === 'suspended') ac.resume();
+  s = create((Math.random() * 2 ** 31) | 0); target = s.x; playing = true; acc = 0; streak = 0; sparks = []; card.style.opacity = 0;
+}
+function finish() {
+  playing = false; ended = performance.now();
+  const pct = Math.min(100, Math.round(s.y / GOAL * 100));
+  if (pct > best) { best = pct; try { localStorage.setItem('lantern-best', String(best)); } catch {} }
+  $('title').textContent = s.over === 'dawn' ? 'Dawn' : s.over === 'dark' ? 'Dark' : 'Lantern';
+  $('line').textContent = s.over === 'dawn' ? `You carried it through with ${s.taken} embers.` : s.over === 'dark' ? 'The flame went out.' : s.over === 'bank' ? 'You ran onto the bank.' : 'You struck a rock.';
+  $('sub').textContent = s.over === 'dawn' ? '' : `${pct}% of the way to dawn. Best ${best}%.`;
+  $('go').textContent = 'touch to go again';
+  setTimeout(() => { card.style.opacity = 1; }, s.over === 'dawn' ? 2600 : 700);
+}
+
+function point(e) { target = (e.clientX * dpr - left) / unit; }
+canvas.addEventListener('pointerdown', e => { if (!playing) { if (performance.now() - ended > 900) begin(); } point(e); });
+canvas.addEventListener('pointermove', e => { if (e.pressure > 0 || e.pointerType === 'mouse') point(e); });
+const keys = new Set();
+addEventListener('keydown', e => { keys.add(e.key); if (!playing && (e.key === ' ' || e.key === 'Enter') && performance.now() - ended > 900) begin(); });
+addEventListener('keyup', e => keys.delete(e.key));
+
+function tick() {
+  if (keys.has('ArrowLeft') || keys.has('a')) target = s.x - 0.1;
+  if (keys.has('ArrowRight') || keys.has('d')) target = s.x + 0.1;
+  step(s, target);
+  for (const e of s.events) {
+    if (e === 'ember') { tone(scale[Math.min(streak++, scale.length - 1)], 0.5, 0.12, 'triangle'); glow = 1; for (let i = 0; i < 8; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.4, vy: Math.random() * 0.5, life: 0.6 }); }
+    if (e === 'graze') { tone(1320, 0.12, 0.05); glow = Math.max(glow, 0.5); }
+    if (e === 'hit') { tone(70, 0.5, 0.35, 'sawtooth'); shake = 1; }
+    if (e === 'out') tone(110, 1.2, 0.2);
+    if (e === 'dawn') [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 1.6, 0.1, 'triangle'), i * 180));
+  }
+  if (s.over) finish();
+}
+
+function draw(now) {
+  const dawn = Math.max(0, (s.y / GOAL - 0.86) / 0.14), day = s.over === 'dawn' ? Math.min(1, (now - ended) / 2500) : 0;
+  const ox = shake * (Math.random() - 0.5) * 14 * dpr, oy = shake * (Math.random() - 0.5) * 14 * dpr;
+  g.setTransform(1, 0, 0, 1, ox, oy);
+  g.fillStyle = '#1a2a20'; g.fillRect(-20, -20, W + 40, H + 40); // banks
+  // water
+  g.beginPath();
+  const top = s.y + 0.74 * H / unit + 0.1, bot = s.y - 0.3 * H / unit - 0.1;
+  for (let y = bot; y <= top; y += 0.05) g.lineTo(sx(centre(s, y) - half(y)), sy(y));
+  for (let y = top; y >= bot; y -= 0.05) g.lineTo(sx(centre(s, y) + half(y)), sy(y));
+  g.closePath(); g.fillStyle = '#14304a'; g.fill();
+  g.strokeStyle = '#6f9a7c'; g.lineWidth = 4 * dpr; g.stroke(); // reeds at the water's edge
+  // current streaks
+  g.strokeStyle = '#3d6f95'; g.lineWidth = 1.5 * dpr; g.globalAlpha = 0.5;
+  for (let i = Math.floor(bot * 3); i < top * 3; i++) {
+    const y = i / 3, k = (Math.sin(i * 12.9898) * 43758.5453) % 1, c = centre(s, y), h = half(y);
+    const x = c + (Math.abs(k) * 2 - 1) * (h - 0.03);
+    g.beginPath(); g.moveTo(sx(x), sy(y)); g.lineTo(sx(x + (centre(s, y + 0.14) - c)), sy(y + 0.14)); g.stroke();
+  }
+  g.globalAlpha = 1;
+  // rocks
+  for (const k of s.rocks) {
+    g.fillStyle = '#2b2f36'; g.beginPath(); g.ellipse(sx(k.x), sy(k.y), k.rad * unit, k.rad * unit * 0.86, 0, 0, 7); g.fill();
+    g.fillStyle = '#59606b'; g.beginPath(); g.ellipse(sx(k.x - k.rad * 0.25), sy(k.y + k.rad * 0.3), k.rad * unit * 0.45, k.rad * unit * 0.3, -0.5, 0, 7); g.fill();
+    g.strokeStyle = '#9fc6e0'; g.globalAlpha = 0.35; g.lineWidth = 2 * dpr; g.beginPath(); g.arc(sx(k.x), sy(k.y), k.rad * unit * 1.18, 0.2, 2.9); g.stroke(); g.globalAlpha = 1;
+  }
+  // boat
+  const bx = sx(s.x), by = sy(s.y), lean = Math.max(-0.5, Math.min(0.5, (target - s.x) * 4));
+  g.save(); g.translate(bx, by); g.rotate(lean * 0.5);
+  g.fillStyle = '#6b4a2f'; g.beginPath(); g.moveTo(0, -0.05 * unit); g.quadraticCurveTo(0.028 * unit, -0.005 * unit, 0.016 * unit, 0.035 * unit); g.lineTo(-0.016 * unit, 0.035 * unit); g.quadraticCurveTo(-0.028 * unit, -0.005 * unit, 0, -0.05 * unit); g.fill();
+  g.restore();
+  // darkness with a hole of light
+  const flick = 1 + Math.sin(now / 90) * 0.015 + Math.sin(now / 37) * 0.01, r = (reach(s.light) + glow * 0.06) * unit * flick;
+  const dark = Math.max(0, 0.97 - dawn * 0.75 - day);
+  const m = g.createRadialGradient(bx, by - 0.05 * unit, r * 0.15, bx, by - 0.05 * unit, r);
+  m.addColorStop(0, 'rgba(4,6,12,0)'); m.addColorStop(0.7, `rgba(4,6,12,${dark * 0.55})`); m.addColorStop(1, `rgba(4,6,12,${dark})`);
+  g.fillStyle = m; g.fillRect(-20, -20, W + 40, H + 40);
+  // warm wash inside the light
+  g.globalCompositeOperation = 'lighter';
+  const w = g.createRadialGradient(bx, by, 0, bx, by, r * 0.8);
+  w.addColorStop(0, `rgba(255,170,80,${0.22 + glow * 0.2})`); w.addColorStop(1, 'rgba(255,140,60,0)');
+  g.fillStyle = w; g.fillRect(bx - r, by - r, r * 2, r * 2);
+  // embers show through the dark: you can see where light is before you can see what guards it
+  for (const e of s.embers) if (!e.got) {
+    const ex = sx(e.x), ey = sy(e.y) + Math.sin(now / 300 + e.y * 9) * 2 * dpr, er = 0.05 * unit;
+    const eg = g.createRadialGradient(ex, ey, 0, ex, ey, er);
+    eg.addColorStop(0, 'rgba(255,214,140,.95)'); eg.addColorStop(0.25, 'rgba(255,150,60,.55)'); eg.addColorStop(1, 'rgba(255,120,40,0)');
+    g.fillStyle = eg; g.fillRect(ex - er, ey - er, er * 2, er * 2);
+  }
+  for (const p of sparks) { g.fillStyle = `rgba(255,200,120,${p.life})`; g.fillRect(sx(p.x), sy(p.y), 3 * dpr, 3 * dpr); }
+  // the flame itself
+  const fg = g.createRadialGradient(bx, by, 0, bx, by, 0.03 * unit);
+  fg.addColorStop(0, '#fff6dc'); fg.addColorStop(0.4, 'rgba(255,190,90,.9)'); fg.addColorStop(1, 'rgba(255,150,60,0)');
+  g.fillStyle = fg; g.fillRect(bx - 0.03 * unit, by - 0.03 * unit, 0.06 * unit, 0.06 * unit);
+  g.globalCompositeOperation = 'source-over';
+  // dawn
+  if (dawn > 0 || day > 0) {
+    const d = g.createLinearGradient(0, 0, 0, H);
+    d.addColorStop(0, `rgba(255,196,140,${Math.min(0.85, dawn * 0.45 + day * 0.6)})`); d.addColorStop(1, `rgba(120,150,190,${Math.min(0.5, dawn * 0.15 + day * 0.4)})`);
+    g.fillStyle = d; g.fillRect(-20, -20, W + 40, H + 40);
+  }
+  // progress: a thin line at the top edge, no numbers
+  g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * Math.min(1, s.y / GOAL), 3 * dpr);
+}
+
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000 || 0); last = now;
+  if (playing) { acc += dt; while (acc >= DT && playing) { tick(); acc -= DT; } }
+  shake = Math.max(0, shake - dt * 3); glow = Math.max(0, glow - dt * 2);
+  for (const p of sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; } sparks = sparks.filter(p => p.life > 0);
+  if (ac) { water.frequency.value = 400 + 500 * (s.y / GOAL); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0; }
+  draw(now); requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

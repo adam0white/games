@@ -18,7 +18,7 @@ The earlier migration-first goal is superseded and "New-game prototypes wait" is
 Proposals from the direction document (owner approved the document on 2026-11-14 and may change any detail):
 
 - **Bake-off.** Build a few small entries in about two weeks; the owner plays each for ten minutes and picks one. The winner gets the remaining effort toward a game outsiders finish without help and recommend.
-- **Prototype lane.** A prototype needs signed commits and green CI only. It does not need HF, a replaying export, a cast registry entry, a design document or a hosted review until it graduates. `scripts/game.mjs` still requires the HF pin for every `games.json` entry, so the first prototype without HF lands together with the check exemption and the way prototypes are served.
+- **Prototype lane.** A prototype needs signed commits and green CI only. It does not need HF, a replaying export, a cast registry entry, a design document or a hosted review until it graduates. A prototype is a static directory `prototypes/<slug>/` with an `index.html`; the build copies it to `/proto/<slug>/`. It has no `games.json` entry, so the HF pin and release-manifest checks do not apply. A prototype that graduates moves to `games/<slug>` and meets the game rules.
 - **Taste gates.** Concept card, then two to four look variants, then a ten-minute play verdict, then outsider-ready. Each gate is one short ask to the owner.
 - **Spend.** Paid art, music or other assets are allowed only under a cap the owner has set, and each purchase is logged in the repository. No cap is set yet; spend nothing until one is.
 
