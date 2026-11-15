@@ -39,6 +39,13 @@ for (const game of registry.games) {
   }
   writeFileSync(`${target}/release.json`, JSON.stringify(manifest(registry, game, commit, false, labVersion, pkg.version, metadata)) + '\n');
 }
+// Prototype lane: static directories served at /proto/<slug>/. No registry entry, HF pin or release manifest.
+if (existsSync('prototypes')) for (const entry of readdirSync('prototypes', { withFileTypes: true })) {
+  if (!entry.isDirectory()) continue;
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry.name) || !existsSync(`prototypes/${entry.name}/index.html`)) throw new Error(`Invalid prototype: ${entry.name}`);
+  rejectRootWorker(`prototypes/${entry.name}`);
+  cpSync(`prototypes/${entry.name}`, `dist/proto/${entry.name}`, { recursive: true });
+}
 if (existsSync('dist/sw.js')) throw new Error('Root service worker forbidden');
 if (headers.length) writeFileSync('dist/_headers', headers.join('\n'));
 if (redirects.length) writeFileSync('dist/_redirects', redirects.join('\n'));

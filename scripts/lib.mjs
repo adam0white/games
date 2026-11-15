@@ -5,7 +5,7 @@ export function validateRegistry(registry) {
   const seen = new Set();
   const origins = new Set();
   for (const game of registry.games) {
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(game.slug) || seen.has(game.slug)) throw new Error('Invalid or duplicate slug');
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(game.slug) || game.slug === 'proto' || seen.has(game.slug)) throw new Error('Invalid or duplicate slug');
     if (!/^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(game.source?.repository ?? '') || !sha.test(game.source?.commit ?? '')) throw new Error('Invalid source lineage');
     const history = game.source.history;
     if (game.slug === 'neighbours' && history === undefined) throw new Error('Missing retained source history');
@@ -30,7 +30,8 @@ export function validateRegistry(registry) {
 export function affectedGames(registry, paths) {
   validateRegistry(registry);
   // Standalone Workers have their own CI job and never enter a game's build.
-  paths = paths.filter(path => !path.startsWith('workers/'));
+  // Prototypes are static files copied by the build; they never enter a game's checks.
+  paths = paths.filter(path => !path.startsWith('workers/') && !path.startsWith('prototypes/'));
   if (paths.some(path => !path.startsWith('games/') || !registry.games.some(g => path.startsWith(`games/${g.slug}/`)))) return registry.games.map(g => g.slug);
   return registry.games.filter(g => paths.some(p => p.startsWith(`games/${g.slug}/`))).map(g => g.slug);
 }
