@@ -34,6 +34,7 @@ test('rejects unsafe lineage and catches shared paths', () => {
   assert.deepEqual(affectedGames(registry, ['scripts/lib.mjs']), ['rope']);
   assert.deepEqual(affectedGames(registry, ['workers/wai-daily/src/run.ts']), []);
   assert.deepEqual(affectedGames(registry, ['workers/wai-daily/src/run.ts', 'pnpm-lock.yaml']), ['rope']);
+  assert.deepEqual(affectedGames(registry, ['prototypes/lantern/index.html']), []);
 });
 test('required CI results cannot be skipped or fail', () => {
   assert.throws(() => checkResults({ tools:'success', changes:'failure', workers:'success', games:'success', build:'success' }, 1));
