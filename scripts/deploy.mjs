@@ -22,7 +22,7 @@ try {
   run('node', ['scripts/check-redirects.mjs'], opts);
   // Build once: Vite bundles the Worker and copies dist/ into the output that `cf deploy --prebuilt` uploads.
   run('pnpm', ['exec', 'vite', 'build'], opts);
-  const uploaded = join(checkout, '.cloudflare', 'output', 'v0', 'workers', 'default', 'assets');
+  const uploaded = join(checkout, '.cloudflare', 'output', 'v1', 'workers', 'default', 'assets');
   const bundle = process.env.GAMES_DEPLOY_BUNDLE_DIR === undefined ? null : retainDeployBundle({ checkout, dist: join(checkout, 'dist'), output: process.env.GAMES_DEPLOY_BUNDLE_DIR, sourceRoot: process.cwd(), commit, slugs: registry.games.map(game => game.slug) });
   // Repeat the live preflight immediately before upload, after the full build.
   checkLatestMainCI(commit, run);
