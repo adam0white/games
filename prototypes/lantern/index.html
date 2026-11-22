@@ -13,13 +13,23 @@
   h1 { font-weight: normal; font-size: 2.6em; letter-spacing: .12em; margin: 0 0 .3em; color: #ffd9a0; text-shadow: 0 0 28px #ff9a3c88; }
   p { margin: .4em 0; opacity: .85; }
   small { display: block; margin-top: 1.4em; opacity: .55; letter-spacing: .08em; }
+  #pause { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: #ffffff14; display: none; place-items: center; touch-action: none; }
+  #pause::before { content: ''; width: 4px; height: 16px; border: solid #ffd9a0aa; border-width: 0 5px; }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="card"><div><h1 id="title">Lantern</h1><p id="line">Carry the light down the river to dawn.</p><p id="sub">Drag to steer. Embers feed the flame.</p><small id="go">touch to begin</small></div></div>
+<button id="pause" aria-label="Pause"></button>
+<div id="card"><div><h1 id="title">Lantern</h1><p id="line">Carry the light down the river to dawn.</p><p id="sub">Slide your thumb anywhere to steer. Embers feed the flame.</p><small id="go">touch to begin</small></div></div>
 <script type="module">
 import { create, step, centre, half, reach, DT, GOAL } from './sim.js';
+
+const query = new URLSearchParams(location.search);
+const gain = Number(query.get('gain')) || 1.3; // boat travel per finger travel; ?gain= to compare
+const store = { get: k => { try { return Number(localStorage.getItem(k) || 0); } catch { return 0; } }, set: (k, v) => { try { localStorage.setItem(k, String(v)); } catch {} } };
+// A night is one river. Reaching dawn opens the next night; a failed night is retried.
+let stage = Math.max(1, Math.floor(Number(query.get('night')) || store.get('lantern-night') || 1));
+const ahead = n => n === 2 ? 'Ice drifts on the water.' : n === 3 ? 'The rocks are restless.' : 'The current runs faster.';
 
 const canvas = document.getElementById('c'), g = canvas.getContext('2d');
 const card = document.getElementById('card'), $ = id => document.getElementById(id);
@@ -31,9 +41,10 @@ function resize() {
 }
 addEventListener('resize', resize); resize();
 
-let s = create(1), playing = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9;
-let best = 0; try { best = Number(localStorage.getItem('lantern-best') || 0); } catch {}
+let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9;
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
+if (stage > 1) $('go').textContent = `touch to begin night ${stage}`;
+window.lanternState = () => ({ x: s.x, t: s.t, over: s.over, target, playing, paused, stage, unit: unit / dpr }); // read by the touch checks
 
 // Sound: all synthesized, started by the first touch.
 let ac, water, drone, droneGain, streak = 0;
@@ -56,34 +67,67 @@ const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
 
 function begin() {
   audio(); if (ac.state === 'suspended') ac.resume();
-  s = create((Math.random() * 2 ** 31) | 0); target = s.x; playing = true; acc = 0; streak = 0; sparks = []; card.style.opacity = 0;
+  s = create((Math.random() * 2 ** 31) | 0, stage); target = s.x; playing = true; acc = 0; streak = 0; sparks = []; card.style.opacity = 0;
+  pauseButton.style.display = 'grid';
 }
 function finish() {
   playing = false; ended = performance.now();
-  const pct = Math.min(100, Math.round(s.y / GOAL * 100));
-  if (pct > best) { best = pct; try { localStorage.setItem('lantern-best', String(best)); } catch {} }
-  $('title').textContent = s.over === 'dawn' ? 'Dawn' : s.over === 'dark' ? 'Dark' : 'Lantern';
-  $('line').textContent = s.over === 'dawn' ? `You carried it through with ${s.taken} embers.` : s.over === 'dark' ? 'The flame went out.' : s.over === 'bank' ? 'You ran onto the bank.' : 'You struck a rock.';
-  $('sub').textContent = s.over === 'dawn' ? '' : `${pct}% of the way to dawn. Best ${best}%.`;
-  $('go').textContent = 'touch to go again';
+  pauseButton.style.display = 'none'; drag = null;
+  const pct = Math.min(100, Math.round(s.y / GOAL * 100)), key = `lantern-best-${stage}`, best = Math.max(pct, store.get(key));
+  store.set(key, best);
+  const won = s.over === 'dawn';
+  $('title').textContent = won ? 'Dawn' : s.over === 'dark' ? 'Dark' : `Night ${stage}`;
+  $('line').textContent = won ? `You carried it through night ${stage} with ${s.taken} embers.` : s.over === 'dark' ? 'The flame went out.' : s.over === 'bank' ? 'You ran onto the bank.' : s.over === 'ice' ? 'You struck the ice.' : 'You struck a rock.';
+  $('sub').textContent = won ? `Night ${stage + 1}: ${ahead(stage + 1)}` : `${pct}% of the way to dawn. Best ${best}%.`;
+  $('go').textContent = won ? 'touch to go on' : 'touch to go again';
+  if (won) { stage++; store.set('lantern-night', stage); }
   setTimeout(() => { card.style.opacity = 1; }, s.over === 'dawn' ? 2600 : 700);
 }
 
-function point(e) { target = (e.clientX * dpr - left) / unit; }
-// The tap that starts a run does not steer: a start tap near a screen edge used to run the boat onto the bank at once.
-// It stays that way until that finger or mouse has moved a clear distance, so finger jitter on the start tap does not steer either.
-let startTap = null;
-canvas.addEventListener('pointerdown', e => { if (!playing) { if (performance.now() - ended > 900) { begin(); startTap = { id: e.pointerId, x: e.clientX, y: e.clientY }; } return; } startTap = null; point(e); });
-canvas.addEventListener('pointermove', e => {
-  if (e.pointerType === 'pen' && !(e.pressure > 0)) return;
-  if (startTap && e.pointerId === startTap.id) { if (Math.hypot(e.clientX - startTap.x, e.clientY - startTap.y) < 12) return; startTap = null; }
-  point(e);
+// Steering. A finger steers by how far it has moved since it touched down, never by where it is,
+// so a tap anywhere does nothing and the thumb can rest wherever is comfortable. A mouse steers by position.
+const pauseButton = $('pause');
+let drag = null, startTap = null;
+function aim(x) { const c = centre(s, s.y), h = half(s.y) + 0.02; target = Math.max(c - h, Math.min(c + h, x)); }
+function anchor(e) { drag = { id: e.pointerId, x0: e.clientX, x: e.clientX, boat0: s.x }; }
+canvas.addEventListener('pointerdown', e => {
+  if (paused) { resume(); startTap = { id: e.pointerId, x: e.clientX, y: e.clientY }; anchor(e); return; }
+  // The tap that starts a run does not steer until that finger or mouse has moved a clear distance.
+  if (!playing) { if (performance.now() - ended > 900) { begin(); startTap = { id: e.pointerId, x: e.clientX, y: e.clientY }; anchor(e); } return; }
+  startTap = null;
+  if (e.pointerType === 'mouse') aim((e.clientX * dpr - left) / unit); else anchor(e);
 });
-for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, e => { if (e.pointerType !== 'mouse') startTap = null; });
+canvas.addEventListener('pointermove', e => {
+  if (!playing || paused) return;
+  if (e.pointerType === 'pen' && !(e.pressure > 0)) return;
+  if (startTap && e.pointerId === startTap.id) { if (Math.hypot(e.clientX - startTap.x, e.clientY - startTap.y) < 12) return; startTap = null; if (drag) anchor(e); }
+  if (e.pointerType === 'mouse') { aim((e.clientX * dpr - left) / unit); return; }
+  if (!drag || e.pointerId !== drag.id) return;
+  drag.x = e.clientX; aim(drag.boat0 + (e.clientX - drag.x0) * dpr / unit * gain);
+});
+for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, e => { if (e.pointerType !== 'mouse') startTap = null; if (drag && e.pointerId === drag.id) drag = null; });
 // iOS Safari may refuse to start audio on touch-down; try again when the finger lifts.
-for (const type of ['pointerup', 'touchend', 'click']) addEventListener(type, () => { if (ac && ac.state === 'suspended') ac.resume(); });
+for (const type of ['pointerup', 'touchend', 'click']) addEventListener(type, () => { if (ac && ac.state === 'suspended' && !paused) ac.resume(); });
+
+// Pause: the button, P or Escape, and whenever the page loses the screen (a phone call, another app).
+function pause() {
+  if (!playing || paused) return; paused = true; drag = null; keys.clear();
+  $('title').textContent = 'Paused'; $('line').textContent = `Night ${stage}, ${Math.round(s.y / GOAL * 100)}% of the way to dawn.`; $('sub').textContent = ''; $('go').textContent = 'touch to go on';
+  card.style.opacity = 1; pauseButton.style.display = 'none'; if (ac) ac.suspend();
+}
+function resume() {
+  if (!paused) return; paused = false; acc = 0; last = performance.now(); target = s.x;
+  card.style.opacity = 0; pauseButton.style.display = 'grid'; if (ac) ac.resume();
+}
+pauseButton.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+addEventListener('blur', pause); addEventListener('pagehide', pause);
 const keys = new Set();
-addEventListener('keydown', e => { keys.add(e.key); if (!playing && (e.key === ' ' || e.key === 'Enter') && performance.now() - ended > 900) begin(); });
+addEventListener('keydown', e => {
+  if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') { paused ? resume() : pause(); return; }
+  if (paused) { if (e.key === ' ' || e.key === 'Enter') resume(); return; }
+  keys.add(e.key); if (!playing && (e.key === ' ' || e.key === 'Enter') && performance.now() - ended > 900) begin();
+});
 addEventListener('keyup', e => keys.delete(e.key));
 
 function tick() {
@@ -93,6 +137,12 @@ function tick() {
   for (const e of s.events) {
     if (e === 'ember') { tone(scale[Math.min(streak++, scale.length - 1)], 0.5, 0.12, 'triangle'); glow = 1; for (let i = 0; i < 8; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.4, vy: Math.random() * 0.5, life: 0.6 }); }
     if (e === 'graze') { tone(1320, 0.12, 0.05); glow = Math.max(glow, 0.5); }
+    if (e === 'shield') { tone(880, 0.5, 0.1); setTimeout(() => tone(1320, 0.7, 0.08), 110); glow = 1; }
+    if (e === 'break') {
+      // The shield took the blow. Steering restarts from where the boat now is, so a held finger does not drag it back in.
+      tone(240, 0.35, 0.25, 'square'); tone(1760, 0.25, 0.06); shake = 0.6; target = s.x; if (drag) { drag.x0 = drag.x; drag.boat0 = s.x; }
+      for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.9, vy: (Math.random() - 0.3) * 0.9, life: 0.7, blue: true });
+    }
     if (e === 'hit') { tone(70, 0.5, 0.35, 'sawtooth'); shake = 1; }
     if (e === 'out') tone(110, 1.2, 0.2);
     if (e === 'dawn') [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 1.6, 0.1, 'triangle'), i * 180));
@@ -122,8 +172,8 @@ function draw(now) {
   g.globalAlpha = 1;
   // rocks
   for (const k of s.rocks) {
-    g.fillStyle = '#2b2f36'; g.beginPath(); g.ellipse(sx(k.x), sy(k.y), k.rad * unit, k.rad * unit * 0.86, 0, 0, 7); g.fill();
-    g.fillStyle = '#59606b'; g.beginPath(); g.ellipse(sx(k.x - k.rad * 0.25), sy(k.y + k.rad * 0.3), k.rad * unit * 0.45, k.rad * unit * 0.3, -0.5, 0, 7); g.fill();
+    g.fillStyle = k.ice ? '#a9c9dc' : '#2b2f36'; g.beginPath(); g.ellipse(sx(k.x), sy(k.y), k.rad * unit, k.rad * unit * 0.86, 0, 0, 7); g.fill();
+    g.fillStyle = k.ice ? '#e8f4fa' : '#59606b'; g.beginPath(); g.ellipse(sx(k.x - k.rad * 0.25), sy(k.y + k.rad * 0.3), k.rad * unit * 0.45, k.rad * unit * 0.3, -0.5, 0, 7); g.fill();
     g.strokeStyle = '#9fc6e0'; g.globalAlpha = 0.35; g.lineWidth = 2 * dpr; g.beginPath(); g.arc(sx(k.x), sy(k.y), k.rad * unit * 1.18, 0.2, 2.9); g.stroke(); g.globalAlpha = 1;
   }
   // boat
@@ -132,7 +182,7 @@ function draw(now) {
   g.fillStyle = '#6b4a2f'; g.beginPath(); g.moveTo(0, -0.05 * unit); g.quadraticCurveTo(0.028 * unit, -0.005 * unit, 0.016 * unit, 0.035 * unit); g.lineTo(-0.016 * unit, 0.035 * unit); g.quadraticCurveTo(-0.028 * unit, -0.005 * unit, 0, -0.05 * unit); g.fill();
   g.restore();
   // darkness with a hole of light
-  const flick = 1 + Math.sin(now / 90) * 0.015 + Math.sin(now / 37) * 0.01, r = (reach(s.light) + glow * 0.06) * unit * flick;
+  const flick = 1 + Math.sin(now / 90) * 0.015 + Math.sin(now / 37) * 0.01, r = (reach(s.light) + glow * 0.09) * unit * flick;
   const dark = Math.max(0, 0.97 - dawn * 0.75 - day);
   const m = g.createRadialGradient(bx, by - 0.05 * unit, r * 0.15, bx, by - 0.05 * unit, r);
   m.addColorStop(0, 'rgba(4,6,12,0)'); m.addColorStop(0.7, `rgba(4,6,12,${dark * 0.55})`); m.addColorStop(1, `rgba(4,6,12,${dark})`);
@@ -146,10 +196,16 @@ function draw(now) {
   for (const e of s.embers) if (!e.got) {
     const ex = sx(e.x), ey = sy(e.y) + Math.sin(now / 300 + e.y * 9) * 2 * dpr, er = 0.05 * unit;
     const eg = g.createRadialGradient(ex, ey, 0, ex, ey, er);
-    eg.addColorStop(0, 'rgba(255,214,140,.95)'); eg.addColorStop(0.25, 'rgba(255,150,60,.55)'); eg.addColorStop(1, 'rgba(255,120,40,0)');
+    if (e.blue) { eg.addColorStop(0, 'rgba(210,240,255,.95)'); eg.addColorStop(0.3, 'rgba(90,170,255,.6)'); eg.addColorStop(1, 'rgba(60,120,255,0)'); }
+    else { eg.addColorStop(0, 'rgba(255,214,140,.95)'); eg.addColorStop(0.25, 'rgba(255,150,60,.55)'); eg.addColorStop(1, 'rgba(255,120,40,0)'); }
     g.fillStyle = eg; g.fillRect(ex - er, ey - er, er * 2, er * 2);
   }
-  for (const p of sparks) { g.fillStyle = `rgba(255,200,120,${p.life})`; g.fillRect(sx(p.x), sy(p.y), 3 * dpr, 3 * dpr); }
+  for (const p of sparks) { g.fillStyle = p.blue ? `rgba(150,210,255,${p.life})` : `rgba(255,200,120,${p.life})`; g.fillRect(sx(p.x), sy(p.y), 3 * dpr, 3 * dpr); }
+  // the shield: a blue ring while it is held, blinking just after it breaks
+  if (s.shield || (s.safe > 0 && Math.floor(now / 90) % 2)) {
+    g.strokeStyle = `rgba(120,190,255,${s.shield ? 0.8 : 0.5})`; g.lineWidth = 2.5 * dpr;
+    g.beginPath(); g.arc(bx, by - 0.005 * unit, 0.06 * unit * (1 + Math.sin(now / 240) * 0.05), 0, 7); g.stroke();
+  }
   // the flame itself
   const fg = g.createRadialGradient(bx, by, 0, bx, by, 0.03 * unit);
   fg.addColorStop(0, '#fff6dc'); fg.addColorStop(0.4, 'rgba(255,190,90,.9)'); fg.addColorStop(1, 'rgba(255,150,60,0)');
@@ -167,7 +223,7 @@ function draw(now) {
 
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000 || 0); last = now;
-  if (playing) { acc += dt; while (acc >= DT && playing) { tick(); acc -= DT; } }
+  if (playing && !paused) { acc += dt; while (acc >= DT && playing) { tick(); acc -= DT; } }
   shake = Math.max(0, shake - dt * 3); glow = Math.max(0, glow - dt * 2);
   for (const p of sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; } sparks = sparks.filter(p => p.life > 0);
   if (ac) { water.frequency.value = 400 + 500 * (s.y / GOAL); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0; }
