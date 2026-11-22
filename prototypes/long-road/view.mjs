@@ -143,8 +143,8 @@ function frame(ms){
   if(!last)last=ms;let delta=Math.min(.1,(ms-last)/1000);last=ms;elapsed+=delta;
   if(sound)sound.windGain.gain.setTargetAtTime(.012+.035*Math.min(1,state.day/state.snowDay),sound.ac.currentTime,.5);
   if(started&&!state.over){acc+=delta;while(acc>=DT){step(state);effects();acc-=DT;}if(!state.broken&&state.phase==='travel'&&elapsed>nextStep){tone(65,.05,'triangle',.025,-20);nextStep=elapsed+(.58-(state.pace||0)*.08);}}
-  regions=[];ctx.clearRect(0,0,CW,CH);landscape(elapsed);
+  regions=[];ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);ctx.restore();ctx.save();ctx.beginPath();ctx.rect(0,0,CW,CH);ctx.clip();landscape(elapsed);
   const order=[{i:0,x:62,y:716},{i:1,x:180,y:735},{i:2,x:300,y:752},{i:3,x:420,y:731},{i:4,x:538,y:713}];
-  cart(elapsed);for(const q of order)person(q.i,q.x,q.y,elapsed);hud();requestAnimationFrame(frame);
+  cart(elapsed);for(const q of order)person(q.i,q.x,q.y,elapsed);hud();ctx.restore();requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
