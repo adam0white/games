@@ -31,7 +31,7 @@ function resize() {
 }
 addEventListener('resize', resize); resize();
 
-let s = create(1), playing = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = 0;
+let s = create(1), playing = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9;
 let best = 0; try { best = Number(localStorage.getItem('lantern-best') || 0); } catch {}
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
 
@@ -70,8 +70,11 @@ function finish() {
 }
 
 function point(e) { target = (e.clientX * dpr - left) / unit; }
-canvas.addEventListener('pointerdown', e => { if (!playing) { if (performance.now() - ended > 900) begin(); } point(e); });
-canvas.addEventListener('pointermove', e => { if (e.pressure > 0 || e.pointerType === 'mouse') point(e); });
+// The tap that starts a run does not steer: a start tap near a screen edge used to run the boat onto the bank at once.
+canvas.addEventListener('pointerdown', e => { if (!playing) { if (performance.now() - ended > 900) begin(); return; } point(e); });
+canvas.addEventListener('pointermove', e => { if (e.pointerType !== 'pen' || e.pressure > 0) point(e); });
+// iOS Safari may refuse to start audio on touch-down; try again when the finger lifts.
+for (const type of ['pointerup', 'touchend', 'click']) addEventListener(type, () => { if (ac && ac.state === 'suspended') ac.resume(); });
 const keys = new Set();
 addEventListener('keydown', e => { keys.add(e.key); if (!playing && (e.key === ' ' || e.key === 'Enter') && performance.now() - ended > 900) begin(); });
 addEventListener('keyup', e => keys.delete(e.key));
