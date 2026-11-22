@@ -21,6 +21,8 @@ function witness(s, kind, summary, valence = 0) {
 }
 function start(s, kind, seconds, data = {}) {
   if (s.operation) return false;
+  // Hand work runs at twice the first build's speed: first players took the waits for dead taps.
+  if (kind !== 'test') seconds *= 0.5;
   s.operation = { kind, start: s.t, end: s.t + seconds, object: s.active, ...data }; event(s, 'work'); return true;
 }
 export function good(s, object) {
@@ -98,7 +100,7 @@ export function act(s, a) {
   const k = s.active, o = s[k];
   if (o.gone) return;
   // A clamped unfinished cart occupies the only mounting socket. Rafi releases it.
-  if (k !== 'cart' && !s.cart.fixed && !s.rafi.holding) { say(s, 'sam', 'Free the cart clamp first.'); return; }
+  if (k !== 'cart' && !s.cart.fixed && !s.rafi.holding) { say(s, 'sam', 'Fix the cart first.'); event(s, 'need-cart'); return; }
   if (a.type === 'rotate') { o.angle = (o.angle + 1) % 4; if (k === 'lamp' && s.coupling === 'lamp' && !s.fastened) { s.lamp.facing = 1 - s.lamp.facing; event(s, 'turn'); } return; }
   if (a.type === 'open' && !o.open) { start(s, 'open', k === 'cart' ? 1.2 : 5); return; }
   if (a.type === 'test') { start(s, 'test', 4); return; }
@@ -108,7 +110,7 @@ export function act(s, a) {
     if (k === 'cart' && s.cart.pin === 'bent') start(s, 'pull-pin', 5);
     if (k === 'bell' && a.part === 'spacer' && ['base', 'striker'].includes(s.spacer)) start(s, 'pull-spacer', 5);
     if (k !== 'cart' && s.coupling === k && !s.broken) {
-      if (s.fastened) { say(s, 'sam', 'Loosen it first.'); return; }
+      if (s.fastened) { say(s, 'sam', 'Loosen it with the wrench.'); return; }
       start(s, 'pull-coupling', 9);
     }
     return;
