@@ -71,8 +71,15 @@ function finish() {
 
 function point(e) { target = (e.clientX * dpr - left) / unit; }
 // The tap that starts a run does not steer: a start tap near a screen edge used to run the boat onto the bank at once.
-canvas.addEventListener('pointerdown', e => { if (!playing) { if (performance.now() - ended > 900) begin(); return; } point(e); });
-canvas.addEventListener('pointermove', e => { if (e.pointerType !== 'pen' || e.pressure > 0) point(e); });
+// It stays that way until that finger or mouse has moved a clear distance, so finger jitter on the start tap does not steer either.
+let startTap = null;
+canvas.addEventListener('pointerdown', e => { if (!playing) { if (performance.now() - ended > 900) { begin(); startTap = { id: e.pointerId, x: e.clientX, y: e.clientY }; } return; } startTap = null; point(e); });
+canvas.addEventListener('pointermove', e => {
+  if (e.pointerType === 'pen' && !(e.pressure > 0)) return;
+  if (startTap && e.pointerId === startTap.id) { if (Math.hypot(e.clientX - startTap.x, e.clientY - startTap.y) < 12) return; startTap = null; }
+  point(e);
+});
+for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, e => { if (e.pointerType !== 'mouse') startTap = null; });
 // iOS Safari may refuse to start audio on touch-down; try again when the finger lifts.
 for (const type of ['pointerup', 'touchend', 'click']) addEventListener(type, () => { if (ac && ac.state === 'suspended') ac.resume(); });
 const keys = new Set();
