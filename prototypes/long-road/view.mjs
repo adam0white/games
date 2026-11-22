@@ -4,8 +4,18 @@ const canvas = document.querySelector('canvas');
 const ctx = canvas.getContext('2d');
 let state = create(Math.floor(Math.random() * 1e9));
 let started = false, selected = -1, menu = '', wheelArmed = false, hover = null;
-let elapsed = 0, last = 0, acc = 0, regions = [], sound = null, nextStep = 0, notice = '', noticeUntil = 0;
+let elapsed = 0, last = 0, acc = 0, regions = [], sound = null, nextStep = 0;
 let W = 0, H = 0, scale = 1, ox = 0, oy = 0;
+// The journey runs a little faster than the simulation clock: first players found it slow.
+const SPEED = Number(new URLSearchParams(globalThis.location?.search || '').get('speed')) || 1.3;
+// Plain words for everything the player can ask for or set.
+const TASK = {mend:'fix cart', scout:'look ahead', carry:'help sick', watch:'guard', forage:'find food'};
+const SKILL = {mender:'fixing', scout:'looking ahead', carrier:'carrying', watcher:'guarding', forager:'finding food'};
+const PACE = ['slow','steady','fast'], MEALS = ['small','normal','big'];
+// Messages: every event and every choice says what happened and what it means. One at a time, newest last.
+let messages = [], messageSince = 0;
+function tell(str){ if(messages.at(-1)===str)return; messages.push(str); if(messages.length>4)messages.splice(1,messages.length-4); if(messages.length===1)messageSince=elapsed; }
+function wrap(str,max=46){const lines=[];let cur='';for(const w of str.split(' ')){if(cur&&(cur+' '+w).length>max){lines.push(cur);cur=w;}else cur=cur?cur+' '+w:w;}if(cur)lines.push(cur);return lines;}
 const CW = 600, CH = 900;
 const palette = ['#ca805c','#d4ac75','#7e9a8f','#b67769','#d1bc93'];
 
@@ -29,9 +39,27 @@ function audioStart(){
 }
 function tone(freq=300,dur=.12,type='sine',vol=.12,slide=0){if(!sound)return;const {ac,master}=sound;const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.setValueAtTime(freq,ac.currentTime);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,freq+slide),ac.currentTime+dur);g.gain.setValueAtTime(.001,ac.currentTime);g.gain.exponentialRampToValueAtTime(vol,ac.currentTime+.012);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+dur);o.connect(g);g.connect(master);o.start();o.stop(ac.currentTime+dur+.02);}
 function begin(){if(!started){started=true;audioStart();tone(210,.3,'sine',.05,80);}if(sound?.ac.state==='suspended')sound.ac.resume();}
-function action(a){if(state.over)return; step(state,a); effects();if(a.type==='route')tone(330,.1,'sine',.06,80);if(a.type==='pace'||a.type==='rations'){notice=(a.type==='pace'?['gentle','steady','hurry']:['small','fair','full'])[a.value];noticeUntil=elapsed+2;}}
-function effects(){for(const e of state.events||[]){if(e.type==='crack') {tone(85,.3,'sawtooth',.17,-45);tone(620,.1,'triangle',.07,-400);} else if(e.type==='mended') {tone(410,.18,'sine',.1,120);setTimeout(()=>tone(590,.3,'sine',.08,100),90);}else if(e.type==='refuse')tone(180,.19,'triangle',.07,-40);else if(e.type==='agree'||e.type==='forage')tone(440,.15,'sine',.07,90);else if(e.type==='creak'){tone(105,.22,'sawtooth',.035,30);}else if(e.type==='stop'){tone(330,.18,'sine',.06,40);setTimeout(()=>tone(440,.2,'sine',.06,30),140);setTimeout(()=>tone(550,.35,'sine',.05,30),280);}else if(e.type==='leave'||e.type==='end')tone(175,.7,'sine',.1,-60);}}
-function reset(){state=create(Math.floor(Math.random()*1e9));selected=-1;menu='';wheelArmed=false;acc=0;started=true;tone(240,.3,'sine',.08,100);}
+function action(a){if(state.over)return; step(state,a); effects();if(a.type==='route')tone(330,.1,'sine',.06,80);if(a.type==='pace')tell(['Slow pace. Easy on everyone, but more days on the road.','Steady pace.','Fast pace. Fewer days, but people tire and the cart wears.'][a.value]);if(a.type==='rations')tell(['Small meals. Food lasts longer, but people grow weak.','Normal meals.','Big meals. People recover, but food runs out sooner.'][a.value]);if(a.type==='route')tell(a.value==='rough'?'Short, rough road next. Quicker, but hard on the cart.':'Long, gentle road next. Slower, but easy on the cart.');}
+function effects(){for(const e of state.events||[]){
+  const who=state.people[e.person]?.name, left=Math.max(0,Math.ceil(state.snowDay-state.day));
+  if(e.type==='crack')tell(state.opening?'A wheel cracked. Tap Tavi to ask for a repair.':'The cart broke down. Tap someone to fix it.');
+  else if(e.type==='refuse')tell(`${who} said no: ${String(e.text).toLowerCase()}. Ask someone else.`);
+  else if(e.type==='agree')tell(`${who} said yes.`);
+  else if(e.type==='mended')tell(`${who} fixed the cart. On you go.`);
+  else if(e.type==='forage')tell(`${who} found ${e.text} food.`);
+  else if(e.type==='scouted')tell(`${who} found a better path. Less wear on the cart.`);
+  else if(e.type==='carried')tell(e.text?`${who} carried ${e.text}'s load. ${e.text} feels better.`:`${who} carried the load.`);
+  else if(e.type==='watched')tell(`${who} is on guard. Thieves will stay away at the next stop.`);
+  else if(e.type==='theft')tell('Thieves took 9 food in the night. A guard would have stopped them.');
+  else if(e.type==='sick')tell(`${who} fell ill. Big meals, a slow pace or help carrying will mend it.`);
+  else if(e.type==='tired')tell(`${who} is worn out and may refuse work. Slow down, or wait for a stop.`);
+  else if(e.type==='low')tell('Food is running low. Ask someone to find food.');
+  else if(e.type==='starve')tell('The food is gone. People are getting weak.');
+  else if(e.type==='snow')tell(`Snow in ${e.text} days. ${12-state.stop} stops to go.`);
+  else if(e.type==='leave')tell(`${who} has left the party.`);
+  else if(e.type==='stop'&&!state.over)tell(`Stop ${state.stop} of 12. Everyone rests. ${left} days until snow.`);
+if(e.type==='crack') {tone(85,.3,'sawtooth',.17,-45);tone(620,.1,'triangle',.07,-400);} else if(e.type==='mended') {tone(410,.18,'sine',.1,120);setTimeout(()=>tone(590,.3,'sine',.08,100),90);}else if(e.type==='refuse')tone(180,.19,'triangle',.07,-40);else if(e.type==='agree'||e.type==='forage')tone(440,.15,'sine',.07,90);else if(e.type==='creak'){tone(105,.22,'sawtooth',.035,30);}else if(e.type==='stop'){tone(330,.18,'sine',.06,40);setTimeout(()=>tone(440,.2,'sine',.06,30),140);setTimeout(()=>tone(550,.35,'sine',.05,30),280);}else if(e.type==='leave'||e.type==='end')tone(175,.7,'sine',.1,-60);}}
+function reset(){messages=[];state=create(Math.floor(Math.random()*1e9));selected=-1;menu='';wheelArmed=false;acc=0;started=true;tone(240,.3,'sine',.08,100);}
 function choosePerson(i){if(state.people[i]?.left)return;if(state.opening&&!state.minds.openingAsked&&i!==0)return; selected=i; if(state.broken && (wheelArmed || state.opening)){action({type:'ask',person:i,task:'mend'});wheelArmed=false;menu='';}else menu='task';tone(360,.09,'sine',.05,35);}
 function task(t){if(selected<0)return;action({type:'ask',person:selected,task:t});menu='';selected=-1;}
 function wheel(){if(!state.broken)return;menu='';selected=-1;if(state.opening&&!state.minds.openingAsked){action({type:'ask',person:0,task:'mend'});wheelArmed=false;}else wheelArmed=true;tone(280,.12,'triangle',.06);}
@@ -63,7 +91,7 @@ function landscape(t){
   for(let i=0;i<9;i++){let x=((i*113-shift*2)%760+760)%760-80;let y=696+(i%3)*24;line([[x,y],[x+1,y-15]],'#4e6654',1.3);line([[x+1,y-7],[x-5,y-13]],'#4e6654',1);}
   if(state.weather>.62){ctx.globalAlpha=.3;for(let i=0;i<6;i++){let x=((i*150+t*(6+state.weather*8))%800)-100;box(x,155+i%3*34,125,12,8,'#425b64');}ctx.globalAlpha=1;for(let i=0;i<55;i++){let x=((i*101+t*90)%680)-40,y=((i*71+t*180)%760);line([[x,y],[x-5,y+12]],'#dce7df88',1);}}
   if(late>.62){ctx.globalAlpha=(late-.62)*1.2;for(let i=0;i<70;i++){let x=((i*89+t*(12+i%5))%650)-25,y=((i*67+t*(23+i%7))%800);circle(x,y,1+i%2,'#f5eee0');}ctx.globalAlpha=1;}
-  const vignette=ctx.createRadialGradient(300,430,180,300,430,650);vignette.addColorStop(0,'#00000000');vignette.addColorStop(1,'#142d3890');ctx.fillStyle=vignette;ctx.fillRect(0,0,600,900);
+  const vignette=ctx.createRadialGradient(300,430,180,300,430,650);vignette.addColorStop(0,'#00000000');vignette.addColorStop(1,'#142d3838');ctx.fillStyle=vignette;ctx.fillRect(0,0,600,900);
 }
 function cart(t){
   let x=302,y=625,tilt=state.broken?.12:0;
@@ -111,7 +139,7 @@ function person(i,x,y,t){
   if(selected===i){ctx.strokeStyle='#f7d594';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,-15,37,0,Math.PI*2);ctx.stroke();}
   ctx.restore();
   region(x-36,y-60,72,110,()=>choosePerson(i),`person ${i+1}`);
-  if(started && p.speech && p.speechUntil>state.t && i===state.people.findIndex(q=>q.speech && q.speechUntil>state.t)){let words=String(p.speech).split(/\s+/).slice(0,3).join(' ');const bx=Math.max(100,Math.min(500,x));box(bx-95,y-105,190,42,12,'#263b3aee','#e9c595aa');text(words,bx,y-84,24);}
+  if(started && p.speech && p.speechUntil>state.t && i===state.people.findIndex(q=>q.speech && q.speechUntil>state.t)){let words=String(p.speech).split(/\s+/).slice(0,4).join(' ');const bx=Math.max(100,Math.min(500,x));box(bx-95,y-105,190,42,12,'#263b3aee','#e9c595aa');text(words,bx,y-84,24);}
 }
 function icon(type,x,y,col='#f6dfb8'){
   ctx.save();ctx.translate(x,y);ctx.strokeStyle=col;ctx.lineWidth=2;ctx.lineCap='round';ctx.lineJoin='round';
@@ -129,24 +157,39 @@ function icon(type,x,y,col='#f6dfb8'){
 }
 function control(x,y,type,fn,sub){box(x-36,y-36,72,72,20,'#263e3eea','#e9c99a80');icon(type,x,y-4);if(sub!==undefined){for(let i=0;i<3;i++)circle(x-8+i*8,y+20,2,i<=sub?'#f7d48d':'#75877a');}region(x-36,y-36,72,72,fn,type);}
 function hud(){
-  if(!started)return;
-  if(state.over){box(72,295,456,238,18,'#203a3bea','#e4c39a99');const endings={together:'All five reached the pass',parted:`${state.people.filter(p=>!p.left).length} reached the pass`,snow:'The pass is closed',stranded:'No one can walk farther',alone:'Everyone left you'};text(endings[state.over]||'The journey ends',300,367,25);text('Walk again',300,449,18,'#f5d492');region(72,295,456,238,reset,'restart');return;}
-  // Task choices replace other labels; the landscape remains visible.
-  if(menu==='task' && selected>=0){let p=state.people[selected];box(44,744,512,125,20,'#233b3bf2','#e4c59b88');text(`${p.name} · ${p.skill}`,300,765,22);const tasks=['mend','scout','carry','watch','forage'];tasks.forEach((v,i)=>{let x=95+i*102;icon(v,x,803);text(v,x,837,22);region(x-42,779,84,75,()=>task(v),v);});return;}
-  // Sparse numeric status uses symbols in place of labels.
-  box(23,24,177,52,15,'#263f40c9','#f3d5a155');text(`${Math.min(12,state.stop)}/12`,42,50,24,'#f7e3bc','left');text(`❄${Math.max(0,Math.ceil(state.snowDay-state.day))}`,184,50,24,'#dfe9e5','right');
-  box(432,24,145,52,15,'#263f40c9','#f3d5a155');text(`◉${Math.max(0,Math.floor(state.food))}`,442,50,24,'#f7e3bc','left');text(`✚${Math.round(state.cart)}`,568,50,24,'#f7e3bc','right');
-  if(state.broken){let label=state.opening&&!state.minds.openingAsked?'Ask Tavi':state.opening?'Ask another':wheelArmed?'Choose someone':'Ask someone';box(153,550,198,42,13,'#273d3de8','#f0d1a388');text(label,252,571,22);line([[252,592],[252,621]],'#f0d1a3',1.5);}
-  if(state.phase==='stop' && !state.broken){box(100,748,400,138,19,'#233c3bea','#ebc99b88');control(223,800,'rough',()=>action({type:'route',value:'rough'}));control(377,800,'gentle',()=>action({type:'route',value:'gentle'}));text('short, rough',223,860,21);text('long, gentle',377,860,21);if(state.queuedRoute){const rx=state.queuedRoute==='rough'?223:377;ctx.strokeStyle='#ffdf9a';ctx.lineWidth=3;ctx.beginPath();ctx.arc(rx,800,42,0,Math.PI*2);ctx.stroke();circle(300,799,4+2*Math.sin(elapsed*3),'#f7d99d');}return;}
-  control(62,820,'pace',()=>action({type:'pace',value:(state.pace+1)%3}),state.pace);
-  control(538,820,'rations',()=>action({type:'rations',value:(state.rations+1)%3}),state.rations);if(notice && elapsed<noticeUntil){box(245,811,110,28,10,'#263e3eea');text(notice,300,825,14);}
+  if(!started){
+    // Start card: where you are going, what you do, and that a tap begins.
+    box(60,150,480,330,20,'#203a3bee','#e4c39a99');text('The Long Road',300,200,38,'#f8d9a0');
+    ['Lead five travellers and their cart','over the mountain pass before the snow.','12 stops. 30 days.'].forEach((l,i)=>text(l,300,255+i*30,21));
+    ['Tap a traveller to ask for help.','They are people. They can say no.'].forEach((l,i)=>text(l,300,365+i*28,19,'#d9cfb6'));
+    text('Tap to set out',300,448,22,'#f5d492');return;
+  }
+  if(state.over){box(52,275,496,278,18,'#203a3bea','#e4c39a99');const n=state.people.filter(p=>!p.left).length;const endings={together:'All five reached the pass',parted:`${n} of five reached the pass`,snow:'Snow closed the pass',stranded:'No one can walk farther',alone:'Everyone left you'};
+    const why={together:'You kept the whole party together.',parted:'Tired, hungry people leave at stops.',snow:`You reached stop ${state.stop} of 12. Try a faster pace or rough roads.`,stranded:'Sick people need big meals and a slow pace.',alone:'Push people too hard and they walk away.'};
+    text(endings[state.over]||'The journey ends',300,340,27);text(why[state.over]||'',300,392,18,'#d9cfb6');text('Tap to walk again',300,480,21,'#f5d492');region(52,275,496,278,reset,'restart');return;}
+  if(menu==='task' && selected>=0){let p=state.people[selected];box(34,716,532,160,20,'#233b3bf2','#e4c59b88');text(`Ask ${p.name} to…`,300,741,22);text(`good at ${SKILL[p.skill]||p.skill}`,300,766,16,'#d9cfb6');const tasks=['mend','scout','carry','watch','forage'];tasks.forEach((v,i)=>{let x=92+i*104;box(x-48,784,96,80,12,'#2f4a48','#e9c99a55');icon(v,x,812);text(TASK[v],x,848,16);region(x-48,784,96,80,()=>task(v),v);});return;}
+  // Status: every number carries its name.
+  const days=Math.max(0,Math.ceil(state.snowDay-state.day)),food=Math.max(0,Math.floor(state.food)),cartNow=Math.round(state.cart);
+  box(16,20,568,48,14,'#263f40d8','#f3d5a155');
+  text(`Stop ${Math.min(12,state.stop)}/12`,30,44,19,'#f7e3bc','left');text(`Snow in ${days} days`,150,44,19,days<=5?'#ff9d8a':'#dfe9e5','left');text(`Food ${food}`,350,44,19,food<25?'#ff9d8a':'#f7e3bc','left');text(`Cart ${cartNow}%`,570,44,19,cartNow<25?'#ff9d8a':'#f7e3bc','right');
+  if(state.broken){let label=state.opening&&!state.minds.openingAsked?'Tap Tavi to fix the wheel':state.opening?'Tavi said no. Tap someone else':wheelArmed?'Now tap a traveller':'Tap a traveller to fix the cart';box(102,550,300,42,13,'#273d3de8','#f0d1a388');text(label,252,571,19);line([[252,592],[252,621]],'#f0d1a3',1.5);}
+  if(state.phase==='stop' && !state.broken){box(60,716,480,166,19,'#233c3bea','#ebc99b88');text(`Stop ${state.stop} of 12. Choose the next road`,300,738,19);control(190,794,'rough',()=>action({type:'route',value:'rough'}));control(410,794,'gentle',()=>action({type:'route',value:'gentle'}));text('Short, rough',190,845,19);text('quick, hard on cart',190,866,14,'#d9cfb6');text('Long, gentle',410,845,19);text('slow, easy on cart',410,866,14,'#d9cfb6');if(state.queuedRoute){const rx=state.queuedRoute==='rough'?190:410;ctx.strokeStyle='#ffdf9a';ctx.lineWidth=3;ctx.beginPath();ctx.arc(rx,794,42,0,Math.PI*2);ctx.stroke();}return;}
+  control(66,806,'pace',()=>action({type:'pace',value:(state.pace+1)%3}),state.pace);text(`Pace: ${PACE[state.pace]}`,66,862,16);
+  control(534,806,'rations',()=>action({type:'rations',value:(state.rations+1)%3}),state.rations);text(`Meals: ${MEALS[state.rations]}`,534,862,16);
+}
+function messageBar(){
+  if(!started||!messages.length)return;
+  // A waiting message shortens the current one, so news never runs far behind the road.
+  if(elapsed>messageSince+(messages.length>1?1.7:4)){messages.shift();messageSince=elapsed;if(!messages.length)return;}
+  const lines=wrap(messages[0]),h=22+lines.length*24;
+  box(40,84,520,h,14,'#1d3334f0','#f0d1a3aa');lines.forEach((l,i)=>text(l,300,84+23+i*24,18));
 }
 function frame(ms){
   if(!last)last=ms;let delta=Math.min(.1,(ms-last)/1000);last=ms;elapsed+=delta;
   if(sound)sound.windGain.gain.setTargetAtTime(.012+.035*Math.min(1,state.day/state.snowDay),sound.ac.currentTime,.5);
-  if(started&&!state.over){acc+=delta;while(acc>=DT){step(state);effects();acc-=DT;}if(!state.broken&&state.phase==='travel'&&elapsed>nextStep){tone(65,.05,'triangle',.025,-20);nextStep=elapsed+(.58-(state.pace||0)*.08);}}
+  if(started&&!state.over){acc+=delta*SPEED;while(acc>=DT&&!state.over){step(state);effects();acc-=DT;}if(!state.broken&&state.phase==='travel'&&elapsed>nextStep){tone(65,.05,'triangle',.025,-20);nextStep=elapsed+(.58-(state.pace||0)*.08);}}
   regions=[];ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);ctx.restore();ctx.save();ctx.beginPath();ctx.rect(0,0,CW,CH);ctx.clip();landscape(elapsed);
   const order=[{i:0,x:62,y:716},{i:1,x:180,y:735},{i:2,x:300,y:752},{i:3,x:420,y:731},{i:4,x:538,y:713}];
-  cart(elapsed);for(const q of order)person(q.i,q.x,q.y,elapsed);hud();ctx.restore();requestAnimationFrame(frame);
+  cart(elapsed);for(const q of order)person(q.i,q.x,q.y,elapsed);hud();messageBar();ctx.restore();requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
