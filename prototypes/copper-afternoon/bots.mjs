@@ -21,7 +21,7 @@ assert(outcomes.size>1,'Runs must end in more than one way.');
 const repair=create(8);cart(repair);bell(repair,false);assert(!good(repair,'bell'));action(repair,{type:'tool',tool:'pliers'});action(repair,{type:'spacer-pull'});action(repair,{type:'fit',part:'spacer',target:'striker'});action(repair,{type:'test'});assert(good(repair,'bell'));
 // Refusal changes sequence. Clamp blocks bell before the cart rolls straight.
 const blocked=create(7);action(blocked,{type:'switch',object:'bell'});action(blocked,{type:'open'});assert(!blocked.bell.open);
-const helper=create(7);action(helper,{type:'rafi'});assert(helper.rafi.holding);action(helper,{type:'switch',object:'bell'});action(helper,{type:'open'});assert(helper.bell.open);wait(helper,26);assert(!helper.rafi.holding);assert(!helper.broken);
+const helper=create(7);action(helper,{type:'rafi'});assert(helper.rafi.holding);action(helper,{type:'switch',object:'bell'});action(helper,{type:'open'});assert(helper.bell.open);wait(helper,28.5);assert(!helper.rafi.holding);assert(!helper.broken);
 const h=createPeople(7);assert(decideRafi(h,0).agreed);assert(!decideRafi(h,70).agreed);assert(decideRafi(h,200).agreed);peopleReading(h);
 // Matched memory control: same geometry, same request, actual earlier received promise event differs.
 const decisions=[];for(const kept of [true,false]){const p=createPeople(7);observe(p,1,'promise','The repairer promised the bell before return.',.2);observe(p,240,kept?'promise-kept':'promise-broken',kept?'The promise was kept.':'The promise was broken.',kept?.6:-.7);decisions.push(decideAylin(p,240,{bellFixed:true,lampFixed:false,damaged:false}).action);}

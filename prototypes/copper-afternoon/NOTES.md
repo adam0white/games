@@ -50,3 +50,22 @@ Real browser and device verification could not run: the sandbox refused the loca
 1. A quick solver may finish the mechanical work well before Aylin returns. The quiet remainder may feel like waiting rather than anticipation.
 2. The bell clearance and lamp coupling orientation may still be hard to infer at phone size. The failed tests must carry most of the explanation.
 3. Tool selection, timed operations, and the visitors' contact silhouettes may feel indirect. The motion and sound need a real finger-and-ear check; the Node shim cannot judge them.
+
+## 2026-11-22: first outside play notes
+
+One tester played the 2026-11-22 build on a phone and gave spoken notes, passed on by the owner. The tester could not tell what to drag or tap, tapped many times with no response, could not see the yellow outlines, did not understand the instructions, and could not tell whether a repair had worked. They preferred Lantern.
+
+| Note | Done in this change | Left as a proposal |
+| --- | --- | --- |
+| No title, menu or tutorial | Start card with the name, the goal and how the guide works | |
+| What do I tap or drag, and where | A guide line under the bench names the next tap in plain words, and a blue ring marks that spot, through the cart, the bell and the lamp | A hands-off demonstration; letting the guide fade once the cart is done |
+| Tapped twenty times, nothing happened | Hand work takes half as long; a tap during work says "Still working" and the progress bar is larger; a pull without pliers says so | Removing timed work altogether |
+| Yellow outlines on a yellow cloth | Sockets, slots, loose-screw marks and selection rings are blue on white | |
+| Jargon ("Free the cart clamp first", "Fit the matching socket") | Rewritten; the clamp rule now says "Fix the cart first" | Dropping the clamp rule |
+| Did it work or not | "It works!" or "Not working yet." after every test | |
+| The finger hides the part being dragged | A dragged part rides above the finger and drops where the part is | |
+| Long idle wait | Once a repair is ready and nothing is touched for four seconds, the clock runs eight times faster until Aylin returns | A shorter afternoon |
+
+The guide solves the bell spacer after one failed test and the lamp direction before any test. That trades the puzzle for clarity, on purpose, for this round. The earlier rules "no text before input" and the twelve-word budget are dropped; `client-smoke.mjs` now expects the start card and the guide.
+
+Checked: `bots.mjs` passes (one timing constant in the clamp test changed with the faster work); `client-smoke.mjs` passes; in a Chromium phone profile, tapping only where the blue ring points fixed the cart and the bell in 18 taps with no page errors. Not verified: a person following the guide, the lamp path in a browser, real-phone drag feel and sound.
