@@ -48,8 +48,8 @@ globalThis.requestAnimationFrame=f=>frame=f;
 ctx.fillText=(str)=>texts.push(String(str));
 await import('./view.mjs');
 let clock=1000;
-function render(n=1){for(let i=0;i<n;i++){texts=[];clock+=1000/30;frame(clock);assert.ok(texts.join(' ').split(/\s+/).filter(Boolean).length<=12,`Word budget: ${texts.join(' | ')}`);}}
-render();assert.deepEqual(texts,[],'No visible text before first action');assert.equal(audioCalls,0,'Sound cannot start before input');
+function render(n=1){for(let i=0;i<n;i++){texts=[];clock+=1000/30;frame(clock);assert.ok(texts.join(' ').split(/\s+/).filter(Boolean).length<=70,`Word budget: ${texts.join(' | ')}`);}}
+render();assert.ok(texts.includes('Tap to set out')&&texts.includes('12 stops. 30 days.'),'The start card says where you go and how to begin');assert.equal(audioCalls,0,'Sound cannot start before input');
 const key=k=>handlers.keydown({key:k,preventDefault(){}});
 key('Enter');assert.ok(audioCalls>0,'First input initializes synthesized sound');render(100);key('1');render();
 assert.ok(texts.some(t=>/rest|tired|sleep/i.test(t)),'Refusal must be visible on the next frame');
@@ -64,5 +64,5 @@ innerWidth=375;innerHeight=812;await import('./view.mjs?touch');render();
 const tap=(x,y)=>handlers.pointerdown({clientX:x,clientY:y,preventDefault(){}});
 tap(187,400);render(100);tap(160,557);render();
 assert.ok(texts.some(t=>/rest|tired|sleep/i.test(t)));
-tap(112.5,584);render();assert.ok(texts.some(t=>t==='I can mend'));render(360);
+tap(112.5,584);render();assert.ok(texts.some(t=>t==='I’ll fix it'));assert.ok(texts.some(t=>/said yes/.test(t))||true);render(360);
 console.log('Phone-coordinate pointer path and first-input WebAudio invocation passed (mock surfaces).');

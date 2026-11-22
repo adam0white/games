@@ -62,3 +62,21 @@ Actual browser verification could not run: the Playwright tool was rejected beca
 1. The symbol-only pace, ration and resource controls may require too much discovery. Refusal is taught directly; later strategy is less explicit.
 2. Twelve legs share a compact landscape and a small event set. The middle minutes may feel repetitive despite snow, food pressure and changing tasks.
 3. HF choices use fresh episodes and authored expectations. Repeated requests can feel less personal than persistent relationships or explicit counteroffers would. Tuning that yields sensible bot endings does not establish believable negotiation.
+
+## 2026-11-22: first outside play notes
+
+One tester played the 2026-11-22 build on a phone and gave spoken notes, passed on by the owner. The tester did not understand the game: no start, no goal, no visible effect of any choice, hard words, too slow. They preferred Lantern.
+
+| Note | Done in this change | Left as a proposal |
+| --- | --- | --- |
+| No menu or tutorial; where am I going, when does it start | Start card: goal, 12 stops, 30 days, tap a traveller, tap to set out | A named route with a map |
+| Choices and events show nothing | A message for every event and every choice: refusal with its reason, agreement, finished work and its effect, theft, illness, exhaustion, low food, snow warnings, each stop. Pace, meals and road choices say what they cost | Injuries and other road events; stopping to eat; hunting |
+| Hard words (mend, forage; small, fair, full) | fix cart, look ahead, help sick, guard, find food; pace slow, steady, fast; meals small, normal, big; every number has its name | |
+| Short and rough against long and gentle means nothing | The stop panel states each road's cost, and choosing one says it again | A visible difference in the landscape |
+| Too long | The journey runs 1.3 times faster (`?speed=` to compare); balance is unchanged | A shorter trip |
+| The sun rises but it stays dark | Edge darkening cut by more than half | |
+| Why no horses | | A draught animal |
+
+The earlier design rules "no visible words before input" and the twelve-word display budget are dropped; `verify.mjs` now expects the start card. This supersedes the wording in the sections above (`I can mend` is now `I’ll fix it`, and so on).
+
+Checked: `bots.mjs 12` endings unchanged; `verify.mjs` passes; played through the opening, a task, pace and a stop in a Chromium phone profile with no page errors. Not verified: a full journey by a person, real-phone feel and sound.

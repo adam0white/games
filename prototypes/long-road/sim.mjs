@@ -19,9 +19,9 @@ function complete(s,i) {
   const expert=p.skill===({mend:'mender',scout:'scout',carry:'carrier',watch:'watcher',forage:'forager'}[task]);
   p.fatigue=clamp(p.fatigue+(expert?.09:.16));p.neglect=clamp(p.neglect+.025);
   if(task==='mend') {s.cart=clamp(s.cart+(expert?65:45),0,100);s.broken=false;s.opening=false;event(s,'mended',i);}
-  if(task==='forage') {s.food=clamp(s.food+(expert?22:15),0,140);event(s,'forage',i);}
+  if(task==='forage') {const found=expert?22:15;s.food=clamp(s.food+found,0,140);event(s,'forage',i,String(found));}
   if(task==='scout') {s.scouted=true;if(s.phase==='travel')s.progress=Math.min(.96,s.progress+.055);event(s,'scouted',i);}
-  if(task==='carry') {s.carrying=true;const sick=s.people.filter(q=>!q.left&&q!==p).sort((a,b)=>a.health-b.health)[0];if(sick){sick.health=clamp(sick.health+.12);sick.fatigue=clamp(sick.fatigue-.2);}event(s,'carried',i);}
+  if(task==='carry') {s.carrying=true;const sick=s.people.filter(q=>!q.left&&q!==p).sort((a,b)=>a.health-b.health)[0];if(sick){sick.health=clamp(sick.health+.12);sick.fatigue=clamp(sick.fatigue-.2);}event(s,'carried',i,sick?.name);}
   if(task==='watch') {s.watch=true;event(s,'watched',i);}
 }
 function ask(s,i,task) {
@@ -34,7 +34,7 @@ function ask(s,i,task) {
   if(!decision.accepted) {s.refusals++;say(s,i,decision.reason||'Need rest','refuse');return;}
   p.job=task;p.jobUntil=s.t+({mend:11,scout:13,carry:12,watch:14,forage:15}[task]);
   if(task==='forage')s.forageDone=true;
-  say(s,i,task==='mend'?'I can mend':task==='scout'?'I’ll scout':task==='carry'?'I’ll carry':task==='watch'?'I’ll watch':'I’ll forage','agree');
+  say(s,i,task==='mend'?'I’ll fix it':task==='scout'?'I’ll look ahead':task==='carry'?'I’ll help carry':task==='watch'?'I’ll keep guard':'I’ll find food','agree');
 }
 function stop(s) {
   s.stop++;s.progress=0;event(s,'stop');
@@ -73,10 +73,15 @@ export function step(s,action) {
     p.fatigue=clamp(p.fatigue+DT*(resting?-.0045:[.0007,.0018,.0044][s.pace])+(s.carrying&&p.health<.8?-DT*.001:0));
     p.neglect=clamp(p.neglect+DT*((s.pace===2?.0014:.0001)+(s.rations===0?.0012:s.rations===2?-.001:-.0003)));
     p.health=clamp(p.health+DT*(s.food<=0?-.0024:s.rations===0?-.00065:s.rations===2?.0007:.00015)-(s.pace===2?DT*.00045:0));
+    // Tell the player when someone wears out, once per spell of tiredness.
+    if(!p.worn&&p.fatigue>.8){p.worn=true;event(s,'tired',i);}else if(p.worn&&p.fatigue<.55)p.worn=false;
   }
   const count=s.people.filter(p=>!p.left).length;
   s.food=Math.max(0,s.food-DT*[.105,.185,.275][s.rations]*(count/5));
+  if(!s.lowFood&&s.food<25&&s.food>0){s.lowFood=true;event(s,'low');}else if(s.lowFood&&s.food>40)s.lowFood=false;
+  if(!s.noFood&&s.food<=0){s.noFood=true;event(s,'starve');}else if(s.noFood&&s.food>0)s.noFood=false;
   s.day+=DT*(s.phase==='stop'?.047:s.broken?.06:.056)*(1+(s.weather>.78?.12:0));
+  for(const days of [10,5])if(!s['snow'+days]&&s.snowDay-s.day<=days){s['snow'+days]=true;event(s,'snow',undefined,String(days));}
   if(s.phase==='travel'&&!s.broken) {
     s.progress+=DT*[.84,1,1.24][s.pace]/(s.route==='rough'?26:34);
     s.cart=Math.max(0,s.cart-DT*(s.route==='rough'?.078:.027)*(s.pace===2?1.8:1)*(s.scouted?.45:1));
