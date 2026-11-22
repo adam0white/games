@@ -1,8 +1,10 @@
 // Lantern: pure, seeded simulation. No DOM. One tick is 1/60 s; the only input is a target x in [0, 1].
-// A stage is one river. Later stages are faster and add ice floes and swinging rocks.
+// Story: a night is one river of length GOAL; each night is harder and nights 2, 3, 4 and 5 each add one hazard.
+// Endless: one river with no dawn; it gets harder every 300 points (10 points a second).
 export const DT = 1 / 60;
 export const GOAL = 78; // river length; about ninety seconds
 export const BOAT = 0.022;
+export const NIGHTS = 20;
 
 function rng(seed) {
   let a = seed >>> 0;
@@ -14,53 +16,91 @@ function rng(seed) {
   };
 }
 
+export function score(s) { return Math.floor(s.t * 10); }
+// Difficulty step: the night in story, one step per 300 points in endless.
+export function level(s) { return s.endless ? 1 + Math.floor(score(s) / 300) : s.stage; }
 export function centre(s, y) { return 0.5 + 0.17 * Math.sin(y * 0.33 + s.p1) + 0.07 * Math.sin(y * 0.81 + s.p2); }
-// The river narrows all the way down and pinches hard in the last tenth.
-export function half(y) { const k = Math.min(1, y / GOAL); return 0.27 - 0.07 * k - 0.035 * Math.max(0, (k - 0.88) / 0.12); }
-export function speed(s) { return (0.62 + 0.62 * Math.min(1, s.y / GOAL)) * (1 + 0.08 * (s.stage - 1)); }
+// The river narrows all the way down. A story night pinches hard in its last tenth; the endless river keeps narrowing slowly.
+export function half(s, y) {
+  const k = Math.min(1, y / GOAL);
+  if (s.endless) return Math.max(0.16, 0.27 - 0.07 * k - 0.012 * Math.max(0, y / GOAL - 1));
+  return 0.27 - 0.07 * k - 0.035 * Math.max(0, (k - 0.88) / 0.12);
+}
+// The waterfall: a short stretch of fast water, from night 5 at the halfway mark and every 60 units of the endless river.
+export function fall(s, y) {
+  let d;
+  if (s.endless) d = ((y + 20) % 60) - 0; else if (s.stage >= 5) d = y - GOAL * 0.5; else return 0;
+  return d >= 0 && d < 3 ? Math.sin(d / 3 * Math.PI) : 0;
+}
+function pace(s) { return 1 + (s.endless ? 0.05 : 0.035) * Math.min(24, level(s) - 1); }
+export function speed(s) { return (0.62 + 0.62 * Math.min(1, s.y / GOAL)) * pace(s) * (1 + 0.7 * fall(s, s.y)); }
 export function reach(light) { return 0.17 + 0.6 * light; }
 
-export function create(seed, stage = 1) {
+export function create(seed, stage = 1, endless = false) {
   const r = rng(seed);
-  const s = { seed, stage, warm: 0, shield: 0, safe: 0, nextBlue: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
+  const s = { seed, stage, endless, hearts: 1, ice: -9, iceSide: 1, warm: 0, shield: 0, safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
   s.x = centre(s, 0);
   return s;
 }
 
+// True when a pickup at (x, y) can be taken without touching this rock anywhere in the rock's travel.
+function clearOf(x, y, k) {
+  if (k.vy) return !(Math.abs(x - k.x0) < k.rad + 0.075 && y > k.y0 - k.rad - 0.08 && y < k.y0 + 3);
+  const dx = Math.max(0, Math.abs(x - k.x0) - k.a), dy = Math.max(0, Math.abs(y - k.y0) - k.b);
+  return Math.hypot(dx, dy) > k.rad + 0.048;
+}
+const clear = (s, x, y) => s.rocks.every(k => Math.abs(k.y0 - y) > 4 || clearOf(x, y, k));
+function rock(x, y, rad) { return { x, x0: x, y, y0: y, rad, a: 0, w: 0, b: 0, wy: 0, ph: 0, vy: 0, ice: false, grazed: false }; }
+
 function spawn(s) {
   // One row at a time, well ahead of the light, so the same seed always gives the same river.
   while (s.next < s.y + 2.4) {
-    const y = s.next, c = centre(s, y), h = half(y), k = Math.min(1, y / GOAL);
+    const y = s.next, c = centre(s, y), h = half(s, y), k = Math.min(1, y / GOAL), lv = level(s);
+    s.next += (0.95 - 0.3 * k + s.r() * 0.35) / (1 + 0.012 * Math.min(24, lv - 1));
+    if (fall(s, y) > 0 || fall(s, y + 0.8) > 0) continue; // the waterfall itself is the hazard
     const rad = 0.03 + s.r() * 0.03;
     const off = (s.r() * 2 - 1) * (h - rad - 0.01);
-    const rock = { x: c + off, x0: c + off, y, rad, a: 0, w: 0, ph: 0, vy: 0, ice: false, grazed: false };
-    // Difficulty rises inside a stage as well as between stages: rocks start to swing past the halfway mark.
-    if (s.stage >= 2 && s.r() < 0.3) { rock.ice = true; rock.rad = 0.05 + s.r() * 0.025; rock.vy = 0.22; rock.x0 = rock.x = c + (s.r() * 2 - 1) * (h - rock.rad - 0.01); }
-    else if (s.r() < Math.min(0.7, Math.max(0, (k - 0.5) * 1.1) + 0.3 * (s.stage - 1) * (s.stage >= 3 ? 1 : 0.4))) {
-      rock.a = Math.min(0.09, Math.max(0, h - Math.abs(off) - rad - 0.01)); rock.w = 1.4 + s.r() * 1.2; rock.ph = s.r() * 6.28;
-    }
-    s.rocks.push(rock);
+    const first = rock(c + off, y, rad), row = [first];
+    // Ice drifts into the row ahead of it, so that row keeps one small rock on the ice's side and the far side stays open.
+    const iced = y - s.ice < 1.5;
+    if (iced) { first.rad = Math.min(rad, 0.035); first.x0 = first.x = c + s.iceSide * Math.abs(off); s.r(); s.r(); }
+    else if (lv >= 2 && s.r() < 0.3) { first.ice = true; first.rad = 0.05 + s.r() * 0.025; first.vy = 0.22; first.x0 = first.x = c + (s.r() * 2 - 1) * (h - first.rad - 0.01); s.ice = y; s.iceSide = first.x < c ? -1 : 1; }
+    else if (s.r() < Math.min(0.7, Math.max(0, (k - 0.5) * 1.1) + (lv >= 3 ? 0.3 : 0.12 * (lv - 1)))) {
+      // Rocks that swing from side to side: past halfway on night 1, more of them every night after.
+      first.a = Math.min(0.09, Math.max(0, h - Math.abs(off) - rad - 0.01)); first.w = 1.4 + s.r() * 1.2; first.ph = s.r() * 6.28;
+    } else if (lv >= 4 && s.r() < 0.3) { first.b = 0.22; first.wy = 1.6 + s.r(); first.ph = s.r() * 6.28; } // rocks that ride up and down the current
     if (s.r() < 0.3 + 0.3 * k) {
       // A second rock on the far side leaves one clear channel.
       const rad2 = 0.028 + s.r() * 0.02, side = off > 0 ? -1 : 1;
       const off2 = side * (0.08 + s.r() * (h - rad2 - 0.09));
-      if (!rock.ice && !rock.a && Math.abs(off2 - off) > rad + rad2 + 0.11) s.rocks.push({ x: c + off2, x0: c + off2, y: y + (s.r() - 0.5) * 0.2, rad: rad2, a: 0, w: 0, ph: 0, vy: 0, ice: false, grazed: false });
+      if (!iced && !first.ice && !first.a && !first.b && Math.abs(off2 - off) > rad + rad2 + 0.11) row.push(rock(c + off2, y + (s.r() - 0.5) * 0.2, rad2));
     }
+    s.rocks.push(...row);
+    // No pickup may sit where a rock is or will be: drop any earlier one this row would cover.
+    s.embers = s.embers.filter(e => e.got || row.every(q => clearOf(e.x, e.y, q)));
     if (s.r() < 0.62) {
       // Embers sit beside the rock more often than in open water: light costs nerve.
-      const near = s.r() < 0.55, ey = y + (near ? 0 : 0.45), ec = centre(s, ey), eh = half(ey);
-      let ex = near ? c + off + (off > 0 ? -1 : 1) * (rad + 0.05) : ec + (s.r() * 2 - 1) * (eh - 0.05);
-      ex = Math.max(ec - eh + 0.04, Math.min(ec + eh - 0.04, ex));
-      s.embers.push({ x: ex, y: ey, got: false, blue: false });
+      const near = s.r() < 0.55 && !iced && !first.ice && !first.a && !first.b;
+      for (let tries = 0; tries < 6; tries++) {
+        const ey = y + (near && !tries ? 0 : 0.45), ec = centre(s, ey), eh = half(s, ey);
+        let ex = near && !tries ? c + off + (off > 0 ? -1 : 1) * (rad + 0.05) : ec + (s.r() * 2 - 1) * (eh - 0.05);
+        ex = Math.max(ec - eh + 0.04, Math.min(ec + eh - 0.04, ex));
+        if (clear(s, ex, ey)) { s.embers.push({ x: ex, y: ey, got: false, kind: 'ember' }); break; }
+      }
     }
-    if (y > s.nextBlue) {
-      // A blue ember is a shield: it takes one hit for you. Rare, and always in open water.
-      const by = y + 0.5, bc = centre(s, by);
-      s.embers.push({ x: bc + (s.r() * 2 - 1) * (half(by) - 0.07), y: by, got: false, blue: true });
-      s.nextBlue = y + 16 + s.r() * 8;
+    if (y > s.nextGift) {
+      // Gifts are rare and sit in open water. Blue is a shield that takes one hit; red is a heart, a spare life.
+      const gy = y + 0.5, gc = centre(s, gy), gx = gc + (s.r() * 2 - 1) * (half(s, gy) - 0.07), kind = s.r() < 0.4 ? 'heart' : 'shield';
+      if (clear(s, gx, gy)) { s.embers.push({ x: gx, y: gy, got: false, kind }); s.nextGift = y + 16 + s.r() * 8; }
     }
-    s.next += 0.95 - 0.3 * k + s.r() * 0.35;
   }
+}
+
+// A blow: the shield takes it, else a spare heart does, else the run ends. Returns true when the run ended.
+function blow(s, cause) {
+  if (s.shield) { s.shield = 0; s.safe = 1.2; s.events.push('break'); return false; }
+  if (s.hearts > 1) { s.hearts--; s.safe = 1.6; s.events.push('hurt'); return false; }
+  s.hearts = 0; s.over = cause; s.events.push('hit'); return true;
 }
 
 export function step(s, target) {
@@ -69,34 +109,34 @@ export function step(s, target) {
   spawn(s);
   s.t += DT;
   s.y += speed(s) * DT;
-  const max = 0.95 * DT, dx = Math.max(0, Math.min(1, target)) - s.x;
+  const max = 0.95 * pace(s) * DT, dx = Math.max(0, Math.min(1, target)) - s.x;
   s.x += Math.max(-max, Math.min(max, dx));
   // An ember holds the flame steady for a moment before it starts to fade again.
   s.warm = Math.max(0, s.warm - DT); s.safe = Math.max(0, s.safe - DT);
-  if (!s.warm) s.light -= (0.04 + 0.025 * Math.min(1, s.y / GOAL)) * DT;
+  if (!s.warm) s.light -= (0.04 + 0.025 * Math.min(1, s.y / GOAL)) * pace(s) * DT; // the same light per stretch of river on every night
   for (const e of s.embers) if (!e.got && Math.hypot(e.x - s.x, e.y - s.y) < 0.05) {
     e.got = true;
-    if (e.blue) { s.shield = 1; s.events.push('shield'); }
+    if (e.kind === 'shield') { s.shield = 1; s.events.push('shield'); }
+    else if (e.kind === 'heart') { s.hearts = Math.min(3, s.hearts + 1); s.events.push('heart'); }
     else { s.taken++; s.light = Math.min(1, s.light + 0.3); s.warm = 2.5; s.events.push('ember'); }
   }
   for (const k of s.rocks) {
+    if (k.vy) k.y0 += k.vy * DT;
     if (k.a) k.x = k.x0 + k.a * Math.sin(s.t * k.w + k.ph);
-    k.y += k.vy * DT;
+    k.y = k.b ? k.y0 + k.b * Math.sin(s.t * k.wy + k.ph) : k.y0;
     const d = Math.hypot(k.x - s.x, k.y - s.y) - k.rad - BOAT;
-    if (d < 0 && !s.safe) {
-      if (s.shield) { s.shield = 0; s.safe = 1.2; s.events.push('break'); continue; }
-      s.over = k.ice ? 'ice' : 'rock'; s.events.push('hit'); return s;
-    }
+    if (d < 0 && !s.safe) { if (blow(s, k.ice ? 'ice' : 'rock')) return s; continue; }
     if (!k.grazed && d < 0.022 && k.y < s.y) { k.grazed = true; s.grazes++; s.light = Math.min(1, s.light + 0.05); s.events.push('graze'); }
   }
-  const c = centre(s, s.y), edge = half(s.y) - BOAT;
+  const c = centre(s, s.y), edge = half(s, s.y) - BOAT;
   if (Math.abs(s.x - c) > edge) {
-    if (s.shield) { s.shield = 0; s.safe = 1.2; s.x = c + Math.sign(s.x - c) * (edge - 0.03); s.events.push('break'); }
-    else { s.over = 'bank'; s.events.push('hit'); return s; }
+    // Just after a blow the bank only holds the boat in; otherwise it is a blow, and the boat is set back inside.
+    if (s.safe) s.x = c + Math.sign(s.x - c) * edge;
+    else { if (blow(s, 'bank')) return s; s.x = c + Math.sign(s.x - c) * (edge - 0.03); }
   }
   if (s.light <= 0) { s.light = 0; s.over = 'dark'; s.events.push('out'); return s; }
-  if (s.y >= GOAL) { s.over = 'dawn'; s.events.push('dawn'); }
-  if (s.rocks.length && s.rocks[0].y < s.y - 1) s.rocks = s.rocks.filter(k => k.y >= s.y - 1);
+  if (!s.endless && s.y >= GOAL) { s.over = 'dawn'; s.events.push('dawn'); }
+  if (s.rocks.length && s.rocks[0].y0 < s.y - 1.5) s.rocks = s.rocks.filter(k => k.y0 >= s.y - 1.5);
   while (s.embers.length && s.embers[0].y < s.y - 1) s.embers.shift();
   return s;
 }

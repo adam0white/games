@@ -6,33 +6,105 @@
 <meta name="theme-color" content="#05080f">
 <title>Lantern</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #05080f; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; }
+  html, body { margin: 0; height: 100%; background: #05080f; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { font: 16px/1.5 Georgia, 'Times New Roman', serif; color: #f3e6cf; }
   canvas { display: block; width: 100vw; height: 100dvh; }
-  #card { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; font: 16px/1.5 Georgia, 'Times New Roman', serif; color: #f3e6cf; text-align: center; transition: opacity .5s; }
-  #card div { max-width: 19em; padding: 1.5em; }
-  h1 { font-weight: normal; font-size: 2.6em; letter-spacing: .12em; margin: 0 0 .3em; color: #ffd9a0; text-shadow: 0 0 28px #ff9a3c88; }
-  p { margin: .4em 0; opacity: .85; }
-  small { display: block; margin-top: 1.4em; opacity: .55; letter-spacing: .08em; }
-  #pause { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: #ffffff14; display: none; place-items: center; touch-action: none; }
+  .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; pointer-events: none; }
+  .screen.on { display: grid; }
+  .screen > div { max-width: 21em; width: calc(100% - 2em); padding: 1em; pointer-events: auto; }
+  #card > div { pointer-events: none; } #card button { pointer-events: auto; }
+  .veil { background: #05080fd9; } #menu.veil { background: #05080f99; }
+  h1 { font-weight: normal; font-size: 2.6em; letter-spacing: .12em; margin: 0 0 .2em; color: #ffd9a0; text-shadow: 0 0 28px #ff9a3c88; }
+  h2 { font-weight: normal; font-size: 1.7em; letter-spacing: .1em; margin: 0 0 .4em; color: #ffd9a0; }
+  p { margin: .4em 0; opacity: .88; }
+  button { font: inherit; color: #ffe6bd; background: #ffffff10; border: 1.5px solid #ffd9a088; border-radius: 999px; padding: .55em 1.2em; margin: .3em; min-width: 9em; min-height: 46px; touch-action: manipulation; }
+  button.main { background: #ffb45a; color: #2a1606; border-color: #ffb45a; font-size: 1.2em; min-width: 9.5em; }
+  button.small { min-width: 46px; padding: .3em .7em; }
+  button:disabled { opacity: .4; }
+  .bank { font-size: 1.25em; color: #ffd9a0; margin: .5em 0; }
+  .dot { display: inline-block; width: .7em; height: .7em; border-radius: 50%; background: radial-gradient(#fff2c8, #ff9a3c); box-shadow: 0 0 10px #ff9a3c; margin-right: .35em; vertical-align: baseline; }
+  #shop > div { max-height: 100dvh; box-sizing: border-box; overflow-y: auto; touch-action: pan-y; }
+  .pack { border-top: 1px solid #ffd9a033; padding: .35em 0; }
+  .pack b { font-weight: normal; font-size: 1.15em; color: #ffd9a0; letter-spacing: .06em; }
+  .items { display: flex; justify-content: center; gap: 8px; margin: .5em 0 .2em; }
+  .item { width: 42px; height: 42px; min-width: 0; min-height: 0; padding: 0; margin: 0; border-radius: 50%; border: 2px solid #ffffff30; }
+  .item.locked { background: #ffffff0c; border-style: dashed; }
+  .item.locked::before { content: '?'; opacity: .5; }
+  .item.worn { border-color: #fff; box-shadow: 0 0 0 2px #ffb45a; }
+  #got { min-height: 1.6em; color: #ffe6bd; }
+  #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); display: none; text-align: left; pointer-events: none; text-shadow: 0 1px 6px #000; }
+  #hearts { font: 26px/1 sans-serif; color: #ff4d5e; letter-spacing: 2px; }
+  #embers { font-size: 26px; line-height: 1.3; color: #ffd9a0; }
+  #big { position: fixed; top: calc(6px + env(safe-area-inset-top)); left: 0; right: 0; display: none; text-align: center; font-size: 40px; line-height: 1.1; color: #fff3dc; pointer-events: none; text-shadow: 0 1px 8px #000; font-variant-numeric: tabular-nums; }
+  #warn, #say { position: fixed; left: 0; right: 0; text-align: center; pointer-events: none; opacity: 0; transition: opacity .3s; text-shadow: 0 1px 8px #000; padding: 0 1em; }
+  #warn { top: 20%; font-size: 26px; line-height: 1.2; font-weight: bold; color: #ff4a4a; }
+  #warn.on { opacity: 1; animation: pulse .9s infinite alternate; }
+  @keyframes pulse { to { opacity: .7; } }
+  #say { top: 31%; font-size: 22px; color: #ffe6bd; }
+  #pause { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); width: 44px; height: 44px; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 50%; background: #ffffff14; display: none; place-items: center; touch-action: none; }
   #pause::before { content: ''; width: 4px; height: 16px; border: solid #ffd9a0aa; border-width: 0 5px; }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="hud"><div id="hearts"></div><div id="embers"><span class="dot"></span><span id="count">0</span></div></div>
+<div id="big"></div>
+<div id="warn">The lantern is beginning to fade</div>
+<div id="say"></div>
 <button id="pause" aria-label="Pause"></button>
-<div id="card"><div><h1 id="title">Lantern</h1><p id="line">Carry the light down the river to dawn.</p><p id="sub">Slide your thumb anywhere to steer. Embers feed the flame.</p><small id="go">touch to begin</small></div></div>
+<div id="menu" class="screen veil on"><div>
+  <h1>Lantern</h1>
+  <p>Carry the light down the river to dawn.</p>
+  <p class="bank"><span class="dot"></span><span id="bank">0</span> embers</p>
+  <p><button id="less" class="small" aria-label="Earlier night">&lsaquo;</button><button id="play" class="main">Play</button><button id="more" class="small" aria-label="Later night">&rsaquo;</button></p>
+  <p id="about"></p>
+  <p><button id="endless">Endless river</button></p>
+  <p><button id="toShop">Shop</button><button id="toCredits">Credits</button></p>
+</div></div>
+<div id="shop" class="screen veil"><div>
+  <h2>Shop</h2>
+  <p class="bank"><span class="dot"></span><span id="bank2">0</span> embers</p>
+  <p><button class="back">Back</button></p>
+  <p id="got">Each pack holds one surprise. A pack costs 50 embers.</p>
+  <div id="packs"></div>
+</div></div>
+<div id="credits" class="screen veil"><div>
+  <h2>Credits</h2>
+  <p>Lantern comes from the game lab at play.adamwhite.work.</p>
+  <p>Every picture and every sound is made in code.</p>
+  <p>Thank you to our first play-tester. Your notes shaped this version: the menu, the shop, the hearts and the endless river.</p>
+  <p><button class="back">Back</button></p>
+</div></div>
+<div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p><p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p></div></div>
 <script type="module">
-import { create, step, centre, half, reach, DT, GOAL } from './sim.js';
+import { create, step, centre, half, reach, fall, level, score, DT, GOAL, NIGHTS } from './sim.js?v=2'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
 
 const query = new URLSearchParams(location.search);
 const gain = Number(query.get('gain')) || 1.3; // boat travel per finger travel; ?gain= to compare
-const store = { get: k => { try { return Number(localStorage.getItem(k) || 0); } catch { return 0; } }, set: (k, v) => { try { localStorage.setItem(k, String(v)); } catch {} } };
-// A night is one river. Reaching dawn opens the next night; a failed night is retried.
-let stage = Math.max(1, Math.floor(Number(query.get('night')) || store.get('lantern-night') || 1));
-const ahead = n => n === 2 ? 'Ice drifts on the water.' : n === 3 ? 'The rocks are restless.' : 'The current runs faster.';
+const store = {
+  get: k => { try { return Number(localStorage.getItem(k) || 0); } catch { return 0; } },
+  set: (k, v) => { try { localStorage.setItem(k, String(v)); } catch {} },
+  json: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+};
+// Story: a night is one river. Reaching dawn opens the next night, up to night 20. Any opened night can be replayed.
+let opened = Math.min(NIGHTS, Math.max(1, Math.floor(Number(query.get('night')) || store.get('lantern-night') || 1)));
+let stage = opened, endless = false, bank = store.get('lantern-bank');
+const ahead = n => n === 1 ? 'Slide your thumb anywhere to steer. Embers feed the flame.' : n === 2 ? 'Ice drifts on the water.' : n === 3 ? 'The rocks are restless.' : n === 4 ? 'Some rocks ride up and down the current.' : n === 5 ? 'A waterfall waits halfway.' : n === NIGHTS ? 'The last night. The fastest water.' : 'The current runs faster and the rocks sit closer.';
+
+// The shop. Embers are the money. A pack gives one thing you do not own yet, picked at random.
+const PACKS = [
+  { id: 'boat', name: 'Boats', items: [['oak', 'Oak boat', '#6b4a2f'], ['red', 'Red boat', '#b3312c'], ['birch', 'Birch boat', '#e9e2d0'], ['iron', 'Iron boat', '#56657a'], ['jade', 'Jade boat', '#2f9e7a'], ['gold', 'Gold boat', '#e0b040']] },
+  { id: 'water', name: 'Waters', items: [['blue', 'Blue water', '#14304a', '#3d6f95'], ['redw', 'Red water', '#4a1420', '#a04a58'], ['moss', 'Moss water', '#17382a', '#4f8f6a'], ['violet', 'Violet water', '#2a1c4a', '#7a62b8'], ['teal', 'Teal water', '#0f3d42', '#48a3a8'], ['glass', 'Black glass', '#0c1016', '#4a5564']] },
+  { id: 'flame', name: 'Flames', items: [['amber', 'Amber flame', '255,170,80'], ['bluef', 'Blue flame', '110,180,255'], ['green', 'Green flame', '120,230,140'], ['rose', 'Rose flame', '255,120,170'], ['white', 'White flame', '235,235,255'], ['violetf', 'Violet flame', '190,130,255']] },
+];
+const COST = 50;
+let owned = new Set(['oak', 'blue', 'amber', ...store.json('lantern-owned', [])]);
+let worn = { boat: 'oak', water: 'blue', flame: 'amber', ...store.json('lantern-worn', {}) };
+const skin = kind => { const pack = PACKS.find(p => p.id === kind); return pack.items.find(i => i[0] === worn[kind]) ?? pack.items[0]; };
+const swatch = (kind, it) => kind === 'flame' ? `radial-gradient(#fff, rgb(${it[2]}) 60%, #0000)` : it[2];
 
 const canvas = document.getElementById('c'), g = canvas.getContext('2d');
-const card = document.getElementById('card'), $ = id => document.getElementById(id);
+const $ = id => document.getElementById(id);
 let W = 0, H = 0, unit = 1, left = 0, dpr = 1;
 function resize() {
   dpr = Math.min(2, devicePixelRatio || 1);
@@ -41,20 +113,63 @@ function resize() {
 }
 addEventListener('resize', resize); resize();
 
-let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9;
+let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', lastLevel = 1, nearFall = false, sayTimer = 0, shown = '';
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
-if (stage > 1) $('go').textContent = `touch to begin night ${stage}`;
-window.lanternState = () => ({ x: s.x, t: s.t, over: s.over, target, playing, paused, stage, unit: unit / dpr }); // read by the touch checks
+window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, score: score(s), bank, owned: [...owned], worn, unit: unit / dpr }); // read by the browser checks
+window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
+
+function show(name) {
+  screen = name;
+  for (const id of ['menu', 'shop', 'credits', 'card']) $(id).classList.toggle('on', id === name);
+  const play = name === 'play';
+  $('hud').style.display = $('big').style.display = play ? 'block' : 'none'; pauseButton.style.display = play ? 'grid' : 'none';
+  if (!play) $('warn').classList.remove('on');
+  if (name === 'menu') menu(); if (name === 'shop') shop();
+}
+function menu() {
+  $('bank').textContent = bank; $('play').textContent = `Play night ${stage}`;
+  $('less').disabled = stage <= 1; $('more').disabled = stage >= opened;
+  const best = store.get(`lantern-best-${stage}`), top = store.get('lantern-best-endless');
+  $('about').textContent = ahead(stage) + (best ? ` Best ${best}%.` : '');
+  $('endless').textContent = top ? `Endless river · best ${top}` : 'Endless river';
+}
+function shop(text) {
+  $('bank2').textContent = bank; if (text) $('got').textContent = text;
+  const box = $('packs'); box.textContent = '';
+  for (const pack of PACKS) {
+    const rest = pack.items.filter(i => !owned.has(i[0])), div = document.createElement('div'); div.className = 'pack';
+    const name = document.createElement('b'); name.textContent = pack.name;
+    const row = document.createElement('div'); row.className = 'items';
+    for (const it of pack.items) {
+      const b = document.createElement('button'), has = owned.has(it[0]);
+      b.className = 'item' + (has ? '' : ' locked') + (worn[pack.id] === it[0] ? ' worn' : ''); b.setAttribute('aria-label', has ? it[1] : 'Not found yet');
+      if (has) { b.style.background = swatch(pack.id, it); b.addEventListener('click', () => { worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); shop(`${it[1]} is on.`); }); } else b.disabled = true;
+      row.append(b);
+    }
+    const buy = document.createElement('button'); buy.dataset.pack = pack.id;
+    buy.textContent = rest.length ? `Open a pack · ${COST}` : 'All found'; buy.disabled = !rest.length || bank < COST;
+    buy.addEventListener('click', () => {
+      if (bank < COST || !rest.length) return;
+      const it = rest[Math.floor(Math.random() * rest.length)];
+      bank -= COST; store.set('lantern-bank', bank); owned.add(it[0]); store.set('lantern-owned', JSON.stringify([...owned])); worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn));
+      audio(); tone(659.25, 0.5, 0.1, 'triangle'); setTimeout(() => tone(987.77, 0.8, 0.1, 'triangle'), 130);
+      shop(`You found: ${it[1]}!`);
+    });
+    div.append(name, row, buy); box.append(div);
+  }
+}
+function say(text, ms = 2200) { const el = $('say'); el.textContent = text; el.style.opacity = 1; clearTimeout(sayTimer); sayTimer = setTimeout(() => { el.style.opacity = 0; }, ms); }
 
 // Sound: all synthesized, started by the first touch.
-let ac, water, drone, droneGain, streak = 0;
+let ac, water, waterGain, drone, droneGain, streak = 0;
 function audio() {
-  if (ac) return; ac = new (window.AudioContext || window.webkitAudioContext)();
+  if (ac) { if (ac.state === 'suspended' && !paused) ac.resume(); return; }
+  ac = new (window.AudioContext || window.webkitAudioContext)();
   const len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
   for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
   const n = ac.createBufferSource(); n.buffer = buf; n.loop = true;
   water = ac.createBiquadFilter(); water.type = 'bandpass'; water.frequency.value = 500; water.Q.value = 0.6;
-  const wg = ac.createGain(); wg.gain.value = 0.05; n.connect(water).connect(wg).connect(ac.destination); n.start();
+  waterGain = ac.createGain(); waterGain.gain.value = 0.05; n.connect(water).connect(waterGain).connect(ac.destination); n.start();
   drone = ac.createOscillator(); drone.type = 'sine'; drone.frequency.value = 55;
   droneGain = ac.createGain(); droneGain.gain.value = 0; drone.connect(droneGain).connect(ac.destination); drone.start();
 }
@@ -66,34 +181,47 @@ function tone(freq, dur, vol, type = 'sine') {
 const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
 
 function begin() {
-  audio(); if (ac.state === 'suspended') ac.resume();
-  s = create((Math.random() * 2 ** 31) | 0, stage); target = s.x; playing = true; acc = 0; streak = 0; sparks = []; card.style.opacity = 0;
-  pauseButton.style.display = 'grid';
+  audio();
+  s = create((Math.random() * 2 ** 31) | 0, endless ? 1 : stage, endless); target = s.x; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; nearFall = false; drag = null; startTap = null;
+  shown = ''; show('play'); hud();
+  say(endless ? 'Endless river' : `Night ${stage}`, 1600);
 }
+function bankRun() { bank += s.taken; store.set('lantern-bank', bank); }
 function finish() {
-  playing = false; ended = performance.now();
-  pauseButton.style.display = 'none'; drag = null;
-  const pct = Math.min(100, Math.round(s.y / GOAL * 100)), key = `lantern-best-${stage}`, best = Math.max(pct, store.get(key));
-  store.set(key, best);
-  const won = s.over === 'dawn';
-  $('title').textContent = won ? 'Dawn' : s.over === 'dark' ? 'Dark' : `Night ${stage}`;
-  $('line').textContent = won ? `You carried it through night ${stage} with ${s.taken} embers.` : s.over === 'dark' ? 'The flame went out.' : s.over === 'bank' ? 'You ran onto the bank.' : s.over === 'ice' ? 'You struck the ice.' : 'You struck a rock.';
-  $('sub').textContent = won ? `Night ${stage + 1}: ${ahead(stage + 1)}` : `${pct}% of the way to dawn. Best ${best}%.`;
-  $('go').textContent = won ? 'touch to go on' : 'touch to go again';
-  if (won) { stage++; store.set('lantern-night', stage); }
-  setTimeout(() => { card.style.opacity = 1; }, s.over === 'dawn' ? 2600 : 700);
+  playing = false; ended = performance.now(); drag = null; bankRun();
+  $('hud').style.display = $('big').style.display = pauseButton.style.display = 'none'; $('warn').classList.remove('on');
+  const won = s.over === 'dawn', why = s.over === 'dark' ? 'The flame went out.' : s.over === 'bank' ? 'You ran onto the bank.' : s.over === 'ice' ? 'You struck the ice.' : 'You struck a rock.';
+  const gained = `+${s.taken} embers. You have ${bank}.`;
+  if (endless) {
+    const pts = score(s), best = Math.max(pts, store.get('lantern-best-endless')); store.set('lantern-best-endless', best);
+    $('title').textContent = `${pts}`; $('line').textContent = `${why} Best ${best}.`; $('go').textContent = 'Play again';
+  } else {
+    const pct = Math.min(100, Math.floor(s.y / GOAL * 100)), key = `lantern-best-${stage}`, best = Math.max(pct, store.get(key)); store.set(key, best);
+    $('title').textContent = won ? 'Dawn' : s.over === 'dark' ? 'Dark' : `Night ${stage}`;
+    if (won && stage >= NIGHTS) { $('line').textContent = 'You carried the light through all twenty nights.'; $('go').textContent = `Play night ${stage} again`; }
+    else if (won) { $('line').textContent = `You carried it through night ${stage}. Night ${stage + 1}: ${ahead(stage + 1)}`; stage++; opened = Math.max(opened, stage); store.set('lantern-night', opened); $('go').textContent = `Play night ${stage}`; }
+    else { $('line').textContent = `${why} ${pct}% of the way to dawn. Best ${best}%.`; $('go').textContent = 'Play again'; }
+  }
+  $('sub').textContent = gained;
+  setTimeout(() => { if (!playing && screen === 'play') show('card'); }, won ? 2600 : 700);
+}
+function hud() {
+  const big = endless ? `${score(s)}` : `${Math.min(100, Math.floor(s.y / GOAL * 100))}%`, low = playing && !paused && s.light < 0.28, now = `${s.hearts}|${s.taken}|${big}|${low}`;
+  if (now === shown) return; shown = now; // touch the page only when a number changes
+  $('hearts').textContent = '♥'.repeat(Math.max(0, s.hearts)); $('count').textContent = s.taken; $('big').textContent = big;
+  $('warn').classList.toggle('on', low);
 }
 
 // Steering. A finger steers by how far it has moved since it touched down, never by where it is,
 // so a tap anywhere does nothing and the thumb can rest wherever is comfortable. A mouse steers by position.
 const pauseButton = $('pause');
 let drag = null, startTap = null;
-function aim(x) { const c = centre(s, s.y), h = half(s.y) + 0.02; target = Math.max(c - h, Math.min(c + h, x)); }
+function aim(x) { const c = centre(s, s.y), h = half(s, s.y) + 0.02; target = Math.max(c - h, Math.min(c + h, x)); }
 function anchor(e) { drag = { id: e.pointerId, x0: e.clientX, x: e.clientX, boat0: s.x }; }
 canvas.addEventListener('pointerdown', e => {
+  // The tap that ends a pause does not steer until that finger has moved a clear distance.
   if (paused) { resume(); startTap = { id: e.pointerId, x: e.clientX, y: e.clientY }; anchor(e); return; }
-  // The tap that starts a run does not steer until that finger or mouse has moved a clear distance.
-  if (!playing) { if (performance.now() - ended > 900) { begin(); startTap = { id: e.pointerId, x: e.clientX, y: e.clientY }; anchor(e); } return; }
+  if (!playing) return;
   startTap = null;
   if (e.pointerType === 'mouse') aim((e.clientX * dpr - left) / unit); else anchor(e);
 });
@@ -109,15 +237,27 @@ for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type,
 // iOS Safari may refuse to start audio on touch-down; try again when the finger lifts.
 for (const type of ['pointerup', 'touchend', 'click']) addEventListener(type, () => { if (ac && ac.state === 'suspended' && !paused) ac.resume(); });
 
+// Buttons.
+$('play').addEventListener('click', () => { endless = false; begin(); });
+$('endless').addEventListener('click', () => { endless = true; begin(); });
+$('less').addEventListener('click', () => { stage = Math.max(1, stage - 1); menu(); });
+$('more').addEventListener('click', () => { stage = Math.min(opened, stage + 1); menu(); });
+$('toShop').addEventListener('click', () => show('shop'));
+$('toCredits').addEventListener('click', () => show('credits'));
+for (const b of document.querySelectorAll('.back')) b.addEventListener('click', () => show('menu'));
+$('go').addEventListener('click', () => { if (paused) resume(); else if (performance.now() - ended > 600) begin(); });
+// Leaving a paused run for the menu ends it and keeps its embers.
+$('toMenu').addEventListener('click', () => { if (paused) { paused = false; playing = false; bankRun(); if (ac) ac.resume(); } show('menu'); });
+
 // Pause: the button, P or Escape, and whenever the page loses the screen (a phone call, another app).
 function pause() {
   if (!playing || paused) return; paused = true; drag = null; keys.clear();
-  $('title').textContent = 'Paused'; $('line').textContent = `Night ${stage}, ${Math.round(s.y / GOAL * 100)}% of the way to dawn.`; $('sub').textContent = ''; $('go').textContent = 'touch to go on';
-  card.style.opacity = 1; pauseButton.style.display = 'none'; if (ac) ac.suspend();
+  $('title').textContent = 'Paused'; $('line').textContent = endless ? `Score ${score(s)}.` : `Night ${stage}, ${Math.floor(s.y / GOAL * 100)}% of the way to dawn.`; $('sub').textContent = 'Touch the river to go on.'; $('go').textContent = 'Go on';
+  show('card'); if (ac) ac.suspend();
 }
 function resume() {
   if (!paused) return; paused = false; acc = 0; last = performance.now(); target = s.x;
-  card.style.opacity = 0; pauseButton.style.display = 'grid'; if (ac) ac.resume();
+  show('play'); if (ac) ac.resume();
 }
 pauseButton.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pause(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
@@ -125,8 +265,8 @@ addEventListener('blur', pause); addEventListener('pagehide', pause);
 const keys = new Set();
 addEventListener('keydown', e => {
   if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') { paused ? resume() : pause(); return; }
-  if (paused) { if (e.key === ' ' || e.key === 'Enter') resume(); return; }
-  keys.add(e.key); if (!playing && (e.key === ' ' || e.key === 'Enter') && performance.now() - ended > 900) begin();
+  if (paused) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); resume(); } return; }
+  keys.add(e.key);
 });
 addEventListener('keyup', e => keys.delete(e.key));
 
@@ -143,31 +283,54 @@ function tick() {
       tone(240, 0.35, 0.25, 'square'); tone(1760, 0.25, 0.06); shake = 0.6; target = s.x; if (drag) { drag.x0 = drag.x; drag.boat0 = s.x; }
       for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.9, vy: (Math.random() - 0.3) * 0.9, life: 0.7, blue: true });
     }
+    if (e === 'heart') { tone(523.25, 0.4, 0.1, 'triangle'); setTimeout(() => tone(783.99, 0.6, 0.1, 'triangle'), 120); glow = 1; say('A heart: one more life', 1500); }
+    if (e === 'hurt') {
+      // A heart took the blow. Steering restarts from where the boat now is.
+      tone(180, 0.4, 0.3, 'square'); shake = 0.8; target = s.x; if (drag) { drag.x0 = drag.x; drag.boat0 = s.x; }
+      for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.9, vy: (Math.random() - 0.3) * 0.9, life: 0.7, red: true });
+      say('You lost a heart', 1500);
+    }
     if (e === 'hit') { tone(70, 0.5, 0.35, 'sawtooth'); shake = 1; }
     if (e === 'out') tone(110, 1.2, 0.2);
     if (e === 'dawn') [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 1.6, 0.1, 'triangle'), i * 180));
   }
+  // Things worth saying aloud: the waterfall coming up, and each step harder on the endless river.
+  const soon = fall(s, s.y + 1.3) > 0 || fall(s, s.y + 0.6) > 0;
+  if (soon && !nearFall) { say('Waterfall!', 1800); tone(196, 0.9, 0.12, 'sawtooth'); }
+  nearFall = soon;
+  if (level(s) !== lastLevel) { lastLevel = level(s); if (endless) { say('The river runs harder', 1800); tone(330, 0.3, 0.1, 'triangle'); setTimeout(() => tone(440, 0.5, 0.1, 'triangle'), 140); } }
+  hud();
   if (s.over) finish();
 }
 
 function draw(now) {
-  const dawn = Math.max(0, (s.y / GOAL - 0.86) / 0.14), day = s.over === 'dawn' ? Math.min(1, (now - ended) / 2500) : 0;
+  const dawn = s.endless ? 0 : Math.max(0, (s.y / GOAL - 0.86) / 0.14), day = s.over === 'dawn' ? Math.min(1, (now - ended) / 2500) : 0;
   const ox = shake * (Math.random() - 0.5) * 14 * dpr, oy = shake * (Math.random() - 0.5) * 14 * dpr;
   g.setTransform(1, 0, 0, 1, ox, oy);
+  const wet = skin('water'), fire = skin('flame')[2];
   g.fillStyle = '#1a2a20'; g.fillRect(-20, -20, W + 40, H + 40); // banks
   // water
   g.beginPath();
   const top = s.y + 0.74 * H / unit + 0.1, bot = s.y - 0.3 * H / unit - 0.1;
-  for (let y = bot; y <= top; y += 0.05) g.lineTo(sx(centre(s, y) - half(y)), sy(y));
-  for (let y = top; y >= bot; y -= 0.05) g.lineTo(sx(centre(s, y) + half(y)), sy(y));
-  g.closePath(); g.fillStyle = '#14304a'; g.fill();
+  for (let y = bot; y <= top; y += 0.05) g.lineTo(sx(centre(s, y) - half(s, y)), sy(y));
+  for (let y = top; y >= bot; y -= 0.05) g.lineTo(sx(centre(s, y) + half(s, y)), sy(y));
+  g.closePath(); g.fillStyle = wet[2]; g.fill();
   g.strokeStyle = '#6f9a7c'; g.lineWidth = 4 * dpr; g.stroke(); // reeds at the water's edge
   // current streaks
-  g.strokeStyle = '#3d6f95'; g.lineWidth = 1.5 * dpr; g.globalAlpha = 0.5;
+  g.strokeStyle = wet[3]; g.lineWidth = 1.5 * dpr; g.globalAlpha = 0.5;
   for (let i = Math.floor(bot * 3); i < top * 3; i++) {
-    const y = i / 3, k = (Math.sin(i * 12.9898) * 43758.5453) % 1, c = centre(s, y), h = half(y);
+    const y = i / 3, k = (Math.sin(i * 12.9898) * 43758.5453) % 1, c = centre(s, y), h = half(s, y);
     const x = c + (Math.abs(k) * 2 - 1) * (h - 0.03);
     g.beginPath(); g.moveTo(sx(x), sy(y)); g.lineTo(sx(x + (centre(s, y + 0.14) - c)), sy(y + 0.14)); g.stroke();
+  }
+  // the waterfall: bands of white water across the river, sliding with the current
+  g.strokeStyle = '#eaf6ff'; g.lineWidth = 3 * dpr;
+  for (let i = Math.floor(bot * 14); i < top * 14; i++) {
+    const y = i / 14 - (now / 260 % 1) / 14, f = fall(s, y); if (f <= 0) continue;
+    const c = centre(s, y), h = half(s, y) - 0.01;
+    g.globalAlpha = 0.15 + 0.5 * f; g.beginPath(); g.moveTo(sx(c - h), sy(y));
+    for (let j = 1; j <= 8; j++) g.lineTo(sx(c - h + 2 * h * j / 8), sy(y + 0.012 * Math.sin(j * 2.1 + i)));
+    g.stroke();
   }
   g.globalAlpha = 1;
   // rocks
@@ -179,7 +342,7 @@ function draw(now) {
   // boat
   const bx = sx(s.x), by = sy(s.y), lean = Math.max(-0.5, Math.min(0.5, (target - s.x) * 4));
   g.save(); g.translate(bx, by); g.rotate(lean * 0.5);
-  g.fillStyle = '#6b4a2f'; g.beginPath(); g.moveTo(0, -0.05 * unit); g.quadraticCurveTo(0.028 * unit, -0.005 * unit, 0.016 * unit, 0.035 * unit); g.lineTo(-0.016 * unit, 0.035 * unit); g.quadraticCurveTo(-0.028 * unit, -0.005 * unit, 0, -0.05 * unit); g.fill();
+  g.fillStyle = skin('boat')[2]; g.beginPath(); g.moveTo(0, -0.05 * unit); g.quadraticCurveTo(0.028 * unit, -0.005 * unit, 0.016 * unit, 0.035 * unit); g.lineTo(-0.016 * unit, 0.035 * unit); g.quadraticCurveTo(-0.028 * unit, -0.005 * unit, 0, -0.05 * unit); g.fill();
   g.restore();
   // darkness with a hole of light
   const flick = 1 + Math.sin(now / 90) * 0.015 + Math.sin(now / 37) * 0.01, r = (reach(s.light) + glow * 0.09) * unit * flick;
@@ -190,17 +353,19 @@ function draw(now) {
   // warm wash inside the light
   g.globalCompositeOperation = 'lighter';
   const w = g.createRadialGradient(bx, by, 0, bx, by, r * 0.8);
-  w.addColorStop(0, `rgba(255,170,80,${0.22 + glow * 0.2})`); w.addColorStop(1, 'rgba(255,140,60,0)');
+  w.addColorStop(0, `rgba(${fire},${0.22 + glow * 0.2})`); w.addColorStop(1, `rgba(${fire},0)`);
   g.fillStyle = w; g.fillRect(bx - r, by - r, r * 2, r * 2);
   // embers show through the dark: you can see where light is before you can see what guards it
   for (const e of s.embers) if (!e.got) {
     const ex = sx(e.x), ey = sy(e.y) + Math.sin(now / 300 + e.y * 9) * 2 * dpr, er = 0.05 * unit;
     const eg = g.createRadialGradient(ex, ey, 0, ex, ey, er);
-    if (e.blue) { eg.addColorStop(0, 'rgba(210,240,255,.95)'); eg.addColorStop(0.3, 'rgba(90,170,255,.6)'); eg.addColorStop(1, 'rgba(60,120,255,0)'); }
+    if (e.kind === 'heart') { eg.addColorStop(0, 'rgba(255,225,225,.95)'); eg.addColorStop(0.3, 'rgba(255,60,80,.7)'); eg.addColorStop(1, 'rgba(255,30,60,0)'); }
+    else if (e.kind === 'shield') { eg.addColorStop(0, 'rgba(210,240,255,.95)'); eg.addColorStop(0.3, 'rgba(90,170,255,.6)'); eg.addColorStop(1, 'rgba(60,120,255,0)'); }
     else { eg.addColorStop(0, 'rgba(255,214,140,.95)'); eg.addColorStop(0.25, 'rgba(255,150,60,.55)'); eg.addColorStop(1, 'rgba(255,120,40,0)'); }
     g.fillStyle = eg; g.fillRect(ex - er, ey - er, er * 2, er * 2);
+    if (e.kind === 'heart') { g.fillStyle = '#ff4d5e'; g.font = `${0.05 * unit}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('♥', ex, ey); }
   }
-  for (const p of sparks) { g.fillStyle = p.blue ? `rgba(150,210,255,${p.life})` : `rgba(255,200,120,${p.life})`; g.fillRect(sx(p.x), sy(p.y), 3 * dpr, 3 * dpr); }
+  for (const p of sparks) { g.fillStyle = p.blue ? `rgba(150,210,255,${p.life})` : p.red ? `rgba(255,80,90,${p.life})` : `rgba(255,200,120,${p.life})`; g.fillRect(sx(p.x), sy(p.y), 3 * dpr, 3 * dpr); }
   // the shield: a blue ring while it is held, blinking just after it breaks
   if (s.shield || (s.safe > 0 && Math.floor(now / 90) % 2)) {
     g.strokeStyle = `rgba(120,190,255,${s.shield ? 0.8 : 0.5})`; g.lineWidth = 2.5 * dpr;
@@ -208,7 +373,7 @@ function draw(now) {
   }
   // the flame itself
   const fg = g.createRadialGradient(bx, by, 0, bx, by, 0.03 * unit);
-  fg.addColorStop(0, '#fff6dc'); fg.addColorStop(0.4, 'rgba(255,190,90,.9)'); fg.addColorStop(1, 'rgba(255,150,60,0)');
+  fg.addColorStop(0, '#fff6dc'); fg.addColorStop(0.4, `rgba(${fire},.9)`); fg.addColorStop(1, `rgba(${fire},0)`);
   g.fillStyle = fg; g.fillRect(bx - 0.03 * unit, by - 0.03 * unit, 0.06 * unit, 0.06 * unit);
   g.globalCompositeOperation = 'source-over';
   // dawn
@@ -217,8 +382,8 @@ function draw(now) {
     d.addColorStop(0, `rgba(255,196,140,${Math.min(0.85, dawn * 0.45 + day * 0.6)})`); d.addColorStop(1, `rgba(120,150,190,${Math.min(0.5, dawn * 0.15 + day * 0.4)})`);
     g.fillStyle = d; g.fillRect(-20, -20, W + 40, H + 40);
   }
-  // progress: a thin line at the top edge, no numbers
-  g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * Math.min(1, s.y / GOAL), 3 * dpr);
+  // progress: a thin line at the top edge on a story night
+  if (!s.endless) { g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * Math.min(1, s.y / GOAL), 3 * dpr); }
 }
 
 function frame(now) {
@@ -226,9 +391,10 @@ function frame(now) {
   if (playing && !paused) { acc += dt; while (acc >= DT && playing) { tick(); acc -= DT; } }
   shake = Math.max(0, shake - dt * 3); glow = Math.max(0, glow - dt * 2);
   for (const p of sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; } sparks = sparks.filter(p => p.life > 0);
-  if (ac) { water.frequency.value = 400 + 500 * (s.y / GOAL); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0; }
+  if (ac) { water.frequency.value = 400 + 500 * Math.min(1.4, s.y / GOAL); waterGain.gain.value = 0.05 + (playing ? 0.14 * Math.max(fall(s, s.y), fall(s, s.y + 0.8)) : 0); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0; }
   draw(now); requestAnimationFrame(frame);
 }
+show('menu');
 requestAnimationFrame(frame);
 </script>
 </body>
