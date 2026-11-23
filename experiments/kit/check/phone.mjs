@@ -35,7 +35,7 @@ const { webkit, chromium, devices } = require('playwright');
 const PHONES = { webkit: [webkit, devices['iPhone 13']], chromium: [chromium, devices['Pixel 7']] };
 
 const sleep = ms => new Promise(done => setTimeout(done, ms));
-async function until(page, fn, what, ms = 8000) { try { await page.waitForFunction(fn, null, { timeout: ms }); } catch { throw new Error(`timed out waiting for: ${what}`); } }
+async function until(page, fn, what, ms = 8000, arg = null) { try { await page.waitForFunction(fn, arg, { timeout: ms }); } catch { throw new Error(`timed out waiting for: ${what}`); } }
 // A finger on the canvas, as the pointer events the games listen for.
 const finger = (page, sel, steps) => page.evaluate(([sel, steps]) => {
   const el = document.querySelector(sel);
@@ -308,6 +308,18 @@ const GAMES = {
     // The leaderboard on this phone (note #96): a name, and an endless run that beats the best goes to the top. Nothing of it is sent.
     await sleep(400); await page.evaluate(() => localStorage.removeItem('hf-lab-recording-off')); await page.reload(); // recording back on, so the check below can see what is sent
     const sentBefore = labSent(page).length;
+    // The shared board (workers/lab-ai) is played by a stand-in here. mode: ok answers, 401 and html are bad answers, hang never answers.
+    const posts = [], kept = new Map([['zed', { n: 'Zed', s: 99999 }]]); let mode = 'ok';
+    const listed = () => [...kept.values()].sort((x, y) => y.s - x.s);
+    await page.route('**/lab-api/board/lantern', async route => {
+      const r = route.request();
+      if (mode === 'hang') return;
+      if (mode === '401') return route.fulfill({ status: 401, contentType: 'application/json', body: '{"rows":[{"n":"Bad","s":5}]}' });
+      if (mode === 'html') return route.fulfill({ status: 200, contentType: 'text/html', body: '<html>not found</html>' });
+      if (r.method() !== 'POST') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ rows: listed() }) });
+      const b = r.postDataJSON(); posts.push(b); if (b.remove) kept.delete(b.id); else kept.set(b.id, { n: b.n, s: Math.max(b.s, kept.get(b.id)?.s ?? 0) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ place: b.remove ? 0 : listed().indexOf(kept.get(b.id)) + 1, rows: listed() }) });
+    });
     await page.click('#toBoard'); assert.equal(await page.isVisible('#name'), true); assert.match(await page.textContent('#rows'), /^1No name55/);
     await page.fill('#name', ' Rio <b>river</b>'); assert.equal((await saved())['lantern-name'], 'Rio <b>river</b', 'the name is trimmed and kept to 16 characters');
     await page.keyboard.press('p'); assert.equal((await state()).screen, 'board', 'typing P in the name does not pause or play');
@@ -320,7 +332,28 @@ const GAMES = {
     assert.equal(await page.locator('#rows li.me .n').textContent(), 'Rio <b>river</b', 'the name is shown as text'); assert.equal(await page.locator('#rows b').count(), 0, 'no markup from the name');
     await sleep(300); const sent = labSent(page).slice(sentBefore); assert.ok(sent.some(r => r.kind === 'run' && r.data.summary?.score >= 900), 'the endless run was recorded');
     assert.ok(!JSON.stringify(sent).includes('Rio'), 'the name is not sent to the lab');
-    await sleep(400); await page.reload(); st = await state(); assert.equal(st.name, 'Rio <b>river</b'); assert.equal(st.board.length, 2, 'the board is kept');
+    // The shared board. That run sent nothing: sharing is off until the player taps Share. Every bad answer leaves the phone's own board.
+    assert.equal(posts.length, 0, 'no score is sent before the player shares'); await page.click('#board .back');
+    const openBoard = async () => { const n = (await state()).asked; await page.click('#toBoard'); await until(page, n => window.lanternState().asked > n, 'the shared board answered or was given up', 9000, n); };
+    page.context().boardBad = true; // the bad answers below are meant, so their network errors are not page errors
+    for (const m of ['401', 'html', 'hang']) {
+      mode = m; await openBoard(); st = await state(); assert.equal(st.shared, -1, `${m}: no shared rows`); assert.equal(await page.isVisible('#tabs'), false, `${m}: no tabs`); assert.equal(await page.isVisible('#share'), false, `${m}: no share button`);
+      assert.match(await page.textContent('#rows'), /Rio/, `${m}: the phone's board shows`); assert.match(await page.textContent('#boardHint'), /stay on this phone/); await page.click('#board .back');
+    }
+    mode = 'ok'; await openBoard(); assert.equal(await page.isVisible('#tabs'), true, 'tabs when the shared board answers'); assert.match(await page.textContent('#rows'), /Rio/, 'the phone tab is first');
+    await page.click('#tabAll'); assert.match(await page.textContent('#rows'), /Zed99999/); assert.doesNotMatch(await page.textContent('#rows'), /Rio/); assert.match(await page.textContent('#shareNote'), /Share sends your name and your best score/);
+    await page.click('#share'); await until(page, () => document.querySelector('#rows li.me'), 'the shared row');
+    assert.equal(posts.length, 1); assert.deepEqual(Object.keys(posts[0]).sort(), ['id', 'n', 's'], 'only the id, the name and the score are sent'); assert.equal(posts[0].n, 'Rio <b>river</b'); assert.ok(posts[0].s >= 900); assert.match(posts[0].id, /^[A-Za-z0-9-]{20,64}$/);
+    assert.match(await page.textContent('#rows li.me'), /^2Rio/); assert.equal(await page.locator('#rows b').count(), 0, 'no markup from a shared name'); assert.equal((await saved())['lantern-share'], '1'); assert.equal(await page.textContent('#share'), 'Stop sharing');
+    await page.click('#boardPlay'); await page.evaluate(() => { const s = window.lanternSim(); s.extra = 40; s.light = 0.0001; s.warm = 0; });
+    await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'second endless run ends'); await page.click('#toMenu');
+    for (let i = 0; i < 40 && posts.length < 2; i++) await sleep(50);
+    assert.equal(posts.length, 2, 'a run is sent while sharing'); assert.equal(posts[1].id, posts[0].id); assert.ok(posts[1].s < 900);
+    await openBoard(); await page.click('#tabAll'); await page.click('#share'); for (let i = 0; i < 40 && posts.length < 3; i++) await sleep(50);
+    assert.deepEqual(posts[2], { id: posts[0].id, remove: true }, 'stop sharing takes the row away'); assert.equal((await saved())['lantern-share'], ''); assert.equal((await saved())['lantern-board-id'], '');
+    await until(page, () => !/Rio/.test(document.querySelector('#rows').textContent), 'the row is gone'); assert.ok(!JSON.stringify(labSent(page)).includes(posts[0].id), 'the board id is not sent to the lab');
+    await page.unroute('**/lab-api/board/lantern');
+    await sleep(400); await page.reload(); st = await state(); assert.equal(st.name, 'Rio <b>river</b'); assert.equal(st.board.length, 3, 'the board is kept');
     await page.evaluate(() => localStorage.setItem('hf-lab-recording-off', '1')); await page.reload(); // recording off again, as the steps below expect
     // A look on the whole screen (note #73): tapping an owned boat wears it and hides every button; a tap brings the shop back.
     await page.click('#toShop'); await page.click('[data-item="red"]'); st = await state();
@@ -533,7 +566,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     });
     page.on('pageerror', e => errors.push(String(e))); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     page.on('requestfailed', r => errors.push(`request failed: ${r.url()}`)); page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
-    try { await run(page); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
+    try { await run(page); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
     catch (e) { failed++; console.log(`FAIL ${game} on ${phone}: ${e.message}`); if (errors.length) console.log('     ' + errors.join('\n     ')); }
     await context.close();
   }

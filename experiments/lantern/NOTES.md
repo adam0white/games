@@ -403,4 +403,36 @@ Checks: `node experiments/kit/check/phone.mjs` on WebKit iPhone 13 and Chromium 
 Not checked: the victory sounds and the name keyboard on a real phone.
 
 ### Left as a proposal (2026-11-23, note #96)
-- **A shared leaderboard with accounts or sign-up** (notes #76 and #96). It needs a server, storage of names and scores from many players, and some way to stop fake scores. All of that waits on an owner decision ("no new server infrastructure without an owner decision"; accounts are not authorized). The local board's format (`{ n, s, d }`) could be sent as is if a shared board is approved.
+- **A shared leaderboard with accounts or sign-up** (notes #76 and #96). It needs a server, storage of names and scores from many players, and some way to stop fake scores. All of that waits on an owner decision ("no new server infrastructure without an owner decision"; accounts are not authorized). The local board's format (`{ n, s, d }`) could be sent as is if a shared board is approved. A build without accounts is described in the next section.
+
+## 2026-11-23: a leaderboard shared between players (notes #76 and #96), built, waiting on the owner
+
+The owner was asked on 2026-11-23 whether Lantern gets a leaderboard shared between players. This entry is the build that is
+ready for a yes. **Until the owner says yes, the endpoint is not deployed**, and the game behaves as before: the page asks
+`/lab-api/board/lantern`, gets no good answer, and shows only the phone's own board.
+
+What it is: no account, no password, no Google sign-in. A name and a best score, under a random id made on the phone.
+
+| Part | What it does |
+|---|---|
+| Server | `workers/lab-ai/src/board.mjs`: `GET` and `POST /lab-api/board/lantern`, one SQLite Durable Object. Its README lists what is stored, the guards and what was checked. |
+| Leaderboard screen | When the shared board answers, two tabs appear, "This phone" and "All players", and a "Share my best run" button with the line "Share sends your name and your best score to this game's server. Nothing else is sent." |
+| Sharing | Off for everyone until that button is tapped, so a name typed before today is never sent on its own. While on, each endless run is sent and the server keeps the best. "Stop sharing" deletes the row. "Erase everything" (tester tools) deletes it too. |
+| Failure | Any bad answer (no server, an error status, an answer that is not JSON, no answer in 4 seconds) hides the tabs and the button. |
+
+New save keys: `lantern-share` (`'1'` while sharing, else empty) and `lantern-board-id` (the random id, empty when not sharing).
+Neither is in the lab recording.
+
+Decisions:
+- **On the existing `games-lab-ai` Worker, not the notes Worker.** The notes Worker's database holds private tester notes and every route there needs a token; a public route beside them is a risk for no gain. `games-lab-ai` is already public, has no secrets, and already has the rate limiter and a Durable Object.
+- **Opt-in, per phone.** The screen said "Your name and scores stay on this phone" when names were typed, so nothing is sent without a tap on a button that says what is sent.
+- **The server's name rule is stricter than the phone's** (letters, digits, space, `_ . -`). A name with other characters shows without them on the shared tab.
+
+Checked: the Worker's unit tests; the Worker under `wrangler dev --local`; the phone check on WebKit and Chromium with a stand-in
+server (nothing sent before Share; 401, HTML and a hung request each leave the phone's board; sharing sends only id, name and
+score; a later run is sent; Stop sharing sends the removal and clears both keys; the id is not in the lab recording). Two faults
+were put in to see the check fail: a failed request treated as an empty shared board, and the sharing switch ignored when sending.
+
+Not checked: the deployed endpoint, a real phone, two real players.
+
+Open for the owner: whether to deploy at all; rude names (no word filter); false scores (the page reports its own score).

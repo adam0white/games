@@ -44,6 +44,48 @@ Workers AI changelog of 2026-05-08 says the `-fast` variants stay active, and th
 deprecation list does not name it. If it goes away, change `MODEL`; the code reads both the
 `choices[0].message.content` and `response` answer shapes.
 
+## The shared leaderboard (2026-11-23, built, **not deployed**)
+
+A second endpoint, `/lab-api/board/<game>`, for a leaderboard shared between players. Only `lantern`
+is on the allow-list. The code is in `src/board.mjs`; the tests are `test/board.test.mjs`.
+Deploying it is an owner decision that had not been given when this was written (the repository's
+`AGENTS.md` says no new server infrastructure without one), so `wrangler.jsonc` on main describes
+a Worker that is one deploy ahead of production until then.
+
+- `GET /lab-api/board/lantern` answers `{ rows: [{ n, s }] }`: the 20 best, best first.
+- `POST /lab-api/board/lantern` with `{ id, n, s }` keeps that player's best score and newest name
+  and answers `{ place, rows }`. With `{ id, remove: true }` it deletes the player's row.
+
+What is stored, per player: a random id made on the player's phone (never sent back to anyone), the
+name the player typed, the best score and the time of that score. Nothing else: no account, no
+password, no email, no address. One SQLite-backed Durable Object per game (`Board`, binding `BOARD`,
+named by the game) holds the rows. The 500 best rows are kept and the rest are deleted.
+
+Guards:
+
+- Names are cut down on the server to letters, digits, space and `_ . -`, at most 16 characters.
+  **There is no word filter**, so a rude name made of ordinary letters would show to other players.
+  That is an open item for the owner.
+- Scores are whole numbers from 1 to 1,000,000. They are reported by the page, so a player who
+  edits the page can post a false score up to that cap. There is no check that a run was played.
+- A post must carry the site's `Origin` (or localhost). A read from another site is refused.
+- Posts are limited per address with the `PER_IP` limiter (6 per 60 s, keyed apart from the persona
+  endpoint). The address is the limiter's key only and is not stored. A limiter error refuses.
+- At most 2000 new players a UTC day are added; known players can still post. Over it: 503.
+- Reads are answered from the Cache API for 20 seconds; a post clears that entry at the location
+  that handled it, so another location can show a list up to 20 seconds old.
+- Cost: no model call. A post is one Durable Object request with a few SQLite rows written.
+
+The game sends nothing until the player taps "Share my best run" on its leaderboard screen, which
+says what is sent. "Stop sharing" deletes the row. If the endpoint does not answer well within 4
+seconds, the game shows only the phone's own board.
+
+Checked on 2026-11-23: the unit tests (storage on real SQLite through `node:sqlite`), and a run under
+`wrangler dev --local` (with `--compatibility-date 2026-10-26`, because the local runtime was older
+than the date in the config): post, read, a lower score keeping the best, rename, remove, a post
+without `Origin` refused, and the seventh post in a minute refused with 429. Not checked: the
+deployed Worker, the migration `v2` on Cloudflare, and the cache across locations.
+
 ## Spend guards
 
 - Origin check: only `https://play.adamwhite.work`, `http://localhost[:port]` and `http://127.0.0.1[:port]`.
