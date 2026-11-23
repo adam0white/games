@@ -15,6 +15,7 @@
       noKey: 'Bu sayfa özel bir bağlantıyla açılır. Sana gönderilen bağlantıyı kullan.',
       badKey: 'Bağlantı geçerli değil. Yeni bir bağlantı iste.', limit: 'Bugünlük not sınırına ulaşıldı. Yarın tekrar dene.',
       noMic: 'Mikrofon açılamadı. Tarayıcıya mikrofon izni ver ya da yazarak gönder.', original: 'İngilizce aslı', heard: 'Anladığımız',
+      question: 'Sana bir sorumuz var', open: 'Oyunu aç ▶', answer: 'Yazarak ya da sesle cevapla', answering: 'Cevaplanan soru', answered: 'Cevaplandı ✓', to: 'Soruya cevap',
     },
     en: {
       title: 'Game notes', lead: 'Type or say whatever comes to mind. Replies show up here.',
@@ -26,6 +27,7 @@
       noKey: 'This page opens with a private link. Use the link that was sent to you.',
       badKey: 'This link is not valid. Ask for a new one.', limit: 'Daily note limit reached. Try again tomorrow.',
       noMic: 'Could not open the microphone. Allow microphone access, or type instead.', original: 'Original', heard: 'What we heard',
+      question: 'A question for you', open: 'Open the game ▶', answer: 'Answer by typing or voice', answering: 'Answering', answered: 'Answered ✓', to: 'Answer to',
     },
   };
   const $ = id => document.getElementById(id);
@@ -48,6 +50,9 @@
   const drafts = new Map();
   // Notes still being transcribed; each poll asks for them again until they settle.
   const waiting = new Set();
+  const known = new Map();
+  let replyTo = null;
+  const excerpt = text => (text.length > 70 ? `${text.slice(0, 68)}…` : text);
 
   function applyLanguage() {
     t = STRINGS[lang] || STRINGS.tr;
@@ -90,9 +95,60 @@
         label.textContent = `🎤 ${t.voice}${message.body ? ` · ${t.heard}:` : ''}`;
         node.append(label);
       }
+      const asked = message.reply_to ? known.get(message.reply_to) : null;
+      if (asked) {
+        const label = document.createElement('small');
+        label.className = 'quote';
+        label.textContent = `↩ ${t.to}: ${excerpt(asked.body)}`;
+        node.append(label);
+      }
       node.append(message.body || (failed ? (message.kind === 'voice' ? t.failedVoice : t.failedText) : t.working));
     } else {
+      if (message.ask) {
+        node.classList.add('ask');
+        const label = document.createElement('small');
+        label.textContent = `❓ ${t.question}`;
+        node.append(label);
+      }
       node.append(message.body);
+      if (message.image) {
+        const image = document.createElement('img');
+        image.alt = '';
+        node.append(image);
+        fetch(`/notes/api/image?id=${message.id}`, { cache: 'no-store', headers: { Authorization: `Bearer ${key}` } })
+          .then(response => (response.ok ? response.blob() : null))
+          .then(blob => { if (blob) image.src = URL.createObjectURL(blob); else image.remove(); }).catch(() => image.remove());
+      }
+      if (message.link && /^\/proto\/[a-z0-9-]+\//.test(message.link)) {
+        const link = document.createElement('a');
+        link.className = 'open';
+        link.href = message.link;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = t.open;
+        node.append(link);
+      }
+      if (message.ask && message.answered) {
+        const done = document.createElement('small');
+        done.textContent = t.answered;
+        node.append(done);
+      } else if (message.ask && !message.closed) {
+        const row = document.createElement('div');
+        row.className = 'choices';
+        for (const choice of message.choices || []) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = choice;
+          button.addEventListener('click', () => queue({ text: choice, replyTo: message.id, game: message.game || '' }));
+          row.append(button);
+        }
+        const other = document.createElement('button');
+        other.type = 'button';
+        other.textContent = t.answer;
+        other.addEventListener('click', () => answer(message.id));
+        row.append(other);
+        node.append(row);
+      }
       if (message.original) {
         const details = document.createElement('details');
         const summary = document.createElement('summary');
@@ -107,10 +163,29 @@
     return node;
   }
 
+  function answer(id) {
+    replyTo = id && known.has(id) ? id : null;
+    const asked = replyTo ? known.get(replyTo) : null;
+    $('answering').hidden = !asked;
+    if (!asked) return;
+    $('answering-text').textContent = `↩ ${t.answering}: ${excerpt(asked.body)}`;
+    if (asked.game && [...$('game').options].some(option => option.value === asked.game)) $('game').value = asked.game;
+    $('text').focus();
+  }
+
+  function markAnswered(id) {
+    const asked = known.get(id);
+    if (!asked || asked.answered) return;
+    asked.answered = true;
+    $('thread').querySelector(`[data-id="${id}"]`)?.replaceWith(bubble(asked));
+  }
+
   function show(messages) {
     const thread = $('thread');
     const nearEnd = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 80;
     for (const message of messages) {
+      known.set(message.id, message);
+      if (message.reply_to) markAnswered(message.reply_to);
       const old = thread.querySelector(`[data-id="${message.id}"]`);
       if (old) old.replaceWith(bubble(message)); else thread.append(bubble(message));
       lastId = Math.max(lastId, message.id);
@@ -179,9 +254,10 @@
         const query = new URLSearchParams({ client_id: id });
         if (draft.game) query.set('game', draft.game);
         if (build) query.set('build', build);
+        if (draft.replyTo) query.set('reply_to', draft.replyTo);
         data = await api(`notes?${query}`, { method: 'POST', headers: { 'Content-Type': draft.blob.type.split(';')[0] }, body: draft.blob });
       } else {
-        data = await api('notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: draft.text, game: draft.game, build, client_id: id }) });
+        data = await api('notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: draft.text, game: draft.game, build, client_id: id, reply_to: draft.replyTo || undefined }) });
       }
       drafts.delete(id);
       node.remove();
@@ -201,7 +277,8 @@
 
   function queue(draft) {
     const id = crypto.randomUUID();
-    drafts.set(id, { ...draft, game: $('game').value, node: pendingBubble(id, draft.text || `🎤 ${t.voice}`) });
+    if (draft.replyTo === undefined && replyTo) { draft.replyTo = replyTo; answer(null); }
+    drafts.set(id, { ...draft, game: draft.game ?? $('game').value, node: pendingBubble(id, draft.text || `🎤 ${t.voice}`) });
     deliver(id);
   }
 
@@ -251,6 +328,7 @@
     queue({ text });
   });
   $('mic').addEventListener('click', startRecording);
+  $('answering-clear').addEventListener('click', () => answer(null));
   $('stop').addEventListener('click', () => recorder?.stop());
   $('cancel').addEventListener('click', () => recorder?.cancel());
   if (!navigator.mediaDevices || typeof MediaRecorder === 'undefined') $('mic').hidden = true;
