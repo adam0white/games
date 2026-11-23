@@ -131,6 +131,24 @@ async function houseRules(page) {
   sent.length = 0;
 }
 
+// The shared first-time hint (kit/hint.js), forced on with ?hint=hand: a finger tapping shows after 3 s of idle play, above
+// the ability bar; a real tap on the island removes it and reaches the game.
+async function firstHint(page) {
+  const on = () => page.evaluate(() => !!document.querySelector('.kit-hint.on'));
+  await page.goto(`${base}/borrowed/?seed=${SEED}&hint=hand`); await until(page, () => window.borrowedState?.().screen === 'menu', 'menu');
+  await page.click('#play'); await sleep(1000);
+  assert.equal(await on(), false, 'hint: not before 3 s of idle play');
+  await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown after idle play', 8000);
+  assert.equal(await page.evaluate(() => document.querySelector('.kit-hint').dataset.kind), 'tap', 'hint: a tap');
+  const p = await page.evaluate(() => { const r = document.querySelector('.kit-hint .knob').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+  assert.ok(p.y < (await state(page)).buttons.who.y - 42 - 90, 'hint: the finger stays above the ability bar');
+  await tap(page, p);
+  assert.equal(await page.evaluate(() => document.querySelector('.kit-hint')), null, 'hint: a real tap removes it');
+  assert.ok((await state(page)).touched, 'hint: the tap reached the game');
+  await page.evaluate(() => { const el = document.querySelector('#pause'); el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 9, pointerType: 'touch', bubbles: true, cancelable: true })); el.click(); });
+  await page.click('#toMenu'); await until(page, () => window.borrowedState().screen === 'menu', 'back on the menu');
+}
+
 // Push, Leap and Rewind in the browser, with their effects drawn. The candle is topped up between them.
 async function abilityTour(page, phone) {
   const fill = () => page.evaluate(L => { window.borrowedSim().life = L; }, LIFE);
@@ -363,6 +381,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
   try {
     await run(page, phone);
+    await firstHint(page);
     assert.deepEqual(errors, [], 'page errors');
     console.log(`ok   borrowed on ${phone}`);
   } catch (e) {

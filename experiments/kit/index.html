@@ -165,6 +165,14 @@ async function hintChecks() {
   localStorage.removeItem(HK); const old = hint(el, { kind: 'drag', key: HK, when: () => true, delay: 0, played: true });
   const odd = hint(el, { kind: 'no such kind', key: HK, when: () => true, delay: 0 });
   await wait(100); check('hint: never shown to a returning player, or for a kind it does not know', () => !document.querySelector('.kit-hint') && !again.shown && !old.shown && !odd.shown);
+  // The kinds a tap, a hold and a path: each shows, its finger moves, nothing takes input, and done() puts it away.
+  for (const kind of ['tap', 'hold-and-move', 'path']) {
+    localStorage.removeItem(HK); const h = hint(el, { kind, key: HK, when: () => true, delay: 0 });
+    const on = await soon(() => h.shown), pose = () => document.querySelector('.kit-hint .hand').style.transform, p0 = pose();
+    const moved = await soon(() => pose() !== p0);
+    check(`hint: ${kind} shows, its finger moves and it never takes input`, () => on && moved && [...document.querySelectorAll('.kit-hint, .kit-hint *')].every(e => getComputedStyle(e).pointerEvents === 'none'));
+    h.done(); check(`hint: ${kind} put away by done()`, () => !document.querySelector('.kit-hint') && localStorage.getItem(HK) === '1');
+  }
   localStorage.removeItem(HK);
 }
 try { await hintChecks(); } catch (e) { check(`hint: checks ran to the end (${e.message})`, () => false); }

@@ -111,6 +111,18 @@ for (const t of ['pointerup', 'pointercancel']) sprint.addEventListener(t, () =>
 addEventListener('blur', () => { input.keys.clear(); input.sprint = false; input.move = false; input.stick = null; });
 $('play').addEventListener('click', connect);
 
+// A first-time player who does not touch for 3 s in play sees a see-through stick with a finger using it. The shared kit
+// serves it on this origin (/kit/hint.js, from the games-static site, not this Worker). Where it is not served (wrangler
+// dev, or before the site has it) the import fails and the page plays on without it. reach 38: the ring drawn above.
+import('/kit/hint.js')
+  .then(({ hint }) => hint(canvas, {
+    kind: 'stick',
+    key: 'crumbwar:hint',
+    reach: 38,
+    when: () => playing && $('card').hidden,
+  }))
+  .catch(() => {});
+
 function ant(x, y, heading, color, size, carry, alpha) {
   g.save(); g.translate(x, y); g.rotate(heading); g.globalAlpha = alpha; g.scale(size, size);
   g.strokeStyle = '#1b1410'; g.lineWidth = 1.6; g.beginPath();

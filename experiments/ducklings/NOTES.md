@@ -57,6 +57,8 @@ Endless pond opens after stage 3. Rows are generated ahead, each from its own se
 
 Teaching: stage 1 waits for the first touch with a ghost finger and "Hold here". In stages 1 and 2, a turn of more than 0.9 rad shows a dotted trail for 3.2 s with "They follow your path" (at most 3 times). Stopping bunches the line into a huddle (view only).
 
+First-time hint: the shared kit hint (`../kit/hint.js`, kind `hold-and-move`, key `ducklings:hint`, 130 px above the bottom) shows after 3 s of idle play to a player with no save. While it shows, the stage-1 ghost finger waits; the first touch ends it for good. `check.mjs` asserts that `?hint=hand` shows it after idle play and that a finger down removes it.
+
 `?level=N` opens on stage N. `?fast=K` runs K ticks per tick (checks only).
 
 Save: one key `ducklings-save`: `{ v, sound, opened, stars, best, endless, home, album, taught }`.
