@@ -127,6 +127,25 @@ async function noZoomed(page) {
   });
   assert.match(r.meta, /maximum-scale=1/); assert.deepEqual(r.loose, [], 'no visible element at touch-action auto'); assert.ok(r.cancelled, 'a double tap does not zoom');
 }
+// A game that follows the house layout: #play on the menu, #pause in play, a state hook with `screen`, and a save blob.
+async function started(page, slug, hook, toMenu) {
+  const wait = async (fn, what) => { try { await page.waitForFunction(fn, hook, { timeout: 8000 }); } catch { throw new Error(`timed out waiting for: ${what}`); } };
+  // A pause button may listen for the finger going down, so send that before the click.
+  const tap = sel => page.evaluate(sel => { const el = document.querySelector(sel); el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 9, pointerType: 'touch', bubbles: true, cancelable: true })); el.click(); }, sel);
+  await page.goto(`${base}/${slug}/?labRunSource=agent`); await page.evaluate(LAB_LOCAL); await page.reload();
+  await wait(hook => window[hook]?.().screen === 'menu', 'menu');
+  assert.equal(await page.evaluate(() => window.audioLog?.made ?? 0), 0, 'no audio before a touch');
+  await page.click('#play'); await wait(hook => window[hook]().screen !== 'menu', 'a run starts');
+  await tap('#pause'); await wait(hook => window[hook]().paused === true, 'pause');
+  await page.click(toMenu); await wait(hook => window[hook]().screen === 'menu', 'back on the menu');
+  // The record is compressed before it is sent, so wait for it; then confirm no second run follows.
+  for (let i = 0; i < 80 && !(labRuns(page, slug).length && labSent(page).some(r => r.game === slug && r.kind === 'events')); i++) await sleep(100);
+  await sleep(300);
+  const runs = labRuns(page, slug);
+  assert.equal(labSent(page).filter(r => r.game === slug && r.kind === 'events').length, 1, 'one events record for the dashboard');
+  assert.equal(runs.length, 1, 'one run sent'); assert.equal(runs[0].data.outcome, 'left'); assert.equal(runs[0].runSource, 'agent', 'labRunSource=agent marks the record');
+}
+
 const GAMES = {
   async kit(page) {
     await page.goto(`${base}/kit/`);
@@ -348,6 +367,12 @@ const GAMES = {
     assert.ok(runs.every(r => r.runSource === 'agent'), 'labRunSource=agent marks the records');
     assert.deepEqual(runs[2].data.events[0].data, { c: '#d6b21c', p: 'stripes' }, 'the skin choice');
   },
+  // The three games of 2026-11-23. Each has its own full check (experiments/<slug>/check.mjs); this is the shared part:
+  // the page loads through the kit with no error, a run starts from Play, pause holds it, and leaving for the menu
+  // sends one lab record marked as an agent run. Run a game's own check after changing that game.
+  grapevine: page => started(page, 'grapevine', 'grapevineState', '#toMenu'),
+  ducklings: page => started(page, 'ducklings', 'ducklingsState', '#pauseMenu'),
+  fixit: page => started(page, 'fixit', 'fixitState', '#quit'),
   // Lab pages (/lab/<name>/): an old save survives, a finger steers, pause stops time, one audio context after the first tap.
   'lab/ant-nemesis': page => antLab(page, 'ant-nemesis', '?ai=0', { nem: null, trophies: [{ name: 'Old Scar the Beetle' }], gens: 1 }, async () => {
     assert.match(await page.textContent('#trophies'), /Old Scar the Beetle/, 'old save: trophies');
