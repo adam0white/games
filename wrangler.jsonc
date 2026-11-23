@@ -55,6 +55,34 @@
     {
       "pattern": "smoke.adamwhite.work/*",
       "zone_name": "adamwhite.work"
+    },
+    {
+      "pattern": "hearsay.adamwhite.work/*",
+      "zone_name": "adamwhite.work"
+    },
+    {
+      "pattern": "goodhands.adamwhite.work/*",
+      "zone_name": "adamwhite.work"
+    },
+    {
+      "pattern": "valley.adamwhite.work/*",
+      "zone_name": "adamwhite.work"
+    },
+    {
+      "pattern": "commonstead.adamwhite.work/*",
+      "zone_name": "adamwhite.work"
+    },
+    {
+      "pattern": "child.adamwhite.work/*",
+      "zone_name": "adamwhite.work"
+    },
+    {
+      "pattern": "days.adamwhite.work/*",
+      "zone_name": "adamwhite.work"
+    },
+    {
+      "pattern": "island.adamwhite.work/*",
+      "zone_name": "adamwhite.work"
     }
   ],
   "assets": {
