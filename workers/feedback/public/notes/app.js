@@ -46,6 +46,8 @@
   const builds = new Map();
   if (params.get('game') && params.get('build')) builds.set(params.get('game'), params.get('build'));
   const drafts = new Map();
+  // Notes still being transcribed; each poll asks for them again until they settle.
+  const waiting = new Set();
 
   function applyLanguage() {
     t = STRINGS[lang] || STRINGS.tr;
@@ -112,6 +114,7 @@
       const old = thread.querySelector(`[data-id="${message.id}"]`);
       if (old) old.replaceWith(bubble(message)); else thread.append(bubble(message));
       lastId = Math.max(lastId, message.id);
+      if (message.status === 'pending') waiting.add(message.id); else waiting.delete(message.id);
     }
     const empty = thread.querySelector('.empty');
     if (thread.querySelector('.msg')) empty?.remove();
@@ -129,7 +132,7 @@
 
   async function refresh() {
     try {
-      const data = await api(`thread?after=${lastId}`);
+      const data = await api(`thread?after=${waiting.size ? Math.min(...waiting) - 1 : lastId}`);
       if (data.lang && data.lang !== lang && STRINGS[data.lang]) { lang = data.lang; store.set('notes.lang', lang); applyLanguage(); }
       $('composer').hidden = false;
       show(data.messages);

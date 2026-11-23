@@ -56,12 +56,12 @@ Each note carries the game the tester chose and a build id: the first ten hex di
 
 ## Operating it
 
-Nothing deploys this Worker automatically. It has no `package.json`, so it adds nothing to the workspace lockfile; use the repository's installed wrangler from this directory.
+Nothing deploys this Worker automatically. It has no `package.json`, so it adds nothing to the workspace lockfile; use the repository's installed wrangler (root `pnpm install`) from this directory.
 
 ```sh
 node --test test/                                         # API tests with in-memory D1, R2 and AI
-pnpm exec wrangler d1 migrations apply games-feedback --remote
-pnpm exec wrangler deploy
+../../node_modules/.bin/wrangler d1 migrations apply games-feedback --remote
+../../node_modules/.bin/wrangler deploy
 ```
 
 Adding a tester: generate a key (`openssl rand -base64 33 | tr '+/' '-_' | tr -d '='`), add `{ "id": "t2", "token": "<key>", "lang": "tr" }` to the `TESTERS` secret with `wrangler secret put TESTERS`, and send them `https://play.adamwhite.work/notes/#k=<key>`. Supported page languages are `tr` and `en`. Removing an entry revokes that link at once. The tester `t0` is the lab's own test tester.

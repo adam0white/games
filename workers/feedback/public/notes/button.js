@@ -12,7 +12,8 @@
     link.rel = 'noopener';
     link.textContent = '💬';
     link.setAttribute('aria-label', 'Notes');
-    link.style.cssText = 'position:fixed;z-index:2147483000;left:calc(50% - 17px);top:calc(4px + env(safe-area-inset-top));width:34px;height:34px;display:grid;place-items:center;font-size:17px;line-height:1;text-decoration:none;border-radius:50%;background:#0009;border:1px solid #fff5;opacity:.55;touch-action:manipulation;-webkit-tap-highlight-color:transparent';
+    link.style.cssText = 'position:fixed;z-index:2147483000;right:calc(8px + env(safe-area-inset-right));top:calc(62px + env(safe-area-inset-top));width:34px;height:34px;display:grid;place-items:center;font-size:17px;line-height:1;text-decoration:none;border-radius:50%;background:#0009;border:1px solid #fff5;opacity:.55;touch-action:manipulation;-webkit-tap-highlight-color:transparent';
+    // Below the pause buttons, on the right edge: clear of every prototype's HUD (checked 2026-11-22).
     // The games steer by pointer; a touch on the button must not reach them.
     for (const type of ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown']) link.addEventListener(type, event => event.stopPropagation());
     (document.body || document.documentElement).append(link);
