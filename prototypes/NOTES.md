@@ -9,3 +9,7 @@ The lab asked "Which game should we put the most work into?". Tester t1, a secon
 ### Left as a proposal (2026-11-22)
 
 Focus new work on Lantern and Ant Promotion. Stop new work on The Long Road and Copper Afternoon. Removing them from the site is a separate decision; nothing has been deleted, and both stay playable at `/proto/long-road/` and `/proto/copper-afternoon/`.
+
+## 2026-11-23: shared code (owner)
+
+The owner asked for the live games to be kept on shared code as a standing practice. The shared code is `prototypes/kit/`; its `README.md` holds the rules and lists what is deliberately not shared yet. `prototypes/kit/check/phone.mjs` runs every live prototype in two phone profiles with saves seeded in the formats players already have.
