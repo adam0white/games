@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#2f5a2a">
 <title>Ant Promotion</title>
 <style>
@@ -95,9 +95,10 @@
     <li><span class="r">Red number</span>: stronger than you. Touch it and you die.</li>
     <li>The pale wedge is what an animal can see. Walk into it and the animal notices you: <span class="y">!</span></li>
     <li><span class="r">&raquo;</span> means it is faster than you. A fast strong animal that notices you will catch you. A fast weak one will get away, so sneak up from behind.</li>
+    <li>No food on the screen? A <span class="g">green arrow</span> at the edge points to the nearest animal you can eat. A red arrow points to a stronger animal that has seen you.</li>
     <li>Fill the bar to get promoted. You pick 1 of 3 new animals each time. Picking fast again makes you faster each time. Picking sneaky again makes you harder to see each time.</li>
     <li>Animals hunt each other too. A red dashed line shows who is chasing whom. A hunter that is busy is easier to sneak past.</li>
-    <li><b>Wild rules</b> (menu button) add two things. A strong animal has a thick hide: it lives through one bite, then the hide needs 25 seconds. And every 45 seconds a stronger animal nearby hunts you for 5 seconds, wherever it is looking.</li>
+    <li><b>Wild rules</b> are the normal game; the Rules button in the menu switches to Classic. Wild adds two things. A strong animal has a thick hide: it lives through one bite, then the hide needs 25 seconds. And every 45 seconds a stronger animal nearby hunts you for 5 seconds, wherever it is looking.</li>
     <li><b>Your rival.</b> The animal that kills you becomes your rival. It gets a name, a crown and a coloured ring, and it talks in speech bubbles. When it is off the screen, an arrow in its colour shows where it is.</li>
     <li>Your rival does not go away. It stays in the world, comes looking for you now and then, and each time it kills you it gets 10 stronger (up to 30) and gets a scar.</li>
     <li>Rivals act differently. Some wait still and see far. Some follow you and strike while you are eating. Some charge and chase for a long time. Some are bullies that run once you are nearly as strong.</li>
@@ -145,6 +146,7 @@ import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { lab } from '../kit/lab.js'; // lab recording: the rec lines below
+import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
 
 const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d');
 const KEY = 'ant-promotion:v1', query = new URLSearchParams(location.search);
@@ -152,8 +154,9 @@ const COLOURS = ['#3a2a22', '#c0271f', '#e08a1c', '#d6b21c', '#3f9a3c', '#2a7fd9
 const PATTERNS = [['plain', 'Plain'], ['stripes', 'Stripes'], ['spots', 'Spots'], ['crown', 'Crown']];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const pick = list => list[Math.floor(Math.random() * list.length)];
+// wild: Wild rules are the default from 2026-11-23 (tester t1, note #88). A save that already holds wild: false keeps Classic.
 // nem: the living rival (null when there is none). trophies: rivals eaten. gens: how many rivals there have been. Saves from before the rival have none of the three.
-let save = { skin: { c: COLOURS[0], p: 'plain' }, stack: [ANT], xp: 0, sound: true, look: 1, seen: [], wild: false, nem: null, trophies: [], gens: 0 };
+let save = { skin: { c: COLOURS[0], p: 'plain' }, stack: [ANT], xp: 0, sound: true, look: 1, seen: [], wild: true, nem: null, trophies: [], gens: 0 };
 Object.assign(save, readJson(KEY, {}));
 if (query.has('look')) save.look = Number(query.get('look')); // ?look=0 flat, 1 cartoon, 2 soft
 if (!LOOKS[save.look]) save.look = 1;
@@ -167,6 +170,7 @@ const saw = ids => { for (const id of ids) if (!save.seen.includes(id)) save.see
 const buzz = ms => { try { if (save.sound) navigator.vibrate?.(ms); } catch {} };
 const store = () => writeJson(KEY, save);
 
+let arrowTo = null; // the id the green food arrow points at, for the checks
 let s = null, mode = 'menu', W = 0, H = 0, dpr = 1, zoom = 1, last = 0, acc = 0, shake = 0, sayTimer = 0;
 const floats = [], bits = [], keys = new Set(); let joy = null, flash = 0, dying = 0, streak = 0, streakAt = 0, hideWas = false;
 
@@ -578,7 +582,20 @@ function draw(now) {
   overlay(edge, p, view);
 }
 
+// The nearest animal you can eat, when none is on the screen (tester t1, note #89). null while food is in view.
+function foodOff(p) {
+  const F = me(s), hw = W / zoom / 2, hh = H / zoom / 2; let best = null, near = Infinity;
+  for (const m of s.mobs) {
+    if (powerOf(m) >= F.power) continue;
+    if (Math.abs(m.x - p.x) < hw && Math.abs(m.y - p.y) < hh) return null;
+    const d = Math.hypot(m.x - p.x, m.y - p.y); if (d < near) { near = d; best = m; }
+  }
+  return best;
+}
 function overlay(edge, p, view) {
+  // a green arrow to the nearest food off the screen
+  const food = s.dead ? null : foodOff(p); arrowTo = food ? food.id : null;
+  if (food) edgeArrow(Math.atan2(food.y - p.y, food.x - p.x), '#3fd14a', 1.1);
   // arrows to hunters off the screen
   for (const m of edge) {
     const a = Math.atan2(m.y - p.y, m.x - p.x), k = Math.min((W / 2 - 22) / Math.abs(Math.cos(a) || 1e-6), (H / 2 - 22) / Math.abs(Math.sin(a) || 1e-6));
@@ -732,7 +749,7 @@ function frame(now) {
   draw(now);
 }
 addEventListener('pagehide', () => { if (s && !s.dead) { save.stack = s.player.stack.slice(); save.xp = s.player.xp; keepNem(); store(); } });
-window.__ant = { get s() { return s; }, get mode() { return mode; }, get save() { return save; }, get bubble() { return bubble; }, FORMS, me, level, step, powerOf, nemesisMob };
+window.__ant = { get s() { return s; }, get mode() { return mode; }, get arrowTo() { return arrowTo; }, get save() { return save; }, get bubble() { return bubble; }, FORMS, me, level, step, powerOf, nemesisMob };
 show('menu'); requestAnimationFrame(frame);
 </script>
 <script src="/notes/button.js" defer></script>

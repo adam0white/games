@@ -46,6 +46,15 @@ const labSent = page => page.context().labSent;
 const labRuns = (page, game) => labSent(page).filter(r => r.game === game && r.kind === 'run');
 const LAB_LOCAL = () => localStorage.setItem('hf-lab-send-localhost', '1'); // pages on 127.0.0.1 send only with this
 
+// No zoom (note #74, kit/zoom.js): the viewport caps the scale, no visible element is left at touch-action auto, and a double tap's default is cancelled.
+async function noZoomed(page) {
+  const r = await page.evaluate(() => {
+    const loose = [...document.querySelectorAll('body *')].filter(el => el.getClientRects().length && getComputedStyle(el).touchAction === 'auto').map(el => el.id || el.tagName);
+    const ev = new MouseEvent('dblclick', { bubbles: true, cancelable: true }); document.body.dispatchEvent(ev);
+    return { meta: document.querySelector('meta[name=viewport]').content, loose, cancelled: ev.defaultPrevented };
+  });
+  assert.match(r.meta, /maximum-scale=1/); assert.deepEqual(r.loose, [], 'no visible element at touch-action auto'); assert.ok(r.cancelled, 'a double tap does not zoom');
+}
 const GAMES = {
   async kit(page) {
     await page.goto(`${base}/kit/`);
@@ -60,12 +69,13 @@ const GAMES = {
     // A save in the format players already have.
     await page.goto(`${base}/lantern/`);
     await page.evaluate(LAB_LOCAL);
-    await page.evaluate(() => { localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('lantern-best-endless', '55'); localStorage.setItem('lantern-best-tower', '4'); localStorage.setItem('lantern-stats', '{"red":1}'); localStorage.setItem('lantern-off', '[]'); localStorage.setItem('lantern-best-level', '0'); localStorage.setItem('lantern-tower-at', '1'); localStorage.setItem('lantern-rebirths', '0'); localStorage.setItem('notes.k', 'check'); });
+    await page.evaluate(() => { localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('lantern-best-endless', '55'); localStorage.setItem('lantern-best-tower', '4'); localStorage.setItem('lantern-stats', '{"red":1}'); localStorage.setItem('lantern-off', '[]'); localStorage.setItem('lantern-best-level', '0'); localStorage.setItem('lantern-tower-at', '1'); localStorage.setItem('lantern-rebirths', '0'); localStorage.setItem('lantern-crash', '[]'); localStorage.setItem('notes.k', 'check'); });
     await page.reload();
     let st = await state();
     assert.equal(st.opened, 3, 'old save: opened night'); assert.equal(st.bank, 120, 'old save: bank'); assert.ok(st.owned.includes('red'), 'old save: owned'); assert.equal(st.worn.boat, 'red', 'old save: worn');
     assert.equal(await page.textContent('#play'), 'Play night 3'); assert.match(await page.textContent('#about'), /Best 40%/);
     await until(page, () => document.getElementById('notes-button'), 'notes button');
+    await noZoomed(page);
     // Play, steer by a relative drag, and a tap alone does not steer.
     assert.equal((await audioLog()).made, 0, 'no audio before the first tap');
     await page.click('#play'); st = await state();
@@ -146,6 +156,7 @@ const GAMES = {
     await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu'); assert.match(await page.textContent('#tower'), /go on at level 2/);
     await page.click('#tower'); assert.equal((await state()).climb, 2, 'the menu climb goes on at level 2');
     await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu');
+    await page.click('#anew'); assert.equal((await state()).screen, 'menu', 'one tap on new climb only asks'); assert.equal((await saved())['lantern-tower-at'], '2');
     await page.click('#anew'); assert.equal((await state()).climb, 1, 'a new climb starts at level 1'); assert.equal((await saved())['lantern-tower-at'], '1');
     await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu'); assert.equal(await page.isVisible('#anew'), false);
     // Sector 2 (note #73): level 50 cleared opens 50 more levels, numbered 51 to 100 inside and shown as "sector 2, level N".
@@ -157,21 +168,42 @@ const GAMES = {
     await page.evaluate(() => { window.lanternSim().light = 0.0001; }); await until(page, () => window.lanternState().screen === 'card', 'sector 2 lost card');
     assert.match(await page.textContent('#line'), /Best 50 of 50\. Your climb goes on from sector 2, level 1/);
     await page.click('#toMenu'); assert.match(await page.textContent('#tower'), /go on at sector 2, level 1/);
-    await page.click('#anew'); await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu');
+    await page.click('#anew'); await page.click('#anew'); await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu');
     // 50 nights (note #73): the tester tool opens them all; night 50 is the last.
     await page.click('#toShop'); await page.click('[data-test="nights"]'); await page.click('.back');
     assert.equal(await page.textContent('#play'), 'Play night 50'); assert.match(await page.textContent('#about'), /This is the last night/);
     await page.click('#less'); assert.doesNotMatch(await page.textContent('#about'), /last night/);
     // Rebirth (note #73): a goal until everything is found and all 50 nights are open; then two taps start over with 25% more embers for good.
-    await page.click('#toShop'); assert.equal(await page.isVisible('#rebirth'), false, 'no rebirth before everything is found'); assert.match(await page.textContent('#packs'), /Find everything \(\d+ of 23\)/);
+    await page.click('#toShop'); assert.equal(await page.isVisible('#rebirth'), false, 'no rebirth before everything is found'); assert.match(await page.textContent('#packs'), /Find everything \(\d+ of 28\)/);
     await page.click('[data-test="all"]'); await page.click('[data-test="nights"]');
     await page.click('#rebirth'); assert.equal((await state()).reborn, 0, 'one tap is not a rebirth'); await page.click('#rebirth');
     st = await state(); assert.equal(st.reborn, 1); assert.equal(st.bank, 0); assert.equal(st.opened, 1); assert.deepEqual(st.owned.sort(), ['amber', 'blue', 'boost', 'oak']);
     assert.equal((await saved())['lantern-rebirths'], '1'); assert.equal((await saved())['lantern-owned'], '[]'); assert.equal((await saved())['lantern-night'], '1');
     await page.click('.back'); assert.match(await page.textContent('#stars'), /★/);
-    await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.taken = 4; s.light = 0.0001; s.warm = 0; });
+    // Reborn nights run faster and pay more at dawn (answer to question #79).
+    assert.match(await page.textContent('#about'), /Reborn night: 6% faster, \+10 embers at dawn/);
+    await page.click('#play'); assert.equal(await page.evaluate(() => window.lanternSim().hard), 1.06, 'a reborn night runs 6% faster');
+    // The force field (answer to question #72): a blue pickup pushes a rock out of the way for a few seconds; no heart is lost.
+    await page.evaluate(() => { const s = window.lanternSim(); s.embers.push({ x: s.x, y: s.y, got: false, kind: 'shield' }); });
+    await until(page, () => window.lanternState().field > 3, 'the force field is on');
+    const pushed = await page.evaluate(() => { const s = window.lanternSim(), k = { x: s.x, x0: s.x, y: s.y + 0.02, y0: s.y + 0.02, rad: 0.03, kind: '', len: 0, on: true, a: 0, w: 0, b: 0, wy: 0, ph: 0, phy: 0, vy: 0, ice: false, grazed: false }; s.rocks.push(k); window.__rock = k; return [s.hearts, k.x0]; });
+    await sleep(500); const after = await page.evaluate(() => [window.lanternSim().hearts, window.__rock.x0, window.lanternState().playing]);
+    assert.equal(after[0], pushed[0], 'no heart lost inside the field'); assert.ok(Math.abs(after[1] - pushed[1]) > 0.03, 'the rock was pushed aside'); assert.ok(after[2], 'still playing');
+    await page.evaluate(() => { const s = window.lanternSim(); s.taken = 4; s.light = 0.0001; s.warm = 0; });
     await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'reborn run ends'); assert.equal((await state()).bank, 5, '4 embers bank as 5 after one rebirth');
     await page.click('#toMenu'); await page.evaluate(() => localStorage.setItem('lantern-owned', '["red"]')); await page.reload(); // the look check below wears the red canoe
+    // Two abilities at a time and the crash pack (note #75). lantern-off and lantern-crash are JSON lists of ids.
+    await page.click('#toShop'); await page.click('[data-test="all"]');
+    const abilitiesOn = async () => { const s = await saved(), off = JSON.parse(s['lantern-off'] || '[]'); return ['boost', 'slow', 'size', 'magnet', 'flare'].filter(k => !off.includes(k)); };
+    assert.equal((await abilitiesOn()).length, 2, 'finding every ability leaves two on');
+    const offOne = (await page.evaluate(() => JSON.parse(localStorage.getItem("lantern-off"))))[0];
+    await page.click(`[data-item="${offOne}"]`); assert.match(await page.textContent('#got'), /Only 2 abilities at a time/); assert.equal((await abilitiesOn()).length, 2);
+    for (const id of ['burst', 'freeze', 'ghost']) await page.click(`[data-item="${id}"]`);
+    await page.click('[data-item="bolt"]'); assert.match(await page.textContent('#got'), /Only 3 crashes at a time/); assert.deepEqual(JSON.parse((await saved())['lantern-crash']), ['burst', 'freeze', 'ghost']);
+    await page.click('[data-item="ghost"]'); await page.click('[data-item="freeze"]'); assert.deepEqual(JSON.parse((await saved())['lantern-crash']), ['burst']);
+    await page.click('.back'); await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.hearts = 1; s.shield = 0; s.safe = 0; s.x = 5; });
+    await until(page, () => window.lanternState().crash === 'burst', 'a crash plays the crash switched on');
+    await until(page, () => window.lanternState().screen === 'card', 'crash card'); await page.click('#toMenu');
     // A look on the whole screen (note #73): tapping an owned boat wears it and hides every button; a tap brings the shop back.
     await page.click('#toShop'); await page.click('[data-item="red"]'); st = await state();
     assert.equal(st.looking, 'boat'); assert.equal(st.worn.boat, 'red'); assert.equal(await page.isVisible('#shop'), false, 'the shop hides'); assert.equal(await page.isVisible('#notes-button'), false, 'the notes button hides');
@@ -194,17 +226,26 @@ const GAMES = {
     const stack = await page.evaluate(() => { const F = window.__ant.FORMS; return [F.findIndex(f => f && f.level === 1), F.findIndex(f => f && f.level === 2)]; });
     await page.evaluate(([k, stack]) => { localStorage.setItem(k, JSON.stringify({ skin: { c: '#c0271f', p: 'stripes' }, stack, xp: 3, sound: true, look: 2 })); localStorage.setItem('notes.k', 'check'); }, [KEY, stack]);
     await page.reload(); await until(page, () => window.__ant, 'game script');
-    assert.match(await page.textContent('#continue'), /^Continue as /, 'old save: continues'); assert.match(await page.textContent('#look'), /^Look: /);
+    assert.match(await page.textContent('#continue'), /^Continue as /, 'old save: continues'); assert.equal(await page.textContent('#rules'), 'Rules: Wild', 'Wild is the default (note #88)'); assert.match(await page.textContent('#look'), /^Look: /);
     await until(page, () => document.getElementById('notes-button'), 'notes button');
+    await noZoomed(page);
     assert.equal(await page.evaluate(() => window.audioLog.made), 0, 'no audio before the first tap');
+    assert.notEqual(await page.evaluate(() => navigator.audioSession.type), 'playback', 'no audio session is asked for before the first tap');
     await page.click('#continue'); assert.equal(await mode(), 'play');
     assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'Play starts audio');
+    assert.equal(await page.evaluate(() => navigator.audioSession.type), 'playback', 'sound plays through the iPhone silent switch (note #80)');
     assert.equal(await page.evaluate(() => window.__ant.level(window.__ant.s)), 2, 'old save: level'); assert.equal(await page.evaluate(() => window.__ant.s.player.xp), 3, 'old save: xp');
     // Walk by dragging.
     const x0 = await page.evaluate(() => window.__ant.s.player.x);
     await finger(page, '#c', [['pointerdown', 150, 400], ['pointermove', 215, 400]]);
     await page.waitForFunction(x => window.__ant.s.player.x > x + 5, x0);
     await finger(page, '#c', [['pointerup', 215, 400]]);
+    // Food arrow (note #89): with no food on the screen a green arrow points to the nearest; with food in view there is none.
+    await page.evaluate(() => { const { s, powerOf, me } = window.__ant, p = s.player; s.mobs.filter(m => powerOf(m) < me(s).power).forEach((m, i) => { m.x = p.x + 700 + i * 40; m.y = p.y; }); });
+    await until(page, () => window.__ant.arrowTo !== null, 'green food arrow');
+    assert.ok(await page.evaluate(() => { const { s, powerOf, me, arrowTo } = window.__ant, m = s.mobs.find(m => m.id === arrowTo); return m && powerOf(m) < me(s).power; }), 'the arrow points to food');
+    await page.evaluate(() => { const { s, arrowTo } = window.__ant, m = s.mobs.find(m => m.id === arrowTo); m.x = s.player.x + 40; m.y = s.player.y; }); // the food the arrow points at now
+    await until(page, () => window.__ant.arrowTo === null, 'no arrow with food in view');
     // Pause by the button, by P, and when the page is hidden.
     await page.click('#pause'); assert.equal(await mode(), 'paused');
     const t0 = await page.evaluate(() => window.__ant.s.t); await sleep(300); assert.equal(await page.evaluate(() => window.__ant.s.t), t0, 'time stands still while paused');
@@ -214,7 +255,7 @@ const GAMES = {
     assert.equal(await mode(), 'paused', 'hiding the page pauses'); await page.click('#resume');
     await page.evaluate(() => dispatchEvent(new Event('blur'))); assert.equal(await mode(), 'paused', 'losing focus pauses'); await page.keyboard.press('P'); assert.equal(await mode(), 'play', 'capital P resumes');
     // Death costs one level and is saved at once.
-    await page.evaluate(() => { const { s, FORMS, me } = window.__ant, p = s.player, m = s.mobs.find(m => FORMS[m.f].power > me(s).power); p.safe = 0; p.x = m.x; p.y = m.y; });
+    await page.evaluate(() => { const { s, FORMS, me } = window.__ant, p = s.player, m = s.mobs.find(m => FORMS[m.f].power > me(s).power); p.safe = 0; p.hideAt = 1e9; p.x = m.x; p.y = m.y; }); // no Wild hide
     await until(page, () => window.__ant.mode === 'dead', 'death card');
     assert.equal((await saved()).stack.length, 1, 'death saved');
     await page.click('#goOn'); assert.equal(await mode(), 'play');
@@ -276,6 +317,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     await page.addInitScript(() => {
       const Real = window.AudioContext || window.webkitAudioContext; if (!Real) return;
       window.audioLog = { made: 0, suspend: 0, resume: 0 };
+      if (!navigator.audioSession) Object.defineProperty(navigator, 'audioSession', { value: { type: 'auto' }, configurable: true }); // a stand-in where the browser has none
       window.AudioContext = window.webkitAudioContext = class extends Real {
         constructor(...a) { super(...a); window.audioLog.made++; }
         suspend() { window.audioLog.suspend++; return super.suspend(); }

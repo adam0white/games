@@ -330,3 +330,55 @@ Not checked: whether a person reaches night 50, which the rebirth requires (bots
 - **"Trash bags".** No earlier note mentions trash bags. The lab reads it as "crash packs", the crash effects pack of note #69, in which the player picks two or three crash effects. A question went to the tester before building it. If it is the crash pack, a plan: a fifth pack, Crashes, with the six effects there now (sink, smash, tip, crack, swirl, throw) and two new ones (the flame bursts into sparks, the boat freezes and shatters). The player turns on two or three. A crash uses the effect that fits what was hit when it is on, else one of those on.
 - **River animations pack** (note #69): still a proposal.
 - **The app-store bar.** The tester wants a game people would download from an app store. Recorded as the bar the tester holds the game to. Publishing is the owner's decision and is not asked for here.
+
+## 2026-11-23: tester t1's notes #74, #75 and #76
+
+- **#74, zoom stuck after a double tap.** Fixed in the kit for both games (`kit/zoom.js`, see `experiments/NOTES.md`). Not verified on a real phone.
+- **#75, 30 new nights.** Already built: 50 nights went live in the change above. The note was written before that build was deployed.
+- **#75, only two abilities, picked by the player.** This answers question #71 ("pick two"). See the table below. Question #72, on whether hearts and the shield take one of the two places, stays open.
+- **#75, "a crash pack or victory pack".** The crash pack is built; see below. The victory pack is left as a proposal.
+- **#76, leaderboard with Google sign-up or accounts, names, endless only.** Accounts, sign-in and a shared leaderboard need a server and accounts. Those are the owner's decision ("no new server infrastructure without an owner decision"; accounts are not authorized). Nothing is built for them. See the proposal below.
+
+### Done in this change
+
+| Ask | What changed |
+| --- | --- |
+| Two abilities at a time | At most two owned abilities are switched on. Tapping a third says "Only 2 abilities at a time. Switch one off first." A find from a pack that would make three arrives switched off, and the shop says so. A save with more than two on keeps the first two in the order they were found, and the rest go into `lantern-off`, which keeps its format. "Find everything" leaves two on. |
+| Crash pack | A fifth pack, Crashes, at 50 embers. It holds Fireworks (the lantern bursts into sparks of the flame's colour), Freeze (the boat ices over and shatters), Ghost (a pale ghost of the boat rises), Lightning (a bolt, a blackened boat and smoke) and Big splash (a column of water). Up to three are switched on; a crash plays one of them at random. With none on, a crash fits what was hit, as before. A find switches itself on if fewer than three are. New key `lantern-crash`, a JSON list of ids. Rebirth clears it. The rebirth goal now counts 28 things. |
+| (Lab) "New climb from level 1" | Asks twice, as Erase and Rebirth do, so a stray tap under the resume button does not lose the climb. |
+| (Lab) Sound fix | Lantern's `tone` wrapper dropped the slide argument, so the crash sounds of note #69 never slid in pitch. It now passes it on. |
+
+Checks: the phone check on both profiles covers two abilities after "Find everything", the refusal of a third, three crashes on and the refusal of a fourth, a crash playing the one crash switched on, and the two taps for a new climb. Making crashes ignore the switched-on list fails the check. Each new effect was screenshotted mid-crash in a phone-sized Chromium, with no page errors.
+
+Not checked: the new crash sounds on a phone.
+
+### Left as a proposal (2026-11-23, notes #75 and #76)
+
+- **Victory pack.** Dawn effects to pick from, like the crash pack: fireworks over the river, lanterns rising, a burst of birds, a rainbow.
+- **Leaderboard, names and sign-up.** The owner decides on a server and accounts. Without one, the lab could add a name field above the title and an endless best list on this phone only. That was not built, so as not to suggest names reach anyone else.
+
+## 2026-11-23: tester t1 answered the lab's Lantern questions (notes #81, #83, #91, #92, #93, #94)
+
+| Question | Answer | What follows |
+| --- | --- | --- |
+| #42: seven of the new things are weather or tricks, not solid obstacles. Change some? | "Good as it is" (#81) | Nothing. |
+| #47: which look, flat or the 3D lab version? | "Let me switch between them" (#83) | Left as a proposal: a Look switch between flat and 3D in the game. The 3D version lives in `../lab/lantern-3d/` with its own page, and does not share saves or the shop. |
+| #71: "two at a time" meant what? | "Only 2 working at the same moment" (#91) | Note #75 said "so they can only select two of them", and that is built: at most two abilities switched on. With only two kinds in the river, at most two work at the same moment. If the tester wants all five in the river with a limit of two active at once, that is a change to make. |
+| #72: should the force field become a few seconds' bubble that pushes rocks, and the heart stay the spare life? | "Yes" (#92) | Built, see below. |
+| #78: what were the trash bags? | "The crash effects pack: I pick 2 or 3 crash effects" (#93) | Built in the change above: up to three on. |
+| #79: should a rebirth give more than 25% embers? | "Reborn nights that are harder and pay more" (#94) | Built, see below. |
+
+### Done in this change
+
+- **Force field.** The blue pickup no longer takes a hit. For 4 seconds, plus 1.5 seconds a Barrier level, a bubble round the boat shoves any rock it touches sideways, kept inside the river, and holds the boat off the bank. When it ends, half a second of grace follows. An arc shows the time left, and the bubble blinks in its last second. A rock shoved onto an ember or power drops that pickup, so nothing is left buried. The barrier stat now reads "The force field lasts longer"; `lantern-stats` keeps its format. A shield saved inside an old run cannot exist, since runs are not saved.
+- **Reborn nights.** After a rebirth, story nights run 6% faster for each rebirth, counted up to five, and dawn pays 10 more embers for each rebirth. The rebirth bonus applies on top. The menu says so. The tower and the endless river are unchanged by rebirth.
+
+Checks:
+- A fingerprint over 40 rivers of each night, the endless river and four tower levels matches main once the field pickup is made inert in both copies. With it live, rivers differ only after a field has shoved a rock, which moves where later pickups go.
+- Audit, 60 rivers each, ridden five ways, on nights 1, 3, 5, 8, 12, 20, 30 and 50, endless, and tower levels 1, 50 and 75: no closed river. The first run found 5 buried pickups on night 20 and 3 on the endless river, where the field had shoved rocks onto them. After the drop rule: 0.
+- The phone check on both profiles covers taking the field, a rock placed on the boat being pushed aside with no heart lost, a reborn night's 1.06 pace, and the menu line. With the push turned off, it fails.
+- A phone-sized screenshot shows the bubble and a pushed rock.
+
+Not checked:
+- Reborn pace was not audited: five rebirths on night 50 is a pace of about 3.0, the same as tower level 100, which was audited.
+- A real phone.
