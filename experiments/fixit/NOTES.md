@@ -160,3 +160,7 @@ One key, `fixit-save`, holding one JSON object: `v`, `bank`, `best`, `shifts`, `
 - **WebKit and the lab record.** WebKit logs "Cannot load blob … due to access control checks" if the page navigates while `kit/lab.js` is still compressing a record. The check quits to the menu and waits 300 ms before each navigation. A real player closing the tab mid-shift could lose that last record in Safari. This is a kit question, not fixed here.
 - **Screenshot folder.** `check.mjs` writes to `$SHOTS`, or to `fixit-shots` in the OS temp directory when it is unset, so that no session-specific path is written into the repo. This build ran it with `SHOTS` set to the scratch shots folder.
 - **Shift length.** The day is 90 s; with the tutorial and walk-ups a shift takes about 1.5 to 2 minutes.
+
+## 2026-11-23: the tester picked this one (note #103)
+
+Asked which of the three new games (Grapevine, Fix-It Stall, Follow Me) to work on more, tester t1 answered "Fix-It Stall" (note #103, answering #100). It is the one of the three to grow next. No change was made in this run; see `experiments/NOTES.md`.

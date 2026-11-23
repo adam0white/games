@@ -392,6 +392,14 @@ const GAMES = {
     assert.equal(runs[0].data.summary.level, 2); assert.equal(runs[0].data.start.how, 'continue');
     assert.ok(runs.every(r => r.runSource === 'agent'), 'labRunSource=agent marks the records');
     assert.deepEqual(runs[2].data.events[0].data, { c: '#d6b21c', p: 'stripes' }, 'the skin choice');
+    // A promotion sends a beam of light up into the sky (note #101).
+    await page.click('#resume'); assert.equal(await page.evaluate(() => window.__ant.beam), 0, 'no beam before a promotion');
+    await page.evaluate(() => { window.__ant.s.player.xp = 999; });
+    await until(page, () => window.__ant.mode === 'evolve', 'promotion card');
+    await page.click('#opts .opt'); assert.equal(await mode(), 'play');
+    assert.ok(await page.evaluate(() => window.__ant.beam) > 0.5, 'a promotion starts the light beam');
+    await page.evaluate(() => { window.__ant.s.player.safe = 99; }); // nothing may eat the player while the beam plays out
+    await until(page, () => window.__ant.beam < 0.9, 'the beam fades', 8000); assert.equal(await mode(), 'play'); // headless WebKit draws few frames, so only the start of the fade is waited for
   },
   // The three games of 2026-11-23. Each has its own full check (experiments/<slug>/check.mjs); this is the shared part:
   // the page loads through the kit with no error, a run starts from Play, pause holds it, and leaving for the menu

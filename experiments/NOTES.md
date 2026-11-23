@@ -55,3 +55,12 @@ Each directory has `sim.js` (rules, runs in Node), `bots.mjs` (proves the rules 
 
 ### Left as a proposal (2026-11-23)
 - Crumbwar rooms: a short code to share, and a field that holds only the people who joined with it, with bots filling the empty places. This needs an owner decision.
+
+## 2026-11-23: answers on which games to keep (tester t1, notes #103 and #104)
+
+- **Note #103, answering #100 ("Which of the three new games should we work on more?", Grapevine, Fix-It Stall, Follow Me or none):** "Fix-It Stall". Recorded here and in `fixit/NOTES.md`. The lane already puts most work on Lantern and Ant Promotion (note #33). Read this as: among the three new experiments, Fix-It Stall is the one to grow. Nothing was dropped; dropping Grapevine or Follow Me is the owner's decision.
+- **Note #104, answering #44 ("Smoke on the Stairs: keep it or drop it?"):** "Drop". Recorded only. Dropping a game is the owner's decision, and Smoke (`games/smoke`) is a full game, not an experiment. One caution: #104 arrived 68 ms before #105, an answer the tester then withdrew as a mis-tap (#106). Both were sent from the same tap sequence, so #104 may also be a mis-tap.
+
+### Left as a proposal (2026-11-23)
+- Smoke on the Stairs: the tester's answer is "drop". The owner decides whether to archive it.
+- Fix-It Stall: the next working session on the three new experiments goes to Fix-It Stall first.

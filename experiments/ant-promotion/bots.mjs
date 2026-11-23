@@ -3,7 +3,7 @@
 // 5. the rival: a death makes one, it persists and gains power, no animal eats it, temperaments differ, it can be eaten
 import assert from 'node:assert/strict';
 import { SPAWN_WEIGHTS, HIDE_S, hideReady, SAME_FAST, FAST_CAP, crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENT_NAMES, NEM_STEP, NEM_MAX_BONUS, NEM_PRIZE, MOBS,
-  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article } from './sim.js';
+  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY } from './sim.js';
 const seeds = Number(process.argv[2] ?? 20), minutes = Number(process.argv[3] ?? 12);
 
 // 1. Rule table. Player: power 50, speed 124.
@@ -121,6 +121,26 @@ console.log('wild rules: hide and hunt checks pass');
   const s = create(3); let eats = 0, food = 0; for (let i = 0; i < 3600 * 3; i++) { step(s, null); if (s.dead) revive(s, false); for (const e of s.events) if (e.t === 'mobeat') { eats++; if (FORMS.find(f => f.name === e.name).level < 1) food++; } }
   assert.ok(eats > 0, 'animals eat each other'); assert.equal(food, 0, 'food bugs are never hunted by animals');
   console.log(`same-kind picks and animal hunts pass (${eats} animal-on-animal eats in 3 minutes)`);
+}
+{ // stronger animals keep up with a fast-boosted player (note #101); a player without a boost meets the old speeds
+  const fast = l => optionsFor(l)[1].id; let st = [ANT];
+  for (let l = 1; l < TOP; l++) {
+    st = [...st, fast(l)]; const F = me(create(1, st)), stronger = FORMS.filter(M => M.level > F.level && M.level <= F.level + 2);
+    if (F.again > 1 && F.level < TOP) assert.ok(stronger.some(M => chasePace(M, F) > F.speed), `a boosted runner at level ${F.level} meets stronger animals faster than itself`);
+    for (const M of stronger) assert.equal(chasePace(M, F) > F.speed, M.pace === 'fast' && F.again > 1, `${M.name} against a level ${F.level} runner: only fast animals outrun a boosted runner`);
+  }
+  for (const pick of [0, 2]) { st = [ANT]; for (let l = 1; l < TOP; l++) { st = [...st, optionsFor(l)[pick].id]; const F = me(create(1, st)); for (const M of FORMS) assert.equal(chasePace(M, F), M.speed, 'no boost: plain speeds'); } }
+  const first = me(create(1, [ANT, fast(1)])); for (const M of FORMS) assert.equal(chasePace(M, first), M.speed, 'a first fast pick: plain speeds');
+  // a hunting animal runs at full speed, and faster when it is close (note #106)
+  const s = create(1, [ANT, fast(1), fast(2), fast(3), fast(4), fast(5), fast(6), fast(7), fast(8)]), hunter = s.mobs.find(m => FORMS[m.f].level >= 3), prey = s.mobs.find(m => m !== hunter && FORMS[m.f].level === FORMS[hunter.f].level - 1);
+  assert.ok(prey, 'a hunter and its prey');
+  {
+    s.player.x = 100; s.player.y = 100; s.player.safe = 99; s.mobs = [hunter, prey]; for (const m of s.mobs) { m.alert = false; m.fed = 0; }
+    hunter.x = 1000; hunter.y = 1000; hunter.a = 0; prey.x = 1000 + FORMS[hunter.f].range * 0.9; prey.y = 1000; prey.a = 0; s.tick = (12 - hunter.id % 12) % 12;
+    let moved = 0; for (let i = 0; i < 60; i++) { const x = hunter.x, y = hunter.y; step(s, null); if (hunter.chase === prey && Math.hypot(prey.x - x, prey.y - y) > (FORMS[hunter.f].r + FORMS[prey.f].r) * 3) moved = Math.max(moved, Math.hypot(hunter.x - x, hunter.y - y) * 60); } // before the lunge
+    assert.ok(moved >= FORMS[hunter.f].speed - 1, `a hunter runs at full speed (${moved.toFixed(0)} against ${FORMS[hunter.f].speed})`);
+  }
+  console.log(`stronger animals keep up with a boosted runner (fast ones ${Math.round((PACE_UP - 1) * 100)}% faster); hunters run at full speed`);
 }
 
 // 5. The rival. With none passed to create() and nobody crowned, every line above is a world without a rival.
@@ -289,7 +309,8 @@ function wary(s) {
   // The lab also asserted, from this table, that a brute's mean chase is longer than a coward's and that an ambusher notices
   // more often than a brute. With animals hunting each other those two columns rest on a handful of meetings per run and
   // do not hold at every seed count (see NOTES.md, 2026-11-23). The two rules behind them are checked directly below.
-  assert.ok(rows.coward.close.closing < 0.5 && rows.brute.close.closing > 0.5, 'a coward runs from a player close to its power; a brute closes in');
+  // "Closing in" (column C) went the same way on 2026-11-23, when hunters began chasing at full speed (note #106): brute 100% -> 0%,
+  // ambusher 0% -> 71%, on a few alert ticks each. The rule is checked directly below instead.
 }
 { // the rules behind the temperaments, one at a time, in a world with only the rival in it
   const mole = optionsFor(4)[0], alone = (t, dx, dy) => {
@@ -315,6 +336,10 @@ function wary(s) {
   assert.ok(hold.brute > hold.stalker && hold.stalker > hold.ambusher && hold.ambusher > hold.coward, 'a brute keeps a lost chase longest, a coward shortest');
   // an ambusher that has not noticed stands still inside its territory; the others wander
   const moved = Object.fromEntries(TEMPERAMENT_NAMES.map(t => { const { s, m } = alone(t, 600, 600); m.timer = 0; const x = m.x, y = m.y; let far = 0; for (let i = 0; i < 1200; i++) { step(s, null); far = Math.max(far, Math.hypot(m.x - x, m.y - y)); } return [t, far]; }));
+  // a coward runs from a player close to its power; a brute closes in (the player: a level 4 Crab, power 44, against the Mole's 54)
+  const gap = Object.fromEntries(['brute', 'coward'].map(t => { const { s, m } = alone(t, reach * 0.5, 0); s.player.stack = levelStack(4); m.alert = true; // safe stays 0: a player who is safe is not seen
+    const d0 = Math.hypot(m.x - s.player.x, m.y - s.player.y); for (let i = 0; i < 30; i++) step(s, null); return [t, Math.hypot(m.x - s.player.x, m.y - s.player.y) - d0]; }));
+  assert.ok(gap.brute < -10 && gap.coward > 10, `a coward runs from a player close to its power; a brute closes in (${gap.brute.toFixed(0)}, ${gap.coward.toFixed(0)})`);
   assert.equal(moved.ambusher, 0, 'an ambusher waits'); assert.ok(moved.stalker > 20 && moved.brute > 20 && moved.coward > 20, 'the others wander');
   console.log(`temperament rules: sees past plain range ${TEMPERAMENT_NAMES.filter(t => far[t]).join(', ')}; wider wedge ${TEMPERAMENT_NAMES.filter(t => side[t]).join(', ')}; seconds it keeps a lost chase ${TEMPERAMENT_NAMES.map(t => `${t} ${hold[t].toFixed(2)}`).join(', ')}`);
 }
