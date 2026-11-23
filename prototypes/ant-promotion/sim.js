@@ -73,14 +73,17 @@ export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS,
   while (s.mobs.length < MOBS) spawn(s, 260);
   return s;
 }
-// What the player is now. Picking the same kind again builds on it: each earlier fast pick makes a fast animal 5% faster,
+// What the player is now. Picking the same kind again builds on it: each earlier fast pick makes a fast animal faster (fastBoost),
 // each earlier sneaky pick shrinks the distance a sneaky animal is seen from by 5%. `again` counts the picks of this kind.
-export const SAME_FAST = 1.05, SAME_SNEAK = 0.95;
+// Fast again (revised 2026-11-23, note #46): 5% a pick showed as about 2% on screen, because the view zooms out each level.
+// Now SAME_FAST a pick, capped at FAST_CAP times the plain fast speed. fastBoost(k) is the factor after k fast picks.
+export const SAME_FAST = 1.12, FAST_CAP = 2.5, SAME_SNEAK = 0.95;
+export const fastBoost = k => Math.min(FAST_CAP, SAME_FAST ** Math.max(0, k - 1));
 export const me = s => {
   const p = s.player, id = p.stack[p.stack.length - 1], key = p.stack.length * 1000 + id;
   if (p.meKey !== key) {
     const F = FORMS[id]; let k = 0; for (const i of p.stack) if (FORMS[i].role === F.role) k++;
-    p.meKey = key; p.me = { ...F, again: k, speed: F.role === 'runner' ? F.speed * SAME_FAST ** (k - 1) : F.speed, stealth: F.role === 'sneak' ? F.stealth * SAME_SNEAK ** (k - 1) : F.stealth };
+    p.meKey = key; p.me = { ...F, again: k, speed: F.role === 'runner' ? F.speed * fastBoost(k) : F.speed, stealth: F.role === 'sneak' ? F.stealth * SAME_SNEAK ** (k - 1) : F.stealth };
   }
   return p.me;
 };

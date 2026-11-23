@@ -124,7 +124,7 @@
 </div></div>
 
 <script type="module">
-import { FORMS, ANT, WORLD, TOP, CONE, create, step, choose, revive, me, level, needFor, article, SPAWN_WEIGHTS, hideReady, SAME_FAST, SAME_SNEAK } from './sim.js';
+import { FORMS, ANT, WORLD, TOP, CONE, create, step, choose, revive, me, level, needFor, article, SPAWN_WEIGHTS, hideReady, fastBoost, SAME_SNEAK } from './sim.js';
 import { drawForm, setLook, LOOKS } from './art.js';
 import { create3D } from './look3d.js';
 import { readJson, writeJson } from '../kit/save.js';
@@ -226,7 +226,7 @@ function offer() {
     const pace = { slow: 'Slow', medium: 'Medium', fast: 'Fast' }[F.pace];
     b.append(pic, Object.assign(document.createElement('b'), { textContent: F.name }), Object.assign(document.createElement('small'), { textContent: `Power ${F.power} · ${pace}` }), Object.assign(document.createElement('small'), { textContent: F.trait }));
     const k = s.player.stack.filter(id => FORMS[id].role === F.role).length; // earlier picks of this kind make this one better
-    if (k && F.role === 'runner') b.append(Object.assign(document.createElement('small'), { textContent: `Fast again: +${Math.round((SAME_FAST ** k - 1) * 100)}% speed`, style: 'color:#8dff8a' }));
+    if (k && F.role === 'runner') b.append(Object.assign(document.createElement('small'), { textContent: `Fast again: +${Math.round((fastBoost(k + 1) - 1) * 100)}% speed`, style: 'color:#8dff8a' }));
     if (k && F.role === 'sneak') b.append(Object.assign(document.createElement('small'), { textContent: `Sneaky again: ${Math.round((1 - SAME_SNEAK ** k) * 100)}% harder to see`, style: 'color:#8dff8a' }));
     b.onclick = () => { if (!s.choosing) return; choose(s, i); save.stack = s.player.stack.slice(); save.xp = 0; const fresh = !save.seen.includes(F.id); saw(save.stack); store(); blip(520, 0.3, 'triangle', 0.14, 500); hud(); show('play'); say(fresh ? `New in your book: ${F.name}` : `You are ${article(F.name)} now`); };
     box.append(b);
