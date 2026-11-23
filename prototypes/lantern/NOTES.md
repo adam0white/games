@@ -102,14 +102,14 @@ Three powers lie in open water, about four a night, on every night and the endle
 | Slow water | violet clock | the river runs at half speed; the percent to dawn keeps its usual speed, and the flame fades by river passed, not by time | 5 s |
 | Size | teal rings | four times in five the boat is 0.6 of its size; one time in five it is 1.4 times its size. The pickup looks the same either way | 6 s |
 
-Decisions taken here, not asked for by the tester: a boost also makes the boat unbreakable (a faster river alone would be a penalty); the size gamble is hidden until taken; an arc round the boat shows the time left.
+Decisions taken here, not asked for by the tester: a boost also makes the boat unbreakable (a faster river alone would be a penalty); the size gamble is hidden until taken; an arc round the boat shows the time left; powers are free on every night from night 1 until the Abilities pack exists; a boost on the endless river scores the extra river it covers (8 points a second) without bringing the next step harder any sooner.
 
 How it is built: powers draw from their own random stream and sit in their own list, so a seed's rocks and embers are the same as before. Which power, and whether a size power grows the boat, is fixed when the river is laid down. Ice now drifts by river passed. `create(seed, stage, endless, powers)` takes the list of powers allowed, ready for the Abilities pack.
 
 Checked:
 - 440 story rivers (nights 1 to 20 sampled, 40 seeds each) with powers switched off: rocks and embers identical to main.
-- With powers on, rocks matched main on all but 3 of 440 story rivers; in those a power taken shifted ice by a hair and one later pickup moved. Unresolved, judged harmless.
-- Audit, 200 rivers a night: no closed river, no buried pickup of any kind. Narrowest gap for the bigger boat 0.030 on story nights. On the endless river, ridden 30 nights long, the narrowest moment was 0.022 for the usual boat and 0.004 for the bigger boat.
+- With powers on, rocks matched main on all but 3 of 440 story rivers; one of them on night 5. In those a power taken shifted ice by a hair and one later pickup moved. Unresolved, judged harmless.
+- Audit, 200 rivers a night, each ridden four ways (no powers, boost only, slow only, all three) because a power shifts when the boat meets each moving rock: no closed river, no buried pickup of any kind. Narrowest gap on story nights 0.048 for the usual boat and 0.030 for the bigger one; on the endless river, ridden 30 nights long, 0.038 and 0.020.
 - Chromium phone profile: each power taken, said aloud and drawn; under slow water the boat covered 0.55 of river in 1.5 s while the percent gained 1.01, the same as without it. No page errors.
 - Careful bot, 100 runs, dawn reached before and after: night 1 20 and 23, night 3 20 and 21, night 5 18 and 22. Not tuned.
 

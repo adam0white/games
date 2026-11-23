@@ -19,12 +19,12 @@ function rng(seed) {
   };
 }
 
-export function score(s) { return Math.floor(s.t * 10); }
+export function score(s) { return Math.floor(s.t * 10 + s.extra); } // a boost on the endless river scores the extra river it covers
 // The boat's size, and how far to dawn (0 to 1). Slow water credits the distance it holds back, so the count keeps its speed.
 export function boat(s) { return BOAT * (s.size ? (s.big ? 1.4 : 0.6) : 1); }
 export function progress(s) { return Math.min(1, (s.y + s.bonus) / GOAL); }
 // Difficulty step: the night in story, one step per 300 points in endless.
-export function level(s) { return s.endless ? 1 + Math.floor(score(s) / 300) : s.stage; }
+export function level(s) { return s.endless ? 1 + Math.floor(Math.floor(s.t * 10) / 300) : s.stage; }
 export function centre(s, y) { return 0.5 + 0.17 * Math.sin(y * 0.33 + s.p1) + 0.07 * Math.sin(y * 0.81 + s.p2); }
 // The river narrows all the way down. A story night pinches hard in its last tenth; the endless river keeps narrowing slowly.
 export function half(s, y) {
@@ -53,7 +53,7 @@ export function sight(s) { return reach(s.light) * (fog(s, s.y) ? 0.6 : 1) * (da
 
 export function create(seed, stage = 1, endless = false, powers = POWERS) {
   const r = rng(seed), q = rng(seed ^ 0x9e3779b9); // powers draw from their own stream, so the rocks and embers of a seed never change
-  const s = { seed, stage, endless, q, on: powers, powers: [], nextPower: 6 + q() * 6, boost: 0, slow: 0, size: 0, big: false, bonus: 0, hearts: 1, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
+  const s = { seed, stage, endless, q, on: powers, powers: [], nextPower: 6 + q() * 6, boost: 0, slow: 0, size: 0, big: false, bonus: 0, extra: 0, hearts: 1, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
   s.x = centre(s, 0);
   return s;
 }
@@ -188,7 +188,7 @@ export function step(s, target) {
   spawn(s);
   s.t += DT;
   const sl = s.slow ? 0.5 : 1, flow = sl * (s.boost ? 1.8 : 1), v = speed(s) * DT; // flow: how fast the river passes, against its usual pace
-  s.y += v * sl; s.bonus += v * (1 - sl);
+  s.y += v * sl; s.bonus += v * (1 - sl); if (s.boost) s.extra += 8 * DT;
   const max = 0.95 * pace(s) * DT, dx = Math.max(0, Math.min(1, target)) - s.x;
   s.x += Math.max(-max, Math.min(max, dx)) + wind(s, s.y) * 0.22 * DT;
   // An ember holds the flame steady for a moment before it starts to fade again.

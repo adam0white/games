@@ -415,7 +415,7 @@ function draw(now) {
     if (e.kind === 'boost') { const b = (now / 400 % 1) * u * 0.5; for (const o of [-0.5, 0.6]) { g.moveTo(ex - u, ey + o * u + u * 0.5 - b); g.lineTo(ex, ey + o * u - u * 0.5 - b); g.lineTo(ex + u, ey + o * u + u * 0.5 - b); } }
     else if (e.kind === 'slow') { const a = now / 900; g.arc(ex, ey, u * 1.1, 0, 7); g.moveTo(ex, ey); g.lineTo(ex + Math.sin(a) * u * 0.8, ey - Math.cos(a) * u * 0.8); g.moveTo(ex, ey); g.lineTo(ex + u * 0.5, ey); }
     else { const k = 0.75 + 0.35 * Math.sin(now / 260); g.arc(ex, ey, u * 1.2 * k, 0, 7); g.moveTo(ex + u * 0.4 / k, ey); g.arc(ex, ey, u * 0.4 / k, 0, 7); }
-    g.stroke();
+    g.stroke(); g.lineJoin = 'miter'; g.lineCap = 'butt';
   }
   // powers in use: an arc round the boat that runs down with the time left
   let ring = 0.075;
