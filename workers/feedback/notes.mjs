@@ -2,6 +2,7 @@
 // Read testers' notes and reply to them. For lab threads; see README.md.
 //
 //   node notes.mjs new                      notes not yet handled (the usual check)
+//   node notes.mjs count                    how many notes are open, without printing any note text
 //   node notes.mjs all [--after <id>]       the whole exchange, both directions
 //   node notes.mjs reply <tester> "<text>" [--tr "<Turkish text>"] [--game <slug>] [--handled 12,13]
 //   node notes.mjs handled <id>[,<id>...]   mark notes handled without replying
@@ -66,7 +67,12 @@ function list(data) {
   for (const message of data.messages) print(message);
 }
 
-if (command === 'new') list(await (await api('notes?unhandled=1')).json());
+if (command === 'count') {
+  // For a scheduled check: numbers and ids only, so the checking agent never reads a tester's words.
+  const { messages } = await (await api('notes?unhandled=1')).json();
+  const stuck = messages.filter(message => message.status !== 'ready' && Date.now() - message.at > 5 * 60 * 1000).map(message => message.id);
+  console.log(`open=${messages.length} stuck=${stuck.join(',') || 'none'}`);
+} else if (command === 'new') list(await (await api('notes?unhandled=1')).json());
 else if (command === 'all') list(await (await api(`notes?after=${Number(flags.after) || 0}`)).json());
 else if (command === 'reply' && args.length === 2) {
   const data = await (await api('reply', { tester: args[0], text: args[1], translated: flags.tr, game: flags.game, handled: ids(flags.handled) })).json();
@@ -83,6 +89,6 @@ else if (command === 'audio' && args.length === 2) {
   if (!key) throw new Error('No such tester in this Keychain.');
   console.log(`${ORIGIN}/notes/#k=${key}`);
 } else {
-  console.error('Usage: node notes.mjs new | all | reply <tester> "<text>" | handled <ids> | retry <ids> | audio <id> <file> | delete <ids> | link <tester>');
+  console.error('Usage: node notes.mjs new | count | all | reply <tester> "<text>" | handled <ids> | retry <ids> | audio <id> <file> | delete <ids> | link <tester>');
   process.exitCode = 2;
 }

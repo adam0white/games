@@ -46,7 +46,7 @@ Rules for a thread that reads notes:
 - The English text is a machine translation and a voice note's original is a machine transcript. Game names and numbers are the usual errors. When a note decides something, read the original, and fetch the audio if the transcript is doubtful.
 - Reply in plain words. A reply is machine-translated into the tester's language unless you pass your own translation with `--tr`. The tester can open the English original under each reply.
 - Mark a note handled when it has been answered or recorded in the game's `NOTES.md`, so `new` stays a list of open work.
-- Nothing wakes a thread when a note arrives. A scheduled check has to run `new`.
+- Nothing in the Worker wakes a thread when a note arrives. A scheduled check runs `node workers/feedback/notes.mjs count`, which prints only `open=<n> stuck=<ids>`, retries the stuck ids, and alerts the lab when `open` is above zero.
 
 Each note carries the game the tester chose and a build id: the first ten hex digits of the SHA-256 of the served game page. Two notes with the same id were written against the same build. The id does not equal a hash of the file in git, because Cloudflare adds a script to served HTML; map a note to a commit by its time and the Deploy history.
 
