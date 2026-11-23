@@ -81,6 +81,7 @@
 <div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p><p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p></div></div>
 <script type="module">
 import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS } from './sim.js?v=5'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
+import { hull, wake, flame, burn, glow as flameGlow } from './looks.js?v=1';
 
 const query = new URLSearchParams(location.search);
 const gain = Number(query.get('gain')) || 1.3; // boat travel per finger travel; ?gain= to compare
@@ -100,9 +101,9 @@ const ahead = n => NIGHT[n] ?? '';
 
 // The shop. Embers are the money. A pack gives one thing you do not own yet, picked at random.
 const PACKS = [
-  { id: 'boat', name: 'Boats', items: [['oak', 'Oak boat', '#6b4a2f'], ['red', 'Red boat', '#b3312c'], ['birch', 'Birch boat', '#e9e2d0'], ['iron', 'Iron boat', '#56657a'], ['jade', 'Jade boat', '#2f9e7a'], ['gold', 'Gold boat', '#e0b040']] },
+  { id: 'boat', name: 'Boats', items: [['oak', 'Oak rowboat', '#6b4a2f'], ['red', 'Red canoe', '#b3312c'], ['birch', 'Birch raft', '#e9e2d0'], ['iron', 'Iron barge', '#56657a'], ['jade', 'Jade dragon', '#2f9e7a'], ['gold', 'Golden barge', '#e0b040']] },
   { id: 'water', name: 'Waters', items: [['blue', 'Blue water', '#14304a', '#3d6f95'], ['redw', 'Red water', '#4a1420', '#a04a58'], ['moss', 'Moss water', '#17382a', '#4f8f6a'], ['violet', 'Violet water', '#2a1c4a', '#7a62b8'], ['teal', 'Teal water', '#0f3d42', '#48a3a8'], ['glass', 'Black glass', '#0c1016', '#4a5564']] },
-  { id: 'flame', name: 'Flames', items: [['amber', 'Amber flame', '255,170,80'], ['bluef', 'Blue flame', '110,180,255'], ['green', 'Green flame', '120,230,140'], ['rose', 'Rose flame', '255,120,170'], ['white', 'White flame', '235,235,255'], ['violetf', 'Violet flame', '190,130,255']] },
+  { id: 'flame', name: 'Flames', items: [['amber', 'Candle flame', '255,170,80'], ['bluef', 'Gas flame', '110,180,255'], ['green', 'Marsh fire', '120,230,140'], ['rose', 'Sparkler', '255,120,170'], ['white', 'Star light', '235,235,255'], ['violetf', 'Twin flame', '190,130,255']] },
 ];
 const COST = 50;
 // Stats: bought a level at a time and kept. They change the run itself, where packs change only its looks.
@@ -112,7 +113,18 @@ const statCost = id => 40 * ((stats[id] || 0) + 1);
 let owned = new Set(['oak', 'blue', 'amber', ...store.json('lantern-owned', [])]);
 let worn = { boat: 'oak', water: 'blue', flame: 'amber', ...store.json('lantern-worn', {}) };
 const skin = kind => { const pack = PACKS.find(p => p.id === kind); return pack.items.find(i => i[0] === worn[kind]) ?? pack.items[0]; };
-const swatch = (kind, it) => kind === 'flame' ? `radial-gradient(#fff, rgb(${it[2]}) 60%, #0000)` : it[2];
+// A shop button shows the thing itself: the boat drawn small, or the flame after half a second of burning.
+const shots = new Map();
+function swatch(kind, it) {
+  if (kind === 'water') return it[2];
+  if (!shots.has(it[0])) {
+    const c = document.createElement('canvas'), q = c.getContext('2d'); c.width = c.height = 96;
+    if (kind === 'boat') { q.fillStyle = '#14304a'; q.fillRect(0, 0, 96, 96); q.translate(48, 52); hull(q, it[0], 760, it[2], 0.7); }
+    else { q.fillStyle = '#05080f'; q.fillRect(0, 0, 96, 96); q.globalCompositeOperation = 'lighter'; const f = flame(); for (let i = 0; i < 40; i++) burn(f, it[0], 1 / 60, 0, 1); flameGlow(q, f, it[0], 48, 26, 900, it[2], 1, 0.4); const z = q.createRadialGradient(48, 26, 0, 48, 26, 20); z.addColorStop(0, '#fff6dc'); z.addColorStop(0.4, `rgba(${it[2]},.9)`); z.addColorStop(1, `rgba(${it[2]},0)`); q.fillStyle = z; q.fillRect(28, 6, 40, 40); }
+    shots.set(it[0], `url(${c.toDataURL()}) center / cover`);
+  }
+  return shots.get(it[0]);
+}
 
 const canvas = document.getElementById('c'), g = canvas.getContext('2d');
 const $ = id => document.getElementById(id);
@@ -207,7 +219,7 @@ const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
 
 function begin() {
   audio();
-  s = create((Math.random() * 2 ** 31) | 0, endless ? 1 : stage, endless, undefined, stats); target = s.x; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; nearFall = false; weather = ''; drag = null; startTap = null;
+  s = create((Math.random() * 2 ** 31) | 0, endless ? 1 : stage, endless, undefined, stats); target = s.x; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; drag = null; startTap = null;
   shown = ''; show('play'); hud();
   say(endless ? 'Endless river' : `Night ${stage}`, 1600);
 }
@@ -240,7 +252,7 @@ function hud() {
 // Steering. A finger steers by how far it has moved since it touched down, never by where it is,
 // so a tap anywhere does nothing and the thumb can rest wherever is comfortable. A mouse steers by position.
 const pauseButton = $('pause');
-let drag = null, startTap = null, size = 1;
+let drag = null, startTap = null, size = 1, fire0 = flame();
 function aim(x) { const c = centre(s, s.y), h = half(s, s.y) + 0.02; target = Math.max(c - h, Math.min(c + h, x)); }
 function anchor(e) { drag = { id: e.pointerId, x0: e.clientX, x: e.clientX, boat0: s.x }; }
 canvas.addEventListener('pointerdown', e => {
@@ -400,8 +412,8 @@ function draw(now) {
   }
   // boat
   const bx = sx(s.x), by = sy(s.y), lean = Math.max(-0.5, Math.min(0.5, (target - s.x) * 4));
-  g.save(); g.translate(bx, by); g.rotate(lean * 0.5); size += (boat(s) / BOAT - size) * 0.2; g.scale(size, size);
-  g.fillStyle = skin('boat')[2]; g.beginPath(); g.moveTo(0, -0.05 * unit); g.quadraticCurveTo(0.028 * unit, -0.005 * unit, 0.016 * unit, 0.035 * unit); g.lineTo(-0.016 * unit, 0.035 * unit); g.quadraticCurveTo(-0.028 * unit, -0.005 * unit, 0, -0.05 * unit); g.fill();
+  g.save(); g.translate(bx, by); g.rotate(lean * 0.5); size += (boat(s) / BOAT - size) * 0.2; g.scale(size * 1.2, size * 1.2); // drawn a little larger than it collides
+  if (playing) wake(g, unit, now / 1000); hull(g, skin('boat')[0], unit, skin('boat')[2], now / 1000);
   g.restore();
   // darkness with a hole of light
   const flick = 1 + Math.sin(now / 90) * 0.015 + Math.sin(now / 37) * 0.01, r = (sight(s) + glow * 0.09) * unit * flick, flash = dazzle(s) < 0;
@@ -448,9 +460,10 @@ function draw(now) {
     for (let i = 0; i < Math.max(1, s.shield); i++) { g.beginPath(); g.arc(bx, by - 0.005 * unit, (0.06 + 0.012 * i) * unit * (1 + Math.sin(now / 240) * 0.05), 0, 7); g.stroke(); } // one ring for each hit the barrier still takes
   }
   // the flame itself
-  const fg = g.createRadialGradient(bx, by, 0, bx, by, 0.03 * unit);
-  fg.addColorStop(0, '#fff6dc'); fg.addColorStop(0.4, `rgba(${fire},.9)`); fg.addColorStop(1, `rgba(${fire},0)`);
-  g.fillStyle = fg; g.fillRect(bx - 0.03 * unit, by - 0.03 * unit, 0.06 * unit, 0.06 * unit);
+  const fr = 0.02 * unit, fg = g.createRadialGradient(bx, by, 0, bx, by, fr); // small, so the boat under it still shows
+  fg.addColorStop(0, '#fff6dc'); fg.addColorStop(0.45, `rgba(${fire},.8)`); fg.addColorStop(1, `rgba(${fire},0)`);
+  g.fillStyle = fg; g.fillRect(bx - fr, by - fr, 2 * fr, 2 * fr);
+  flameGlow(g, fire0, skin('flame')[0], bx, by, unit, fire, s.light, now / 1000); // the flame streams out behind the lantern
   g.globalCompositeOperation = 'source-over';
   // boost: streaks of speed down the screen. slow water: a violet hush at the edges.
   if (playing && s.boost) { g.strokeStyle = `rgba(255,235,170,${0.5 * Math.min(1, s.boost * 2)})`; g.lineWidth = 2 * dpr; g.beginPath(); for (let i = 0; i < 18; i++) { const x = (Math.sin(i * 53.1) * 0.5 + 0.5) * W, y = ((Math.sin(i * 17.7) * 0.5 + 0.5) * H + now * 2.4 * dpr) % H; g.moveTo(x, y); g.lineTo(x, y + 46 * dpr); } g.stroke(); }
@@ -471,6 +484,7 @@ function draw(now) {
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000 || 0); last = now;
   if (playing && !paused) { acc += dt; while (acc >= DT && playing) { tick(); acc -= DT; } }
+  if (!paused && !(s.over && s.over !== 'dawn')) burn(fire0, skin('flame')[0], dt, Math.max(-0.5, Math.min(0.5, (target - s.x) * 4)), s.light);
   shake = Math.max(0, shake - dt * 3); glow = Math.max(0, glow - dt * 2);
   for (const p of sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; } sparks = sparks.filter(p => p.life > 0);
   if (ac) { water.frequency.value = 400 + 500 * Math.min(1.4, s.y / GOAL); waterGain.gain.value = 0.05 + (playing ? 0.14 * Math.max(fall(s, s.y), fall(s, s.y + 0.8)) : 0); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0; }

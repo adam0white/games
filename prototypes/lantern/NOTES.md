@@ -132,3 +132,15 @@ The tester named barrier strength, lives and game speed, and asked for others; l
 Checked: full stats clamp bad saved values; a full barrier took three hits in the sim; 196 of 200 story rivers are identical with full stats and the other 4 differ by one pickup (same cause as the powers note); in a phone-sized Chromium the shop sold two heart levels for 40 and 80, the Back button stayed on screen, and the next run started with three hearts. No page errors.
 
 Not checked: whether the prices are right; how much easier night 5 is with full stats, for a person.
+
+## 2026-11-23: boats and flames (note #35, fourth item)
+
+The tester asked for different models and less plain colours. Drawing lives in `looks.js` and changes nothing in the run.
+
+- Boats are six different vessels, each shaded as if lit from the left: oak rowboat, red canoe, birch raft, iron barge with lit cabin windows, jade dragon with horns and a moving tail, golden barge with glints. A foam wake follows the boat. The boat is drawn 1.2 times the size it collides at.
+- Flames are a small particle simulation that streams out behind the lantern, leans away from a turn and shrinks as the light fades: candle, tight gas jet, slow marsh fire, sparkler that throws sparks, turning star, twin flame wound in a helix.
+- Shop buttons show the boat or flame itself, drawn small, in place of a plain colour.
+
+The lab's additions beyond the ask: the wake, the lean and fade of the flame, the shop previews.
+
+Checked: all six boats and flames drawn in a phone-sized Chromium with no page errors, and looked at. Not checked: frame rate on a real phone (about 35 soft particles a frame); whether the tester finds them better.
