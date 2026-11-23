@@ -382,3 +382,24 @@ Checks:
 Not checked:
 - Reborn pace was not audited: five rebirths on night 50 is a pace of about 3.0, the same as tower level 100, which was audited.
 - A real phone.
+
+## 2026-11-23: tester t1's note #96 (victory pack, leaderboard, name)
+
+The note: "Just build the leaderboard the victory pack, and the sign-up username UI". It follows notes #75 and #76.
+
+| Ask | What changed |
+| --- | --- |
+| Victory pack | A sixth pack, Victories, at 50 embers: Rockets, Sky lanterns, Birds, Rainbow and Blossom (`cheer` in `looks.js`). Up to three are switched on, and a dawn plays one of them at random with its own sound. With none on, dawn is the plain dawn. A find switches itself on if fewer than three are. New key `lantern-win`, a JSON list of ids. A cleared tower level is a dawn too, so it plays one. Everything to find is now 33 things, which Rebirth counts. Rebirth empties the pack as it does the others. |
+| Name | A field above the title, "Enter your name", 12 characters at most, letters, digits, space and `_ . -`. Saved as typed under `lantern-name`. It stays on the phone: it is not in what the lab records, and the phone check asserts that. |
+| Leaderboard | A Leaderboard button on the menu. It lists the ten best endless runs on this phone with the name each was played under (#76: endless only). The newest run is marked, and the endless card says which place a run took. New key `lantern-board`, a JSON list of `{ n, s, t }`. A best from before the board becomes its first row. The screen says plainly that only this phone's runs are listed. |
+| (Lab) Tower card | The line under "Level n cleared" was never set: a comment in the middle of a line had swallowed the statement. It is set again. |
+
+Decisions and limits:
+
+- **No sign-up, no Google sign-in, no shared board.** Accounts are not authorized, and a public endpoint that stores names typed by players is a server and publishing decision for the owner. The board reads its list from one function, `rows()`, so a shared source can replace it without redoing the screen. The question went to the owner on 2026-11-23.
+- **Rockets and the rainbow are drawn in plain colour, not added light.** Added light turned them white on the bright dawn. The rainbow sits above the card's title; the first version crossed it.
+- **Rebirth keeps the name and the board.** "Erase everything" removes them with every other `lantern-` key.
+
+Checks: the phone check on both profiles covers three victories on and the refusal of a fourth, a dawn playing the one victory switched on, the board's first row from an old best, the name tidied and saved, typing starting nothing, an endless run taking place 1 under the name, and the name absent from the lab's records. Making a dawn ignore the switched-on list fails the check. Each victory was screenshotted over the dawn and behind the card in a phone-sized Chromium, with no page errors.
+
+Not checked: typing the name on a real phone's keyboard (the page blocks text selection everywhere else, and the field re-allows it), the victory sounds, a person's opinion of the effects.

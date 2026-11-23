@@ -39,6 +39,13 @@
   .item.off { opacity: .35; border-style: dashed; filter: grayscale(1); }
   .pack small.once { display: block; font-size: .8em; color: #ffb45a; margin: .1em 0 .3em; }
   #ready { color: #ffb45a; font-size: .9em; }
+  #name { font: inherit; color: #ffe6bd; background: #ffffff10; border: 0; border-bottom: 1.5px solid #ffd9a088; border-radius: 6px 6px 0 0; padding: .3em .5em; width: 11em; text-align: center; -webkit-user-select: text; user-select: text; touch-action: manipulation; }
+  #name::placeholder { color: #ffd9a099; } #name:focus { outline: none; border-bottom-color: #ffb45a; background: #ffffff1c; }
+  #board > div { max-height: 100dvh; box-sizing: border-box; overflow-y: auto; touch-action: pan-y; }
+  #rows { list-style: none; margin: .6em auto; padding: 0; max-width: 17em; text-align: left; font-variant-numeric: tabular-nums; }
+  #rows li { display: flex; gap: .6em; padding: .28em .5em; border-bottom: 1px solid #ffd9a022; } #rows li span:nth-child(2) { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #rows li span:first-child { width: 1.6em; opacity: .6; } #rows li.new { color: #2a1606; background: #ffb45a; border-radius: 8px; } #rows li.new span:first-child { opacity: 1; }
+  #boardNote { font-size: .85em; opacity: .7; }
   #stars { color: #ffe08a; margin-left: .5em; letter-spacing: .05em; } .pack.reborn b { color: #ffe08a; } .pack.reborn small { display: block; font-size: .8em; opacity: .75; margin: .1em 0 .3em; }
   .pack.test { border-top: 1px dashed #ff7a7a88; } .pack.test b { color: #ff9a9a; }
   #got { min-height: 1.6em; color: #ffe6bd; position: sticky; top: 0; z-index: 2; margin: 0; padding: .45em .3em; background: #070b14f2; border-radius: 0 0 12px 12px; } /* stays in view while the packs scroll */
@@ -67,6 +74,7 @@
 <div id="look" aria-label="Tap to go back to the shop"></div>
 <button id="pause" aria-label="Pause"></button>
 <div id="menu" class="screen veil on"><div>
+  <p><input id="name" maxlength="12" placeholder="Enter your name" aria-label="Your name" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done"></p>
   <h1>Lantern</h1>
   <p>Carry the light down the river to dawn.</p>
   <p class="bank"><span class="dot"></span><span id="bank">0</span> embers<span id="stars"></span></p>
@@ -74,14 +82,22 @@
   <p id="about"></p>
   <p id="ready"></p>
   <p><button id="endless">Endless river</button><button id="tower">Tower climb</button><button id="anew" hidden>New climb from level 1</button></p>
-  <p><button id="toShop">Shop</button><button id="toCredits">Credits</button></p>
+  <p><button id="toShop">Shop</button><button id="toBoard">Leaderboard</button></p>
+  <p><button id="toCredits">Credits</button></p>
 </div></div>
 <div id="shop" class="screen veil"><div>
   <h2>Shop</h2>
   <p class="bank"><span class="dot"></span><span id="bank2">0</span> embers</p>
   <p><button class="back">Back</button></p>
-  <p id="got">Stats last for your next run only. Each pack holds one surprise for 50 embers. Pick two abilities and up to three crashes: tap one to switch it on or off.</p>
+  <p id="got">Stats last for your next run only. Each pack holds one surprise for 50 embers. Pick two abilities, and up to three crashes and three victories: tap one to switch it on or off.</p>
   <div id="packs"></div>
+</div></div>
+<div id="board" class="screen veil"><div>
+  <h2>Leaderboard</h2>
+  <p>The endless river. The best runs on this phone.</p>
+  <ol id="rows"></ol>
+  <p id="boardNote"></p>
+  <p><button class="back">Back</button></p>
 </div></div>
 <div id="credits" class="screen veil"><div>
   <h2>Credits</h2>
@@ -93,14 +109,14 @@
 <div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p><p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p></div></div>
 <script type="module">
 import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace, FIELD, REBORN_PACE } from './sim.js?v=12'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
-import { readNumber, readJson, write } from '../kit/save.js';
+import { read, readNumber, readJson, write } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { drag } from '../kit/drag.js';
 import { lab } from '../kit/lab.js'; // lab recording: the rec lines below
 import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
-import { hull, wake, flame, burn, glow as flameGlow, mark, TINT, reeds, shine, halo, flood } from './looks.js?v=3';
+import { hull, wake, flame, burn, glow as flameGlow, mark, TINT, reeds, shine, halo, flood, cheer } from './looks.js?v=4';
 
 const query = new URLSearchParams(location.search);
 const gain = Number(query.get('gain')) || 1.3; // boat travel per finger travel; ?gain= to compare
@@ -128,6 +144,7 @@ const PACKS = [
   { id: 'flame', name: 'Flames', items: [['amber', 'Candle flame', '255,170,80'], ['bluef', 'Gas flame', '110,180,255'], ['green', 'Marsh fire', '120,230,140'], ['rose', 'Sparkler', '255,120,170'], ['white', 'Star light', '235,235,255'], ['violetf', 'Twin flame', '190,130,255']] },
   { id: 'power', name: 'Abilities', items: [['boost', 'Boost', TINT.boost, 'Gold arrows. Fast, and nothing can break the boat.'], ['slow', 'Slow water', TINT.slow, 'Violet clock. The river slows; dawn keeps coming.'], ['size', 'Size', TINT.size, 'Teal rings. A smaller boat, four times in five.'], ['magnet', 'Magnet', TINT.magnet, 'Pink magnet. Embers swim to you.'], ['flare', 'Flare', TINT.flare, 'White sun. The flame is filled and holds.']] },
   { id: 'crash', name: 'Crashes', items: [['burst', 'Fireworks', '#ff9a3c', 'The lantern bursts into sparks.'], ['freeze', 'Freeze', '#9fd8ff', 'The boat ices over and shatters.'], ['ghost', 'Ghost', '#d8d8ff', 'The boat rises as a ghost.'], ['bolt', 'Lightning', '#ffe45a', 'A bolt strikes the boat.'], ['splash', 'Big splash', '#4fa3e0', 'A column of water swallows the boat.']] },
+  { id: 'win', name: 'Victories', items: [['works', 'Rockets', '#ff7ac8', 'Rockets burst over the river at dawn.'], ['rise', 'Sky lanterns', '#ffb65e', 'Paper lanterns rise into the morning.'], ['birds', 'Birds', '#c9d4ea', 'A flock crosses the dawn.'], ['bow', 'Rainbow', '#7fd6a0', 'A rainbow spans the river.'], ['petal', 'Blossom', '#ffc4dc', 'Blossom falls on the water.']] },
 ];
 const COST = 50;
 // Rebirth (tester t1, note #73): once every pack is found and all 50 nights are open, the player may start over from night 1 with nothing.
@@ -157,6 +174,26 @@ twoOn();
 // With none on, a crash plays the effect that fits what was hit, as before. lantern-crash: a JSON list of the crash effects switched on.
 const CRASH_ON = 3;
 let crashOn = [].concat(store.json('lantern-crash', [])).filter(k => typeof k === 'string' && owned.has(k)).slice(0, CRASH_ON);
+// The victory pack (tester t1, notes #75 and #96): dawn effects found in a pack; up to three are switched on, and a dawn plays one of them at random.
+// With none on, dawn is the plain dawn. lantern-win: a JSON list of the victory effects switched on.
+const WIN_ON = 3;
+let winOn = [].concat(store.json('lantern-win', [])).filter(k => typeof k === 'string' && owned.has(k)).slice(0, WIN_ON);
+// The player's name (tester t1, notes #76 and #96), typed above the title. It is kept on this phone and sent nowhere. lantern-name: plain text, 12 characters at most.
+const tidy = v => String(v ?? '').replace(/[^\p{L}\p{N} _.-]/gu, '').replace(/\s+/g, ' ').slice(0, 12);
+let name = tidy(read('lantern-name', '')).trim();
+// The leaderboard (notes #69, #76 and #96): the ten best endless runs on this phone, each with the name set when it was played.
+// A board shared between players needs a server and is the owner's decision; rows() is the one place the list comes from, so a shared source can replace it.
+// lantern-board: a JSON list of { n: name, s: score, t: time in ms }, best first.
+const BOARD = 10;
+const rows = () => [].concat(store.json('lantern-board', [])).filter(r => r && Number.isFinite(r.s) && r.s > 0).map(r => ({ n: tidy(r.n).trim(), s: Math.floor(r.s), t: Number(r.t) || 0 })).sort((a, b) => b.s - a.s || a.t - b.t).slice(0, BOARD);
+let fresh = 0;
+function boardAdd(pts) { // returns the place the run took, or 0 when it did not make the list
+  if (!(pts > 0)) return 0;
+  const row = { n: name, s: pts, t: Date.now() }, list = [...rows(), row].sort((a, b) => b.s - a.s || a.t - b.t).slice(0, BOARD), at = list.indexOf(row) + 1;
+  if (at) { store.set('lantern-board', JSON.stringify(list)); fresh = row.t; }
+  return at;
+}
+if (!rows().length && store.get('lantern-best-endless') > 0) store.set('lantern-board', JSON.stringify([{ n: name, s: store.get('lantern-best-endless'), t: 1 }])); // a best from before the board is its first row
 const skin = kind => { const pack = PACKS.find(p => p.id === kind); return pack.items.find(i => i[0] === worn[kind]) ?? pack.items[0]; };
 // A shop button shows the thing itself: the boat drawn small, or the flame after half a second of burning.
 const shots = new Map();
@@ -171,6 +208,7 @@ function icon(q, id, col) { // a crash effect, drawn small for its shop button
 }
 function swatch(kind, it) {
   if (kind === 'water') return it[2];
+  if (kind === 'win' && !shots.has(it[0])) { const c = document.createElement('canvas'), q = c.getContext('2d'); c.width = c.height = 96; q.fillStyle = it[0] === 'birds' ? '#e9b98a' : '#0a1220'; q.fillRect(0, 0, 96, 96); cheer(q, it[0], 96, 96, it[0] === 'bow' ? 150 : 230, it[0] === 'works' ? 0.75 : it[0] === 'birds' ? 1.9 : 2.6); shots.set(it[0], `url(${c.toDataURL()}) center / cover`); }
   if (kind === 'crash' && !shots.has(it[0])) { const c = document.createElement('canvas'), q = c.getContext('2d'); c.width = c.height = 96; q.fillStyle = '#0a1220'; q.fillRect(0, 0, 96, 96); icon(q, it[0], it[2]); shots.set(it[0], `url(${c.toDataURL()}) center / cover`); }
   if (kind === 'power' && !shots.has(it[0])) { const c = document.createElement('canvas'), q = c.getContext('2d'); c.width = c.height = 96; q.fillStyle = `rgba(${it[2]},.45)`; q.fillRect(0, 0, 96, 96); mark(q, it[0], 48, 50, 17, 5, 0.3); shots.set(it[0], `#0a1220 url(${c.toDataURL()}) center / cover`); }
   if (!shots.has(it[0])) {
@@ -194,17 +232,17 @@ addEventListener('resize', resize); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', lastLevel = 1, nearFall = false, sayTimer = 0, shown = '', weather = '';
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
-window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, field: s.field, crashOn, crash: crash && crash.how, unit: unit / dpr }); // read by the browser checks
+window.lanternState = () => ({ victory: victory?.how ?? '', winOn: [...winOn], name, board: rows(), x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, field: s.field, crashOn, crash: crash && crash.how, unit: unit / dpr }); // read by the browser checks
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 
-const cards = screens(['menu', 'shop', 'credits', 'card']);
+const cards = screens(['menu', 'shop', 'board', 'credits', 'card']);
 function show(name) {
   screen = name;
   cards(name);
   const play = name === 'play';
   $('hud').style.display = $('big').style.display = play ? 'block' : 'none'; pauseButton.style.display = play ? 'grid' : 'none';
   if (!play) $('warn').classList.remove('on');
-  if (name === 'menu') menu(); if (name === 'shop') shop();
+  if (name === 'menu') menu(); if (name === 'shop') shop(); if (name === 'board') board();
 }
 function menu() {
   $('stars').textContent = reborn ? ` · ${'★'.repeat(Math.min(5, reborn))}${reborn > 5 ? reborn : ''}` : '';
@@ -246,7 +284,7 @@ function shop(text) {
         if (rb.dataset.sure !== '1') { rb.dataset.sure = '1'; rb.textContent = 'Tap again to be reborn'; return; }
         reborn++; store.set('lantern-rebirths', reborn);
         bank = 0; store.set('lantern-bank', 0); owned = new Set(['oak', 'blue', 'amber', 'boost']); store.set('lantern-owned', '[]');
-        worn = { boat: 'oak', water: 'blue', flame: 'amber' }; store.set('lantern-worn', JSON.stringify(worn)); off = new Set(); store.set('lantern-off', '[]'); crashOn = []; store.set('lantern-crash', '[]');
+        worn = { boat: 'oak', water: 'blue', flame: 'amber' }; store.set('lantern-worn', JSON.stringify(worn)); off = new Set(); store.set('lantern-off', '[]'); crashOn = []; store.set('lantern-crash', '[]'); winOn = []; store.set('lantern-win', '[]');
         stats = {}; store.set('lantern-stats', '{}'); opened = stage = 1; store.set('lantern-night', 1); store.set('lantern-tower-at', 1);
         rec.event('rebirth', { rebirths: reborn });
         const fl = $('flash'); fl.style.transition = 'none'; fl.style.background = '#ffe08a'; fl.style.opacity = 1; void fl.offsetWidth; fl.style.transition = 'opacity 1.8s ease-out'; fl.style.opacity = 0;
@@ -266,11 +304,16 @@ function shop(text) {
       b.className = 'item' + (has ? '' : ' locked') + (worn[pack.id] === it[0] || (pack.id === 'power' && has) ? ' worn' : ''); b.dataset.item = it[0]; b.setAttribute('aria-label', has ? it[1] : 'Not found yet');
       if (has && pack.id === 'power' && off.has(it[0])) b.className = 'item off';
       if (pack.id === 'crash') b.className = 'item' + (!has ? ' locked' : crashOn.includes(it[0]) ? ' worn' : ' off');
+      if (pack.id === 'win') b.className = 'item' + (!has ? ' locked' : winOn.includes(it[0]) ? ' worn' : ' off');
       if (has) { b.style.background = swatch(pack.id, it); b.addEventListener('click', () => { if (busy) return;
         if (pack.id === 'crash') { // up to three crash effects on; with none on, a crash fits what was hit
           if (crashOn.includes(it[0])) crashOn = crashOn.filter(k => k !== it[0]); else if (crashOn.length >= CRASH_ON) { shop(`Only ${CRASH_ON} crashes at a time. Switch one off first.`); return; } else crashOn.push(it[0]);
           store.set('lantern-crash', JSON.stringify(crashOn)); rec.event('crash-pick', { crash: it[0], on: crashOn.includes(it[0]) });
           shop(crashOn.includes(it[0]) ? `${it[1]} is on. ${it[3]}` : crashOn.length ? `${it[1]} is off.` : `${it[1]} is off. With no crash on, each crash fits what you hit.`); return; }
+        if (pack.id === 'win') { // up to three victories on; with none on, dawn is the plain dawn
+          if (winOn.includes(it[0])) winOn = winOn.filter(k => k !== it[0]); else if (winOn.length >= WIN_ON) { shop(`Only ${WIN_ON} victories at a time. Switch one off first.`); return; } else winOn.push(it[0]);
+          store.set('lantern-win', JSON.stringify(winOn)); rec.event('victory-pick', { victory: it[0], on: winOn.includes(it[0]) });
+          shop(winOn.includes(it[0]) ? `${it[1]} is on. ${it[3]}` : winOn.length ? `${it[1]} is off.` : `${it[1]} is off. With no victory on, dawn is the plain dawn.`); return; }
         if (pack.id === 'power') { // tap an ability to keep it out of the river, tap again to bring it back; two at most
         if (off.has(it[0]) && powersOwned().length >= PICK) { shop(`Only ${PICK} abilities at a time. Switch one off first.`); return; }
         if (off.has(it[0])) off.delete(it[0]); else off.add(it[0]); store.set('lantern-off', JSON.stringify([...off]));
@@ -284,10 +327,11 @@ function shop(text) {
       if (bank < COST || !rest.length || busy) return;
       const it = rest[Math.floor(Math.random() * rest.length)];
       // The pack is paid for and the find is saved at once; the hop and the flash only show it.
-      bank -= COST; store.set('lantern-bank', bank); owned.add(it[0]); store.set('lantern-owned', JSON.stringify([...owned])); if (pack.id !== 'power' && pack.id !== 'crash') { worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); }
+      bank -= COST; store.set('lantern-bank', bank); owned.add(it[0]); store.set('lantern-owned', JSON.stringify([...owned])); if (pack.id !== 'power' && pack.id !== 'crash' && pack.id !== 'win') { worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); }
       let after = '';
       if (pack.id === 'power' && twoOn().includes(it[0])) after = ` It is off: only ${PICK} abilities at a time. Switch one off to use it.`;
       if (pack.id === 'crash') { if (crashOn.length < CRASH_ON) { crashOn.push(it[0]); store.set('lantern-crash', JSON.stringify(crashOn)); after = ' It is on.'; } else after = ` It is off: only ${CRASH_ON} crashes at a time.`; }
+      if (pack.id === 'win') { if (winOn.length < WIN_ON) { winOn.push(it[0]); store.set('lantern-win', JSON.stringify(winOn)); after = ' It is on.'; } else after = ` It is off: only ${WIN_ON} victories at a time.`; }
       rec.event('buy', { pack: pack.id, item: it[0], bank });
       $('bank2').textContent = bank; audio(); spin(row, rest.map(i => i[0]), it, pack, after);
     });
@@ -297,7 +341,7 @@ function shop(text) {
     const t = document.createElement('div'); t.className = 'pack test'; const tn = document.createElement('b'); tn.textContent = 'Tester tools'; const tw = document.createElement('small'); tw.className = 'once'; tw.textContent = 'For testing only. These go away when the game launches.'; t.append(tn, tw);
     for (const [id, label, act] of [['embers', '+500 embers', () => { bank += 500; store.set('lantern-bank', bank); return 'Added 500 embers.'; }],
       ['nights', 'Open all nights', () => { opened = NIGHTS; stage = NIGHTS; store.set('lantern-night', opened); return `All ${NIGHTS} nights are open.`; }],
-      ['all', 'Find everything', () => { for (const p of PACKS) for (const i of p.items) owned.add(i[0]); store.set('lantern-owned', JSON.stringify([...owned])); twoOn(); return `Every boat, water, flame, ability and crash is yours. Pick ${PICK} abilities and up to ${CRASH_ON} crashes.`; }]]) {
+      ['all', 'Find everything', () => { for (const p of PACKS) for (const i of p.items) owned.add(i[0]); store.set('lantern-owned', JSON.stringify([...owned])); twoOn(); return `Every boat, water, flame, ability, crash and victory is yours. Pick ${PICK} abilities, and up to ${CRASH_ON} crashes and ${WIN_ON} victories.`; }]]) {
       const b = document.createElement('button'); b.dataset.test = id; b.textContent = label; b.addEventListener('click', () => { if (busy) return; const said = act(); rec.event('test', { tool: id, bank }); shop(said); }); t.append(b);
     }
     // Erase everything (tester t1, note #73): every lantern- key goes, so the game starts as a new player's would. Two taps, so a stray one does nothing.
@@ -329,7 +373,7 @@ function spin(row, hidden, it, pack, after = '') {
       const col = pack.id === 'flame' || pack.id === 'power' ? `rgb(${it[2]})` : it[2], fl = $('flash');
       fl.style.transition = 'none'; fl.style.background = col; fl.style.opacity = 0.9; void fl.offsetWidth; fl.style.transition = 'opacity 1.1s ease-out'; fl.style.opacity = 0;
       tone(659.25, 0.5, 0.1, 'triangle'); setTimeout(() => tone(987.77, 0.8, 0.1, 'triangle'), 130); setTimeout(() => tone(1318.5, 1, 0.08, 'triangle'), 260);
-      shop((pack.id === 'power' || pack.id === 'crash' ? `You found: ${it[1]}! ${it[3]}` : `You found: ${it[1]}!`) + after);
+      shop((pack.id === 'power' || pack.id === 'crash' || pack.id === 'win' ? `You found: ${it[1]}! ${it[3]}` : `You found: ${it[1]}!`) + after);
     }, 420);
   };
   hop();
@@ -339,7 +383,7 @@ function spin(row, hidden, it, pack, after = '') {
 let looking = '';
 function look(kind) {
   if (looking) return;
-  looking = kind; s = create(7, 1, false, []); s.light = 1; target = s.x; crash = null; size = 1;
+  looking = kind; s = create(7, 1, false, []); s.light = 1; target = s.x; crash = null; victory = null; size = 1;
   show('look'); $('look').classList.add('on'); document.body.classList.add('looking');
   say('Tap to go back', 1400);
 }
@@ -375,7 +419,7 @@ function begin() {
   const fresh = !tower || !onward; onward = false; if (fresh) { runStats = stats; stats = {}; store.set('lantern-stats', '{}'); } // stats last one run; a whole climb is one run
   s = create((Math.random() * 2 ** 31) | 0, tower ? towerStage(climb) : endless ? 1 : stage, tower ? 'tower' : endless, powersOwned(), runStats, climb, reborn); // after a rebirth the story nights run faster
   const boosted = fresh && Object.values(runStats).some(v => v > 0);
-  target = s.x; crash = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; steer.reset();
+  target = s.x; crash = null; victory = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; steer.reset();
   shown = ''; show('play'); hud();
   say((tower ? (climb > LEVELS ? `Tower sector 2, level ${climb - LEVELS} of ${LEVELS}` : `Tower level ${climb} of ${LEVELS}`) : endless ? 'Endless river' : `Night ${stage}`) + (boosted ? '. Your stats are on for this run' : ''), 1800); floor = 0;
   rec.start({ mode: mode(), night: tower || endless ? 0 : stage, ...(tower ? { level: climb } : {}) });
@@ -398,12 +442,14 @@ function finish() {
     else if (won && climb === LEVELS) { $('title').textContent = 'Sector 1 cleared'; $('line').textContent = `You climbed all ${LEVELS} levels. Sector 2 holds ${LEVELS} more, and each is harder again.`; $('go').textContent = 'Climb on to sector 2'; $('toMenu').textContent = 'Stop'; }
     else if (won) {
       const faster = Math.round((climbPace(climb + 1) / climbPace(1) - 1) * 100), joins = towerStage(climb + 1) > towerStage(climb) ? ` New: ${ahead(towerStage(climb + 1))}` : '';
-      $('title').textContent = `${head(climb)} cleared`; // the card's title stays on one line; the line under it names the sector $('line').textContent = `${Tag(climb + 1)} is harder: ${faster >= 5 ? `${faster}% faster than level 1` : 'faster'}, closer rocks, a narrower river.${joins} Climb on, or stop here and go on from ${tag(climb + 1)} later.`;
+      // the card's title stays on one line; the line under it names the sector
+      $('title').textContent = `${head(climb)} cleared`; $('line').textContent = `${Tag(climb + 1)} is harder: ${faster >= 5 ? `${faster}% faster than level 1` : 'faster'}, closer rocks, a narrower river.${joins} Climb on, or stop here and go on from ${tag(climb + 1)} later.`;
       $('go').textContent = `Climb on to ${tag(climb + 1)}`; $('toMenu').textContent = 'Stop';
     } else { $('title').textContent = head(climb); $('line').textContent = `${why} Best ${best > LEVELS ? tag(best) : `${best} of ${LEVELS}`}. Your climb goes on from ${tag(climb)}.`; $('go').textContent = `Try ${tag(climb)} again`; }
   } else if (endless) {
     const pts = score(s), best = Math.max(pts, store.get('lantern-best-endless')); store.set('lantern-best-endless', best);
-    $('title').textContent = `${pts}`; $('line').textContent = `${why} Best ${best}.`; $('go').textContent = 'Play again';
+    const place = boardAdd(pts);
+    $('title').textContent = `${pts}`; $('line').textContent = `${why} Best ${best}.${place ? ` Place ${place} on the leaderboard${name ? '' : '. Enter your name on the menu'}.` : ''}`; $('go').textContent = 'Play again';
   } else {
     const pct = Math.floor(progress(s) * 100), key = `lantern-best-${stage}`, best = Math.max(pct, store.get(key)); store.set(key, best);
     $('title').textContent = won ? 'Dawn' : s.over === 'dark' ? 'Dark' : `Night ${stage}`;
@@ -412,11 +458,22 @@ function finish() {
     else { $('line').textContent = `${why} ${pct}% of the way to dawn. Best ${best}%.`; $('go').textContent = 'Play again'; }
   }
   $('sub').textContent = gained;
+  if (won && winOn.length) cheerFx();
   setTimeout(() => { if (!playing && screen === 'play') show('card'); }, won ? 2600 : crash ? 1300 : 700); // a crash plays out before the card
 }
 // Crashes look and sound different by what was hit (the lab's experiment from note #69's crash idea; remove crashFx and its drawing to go back).
 // A rock sinks the boat or smashes it, at random; the bank tips it over the bank; ice cracks it; a whirlpool swallows it; a geyser throws it.
 let crash = null;
+// A dawn plays one of the victories switched on (the victory pack). It is drawn over the dawn in draw().
+let victory = null;
+function cheerFx() {
+  const how = winOn[Math.floor(Math.random() * winOn.length)]; victory = { how, t0: performance.now() }; rec.event('victory', { how });
+  if (how === 'works') for (let i = 0; i < 7; i++) setTimeout(() => { if (victory) { tone(180 + 40 * (i % 3), 0.5, 0.12, 'triangle', -120); tone(1400 + 300 * (i % 4), 0.25, 0.04, 'square', -600); } }, 350 + i * 420);
+  else if (how === 'rise') [392, 493.88, 587.33, 783.99].forEach((f, i) => setTimeout(() => tone(f, 2.2, 0.06), 300 + i * 500));
+  else if (how === 'birds') for (let i = 0; i < 9; i++) setTimeout(() => tone(2100 + 500 * ((i * 7) % 4), 0.12, 0.05, 'sine', 700), 400 + i * 260 + (i % 2) * 90);
+  else if (how === 'bow') [523.25, 587.33, 659.25, 783.99, 880, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 1.4, 0.06, 'triangle'), 200 + i * 220));
+  else [1318.5, 1174.7, 1046.5, 880, 783.99].forEach((f, i) => setTimeout(() => tone(f, 1.2, 0.045), 300 + i * 380));
+}
 const SINKS = ['rock', 'chaser', 'hidden', 'isle', 'spinner', 'log'];
 function crashFx(cause) {
   const how = crashOn.length ? crashOn[Math.floor(Math.random() * crashOn.length)] : cause === 'bank' ? 'tip' : cause === 'ice' ? 'crack' : cause === 'pool' ? 'swirl' : cause === 'geyser' ? 'throw' : SINKS.includes(cause) && Math.random() < 0.5 ? 'sink' : 'smash';
@@ -464,6 +521,16 @@ $('less').addEventListener('click', () => { stage = Math.max(1, stage - 1); menu
 $('more').addEventListener('click', () => { stage = Math.min(opened, stage + 1); menu(); });
 $('toShop').addEventListener('click', () => show('shop'));
 $('toCredits').addEventListener('click', () => show('credits'));
+$('toBoard').addEventListener('click', () => show('board'));
+// The name is saved as it is typed. Enter or a tap elsewhere puts the keyboard away.
+$('name').value = name;
+$('name').addEventListener('input', e => { const v = tidy(e.target.value); if (v !== e.target.value) e.target.value = v; name = v.trim(); store.set('lantern-name', name); });
+$('name').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
+function board() {
+  const list = rows(), ol = $('rows'); ol.textContent = '';
+  list.forEach((r, i) => { const li = document.createElement('li'); if (r.t === fresh) li.className = 'new'; for (const t of [`${i + 1}.`, r.n || 'No name', `${r.s}`]) { const sp = document.createElement('span'); sp.textContent = t; li.append(sp); } ol.append(li); });
+  $('boardNote').textContent = (list.length ? '' : 'No runs yet. Play the endless river to set the first score. ') + (name ? `New runs are saved as ${name}. ` : 'Enter your name on the menu so your runs carry it. ') + 'Only runs on this phone are listed. A board shared with other players is not built yet.';
+}
 for (const b of document.querySelectorAll('.back')) b.addEventListener('click', () => show('menu'));
 $('go').addEventListener('click', () => { if (paused) resume(); else if (performance.now() - ended > 600) { if (tower) { onward = s.over === 'dawn' && climbNext > climb; climb = climbNext; } begin(); } });
 // Lab recording (experiments/kit/lab.js): the notice on the menu, the switch on the pause card; begin, finish, quit and the shop call rec.
@@ -485,6 +552,7 @@ pauseButton.addEventListener('pointerdown', e => { e.stopPropagation(); e.preven
 onLeave(pause);
 const keys = new Set();
 addEventListener('keydown', e => {
+  if (e.target instanceof HTMLInputElement) return;
   if (looking) { unlook(); return; }
   if (isPauseKey(e)) { paused ? resume() : pause(); return; }
   if (paused) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); resume(); } return; }
@@ -725,6 +793,7 @@ function draw(now) {
     g.fillStyle = d; g.fillRect(-20, -20, W + 40, H + 40);
     g.globalCompositeOperation = 'lighter'; flood(g, W, H, dawn, day); g.globalCompositeOperation = 'source-over'; // the morning pours down the river
   }
+  if (victory) cheer(g, victory.how, W, H, unit, (now - victory.t0) / 1000);
   // progress: a thin line at the top edge on a story night
   if (!s.endless) { g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * progress(s), 3 * dpr); }
 }

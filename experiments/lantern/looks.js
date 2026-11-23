@@ -169,3 +169,53 @@ export function flood(g, W, H, near, day) {
   z.addColorStop(0, `rgba(255,226,170,${a})`); z.addColorStop(0.4, `rgba(255,170,100,${a * 0.5})`); z.addColorStop(1, 'rgba(255,140,80,0)');
   g.fillStyle = z; g.fillRect(0, 0, W, H);
 }
+
+// The victory pack (tester t1, notes #75 and #96): what plays over the river at dawn. e is the seconds since the win.
+// Each effect is laid out from fixed numbers, so it looks the same each time and needs no state. It fades out by 6 s.
+export function cheer(g, how, W, H, u, e) {
+  const fade = Math.max(0, Math.min(1, e * 3, (6 - e) / 1.5)); if (fade <= 0) return;
+  g.save(); g.lineCap = 'round';
+  if (how === 'works') { // rockets climb and burst into rings of sparks that fall. Strong colours, drawn plainly: added light turns white on a bright dawn.
+    const COL = ['235,40,140', '240,120,20', '30,130,235', '40,170,80', '230,60,50', '130,70,230'];
+    for (let i = 0; i < 7; i++) {
+      const t = e - i * 0.42; if (t < 0) continue;
+      const x = W * (0.16 + 0.68 * hash(i, 1.7)), y = H * (0.14 + 0.3 * hash(i, 4.1)), col = COL[i % 6];
+      if (t < 0.35) { const k = t / 0.35, yy = H + (y - H) * (1 - (1 - k) * (1 - k)); g.strokeStyle = `rgba(${col},${0.8 * fade})`; g.lineWidth = 0.006 * u; g.beginPath(); g.moveTo(x, yy + 0.05 * u); g.lineTo(x, yy); g.stroke(); continue; }
+      const b = t - 0.35, a = Math.max(0, 1 - b / 1.5) * fade; if (a <= 0) continue;
+      const R = u * (0.17 + 0.09 * hash(i, 9.3)) * (1 - Math.exp(-b * 4));
+      for (let j = 0; j < 30; j++) {
+        const an = j / 30 * 6.283 + hash(i, j) * 0.25, r = R * (0.55 + 0.45 * hash(j, i + 0.5)), px = x + Math.cos(an) * r, py = y + Math.sin(an) * r + 0.11 * u * b * b;
+        g.fillStyle = `rgba(${j % 5 ? col : '255,255,240'},${a})`; g.beginPath(); g.arc(px, py, u * 0.007 * (0.6 + a), 0, 7); g.fill();
+      }
+      if (b < 0.15) { const z = g.createRadialGradient(x, y, 0, x, y, u * 0.2); z.addColorStop(0, `rgba(${col},${0.5 * (1 - b / 0.15) * fade})`); z.addColorStop(1, `rgba(${col},0)`); g.fillStyle = z; g.fillRect(x - u * 0.2, y - u * 0.2, u * 0.4, u * 0.4); }
+    }
+  } else if (how === 'rise') { // paper lanterns lift off the water and drift up into the morning
+    for (let i = 0; i < 16; i++) {
+      const t = e - hash(i, 2.2) * 1.6; if (t < 0) continue;
+      const sc = 0.6 + 0.8 * hash(i, 5.5), x = W * (0.06 + 0.88 * hash(i, 8.8)) + Math.sin(e * 1.3 + i) * 0.02 * u, y = H * (1.05 - t * (0.16 + 0.1 * sc)), w = 0.028 * u * sc, h = 0.04 * u * sc;
+      g.globalCompositeOperation = 'lighter'; const z = g.createRadialGradient(x, y, 0, x, y, w * 3.2); z.addColorStop(0, `rgba(255,170,80,${0.45 * fade})`); z.addColorStop(1, 'rgba(255,150,60,0)'); g.fillStyle = z; g.fillRect(x - w * 3.2, y - w * 3.2, w * 6.4, w * 6.4);
+      g.globalCompositeOperation = 'source-over'; g.globalAlpha = fade; g.fillStyle = '#ffb65e'; g.beginPath(); g.moveTo(x - w * 0.7, y - h); g.lineTo(x + w * 0.7, y - h); g.lineTo(x + w, y + h * 0.6); g.lineTo(x + w * 0.6, y + h); g.lineTo(x - w * 0.6, y + h); g.lineTo(x - w, y + h * 0.6); g.closePath(); g.fill();
+      g.fillStyle = '#fff1c4'; g.beginPath(); g.ellipse(x, y + h * 0.35, w * 0.45, h * 0.4, 0, 0, 7); g.fill(); g.globalAlpha = 1;
+    }
+  } else if (how === 'birds') { // a flock crosses the dawn from the lower left, wings beating
+    g.strokeStyle = `rgba(28,24,38,${0.85 * fade})`;
+    for (let i = 0; i < 15; i++) {
+      const row = Math.floor((i + 1) / 2), side = i % 2 ? 1 : -1, k = e * 0.3 - 0.12, sz = u * 0.03 * (0.8 + 0.4 * hash(i, 3.3));
+      const x = W * (-0.15 + 1.3 * k) - row * 0.07 * u + Math.sin(e * 2 + i) * 0.006 * u, y = H * (0.62 - 0.5 * k) + side * row * 0.045 * u + row * 0.03 * u, f = Math.sin(e * 9 + i * 1.7) * 0.55;
+      g.lineWidth = sz * 0.16; g.beginPath(); g.moveTo(x - sz, y - sz * f); g.quadraticCurveTo(x - sz * 0.4, y - sz * 0.35 * (1 + f), x, y); g.quadraticCurveTo(x + sz * 0.4, y - sz * 0.35 * (1 + f), x + sz, y - sz * f); g.stroke();
+    }
+  } else if (how === 'bow') { // a rainbow is drawn from bank to bank, then shimmers
+    const sweep = Math.min(1, e / 1.4), cx = W / 2, cy = H * 0.455, R = Math.max(W * 0.62, u * 0.3);
+    ['255,70,70', '255,150,50', '255,225,80', '90,220,110', '80,160,255', '150,100,240'].forEach((col, i) => {
+      g.strokeStyle = `rgba(${col},${(0.5 + 0.08 * Math.sin(e * 3 + i)) * fade})`; g.lineWidth = 0.0215 * u; g.beginPath(); g.arc(cx, cy, R - i * 0.021 * u, Math.PI, Math.PI * (1 + sweep)); g.stroke();
+    });
+    for (let i = 0; i < 12; i++) { const a = Math.PI * (1 + hash(i, 6.1) * sweep), r = R - hash(i, 2.9) * 0.12 * u, tw = Math.max(0, Math.sin(e * 4 + i * 2.1)); g.fillStyle = `rgba(255,255,255,${0.8 * tw * fade})`; g.beginPath(); g.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 0.005 * u, 0, 7); g.fill(); }
+  } else { // blossom falls on the water, turning as it comes
+    for (let i = 0; i < 46; i++) {
+      const sp = 0.16 + 0.14 * hash(i, 1.1), y = ((hash(i, 7.7) * 1.2 + e * sp) % 1.2 - 0.1) * H, x = W * hash(i, 4.4) + Math.sin(e * 1.4 + i * 0.9) * 0.05 * u, s = u * 0.013 * (0.7 + 0.6 * hash(i, 9.9));
+      g.save(); g.translate(x, y); g.rotate(e * (1 + hash(i, 0.3) * 2) + i); g.scale(1, 0.45 + 0.4 * Math.abs(Math.sin(e * 2.2 + i)));
+      g.fillStyle = `rgba(${i % 3 ? '255,196,220' : '255,236,242'},${0.9 * fade})`; g.beginPath(); g.moveTo(0, -s); g.bezierCurveTo(s, -s * 0.6, s * 0.7, s * 0.8, 0, s); g.bezierCurveTo(-s * 0.7, s * 0.8, -s, -s * 0.6, 0, -s); g.fill(); g.restore();
+    }
+  }
+  g.restore();
+}

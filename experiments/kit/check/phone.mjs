@@ -266,7 +266,7 @@ const GAMES = {
     assert.equal(await page.textContent('#play'), 'Play night 50'); assert.match(await page.textContent('#about'), /This is the last night/);
     await page.click('#less'); assert.doesNotMatch(await page.textContent('#about'), /last night/);
     // Rebirth (note #73): a goal until everything is found and all 50 nights are open; then two taps start over with 25% more embers for good.
-    await page.click('#toShop'); assert.equal(await page.isVisible('#rebirth'), false, 'no rebirth before everything is found'); assert.match(await page.textContent('#packs'), /Find everything \(\d+ of 28\)/);
+    await page.click('#toShop'); assert.equal(await page.isVisible('#rebirth'), false, 'no rebirth before everything is found'); assert.match(await page.textContent('#packs'), /Find everything \(\d+ of 33\)/);
     await page.click('[data-test="all"]'); await page.click('[data-test="nights"]');
     await page.click('#rebirth'); assert.equal((await state()).reborn, 0, 'one tap is not a rebirth'); await page.click('#rebirth');
     st = await state(); assert.equal(st.reborn, 1); assert.equal(st.bank, 0); assert.equal(st.opened, 1); assert.deepEqual(st.owned.sort(), ['amber', 'blue', 'boost', 'oak']);
@@ -296,6 +296,21 @@ const GAMES = {
     await page.click('.back'); await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.hearts = 1; s.shield = 0; s.safe = 0; s.x = 5; });
     await until(page, () => window.lanternState().crash === 'burst', 'a crash plays the crash switched on');
     await until(page, () => window.lanternState().screen === 'card', 'crash card'); await page.click('#toMenu');
+    // The victory pack (note #96): up to three on, saved under lantern-win; a dawn plays one of those switched on.
+    await page.click('#toShop'); for (const id of ['works', 'rise', 'birds']) await page.click(`[data-item="${id}"]`);
+    await page.click('[data-item="bow"]'); assert.match(await page.textContent('#got'), /Only 3 victories at a time/); assert.deepEqual(JSON.parse((await saved())['lantern-win']), ['works', 'rise', 'birds']);
+    await page.click('[data-item="works"]'); await page.click('[data-item="rise"]'); assert.deepEqual(JSON.parse((await saved())['lantern-win']), ['birds']);
+    await page.click('.back'); await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.y = 77.9; s.safe = 99; s.light = 1; });
+    await until(page, () => window.lanternState().victory === 'birds', 'a dawn plays the victory switched on', 12000);
+    await until(page, () => window.lanternState().screen === 'card', 'dawn card', 12000); await page.click('#toMenu');
+    // The name and the leaderboard (notes #76 and #96): the name is saved under lantern-name and stays on the phone; lantern-board holds the ten best endless runs.
+    assert.equal((await state()).board.length >= 1, true, 'a best from before the board is its first row');
+    await page.fill('#name', 'Ada <1>'); assert.equal((await saved())['lantern-name'], 'Ada 1', 'the name is tidied and saved'); assert.equal((await state()).playing, false, 'typing starts nothing');
+    await page.click('#endless'); await page.evaluate(() => { const s = window.lanternSim(); s.t = 900; s.light = 0.0001; s.hearts = 1; });
+    await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'endless card'); assert.match(await page.textContent('#line'), /Place 1 on the leaderboard/);
+    const top = JSON.parse((await saved())['lantern-board'])[0]; assert.equal(top.n, 'Ada 1'); assert.ok(top.s >= 9000, 'the run is the top row');
+    await page.click('#toMenu'); await page.click('#toBoard'); assert.match(await page.textContent('#rows li.new'), /Ada 1/); assert.match(await page.textContent('#boardNote'), /Only runs on this phone/);
+    assert.ok(!labSent(page).some(r => JSON.stringify(r).includes('Ada 1')), 'the name is not in what the lab records'); await page.click('#board .back');
     // A look on the whole screen (note #73): tapping an owned boat wears it and hides every button; a tap brings the shop back.
     await page.click('#toShop'); await page.click('[data-item="red"]'); st = await state();
     assert.equal(st.looking, 'boat'); assert.equal(st.worn.boat, 'red'); assert.equal(await page.isVisible('#shop'), false, 'the shop hides'); assert.equal(await page.isVisible('#notes-button'), false, 'the notes button hides');
