@@ -1,4 +1,4 @@
-// Checks and measured play: node prototypes/ant-promotion/bots.mjs [seeds] [minutes]
+// Checks and measured play: node experiments/ant-promotion/bots.mjs [seeds] [minutes]
 // 1. the contact rule, every cell   2. the form tree   3. food exists for every form   4. bots play
 import assert from 'node:assert/strict';
 import { SPAWN_WEIGHTS, HIDE_S, hideReady, SAME_FAST, FAST_CAP,

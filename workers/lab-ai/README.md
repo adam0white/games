@@ -1,7 +1,7 @@
 # games-lab-ai
 
 A small Cloudflare Worker that writes a rival's name, title and five short lines for the experiment
-`prototypes/lab/ant-nemesis/` ("Ant Promotion: Nemesis").
+`experiments/lab/ant-nemesis/` ("Ant Promotion: Nemesis").
 
 **Status: not deployed yet.** The game works fully without it: it uses its own offline table of names
 and lines, and only swaps in the model's text when this Worker answers within 4 seconds.

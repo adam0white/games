@@ -316,7 +316,7 @@ $('toShop').addEventListener('click', () => show('shop'));
 $('toCredits').addEventListener('click', () => show('credits'));
 for (const b of document.querySelectorAll('.back')) b.addEventListener('click', () => show('menu'));
 $('go').addEventListener('click', () => { if (paused) resume(); else if (performance.now() - ended > 600) begin(); });
-// Lab recording (prototypes/kit/lab.js): the notice on the menu, the switch on the pause card; begin, finish, quit and the shop call rec.
+// Lab recording (experiments/kit/lab.js): the notice on the menu, the switch on the pause card; begin, finish, quit and the shop call rec.
 const rec = lab('lantern'); rec.notice($('menu').firstElementChild); rec.toggle($('card').firstElementChild);
 // Leaving a paused run for the menu ends it and keeps its embers.
 $('toMenu').addEventListener('click', () => { if (paused) { rec.end('quit', { mode: mode(), night: tower || endless ? 0 : stage, reached: Math.floor(progress(s) * 100), embers: s.taken, hearts: s.hearts }); } if (paused) { paused = false; playing = false; bankRun(); snd.release(); } show('menu'); });

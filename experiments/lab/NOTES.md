@@ -1,6 +1,6 @@
 # Lab experiments log
 
-Wildcard experiments on the two focus games, Lantern and Ant Promotion. Each experiment is a static directory `prototypes/lab/<name>/`, served at `/proto/lab/<name>/`, and tests one idea the main lines would not try. Nothing here changes `prototypes/lantern/` or `prototypes/ant-promotion/`.
+Wildcard experiments on the two focus games, Lantern and Ant Promotion. Each experiment is a static directory `experiments/lab/<name>/`, served at `/lab/<name>/`, and tests one idea the main lines would not try. Nothing here changes `experiments/lantern/` or `experiments/ant-promotion/`.
 
 Rules for this directory:
 

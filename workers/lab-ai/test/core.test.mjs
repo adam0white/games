@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { handle, validate, clean, plain, buildMessages, FORM_NAMES, LIMITS, TEMPERAMENTS, takeOne, dailyCap, utcDay, DEFAULT_DAILY_CAP } from '../src/core.mjs';
-import { FORMS, TEMPERAMENT_NAMES } from '../../../prototypes/lab/ant-nemesis/sim.js';
+import { FORMS, TEMPERAMENT_NAMES } from '../../../experiments/lab/ant-nemesis/sim.js';
 
 const GOOD = { event: 'rise', form: 'Wasp', playerForm: 'Ant', kills: 1, escapes: 0, kin: 0, variant: 0 };
 const PERSONA = { name: 'Old Scar the Wasp', title: 'Terror of the Tall Grass', temperament: 'stalker', persistence: 2, territory: 3,

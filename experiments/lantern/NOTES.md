@@ -38,7 +38,7 @@ Also changed: ice no longer closes the channel against the next row (the audit f
 
 The endless river was audited on 10 seeds out to 30 river lengths, past its last step harder: narrowest gap 0.042, no buried pickup. Bots pick up about 0.5 to 1.5 hearts and shields a run.
 
-Left as proposals: a tower mode, custom matches where the player picks the obstacles, wrecks of earlier boats as obstacles, a new hazard on every one of the 20 nights, and menus and shops for the other two prototypes.
+Left as proposals: a tower mode, custom matches where the player picks the obstacles, wrecks of earlier boats as obstacles, a new hazard on every one of the 20 nights, and menus and shops for the other two experiments.
 
 Checked in Chromium with an iPhone profile: menu, night picker, buying two packs, the refusal at 20 embers, saved shop state after reload, story run, pause and menu, endless run to its end card, waterfall, hearts, the warning, relative steering, dawn opening the next night. Not checked: a real phone, sound, how hard nights 6 to 20 feel to a person, and whether 50 embers a pack is the right price (bots take about 8 to 16 embers a run).
 
@@ -49,7 +49,7 @@ Answers to the lab's questions:
 - Steering by finger slide: "very good" (#27). Keep it.
 - Difficulty: reached night 5; fairly hard up to there; do not change the difficulty (#28).
 - Which idea next: a new obstacle every night (#29). Build it without making nights 1 to 5 harder than now.
-- Which game gets the most work: Lantern and Ant Promotion (#33). See `prototypes/NOTES.md`.
+- Which game gets the most work: Lantern and Ant Promotion (#33). See `experiments/NOTES.md`.
 
 ### Left as a proposal (2026-11-22, note #35)
 
