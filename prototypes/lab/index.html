@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d14">
+<title>Lab experiments</title>
+<style>
+  html, body { margin: 0; min-height: 100%; background: #0b0d14; color: #efe8da; font: 17px/1.5 Georgia, 'Times New Roman', serif; }
+  main { max-width: 34em; margin: 0 auto; padding: 1.4em 1em 3em; }
+  h1 { font-weight: normal; letter-spacing: .08em; color: #ffd9a0; margin: 0 0 .2em; }
+  p { opacity: .85; margin: .4em 0; }
+  a.card { display: block; margin: 1em 0; padding: .9em 1em; border: 1.5px solid #ffd9a055; border-radius: 14px; color: inherit; text-decoration: none; background: #ffffff0a; }
+  a.card b { display: block; font-weight: normal; font-size: 1.25em; color: #ffd9a0; }
+  a.card small { opacity: .7; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Lab experiments</h1>
+  <p>Wild takes on Lantern and Ant Promotion. Each one tests one idea. The main games are not changed by anything here.</p>
+  <div id="list"></div>
+  <p><a href="/proto/lantern/" style="color:#ffd9a0">Lantern</a> · <a href="/proto/ant-promotion/" style="color:#ffd9a0">Ant Promotion</a></p>
+</main>
+<script type="module">
+// One entry per experiment: [directory, title, what it tests, which game it comes from]
+const LIST = [];
+const box = document.getElementById('list');
+if (!LIST.length) box.innerHTML = '<p>The first experiments are being built.</p>';
+for (const [dir, title, what, from] of LIST) {
+  const a = document.createElement('a'); a.className = 'card'; a.href = `./${dir}/`;
+  const b = document.createElement('b'); b.textContent = title;
+  const p = document.createElement('span'); p.textContent = what;
+  const s = document.createElement('small'); s.textContent = ` From ${from}.`;
+  a.append(b, p, s); box.append(a);
+}
+</script>
+</body>
+</html>
