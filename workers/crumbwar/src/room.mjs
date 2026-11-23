@@ -15,7 +15,7 @@ const IDLE_TICKS = 90 * C.TICK_HZ, LAG_TICKS = 8 * C.TICK_HZ, GHOST_TICKS = 30 *
 export class Room extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
-    this.world = null; this.clients = new Map(); this.ghosts = new Map(); this.timer = null; this.name = ''; this.cap = 0;
+    this.world = null; this.clients = new Map(); this.ghosts = new Map(); this.timer = null; this.name = ''; this.cap = 0; this.burn = 0;
     this.stat = { wakes: 0, late10: 0, late50: 0, maxLate: 0, dropped: 0, bytesOut: 0, msgsOut: 0, msgsIn: 0, kicks: 0, joins: 0 };
     // A socket that outlived the memory it belonged to has no ant. Close it; the page joins again.
     for (const ws of ctx.getWebSockets()) try { ws.close(4002, 'restart'); } catch {}
@@ -27,6 +27,8 @@ export class Room extends DurableObject {
     const q = new URL(request.url).searchParams, trusted = q.get('trusted') === '1', ip = q.get('ip') || '?';
     this.name ||= q.get('name');
     if (!this.cap || trusted && q.get('cap')) this.cap = Math.min(240, Number(trusted && q.get('cap') || this.env.HUMAN_CAP || 60));
+    // A load test may ask for wasted work on every tick, to show what an overloaded room looks like in the counters.
+    if (trusted && q.get('burn')) this.burn = Math.min(500, Number(q.get('burn')) || 0) * 1e6;
     if (this.people() >= this.cap) return new Response('full', { status: 409 });
     if (!trusted) { let n = 0; for (const c of this.clients.values()) if (c.ip === ip) n++; if (n >= PER_IP) return new Response('too many from one address', { status: 429 }); }
     const w = this.world ??= this.fresh();
@@ -91,6 +93,7 @@ export class Room extends DurableObject {
   start() {
     if (this.timer !== null) return;
     this.next = Date.now() + TICK_MS;
+    this.t0 = Date.now(); this.tick0 = this.world.tick; // start() runs inside a join, where the clock is real
     const wake = () => {
       const now = Date.now(), late = now - this.next, s = this.stat;
       s.wakes++; if (late > 10) s.late10++; if (late > 50) s.late50++; if (late > s.maxLate) s.maxLate = late;
@@ -107,6 +110,7 @@ export class Room extends DurableObject {
     if (!w) return;
     for (const a of w.ants) if (a && a.bot) think(w, a);
     step(w);
+    if (this.burn) { let x = 0; for (let i = 0; i < this.burn; i++) x += Math.sqrt(i); this.burned = x; }
     const tick = w.tick;
     for (const [type, x, y] of w.events) {
       if (type === 1) {
@@ -137,6 +141,9 @@ export class Room extends DurableObject {
 
   stats() {
     const w = this.world;
-    return { room: this.name, running: !!w, tick: w?.tick ?? 0, people: this.people(), ants: w?.count ?? 0, food: w?.foodCount ?? 0, cap: this.cap, ...this.stat };
+    return { room: this.name, running: !!w, tick: w?.tick ?? 0, people: this.people(), ants: w?.count ?? 0, food: w?.foodCount ?? 0, cap: this.cap, ...this.stat,
+      // The clock inside a timer does not show lateness on Cloudflare (the late counters stay 0 there), so the honest
+      // measure of an overloaded room is ticks per real second, taken at this call, which carries a fresh clock.
+      ticksPerSecond: w && this.t0 ? Math.round((w.tick - this.tick0) / Math.max(1, Date.now() - this.t0) * 10000) / 10 : 0 };
   }
 }
