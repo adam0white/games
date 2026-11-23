@@ -1,6 +1,6 @@
 {
   // Writes the rival ("Nemesis") persona for the lab experiment experiments/lab/ant-nemesis/.
-  // One endpoint, POST /lab-api/persona. No secrets. One Durable Object holds the daily call count. See README.md for the guards and the cost.
+  // POST /lab-api/persona, and the shared leaderboard at /lab-api/board/<game>. No secrets. One Durable Object holds the daily call count. See README.md for the guards and the cost.
   "name": "games-lab-ai",
   "account_id": "a20259cba74e506296745f9c67c1f3bc",
   "main": "./src/index.mjs",
@@ -17,12 +17,13 @@
     // Hard cap on model calls per UTC day, for the whole world. Over it the Worker answers 503 without a model call.
     "DAILY_CAP": "2000"
   },
-  // The daily counter: one SQLite-backed Durable Object.
+  // The daily counter, and one shared leaderboard per game: SQLite-backed Durable Objects.
   "durable_objects": {
-    "bindings": [{ "name": "DAILY", "class_name": "DailyCounter" }]
+    "bindings": [{ "name": "DAILY", "class_name": "DailyCounter" }, { "name": "BOARD", "class_name": "Board" }]
   },
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["DailyCounter"] }
+    { "tag": "v1", "new_sqlite_classes": ["DailyCounter"] },
+    { "tag": "v2", "new_sqlite_classes": ["Board"] }
   ],
   // Spend guards. Counts are kept per Cloudflare location and are approximate (see README).
   "ratelimits": [

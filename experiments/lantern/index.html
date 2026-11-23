@@ -45,6 +45,7 @@
   #rows { list-style: none; padding: 0; margin: .6em auto; max-width: 20em; text-align: left; } #rows li { display: flex; gap: .6em; padding: .3em .2em; border-bottom: 1px solid #ffd9a022; } #rows li.me { color: #ffe08a; }
   #rows .n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } #rows .k { width: 1.6em; opacity: .6; } #rows .d { opacity: .5; font-size: .85em; }
   .hint { font-size: .85em; opacity: .7; }
+  #tabs button, #share { min-width: 7em; min-height: 40px; margin: .15em; font-size: .9em; } #tabs button.on { color: #2a1606; background: #ffb45a; border-color: #ffb45a; }
   #got { min-height: 1.6em; color: #ffe6bd; position: sticky; top: 0; z-index: 2; margin: 0; padding: .45em .3em; background: #070b14f2; border-radius: 0 0 12px 12px; } /* stays in view while the packs scroll */
   #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); display: none; text-align: left; pointer-events: none; text-shadow: 0 1px 6px #000; }
   #hearts { font: 26px/1 sans-serif; color: #ff4d5e; letter-spacing: 2px; }
@@ -97,9 +98,11 @@
 </div></div>
 <div id="board" class="screen veil"><div>
   <h2>Leaderboard</h2>
-  <p class="hint">Endless river, best runs on this phone. Your name and scores stay on this phone.</p>
+  <p class="hint" id="boardHint"></p>
   <p><label for="name">Your name</label><br><input id="name" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p>
+  <p id="tabs" hidden><button id="tabPhone">This phone</button><button id="tabAll">All players</button></p>
   <ol id="rows"></ol>
+  <p id="shareRow" hidden><button id="share"></button><br><span class="hint" id="shareNote"></span></p>
   <p><button id="boardPlay" class="main">Play the endless river</button></p>
   <p><button class="back">Back</button></p>
 </div></div>
@@ -223,7 +226,7 @@ addEventListener('resize', resize); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', lastLevel = 1, nearFall = false, sayTimer = 0, shown = '', weather = '';
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
-window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, field: s.field, crashOn, crash: crash && crash.how, winOn, win: victory && victory.how, name: playerName(), board, unit: unit / dpr }); // read by the browser checks
+window.lanternState = () => ({ sharing, tab, asked, shared: shared ? shared.length : -1, x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, field: s.field, crashOn, crash: crash && crash.how, winOn, win: victory && victory.how, name: playerName(), board, unit: unit / dpr }); // read by the browser checks
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 
 const cards = screens(['menu', 'shop', 'credits', 'card', 'board']);
@@ -341,6 +344,7 @@ function shop(text) {
       if (busy) return;
       if (wipe.dataset.sure !== '1') { wipe.dataset.sure = '1'; wipe.textContent = 'Tap again to erase'; $('got').textContent = 'This erases embers, nights, finds, stats and bests on this phone.'; return; }
       rec.event('test', { tool: 'reset', bank });
+      if (sharing && boardId) boardCall({ id: boardId, remove: true });
       for (const k of Object.keys(localStorage)) if (k.startsWith('lantern-')) localStorage.removeItem(k);
       location.reload();
     });
@@ -439,6 +443,7 @@ function finish() {
   } else if (endless) {
     const pts = score(s), best = Math.max(pts, store.get('lantern-best-endless')); store.set('lantern-best-endless', best);
     const place = onBoard(pts);
+    boardSend(pts);
     $('title').textContent = `${pts}`; $('line').textContent = `${why} Best ${best}.${place ? ` Number ${place} on this phone's leaderboard.` : ''}`; $('go').textContent = 'Play again';
   } else {
     const pct = Math.floor(progress(s) * 100), key = `lantern-best-${stage}`, best = Math.max(pct, store.get(key)); store.set(key, best);
@@ -459,12 +464,39 @@ function onBoard(pts) {
   board = [...board, row].sort((a, b) => b.s - a.s).slice(0, BOARD); store.set('lantern-board', JSON.stringify(board));
   const at = board.indexOf(row); lastRun = at >= 0 ? row : null; return at + 1;
 }
+// The board shared between players (workers/lab-ai, /lab-api/board/lantern). Nothing is sent until the player taps Share on the
+// leaderboard, which says what is sent: the name and the best score, under a random id made here. lantern-share is '1' while sharing
+// and lantern-board-id holds that id. Any bad answer (no server, an error, a slow network, not JSON) gives null, and the screen
+// stays the phone's own board, with no tabs and no share button. The server allows fewer characters in a name than this phone does.
+const BOARD_URL = '/lab-api/board/lantern', BOARD_WAIT = 4000;
+let sharing = read('lantern-share', '') === '1', boardId = read('lantern-board-id', ''), shared = null, tab = 'phone', mine = 0, asked = 0;
+async function boardCall(body) {
+  const stop = new AbortController(), timer = setTimeout(() => stop.abort(), BOARD_WAIT);
+  try {
+    const res = await fetch(BOARD_URL, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: stop.signal, keepalive: true } : { signal: stop.signal });
+    if (!res.ok) return null;
+    const out = await res.json();
+    if (!Array.isArray(out?.rows)) return null;
+    return { place: Number.isInteger(out.place) ? out.place : 0, rows: out.rows.filter(r => r && Number.isFinite(r.s) && r.s > 0).map(r => ({ n: cleanName(r.n), s: Math.floor(r.s) })).slice(0, 20) };
+  } catch { return null; } finally { clearTimeout(timer); }
+}
+// Send a score when the player shares and has a name. The server keeps each player's best.
+async function boardSend(pts) {
+  if (!sharing || !boardId || !playerName() || !(pts > 0)) return;
+  const out = await boardCall({ id: boardId, n: playerName(), s: Math.min(Math.floor(pts), 1000000) });
+  if (out) { shared = out.rows; mine = out.place; if (screen === 'board') boardShow(); }
+}
 function boardShow() {
   if (document.activeElement !== $('name')) $('name').value = playerName();
-  const ol = $('rows'); ol.textContent = '';
-  if (!board.length) { const li = document.createElement('li'); li.textContent = 'No runs yet. Play the endless river to get on the board.'; ol.append(li); return; }
-  board.forEach((r, i) => {
-    const li = document.createElement('li'); if (r === lastRun) li.className = 'me';
+  const all = tab === 'all' && !!shared, list = all ? shared : board, ol = $('rows'); ol.textContent = '';
+  // The tabs and the share button appear only when the shared board answered.
+  $('tabs').hidden = $('shareRow').hidden = !shared; $('tabPhone').className = all ? '' : 'on'; $('tabAll').className = all ? 'on' : '';
+  $('boardHint').textContent = all ? 'Endless river, best runs of the players who share.' : shared ? 'Endless river, best runs on this phone.' : 'Endless river, best runs on this phone. Your name and scores stay on this phone.';
+  $('share').textContent = sharing ? 'Stop sharing' : 'Share my best run';
+  $('shareNote').textContent = sharing ? (playerName() ? `You share as ${playerName()}. Stop sharing takes your row away.` : 'Type a name above and your runs will be shared.') : 'Share sends your name and your best score to this game\'s server. Nothing else is sent.';
+  if (!list.length) { const li = document.createElement('li'); li.textContent = all ? 'Nobody has shared a run yet.' : 'No runs yet. Play the endless river to get on the board.'; ol.append(li); return; }
+  list.forEach((r, i) => {
+    const li = document.createElement('li'); if (all ? i + 1 === mine : r === lastRun) li.className = 'me';
     for (const [c, t] of [['k', `${i + 1}`], ['n', r.n || 'No name'], ['s', `${r.s}`], ['d', r.d ? r.d.slice(5).replace('-', '/') : '']]) { const sp = document.createElement('span'); sp.className = c; sp.textContent = t; li.append(sp); }
     ol.append(li);
   });
@@ -558,7 +590,15 @@ $('less').addEventListener('click', () => { stage = Math.max(1, stage - 1); menu
 $('more').addEventListener('click', () => { stage = Math.min(opened, stage + 1); menu(); });
 $('toShop').addEventListener('click', () => show('shop'));
 $('toCredits').addEventListener('click', () => show('credits'));
-$('toBoard').addEventListener('click', () => show('board'));
+$('toBoard').addEventListener('click', async () => { show('board'); const out = await boardCall(); shared = out ? out.rows : null; asked++; if (!shared) tab = 'phone'; if (screen === 'board') boardShow(); });
+$('tabPhone').addEventListener('click', () => { tab = 'phone'; boardShow(); });
+$('tabAll').addEventListener('click', () => { tab = 'all'; boardShow(); });
+$('share').addEventListener('click', async () => {
+  if (sharing) { const id = boardId; sharing = false; boardId = ''; mine = 0; store.set('lantern-share', ''); store.set('lantern-board-id', ''); boardShow(); const out = await boardCall({ id, remove: true }); if (out) shared = out.rows; boardShow(); return; }
+  tab = 'all'; if (!playerName()) { boardShow(); $('shareNote').textContent = 'Type a name above first. Then share.'; return; }
+  boardId = crypto.randomUUID(); sharing = true; store.set('lantern-share', '1'); store.set('lantern-board-id', boardId); boardShow();
+  await boardSend(board[0]?.s ?? 0);
+});
 $('boardPlay').addEventListener('click', () => { if (busy) return; endless = true; tower = false; begin(); });
 $('name').addEventListener('input', () => { store.set('lantern-name', cleanName($('name').value)); });
 $('name').addEventListener('change', () => { $('name').value = playerName(); boardShow(); });
