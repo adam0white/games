@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#05080f">
+<title>Lantern 3D</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #05080f; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { font: 16px/1.5 Georgia, 'Times New Roman', serif; color: #f3e6cf; }
+  canvas { display: block; width: 100vw; height: 100dvh; }
+  a { color: #ffd9a0; }
+  .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; pointer-events: none; }
+  .screen.on { display: grid; }
+  .screen > div { max-width: 21em; width: calc(100% - 2em); padding: 1em; pointer-events: auto; }
+  #card > div { pointer-events: none; } #card button { pointer-events: auto; }
+  .veil { background: #05080fb0; }
+  h1 { font-weight: normal; font-size: 2.6em; letter-spacing: .12em; margin: 0 0 .2em; color: #ffd9a0; text-shadow: 0 0 28px #ff9a3c88; }
+  p { margin: .4em 0; opacity: .88; }
+  button { font: inherit; color: #ffe6bd; background: #ffffff10; border: 1.5px solid #ffd9a088; border-radius: 999px; padding: .55em 1.2em; margin: .3em; min-width: 9em; min-height: 46px; touch-action: manipulation; }
+  button.main { background: #ffb45a; color: #2a1606; border-color: #ffb45a; font-size: 1.2em; min-width: 9.5em; }
+  .dot { display: inline-block; width: .7em; height: .7em; border-radius: 50%; background: radial-gradient(#fff2c8, #ff9a3c); box-shadow: 0 0 10px #ff9a3c; margin-right: .35em; vertical-align: baseline; }
+  #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); display: none; text-align: left; pointer-events: none; text-shadow: 0 1px 6px #000; }
+  #hearts { font: 26px/1 sans-serif; color: #ff4d5e; letter-spacing: 2px; }
+  #embers { font-size: 26px; line-height: 1.3; color: #ffd9a0; }
+  #big { position: fixed; top: calc(6px + env(safe-area-inset-top)); left: 0; right: 0; display: none; text-align: center; font-size: 40px; line-height: 1.1; color: #fff3dc; pointer-events: none; text-shadow: 0 1px 8px #000; font-variant-numeric: tabular-nums; }
+  #warn, #say { position: fixed; left: 0; right: 0; text-align: center; pointer-events: none; opacity: 0; transition: opacity .3s; text-shadow: 0 1px 8px #000; padding: 0 1em; }
+  #warn { top: 20%; font-size: 26px; line-height: 1.2; font-weight: bold; color: #ff4a4a; }
+  #warn.on { opacity: 1; animation: pulse .9s infinite alternate; }
+  @keyframes pulse { to { opacity: .7; } }
+  #say { top: 31%; font-size: 22px; color: #ffe6bd; }
+  #pause { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); width: 44px; height: 44px; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 50%; background: #ffffff14; display: none; place-items: center; touch-action: none; }
+  #pause::before { content: ''; width: 4px; height: 16px; border: solid #ffd9a0aa; border-width: 0 5px; }
+  #nogl { position: fixed; inset: 0; display: none; place-items: center; text-align: center; padding: 1em; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="hearts"></div><div id="embers"><span class="dot"></span><span id="count">0</span></div></div>
+<div id="big"></div>
+<div id="warn">The lantern is beginning to fade</div>
+<div id="say"></div>
+<button id="pause" aria-label="Pause"></button>
+<div id="menu" class="screen veil on"><div>
+  <h1>Lantern 3D</h1>
+  <p>An experiment: the same river, drawn in 3D with a real light.</p>
+  <p id="which"></p>
+  <p><button id="play" class="main">Play</button></p>
+  <p><a href="/proto/lantern/">Back to Lantern</a></p>
+</div></div>
+<div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p><p><button id="go" class="main">Play again</button></p><p><a href="/proto/lantern/">Back to Lantern</a></p></div></div>
+<div id="nogl"><div><p>This experiment needs WebGL2, which this browser does not have.</p><p><a href="/proto/lantern/">Play Lantern instead</a></p></div></div>
+<script type="module">
+import { create, step, centre, half, fall, fog, wind, rain, dazzle, DT, GOAL, NIGHTS } from '../../lantern/sim.js';
+import { createRenderer } from './render.js';
+
+const $ = id => document.getElementById(id);
+const query = new URLSearchParams(location.search);
+const gain = Number(query.get('gain')) || 1.3; // boat travel per finger travel, as on the flat page
+let stage = Math.min(NIGHTS, Math.max(1, Math.floor(Number(query.get('night')) || 1)));
+const NIGHT = [, 'Slide your thumb anywhere to steer. Embers feed the flame.', 'Ice drifts on the water.', 'The rocks are restless.', 'Some rocks ride up and down the current.', 'A waterfall waits halfway.',
+  'Logs lie out from the banks.', 'Fog hides the way ahead.', 'Whirlpools pull you in.', 'A side wind pushes the boat.', 'False embers steal your light. They flicker green.',
+  'Gates of logs leave one gap.', 'Some rocks follow you. They have red eyes.', 'Rain makes the flame fade faster.', 'The ice slides from side to side.', 'Rocks hide under the water until you are close.',
+  'A second waterfall waits near the end.', 'Pairs of rocks spin.', 'Geysers blow and rest. Pass while they rest.', 'Lightning blinds you for a moment.', 'Islands split the river. This is the last night.'];
+const ahead = n => NIGHT[n] ?? '';
+
+const canvas = $('c');
+const R = createRenderer(canvas);
+if (!R || R.errors.length) {
+  // No WebGL2 (or a shader that will not build): say so plainly and point back to the flat game.
+  canvas.style.display = 'none'; $('menu').classList.remove('on'); $('nogl').style.display = 'grid';
+  if (R) $('nogl').firstElementChild.firstElementChild.textContent = 'This experiment could not start its 3D drawing on this browser.';
+  await new Promise(() => {}); // stop here without throwing: nothing below runs
+}
+let W = 0, H = 0, unit = 1, dpr = 1;
+function resize() {
+  dpr = Math.min(2, devicePixelRatio || 1);
+  W = Math.round(innerWidth * dpr); H = Math.round(innerHeight * dpr);
+  R.resize(W, H);
+  unit = Math.min(W, H * 0.62); // the flat page's pixels per river unit: a finger moves the boat exactly as far as there
+}
+addEventListener('resize', resize); resize();
+
+let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', nearFall = false, sayTimer = 0, shown = '', weather = '', snap = true;
+window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, playing, paused, stage, hearts: s.hearts, light: s.light, taken: s.taken, target, screen, shield: s.shield });
+window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
+window.lanternView = R; // the browser checks read the camera and project points through this
+
+function show(name) {
+  screen = name;
+  for (const id of ['menu', 'card']) $(id).classList.toggle('on', id === name);
+  const play = name === 'play';
+  $('hud').style.display = $('big').style.display = play ? 'block' : 'none'; pauseButton.style.display = play ? 'grid' : 'none';
+  if (!play) $('warn').classList.remove('on');
+  if (name === 'menu') { $('play').textContent = `Play night ${stage}`; $('which').textContent = ahead(stage); }
+}
+function say(text, ms = 2200) { const el = $('say'); el.textContent = text; el.style.opacity = 1; clearTimeout(sayTimer); sayTimer = setTimeout(() => { el.style.opacity = 0; }, ms); }
+
+// Sound: all synthesized, started by the Play tap. The same tones as the flat page.
+let ac, water, waterGain, drone, droneGain, streak = 0;
+function audio() {
+  if (ac) { if (ac.state === 'suspended' && !paused) ac.resume(); return; }
+  ac = new (window.AudioContext || window.webkitAudioContext)();
+  const len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  const n = ac.createBufferSource(); n.buffer = buf; n.loop = true;
+  water = ac.createBiquadFilter(); water.type = 'bandpass'; water.frequency.value = 500; water.Q.value = 0.6;
+  waterGain = ac.createGain(); waterGain.gain.value = 0.05; n.connect(water).connect(waterGain).connect(ac.destination); n.start();
+  drone = ac.createOscillator(); drone.type = 'sine'; drone.frequency.value = 55;
+  droneGain = ac.createGain(); droneGain.gain.value = 0; drone.connect(droneGain).connect(ac.destination); drone.start();
+}
+function tone(freq, dur, vol, type = 'sine') {
+  if (!ac) return; const o = ac.createOscillator(), v = ac.createGain(), t = ac.currentTime;
+  o.type = type; o.frequency.setValueAtTime(freq, t); v.gain.setValueAtTime(vol, t); v.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(v).connect(ac.destination); o.start(t); o.stop(t + dur);
+}
+const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
+
+function begin() {
+  audio();
+  s = create((Math.random() * 2 ** 31) | 0, stage); target = s.x; playing = true; paused = false; acc = 0; streak = 0; sparks = []; nearFall = false; weather = ''; drag = null; startTap = null; snap = true;
+  shown = ''; show('play'); hud();
+  say(`Night ${stage}`, 1600);
+}
+function finish() {
+  playing = false; ended = performance.now(); drag = null;
+  $('hud').style.display = $('big').style.display = pauseButton.style.display = 'none'; $('warn').classList.remove('on');
+  const won = s.over === 'dawn', why = { dark: 'The flame went out.', bank: 'You ran onto the bank.', ice: 'You struck the ice.', log: 'You struck a log.', pool: 'The whirlpool took you.', geyser: 'The geyser threw you over.', isle: 'You struck an island.' }[s.over] ?? 'You struck a rock.';
+  const pct = Math.min(100, Math.floor(s.y / GOAL * 100));
+  $('title').textContent = won ? 'Dawn' : s.over === 'dark' ? 'Dark' : `Night ${stage}`;
+  if (won && stage >= NIGHTS) { $('line').textContent = 'You carried the light through all twenty nights.'; $('go').textContent = `Play night ${stage} again`; }
+  else if (won) { $('line').textContent = `You carried it through night ${stage}. Night ${stage + 1}: ${ahead(stage + 1)}`; stage++; $('go').textContent = `Play night ${stage}`; }
+  else { $('line').textContent = `${why} ${pct}% of the way to dawn.`; $('go').textContent = 'Play again'; }
+  $('sub').textContent = `${s.taken} embers this run.`;
+  setTimeout(() => { if (!playing && screen === 'play') show('card'); }, won ? 2600 : 700);
+}
+function hud() {
+  const big = `${Math.min(100, Math.floor(s.y / GOAL * 100))}%`, low = playing && !paused && s.light < 0.28, now = `${s.hearts}|${s.taken}|${big}|${low}`;
+  if (now === shown) return; shown = now; // touch the page only when a number changes
+  $('hearts').textContent = '♥'.repeat(Math.max(0, s.hearts)); $('count').textContent = s.taken; $('big').textContent = big;
+  $('warn').classList.toggle('on', low);
+}
+
+// Steering, the same as the flat page. A finger steers by how far it has moved since it touched down,
+// never by where it is, so a tap anywhere does nothing. A mouse steers by position: here, the point
+// across the river at the boat's own row on the screen.
+const pauseButton = $('pause');
+let drag = null, startTap = null;
+function aim(x) { const c = centre(s, s.y), h = half(s, s.y) + 0.02; target = Math.max(c - h, Math.min(c + h, x)); }
+function anchor(e) { drag = { id: e.pointerId, x0: e.clientX, x: e.clientX, boat0: s.x }; }
+function mouseX(e) { const row = R.boatRow(); return (e.clientX * dpr - row.left) / row.unit; }
+canvas.addEventListener('pointerdown', e => {
+  // The tap that ends a pause does not steer until that finger has moved a clear distance.
+  if (paused) { resume(); startTap = { id: e.pointerId, x: e.clientX, y: e.clientY }; anchor(e); return; }
+  if (!playing) return;
+  startTap = null;
+  if (e.pointerType === 'mouse') aim(mouseX(e)); else anchor(e);
+});
+canvas.addEventListener('pointermove', e => {
+  if (!playing || paused) return;
+  if (e.pointerType === 'pen' && !(e.pressure > 0)) return;
+  if (startTap && e.pointerId === startTap.id) { if (Math.hypot(e.clientX - startTap.x, e.clientY - startTap.y) < 12) return; startTap = null; if (drag) anchor(e); }
+  if (e.pointerType === 'mouse') { aim(mouseX(e)); return; }
+  if (!drag || e.pointerId !== drag.id) return;
+  drag.x = e.clientX; aim(drag.boat0 + (e.clientX - drag.x0) * dpr / unit * gain);
+});
+for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, e => { if (e.pointerType !== 'mouse') startTap = null; if (drag && e.pointerId === drag.id) drag = null; });
+// iOS Safari may refuse to start audio on touch-down; try again when the finger lifts.
+for (const type of ['pointerup', 'touchend', 'click']) addEventListener(type, () => { if (ac && ac.state === 'suspended' && !paused) ac.resume(); });
+
+$('play').addEventListener('click', begin);
+$('go').addEventListener('click', () => { if (paused) resume(); else if (performance.now() - ended > 600) begin(); });
+
+// Pause: the button, P or Escape, and whenever the page loses the screen.
+function pause() {
+  if (!playing || paused) return; paused = true; drag = null; keys.clear();
+  $('title').textContent = 'Paused'; $('line').textContent = `Night ${stage}, ${Math.floor(s.y / GOAL * 100)}% of the way to dawn.`; $('sub').textContent = 'Touch the river to go on.'; $('go').textContent = 'Go on';
+  show('card'); if (ac) ac.suspend();
+}
+function resume() {
+  if (!paused) return; paused = false; acc = 0; last = performance.now(); target = s.x;
+  show('play'); if (ac) ac.resume();
+}
+pauseButton.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+addEventListener('blur', pause); addEventListener('pagehide', pause);
+const keys = new Set();
+addEventListener('keydown', e => {
+  if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') { paused ? resume() : pause(); return; }
+  if (paused) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); resume(); } return; }
+  keys.add(e.key);
+});
+addEventListener('keyup', e => keys.delete(e.key));
+
+function tick() {
+  if (keys.has('ArrowLeft') || keys.has('a')) target = s.x - 0.1;
+  if (keys.has('ArrowRight') || keys.has('d')) target = s.x + 0.1;
+  step(s, target);
+  for (const e of s.events) {
+    if (e === 'ember') { tone(scale[Math.min(streak++, scale.length - 1)], 0.5, 0.12, 'triangle'); glow = 1; for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.5, vy: Math.random() * 0.6, life: 0.7 }); }
+    if (e === 'graze') { tone(1320, 0.12, 0.05); glow = Math.max(glow, 0.5); }
+    if (e === 'shield') { tone(880, 0.5, 0.1); setTimeout(() => tone(1320, 0.7, 0.08), 110); glow = 1; }
+    if (e === 'break') {
+      // The shield took the blow. Steering restarts from where the boat now is, so a held finger does not drag it back in.
+      tone(240, 0.35, 0.25, 'square'); tone(1760, 0.25, 0.06); shake = 0.6; target = s.x; if (drag) { drag.x0 = drag.x; drag.boat0 = s.x; }
+      for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.9, vy: (Math.random() - 0.3) * 0.9, life: 0.7, blue: true });
+    }
+    if (e === 'wisp') { tone(150, 0.5, 0.2, 'sawtooth'); say('A false ember!', 1400); streak = 0; }
+    if (e === 'heart') { tone(523.25, 0.4, 0.1, 'triangle'); setTimeout(() => tone(783.99, 0.6, 0.1, 'triangle'), 120); glow = 1; say('A heart: one more life', 1500); }
+    if (e === 'hurt') {
+      // A heart took the blow. Steering restarts from where the boat now is.
+      tone(180, 0.4, 0.3, 'square'); shake = 0.8; target = s.x; if (drag) { drag.x0 = drag.x; drag.boat0 = s.x; }
+      for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.9, vy: (Math.random() - 0.3) * 0.9, life: 0.7, red: true });
+      say('You lost a heart', 1500);
+    }
+    if (e === 'hit') { tone(70, 0.5, 0.35, 'sawtooth'); shake = 1; }
+    if (e === 'out') tone(110, 1.2, 0.2);
+    if (e === 'dawn') [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 1.6, 0.1, 'triangle'), i * 180));
+  }
+  const soon = fall(s, s.y + 1.3) > 0 || fall(s, s.y + 0.6) > 0;
+  if (soon && !nearFall) { say('Waterfall!', 1800); tone(196, 0.9, 0.12, 'sawtooth'); }
+  nearFall = soon;
+  const sky = (fog(s, s.y) ? 'f' : '') + (wind(s, s.y) ? 'w' : '') + (rain(s, s.y) ? 'r' : '') + (dazzle(s) < 0 ? 'l' : '');
+  if (sky !== weather) {
+    if (sky.includes('f') && !weather.includes('f')) say('Fog', 1500);
+    if (sky.includes('w') && !weather.includes('w')) say(wind(s, s.y) < 0 ? 'Wind from the right' : 'Wind from the left', 1800);
+    if (sky.includes('r') && !weather.includes('r')) say('Rain', 1500);
+    if (sky.includes('l') && !weather.includes('l')) { tone(60, 1.4, 0.3, 'sawtooth'); tone(45, 2, 0.25, 'square'); }
+    weather = sky;
+  }
+  hud();
+  if (s.over) finish();
+}
+
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000 || 0); last = now;
+  if (playing && !paused) { acc += dt; while (acc >= DT && playing) { tick(); acc -= DT; } }
+  shake = Math.max(0, shake - dt * 3); glow = Math.max(0, glow - dt * 2);
+  for (const p of sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; } sparks = sparks.filter(p => p.life > 0);
+  if (ac) { water.frequency.value = 400 + 500 * Math.min(1.4, s.y / GOAL); waterGain.gain.value = 0.05 + (playing ? 0.14 * Math.max(fall(s, s.y), fall(s, s.y + 0.8)) : 0); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0; }
+  const dawn = Math.max(0, (s.y / GOAL - 0.86) / 0.14), day = s.over === 'dawn' ? Math.min(1, (now - ended) / 2500) : 0;
+  R.draw(s, { now, dt, target, shake, glow, sparks, dawn, day, playing, snap });
+  snap = false;
+  requestAnimationFrame(frame);
+}
+show('menu');
+requestAnimationFrame(frame);
+</script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>
