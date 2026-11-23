@@ -3,7 +3,7 @@
 (() => {
   const KEY = 'notes.k';
   // Games offered for a new note. Older notes about a dropped game still show under their own name.
-  const GAMES = [['lantern', 'Lantern'], ['ant-promotion', 'Ant Promotion'], ['grapevine', 'Grapevine'], ['fixit', 'Fix-It Stall'], ['ducklings', 'Follow Me']];
+  const GAMES = [['lantern', 'Lantern'], ['ant-promotion', 'Ant Promotion'], ['grapevine', 'Grapevine'], ['fixit', 'Fix-It Stall'], ['ducklings', 'Follow Me'], ['borrowed', 'Borrowed Time']];
   const NAMES = { 'long-road': 'The Long Road', 'copper-afternoon': 'Copper Afternoon' };
   const MAX_SECONDS = 180;
   const STRINGS = {

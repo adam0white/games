@@ -407,6 +407,7 @@ const GAMES = {
   grapevine: page => started(page, 'grapevine', 'grapevineState', '#toMenu'),
   ducklings: page => started(page, 'ducklings', 'ducklingsState', '#pauseMenu'),
   fixit: page => started(page, 'fixit', 'fixitState', '#quit'),
+  borrowed: page => started(page, 'borrowed', 'borrowedState', '#toMenu'),
   // Lab pages (/lab/<name>/): an old save survives, a finger steers, pause stops time, one audio context after the first tap.
   'lab/ant-nemesis': page => antLab(page, 'ant-nemesis', '?ai=0', { nem: null, trophies: [{ name: 'Old Scar the Beetle' }], gens: 1 }, async () => {
     assert.match(await page.textContent('#trophies'), /Old Scar the Beetle/, 'old save: trophies');

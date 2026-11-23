@@ -78,3 +78,7 @@ Not built in this run. The idea fits several very different games (a story with 
 - **Why it can be fun:** every power is a spend decision, so the player weighs "is this clue worth a year?" as a shop does. Each run reshuffles which of several pasts is true (a doctor, a thief, a soldier...), so a second run is a new mystery, and what you learned of the powers carries over.
 - **Smallest slice that would test it:** one room, three powers, one true past out of three, a lifespan bar and the naming at the end. About a day's work as a no-build experiment under `experiments/`, once the tester has picked a form and the next lab session takes it up. To get the notes button, it also goes in the notes page's game list (`workers/feedback/public/notes/app.js`).
 - **Open questions:** the form (asked of the tester); whether death ends the run or loops back with memory kept (a time-loop variant).
+
+## 2026-11-23: Borrowed Time, from tester t1's note #107
+
+Tester t1 asked for a game where you have forgotten who you are, have several abilities, and every use of an ability shortens your life. It is built as `experiments/borrowed/` (served at `/borrowed/`): three chapters on one candle, four abilities, and at the end of each chapter you pick your own face out of six. It is a new idea, not a rebuild of an archived game. See its `NOTES.md` for rules, bot results and what is not verified. The same day tester t1 picked Fix-It Stall as the game to work on more (note #103); that round is recorded in `experiments/fixit/NOTES.md`.
