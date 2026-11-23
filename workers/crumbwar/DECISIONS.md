@@ -89,7 +89,7 @@ All joined. No snapshot arrived out of step. Round trip p50 2 ms, p99 4.8 ms. Pr
 
 ### Deployed
 
-Measured 2026-11-23 against `play.adamwhite.work`, from one Mac in Texas, every client in one room placed in `enam`. All clients share one network path, so this shows what a room can carry, not what distant players feel.
+Measured 2026-11-23 against `play.adamwhite.work`, from one machine in North America, every client in one room placed in `enam`. All clients share one network path, so this shows what a room can carry, not what distant players feel.
 
 | People | Seconds | Joined | Closed early | Ticks per second | Snapshot gap p50 / p99 ms | Round trip p50 / p99 ms | Bytes per client per second | Snapshots out of step |
 |---|---|---|---|---|---|---|---|---|
@@ -101,6 +101,7 @@ Measured 2026-11-23 against `play.adamwhite.work`, from one Mac in Texas, every 
 | 240 | 600 | 240 | 0 | 20.0 | 99.2 / 128.6 | 54 / 86 | 1645 | 0 |
 
 - Prediction correction stayed at p50 0 and p99 0.2 to 7.5 units. The reported maximum in long runs is about 3500 units: that is a respawn moving the ant to its nest, which the test counts as a correction. It is not a prediction error.
+- The live page also ran seven minutes in headless Chromium on one socket, with the same ant throughout, through a round end and into the next round, with no errors. After the tests, the status call showed every used room stopped with no world in memory, so an empty room does stop on Cloudflare.
 - Every run has one snapshot gap of about 400 ms at the start. The 240 person ten-minute run had one gap of 1.3 seconds. The cause is not known.
 - The live page was run in headless Chromium at phone size: it joined a room through the directory, steered at 150 units a second and stopped on release. Cloudflare's analytics beacon is blocked by the page's content security policy, which is intended.
 
@@ -123,7 +124,13 @@ What this shows:
 3. **A deploy-only bug was found this way.** A room name with no region in it gave an invalid `locationHint`, which is an error on Cloudflare and is ignored locally. Every load test join failed with 500 until it was fixed. Local runs cannot stand in for deployed ones.
 4. The close sent to a lagging client arrives as code 4004 on Cloudflare. The missing close event seen under `wrangler dev` is local only.
 
+## Spend
+
+Logged 2026-11-23. All of the load tests together used about 300 GB-s of Durable Object duration (roughly 40 room-minutes at 128 MB), about 300,000 incoming WebSocket messages (billed as about 15,000 requests) and about 1,500 connection requests. This is an estimate from the test counters, not a reading of the bill. It is far inside the monthly amounts the Workers Paid plan includes (400,000 GB-s and 1 million requests for Durable Objects), so the expected added cost is $0. No domain was bought.
+
 ## Known gaps
+
+- No lab telemetry yet. The slug must first be added to `LAB_PROTOTYPES` in human-framework. Decide by 2026-11-30 what a many-player session should record; a single-player run record does not fit as it is.
 
 - No lag compensation for bites.
 - No edge rate limit on joins.
