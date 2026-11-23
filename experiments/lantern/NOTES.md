@@ -311,3 +311,22 @@ Screenshots looked at: a sector 2 level, its card, and night 50.
 Not checked:
 - Whether a person can play at a pace of 2.3 to 3.0.
 - A real phone.
+
+## 2026-11-23: rebirth (note #73)
+
+The tester asked for a rebirth once everything is unlocked, so the game is not played once and done, and left the reward to the lab.
+
+- **When.** A Rebirth block in the shop, under Stats. Until it is open it shows the goal: "Find everything (N of 23) and open all 50 nights (N of 50)". When both are met it shows a Rebirth button that asks twice.
+- **What it resets.** Embers to 0. Finds back to the starting boat, water, flame and boost. Looks worn, abilities switched off, stats ready, nights opened, and the tower's resume level. Bests stay: they are records, and the tester asked for competition.
+- **Reward, chosen by the lab.** Each rebirth adds 25% to the embers every run banks, for good, and puts a star by the ember count on the menu. The end card says when the bonus added embers. New key `lantern-rebirths`, a number.
+- **Why this reward.** It shortens the second way through without making a run easier. The tester's earlier complaint was that stats and powers made runs too easy.
+
+Checks: the phone check on both profiles covers the goal text before the rebirth is open, one tap doing nothing, the second tap resetting the keys listed above, the star, and a 4-ember run banking 5. With the bonus removed, the check fails at "4 embers bank as 5". The shop's Rebirth block was screenshotted.
+
+Not checked: whether a person reaches night 50, which the rebirth requires (bots reach dawn on night 50 about 8 times in 100). Whether 25% feels like a reward.
+
+### Left as a proposal (2026-11-23, note #73)
+
+- **"Trash bags".** No earlier note mentions trash bags. The lab reads it as "crash packs", the crash effects pack of note #69, in which the player picks two or three crash effects. A question went to the tester before building it. If it is the crash pack, a plan: a fifth pack, Crashes, with the six effects there now (sink, smash, tip, crack, swirl, throw) and two new ones (the flame bursts into sparks, the boat freezes and shatters). The player turns on two or three. A crash uses the effect that fits what was hit when it is on, else one of those on.
+- **River animations pack** (note #69): still a proposal.
+- **The app-store bar.** The tester wants a game people would download from an app store. Recorded as the bar the tester holds the game to. Publishing is the owner's decision and is not asked for here.
