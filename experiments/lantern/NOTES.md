@@ -279,3 +279,35 @@ The tester asked for at least 50 nights; a rebirth that resets everything for a 
 Checks: the phone check on WebKit iPhone 13 and Chromium Pixel 7 now covers resuming at level 2 after a loss, the menu button, a new climb from level 1, the look screen hiding the shop and the notes button and coming back on a tap, and the erase tool (one tap erases nothing; two leave no `lantern-` key and keep `notes.k`). With the old rule put back (a lost climb starts at level 1), the check fails at "after a loss the level is tried again". Screenshots of the jade boat, teal water and sparkler looks, and of the menu with the resume button, were looked at.
 
 Not checked: a real phone.
+
+## 2026-11-23: 50 nights and a second tower sector (note #73)
+
+| Ask | What changed |
+| --- | --- |
+| At least 50 nights | `NIGHTS` is 50. Nights 21 to 50 hold all twenty things. Each is a fixed share harder: the pace grows geometrically from night 20's 1.665 to 2.3 at night 50 (about 1.1% a night), rows come up to 15% closer and the river narrows by up to 0.012, the same as tower levels 1 to 50. Each night puts one old thing up front in turn (logs, whirlpools, gates, red-eyed rocks, hidden rocks, spinners, geysers, islands), and the menu says which. Night 50 is the last night. |
+| A second sector of 50 more levels | Tower climbs 51 to 100 are sector 2, shown as "sector 2, level N", built of violet stone. Clearing level 50 shows "Sector 1 cleared" and "Climb on to sector 2". `lantern-best-level` and `lantern-tower-at` keep their format and now go up to 100. |
+| Keep the difficulty change in the next 50 | Rows come closer at the first sector's rate. The pace grows from 2.2 to 3.0, which is slower than the first sector's rate; at that rate it would reach about 4 times level 1's pace by level 100. The river stops narrowing at level 50: with narrowing kept, the audit found gaps of 0.014 and no room for the big boat at levels 75 and 100. |
+
+Nights 1 to 20, the endless river and tower levels 1 to 50 are unchanged. A fingerprint of every rock and ember over 40 rivers of each, taken before and after, matched.
+
+Audit (`bots.mjs 100 audit`, each river ridden five ways):
+- Nights 21 to 50: no closed river and no buried pickup. The narrowest gap is 0.036, on night 45 (0.018 for the big boat).
+- Sector 2: no closed river and no buried pickup. The narrowest gap is 0.029 at levels 60 and 75 (0.011 for the big boat). That is below the 0.038 accepted for the endless river. The first round accepted 0.028. Capping row density in sector 2 did not change it, so pace is the likely cause. Unresolved.
+
+Careful bot, dawn reached out of 100 runs:
+- Nights: 20 → 15, 21 → 14, 30 → 7, 40 → 6, 50 → 8.
+- Tower levels: 50 → 23, 51 → 16, 75 → 12, 100 → 8.
+
+`bots.mjs` takes a comma-separated list of stages after the run count, and its default lists include the new nights and levels.
+
+Phone check, new lines:
+- Clearing level 50 shows the sector card.
+- Climbing on goes to climb 51.
+- A loss there resumes at "sector 2, level 1".
+- The tester tool opens night 50, and only night 50 says it is the last.
+
+Screenshots looked at: a sector 2 level, its card, and night 50.
+
+Not checked:
+- Whether a person can play at a pace of 2.3 to 3.0.
+- A real phone.

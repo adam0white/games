@@ -148,6 +148,20 @@ const GAMES = {
     await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu');
     await page.click('#anew'); assert.equal((await state()).climb, 1, 'a new climb starts at level 1'); assert.equal((await saved())['lantern-tower-at'], '1');
     await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu'); assert.equal(await page.isVisible('#anew'), false);
+    // Sector 2 (note #73): level 50 cleared opens 50 more levels, numbered 51 to 100 inside and shown as "sector 2, level N".
+    await page.evaluate(() => localStorage.setItem('lantern-tower-at', '50')); await page.reload();
+    await page.click('#tower'); assert.equal((await state()).climb, 50);
+    await page.evaluate(() => { const s = window.lanternSim(); s.y = 77.9; s.safe = 99; }); await until(page, () => window.lanternState().screen === 'card', 'sector card', 12000);
+    assert.equal(await page.textContent('#title'), 'Sector 1 cleared'); assert.equal(await page.textContent('#go'), 'Climb on to sector 2');
+    await page.click('#go'); assert.equal((await state()).climb, 51, 'sector 2 is climb 51');
+    await page.evaluate(() => { window.lanternSim().light = 0.0001; }); await until(page, () => window.lanternState().screen === 'card', 'sector 2 lost card');
+    assert.match(await page.textContent('#line'), /Best 50 of 50\. Your climb goes on from sector 2, level 1/);
+    await page.click('#toMenu'); assert.match(await page.textContent('#tower'), /go on at sector 2, level 1/);
+    await page.click('#anew'); await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu');
+    // 50 nights (note #73): the tester tool opens them all; night 50 is the last.
+    await page.click('#toShop'); await page.click('[data-test="nights"]'); await page.click('.back');
+    assert.equal(await page.textContent('#play'), 'Play night 50'); assert.match(await page.textContent('#about'), /This is the last night/);
+    await page.click('#less'); assert.doesNotMatch(await page.textContent('#about'), /last night/);
     // A look on the whole screen (note #73): tapping an owned boat wears it and hides every button; a tap brings the shop back.
     await page.click('#toShop'); await page.click('[data-item="red"]'); st = await state();
     assert.equal(st.looking, 'boat'); assert.equal(st.worn.boat, 'red'); assert.equal(await page.isVisible('#shop'), false, 'the shop hides'); assert.equal(await page.isVisible('#notes-button'), false, 'the notes button hides');
