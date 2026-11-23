@@ -391,3 +391,7 @@ The owner: Wild "adds a good difficulty, but makes things impossible", and asked
 ### Not verified
 - Whether Wild now feels fair to a person, and whether the tester (who found the game too easy) now finds it easier still. The bots move little between main and this branch except for the sneaky pick in Wild.
 - A real phone.
+
+## 2026-11-23: first-time help (the owner's request for beginners)
+
+After 3 s of play with no input, a see-through joystick near the bottom of the screen, the size of the real one, with a finger pressing the knob and taking it once round (`experiments/kit/hint.js`, kind `stick`). It goes on the first touch or key in play and never shows again on that device. New key `ant-promotion:hint`, `'1'` once the player has given input in play. A player with an `ant-promotion:v1` save never sees it. `?hint=hand` or `?hint=ring` shows it anyway, in the two looks for the owner to pick from. Checks: `hint ant-promotion` in the phone check. Not verified on a real phone.

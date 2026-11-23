@@ -11,6 +11,7 @@ Shared code for the games under `experiments/`. It is served at `/kit/` as plain
 | `screens.js` | `screens(ids, after)`: show one full-page card |
 | `stick.js` | `stick(el, { when, reach, leash, dead })`: a floating joystick; the game owns the numbers and draws it from `touch` |
 | `drag.js` | `drag(el, { playing, paused, resume, from, travel, aim, mouse, settle })`: steering by relative finger travel, with the settle distance after a pause; the game owns the gain |
+| `hint.js` | `hint(el, { kind, key, when, played, delay, look, label, reach, bottom })`: help for a first-time player who does not touch: a see-through copy of the control with a finger showing how; see below |
 | `lab.js` | `lab(slug)`: play recording for the game lab, with its notice and off switch; see below |
 | `/notes/button.js` | the notes button for testers (it lives in `workers/feedback/public/notes/`) |
 | `check/phone.mjs` | phone runs of every live experiment, of the lab pages under `/lab/` and of this kit, on WebKit iPhone 13 and Chromium Pixel 7 |
@@ -25,6 +26,26 @@ Shared code for the games under `experiments/`. It is served at `/kit/` as plain
 5. **Modules that touch the page stay separate from rules.** `sim.js` files run in Node for the bots. Kit files that use `window` or `document` are imported by pages only.
 6. **Run the phone check before and after.** `PLAYWRIGHT=<dir with playwright> node experiments/kit/check/phone.mjs`. CI does not run it yet. A new screen, control or save key in a game comes with a line in that game's section of the check.
 7. **Not verifiable here:** audio on a real iPhone. Keep the unlock wiring in `audio.js` as it is unless a person has tested the change on a phone. The 'playback' audio session (2026-11-23, note #80) leaves the unlock as it was; it answers a tester who heard no sound on a phone, and is itself not yet confirmed on one.
+
+## First-time help (`hint.js`)
+
+The owner asked (2026-11-23) for help at the start for beginners: after a few seconds of play with no input, a see-through copy of the control near the bottom of the screen and a finger moving it, so the controls need no words. To adopt it, import it and make one call after the game's input is set up:
+
+```js
+import { hint } from '../kit/hint.js';
+hint(canvas, { kind: 'stick', key: '<slug>:hint', when: () => mode === 'play', played: readJson(KEY) !== null });
+```
+
+- `kind`: `stick` (a floating joystick: the finger presses the knob and takes it once round) or `drag` (relative steering: the finger slides side to side along a track). A new kind (a tap, a hold) is a new entry in `KINDS` in `hint.js`; callers do not change.
+- `key`: a new key, never an existing one. It is `'1'` once the player has given input in play, and then the hint never shows again on that device. Add it to the game's seed in `check/phone.mjs`.
+- `when`: true only while a run is in play with no card over it. Idle time counts only then, and adds up across runs, so a run that ends quickly still leads to the hint in the next one. A tap on Play or on a card is not counted as input.
+- `played`: true when the game's own save, read at load, shows the player has played. Without it, every current player would see the hint once after it ships. A page with no save (lab/lantern-3d) has only the hint's key.
+- `delay` (3000 ms), `bottom` (120 px above the safe area, to the middle of the copy), `reach` (55 px, the stick's reach, so the copy is the size of the real stick), `label` (words for reduced motion), `look` (`hand`, the default, a pointing hand; `ring`, the knob alone with a press ring).
+- It never takes input (`pointer-events: none` on all of it) and never cancels an event. It is placed right after `el`, so every card later in the page covers it.
+- With `prefers-reduced-motion: reduce` it shows a still copy with a short line of words instead of motion.
+- `?hint=hand` or `?hint=ring` on any page that uses it shows it whatever the save says, with that look; `?hint=0` turns it off. This is how to see it on a phone that has played already.
+
+Used by: `ant-promotion` (stick, 3 s), `lantern` (drag, 1.5 s, low, because a boat left alone meets a rock in 3 to 9 s), `lab/ant-nemesis`, `lab/ant-wilds` (stick) and `lab/lantern-3d` (drag). Not verified on a real phone.
 
 ## Lab recording (`lab.js`)
 

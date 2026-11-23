@@ -147,6 +147,7 @@ import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { stick } from '../kit/stick.js';
+import { hint } from '../kit/hint.js';
 import { lab } from '../kit/lab.js'; // lab recording: the rec lines below
 import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
 
@@ -387,6 +388,7 @@ function skins() {
 
 // ---------- input: drag from where the finger lands; the distance dragged sets the speed
 const pad = stick(cv, { when: () => mode === 'play', reach: 55, leash: 70, dead: 0.15 }); // experiments/kit/stick.js
+hint(cv, { kind: 'stick', key: 'ant-promotion:hint', when: () => mode === 'play', played: readJson(KEY) !== null }); // a first-time player who does not touch sees how (experiments/kit/hint.js)
 addEventListener('keydown', e => { if (isPauseKey(e)) { if (mode === 'play') show('paused'); else if (mode === 'paused') show('play'); return; } keys.add(e.key.toLowerCase()); if (e.key.startsWith('Arrow')) e.preventDefault(); });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => keys.clear());

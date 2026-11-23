@@ -20,6 +20,7 @@
 <div id="a" class="card">card a</div><div id="b" class="card">card b</div>
 <div id="labbox"></div>
 <div id="pad" style="width:300px;height:60px"></div>
+<div id="hintpad" style="width:300px;height:60px"></div>
 <script type="module">
 import { read, write, readNumber, readJson, writeJson } from './save.js';
 import { sound } from './audio.js';
@@ -28,6 +29,7 @@ import { screens } from './screens.js';
 import { lab } from './lab.js';
 import { stick } from './stick.js';
 import { drag } from './drag.js';
+import { hint } from './hint.js';
 
 const results = [], out = document.getElementById('out');
 function check(name, fn) {
@@ -138,6 +140,34 @@ async function labChecks() {
   sessionStorage.removeItem('hf-lab-session:kit-selftest');
   for (const el of document.querySelectorAll('#labbox > *')) el.remove();
 }
+// hint.js, with a short delay and its own key, removed afterwards.
+async function hintChecks() {
+  const HK = 'kit-selftest-hint', el = document.getElementById('hintpad'), wait = ms => new Promise(done => setTimeout(done, ms));
+  // A browser may run animation frames slowly (CI's WebKit does), so a change the hint makes on a frame is waited for, up to 2 s.
+  const soon = async fn => { for (let i = 0; i < 40 && !fn(); i++) await wait(50); return fn(); };
+  const shown = () => !!document.querySelector('.kit-hint.on'), down = () => el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 5, pointerType: 'touch', bubbles: true }));
+  localStorage.removeItem(HK);
+  let playing = false; const help = hint(el, { kind: 'stick', key: HK, when: () => playing, delay: 150 });
+  await wait(300); check('hint: not shown while the game is not in play', () => !shown() && !help.shown);
+  playing = true; await wait(40); check('hint: not before the delay', () => !shown());
+  const appeared = await soon(shown); check('hint: shown after the delay of play', () => appeared && help.shown);
+  check('hint: never takes input', () => [...document.querySelectorAll('.kit-hint, .kit-hint *')].every(e => getComputedStyle(e).pointerEvents === 'none'));
+  playing = false; const hid = await soon(() => !shown()); check('hint: hidden while a card covers the game', () => hid);
+  down(); check('hint: input while not in play does not end it', () => localStorage.getItem(HK) === null);
+  playing = true; const back = await soon(shown); check('hint: back when play goes on', () => back);
+  down(); check('hint: the first input ends it and remembers the player', () => !document.querySelector('.kit-hint') && !help.shown && localStorage.getItem(HK) === '1');
+  await wait(300); check('hint: it does not come back', () => !document.querySelector('.kit-hint'));
+  localStorage.removeItem(HK); const steer = hint(el, { kind: 'drag', key: HK, when: () => true, delay: 0 }); await soon(() => steer.shown);
+  const move = kind => el.dispatchEvent(new PointerEvent('pointermove', { pointerId: 6, pointerType: kind, bubbles: true }));
+  move('touch'); const stayed = steer.shown; move('mouse');
+  check('hint: for drag, a mouse moving over the game ends it (drag.js steers by it); a touch moving does not', () => stayed && !steer.shown && localStorage.getItem(HK) === '1');
+  const again = hint(el, { kind: 'drag', key: HK, when: () => true, delay: 0 });
+  localStorage.removeItem(HK); const old = hint(el, { kind: 'drag', key: HK, when: () => true, delay: 0, played: true });
+  const odd = hint(el, { kind: 'no such kind', key: HK, when: () => true, delay: 0 });
+  await wait(100); check('hint: never shown to a returning player, or for a kind it does not know', () => !document.querySelector('.kit-hint') && !again.shown && !old.shown && !odd.shown);
+  localStorage.removeItem(HK);
+}
+try { await hintChecks(); } catch (e) { check(`hint: checks ran to the end (${e.message})`, () => false); }
 try { await labChecks(); } catch (e) { check(`lab: checks ran to the end (${e.message})`, () => false); }
 
 window.kitResults = results; // read by check/phone.mjs
