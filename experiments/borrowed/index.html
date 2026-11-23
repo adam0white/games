@@ -77,6 +77,7 @@ import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { lab } from '../kit/lab.js';
+import { hint } from '../kit/hint.js';
 import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
 
 const $ = id => document.getElementById(id);
@@ -781,7 +782,7 @@ function abilityBar(time) {
 
 // ---------------------------------------------------------------- first runs: point at what to touch
 function tutorial(time) {
-  if (screen !== 'play' || vignette) return;
+  if (screen !== 'play' || vignette || help.shown) return; // the shared first-time hint stands in while it shows
   const k = (time * 0.9) % 1;
   if (!save.taught && s.found === 0 && !s.path.length) {
     const free = s.spots.find(p => p.lock === 'free');
@@ -1086,9 +1087,42 @@ window.borrowedState = () => ({
   selected, outcome: reveal ? reveal.outcome : null, gallery: Object.keys(save.gallery).length, runs: save.runs,
   chapter: s ? s.chapter : null, right: s ? s.right : 0, chapters: s ? s.chapters.map(c => ({ id: c.id, right: c.right, uses: c.uses, years: c.yearsSpent })) : [],
   next: screen === 'chapter' && nextBtn ? centre(nextBtn) : null,
-  tile: T, viewTop, viewBottom, mapX, cam,
+  tile: T, viewTop, viewBottom, mapX, cam, touched,
 });
 window.borrowedSim = () => s; // checks may shorten a candle to reach the fading end quickly
+
+// The hint is drawn over the island's middle column (the island is 7 tiles wide and centred). It goes on the
+// nearest tile above the player, in that column, with no memory or player on it, on the tile above (the words) or on
+// the two tiles below (the hand hangs below the knob). Plain ground is preferred, so the copy taps somewhere the player
+// could walk. With no such tile it sits mid-screen.
+function clearSpot() {
+  const free = (x, y) => {
+    if (Math.floor(s.px) === x && Math.floor(s.py) === y) return false;
+    return !s.spots.some(p => !p.taken && p.x === x && p.y === y);
+  };
+  const plain = (x, y) => y >= 0 && y < s.h && s.grid[y * s.w + x] === '.' && free(x, y);
+  const me = Math.floor(s.py);
+  const rows = [];
+  for (let y = me - 2; y >= 0; y--) rows.push(y);
+  for (let y = me + 1; y < s.h; y++) rows.push(y);
+  const fits = y => {
+    const mid = sy(y) + T / 2;
+    return mid >= viewTop + T && mid <= viewBottom - T * 1.5 && free(3, y - 1) && free(3, y) && free(3, y + 1) && free(3, y + 2);
+  };
+  const best = rows.find(y => fits(y) && plain(3, y)) ?? rows.find(fits);
+  if (best === undefined) return Math.max(190, Math.round(H * 0.53));
+  return Math.round(H - safe.b - (sy(best) + T / 2));
+}
+// A first-time player who does not touch for 3 s in play sees a finger tap the island (experiments/kit/hint.js).
+// While it shows, the game's own pointing hand waits. It sits on a clear tile above the player (clearSpot).
+const help = hint(canvas, {
+  kind: 'tap',
+  key: 'borrowed:hint',
+  label: 'Tap the island to walk there',
+  bottom: clearSpot,
+  when: () => screen === 'play' && !paused && !vignette && s?.status === 'play',
+  played: readJson(KEY) !== null,
+});
 
 resize();
 menu();

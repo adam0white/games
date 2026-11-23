@@ -80,6 +80,7 @@ import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { lab } from '../kit/lab.js';
+import { hint as firstHint } from '../kit/hint.js';
 
 const $ = id => document.getElementById(id);
 const query = new URLSearchParams(location.search);
@@ -566,7 +567,7 @@ function hud(time) {
 // First levels teach by doing: a ghost hand draws the route on level 1, and points at the teller on 2 and 3.
 let tutorialRoute = null;
 function tutorial(time) {
-  if (mode !== 'level' || index > 2 || touched || sending) return;
+  if (mode !== 'level' || index > 2 || touched || sending || help.shown) return; // the shared first-time hint stands in while it shows
   if (index === 0) {
     tutorialRoute ??= solve(LEVELS[0]).best;
     const per = 0.8, total = per * (tutorialRoute.length - 1) + 1.2, k = ((time - startT / 60) % total + total) % total;
@@ -712,9 +713,22 @@ window.grapevineState = () => ({
   result, stars: lastStars, sends, fails, hints, sound: save.sound,
   now: level ? (sending ? sending.shown : trail.msgs[trail.msgs.length - 1]) : null, want: level?.want ?? null,
   nodes: level ? pos.map((p, i) => ({ x: Math.round(p.x), y: Math.round(p.y), kind: level.nodes[i].kind })) : [],
-  from: level?.from ?? null, to: level?.to ?? null, hintShown: $('hint').style.display === 'block',
+  from: level?.from ?? null, to: level?.to ?? null, hintShown: $('hint').style.display === 'block', touched,
 });
 window.grapevineLevel = () => level; // the check solves the level in Node from this
+
+// A first-time player who does not touch for 3 s in play sees a finger drag through a row of dots (experiments/kit/hint.js).
+// While it shows, the level's own ghost hand waits. It sits between the teller's row and the row above it on level 1
+// (rows run from 150 px below the top to 58 px above the bottom), so it covers neither the teller nor the painter.
+const help = firstHint(canvas, {
+  kind: 'path',
+  key: 'grapevine:hint',
+  label: 'Drag up through the villagers',
+  reach: 46,
+  bottom: Math.round((innerHeight + 24) / 4),
+  when: () => screen === 'play' && !paused && !sending && result !== 'won',
+  played: readJson(KEY) !== null,
+});
 
 resize();
 menu();

@@ -63,7 +63,7 @@ The idea comes from the archived game Hearsay. In Hearsay, news changes each tim
   - Villager radius is 15–30 CSS px, set by the screen.
 - **Levels** (`make-levels.mjs` writes `levels.js`).
   - Levels 1–3 are hand-made:
-    - L1: one path. A ghost finger draws it.
+    - L1: one path. A ghost finger draws it. A player with no save first sees the shared kit hint (`../kit/hint.js`, kind `path`, key `grapevine:hint`) after 3 s of idle play; the ghost finger waits while it shows. It sits between the teller's row and the next row up on level 1; on boards with 4–5 rows it can overlap a villager. `check.mjs` asserts that `?hint=hand` shows it and a tap removes it.
     - L2: two paths, one painter wrong.
     - L3: the short path is wrong and the long one is right.
   - Levels 4–30: each new villager kind gets 3 levels, in this order: exaggerator, grump, muddler, sculptor, contrarian, timid, sleepy, parrot. The last 3 levels mix every kind.

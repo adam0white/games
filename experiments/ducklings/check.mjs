@@ -145,6 +145,15 @@ async function run(name, engine, device, full) {
     // leave each one through the pause menu, as a player would. Navigating away mid-run instead makes WebKit report
     // "Cannot load blob ... access control checks" from the kit lab's flush on hide (see NOTES.md, Kit candidates).
     const leave = async () => { await tap(page, '#pause'); await page.click('#pauseMenu'); await until(page, () => window.ducklingsState().screen === 'menu', 'back on the menu', 4000); };
+    // the shared first-time hint (kit/hint.js), forced on with ?hint=hand: a finger holding and moving shows after 3 s of
+    // idle play; a real touch removes it
+    await page.goto(`${base}/ducklings/?hint=hand`); await page.click('#play'); await sleep(1000);
+    assert.equal(await page.evaluate(() => !!document.querySelector('.kit-hint.on')), false, 'hint: not before 3 s of idle play');
+    await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown after idle play', 8000);
+    assert.equal(await page.evaluate(() => document.querySelector('.kit-hint').dataset.kind), 'hold-and-move', 'hint: a hold and move');
+    st = await state(page); await finger(page, [['pointerdown', st.mom.sx, st.mom.sy + 90]]);
+    assert.equal(await page.evaluate(() => document.querySelector('.kit-hint')), null, 'hint: a real touch removes it');
+    await finger(page, [['pointerup', 0, 0]]); await leave();
     await page.goto(`${base}/ducklings/?level=7`); await page.click('#play'); await drive(page, 7000); await shot('6-stage7'); await leave();
     await page.goto(`${base}/ducklings/?level=5&seed=5`); await page.click('#play'); await drive(page, 9000); await shot('7-stage5'); await leave();
     await page.waitForTimeout(300);

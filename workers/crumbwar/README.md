@@ -34,6 +34,8 @@ node loadtest/load.mjs --url wss://play.adamwhite.work --key <key> --clients 60 
 
 A load test names its own room (`--room`, sent as `lt-<name>`), may raise the room's cap (`--cap`) and may overload the room on purpose (`--burn`). Both need the `LOADTEST_KEY` secret. `lt-` rooms never appear in the directory, so no player is sent to one. `GET /crumbwar/api/status?lt=<key>&room=<name>` returns a room's counters, and without `room` it lists the region's rooms.
 
+First-time hint: `public/crumbwar/client.js` loads the shared kit hint (`/kit/hint.js`, kind `stick`, key `crumbwar:hint`) with a dynamic import that does nothing if the file is missing. The static site serves that file, so deploy the static site first; until then the hint does not show, and in `wrangler dev` it never shows. The kit styles itself with a constructed stylesheet, so the page's `style-src 'self'` policy needs no change.
+
 ## Roll back
 
 `npx wrangler rollback` returns to the previous version. To remove the game, run `npx wrangler delete`: the routes go with the Worker, and `/crumbwar/` then falls through to the static site, which has no such path. Rooms store nothing, so there is no data to migrate or restore. A deploy closes every open socket; the page reconnects on its own and joins a fresh round.

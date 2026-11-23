@@ -89,6 +89,7 @@ I looked at the grown-up and old portraits at 360 × 640 (`small-5-lineup-grown.
   - Enter or Space goes on from a chapter card.
   - P or Escape pauses.
 - Teaching by doing: on a first run a ghost finger points at the free memory. In the first three runs a finger points at each ability button the first time it becomes ready.
+- First-time hint: the shared kit hint (`../kit/hint.js`, kind `tap`, key `borrowed:hint`) shows after 3 s of idle play to a player with no save. It goes on the nearest tile above the player, in the island's middle column, with no memory or player on it or on the two tiles below (`clearSpot`, passed as `bottom`); plain ground is preferred, so on some islands it sits over a rock or water. While it shows, the ghost finger waits; any touch or key ends it for good. `check.mjs` asserts that `?hint=hand` shows it after idle play and that a tap removes it.
 
 ## Tuning numbers (`sim.js`)
 

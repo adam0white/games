@@ -56,6 +56,23 @@ const levelNow = async page => page.evaluate(() => JSON.parse(JSON.stringify(win
 let colourReport = null;
 const shot = (page, phone, name) => page.screenshot({ path: join(SHOTS, `${phone}-${name}.png`) });
 
+// The shared first-time hint (kit/hint.js), forced on with ?hint=hand: a finger dragging through dots shows after 3 s of
+// idle play; a real touch removes it and reaches the game.
+async function firstHint(page) {
+  const on = () => page.evaluate(() => !!document.querySelector('.kit-hint.on'));
+  await page.goto(`${base}/grapevine/?level=4&hint=hand`); await until(page, () => window.grapevineState, 'state hook');
+  await page.click('#play'); await sleep(1000);
+  assert.equal(await on(), false, 'hint: not before 3 s of idle play');
+  await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown after idle play', 8000);
+  assert.equal(await page.evaluate(() => document.querySelector('.kit-hint').dataset.kind), 'path', 'hint: a path');
+  assert.equal((await state(page)).touched, false);
+  const vp = page.viewportSize(); await tap(page, { x: vp.width / 2, y: vp.height / 2 });
+  assert.equal(await page.evaluate(() => document.querySelector('.kit-hint')), null, 'hint: a real touch removes it');
+  assert.ok((await state(page)).touched, 'hint: the touch reached the game');
+  await page.evaluate(() => { const el = document.querySelector('#pause'); el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 9, pointerType: 'touch', bubbles: true, cancelable: true })); el.click(); });
+  await page.click('#toMenu'); await until(page, () => window.grapevineState().screen === 'menu', 'back on the menu');
+}
+
 async function run(page, phone) {
   const sent = page.context().labSent;
   await page.goto(`${base}/grapevine/?labRunSource=agent`);
@@ -189,6 +206,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
   try {
     await run(page, phone);
+    await firstHint(page);
     assert.deepEqual(errors, [], 'page errors');
     console.log(`ok   grapevine on ${phone}`);
   } catch (e) {

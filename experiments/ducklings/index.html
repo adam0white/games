@@ -92,6 +92,7 @@ import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { lab } from '../kit/lab.js';
+import { hint } from '../kit/hint.js';
 
 const $ = id => document.getElementById(id);
 const query = new URLSearchParams(location.search);
@@ -611,7 +612,7 @@ function drawGuide(now) {
     const k = (now - touchRing.t) / 400;
     if (k < 1) { g.strokeStyle = `rgba(255,255,255,${0.8 * (1 - k)})`; g.lineWidth = 3 * dpr; g.beginPath(); g.arc(touchRing.x * dpr, touchRing.y * dpr, (20 + 30 * k) * dpr, 0, 7); g.stroke(); }
   }
-  if (waitTouch) {
+  if (waitTouch && !help.shown) { // while the shared first-time hint shows, this one waits
     // the ghost finger: hold here, below and ahead of her
     const gx = sx(0.5), gy = sy(s.mom.y + 0.42) + OFFSET * dpr;
     const ty = gy - OFFSET * dpr;
@@ -741,6 +742,17 @@ window.ducklingsState = () => ({
   nest: s.nest ? { sx: sx(s.nest.x) / dpr, sy: sy(s.nest.y) / dpr } : null,
   waitingDucks: s.lost.map(l => ({ sx: sx(l.x) / dpr, sy: sy(l.y) / dpr, y: l.y })),
   opened: data.opened, sound: data.sound, taught: data.taught, hudPeeks, rollCalls,
+});
+
+// A first-time player who does not touch for 3 s in play sees a finger hold and move (experiments/kit/hint.js).
+// It stands in for the stage 1 ghost finger while it shows, and sits above the Quack button.
+const help = hint(canvas, {
+  kind: 'hold-and-move',
+  key: 'ducklings:hint',
+  label: 'Hold and move your finger to lead her',
+  bottom: 130,
+  when: () => playing && !paused && screen === 'play',
+  played: save.readJson(KEY) !== null,
 });
 
 show('menu');
