@@ -55,7 +55,11 @@ export function lab(game, options = {}) {
 
   async function post(record) {
     if (typeof CompressionStream !== 'function') return;
-    const body = await new Response(new Blob([JSON.stringify(record)]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+    // Bytes go straight into the compressor. A Blob's stream is read through a blob address, and WebKit raises
+    // a page error ("Cannot load blob ... due to access control checks") when the page leaves mid-read.
+    const gz = new CompressionStream('gzip'), w = gz.writable.getWriter();
+    w.write(new TextEncoder().encode(JSON.stringify(record))).catch(() => {}); w.close().catch(() => {});
+    const body = await new Response(gz.readable).arrayBuffer();
     if (body.byteLength > 250 * 1024) return;
     const res = await send(endpoint, { method: 'POST', body, headers: { 'Content-Type': 'application/gzip' }, credentials: 'omit', referrerPolicy: 'no-referrer', mode: 'cors', keepalive: body.byteLength < 60000 });
     if (res && res.status === 200) self.sent++;

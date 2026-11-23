@@ -356,3 +356,29 @@ Not checked: the new crash sounds on a phone.
 
 - **Victory pack.** Dawn effects to pick from, like the crash pack: fireworks over the river, lanterns rising, a burst of birds, a rainbow.
 - **Leaderboard, names and sign-up.** The owner decides on a server and accounts. Without one, the lab could add a name field above the title and an endless best list on this phone only. That was not built, so as not to suggest names reach anyone else.
+
+## 2026-11-23: tester t1 answered the lab's Lantern questions (notes #81, #83, #91, #92, #93, #94)
+
+| Question | Answer | What follows |
+| --- | --- | --- |
+| #42: seven of the new things are weather or tricks, not solid obstacles. Change some? | "Good as it is" (#81) | Nothing. |
+| #47: which look, flat or the 3D lab version? | "Let me switch between them" (#83) | Left as a proposal: a Look switch between flat and 3D in the game. The 3D version lives in `../lab/lantern-3d/` with its own page, and does not share saves or the shop. |
+| #71: "two at a time" meant what? | "Only 2 working at the same moment" (#91) | Note #75 said "so they can only select two of them", and that is built: at most two abilities switched on. With only two kinds in the river, at most two work at the same moment. If the tester wants all five in the river with a limit of two active at once, that is a change to make. |
+| #72: should the force field become a few seconds' bubble that pushes rocks, and the heart stay the spare life? | "Yes" (#92) | Built, see below. |
+| #78: what were the trash bags? | "The crash effects pack: I pick 2 or 3 crash effects" (#93) | Built in the change above: up to three on. |
+| #79: should a rebirth give more than 25% embers? | "Reborn nights that are harder and pay more" (#94) | Built, see below. |
+
+### Done in this change
+
+- **Force field.** The blue pickup no longer takes a hit. For 4 seconds, plus 1.5 seconds a Barrier level, a bubble round the boat shoves any rock it touches sideways, kept inside the river, and holds the boat off the bank. When it ends, half a second of grace follows. An arc shows the time left, and the bubble blinks in its last second. A rock shoved onto an ember or power drops that pickup, so nothing is left buried. The barrier stat now reads "The force field lasts longer"; `lantern-stats` keeps its format. A shield saved inside an old run cannot exist, since runs are not saved.
+- **Reborn nights.** After a rebirth, story nights run 6% faster for each rebirth, counted up to five, and dawn pays 10 more embers for each rebirth. The rebirth bonus applies on top. The menu says so. The tower and the endless river are unchanged by rebirth.
+
+Checks:
+- A fingerprint over 40 rivers of each night, the endless river and four tower levels matches main once the field pickup is made inert in both copies. With it live, rivers differ only after a field has shoved a rock, which moves where later pickups go.
+- Audit, 60 rivers each, ridden five ways, on nights 1, 3, 5, 8, 12, 20, 30 and 50, endless, and tower levels 1, 50 and 75: no closed river. The first run found 5 buried pickups on night 20 and 3 on the endless river, where the field had shoved rocks onto them. After the drop rule: 0.
+- The phone check on both profiles covers taking the field, a rock placed on the boat being pushed aside with no heart lost, a reborn night's 1.06 pace, and the menu line. With the push turned off, it fails.
+- A phone-sized screenshot shows the bubble and a pushed rock.
+
+Not checked:
+- Reborn pace was not audited: five rebirths on night 50 is a pace of about 3.0, the same as tower level 100, which was audited.
+- A real phone.

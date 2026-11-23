@@ -10,8 +10,12 @@ export const NIGHTS = 50;
 // magnet (embers swim to the boat) and flare (the flame is filled and does not fade) are the lab's own two.
 export const POWERS = ['boost', 'slow', 'size', 'magnet', 'flare'];
 export const LAST = { boost: 2.5, slow: 5, size: 6, magnet: 7, flare: 6 };
-// Stats are bought with embers for one run. Each is a level from 0: hearts (start with more), barrier (hits a shield takes),
+// Stats are bought with embers for one run. Each is a level from 0: hearts (start with more), barrier (the force field lasts 1.5 s longer a level; it was hits a shield takes),
 // calm (the river runs 4% slower a level), wick (the flame fades 8% slower a level), pull (pickups are taken from further away).
+// The force field (tester t1, answer to question #72): a blue pickup that for FIELD seconds pushes rocks out of the boat's way. A heart stays the spare life.
+export const FIELD = 4;
+// After a rebirth the story nights run faster (tester t1, answer to question #79): REBORN_PACE a rebirth, counted up to five rebirths.
+export const REBORN_PACE = 0.06;
 export const STATS = { hearts: 2, barrier: 2, calm: 3, wick: 3, pull: 3 }; // the top level of each
 
 function rng(seed) {
@@ -61,7 +65,7 @@ export function fall(s, y) {
   if (s.endless) d = (y + 20) % 60; else if (s.stage >= 16 && y > GOAL * 0.7) d = y - GOAL * 0.8; else if (s.stage >= 5) d = y - GOAL * 0.5; else return 0;
   return d >= 0 && d < 3 ? Math.sin(d / 3 * Math.PI) : 0;
 }
-function pace(s) { return s.tower ? climbPace(s.climb) : s.endless ? 1 + 0.05 * Math.min(24, level(s) - 1) : nightPace(s.stage); }
+function pace(s) { return s.tower ? climbPace(s.climb) : s.endless ? 1 + 0.05 * Math.min(24, level(s) - 1) : nightPace(s.stage) * s.hard; }
 export function speed(s) { return (0.62 + 0.62 * Math.min(1, s.y / GOAL)) * pace(s) * (1 + 0.7 * fall(s, s.y)) * (s.boost ? 1.8 : 1) * s.calm; }
 export function reach(light) { return 0.17 + 0.6 * light; }
 // Stretches of weather, each a fixed length of river that comes round again. Night 7 fog, night 9 wind, night 13 rain.
@@ -74,11 +78,11 @@ export function dazzle(s) { if (level(s) < 19) return 0; const p = (s.t + 2) % 9
 // How far the boat can see: the flame's reach, cut by fog and by the moments after lightning.
 export function sight(s) { return reach(s.light) * (fog(s, s.y) ? 0.6 : 1) * (dazzle(s) > 0 ? 0.6 : 1); }
 
-export function create(seed, stage = 1, mode = false, powers = POWERS, stats = {}, climb = 1) { // mode: false for a story night, true for the endless river, 'tower' for the climb; climb: the tower level
+export function create(seed, stage = 1, mode = false, powers = POWERS, stats = {}, climb = 1, reborn = 0) { // reborn: rebirths so far; story nights only // mode: false for a story night, true for the endless river, 'tower' for the climb; climb: the tower level
   const endless = mode === true, tower = mode === 'tower';
   const st = Object.fromEntries(Object.entries(STATS).map(([k, top]) => [k, Math.max(0, Math.min(top, Math.floor(stats[k] || 0)))]));
   const r = rng(seed), q = rng(seed ^ 0x9e3779b9); // powers draw from their own stream, so the rocks and embers of a seed never change
-  const s = { seed, stage, endless, tower, climb: Math.max(1, Math.min(LEVELS * SECTORS, Math.floor(climb) || 1)), q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers, powers: [], nextPower: 10 + q() * 10, boost: 0, slow: 0, size: 0, magnet: 0, flare: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
+  const s = { seed, stage, endless, tower, climb: Math.max(1, Math.min(LEVELS * SECTORS, Math.floor(climb) || 1)), q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers, powers: [], nextPower: 10 + q() * 10, boost: 0, slow: 0, size: 0, magnet: 0, flare: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, field: 0, hard: mode ? 1 : 1 + REBORN_PACE * Math.max(0, Math.min(5, Math.floor(reborn) || 0)), safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
   s.x = centre(s, 0);
   return s;
 }
@@ -191,7 +195,7 @@ function spawn(s) {
       }
     }
     if (y > s.nextGift) {
-      // Gifts are rare and sit in open water. Blue is a shield that takes one hit; red is a heart, a spare life.
+      // Gifts are rare and sit in open water. Blue is a force field that pushes rocks aside for a few seconds; red is a heart, a spare life.
       const gy = y + 0.5, gc = centre(s, gy), gx = gc + (s.r() * 2 - 1) * (half(s, gy) - 0.07), kind = s.r() < 0.4 ? 'heart' : 'shield';
       if (clear(s, gx, gy)) { s.embers.push({ x: gx, y: gy, got: false, kind }); s.nextGift = y + 16 + s.r() * 8; }
     }
@@ -200,7 +204,7 @@ function spawn(s) {
   }
 }
 
-// A blow: the shield takes it, else a spare heart does, else the run ends. Returns true when the run ended.
+// A blow: a shield left from an old save takes it, else a spare heart does, else the run ends. Returns true when the run ended.
 function blow(s, cause) {
   if (s.shield) { s.shield--; s.safe = 1.2; s.events.push('break'); return false; }
   if (s.hearts > 1) { s.hearts--; s.safe = 1.6; s.events.push('hurt'); return false; }
@@ -218,6 +222,7 @@ export function step(s, target) {
   s.x += Math.max(-max, Math.min(max, dx)) + wind(s, s.y) * 0.22 * DT;
   // An ember holds the flame steady for a moment before it starts to fade again.
   s.warm = Math.max(0, s.warm - DT); s.safe = Math.max(0, s.safe - DT);
+  if (s.field) { s.field = Math.max(0, s.field - DT); if (!s.field) { s.safe = Math.max(s.safe, 0.5); s.events.push('fieldEnd'); } } // a moment's grace as it fades
   s.boost = Math.max(0, s.boost - DT); s.slow = Math.max(0, s.slow - DT); s.magnet = Math.max(0, s.magnet - DT); s.flare = Math.max(0, s.flare - DT);
   if (s.flare) { s.light = 1; s.warm = Math.max(s.warm, DT); }
   if (s.magnet) for (const e of s.embers) if (!e.got && e.kind === 'ember') { const dx = s.x - e.x, dy = s.y - e.y, d = Math.hypot(dx, dy); if (d < 0.32 && d > 0.001) { const m = Math.min(d, 0.9 * DT); e.x += dx / d * m; e.y += dy / d * m; e.pulled = true; } }
@@ -232,7 +237,7 @@ export function step(s, target) {
   for (const e of s.embers) if (!e.got && Math.hypot(e.x - s.x, e.y - s.y) < (e.kind === 'wisp' ? 0.05 : s.take)) {
     e.got = true;
     if (e.kind === 'wisp') { s.light = Math.max(0.05, s.light - 0.2); s.events.push('wisp'); }
-    else if (e.kind === 'shield') { s.shield = 1 + s.st.barrier; s.events.push('shield'); }
+    else if (e.kind === 'shield') { s.field = FIELD + 1.5 * s.st.barrier; s.events.push('shield'); }
     else if (e.kind === 'heart') { s.hearts = Math.min(3, s.hearts + 1); s.events.push('heart'); }
     else { s.taken++; s.light = Math.min(1, s.light + 0.3); s.warm = 2.5; s.events.push('ember'); }
   }
@@ -248,13 +253,21 @@ export function step(s, target) {
     }
     const d = Math.hypot(Math.max(0, Math.abs(k.x - s.x) - k.len), k.y - s.y) - k.rad - boat(s);
     if (!k.on) continue;
+    if (s.field && d < 0.012) { // the force field shoves the rock sideways, out of the boat's way, and keeps it inside the river
+      const c = centre(s, k.y0), h = half(s, k.y0), dir = Math.sign(k.x - s.x) || (k.x0 < c ? -1 : 1), move = 0.012 - d;
+      k.x0 = Math.max(c - h, Math.min(c + h, k.x0 + dir * move)); k.x = k.a ? k.x0 + k.a * Math.sin(s.t * k.w + k.ph) : k.x0;
+      const free = e => e.got || Math.hypot(Math.max(0, Math.abs(e.x - k.x0) - k.len - k.a), e.y - k.y0) > k.rad + k.b + 0.048; // a pickup the rock is shoved onto is lost
+      s.embers = s.embers.filter(free); s.powers = s.powers.filter(free);
+      if (!k.pushed) { k.pushed = true; s.events.push('push'); }
+      continue;
+    }
     if (d < 0 && !s.safe) { if (blow(s, k.ice ? 'ice' : k.kind || 'rock')) return s; continue; }
     if (!k.grazed && d < 0.022 && k.y < s.y) { k.grazed = true; s.grazes++; s.light = Math.min(1, s.light + 0.05); s.events.push('graze'); }
   }
   const c = centre(s, s.y), edge = half(s, s.y) - boat(s);
   if (Math.abs(s.x - c) > edge) {
     // Just after a blow the bank only holds the boat in; otherwise it is a blow, and the boat is set back inside.
-    if (s.safe) s.x = c + Math.sign(s.x - c) * edge;
+    if (s.safe || s.field) s.x = c + Math.sign(s.x - c) * edge; // the force field holds the boat off the bank too
     else { if (blow(s, 'bank')) return s; s.x = c + Math.sign(s.x - c) * (edge - 0.03); }
   }
   if (s.light <= 0) { s.light = 0; s.over = 'dark'; s.events.push('out'); return s; }

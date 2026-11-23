@@ -1,7 +1,8 @@
 // Simulated clients against a running server, local or deployed. Each one is a real client: it opens the
 // WebSocket, runs the same prediction code as the page 20 times a second, steers at random, pings, and checks
 // what comes back. All of them join one room made for the test (lt-<name>), which nobody else is offered.
-//   node loadtest/load.mjs --url wss://play.adamwhite.work --key <LOADTEST_KEY> --clients 60 --seconds 60 [--cap 60] [--room a1]
+//   node loadtest/load.mjs --url wss://play.adamwhite.work --key <LOADTEST_KEY> --clients 60 --seconds 60 [--cap 60] [--room a1] [--burn 50]
+// --burn N wastes N million square roots on every tick of that room, to overload it on purpose.
 // Reported: joins, bytes per client, how regularly snapshots arrive, round trip time, how far prediction was
 // corrected, and the room's own counters (ticks late, ticks skipped, kicks). This process's own timer lag is
 // reported too, because a busy load generator looks like a slow server.
@@ -17,7 +18,7 @@ const clients = [], gaps = [], rtts = [], fixes = [], replays = [], lag = [], cl
 let joined = 0, refused = 0, bytes = 0, snaps = 0, skipped = 0, measuring = false;
 
 function client(i) {
-  const c = { ws: new WebSocket(`${url}/crumbwar/play?lt=${key}&room=${room}&cap=${cap}`), p: null, ants: new Map(), food: new Map(), lastAt: 0, lastTick: 0, angle: Math.random() * 256 | 0, move: true, sprint: false, until: 0, pings: new Map(), n: 0 };
+  const c = { ws: new WebSocket(`${url}/crumbwar/play?lt=${key}&room=${room}&cap=${cap}${arg('burn', '') ? '&burn=' + arg('burn') : ''}`), p: null, ants: new Map(), food: new Map(), lastAt: 0, lastTick: 0, angle: Math.random() * 256 | 0, move: true, sprint: false, until: 0, pings: new Map(), n: 0 };
   c.ws.binaryType = 'arraybuffer';
   c.ws.onerror = () => {};
   c.ws.onclose = e => { if (!c.p) refused++; closes[e.code] = (closes[e.code] || 0) + 1; c.p = null; };
