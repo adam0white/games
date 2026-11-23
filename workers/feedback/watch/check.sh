@@ -73,7 +73,7 @@ cd "$RUN" || exit 1
 pid=$!
 ( sleep 7200; kill "$pid" 2>/dev/null ) & timer=$!
 wait "$pid"; status=$?
-kill "$timer" 2>/dev/null
+kill "$timer" 2>/dev/null; wait "$timer" 2>/dev/null
 result="$(grep -E '^RESULT ' "$STATE/last-run.txt" | tail -1)"
 if [ "$status" -eq 0 ] && [ "${result:0:9}" = "RESULT ok" ]; then
   for id in $new; do echo "$id" >> "$STATE/fired"; done
