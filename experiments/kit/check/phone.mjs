@@ -165,6 +165,7 @@ const GAMES = {
     let st = await state();
     assert.equal(st.opened, 3, 'old save: opened night'); assert.equal(st.bank, 120, 'old save: bank'); assert.ok(st.owned.includes('red'), 'old save: owned'); assert.equal(st.worn.boat, 'red', 'old save: worn');
     assert.equal(await page.textContent('#play'), 'Play night 3'); assert.match(await page.textContent('#about'), /Best 40%/);
+    assert.deepEqual(st.board.map(r => r.s), [55], 'old save: the endless best starts the leaderboard'); assert.deepEqual(st.winOn, []);
     await until(page, () => document.getElementById('notes-button'), 'notes button');
     await noZoomed(page);
     // Play, steer by a relative drag, and a tap alone does not steer.
@@ -266,7 +267,7 @@ const GAMES = {
     assert.equal(await page.textContent('#play'), 'Play night 50'); assert.match(await page.textContent('#about'), /This is the last night/);
     await page.click('#less'); assert.doesNotMatch(await page.textContent('#about'), /last night/);
     // Rebirth (note #73): a goal until everything is found and all 50 nights are open; then two taps start over with 25% more embers for good.
-    await page.click('#toShop'); assert.equal(await page.isVisible('#rebirth'), false, 'no rebirth before everything is found'); assert.match(await page.textContent('#packs'), /Find everything \(\d+ of 28\)/);
+    await page.click('#toShop'); assert.equal(await page.isVisible('#rebirth'), false, 'no rebirth before everything is found'); assert.match(await page.textContent('#packs'), /Find everything \(\d+ of 33\)/);
     await page.click('[data-test="all"]'); await page.click('[data-test="nights"]');
     await page.click('#rebirth'); assert.equal((await state()).reborn, 0, 'one tap is not a rebirth'); await page.click('#rebirth');
     st = await state(); assert.equal(st.reborn, 1); assert.equal(st.bank, 0); assert.equal(st.opened, 1); assert.deepEqual(st.owned.sort(), ['amber', 'blue', 'boost', 'oak']);
@@ -296,6 +297,31 @@ const GAMES = {
     await page.click('.back'); await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.hearts = 1; s.shield = 0; s.safe = 0; s.x = 5; });
     await until(page, () => window.lanternState().crash === 'burst', 'a crash plays the crash switched on');
     await until(page, () => window.lanternState().screen === 'card', 'crash card'); await page.click('#toMenu');
+    // The victory pack (note #96): up to three on, and dawn plays one of them. lantern-win is a JSON list of ids.
+    await page.click('#toShop');
+    for (const id of ['vfire', 'vlamp', 'vbird']) await page.click(`[data-item="${id}"]`);
+    await page.click('[data-item="vbow"]'); assert.match(await page.textContent('#got'), /Only 3 victories at a time/); assert.deepEqual(JSON.parse((await saved())['lantern-win']), ['vfire', 'vlamp', 'vbird']);
+    await page.click('[data-item="vlamp"]'); await page.click('[data-item="vbird"]'); assert.deepEqual(JSON.parse((await saved())['lantern-win']), ['vfire']);
+    await page.click('.back'); await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.safe = 99; s.bonus = 1000; });
+    await until(page, () => window.lanternState().win === 'vfire', 'dawn plays the victory switched on');
+    await until(page, () => window.lanternState().screen === 'card', 'dawn card'); await page.click('#toMenu');
+    // The leaderboard on this phone (note #96): a name, and an endless run that beats the best goes to the top. Nothing of it is sent.
+    await sleep(400); await page.evaluate(() => localStorage.removeItem('hf-lab-recording-off')); await page.reload(); // recording back on, so the check below can see what is sent
+    const sentBefore = labSent(page).length;
+    await page.click('#toBoard'); assert.equal(await page.isVisible('#name'), true); assert.match(await page.textContent('#rows'), /^1No name55/);
+    await page.fill('#name', ' Rio <b>river</b>'); assert.equal((await saved())['lantern-name'], 'Rio <b>river</b', 'the name is trimmed and kept to 16 characters');
+    await page.keyboard.press('p'); assert.equal((await state()).screen, 'board', 'typing P in the name does not pause or play');
+    await page.click('#boardPlay'); assert.equal((await state()).endless, true);
+    await page.evaluate(() => { const s = window.lanternSim(); s.extra = 900; s.light = 0.0001; s.warm = 0; });
+    await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'endless run ends');
+    assert.match(await page.textContent('#line'), /Number 1 on this phone's leaderboard/);
+    st = await state(); assert.equal(st.board.length, 2); assert.equal(st.board[0].n, 'Rio <b>river</b'); assert.ok(st.board[0].s >= 900);
+    await page.click('#toMenu'); await page.click('#toBoard');
+    assert.equal(await page.locator('#rows li.me .n').textContent(), 'Rio <b>river</b', 'the name is shown as text'); assert.equal(await page.locator('#rows b').count(), 0, 'no markup from the name');
+    await sleep(300); const sent = labSent(page).slice(sentBefore); assert.ok(sent.some(r => r.kind === 'run' && r.data.summary?.score >= 900), 'the endless run was recorded');
+    assert.ok(!JSON.stringify(sent).includes('Rio'), 'the name is not sent to the lab');
+    await sleep(400); await page.reload(); st = await state(); assert.equal(st.name, 'Rio <b>river</b'); assert.equal(st.board.length, 2, 'the board is kept');
+    await page.evaluate(() => localStorage.setItem('hf-lab-recording-off', '1')); await page.reload(); // recording off again, as the steps below expect
     // A look on the whole screen (note #73): tapping an owned boat wears it and hides every button; a tap brings the shop back.
     await page.click('#toShop'); await page.click('[data-item="red"]'); st = await state();
     assert.equal(st.looking, 'boat'); assert.equal(st.worn.boat, 'red'); assert.equal(await page.isVisible('#shop'), false, 'the shop hides'); assert.equal(await page.isVisible('#notes-button'), false, 'the notes button hides');

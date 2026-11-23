@@ -382,3 +382,25 @@ Checks:
 Not checked:
 - Reborn pace was not audited: five rebirths on night 50 is a pace of about 3.0, the same as tower level 100, which was audited.
 - A real phone.
+
+## 2026-11-23: victory pack and a leaderboard on this phone (tester t1, note #96)
+
+The note, in short: "Just build the leaderboard, the victory pack, and the sign-up username UI." All three were earlier left as proposals (notes #75 and #76): a shared leaderboard, accounts and sign-up need a server, which is the owner's decision. The tester now asks for them to be built.
+
+### Done
+| Ask | What changed |
+| --- | --- |
+| Victory pack | A sixth pack, Victories, at 50 embers: Fireworks (rockets burst over the river), Sky lanterns (paper lanterns rise from the water), Birds (a flock takes off from the banks), Rainbow (it opens over the river) and Shooting stars. Up to three are switched on, like crashes; reaching dawn (a night or a tower level) plays one of them at random, with its own sound for fireworks, birds and stars. With none on, dawn is as before. A find switches itself on if fewer than three are. New key `lantern-win`, a JSON list of ids. Rebirth clears it. **The rebirth goal now counts 33 things, not 28**, so a player who had found everything must find five more before the next rebirth. |
+| Leaderboard | A Leaderboard button on the menu opens a screen with the ten best endless-river runs **on this phone**: place, name, score and date. An endless run that makes the ten goes in, and the end card says "Number 3 on this phone's leaderboard". A best from before the board becomes its first row. New key `lantern-board`, a JSON list of `{ n, s, d }` (name, score, date), best first. |
+| Name ("sign-up username") | A name field on the leaderboard screen, up to 16 characters, saved as you type. Each run on the board carries the name it was played under. New key `lantern-name`, text. There is no account and no sign-in: the screen says the name and scores stay on this phone. |
+
+Kept on this phone only: the name and the board are not in any lab recording. The phone check turns recording on, plays an endless run under a name, confirms the run was recorded, and confirms no record contains the name. With the name added to the run's start record, the check fails (tried).
+
+The name field keeps key presses from reaching the game, so typing P in it does not pause or start anything. Found while testing: the five victory drawings first used added light, which washed out to white against the dawn sky. They are now painted, and only the lantern glows are added as light.
+
+Checks: `node experiments/kit/check/phone.mjs` on WebKit iPhone 13 and Chromium Pixel 7. New lines: an old save's endless best starts the board; three victories on and a fourth refused; dawn plays the one switched on; the name is trimmed and kept to 16 characters and shown as text, not markup; typing P in the name field does not pause; an endless run lands first on the board and the card says so; the board and name survive a reload; nothing sent contains the name. Phone-sized Chromium screenshots of all five victories, the board and the shop; no page errors.
+
+Not checked: the victory sounds and the name keyboard on a real phone.
+
+### Left as a proposal (2026-11-23, note #96)
+- **A shared leaderboard with accounts or sign-up** (notes #76 and #96). It needs a server, storage of names and scores from many players, and some way to stop fake scores. All of that waits on an owner decision ("no new server infrastructure without an owner decision"; accounts are not authorized). The local board's format (`{ n, s, d }`) could be sent as is if a shared board is approved.
