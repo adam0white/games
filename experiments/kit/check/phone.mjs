@@ -74,6 +74,9 @@ async function antLab(page, slug, query, extra, checkExtra) {
   await page.keyboard.press('p'); assert.equal(await mode(), 'paused'); await page.keyboard.press('p'); assert.equal(await mode(), 'play');
   await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); delete document.hidden; });
   assert.equal(await mode(), 'paused', 'hiding the page pauses'); await page.click('#resume');
+  // From the kit (pause.js): losing focus and putting the page away pause too, and capital P is a pause key.
+  await page.evaluate(() => dispatchEvent(new Event('blur'))); assert.equal(await mode(), 'paused', 'losing focus pauses'); await page.keyboard.press('P'); assert.equal(await mode(), 'play', 'capital P resumes');
+  await page.evaluate(() => dispatchEvent(new Event('pagehide'))); assert.equal(await mode(), 'paused', 'putting the page away pauses'); await page.click('#resume');
   assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'one audio context for the whole run');
   // Leaving for the menu keeps the animal; a reload keeps all of it.
   await page.click('#pause'); await page.click('#paused .toMenu'); assert.equal(await mode(), 'menu');
@@ -236,6 +239,9 @@ const GAMES = {
     await page.click('#resume'); assert.equal((await nest()).mode, 'play');
     await page.waitForFunction(t => window.__nest.s.t > t, t0);
     await page.keyboard.press('p'); assert.equal((await nest()).mode, 'paused'); await page.keyboard.press('p'); assert.equal((await nest()).mode, 'play');
+    // From the kit (pause.js): losing focus and putting the page away pause too, and capital P is a pause key.
+    await page.evaluate(() => dispatchEvent(new Event('blur'))); assert.equal((await nest()).mode, 'paused', 'losing focus pauses'); await page.keyboard.press('P'); assert.equal((await nest()).mode, 'play', 'capital P resumes');
+    await page.evaluate(() => dispatchEvent(new Event('pagehide'))); assert.equal((await nest()).mode, 'paused', 'putting the page away pauses'); await page.click('#resume');
     // A round ends; the best is kept across a reload.
     await page.evaluate(() => window.__nest.skipTo(1e9)); await until(page, () => window.__nest.mode === 'end', 'end card');
     await page.reload(); await until(page, () => window.__nest, 'game script');

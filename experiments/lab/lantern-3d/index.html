@@ -53,6 +53,9 @@
 <script type="module">
 import { create, step, centre, half, fall, fog, wind, rain, dazzle, progress, DT, GOAL, NIGHTS } from '../../lantern/sim.js';
 import { createRenderer } from './render.js';
+import { sound } from '../../kit/audio.js';
+import { onLeave, isPauseKey } from '../../kit/pause.js';
+import { screens } from '../../kit/screens.js';
 
 const $ = id => document.getElementById(id);
 const query = new URLSearchParams(location.search);
@@ -86,9 +89,10 @@ window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, playing, pa
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 window.lanternView = R; // the browser checks read the camera and project points through this
 
+const cards = screens(['menu', 'card']);
 function show(name) {
   screen = name;
-  for (const id of ['menu', 'card']) $(id).classList.toggle('on', id === name);
+  cards(name);
   const play = name === 'play';
   $('hud').style.display = $('big').style.display = play ? 'block' : 'none'; pauseButton.style.display = play ? 'grid' : 'none';
   if (!play) $('warn').classList.remove('on');
@@ -97,10 +101,8 @@ function show(name) {
 function say(text, ms = 2200) { const el = $('say'); el.textContent = text; el.style.opacity = 1; clearTimeout(sayTimer); sayTimer = setTimeout(() => { el.style.opacity = 0; }, ms); }
 
 // Sound: all synthesized, started by the Play tap. The same tones as the flat page.
-let ac, water, waterGain, drone, droneGain, streak = 0;
-function audio() {
-  if (ac) { if (ac.state === 'suspended' && !paused) ac.resume(); return; }
-  ac = new (window.AudioContext || window.webkitAudioContext)();
+let water, waterGain, drone, droneGain, streak = 0;
+const snd = sound({ setup: ac => { // the river and the low drone, built once
   const len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
   for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
   const n = ac.createBufferSource(); n.buffer = buf; n.loop = true;
@@ -108,12 +110,9 @@ function audio() {
   waterGain = ac.createGain(); waterGain.gain.value = 0.05; n.connect(water).connect(waterGain).connect(ac.destination); n.start();
   drone = ac.createOscillator(); drone.type = 'sine'; drone.frequency.value = 55;
   droneGain = ac.createGain(); droneGain.gain.value = 0; drone.connect(droneGain).connect(ac.destination); drone.start();
-}
-function tone(freq, dur, vol, type = 'sine') {
-  if (!ac) return; const o = ac.createOscillator(), v = ac.createGain(), t = ac.currentTime;
-  o.type = type; o.frequency.setValueAtTime(freq, t); v.gain.setValueAtTime(vol, t); v.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.connect(v).connect(ac.destination); o.start(t); o.stop(t + dur);
-}
+} });
+const audio = () => snd.unlock();
+const tone = (freq, dur, vol, type = 'sine') => { if (snd.ctx) snd.tone(freq, dur, vol, type); };
 const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
 
 function begin() {
@@ -165,8 +164,6 @@ canvas.addEventListener('pointermove', e => {
   drag.x = e.clientX; aim(drag.boat0 + (e.clientX - drag.x0) * dpr / unit * gain);
 });
 for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, e => { if (e.pointerType !== 'mouse') startTap = null; if (drag && e.pointerId === drag.id) drag = null; });
-// iOS Safari may refuse to start audio on touch-down; try again when the finger lifts.
-for (const type of ['pointerup', 'touchend', 'click']) addEventListener(type, () => { if (ac && ac.state === 'suspended' && !paused) ac.resume(); });
 
 $('play').addEventListener('click', begin);
 $('go').addEventListener('click', () => { if (paused) resume(); else if (performance.now() - ended > 600) begin(); });
@@ -175,18 +172,17 @@ $('go').addEventListener('click', () => { if (paused) resume(); else if (perform
 function pause() {
   if (!playing || paused) return; paused = true; drag = null; keys.clear();
   $('title').textContent = 'Paused'; $('line').textContent = `Night ${stage}, ${Math.floor(progress(s) * 100)}% of the way to dawn.`; $('sub').textContent = 'Touch the river to go on.'; $('go').textContent = 'Go on';
-  show('card'); if (ac) ac.suspend();
+  show('card'); snd.hold();
 }
 function resume() {
   if (!paused) return; paused = false; acc = 0; last = performance.now(); target = s.x;
-  show('play'); if (ac) ac.resume();
+  show('play'); snd.release();
 }
 pauseButton.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pause(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
-addEventListener('blur', pause); addEventListener('pagehide', pause);
+onLeave(pause);
 const keys = new Set();
 addEventListener('keydown', e => {
-  if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') { paused ? resume() : pause(); return; }
+  if (isPauseKey(e)) { paused ? resume() : pause(); return; }
   if (paused) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); resume(); } return; }
   keys.add(e.key);
 });
@@ -243,7 +239,7 @@ function frame(now) {
   if (playing && !paused) { acc += dt; while (acc >= DT && playing) { tick(); acc -= DT; } }
   shake = Math.max(0, shake - dt * 3); glow = Math.max(0, glow - dt * 2);
   for (const p of sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; } sparks = sparks.filter(p => p.life > 0);
-  if (ac) { water.frequency.value = 400 + 500 * Math.min(1.4, s.y / GOAL); waterGain.gain.value = 0.05 + (playing ? 0.14 * Math.max(fall(s, s.y), fall(s, s.y + 0.8)) : 0); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0; }
+  if (snd.ctx) { water.frequency.value = 400 + 500 * Math.min(1.4, s.y / GOAL); waterGain.gain.value = 0.05 + (playing ? 0.14 * Math.max(fall(s, s.y), fall(s, s.y + 0.8)) : 0); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0; }
   const dawn = Math.max(0, (progress(s) - 0.86) / 0.14), day = s.over === 'dawn' ? Math.min(1, (now - ended) / 2500) : 0;
   R.draw(s, { now, dt, target, shake, glow, sparks, dawn, day, playing, snap });
   snap = false;

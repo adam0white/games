@@ -39,9 +39,11 @@ A game calls `const rec = lab('<slug>')`, then `rec.notice(menuCard)`, `rec.togg
 
 - `readNumber` gives the fallback for stored text that is not a finite number. Lantern's old code gave `NaN`, which then could never buy anything and was written back. Reviewed 2026-11-23.
 - A page two levels down (`/lab/<name>/`) imports `../../kit/`.
+- The lab pages (`lab/ant-nemesis`, `lab/ant-wilds`, `lab/ant-nest`, `lab/lantern-3d`) moved onto `save.js`, `audio.js`, `pause.js` and `screens.js` on 2026-11-23. The three ant pages now also pause when the window loses focus or the page is put away, take capital P as a pause key, and retry the audio start when a finger lifts, as Ant Promotion did when it moved. `lantern-3d` already did all three. Storage keys and formats are unchanged.
 
 ## Not shared yet, and why
 
 - **Steering.** Lantern steers by how far a finger has moved (with a gain and a dead zone after a pause). Ant Promotion uses a floating joystick. They are different models on purpose. A third game that wants one of them moves it here.
 - **Shop.** Lantern has a bank and packs; Ant Promotion has free skins. When Ant Promotion gets a currency, the bank and the pack draw move here.
+- **Looping noise.** `lab/ant-nest` plays its rain as a noise loop that runs until it is stopped. It is the only page that needs one, so it stays in that page on the kit's audio context.
 - **Page styles.** Both games have the same card and button layout with different colours. A shared stylesheet needs before and after screenshots to prove nothing moved.
