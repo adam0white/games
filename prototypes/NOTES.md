@@ -13,3 +13,7 @@ Focus new work on Lantern and Ant Promotion. Stop new work on The Long Road and 
 ## 2026-11-23: the owner's decision
 
 The owner dropped The Long Road and Copper Afternoon. Both moved to `archive/prototypes/` and are no longer served. Copper Afternoon is kept intact there for reuse; see `archive/README.md`.
+
+## 2026-11-23: shared code (owner)
+
+The owner asked for the live games to be kept on shared code as a standing practice. The shared code is `prototypes/kit/`; its `README.md` holds the rules and lists what is deliberately not shared yet. `prototypes/kit/check/phone.mjs` runs every live prototype in two phone profiles with saves seeded in the formats players already have.

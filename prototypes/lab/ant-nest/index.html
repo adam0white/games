@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#7cc4f0">
+<title>Ant Promotion: The Nest</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #5a3a20; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { font: 16px/1.4 ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif; color: #fff8e6; }
+  canvas#c { display: block; width: 100vw; height: 100dvh; }
+  .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: #2a1a0ed9; overflow-y: auto; touch-action: pan-y; }
+  .screen.on { display: grid; }
+  #end { background: #2a1a0ef0; }
+  .screen > div { max-width: 24em; width: calc(100% - 1.6em); padding: .8em; box-sizing: border-box; }
+  h1 { font-size: 2.1em; line-height: 1.1; margin: 0 0 .2em; color: #ffe08a; text-shadow: 0 3px 0 #5a3a0c; letter-spacing: .02em; }
+  h1 small { display: block; font-size: .62em; color: #fff8e6; text-shadow: 0 2px 0 #5a3a0c; }
+  h2 { font-size: 1.5em; margin: 0 0 .3em; color: #ffe08a; }
+  p { margin: .4em 0; }
+  a { color: #ffe08a; }
+  button { font: inherit; color: #fff8e6; background: #ffffff1c; border: 2px solid #ffe08a99; border-radius: 16px; padding: .55em 1.1em; margin: .3em; min-height: 48px; min-width: 9em; touch-action: manipulation; cursor: pointer; }
+  button.main { background: #ffb42a; color: #33200a; border-color: #ffb42a; font-size: 1.2em; font-weight: bold; }
+  button:active { transform: scale(.97); }
+  .exp { display: inline-block; font-size: .85em; padding: .15em .7em; border-radius: 99px; background: #ffffff22; border: 1.5px dashed #ffe08aaa; }
+  #tools { position: fixed; left: 0; right: 0; bottom: 0; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); display: none; gap: 8px; justify-content: center; background: #3a2414; border-top: 3px solid #2a180c; }
+  #tools button { flex: 1 1 0; min-width: 0; margin: 0; padding: .3em .2em; font-size: 15px; font-weight: bold; }
+  #tools button.on { background: #ffb42a; color: #33200a; border-color: #ffb42a; }
+  #tools button.pulse { animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 5px #ffe08a99; } }
+  #tools #pause { flex: 0 0 52px; }
+  #tools #tRoom { flex-grow: 1.35; white-space: nowrap; font-size: 14px; }
+  #say { position: fixed; left: 0; right: 0; bottom: calc(84px + env(safe-area-inset-bottom)); text-align: center; font-size: 21px; font-weight: bold; pointer-events: none; opacity: 0; transition: opacity .3s; text-shadow: 0 2px 6px #000, 0 0 2px #000; padding: 0 1em; }
+  #say.on { opacity: 1; }
+  .score { font-size: 3em; font-weight: bold; color: #ffe08a; line-height: 1; margin: .1em 0; text-shadow: 0 3px 0 #5a3a0c; }
+  .why { font-size: 1.1em; margin: .6em 0; }
+  .rows { display: inline-grid; grid-template-columns: auto auto; gap: .15em 1em; text-align: left; margin: .3em 0; }
+  .rows span:nth-child(even) { text-align: right; font-weight: bold; }
+  .g { color: #8dff8a; } .r { color: #ff8a7a; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="tools">
+  <button id="tDig" class="on">Dig</button>
+  <button id="tErase">Erase</button>
+  <button id="tRoom">Queen's room</button>
+  <button id="pause" aria-label="Pause">II</button>
+</div>
+<div id="say"></div>
+
+<div id="menu" class="screen on"><div>
+  <h1>Ant Promotion<small>The Nest</small></h1>
+  <p><span class="exp">An experiment</span></p>
+  <p>Mark where to dig. The ants decide when, and whether, to do it. Keep the queen dry when the rain comes.</p>
+  <canvas id="hero" width="300" height="150" style="width:200px;height:100px"></canvas>
+  <p><button id="play" class="main">Play</button></p>
+  <p id="bestLine"></p>
+  <p><button id="sound" style="min-width:0"></button></p>
+  <p><a href="/proto/ant-promotion/">Back to Ant Promotion</a></p>
+</div></div>
+
+<div id="paused" class="screen"><div>
+  <h2>Paused</h2>
+  <p><button id="resume" class="main">Keep playing</button></p>
+  <p><button class="toMenu">Menu</button></p>
+</div></div>
+
+<div id="end" class="screen"><div>
+  <h2 id="endHead"></h2>
+  <div class="score" id="endScore"></div>
+  <p id="endBest"></p>
+  <p class="why" id="endWhy"></p>
+  <div class="rows" id="endRows"></div>
+  <p><button id="again" class="main">Play again</button></p>
+  <p><button class="toMenu" style="min-width:0">Menu</button></p>
+</div></div>
+
+<script type="module">
+import { COLS, ROWS, DT, RAIN_AT, RAIN_FOR, WARN, END_AT, EARTH, CLAY, STONE, SEEDS, POCKET, OPEN, SCORE, KIND_NAME, idx, create, step, setMark, placeRoom, roomCells, touching, moundX } from './sim.js';
+import { drawForm, setLook } from '../../ant-promotion/art.js';
+import { FORMS, ANT } from '../../ant-promotion/sim.js';
+
+const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d');
+const KEY = 'ant-nest:v1', query = new URLSearchParams(location.search);
+const ANTF = FORMS[ANT], QUEEN_SKIN = { c: '#7a2a1c', p: 'crown' };
+let best = 0; try { best = JSON.parse(localStorage.getItem(KEY) || '{}').best || 0; } catch {}
+const storeBest = () => { try { localStorage.setItem(KEY, JSON.stringify({ best })); } catch {} };
+setLook(1);
+
+let s = null, mode = 'menu', tool = 'dig', W = 0, H = 0, dpr = 1, cell = 24, ox = 0, oy = 0, last = 0, acc = 0, sayTimer = 0, sound = true;
+let rounds = 0, hint = 0, selected = null, selT = 0, drag = null, endAt = 0, marked = false;
+const bits = [];
+
+// ---------- sound (the blip and crunch helpers from the main game)
+let ac = null, rainNode = null;
+function blip(freq, dur = 0.08, type = 'sine', vol = 0.12, slide = 0) {
+  if (!sound) return;
+  try {
+    ac ??= new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume();
+    const o = ac.createOscillator(), v = ac.createGain(), t = ac.currentTime;
+    o.type = type; o.frequency.setValueAtTime(freq, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
+    v.gain.setValueAtTime(vol, t); v.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(v).connect(ac.destination); o.start(t); o.stop(t + dur);
+  } catch {}
+}
+function crunch(dur = 0.12, vol = 0.2, hz = 1800, loop = false) {
+  if (!sound) return null;
+  try {
+    ac ??= new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume();
+    const n = Math.ceil(ac.sampleRate * dur), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (loop ? 1 : (1 - i / n) ** 2);
+    const src = ac.createBufferSource(), f = ac.createBiquadFilter(), v = ac.createGain();
+    src.buffer = buf; src.loop = loop; f.type = 'bandpass'; f.frequency.value = hz; f.Q.value = 0.8; v.gain.value = vol;
+    src.connect(f).connect(v).connect(ac.destination); src.start();
+    return src;
+  } catch { return null; }
+}
+function unlock() { if (!sound) return; try { ac ??= new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch {} }
+function rainSound(on) { if (on && !rainNode && mode === 'play') rainNode = crunch(2, 0.07, 3200, true); if (!on && rainNode) { try { rainNode.stop(); } catch {} rainNode = null; } }
+
+// ---------- screens
+function show(name) {
+  mode = name;
+  for (const id of ['menu', 'paused', 'end']) $(id).classList.toggle('on', id === name);
+  const inGame = name === 'play';
+  $('tools').style.display = inGame || name === 'paused' ? 'flex' : 'none';
+  if (name !== 'play') { drag = null; rainSound(false); }
+  if (name === 'menu') menu();
+  last = 0;
+}
+function menu() {
+  $('sound').textContent = sound ? 'Sound: on' : 'Sound: off';
+  $('bestLine').textContent = best ? `Best score: ${best}` : '';
+  const h = $('hero'), x = h.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, h.width, h.height);
+  x.fillStyle = '#f0d7a6'; x.beginPath(); x.roundRect(10, 40, 280, 76, 38); x.fill();
+  x.save(); x.translate(95, 78); drawForm(x, ANTF, 30, 0.4, QUEEN_SKIN); x.restore();
+  x.save(); x.translate(215, 82); x.rotate(-0.2); drawForm(x, ANTF, 22, 1.2, null, -0.2); x.restore();
+  x.fillStyle = '#6a4424'; x.beginPath(); x.arc(255, 74, 8, 0, 7); x.fill();
+}
+function start() {
+  const seed = (!s && rounds === 0 && Number(query.get('seed'))) || (Math.random() * 1e9 | 0); rounds++;
+  s = create(seed); tool = 'dig'; tools(); selected = null; bits.length = 0; marked = false; hint = 0; endAt = 0; acc = 0;
+  $('tRoom').classList.remove('pulse');
+  show('play'); resize();
+  say('Rain is coming. Dig a safe nest');
+}
+function say(text, t = 2.6) { $('say').textContent = text; $('say').classList.add('on'); sayTimer = t; }
+function tools() { for (const [id, t] of [['tDig', 'dig'], ['tErase', 'erase'], ['tRoom', 'room']]) $(id).classList.toggle('on', tool === t); }
+
+$('play').onclick = () => { unlock(); start(); };
+$('again').onclick = () => { unlock(); start(); };
+$('sound').onclick = () => { sound = !sound; menu(); blip(660); };
+$('pause').onclick = () => show('paused'); $('resume').onclick = () => show('play');
+for (const b of document.querySelectorAll('.toMenu')) b.onclick = () => { s = null; show('menu'); };
+$('tDig').onclick = () => { tool = 'dig'; tools(); };
+$('tErase').onclick = () => { tool = 'erase'; tools(); };
+$('tRoom').onclick = () => { tool = 'room'; tools(); $('tRoom').classList.remove('pulse'); say("Tap the soil where the queen's room should go", 2.2); };
+document.addEventListener('visibilitychange', () => { if (document.hidden && mode === 'play') show('paused'); });
+addEventListener('keydown', e => { if (e.key === 'p' || e.key === 'Escape') { if (mode === 'play') show('paused'); else if (mode === 'paused') show('play'); } });
+addEventListener('contextmenu', e => e.preventDefault());
+
+function finish() {
+  const r = s.result, isBest = r.score > best; selected = null;
+  if (isBest) { best = r.score; storeBest(); }
+  $('endHead').textContent = r.queen ? 'The queen stayed dry!' : 'The queen got wet';
+  $('endScore').textContent = r.score;
+  $('endBest').textContent = isBest ? 'New best score' : `Best: ${best}`;
+  $('endWhy').textContent = r.why;
+  const rows = [['Queen dry', r.queen ? `yes, +${SCORE.queen}` : 'no, +0'], ['Ants kept', `${r.ants} × ${SCORE.ant}`], ['Food kept dry', `${r.food} × ${SCORE.food}`], ['Ants hatched', r.hatched]];
+  $('endRows').textContent = '';
+  for (const [a, b] of rows) $('endRows').append(Object.assign(document.createElement('span'), { textContent: a }), Object.assign(document.createElement('span'), { textContent: b, className: a === 'Queen dry' ? (r.queen ? 'g' : 'r') : '' }));
+  show('end');
+}
+
+// ---------- layout
+function resize() {
+  dpr = Math.min(3, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  const tb = $('tools').offsetHeight || 64; // includes the bottom safe area
+  cell = Math.floor(Math.min(W / COLS, (H - tb) / (ROWS + 3.3)));
+  ox = Math.round((W - cell * COLS) / 2);
+  oy = Math.round(H - tb - cell * ROWS - Math.max(0, (H - tb - cell * (ROWS + 3.3)) * 0.2)); // top of soil row 0
+}
+addEventListener('resize', resize); resize();
+const cx = x => ox + (x + 0.5) * cell, cy = y => oy + (y + 0.5) * cell;
+const hash = (x, y) => { let h = x * 374761393 + y * 668265263 | 0; h = (h ^ h >>> 13) * 1274126177 | 0; return ((h ^ h >>> 16) >>> 0) / 4294967296; };
+
+// ---------- input: drag on soil marks; a tap on a tunnel picks the ant nearest the finger
+function cellAt(e) { return [Math.floor((e.clientX - ox) / cell), Math.floor((e.clientY - oy) / cell), (e.clientX - ox) / cell - 0.5, (e.clientY - oy) / cell - 0.5]; }
+function paint(x, y) {
+  if (!s || x < 0 || x >= COLS || y < 1 || y >= ROWS) return;
+  if (setMark(s, x, y, tool === 'dig')) {
+    blip(tool === 'dig' ? 880 + y * 12 : 420, 0.03, 'square', 0.025);
+    if (tool === 'dig' && !marked) { marked = true; hint = 0; setTimeout(() => { if (s && !s.room && mode === 'play') { $('tRoom').classList.add('pulse'); } }, 5000); }
+  } else if (tool === 'dig' && drag && !drag.warned && (s.kind[idx(x, y)] === STONE || s.kind[idx(x, y)] === POCKET)) { drag.warned = true; say(s.kind[idx(x, y)] === STONE ? 'Stone cannot be dug' : 'Water: digging next to it lets it out', 1.8); }
+}
+function pickAnt(fx, fy) {
+  let bestA = null, bd = 1.1;
+  for (const a of s.ants) { const d = Math.hypot(a.x - fx, a.y - fy); if (d < bd) { bd = d; bestA = a; } }
+  const q = s.queen; if (Math.hypot(q.x - fx, q.y - fy) < Math.min(bd, 0.7)) bestA = 'queen';
+  return bestA;
+}
+cv.addEventListener('pointerdown', e => {
+  if (mode !== 'play' || !s || s.over) return;
+  const [x, y, fx, fy] = cellAt(e);
+  const open = y <= 0 || (x >= 0 && x < COLS && y < ROWS && s.kind[idx(x, y)] === OPEN);
+  if (tool === 'room' && y >= 1) {
+    if (placeRoom(s, Math.round(fx - 0.5), Math.round(fy - 0.5))) { blip(520, 0.15, 'triangle', 0.1, 300); tool = 'dig'; tools(); say("Room marked. The queen moves in once it is dug", 2.6); }
+    else say(s.roomDone ? 'The queen already has her room' : 'The room cannot go on stone or water', 1.8);
+    return;
+  }
+  // a drag may start on a tunnel; if the finger lifts without leaving that cell, it was a tap on an ant
+  drag = { id: e.pointerId, x, y, open, fx, fy, moved: false };
+  try { cv.setPointerCapture(e.pointerId); } catch {}
+  if (!open) paint(x, y);
+});
+cv.addEventListener('pointermove', e => {
+  if (!drag || e.pointerId !== drag.id || mode !== 'play') return;
+  const [x, y] = cellAt(e);
+  // fill every cell between the last one and this one, so a quick drag leaves no gaps
+  let x0 = drag.x, y0 = drag.y; const dx = Math.abs(x - x0), dy = Math.abs(y - y0), sx = x > x0 ? 1 : -1, sy = y > y0 ? 1 : -1; let err = dx - dy;
+  while (x0 !== x || y0 !== y) { const e2 = 2 * err; if (e2 > -dy) { err -= dy; x0 += sx; } else { err += dx; y0 += sy; } paint(x0, y0); }
+  if (x !== drag.x || y !== drag.y) drag.moved = true;
+  drag.x = x; drag.y = y;
+});
+for (const type of ['pointerup', 'pointercancel']) cv.addEventListener(type, e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  if (type === 'pointerup' && drag.open && !drag.moved && s) { const a = pickAnt(drag.fx, drag.fy); selected = a; selT = a ? 4 : 0; }
+  drag = null;
+});
+
+// ---------- drawing
+const EARTH_C = ['#a06c40', '#94623a', '#875833'], TUNNEL = '#f3dcae', TUNNEL_EDGE = '#d6b27a';
+function soil() {
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const k = s.kind[idx(x, y)], X = ox + x * cell, Y = oy + y * cell, h = hash(x, y);
+    const base = EARTH_C[Math.min(2, Math.floor(y / 7))];
+    g.fillStyle = k === CLAY ? '#c4743f' : base; g.fillRect(X, Y, cell + 0.5, cell + 0.5);
+    if (k === CLAY) { g.fillStyle = '#d88d55'; g.fillRect(X, Y + cell * 0.25, cell + 0.5, cell * 0.12); g.fillRect(X, Y + cell * 0.66, cell + 0.5, cell * 0.1); }
+    else if (k !== POCKET) { g.fillStyle = '#00000018'; g.beginPath(); g.arc(X + cell * (0.2 + h * 0.6), Y + cell * (0.25 + hash(y, x) * 0.5), cell * 0.07, 0, 7); g.fill(); }
+  }
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const k = s.kind[idx(x, y)], X = cx(x), Y = cy(y);
+    if (k === STONE) {
+      g.fillStyle = '#4a4c52'; g.beginPath(); g.ellipse(X, Y, cell * 0.5, cell * 0.44, 0, 0, 7); g.fill();
+      g.fillStyle = '#9a9ca4'; g.beginPath(); g.ellipse(X, Y, cell * 0.43, cell * 0.37, 0, 0, 7); g.fill();
+      g.fillStyle = '#c4c7ce'; g.beginPath(); g.ellipse(X - cell * 0.12, Y - cell * 0.12, cell * 0.17, cell * 0.11, -0.4, 0, 7); g.fill();
+    }
+    if (k === SEEDS) for (const [dx, dy] of [[-0.18, 0.1], [0.15, 0.12], [0, -0.14]]) seed(X + dx * cell, Y + dy * cell, cell * 0.15);
+    if (k === POCKET) {
+      g.fillStyle = '#2f6fb0'; g.beginPath(); g.roundRect(ox + x * cell + 1, oy + y * cell + 1, cell - 2, cell - 2, cell * 0.35); g.fill();
+      g.fillStyle = '#4f9ae6'; g.beginPath(); g.roundRect(ox + x * cell + 3, oy + y * cell + 3, cell - 6, cell - 6, cell * 0.3); g.fill();
+      g.fillStyle = '#bfe4ff'; g.beginPath(); g.ellipse(X - cell * 0.12, Y - cell * 0.15, cell * 0.12, cell * 0.06, -0.3, 0, 7); g.fill();
+    }
+  }
+  // tunnels: a pale rounded cell, bridged to open neighbours
+  const pad = Math.max(1.5, cell * 0.08), r = cell * 0.32;
+  for (const [fill, grow] of [[TUNNEL_EDGE, 1.5], [TUNNEL, 0]]) {
+    g.fillStyle = fill;
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+      if (s.kind[idx(x, y)] !== OPEN) continue;
+      const X = ox + x * cell, Y = oy + y * cell;
+      g.beginPath(); g.roundRect(X + pad - grow, Y + pad - grow, cell - 2 * pad + 2 * grow, cell - 2 * pad + 2 * grow, r); g.fill();
+      if (x + 1 < COLS && s.kind[idx(x + 1, y)] === OPEN) g.fillRect(X + cell / 2, Y + pad - grow, cell, cell - 2 * pad + 2 * grow);
+      if (y + 1 < ROWS && s.kind[idx(x, y + 1)] === OPEN) g.fillRect(X + pad - grow, Y + cell / 2, cell - 2 * pad + 2 * grow, cell);
+    }
+  }
+  // the entrance hole through the turf
+  g.fillStyle = TUNNEL; g.fillRect(ox + s.E * cell + pad, oy - 2, cell - 2 * pad, cell * 0.6);
+}
+function water(now) {
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    const w = s.water[idx(x, y)]; if (w < 0.03 || s.kind[idx(x, y)] !== OPEN) continue;
+    const X = ox + x * cell, Y = oy + y * cell, hgt = Math.min(1, w) * cell, top = Y + cell - hgt;
+    g.fillStyle = '#2f80d8c8'; g.fillRect(X, top, cell + 0.5, hgt + 0.5);
+    if (y === 0 || s.water[idx(x, y - 1)] < 0.03) { g.fillStyle = '#9fd4ffcc'; g.fillRect(X, top, cell + 0.5, Math.max(1.5, cell * 0.08)); }
+  }
+}
+function seed(x, y, r) { g.fillStyle = '#7a5a10'; g.beginPath(); g.ellipse(x, y, r * 1.15, r * 0.85, 0.5, 0, 7); g.fill(); g.fillStyle = '#ffd23a'; g.beginPath(); g.ellipse(x, y, r, r * 0.7, 0.5, 0, 7); g.fill(); g.fillStyle = '#fff2a0'; g.beginPath(); g.ellipse(x - r * 0.3, y - r * 0.2, r * 0.35, r * 0.2, 0.5, 0, 7); g.fill(); }
+function pellet(x, y, r) { g.fillStyle = '#5a3a1e'; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.fillStyle = '#8a5a30'; g.beginPath(); g.arc(x - r * 0.3, y - r * 0.3, r * 0.45, 0, 7); g.fill(); }
+function marks(now) {
+  g.lineWidth = Math.max(2, cell * 0.09); g.lineCap = 'round';
+  for (let i = 0; i < s.mark.length; i++) {
+    if (s.mark[i] !== 1) continue;
+    const x = i % COLS, y = Math.floor(i / COLS), near = touching(s, x, y), X = ox + x * cell, Y = oy + y * cell, p = cell * 0.16;
+    g.globalAlpha = near ? 1 : 0.55;
+    g.fillStyle = near ? '#fff8e640' : '#fff8e61c'; g.fillRect(X + p, Y + p, cell - 2 * p, cell - 2 * p);
+    g.strokeStyle = '#fff8e6'; g.setLineDash([cell * 0.16, cell * 0.12]); g.lineDashOffset = near ? -now / 60 : 0;
+    g.strokeRect(X + p, Y + p, cell - 2 * p, cell - 2 * p);
+    g.setLineDash([]);
+    g.beginPath(); g.moveTo(X + cell * 0.36, Y + cell * 0.64); g.lineTo(X + cell * 0.64, Y + cell * 0.36); g.stroke();
+  }
+  g.globalAlpha = 1;
+  if (s.room) {
+    const X = ox + s.room.x * cell, Y = oy + s.room.y * cell, p = cell * 0.1;
+    g.strokeStyle = '#ffd23a'; g.lineWidth = Math.max(2.5, cell * 0.11);
+    if (!s.roomDone) { g.setLineDash([cell * 0.2, cell * 0.14]); g.lineDashOffset = -now / 60; g.fillStyle = '#ffd23a2a'; g.fillRect(X + p, Y + p, cell * 2 - 2 * p, cell * 2 - 2 * p); }
+    else g.globalAlpha = 0.6;
+    g.strokeRect(X + p, Y + p, cell * 2 - 2 * p, cell * 2 - 2 * p); g.setLineDash([]); g.globalAlpha = 1;
+    if (!s.roomDone) crown(X + cell, Y + cell, cell * 0.34);
+  }
+}
+function crown(x, y, r) {
+  g.fillStyle = '#ffd23a'; g.strokeStyle = '#5a3a0c'; g.lineWidth = 2; g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(x - r, y + r * 0.6); g.lineTo(x - r, y - r * 0.4); g.lineTo(x - r * 0.5, y + r * 0.05); g.lineTo(x, y - r * 0.7); g.lineTo(x + r * 0.5, y + r * 0.05); g.lineTo(x + r, y - r * 0.4); g.lineTo(x + r, y + r * 0.6); g.closePath(); g.stroke(); g.fill();
+}
+function sky(now) {
+  const top = oy - cell; // top of the surface strip
+  const warnK = Math.max(0, Math.min(1, (s.t - (RAIN_AT - 25)) / 25)), raining = s.t >= RAIN_AT && s.t < RAIN_AT + RAIN_FOR;
+  const grd = g.createLinearGradient(0, 0, 0, top);
+  grd.addColorStop(0, mix('#5ab0ec', '#4a5868', s.t >= RAIN_AT + RAIN_FOR ? 0.3 : warnK)); grd.addColorStop(1, mix('#bfe6ff', '#8a98a6', s.t >= RAIN_AT + RAIN_FOR ? 0.3 : warnK));
+  g.fillStyle = grd; g.fillRect(0, 0, W, top);
+  // the rain cloud drifts in from the left as the rain gets near; the number on it counts down
+  const k = Math.min(1, s.t / (RAIN_AT - 4)), left = Math.max(0, RAIN_AT - s.t), after = s.t >= RAIN_AT + RAIN_FOR;
+  const R = Math.min(top * 0.3, 26), cyl = Math.max(R + 4, top * 0.5), home = Math.max(W * 0.5, cx(s.E));
+  const cxl = after ? home + (s.t - RAIN_AT - RAIN_FOR) * 60 : (W - R * 1.9) + (home - (W - R * 1.9)) * k;
+  g.fillStyle = raining || warnK > 0.6 ? '#5d6672' : '#eef3f8';
+  for (const [dx, dy, rr] of [[-1.1, 0.2, 0.7], [-0.4, -0.25, 0.9], [0.45, -0.1, 0.85], [1.15, 0.25, 0.65], [0, 0.3, 0.8]]) { g.beginPath(); g.arc(cxl + dx * R, cyl + dy * R, rr * R, 0, 7); g.fill(); }
+  const txt = raining ? 'Raining' : after ? 'Rain over' : `Rain in ${Math.ceil(left)}`;
+  label(cxl, cyl + R * 0.28, txt, raining || warnK > 0.6 ? '#fff8e6' : '#33200a', Math.max(14, R * 0.55), raining || warnK > 0.6 ? '#0b1408cc' : '#ffffffaa');
+  // counters
+  label(12, 24, `Ants ${s.ants.length}`, '#fff8e6', 17, '#0b1408cc', 'left');
+  label(12, 46, s.foodWet ? 'Food got wet' : `Food ${s.food}`, s.foodWet ? '#ff8a7a' : '#ffe23a', 17, '#0b1408cc', 'left');
+  if (raining) { g.strokeStyle = '#d6ecffaa'; g.lineWidth = 1.5; g.beginPath(); for (let i = 0; i < 70; i++) { const x = (hash(i, 3) * W + now * 0.05) % W, y = (hash(i, 9) * (oy + 8) + now * 0.7) % (oy + 8); g.moveTo(x, y); g.lineTo(x - 3, y + 11); } g.stroke(); }
+  // meadow strip
+  g.fillStyle = '#6fa558'; g.fillRect(0, top, W, cell + 2);
+  g.fillStyle = '#5a8f45'; g.fillRect(0, oy - cell * 0.18, W, cell * 0.18 + 2);
+  g.strokeStyle = '#4f8a40'; g.lineWidth = 2; g.lineCap = 'round'; g.beginPath();
+  for (let i = 0; i < W / 9; i++) { const x = i * 9 + hash(i, 1) * 5, hgt = 5 + hash(i, 2) * 7; if (Math.abs(x - cx(s.E)) < cell * 0.5) continue; g.moveTo(x, top + 4); g.lineTo(x + 2, top + 4 - hgt); } g.stroke();
+  // soil mound beside the entrance grows with every pellet carried out
+  const mx = cx(moundX(s)), mr = cell * (0.25 + Math.sqrt(s.mound) * 0.13);
+  g.fillStyle = '#7a4f2a'; g.beginPath(); g.ellipse(mx, oy - cell * 0.12, mr * 1.25, mr * 0.9, 0, Math.PI, 0); g.fill();
+  for (let i = 0; i < Math.min(s.mound, 12); i++) pellet(mx + (hash(i, 5) - 0.5) * mr * 1.6, oy - cell * 0.2 - hash(i, 6) * mr * 0.55, cell * 0.08);
+  if (s.mound) label(mx, oy - cell * 0.2 - mr * 0.9 - 4, String(s.mound), '#fff8e6', 12, '#0b1408cc');
+  for (const q of s.seeds) seed(cx(q.x), cy(-1) + cell * 0.12, cell * 0.17);
+}
+function mix(a, b, k) { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)), A = p(a), B = p(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * k)).join(',')})`; }
+function label(x, y, text, colour, size, ink = '#0b1408cc', align = 'center') {
+  g.font = `bold ${size}px ui-rounded, 'Arial Rounded MT Bold', system-ui, sans-serif`; g.textAlign = align; g.textBaseline = 'alphabetic';
+  g.lineWidth = Math.max(3, size / 4.5); g.strokeStyle = ink; g.lineJoin = 'round'; g.strokeText(text, x, y); g.fillStyle = colour; g.fillText(text, x, y);
+}
+const lerp = (a, b, k) => a + (b - a) * k;
+function creatures(k, now) {
+  const q = s.queen, home = q.home;
+  // food store and eggs at the queen's home
+  const fx = cx(home[0]) + (s.roomDone ? cell * 0.75 : 0), fy = cy(home[1]) + cell * 0.22;
+  for (let i = 0; i < Math.min(s.food, 9); i++) seed(fx + ((i % 3) - 1) * cell * 0.2, fy - Math.floor(i / 3) * cell * 0.14, cell * 0.12);
+  if (s.food && !s.foodWet) label(fx, fy - cell * 0.42 - (s.food > 3 ? cell * 0.12 : 0), `${s.food}`, '#ffe23a', 12);
+  for (let i = 0; i < s.eggs.length; i++) { g.fillStyle = '#fffbea'; g.strokeStyle = '#c9b48a'; g.lineWidth = 1; g.beginPath(); g.ellipse(cx(home[0]) + cell * (0.3 + i * 0.18), cy(home[1]) - cell * 0.7, cell * 0.08, cell * 0.11, 0.3, 0, 7); g.fill(); g.stroke(); }
+  for (const p of s.pellets) pellet(cx(p.x) + (hash(p.id, 1) - 0.5) * cell * 0.4, cy(p.y) + cell * 0.25, cell * 0.11);
+  for (const p of s.loose) seed(cx(p.x) + (hash(p.id, 2) - 0.5) * cell * 0.4, cy(p.y) + cell * 0.25, cell * 0.12);
+  // the queen
+  const qx = cx(lerp(q.px ?? q.x, q.x, k)), qy = cy(lerp(q.py ?? q.y, q.y, k));
+  g.save(); g.translate(qx, qy); g.rotate(q.path.length ? q.face : -0.15); drawForm(g, ANTF, cell * 0.4, q.ph, QUEEN_SKIN, q.face || 0); g.restore();
+  // workers; ants that share a cell spread out a little
+  const r = Math.max(6, cell * 0.3), seen = new Map();
+  for (const a of s.ants) {
+    const still = !a.path.length, key = a.cx + ',' + a.cy, n = still ? (seen.get(key) || 0) : 0; if (still) seen.set(key, n + 1);
+    const spot = [[0, 0], [-0.28, -0.18], [0.28, 0.18], [0.28, -0.2], [-0.28, 0.2], [0, -0.3], [0, 0.3]][n % 7];
+    const jx = still ? spot[0] : 0, jy = still ? spot[1] * (a.cy === -1 ? 0 : 1) : 0;
+    const x = cx(lerp(a.px ?? a.x, a.x, k) + jx), y = cy(lerp(a.py ?? a.y, a.y, k) + jy) + (a.cy === -1 ? cell * 0.08 : 0);
+    a.sx = x; a.sy = y;
+    const wiggle = a.task === 'dig' && still ? Math.sin(now / 50) * 0.15 : 0;
+    g.save(); g.translate(x, y); g.rotate(a.face + wiggle);
+    if (a === selected) { g.strokeStyle = '#ffe23a'; g.lineWidth = 2.5; g.beginPath(); g.arc(0, 0, r * 1.7, 0, 7); g.stroke(); }
+    drawForm(g, ANTF, r, a.ph, null, a.face);
+    if (a.carry === 'soil') pellet(r * 1.35, 0, r * 0.38);
+    if (a.carry === 'seed') seed(r * 1.35, 0, r * 0.4);
+    g.restore();
+    const icon = a.task === 'rest' ? ['z', '#fff8e6'] : a.task === 'flee' || a.task === 'stuck' ? ['!', '#ff7a6a'] : a.task === 'shelter' && a.path.length ? ['!', '#ffe23a'] : a.task === 'idle' ? ['?', '#fff8e6'] : a.hunger > 0.7 ? ['•', '#ff7a6a'] : null;
+    if (icon) label(x + r * 0.9, y - r * 0.9, icon[0], icon[1], Math.max(12, cell * 0.5));
+    if (a.task === 'dig' && still && Math.random() < 0.25) { const ang = a.face; bits.push({ x: x + Math.cos(ang) * r * 1.3, y: y + Math.sin(ang) * r * 1.3, vx: (Math.random() - 0.5) * 50, vy: -20 - Math.random() * 40, r: cell * 0.05, c: '#6a4424', age: 0, life: 0.4 }); }
+  }
+}
+function bubble(now) {
+  if (!selected || selT <= 0) return;
+  const isQ = selected === 'queen';
+  if (!isQ && !s.ants.includes(selected)) { selected = null; return; }
+  const a = isQ ? null : selected, x = isQ ? cx(s.queen.x) : a.sx, y = isQ ? cy(s.queen.y) : a.sy;
+  const qn = isQ ? (s.queenWet ? 'The queen is wet!' : s.roomDone ? 'The queen: safe in her room' : "The queen: waiting for her room") : null;
+  const text = isQ ? qn : a.think + (a.carry === 'soil' ? ' · carrying soil' : a.carry === 'seed' ? ' · carrying a seed' : '');
+  const sub = isQ ? `${s.eggs.length} eggs` : `Hunger ${Math.round(a.hunger * 100)}% · Tired ${Math.round(a.tired * 100)}%`;
+  g.font = `bold 14px ui-rounded, 'Arial Rounded MT Bold', system-ui, sans-serif`;
+  const w = Math.max(g.measureText(text).width, g.measureText(sub).width) + 20, h = 44;
+  let bx = Math.max(6, Math.min(W - w - 6, x - w / 2)), by = y - cell * 0.8 - h; if (by < 6) by = y + cell * 0.8;
+  g.fillStyle = '#fff8e6'; g.strokeStyle = '#33200a'; g.lineWidth = 2; g.beginPath(); g.roundRect(bx, by, w, h, 12); g.fill(); g.stroke();
+  g.fillStyle = '#33200a'; g.textAlign = 'left'; g.fillText(text, bx + 10, by + 19);
+  g.font = `12px ui-rounded, 'Arial Rounded MT Bold', system-ui, sans-serif`; g.fillStyle = '#6a4a2a'; g.fillText(sub, bx + 10, by + 36);
+}
+function ghost(now) {
+  // first-run hint: a finger drags down the soil under the entrance until the player makes a mark
+  if (marked || s.t > RAIN_AT - WARN) return;
+  hint += 1 / 60;
+  const ph = (now / 1600) % 1, k = Math.min(1, ph * 1.4), x = cx(s.E), y0 = cy(3), y = y0 + k * cell * 2.2;
+  g.globalAlpha = 0.5 * (1 - Math.max(0, ph - 0.8) * 5);
+  g.strokeStyle = '#fff8e6'; g.lineWidth = cell * 0.09; g.setLineDash([cell * 0.16, cell * 0.12]);
+  for (let i = 0; i <= Math.floor(k * 2.2 + 0.2) && i < 3; i++) g.strokeRect(ox + s.E * cell + cell * 0.16, oy + (3 + i) * cell + cell * 0.16, cell * 0.68, cell * 0.68);
+  g.setLineDash([]);
+  g.globalAlpha = 0.8 * (1 - Math.max(0, ph - 0.8) * 5);
+  g.fillStyle = '#fff8e6'; g.beginPath(); g.arc(x + cell * 0.25, y + cell * 0.2, cell * 0.38, 0, 7); g.fill();
+  g.strokeStyle = '#33200a'; g.lineWidth = 2; g.stroke();
+  g.globalAlpha = 1;
+  label(Math.min(W - 90, Math.max(90, x)), cy(6) + cell * 0.4, 'Drag down to dig', '#fff8e6', 16);
+}
+
+function draw(now, k) {
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = '#5a3a20'; g.fillRect(0, 0, W, H);
+  if (!s) { return; }
+  sky(now); soil(); water(now); marks(now); creatures(k, now);
+  for (const b of bits) { g.globalAlpha = Math.max(0, 1 - b.age / b.life); g.fillStyle = b.c; g.beginPath(); g.arc(b.x, b.y, b.r, 0, 7); g.fill(); }
+  g.globalAlpha = 1;
+  ghost(now); bubble(now);
+}
+
+function events() {
+  for (const e of s.events) {
+    if (e.t === 'dig') { crunch(0.06, 0.14, e.clay ? 900 : 2200); }
+    if (e.t === 'drop') blip(160, 0.07, 'triangle', 0.07, -40);
+    if (e.t === 'store') blip(620, 0.06, 'sine', 0.05, 120);
+    if (e.t === 'cache') { blip(760, 0.18, 'triangle', 0.1, 400); say('Buried seeds found!', 1.6); }
+    if (e.t === 'room') { blip(520, 0.35, 'triangle', 0.12, 520); say("The room is dug. The queen moves in", 2.2); $('tRoom').classList.remove('pulse'); }
+    if (e.t === 'egg') blip(900, 0.08, 'sine', 0.05);
+    if (e.t === 'hatch') { blip(700, 0.22, 'sine', 0.1, 500); bits.push({ x: cx(e.x), y: cy(e.y), vx: 0, vy: -30, r: cell * 0.3, c: '#fff8e6', age: 0, life: 0.5 }); }
+    if (e.t === 'warn') { say('Rain soon! The ants are going in', 2.4); blip(300, 0.3, 'sawtooth', 0.06, -80); }
+    if (e.t === 'rain') { say('Rain!', 1.5); rainSound(true); }
+    if (e.t === 'dry') rainSound(false);
+    if (e.t === 'breach') { crunch(0.5, 0.3, 500); say('You opened the water pocket!', 2.2); }
+    if (e.t === 'queenWet') { blip(320, 0.5, 'sawtooth', 0.1, -200); say('The queen is getting wet!', 2.2); }
+    if (e.t === 'lost') blip(240, 0.2, 'sine', 0.06, -120);
+    if (e.t === 'end') endAt = performance.now() + 1100;
+  }
+}
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = last ? Math.min(0.1, (now - last) / 1000) : 0; last = now;
+  if (mode === 'play' && s && !s.over) {
+    acc += dt;
+    while (acc >= DT && mode === 'play' && !s.over) {
+      acc -= DT;
+      for (const a of s.ants) { a.px = a.x; a.py = a.y; } s.queen.px = s.queen.x; s.queen.py = s.queen.y;
+      step(s); events();
+    }
+  }
+  if (mode === 'play') {
+    for (const b of bits) { b.age += dt; b.x += b.vx * dt; b.y += b.vy * dt; b.vy += 120 * dt; }
+    for (let i = bits.length - 1; i >= 0; i--) if (bits[i].age > bits[i].life) bits.splice(i, 1);
+    if (selT > 0) selT -= dt;
+  }
+  if (sayTimer > 0 && (sayTimer -= dt) <= 0) $('say').classList.remove('on');
+  if (endAt && now >= endAt && mode === 'play') { endAt = 0; finish(); }
+  draw(now, s && !s.over ? Math.min(1, acc / DT) : 1);
+}
+// test hook: read the state and skip ahead in game time
+window.__nest = { get s() { return s; }, get mode() { return mode; }, get layout() { return { ox, oy, cell, W, H }; }, skipTo(t) { while (s && !s.over && s.t < t) { step(s); events(); } } };
+show('menu'); requestAnimationFrame(frame);
+</script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>
