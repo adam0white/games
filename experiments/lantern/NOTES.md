@@ -454,9 +454,9 @@ The note, in short: tapping a crash or victory effect should play it with all th
 | The same for every pack | Abilities: the pickup floats down to the boat and is taken, with its ring and its screen effect (boost streaks, slow-water hush, the smaller boat for Size), every 3.4 seconds. Boats, waters and flames already had a whole-screen look (note #73). **A tap on them now only shows them. It no longer wears them.** |
 | A button to switch it on or off | Under each pack: the thing last shown, whether it is on, and a button: "Switch on" or "Switch off" for abilities, crashes and victories (the limits of 2, 3 and 3 are unchanged), and "Use it" for boats, waters and flames. Before this change, a tap on the thing itself did this. The thing last shown has an outline. |
 | (Lab) The shop comes back where it was | Crashes and Victories are at the bottom of the shop, so going back keeps the scroll position. |
-| (Lab) A rare blank dawn | A frame's time can be a little older than the moment dawn was reached. Dawn's light radius then went below zero, and the canvas threw an error. The phone check failed on this once in Chromium before this change. Dawn's progress is now kept at 0 or above. |
+| (Lab) Dawn's light radius | Dawn's progress is now kept at 0 or above, so its light radius cannot go below zero. Before this change the phone check failed once in Chromium, on the tower's level card, with "createRadialGradient: r1 is less than 0". This clamp is a possible cause, **not reproduced**. The timing does not fit well: the level card is scheduled before the dawn frames are drawn. The failure is unexplained. |
 
-A showing changes no save and is not recorded as a crash or a victory. The lab recording gets a `look` event (pack and item) instead. No storage key was added or changed.
+A showing changes no save and sends nothing to the lab recording. (The first version sent a `look` event, but outside a run every event is posted as its own record, one per tap. That was removed the same day.) No storage key was added or changed.
 
 The previews run by the clock, not by frame time. Headless WebKit draws about two frames a second, and the frame time is capped at 0.1 s, so a preview timed by frames never finished there.
 
@@ -465,4 +465,5 @@ Checks: `node experiments/kit/check/phone.mjs` passes for every experiment on We
 Not checked: sound and feel on a real phone. Magnet and Flare show only their ring and pickup, because a calm river has no embers to pull and the light is already full.
 
 ### Left as a proposal (2026-11-23, note #112)
+- **A drawing error stops the game for good.** Any error thrown in `draw` ends the frame loop, since `requestAnimationFrame` is called after it. Calling it first, or catching the error, would keep a rare bad frame from freezing the screen.
 - **A setting for showing on tap.** The note's "a button to enable and disable the feature" is read as the on/off button for each thing. If the tester meant a setting that turns the whole-screen showing itself off, that is a new saved setting. A question was sent.
