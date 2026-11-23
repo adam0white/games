@@ -14,7 +14,7 @@ const tutorial = document.createElement('div');
 tutorial.id = 'tutorial';
 tutorial.hidden = true;
 tutorial.setAttribute('aria-live', 'polite');
-document.body.append(tutorial);
+document.querySelector('.controls')?.insertBefore(tutorial, document.getElementById('people'));
 let tutorialStage: 'off' | 'select' | 'approach' | 'speech' | 'waiting' | 'answer' | 'street' | 'arrival' =
   'off';
 let tutorialEvents = 0;
