@@ -37,3 +37,6 @@ button:disabled { opacity: .5; }
 #answering { margin: 0; display: flex; gap: .5em; align-items: center; color: var(--accent); font-size: .9em; }
 #answering span { flex: 1 1 auto; }
 #answering button { min-height: 36px; padding: .2em .8em; }
+#history { flex: 0 0 auto; }
+#history > summary { color: var(--soft); font-size: .9em; text-align: center; padding: .5em; cursor: pointer; }
+#history > div { display: flex; flex-direction: column; gap: .6em; padding-bottom: .6em; border-bottom: 1px dashed var(--line); }

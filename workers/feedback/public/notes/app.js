@@ -11,7 +11,7 @@
       title: 'Oyun notları', lead: 'Aklına geleni yaz ya da sesli söyle. Cevaplar burada görünür.',
       game: 'Hangi oyun?', general: 'Genel / başka bir şey', placeholder: 'Notunu buraya yaz…',
       send: 'Gönder', mic: '🎤 Sesli not', stop: 'Bitir ve gönder', cancel: 'Vazgeç',
-      empty: 'Henüz not yok. İlk notunu gönder!', sending: 'Gönderiliyor…', working: 'Ses yazıya çevriliyor…',
+      earlier: 'Önceki mesajlar', empty: 'Henüz not yok. İlk notunu gönder!', sending: 'Gönderiliyor…', working: 'Ses yazıya çevriliyor…',
       voice: 'Sesli not', failedVoice: 'Sesli not alındı, ama yazıya çevrilemedi. Kaydın bizde, tekrar deneyeceğiz.',
       failedText: 'Not alındı.', retry: 'Tekrar dene', notSent: 'Gönderilemedi. İnternetini kontrol et.',
       noKey: 'Bu sayfa özel bir bağlantıyla açılır. Sana gönderilen bağlantıyı kullan.',
@@ -23,7 +23,7 @@
       title: 'Game notes', lead: 'Type or say whatever comes to mind. Replies show up here.',
       game: 'Which game?', general: 'General / something else', placeholder: 'Write your note here…',
       send: 'Send', mic: '🎤 Voice note', stop: 'Stop and send', cancel: 'Cancel',
-      empty: 'No notes yet. Send the first one!', sending: 'Sending…', working: 'Turning speech into text…',
+      earlier: 'Earlier messages', empty: 'No notes yet. Send the first one!', sending: 'Sending…', working: 'Turning speech into text…',
       voice: 'Voice note', failedVoice: 'Voice note received, but we could not turn it into text. We kept the recording and will retry.',
       failedText: 'Note received.', retry: 'Try again', notSent: 'Could not send. Check your connection.',
       noKey: 'This page opens with a private link. Use the link that was sent to you.',
@@ -45,6 +45,7 @@
   let lang = store.get('notes.lang') || ((navigator.language || '').toLowerCase().startsWith('en') ? 'en' : 'tr');
   let t = STRINGS[lang];
   let lastId = 0;
+  let loaded = false;
   let recorder = null;
   let ticker = null;
   const builds = new Map();
@@ -182,21 +183,45 @@
     $('thread').querySelector(`[data-id="${id}"]`)?.replaceWith(bubble(asked));
   }
 
+  const open = message => message.dir === 'out' && message.ask && !message.answered && !message.closed;
+
+  // On the first load, everything already dealt with goes into a closed section, so open
+  // questions and whatever arrived since the last note sit first without scrolling.
+  function fold(messages) {
+    for (const message of messages) if (message.reply_to) { const asked = messages.find(m => m.id === message.reply_to); if (asked) asked.answered = true; }
+    const lastNote = Math.max(0, ...messages.filter(m => m.dir === 'in').map(m => m.id));
+    const keep = m => open(m) || (m.dir === 'out' && m.id > lastNote) || (m.dir === 'in' && m.status !== 'ready');
+    const old = messages.some(keep) ? messages.filter(m => !keep(m)) : messages.slice(0, -3);
+    if (!old.length) return;
+    const details = document.createElement('details');
+    details.id = 'history';
+    const summary = document.createElement('summary');
+    summary.textContent = `${t.earlier} (${old.length})`;
+    const list = document.createElement('div');
+    for (const message of old) { known.set(message.id, message); list.append(bubble(message)); }
+    details.append(summary, list);
+    $('thread').append(details);
+  }
+
   function show(messages) {
     const thread = $('thread');
     const nearEnd = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 80;
+    const first = !loaded;
+    if (first) { loaded = true; fold(messages); }
     for (const message of messages) {
       known.set(message.id, message);
       if (message.reply_to) markAnswered(message.reply_to);
       const old = thread.querySelector(`[data-id="${message.id}"]`);
-      if (old) old.replaceWith(bubble(message)); else thread.append(bubble(message));
+      if (old) { if (!first) old.replaceWith(bubble(message)); } else thread.append(bubble(message));
       lastId = Math.max(lastId, message.id);
       if (message.status === 'pending') waiting.add(message.id); else waiting.delete(message.id);
     }
     const empty = thread.querySelector('.empty');
     if (thread.querySelector('.msg')) empty?.remove();
     else if (!empty) { const p = document.createElement('p'); p.className = 'empty'; p.textContent = t.empty; thread.append(p); }
-    if (messages.length && (nearEnd || messages.some(m => m.dir === 'in'))) thread.scrollTop = thread.scrollHeight;
+    const question = first ? thread.querySelector(':scope > .ask .choices')?.closest('.msg') : null;
+    if (question) thread.scrollTop += question.getBoundingClientRect().top - thread.getBoundingClientRect().top - 44;
+    else if (messages.length && (nearEnd || messages.some(m => m.dir === 'in'))) thread.scrollTop = thread.scrollHeight;
   }
 
   async function api(path, options = {}) {
