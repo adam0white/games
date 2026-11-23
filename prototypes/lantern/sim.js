@@ -37,9 +37,9 @@ export function speed(s) { return (0.62 + 0.62 * Math.min(1, s.y / GOAL)) * pace
 export function reach(light) { return 0.17 + 0.6 * light; }
 // Stretches of weather, each a fixed length of river that comes round again. Night 7 fog, night 9 wind, night 13 rain.
 function zone(s, y, from, period, len, off) { return level(s) >= from && y > 8 && (y + off) % period < len; }
-export const fog = (s, y) => zone(s, y, 7, 26, 5, 3);
-export const wind = (s, y) => zone(s, y, 9, 31, 4, 11) ? (Math.floor((y + 11) / 31) % 2 ? 1 : -1) : 0; // -1 blows left, 1 right
-export const rain = (s, y) => zone(s, y, 13, 37, 6, 20);
+export const fog = (s, y) => zone(s, y, 7, 26, 5, 18); // the first stretch of each starts about a tenth of the way down
+export const wind = (s, y) => zone(s, y, 9, 25, 4, 13) ? (Math.floor((y + 13) / 25) % 2 ? 1 : -1) : 0; // -1 blows left, 1 right
+export const rain = (s, y) => zone(s, y, 13, 37, 6, 27);
 // Night 19 lightning, every nine seconds: -1 during the flash, 1 while the eyes recover, else 0.
 export function dazzle(s) { if (level(s) < 19) return 0; const p = (s.t + 2) % 9; return p < 0.35 ? -1 : p < 2.4 ? 1 : 0; }
 // How far the boat can see: the flame's reach, cut by fog and by the moments after lightning.
@@ -85,7 +85,7 @@ function special(s, y, c, h, k, lv) {
     let kind = kinds[Math.floor(s.r() * kinds.length)][1];
     const tonight = SPECIAL.find(q => q[0] === s.stage);
     if (!s.endless && tonight && s.r() < 0.5) kind = tonight[1]; // tonight's new thing shows up most
-    const u = s.r() * 2 - 1, side = u < 0 ? -1 : 1, tight = k > 0.85;
+    const u = s.r() * 2 - 1, side = u < 0 ? -1 : 1, tight = !s.endless && k > 0.85; // not in a story night's last pinch
     if (kind === 'log') { const q = rock(0, y, 0.018, 'log'); q.len = 0.05 + s.r() * 0.05; q.x = q.x0 = c + side * (h - q.len - 0.02); row.push(q); }
     else if (kind === 'pool') row.push(rock(c + u * (h - 0.09), y, 0.022, 'pool'));
     else if (kind === 'gate') {
@@ -101,7 +101,7 @@ function special(s, y, c, h, k, lv) {
       for (const turn of [0, Math.PI]) { const q = rock(x, y, 0.028, 'spinner'); q.a = q.b = 0.075; q.w = q.wy = w; q.ph = ph + turn; q.phy = Math.PI / 2; row.push(q); }
     }
     else if (kind === 'geyser') { const q = rock(c + u * (h - 0.07), y, 0.05, 'geyser'); q.ph = s.r() * 6.28; row.push(q); }
-    else { if (k > 0.75) return false; s.isle = y + 2.4; row.push(rock(c, y, 0.035, 'isle')); }
+    else { if (!s.endless && k > 0.75) return false; s.isle = y + 2.4; row.push(rock(c, y, 0.035, 'isle')); }
   }
   s.rocks.push(...row);
   s.embers = s.embers.filter(e => e.got || row.every(q => clearOf(e.x, e.y, q)));

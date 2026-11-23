@@ -358,7 +358,7 @@ function draw(now) {
   // rocks and the other things in the water
   for (const k of s.rocks) {
     const x = sx(k.x), y = sy(k.y), R = k.rad * unit;
-    if (k.kind === 'log') { g.fillStyle = '#7a5632'; g.beginPath(); g.roundRect(x - (k.len + k.rad) * unit, y - R, 2 * (k.len + k.rad) * unit, 2 * R, R); g.fill(); g.fillStyle = '#b08a5a'; g.fillRect(x - k.len * unit, y - R * 0.35, 2 * k.len * unit, R * 0.3); continue; }
+    if (k.kind === 'log') { g.fillStyle = '#7a5632'; g.beginPath(); if (g.roundRect) g.roundRect(x - (k.len + k.rad) * unit, y - R, 2 * (k.len + k.rad) * unit, 2 * R, R); else g.rect(x - (k.len + k.rad) * unit, y - R, 2 * (k.len + k.rad) * unit, 2 * R); g.fill(); g.fillStyle = '#b08a5a'; g.fillRect(x - k.len * unit, y - R * 0.35, 2 * k.len * unit, R * 0.3); continue; }
     if (k.kind === 'pool') { g.strokeStyle = '#bfe0f2'; g.lineWidth = 2 * dpr; for (let i = 1; i <= 4; i++) { g.globalAlpha = 0.6 - i * 0.1; const a = -now / 260 + i * 1.3; g.beginPath(); g.arc(x, y, 0.04 * i * unit, a, a + 4.2); g.stroke(); } g.globalAlpha = 1; g.fillStyle = '#05080f'; g.beginPath(); g.arc(x, y, R, 0, 7); g.fill(); continue; }
     if (k.kind === 'geyser') {
       if (k.on) { g.fillStyle = 'rgba(225,242,255,.9)'; g.beginPath(); g.arc(x, y, R * (1 + 0.08 * Math.sin(now / 50)), 0, 7); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, R * 0.5, 0, 7); g.fill(); }

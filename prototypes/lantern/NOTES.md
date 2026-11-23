@@ -86,6 +86,8 @@ Nights 6 to 20 each add one new thing; it shows up most on its own night and sta
 
 Nights 1 to 5 are unchanged, as the tester asked: the same seeds give the same rivers as before (a fingerprint over 200 rivers matched). `bots.mjs 200 audit` on nights 1 to 20 and the endless river: no closed river (narrowest gap 0.048 on story nights, 0.038 endless), no buried pickup. Each new thing was seen in a Chromium phone-profile screenshot.
 
-Not checked: whether nights 6 to 20 are too hard for a person now that they are faster and also hold new things; a real phone; sound.
+Fog, wind and rain each start their first stretch about a tenth of the way down, so a short run still meets the night's new thing. Seven of the fifteen are not solid obstacles (fog, wind, false embers, rain, sliding ice, the second waterfall, lightning); the tester may want some swapped for solid ones.
+
+Not checked: whether nights 6 to 20 are too hard for a person now that they are faster and also hold new things (the careful bot's runs that end in the dark on night 20 rose from 21 to 49 in 100); a real phone; sound.
 
 Still left from note #35, in the tester's order: power-ups, stats to spend points on, better-looking boats and flames, an Abilities pack, the pack-opening animation, tower mode.
