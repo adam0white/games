@@ -216,3 +216,9 @@ test('archived hosts add exactly their own catch-all routes and fetch nothing', 
     await assert.rejects(verifyRedirects({ ...f.args(), routes: [...routes, ...bad.map(host => ({ pattern: `${host}/*`, zone_name: 'adamwhite.work' }))], archived: bad }), /archived/i);
   }
 });
+test('a live release from before an archive still reads, though its games.json lists an archived host', async t => {
+  const f = fixture(t);
+  f.game.legacyOrigin = 'https://hearsay.adamwhite.work';
+  const old = f.commit();
+  assert.equal(repositoryEvidence(f.cwd).registry(old).games[0].legacyOrigin, 'https://hearsay.adamwhite.work');
+});

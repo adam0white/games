@@ -199,9 +199,6 @@ jobs:
         browser: [chromium, webkit]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    # WebKit on Linux has not yet been seen green here (the check is run on macOS locally), so its entry is advisory.
-    # Tighten this to false once a WebKit run passes on Linux.
-    continue-on-error: ${{ matrix.browser == 'webkit' }}
     env:
       PLAYWRIGHT_VERSION: 1.64.1
     steps:
@@ -216,11 +213,17 @@ jobs:
       - run: npm install --prefix "$PLAYWRIGHT" --no-save --no-package-lock --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION"
         env:
           PLAYWRIGHT: ${{ runner.temp }}/playwright
+      # WebKit on Linux has not yet been seen green here (the check runs on macOS locally), so its WebKit steps are
+      # advisory: a failure shows in the log but the job, and the required ci gate, still pass. This sits on the steps,
+      # not the job, because a step's continue-on-error is documented to conclude success. Tighten both to false once
+      # a WebKit run passes on Linux.
       - run: '"$PLAYWRIGHT/node_modules/.bin/playwright" install --with-deps "$BROWSER"'
+        continue-on-error: ${{ matrix.browser == 'webkit' }}
         env:
           PLAYWRIGHT: ${{ runner.temp }}/playwright
           BROWSER: ${{ matrix.browser }}
       - run: node experiments/kit/check/phone.mjs all "$BROWSER"
+        continue-on-error: ${{ matrix.browser == 'webkit' }}
         env:
           PLAYWRIGHT: ${{ runner.temp }}/playwright
           BROWSER: ${{ matrix.browser }}

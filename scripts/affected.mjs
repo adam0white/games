@@ -8,4 +8,4 @@ const games = affectedGames(registry, paths);
 const matrix = JSON.stringify(games);
 const phone = phoneCheckNeeded(paths);
 if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `games=${matrix}\ncount=${games.length}\ntotal=${registry.games.length}\nphone=${phone}\n`);
-else console.log(matrix, `phone=${phone}`);
+else console.log(matrix);

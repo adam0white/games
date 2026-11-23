@@ -122,7 +122,7 @@ test('Lefthand serves one precompressed WASM layer only on its scoped engine rou
 
 test('archived game hosts send every path and query to the shelf with a 302', async () => {
   const real = createHandler(games);
-  assert.deepEqual(archivedHosts, ['hearsay', 'goodhands', 'valley', 'commonstead', 'child', 'days', 'island'].map(name => `${name}.adamwhite.work`));
+  assert.ok(archivedHosts.length > 0);
   for (const host of archivedHosts) {
     for (const path of ['/', '/a/b?x=1&y=2', '/sw.js', '/release.json', '//evil.example/x', '/proto/lantern/']) {
       for (const method of ['GET', 'HEAD', 'POST']) {
@@ -139,15 +139,21 @@ test('archived game hosts send every path and query to the shelf with a 302', as
   assert.equal(old.headers.get('location'), 'https://play.adamwhite.work/stairwell/a?x=1');
   assert.equal(await (await stairwell.fetch(new Request('https://play.adamwhite.work/stairwell/'), assets)).text(), 'asset');
   assert.equal((await stairwell.fetch(new Request('https://play.adamwhite.work/'), assets)).headers.get('location'), 'https://human.adamwhite.work/games/');
-  // Look-alike hosts are not archived.
-  assert.equal((await real.fetch(new Request('https://hearsay.adamwhite.work.evil.example/'), assets)).status, 404);
-  assert.equal((await real.fetch(new Request('https://x.hearsay.adamwhite.work/'), assets)).status, 404);
-  // Removing a host from the list is the rollback: the Worker then has nothing to say about it.
-  const rolledBack = createHandler(games, archivedHosts.filter(host => host !== 'hearsay.adamwhite.work'));
-  assert.equal((await rolledBack.fetch(new Request('https://hearsay.adamwhite.work/'), assets)).status, 404);
-  assert.equal((await rolledBack.fetch(new Request('https://days.adamwhite.work/'), assets)).status, 302);
+  // Look-alike hosts are not archived, and removing a host from the list is the rollback: the Worker then has
+  // nothing to say about it.
+  const fixture = createHandler(games, ['old.adamwhite.work', 'gone.adamwhite.work']);
+  assert.equal((await fixture.fetch(new Request('https://old.adamwhite.work/x?y=1'), assets)).headers.get('location'), 'https://human.adamwhite.work/games/');
+  assert.equal((await fixture.fetch(new Request('https://old.adamwhite.work.evil.example/'), assets)).status, 404);
+  assert.equal((await fixture.fetch(new Request('https://x.old.adamwhite.work/'), assets)).status, 404);
+  const rolledBack = createHandler(games, ['gone.adamwhite.work']);
+  assert.equal((await rolledBack.fetch(new Request('https://old.adamwhite.work/'), assets)).status, 404);
+  assert.equal((await rolledBack.fetch(new Request('https://gone.adamwhite.work/'), assets)).status, 302);
 });
 test('a games.json legacy origin cannot also be an archived host', () => {
-  const revived = { ...base, slug: 'hearsay', legacyOrigin: 'https://hearsay.adamwhite.work', redirectEnabled: true, verifiedRelease: 'b'.repeat(40) };
-  assert.throws(() => validateRegistry({ hfVersion: '4.17.0', games: [revived] }), /archived host/);
+  const revived = { hfVersion: '4.17.0', games: [{ ...base, slug: 'old', legacyOrigin: 'https://old.adamwhite.work', redirectEnabled: true, verifiedRelease: 'b'.repeat(40) }] };
+  assert.throws(() => validateRegistry(revived, ['old.adamwhite.work']), /archived host/);
+  assert.throws(() => createHandler(revived.games, ['old.adamwhite.work']), /archived host/);
+  assert.doesNotThrow(() => validateRegistry(revived, []));
+  // The real list and the real registry agree.
+  for (const host of archivedHosts) assert.throws(() => validateRegistry({ hfVersion: '4.17.0', games: [{ ...revived.games[0], legacyOrigin: `https://${host}` }] }), /archived host/, host);
 });

@@ -10,7 +10,8 @@ export function repositoryEvidence(cwd = process.cwd()) {
   const git = (...args) => execFileSync('git', args, { cwd, stdio: ['pipe', 'pipe', 'pipe'] });
   const read = (commit, path) => JSON.parse(git('show', `${commit}:${path}`).toString('utf8'));
   return {
-    registry: commit => validateRegistry(read(commit, 'games.json')),
+    // A live release may predate an archive, when its games.json still listed the host; archivedHosts does not apply.
+    registry: commit => validateRegistry(read(commit, 'games.json'), []),
     ancestor(commit, head) {
       if (!SHA.test(commit)) return false;
       try { git('cat-file', '-e', `${commit}^{commit}`); git('merge-base', '--is-ancestor', commit, head); return true; } catch { return false; }
@@ -47,7 +48,7 @@ export function repositoryEvidence(cwd = process.cwd()) {
 /** Enabled aliases require a directly observed release before every build/upload. Archived hosts (worker-settings.mjs)
  * add exactly one `<host>/*` zone route each and need no release; they redirect to the shelf. */
 export async function verifyRedirects({ registry, routes, head, expected, archived = [], evidence = repositoryEvidence(), fetch: fetchRelease = globalThis.fetch }) {
-  validateRegistry(registry);
+  validateRegistry(registry, archived);
   const enabled = registry.games.filter(game => game.redirectEnabled === true);
   for (const game of enabled) {
     if (new URL(game.legacyOrigin).hostname === 'repair.adamwhite.work' && game.redirectMode !== 'zone') throw new Error('Small Works requires a zone redirect to preserve its experiments archive');

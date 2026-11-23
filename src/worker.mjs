@@ -15,7 +15,7 @@ export function experimentPath(pathname) {
 }
 
 export function createHandler(games, archived = archivedHosts) {
-  validateRegistry({ hfVersion: '0.0.0', games });
+  validateRegistry({ hfVersion: '0.0.0', games }, archived);
   // Archived games' old hosts (worker-settings.mjs). A 302, not a 301, so removing a host from the list rolls back.
   const retired = new Set(archived);
   const legacy = new Map(games.filter(game => game.redirectEnabled === true && game.legacyOrigin).map(game => [game.legacyOrigin, game.slug]));
