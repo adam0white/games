@@ -5,23 +5,22 @@ export const compatibilityDate = '2026-11-05';
 export const domains = ['play.adamwhite.work'];
 export const zone = 'adamwhite.work';
 export const assets = { notFoundHandling: 'none', runWorkerFirst: true };
+// Top-level paths on play.adamwhite.work that are not games or experiments: /proto/ redirects old experiment
+// links (src/worker.mjs), /notes/ and /lab-api/ are other Workers' routes (workers/*/wrangler.jsonc), and
+// /cdn-cgi/ is Cloudflare's. An experiment or game slug may not take one; scripts/experiments.mjs checks.
+export const reservedPaths = ['proto', 'notes', 'lab-api', 'cdn-cgi'];
 // Legacy per-game origins that still route to this Worker. scripts/check-redirects.mjs verifies this list
 // against games.json before every build and deploy.
 export const legacyRoutes = [
   'rope.adamwhite.work/*',
-  'hearsay.adamwhite.work/*',
-  'goodhands.adamwhite.work/*',
   'glance.adamwhite.work/*',
   'repair.adamwhite.work/sw.js',
-  'valley.adamwhite.work/*',
   'murmur.adamwhite.work/*',
   'stairwell.adamwhite.work/*',
   'pass.adamwhite.work/*',
   'warren.adamwhite.work/*',
-  'child.adamwhite.work/*',
   'neighbours.adamwhite.work/*',
   'lefthand.adamwhite.work/*',
-  'days.adamwhite.work/*',
   'word.adamwhite.work/*',
   'smoke.adamwhite.work/*',
 ];

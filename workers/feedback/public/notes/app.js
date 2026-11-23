@@ -121,7 +121,7 @@
           .then(response => (response.ok ? response.blob() : null))
           .then(blob => { if (blob) image.src = URL.createObjectURL(blob); else image.remove(); }).catch(() => image.remove());
       }
-      if (message.link && /^\/proto\/[a-z0-9-]+\//.test(message.link)) {
+      if (message.link && /^(?:\/proto)?(?:\/lab)?\/[a-z0-9-]+\//.test(message.link)) {
         const link = document.createElement('a');
         link.className = 'open';
         link.href = message.link;
@@ -220,7 +220,9 @@
     if (!game) return null;
     if (builds.has(game)) return builds.get(game);
     try {
-      const response = await fetch(`/proto/${game}/`, { cache: 'no-store' });
+      // The new /<slug>/ first; /proto/<slug>/ while games-static still serves the old shape.
+      let response = await fetch(`/${game}/`, { cache: 'no-store' });
+      if (!response.ok) response = await fetch(`/proto/${game}/`, { cache: 'no-store' });
       if (!response.ok) return null;
       const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', await response.arrayBuffer()));
       const id = [...hash.slice(0, 5)].map(b => b.toString(16).padStart(2, '0')).join('');

@@ -159,6 +159,15 @@ test('the daily limit stops a flood', async () => {
   assert.equal((await call(env, 'notes', { token: OTHER, method: 'POST', body: { text: 'other tester' } })).status, 200);
 });
 
+test('a reply link may point at an experiment in the new or the old URL shape, and nowhere else', async () => {
+  const env = fakeEnv();
+  const links = { '/lantern/': '/lantern/', '/lantern/?night=6': '/lantern/?night=6', '/lab/ant-nest/': '/lab/ant-nest/', '/proto/lantern/': '/proto/lantern/', '/proto/lab/ant-nest/': '/proto/lab/ant-nest/',
+    '//evil.example/': null, 'https://evil.example/': null, '/lantern/x.js': null, '/a/b/c/': null, '/../lantern/': null, '/lantern': null };
+  for (const link of Object.keys(links)) await call(env, 'staff/reply', { token: STAFF, method: 'POST', body: { tester: 't1', text: 'x', translate: false, link } });
+  const thread = await (await call(env, 'thread')).json();
+  assert.deepEqual(thread.messages.map(m => m.link), Object.values(links));
+});
+
 test('a question carries choices and a link; an answer is tied to it and marks it answered', async () => {
   const env = fakeEnv();
   const asked = await (await call(env, 'staff/reply', { token: STAFF, method: 'POST', body: { tester: 't1', text: 'Is night 6 too hard?', translated: '6. gece çok mu zor?', game: 'lantern', ask: true, choices: ['Kolay', 'Tam kararında', 'Çok zor', ''], link: '/proto/lantern/?night=6' } })).json();
