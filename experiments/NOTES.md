@@ -47,3 +47,11 @@ The owner asked for one or two new games, or a rebuild of a good idea that was w
 | Follow Me | `/ducklings/` | The little one does what it watched you do | What the Child Saw |
 
 Each directory has `sim.js` (rules, runs in Node), `bots.mjs` (proves the rules and measures difficulty), `check.mjs` (its own phone-browser check) and `NOTES.md`. The shared phone check has a short section for each. None has been played by a person or on a real phone. Which of the three gets more work is the owners' call after playing.
+
+## 2026-11-23: answers about older and online games (tester t1, notes #82 and #90)
+
+- **Two Voices (`games/murmur`), note #82 answering #43 ("keep it or drop it?"):** "Keep, but change it". Recorded only. Keeping or dropping a game is the owner's decision, and the tester did not say what to change.
+- **Crumbwar, note #90 answering #68 ("what should we build on it first?"):** "Play in a room with friends". Recorded only. Crumbwar's server is in `workers/crumbwar/`, outside `experiments/` and `games/`. Private rooms are multiplayer work beyond the owner's Crumbwar decision, so they are left for the owner.
+
+### Left as a proposal (2026-11-23)
+- Crumbwar rooms: a short code to share, and a field that holds only the people who joined with it, with bots filling the empty places. This needs an owner decision.
