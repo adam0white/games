@@ -35,3 +35,15 @@ The tester zoomed in by accident with a double tap and could not zoom back out w
 The phone check now asserts, in both games, that the viewport caps the scale, that no visible element is left at `touch-action: auto`, and that a double click's default is cancelled. Without the `noZoom()` call, it fails.
 
 Not verified: a real phone. Emulated browsers do not zoom on a double tap, so the check shows the guards are in place, not that an iPhone stays at scale 1. Whether the snap-back works on the tester's iOS version is unknown.
+
+## 2026-11-23: three new experiments from archived ideas
+
+The owner asked for one or two new games, or a rebuild of a good idea that was wasted earlier. Three were built, each taking one idea from `archive/README.md` ("Ideas worth reusing") and none of the archived code, in the one-thumb form with no reading that tester t1 preferred:
+
+| Experiment | Served at | Idea it rebuilds | From |
+| --- | --- | --- | --- |
+| Grapevine | `/grapevine/` | News changes as each person repeats it | Hearsay |
+| Fix-It Stall | `/fixit/` | Hands on the object, one clear repair at a time | Copper Afternoon |
+| Follow Me | `/ducklings/` | The little one does what it watched you do | What the Child Saw |
+
+Each directory has `sim.js` (rules, runs in Node), `bots.mjs` (proves the rules and measures difficulty), `check.mjs` (its own phone-browser check) and `NOTES.md`. The shared phone check has a short section for each. None has been played by a person or on a real phone. Which of the three gets more work is the owners' call after playing.
