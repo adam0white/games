@@ -35,3 +35,11 @@ The tester zoomed in by accident with a double tap and could not zoom back out w
 The phone check now asserts, in both games, that the viewport caps the scale, that no visible element is left at `touch-action: auto`, and that a double click's default is cancelled. Without the `noZoom()` call, it fails.
 
 Not verified: a real phone. Emulated browsers do not zoom on a double tap, so the check shows the guards are in place, not that an iPhone stays at scale 1. Whether the snap-back works on the tester's iOS version is unknown.
+
+## 2026-11-23: answers about older and online games (tester t1, notes #82 and #90)
+
+- **Two Voices (`games/murmur`), note #82 answering #43 ("keep it or drop it?"):** "Keep, but change it". Recorded only. Keeping or dropping a game is the owner's decision, and the tester did not say what to change.
+- **Crumbwar, note #90 answering #68 ("what should we build on it first?"):** "Play in a room with friends". Recorded only. Crumbwar's server is in `workers/crumbwar/`, outside `experiments/` and `games/`. Private rooms are multiplayer work beyond the owner's Crumbwar decision, so they are left for the owner.
+
+### Left as a proposal (2026-11-23)
+- Crumbwar rooms: a short code to share, and a field that holds only the people who joined with it, with bots filling the empty places. This needs an owner decision.
