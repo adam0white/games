@@ -155,6 +155,10 @@ async function hintChecks() {
   playing = true; await wait(80); check('hint: back when play goes on', () => shown());
   down(); check('hint: the first input ends it and remembers the player', () => !document.querySelector('.kit-hint') && !help.shown && localStorage.getItem(HK) === '1');
   await wait(300); check('hint: it does not come back', () => !document.querySelector('.kit-hint'));
+  localStorage.removeItem(HK); const steer = hint(el, { kind: 'drag', key: HK, when: () => true, delay: 0 }); await wait(80);
+  const move = kind => el.dispatchEvent(new PointerEvent('pointermove', { pointerId: 6, pointerType: kind, bubbles: true }));
+  move('touch'); const stayed = steer.shown; move('mouse');
+  check('hint: for drag, a mouse moving over the game ends it (drag.js steers by it); a touch moving does not', () => stayed && !steer.shown && localStorage.getItem(HK) === '1');
   const again = hint(el, { kind: 'drag', key: HK, when: () => true, delay: 0 });
   localStorage.removeItem(HK); const old = hint(el, { kind: 'drag', key: HK, when: () => true, delay: 0, played: true });
   const odd = hint(el, { kind: 'no such kind', key: HK, when: () => true, delay: 0 });

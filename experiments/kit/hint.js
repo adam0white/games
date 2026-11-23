@@ -14,7 +14,8 @@
 //   bottom  px from the bottom of the screen (above the safe area) to the middle of the copy (120); keep it clear of the player
 //   help.shown   true while it is on screen
 //   help.done()  put it away for good and remember the player (the game saw input some other way)
-// Input that ends it: a pointer going down on `el`, or a key that is not a pause key, while `when()` is true. The tap on Play
+// Input that ends it: a pointer going down on `el`, or a key that is not a pause key, while `when()` is true (for `drag`, a
+// mouse moving over `el` too). The tap on Play
 // and taps on cards do not count. It never takes input itself (pointer-events: none) and never cancels an event.
 // On any page, ?hint=hand or ?hint=ring shows it whatever the save says, with that look, and ?hint=0 turns it off.
 import { read, write } from './save.js';
@@ -61,6 +62,7 @@ const KINDS = {
     },
   },
   drag: {
+    hover: true, // drag.js steers by a mouse that moves with no button down, so that is input too
     label: 'Slide your finger sideways to steer',
     build(box, { reach }) {
       const span = Math.round(reach * 1.4), track = document.createElement('div'); track.className = 'track';
@@ -106,10 +108,11 @@ export function hint(el, { kind = 'stick', key, when, played = false, delay = 30
   function finish() {
     if (over) return; over = true;
     write(key, '1'); cancelAnimationFrame(frame); box.remove();
-    el.removeEventListener('pointerdown', touched, true); removeEventListener('keydown', pressed, true);
+    el.removeEventListener('pointerdown', touched, true); el.removeEventListener('pointermove', hovered, true); removeEventListener('keydown', pressed, true);
   }
   const touched = () => { if (when()) finish(); };
   const pressed = e => { if (when() && !isPauseKey(e) && !['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) finish(); };
-  el.addEventListener('pointerdown', touched, true); addEventListener('keydown', pressed, true);
+  const hovered = e => { if (e.pointerType === 'mouse') touched(); };
+  el.addEventListener('pointerdown', touched, true); if (KINDS[kind].hover) el.addEventListener('pointermove', hovered, true); addEventListener('keydown', pressed, true);
   return handle;
 }
