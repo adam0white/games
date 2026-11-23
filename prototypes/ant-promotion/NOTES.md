@@ -53,3 +53,13 @@ A WebKit run at phone size (390 by 844, touch) loaded the page, changed the skin
 - Feel, speed and sound on a real phone. Nobody has played it by hand.
 - Whether it is fun, or the right difficulty for a person. Bots only show that careful play is rewarded.
 - The 55 drawings were checked on one contact sheet at one size. Some are plain (Dog, Lynx, Bear) and all are placeholders for the owner's taste.
+
+## 2026-11-22: tester t1's answers and requests (notes #30, #33, #34)
+
+- First impression: "not bad" (#30).
+- Tester t1 named Ant Promotion one of the two best games, with Lantern (#33). See `prototypes/NOTES.md`.
+
+### Left as a proposal (2026-11-22, note #34)
+
+- More detailed animal drawings: "too plain for modern games". The look is a taste decision, so it goes through look variants first.
+- Sound effects and eat and death effects are a small change, handled in a separate pull request.

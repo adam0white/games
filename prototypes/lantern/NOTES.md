@@ -41,3 +41,23 @@ The endless river was audited on 10 seeds out to 30 river lengths, past its last
 Left as proposals: a tower mode, custom matches where the player picks the obstacles, wrecks of earlier boats as obstacles, a new hazard on every one of the 20 nights, and menus and shops for the other two prototypes.
 
 Checked in Chromium with an iPhone profile: menu, night picker, buying two packs, the refusal at 20 embers, saved shop state after reload, story run, pause and menu, endless run to its end card, waterfall, hearts, the warning, relative steering, dawn opening the next night. Not checked: a real phone, sound, how hard nights 6 to 20 feel to a person, and whether 50 embers a pack is the right price (bots take about 8 to 16 embers a run).
+
+## 2026-11-22: tester t1's answers and requests (notes #27, #28, #29, #33, #35)
+
+Answers to the lab's questions:
+
+- Steering by finger slide: "very good" (#27). Keep it.
+- Difficulty: reached night 5; fairly hard up to there; do not change the difficulty (#28).
+- Which idea next: a new obstacle every night (#29). Build it without making nights 1 to 5 harder than now.
+- Which game gets the most work: Lantern and Ant Promotion (#33). See `prototypes/NOTES.md`.
+
+### Left as a proposal (2026-11-22, note #35)
+
+One long request for the next Lantern round. Nothing of it is built yet.
+
+- More power-ups. Named: a boost; a slow-down for the boat that leaves the percent counter running at the same speed; a shrink power, like the shield, that makes the boat smaller 80% of the time and bigger 20% of the time.
+- Stats to spend points on: barrier (shield) strength, lives, game speed, and others at the lab's choice.
+- Tower mode: the river climbs upward first; when it finally runs straight, you reach dawn. (Tower mode was already a proposal; this describes it.)
+- Better-looking boats and flames: different models, less plain colours.
+- A fourth shop pack, "Abilities", that sells the powers above. Packs should also keep selling looks for flames, boats and water.
+- Pack opening animation: the pick hops from one hidden item to another, and when it settles the whole screen lights up in that item's colour.
