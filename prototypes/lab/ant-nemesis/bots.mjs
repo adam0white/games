@@ -24,8 +24,8 @@ const cells = [
   ['same power', { power: 50, speed: 150, alert: true }, 'none'],
 ];
 for (const [name, mob, want] of cells) { assert.equal(encounter(P, mob), want, name); assert.equal(Main.encounter(P, mob), want, 'main: ' + name); }
-assert.equal(encounter.toString(), Main.encounter.toString(), 'encounter() is the main game\'s, unchanged');
-console.log(`rule table: ${cells.length} cells pass; encounter() is identical to the main game's`);
+// encounter() was identical to the main game's when copied; no longer asserted, the main game may change it
+console.log(`rule table: ${cells.length} cells pass`);
 
 // Bots. Written against a sim module so the same policy drives both sims. pow gives a mob's power in that sim.
 const ang = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return Math.abs(d); };
@@ -53,17 +53,9 @@ function reckless(s, pow = powerOf) {
 }
 const snap = s => [s.tick, s.player.x.toFixed(6), s.player.y.toFixed(6), s.player.xp, s.deaths, s.eaten, s.mobs.length, s.mobs.map(m => m.x.toFixed(3) + ',' + m.y.toFixed(3)).join(';')].join('|');
 
-// 2. Reference check: with no Nemesis (nobody is crowned) the copy runs exactly as the main game.
-for (const [name, policy] of [['careful', careful], ['reckless', reckless]]) for (const seed of [1, 2, 3]) {
-  const a = create(seed), b = Main.create(seed);
-  for (let i = 0; i < 3 * 3600; i++) {
-    step(a, policy(a, powerOf)); Main.step(b, policy(b, powMain));
-    for (const s of [a, b]) { if (s.choosing) (s === a ? choose : Main.choose)(s, 1); if (s.dead) (s === a ? revive : Main.revive)(s, false); }
-    if (i % 600 === 0) assert.equal(snap(a), snap(b), `${name} seed ${seed} tick ${i}`);
-  }
-  assert.equal(snap(a), snap(b));
-}
-console.log('reference: with no Nemesis the sim matches the main game tick for tick (2 bots x 3 seeds x 3 min)');
+// 2. Reference check, removed 2026-11-23: this sim was copied from the main game at 1ba5bae7 and matched it tick for tick then.
+// The main game has moved on (PRs 51 and 63) and the rival itself is moving into it, so the copy is no longer pinned to it.
+console.log('reference: skipped, the main game has moved on since this copy was taken');
 
 // A run where every death to a stronger animal crowns the killer if no Nemesis is alive.
 const KNOBS = t => ({ temperament: t, persistence: 2, territory: 2 });
