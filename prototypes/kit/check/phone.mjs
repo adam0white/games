@@ -44,6 +44,7 @@ const GAMES = {
   },
   async lantern(page) {
     const state = () => page.evaluate(() => window.lanternState());
+    const audioLog = () => page.evaluate(() => window.audioLog);
     const saved = () => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(k => k.startsWith('lantern-')).map(k => [k, localStorage.getItem(k)])));
     // A save in the format players already have.
     await page.goto(`${base}/proto/lantern/`);
@@ -54,7 +55,9 @@ const GAMES = {
     assert.equal(await page.textContent('#play'), 'Play night 3'); assert.match(await page.textContent('#about'), /Best 40%/);
     await until(page, () => document.getElementById('notes-button'), 'notes button');
     // Play, steer by a relative drag, and a tap alone does not steer.
+    assert.equal((await audioLog()).made, 0, 'no audio before the first tap');
     await page.click('#play'); st = await state();
+    assert.equal((await audioLog()).made, 1, 'Play starts audio');
     assert.ok(st.playing && st.screen === 'play', 'play starts');
     const x0 = st.target;
     await finger(page, '#c', [['pointerdown', 40, 400], ['pointerup', 40, 400]]);
@@ -65,12 +68,15 @@ const GAMES = {
     // Pause by the button, resume by the card; pause when the page loses the screen.
     await finger(page, '#pause', [['pointerdown', 0, 0]]);
     st = await state(); assert.ok(st.paused && st.screen === 'card', 'pause button pauses');
+    assert.equal((await audioLog()).suspend, 1, 'pause silences audio');
     await sleep(300); assert.equal((await state()).t, st.t, 'time stands still while paused');
     await page.click('#go'); await until(page, () => !window.lanternState().paused, 'resume');
     const t1 = (await state()).t; await page.waitForFunction(t => window.lanternState().t > t, t1);
     await page.evaluate(() => dispatchEvent(new Event('blur')));
     assert.ok((await state()).paused, 'losing focus pauses');
     await page.keyboard.press('p'); assert.ok(!(await state()).paused, 'P resumes');
+    await page.evaluate(() => dispatchEvent(new Event('pagehide'))); assert.ok((await state()).paused, 'putting the page away pauses'); await page.keyboard.press('Escape'); assert.ok(!(await state()).paused, 'Escape resumes');
+    assert.equal((await audioLog()).made, 1, 'one audio context for the whole run');
     // The run ends; its embers go to the bank and to storage.
     await page.evaluate(() => { const s = window.lanternSim(); s.taken = 7; s.hearts = 1; s.light = 0.0001; });
     await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'end card');
@@ -95,7 +101,9 @@ const GAMES = {
     await page.reload(); await until(page, () => window.__ant, 'game script');
     assert.match(await page.textContent('#continue'), /^Continue as /, 'old save: continues'); assert.match(await page.textContent('#look'), /^Look: /);
     await until(page, () => document.getElementById('notes-button'), 'notes button');
+    assert.equal(await page.evaluate(() => window.audioLog.made), 0, 'no audio before the first tap');
     await page.click('#continue'); assert.equal(await mode(), 'play');
+    assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'Play starts audio');
     assert.equal(await page.evaluate(() => window.__ant.level(window.__ant.s)), 2, 'old save: level'); assert.equal(await page.evaluate(() => window.__ant.s.player.xp), 3, 'old save: xp');
     // Walk by dragging.
     const x0 = await page.evaluate(() => window.__ant.s.player.x);
@@ -121,6 +129,7 @@ const GAMES = {
     const before = await saved(); assert.equal(before.skin.c, '#d6b21c'); assert.equal(before.sound, false); assert.equal(before.look, 2);
     await page.reload(); await until(page, () => window.__ant, 'game script');
     assert.deepEqual(await saved(), before); assert.equal(await page.textContent('#sound'), 'Sound: off');
+    await page.click('#continue'); await page.click('#pause'); assert.equal(await page.evaluate(() => window.audioLog.made), 0, 'sound off: no audio is started');
   },
 };
 
@@ -132,6 +141,16 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   for (const [game, run] of Object.entries(GAMES)) {
     if (onlyGame && onlyGame !== 'all' && onlyGame !== game) continue;
     const context = await browser.newContext({ ...device }), page = await context.newPage(), errors = [];
+    // Count audio contexts and their suspend and resume calls, so the checks can see what the sound code did.
+    await page.addInitScript(() => {
+      const Real = window.AudioContext || window.webkitAudioContext; if (!Real) return;
+      window.audioLog = { made: 0, suspend: 0, resume: 0 };
+      window.AudioContext = window.webkitAudioContext = class extends Real {
+        constructor(...a) { super(...a); window.audioLog.made++; }
+        suspend() { window.audioLog.suspend++; return super.suspend(); }
+        resume() { window.audioLog.resume++; return super.resume(); }
+      };
+    });
     page.on('pageerror', e => errors.push(String(e))); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     page.on('requestfailed', r => errors.push(`request failed: ${r.url()}`)); page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
     try { await run(page); assert.deepEqual(errors, [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }

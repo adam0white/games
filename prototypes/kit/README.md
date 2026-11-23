@@ -22,6 +22,11 @@ Shared code for the games under `prototypes/`. It is served at `/proto/kit/` as 
 6. **Run the phone check before and after.** `PLAYWRIGHT=<dir with playwright> node prototypes/kit/check/phone.mjs`. CI does not run it yet. A new screen, control or save key in a game comes with a line in that game's section of the check.
 7. **Not verifiable here:** audio on a real iPhone. Keep the unlock wiring in `audio.js` as it is unless a person has tested the change on a phone.
 
+## Deliberate differences from the code the kit replaced
+
+- `readNumber` gives the fallback for stored text that is not a finite number. Lantern's old code gave `NaN`, which then could never buy anything and was written back. Reviewed 2026-11-23.
+- A page two levels down (`/proto/lab/<name>/`) imports `../../kit/`.
+
 ## Not shared yet, and why
 
 - **Steering.** Lantern steers by how far a finger has moved (with a gain and a dead zone after a pause). Ant Promotion uses a floating joystick. They are different models on purpose. A third game that wants one of them moves it here.

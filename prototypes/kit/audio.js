@@ -1,10 +1,11 @@
 // Sound made in code, for phones. A phone keeps audio silent until it is started inside a touch, and
 // iOS Safari may refuse on touch-down, so the kit tries again whenever a finger lifts.
-//   const snd = sound({ on: () => save.sound, setup: ctx => { build looping nodes once } });
+//   const snd = sound({ on: () => save.sound, setup: ctx => { build looping nodes once }, floor: 0.0001 });
+//   floor is the gain a note fades to: 0.0001 rings out softly, 0.001 ends sooner at a louder level
 //   snd.unlock()   call inside a tap handler (a Play button)
 //   snd.tone(440, 0.3, 0.1, 'triangle', slide)   snd.noise(0.12, 0.2, 1800)
 //   snd.hold()     silence while paused; snd.release() to go on
-export function sound({ on = () => true, setup = null } = {}) {
+export function sound({ on = () => true, setup = null, floor = 0.0001 } = {}) {
   let ctx = null, held = false;
   function get() {
     if (!on()) return null;
@@ -26,7 +27,7 @@ export function sound({ on = () => true, setup = null } = {}) {
       try {
         const o = ac.createOscillator(), v = ac.createGain(), t = ac.currentTime;
         o.type = type; o.frequency.setValueAtTime(freq, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
-        v.gain.setValueAtTime(vol, t); v.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        v.gain.setValueAtTime(vol, t); v.gain.exponentialRampToValueAtTime(floor, t + dur);
         o.connect(v).connect(ac.destination); o.start(t); o.stop(t + dur);
       } catch {}
     },
