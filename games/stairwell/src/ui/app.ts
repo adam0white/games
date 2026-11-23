@@ -1297,7 +1297,11 @@ function dayView(s: GameState, full: boolean) {
   root.classList.toggle('tab-here', !['orders', 'residents', 'notebook'].includes(ui.sheet));
   root.classList.toggle('decision', ['tell', 'invent'].includes(ui.sheet));
   root.classList.toggle('travelling', !!s.k.walk || s.k.busyTask !== null);
-  requiredUiValue(root.querySelector('.scene-drawing'), 'day scene drawing').innerHTML = sceneSvg(s);
+  const drawing = requiredUiValue(root.querySelector<HTMLElement>('.scene-drawing'), 'day scene drawing');
+  const keptScroll = drawing.scrollTop;
+  drawing.innerHTML = sceneSvg(s);
+  drawing.scrollTop = keptScroll;
+  keepMapInView(drawing, s);
   sceneChoices(s, root.querySelectorAll<SVGElement>('.scene [data-go]'));
   const voice = [...s.said].reverse().find((x) => x.kind === 'voice');
   requiredUiValue(root.querySelector<HTMLElement>('.speech-overlay'), 'day speech overlay').textContent =
@@ -1604,6 +1608,7 @@ function goTo(s: GameState, to: Place, person: Rid | null = null) {
 // The building, drawn: floors from the top, flats on each landing, the stair zigzag on the left.
 const W = 360;
 const FLOOR_H = 44;
+const MAP_H = 288;
 const TOP_Y = 16;
 const floorY = (f: number) => TOP_Y + (TOP_FLOOR + 1 - f) * FLOOR_H;
 
@@ -1620,16 +1625,18 @@ function doorX(id: Rid): number {
   return same.length === 1 ? 196 : i === 0 ? 132 : 222;
 }
 
+function placePos(pl: Place): { x: number; y: number } {
+  if (pl === 'bakery') return { x: 330, y: floorY(0) + 8 };
+  if (pl === 'shop') return { x: 330, y: floorY(0) - 16 };
+  if (pl === 'room') return { x: 70, y: floorY(-1) + 4 };
+  if (pl === 'step') return { x: 100, y: floorY(0) + 4 };
+  if (pl === 'roof') return { x: 200, y: floorY(TOP_FLOOR + 1) };
+  if (pl.startsWith('door:')) return { x: doorX(pl.slice(5) as Rid) - 22, y: floorY(floorOf(pl)) };
+  return { x: 74, y: floorY(floorOf(pl)) };
+}
+
 function kapiciPos(s: GameState): { x: number; y: number } {
-  const pos = (pl: Place) => {
-    if (pl === 'bakery') return { x: 330, y: floorY(0) + 8 };
-    if (pl === 'shop') return { x: 330, y: floorY(0) - 16 };
-    if (pl === 'room') return { x: 70, y: floorY(-1) + 4 };
-    if (pl === 'step') return { x: 100, y: floorY(0) + 4 };
-    if (pl === 'roof') return { x: 200, y: floorY(TOP_FLOOR + 1) };
-    if (pl.startsWith('door:')) return { x: doorX(pl.slice(5) as Rid) - 22, y: floorY(floorOf(pl)) };
-    return { x: 74, y: floorY(floorOf(pl)) };
-  };
+  const pos = placePos;
   const w = s.k.walk;
   if (!w) return pos(s.k.at);
   const a = pos(w.from);
@@ -1650,7 +1657,7 @@ function sceneSvg(s: GameState): string {
   const cropped = (ui.sheet === 'tell' || ui.sheet === 'invent') && matchMedia('(max-width: 899px)').matches;
   const focusFloor = floorOf(s.k.walk?.to ?? s.k.at);
   const parts: string[] = [];
-  const H = 288;
+  const H = MAP_H;
   // Roof line and floors.
   parts.push(`<path class="ink" d="${wob(30, TOP_Y + 4, 300, TOP_Y + 4, 1)}"/>`);
   parts.push(`<rect class="hit" data-go="roof" x="98" y="0" width="62" height="44"/>`);
@@ -1739,7 +1746,32 @@ function sceneSvg(s: GameState): string {
   if (s.k.busyTask !== null)
     parts.push(`<text class="lbl hand me-t" x="${kp.x + 8}" y="${kp.y - 30}">working…</text>`);
   const cropY = Math.max(0, Math.min(H - 88, floorY(focusFloor) - 64));
-  return `<svg viewBox="0 ${cropped ? cropY : 0} ${W} ${cropped ? 88 : H}" preserveAspectRatio="none" role="group" aria-label="${cropped ? 'Current floor' : 'The building'}">${parts.join('')}</svg>`;
+  return `<svg${cropped ? '' : ' class="full-map"'} viewBox="0 ${cropped ? cropY : 0} ${W} ${cropped ? 88 : H}" preserveAspectRatio="none" role="group" aria-label="${cropped ? 'Current floor' : 'The building'}">${parts.join('')}</svg>`;
+}
+
+/**
+ * The building map is drawn at least MAP_MIN_PX tall so each floor target is 40px or more to the touch. On a short
+ * screen the map scrolls inside its box; keep the kapıcı, and a newly chosen place, in view without fighting the player's own scroll.
+ */
+let followedKey = '';
+function keepMapInView(drawing: HTMLElement, s: GameState) {
+  const map = drawing.querySelector<SVGElement>('svg.full-map');
+  if (!map || drawing.scrollHeight <= drawing.clientHeight + 1) return;
+  const px = map.getBoundingClientRect().height / MAP_H;
+  const key = `${selection?.to ?? ''}:${s.k.walk?.to ?? ''}`;
+  const places = [kapiciPos(s).y];
+  if (key !== followedKey) {
+    followedKey = key;
+    const to = selection?.to ?? s.k.walk?.to;
+    if (to) places.push(placePos(to).y);
+  }
+  const view = drawing.clientHeight;
+  for (const y of places) {
+    const lo = (y - FLOOR_H) * px;
+    const hi = (y + 8) * px;
+    if (lo < drawing.scrollTop) drawing.scrollTop = Math.max(0, lo);
+    else if (hi > drawing.scrollTop + view) drawing.scrollTop = hi - view;
+  }
 }
 
 function saidLine(x: Said): string {

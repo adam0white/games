@@ -1220,3 +1220,32 @@ body {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* Short phones: draw the building map at a size where every door and room
+   is at least 40px tall to the touch. The map scrolls inside its frame and
+   follows the player. */
+@media (max-width: 899px) {
+  .scene-drawing {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .scene svg.full-map {
+    height: max(100%, 266px);
+  }
+  .state-strip > .clock-rate {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .sheet-tabs > .tutorial-prompt {
+    order: 1;
+    flex: 0 0 100%;
+  }
+  .game.tab-here:not(.has-conversation):not(.decision) .sheet {
+    flex: 0 0 auto;
+    max-height: none;
+  }
+  .game {
+    grid-template-rows: 44px auto minmax(120px, 1fr) minmax(210px, auto) auto;
+  }
+}
