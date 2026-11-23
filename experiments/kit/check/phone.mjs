@@ -60,7 +60,7 @@ const GAMES = {
     // A save in the format players already have.
     await page.goto(`${base}/lantern/`);
     await page.evaluate(LAB_LOCAL);
-    await page.evaluate(() => { localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('lantern-best-endless', '55'); localStorage.setItem('lantern-best-tower', '4'); localStorage.setItem('lantern-stats', '{"red":1}'); localStorage.setItem('lantern-off', '[]'); localStorage.setItem('lantern-best-level', '0'); localStorage.setItem('notes.k', 'check'); });
+    await page.evaluate(() => { localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('lantern-best-endless', '55'); localStorage.setItem('lantern-best-tower', '4'); localStorage.setItem('lantern-stats', '{"red":1}'); localStorage.setItem('lantern-off', '[]'); localStorage.setItem('lantern-best-level', '0'); localStorage.setItem('lantern-tower-at', '1'); localStorage.setItem('notes.k', 'check'); });
     await page.reload();
     let st = await state();
     assert.equal(st.opened, 3, 'old save: opened night'); assert.equal(st.bank, 120, 'old save: bank'); assert.ok(st.owned.includes('red'), 'old save: owned'); assert.equal(st.worn.boat, 'red', 'old save: worn');
@@ -134,15 +134,30 @@ const GAMES = {
     await page.evaluate(() => { window.lanternSim().light = 0.0001; }); await until(page, () => !window.lanternState().playing, 'stat run ends');
     await until(page, () => window.lanternState().screen === 'card', 'end card'); await page.click('#toMenu');
     assert.equal(await page.textContent('#ready'), '', 'no stats left after the run');
-    // Tower of 50 levels (2026-11-23): after a level, climb on or stop; the best level is kept under lantern-best-level; a new climb starts at level 1.
-    await page.click('#tower'); assert.equal((await state()).climb, 1, 'a climb starts at level 1');
+    // Tower of 50 levels (2026-11-23): after a level, climb on or stop; the best level is kept under lantern-best-level.
+    // The next climb goes on where the last left off, saved under lantern-tower-at (note #73); a new climb from level 1 is one tap.
+    await page.click('#tower'); assert.equal((await state()).climb, 1, 'a first climb starts at level 1'); assert.equal(await page.isVisible('#anew'), false);
     await page.evaluate(() => { const s = window.lanternSim(); s.y = 77.9; s.safe = 99; }); await until(page, () => window.lanternState().screen === 'card', 'level card', 12000);
-    assert.match(await page.textContent('#title'), /Level 1 cleared/); assert.equal(await page.textContent('#toMenu'), 'Stop'); assert.equal((await saved())['lantern-best-level'], '1');
+    assert.match(await page.textContent('#title'), /Level 1 cleared/); assert.equal(await page.textContent('#toMenu'), 'Stop'); assert.equal((await saved())['lantern-best-level'], '1'); assert.equal((await saved())['lantern-tower-at'], '2');
     await page.click('#go'); st = await state(); assert.equal(st.climb, 2, 'climb on goes to level 2'); assert.ok(st.playing);
     await page.evaluate(() => { window.lanternSim().light = 0.0001; }); await until(page, () => window.lanternState().screen === 'card', 'lost card');
-    assert.match(await page.textContent('#line'), /cleared 1 level\. Best 1 of 50/); assert.equal(await page.textContent('#toMenu'), 'Menu');
-    await page.click('#go'); assert.equal((await state()).climb, 1, 'after a loss the next climb starts at level 1');
-    await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu'); assert.match(await page.textContent('#tower'), /best level 1 of 50/);
+    assert.match(await page.textContent('#line'), /Best 1 of 50\. Your climb goes on from level 2/); assert.equal(await page.textContent('#go'), 'Try level 2 again');
+    await page.click('#go'); assert.equal((await state()).climb, 2, 'after a loss the level is tried again');
+    await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu'); assert.match(await page.textContent('#tower'), /go on at level 2/);
+    await page.click('#tower'); assert.equal((await state()).climb, 2, 'the menu climb goes on at level 2');
+    await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu');
+    await page.click('#anew'); assert.equal((await state()).climb, 1, 'a new climb starts at level 1'); assert.equal((await saved())['lantern-tower-at'], '1');
+    await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu'); assert.equal(await page.isVisible('#anew'), false);
+    // A look on the whole screen (note #73): tapping an owned boat wears it and hides every button; a tap brings the shop back.
+    await page.click('#toShop'); await page.click('[data-item="red"]'); st = await state();
+    assert.equal(st.looking, 'boat'); assert.equal(st.worn.boat, 'red'); assert.equal(await page.isVisible('#shop'), false, 'the shop hides'); assert.equal(await page.isVisible('#notes-button'), false, 'the notes button hides');
+    const y0 = (await state()).y; await page.waitForFunction(y => window.lanternSim().y > y + 0.05, y0);
+    await page.click('#look'); st = await state(); assert.equal(st.looking, ''); assert.equal(st.screen, 'shop'); assert.equal(await page.isVisible('#shop'), true, 'the shop comes back');
+    // Erase everything (note #73, tester tools): two taps; every lantern- key goes and nothing else.
+    await page.click('[data-test="reset"]'); assert.ok(Object.keys(await saved()).length > 3, 'one tap erases nothing');
+    await Promise.all([page.waitForEvent('load'), page.click('[data-test="reset"]')]);
+    assert.deepEqual(await saved(), {}, 'every lantern- key is gone'); assert.equal(await page.evaluate(() => localStorage.getItem('notes.k')), 'check', 'the tester link stays');
+    st = await state(); assert.equal(st.bank, 0); assert.equal(st.opened, 1);
   },
   async 'ant-promotion'(page) {
     const KEY = 'ant-promotion:v1';
