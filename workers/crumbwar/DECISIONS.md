@@ -89,15 +89,49 @@ All joined. No snapshot arrived out of step. Round trip p50 2 ms, p99 4.8 ms. Pr
 
 ### Deployed
 
-Not run yet. The first deploy follows the merge of this directory; the deployed load test results, including one run that overloads a room on purpose, will be added here then.
+Measured 2026-11-23 against `play.adamwhite.work`, from one Mac in Texas, every client in one room placed in `enam`. All clients share one network path, so this shows what a room can carry, not what distant players feel.
+
+| People | Seconds | Joined | Closed early | Ticks per second | Snapshot gap p50 / p99 ms | Round trip p50 / p99 ms | Bytes per client per second | Snapshots out of step |
+|---|---|---|---|---|---|---|---|---|
+| 20 | 30 | 20 | 0 | 20 | 99.9 / 108.8 | 32 / 59 | 457 | 0 |
+| 60 | 40 | 60 | 0 | 20 | 99.7 / 118.4 | 52 / 67 | 648 | 0 |
+| 120 | 40 | 120 | 0 | 20 | 99.4 / 130.2 | 64 / 107 | 984 | 0 |
+| 240 | 40 | 240 | 0 | 20 | 99.3 / 122.3 | 71 / 91 | 1692 | 0 |
+| 60 | 600 | 60 | 0 | 20.0 | 99.8 / 112.2 | 66 / 80 | 655 | 0 |
+| 240 | 600 | 240 | 0 | 20.0 | 99.2 / 128.6 | 54 / 86 | 1645 | 0 |
+
+- Prediction correction stayed at p50 0 and p99 0.2 to 7.5 units. The reported maximum in long runs is about 3500 units: that is a respawn moving the ant to its nest, which the test counts as a correction. It is not a prediction error.
+- Every run has one snapshot gap of about 400 ms at the start. The 240 person ten-minute run had one gap of 1.3 seconds. The cause is not known.
+- The live page was run in headless Chromium at phone size: it joined a room through the directory, steered at 150 units a second and stopped on release. Cloudflare's analytics beacon is blocked by the page's content security policy, which is intended.
+
+### Overload, on purpose
+
+A load test room can waste CPU on every tick (`--burn N`, N million square roots). One client per room, pinging four times a second:
+
+| Burn | Result |
+|---|---|
+| 0 | Ran 62 seconds until the test ended. |
+| 1 (20 clients) | Ran 150 seconds at 20 ticks a second until the test ended. |
+| 2 | Cloudflare reset the object after 39 seconds. Every socket closed with 1006 and the round was lost. |
+| 4, 6, 8 | Reset after 6 to 9 seconds. Before the reset the clients received 13, 12 and 8.5 messages a second instead of 15. |
+| 10 | Reset after 3 seconds. |
+
+What this shows:
+
+1. **An overloaded room is not slow, it is gone.** Cloudflare discards an object that uses too much CPU. The documentation gives a budget of 30 CPU seconds that each incoming message refills; these resets came sooner than that rule alone predicts, so the exact rule is not understood. The safe reading: keep a tick far below the 50 ms budget. A 240 person tick is under 1 ms locally and ran ten minutes deployed without a reset.
+2. **The late-tick counters do not work on Cloudflare.** `late10`, `late50`, `maxLate` and `dropped` stayed 0 in every deployed run, the overloaded ones included, because the clock inside a timer does not show the delay there. They work under `wrangler dev` only. The measures that do work are `ticksPerSecond` in the status call, the snapshot rate the clients see, and sockets closing with 1006.
+3. **A deploy-only bug was found this way.** A room name with no region in it gave an invalid `locationHint`, which is an error on Cloudflare and is ignored locally. Every load test join failed with 500 until it was fixed. Local runs cannot stand in for deployed ones.
+4. The close sent to a lagging client arrives as code 4004 on Cloudflare. The missing close event seen under `wrangler dev` is local only.
 
 ## Known gaps
 
 - No lag compensation for bites.
 - No edge rate limit on joins.
 - No way for friends to share a room.
+- No alert when a room is reset. Add one from Workers logs or analytics before the link is public.
+- All deployed tests ran from one place into one region. Rooms in other regions and players far from their room are untested.
 - A deploy ends every round in progress.
-- The time a tick takes cannot be measured inside a deployed object, because the clock does not advance during execution there (from memory of the Workers security model; not re-read). The room counts how late each tick starts instead, which shows overload just as well.
+- The time a tick takes cannot be measured inside a deployed object, because the clock does not advance during execution there (from memory of the Workers security model; not re-read). The late-tick counters do not show it either (see "Overload, on purpose"); use `ticksPerSecond`.
 - Exercised once by hand over real sockets against `wrangler dev` (2026-11-23), not by an automated test: resume returns the same ant; a 9 byte message, a text message and a 200 message burst each close the socket with 1008; the fifth socket from one address is refused; a client that never pings is removed after 8 to 9 seconds. Never exercised: the idle kick and the 3 retries when a room is full.
-- When the room closes a lagging socket from its tick loop, a Node client under `wrangler dev` stayed in the closing state and never got a close event. The cause is not known and it is not checked on Cloudflare. The page does not depend on the close event: five seconds without a message ends the socket and reconnects.
+- Under `wrangler dev` only, a socket the room closes from its tick loop stays in the closing state. The page does not depend on the close event: five seconds without a message ends the socket and reconnects.
 - The page was checked in headless Chromium at phone size only (joins through the directory, steers at 150 units a second in the direction dragged, stops on release, no console errors). It has not been checked on a real phone or in WebKit.
