@@ -1,7 +1,8 @@
 // Checks and measured play: node prototypes/ant-promotion/bots.mjs [seeds] [minutes]
 // 1. the contact rule, every cell   2. the form tree   3. food exists for every form   4. bots play
 import assert from 'node:assert/strict';
-import { FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article } from './sim.js';
+import { SPAWN_WEIGHTS, HIDE_S, hideReady,
+  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article } from './sim.js';
 const seeds = Number(process.argv[2] ?? 20), minutes = Number(process.argv[3] ?? 12);
 
 // 1. Rule table. Player: power 50, speed 124.
@@ -66,25 +67,42 @@ function reckless(s) {
   return best ? { x: best.x - p.x, y: best.y - p.y } : { x: 0, y: 0 };
 }
 const result = {};
-for (const [name, policy] of Object.entries({ careful, reckless })) for (const pick of [0, 1, 2]) {
-  const tops = [], deaths = []; let eaten = 0, wins = 0;
+for (const wild of [false, true]) for (const [name, policy] of Object.entries({ careful, reckless })) for (const pick of [0, 1, 2]) {
+  const tops = [], deaths = []; let eaten = 0, wins = 0, hides = 0, hunts = 0;
   for (let seed = 1; seed <= seeds; seed++) {
-    const s = create(seed); let top = 1;
+    const s = create(seed, [ANT], 0, SPAWN_WEIGHTS, wild); let top = 1;
     for (let i = 0; i < minutes * 3600; i++) {
       step(s, policy(s));
       if (s.choosing) choose(s, pick);
       if (s.dead) revive(s, false);
       top = Math.max(top, level(s));
     }
-    tops.push(top); deaths.push(s.deaths); eaten += s.eaten; wins += s.won ? 1 : 0;
+    tops.push(top); deaths.push(s.deaths); eaten += s.eaten; wins += s.won ? 1 : 0; hides += s.hides; hunts += s.hunts;
+    if (!wild) assert.equal(s.hides + s.hunts, 0, 'classic rules have no hide and no hunt');
   }
   tops.sort((a, b) => a - b); deaths.sort((a, b) => a - b);
   const mid = a => a[Math.floor(a.length / 2)];
-  result[`${name}/${pick}`] = { top: mid(tops), deaths: mid(deaths) };
-  console.log(`${name.padEnd(8)} always picks ${['strong', 'fast', 'sneaky'][pick].padEnd(6)} ${minutes} min: highest level median ${mid(tops)} (min ${tops[0]}, max ${tops.at(-1)}), deaths median ${mid(deaths)}, eaten/run ${(eaten / seeds).toFixed(0)}, reached the top ${wins}/${seeds}`);
+  result[`${wild ? 'wild ' : ''}${name}/${pick}`] = { top: mid(tops), deaths: mid(deaths), sum: deaths.reduce((a, b) => a + b, 0), hides, hunts };
+  console.log(`${wild ? 'WILD   ' : 'classic'} ${name.padEnd(8)} always picks ${['strong', 'fast', 'sneaky'][pick].padEnd(6)} ${minutes} min: highest level median ${mid(tops)} (min ${tops[0]}, max ${tops.at(-1)}), deaths median ${mid(deaths)}, eaten/run ${(eaten / seeds).toFixed(0)}, reached the top ${wins}/${seeds}${wild ? `, hides used/run ${(hides / seeds).toFixed(1)}, hunts/run ${(hunts / seeds).toFixed(0)}` : ''}`);
 }
 for (const pick of [0, 1, 2]) {
   assert.ok(result[`careful/${pick}`].top >= 6, `careful bot climbs (pick ${pick})`);
   assert.ok(result[`careful/${pick}`].deaths < result[`reckless/${pick}`].deaths, `care pays (pick ${pick})`);
 }
 console.log('bots: a careful player climbs and dies less than a reckless one');
+// Wild rules: the hide is used by strong picks only, the hunt happens, and care still pays.
+for (const pick of [0, 1, 2]) {
+  assert.ok(result[`wild careful/${pick}`].hunts > 0, 'wild: hunts happen');
+  assert.ok(result[`wild careful/${pick}`].top >= 6, `wild: careful bot still climbs (pick ${pick})`);
+  assert.ok(result[`wild careful/${pick}`].deaths < result[`wild reckless/${pick}`].deaths, `wild: care pays (pick ${pick})`);
+}
+assert.ok(result['wild reckless/0'].hides > 0, 'wild: strong picks use the hide');
+assert.equal(result['wild reckless/1'].hides + result['wild reckless/2'].hides, 0, 'wild: only strong picks have a hide');
+{ // one bite on a hide: alive, thrown clear, hide not ready until HIDE_S has passed
+  const brute = optionsFor(1)[0], s = create(1, [ANT, brute.id], 0, SPAWN_WEIGHTS, true), big = FORMS.find(f => f.power > brute.power && f.level === 3);
+  s.player.safe = 0; s.mobs.length = 0; s.mobs.push({ id: 1, f: big.id, x: s.player.x + 5, y: s.player.y, a: 0, alert: false, lost: 0, timer: 9, want: 0, walk: false, ph: 0 });
+  step(s, null); assert.equal(s.dead, null, 'the hide takes the first bite'); assert.equal(hideReady(s), false);
+  s.player.safe = 0; s.mobs[0].x = s.player.x + 5; s.mobs[0].y = s.player.y; step(s, null); assert.ok(s.dead, 'the second bite kills');
+  const c = create(1, [ANT, brute.id]); c.player.safe = 0; c.mobs.length = 0; c.mobs.push({ ...s.mobs[0], x: c.player.x + 5, y: c.player.y }); step(c, null); assert.ok(c.dead, 'classic: the first bite kills');
+}
+console.log('wild rules: hide and hunt checks pass');
