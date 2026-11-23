@@ -178,3 +178,38 @@ The wildcard lab drew Lantern in 3D (`../lab/lantern-3d/`, log in `../lab/NOTES.
 - **Dawn flood** (`flood`). From 86% a low sun shows past the top edge. At dawn its light pours down the screen, then settles within 2.5 s so the card can be read. The first version stayed bright and made the card's title unreadable; the screenshot caught it.
 
 Checked: phone-sized Chromium, a night-1 run with each look on screen, 60 frames a second on this Mac, no page errors; the dawn card compared with the build before. Not checked: a real phone (about 350 reed blades a frame are new), a person's opinion. Full 3D stays in the lab until a person compares the two on a phone, because rocks ahead draw about 20% smaller there.
+
+## 2026-11-23: tester t1 asks for a harder, longer game (note #69)
+
+The tester likes the game but finds it too easy: night 6 without a struggle, the tower cleared in one go, the whole game done in 15 to 30 minutes. They blame the stats and powers. They asked for a long list. In their words, shortened:
+
+1. Stats should last one night only, with a warning in the shop.
+2. Powers should be rarer; a player can switch some off so they stop appearing; only two at a time; hearts and the shield should count as powers and not be free; the shield and a heart should differ (now both are a spare life).
+3. Test commands to get as many embers and powers as wanted, removed at launch.
+4. The river colours barely differ (blue and a darker blue).
+5. Tower: about 50 levels, much harder each level, growing exponentially. After each level ask "go again or stop". Going to the menu after level 7 shows "best 7" and the next climb starts from 1 again, for competition.
+6. 50 more nights, with an exponential rise in difficulty between nights.
+7. A leaderboard so people compete.
+8. A river animations pack; a crash effects pack (choose two or three): crashes that differ by what you hit, with their own sounds (a rock: the boat sinks or breaks; the bank: it tips over the bank).
+
+### Done in this change
+
+| Ask | What changed |
+| --- | --- |
+| 1 | A stat level now lasts the next run only and is used up when that run starts, whatever the mode. The price fell to 15 embers times the level bought (15, 30, 45), since it is spent each time. The shop shows a warning in orange, the menu lists the stats ready for the next run, and the run opens with "Your stats are on for this run". Stats bought before this change are used by the next run. `lantern-stats` keeps its format; it now holds the levels for the next run. |
+| 2, rarer | About two powers a night (one every 26 to 40 river units, was 14 to 24). Careful bot, night 5: 0.33 powers taken a run before, 0.26 after; greedy bot 0.78 and 0.39. Hearts and shields are unchanged here. |
+| 2, switch off | Tapping an owned ability in the shop switches it off (dimmed, dashed); it stays owned and no longer lies in the river. Tap again to bring it back. New key `lantern-off`: a JSON list of ability ids. |
+| 3 | "Tester tools" at the bottom of the shop: +500 embers, open all nights, find everything. They show only in a browser that has the notes button, that is one that opened a tester's private link. Each use is recorded in the lab events as `test`. **Remove before launch.** |
+| 4 | Blue is a brighter cobalt, teal is clearly green-blue, black glass is darker with silver streaks. Screenshots of all six waters before and after were compared; blue and teal were the close pair. |
+
+The lab's own reading: "two at a time" is ambiguous (two chosen for a run, or two working at once), and it decides whether hearts and shields take a slot. A question went to the tester.
+
+Checks: `node experiments/kit/check/phone.mjs lantern` on WebKit iPhone 13 and Chromium Pixel 7 with new lines for the stat warning, the 15-ember price, the menu line, stats used up at run start, the switch and its saved key, and a tester tool. Making the run keep its stats makes the check fail (tried). `bots.mjs 60 audit` on nights 1 to 20, endless and tower: no closed river, no buried pickup. Not checked: a real phone; whether 15 embers a level is the right price now that a stat is spent each run.
+
+### Left as a proposal (2026-11-23, note #69)
+
+- **Only two powers, hearts and shield as powers, shield different from a heart.** Waiting on the tester's answer about "two at a time". A lab idea for the difference: the shield becomes a force field that lasts a few seconds and pushes rocks aside, while a heart stays a spare life.
+- **50 more nights and an exponential rise between nights.** Nights past 24 would be the same under the current caps on speed and density; it needs new hazards or a new curve, audited for closed rivers. The steeper rise should start at night 6, as the tester earlier asked nights 1 to 5 kept, and come with careful-bot numbers before and after.
+- **Leaderboard.** A shared leaderboard needs a server, which is the owner's decision. A best list on this device is possible without one.
+- **Crash effects pack and river animations pack.** A crash that differs by what is hit (sink or shatter on a rock, tip over on the bank, crack on ice), each with its own sound; the pack lets a player pick two or three. River animations: moving ripples, moonlight glints, mist.
+- **Tower of 50 levels** (built in the next change if it lands; see below).

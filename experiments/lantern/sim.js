@@ -9,7 +9,7 @@ export const NIGHTS = 20;
 // magnet (embers swim to the boat) and flare (the flame is filled and does not fade) are the lab's own two.
 export const POWERS = ['boost', 'slow', 'size', 'magnet', 'flare'];
 export const LAST = { boost: 2.5, slow: 5, size: 6, magnet: 7, flare: 6 };
-// Stats are bought with embers and kept between runs. Each is a level from 0: hearts (start with more), barrier (hits a shield takes),
+// Stats are bought with embers for one run. Each is a level from 0: hearts (start with more), barrier (hits a shield takes),
 // calm (the river runs 4% slower a level), wick (the flame fades 8% slower a level), pull (pickups are taken from further away).
 export const STATS = { hearts: 2, barrier: 2, calm: 3, wick: 3, pull: 3 }; // the top level of each
 
@@ -64,7 +64,7 @@ export function create(seed, stage = 1, mode = false, powers = POWERS, stats = {
   const endless = mode === true, tower = mode === 'tower';
   const st = Object.fromEntries(Object.entries(STATS).map(([k, top]) => [k, Math.max(0, Math.min(top, Math.floor(stats[k] || 0)))]));
   const r = rng(seed), q = rng(seed ^ 0x9e3779b9); // powers draw from their own stream, so the rocks and embers of a seed never change
-  const s = { seed, stage, endless, tower, q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers, powers: [], nextPower: 6 + q() * 6, boost: 0, slow: 0, size: 0, magnet: 0, flare: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
+  const s = { seed, stage, endless, tower, q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers, powers: [], nextPower: 10 + q() * 10, boost: 0, slow: 0, size: 0, magnet: 0, flare: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
   s.x = centre(s, 0);
   return s;
 }
@@ -94,12 +94,12 @@ function open(s, y, kind, chance) {
 }
 // No pickup may sit where a rock is or will be: drop any earlier one this row would cover.
 function cover(s, row) { const free = e => e.got || row.every(q => clearOf(e.x, e.y, q)); s.embers = s.embers.filter(free); s.powers = s.powers.filter(free); }
-// A power in open water, every so often. Which one, and whether a size power grows the boat, is settled here and not when it is taken.
+// A power in open water, about two a night (tester t1, 2026-11-23: powers should be rarer). Which one, and whether a size power grows the boat, is settled here and not when it is taken.
 function power(s, y) {
   if (y < s.nextPower || !s.on.length) return;
   for (let tries = 0; tries < 4; tries++) {
     const py = y + 0.5, pc = centre(s, py), px = pc + (s.q() * 2 - 1) * (half(s, py) - 0.07);
-    if (clear(s, px, py) && s.embers.every(e => Math.hypot(e.x - px, e.y - py) > 0.11)) { s.powers.push({ x: px, y: py, got: false, kind: s.on[Math.floor(s.q() * s.on.length)], big: s.q() < 0.2 }); s.nextPower = y + 14 + s.q() * 10; return; }
+    if (clear(s, px, py) && s.embers.every(e => Math.hypot(e.x - px, e.y - py) > 0.11)) { s.powers.push({ x: px, y: py, got: false, kind: s.on[Math.floor(s.q() * s.on.length)], big: s.q() < 0.2 }); s.nextPower = y + 26 + s.q() * 14; return; }
   }
 }
 function special(s, y, c, h, k, lv) {

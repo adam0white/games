@@ -36,6 +36,10 @@
   .item.hop { border-color: #fff; border-style: solid; background: #ffffff55; box-shadow: 0 0 14px #fff; transform: scale(1.15); opacity: 1; }
   #flash { position: fixed; inset: 0; opacity: 0; pointer-events: none; z-index: 9; }
   .item.worn { border-color: #fff; box-shadow: 0 0 0 2px #ffb45a; }
+  .item.off { opacity: .35; border-style: dashed; filter: grayscale(1); }
+  .pack small.once { display: block; font-size: .8em; color: #ffb45a; margin: .1em 0 .3em; }
+  #ready { color: #ffb45a; font-size: .9em; }
+  .pack.test { border-top: 1px dashed #ff7a7a88; } .pack.test b { color: #ff9a9a; }
   #got { min-height: 1.6em; color: #ffe6bd; position: sticky; top: 0; z-index: 2; margin: 0; padding: .45em .3em; background: #070b14f2; border-radius: 0 0 12px 12px; } /* stays in view while the packs scroll */
   #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); display: none; text-align: left; pointer-events: none; text-shadow: 0 1px 6px #000; }
   #hearts { font: 26px/1 sans-serif; color: #ff4d5e; letter-spacing: 2px; }
@@ -64,6 +68,7 @@
   <p class="bank"><span class="dot"></span><span id="bank">0</span> embers</p>
   <p><button id="less" class="small" aria-label="Earlier night">&lsaquo;</button><button id="play" class="main">Play</button><button id="more" class="small" aria-label="Later night">&rsaquo;</button></p>
   <p id="about"></p>
+  <p id="ready"></p>
   <p><button id="endless">Endless river</button><button id="tower">Tower climb</button></p>
   <p><button id="toShop">Shop</button><button id="toCredits">Credits</button></p>
 </div></div>
@@ -71,7 +76,7 @@
   <h2>Shop</h2>
   <p class="bank"><span class="dot"></span><span id="bank2">0</span> embers</p>
   <p><button class="back">Back</button></p>
-  <p id="got">Stats make every run easier. Each pack holds one surprise for 50 embers. Abilities you own lie in the river.</p>
+  <p id="got">Stats last for your next run only. Each pack holds one surprise for 50 embers. Tap an ability to switch it on or off.</p>
   <div id="packs"></div>
 </div></div>
 <div id="credits" class="screen veil"><div>
@@ -83,7 +88,7 @@
 </div></div>
 <div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p><p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p></div></div>
 <script type="module">
-import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS } from './sim.js?v=7'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
+import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS } from './sim.js?v=8'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
 import { readNumber, readJson, write } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
@@ -106,18 +111,20 @@ const ahead = n => NIGHT[n] ?? '';
 // The shop. Embers are the money. A pack gives one thing you do not own yet, picked at random.
 const PACKS = [
   { id: 'boat', name: 'Boats', items: [['oak', 'Oak rowboat', '#6b4a2f'], ['red', 'Red canoe', '#b3312c'], ['birch', 'Birch raft', '#e9e2d0'], ['iron', 'Iron barge', '#56657a'], ['jade', 'Jade dragon', '#2f9e7a'], ['gold', 'Golden barge', '#e0b040']] },
-  { id: 'water', name: 'Waters', items: [['blue', 'Blue water', '#14304a', '#3d6f95'], ['redw', 'Red water', '#4a1420', '#a04a58'], ['moss', 'Moss water', '#17382a', '#4f8f6a'], ['violet', 'Violet water', '#2a1c4a', '#7a62b8'], ['teal', 'Teal water', '#0f3d42', '#48a3a8'], ['glass', 'Black glass', '#0c1016', '#4a5564']] },
+  { id: 'water', name: 'Waters', items: [['blue', 'Blue water', '#173a63', '#5a95cc'], ['redw', 'Red water', '#4a1420', '#a04a58'], ['moss', 'Moss water', '#17382a', '#4f8f6a'], ['violet', 'Violet water', '#2a1c4a', '#7a62b8'], ['teal', 'Teal water', '#0b4a3c', '#4fd1b0'], ['glass', 'Black glass', '#06080b', '#9aa6b6']] },
   { id: 'flame', name: 'Flames', items: [['amber', 'Candle flame', '255,170,80'], ['bluef', 'Gas flame', '110,180,255'], ['green', 'Marsh fire', '120,230,140'], ['rose', 'Sparkler', '255,120,170'], ['white', 'Star light', '235,235,255'], ['violetf', 'Twin flame', '190,130,255']] },
   { id: 'power', name: 'Abilities', items: [['boost', 'Boost', TINT.boost, 'Gold arrows. Fast, and nothing can break the boat.'], ['slow', 'Slow water', TINT.slow, 'Violet clock. The river slows; dawn keeps coming.'], ['size', 'Size', TINT.size, 'Teal rings. A smaller boat, four times in five.'], ['magnet', 'Magnet', TINT.magnet, 'Pink magnet. Embers swim to you.'], ['flare', 'Flare', TINT.flare, 'White sun. The flame is filled and holds.']] },
 ];
 const COST = 50;
-// Stats: bought a level at a time and kept. They change the run itself, where packs change only its looks.
+// Stats: bought a level at a time for the next run only, then used up when that run starts (tester t1, 2026-11-23). They change the run itself, where packs change only its looks.
+// The save keeps its format: lantern-stats holds the levels ready for the next run.
 const STAT = [['hearts', 'Hearts', 'Start with one more heart'], ['barrier', 'Barrier', 'A shield takes one more hit'], ['calm', 'Calm water', 'The river runs a little slower'], ['wick', 'Long wick', 'The flame fades more slowly'], ['pull', 'Long reach', 'Take embers from further away']];
 let stats = store.json('lantern-stats', {});
-const statCost = id => 40 * ((stats[id] || 0) + 1);
+const statCost = id => 15 * ((stats[id] || 0) + 1);
 let owned = new Set(['oak', 'blue', 'amber', 'boost', ...store.json('lantern-owned', [])]);
 let worn = { boat: 'oak', water: 'blue', flame: 'amber', ...store.json('lantern-worn', {}) };
-const powersOwned = () => POWERS.filter(k => owned.has(k)); // only abilities found in the shop lie in the river
+let off = new Set([].concat(store.json('lantern-off', [])).filter(k => typeof k === 'string')); // abilities the player switched off in the shop
+const powersOwned = () => POWERS.filter(k => owned.has(k) && !off.has(k)); // only abilities found in the shop, and not switched off, lie in the river
 const skin = kind => { const pack = PACKS.find(p => p.id === kind); return pack.items.find(i => i[0] === worn[kind]) ?? pack.items[0]; };
 // A shop button shows the thing itself: the boat drawn small, or the flame after half a second of burning.
 const shots = new Map();
@@ -162,13 +169,14 @@ function menu() {
   $('less').disabled = stage <= 1; $('more').disabled = stage >= opened;
   const best = store.get(`lantern-best-${stage}`), top = store.get('lantern-best-endless');
   $('about').textContent = ahead(stage) + (best ? ` Best ${best}%.` : '');
+  const ready = STAT.filter(([id]) => stats[id] > 0).map(([id, label]) => `${label} ${stats[id]}`); $('ready').textContent = ready.length ? `Stats for your next run: ${ready.join(', ')}.` : '';
   $('endless').textContent = top ? `Endless river · best ${top}` : 'Endless river';
   const high = store.get('lantern-best-tower'); $('tower').textContent = high ? `Tower climb · best floor ${high}` : 'Tower climb';
 }
 function shop(text) {
   $('bank2').textContent = bank; if (text) $('got').textContent = text;
   const box = $('packs'); box.textContent = '';
-  const sdiv = document.createElement('div'); sdiv.className = 'pack'; const sname = document.createElement('b'); sname.textContent = 'Stats'; sdiv.append(sname);
+  const sdiv = document.createElement('div'); sdiv.className = 'pack'; const sname = document.createElement('b'); sname.textContent = 'Stats'; const warn = document.createElement('small'); warn.className = 'once'; warn.textContent = 'Warning: stats last one run. They are used up when your next run starts.'; sdiv.append(sname, warn);
   for (const [id, label, what] of STAT) {
     const lv = stats[id] || 0, top = STATS[id], row = document.createElement('div'); row.className = 'stat';
     const txt = document.createElement('span'); txt.textContent = `${label} ${'●'.repeat(lv)}${'○'.repeat(top - lv)}`; const sm = document.createElement('small'); sm.textContent = what; txt.append(sm);
@@ -178,7 +186,7 @@ function shop(text) {
       bank -= cost; store.set('lantern-bank', bank); stats[id] = (stats[id] || 0) + 1; store.set('lantern-stats', JSON.stringify(stats));
       audio(); tone(523.25, 0.3, 0.1, 'triangle'); setTimeout(() => tone(783.99, 0.5, 0.1, 'triangle'), 100);
       rec.event('stat', { stat: id, level: stats[id], bank });
-      shop(`${label} is now ${stats[id]} of ${top}. ${what}.`);
+      shop(`${label} ${stats[id]} of ${top} for your next run only. ${what}.`);
     });
     row.append(txt, b); sdiv.append(row);
   }
@@ -190,7 +198,11 @@ function shop(text) {
     for (const it of pack.items) {
       const b = document.createElement('button'), has = owned.has(it[0]);
       b.className = 'item' + (has ? '' : ' locked') + (worn[pack.id] === it[0] || (pack.id === 'power' && has) ? ' worn' : ''); b.dataset.item = it[0]; b.setAttribute('aria-label', has ? it[1] : 'Not found yet');
-      if (has) { b.style.background = swatch(pack.id, it); b.addEventListener('click', () => { if (busy) return; if (pack.id === 'power') { shop(`${it[1]}: ${it[3]}`); return; } worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); shop(`${it[1]} is on.`); }); } else b.disabled = true;
+      if (has && pack.id === 'power' && off.has(it[0])) b.className = 'item off';
+      if (has) { b.style.background = swatch(pack.id, it); b.addEventListener('click', () => { if (busy) return; if (pack.id === 'power') { // tap an ability to keep it out of the river, tap again to bring it back
+        if (off.has(it[0])) off.delete(it[0]); else off.add(it[0]); store.set('lantern-off', JSON.stringify([...off]));
+        rec.event('ability', { ability: it[0], on: !off.has(it[0]) }); shop(off.has(it[0]) ? `${it[1]} is off. It will not show up in the river.` : `${it[1]} is on. ${it[3]}`); return; }
+        worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); shop(`${it[1]} is on.`); }); } else b.disabled = true;
       row.append(b);
     }
     const buy = document.createElement('button'); buy.dataset.pack = pack.id;
@@ -204,6 +216,15 @@ function shop(text) {
       $('bank2').textContent = bank; audio(); spin(row, rest.map(i => i[0]), it, pack);
     });
     div.append(name, row, buy); box.append(div);
+  }
+  if (document.getElementById('notes-button')) { // tester tools: only in a browser that opened a tester's private link; to be removed before launch
+    const t = document.createElement('div'); t.className = 'pack test'; const tn = document.createElement('b'); tn.textContent = 'Tester tools'; const tw = document.createElement('small'); tw.className = 'once'; tw.textContent = 'For testing only. These go away when the game launches.'; t.append(tn, tw);
+    for (const [id, label, act] of [['embers', '+500 embers', () => { bank += 500; store.set('lantern-bank', bank); return 'Added 500 embers.'; }],
+      ['nights', 'Open all nights', () => { opened = NIGHTS; stage = NIGHTS; store.set('lantern-night', opened); return `All ${NIGHTS} nights are open.`; }],
+      ['all', 'Find everything', () => { for (const p of PACKS) for (const i of p.items) owned.add(i[0]); store.set('lantern-owned', JSON.stringify([...owned])); return 'Every boat, water, flame and ability is yours.'; }]]) {
+      const b = document.createElement('button'); b.dataset.test = id; b.textContent = label; b.addEventListener('click', () => { if (busy) return; const said = act(); rec.event('test', { tool: id, bank }); shop(said); }); t.append(b);
+    }
+    box.append(t);
   }
 }
 // Opening a pack: a light hops between the hidden things, slows, and stops on the find; then the whole screen fills with its colour.
@@ -246,9 +267,11 @@ const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
 
 function begin() {
   audio(); // the tower holds the things of the nights you have opened, from 3 up to 12
-  s = create((Math.random() * 2 ** 31) | 0, tower ? Math.max(3, Math.min(12, opened)) : endless ? 1 : stage, tower ? 'tower' : endless, powersOwned(), stats); target = s.x; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; drag = null; startTap = null;
+  s = create((Math.random() * 2 ** 31) | 0, tower ? Math.max(3, Math.min(12, opened)) : endless ? 1 : stage, tower ? 'tower' : endless, powersOwned(), stats);
+  const boosted = Object.values(stats).some(v => v > 0); stats = {}; store.set('lantern-stats', '{}'); // stats last this one run
+  target = s.x; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; drag = null; startTap = null;
   shown = ''; show('play'); hud();
-  say(tower ? 'The tower. Climb to the top' : endless ? 'Endless river' : `Night ${stage}`, 1800); floor = 0;
+  say((tower ? 'The tower. Climb to the top' : endless ? 'Endless river' : `Night ${stage}`) + (boosted ? '. Your stats are on for this run' : ''), 1800); floor = 0;
   rec.start({ mode: mode(), night: tower || endless ? 0 : stage });
 }
 const mode = () => tower ? 'tower' : endless ? 'endless' : 'night';

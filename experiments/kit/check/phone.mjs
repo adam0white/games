@@ -120,6 +120,20 @@ const GAMES = {
     assert.equal(labRuns(page, 'lantern').length, 3, 'nothing is sent while recording is off');
     await page.reload(); await page.click('#play'); await finger(page, '#pause', [['pointerdown', 0, 0]]);
     assert.equal(await page.isChecked('.lab-toggle input'), false, 'the switch stays off after a reload');
+    // Stats last one run (2026-11-23): bought for the next run, shown on the menu, used up when it starts. lantern-stats keeps its format.
+    await page.click('#toMenu'); await page.click('#toShop');
+    assert.match(await page.textContent('#packs'), /stats last one run/i, 'the shop warns that stats last one run');
+    // Tester tools show only where the notes button is (a tester's browser).
+    const bank0 = (await state()).bank; await page.click('[data-test="embers"]'); assert.equal((await state()).bank, bank0 + 500, 'tester tool adds embers');
+    await page.click('[data-stat="hearts"]'); st = await state(); assert.equal(st.bank, bank0 + 500 - 15, 'a stat level costs 15'); assert.equal(JSON.parse((await saved())['lantern-stats']).hearts, 1);
+    // An ability switched off stays owned and is kept out of the river; the choice is saved under lantern-off.
+    await page.click('[data-item="boost"]'); assert.equal((await saved())['lantern-off'], '["boost"]'); assert.ok((await state()).owned.includes('boost'), 'switched off, still owned');
+    await page.click('.back'); assert.match(await page.textContent('#ready'), /Hearts 1/, 'the menu shows the stats ready for the next run');
+    await page.click('#play'); st = await state(); assert.equal(st.hearts, 2, 'the stat is on for this run'); assert.ok(!st.on.includes('boost'), 'a switched-off ability is not in the river');
+    assert.equal((await saved())['lantern-stats'], '{}', 'the stat is used up when the run starts');
+    await page.evaluate(() => { window.lanternSim().light = 0.0001; }); await until(page, () => !window.lanternState().playing, 'stat run ends');
+    await until(page, () => window.lanternState().screen === 'card', 'end card'); await page.click('#toMenu');
+    assert.equal(await page.textContent('#ready'), '', 'no stats left after the run');
   },
   async 'ant-promotion'(page) {
     const KEY = 'ant-promotion:v1';
