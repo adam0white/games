@@ -13,7 +13,7 @@ test('interactive cloud suites honor one shared configured lock without a home c
   const env = { ...process.env, HOME: join(fixture, 'empty-home'), HF_SUITE_LOCK_DIR: join(fixture, 'shared', 'full-suite') };
   delete env.CI; delete env.SUITE_LOCK;
   try {
-    for (const slug of ['glance', 'commonstead', 'goodhands', 'hearsay', 'smallworks', 'valley']) {
+    for (const slug of ['glance', 'goodhands', 'hearsay', 'smallworks', 'valley']) {
       const helper = new URL(`../games/${slug}/scripts/suite-lock.ts`, import.meta.url).href;
       const source = `import { acquireSuiteLock } from ${JSON.stringify(helper)};
 import { existsSync, readFileSync } from 'node:fs';
@@ -35,6 +35,7 @@ test('rejects unsafe lineage and catches shared paths', () => {
   assert.deepEqual(affectedGames(registry, ['workers/wai-daily/src/run.ts']), []);
   assert.deepEqual(affectedGames(registry, ['workers/wai-daily/src/run.ts', 'pnpm-lock.yaml']), ['rope']);
   assert.deepEqual(affectedGames(registry, ['prototypes/lantern/index.html']), []);
+  assert.deepEqual(affectedGames(registry, ['archive/README.md', 'archive/prototypes/long-road/index.html']), []);
 });
 test('required CI results cannot be skipped or fail', () => {
   assert.throws(() => checkResults({ tools:'success', changes:'failure', workers:'success', games:'success', build:'success' }, 1));

@@ -7,6 +7,9 @@ Do not overwrite another agent's work; use a separate worktree or branch. Use pn
 The full deployment assembles every game. Deploy only the exact clean commit with successful main CI; verify each live `release.json`. For asset verification use the exact successful Deploy run’s `games-static-<commit>` artifact, verify its digest, receipt commit and file hashes; local rebuild bytes may differ. Keep each game's service worker, storage, CSP, recording notice and lab behavior isolated under its game path. Do not move HF engine code into this repository. Original repositories are retained; ask the owner before archiving one.
 
 
+Archived code lives under `archive/` and is not built, served or checked; `archive/README.md` lists what is there, why, and how to bring it back. Do not port, polish or upgrade archived code.
+
+
 ## Current goal (owner, 2026-11-13 and 2026-11-14)
 
 Owner words are in [HF owner directions](https://github.com/adam0white/human-framework/blob/main/docs/owner-directions-2026-10-18.md). The reasoning is in [the direction document](docs/game-lab-direction-2026-11-13.md).
