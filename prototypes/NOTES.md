@@ -9,3 +9,7 @@ The lab asked "Which game should we put the most work into?". Tester t1, a secon
 ### Left as a proposal (2026-11-22)
 
 Focus new work on Lantern and Ant Promotion. Stop new work on The Long Road and Copper Afternoon. Removing them from the site is a separate decision; nothing has been deleted, and both stay playable at `/proto/long-road/` and `/proto/copper-afternoon/`.
+
+## 2026-11-23: the owner's decision
+
+The owner dropped The Long Road and Copper Afternoon. Both moved to `archive/prototypes/` and are no longer served. Copper Afternoon is kept intact there for reuse; see `archive/README.md`.
