@@ -5,7 +5,7 @@ Shared code for the games under `experiments/`. It is served at `/kit/` as plain
 | File | What it gives a game |
 | --- | --- |
 | `save.js` | `read`, `write`, `readNumber`, `readJson`, `writeJson`: localStorage that never throws |
-| `audio.js` | `sound()`: phone audio unlock with the iOS retry, `tone`, `noise`, `hold` and `release` for pause |
+| `audio.js` | `sound()`: phone audio unlock with the iOS retry, the 'playback' audio session so an iPhone plays through its silent switch, `tone`, `noise`, `hold` and `release` for pause |
 | `pause.js` | `onLeave(pause)`: pause when the page loses the screen; `isPauseKey` |
 | `zoom.js` | `noZoom()`: no double-tap or pinch zoom, and a zoomed page asked back to scale 1 (iOS ignores `user-scalable=no`) |
 | `screens.js` | `screens(ids, after)`: show one full-page card |
@@ -24,7 +24,7 @@ Shared code for the games under `experiments/`. It is served at `/kit/` as plain
 4. **Exports only grow.** Pages are served with `max-age=0, must-revalidate`, so a browser checks each file on every load, but a page already open can fetch a newer module. Never remove an export or change what it means. Add a new name instead, and delete the old one only after no page imports it.
 5. **Modules that touch the page stay separate from rules.** `sim.js` files run in Node for the bots. Kit files that use `window` or `document` are imported by pages only.
 6. **Run the phone check before and after.** `PLAYWRIGHT=<dir with playwright> node experiments/kit/check/phone.mjs`. CI does not run it yet. A new screen, control or save key in a game comes with a line in that game's section of the check.
-7. **Not verifiable here:** audio on a real iPhone. Keep the unlock wiring in `audio.js` as it is unless a person has tested the change on a phone.
+7. **Not verifiable here:** audio on a real iPhone. Keep the unlock wiring in `audio.js` as it is unless a person has tested the change on a phone. The 'playback' audio session (2026-11-23, note #80) leaves the unlock as it was; it answers a tester who heard no sound on a phone, and is itself not yet confirmed on one.
 
 ## Lab recording (`lab.js`)
 

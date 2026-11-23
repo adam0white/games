@@ -281,3 +281,32 @@ Two lab fixtures were changed for the same kind of reason: the "other knobs give
 - A number over an animal is not drawn while it is under the HUD. Before, in both looks, it sat on the bar and the percentage and neither could be read.
 - A speech bubble has no tail when the tail would end on the message line or on a name. The bubble still sits beside the speaker.
 - Checked in a WebKit phone profile, flat and 3D, with animals placed under the HUD. Not checked on a real phone.
+
+## 2026-11-23: tester t1's answers (notes #80, #84 to #89)
+
+| Note | Question | Answer | What happened |
+|---|---|---|---|
+| #80 | #39: do you hear a sound when you eat or die? | "No, there is no sound." | Fixed in the kit, see below |
+| #84 | #48: should the real game have a rival? | Yes | Already done: the rival was ported from `lab/ant-nemesis` into this game earlier today |
+| #85 | #49: is the meadow more fun when animals hunt each other? | "Function not working properly" | Unclear which part. A one-tap question asks what went wrong |
+| #86 | #50 (`lab/ant-nest`): did an ant that did not dig feel like its choice or a bug? | "I did not notice" | Recorded. No change |
+| #87 | #53: which look? | Cartoon | Cartoon is already the default look (`look: 1`). No change |
+| #88 | #54: Classic or Wild as the normal game? | Wild | Wild is now the default |
+| #89 | #56: leftovers or a green arrow to food? | The green arrow | Built |
+
+### Done
+- **Sound (#80).** The page made its sound correctly in the browsers we test: one audio context on the first Play tap, notes on every bite. The most likely cause is the iPhone silent switch. Safari mutes Web Audio while the switch is on, and a game has no other sound path. The kit (`kit/audio.js`) now sets `navigator.audioSession.type = 'playback'` when the game's sound is on and the first tap starts audio (Safari 16.4 and later). Sound then plays through the silent switch, as a video does. The cost: it pauses music from another app. The Sound button in the menu still mutes. This also applies to Lantern.
+- **Wild is the default (#88).** A new save starts with Wild rules, and so does a save from before Wild existed. A save that already holds `wild: false` keeps Classic. The save format does not change, so the tester's own save probably still says Classic: one tap on the Rules button switches it. The help text now says Wild is the normal game.
+- **Green arrow (#89).** When no animal you can eat is on the screen, a green arrow at the screen edge points to the nearest one. It goes away as soon as food is in view. It is drawn in the overlay that the flat, cartoon, soft and 3D looks share. The help list explains it next to the red hunter arrows.
+
+### Checks
+- `kit/check/phone.mjs` on WebKit and Chromium:
+  - The audio session is not asked for before the first tap, and is 'playback' after Play.
+  - An old save without the field shows "Rules: Wild".
+  - With all food moved off the screen, the arrow points to food; with food beside the player, no arrow.
+- Mutation tests: with the arrow disabled the check times out on "green food arrow". Without the audio session line it fails on "sound plays through the iPhone silent switch".
+- WebKit iPhone 13 screenshot: the arrow sits at the right edge, pointing up and right at the moved food.
+
+### Not verified
+- That the silent switch was the cause, and that sound now plays on the tester's phone. No real iPhone was used. If the phone runs iOS older than 16.4, this change does nothing there.
+- How the arrow feels in play: it may show often at high levels, where food is sparse.

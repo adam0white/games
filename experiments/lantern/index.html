@@ -92,7 +92,7 @@
 </div></div>
 <div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p><p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p></div></div>
 <script type="module">
-import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace } from './sim.js?v=11'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
+import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace, FIELD, REBORN_PACE } from './sim.js?v=12'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
 import { readNumber, readJson, write } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
@@ -138,7 +138,7 @@ const boon = () => 1 + 0.25 * reborn, ALL = PACKS.reduce((n, p) => n + p.items.l
 const found = () => PACKS.reduce((n, p) => n + p.items.filter(i => owned.has(i[0])).length, 0), ripe = () => found() >= ALL && opened >= NIGHTS;
 // Stats: bought a level at a time for the next run only, then used up when that run starts (tester t1, 2026-11-23). They change the run itself, where packs change only its looks.
 // The save keeps its format: lantern-stats holds the levels ready for the next run.
-const STAT = [['hearts', 'Hearts', 'Start with one more heart'], ['barrier', 'Barrier', 'A shield takes one more hit'], ['calm', 'Calm water', 'The river runs a little slower'], ['wick', 'Long wick', 'The flame fades more slowly'], ['pull', 'Long reach', 'Take embers from further away']];
+const STAT = [['hearts', 'Hearts', 'Start with one more heart'], ['barrier', 'Barrier', 'The force field lasts longer'], ['calm', 'Calm water', 'The river runs a little slower'], ['wick', 'Long wick', 'The flame fades more slowly'], ['pull', 'Long reach', 'Take embers from further away']];
 let stats = store.json('lantern-stats', {});
 const statCost = id => 15 * ((stats[id] || 0) + 1);
 let owned = new Set(['oak', 'blue', 'amber', 'boost', ...store.json('lantern-owned', [])]);
@@ -194,7 +194,7 @@ addEventListener('resize', resize); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', lastLevel = 1, nearFall = false, sayTimer = 0, shown = '', weather = '';
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
-window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, crashOn, crash: crash && crash.how, unit: unit / dpr }); // read by the browser checks
+window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, field: s.field, crashOn, crash: crash && crash.how, unit: unit / dpr }); // read by the browser checks
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 
 const cards = screens(['menu', 'shop', 'credits', 'card']);
@@ -211,7 +211,7 @@ function menu() {
   $('bank').textContent = bank; $('play').textContent = `Play night ${stage}`;
   $('less').disabled = stage <= 1; $('more').disabled = stage >= opened;
   const best = store.get(`lantern-best-${stage}`), top = store.get('lantern-best-endless');
-  $('about').textContent = ahead(stage) + (best ? ` Best ${best}%.` : '');
+  $('about').textContent = (reborn ? `Reborn night: ${Math.round(REBORN_PACE * Math.min(5, reborn) * 100)}% faster, +${10 * Math.min(5, reborn)} embers at dawn. ` : '') + ahead(stage) + (best ? ` Best ${best}%.` : '');
   const ready = STAT.filter(([id]) => stats[id] > 0).map(([id, label]) => `${label} ${stats[id]}`); $('ready').textContent = ready.length ? `Stats for your next run: ${ready.join(', ')}.` : '';
   $('endless').textContent = top ? `Endless river · best ${top}` : 'Endless river';
   const high = store.get('lantern-best-level'), at = towerAt(); $('tower').textContent = at > 1 ? `Tower climb · go on at ${tag(at)}` : high ? `Tower climb · best ${high > LEVELS ? tag(high) : `level ${high} of ${LEVELS}`}` : 'Tower climb';
@@ -239,7 +239,7 @@ function shop(text) {
     const r = document.createElement('div'); r.className = 'pack reborn'; const rn = document.createElement('b'); rn.textContent = reborn ? `Rebirth ${'★'.repeat(Math.min(5, reborn))}` : 'Rebirth'; const rs = document.createElement('small'); r.append(rn, rs);
     if (!ripe()) rs.textContent = `Find everything (${found()} of ${ALL}) and open all ${NIGHTS} nights (${opened} of ${NIGHTS}). Then start over with nothing, and earn 25% more embers for good.${reborn ? ` Now: +${25 * reborn}%.` : ''}`;
     else {
-      rs.textContent = `You have it all. Start over from night 1 with nothing found and no embers, and earn ${25 * (reborn + 1)}% more embers for good. Your bests stay.`;
+      rs.textContent = `You have it all. Start over from night 1 with nothing found and no embers, and earn ${25 * (reborn + 1)}% more embers for good. Nights get faster and pay more at dawn. Your bests stay.`;
       const rb = document.createElement('button'); rb.id = 'rebirth'; rb.className = 'main'; rb.textContent = 'Rebirth';
       rb.addEventListener('click', () => {
         if (busy) return;
@@ -373,7 +373,7 @@ const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
 function begin() {
   audio(); // a tower level holds the things of the nights up to towerStage(level); see sim.js
   const fresh = !tower || !onward; onward = false; if (fresh) { runStats = stats; stats = {}; store.set('lantern-stats', '{}'); } // stats last one run; a whole climb is one run
-  s = create((Math.random() * 2 ** 31) | 0, tower ? towerStage(climb) : endless ? 1 : stage, tower ? 'tower' : endless, powersOwned(), runStats, climb);
+  s = create((Math.random() * 2 ** 31) | 0, tower ? towerStage(climb) : endless ? 1 : stage, tower ? 'tower' : endless, powersOwned(), runStats, climb, reborn); // after a rebirth the story nights run faster
   const boosted = fresh && Object.values(runStats).some(v => v > 0);
   target = s.x; crash = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; steer.reset();
   shown = ''; show('play'); hud();
@@ -383,6 +383,7 @@ function begin() {
 const mode = () => tower ? 'tower' : endless ? 'endless' : 'night';
 function bankRun() { s.banked = Math.round(s.taken * boon()); bank += s.banked; store.set('lantern-bank', bank); } // a rebirth's bonus is added as the run banks
 function finish() {
+  const paid = s.over === 'dawn' && !tower && !endless && reborn ? 10 * Math.min(5, reborn) : 0; s.taken += paid; // a reborn night pays more at dawn
   playing = false; ended = performance.now(); steer.drop(); bankRun();
   rec.end(s.over, { mode: mode(), night: tower || endless ? 0 : stage, reached: Math.floor(progress(s) * 100), score: endless ? score(s) : null, embers: s.taken, hearts: s.hearts, bank });
   $('hud').style.display = $('big').style.display = pauseButton.style.display = 'none'; $('warn').classList.remove('on');
@@ -498,7 +499,9 @@ function tick() {
   for (const e of s.events) {
     if (e === 'ember') { tone(scale[Math.min(streak++, scale.length - 1)], 0.5, 0.12, 'triangle'); glow = 1; for (let i = 0; i < 8; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.4, vy: Math.random() * 0.5, life: 0.6 }); }
     if (e === 'graze') { tone(1320, 0.12, 0.05); glow = Math.max(glow, 0.5); }
-    if (e === 'shield') { tone(880, 0.5, 0.1); setTimeout(() => tone(1320, 0.7, 0.08), 110); glow = 1; }
+    if (e === 'shield') { tone(880, 0.5, 0.1); setTimeout(() => tone(1320, 0.7, 0.08), 110); glow = 1; say('Force field: rocks are pushed aside', 1700); }
+    if (e === 'push') { tone(300, 0.15, 0.08, 'triangle', 220); snd.ctx && snd.noise(0.08, 0.1, 900); }
+    if (e === 'fieldEnd') tone(660, 0.3, 0.06, 'sine', -300);
     if (e === 'break') {
       // The shield took the blow. Steering restarts from where the boat now is, so a held finger does not drag it back in.
       tone(240, 0.35, 0.25, 'square'); tone(1760, 0.25, 0.06); shake = 0.6; target = s.x; steer.rebase();
@@ -691,7 +694,13 @@ function draw(now) {
   for (const [left, full, col] of POWERS.map(k => [s[k], LAST[k], k === 'size' && s.big ? '255,110,90' : TINT[k]])) if (left > 0) {
     g.strokeStyle = `rgba(${col},.85)`; g.lineWidth = 3 * dpr; g.beginPath(); g.arc(bx, by, ring * unit, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * left / full); g.stroke(); ring += 0.014;
   }
-  if (s.shield || (s.safe > 0 && !s.boost && Math.floor(now / 90) % 2)) {
+  if (s.field) { // the force field: a bubble round the boat, its arc running down with the time left
+    const full = FIELD + 1.5 * s.st.barrier, R = 0.062 * unit * (1 + Math.sin(now / 160) * 0.04), fade = s.field < 1 && Math.floor(now / 110) % 2 ? 0.45 : 1;
+    halo(g, bx, by, unit, fade, now / 1000);
+    const bub = g.createRadialGradient(bx, by, R * 0.5, bx, by, R); bub.addColorStop(0, 'rgba(120,190,255,0)'); bub.addColorStop(1, `rgba(140,205,255,${0.35 * fade})`); g.fillStyle = bub; g.beginPath(); g.arc(bx, by, R, 0, 7); g.fill();
+    g.strokeStyle = `rgba(170,220,255,${0.9 * fade})`; g.lineWidth = 2.5 * dpr; g.beginPath(); g.arc(bx, by, R, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * s.field / full); g.stroke();
+  }
+  if (s.shield || (s.safe > 0 && !s.boost && !s.field && Math.floor(now / 90) % 2)) {
     halo(g, bx, by, unit, s.shield ? 1 : 0.5, now / 1000);
     g.strokeStyle = `rgba(120,190,255,${s.shield ? 0.2 : 0.12})`; g.lineWidth = 9 * dpr; g.beginPath(); g.arc(bx, by - 0.005 * unit, (0.06 + 0.006 * Math.max(0, s.shield - 1)) * unit, 0, 7); g.stroke();
     g.strokeStyle = `rgba(120,190,255,${s.shield ? 0.8 : 0.5})`; g.lineWidth = 2.5 * dpr;
