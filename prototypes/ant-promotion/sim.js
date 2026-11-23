@@ -62,13 +62,28 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 export const CONE = 1.13; // half-angle a mob can see, radians
 export const SPAWN_WEIGHTS = [[-3, 1], [-2, 3], [-1, 5], [0, 3], [1, 2], [2, 1]];
 
-export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS) {
-  const s = { rand: rng(seed), t: 0, tick: 0, weights, mobs: [], events: [], choosing: null, dead: null, won: false, eaten: 0, deaths: 0, nextId: 1,
-    player: { x: WORLD / 2, y: WORLD / 2, a: 0, ph: 0, stack: stack.slice(), xp, safe: 2.5 } };
+// Wild rules (a variant; classic is the default and is unchanged):
+//   thick hide: a strong (brute) animal survives one bite, then the hide needs HIDE_S seconds to grow back
+//   the hunt: every HUNT_EVERY seconds the nearest stronger animal within HUNT_REACH tracks you for HUNT_S seconds, wherever it is looking
+export const HIDE_S = 25, HUNT_EVERY = 45, HUNT_S = 5, HUNT_REACH = 700;
+export const hideReady = s => !!s.wild && me(s).role === 'brute' && s.t >= s.player.hideAt;
+export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS, wild = false) {
+  const s = { wild, huntAt: HUNT_EVERY, hides: 0, hunts: 0, mobEats: 0, rand: rng(seed), t: 0, tick: 0, weights, mobs: [], events: [], choosing: null, dead: null, won: false, eaten: 0, deaths: 0, nextId: 1,
+    player: { x: WORLD / 2, y: WORLD / 2, a: 0, ph: 0, stack: stack.slice(), xp, safe: 2.5, hideAt: 0 } };
   while (s.mobs.length < MOBS) spawn(s, 260);
   return s;
 }
-export const me = s => FORMS[s.player.stack[s.player.stack.length - 1]];
+// What the player is now. Picking the same kind again builds on it: each earlier fast pick makes a fast animal 5% faster,
+// each earlier sneaky pick shrinks the distance a sneaky animal is seen from by 5%. `again` counts the picks of this kind.
+export const SAME_FAST = 1.05, SAME_SNEAK = 0.95;
+export const me = s => {
+  const p = s.player, id = p.stack[p.stack.length - 1], key = p.stack.length * 1000 + id;
+  if (p.meKey !== key) {
+    const F = FORMS[id]; let k = 0; for (const i of p.stack) if (FORMS[i].role === F.role) k++;
+    p.meKey = key; p.me = { ...F, again: k, speed: F.role === 'runner' ? F.speed * SAME_FAST ** (k - 1) : F.speed, stealth: F.role === 'sneak' ? F.stealth * SAME_SNEAK ** (k - 1) : F.stealth };
+  }
+  return p.me;
+};
 export const level = s => s.player.stack.length;
 
 function spawn(s, minDist) {
@@ -95,11 +110,32 @@ export function step(s, input) {
   if (il > 0.01) { p.a = Math.atan2(iy, ix); p.ph += Math.min(1, il) * dt * 10; }
   p.x = clamp(p.x + ix * F.speed * dt, F.r, WORLD - F.r); p.y = clamp(p.y + iy * F.speed * dt, F.r, WORLD - F.r);
 
+  if (s.wild && s.t >= s.huntAt) {
+    let hunter = null, near = HUNT_REACH;
+    for (const m of s.mobs) { const d = Math.hypot(m.x - p.x, m.y - p.y); if (FORMS[m.f].power > F.power && !m.alert && d < near) { near = d; hunter = m; } }
+    if (hunter && p.safe <= 0) { hunter.hunt = HUNT_S; s.hunts++; s.huntAt = s.t + HUNT_EVERY; s.events.push({ t: 'hunt', id: hunter.id, name: FORMS[hunter.f].name }); }
+    else s.huntAt = s.t + 2; // nobody in reach, or you are still safe: look again soon
+  }
   for (let i = s.mobs.length - 1; i >= 0; i--) {
     const m = s.mobs[i], M = FORMS[m.f], dx = p.x - m.x, dy = p.y - m.y, d = Math.hypot(dx, dy), to = Math.atan2(dy, dx);
-    const sees = p.safe <= 0 && d < M.range * F.stealth + F.r && Math.abs(wrap(to - m.a)) < CONE;
+    if (m.hunt > 0) m.hunt -= dt;
+    const sees = p.safe <= 0 && (m.hunt > 0 || d < M.range * F.stealth + F.r && Math.abs(wrap(to - m.a)) < CONE);
     if (sees) { if (!m.alert && M.power !== F.power) s.events.push({ t: 'notice', strong: M.power > F.power, id: m.id }); m.alert = true; m.lost = 0; }
     else if (m.alert) { m.lost = d > M.range * 1.8 ? m.lost + dt : 0; if (m.lost > 1.5 || p.safe > 0) m.alert = false; }
+    // animals hunt each other: a stronger animal that sees a weaker one (at most 2 levels below, never the little food bugs) chases it
+    if (m.fed > 0) m.fed -= dt;
+    if ((s.tick + m.id) % 12 === 0) {
+      const was = m.chase; m.chase = m.fear = null; let bc = Infinity, bf = Infinity;
+      if (M.level >= 1) for (const o of s.mobs) {
+        if (o === m || o.gone) continue; const O = FORMS[o.f]; if (O.power === M.power || O.level < 1) continue;
+        const ex = o.x - m.x, ey = o.y - m.y; if (ex > 220 || ex < -220 || ey > 220 || ey < -220) continue; const e = Math.hypot(ex, ey);
+        if (O.power > M.power) { if (o.chase === m && e < bf) { bf = e; m.fear = o; } }
+        else if (!(m.fed > 0) && M.level - O.level <= 2 && e < M.range * 0.85 && e < bc && Math.abs(wrap(Math.atan2(ey, ex) - m.a)) < CONE) { bc = e; m.chase = o; }
+      }
+      m.chaseFor = m.chase && m.chase === was ? (m.chaseFor || 0) + 0.2 : 0;
+      if (m.chaseFor > 6) { m.chase = null; m.fed = 5; } // gives up on prey it cannot catch
+    }
+    if (m.chase?.gone) m.chase = null; if (m.fear?.gone) m.fear = null;
     let speed = 0, turn = 2.5;
     if (m.alert && M.power !== F.power) {
       turn = 7; speed = M.speed;
@@ -109,6 +145,14 @@ export function step(s, input) {
         if (m.x < pad) fx += (pad - m.x) / 40; if (m.x > WORLD - pad) fx -= (m.x - WORLD + pad) / 40;
         if (m.y < pad) fy += (pad - m.y) / 40; if (m.y > WORLD - pad) fy -= (m.y - WORLD + pad) / 40;
         m.want = Math.atan2(fy, fx);
+      }
+    } else if (m.fear) {
+      turn = 7; speed = M.speed; m.want = Math.atan2(m.y - m.fear.y, m.x - m.fear.x);
+      if (m.x < 70 || m.x > WORLD - 70 || m.y < 70 || m.y > WORLD - 70) m.want = Math.atan2(WORLD / 2 - m.y, WORLD / 2 - m.x);
+    } else if (m.chase) {
+      turn = 6; speed = M.speed * 0.8; m.want = Math.atan2(m.chase.y - m.y, m.chase.x - m.x);
+      if (Math.hypot(m.chase.x - m.x, m.chase.y - m.y) < (M.r + FORMS[m.chase.f].r) * 0.8) {
+        m.chase.gone = true; m.fed = 15; s.mobEats++; s.events.push({ t: 'mobeat', name: FORMS[m.chase.f].name, by: M.name, x: m.chase.x, y: m.chase.y }); m.chase = null;
       }
     } else {
       m.timer -= dt;
@@ -120,12 +164,16 @@ export function step(s, input) {
     m.x = clamp(m.x + Math.cos(m.a) * speed * dt, M.r, WORLD - M.r); m.y = clamp(m.y + Math.sin(m.a) * speed * dt, M.r, WORLD - M.r);
     m.ph += speed * dt * 0.09;
 
-    if (d < (M.r + F.r) * 0.85) {
+    if (!m.gone && d < (M.r + F.r) * 0.85) {
       const out = encounter(F, { power: M.power, speed: M.speed, alert: m.alert });
       if (out === 'eat') {
         const gain = M.level >= F.level - 1 ? 3 : M.level === F.level - 2 ? 2 : 1;
-        s.mobs.splice(i, 1); s.eaten++; p.xp += gain;
+        m.gone = true; s.mobs.splice(i, 1); s.eaten++; p.xp += gain;
         s.events.push({ t: 'eat', name: M.name, gain, x: m.x, y: m.y });
+      } else if (out === 'die' && p.safe <= 0 && hideReady(s)) { // wild: the hide takes the bite and you are thrown clear
+        p.hideAt = s.t + HIDE_S; p.safe = 1.5; s.hides++;
+        p.x = clamp(p.x + dx / (d || 1) * 70, F.r, WORLD - F.r); p.y = clamp(p.y + dy / (d || 1) * 70, F.r, WORLD - F.r);
+        s.events.push({ t: 'hide', name: M.name, x: p.x, y: p.y });
       } else if (out === 'die' && p.safe <= 0) {
         s.dead = { as: F.name, to: M.name, level: level(s) }; s.deaths++;
         s.events.push({ t: 'die' });
@@ -135,6 +183,7 @@ export function step(s, input) {
       }
     }
   }
+  for (let i = s.mobs.length - 1; i >= 0; i--) if (s.mobs[i].gone) s.mobs.splice(i, 1);
   if (p.xp >= needFor(level(s))) {
     if (level(s) < TOP) { s.choosing = optionsFor(level(s)); s.events.push({ t: 'full' }); }
     else { p.xp = needFor(TOP); if (!s.won) { s.won = true; s.events.push({ t: 'win' }); } }
@@ -147,7 +196,7 @@ function upkeep(s) {
   const p = s.player, pl = level(s);
   for (let i = s.mobs.length - 1; i >= 0; i--) {
     const m = s.mobs[i], gap = FORMS[m.f].level - pl;
-    if ((gap < -3 || gap > 2) && Math.hypot(m.x - p.x, m.y - p.y) > 700) s.mobs.splice(i, 1);
+    if ((gap < -3 || gap > 2) && Math.hypot(m.x - p.x, m.y - p.y) > 700) { m.gone = true; s.mobs.splice(i, 1); }
   }
   for (let i = 0; i < 4 && s.mobs.length < MOBS; i++) spawn(s, 520);
 }

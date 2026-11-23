@@ -93,3 +93,85 @@ The menu has a Look button that cycles the three and saves the choice. `?look=0`
 Checked in WebKit with an iPhone 13 profile: each look loads and plays with no script errors, and a frame took the same time in all three (about 14 ms headless). A side-by-side sheet of 14 animals in each look was checked by eye.
 
 Not verified: frame rate on a real phone, where the two detailed looks draw about four times as many shapes. Which look is right is the tester's and the owner's call; the question was sent to tester t1.
+
+## 2026-11-23: a 3D look, the animal book, eat streaks (own ideas, Adam's standing instruction)
+
+Adam asked the lab to go past the literal asks: try 3D for the "more detailed animals" request, hunt bugs unasked, add own ideas.
+
+### 3D look (Look button, fourth option; `?look=3`)
+- `look3d.js` is a small WebGL2 renderer with no dependencies. It does not hold a second set of models. A recorder object stands in for the 2D canvas context, takes the same `drawForm` calls from `art.js`, and turns filled ellipses into lit ellipsoids, stroked lines into capsules (legs, tails, feelers) and polygons into plates (wings, fins).
+- Tilted camera, one sun, shadows projected on the ground, grass that sways, eat and death pieces that bounce. Numbers, "!" marks and edge arrows stay on the 2D canvas, placed with `project()`.
+- The sim is untouched, so the rules and the bots are the same in every look.
+- If WebGL2 is missing, a shader fails or the phone drops the WebGL context, the game says so, switches to Cartoon and saves that. Checked with a real shader failure during the build and with WebGL2 stubbed out.
+- Promotion cards, the menu and the book stay 2D.
+- Why not three.js: nothing else in the lab ships a dependency, and 55 animals as hand-made models was not a one-session job. The recorder gives every animal a solid for free. The cost: shapes are only as good as the stacking guess (a small ellipse drawn on a big one sits on top of it).
+
+### Animal book
+- Menu button "Animal book n/52". Shows every animal the player has been; the rest are dark outlines with their level. It gives a reason to pick a different animal at each promotion, which the design asks for ("every single time, it has to be unique").
+- Saved as `seen` in the same save. Old saves start with the animals in their current path.
+
+### Eat streak and buzz
+- Eating again within 4 seconds raises the eat sound by a semitone per step and shows "3 in a row" on the float. It changes no rule and gives no XP.
+- Phones that support it vibrate on eat and death (off with sound off). iPhones do not support web vibration.
+
+### Checks
+- WebKit with the iPhone 13 profile and Chromium: 3D loads, no page errors, the frame loop holds the headless frame cap (13.8 ms) at levels 6, 12 and 18. That shows no stall; it does not measure render cost.
+- Phone flow test passes in Cartoon and 3D. Death in 3D, drop a level, switch look in the menu and back: no errors.
+- `node bots.mjs 10 12` and `npm run check:lane` pass.
+
+### Found while testing, answered with a rules variant (see "Wild rules" below)
+- The careful bot reaches a median top level of 18 picking sneaky, 15 picking fast and 14 picking strong, with 0 deaths in 12 minutes. A bot that always picks sneaky climbs highest, and a careful bot is never in danger. The tester called the game "not bad", not "fun" (note #30). Proposal for Adam: give strong animals something of their own, and add pressure for careful players. Both change rules he wrote, so they wait for him.
+
+### Not verified
+- 3D on a real phone: frame rate, battery, how it reads on a small screen. Headless numbers come from a desktop GPU.
+- Whether 3D is liked more than the 2D looks. That is the tester's and Adam's call.
+
+## 2026-11-23: Wild rules, a variant beside Classic
+
+Classic is the default and plays exactly as before (the classic bot numbers did not move). The menu has "Rules: Classic / Wild"; `?wild=1` forces it.
+
+Wild adds two things, both in `sim.js` behind `s.wild`:
+- **Thick hide.** A strong (brute) animal lives through one bite and is thrown clear. The hide grows back in 25 seconds. The HUD shows "hide ready" or "hide growing".
+- **The hunt.** Every 45 seconds the nearest stronger animal within 700 units that has not noticed you tracks you for 5 seconds, wherever it is looking. The game says which animal is hunting.
+
+Why: under Classic a bot that always picks sneaky reaches level 18 and a careful bot never dies. Bots, 10 seeds, 12 minutes, careful play, median top level and deaths:
+
+| pick | Classic | Wild |
+|---|---|---|
+| strong | 14, 0 deaths | 11, 2 deaths |
+| fast | 15, 0 deaths | 10, 6 deaths |
+| sneaky | 18, 0 deaths | 12, 7 deaths |
+
+Wild brings the three picks within two levels of each other and puts careful players in danger. It may be too hard; nobody has played it by hand.
+
+Checks: `bots.mjs` asserts classic has no hide and no hunt, the first bite on a hide does not kill and the second does, only strong picks use the hide, hunts happen, and care still pays under Wild. In WebKit with the iPhone 13 profile: switch to Wild, hide takes a bite, second bite kills, no page errors.
+
+Not verified: whether Wild is more fun. That is the tester's call; a one-tap question asks which they prefer, and the winner becomes the default.
+
+## 2026-11-23: tester t1's round 3 (notes #45, #46)
+
+Asked for: animals hostile to each other, a percentage beside the progress bar, faster each time you pick fast again (and the same idea for the last option), more quality of life, and our own ideas.
+
+### Done
+- **Animals hunt each other** (both rule sets). A stronger animal that sees a weaker one, at most 2 levels below it, chases it at 80% speed and eats it on contact. The hunted animal runs. A hunter gives up after 6 seconds and rests 15 seconds after a meal. The little food bugs are never hunted, so an ant always has food. A red dashed line shows who is chasing whom; an eat in view shows "Wolf ate a Deer".
+- **Percentage** beside the progress bar.
+- **Same kind again builds on it.** Each earlier fast pick makes a fast animal 5% faster (16 fast picks: about 2.1 times). Each earlier sneaky pick shrinks the distance a sneaky animal is seen from by 5%. The promotion card shows the bonus before the pick and the HUD shows it after.
+  - Reading taken: "the middle one" is the fast option and "the last one" is the sneaky option. Strong is not changed here, because power is the level number other animals are compared with. Under Wild rules strong has the thick hide.
+  - 5% per pick, compounding, is the lab's number. The tester said "exponentially"; a bigger base made a level-18 runner faster than the screen can follow.
+
+### Bots after this round (6 seeds, 12 minutes, careful play, median top level)
+| pick | Classic | Wild |
+|---|---|---|
+| strong | 12, 2 deaths | 8, 3 deaths |
+| fast | 14, 3 deaths | 11, 8 deaths |
+| sneaky | 18, 0 deaths | 10, 9 deaths |
+
+Animals hunting each other makes the meadow less predictable: fleeing animals run into the player. Wild on top of that is hard for the bots.
+
+### Checks
+- `bots.mjs`: a second fast pick is 5% faster, a second sneaky pick is seen from 5% less far, animals eat each other, food bugs are never hunted, plus all earlier asserts.
+- WebKit, iPhone 13 profile: flow test in Cartoon and 3D, Wild rules test, a chase with its line on screen, promotion cards showing "Fast again: +22% speed". No page errors.
+- Local testing must serve `prototypes/` (not this folder), because the page imports `../kit/`. Served from this folder the module fails without a page error and tests that only click can pass falsely.
+
+### From the wildcard lab, next
+- The named rival (lab `ant-nemesis`) is picked to graduate into this game. The lab's animals-chase-each-other test (`ant-wilds`) overlaps with this round; its dashed red line is used here.
