@@ -2,7 +2,7 @@
 // Read testers' notes and reply to them. For lab threads; see README.md.
 //
 //   node notes.mjs new                      notes not yet handled (the usual check)
-//   node notes.mjs count [--except t0]      open note ids, without printing any note text
+//   node notes.mjs count [--except t0]      open notes: a count, the ids that are ready to read, the stuck ids; no note text
 //   node notes.mjs all [--after <id>]       the whole exchange, both directions
 //   node notes.mjs reply <tester> "<text>" [--tr "<Turkish text>"] [--game <slug>] [--handled 12,13]
 //       more: [--as-is] sends the text untranslated (write in the tester's own language);
@@ -79,7 +79,7 @@ if (command === 'count') {
   const skip = String(flags.except ?? '').split(',');
   const messages = (await (await api('notes?unhandled=1')).json()).messages.filter(message => !skip.includes(message.tester));
   const stuck = messages.filter(message => message.status !== 'ready' && Date.now() - message.at > 5 * 60 * 1000).map(message => message.id);
-  console.log(`open=${messages.length} ids=${messages.map(message => message.id).join(',') || 'none'} stuck=${stuck.join(',') || 'none'}`);
+  console.log(`open=${messages.length} ids=${messages.filter(message => message.status === 'ready').map(message => message.id).join(',') || 'none'} stuck=${stuck.join(',') || 'none'}`);
 } else if (command === 'new') list(await (await api('notes?unhandled=1')).json());
 else if (command === 'all') list(await (await api(`notes?after=${Number(flags.after) || 0}`)).json());
 else if (command === 'asks') {
