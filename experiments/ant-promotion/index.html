@@ -732,7 +732,7 @@ function frame(now) {
   draw(now);
 }
 addEventListener('pagehide', () => { if (s && !s.dead) { save.stack = s.player.stack.slice(); save.xp = s.player.xp; keepNem(); store(); } });
-window.__ant = { get s() { return s; }, get mode() { return mode; }, get save() { return save; }, get bubble() { return bubble; }, FORMS, me, level, step, powerOf, nemesisMob };
+window.__ant = { get s() { return s; }, get mode() { return mode; }, get input() { return input(); }, get save() { return save; }, get bubble() { return bubble; }, FORMS, me, level, step, powerOf, nemesisMob };
 show('menu'); requestAnimationFrame(frame);
 </script>
 <script src="/notes/button.js" defer></script>

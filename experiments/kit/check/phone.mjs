@@ -46,6 +46,33 @@ const labSent = page => page.context().labSent;
 const labRuns = (page, game) => labSent(page).filter(r => r.game === game && r.kind === 'run');
 const LAB_LOCAL = () => localStorage.setItem('hf-lab-send-localhost', '1'); // pages on 127.0.0.1 send only with this
 
+// The joystick's numbers: 55 px of travel is full speed, a dead zone of 0.15 of that, and a 70 px leash that drags the origin.
+async function stickNumbers(page) {
+  const input = () => page.evaluate(() => window.__ant.input), near = (a, b, what) => assert.ok(Math.abs(a - b) < 1e-9, `${what}: ${a} is not ${b}`);
+  await finger(page, '#c', [['pointerdown', 150, 400], ['pointermove', 155, 400]]);
+  assert.deepEqual(await input(), { x: 0, y: 0 }, 'stick: inside the dead zone does nothing');
+  await finger(page, '#c', [['pointermove', 150, 409]]); near((await input()).y, 9 / 55, 'stick: just outside the dead zone');
+  await finger(page, '#c', [['pointermove', 177.5, 400]]); near((await input()).x, 0.5, 'stick: half of 55 px is half speed');
+  await finger(page, '#c', [['pointermove', 250, 400]]); near((await input()).x, 70 / 55, 'stick: the leash holds the origin 70 px behind');
+  await finger(page, '#c', [['pointermove', 200, 400]]); near((await input()).x, 20 / 55, 'stick: the origin moved with the leash');
+  await finger(page, '#c', [['pointerup', 200, 400]]); assert.deepEqual(await input(), { x: 0, y: 0 }, 'stick: lifting the finger stops');
+}
+// Lantern's relative drag: boat travel is finger travel times the gain (1.3), in river units; after a pause, a 12 px dead zone, then a re-anchor.
+async function dragNumbers(page) {
+  const state = () => page.evaluate(() => window.lanternState()), near = (a, b, what) => assert.ok(Math.abs(a - b) < 1e-9, `${what}: ${a} is not ${b}`);
+  await page.evaluate(() => { const s = window.lanternSim(); s.safe = 60; s.light = 1; }); // no blow or dark ends the run, or moves the anchor, mid-check
+  // The boat moves every frame, so read where it was at touch-down in the same task as the touch.
+  const moved = await page.evaluate(() => { const x = window.lanternState().x, c = document.querySelector('#c'), ev = (type, cx) => c.dispatchEvent(new PointerEvent(type, { pointerId: 8, pointerType: 'touch', isPrimary: true, clientX: cx, clientY: 400, pressure: 0.5, bubbles: true }));
+    ev('pointerdown', 200); ev('pointermove', 180); const t = window.lanternState().target; ev('pointerup', 180); return t - x; });
+  let st = await state(); const u = st.unit; near(moved, -20 / u * 1.3, 'drag: gain 1.3'); // to the left: earlier checks steered right, so the bank is far on this side
+  await finger(page, '#pause', [['pointerdown', 0, 0]]); st = await state(); assert.ok(st.paused);
+  await finger(page, '#c', [['pointerdown', 200, 400], ['pointermove', 189, 400]]); assert.equal((await state()).target, st.x, 'drag: 11 px after a pause does not steer');
+  await finger(page, '#c', [['pointermove', 187, 400]]); const t13 = (await state()).target;
+  assert.ok(Math.abs(t13 - st.x) < 0.01, 'drag: leaving the dead zone re-anchors, it does not jump'); // a jump of 13 px would be about 0.04
+  await finger(page, '#c', [['pointermove', 177, 400]]); near((await state()).target - t13, -10 / u * 1.3, 'drag: steers from the re-anchor');
+  await finger(page, '#c', [['pointercancel', 177, 400], ['pointermove', 140, 400]]); near((await state()).target - t13, -10 / u * 1.3, 'drag: a cancelled finger no longer steers');
+}
+
 // The Ant Promotion lab variants share the main game's save shape, joystick and cards. extra: the variant's own save fields.
 async function antLab(page, slug, query, extra, checkExtra) {
   const KEY = `${slug}:v1`;
@@ -62,6 +89,7 @@ async function antLab(page, slug, query, extra, checkExtra) {
   await page.click('#continue'); assert.equal(await mode(), 'play');
   assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'Play starts audio');
   assert.equal(await page.evaluate(() => window.__ant.level(window.__ant.s)), 2, 'old save: level'); assert.equal(await page.evaluate(() => window.__ant.s.player.xp), 3, 'old save: xp');
+  await stickNumbers(page);
   // Walk by dragging.
   const x0 = await page.evaluate(() => window.__ant.s.player.x);
   await finger(page, '#c', [['pointerdown', 150, 400], ['pointermove', 215, 400]]);
@@ -132,6 +160,7 @@ const GAMES = {
     assert.ok((await state()).paused, 'losing focus pauses');
     await page.keyboard.press('p'); assert.ok(!(await state()).paused, 'P resumes');
     await page.evaluate(() => dispatchEvent(new Event('pagehide'))); assert.ok((await state()).paused, 'putting the page away pauses'); await page.keyboard.press('Escape'); assert.ok(!(await state()).paused, 'Escape resumes');
+    await dragNumbers(page); await finger(page, '#c', [['pointerup', 140, 400]]);
     assert.equal((await audioLog()).made, 1, 'one audio context for the whole run');
     // The run ends; its embers go to the bank and to storage.
     await page.evaluate(() => { const s = window.lanternSim(); s.taken = 7; s.hearts = 1; s.light = 0.0001; });
@@ -182,6 +211,7 @@ const GAMES = {
     await page.click('#continue'); assert.equal(await mode(), 'play');
     assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'Play starts audio');
     assert.equal(await page.evaluate(() => window.__ant.level(window.__ant.s)), 2, 'old save: level'); assert.equal(await page.evaluate(() => window.__ant.s.player.xp), 3, 'old save: xp');
+    await stickNumbers(page);
     // Walk by dragging.
     const x0 = await page.evaluate(() => window.__ant.s.player.x);
     await finger(page, '#c', [['pointerdown', 150, 400], ['pointermove', 215, 400]]);
@@ -279,6 +309,7 @@ const GAMES = {
     await finger(page, '#c', [['pointerdown', 200, 400], ['pointermove', 205, 400], ['pointermove', 210, 400]]);
     st = await state(); assert.ok(!st.paused, 'a touch resumes'); assert.equal(st.target, x1, 'jitter after a pause does not steer');
     await finger(page, '#c', [['pointerup', 210, 400]]);
+    await dragNumbers(page); await finger(page, '#c', [['pointerup', 140, 400]]);
     assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'one audio context for the whole run');
     // The run ends with an end card; the page keeps nothing in storage, so a reload starts clean.
     await page.evaluate(() => { window.lanternSim().light = 0.0001; });

@@ -85,7 +85,7 @@ function resize() {
 addEventListener('resize', resize); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', nearFall = false, sayTimer = 0, shown = '', weather = '', snap = true;
-window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, playing, paused, stage, hearts: s.hearts, light: s.light, taken: s.taken, target, screen, shield: s.shield });
+window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, playing, paused, stage, hearts: s.hearts, light: s.light, taken: s.taken, target, screen, shield: s.shield, unit: unit / dpr });
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 window.lanternView = R; // the browser checks read the camera and project points through this
 

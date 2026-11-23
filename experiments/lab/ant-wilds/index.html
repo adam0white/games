@@ -420,7 +420,7 @@ function frame(now) {
   draw(now);
 }
 addEventListener('pagehide', () => { if (s && !s.dead) { save.stack = s.player.stack.slice(); save.xp = s.player.xp; store(); } });
-window.__ant = { get s() { return s; }, get mode() { return mode; }, FORMS, WILD, me, level, step };
+window.__ant = { get s() { return s; }, get mode() { return mode; }, get input() { return input(); }, FORMS, WILD, me, level, step };
 show('menu'); requestAnimationFrame(frame);
 </script>
 <script src="/notes/button.js" defer></script>
