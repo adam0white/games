@@ -204,6 +204,16 @@ const GAMES = {
     await page.click('#go'); assert.ok((await page.evaluate(() => window.lanternState())).playing, 'plays on');
     assert.ok(page.context().labTried > 0, 'a send was tried');
   },
+  // The page is put away and left while a record is still being compressed: no page error (WebKit raised one).
+  async 'leaving mid-run'(page) {
+    await page.goto(`${base}/lantern/`); await page.evaluate(LAB_LOCAL); await page.reload();
+    await page.click('#play');
+    for (let i = 0; i < 3; i++) {
+      await page.evaluate(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }); document.dispatchEvent(new Event('visibilitychange')); });
+      await page.goto(`${base}/kit/`); await sleep(300);
+      await page.goto(`${base}/lantern/`); await page.click('#play');
+    }
+  },
 };
 
 const [onlyGame, onlyPhone] = process.argv.slice(2);
