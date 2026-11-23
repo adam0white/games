@@ -1,4 +1,4 @@
-// Measured play: node experiments/lantern/bots.mjs [runs]. Three policies of rising skill; prints how runs end.
+// Measured play: node experiments/lantern/bots.mjs [runs] [stages, comma-separated]. Three policies of rising skill; prints how runs end.
 import { create, step, centre, half, sight, score, progress, towerStage, GOAL, BOAT } from './sim.js';
 // A stage of -100 - L is tower level L (with that level's things); -n above -100 is the old tower holding night n's things at level 1.
 const make = (seed, stage, set, stats) => stage <= -100 ? create(seed, towerStage(-stage - 100), 'tower', set, stats, -stage - 100) : create(seed, Math.abs(stage) || 1, stage < 0 ? 'tower' : !stage, set, stats);
@@ -24,7 +24,7 @@ function steer(s, wantEmbers) {
   }
   return best;
 }
-if (process.argv[3] !== 'audit') for (const stage of [1, 3, 5, 6, 8, 11, 12, 15, 17, 18, 20, 0, -3, -12, -101, -110, -125, -150]) for (const [name, policy] of Object.entries(policies)) {
+if (process.argv[3] !== 'audit') for (const stage of (process.argv[3] ? process.argv[3].split(',').map(Number) : [1, 3, 5, 6, 8, 11, 12, 15, 17, 18, 20, 21, 30, 40, 50, 0, -3, -12, -101, -110, -125, -150, -151, -175, -200])) for (const [name, policy] of Object.entries(policies)) {
   const ends = {}, dist = []; let grazes = 0, embers = 0, gifts = 0, powers = 0;
   for (let seed = 1; seed <= runs; seed++) {
     const s = make(seed, stage); // stage 0 is the endless river, -n the tower
@@ -39,7 +39,7 @@ if (process.argv[3] !== 'audit') for (const stage of [1, 3, 5, 6, 8, 11, 12, 15,
 // Passability audit: node experiments/lantern/bots.mjs 200 audit. A ghost boat rides the centre line and cannot die;
 // each tick we measure the widest free gap across the river at the boat's row. A river is unfair if that gap closes.
 // Also prints where the hazards sit, by tenth of the river, to show the ramp.
-if (process.argv[3] === 'audit') for (const stage of (process.argv[4] ? process.argv[4].split(',').map(Number) : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 0, -3, -12, -101, -110, -125, -150])) { // a list after audit picks the stages // 0 is the endless river; -n is the tower with night n's things
+if (process.argv[3] === 'audit') for (const stage of (process.argv[4] ? process.argv[4].split(',').map(Number) : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 25, 30, 35, 40, 45, 50, 0, -3, -12, -101, -110, -125, -150, -151, -160, -175, -200])) { // a list after audit picks the stages // 0 is the endless river; -n is the tower with night n's things
   let worst = Infinity, worstBig = Infinity, tight = 0, buried = 0, pickups = 0; const swing = Array(10).fill(0), all = Array(10).fill(0), seen = new Set();
   for (let seed = 1; seed <= (stage ? runs : Math.ceil(runs / 10)); seed++) { // the endless river is ridden far past its last step harder, on fewer seeds
     for (const [set, stats] of [[[]], [['boost']], [['slow']], [undefined], [undefined, { calm: 3 }]]) { // powers and calm water shift when the boat meets each moving rock, so every river is ridden five ways
