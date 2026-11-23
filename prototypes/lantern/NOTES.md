@@ -114,3 +114,21 @@ Checked:
 - Careful bot, 100 runs, dawn reached before and after: night 1 20 and 23, night 3 20 and 21, night 5 18 and 22. Not tuned.
 
 Not checked: a person playing; a real phone; sound; whether four a night is too many.
+
+## 2026-11-23: stats to spend embers on (note #35, third item)
+
+The shop has a Stats block above the packs. A level costs 40 embers times the level being bought (40, 80, 120). Stats are kept between runs and apply on every night and the endless river.
+
+| Stat | Levels | Each level |
+|---|---|---|
+| Hearts | 2 | start with one more heart (the most held is still 3) |
+| Barrier | 2 | a shield takes one more hit; one blue ring shows for each hit left |
+| Calm water | 3 | the river runs 4% slower; the flame fades by river passed, so calm water costs no light |
+| Long wick | 3 | the flame fades 8% more slowly |
+| Long reach | 3 | embers, gifts and powers are taken from further away (0.05 plus 0.012 a level); false embers are not |
+
+The tester named barrier strength, lives and game speed, and asked for others; long wick and long reach are the lab's additions. Reading taken for "game speed": slower, because a stat should help.
+
+Checked: full stats clamp bad saved values; a full barrier took three hits in the sim; 196 of 200 story rivers are identical with full stats and the other 4 differ by one pickup (same cause as the powers note); in a phone-sized Chromium the shop sold two heart levels for 40 and 80, the Back button stayed on screen, and the next run started with three hearts. No page errors.
+
+Not checked: whether the prices are right; how much easier night 5 is with full stats, for a person.

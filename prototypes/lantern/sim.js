@@ -8,6 +8,9 @@ export const NIGHTS = 20;
 // Powers are rare pickups: boost (fast and unbreakable for a moment), slow (the river slows, the way to dawn does not), size (a smaller boat four times in five, a bigger one otherwise).
 export const POWERS = ['boost', 'slow', 'size'];
 const LAST = { boost: 2.5, slow: 5, size: 6 };
+// Stats are bought with embers and kept between runs. Each is a level from 0: hearts (start with more), barrier (hits a shield takes),
+// calm (the river runs 4% slower a level), wick (the flame fades 8% slower a level), pull (pickups are taken from further away).
+export const STATS = { hearts: 2, barrier: 2, calm: 3, wick: 3, pull: 3 }; // the top level of each
 
 function rng(seed) {
   let a = seed >>> 0;
@@ -39,7 +42,7 @@ export function fall(s, y) {
   return d >= 0 && d < 3 ? Math.sin(d / 3 * Math.PI) : 0;
 }
 function pace(s) { return 1 + (s.endless ? 0.05 : 0.035) * Math.min(24, level(s) - 1); }
-export function speed(s) { return (0.62 + 0.62 * Math.min(1, s.y / GOAL)) * pace(s) * (1 + 0.7 * fall(s, s.y)) * (s.boost ? 1.8 : 1); }
+export function speed(s) { return (0.62 + 0.62 * Math.min(1, s.y / GOAL)) * pace(s) * (1 + 0.7 * fall(s, s.y)) * (s.boost ? 1.8 : 1) * s.calm; }
 export function reach(light) { return 0.17 + 0.6 * light; }
 // Stretches of weather, each a fixed length of river that comes round again. Night 7 fog, night 9 wind, night 13 rain.
 function zone(s, y, from, period, len, off) { return level(s) >= from && y > 8 && (y + off) % period < len; }
@@ -51,9 +54,10 @@ export function dazzle(s) { if (level(s) < 19) return 0; const p = (s.t + 2) % 9
 // How far the boat can see: the flame's reach, cut by fog and by the moments after lightning.
 export function sight(s) { return reach(s.light) * (fog(s, s.y) ? 0.6 : 1) * (dazzle(s) > 0 ? 0.6 : 1); }
 
-export function create(seed, stage = 1, endless = false, powers = POWERS) {
+export function create(seed, stage = 1, endless = false, powers = POWERS, stats = {}) {
+  const st = Object.fromEntries(Object.entries(STATS).map(([k, top]) => [k, Math.max(0, Math.min(top, Math.floor(stats[k] || 0)))]));
   const r = rng(seed), q = rng(seed ^ 0x9e3779b9); // powers draw from their own stream, so the rocks and embers of a seed never change
-  const s = { seed, stage, endless, q, on: powers, powers: [], nextPower: 6 + q() * 6, boost: 0, slow: 0, size: 0, big: false, bonus: 0, extra: 0, hearts: 1, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
+  const s = { seed, stage, endless, q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers, powers: [], nextPower: 6 + q() * 6, boost: 0, slow: 0, size: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
   s.x = centre(s, 0);
   return s;
 }
@@ -177,7 +181,7 @@ function spawn(s) {
 
 // A blow: the shield takes it, else a spare heart does, else the run ends. Returns true when the run ended.
 function blow(s, cause) {
-  if (s.shield) { s.shield = 0; s.safe = 1.2; s.events.push('break'); return false; }
+  if (s.shield) { s.shield--; s.safe = 1.2; s.events.push('break'); return false; }
   if (s.hearts > 1) { s.hearts--; s.safe = 1.6; s.events.push('hurt'); return false; }
   s.hearts = 0; s.over = cause; s.events.push('hit'); return true;
 }
@@ -187,7 +191,7 @@ export function step(s, target) {
   if (s.over) return s;
   spawn(s);
   s.t += DT;
-  const sl = s.slow ? 0.5 : 1, flow = sl * (s.boost ? 1.8 : 1), v = speed(s) * DT; // flow: how fast the river passes, against its usual pace
+  const sl = s.slow ? 0.5 : 1, flow = sl * (s.boost ? 1.8 : 1) * s.calm, v = speed(s) * DT; // flow: how fast the river passes, against its usual pace
   s.y += v * sl; s.bonus += v * (1 - sl); if (s.boost) s.extra += 8 * DT;
   const max = 0.95 * pace(s) * DT, dx = Math.max(0, Math.min(1, target)) - s.x;
   s.x += Math.max(-max, Math.min(max, dx)) + wind(s, s.y) * 0.22 * DT;
@@ -195,17 +199,17 @@ export function step(s, target) {
   s.warm = Math.max(0, s.warm - DT); s.safe = Math.max(0, s.safe - DT);
   s.boost = Math.max(0, s.boost - DT); s.slow = Math.max(0, s.slow - DT);
   if (s.size) { s.size = Math.max(0, s.size - DT); if (!s.size && !s.big) s.safe = Math.max(s.safe, 0.5); } // growing back beside a rock is not a blow
-  for (const e of s.powers) if (!e.got && Math.hypot(e.x - s.x, e.y - s.y) < 0.05) {
+  for (const e of s.powers) if (!e.got && Math.hypot(e.x - s.x, e.y - s.y) < s.take) {
     e.got = true; s[e.kind] = LAST[e.kind];
     if (e.kind === 'boost') s.safe = Math.max(s.safe, LAST.boost + 0.6); // nothing breaks the boat while it flies, or just after
     if (e.kind === 'size') { s.big = e.big; if (e.big) s.safe = Math.max(s.safe, 0.8); }
     s.events.push(e.kind === 'size' ? (e.big ? 'big' : 'small') : e.kind);
   }
-  if (!s.warm) s.light -= (0.04 + 0.025 * Math.min(1, s.y / GOAL)) * pace(s) * (rain(s, s.y) ? 1.6 : 1) * sl * DT; // the same light per stretch of river on every night; rain costs more
-  for (const e of s.embers) if (!e.got && Math.hypot(e.x - s.x, e.y - s.y) < 0.05) {
+  if (!s.warm) s.light -= (0.04 + 0.025 * Math.min(1, s.y / GOAL)) * pace(s) * (rain(s, s.y) ? 1.6 : 1) * sl * s.calm * (1 - 0.08 * s.st.wick) * DT; // the same light per stretch of river on every night; rain costs more
+  for (const e of s.embers) if (!e.got && Math.hypot(e.x - s.x, e.y - s.y) < (e.kind === 'wisp' ? 0.05 : s.take)) {
     e.got = true;
     if (e.kind === 'wisp') { s.light = Math.max(0.05, s.light - 0.2); s.events.push('wisp'); }
-    else if (e.kind === 'shield') { s.shield = 1; s.events.push('shield'); }
+    else if (e.kind === 'shield') { s.shield = 1 + s.st.barrier; s.events.push('shield'); }
     else if (e.kind === 'heart') { s.hearts = Math.min(3, s.hearts + 1); s.events.push('heart'); }
     else { s.taken++; s.light = Math.min(1, s.light + 0.3); s.warm = 2.5; s.events.push('ember'); }
   }
