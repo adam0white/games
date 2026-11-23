@@ -5,12 +5,18 @@
 //   snd.unlock()   call inside a tap handler (a Play button)
 //   snd.tone(440, 0.3, 0.1, 'triangle', slide)   snd.noise(0.12, 0.2, 1800)
 //   snd.hold()     silence while paused; snd.release() to go on
+// An iPhone with its silent switch on mutes Web Audio in the default session (tester t1, note #80: "there is no sound").
+// When the game's sound is on, the kit asks for the 'playback' audio session (Safari 16.4+), which plays through the
+// silent switch, as a video does. It also pauses music from other apps. The game's own Sound button stays the way to mute.
 export function sound({ on = () => true, setup = null, floor = 0.0001 } = {}) {
   let ctx = null, held = false;
   function get() {
     if (!on()) return null;
     try {
-      if (!ctx) { ctx = new (window.AudioContext || window.webkitAudioContext)(); setup?.(ctx); }
+      if (!ctx) {
+        try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch {}
+        ctx = new (window.AudioContext || window.webkitAudioContext)(); setup?.(ctx);
+      }
       if (ctx.state === 'suspended' && !held) ctx.resume();
     } catch { return null; }
     return ctx;
