@@ -38,6 +38,22 @@ function piece(g, s, c, x, y, r) {
   g.save(); g.clip();
   g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(x - r * 0.3, y - r * 0.45, r * 0.55, r * 0.3, -0.5, 0, Math.PI * 2); g.fill();
   g.restore();
+  mark(g, c, x, s === 2 ? y + r * 0.14 : y, r);
+}
+// A second cue for each colour, for players who cannot tell red from green:
+// red a dot, yellow a ring, blue a bar, green a cross. Drawn small and soft in the middle of a colour patch of radius r.
+export function mark(g, c, x, y, r) {
+  if (r < 3.5) return;
+  const m = r * 0.3;
+  g.save();
+  g.fillStyle = g.strokeStyle = 'rgba(43,24,48,.58)';
+  g.lineCap = 'round'; g.lineWidth = Math.max(1.1, m * 0.5);
+  g.beginPath();
+  if (c === 0) { g.arc(x, y, m * 0.72, 0, Math.PI * 2); g.fill(); }
+  else if (c === 1) { g.arc(x, y, m * 0.78, 0, Math.PI * 2); g.stroke(); }
+  else if (c === 2) { g.moveTo(x - m, y); g.lineTo(x + m, y); g.stroke(); }
+  else { const q = m * 0.75; g.moveTo(x - q, y - q); g.lineTo(x + q, y + q); g.moveTo(x + q, y - q); g.lineTo(x - q, y + q); g.stroke(); }
+  g.restore();
 }
 // The message: `n` copies of the shape. size is the radius of the whole token.
 // sx, sy squash and stretch it (1 is round).
@@ -77,12 +93,13 @@ export function change(g, id, x, y, w, h, node = null) {
   } else if (id <= 4) { // paint it a colour: a brush stroke of that colour
     blank(L); arrow(x);
     g.beginPath(); g.arc(R, y, u * 0.5, 0, Math.PI * 2); g.fillStyle = COLOUR[id - 1]; g.fill(); g.strokeStyle = INK; g.lineWidth = Math.max(1.2, u * 0.13); g.stroke();
+    mark(g, id - 1, R, y, u * 0.5);
   } else if (id === 5) { dots(L, 1); arrow(x); dots(R + u * 0.05, 2); plus(g, R + u * 0.55, y - u * 0.55, u * 0.22); }
   else if (id === 6) { dots(L - u * 0.05, 2); arrow(x); dots(R, 1); }
   else if (id === 7 || id === 8) { const a = id === 7 ? 0 : 2; outline(L, a); arrow(x, true); outline(R, a + 1); }
   else if (id <= 12) { blank(L); arrow(x); outline(R, id - 9); }
   else if (id === 13) { // opposite colour: red and green trade, yellow and blue trade
-    const chip = (cx, cy, c) => { g.beginPath(); g.arc(cx, cy, u * 0.26, 0, Math.PI * 2); g.fillStyle = COLOUR[c]; g.fill(); g.strokeStyle = INK; g.lineWidth = Math.max(1, u * 0.1); g.stroke(); };
+    const chip = (cx, cy, c) => { g.beginPath(); g.arc(cx, cy, u * 0.26, 0, Math.PI * 2); g.fillStyle = COLOUR[c]; g.fill(); g.strokeStyle = INK; g.lineWidth = Math.max(1, u * 0.1); g.stroke(); mark(g, c, cx, cy, u * 0.3); };
     const yy = y; y = yy - u * 0.36; chip(L, y, 0); chip(R, y, 3); arrowSmall(g, x, y, u * 0.7);
     y = yy + u * 0.36; chip(L, y, 1); chip(R, y, 2); arrowSmall(g, x, y, u * 0.7); y = yy;
   }
@@ -107,6 +124,7 @@ export function badge(g, node, x, y, w, h, { copy = null, dim = false } = {}) {
   if (k === 'timid') { // no red news: a red chip crossed out
     const u = h * 0.5;
     g.beginPath(); g.arc(x, y, u * 0.55, 0, Math.PI * 2); g.fillStyle = COLOUR[0]; g.fill(); g.lineWidth = 1.5; g.strokeStyle = INK; g.stroke();
+    mark(g, 0, x, y, u * 0.55);
     g.beginPath(); g.arc(x, y, u * 0.8, 0, Math.PI * 2); g.moveTo(x - u * 0.57, y + u * 0.57); g.lineTo(x + u * 0.57, y - u * 0.57);
     g.strokeStyle = '#c4161c'; g.lineWidth = Math.max(2, u * 0.2); g.stroke();
   } else if (k === 'parrot') {
@@ -291,8 +309,9 @@ export function bubble(g, x, y, w, h, fx, fy, fill = CREAM) {
 }
 
 // A ghost hand that shows the gesture.
-export function hand(g, x, y, press, scale = 1) {
-  g.save(); g.translate(x, y); g.scale(scale, scale); g.rotate(-0.35);
+// flip draws it mirrored, reaching in from the left.
+export function hand(g, x, y, press, scale = 1, flip = false) {
+  g.save(); g.translate(x, y); g.scale(flip ? -scale : scale, scale); g.rotate(-0.35);
   g.globalAlpha *= 0.85;
   if (press > 0) { g.beginPath(); g.arc(0, 0, 14 + press * 10, 0, Math.PI * 2); g.strokeStyle = `rgba(255,255,255,${0.7 * (1 - press)})`; g.lineWidth = 3; g.stroke(); }
   g.fillStyle = '#fff'; g.strokeStyle = INK; g.lineWidth = 2.5;
@@ -319,6 +338,13 @@ export function backdrop(g, W, H, top) {
   // cobbles
   g.fillStyle = 'rgba(255,230,200,.04)';
   for (let i = 0; i < 160; i++) { const x = rand() * W, y = top + rand() * (H - top); g.beginPath(); g.ellipse(x, y, 6 + rand() * 8, 4 + rand() * 4, rand(), 0, Math.PI * 2); g.fill(); }
+  // On a wide screen the board stays a phone-wide column (see BOARD_HALF); the street fills both sides.
+  if (W >= WIDE) {
+    const inner = BOARD_HALF + 30;
+    street(g, 0, W / 2 - inner, top, H, rand, 0);
+    street(g, W / 2 + inner, W, top, H, rand, 1);
+    return;
+  }
   // houses along both sides
   for (const side of [0, 1]) {
     for (let i = 0; i < 4; i++) {
@@ -334,8 +360,91 @@ export function backdrop(g, W, H, top) {
     }
   }
 }
-// A string of lanterns across the top, swaying.
-export function lanterns(g, W, y, t) {
+// Wide screens: the board keeps this half-width, and the rest is street.
+export const WIDE = 700, BOARD_HALF = 300;
+// Rows of houses facing the square, with lit windows, doors, trees and lamp posts, between x0 and x1.
+// side 0 is the left street, 1 the right; the house nearest the board is the lowest.
+function street(g, x0, x1, top, H, rand, side) {
+  if (x1 - x0 < 40) return;
+  const rows = Math.max(3, Math.round((H - top) / 150));
+  const step = (H - top - 90) / rows;
+  for (let row = 0; row < rows; row++) {
+    const base = top + 120 + row * step; // the street level of this row
+    let x = x0 - 20 + rand() * 30;
+    while (x < x1) {
+      const hw = 54 + rand() * 46, hh = 52 + rand() * 46, far = side ? (x - x0) / (x1 - x0 + 1) : 1 - (x - x0) / (x1 - x0 + 1);
+      const shade = 0.6 + 0.25 * far; // houses further from the square sit a little darker
+      const wall = ['#4a3352', '#3e3a5e', '#523a3f', '#3b4a4f', '#463a55'][Math.floor(rand() * 5)];
+      g.save(); g.globalAlpha = shade;
+      g.fillStyle = wall; g.fillRect(x, base - hh, hw, hh);
+      // roof
+      g.beginPath(); g.moveTo(x - 5, base - hh); g.lineTo(x + hw / 2, base - hh - 16 - rand() * 12); g.lineTo(x + hw + 5, base - hh); g.closePath();
+      g.fillStyle = '#2a1d33'; g.fill();
+      // chimney, sometimes
+      if (rand() < 0.4) { g.fillStyle = '#2a1d33'; g.fillRect(x + hw * 0.7, base - hh - 22, 7, 14); }
+      // windows: some lit, with a glow
+      const cols = Math.max(1, Math.floor(hw / 28));
+      for (let c = 0; c < cols; c++) {
+        for (let w = 0; w < (hh > 70 ? 2 : 1); w++) {
+          const wx = x + (c + 0.5) * hw / cols - 5, wy = base - hh + 12 + w * 26;
+          if (rand() < 0.7) {
+            const glow = g.createRadialGradient(wx + 5, wy + 6, 1, wx + 5, wy + 6, 22);
+            glow.addColorStop(0, 'rgba(255,200,110,.38)'); glow.addColorStop(1, 'rgba(255,200,110,0)');
+            g.fillStyle = glow; g.fillRect(wx - 18, wy - 16, 46, 44);
+            g.fillStyle = '#ffd27a';
+          } else g.fillStyle = '#2b2338';
+          g.fillRect(wx, wy, 10, 12);
+          g.fillStyle = 'rgba(43,24,48,.6)'; g.fillRect(wx + 4.5, wy, 1, 12); g.fillRect(wx, wy + 5.5, 10, 1);
+        }
+      }
+      // door
+      g.fillStyle = '#2a1d33'; g.beginPath(); roundRect(g, x + hw / 2 - 6, base - 18, 12, 18, 4); g.fill();
+      g.restore();
+      // a tree or a lamp post in the gap
+      const gap = 10 + rand() * 26;
+      if (gap > 22 && rand() < 0.6) {
+        const tx = x + hw + gap / 2;
+        if (rand() < 0.5) {
+          g.fillStyle = '#3a2a2a'; g.fillRect(tx - 2, base - 16, 4, 16);
+          g.fillStyle = ['#2f5a45', '#355f4a', '#2b4f43'][Math.floor(rand() * 3)];
+          g.beginPath(); g.arc(tx, base - 24, 12, 0, Math.PI * 2); g.arc(tx - 7, base - 18, 8, 0, Math.PI * 2); g.arc(tx + 7, base - 18, 8, 0, Math.PI * 2); g.fill();
+        } else {
+          g.fillStyle = '#2a1d33'; g.fillRect(tx - 1.5, base - 40, 3, 40);
+          const glow = g.createRadialGradient(tx, base - 42, 1, tx, base - 42, 26);
+          glow.addColorStop(0, 'rgba(255,214,140,.5)'); glow.addColorStop(1, 'rgba(255,214,140,0)');
+          g.fillStyle = glow; g.fillRect(tx - 26, base - 68, 52, 52);
+          g.fillStyle = '#ffe3a0'; g.beginPath(); g.arc(tx, base - 42, 4, 0, Math.PI * 2); g.fill();
+        }
+      }
+      x += hw + gap;
+    }
+  }
+}
+// The strings of lanterns across each street on a wide screen, between the rows of houses.
+function sideStrings(g, W, H, top, t) {
+  const inner = BOARD_HALF + 30, rows = Math.max(3, Math.round((H - top) / 150)), step = (H - top - 90) / rows;
+  for (const [x0, x1] of [[0, W / 2 - inner], [W / 2 + inner, W]]) {
+    if (x1 - x0 < 80) continue;
+    for (let row = 0; row < rows; row++) {
+      const y = top + 120 + row * step - step * 0.55, sag = 18;
+      g.strokeStyle = 'rgba(30,20,30,.7)'; g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(x0 - 4, y); g.quadraticCurveTo((x0 + x1) / 2, y + sag * 2, x1 + 4, y); g.stroke();
+      const n = Math.max(3, Math.round((x1 - x0) / 60));
+      for (let i = 0; i < n; i++) {
+        const p = (i + 0.5) / n, x = x0 + p * (x1 - x0), yy = y + sag * 2 * 2 * p * (1 - p) + 1;
+        g.save(); g.translate(x, yy); g.rotate(Math.sin(t * 1.1 + i + row * 2) * 0.09);
+        const glow = g.createRadialGradient(0, 7, 1, 0, 7, 18); glow.addColorStop(0, 'rgba(255,170,90,.45)'); glow.addColorStop(1, 'rgba(255,170,90,0)');
+        g.fillStyle = glow; g.fillRect(-18, -11, 36, 36);
+        g.fillStyle = ['#ff8a5c', '#ffcf5c', '#ff6f8a', '#9be07a'][(i + row) % 4];
+        g.beginPath(); g.ellipse(0, 7, 5, 6.5, 0, 0, Math.PI * 2); g.fill();
+        g.restore();
+      }
+    }
+  }
+}
+// A string of lanterns across the top, swaying. On a wide screen, more strings across the side streets.
+export function lanterns(g, W, y, t, H = 0, top = 0) {
+  if (W >= WIDE && H) sideStrings(g, W, H, top, t);
   g.strokeStyle = 'rgba(30,20,30,.8)'; g.lineWidth = 1.5;
   g.beginPath(); g.moveTo(-10, y); g.quadraticCurveTo(W / 2, y + 26, W + 10, y); g.stroke();
   const n = Math.max(5, Math.round(W / 70));

@@ -41,7 +41,7 @@ function brute(level, limit) {
 }
 const randomBot = (level, r) => { const res = wander(level, r); return res.won ? { ...res, stars: stars(res.hops, level.min) } : res; };
 
-const rows = [];
+const rows = [], rates = [];
 let solverStars = 0, randomStars = 0, randomWins = 0, randomTrials = 0, straightWins = 0;
 LEVELS.forEach((level, i) => {
   const n = i + 1, sol = solve(level);
@@ -63,7 +63,7 @@ LEVELS.forEach((level, i) => {
   let wins = 0, starSum = 0;
   const trials = 400;
   for (let t = 0; t < trials; t++) { const res = randomBot(level, r); if (res.won) { wins++; starSum += res.stars; } }
-  randomWins += wins; randomTrials += trials;
+  randomWins += wins; randomTrials += trials; rates[n] = wins / trials;
   const kinds = [...new Set(level.nodes.map(v => v.kind + (v.once ? '+sleepy' : '')).filter(k => k !== 'teller' && k !== 'listener'))];
   randomStars += starSum;
   rows.push({ n, name: level.name, villagers: level.nodes.length, paths: level.edges.length, min: sol.min, shortest: sol.countMin, upTo2: sol.countUpTo,
@@ -98,6 +98,21 @@ console.log(`random bot (three sends a level): won ${(100 * randomWins / randomT
 console.log(`do-nothing bot: won ${nothingWins}/${LEVELS.length}`);
 console.log(`levels a shortest-by-distance path solves: ${straightWins} (only levels 1 to 3 may)`);
 console.log(`daily villages for 2026: ${dailyOk}/365 solvable and repeatable, ${dailyFallback} used the fixed fallback, shortest route ${Math.min(...dailyMins)} to ${Math.max(...dailyMins)} hops (mean ${avg(dailyMins)})`);
+// 6. The ramp: from level 4 on, the random bot's win rate falls roughly steadily.
+//    Each level is within RAMP_TOL of the median of the five levels around it, and each group of three
+//    (one villager kind) is no easier on average than the group before, give or take RAMP_STEP.
+const RAMP_TOL = 0.12, RAMP_STEP = 0.05;
+for (let n = 4; n <= LEVELS.length; n++) {
+  const near = [];
+  for (let k = Math.max(4, n - 2); k <= Math.min(LEVELS.length, n + 2); k++) near.push(rates[k]);
+  near.sort((a, b) => a - b);
+  const med = near.length % 2 ? near[(near.length - 1) / 2] : (near[near.length / 2 - 1] + near[near.length / 2]) / 2;
+  check(Math.abs(rates[n] - med) <= RAMP_TOL, `ramp: level ${n} random win ${(100 * rates[n]).toFixed(0)}% is within ${100 * RAMP_TOL} points of its neighbours' median ${(100 * med).toFixed(0)}%`);
+}
+const groups = [];
+for (let n = 4; n + 2 <= LEVELS.length; n += 3) groups.push((rates[n] + rates[n + 1] + rates[n + 2]) / 3);
+groups.forEach((m, i) => { if (i) check(m <= groups[i - 1] + RAMP_STEP, `ramp: levels ${4 + 3 * i}-${6 + 3 * i} average ${(100 * m).toFixed(0)}% is not easier than the group before (${(100 * groups[i - 1]).toFixed(0)}%)`); });
+console.log(`ramp: random-bot win rate by group of three from level 4: ${groups.map(m => (100 * m).toFixed(0) + '%').join(' ')}`);
 check(randomWins / randomTrials < 0.6 && randomStars / randomTrials < 1.5, 'the random bot does clearly worse than the solver bot');
 check(Date.now() - t0 < 60000, 'bots finish in under 60 seconds');
 console.log(`${failures ? 'FAILED' : 'all checks passed'} in ${((Date.now() - t0) / 1000).toFixed(1)} s (kinds known: ${KINDS.length})`);

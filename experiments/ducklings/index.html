@@ -85,7 +85,7 @@
 </div></div>
 
 <script type="module">
-import { create, step, stars, timeLeft, progress, pathAt, view, DT, SPEED, STAGES, LAST_STAGE, ENDLESS_AFTER, NEST_R, TRAITS, QUACK_COOL, HEARTS, LINE_MAX } from './sim.js?v=1';
+import { create, step, stars, timeLeft, progress, pathAt, view, DT, SPEED, STAGES, LAST_STAGE, ENDLESS_AFTER, NEST_R, TRAITS, QUACK_COOL, HEARTS, LINE_MAX } from './sim.js?v=2';
 import * as art from './art.js?v=1';
 import * as save from '../kit/save.js';
 import { sound } from '../kit/audio.js';
@@ -197,7 +197,7 @@ function begin(endless = false) {
   s = create(endless ? { endless: true, seed: SEED ?? ((Math.random() * 2 ** 31) | 0) } : { stage, seed: SEED });
   cam = camShown = s.mom.y + 0.2 * H / u; acc = 0; last = performance.now(); prevMom = { x: s.mom.x, y: s.mom.y }; momA = 0;
   parts = []; ripples = []; disp = new Map(); heads = new Map(); hops = new Map(); runners = []; nestDucks = []; turnLog = [];
-  finger = null; keys.clear(); wantQuack = false; trailT = 0; trailShows = 0; shake = 0; flash = 0; recCount = 0; endTimer = 0; homeGlow = 0;
+  finger = null; keys.clear(); wantQuack = false; roll = new Map(); rolled = false; trailT = 0; trailShows = 0; shake = 0; flash = 0; recCount = 0; endTimer = 0; homeGlow = 0;
   waitTouch = !endless && stage === 1 && !data.taught;
   playing = true; paused = false; show('play');
   say(endless ? 'Endless pond' : waitTouch ? '' : `Stage ${stage}`, 1300);
@@ -263,9 +263,21 @@ canvas.addEventListener('pointerdown', e => {
   finger = { id: e.pointerId, x: e.clientX, y: e.clientY, t: now };
   try { canvas.setPointerCapture(e.pointerId); } catch {}
   if (waitTouch) { waitTouch = false; say('', 1); }
+  if (!rolled) { rolled = true; rollCall(350, true); }
   sfx.touch(); touchRing = { x: e.clientX, y: e.clientY, t: now };
 });
 let lastTap = null, touchRing = null;
+// Roll call: when she first sets off, each duckling peeps and hops in turn and its name floats up; a quack is
+// answered the same way down the line, a little echo of what she did.
+let nameTags = [], roll = new Map(), rolled = false, hudPeeks = 0, rollCalls = 0;
+function rollCall(delay0, names) {
+  const now = performance.now(); rollCalls++;
+  s.line.forEach((f, i) => {
+    const at = now + delay0 + i * 170;
+    hops.set(f.id, at); if (names) roll.set(f.id, at);
+    later(delay0 + i * 170, () => { if (playing && !paused) peep(note(i + 3) * 1.6, 0.035); });
+  });
+}
 canvas.addEventListener('pointermove', e => { if (finger && e.pointerId === finger.id) { finger.x = e.clientX; finger.y = e.clientY; } });
 for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(type, e => { if (finger && e.pointerId === finger.id) finger = null; });
 $('quack').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (playing && !paused) wantQuack = true; });
@@ -275,7 +287,7 @@ addEventListener('keydown', e => {
   if (!playing) return;
   if (paused) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); resume(); } return; }
   if (e.key === ' ' || e.key === 'q' || e.key === 'Q') { e.preventDefault(); wantQuack = true; }
-  if (e.key.startsWith('Arrow')) { e.preventDefault(); keys.add(e.key); if (waitTouch) waitTouch = false; }
+  if (e.key.startsWith('Arrow')) { e.preventDefault(); keys.add(e.key); if (waitTouch) waitTouch = false; if (!rolled) { rolled = true; rollCall(350, true); } }
 });
 addEventListener('keyup', e => keys.delete(e.key));
 function keyTarget() {
@@ -319,7 +331,7 @@ function tick() {
   for (const e of s.events) {
     if (e.type === 'join') {
       sfx.join(s.line.length); say(s.line.length > 1 ? `×${s.line.length}` : 'Got one!', 900);
-      s.line.forEach((f, i) => hops.set(f.id, performance.now() + i * 55));
+      s.line.forEach((f, i) => hops.set(f.id, performance.now() + i * 55)); roll.set(e.id, performance.now() + 150);
       burst(e.x, e.y, 'spark', 10);
       note2('join', { n: s.line.length });
     }
@@ -339,7 +351,7 @@ function tick() {
     if (e.type === 'warn') {
       if (e.kind === 'bike') sfx.bell(); else if (e.kind === 'turtle') sfx.bubbles(); else if (e.kind === 'heron') sfx.heron(); else if (e.kind === 'gust') sfx.gust();
     }
-    if (e.type === 'quack') { sfx.quack(); quackShow = 0.5; for (const f of s.line) hops.set(f.id, performance.now()); }
+    if (e.type === 'quack') { sfx.quack(); quackShow = 0.5; rollCall(180, false); }
     if (e.type === 'home') { sfx.home(); homeGlow = 1; }
     if (e.type === 'arrive') { sfx.arrive(e.k); nestDucks.push({ id: e.id, x: e.x, y: e.y, t0: performance.now(), k: e.k, trait: (s.arrived.find(f => f.id === e.id) || {}).trait }); disp.delete(e.id); burst(s.nest.x, s.nest.y, 'spark', 6); }
     if (e.type === 'check') { sfx.check(); say(`+${e.add} s  ×${e.n}`, 1000); burst(s.mom.x, s.mom.y, 'spark', 12); }
@@ -464,10 +476,11 @@ function drawHazards(now) {
 
 function drawLine(now, alpha) {
   const t = now / 1000, m = lerpMom(alpha), last = s.line.length ? s.line[s.line.length - 1].delay : 0;
+  const lag = (1 - alpha) * DT; // the mother is drawn between the last two ticks; draw the trail the same way
   // her path: a faint line always, a bright dotted one while the rule is being shown
   if (s.line.length) {
     g.lineCap = 'round'; g.lineJoin = 'round';
-    const pts = []; for (let d = 0; d <= last + 0.001; d += 0.05) { const p = pathAt(s, d); pts.push([sx(p.x), sy(p.y)]); }
+    const pts = []; for (let d = 0; d <= last + 0.001; d += 0.05) { const p = pathAt(s, d + lag); pts.push([sx(p.x), sy(p.y)]); }
     if (pts.length > 1) {
       g.strokeStyle = 'rgba(255,255,255,.16)'; g.lineWidth = 0.02 * u; g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke();
       if (trailT > 0) {
@@ -491,7 +504,7 @@ function drawLine(now, alpha) {
   }
   // the ducklings, back to front
   const pos = s.line.map(f => {
-    const p = pathAt(s, f.delay);
+    const p = pathAt(s, f.delay + lag);
     let d = disp.get(f.id); if (!d) { d = { x: p.x, y: p.y }; disp.set(f.id, d); }
     return { f, p, d };
   });
@@ -506,10 +519,11 @@ function drawLine(now, alpha) {
       }
     }
   }
+  const names = [];
   for (let i = pos.length - 1; i >= 0; i--) {
     const { f, p, d } = pos[i];
     d.x += (p.x - d.x) * 0.25; d.y += (p.y - d.y) * 0.25; // and drift back onto her path
-    const q = pathAt(s, f.delay + 0.12), mv = Math.hypot(p.x - q.x, p.y - q.y);
+    const q = pathAt(s, f.delay + lag + 0.12), mv = Math.hypot(p.x - q.x, p.y - q.y);
     let a = heads.get(f.id) ?? 0;
     if (mv > 0.004) a = Math.atan2(p.x - q.x, p.y - q.y); else if (Math.hypot(d.x - m.x, d.y - m.y) < 0.12) a = Math.atan2(m.x - d.x, m.y - d.y);
     const prev = heads.get(f.id) ?? a; let da = a - prev; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
@@ -517,7 +531,17 @@ function drawLine(now, alpha) {
     const hop = hops.get(f.id), hk = hop ? (now - hop) / 260 : 2, lift = hk > 0 && hk < 1 ? Math.sin(hk * Math.PI) * 0.018 * u : 0;
     if (mv > 0.004 && Math.random() < 0.03) ripples.push({ x: d.x, y: d.y, t0: now, s: 0.7 });
     art.duckling(g, sx(d.x), sy(d.y) - lift, a, u, t, f.id * 1.7, { trait: f.trait, moving: mv > 0.004 ? 1 : 0.2, open: hk > 0 && hk < 1, blink: (t + f.id) % 4 < 0.12 });
+    const rc = roll.get(f.id), rk = rc ? (now - rc) / 1600 : -1;
+    if (rk > 0 && rk < 1) names.push({ text: f.name, x: sx(d.x) + (i % 2 ? 1 : -1) * 0.1 * u, y: sy(d.y) - 0.02 * u - rk * 0.06 * u, a: Math.min(1, 4 * (1 - rk), rk * 8) });
+    else if (rk >= 1) roll.delete(f.id);
   }
+  nameTags = names;
+}
+// The roll-call names, over every bird.
+function drawNames() {
+  g.font = `bold ${Math.round(14 * dpr)}px ui-rounded, system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (const n of nameTags) { g.globalAlpha = n.a; g.lineWidth = 4 * dpr; g.strokeStyle = '#fffdf3'; g.strokeText(n.text, n.x, n.y); g.fillStyle = '#7a4a1c'; g.fillText(n.text, n.x, n.y); }
+  g.globalAlpha = 1;
 }
 function lerpMom(alpha) { return { x: prevMom.x + (s.mom.x - prevMom.x) * alpha, y: prevMom.y + (s.mom.y - prevMom.y) * alpha }; }
 
@@ -607,6 +631,12 @@ function label(text, x, y) {
 
 function drawHud(now) {
   const top = (inset.top + 12) * dpr, pad = 14 * dpr, r = 9 * dpr;
+  // a soft strip behind the HUD, so what drifts in at the top still shows through but the HUD reads
+  const hudBottom = top + 72 * dpr, strip = g.createLinearGradient(0, 0, 0, hudBottom + 18 * dpr);
+  strip.addColorStop(0, 'rgba(226,246,240,.9)'); strip.addColorStop(hudBottom / (hudBottom + 18 * dpr), 'rgba(226,246,240,.55)'); strip.addColorStop(1, 'rgba(226,246,240,0)');
+  g.fillStyle = strip; g.fillRect(0, 0, W, hudBottom + 18 * dpr);
+  // a hazard warning hidden under the HUD is repeated just below it, at the same x
+  for (const w of warningsAt(s.t)) { const y = sy(w.y); if (y < hudBottom && y > hudBottom - 0.9 * u) { art.alert(g, sx(w.x), hudBottom + 0.07 * u + 16 * dpr, u * 0.8, now / 1000 + w.x, '#d94f3d'); hudPeeks++; } }
   // hearts
   for (let i = 0; i < HEARTS; i++) {
     const x = pad + r + i * 2.4 * r, y = top + 14 * dpr, full = i < s.hearts;
@@ -635,6 +665,18 @@ function drawHud(now) {
   if (trailT > 0 && s.stage <= 2 && trailShows <= 2) label('They follow your path', W / 2, H - (inset.bottom + 120) * dpr);
 }
 
+// Where warnings are showing at time t: the side a log or bike comes from, or the hazard itself.
+function warningsAt(t) {
+  const out = [];
+  for (const h of s.hazards) {
+    if (h.y0 > s.mom.y + 3 || h.y1 < s.mom.y) continue;
+    const v = view(h, t);
+    if (h.kind === 'log') { if (v.logs.some(l => l.warn)) out.push({ x: h.dir > 0 ? 0.06 : 0.94, y: h.y }); }
+    else if (h.kind === 'bike') { for (const b of v.bikes) if (b.warn) out.push({ x: b.dir > 0 ? 0.06 : 0.94, y: h.y }); }
+    else if (v.phase === 'warn') out.push({ x: h.kind === 'heron' ? h.px + h.side * 0.06 : h.kind === 'gust' ? 0.5 : h.x, y: h.kind === 'heron' ? h.py : h.kind === 'gust' ? (h.y0 + h.y1) / 2 : h.y });
+  }
+  return out;
+}
 function drawParts(dt) {
   for (const p of parts) {
     p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.94; p.vy *= 0.94; p.life -= dt; p.r += dt * 6;
@@ -672,7 +714,7 @@ function frame(now) {
   shake = Math.max(0, shake - dt * 2.5); flash = Math.max(0, flash - dt * 2);
   const k = still ? 0 : shake * 10 * dpr;
   g.setTransform(1, 0, 0, 1, (Math.random() - 0.5) * k, (Math.random() - 0.5) * k);
-  drawPond(now); drawHazards(now); drawNest(now); drawLost(now); drawLine(now, alpha); drawMother(now, alpha); drawParts(paused ? 0 : dt);
+  drawPond(now); drawHazards(now); drawNest(now); drawLost(now); drawLine(now, alpha); drawMother(now, alpha); drawNames(); drawParts(paused ? 0 : dt);
   g.setTransform(1, 0, 0, 1, 0, 0);
   if (flash > 0) { g.fillStyle = `rgba(255,90,80,${flash * 0.4})`; g.fillRect(0, 0, W, H); }
   if (screen === 'play') { drawGuide(now); drawHud(now); }
@@ -698,7 +740,7 @@ window.ducklingsState = () => ({
   mom: { x: s.mom.x, y: s.mom.y, sx: sx(s.mom.x) / dpr, sy: sy(s.mom.y) / dpr },
   nest: s.nest ? { sx: sx(s.nest.x) / dpr, sy: sy(s.nest.y) / dpr } : null,
   waitingDucks: s.lost.map(l => ({ sx: sx(l.x) / dpr, sy: sy(l.y) / dpr, y: l.y })),
-  opened: data.opened, sound: data.sound, taught: data.taught,
+  opened: data.opened, sound: data.sound, taught: data.taught, hudPeeks, rollCalls,
 });
 
 show('menu');
