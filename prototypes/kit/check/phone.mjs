@@ -1,7 +1,7 @@
 // Phone runs for the live prototypes. Run before and after any change to prototypes/kit/ or to a game's page:
 //   node prototypes/kit/check/phone.mjs            both games, WebKit iPhone 13 and Chromium Pixel 7
 //   node prototypes/kit/check/phone.mjs lantern webkit
-// It serves this checkout the way production does (/proto/<slug>/ and /notes/button.js), seeds saves in the
+// It serves this checkout the way production does (/<slug>/, the 301 from /proto/<slug>/, /notes/button.js), seeds saves in the
 // formats players already have, and fails on any page error. Playwright is not a dependency of this repository:
 // set PLAYWRIGHT to a directory that has it installed, or install it anywhere Node can resolve it.
 import { createServer } from 'node:http';
@@ -11,12 +11,18 @@ import { fileURLToPath } from 'node:url';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { gunzipSync } from 'node:zlib';
+import { existsSync } from 'node:fs';
+import { experimentPath } from '../../../src/worker.mjs';
+import { experimentRoots } from '../../../scripts/experiments.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
-  let path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname));
-  let file = path.startsWith('/proto/') ? join(root, 'prototypes', path.slice(7)) : path === '/notes/button.js' ? join(root, 'workers/feedback/public/notes/button.js') : null;
+  const url = new URL(req.url, 'http://x'), moved = experimentPath(url.pathname);
+  if (moved) { res.writeHead(301, { location: `${base}${moved}${url.search}` }); return res.end(); } // as src/worker.mjs does
+  let path = normalize(decodeURIComponent(url.pathname));
+  const dir = experimentRoots.find(dir => existsSync(join(root, dir, path.split('/')[1] || '.', 'index.html')));
+  let file = path === '/notes/button.js' ? join(root, 'workers/feedback/public/notes/button.js') : dir ? join(root, dir, path) : null;
   if (file && path.endsWith('/')) file = join(file, 'index.html');
   try { if (!file || !file.startsWith(root)) throw 0; const body = await readFile(file); res.writeHead(200, { 'content-type': types[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-store' }); res.end(body); }
   catch { res.writeHead(404); res.end('not found'); }
@@ -42,7 +48,7 @@ const LAB_LOCAL = () => localStorage.setItem('hf-lab-send-localhost', '1'); // p
 
 const GAMES = {
   async kit(page) {
-    await page.goto(`${base}/proto/kit/`);
+    await page.goto(`${base}/kit/`);
     await until(page, () => window.kitResults, 'self-test');
     const bad = (await page.evaluate(() => window.kitResults)).filter(r => !r.ok).map(r => r.name);
     assert.deepEqual(bad, [], 'kit self-test');
@@ -52,7 +58,7 @@ const GAMES = {
     const audioLog = () => page.evaluate(() => window.audioLog);
     const saved = () => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(k => k.startsWith('lantern-')).map(k => [k, localStorage.getItem(k)])));
     // A save in the format players already have.
-    await page.goto(`${base}/proto/lantern/`);
+    await page.goto(`${base}/lantern/`);
     await page.evaluate(LAB_LOCAL);
     await page.evaluate(() => { localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('lantern-best-endless', '55'); localStorage.setItem('lantern-best-tower', '4'); localStorage.setItem('lantern-stats', '{"red":1}'); localStorage.setItem('notes.k', 'check'); });
     await page.reload();
@@ -119,7 +125,7 @@ const GAMES = {
     const KEY = 'ant-promotion:v1';
     const mode = () => page.evaluate(() => window.__ant.mode);
     const saved = () => page.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
-    await page.goto(`${base}/proto/ant-promotion/?labRunSource=agent`);
+    await page.goto(`${base}/ant-promotion/?labRunSource=agent`);
     await until(page, () => window.__ant, 'game script');
     await page.evaluate(LAB_LOCAL);
     // A save in the format players already have: a level-2 animal, a skin, the soft look.
@@ -165,10 +171,20 @@ const GAMES = {
     assert.ok(runs.every(r => r.runSource === 'agent'), 'labRunSource=agent marks the records');
     assert.deepEqual(runs[2].data.events[0].data, { c: '#d6b21c', p: 'stripes' }, 'the skin choice');
   },
+  // Old /proto/ links move to the top level with their query; the new URL plays to its first frame.
+  async 'old links'(page) {
+    const response = await page.goto(`${base}/proto/lantern/?x=1`);
+    assert.equal(page.url(), `${base}/lantern/?x=1`, 'redirected with the query');
+    assert.equal((await response.request().redirectedFrom().response()).status(), 301, 'a permanent redirect');
+    await page.click('#play'); const t = (await page.evaluate(() => window.lanternState())).t;
+    await page.waitForFunction(t => window.lanternState().playing && window.lanternState().t > t, t);
+    await page.goto(`${base}/proto/lab/`); assert.equal(page.url(), `${base}/lab/`, 'lab index');
+    await page.goto(`${base}/proto/`); assert.equal(page.url(), `${base}/lab/`, '/proto/ goes to the lab index');
+  },
   // The lab is down: every send fails, and the game plays on with no page error.
   async 'lab down'(page) {
     page.context().labDown = true;
-    await page.goto(`${base}/proto/lantern/`); await page.evaluate(LAB_LOCAL); await page.reload();
+    await page.goto(`${base}/lantern/`); await page.evaluate(LAB_LOCAL); await page.reload();
     await page.click('#play'); await page.evaluate(() => { window.lanternSim().light = 0.0001; });
     await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'end card');
     await page.click('#go'); assert.ok((await page.evaluate(() => window.lanternState())).playing, 'plays on');

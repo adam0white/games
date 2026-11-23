@@ -22,6 +22,22 @@ test('play root opens shelf and game paths reach assets', async () => {
   assert.equal((await get('https://play.adamwhite.work/')).headers.get('location'), 'https://human.adamwhite.work/games/');
   assert.equal(await (await get('https://play.adamwhite.work/rope/')).text(), 'asset');
 });
+test('old experiment links move permanently to the top level and keep the query', async () => {
+  const cases = {
+    '/proto/lantern/?x=1': '/lantern/?x=1', '/proto/lantern/': '/lantern/', '/proto/kit/save.js': '/kit/save.js',
+    '/proto/lab/ant-nest/?a=b&c=d': '/lab/ant-nest/?a=b&c=d', '/proto/': '/lab/', '/proto': '/lab/', '/proto?x=1': '/lab/?x=1',
+    '/proto//evil.example/x': '//evil.example/x',
+  };
+  for (const [from, to] of Object.entries(cases)) {
+    const response = await get(`https://play.adamwhite.work${from}`);
+    assert.equal(response.status, 301, from);
+    assert.equal(response.headers.get('location'), `https://play.adamwhite.work${to}`, from);
+  }
+  // Only the exact /proto segment moves; new paths and look-alikes reach the assets.
+  for (const path of ['/lantern/', '/lab/ant-nest/', '/kit/save.js', '/protocol/', '/proto-x/']) assert.equal(await (await get(`https://play.adamwhite.work${path}`)).text(), 'asset', path);
+  // Another origin never gets this redirect.
+  assert.equal((await get('https://rope.adamwhite.work/proto/lantern/')).headers.get('location'), 'https://play.adamwhite.work/rope/proto/lantern/');
+});
 test('old service worker is a same-origin non-cacheable tombstone', async () => {
   const response = await get('https://rope.adamwhite.work/sw.js');
   assert.match(response.headers.get('content-type'), /javascript/);

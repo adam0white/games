@@ -35,6 +35,8 @@ test('rejects unsafe lineage and catches shared paths', () => {
   assert.deepEqual(affectedGames(registry, ['workers/wai-daily/src/run.ts']), []);
   assert.deepEqual(affectedGames(registry, ['workers/wai-daily/src/run.ts', 'pnpm-lock.yaml']), ['rope']);
   assert.deepEqual(affectedGames(registry, ['prototypes/lantern/index.html']), []);
+  assert.deepEqual(affectedGames(registry, ['experiments/lantern/index.html', 'experiments/lab/x/index.html', 'prototypes/kit/save.js']), []);
+  assert.deepEqual(affectedGames(registry, ['experiments.md']), registry.games.map(g => g.slug));
   assert.deepEqual(affectedGames(registry, ['archive/README.md', 'archive/prototypes/long-road/index.html']), []);
   assert.deepEqual(affectedGames(registry, ['docs/triage-2026-11-23.md', 'archive/README.md']), []);
 });

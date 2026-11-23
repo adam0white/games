@@ -1,11 +1,12 @@
 import { neighboursSource } from './history.mjs';
+import { reservedPaths } from '../worker-settings.mjs';
 const sha = /^[0-9a-f]{40}$/;
 export function validateRegistry(registry) {
   if (!registry || !/^\d+\.\d+\.\d+$/.test(registry.hfVersion) || !Array.isArray(registry.games)) throw new Error('Invalid registry');
   const seen = new Set();
   const origins = new Set();
   for (const game of registry.games) {
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(game.slug) || game.slug === 'proto' || seen.has(game.slug)) throw new Error('Invalid or duplicate slug');
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(game.slug) || reservedPaths.includes(game.slug) || seen.has(game.slug)) throw new Error('Invalid or duplicate slug');
     if (!/^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(game.source?.repository ?? '') || !sha.test(game.source?.commit ?? '')) throw new Error('Invalid source lineage');
     const history = game.source.history;
     if (game.slug === 'neighbours' && history === undefined) throw new Error('Missing retained source history');
@@ -30,9 +31,10 @@ export function validateRegistry(registry) {
 export function affectedGames(registry, paths) {
   validateRegistry(registry);
   // Standalone Workers have their own CI job and never enter a game's build.
-  // Prototypes are static files copied by the build; they never enter a game's checks.
+  // Experiments (experiments/, and prototypes/ until it is renamed) are static files copied by the build;
+  // they never enter a game's checks.
   // Nothing under archive/ is built, served or checked. Documents under docs/ never enter a game's checks.
-  paths = paths.filter(path => !path.startsWith('workers/') && !path.startsWith('prototypes/') && !path.startsWith('archive/') && !path.startsWith('docs/'));
+  paths = paths.filter(path => !path.startsWith('workers/') && !path.startsWith('prototypes/') && !path.startsWith('experiments/') && !path.startsWith('archive/') && !path.startsWith('docs/'));
   if (paths.some(path => !path.startsWith('games/') || !registry.games.some(g => path.startsWith(`games/${g.slug}/`)))) return registry.games.map(g => g.slug);
   return registry.games.filter(g => paths.some(p => p.startsWith(`games/${g.slug}/`))).map(g => g.slug);
 }

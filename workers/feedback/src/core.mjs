@@ -54,8 +54,9 @@ async function findTester(request, env) {
 
 const slug = value => (typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && value.length <= 40 ? value : null);
 const buildId = value => (typeof value === 'string' && /^[A-Za-z0-9._-]{1,40}$/.test(value) ? value : null);
-// A link in a reply may only point at a prototype on this site.
-const sitePath = value => (typeof value === 'string' && /^\/proto\/[a-z0-9]+(?:-[a-z0-9]+)*\/(?:\?[A-Za-z0-9=&_.-]{0,80})?$/.test(value) ? value : null);
+// A link in a reply may only point at an experiment on this site: /<slug>/ or /lab/<name>/, or the old
+// /proto/... shape, which games-static redirects to the new one.
+const sitePath = value => (typeof value === 'string' && /^(?:\/proto)?(?:\/lab)?\/[a-z0-9]+(?:-[a-z0-9]+)*\/(?:\?[A-Za-z0-9=&_.-]{0,80})?$/.test(value) ? value : null);
 const choiceList = value => (Array.isArray(value) ? value.filter(c => typeof c === 'string' && c.trim()).map(c => c.trim().slice(0, 80)).slice(0, 6) : []);
 const parseChoices = text => { try { return choiceList(JSON.parse(text ?? '[]')); } catch { return []; } };
 const clientId = value => (typeof value === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(value) ? value : null);
