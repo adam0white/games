@@ -1,4 +1,4 @@
-// Measured play: node prototypes/lantern/bots.mjs [runs]. Three policies of rising skill; prints how runs end.
+// Measured play: node experiments/lantern/bots.mjs [runs]. Three policies of rising skill; prints how runs end.
 import { create, step, centre, half, sight, score, progress, GOAL, BOAT } from './sim.js';
 const runs = Number(process.argv[2] ?? 300);
 const policies = {
@@ -33,7 +33,7 @@ if (process.argv[3] !== 'audit') for (const stage of [1, 3, 5, 6, 8, 11, 12, 15,
   console.log(stage < 0 ? `tower ${-stage}` : stage ? `stage ${stage}` : 'endless (score)', name.padEnd(8), JSON.stringify(ends), `distance p10 ${q(0.1)} median ${q(0.5)} p90 ${q(0.9)}`, `grazes/run ${(grazes / runs).toFixed(1)} embers/run ${(embers / runs).toFixed(1)} hearts+shields/run ${(gifts / runs).toFixed(2)} powers/run ${(powers / runs).toFixed(2)}`);
 }
 
-// Passability audit: node prototypes/lantern/bots.mjs 200 audit. A ghost boat rides the centre line and cannot die;
+// Passability audit: node experiments/lantern/bots.mjs 200 audit. A ghost boat rides the centre line and cannot die;
 // each tick we measure the widest free gap across the river at the boat's row. A river is unfair if that gap closes.
 // Also prints where the hazards sit, by tenth of the river, to show the ramp.
 if (process.argv[3] === 'audit') for (const stage of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 0, -3, -12]) { // 0 is the endless river; -n is the tower with night n's things

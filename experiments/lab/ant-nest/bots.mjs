@@ -1,4 +1,4 @@
-// Checks and measured play for The Nest: node prototypes/lab/ant-nest/bots.mjs [seeds]
+// Checks and measured play for The Nest: node experiments/lab/ant-nest/bots.mjs [seeds]
 // 1. determinism  2. paths never cross soil  3. no ant idles beside work it could do  4. rounds end on time
 // 5. three players (no marks, straight shaft, sensible layout) score in that order on every seed
 // 6. the checks can fail: a frozen ant and an ant moved through soil are both caught

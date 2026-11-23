@@ -57,7 +57,7 @@ A WebKit run at phone size (390 by 844, touch) loaded the page, changed the skin
 ## 2026-11-22: tester t1's answers and requests (notes #30, #33, #34)
 
 - First impression: "not bad" (#30).
-- Tester t1 named Ant Promotion one of the two best games, with Lantern (#33). See `prototypes/NOTES.md`.
+- Tester t1 named Ant Promotion one of the two best games, with Lantern (#33). See `experiments/NOTES.md`.
 
 ### Left as a proposal (2026-11-22, note #34)
 
@@ -171,7 +171,7 @@ Animals hunting each other makes the meadow less predictable: fleeing animals ru
 ### Checks
 - `bots.mjs`: a second fast pick is 5% faster, a second sneaky pick is seen from 5% less far, animals eat each other, food bugs are never hunted, plus all earlier asserts.
 - WebKit, iPhone 13 profile: flow test in Cartoon and 3D, Wild rules test, a chase with its line on screen, promotion cards showing "Fast again: +22% speed". No page errors.
-- Local testing must serve `prototypes/` (not this folder), because the page imports `../kit/`. Served from this folder the module fails without a page error and tests that only click can pass falsely.
+- Local testing must serve `experiments/` (not this folder), because the page imports `../kit/`. Served from this folder the module fails without a page error and tests that only click can pass falsely.
 
 ### From the wildcard lab, next
 - The named rival (lab `ant-nemesis`) is picked to graduate into this game. The lab's animals-chase-each-other test (`ant-wilds`) overlaps with this round; its dashed red line is used here.

@@ -1,5 +1,5 @@
 {
-  // Writes the rival ("Nemesis") persona for the lab experiment prototypes/lab/ant-nemesis/.
+  // Writes the rival ("Nemesis") persona for the lab experiment experiments/lab/ant-nemesis/.
   // One endpoint, POST /lab-api/persona. No secrets. One Durable Object holds the daily call count. See README.md for the guards and the cost.
   "name": "games-lab-ai",
   "account_id": "a20259cba74e506296745f9c67c1f3bc",

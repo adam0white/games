@@ -6,7 +6,7 @@
 //   node notes.mjs all [--after <id>]       the whole exchange, both directions
 //   node notes.mjs reply <tester> "<text>" [--tr "<Turkish text>"] [--game <slug>] [--handled 12,13]
 //       more: [--as-is] sends the text untranslated (write in the tester's own language);
-//             [--link /proto/<slug>/] adds an "open the game" button; [--image file.png] adds a picture
+//             [--link /<slug>/] adds an "open the game" button; [--image file.png] adds a picture
 //   node notes.mjs ask <tester> "<English>" --tr "<their language>" [--choices "a|b|c"] [--game <slug>] [--link ...]
 //   node notes.mjs asks                     questions asked, with their answers
 //   node notes.mjs close <id>[,<id>...]     withdraw a question

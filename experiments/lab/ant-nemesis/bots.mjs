@@ -1,4 +1,4 @@
-// Checks and measured play for Ant Promotion: Nemesis. node prototypes/lab/ant-nemesis/bots.mjs [seeds] [minutes]
+// Checks and measured play for Ant Promotion: Nemesis. node experiments/lab/ant-nemesis/bots.mjs [seeds] [minutes]
 // 1. the contact rule   2. with no Nemesis the sim matches the main game tick for tick   3. determinism
 // 4. a death creates a Nemesis; it persists and gains power   5. each temperament changes measured behaviour
 // 6. the careful bot still climbs with a Nemesis in the world   7. the Nemesis can be eaten in play
