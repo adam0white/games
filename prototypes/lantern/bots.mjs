@@ -1,5 +1,5 @@
 // Measured play: node prototypes/lantern/bots.mjs [runs]. Three policies of rising skill; prints how runs end.
-import { create, step, centre, half, reach, score, GOAL, BOAT } from './sim.js';
+import { create, step, centre, half, sight, score, GOAL, BOAT } from './sim.js';
 const runs = Number(process.argv[2] ?? 300);
 const policies = {
   // Sees nothing but the banks.
@@ -10,18 +10,18 @@ const policies = {
   greedy: s => steer(s, true),
 };
 function steer(s, wantEmbers) {
-  const see = reach(s.light), c = centre(s, s.y + 0.2), h = half(s, s.y + 0.2);
+  const see = sight(s), c = centre(s, s.y + 0.2), h = half(s, s.y + 0.2);
   let best = s.x, bestScore = -Infinity;
   for (let i = 0; i <= 24; i++) {
     const x = c - h + 0.04 + (2 * h - 0.08) * i / 24;
     let score = -Math.abs(x - s.x) * 0.6 - Math.abs(x - c) * 0.3;
-    for (const k of s.rocks) { const dy = k.y - s.y; if (dy > -0.03 && dy < see) { const gap = Math.abs(k.x - x) - k.rad - 0.03; if (gap < 0.03) score -= (0.03 - gap) * 60 / (0.15 + dy); } }
+    for (const k of s.rocks) { const dy = k.y - s.y; if (dy > -0.03 && dy < see) { const gap = Math.max(0, Math.abs(k.x - x) - k.len) - k.rad - 0.03; if (gap < 0.03) score -= (0.03 - gap) * 60 / (0.15 + dy); } }
     if (wantEmbers) for (const e of s.embers) { const dy = e.y - s.y; if (!e.got && dy > 0 && dy < 1.2) score += Math.max(0, 0.12 - Math.abs(e.x - x)) * (4 + 6 * (1 - s.light)) / (0.3 + dy); }
     if (score > bestScore) { bestScore = score; best = x; }
   }
   return best;
 }
-if (process.argv[3] !== 'audit') for (const stage of [1, 2, 3, 5, 10, 20, 0]) for (const [name, policy] of Object.entries(policies)) {
+if (process.argv[3] !== 'audit') for (const stage of [1, 3, 5, 6, 8, 11, 12, 15, 17, 18, 20, 0]) for (const [name, policy] of Object.entries(policies)) {
   const ends = {}, dist = []; let grazes = 0, embers = 0, gifts = 0;
   for (let seed = 1; seed <= runs; seed++) {
     const s = create(seed, stage || 1, !stage); // stage 0 is the endless river
@@ -36,19 +36,19 @@ if (process.argv[3] !== 'audit') for (const stage of [1, 2, 3, 5, 10, 20, 0]) fo
 // Passability audit: node prototypes/lantern/bots.mjs 200 audit. A ghost boat rides the centre line and cannot die;
 // each tick we measure the widest free gap across the river at the boat's row. A river is unfair if that gap closes.
 // Also prints where the hazards sit, by tenth of the river, to show the ramp.
-if (process.argv[3] === 'audit') for (const stage of [1, 2, 3, 4, 5, 8, 12, 20, 0]) {
+if (process.argv[3] === 'audit') for (const stage of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 0]) {
   let worst = Infinity, tight = 0, buried = 0, pickups = 0; const swing = Array(10).fill(0), all = Array(10).fill(0), seen = new Set();
   for (let seed = 1; seed <= (stage ? runs : Math.ceil(runs / 10)); seed++) { // the endless river is ridden far past its last step harder, on fewer seeds
     const s = create(seed, stage || 1, !stage); let min = Infinity; seen.clear(); const checked = new Set();
     while (!s.over && s.y < 30 * GOAL) {
       s.safe = 1e9; s.light = 1; step(s, centre(s, s.y));
       // A pickup is buried if a boat sitting on it at the moment it comes level would touch a rock.
-      for (const p of s.embers) if (!checked.has(p) && p.y <= s.y) { checked.add(p); pickups++; if (s.rocks.some(k => Math.hypot(k.x - p.x, k.y - p.y) < k.rad + BOAT)) buried++; }
+      for (const p of s.embers) if (!checked.has(p) && p.y <= s.y) { checked.add(p); pickups++; if (s.rocks.some(k => Math.hypot(Math.max(0, Math.abs(k.x - p.x) - k.len), k.y - p.y) < k.rad + BOAT)) buried++; }
       const c = centre(s, s.y), e = half(s, s.y) - BOAT, cuts = [];
       for (const k of s.rocks) {
         const dy = Math.abs(k.y - s.y), r = k.rad + BOAT;
         if (!seen.has(k)) { seen.add(k); const d = Math.min(9, Math.floor(k.y / GOAL * 10)); all[d]++; if (k.a || k.b || k.ice) swing[d]++; }
-        if (dy < r) { const w = Math.sqrt(r * r - dy * dy); cuts.push([k.x - w, k.x + w]); }
+        if (dy < r) { const w = Math.sqrt(r * r - dy * dy) + k.len; cuts.push([k.x - w, k.x + w]); }
       }
       cuts.sort((a, b) => a[0] - b[0]);
       let x = c - e, gap = 0;
