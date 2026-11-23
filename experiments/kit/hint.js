@@ -94,7 +94,7 @@ export function hint(el, { kind = 'stick', key, when, played = false, delay = 30
   const calm = matchMedia('(prefers-reduced-motion: reduce)');
   let idle = 0, last = performance.now(), from = 0, frame = requestAnimationFrame(tick);
   function tick(now) {
-    const dt = Math.min(now - last, 100); last = now;
+    const dt = Math.min(now - last, 250); last = now; // a slow phone still counts real time; a page put away and back does not jump
     const on = when() && (idle += dt) >= delay;
     if (on !== box.classList.contains('on')) { box.classList.toggle('on', on); from = now; }
     if (on) {

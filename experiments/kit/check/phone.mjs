@@ -141,7 +141,7 @@ async function hinted(page, g) {
   await fresh();
   await sleep(g.delay + 500); assert.equal(await on(), false, 'hint: not on the menu');
   await play(); await sleep(g.delay / 2); assert.equal(await on(), false, 'hint: not before the delay');
-  await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown after the delay', g.delay + 4000);
+  await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown after the delay', g.delay + 8000); // CI's software WebGL draws lantern-3d at a few frames a second
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.kit-hint .label')).display), 'none', 'hint: no words while it moves');
   await page.evaluate(() => dispatchEvent(new Event('blur'))); await sleep(200); assert.equal(await on(), false, 'hint: hidden under the pause card');
   await page.click(g.resume); await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: back after resume (a tap on a card is not play input)', 2000);
@@ -162,7 +162,7 @@ async function hinted(page, g) {
   }
   // Reduced motion: a still copy with words.
   await page.emulateMedia({ reducedMotion: 'reduce' }); await fresh(); await play();
-  await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown with reduced motion', g.delay + 4000);
+  await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown with reduced motion', g.delay + 8000);
   const pose = () => page.evaluate(() => document.querySelector('.kit-hint .knob').style.transform);
   const p0 = await pose(); await sleep(400);
   assert.equal(await pose(), p0, 'hint: still with reduced motion'); assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.kit-hint .label')).display), 'block', 'hint: words with reduced motion');
