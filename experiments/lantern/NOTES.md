@@ -435,4 +435,5 @@ were put in to see the check fail: a failed request treated as an empty shared b
 
 Not checked: the deployed endpoint, a real phone, two real players.
 
-Open for the owner: whether to deploy at all; rude names (no word filter); false scores (the page reports its own score).
+Owner's answer, 2026-11-23 21:23Z: "Yes shared stuff in any game is okay". A basic rude-name filter was added on the server
+(a listed word stores the name as "Player"). Still open: false scores (the page reports its own score).

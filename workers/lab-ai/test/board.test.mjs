@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
-import { handleBoard, validateScore, tidyName, boardTop, boardPut, boardRemove, BOARD } from '../src/board.mjs';
+import { handleBoard, validateScore, tidyName, rudeName, shownName, boardTop, boardPut, boardRemove, BOARD } from '../src/board.mjs';
 
 const ID = n => `player-${String(n).padStart(4, '0')}-0123456789abcdef`;
 // A stand-in for ctx.storage.sql (exec returning a cursor with toArray) over a real SQLite database.
@@ -34,6 +34,12 @@ test('names are tidied the way the game tidies them', () => {
   assert.equal(tidyName('a'.repeat(40)), 'a'.repeat(16));
   assert.equal(tidyName('<>!!'), ''); assert.equal(tidyName(7), ''); assert.equal(tidyName(null), '');
   assert.equal(tidyName('a\u0000\n\tb'), 'ab');
+});
+
+test('rude names are stored as Player; ordinary names pass', () => {
+  for (const n of ['fuck', 'F.u_c-k you', 'sh1t', '5hit head', 'B1TCH', 'xXn1ggaXx', 'a55hole']) { assert.equal(rudeName(tidyName(n)), true, n); assert.equal(shownName(n), 'Player', n); }
+  for (const n of ['Ada', 'Rio river', 'Deniz', 'Kai_7', 'Çağla', 'Otto 1234', 'Mira.x', 'Player', 'Grape', 'Essex', 'Hancock', 'Dickens']) assert.equal(shownName(n), n, n);
+  assert.equal(shownName('<>'), ''); assert.deepEqual(validateScore({ id: ID(1), n: 'sh1t', s: 5 }), { id: ID(1), n: 'Player', s: 5 });
 });
 
 test('validation: an id, a name and a whole score in range; nothing else', () => {

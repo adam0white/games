@@ -9,6 +9,14 @@ export const BOARD = { games: ['lantern'], top: 20, keep: 500, name: 16, maxScor
 
 // Stricter than the game's own name field: letters, digits, space and _ . - only, at most 16 characters. Markup characters never reach another player's screen as typed.
 export const tidyName = v => (typeof v === 'string' ? v.normalize('NFKC').replace(/[^\p{L}\p{N} _.-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, BOARD.name).trim() : '');
+// A basic filter for rude names (owner, 2026-11-23). The name is compared without spaces, dots, dashes and underscores, in
+// lower case, with the usual digit-for-letter swaps undone. A name that contains a listed word is stored as "Player".
+// It is a short English list and it will miss things; it is not a moderation system.
+const RUDE = ['fuck', 'shit', 'bitch', 'cunt', 'nigg', 'fagg', 'whore', 'slut', 'pussy', 'penis', 'vagina', 'asshole', 'bastard', 'nazi', 'hitler', 'porn', 'retard'];
+// Left out on purpose because they sit inside ordinary names and words: sex (Essex), dick (Dickens), cock (Hancock), rape (grape).
+const SWAPS = { 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't', 8: 'b' };
+export const rudeName = n => { const flat = n.toLowerCase().replace(/[ _.-]/g, '').replace(/[0134578]/g, d => SWAPS[d]); return RUDE.some(w => flat.includes(w)); };
+export const shownName = v => { const n = tidyName(v); return n && rudeName(n) ? 'Player' : n; };
 const goodId = v => typeof v === 'string' && /^[A-Za-z0-9-]{20,64}$/.test(v);
 
 // Accepts { id, n, s } to post a score or { id, remove: true } to take the player's row away. Returns the clean request or null.
@@ -17,7 +25,7 @@ export function validateScore(body) {
   const keys = Object.keys(body);
   if (body.remove === true) return keys.length === 2 ? { id: body.id, remove: true } : null;
   if (keys.length !== 3 || !('n' in body) || !('s' in body)) return null;
-  const n = tidyName(body.n);
+  const n = shownName(body.n);
   if (!n || !Number.isInteger(body.s) || body.s < 1 || body.s > BOARD.maxScore) return null;
   return { id: body.id, n, s: body.s };
 }

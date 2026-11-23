@@ -44,13 +44,11 @@ Workers AI changelog of 2026-05-08 says the `-fast` variants stay active, and th
 deprecation list does not name it. If it goes away, change `MODEL`; the code reads both the
 `choices[0].message.content` and `response` answer shapes.
 
-## The shared leaderboard (2026-11-23, built, **not deployed**)
+## The shared leaderboard (2026-11-23)
 
 A second endpoint, `/lab-api/board/<game>`, for a leaderboard shared between players. Only `lantern`
 is on the allow-list. The code is in `src/board.mjs`; the tests are `test/board.test.mjs`.
-Deploying it is an owner decision that had not been given when this was written (the repository's
-`AGENTS.md` says no new server infrastructure without one), so `wrangler.jsonc` on main describes
-a Worker that is one deploy ahead of production until then.
+The owner approved shared features in any game on 2026-11-23.
 
 - `GET /lab-api/board/lantern` answers `{ rows: [{ n, s }] }`: the 20 best, best first.
 - `POST /lab-api/board/lantern` with `{ id, n, s }` keeps that player's best score and newest name
@@ -64,8 +62,8 @@ named by the game) holds the rows. The 500 best rows are kept and the rest are d
 Guards:
 
 - Names are cut down on the server to letters, digits, space and `_ . -`, at most 16 characters.
-  **There is no word filter**, so a rude name made of ordinary letters would show to other players.
-  That is an open item for the owner.
+  A basic word filter (a short English list, with digit-for-letter swaps undone) stores a rude name
+  as "Player". It will miss things; it is not a moderation system.
 - Scores are whole numbers from 1 to 1,000,000. They are reported by the page, so a player who
   edits the page can post a false score up to that cap. There is no check that a run was played.
 - A post must carry the site's `Origin` (or localhost). A read from another site is refused.
