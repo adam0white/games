@@ -1,7 +1,7 @@
 // Lantern 3D renderer: draws one frame of the Lantern simulation with WebGL2.
 // It reads the simulation and never changes it. World axes: x is the sim's x (river units),
 // y is up, z points back toward the camera; the boat's row is always z = 0, so z = -(y - s.y).
-import { centre, half, fall, fog, wind, rain, sight, dazzle } from '../../lantern/sim.js';
+import { centre, half, fall, fog, wind, rain, sight, dazzle, boat, BOAT } from '../../lantern/sim.js';
 
 const ROWS = 256, DY = 0.05, BEHIND = 40; // river table: 256 rows, 0.05 apart, from 2 units behind the boat
 const NEAR = -1.2, FAR = 4.2, ROW_STEP = 0.025; // ground mesh rows, boat-relative
@@ -487,6 +487,8 @@ function lookAt(eye, at) {
   const z = norm(sub(eye, at)), x = norm(cross([0, 1, 0], z)), y = cross(z, x);
   return { m: new Float32Array([x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -dot(x, eye), -dot(y, eye), -dot(z, eye), 1]), x, y };
 }
+// the flat page's ability colours, brightened for the dark river
+const POWER_COL = { boost: [1.9, 1.6, 0.65], slow: [1.4, 1.0, 1.9], size: [0.65, 1.7, 1.5], magnet: [1.9, 1.0, 1.4], flare: [1.75, 1.8, 1.9] };
 function model(tx, ty, tz, yaw, roll) {
   const cy = Math.cos(yaw), sy = Math.sin(yaw), cr = Math.cos(roll), sr = Math.sin(roll);
   // rotate about z (roll) then about y (yaw), then translate
@@ -689,6 +691,8 @@ export function createRenderer(canvas) {
     const lean = Math.max(-0.5, Math.min(0.5, (f.target - s.x) * 4)), bob = 0.002 * Math.sin(time * 2.1);
     const yaw = -lean * 0.35, roll = -lean * 0.45;
     const M = model(s.x, bob, 0, yaw, roll);
+    // the size ability makes the boat smaller or bigger, as the rules do
+    const grow = boat(s) / BOAT; for (let i = 0; i < 12; i++) M[i] *= grow;
     const lamp = [M[0] * LAMP[0] + M[4] * LAMP[1] + M[8] * LAMP[2] + M[12], M[1] * LAMP[0] + M[5] * LAMP[1] + M[9] * LAMP[2] + M[13], M[2] * LAMP[0] + M[6] * LAMP[1] + M[10] * LAMP[2] + M[14]];
     // the light's reach: the same circle the flat page draws, including fog, lightning and the ember glow
     const flick = 1 + Math.sin(f.now / 90) * 0.015 + Math.sin(f.now / 37) * 0.01, R = (sight(s) + f.glow * 0.09) * flick, flash = dazzle(s) < 0;
@@ -765,6 +769,15 @@ export function createRenderer(canvas) {
       else col = [1.7, 0.95, 0.4];
       spr(e.x, h, z, size, col, kind);
       dec(e.x, e.y - 0.07, 0.03, 0.07, 7, 0.01, 0, [col[0] * 0.5, col[1] * 0.5, col[2] * 0.5, 0]);
+    }
+    // abilities: one colour each, larger than an ember, with a slow pulse
+    for (const e of s.powers || []) {
+      if (e.got) continue;
+      const dy = e.y - s.y; if (dy < -1.4 || dy > 4.3) continue;
+      const pulse = 1 + 0.18 * Math.sin(time * 4 + e.y * 7), col = POWER_COL[e.kind] || [1.5, 1.5, 1.5];
+      spr(e.x, 0.07 + bob2(e.y), -dy, 0.075 * pulse * (1 + 0.12 * Math.max(0, dy)), col, 4);
+      spr(e.x, 0.07 + bob2(e.y), -dy, 0.03, [2.2, 2.2, 2.2], 0);
+      dec(e.x, e.y - 0.09, 0.045, 0.1, 7, 0.012, 0, [col[0] * 0.5, col[1] * 0.5, col[2] * 0.5, 0]);
     }
     // the lantern's own reflection
     dec(lamp[0], s.y - 0.09, 0.03, 0.08, 7, 0.012, 0, [1.2, 0.7, 0.32, 0]);
