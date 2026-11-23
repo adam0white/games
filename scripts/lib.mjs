@@ -68,7 +68,9 @@ export function packageReleaseMetadata(pkg, read) {
   return metadata;
 }
 export function manifest(registry, game, commit, dirty, labVersion, app, metadata) {
-  validateRegistry(registry);
+  // A live release's registry may predate an archive and still list a host that archivedHosts now holds; the
+  // current registry is checked against archivedHosts where it is loaded (context.mjs, verifyRedirects).
+  validateRegistry(registry, []);
   const validLab = game.kind === 'recorded-viewer' ? labVersion === null : typeof labVersion === 'string' && /^\d+\.\d+\.\d+$/.test(labVersion);
   if (!sha.test(commit) || dirty || !registry.games.some(g => g.slug === game.slug) || !validLab || !app) throw new Error('Refusing unclean or invalid release');
   const release = { game: game.slug, commit, dirty: false, source: game.source, hfVersion: registry.hfVersion, framework: registry.hfVersion, app, frameworkLibrary: registry.hfVersion, labVersion, saveSchema: game.saveSchema };
