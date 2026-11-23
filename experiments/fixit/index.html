@@ -37,6 +37,8 @@
   .coin { display: inline-block; width: .85em; height: .85em; border-radius: 50%; background: radial-gradient(#f6d77e 55%, #d9a93e 60%); border: 2px solid #9c7420; vertical-align: -.1em; margin-right: .25em; box-sizing: border-box; }
   .lab-notice, .lab-toggle { font-size: 12px !important; }
   #newjob { color: #1d5e5b; font-weight: bold; }
+  .desk { display: none; font-size: .85em; }
+  @media (pointer: fine) { .desk { display: block; } }
 </style>
 </head>
 <body>
@@ -47,8 +49,11 @@
 <div id="menu" class="screen on"><div class="card">
   <h1>Fix-It Stall</h1>
   <p class="sub">Fix things fast. Get paid.</p>
-  <div class="stats"><span><span class="coin"></span><b id="bank">0</b></span><span>Best <b id="best">0</b></span><span>Jobs <b id="jobs">3</b>/9</span></div>
+  <div class="stats"><span><span class="coin"></span><b id="bank">0</b></span><span>Best <b id="best">0</b></span><span>Jobs <b id="jobs">3</b>/<span id="jobsAll">11</span></span></div>
   <p><button id="play" class="main">Play</button></p>
+  <p><button id="daily">Daily stall</button></p>
+  <p id="dailyLine" class="sub"></p>
+  <p class="desk sub">On a computer: drag with the mouse, or hold Space.</p>
   <p><button id="toShop">Stall shop</button><button id="sound1" class="small">Sound: on</button></p>
 </div></div>
 
