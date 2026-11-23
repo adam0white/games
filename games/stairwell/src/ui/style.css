@@ -1220,3 +1220,24 @@ body {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* Phones: the long clock-rate message wraps instead of ending in an ellipsis; the tutorial prompt takes its
+   own row instead of splitting the tabs; the sheet that holds the optional gate button keeps its height. */
+@media (max-width: 899px) {
+  .state-strip > .clock-rate {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .sheet-tabs > .tutorial-prompt {
+    order: 1;
+    flex: 0 0 100%;
+  }
+  .game.tab-here:not(.has-conversation):not(.decision) .sheet {
+    flex: 0 0 auto;
+    max-height: none;
+  }
+  .game {
+    grid-template-rows: 44px auto minmax(120px, 1.7fr) minmax(182px, 1fr) minmax(0, auto);
+  }
+}
