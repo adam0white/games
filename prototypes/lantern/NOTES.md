@@ -61,3 +61,33 @@ One long request for the next Lantern round. Nothing of it is built yet.
 - Better-looking boats and flames: different models, less plain colours.
 - A fourth shop pack, "Abilities", that sells the powers above. Packs should also keep selling looks for flames, boats and water.
 - Pack opening animation: the pick hops from one hidden item to another, and when it settles the whole screen lights up in that item's colour.
+
+## 2026-11-23: a new thing every night (note #29, first item of note #35's order)
+
+Nights 6 to 20 each add one new thing; it shows up most on its own night and stays for the nights after. The endless river gets them in the same order, one step every 300 points.
+
+| Night | New thing | Rule |
+| --- | --- | --- |
+| 6 | Logs | A trunk lies out from one bank. |
+| 7 | Fog | Stretches where the boat sees 60% as far. |
+| 8 | Whirlpools | Pull the boat sideways within 0.16; the centre is a blow. |
+| 9 | Side wind | Stretches that push the boat at about a quarter of its own sideways speed. |
+| 10 | False embers | Flicker green; taking one costs 0.2 light. |
+| 11 | Gates | Trunks from both banks with one gap of 0.15. |
+| 12 | Rocks that follow | Drift toward the boat at 0.08 a second; red eyes. |
+| 13 | Rain | Stretches where the flame fades 1.6 times as fast. |
+| 14 | Sliding ice | Some ice also slides from side to side. |
+| 15 | Hidden rocks | Only a ripple shows until the rock is 0.45 away. |
+| 16 | Second waterfall | At 80%. |
+| 17 | Spinning rocks | Two rocks turning about a point near one bank. |
+| 18 | Geysers | Deadly only while they blow; a dashed ring while they rest. |
+| 19 | Lightning | Every nine seconds: a flash, then two seconds of seeing 60% as far. |
+| 20 | Islands | A line of rocks down the middle of the river. |
+
+Nights 1 to 5 are unchanged, as the tester asked: the same seeds give the same rivers as before (a fingerprint over 200 rivers matched). `bots.mjs 200 audit` on nights 1 to 20 and the endless river: no closed river (narrowest gap 0.048 on story nights, 0.038 endless), no buried pickup. Each new thing was seen in a Chromium phone-profile screenshot.
+
+Fog, wind and rain each start their first stretch about a tenth of the way down, so a short run still meets the night's new thing. Seven of the fifteen are not solid obstacles (fog, wind, false embers, rain, sliding ice, the second waterfall, lightning); the tester may want some swapped for solid ones.
+
+Not checked: whether nights 6 to 20 are too hard for a person now that they are faster and also hold new things (the careful bot's runs that end in the dark on night 20 rose from 21 to 49 in 100); a real phone; sound.
+
+Still left from note #35, in the tester's order: power-ups, stats to spend points on, better-looking boats and flames, an Abilities pack, the pack-opening animation, tower mode.
