@@ -220,7 +220,7 @@ Checks: `node experiments/kit/check/phone.mjs lantern` on WebKit iPhone 13 and C
 - After each level a card shows what the next level adds. Its buttons are "Climb on to level N" and "Stop".
 - Stopping, losing or leaving ends the climb. The best number of levels cleared is kept, and the next climb starts at level 1, as the tester asked for competition.
 - The menu shows "Tower climb · best level N of 50". New key: `lantern-best-level`, a number. `lantern-best-tower`, the best floor, is still written and no longer shown.
-- **The curve.** The pace grows geometrically, from 1.15 at level 1 to 2.2 at level 50. Level 1 is a little faster than the old tower at night 12's things, and night 20 runs at 1.67. Rows come up to 15% closer and the river narrows by up to 0.012 by level 50.
+- **The curve.** The pace grows geometrically, from 1.15 at level 1 to 2.2 at level 50. (Corrected below: level 1 now starts at 1.2.) Night 20 runs at 1.67. Rows come up to 15% closer and the river narrows by up to 0.012 by level 50.
 - **New things.** Level 1 holds night 4's things, and one more of the nights' new things joins every two levels: all twenty from level 33. The tower no longer depends on the nights opened.
 - **Stats.** A whole climb counts as one run: stats bought before it last every level of that climb.
 - The lab took "exponential" as a fixed share harder each level, about 1.3% faster plus a new thing every second level. A steeper curve over 50 levels would end far past what a person can react to.
@@ -233,3 +233,32 @@ Checks:
 Not checked:
 - How hard levels 10 to 50 feel to a person. Bots react instantly, so they clear 10% to 28% of levels at every height and cannot measure speed.
 - A real phone.
+
+## 2026-11-23: the tower starts harder; crashes differ (note #69, follow-up)
+
+**Correction.** The entry above said tower level 1 was "a little faster than the old tower at night 12's things". That was wrong. The old tower took the nights opened, clamped to 3 to 12. For a player on night 6 that meant pace 1.175 with logs. The first curve's level 1 was 1.15 with night 4's things, so it was easier than the tower the tester called too easy.
+
+**The fix.** Level 1 now runs at 1.2 with night 6's things. The pace still ends at 2.2 at level 50. A new thing joins every two levels, and all twenty are in from level 29. The level card gives the percent faster only from 5% up; below that it just says "faster". Audit, 100 rivers each ridden five ways, at levels 1, 15, 29 and 50: no closed river and no buried pickup. The narrowest gaps are 0.062, 0.055, 0.043 and 0.040.
+
+### Lab experiment: crashes that differ by what was hit
+
+This is the lab's own experiment, a first slice of the tester's crash-effects idea. Each kind of crash has its own look and sound:
+
+| Hit | Effect |
+| --- | --- |
+| A rock, log, island, spinning rock or hidden rock | Half the time the boat sinks: it shrinks and turns under expanding rings, with bubbles. The other half it smashes into flying planks with a crunch. |
+| The bank | The boat tips over onto the bank with a creak and a splash. |
+| Ice | Cracks run across the boat and white shards fly, with a glassy crack. |
+| A whirlpool | The boat spins down and fades, with a falling tone. |
+| A geyser | The boat is thrown up, turning, with a rush of spray. |
+
+The card waits 1.3 s after a crash (was 0.7 s), so the crash can play out. Each crash is recorded in the lab events as `crash` with its cause and effect. To remove the experiment, delete `crashFx`, `wreck` and the `crash` variable in `index.html`.
+
+Checked: each effect was screenshotted in a phone-sized Chromium. A first run found a negative radius, because the frame time can fall just before the crash time; it is clamped and the run is now clean.
+
+Not checked: the sounds on a phone, and whether the tester likes the effects.
+
+### Left as a proposal (2026-11-23)
+
+- The crash-effects pack, where a player picks two or three effects, is still to build on top of this experiment.
+- The flame stays lit over a sunk boat. It could go out with a hiss.

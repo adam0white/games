@@ -88,7 +88,7 @@
 </div></div>
 <div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p><p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p></div></div>
 <script type="module">
-import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, towerStage, climbPace } from './sim.js?v=9'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
+import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, towerStage, climbPace } from './sim.js?v=10'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
 import { readNumber, readJson, write } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
@@ -270,7 +270,7 @@ function begin() {
   const fresh = !tower || climb === 1; if (fresh) { runStats = stats; stats = {}; store.set('lantern-stats', '{}'); } // stats last one run; a whole climb is one run
   s = create((Math.random() * 2 ** 31) | 0, tower ? towerStage(climb) : endless ? 1 : stage, tower ? 'tower' : endless, powersOwned(), runStats, climb);
   const boosted = fresh && Object.values(runStats).some(v => v > 0);
-  target = s.x; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; drag = null; startTap = null;
+  target = s.x; crash = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; drag = null; startTap = null;
   shown = ''; show('play'); hud();
   say((tower ? `Tower level ${climb} of ${LEVELS}` : endless ? 'Endless river' : `Night ${stage}`) + (boosted ? '. Your stats are on for this run' : ''), 1800); floor = 0;
   rec.start({ mode: mode(), night: tower || endless ? 0 : stage, ...(tower ? { level: climb } : {}) });
@@ -291,7 +291,7 @@ function finish() {
     if (won && climb >= LEVELS) { $('title').textContent = 'The top'; $('line').textContent = `You climbed all ${LEVELS} levels of the tower.`; $('go').textContent = 'Climb again from level 1'; }
     else if (won) {
       const faster = Math.round((climbPace(climb + 1) / climbPace(1) - 1) * 100), joins = towerStage(climb + 1) > towerStage(climb) ? ` New: ${ahead(towerStage(climb + 1))}` : '';
-      $('title').textContent = `Level ${climb} cleared`; $('line').textContent = `Level ${climb + 1} is harder: ${faster}% faster than level 1, closer rocks, a narrower river.${joins} Climb on, or stop here with ${best === cleared ? 'a best of' : 'your best still'} ${best}.`;
+      $('title').textContent = `Level ${climb} cleared`; $('line').textContent = `Level ${climb + 1} is harder: ${faster >= 5 ? `${faster}% faster than level 1` : 'faster'}, closer rocks, a narrower river.${joins} Climb on, or stop here with ${best === cleared ? 'a best of' : 'your best still'} ${best}.`;
       $('go').textContent = `Climb on to level ${climb + 1}`; $('toMenu').textContent = 'Stop';
     } else { $('title').textContent = `Level ${climb}`; $('line').textContent = `${why} You cleared ${cleared} level${cleared === 1 ? '' : 's'}. Best ${best} of ${LEVELS}. A new climb starts at level 1.`; $('go').textContent = 'Climb again from level 1'; }
   } else if (endless) {
@@ -305,7 +305,24 @@ function finish() {
     else { $('line').textContent = `${why} ${pct}% of the way to dawn. Best ${best}%.`; $('go').textContent = 'Play again'; }
   }
   $('sub').textContent = gained;
-  setTimeout(() => { if (!playing && screen === 'play') show('card'); }, won ? 2600 : 700);
+  setTimeout(() => { if (!playing && screen === 'play') show('card'); }, won ? 2600 : crash ? 1300 : 700); // a crash plays out before the card
+}
+// Crashes look and sound different by what was hit (the lab's experiment from note #69's crash idea; remove crashFx and its drawing to go back).
+// A rock sinks the boat or smashes it, at random; the bank tips it over the bank; ice cracks it; a whirlpool swallows it; a geyser throws it.
+let crash = null;
+const SINKS = ['rock', 'chaser', 'hidden', 'isle', 'spinner', 'log'];
+function crashFx(cause) {
+  const how = cause === 'bank' ? 'tip' : cause === 'ice' ? 'crack' : cause === 'pool' ? 'swirl' : cause === 'geyser' ? 'throw' : SINKS.includes(cause) && Math.random() < 0.5 ? 'sink' : 'smash';
+  const side = Math.sign(s.x - centre(s, s.y)) || 1;
+  crash = { how, t0: performance.now(), side, bits: Array.from({ length: 9 }, (_, i) => ({ a: i / 9 * 6.28 + Math.random() * 0.5, v: 0.08 + Math.random() * 0.1, r: Math.random() * 6.28, w: (Math.random() - 0.5) * 14 })) };
+  rec.event('crash', { cause, how });
+  if (!snd.ctx) return;
+  if (how === 'sink') { snd.noise(0.25, 0.25, 600); [0, 140, 300, 480].forEach((d, i) => setTimeout(() => tone(260 - 40 * i, 0.18, 0.12, 'sine', -90), d)); shake = 0.5; }
+  else if (how === 'smash') { snd.noise(0.35, 0.45, 900); tone(90, 0.4, 0.3, 'square', -50); setTimeout(() => snd.noise(0.2, 0.2, 2400), 90); shake = 1.1; }
+  else if (how === 'tip') { tone(170, 0.6, 0.18, 'sawtooth', -110); setTimeout(() => snd.noise(0.4, 0.25, 500), 380); shake = 0.6; }
+  else if (how === 'crack') { tone(2400, 0.25, 0.12, 'square', -1800); snd.noise(0.15, 0.3, 4200); setTimeout(() => tone(1800, 0.3, 0.08, 'triangle', -1200), 70); shake = 0.8; }
+  else if (how === 'swirl') { tone(500, 1.1, 0.15, 'sine', -420); snd.noise(0.9, 0.12, 400); }
+  else { snd.noise(0.6, 0.3, 1400); tone(220, 0.7, 0.15, 'sine', 500); shake = 0.7; }
 }
 function hud() {
   const big = endless ? `${score(s)}` : `${Math.floor(progress(s) * 100)}%`, low = playing && !paused && s.light < 0.28, now = `${s.hearts}|${s.taken}|${big}|${low}`;
@@ -400,7 +417,7 @@ function tick() {
     if (e === 'big') { tone(196, 0.5, 0.2, 'square'); setTimeout(() => tone(147, 0.7, 0.2, 'square'), 120); shake = 0.4; say('Bad luck: a bigger boat!', 1700); }
     if (e === 'magnet') { tone(660, 0.3, 0.1, 'triangle'); setTimeout(() => tone(990, 0.5, 0.1, 'triangle'), 90); glow = 1; say('Magnet: embers come to you', 1700); }
     if (e === 'flare') { [523.25, 783.99, 1046.5, 1568].forEach((f, i) => setTimeout(() => tone(f, 0.7, 0.08), i * 70)); glow = 1; say('Flare: the flame holds', 1600); }
-    if (e === 'hit') { tone(70, 0.5, 0.35, 'sawtooth'); shake = 1; }
+    if (e === 'hit') crashFx(s.over);
     if (e === 'out') tone(110, 1.2, 0.2);
     if (e === 'dawn') [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 1.6, 0.1, 'triangle'), i * 180));
   }
@@ -423,6 +440,18 @@ function tick() {
   if (s.over) finish();
 }
 
+// The boat after a crash, drawn about its lantern as the hull is.
+function wreck(now) {
+  const e = Math.max(0, Math.min(1.3, (now - crash.t0) / 1000)), col = skin('boat')[2], id = skin('boat')[0], k = Math.min(1, e / 0.9);
+  const rings = n => { g.strokeStyle = 'rgba(190,225,245,.6)'; g.lineWidth = 2 * dpr; for (let i = 0; i < n; i++) { const r = ((e * 1.4 + i * 0.3) % 1) * 0.09 * unit; g.globalAlpha = 0.7 * (1 - r / (0.09 * unit)); g.beginPath(); g.ellipse(0, 0, r, r * 0.7, 0, 0, 7); g.stroke(); } g.globalAlpha = 1; };
+  const bits = (fill, spread) => { g.fillStyle = fill; for (const b of crash.bits) { const d = b.v * spread * e * unit; g.save(); g.translate(Math.cos(b.a) * d, Math.sin(b.a) * d); g.rotate(b.r + b.w * e); g.globalAlpha = Math.max(0, 1 - e / 1.2); g.fillRect(-0.007 * unit, -0.0025 * unit, 0.014 * unit, 0.005 * unit); g.restore(); } g.globalAlpha = 1; };
+  if (crash.how === 'sink') { rings(3); g.globalAlpha = 1 - k; g.rotate(0.5 * k * crash.side); g.scale(1 - 0.7 * k, 1 - 0.7 * k); hull(g, id, unit, col, 0); g.globalAlpha = 1; }
+  else if (crash.how === 'smash') { if (e < 0.08) hull(g, id, unit, col, 0); bits(col, 1); rings(1); }
+  else if (crash.how === 'tip') { g.translate(crash.side * 0.02 * unit * k, 0); g.rotate(crash.side * 1.35 * k); g.scale(1 - 0.35 * k, 1); hull(g, id, unit, col, 0); }
+  else if (crash.how === 'crack') { hull(g, id, unit, col, 0); g.strokeStyle = '#eaf6ff'; g.lineWidth = 1.5 * dpr; g.beginPath(); for (const b of crash.bits.slice(0, 5)) { g.moveTo(0, 0); g.lineTo(Math.cos(b.a) * 0.04 * unit * Math.min(1, e * 5), Math.sin(b.a) * 0.05 * unit * Math.min(1, e * 5)); } g.stroke(); if (e > 0.4) bits('#dff2ff', 0.6); }
+  else if (crash.how === 'swirl') { rings(4); g.rotate(e * 9); g.scale(1 - 0.85 * k, 1 - 0.85 * k); g.globalAlpha = 1 - 0.6 * k; hull(g, id, unit, col, 0); g.globalAlpha = 1; }
+  else { const up = Math.sin(Math.min(1, e / 1.1) * Math.PI) * 0.12 * unit; g.translate(0, -up); g.rotate(e * 5 * crash.side); g.scale(1 + up / unit * 3, 1 + up / unit * 3); hull(g, id, unit, col, 0); rings(2); }
+}
 function draw(now) {
   const dawn = s.endless ? 0 : Math.max(0, (progress(s) - 0.86) / 0.14), day = s.over === 'dawn' ? Math.min(1, (now - ended) / 2500) : 0;
   const ox = shake * (Math.random() - 0.5) * 14 * dpr, oy = shake * (Math.random() - 0.5) * 14 * dpr;
@@ -494,7 +523,7 @@ function draw(now) {
   // boat
   const bx = sx(s.x), by = sy(s.y), lean = Math.max(-0.5, Math.min(0.5, (target - s.x) * 4));
   g.save(); g.translate(bx, by); g.rotate(lean * 0.5); size += (boat(s) / BOAT - size) * 0.2; g.scale(size * 1.2, size * 1.2); // drawn a little larger than it collides
-  if (playing) wake(g, unit, now / 1000); hull(g, skin('boat')[0], unit, skin('boat')[2], now / 1000);
+  if (crash) wreck(now); else { if (playing) wake(g, unit, now / 1000); hull(g, skin('boat')[0], unit, skin('boat')[2], now / 1000); }
   g.restore();
   // darkness with a hole of light
   const flick = 1 + Math.sin(now / 90) * 0.015 + Math.sin(now / 37) * 0.01, r = (sight(s) + glow * 0.09) * unit * flick, flash = dazzle(s) < 0;
