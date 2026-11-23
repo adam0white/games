@@ -437,3 +437,7 @@ Not checked: the deployed endpoint, a real phone, two real players.
 
 Owner's answer, 2026-11-23 21:23Z: "Yes shared stuff in any game is okay". A basic rude-name filter was added on the server
 (a listed word stores the name as "Player"). Still open: false scores (the page reports its own score).
+
+## 2026-11-23: first-time help (the owner's request for beginners)
+
+After 1.5 s of play with no input, a see-through track near the bottom of the screen with a finger sliding along it shows how to steer (`experiments/kit/hint.js`, kind `drag`). It goes on the first touch or key in play and never shows again on that device. New key `lantern-hint`, `'1'` once the player has given input in play. A save with `lantern-bank` means a returning player, who never sees it. Erase everything removes the key with the other `lantern-` keys, so a tester sees the hint again. 1.5 s rather than 3 s because a boat left alone met a rock or the bank after 3.4 to 8.7 s in six emulated runs. Checks: `hint lantern` in the phone check. Not verified on a real phone.

@@ -127,6 +127,47 @@ async function noZoomed(page) {
   });
   assert.match(r.meta, /maximum-scale=1/); assert.deepEqual(r.loose, [], 'no visible element at touch-action auto'); assert.ok(r.cancelled, 'a double tap does not zoom');
 }
+// The first-time help (kit/hint.js). On a fresh save: not on the menu, not before the delay, shown after it, hidden while the
+// pause card covers the game, and a real press on it reaches the game (it never takes input). The press ends it for good and
+// writes its key. A returning player (the game's own save, or the hint's key alone) never sees it. With reduced motion it stands
+// still with words. g: path, play (the button that starts a run), resume (the pause card's button), key, delay, moved (did the
+// press reach the game), alive (keep the run going while the check waits), legacy (a save in the game's existing format).
+async function hinted(page, g) {
+  const on = () => page.evaluate(() => !!document.querySelector('.kit-hint.on'));
+  // Leave the game first: a game may save as its page goes away (Ant Promotion does), which would make this player a returning one.
+  const fresh = async (seed = {}) => { await page.goto(`${base}/notes/button.js`); await page.evaluate(seed => { localStorage.clear(); for (const [k, v] of Object.entries(seed)) localStorage.setItem(k, v); }, seed); await page.goto(`${base}${g.path}`); await page.waitForSelector(g.play); };
+  const play = async () => { await page.click(g.play); if (g.alive) await page.evaluate(g.alive); };
+  const idle = async ms => { for (let t = 0; t < ms; t += 500) { if (g.alive) await page.evaluate(g.alive); await sleep(500); } };
+  await fresh();
+  await sleep(g.delay + 500); assert.equal(await on(), false, 'hint: not on the menu');
+  await play(); await sleep(g.delay / 2); assert.equal(await on(), false, 'hint: not before the delay');
+  await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown after the delay', g.delay + 4000);
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.kit-hint .label')).display), 'none', 'hint: no words while it moves');
+  await page.evaluate(() => dispatchEvent(new Event('blur'))); await sleep(200); assert.equal(await on(), false, 'hint: hidden under the pause card');
+  await page.click(g.resume); await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: back after resume (a tap on a card is not play input)', 2000);
+  if (g.alive) await page.evaluate(g.alive);
+  // A real press where the knob is: the page's own hit test says the game is under it, and the game moves.
+  const { x, y, top } = await page.evaluate(() => { const r = document.querySelector('.kit-hint .knob').getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2; return { x, y, top: document.elementFromPoint(x, y)?.id }; });
+  assert.equal(top, 'c', 'hint: the game canvas is what a finger on the hint touches');
+  const before = await page.evaluate(g.before ?? (() => null));
+  await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 40, y, { steps: 4 });
+  assert.ok(await page.evaluate(g.moved, before), 'hint: a press on the hint reaches the game'); await page.mouse.up();
+  assert.equal(await page.evaluate(() => document.querySelector('.kit-hint')), null, 'hint: gone on the first input');
+  assert.equal(await page.evaluate(k => localStorage.getItem(k), g.key), '1', 'hint: the player is remembered');
+  await idle(g.delay + 500); assert.equal(await on(), false, 'hint: does not come back');
+  // Returning players.
+  for (const [seed, what] of [[g.legacy, 'a save in the game\'s existing format'], [{ [g.key]: '1' }, 'the hint\'s own key']]) {
+    if (!seed) continue;
+    await fresh(seed); await play(); await idle(g.delay + 1000); assert.equal(await on(), false, `hint: never shown to a returning player (${what})`);
+  }
+  // Reduced motion: a still copy with words.
+  await page.emulateMedia({ reducedMotion: 'reduce' }); await fresh(); await play();
+  await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown with reduced motion', g.delay + 4000);
+  const pose = () => page.evaluate(() => document.querySelector('.kit-hint .knob').style.transform);
+  const p0 = await pose(); await sleep(400);
+  assert.equal(await pose(), p0, 'hint: still with reduced motion'); assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.kit-hint .label')).display), 'block', 'hint: words with reduced motion');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+}
 // A game that follows the house layout: #play on the menu, #pause in play, a state hook with `screen`, and a save blob.
 async function started(page, slug, hook, toMenu) {
   const wait = async (fn, what) => { try { await page.waitForFunction(fn, hook, { timeout: 8000 }); } catch { throw new Error(`timed out waiting for: ${what}`); } };
@@ -160,7 +201,7 @@ const GAMES = {
     // A save in the format players already have.
     await page.goto(`${base}/lantern/`);
     await page.evaluate(LAB_LOCAL);
-    await page.evaluate(() => { localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('lantern-best-endless', '55'); localStorage.setItem('lantern-best-tower', '4'); localStorage.setItem('lantern-stats', '{"red":1}'); localStorage.setItem('lantern-off', '[]'); localStorage.setItem('lantern-best-level', '0'); localStorage.setItem('lantern-tower-at', '1'); localStorage.setItem('lantern-rebirths', '0'); localStorage.setItem('lantern-crash', '[]'); localStorage.setItem('notes.k', 'check'); });
+    await page.evaluate(() => { localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('lantern-best-endless', '55'); localStorage.setItem('lantern-best-tower', '4'); localStorage.setItem('lantern-stats', '{"red":1}'); localStorage.setItem('lantern-off', '[]'); localStorage.setItem('lantern-best-level', '0'); localStorage.setItem('lantern-tower-at', '1'); localStorage.setItem('lantern-rebirths', '0'); localStorage.setItem('lantern-crash', '[]'); localStorage.setItem('lantern-hint', '1'); localStorage.setItem('notes.k', 'check'); });
     await page.reload();
     let st = await state();
     assert.equal(st.opened, 3, 'old save: opened night'); assert.equal(st.bank, 120, 'old save: bank'); assert.ok(st.owned.includes('red'), 'old save: owned'); assert.equal(st.worn.boat, 'red', 'old save: worn');
@@ -375,7 +416,7 @@ const GAMES = {
     await page.evaluate(LAB_LOCAL);
     // A save in the format players already have: a level-2 animal, a skin, the soft look.
     const stack = await page.evaluate(() => { const F = window.__ant.FORMS; return [F.findIndex(f => f && f.level === 1), F.findIndex(f => f && f.level === 2)]; });
-    await page.evaluate(([k, stack]) => { localStorage.setItem(k, JSON.stringify({ skin: { c: '#c0271f', p: 'stripes' }, stack, xp: 3, sound: true, look: 2 })); localStorage.setItem('notes.k', 'check'); }, [KEY, stack]);
+    await page.evaluate(([k, stack]) => { localStorage.setItem(k, JSON.stringify({ skin: { c: '#c0271f', p: 'stripes' }, stack, xp: 3, sound: true, look: 2 })); localStorage.setItem('ant-promotion:hint', '1'); localStorage.setItem('notes.k', 'check'); }, [KEY, stack]);
     await page.reload(); await until(page, () => window.__ant, 'game script');
     assert.match(await page.textContent('#continue'), /^Continue as /, 'old save: continues'); assert.equal(await page.textContent('#rules'), 'Rules: Wild', 'Wild is the default (note #88)'); assert.match(await page.textContent('#look'), /^Look: /);
     await until(page, () => document.getElementById('notes-button'), 'notes button');
@@ -510,9 +551,15 @@ const GAMES = {
     // The run ends with an end card; the page keeps nothing in storage, so a reload starts clean.
     await page.evaluate(() => { window.lanternSim().light = 0.0001; });
     await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'end card');
-    assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(k => k !== 'notes.k')), [], 'no saved keys');
+    assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(k => k !== 'notes.k')), ['lantern-3d:hint'], 'no saved keys but the first-time help\'s (kit/hint.js)');
     await page.reload(); await until(page, () => window.lanternState, 'game script'); assert.equal((await state()).screen, 'menu');
   },
+  // The first-time help (kit/hint.js) on each page that uses it.
+  'hint ant-promotion': page => hinted(page, { path: '/ant-promotion/', play: '#continue', resume: '#resume', key: 'ant-promotion:hint', delay: 3000, moved: () => window.__ant.input.x > 0, legacy: { 'ant-promotion:v1': '{"skin":{"c":"#c0271f","p":"stripes"},"xp":0,"sound":true,"look":2}' } }),
+  'hint lantern': page => hinted(page, { path: '/lantern/', play: '#play', resume: '#go', key: 'lantern-hint', delay: 1500, before: () => window.lanternState().target, moved: t => window.lanternState().target !== t, alive: () => { const s = window.lanternSim(); s.safe = 60; s.light = 1; }, legacy: { 'lantern-bank': '120', 'lantern-night': '3' } }),
+  'hint lab/ant-nemesis': page => hinted(page, { path: '/lab/ant-nemesis/?ai=0', play: '#continue', resume: '#resume', key: 'ant-nemesis:hint', delay: 3000, moved: () => window.__ant.input.x > 0, legacy: { 'ant-nemesis:v1': '{"sound":true}' } }),
+  'hint lab/ant-wilds': page => hinted(page, { path: '/lab/ant-wilds/', play: '#continue', resume: '#resume', key: 'ant-wilds:hint', delay: 3000, moved: () => window.__ant.input.x > 0, legacy: { 'ant-wilds:v1': '{"sound":true}' } }),
+  'hint lab/lantern-3d': page => hinted(page, { path: '/lab/lantern-3d/', play: '#play', resume: '#go', key: 'lantern-3d:hint', delay: 1500, before: () => window.lanternState().target, moved: t => window.lanternState().target !== t, alive: () => { const s = window.lanternSim(); s.safe = 60; s.light = 1; } }),
   // Old /proto/ links move to the top level with their query; the new URL plays to its first frame.
   async 'old links'(page) {
     const response = await page.goto(`${base}/proto/lantern/?x=1`);

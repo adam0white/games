@@ -57,6 +57,7 @@ import { sound } from '../../kit/audio.js';
 import { onLeave, isPauseKey } from '../../kit/pause.js';
 import { screens } from '../../kit/screens.js';
 import { drag } from '../../kit/drag.js';
+import { hint } from '../../kit/hint.js';
 
 const $ = id => document.getElementById(id);
 const query = new URLSearchParams(location.search);
@@ -149,6 +150,7 @@ function aim(x) { const c = centre(s, s.y), h = half(s, s.y) + 0.02; target = Ma
 function mouseX(e) { const row = R.boatRow(); return (e.clientX * dpr - row.left) / row.unit; }
 // The tap that ends a pause does not steer until that finger has moved a clear distance (experiments/kit/drag.js).
 const steer = drag(canvas, { playing: () => playing, paused: () => paused, resume: () => resume(), from: () => s.x, travel: dx => dx * dpr / unit * gain, aim, mouse: e => aim(mouseX(e)), settle: 12 });
+hint(canvas, { kind: 'drag', key: 'lantern-3d:hint', delay: 1500, bottom: 56, when: () => playing && !paused && screen === 'play' }); // this page keeps no save, so only the hint's own key remembers the player
 
 $('play').addEventListener('click', begin);
 $('go').addEventListener('click', () => { if (paused) resume(); else if (performance.now() - ended > 600) begin(); });

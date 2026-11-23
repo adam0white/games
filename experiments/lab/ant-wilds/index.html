@@ -116,6 +116,7 @@ import { sound } from '../../kit/audio.js';
 import { onLeave, isPauseKey } from '../../kit/pause.js';
 import { screens } from '../../kit/screens.js';
 import { stick } from '../../kit/stick.js';
+import { hint } from '../../kit/hint.js';
 
 const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d');
 const KEY = 'ant-wilds:v1', query = new URLSearchParams(location.search);
@@ -225,6 +226,7 @@ function skins() {
 
 // ---------- input: drag from where the finger lands; the distance dragged sets the speed
 const pad = stick(cv, { when: () => mode === 'play', reach: 55, leash: 70, dead: 0.15 }); // experiments/kit/stick.js
+hint(cv, { kind: 'stick', key: 'ant-wilds:hint', when: () => mode === 'play', played: readJson(KEY) !== null }); // a first-time player who does not touch sees how (experiments/kit/hint.js)
 addEventListener('keydown', e => { if (isPauseKey(e)) { if (mode === 'play') show('paused'); else if (mode === 'paused') show('play'); return; } keys.add(e.key.toLowerCase()); if (e.key.startsWith('Arrow')) e.preventDefault(); });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => keys.clear());
