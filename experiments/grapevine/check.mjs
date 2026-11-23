@@ -53,6 +53,7 @@ function dragSteps(nodes, route, hold = false) {
 }
 const tap = (page, p) => finger(page, '#c', [['pointerdown', p.x, p.y], ['pointerup', p.x, p.y]]);
 const levelNow = async page => page.evaluate(() => JSON.parse(JSON.stringify(window.grapevineLevel())));
+let colourReport = null;
 const shot = (page, phone, name) => page.screenshot({ path: join(SHOTS, `${phone}-${name}.png`) });
 
 async function run(page, phone) {
@@ -92,6 +93,7 @@ async function run(page, phone) {
   // Level 2 by taps: first a wrong route (the listener is puzzled), then the right one.
   await page.click('#next');
   st = await state(page); assert.equal(st.level, 2);
+  await sleep(500); await shot(page, phone, '2c-level2-tutorial');
   lv = await levelNow(page); best = solve(lv).best;
   const wrongMid = lv.edges.flat().find(v => v !== lv.from && v !== lv.to && !best.includes(v) && lv.edges.some(e => e.includes(v) && e.includes(lv.to)));
   for (const v of [wrongMid, lv.to]) await tap(page, st.nodes[v]);
@@ -108,6 +110,7 @@ async function run(page, phone) {
   await page.evaluate(() => dispatchEvent(new Event('blur')));
   assert.ok((await state(page)).paused, 'losing focus pauses');
   await page.keyboard.press('p'); assert.ok(!(await state(page)).paused, 'P resumes');
+  await sleep(500); await shot(page, phone, '2d-level3-tutorial');
 
   // Three wrong sends on level 3 bring the hint; each press shows one more hop of a best route.
   lv = await levelNow(page); best = solve(lv).best;
@@ -217,6 +220,85 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
       console.log('ok   grapevine on chromium 360x640');
     } catch (e) { failed++; console.log(`FAIL grapevine on chromium 360x640: ${e.message}`); }
     await small.close();
+    // Colour cues: every colour carries a mark, so the four stay apart for red-green colour blindness and in grey.
+    // Draws tokens and painter badges with art.js, then simulates deuteranopia (the Machado 2009 matrix, full
+    // severity, applied in linear RGB) and greyscale on the pixels, and compares every pair of colours.
+    const cb = await browser.newContext({ viewport: { width: 420, height: 560 }, deviceScaleFactor: 2 });
+    const p4 = await cb.newPage(), errs4 = [];
+    p4.on('pageerror', e => errs4.push(String(e))); p4.on('console', m => { if (m.type() === 'error') errs4.push(m.text()); });
+    try {
+      await p4.goto(`${base}/grapevine/`); await until(p4, () => window.grapevineState, 'state hook');
+      const result = await p4.evaluate(async () => {
+        const art = await import('./art.js');
+        const S = 2, cell = 100;
+        const lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+        const enc = v => 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+        const M = [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.011820, 0.042940, 0.968881]];
+        const views = {
+          normal: (r, g, b) => [r, g, b],
+          deuteranopia: (r, g, b) => { const L = [lin(r), lin(g), lin(b)]; return M.map(row => enc(Math.min(1, Math.max(0, row[0] * L[0] + row[1] * L[1] + row[2] * L[2])))); },
+          grey: (r, g, b) => { const y = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b); const v = enc(y); return [v, v, v]; },
+        };
+        // one canvas per colour: a single circle token, the same for all four but the colour
+        const one = c => {
+          const cv = document.createElement('canvas'); cv.width = cv.height = cell * S; const g = cv.getContext('2d'); g.scale(S, S);
+          g.fillStyle = '#3b2a5c'; g.fillRect(0, 0, cell, cell);
+          art.token(g, { s: 0, c, n: 1 }, cell / 2, cell / 2, 40);
+          return g.getImageData(0, 0, cv.width, cv.height).data;
+        };
+        const raw = [0, 1, 2, 3].map(one), out = {};
+        for (const [name, f] of Object.entries(views)) {
+          const imgs = raw.map(d => { const o = new Float32Array(d.length / 4 * 3); for (let i = 0, j = 0; i < d.length; i += 4, j += 3) { const v = f(d[i], d[i + 1], d[i + 2]); o[j] = v[0]; o[j + 1] = v[1]; o[j + 2] = v[2]; } return o; });
+          // for each pair: the share of the coloured shape (radius 22 around the middle) whose colour differs
+          // by more than 40 (of 255) in some channel
+          const pairs = {}, side = cell * S, mid = side / 2, rad = 22 * S;
+          for (let a = 0; a < 4; a++) for (let b = a + 1; b < 4; b++) {
+            let n = 0, all = 0; const A = imgs[a], B = imgs[b];
+            for (let i = 0, k = 0; i < A.length; i += 3, k++) {
+              if (Math.hypot(k % side - mid, Math.floor(k / side) - mid) > rad) continue;
+              all++;
+              if (Math.max(Math.abs(A[i] - B[i]), Math.abs(A[i + 1] - B[i + 1]), Math.abs(A[i + 2] - B[i + 2])) > 40) n++;
+            }
+            pairs[`${a}-${b}`] = n / all;
+          }
+          out[name] = pairs;
+        }
+        // a sheet for the eye: tokens of each colour in four shapes and counts, and the painter badges, in three views
+        const sheet = document.createElement('canvas'); const SW = 400, SH = 520;
+        sheet.width = SW * S; sheet.height = SH * S; sheet.style.cssText = `position:fixed;left:10px;top:20px;width:${SW}px;height:${SH}px;z-index:99`;
+        const sg = sheet.getContext('2d'); sg.scale(S, S); sg.fillStyle = '#3b2a5c'; sg.fillRect(0, 0, SW, SH);
+        const drawSet = (g, y0) => {
+          g.fillStyle = '#3b2a5c'; g.fillRect(0, y0, SW, 180);
+          for (let c = 0; c < 4; c++) {
+            const x = 50 + c * 100;
+            art.token(g, { s: 0, c, n: 1 }, x - 22, y0 + 32, 22);
+            art.token(g, { s: 3, c, n: 1 }, x + 22, y0 + 32, 22);
+            art.token(g, { s: 2, c, n: 2 }, x - 22, y0 + 80, 22);
+            art.token(g, { s: 1, c, n: 3 }, x + 22, y0 + 80, 22);
+            art.badge(g, { kind: 'paint', arg: c }, x, y0 + 130, 60, 26);
+          }
+        };
+        drawSet(sg, 0);
+        const base = sg.getImageData(0, 0, SW * S, 160 * S);
+        [['deuteranopia', 180], ['grey', 360]].forEach(([name, y0]) => {
+          const d = new ImageData(new Uint8ClampedArray(base.data), base.width, base.height);
+          for (let i = 0; i < d.data.length; i += 4) { const v = views[name](d.data[i], d.data[i + 1], d.data[i + 2]); d.data[i] = v[0]; d.data[i + 1] = v[1]; d.data[i + 2] = v[2]; }
+          sg.putImageData(d, 0, y0 * S);
+        });
+        sg.fillStyle = '#fff4dc'; sg.font = '12px sans-serif';
+        sg.fillText('normal', 4, 156); sg.fillText('deuteranopia (simulated)', 4, 336); sg.fillText('greyscale', 4, 516);
+        document.body.append(sheet);
+        return out;
+      });
+      await sleep(100); await p4.screenshot({ path: join(SHOTS, 'colour-cues.png'), clip: { x: 10, y: 20, width: 400, height: 520 } });
+      for (const view of ['deuteranopia', 'grey']) for (const [pair, share] of Object.entries(result[view]))
+        assert.ok(share > 0.03, `${view}: colours ${pair} differ on ${(100 * share).toFixed(1)}% of a token's shape`);
+      assert.deepEqual(errs4, []);
+      const worst = view => Math.min(...Object.values(result[view])) * 100;
+      console.log(`ok   grapevine colour cues: least different pair covers ${worst('deuteranopia').toFixed(1)}% of a token's shape under deuteranopia, ${worst('grey').toFixed(1)}% in grey`);
+      colourReport = result;
+    } catch (e) { failed++; console.log(`FAIL grapevine colour cues: ${e.message}`); }
+    await cb.close();
     // Desktop: 1280 x 800 with a mouse. The menu fits, and level 1 is solved by a mouse drag.
     const desk = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const p3 = await desk.newPage(), errs3 = [];
@@ -231,6 +313,10 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
       await sleep(100); await shot(p3, 'desktop', '2-level1');
       await p3.mouse.up();
       await until(p3, () => window.grapevineState().result === 'won', 'desktop win');
+      await p3.goto(`${base}/grapevine/?level=29`); await until(p3, () => window.grapevineState, 'state hook');
+      await p3.click('#play'); const s29 = await state(p3);
+      assert.ok(s29.nodes.every(n => Math.abs(n.x - 640) <= 300), 'the board stays a phone-wide column on desktop');
+      await sleep(300); await shot(p3, 'desktop', '3-level29');
       assert.deepEqual(errs3, []);
       console.log('ok   grapevine on chromium desktop 1280x800');
     } catch (e) { failed++; console.log(`FAIL grapevine on chromium desktop: ${e.message}`); }
@@ -239,5 +325,6 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   await browser.close();
 }
 server.close();
+if (colourReport && process.env.VERBOSE) console.log(JSON.stringify(colourReport));
 console.log(`screenshots in ${SHOTS}`);
 process.exit(failed ? 1 : 0);

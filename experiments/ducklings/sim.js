@@ -59,7 +59,8 @@ export const STAGES = [
 ];
 export const LAST_STAGE = STAGES.length - 1;
 // endless: each lily-pad checkpoint adds time, more for a longer line, so losing ducklings shortens the run
-export const CHECK_TIME = 3, CHECK_PER = 1.2;
+export const CHECK_TIME = 2, CHECK_PER = 3, CHECK_CAP = 6;
+export const checkGain = n => CHECK_TIME + CHECK_PER * Math.min(n, CHECK_CAP);
 export const ENDLESS_AFTER = 3; // endless opens when stage 3 is done
 export const stageSeed = n => 7919 * n + 13;
 
@@ -320,7 +321,7 @@ function spreadLost(lost, rows) {
   return per;
 }
 const ENDLESS_POOL = [['log', 'pike', 'log2', 'reeds'], ['turtle', 'bike', 'log2', 'pike'], ['gust', 'heron', 'bike', 'turtle', 'log2', 'pike']];
-function endlessAhead(s) {
+export function endlessAhead(s) {
   while (s.top < s.mom.y + 3.5) {
     const d = Math.min(8, Math.floor(s.rowCount / 3));
     const g = rng(s.seed + s.rowCount * 131);
@@ -438,7 +439,7 @@ export function step(s, target, quack = false) {
   // endless: lily-pad checkpoints give time and score the line
   if (s.endless) {
     s.best = Math.max(s.best, m.y);
-    for (const c of s.checkpoints) if (!c.got && m.y > c.y) { c.got = true; const n = s.line.length, add = CHECK_TIME + CHECK_PER * Math.min(n, 5); s.time += add; s.score += 20 * n * (n + 1) / 2 + 10; s.events.push({ type: 'check', n, add }); }
+    for (const c of s.checkpoints) if (!c.got && m.y > c.y) { c.got = true; const n = s.line.length, add = checkGain(n); s.time += add; s.score += 20 * n * (n + 1) / 2 + 10; s.events.push({ type: 'check', n, add }); }
   }
   // home
   if (s.nest && !s.home && Math.hypot(m.x - s.nest.x, m.y - s.nest.y) < NEST_R - 0.02) { s.home = true; s.events.push({ type: 'home' }); }

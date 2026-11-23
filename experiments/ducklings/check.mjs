@@ -88,6 +88,11 @@ async function run(name, engine, device, full) {
       await page.goto(`${base}/ducklings/?level=4`); await page.click('#play');
       await drive(page, 6000); await shot('2-stage4');
       await tap(page, '#pause'); await page.click('#pauseMenu');
+      // bikes warn often: a warning under the HUD is repeated below it
+      await page.goto(`${base}/ducklings/?level=5&seed=5`); await page.click('#play');
+      await drive(page, 12000, { t: 6, path: join(SHOTS, `${name}-3-stage5.png`) });
+      assert.ok((await state(page)).hudPeeks > 0, 'a warning under the HUD shows below it');
+      await tap(page, '#pause'); await page.click('#pauseMenu');
       assert.deepEqual(errors, [], 'page errors'); console.log(`ok   ${name}`); return true;
     }
     // Play: audio starts in the tap; stage 1 waits for the first touch with a ghost finger
@@ -102,6 +107,8 @@ async function run(name, engine, device, full) {
     await finger(page, [['pointerdown', st.mom.sx, st.mom.sy - 20]]);
     await until(page, y => window.ducklingsState().mom.y > y + 0.05, 'she swims up toward the finger', 5000, y0);
     st = await state(page); assert.ok(!st.waiting && st.t > 0, 'the sim runs after the touch');
+    assert.ok(st.rollCalls >= 1, 'the first touch starts the roll call');
+    await page.waitForTimeout(700); await shot('2b-rollcall');
     await finger(page, [['pointerup', st.mom.sx, st.mom.sy]]);
     // a second finger while one steers is a quack
     await finger(page, [['pointerdown', st.mom.sx, st.mom.sy + 90], ['pointerdown', 40, 300, 8], ['pointerup', 40, 300, 8]]);

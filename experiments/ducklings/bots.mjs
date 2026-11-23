@@ -7,12 +7,24 @@
 import assert from 'node:assert/strict';
 import { create, step, stars, STAGES, LAST_STAGE, DT, SPEED, GAP, R_MOM, R_DUCK, LINE_MAX, WARN_MIN, QUACK_TIME, QUACK_SQUEEZE, TRAITS,
   hitAny, moveMom, pathAt, stepDelay } from './sim.js';
+import { bands, routeCheck } from './route.mjs';
 
 const LOOK = 0.1, STEPS = 42; // look-ahead: 4.2 s in 0.1 s steps, long enough for the tail of a long line
 const DIRS = 16;
 
 // Where to go next: the nearest waiting duckling not far behind, else the nest (or onward, on the endless pond).
-export function goalOf(s) {
+export function goalOf(s) { return stepping(s, wantOf(s)); }
+// Cross one hazard band at a time: if a band lies between her and the goal, aim for the free water just past it,
+// so she can stop there and let the line bunch before the next band (a person sees those calm strips too).
+let bandCache = null;
+function stepping(s, goal) {
+  if (!bandCache || bandCache.s !== s || bandCache.n !== s.hazards.length) bandCache = { s, n: s.hazards.length, list: bands(s, -1, 1e9) };
+  const m = s.mom;
+  if (goal.y > m.y) { const b = bandCache.list.find(b => b.b > m.y + 0.02 && b.a < goal.y); if (b && b.b + 0.04 < goal.y) return { x: goal.x, y: b.b + 0.04 }; }
+  else { const b = [...bandCache.list].reverse().find(b => b.a < m.y - 0.02 && b.b > goal.y); if (b && b.a - 0.04 > goal.y) return { x: goal.x, y: b.a - 0.04 }; }
+  return goal;
+}
+function wantOf(s) {
   const m = s.mom; let best = null, bestD = Infinity;
   if (s.line.length < LINE_MAX) for (const l of s.lost) {
     if (l.y < m.y - 1.6) continue;
@@ -170,14 +182,27 @@ check(sumG <= sumP * 0.8, 'greedy (mother only) brings home clearly fewer than p
   check(worst >= 0.8, 'planner reaches the nest on most other layouts');
 }
 
-// 5. endless
+// 5. endless: a way through exists (checked without the bots), and planning beats carelessness
 {
-  console.log('\nendless, 4 seeds, up to 180 s');
-  for (const name of ['planner', 'greedy', 'idle']) {
-    const out = [];
-    for (let k = 1; k <= 4; k++) { const { s } = play({ endless: true, seed: k * 101 }, BOTS[name], 180); out.push(`${s.score}${s.over ? '' : '+'}(${s.why ?? 'alive'}, ${s.best.toFixed(0)}m)`); }
-    console.log(row([name, out.join('  ')], [8, 80]));
+  // route.mjs: every hazard band in the first 60 m can be crossed by a line of 6 waiting at most 15 s, and the
+  // first-crossing clock stays ahead of dusk at every checkpoint. 30 seeds.
+  let sealed = 0, late = 0;
+  for (let k = 1; k <= 30; k++) { const r = routeCheck(k * 101, { yEnd: 60, n: 6 }); if (!r.ok) { sealed++; console.log('sealed', k * 101, JSON.stringify(r.fails)); } if (r.dusk !== null) { late++; console.log('dusk before 60 m', k * 101, r.dusk); } }
+  console.log(`\nendless route check, 30 seeds to 60 m: ${30 - sealed} passable, ${30 - late} on time`);
+  check(sealed === 0 && late === 0, 'endless: the first 60 m always has a passable route in time');
+  // planner against greedy, 20 seeds, score at 90 s or at the end
+  console.log('endless, 20 seeds, up to 90 s: score (end, distance, line)');
+  let wins = 0; const W3 = [6, 26, 26, 6];
+  console.log(row(['seed', 'planner', 'greedy', 'idle'], W3));
+  for (let k = 1; k <= 20; k++) {
+    const seed = k * 101, out = {};
+    for (const name of ['planner', 'greedy', 'idle']) { const { s } = play({ endless: true, seed }, BOTS[name], 90); out[name] = s; }
+    const f = s => `${s.score} (${s.why ?? 'alive'}, ${s.best.toFixed(0)}m, ${s.line.length})`;
+    wins += out.planner.score > out.greedy.score;
+    console.log(row([seed, f(out.planner), f(out.greedy), out.idle.score], W3));
   }
+  console.log(`planner beats greedy on ${wins} of 20`);
+  check(wins >= 16, 'endless: planner beats greedy on at least 80% of 20 seeds');
 }
 
 console.log(`\n${failed ? failed + ' FAILED' : 'all checks passed'} in ${((Date.now() - started) / 1000).toFixed(1)} s`);

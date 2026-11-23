@@ -106,17 +106,17 @@ The bots check:
 | 13 | Carved | 7 | 10 | 4 | 2 | 10 | fails | 51% | carve |
 | 14 | Star-maker | 8 | 8 | 4 | 1 | 1 | fails | 58% | carve |
 | 15 | Chips fly | 9 | 10 | 6 | 1 | 3 | fails | 44% | carve |
-| 16 | Not so | 6 | 7 | 3 | 1 | 1 | fails | 40% | flip |
+| 16 | Not so | 6 | 7 | 4 | 2 | 2 | fails | 45% | flip |
 | 17 | Quite the opposite | 7 | 7 | 5 | 1 | 2 | fails | 51% | flip |
 | 18 | Back and forth | 9 | 11 | 7 | 1 | 8 | fails | 47% | flip |
 | 19 | Not red! | 7 | 8 | 5 | 1 | 1 | fails | 44% | timid |
 | 20 | Tiptoe | 8 | 11 | 4 | 1 | 1 | fails | 35% | timid |
 | 21 | Hush | 9 | 11 | 7 | 1 | 1 | fails | 35% | timid |
 | 22 | Bedtime | 8 | 14 | 7 | 3 | 28 | fails | 38% | once |
-| 23 | Lights out | 7 | 9 | 7 | 1 | 1 | fails | 11% | once |
+| 23 | Lights out | 8 | 10 | 7 | 3 | 4 | fails | 32% | once |
 | 24 | Night owls | 9 | 13 | 5 | 2 | 2 | fails | 30% | once |
-| 25 | Pretty bird | 6 | 6 | 4 | 1 | 1 | fails | 46% | parrot |
-| 26 | Echo | 8 | 10 | 6 | 1 | 4 | fails | 15% | parrot |
+| 25 | Pretty bird | 6 | 7 | 4 | 1 | 1 | fails | 22% | parrot |
+| 26 | Echo | 8 | 11 | 5 | 1 | 3 | fails | 20% | parrot |
 | 27 | Says it twice | 9 | 11 | 5 | 1 | 2 | fails | 20% | parrot |
 | 28 | Market day | 9 | 11 | 7 | 1 | 9 | fails | 31% | mix |
 | 29 | Festival | 9 | 12 | 6 | 1 | 4 | fails | 25% | mix |
@@ -124,12 +124,13 @@ The bots check:
 
 Summary of the run:
 - Solver bot: won 30/30 levels, 90/90 stars.
-- Random bot: won 49.2% of 12,000 level attempts, 1.24 stars per attempt.
+- Random bot: won 49.4% of 12,000 level attempts, 1.24 stars per attempt.
+- Ramp (random-bot win rate, groups of three from L4): 70% 60% 57% 51% 47% 38% 33% 21% 24%.
 - Do-nothing bot (sends the teller's message as it is): won 0/30.
 - Straight path: solves only levels 1–2.
 - Daily villages for 2026: 365/365 solvable and repeatable, 0 fallbacks. Shortest route 5–8 hops, mean 6.0.
 
-The random bot is a weak measure: it walks only along paths and gets 3 sends, so the small early levels are easy for it on purpose. The ramp is not smooth everywhere. L23 (11%) is harder for the random bot than L24–25.
+The random bot is a weak measure: it walks only along paths and gets 3 sends, so the small early levels are easy for it on purpose. Since the follow-up below, `bots.mjs` asserts the ramp: each level from L4 is within 12 points of the median of the five levels around it, and each group of three is no easier on average than the group before, give or take 5 points. The last group (mixed villagers) is 3 points easier than the parrot group, inside that tolerance.
 
 ## What the browser check covers (`check.mjs`)
 
@@ -157,7 +158,13 @@ A third pass runs Chromium at 360x640. It checks:
 
 A fourth pass runs Chromium at 1280x800 with a mouse. It takes a menu screenshot and solves level 1 by a mouse drag.
 
-Last run: ok on webkit, ok on chromium, ok on chromium 360x640, ok on chromium desktop 1280x800.
+The desktop pass also opens level 29 and checks that every villager stays within 300 px of the middle.
+
+A colour pass (Chromium) draws tokens and painter badges with `art.js`, then simulates deuteranopia and greyscale on the pixels and compares every pair of the four colours (see the follow-up below).
+
+The main pass also takes screenshots of the level 2 and level 3 tutorials.
+
+Last run: ok on webkit, ok on chromium, ok on chromium 360x640, ok on colour cues, ok on chromium desktop 1280x800.
 
 ## Reduced motion
 
@@ -168,8 +175,8 @@ With `prefers-reduced-motion: reduce`: no screen shake, no hint-button nudge, no
 - Not run on a real phone.
 - Audio was not heard on a real phone; only the WebAudio calls ran in the headless browsers.
 - No person has played it. The quality bar ("a new person solves L1–3 without reading anything, and smiles") is untested.
-- Desktop: only level 1 was played with a mouse, at 1280x800. On wide screens the board stays a narrow column in the middle; this is readable but leaves the sides empty.
-- Colour-blind readability is not checked. The contrarian pairs red with green; shapes and counts carry no colour information.
+- Desktop: only level 1 was played with a mouse, at 1280x800.
+- Colour blindness: only a simulation was checked (deuteranopia and greyscale). No colour-blind person has looked at it. Protanopia and tritanopia were not simulated.
 
 ## Ideas of the builder
 
@@ -197,5 +204,51 @@ Labelled: these go beyond the brief.
 
 - The lab endpoint stores records only for slugs listed in `LAB_PROTOTYPES` (human-framework `apps/site/src/lab/games.ts`). `grapevine` must be added there before real lab sends are kept. The check captures sends locally, so it does not depend on this.
 - Teller at the bottom versus the brief's left/top example (see above).
-- The ramp has outliers by the random-bot measure: L16 (40%) is low for its place, L23 (11%) sits between L22 (38%) and L24 (30%), and L26 (15%) is below L27 (20%). The curator tries only 8 seeds per level; more seeds or a `PICK` entry would smooth it.
-- Red and green are a pair for the contrarian; a colour-blind player may need a second cue (pattern or mark per colour).
+- Levels 16, 23, 25 and 26 changed on 2026-11-23 (see the follow-up below). Saved stars for those four numbers came from the old puzzles.
+
+## Follow-up, 2026-11-23
+
+The game went live less than an hour before this round. Changes:
+
+1. **Level 1 ghost finger.** The finger now runs beside the route, about one villager-width to the right (mirrored to the left near the right edge). The painter's badge, which is what level 1 teaches, stays fully visible. Screenshots of levels 1, 2 and 3 were checked.
+2. **A second cue for every colour.** Each colour has a small mark in the middle of every coloured shape:
+
+   | Colour | Mark |
+   | --- | --- |
+   | red | dot |
+   | yellow | ring |
+   | blue | bar |
+   | green | cross |
+
+   The marks show in tokens, the thought bubble, the HUD pill, painter badges, the contrarian's badge and the timid villager's badge. They are drawn in soft ink, and skipped on shapes too small to hold them.
+
+   `check.mjs` renders one token of each colour, simulates deuteranopia and greyscale, and asserts that every pair of colours differs on more than 3% of the token's shape. Deuteranopia uses the Machado 2009 matrix at full severity in linear RGB; I typed the matrix from memory and did not check it against the paper.
+
+   | Result | Share of the token's shape that differs |
+   | --- | --- |
+   | Deuteranopia, least different pair | 59.7% |
+   | Greyscale, least different pair (red and blue) | 3.7% |
+
+   Red and blue have almost the same grey, so the marks alone separate them in grey. With the marks switched off, that pair differs on 0.0% and the check fails (mutation test run). The screenshot `colour-cues.png` shows tokens and badges in normal, deuteranopia and grey views.
+3. **Ramp.**
+   - `make-levels.mjs` now searches 48 seeds instead of 8 for levels 16, 23, 25 and 26 (`MORE_SEEDS`). The first 8 seeds are the same as before, so every other level came out byte-identical. A diff of `levels.js` changed only those four lines.
+   - Random-bot win rates for the changed levels:
+
+     | Level | Before | After |
+     | --- | --- | --- |
+     | 16 | 40% | 45% |
+     | 23 | 11% | 32% |
+     | 25 | 46% | 22% |
+     | 26 | 15% | 20% |
+
+   - Level 25 was not one of the three named outliers. It had to change because it was 26 points easier than its neighbours.
+   - Saved stars are keyed by level number, so a player who had stars on these four levels keeps them for a different puzzle. This is accepted because the game had been live for less than an hour.
+   - `bots.mjs` now asserts the ramp (see "Bot results"). Run against the old `levels.js`, it fails on levels 23, 25 and 26.
+4. **Overlaps.**
+   - **Flying token.** It still arcs from above one head to above the next. The arc now bows sideways away from the line between them, more on steep hops, so it passes beside the badge under the next villager instead of over it.
+   - **Ghost tokens.** Each villager's "after me" token takes the best of four spots beside its head: the spot furthest from paths, from other villagers and their badges, from its own head and from the screen edge. The spots are chosen once per layout.
+5. **Desktop.**
+   - Correction: the earlier note said the board stays a narrow column on wide screens. That was true only for level 1. On wider levels the board stretched across the whole window.
+   - From 700 px wide, the board is now held to a 600 px column in the middle. Both sides become a street: rows of houses with lit windows, chimneys, trees and lamp posts, plus swaying lantern strings between the rows.
+   - Phones (narrower than 700 px) are unchanged.
+
