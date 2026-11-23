@@ -1,5 +1,5 @@
 import { neighboursSource } from './history.mjs';
-import { reservedPaths } from '../worker-settings.mjs';
+import { archivedHosts, reservedPaths } from '../worker-settings.mjs';
 const sha = /^[0-9a-f]{40}$/;
 export function validateRegistry(registry) {
   if (!registry || !/^\d+\.\d+\.\d+$/.test(registry.hfVersion) || !Array.isArray(registry.games)) throw new Error('Invalid registry');
@@ -21,6 +21,7 @@ export function validateRegistry(registry) {
       let origin;
       try { origin = new URL(game.legacyOrigin); } catch { throw new Error('Invalid legacy origin'); }
       if (!/^https:\/\/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.adamwhite\.work$/.test(game.legacyOrigin) || origin.origin !== game.legacyOrigin || ['https://play.adamwhite.work', 'https://human.adamwhite.work'].includes(origin.origin) || origins.has(origin.origin)) throw new Error('Invalid or duplicate legacy origin');
+      if (archivedHosts.includes(origin.hostname)) throw new Error(`Legacy origin ${origin.hostname} is an archived host; remove it from archivedHosts in worker-settings.mjs first`);
       origins.add(origin.origin);
     }
     if (game.ciBrowsers !== undefined && (!Array.isArray(game.ciBrowsers) || game.ciBrowsers.some(b => !['chromium', 'chromium-headless-shell', 'webkit', 'firefox'].includes(b)))) throw new Error('Invalid CI browser');

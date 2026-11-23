@@ -24,3 +24,17 @@ export const legacyRoutes = [
   'word.adamwhite.work/*',
   'smoke.adamwhite.work/*',
 ];
+// Hostnames of archived games (archive/README.md). This Worker answers each one with a 302 to the games shelf,
+// so the games' original deployments no longer serve old builds there. A host leaves this list (and its route in
+// wrangler.jsonc) to roll back; the original deployment then answers it again. validateRegistry keeps it apart
+// from games.json legacy origins.
+export const archivedHosts = [
+  'hearsay.adamwhite.work',
+  'goodhands.adamwhite.work',
+  'valley.adamwhite.work',
+  'commonstead.adamwhite.work',
+  'child.adamwhite.work',
+  'days.adamwhite.work',
+  'island.adamwhite.work',
+];
+export const archivedRoutes = archivedHosts.map(host => `${host}/*`);

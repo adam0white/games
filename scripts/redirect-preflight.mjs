@@ -44,14 +44,18 @@ export function repositoryEvidence(cwd = process.cwd()) {
   };
 }
 
-/** Enabled aliases require a directly observed release before every build/upload. */
-export async function verifyRedirects({ registry, routes, head, expected, evidence = repositoryEvidence(), fetch: fetchRelease = globalThis.fetch }) {
+/** Enabled aliases require a directly observed release before every build/upload. Archived hosts (worker-settings.mjs)
+ * add exactly one `<host>/*` zone route each and need no release; they redirect to the shelf. */
+export async function verifyRedirects({ registry, routes, head, expected, archived = [], evidence = repositoryEvidence(), fetch: fetchRelease = globalThis.fetch }) {
   validateRegistry(registry);
   const enabled = registry.games.filter(game => game.redirectEnabled === true);
   for (const game of enabled) {
     if (new URL(game.legacyOrigin).hostname === 'repair.adamwhite.work' && game.redirectMode !== 'zone') throw new Error('Small Works requires a zone redirect to preserve its experiments archive');
   }
   const legacyPatterns = enabled.map(game => `${new URL(game.legacyOrigin).hostname}/${game.redirectMode === 'zone' ? 'sw.js' : '*'}`);
+  const enabledHosts = new Set(enabled.map(game => new URL(game.legacyOrigin).hostname));
+  if (!Array.isArray(archived) || archived.some(host => !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.adamwhite\.work$/.test(host) || ['play.adamwhite.work', 'human.adamwhite.work'].includes(host) || enabledHosts.has(host)) || new Set(archived).size !== archived.length) throw new Error('Archived hosts must be distinct adamwhite.work hosts with no enabled alias');
+  legacyPatterns.push(...archived.map(host => `${host}/*`));
   const matchesRoute = route => {
     if (!route || typeof route !== 'object') return false;
     if (route.pattern === 'play.adamwhite.work') {

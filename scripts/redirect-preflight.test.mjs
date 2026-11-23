@@ -199,3 +199,20 @@ test('Small Works archive protection rejects initial and already-active catch-al
   delete f.game.redirectMode;
   await assert.rejects(verifyRedirects({ ...f.args(), routes: catchAll }), /experiments archive/);
 });
+
+test('archived hosts add exactly their own catch-all routes and fetch nothing', async t => {
+  const f = fixture(t);
+  const archived = ['hearsay.adamwhite.work', 'island.adamwhite.work'];
+  const extra = archived.map(host => ({ pattern: `${host}/*`, zone_name: 'adamwhite.work' }));
+  await verifyRedirects({ ...f.args(), routes: [...routes, ...extra], archived });
+  assert.equal(f.fetches.length, 1, 'only the enabled game release is fetched');
+  // A route for an archived host the list does not name, a missing route, a narrower route or a duplicate fails.
+  await assert.rejects(verifyRedirects({ ...f.args(), routes: [...routes, ...extra] }), /route/i);
+  await assert.rejects(verifyRedirects({ ...f.args(), routes: [...routes, extra[0]], archived }), /route/i);
+  await assert.rejects(verifyRedirects({ ...f.args(), routes: [...routes, extra[0], { ...extra[1], pattern: 'island.adamwhite.work/sw.js' }], archived }), /route/i);
+  await assert.rejects(verifyRedirects({ ...f.args(), routes: [...routes, ...extra, extra[0]], archived }), /route/i);
+  // An archived host cannot be an enabled alias, a duplicate or a host outside the zone.
+  for (const bad of [['rope.adamwhite.work'], ['hearsay.adamwhite.work', 'hearsay.adamwhite.work'], ['play.adamwhite.work'], ['hearsay.example.com']]) {
+    await assert.rejects(verifyRedirects({ ...f.args(), routes: [...routes, ...bad.map(host => ({ pattern: `${host}/*`, zone_name: 'adamwhite.work' }))], archived: bad }), /archived/i);
+  }
+});
