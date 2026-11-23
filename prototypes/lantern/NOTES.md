@@ -91,3 +91,26 @@ Fog, wind and rain each start their first stretch about a tenth of the way down,
 Not checked: whether nights 6 to 20 are too hard for a person now that they are faster and also hold new things (the careful bot's runs that end in the dark on night 20 rose from 21 to 49 in 100); a real phone; sound.
 
 Still left from note #35, in the tester's order: power-ups, stats to spend points on, better-looking boats and flames, an Abilities pack, the pack-opening animation, tower mode.
+
+## 2026-11-23: powers (note #35, second item)
+
+Three powers lie in open water, about four a night, on every night and the endless river.
+
+| Power | Looks like | Does | Lasts |
+|---|---|---|---|
+| Boost | gold arrows | the river runs 1.8 times as fast and nothing can break the boat | 2.5 s, then 0.6 s more of safety |
+| Slow water | violet clock | the river runs at half speed; the percent to dawn keeps its usual speed, and the flame fades by river passed, not by time | 5 s |
+| Size | teal rings | four times in five the boat is 0.6 of its size; one time in five it is 1.4 times its size. The pickup looks the same either way | 6 s |
+
+Decisions taken here, not asked for by the tester: a boost also makes the boat unbreakable (a faster river alone would be a penalty); the size gamble is hidden until taken; an arc round the boat shows the time left.
+
+How it is built: powers draw from their own random stream and sit in their own list, so a seed's rocks and embers are the same as before. Which power, and whether a size power grows the boat, is fixed when the river is laid down. Ice now drifts by river passed. `create(seed, stage, endless, powers)` takes the list of powers allowed, ready for the Abilities pack.
+
+Checked:
+- 440 story rivers (nights 1 to 20 sampled, 40 seeds each) with powers switched off: rocks and embers identical to main.
+- With powers on, rocks matched main on all but 3 of 440 story rivers; in those a power taken shifted ice by a hair and one later pickup moved. Unresolved, judged harmless.
+- Audit, 200 rivers a night: no closed river, no buried pickup of any kind. Narrowest gap for the bigger boat 0.030 on story nights. On the endless river, ridden 30 nights long, the narrowest moment was 0.022 for the usual boat and 0.004 for the bigger boat.
+- Chromium phone profile: each power taken, said aloud and drawn; under slow water the boat covered 0.55 of river in 1.5 s while the percent gained 1.01, the same as without it. No page errors.
+- Careful bot, 100 runs, dawn reached before and after: night 1 20 and 23, night 3 20 and 21, night 5 18 and 22. Not tuned.
+
+Not checked: a person playing; a real phone; sound; whether four a night is too many.

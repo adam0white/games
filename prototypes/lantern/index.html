@@ -77,7 +77,7 @@
 </div></div>
 <div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p><p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p></div></div>
 <script type="module">
-import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, DT, GOAL, NIGHTS } from './sim.js?v=3'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
+import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS } from './sim.js?v=4'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
 
 const query = new URLSearchParams(location.search);
 const gain = Number(query.get('gain')) || 1.3; // boat travel per finger travel; ?gain= to compare
@@ -119,7 +119,7 @@ addEventListener('resize', resize); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', lastLevel = 1, nearFall = false, sayTimer = 0, shown = '', weather = '';
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
-window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, score: score(s), bank, owned: [...owned], worn, unit: unit / dpr }); // read by the browser checks
+window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, unit: unit / dpr }); // read by the browser checks
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 
 function show(name) {
@@ -186,7 +186,7 @@ const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
 
 function begin() {
   audio();
-  s = create((Math.random() * 2 ** 31) | 0, endless ? 1 : stage, endless); target = s.x; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; nearFall = false; weather = ''; drag = null; startTap = null;
+  s = create((Math.random() * 2 ** 31) | 0, endless ? 1 : stage, endless); target = s.x; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; nearFall = false; weather = ''; drag = null; startTap = null;
   shown = ''; show('play'); hud();
   say(endless ? 'Endless river' : `Night ${stage}`, 1600);
 }
@@ -200,7 +200,7 @@ function finish() {
     const pts = score(s), best = Math.max(pts, store.get('lantern-best-endless')); store.set('lantern-best-endless', best);
     $('title').textContent = `${pts}`; $('line').textContent = `${why} Best ${best}.`; $('go').textContent = 'Play again';
   } else {
-    const pct = Math.min(100, Math.floor(s.y / GOAL * 100)), key = `lantern-best-${stage}`, best = Math.max(pct, store.get(key)); store.set(key, best);
+    const pct = Math.floor(progress(s) * 100), key = `lantern-best-${stage}`, best = Math.max(pct, store.get(key)); store.set(key, best);
     $('title').textContent = won ? 'Dawn' : s.over === 'dark' ? 'Dark' : `Night ${stage}`;
     if (won && stage >= NIGHTS) { $('line').textContent = 'You carried the light through all twenty nights.'; $('go').textContent = `Play night ${stage} again`; }
     else if (won) { $('line').textContent = `You carried it through night ${stage}. Night ${stage + 1}: ${ahead(stage + 1)}`; stage++; opened = Math.max(opened, stage); store.set('lantern-night', opened); $('go').textContent = `Play night ${stage}`; }
@@ -210,7 +210,7 @@ function finish() {
   setTimeout(() => { if (!playing && screen === 'play') show('card'); }, won ? 2600 : 700);
 }
 function hud() {
-  const big = endless ? `${score(s)}` : `${Math.min(100, Math.floor(s.y / GOAL * 100))}%`, low = playing && !paused && s.light < 0.28, now = `${s.hearts}|${s.taken}|${big}|${low}`;
+  const big = endless ? `${score(s)}` : `${Math.floor(progress(s) * 100)}%`, low = playing && !paused && s.light < 0.28, now = `${s.hearts}|${s.taken}|${big}|${low}`;
   if (now === shown) return; shown = now; // touch the page only when a number changes
   $('hearts').textContent = '♥'.repeat(Math.max(0, s.hearts)); $('count').textContent = s.taken; $('big').textContent = big;
   $('warn').classList.toggle('on', low);
@@ -219,7 +219,7 @@ function hud() {
 // Steering. A finger steers by how far it has moved since it touched down, never by where it is,
 // so a tap anywhere does nothing and the thumb can rest wherever is comfortable. A mouse steers by position.
 const pauseButton = $('pause');
-let drag = null, startTap = null;
+let drag = null, startTap = null, size = 1;
 function aim(x) { const c = centre(s, s.y), h = half(s, s.y) + 0.02; target = Math.max(c - h, Math.min(c + h, x)); }
 function anchor(e) { drag = { id: e.pointerId, x0: e.clientX, x: e.clientX, boat0: s.x }; }
 canvas.addEventListener('pointerdown', e => {
@@ -256,7 +256,7 @@ $('toMenu').addEventListener('click', () => { if (paused) { paused = false; play
 // Pause: the button, P or Escape, and whenever the page loses the screen (a phone call, another app).
 function pause() {
   if (!playing || paused) return; paused = true; drag = null; keys.clear();
-  $('title').textContent = 'Paused'; $('line').textContent = endless ? `Score ${score(s)}.` : `Night ${stage}, ${Math.floor(s.y / GOAL * 100)}% of the way to dawn.`; $('sub').textContent = 'Touch the river to go on.'; $('go').textContent = 'Go on';
+  $('title').textContent = 'Paused'; $('line').textContent = endless ? `Score ${score(s)}.` : `Night ${stage}, ${Math.floor(progress(s) * 100)}% of the way to dawn.`; $('sub').textContent = 'Touch the river to go on.'; $('go').textContent = 'Go on';
   show('card'); if (ac) ac.suspend();
 }
 function resume() {
@@ -295,6 +295,10 @@ function tick() {
       for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.9, vy: (Math.random() - 0.3) * 0.9, life: 0.7, red: true });
       say('You lost a heart', 1500);
     }
+    if (e === 'boost') { [392, 523.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.09, 'sawtooth'), i * 60)); glow = 1; say('Boost! Nothing can stop you', 1600); }
+    if (e === 'slow') { tone(440, 0.9, 0.1); setTimeout(() => tone(330, 1.1, 0.1), 160); glow = 1; say('Slow water. Dawn keeps coming', 1800); }
+    if (e === 'small') { tone(1046.5, 0.25, 0.1, 'triangle'); setTimeout(() => tone(1568, 0.4, 0.08, 'triangle'), 90); glow = 1; say('A smaller boat', 1500); }
+    if (e === 'big') { tone(196, 0.5, 0.2, 'square'); setTimeout(() => tone(147, 0.7, 0.2, 'square'), 120); shake = 0.4; say('Bad luck: a bigger boat!', 1700); }
     if (e === 'hit') { tone(70, 0.5, 0.35, 'sawtooth'); shake = 1; }
     if (e === 'out') tone(110, 1.2, 0.2);
     if (e === 'dawn') [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 1.6, 0.1, 'triangle'), i * 180));
@@ -312,12 +316,13 @@ function tick() {
     weather = sky;
   }
   if (level(s) !== lastLevel) { lastLevel = level(s); if (endless) { say('The river runs harder', 1800); tone(330, 0.3, 0.1, 'triangle'); setTimeout(() => tone(440, 0.5, 0.1, 'triangle'), 140); } }
+  if (s.boost) for (let i = 0; i < 2; i++) sparks.push({ x: s.x + (Math.random() - 0.5) * 0.03, y: s.y - 0.03, vx: (Math.random() - 0.5) * 0.15, vy: -0.6 - Math.random() * 0.5, life: 0.45 });
   hud();
   if (s.over) finish();
 }
 
 function draw(now) {
-  const dawn = s.endless ? 0 : Math.max(0, (s.y / GOAL - 0.86) / 0.14), day = s.over === 'dawn' ? Math.min(1, (now - ended) / 2500) : 0;
+  const dawn = s.endless ? 0 : Math.max(0, (progress(s) - 0.86) / 0.14), day = s.over === 'dawn' ? Math.min(1, (now - ended) / 2500) : 0;
   const ox = shake * (Math.random() - 0.5) * 14 * dpr, oy = shake * (Math.random() - 0.5) * 14 * dpr;
   g.setTransform(1, 0, 0, 1, ox, oy);
   const wet = skin('water'), fire = skin('flame')[2];
@@ -374,7 +379,7 @@ function draw(now) {
   }
   // boat
   const bx = sx(s.x), by = sy(s.y), lean = Math.max(-0.5, Math.min(0.5, (target - s.x) * 4));
-  g.save(); g.translate(bx, by); g.rotate(lean * 0.5);
+  g.save(); g.translate(bx, by); g.rotate(lean * 0.5); size += (boat(s) / BOAT - size) * 0.2; g.scale(size, size);
   g.fillStyle = skin('boat')[2]; g.beginPath(); g.moveTo(0, -0.05 * unit); g.quadraticCurveTo(0.028 * unit, -0.005 * unit, 0.016 * unit, 0.035 * unit); g.lineTo(-0.016 * unit, 0.035 * unit); g.quadraticCurveTo(-0.028 * unit, -0.005 * unit, 0, -0.05 * unit); g.fill();
   g.restore();
   // darkness with a hole of light
@@ -401,7 +406,23 @@ function draw(now) {
   }
   for (const p of sparks) { g.fillStyle = p.blue ? `rgba(150,210,255,${p.life})` : p.red ? `rgba(255,80,90,${p.life})` : `rgba(255,200,120,${p.life})`; g.fillRect(sx(p.x), sy(p.y), 3 * dpr, 3 * dpr); }
   // the shield: a blue ring while it is held, blinking just after it breaks
-  if (s.shield || (s.safe > 0 && Math.floor(now / 90) % 2)) {
+  // powers waiting in the water: gold arrows are a boost, a violet clock is slow water, teal rings change the boat's size
+  for (const e of s.powers) if (!e.got) {
+    const ex = sx(e.x), ey = sy(e.y) + Math.sin(now / 300 + e.y * 9) * 2 * dpr, er = 0.06 * unit, u = 0.014 * unit, col = { boost: '255,215,90', slow: '190,140,255', size: '90,230,205' }[e.kind];
+    const eg = g.createRadialGradient(ex, ey, 0, ex, ey, er); eg.addColorStop(0, `rgba(${col},.75)`); eg.addColorStop(0.35, `rgba(${col},.35)`); eg.addColorStop(1, `rgba(${col},0)`);
+    g.fillStyle = eg; g.fillRect(ex - er, ey - er, er * 2, er * 2);
+    g.strokeStyle = '#fff'; g.lineWidth = 2 * dpr; g.lineJoin = g.lineCap = 'round'; g.beginPath();
+    if (e.kind === 'boost') { const b = (now / 400 % 1) * u * 0.5; for (const o of [-0.5, 0.6]) { g.moveTo(ex - u, ey + o * u + u * 0.5 - b); g.lineTo(ex, ey + o * u - u * 0.5 - b); g.lineTo(ex + u, ey + o * u + u * 0.5 - b); } }
+    else if (e.kind === 'slow') { const a = now / 900; g.arc(ex, ey, u * 1.1, 0, 7); g.moveTo(ex, ey); g.lineTo(ex + Math.sin(a) * u * 0.8, ey - Math.cos(a) * u * 0.8); g.moveTo(ex, ey); g.lineTo(ex + u * 0.5, ey); }
+    else { const k = 0.75 + 0.35 * Math.sin(now / 260); g.arc(ex, ey, u * 1.2 * k, 0, 7); g.moveTo(ex + u * 0.4 / k, ey); g.arc(ex, ey, u * 0.4 / k, 0, 7); }
+    g.stroke();
+  }
+  // powers in use: an arc round the boat that runs down with the time left
+  let ring = 0.075;
+  for (const [left, full, col] of [[s.boost, 2.5, '255,215,90'], [s.slow, 5, '190,140,255'], [s.size, 6, s.big ? '255,110,90' : '90,230,205']]) if (left > 0) {
+    g.strokeStyle = `rgba(${col},.85)`; g.lineWidth = 3 * dpr; g.beginPath(); g.arc(bx, by, ring * unit, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * left / full); g.stroke(); ring += 0.014;
+  }
+  if (s.shield || (s.safe > 0 && !s.boost && Math.floor(now / 90) % 2)) {
     g.strokeStyle = `rgba(120,190,255,${s.shield ? 0.8 : 0.5})`; g.lineWidth = 2.5 * dpr;
     g.beginPath(); g.arc(bx, by - 0.005 * unit, 0.06 * unit * (1 + Math.sin(now / 240) * 0.05), 0, 7); g.stroke();
   }
@@ -410,6 +431,9 @@ function draw(now) {
   fg.addColorStop(0, '#fff6dc'); fg.addColorStop(0.4, `rgba(${fire},.9)`); fg.addColorStop(1, `rgba(${fire},0)`);
   g.fillStyle = fg; g.fillRect(bx - 0.03 * unit, by - 0.03 * unit, 0.06 * unit, 0.06 * unit);
   g.globalCompositeOperation = 'source-over';
+  // boost: streaks of speed down the screen. slow water: a violet hush at the edges.
+  if (playing && s.boost) { g.strokeStyle = `rgba(255,235,170,${0.5 * Math.min(1, s.boost * 2)})`; g.lineWidth = 2 * dpr; g.beginPath(); for (let i = 0; i < 18; i++) { const x = (Math.sin(i * 53.1) * 0.5 + 0.5) * W, y = ((Math.sin(i * 17.7) * 0.5 + 0.5) * H + now * 2.4 * dpr) % H; g.moveTo(x, y); g.lineTo(x, y + 46 * dpr); } g.stroke(); }
+  if (playing && s.slow) { const v = g.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.7); v.addColorStop(0, 'rgba(150,110,255,0)'); v.addColorStop(1, `rgba(150,110,255,${0.3 * Math.min(1, s.slow * 2)})`); g.fillStyle = v; g.fillRect(-20, -20, W + 40, H + 40); }
   // rain and lightning lie over everything
   if (playing && rain(s, s.y)) { g.strokeStyle = 'rgba(190,215,235,.4)'; g.lineWidth = 1.5 * dpr; g.beginPath(); for (let i = 0; i < 40; i++) { const x = (Math.sin(i * 91.7) * 0.5 + 0.5) * W, y = ((Math.sin(i * 47.3) * 0.5 + 0.5) * H + now * 1.6 * dpr) % H; g.moveTo(x, y); g.lineTo(x - 5 * dpr, y + 16 * dpr); } g.stroke(); }
   if (flash) { g.fillStyle = 'rgba(235,240,255,.35)'; g.fillRect(-20, -20, W + 40, H + 40); }
@@ -420,7 +444,7 @@ function draw(now) {
     g.fillStyle = d; g.fillRect(-20, -20, W + 40, H + 40);
   }
   // progress: a thin line at the top edge on a story night
-  if (!s.endless) { g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * Math.min(1, s.y / GOAL), 3 * dpr); }
+  if (!s.endless) { g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * progress(s), 3 * dpr); }
 }
 
 function frame(now) {
