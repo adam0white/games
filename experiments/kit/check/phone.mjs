@@ -66,8 +66,11 @@ async function started(page, slug, hook, toMenu) {
   await page.click('#play'); await wait(hook => window[hook]().screen !== 'menu', 'a run starts');
   await tap('#pause'); await wait(hook => window[hook]().paused === true, 'pause');
   await page.click(toMenu); await wait(hook => window[hook]().screen === 'menu', 'back on the menu');
-  await sleep(500); // the record is compressed before it is sent
+  // The record is compressed before it is sent, so wait for it; then confirm no second run follows.
+  for (let i = 0; i < 80 && !(labRuns(page, slug).length && labSent(page).some(r => r.game === slug && r.kind === 'events')); i++) await sleep(100);
+  await sleep(300);
   const runs = labRuns(page, slug);
+  assert.equal(labSent(page).filter(r => r.game === slug && r.kind === 'events').length, 1, 'one events record for the dashboard');
   assert.equal(runs.length, 1, 'one run sent'); assert.equal(runs[0].data.outcome, 'left'); assert.equal(runs[0].runSource, 'agent', 'labRunSource=agent marks the record');
 }
 
