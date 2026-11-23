@@ -1817,3 +1817,61 @@ body {
     grid-template-rows: 44px minmax(0, 1fr) 0;
   }
 }
+
+/* Phone portrait: nothing overlaps or clips on the opening screen (checked at 360x640 and 390x844). */
+.where-part {
+  white-space: nowrap;
+}
+@media (max-width: 759px) and (orientation: portrait) and (min-height: 501px) {
+  .top .journal-trigger {
+    padding: 0 2px;
+  }
+  #app[data-sheet-id] .where {
+    line-height: 1.15;
+  }
+  /* The first daylight hour sits left of the bar so the marker never crosses it. */
+  .day-bar {
+    margin-left: 22px;
+  }
+  .day-dawn {
+    left: -22px;
+    top: -2px;
+  }
+  /* "more requests" keeps its own word whole. */
+  .sheet .people-verbs {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.3fr);
+  }
+  .leader-bar .movement-verbs {
+    grid-template-columns: 1.4fr 1.4fr 1.4fr 1fr 1fr;
+  }
+  .request-result {
+    min-height: 0;
+  }
+  .sheet > :last-child {
+    margin-bottom: 4px;
+  }
+  /* The sheet takes the height its content needs (up to 42%) so no control is cut off; the mountain gets the rest. */
+  #app:has(.leader-bar .tutorial-cue),
+  #app[data-sheet-id]:has(.leader-bar .tutorial-cue) {
+    grid-template-rows: max-content max-content minmax(48px, 1fr) fit-content(42%) max-content;
+  }
+  /* The opening note holds only the skip button: keep it a small control in the empty sky, not a bar across the
+     mountain, and clear of the Skip button in the lower corner. */
+  .note:has(> .tutorial-skip:only-child) {
+    inset: 0 0 auto auto;
+    width: auto;
+    min-height: 0;
+    padding: 0;
+    border-radius: 0 0 0 10px;
+  }
+  .bubble {
+    font-size: 17px;
+    line-height: 1.15;
+    max-width: 150px;
+    padding: 2px 7px 3px;
+  }
+  .bubble .who {
+    font-size: 12px;
+    margin-right: 3px;
+  }
+}

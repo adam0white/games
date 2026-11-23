@@ -40,6 +40,13 @@ const VE = 2.1;
 /** Metres of trail across the screen width. */
 const SPAN = 1500;
 
+export interface SceneBox {
+  l: number;
+  r: number;
+  t: number;
+  b: number;
+}
+
 export interface ScreenPoint {
   x: number;
   y: number;
@@ -63,6 +70,8 @@ export class Scene {
   private h = 400;
   /** Screen positions of the figures, for bubbles and taps. */
   readonly at = new Map<string, ScreenPoint>();
+  /** Drawn extents of each figure and its name, so speech bubbles can keep clear of them. */
+  readonly blocks = new Map<string, { figure: SceneBox; label: SceneBox | null }>();
   selected: string | null = null;
   onTap: (id: string) => void = () => {};
 
@@ -426,6 +435,7 @@ export class Scene {
       g.stroke({ width: 1.3, color: P.rope });
     }
     this.at.clear();
+    this.blocks.clear();
     const placedNames: { x: number; y: number; half: number }[] = [];
     for (const x of MEMBERS) {
       const mem = memberState(s, x.id);
@@ -478,10 +488,18 @@ export class Scene {
       }
       placedNames.push({ x: sp.x, y: ny, half });
       t.position.set(sp.x, ny);
+      this.blocks.set(x.id, {
+        figure: { l: sp.x - 12, r: sp.x + 12, t: sp.y - 34, b: sp.y + 1 },
+        label: { l: sp.x - half, r: sp.x + half, t: ny, b: ny + t.height },
+      });
     }
     const L = pos.get('leader');
     if (L) {
       this.at.set('leader', L);
+      this.blocks.set('leader', {
+        figure: { l: L.x - 12, r: L.x + 12, t: L.y - 34, b: L.y + 1 },
+        label: null,
+      });
       const ph = (this.phase.get('leader') ?? 0) + (s.leader.move ? dt * 5 : 0);
       this.phase.set('leader', ph);
       this.figure(g, L.x, L.y, {

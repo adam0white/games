@@ -1407,11 +1407,15 @@ export function verbsTonight(s: GameState): Verb[] {
   return [...stationsTonight(s), 'break', 'eat', 'home'];
 }
 
-/** What each cook would likely say to each verb, right now. Pure: no state change, no randomness. */
-export function hints(s: GameState, id: CookId, insist = false): Hint[] {
+/**
+ * What each cook would likely say to each verb, right now. Pure: no state change, no randomness.
+ * `only` asks about one verb; each verb's answer is independent, so it equals that entry of the full list.
+ */
+export function hints(s: GameState, id: CookId, insist = false, only?: Verb): Hint[] {
   const p = personOf(s, id);
   const m = memberOf(s, id);
-  return verbsTonight(s).map((verb) => {
+  const verbs = verbsTonight(s);
+  return (only === undefined ? verbs : verbs.filter((v) => v === only)).map((verb) => {
     const offers = offersFor(s, id, verb);
     const sug = suggestion(verb, insist);
     // Nevin's established cooks are known. New hires use the chef's growing impression.
