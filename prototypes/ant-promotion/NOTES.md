@@ -102,7 +102,7 @@ Adam asked the lab to go past the literal asks: try 3D for the "more detailed an
 - `look3d.js` is a small WebGL2 renderer with no dependencies. It does not hold a second set of models. A recorder object stands in for the 2D canvas context, takes the same `drawForm` calls from `art.js`, and turns filled ellipses into lit ellipsoids, stroked lines into capsules (legs, tails, feelers) and polygons into plates (wings, fins).
 - Tilted camera, one sun, shadows projected on the ground, grass that sways, eat and death pieces that bounce. Numbers, "!" marks and edge arrows stay on the 2D canvas, placed with `project()`.
 - The sim is untouched, so the rules and the bots are the same in every look.
-- If WebGL2 or a shader fails the game says so and falls back to Cartoon. This path was hit for real during the build (a precision mismatch) and worked.
+- If WebGL2 is missing, a shader fails or the phone drops the WebGL context, the game says so, switches to Cartoon and saves that. Checked with a real shader failure during the build and with WebGL2 stubbed out.
 - Promotion cards, the menu and the book stay 2D.
 - Why not three.js: nothing else in the lab ships a dependency, and 55 animals as hand-made models was not a one-session job. The recorder gives every animal a solid for free. The cost: shapes are only as good as the stacking guess (a small ellipse drawn on a big one sits on top of it).
 
@@ -111,16 +111,16 @@ Adam asked the lab to go past the literal asks: try 3D for the "more detailed an
 - Saved as `seen` in the same save. Old saves start with the animals in their current path.
 
 ### Eat streak and buzz
-- Eating again within 4 seconds raises the eat sound by a semitone per step and shows ×3, ×4 on the float. It changes no rule and gives no XP.
+- Eating again within 4 seconds raises the eat sound by a semitone per step and shows "3 in a row" on the float. It changes no rule and gives no XP.
 - Phones that support it vibrate on eat and death (off with sound off). iPhones do not support web vibration.
 
 ### Checks
-- WebKit with the iPhone 13 profile and Chromium: 3D loads, no page errors, 13.8 ms a frame headless at levels 6, 12 and 18 (same as the 2D looks).
+- WebKit with the iPhone 13 profile and Chromium: 3D loads, no page errors, the frame loop holds the headless frame cap (13.8 ms) at levels 6, 12 and 18. That shows no stall; it does not measure render cost.
 - Phone flow test passes in Cartoon and 3D. Death in 3D, drop a level, switch look in the menu and back: no errors.
 - `node bots.mjs 10 12` and `npm run check:lane` pass.
 
 ### Found while testing, not changed
-- The careful bot reaches a median top level of 18 picking sneaky, 15 picking fast and 14 picking strong, with 0 deaths in 12 minutes. Sneaky is the best pick at every level and a careful player is never in danger. The tester called the game "not bad", not "fun" (note #30). Proposal for Adam: give strong animals something of their own, and add pressure for careful players. Both change rules he wrote, so they wait for him.
+- The careful bot reaches a median top level of 18 picking sneaky, 15 picking fast and 14 picking strong, with 0 deaths in 12 minutes. A bot that always picks sneaky climbs highest, and a careful bot is never in danger. The tester called the game "not bad", not "fun" (note #30). Proposal for Adam: give strong animals something of their own, and add pressure for careful players. Both change rules he wrote, so they wait for him.
 
 ### Not verified
 - 3D on a real phone: frame rate, battery, how it reads on a small screen. Headless numbers come from a desktop GPU.

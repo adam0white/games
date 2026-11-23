@@ -378,7 +378,11 @@ function overlay(edge, p) {
 let R3 = null;
 function use3d() {
   if (save.look !== 3) return false;
-  if (R3 === null) { R3 = create3D($('gl'), WORLD) || false; if (!R3) { save.look = 1; setLook(1); say('3D is not available on this device'); } }
+  if (R3 === null) {
+    R3 = create3D($('gl'), WORLD) || false;
+    $('gl').addEventListener('webglcontextlost', e => { e.preventDefault(); R3 = false; }); // a phone may drop the context when the tab is in the background
+  }
+  if (!R3) { save.look = 1; setLook(1); store(); say('3D is not available here. Using Cartoon.'); }
   return !!R3;
 }
 const pose = (M, ph) => M.kind === 'bird' ? { flat: M.r * (0.9 + Math.sin(ph * 2) * 0.08) } : { lift: Math.abs(Math.sin(ph * 3)) * M.r * 0.07, squash: M.kind === 'bug' ? 0.62 : M.kind === 'snake' ? 0.8 : 0.72 };
@@ -438,7 +442,7 @@ function frame(now) {
         if (e.t === 'eat') {
           const M = FORMS.find(f => f.name === e.name);
           streak = now - streakAt < 4000 ? streak + 1 : 1; streakAt = now; buzz(12);
-          floats.push({ x: e.x, y: e.y, text: '+' + e.gain + (streak > 2 ? `  ×${streak}` : ''), age: 0 }); burst(e.x, e.y, [M.c, M.d, M.e, '#ffffff'], 16, 110 + M.r * 6, Math.max(3.5, M.r * 0.32));
+          floats.push({ x: e.x, y: e.y, text: '+' + e.gain + (streak > 2 ? `  ${streak} in a row` : ''), age: 0 }); burst(e.x, e.y, [M.c, M.d, M.e, '#ffffff'], 16, 110 + M.r * 6, Math.max(3.5, M.r * 0.32));
           bits.push({ ring: 1, x: e.x, y: e.y, r: Math.max(8, M.r), c: '#ffe23a', age: 0, life: 0.35 });
           crunch(0.1, 0.22, 1400 + Math.random() * 900); blip((300 + e.gain * 90) * 2 ** (Math.min(streak - 1, 12) / 12), 0.09, 'square', 0.06, 200); save.xp = s.player.xp; hud();
         }
