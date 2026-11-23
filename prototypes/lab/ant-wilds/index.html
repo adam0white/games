@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#2f5a2a">
+<title>Ant Promotion: Wilds</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #24451f; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { font: 16px/1.4 ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif; color: #fff8e6; }
+  canvas#c { display: block; width: 100vw; height: 100dvh; }
+  .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: #14280fd9; overflow-y: auto; touch-action: pan-y; }
+  .screen.on { display: grid; }
+  .screen > div { max-width: 24em; width: calc(100% - 1.6em); padding: .8em; box-sizing: border-box; }
+  h1 { font-size: 2.3em; margin: 0 0 .1em; color: #ffe08a; text-shadow: 0 3px 0 #5a3a0c; letter-spacing: .02em; }
+  h2 { font-size: 1.5em; margin: 0 0 .3em; color: #ffe08a; }
+  p { margin: .4em 0; }
+  button { font: inherit; color: #fff8e6; background: #ffffff1c; border: 2px solid #ffe08a99; border-radius: 16px; padding: .55em 1.1em; margin: .3em; min-height: 48px; min-width: 9em; touch-action: manipulation; cursor: pointer; }
+  button.main { background: #ffb42a; color: #33200a; border-color: #ffb42a; font-size: 1.2em; font-weight: bold; }
+  button:active { transform: scale(.97); }
+  .opts { display: flex; gap: 8px; justify-content: center; }
+  .opt { flex: 1 1 0; min-width: 0; margin: 0; padding: .5em .2em; display: flex; flex-direction: column; align-items: center; line-height: 1.25; }
+  .opt canvas { width: 84px; height: 84px; }
+  .opt b { font-size: 1.05em; color: #ffe08a; }
+  .opt small { opacity: .9; font-size: .8em; }
+  .sw { width: 46px; height: 46px; min-width: 0; min-height: 0; padding: 0; margin: 4px; border-radius: 50%; border: 3px solid #ffffff40; }
+  .pat { min-width: 0; padding: .4em .8em; }
+  .on2 { border-color: #fff; box-shadow: 0 0 0 3px #ffb42a; }
+  #how li { text-align: left; margin: .35em 0; } #how ul { padding-left: 1.2em; margin: .4em 0; }
+  .g { color: #8dff8a; font-weight: bold; } .r { color: #ff7a6a; font-weight: bold; } .y { color: #ffe23a; font-weight: bold; }
+  #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); right: calc(64px + env(safe-area-inset-right)); display: none; pointer-events: none; text-shadow: 0 1px 4px #000; }
+  #bar { height: 16px; border-radius: 9px; background: #00000066; border: 2px solid #fff8e6aa; overflow: hidden; }
+  #fill { height: 100%; width: 0; background: linear-gradient(#ffe23a, #ffb42a); transition: width .15s; }
+  #who { font-size: 17px; font-weight: bold; margin-top: 3px; }
+  #pause { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); width: 46px; height: 46px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; font-weight: bold; }
+  #say { position: fixed; left: 0; right: 0; top: 22%; text-align: center; font-size: 22px; font-weight: bold; pointer-events: none; opacity: 0; transition: opacity .3s; text-shadow: 0 2px 6px #000; padding: 0 1em; }
+  #say.on { opacity: 1; }
+  .exp { font-size: .9em; opacity: .9; } .exp a { color: #ffe08a; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="bar"><div id="fill"></div></div><div id="who"></div></div>
+<button id="pause" aria-label="Pause">II</button>
+<div id="say"></div>
+
+<div id="menu" class="screen on"><div>
+  <h1>Ant Promotion: Wilds</h1>
+  <p>Eat. Grow. Get promoted.</p>
+  <p class="exp">An experiment. Animals hunt each other. Eat the leftovers.<br><a href="/proto/ant-promotion/">Back to the main game</a></p>
+  <canvas id="hero" width="240" height="150" style="width:160px;height:100px"></canvas>
+  <p><button id="continue" class="main"></button></p>
+  <p><button id="fresh"></button></p>
+  <p><button id="toSkins">Ant skins</button><button id="toHow">How to play</button></p>
+  <p><button id="look" style="min-width:0"></button><button id="sound" style="min-width:0"></button></p>
+</div></div>
+
+<div id="skins" class="screen"><div>
+  <h2>Your ant</h2>
+  <canvas id="skinView" width="300" height="180" style="width:200px;height:120px"></canvas>
+  <div id="colours"></div>
+  <div id="patterns"></div>
+  <p><button class="main back">Done</button></p>
+</div></div>
+
+<div id="how" class="screen"><div>
+  <h2>How to play</h2>
+  <ul>
+    <li>Drag anywhere to walk. On a keyboard use the arrow keys or WASD.</li>
+    <li>Every animal has a power number over its head. So do you.</li>
+    <li><span class="g">Green number</span>: weaker than you. Touch it to eat it.</li>
+    <li><span class="r">Red number</span>: stronger than you. Touch it and you die.</li>
+    <li>The pale wedge is what an animal can see. Walk into it and the animal notices you: <span class="y">!</span></li>
+    <li><span class="r">&raquo;</span> means it is faster than you. A fast strong animal that notices you will catch you. A fast weak one will get away, so sneak up from behind.</li>
+    <li>Fill the bar to get promoted. You pick 1 of 3 new animals each time.</li>
+    <li>If you die you go back one animal, or you can start again as an ant.</li>
+    <li><b>In the Wilds, animals hunt each other.</b> A <span class="r">red arrow</span> points from a hunter to the animal it is chasing. Animals run from hunters they see.</li>
+    <li>A hunter chasing another animal ignores you unless you are nearer than its prey. Use that: lead a hunter into another animal, or slip past while it is busy.</li>
+    <li>A kill leaves <b>leftovers</b> for a few seconds. Walk over them for 1 point, even if the dead animal was stronger than you. The hunter eats first. While it eats it has no sight wedge and notices nobody, but touching it still counts.</li>
+  </ul>
+  <p><button class="main back">Got it</button></p>
+</div></div>
+
+<div id="evolve" class="screen"><div>
+  <h2>Promotion!</h2>
+  <p id="evolveSay"></p>
+  <div class="opts" id="opts"></div>
+</div></div>
+
+<div id="dead" class="screen"><div>
+  <h2 id="deadSay"></h2>
+  <p id="deadMore"></p>
+  <p><button id="goOn" class="main"></button></p>
+  <p><button id="restart">Start again as an Ant</button></p>
+  <p><button class="toMenu" style="min-width:0">Menu</button></p>
+</div></div>
+
+<div id="paused" class="screen"><div>
+  <h2>Paused</h2>
+  <p><button id="resume" class="main">Keep playing</button></p>
+  <p><button class="toMenu">Menu</button></p>
+</div></div>
+
+<div id="win" class="screen"><div>
+  <h2>Top of the food chain!</h2>
+  <p id="winSay"></p>
+  <p><button id="winOn" class="main">Keep roaming</button></p>
+  <p><button id="winNew">Start again as an Ant</button></p>
+</div></div>
+
+<script type="module">
+import { FORMS, ANT, WORLD, TOP, CONE, WILD, create, step, choose, revive, me, level, needFor, article } from './sim.js';
+import { drawForm, setLook, LOOKS } from '../../ant-promotion/art.js';
+
+const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d');
+const KEY = 'ant-wilds:v1', query = new URLSearchParams(location.search);
+const COLOURS = ['#3a2a22', '#c0271f', '#e08a1c', '#d6b21c', '#3f9a3c', '#2a7fd9', '#7a44c0', '#e05a9a', '#e8e2d6'];
+const PATTERNS = [['plain', 'Plain'], ['stripes', 'Stripes'], ['spots', 'Spots'], ['crown', 'Crown']];
+let save = { skin: { c: COLOURS[0], p: 'plain' }, stack: [ANT], xp: 0, sound: true, look: 1 };
+try { Object.assign(save, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch {}
+if (query.has('look')) save.look = Number(query.get('look')); // ?look=0 flat, 1 cartoon, 2 soft
+if (!LOOKS[save.look]) save.look = 1;
+setLook(save.look);
+if (!Array.isArray(save.stack) || !save.stack.length || save.stack.some((id, i) => !FORMS[id] || FORMS[id].level !== i + 1)) { save.stack = [ANT]; save.xp = 0; }
+const store = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch {} };
+
+let s = null, mode = 'menu', W = 0, H = 0, dpr = 1, zoom = 1, last = 0, acc = 0, shake = 0, sayTimer = 0;
+const floats = [], bits = [], keys = new Set(); let joy = null, flash = 0, dying = 0;
+
+// ---------- sound
+let ac = null;
+function blip(freq, dur = 0.08, type = 'sine', vol = 0.12, slide = 0) {
+  if (!save.sound) return;
+  try {
+    ac ??= new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume();
+    const o = ac.createOscillator(), v = ac.createGain(), t = ac.currentTime;
+    o.type = type; o.frequency.setValueAtTime(freq, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
+    v.gain.setValueAtTime(vol, t); v.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(v).connect(ac.destination); o.start(t); o.stop(t + dur);
+  } catch {}
+}
+// a short burst of filtered noise: the crunch of a bite
+function crunch(dur = 0.12, vol = 0.2, hz = 1800) {
+  if (!save.sound) return;
+  try {
+    ac ??= new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume();
+    const n = Math.ceil(ac.sampleRate * dur), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n) ** 2;
+    const src = ac.createBufferSource(), f = ac.createBiquadFilter(), v = ac.createGain();
+    src.buffer = buf; f.type = 'bandpass'; f.frequency.value = hz; f.Q.value = 0.8; v.gain.value = vol;
+    src.connect(f).connect(v).connect(ac.destination); src.start();
+  } catch {}
+}
+// phones keep audio silent until it is started inside a tap
+function unlock() { if (!save.sound) return; try { ac ??= new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch {} }
+function burst(x, y, colours, n, speed, size) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * 6.283, v = speed * (0.35 + Math.random() * 0.65);
+    bits.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: size * (0.5 + Math.random() * 0.7), c: colours[i % colours.length], age: 0, life: 0.45 + Math.random() * 0.35 });
+  }
+}
+
+// ---------- screens
+function show(name) {
+  mode = name;
+  for (const id of ['menu', 'skins', 'how', 'evolve', 'dead', 'paused', 'win']) $(id).classList.toggle('on', id === name);
+  const play = name === 'play';
+  $('hud').style.display = s && name !== 'menu' && name !== 'skins' && name !== 'how' ? 'block' : 'none';
+  $('pause').style.display = play ? 'block' : 'none';
+  if (name === 'menu') menu();
+  joy = null; keys.clear(); last = 0;
+}
+function menu() {
+  const F = FORMS[save.stack.at(-1)], going = save.stack.length > 1;
+  $('continue').textContent = going ? `Continue as ${article(F.name)}` : 'Play';
+  $('fresh').style.display = going ? '' : 'none'; $('fresh').textContent = 'New game as an Ant';
+  $('sound').textContent = save.sound ? 'Sound: on' : 'Sound: off';
+  $('look').textContent = 'Look: ' + LOOKS[save.look];
+  portrait($('hero'), F, 30);
+}
+function portrait(canvas, F, r, t = 0) {
+  const x = canvas.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, canvas.width, canvas.height);
+  const wide = F.kind === 'bird' ? 2.3 : F.kind === 'snake' ? (F.f.long ? 3.2 : 2.2) : 2.2, fit = Math.min(r, canvas.height / 2 / wide * 1.9, canvas.width / 2 / wide);
+  x.translate(canvas.width / 2 + (F.kind === 'snake' ? fit * 1.6 : F.kind === 'quad' ? fit * 0.4 : 0), canvas.height / 2); x.rotate(-0.25);
+  drawForm(x, F, fit, t, save.skin, -0.25);
+}
+function start(fresh) {
+  if (fresh) { save.stack = [ANT]; save.xp = 0; store(); }
+  s = create(Number(query.get('seed')) || (Math.random() * 1e9 | 0), save.stack, save.xp);
+  floats.length = 0; bits.length = 0; flash = 0; hud(); show('play');
+  say(level(s) === 1 ? 'Eat the little bugs with green numbers' : `You are ${article(me(s).name)}`);
+}
+function hud() {
+  const F = me(s), need = needFor(level(s));
+  $('fill').style.width = Math.min(100, s.player.xp / need * 100) + '%';
+  $('who').textContent = `Level ${level(s)} · ${F.name}`;
+}
+function say(text) { $('say').textContent = text; $('say').classList.add('on'); sayTimer = 2.6; }
+
+function offer() {
+  $('evolveSay').textContent = `You were ${article(me(s).name)}. Pick what you become.`;
+  const box = $('opts'); box.textContent = '';
+  s.choosing.forEach((F, i) => {
+    const b = document.createElement('button'); b.className = 'opt';
+    const pic = document.createElement('canvas'); pic.width = pic.height = 168; portrait(pic, F, 34);
+    const pace = { slow: 'Slow', medium: 'Medium', fast: 'Fast' }[F.pace];
+    b.append(pic, Object.assign(document.createElement('b'), { textContent: F.name }), Object.assign(document.createElement('small'), { textContent: `Power ${F.power} · ${pace}` }), Object.assign(document.createElement('small'), { textContent: F.trait }));
+    b.onclick = () => { if (!s.choosing) return; choose(s, i); save.stack = s.player.stack.slice(); save.xp = 0; store(); blip(520, 0.3, 'triangle', 0.14, 500); hud(); show('play'); say(`You are ${article(F.name)} now`); };
+    box.append(b);
+  });
+  show('evolve');
+}
+function died() {
+  const d = s.dead, prev = s.player.stack.length > 1 ? FORMS[s.player.stack.at(-2)] : FORMS[ANT];
+  $('deadSay').textContent = `Died to ${article(d.to)} as ${article(d.as)}`;
+  $('deadMore').textContent = d.level > 1 ? `You drop from level ${d.level} to level ${d.level - 1}.` : 'An ant cannot drop any lower. Try again.';
+  $('goOn').textContent = d.level > 1 ? `Keep going as ${article(prev.name)}` : 'Try again as an Ant';
+  $('restart').style.display = d.level > 2 ? '' : 'none'; // at level 2 both buttons would mean the same
+  save.stack = s.player.stack.slice(0, Math.max(1, s.player.stack.length - 1)); save.xp = 0; store(); // closing the tab on this card still costs the level
+  show('dead');
+}
+function back(restart) { revive(s, restart); save.stack = s.player.stack.slice(); save.xp = 0; store(); hud(); show('play'); say(`You are ${article(me(s).name)}`); }
+
+$('continue').onclick = () => { unlock(); start(false); }; $('fresh').onclick = () => { unlock(); start(true); };
+$('toSkins').onclick = () => { skins(); show('skins'); }; $('toHow').onclick = () => show('how');
+$('look').onclick = () => { save.look = (save.look + 1) % LOOKS.length; setLook(save.look); store(); menu(); };
+$('sound').onclick = () => { save.sound = !save.sound; store(); menu(); blip(660); };
+for (const b of document.querySelectorAll('.back')) b.onclick = () => show('menu');
+for (const b of document.querySelectorAll('.toMenu')) b.onclick = () => { if (s?.dead) revive(s, false); if (s) { save.stack = s.player.stack.slice(); save.xp = s.player.xp; store(); } s = null; show('menu'); };
+$('goOn').onclick = () => back(false); $('restart').onclick = () => back(true);
+$('pause').onclick = () => show('paused'); $('resume').onclick = () => show('play');
+$('winOn').onclick = () => show('play'); $('winNew').onclick = () => start(true);
+
+function skins() {
+  const cs = $('colours'), ps = $('patterns'); cs.textContent = ps.textContent = '';
+  for (const c of COLOURS) { const b = document.createElement('button'); b.className = 'sw' + (save.skin.c === c ? ' on2' : ''); b.style.background = c; b.setAttribute('aria-label', 'Colour ' + c); b.onclick = () => { save.skin.c = c; store(); skins(); }; cs.append(b); }
+  for (const [p, label] of PATTERNS) { const b = document.createElement('button'); b.className = 'pat' + (save.skin.p === p ? ' on2' : ''); b.textContent = label; b.onclick = () => { save.skin.p = p; store(); skins(); }; ps.append(b); }
+  portrait($('skinView'), FORMS[ANT], 40);
+}
+
+// ---------- input: drag from where the finger lands; the distance dragged sets the speed
+cv.addEventListener('pointerdown', e => { if (mode !== 'play') return; joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY }; try { cv.setPointerCapture(e.pointerId); } catch {} });
+cv.addEventListener('pointermove', e => { if (joy && e.pointerId === joy.id) { joy.x = e.clientX; joy.y = e.clientY; const dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = Math.hypot(dx, dy); if (d > 70) { joy.ox = joy.x - dx / d * 70; joy.oy = joy.y - dy / d * 70; } } });
+for (const type of ['pointerup', 'pointercancel']) cv.addEventListener(type, e => { if (joy && e.pointerId === joy.id) joy = null; });
+addEventListener('keydown', e => { if (e.key === 'p' || e.key === 'Escape') { if (mode === 'play') show('paused'); else if (mode === 'paused') show('play'); return; } keys.add(e.key.toLowerCase()); if (e.key.startsWith('Arrow')) e.preventDefault(); });
+addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+addEventListener('blur', () => keys.clear());
+document.addEventListener('visibilitychange', () => { if (document.hidden && mode === 'play') show('paused'); });
+addEventListener('contextmenu', e => e.preventDefault());
+function input() {
+  let x = 0, y = 0;
+  if (joy) { x = (joy.x - joy.ox) / 55; y = (joy.y - joy.oy) / 55; if (Math.hypot(x, y) < 0.15) x = y = 0; }
+  if (keys.has('arrowleft') || keys.has('a')) x -= 1; if (keys.has('arrowright') || keys.has('d')) x += 1;
+  if (keys.has('arrowup') || keys.has('w')) y -= 1; if (keys.has('arrowdown') || keys.has('s')) y += 1;
+  return { x, y };
+}
+
+// ---------- drawing
+function resize() { dpr = Math.min(3, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+addEventListener('resize', resize); resize();
+const hash = (x, y) => { let h = x * 374761393 + y * 668265263 | 0; h = (h ^ h >>> 13) * 1274126177 | 0; return ((h ^ h >>> 16) >>> 0) / 4294967296; };
+
+function ground(cx, cy) {
+  g.fillStyle = '#24451f'; g.fillRect(-W, -H, W * 3, H * 3);
+  const x0 = cx - W / 2 / zoom, y0 = cy - H / 2 / zoom, x1 = cx + W / 2 / zoom, y1 = cy + H / 2 / zoom;
+  g.save(); g.scale(zoom, zoom); g.translate(-x0, -y0);
+  g.fillStyle = '#6fa558'; g.fillRect(0, 0, WORLD, WORLD);
+  const cell = 90;
+  for (let gx = Math.max(0, Math.floor(x0 / cell)); gx <= Math.min(WORLD / cell - 1, Math.floor(x1 / cell)); gx++) for (let gy = Math.max(0, Math.floor(y0 / cell)); gy <= Math.min(WORLD / cell - 1, Math.floor(y1 / cell)); gy++) {
+    const a = hash(gx, gy), b = hash(gy + 77, gx + 13), x = (gx + 0.15 + a * 0.7) * cell, y = (gy + 0.15 + b * 0.7) * cell;
+    if ((gx + gy) % 2 === 0) { g.fillStyle = '#69a053'; g.fillRect(gx * cell, gy * cell, cell, cell); }
+    if (a < 0.45) { g.strokeStyle = '#4f8a40'; g.lineWidth = 2; g.lineCap = 'round'; g.beginPath(); for (const k of [-5, 0, 5]) { g.moveTo(x + k, y); g.lineTo(x + k * 1.6, y - 9 - b * 5); } g.stroke(); }
+    else if (a < 0.6) { g.fillStyle = '#a8a89a'; g.beginPath(); g.ellipse(x, y, 7 + b * 6, 5 + b * 4, a * 6, 0, 7); g.fill(); }
+    else if (a < 0.72) { g.fillStyle = b < 0.5 ? '#f2e23a' : '#f2a6c6'; for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(x + Math.cos(k * 1.257) * 4, y + Math.sin(k * 1.257) * 4, 2.6, 0, 7); g.fill(); } g.fillStyle = '#fff8e6'; g.beginPath(); g.arc(x, y, 2, 0, 7); g.fill(); }
+  }
+  g.strokeStyle = '#3a2a1a'; g.lineWidth = 8; g.strokeRect(-4, -4, WORLD + 8, WORLD + 8);
+}
+
+function label(x, y, text, colour, size, extra) {
+  g.font = `bold ${size}px ui-rounded, 'Arial Rounded MT Bold', system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  g.lineWidth = Math.max(3, size / 4.5); g.strokeStyle = '#0b1408cc'; g.lineJoin = 'round'; g.strokeText(text, x, y); g.fillStyle = colour; g.fillText(text, x, y);
+  if (extra) { const w = g.measureText(text).width / 2; g.textAlign = 'left'; g.strokeText(extra, x + w + 2, y); g.fillStyle = '#ff7a3a'; g.fillText(extra, x + w + 2, y); }
+}
+
+// Leftovers: a dark stain, meat in the dead animal's colours and two small bones. Fades in its last 3 seconds; pulses so it reads as food.
+function pile(L, now) {
+  const M = FORMS[L.f], r = L.r * 1.2, h = L.id * 2.399;
+  g.save(); g.translate(L.x, L.y); g.globalAlpha = Math.min(1, L.t / 3);
+  g.fillStyle = '#3a140c55'; g.beginPath(); g.ellipse(0, 0, r * 1.2, r * 0.9, h, 0, 7); g.fill();
+  // fur or shell in the dead animal's own colours, outlined so dark animals still show
+  g.lineWidth = Math.max(1.2, r * 0.08); g.strokeStyle = '#1d1410';
+  for (const [c, x, y, k] of [[M.c, -0.45, -0.3, 0.38], [M.e, 0.45, 0.3, 0.3], [M.c, 0.4, -0.35, 0.28]]) { g.fillStyle = c; g.beginPath(); g.ellipse(x * r, y * r, k * r, k * r * 0.75, h + x * 2, 0, 7); g.fill(); g.stroke(); }
+  for (const [c, x, y, k] of [['#c8402e', -0.05, 0.2, 0.42], ['#f08a7a', 0.0, 0.12, 0.2], ['#c8402e', -0.4, 0.35, 0.22]]) { g.fillStyle = c; g.beginPath(); g.ellipse(x * r, y * r, k * r, k * r * 0.8, h, 0, 7); g.fill(); }
+  g.strokeStyle = '#f4ecd6'; g.lineCap = 'round';
+  for (const [x, y, a] of [[-0.2, -0.05, h], [0.15, 0.1, h + 1.9]]) {
+    const c = Math.cos(a) * r * 0.45, s2 = Math.sin(a) * r * 0.45; g.lineWidth = Math.max(2, r * 0.14);
+    g.beginPath(); g.moveTo(x * r - c, y * r - s2); g.lineTo(x * r + c, y * r + s2); g.stroke();
+    g.fillStyle = '#f4ecd6'; for (const e of [-1, 1]) { g.beginPath(); g.arc(x * r + c * e, y * r + s2 * e, Math.max(1.6, r * 0.11), 0, 7); g.fill(); }
+  }
+  g.globalAlpha *= 0.5 + 0.3 * Math.sin(now / 160); g.strokeStyle = '#ffe23a'; g.lineWidth = 2; g.beginPath(); g.arc(0, 0, r * 1.45, 0, 7); g.stroke();
+  g.restore();
+}
+
+function draw(now) {
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (!s) { g.fillStyle = '#3f6a34'; g.fillRect(0, 0, W, H); return; }
+  const p = s.player, F = me(s);
+  zoom = Math.sqrt(W * H) / (480 + 14 * level(s));
+  const sx = shake > 0 ? (Math.random() - 0.5) * shake * 14 : 0;
+  ground(p.x, p.y);
+  g.translate(sx, 0); // still inside the world transform that ground() set; restored below
+  const vw = W / zoom / 2 + 260, vh = H / zoom / 2 + 260, edge = [];
+  // sight wedges first, so bodies sit on top
+  for (const m of s.mobs) {
+    const M = FORMS[m.f]; if (Math.abs(m.x - p.x) > vw || Math.abs(m.y - p.y) > vh || M.power === F.power || m.busy > 0) continue;
+    const strong = M.power > F.power, R = M.range * F.stealth + F.r;
+    g.beginPath(); g.moveTo(m.x, m.y); g.arc(m.x, m.y, R, m.a - CONE, m.a + CONE); g.closePath();
+    g.fillStyle = strong ? (m.onPlayer ? '#ff3a2a40' : '#ffffff2c') : (m.alert ? '#ffe23a38' : '#ffffff12'); g.fill();
+  }
+  // leftovers, on the ground under everything that walks
+  for (const L of s.left) if (Math.abs(L.x - p.x) < vw && Math.abs(L.y - p.y) < vh) pile(L, now);
+  // hunters: a faint dashed line to the prey and a red arrowhead at the hunter's nose
+  const byId = new Map(s.mobs.map(m => [m.id, m]));
+  g.setLineDash([7, 6]); g.lineWidth = 2.5; g.strokeStyle = '#ff3a2acc';
+  for (const m of s.mobs) {
+    const P = m.prey && !m.onPlayer && byId.get(m.prey); if (!P || Math.abs(m.x - p.x) > vw || Math.abs(m.y - p.y) > vh) continue;
+    g.beginPath(); g.moveTo(m.x, m.y); g.lineTo(P.x, P.y); g.stroke();
+    g.beginPath(); g.arc(P.x, P.y, FORMS[P.f].r * 1.6, 0, 7); g.stroke(); // the hunted animal is ringed
+  }
+  g.setLineDash([]);
+  for (const m of s.mobs) {
+    const M = FORMS[m.f], strong = M.power > F.power;
+    if (Math.abs(m.x - p.x) > vw || Math.abs(m.y - p.y) > vh) continue;
+    if (strong && m.onPlayer && (Math.abs(m.x - p.x) > W / zoom / 2 || Math.abs(m.y - p.y) > H / zoom / 2)) edge.push(m);
+    g.save(); g.translate(m.x, m.y); g.rotate(m.a); g.fillStyle = '#00000026'; g.beginPath(); g.ellipse(0, 3, M.r * 1.1, M.r * 0.8, 0, 0, 7); g.fill();
+    if (m.busy > 0) { const k = Math.sin(now / 55); g.translate(k * M.r * 0.08, 0); g.scale(1 + k * 0.05, 1 - k * 0.05); } // chewing
+    drawForm(g, M, M.r, m.ph, null, m.a); g.restore();
+    const P = m.prey && !m.onPlayer && byId.get(m.prey);
+    if (P) { // red arrowhead just in front of the hunter, pointing at its prey
+      const a = Math.atan2(P.y - m.y, P.x - m.x), z = Math.max(7, M.r * 0.5), dd = Math.hypot(P.x - m.x, P.y - m.y), k = Math.max(M.r + z, Math.min(dd * 0.5, dd - FORMS[P.f].r * 1.6 - z));
+      g.save(); g.translate(m.x + Math.cos(a) * k, m.y + Math.sin(a) * k); g.rotate(a); g.fillStyle = '#ff3a2a'; g.strokeStyle = '#fff'; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(z, 0); g.lineTo(-z * 0.6, -z * 0.75); g.lineTo(-z * 0.2, 0); g.lineTo(-z * 0.6, z * 0.75); g.closePath(); g.fill(); g.stroke(); g.restore();
+    }
+  }
+  // bits of eaten animals, under the numbers
+  for (const b of bits) {
+    const k = b.age / b.life; g.globalAlpha = Math.max(0, 1 - k);
+    if (b.ring) { g.strokeStyle = b.c; g.lineWidth = 3 * (1 - k) + 1; g.beginPath(); g.arc(b.x, b.y, b.r * (1 + k * 1.6), 0, 6.283); g.stroke(); }
+    else { g.fillStyle = b.c; g.beginPath(); g.arc(b.x, b.y, b.r * (1 - k * 0.5), 0, 6.283); g.fill(); }
+  }
+  g.globalAlpha = 1;
+  // the player, unless it has just been eaten
+  if (!s.dead) {
+  g.save(); g.translate(p.x, p.y);
+  if (p.safe > 0) { g.strokeStyle = `rgba(160,220,255,${0.4 + 0.3 * Math.sin(now / 90)})`; g.lineWidth = 3; g.beginPath(); g.arc(0, 0, F.r * 1.9, 0, 7); g.stroke(); }
+  g.strokeStyle = save.skin.c === '#3a2a22' ? '#fff8e6' : save.skin.c; g.lineWidth = 2.5; g.setLineDash([5, 5]); g.beginPath(); g.arc(0, 0, F.r * 1.55, now / 900, now / 900 + 6.283); g.stroke(); g.setLineDash([]);
+  g.rotate(p.a); drawForm(g, F, F.r, p.ph, save.skin, p.a); g.restore();
+  }
+  // numbers
+  const size = Math.max(11, 15 / zoom);
+  for (const m of s.mobs) {
+    const M = FORMS[m.f]; if (Math.abs(m.x - p.x) > vw || Math.abs(m.y - p.y) > vh) continue;
+    const top = m.y - M.r * (M.kind === 'bird' ? 1.5 : 1.25) - 4;
+    label(m.x, top, String(M.power), M.power < F.power ? '#8dff8a' : M.power > F.power ? '#ff7a6a' : '#fff8e6', size, M.speed > F.speed ? '»' : '');
+    if (M.power > F.power ? m.onPlayer : m.alert && M.power < F.power) label(m.x, top - size * 0.95, '!', '#ffe23a', size * 1.25);
+  }
+  if (!s.dead) label(p.x, p.y - F.r * (F.kind === 'bird' ? 1.5 : 1.25) - 6, String(F.power), '#ffffff', size * 1.1);
+  for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i]; g.globalAlpha = Math.max(0, 1 - f.age); label(f.x, f.y - f.age * 30, f.text, f.c || '#ffe23a', f.small ? size * 0.85 : size); g.globalAlpha = 1; }
+  g.restore();
+  // arrows to hunters off the screen
+  for (const m of edge) {
+    const a = Math.atan2(m.y - p.y, m.x - p.x), k = Math.min((W / 2 - 22) / Math.abs(Math.cos(a) || 1e-6), (H / 2 - 22) / Math.abs(Math.sin(a) || 1e-6));
+    g.save(); g.translate(W / 2 + Math.cos(a) * k, H / 2 + Math.sin(a) * k); g.rotate(a); g.fillStyle = '#ff3a2a'; g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.moveTo(14, 0); g.lineTo(-10, -11); g.lineTo(-10, 11); g.closePath(); g.fill(); g.stroke(); g.restore();
+  }
+  if (flash > 0) { g.fillStyle = `rgba(200,20,10,${0.45 * flash})`; g.fillRect(0, 0, W, H); }
+  if (joy && mode === 'play') {
+    g.globalAlpha = 0.35; g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.arc(joy.ox, joy.oy, 55, 0, 7); g.stroke();
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(joy.x, joy.y, 22, 0, 7); g.fill(); g.globalAlpha = 1;
+  }
+}
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = last ? Math.min(0.1, (now - last) / 1000) : 0; last = now;
+  if (mode === 'play' && s) {
+    acc += dt; const inp = input();
+    while (acc >= 1 / 60 && mode === 'play') {
+      acc -= 1 / 60; step(s, inp);
+      for (const e of s.events) {
+        if (e.t === 'eat') {
+          const M = FORMS.find(f => f.name === e.name);
+          floats.push({ x: e.x, y: e.y, text: '+' + e.gain, age: 0 }); burst(e.x, e.y, [M.c, M.d, M.e, '#ffffff'], 16, 110 + M.r * 6, Math.max(3.5, M.r * 0.32));
+          bits.push({ ring: 1, x: e.x, y: e.y, r: Math.max(8, M.r), c: '#ffe23a', age: 0, life: 0.35 });
+          crunch(0.1, 0.22, 1400 + Math.random() * 900); blip(300 + e.gain * 90, 0.09, 'square', 0.06, 200); save.xp = s.player.xp; hud();
+        }
+        if (e.t === 'kill') { // another animal's kill: a burst, and a crunch that is quieter with distance and silent far away
+          const M = FORMS[e.prey], dist = Math.hypot(e.x - s.player.x, e.y - s.player.y);
+          burst(e.x, e.y, [M.c, M.d, '#b8322a', '#ffffff'], 12, 90 + M.r * 5, Math.max(3, M.r * 0.28));
+          bits.push({ ring: 1, x: e.x, y: e.y, r: Math.max(8, M.r), c: '#ff5a3a', age: 0, life: 0.4 });
+          if (dist < 900) crunch(0.12, 0.2 * (1 - dist / 900) ** 2, 900 + Math.random() * 500);
+        }
+        if (e.t === 'scavenge') {
+          const M = FORMS[e.f];
+          floats.push({ x: e.x, y: e.y, text: `+${e.gain} leftovers`, age: 0, c: '#ffd0a0', small: 1 }); burst(e.x, e.y, [M.c, M.d, '#f4ecd6'], 8, 80, 3.5);
+          crunch(0.08, 0.16, 2200); save.xp = s.player.xp; hud();
+        }
+        if (e.t === 'hunt' && Math.hypot(e.x - s.player.x, e.y - s.player.y) < 350) blip(140, 0.18, 'triangle', 0.035, -40); // a low growl when a chase starts close by
+        if (e.t === 'notice') blip(e.strong ? 180 : 700, 0.12, e.strong ? 'sawtooth' : 'sine', 0.06);
+        if (e.t === 'full') offer();
+        if (e.t === 'die') { // show the bite for a moment, then the card
+          const F = me(s), p = s.player;
+          shake = 0.6; flash = 1; burst(p.x, p.y, [F.c, F.d, '#c0271f', '#ff5a3a'], 30, 140 + F.r * 7, F.r * 0.36);
+          bits.push({ ring: 1, x: p.x, y: p.y, r: F.r * 1.4, c: '#ff3a2a', age: 0, life: 0.5 });
+          crunch(0.22, 0.3, 700); blip(220, 0.6, 'sawtooth', 0.14, -170);
+          save.stack = s.player.stack.slice(0, Math.max(1, s.player.stack.length - 1)); save.xp = 0; store(); // closing the tab now still costs the level
+          dying = performance.now() + 900; mode = 'dying'; $('pause').style.display = 'none'; joy = null; keys.clear();
+        }
+        if (e.t === 'win') { store(); $('winSay').textContent = `You climbed all ${TOP} levels and became ${article(me(s).name)}. Nothing here can eat you.`; blip(660, 0.6, 'triangle', 0.14, 600); show('win'); }
+      }
+    }
+    for (const m of s.mobs) if (m.busy > 0 && Math.random() < dt * 5) { // crumbs fly while a hunter eats
+      const M = FORMS[m.f], L = s.left.find(L => Math.hypot(L.x - m.x, L.y - m.y) < M.r * 3);
+      if (L) burst(m.x + Math.cos(m.a) * M.r, m.y + Math.sin(m.a) * M.r, ['#c8402e', FORMS[L.f].c], 1, 60, 2.5);
+    }
+    for (const f of floats) f.age += dt * 1.3;
+    while (floats.length && floats[0].age > 1) floats.shift();
+  } else acc = 0;
+  if (mode === 'play' || mode === 'dying') {
+    for (const b of bits) { b.age += dt; if (!b.ring) { b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= 1 - 3 * dt; b.vy *= 1 - 3 * dt; } }
+    for (let i = bits.length - 1; i >= 0; i--) if (bits[i].age > bits[i].life) bits.splice(i, 1);
+    if (flash > 0) flash = Math.max(0, flash - dt * 1.6);
+  }
+  if (mode === 'dying' && now >= dying) { flash = 0; died(); }
+  if (shake > 0) shake -= dt;
+  if (sayTimer > 0 && (sayTimer -= dt) <= 0) $('say').classList.remove('on');
+  draw(now);
+}
+addEventListener('pagehide', () => { if (s && !s.dead) { save.stack = s.player.stack.slice(); save.xp = s.player.xp; store(); } });
+window.__ant = { get s() { return s; }, get mode() { return mode; }, FORMS, WILD, me, level, step };
+show('menu'); requestAnimationFrame(frame);
+</script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>
