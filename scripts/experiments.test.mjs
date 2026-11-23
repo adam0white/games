@@ -25,7 +25,8 @@ test('experiments in both prototypes/ and experiments/ are all built at the top 
 test('a slug may not collide with the other root, a game, a reserved path or an archived name', t => {
   const fails = (pages, pattern) => assert.throws(() => planExperiments(checkout(t, pages), registry), pattern);
   fails(['prototypes/lantern/index.html', 'experiments/lantern/index.html'], /lantern is in both prototypes\/ and experiments\//);
-  fails(['experiments/rope/index.html'], /collides with the game at \/rope\//);
+  fails(['experiments/rope/index.html'], /collides with the game or legacy host rope/);
+  fails(['experiments/repair/index.html'], /collides with the game or legacy host repair/);
   for (const slug of reservedPaths) fails([`experiments/${slug}/index.html`], /reserved path/);
   fails(['archive/games/hearsay/package.json', 'experiments/hearsay/index.html'], /archived name hearsay/);
   fails(['archive/prototypes/long-road/index.html', 'prototypes/long-road/index.html'], /archived name long-road/);

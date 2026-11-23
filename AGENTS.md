@@ -12,9 +12,9 @@ Archived code lives under `archive/` and is not built, served or checked; `archi
 
 ## Shared code (owner, 2026-11-23)
 
-The live prototypes share plumbing through `prototypes/kit/`. `prototypes/kit/README.md` holds the rules.
+The live prototypes share plumbing through `kit/` in the experiments directory (`prototypes/kit/`, or `experiments/kit/` after the rename). Its `README.md` holds the rules.
 Before you write input, sound, pause, menu, save, shop or feedback-button code in a game, use or extend the kit.
-Run `node prototypes/kit/check/phone.mjs` before and after your changes.
+Run `node <dir>/kit/check/phone.mjs` (`<dir>` is `prototypes` or, after the rename, `experiments`) before and after your changes.
 Storage keys and formats never change.
 Reuse before you build. When two games need the same thing, move it to the kit in the same change.
 
@@ -31,7 +31,7 @@ The earlier migration-first goal is superseded and "New-game prototypes wait" is
 Proposals from the direction document (owner approved the document on 2026-11-14 and may change any detail):
 
 - **Bake-off.** Build a few small entries in about two weeks; the owner plays each for ten minutes and picks one. The winner gets the remaining effort toward a game outsiders finish without help and recommend.
-- **Prototype lane.** A prototype needs signed commits and green CI only. It does not need HF, a replaying export, a cast registry entry, a design document or a hosted review until it graduates. A prototype is a static directory `prototypes/<slug>/` with an `index.html`; the build copies it to `/<slug>/` (see Experiments above). It has no `games.json` entry, so the HF pin and release-manifest checks do not apply. A prototype that graduates moves to `games/<slug>` and meets the game rules.
+- **Prototype lane.** A prototype needs signed commits and green CI only. It does not need HF, a replaying export, a cast registry entry, a design document or a hosted review until it graduates. A prototype is a static directory `experiments/<slug>/` (`prototypes/<slug>/` until the rename) with an `index.html`; the build copies it to `/<slug>/` (see Experiments above). It has no `games.json` entry, so the HF pin and release-manifest checks do not apply. A prototype that graduates moves to `games/<slug>` and meets the game rules.
 - **Taste gates.** Concept card, then two to four look variants, then a ten-minute play verdict, then outsider-ready. Each gate is one short ask to the owner.
 - **Spend.** Paid art, music or other assets are allowed only under a cap the owner has set, and each purchase is logged in the repository. No cap is set yet; spend nothing until one is.
 
