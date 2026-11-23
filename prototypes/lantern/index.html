@@ -84,15 +84,15 @@
 <div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p><p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p></div></div>
 <script type="module">
 import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS } from './sim.js?v=7'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
+import { readNumber, readJson, write } from '../kit/save.js';
+import { sound } from '../kit/audio.js';
+import { onLeave, isPauseKey } from '../kit/pause.js';
+import { screens } from '../kit/screens.js';
 import { hull, wake, flame, burn, glow as flameGlow, mark, TINT } from './looks.js?v=2';
 
 const query = new URLSearchParams(location.search);
 const gain = Number(query.get('gain')) || 1.3; // boat travel per finger travel; ?gain= to compare
-const store = {
-  get: k => { try { return Number(localStorage.getItem(k) || 0); } catch { return 0; } },
-  set: (k, v) => { try { localStorage.setItem(k, String(v)); } catch {} },
-  json: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
-};
+const store = { get: k => readNumber(k), set: write, json: readJson }; // keys and formats are listed in NOTES.md and must not change
 // Story: a night is one river. Reaching dawn opens the next night, up to night 20. Any opened night can be replayed.
 let opened = Math.min(NIGHTS, Math.max(1, Math.floor(Number(query.get('night')) || store.get('lantern-night') || 1)));
 let stage = opened, endless = false, tower = false, bank = store.get('lantern-bank');
@@ -147,9 +147,10 @@ const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
 window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, unit: unit / dpr }); // read by the browser checks
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 
+const cards = screens(['menu', 'shop', 'credits', 'card']);
 function show(name) {
   screen = name;
-  for (const id of ['menu', 'shop', 'credits', 'card']) $(id).classList.toggle('on', id === name);
+  cards(name);
   const play = name === 'play';
   $('hud').style.display = $('big').style.display = play ? 'block' : 'none'; pauseButton.style.display = play ? 'grid' : 'none';
   if (!play) $('warn').classList.remove('on');
@@ -226,10 +227,8 @@ function spin(row, hidden, it, pack) {
 function say(text, ms = 2200) { const el = $('say'); el.textContent = text; el.style.opacity = 1; clearTimeout(sayTimer); sayTimer = setTimeout(() => { el.style.opacity = 0; }, ms); }
 
 // Sound: all synthesized, started by the first touch.
-let ac, water, waterGain, drone, droneGain, streak = 0;
-function audio() {
-  if (ac) { if (ac.state === 'suspended' && !paused) ac.resume(); return; }
-  ac = new (window.AudioContext || window.webkitAudioContext)();
+let water, waterGain, drone, droneGain, streak = 0;
+const snd = sound({ setup: ac => { // the river and the low drone, built once
   const len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
   for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
   const n = ac.createBufferSource(); n.buffer = buf; n.loop = true;
@@ -237,12 +236,9 @@ function audio() {
   waterGain = ac.createGain(); waterGain.gain.value = 0.05; n.connect(water).connect(waterGain).connect(ac.destination); n.start();
   drone = ac.createOscillator(); drone.type = 'sine'; drone.frequency.value = 55;
   droneGain = ac.createGain(); droneGain.gain.value = 0; drone.connect(droneGain).connect(ac.destination); drone.start();
-}
-function tone(freq, dur, vol, type = 'sine') {
-  if (!ac) return; const o = ac.createOscillator(), v = ac.createGain(), t = ac.currentTime;
-  o.type = type; o.frequency.setValueAtTime(freq, t); v.gain.setValueAtTime(vol, t); v.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.connect(v).connect(ac.destination); o.start(t); o.stop(t + dur);
-}
+} });
+const audio = () => snd.unlock();
+const tone = (freq, dur, vol, type = 'sine') => { if (snd.ctx) snd.tone(freq, dur, vol, type); };
 const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
 
 function begin() {
@@ -303,8 +299,6 @@ canvas.addEventListener('pointermove', e => {
   drag.x = e.clientX; aim(drag.boat0 + (e.clientX - drag.x0) * dpr / unit * gain);
 });
 for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, e => { if (e.pointerType !== 'mouse') startTap = null; if (drag && e.pointerId === drag.id) drag = null; });
-// iOS Safari may refuse to start audio on touch-down; try again when the finger lifts.
-for (const type of ['pointerup', 'touchend', 'click']) addEventListener(type, () => { if (ac && ac.state === 'suspended' && !paused) ac.resume(); });
 
 // Buttons.
 $('play').addEventListener('click', () => { endless = tower = false; begin(); });
@@ -317,24 +311,23 @@ $('toCredits').addEventListener('click', () => show('credits'));
 for (const b of document.querySelectorAll('.back')) b.addEventListener('click', () => show('menu'));
 $('go').addEventListener('click', () => { if (paused) resume(); else if (performance.now() - ended > 600) begin(); });
 // Leaving a paused run for the menu ends it and keeps its embers.
-$('toMenu').addEventListener('click', () => { if (paused) { paused = false; playing = false; bankRun(); if (ac) ac.resume(); } show('menu'); });
+$('toMenu').addEventListener('click', () => { if (paused) { paused = false; playing = false; bankRun(); snd.release(); } show('menu'); });
 
 // Pause: the button, P or Escape, and whenever the page loses the screen (a phone call, another app).
 function pause() {
   if (!playing || paused) return; paused = true; drag = null; keys.clear();
   $('title').textContent = 'Paused'; $('line').textContent = endless ? `Score ${score(s)}.` : tower ? `The tower, floor ${Math.floor(progress(s) * FLOORS)} of ${FLOORS}.` : `Night ${stage}, ${Math.floor(progress(s) * 100)}% of the way to dawn.`; $('sub').textContent = 'Touch the river to go on.'; $('go').textContent = 'Go on';
-  show('card'); if (ac) ac.suspend();
+  show('card'); snd.hold();
 }
 function resume() {
   if (!paused) return; paused = false; acc = 0; last = performance.now(); target = s.x;
-  show('play'); if (ac) ac.resume();
+  show('play'); snd.release();
 }
 pauseButton.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pause(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
-addEventListener('blur', pause); addEventListener('pagehide', pause);
+onLeave(pause);
 const keys = new Set();
 addEventListener('keydown', e => {
-  if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') { paused ? resume() : pause(); return; }
+  if (isPauseKey(e)) { paused ? resume() : pause(); return; }
   if (paused) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); resume(); } return; }
   keys.add(e.key);
 });
@@ -528,7 +521,7 @@ function frame(now) {
   if (!paused && !(s.over && s.over !== 'dawn')) burn(fire0, skin('flame')[0], dt, Math.max(-0.5, Math.min(0.5, (target - s.x) * 4)), s.light);
   shake = Math.max(0, shake - dt * 3); glow = Math.max(0, glow - dt * 2);
   for (const p of sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; } sparks = sparks.filter(p => p.life > 0);
-  if (ac) { water.frequency.value = 400 + 500 * Math.min(1.4, s.y / GOAL); waterGain.gain.value = 0.05 + (playing ? 0.14 * Math.max(fall(s, s.y), fall(s, s.y + 0.8)) : 0); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0; }
+  if (snd.ctx) { water.frequency.value = 400 + 500 * Math.min(1.4, s.y / GOAL); waterGain.gain.value = 0.05 + (playing ? 0.14 * Math.max(fall(s, s.y), fall(s, s.y + 0.8)) : 0); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0; }
   draw(now); requestAnimationFrame(frame);
 }
 show('menu');
