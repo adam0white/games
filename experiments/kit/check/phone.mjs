@@ -60,7 +60,7 @@ const GAMES = {
     // A save in the format players already have.
     await page.goto(`${base}/lantern/`);
     await page.evaluate(LAB_LOCAL);
-    await page.evaluate(() => { localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('lantern-best-endless', '55'); localStorage.setItem('lantern-best-tower', '4'); localStorage.setItem('lantern-stats', '{"red":1}'); localStorage.setItem('notes.k', 'check'); });
+    await page.evaluate(() => { localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('lantern-best-endless', '55'); localStorage.setItem('lantern-best-tower', '4'); localStorage.setItem('lantern-stats', '{"red":1}'); localStorage.setItem('lantern-off', '[]'); localStorage.setItem('lantern-best-level', '0'); localStorage.setItem('notes.k', 'check'); });
     await page.reload();
     let st = await state();
     assert.equal(st.opened, 3, 'old save: opened night'); assert.equal(st.bank, 120, 'old save: bank'); assert.ok(st.owned.includes('red'), 'old save: owned'); assert.equal(st.worn.boat, 'red', 'old save: worn');
@@ -120,6 +120,29 @@ const GAMES = {
     assert.equal(labRuns(page, 'lantern').length, 3, 'nothing is sent while recording is off');
     await page.reload(); await page.click('#play'); await finger(page, '#pause', [['pointerdown', 0, 0]]);
     assert.equal(await page.isChecked('.lab-toggle input'), false, 'the switch stays off after a reload');
+    // Stats last one run (2026-11-23): bought for the next run, shown on the menu, used up when it starts. lantern-stats keeps its format.
+    await page.click('#toMenu'); await page.click('#toShop');
+    assert.match(await page.textContent('#packs'), /stats last one run/i, 'the shop warns that stats last one run');
+    // Tester tools show only where the notes button is (a tester's browser).
+    const bank0 = (await state()).bank; await page.click('[data-test="embers"]'); assert.equal((await state()).bank, bank0 + 500, 'tester tool adds embers');
+    await page.click('[data-stat="hearts"]'); st = await state(); assert.equal(st.bank, bank0 + 500 - 15, 'a stat level costs 15'); assert.equal(JSON.parse((await saved())['lantern-stats']).hearts, 1);
+    // An ability switched off stays owned and is kept out of the river; the choice is saved under lantern-off.
+    await page.click('[data-item="boost"]'); assert.equal((await saved())['lantern-off'], '["boost"]'); assert.ok((await state()).owned.includes('boost'), 'switched off, still owned');
+    await page.click('.back'); assert.match(await page.textContent('#ready'), /Hearts 1/, 'the menu shows the stats ready for the next run');
+    await page.click('#play'); st = await state(); assert.equal(st.hearts, 2, 'the stat is on for this run'); assert.ok(!st.on.includes('boost'), 'a switched-off ability is not in the river');
+    assert.equal((await saved())['lantern-stats'], '{}', 'the stat is used up when the run starts');
+    await page.evaluate(() => { window.lanternSim().light = 0.0001; }); await until(page, () => !window.lanternState().playing, 'stat run ends');
+    await until(page, () => window.lanternState().screen === 'card', 'end card'); await page.click('#toMenu');
+    assert.equal(await page.textContent('#ready'), '', 'no stats left after the run');
+    // Tower of 50 levels (2026-11-23): after a level, climb on or stop; the best level is kept under lantern-best-level; a new climb starts at level 1.
+    await page.click('#tower'); assert.equal((await state()).climb, 1, 'a climb starts at level 1');
+    await page.evaluate(() => { const s = window.lanternSim(); s.y = 77.9; s.safe = 99; }); await until(page, () => window.lanternState().screen === 'card', 'level card', 12000);
+    assert.match(await page.textContent('#title'), /Level 1 cleared/); assert.equal(await page.textContent('#toMenu'), 'Stop'); assert.equal((await saved())['lantern-best-level'], '1');
+    await page.click('#go'); st = await state(); assert.equal(st.climb, 2, 'climb on goes to level 2'); assert.ok(st.playing);
+    await page.evaluate(() => { window.lanternSim().light = 0.0001; }); await until(page, () => window.lanternState().screen === 'card', 'lost card');
+    assert.match(await page.textContent('#line'), /cleared 1 level\. Best 1 of 50/); assert.equal(await page.textContent('#toMenu'), 'Menu');
+    await page.click('#go'); assert.equal((await state()).climb, 1, 'after a loss the next climb starts at level 1');
+    await finger(page, '#pause', [['pointerdown', 0, 0]]); await page.click('#toMenu'); assert.match(await page.textContent('#tower'), /best level 1 of 50/);
   },
   async 'ant-promotion'(page) {
     const KEY = 'ant-promotion:v1';
