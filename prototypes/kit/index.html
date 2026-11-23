@@ -18,11 +18,13 @@
 <ul id="out"></ul>
 <p><button id="beep">Play a sound</button> <span id="heard"></span></p>
 <div id="a" class="card">card a</div><div id="b" class="card">card b</div>
+<div id="labbox"></div>
 <script type="module">
 import { read, write, readNumber, readJson, writeJson } from './save.js';
 import { sound } from './audio.js';
 import { onLeave, isPauseKey } from './pause.js';
 import { screens } from './screens.js';
+import { lab } from './lab.js';
 
 const results = [], out = document.getElementById('out');
 function check(name, fn) {
@@ -58,6 +60,39 @@ enabled = true;
 check('audio: unlock makes one context and runs setup once', () => { const a = snd.unlock(), b = snd.unlock(); snd.tone(440, 0.01, 0.0001); snd.noise(0.01, 0.0001); return !!a && a === b && built === 1; });
 check('audio: hold and release do not throw', () => { snd.hold(); snd.release(); return true; });
 document.getElementById('beep').addEventListener('click', () => { snd.unlock(); snd.tone(523.25, 0.4, 0.15, 'triangle'); snd.noise(0.15, 0.1); document.getElementById('heard').textContent = `Context is ${snd.ctx?.state}. You should have heard a note and a crunch.`; });
+
+// lab.js, with a stand-in for the network: this page never sends anything to the lab.
+// It restores the shared player id afterwards, so opening this page changes nothing for a player.
+const gunzip = async body => new Response(new Blob([body]).stream().pipeThrough(new DecompressionStream('gzip'))).json();
+const flushed = () => new Promise(done => setTimeout(done, 200));
+async function labChecks() {
+  const keepPlayer = localStorage.getItem('hf-lab-player'), sent = [];
+  const fake = async (url, init) => { sent.push({ url, body: await gunzip(init.body) }); return { status: 200 }; };
+  const rec = lab('kit-selftest', { fetch: fake, version: 'kit-1' });
+  rec.start({ n: 1 }); rec.event('buy', { x: 1 }); rec.end('won', { s: 1 }); await flushed();
+  check('lab: nothing is recorded or sent before the notice is on the page', () => sent.length === 0 && localStorage.getItem('hf-lab-player') === keepPlayer);
+  check('lab: the notice says what the lab records and links to the privacy page', () => { const p = rec.notice(document.getElementById('labbox')); return /keeps it for 180 days/.test(p.textContent) && p.querySelector('a').href.endsWith('/lab/privacy/'); });
+  if (!rec.on) { check('lab: recording is switched off in this browser, so the send checks are skipped', () => true); return; }
+  rec.event('before', 1); await flushed(); const between = sent.splice(0);
+  rec.start({ night: 3 }); rec.event('buy', { pack: 'boat' }); rec.end('dawn', { embers: 7 }); await flushed();
+  const run = sent.find(r => r.body.kind === 'run')?.body, events = sent.find(r => r.body.kind === 'events')?.body;
+  check('lab: a run end sends one run record and one events record', () => sent.length === 2 && !!run && !!events && sent.every(r => r.url === 'https://human.adamwhite.work/lab/api/linked'));
+  check('lab: the run record carries the outcome, the summary and the choices', () => run.v === 2 && run.game === 'kit-selftest' && run.data.outcome === 'dawn' && run.data.summary.embers === 7 && run.data.start.night === 3 && run.data.events.map(e => e.type).join() === 'buy' && run.build.a === 'kit-1');
+  check('lab: a choice between runs is sent at once as its own record', () => between.length === 1 && between[0].body.data.outcome === 'between-runs' && between[0].body.data.events[0].type === 'before');
+  check('lab: ids are 32 hex characters and both records share the run', () => ['id', 'player', 'session', 'runId'].every(k => /^[a-f0-9]{32}$/.test(run[k])) && events.runId === run.runId && events.player === run.player);
+  check('lab: the events record uses only labels the lab accepts', () => JSON.stringify(events.data.e.map(e => e[2] ?? null)) === '[null,"run started","ending reached",null]');
+  check('lab: an ended run is not sent twice', () => { rec.end('again'); return true; });
+  const broken = lab('kit-selftest', { fetch: () => Promise.reject(new Error('offline')) });
+  broken.notice(document.getElementById('labbox'));
+  check('lab: a failing network never throws into the game', () => { broken.start(); broken.event('x'); broken.end('lost'); return true; });
+  check('lab: a bad game name gives a recorder that does nothing', () => { const r = lab('Bad Name!'); r.start(); r.end('x'); return r.on === false; });
+  await flushed();
+  check('lab: an ended run was sent once', () => sent.length === 2);
+  if (keepPlayer === null) localStorage.removeItem('hf-lab-player'); else localStorage.setItem('hf-lab-player', keepPlayer);
+  sessionStorage.removeItem('hf-lab-session:kit-selftest');
+  for (const el of document.querySelectorAll('#labbox > *')) el.remove();
+}
+try { await labChecks(); } catch (e) { check(`lab: checks ran to the end (${e.message})`, () => false); }
 
 window.kitResults = results; // read by check/phone.mjs
 </script>

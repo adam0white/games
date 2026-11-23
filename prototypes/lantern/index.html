@@ -88,6 +88,7 @@ import { readNumber, readJson, write } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
+import { lab } from '../kit/lab.js'; // lab recording: the rec lines below
 import { hull, wake, flame, burn, glow as flameGlow, mark, TINT, reeds, shine, halo, flood } from './looks.js?v=3';
 
 const query = new URLSearchParams(location.search);
@@ -176,6 +177,7 @@ function shop(text) {
       const cost = statCost(id); if (busy || bank < cost || (stats[id] || 0) >= top) return;
       bank -= cost; store.set('lantern-bank', bank); stats[id] = (stats[id] || 0) + 1; store.set('lantern-stats', JSON.stringify(stats));
       audio(); tone(523.25, 0.3, 0.1, 'triangle'); setTimeout(() => tone(783.99, 0.5, 0.1, 'triangle'), 100);
+      rec.event('stat', { stat: id, level: stats[id], bank });
       shop(`${label} is now ${stats[id]} of ${top}. ${what}.`);
     });
     row.append(txt, b); sdiv.append(row);
@@ -198,6 +200,7 @@ function shop(text) {
       const it = rest[Math.floor(Math.random() * rest.length)];
       // The pack is paid for and the find is saved at once; the hop and the flash only show it.
       bank -= COST; store.set('lantern-bank', bank); owned.add(it[0]); store.set('lantern-owned', JSON.stringify([...owned])); if (pack.id !== 'power') { worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); }
+      rec.event('buy', { pack: pack.id, item: it[0], bank });
       $('bank2').textContent = bank; audio(); spin(row, rest.map(i => i[0]), it, pack);
     });
     div.append(name, row, buy); box.append(div);
@@ -246,10 +249,13 @@ function begin() {
   s = create((Math.random() * 2 ** 31) | 0, tower ? Math.max(3, Math.min(12, opened)) : endless ? 1 : stage, tower ? 'tower' : endless, powersOwned(), stats); target = s.x; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; drag = null; startTap = null;
   shown = ''; show('play'); hud();
   say(tower ? 'The tower. Climb to the top' : endless ? 'Endless river' : `Night ${stage}`, 1800); floor = 0;
+  rec.start({ mode: mode(), night: tower || endless ? 0 : stage });
 }
+const mode = () => tower ? 'tower' : endless ? 'endless' : 'night';
 function bankRun() { bank += s.taken; store.set('lantern-bank', bank); }
 function finish() {
   playing = false; ended = performance.now(); drag = null; bankRun();
+  rec.end(s.over, { mode: mode(), night: tower || endless ? 0 : stage, reached: Math.floor(progress(s) * 100), score: endless ? score(s) : null, embers: s.taken, hearts: s.hearts, bank });
   $('hud').style.display = $('big').style.display = pauseButton.style.display = 'none'; $('warn').classList.remove('on');
   const won = s.over === 'dawn', why = { dark: 'The flame went out.', bank: 'You ran onto the bank.', ice: 'You struck the ice.', log: 'You struck a log.', pool: 'The whirlpool took you.', geyser: 'The geyser threw you over.', isle: 'You struck an island.' }[s.over] ?? 'You struck a rock.';
   const gained = `+${s.taken} ember${s.taken === 1 ? '' : 's'}. You have ${bank}.`;
@@ -310,8 +316,10 @@ $('toShop').addEventListener('click', () => show('shop'));
 $('toCredits').addEventListener('click', () => show('credits'));
 for (const b of document.querySelectorAll('.back')) b.addEventListener('click', () => show('menu'));
 $('go').addEventListener('click', () => { if (paused) resume(); else if (performance.now() - ended > 600) begin(); });
+// Lab recording (prototypes/kit/lab.js): the notice on the menu, the switch on the pause card; begin, finish, quit and the shop call rec.
+const rec = lab('lantern'); rec.notice($('menu').firstElementChild); rec.toggle($('card').firstElementChild);
 // Leaving a paused run for the menu ends it and keeps its embers.
-$('toMenu').addEventListener('click', () => { if (paused) { paused = false; playing = false; bankRun(); snd.release(); } show('menu'); });
+$('toMenu').addEventListener('click', () => { if (paused) { rec.end('quit', { mode: mode(), night: tower || endless ? 0 : stage, reached: Math.floor(progress(s) * 100), embers: s.taken, hearts: s.hearts }); } if (paused) { paused = false; playing = false; bankRun(); snd.release(); } show('menu'); });
 
 // Pause: the button, P or Escape, and whenever the page loses the screen (a phone call, another app).
 function pause() {
