@@ -3,7 +3,7 @@
 // 5. the rival: a death makes one, it persists and gains power, no animal eats it, temperaments differ, it can be eaten
 import assert from 'node:assert/strict';
 import { SPAWN_WEIGHTS, HIDE_S, hideReady, SAME_FAST, FAST_CAP, crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENT_NAMES, NEM_STEP, NEM_MAX_BONUS, NEM_PRIZE, MOBS,
-  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article } from './sim.js';
+  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, mobSpeed } from './sim.js';
 const seeds = Number(process.argv[2] ?? 20), minutes = Number(process.argv[3] ?? 12);
 
 // 1. Rule table. Player: power 50, speed 124.
@@ -54,11 +54,11 @@ function careful(s) {
     if (pw > F.power) {
       const reach = M.range * F.stealth + 110, facing = ang(Math.atan2(-dy, -dx), m.a) < CONE + 0.4;
       if (d < reach * (facing || m.alert ? 1.5 : 0.7)) { const w = (m.alert ? 5 : facing ? 3 : 1.5) * reach / d; vx -= dx / d * w; vy -= dy / d * w; }
-    } else if (pw < F.power && (M.speed <= F.speed || !m.alert) && d < bd) { bd = d; best = m; }
+    } else if (pw < F.power && (mobSpeed(M) <= F.speed || !m.alert) && d < bd) { bd = d; best = m; }
   }
   if (best) {
     const M = FORMS[best.f]; let tx = best.x, ty = best.y;
-    if (M.speed > F.speed && bd > 40) { const back = Math.min(bd * 0.7, 70); tx -= Math.cos(best.a) * back; ty -= Math.sin(best.a) * back; } // come from behind
+    if (mobSpeed(M) > F.speed && bd > 40) { const back = Math.min(bd * 0.7, 70); tx -= Math.cos(best.a) * back; ty -= Math.sin(best.a) * back; } // come from behind
     const d = Math.hypot(tx - p.x, ty - p.y) || 1; vx += (tx - p.x) / d; vy += (ty - p.y) / d;
   }
   return { x: vx, y: vy };
@@ -95,7 +95,9 @@ console.log('bots: a careful player climbs and dies less than a reckless one');
 // Wild rules: the hide is used by strong picks only, the hunt happens, and care still pays.
 for (const pick of [0, 1, 2]) {
   assert.ok(result[`wild careful/${pick}`].hunts > 0, 'wild: hunts happen');
-  assert.ok(result[`wild careful/${pick}`].top >= 6, `wild: careful bot still climbs (pick ${pick})`);
+  // 5, not 6, since 2026-11-23: the tester found the game too easy (note #101), so fast animals got faster and animals hunt each other harder.
+  // The strong-pick bot in Wild now reaches a median of 5 (it was 8).
+  assert.ok(result[`wild careful/${pick}`].top >= 5, `wild: careful bot still climbs (pick ${pick})`);
   assert.ok(result[`wild careful/${pick}`].deaths < result[`wild reckless/${pick}`].deaths, `wild: care pays (pick ${pick})`);
 }
 assert.ok(result['wild reckless/0'].hides > 0, 'wild: strong picks use the hide');
@@ -170,8 +172,10 @@ function play(seed, policy, { ticks, knobs = KNOBS('stalker'), stack, nemesis = 
   assert.equal(snap(a.s), snap(b.s)); assert.deepEqual(nemesisSave(a.s), nemesisSave(b.s));
   assert.ok(a.log.rise > 0, 'the reckless bot made a rival');
   // the rival is present from the start here, so the two temperaments have time to act (a rival crowned late in a short run may never meet the player)
-  const from = t => play(7, reckless, { ticks: 4 * 3600, stack: levelStack(3), nemesis: { f: optionsFor(4)[0].id, bonus: 0, kills: 1, knobs: KNOBS(t) } });
-  const c = from('stalker'), d = from('brute'), e = from('brute');
+  // Whether the rival meets the bot in 4 minutes depends on the world, so take the first of a few seeds where both temperaments do.
+  const from = (t, seed) => play(seed, reckless, { ticks: 4 * 3600, stack: levelStack(3), nemesis: { f: optionsFor(4)[0].id, bonus: 0, kills: 1, knobs: KNOBS(t) } });
+  let c, d, e;
+  for (const seed of [7, 3, 11, 5, 13, 2]) { c = from('stalker', seed); d = from('brute', seed); e = from('brute', seed); if (c.log.notices > 0 && d.log.notices > 0) break; }
   assert.equal(snap(d.s), snap(e.s)); assert.ok(c.log.notices > 0 && d.log.notices > 0, 'the rival met the player in both runs');
   assert.notEqual(snap(c.s), snap(d.s), 'different knobs give a different world');
 }

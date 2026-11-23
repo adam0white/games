@@ -310,3 +310,32 @@ Two lab fixtures were changed for the same kind of reason: the "other knobs give
 ### Not verified
 - That the silent switch was the cause, and that sound now plays on the tester's phone. No real iPhone was used. If the phone runs iOS older than 16.4, this change does nothing there.
 - How the arrow feels in play: it may show often at high levels, where food is sparse.
+
+## 2026-11-23: tester t1's notes #101, #105, #106
+
+The notes: a beam of light on each promotion; the game is too easy now, no animal is faster than the player, make the animals faster (#101). "Animals kill me too often" (#105) was a mis-tap, the tester said so in #106. Animals do not try hard enough to kill each other (#106).
+
+### Done
+- **Beam of light.** On each promotion a beam goes up from the new animal to the top of the screen for about 1.5 seconds, with a ring on the ground, sparks, three rising notes and a short buzz. It is drawn in the shared overlay, so all four looks have it.
+- **Fast animals get faster as they get bigger** (`mobSpeed`, `MOB_FAST = 1.08`): a fast animal of level L moves at its plain speed times 1.08^(L-1), capped like the player at 2.5 times. Before, a player who stacked fast picks (12% each) outran every animal. Slow and medium animals are unchanged. The » mark, the eat rule and `catchable` all use the new speed. The help list says so.
+- **Animals hunt each other harder** (`HUNT`): a hunter now sprints at 1.1 times its speed (it was 0.8 times, so prey that ran usually got away) and keeps at one prey for 9 seconds (it was 6).
+
+### How the values were chosen
+`node bots.mjs 6 12`, careful bot, median highest level / median deaths in 12 minutes.
+
+| | before | now |
+|---|---|---|
+| classic strong | 12 / 2 | 8 / 4 |
+| classic fast | 16 / 3 | 13 / 3 |
+| classic sneaky | 18 / 0 | 18 / 0 |
+| Wild strong | 8 / 3 | 5 / 7 |
+| Wild fast | 10 / 9 | 10 / 7 |
+| Wild sneaky | 10 / 9 | 8 / 9 |
+
+Tried and dropped: a 12% step for animals (classic strong and fast both fell to 6); hunters that see further, take prey 3 levels below and rest less (classic strong fell to 5 to 7 even with animal speed unchanged). Why harder hunts between animals cost the slow bot so much is not known; more strong animals moving fast across the meadow is the guess.
+
+The Wild assert "careful bot still climbs" went from level 6 to level 5 for this reason. A seed-dependent rival fixture ("the rival met the player in both runs") now takes the first of six seeds where it holds.
+
+### Not verified
+- Whether it is now the right difficulty for a person. The bots say the strong pick in Wild got much harder (5 of 18 levels in 12 minutes). If the tester finds it too hard, lower `MOB_FAST` or `HUNT.sprint`.
+- A real phone. The beam was looked at in WebKit with the iPhone 13 profile, cartoon and 3D.

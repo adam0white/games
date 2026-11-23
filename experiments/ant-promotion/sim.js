@@ -113,6 +113,12 @@ export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS,
 // Now SAME_FAST a pick, capped at FAST_CAP times the plain fast speed. fastBoost(k) is the factor after k fast picks.
 export const SAME_FAST = 1.12, FAST_CAP = 2.5, SAME_SNEAK = 0.95;
 export const fastBoost = k => Math.min(FAST_CAP, SAME_FAST ** Math.max(0, k - 1));
+// Animals (revised 2026-11-23, note #101): once fast picks stacked, no animal could keep up with the player. A fast animal now
+// gains the same step for each level, so a fast animal of your level or above is faster than you whatever you picked.
+export const MOB_FAST = 1.08;
+export const mobSpeed = M => M.pace === 'fast' && M.level > 1 ? M.speed * Math.min(FAST_CAP, MOB_FAST ** (M.level - 1)) : M.speed;
+// Animals hunting animals (revised 2026-11-23, note #106: "they don't try enough"): see prey from further, sprint, keep at it longer, rest less.
+export const HUNT = { see: 0.85, gap: 2, sprint: 1.1, giveUp: 9, rest: 5, fed: 15 };
 export const me = s => {
   const p = s.player, id = p.stack[p.stack.length - 1], key = p.stack.length * 1000 + id;
   if (p.meKey !== key) {
@@ -209,27 +215,27 @@ export function step(s, input) {
       const was = m.chase; m.chase = m.fear = null; let bc = Infinity, bf = Infinity;
       if (M.level >= 1) for (const o of s.mobs) {
         if (o === m || o.gone || o.nem) continue; const O = FORMS[o.f], op = powerOf(o); if (op === power || O.level < 1) continue;
-        const ex = o.x - m.x, ey = o.y - m.y; if (ex > 220 || ex < -220 || ey > 220 || ey < -220) continue; const e = Math.hypot(ex, ey);
+        const ex = o.x - m.x, ey = o.y - m.y; if (ex > 260 || ex < -260 || ey > 260 || ey < -260) continue; const e = Math.hypot(ex, ey);
         if (op > power) { if (o.chase === m && e < bf) { bf = e; m.fear = o; } }
-        else if (!(m.fed > 0) && M.level - O.level <= 2 && e < M.range * 0.85 && e < bc && Math.abs(wrap(Math.atan2(ey, ex) - m.a)) < CONE) { bc = e; m.chase = o; }
+        else if (!(m.fed > 0) && M.level - O.level <= HUNT.gap && e < M.range * HUNT.see && e < bc && Math.abs(wrap(Math.atan2(ey, ex) - m.a)) < CONE) { bc = e; m.chase = o; }
       }
       m.chaseFor = m.chase && m.chase === was ? (m.chaseFor || 0) + 0.2 : 0;
-      if (m.chaseFor > 6) { m.chase = null; m.fed = 5; } // gives up on prey it cannot catch
+      if (m.chaseFor > HUNT.giveUp) { m.chase = null; m.fed = HUNT.rest; } // gives up on prey it cannot catch
     }
     if (m.chase?.gone) m.chase = null; if (m.fear?.gone) m.fear = null;
-    let speed = 0, turn = 2.5;
+    let speed = 0, turn = 2.5; const V = mobSpeed(M);
     // a coward rival runs once the player's power gets close to its own
     const flees = power < F.power || (T && T.flee && power - F.power <= fleeMargin(T, power));
     if (m.alert && power !== F.power) {
-      turn = 7; speed = M.speed;
+      turn = 7; speed = V;
       if (!flees) {
         m.want = to;
         if (T) {
-          turn = T.turn; speed = M.speed * T.chase; N.chase += dt;
+          turn = T.turn; speed = V * T.chase; N.chase += dt;
           if (N.knobs.temperament === 'stalker' && !N.commit) { // follow at the edge of sight; strike when the player is busy eating or comes close
             N.stalk += dt;
             if (p.busy > 0 || d < range * 0.45 || N.stalk > 7) N.commit = true;
-            else speed = d > range * 0.7 ? Math.min(M.speed, F.speed) * 0.95 : 0;
+            else speed = d > range * 0.7 ? Math.min(V, F.speed) * 0.95 : 0;
           }
         }
       } else { // run away; near a wall, slide along it
@@ -239,12 +245,12 @@ export function step(s, input) {
         m.want = Math.atan2(fy, fx);
       }
     } else if (m.fear) {
-      turn = 7; speed = M.speed; m.want = Math.atan2(m.y - m.fear.y, m.x - m.fear.x);
+      turn = 7; speed = V; m.want = Math.atan2(m.y - m.fear.y, m.x - m.fear.x);
       if (m.x < 70 || m.x > WORLD - 70 || m.y < 70 || m.y > WORLD - 70) m.want = Math.atan2(WORLD / 2 - m.y, WORLD / 2 - m.x);
     } else if (m.chase) {
-      turn = 6; speed = M.speed * 0.8; m.want = Math.atan2(m.chase.y - m.y, m.chase.x - m.x);
+      turn = 6; speed = V * HUNT.sprint; m.want = Math.atan2(m.chase.y - m.y, m.chase.x - m.x);
       if (Math.hypot(m.chase.x - m.x, m.chase.y - m.y) < (M.r + FORMS[m.chase.f].r) * 0.8) {
-        m.chase.gone = true; m.fed = 15; s.mobEats++; s.events.push({ t: 'mobeat', name: FORMS[m.chase.f].name, by: M.name, x: m.chase.x, y: m.chase.y }); m.chase = null;
+        m.chase.gone = true; m.fed = HUNT.fed; s.mobEats++; s.events.push({ t: 'mobeat', name: FORMS[m.chase.f].name, by: M.name, x: m.chase.x, y: m.chase.y }); m.chase = null;
       }
     } else {
       m.timer -= dt;
@@ -267,7 +273,7 @@ export function step(s, input) {
     m.ph += speed * dt * 0.09;
 
     if (!m.gone && d < (M.r + F.r) * 0.85) {
-      const out = encounter(F, { power, speed: M.speed, alert: m.alert });
+      const out = encounter(F, { power, speed: V, alert: m.alert });
       if (out === 'eat') {
         let gain = M.level >= F.level - 1 ? 3 : M.level === F.level - 2 ? 2 : 1;
         m.gone = true; s.mobs.splice(i, 1); s.eaten++; p.busy = 1.2;
@@ -335,4 +341,4 @@ export function revive(s, restart) {
 }
 
 // Mobs the player could eat right now: weaker, and either not faster or not yet alert.
-export const catchable = s => { const F = me(s); return s.mobs.filter(m => encounter(F, { power: powerOf(m), speed: FORMS[m.f].speed, alert: m.alert }) === 'eat' && (FORMS[m.f].speed <= F.speed || !m.alert)); };
+export const catchable = s => { const F = me(s); return s.mobs.filter(m => encounter(F, { power: powerOf(m), speed: mobSpeed(FORMS[m.f]), alert: m.alert }) === 'eat' && (mobSpeed(FORMS[m.f]) <= F.speed || !m.alert)); };

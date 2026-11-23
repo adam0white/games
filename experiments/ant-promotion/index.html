@@ -97,6 +97,7 @@
     <li><span class="r">&raquo;</span> means it is faster than you. A fast strong animal that notices you will catch you. A fast weak one will get away, so sneak up from behind.</li>
     <li>No food on the screen? A <span class="g">green arrow</span> at the edge points to the nearest animal you can eat. A red arrow points to a stronger animal that has seen you.</li>
     <li>Fill the bar to get promoted. You pick 1 of 3 new animals each time. Picking fast again makes you faster each time. Picking sneaky again makes you harder to see each time.</li>
+    <li>Fast animals get faster as they get bigger. A number with » is an animal that is faster than you.</li>
     <li>Animals hunt each other too. A red dashed line shows who is chasing whom. A hunter that is busy is easier to sneak past.</li>
     <li><b>Wild rules</b> are the normal game; the Rules button in the menu switches to Classic. Wild adds two things. A strong animal has a thick hide: it lives through one bite, then the hide needs 25 seconds. And every 45 seconds a stronger animal nearby hunts you for 5 seconds, wherever it is looking.</li>
     <li><b>Your rival.</b> The animal that kills you becomes your rival. It gets a name, a crown and a coloured ring, and it talks in speech bubbles. When it is off the screen, an arrow in its colour shows where it is.</li>
@@ -138,7 +139,7 @@
 
 <script type="module">
 import { FORMS, ANT, WORLD, TOP, CONE, create, step, choose, revive, me, level, needFor, article, SPAWN_WEIGHTS, hideReady, fastBoost, SAME_SNEAK,
-  crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENTS, TEMPERAMENT_NAMES } from './sim.js';
+  crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENTS, TEMPERAMENT_NAMES, mobSpeed } from './sim.js';
 import { drawForm, setLook, LOOKS } from './art.js';
 import { create3D } from './look3d.js';
 import { readJson, writeJson } from '../kit/save.js';
@@ -235,7 +236,7 @@ const fill = (line, kills) => line.replaceAll('{you}', s ? me(s).name : 'little 
 function remember(k) { if (!save.nem || !s) return; save.nem.history.push({ k, as: me(s).name }); save.nem.history = save.nem.history.slice(-12); }
 function keepNem() { if (save.nem && s?.nemesis) save.nem.sim = nemesisSave(s); }
 // What the rival says. at: a fixed world spot (after it is eaten); otherwise the bubble follows the rival.
-let bubble = null, noticeAt = -99, riseNow = false, glow = 0, glowColour = null, offerAt = 0, pendingOffer = false;
+let beam = 0, bubble = null, noticeAt = -99, riseNow = false, glow = 0, glowColour = null, offerAt = 0, pendingOffer = false;
 function speak(text, kind, ms = 3800, at = null, colour = null) { if (!text) return; bubble = { text, kind, until: performance.now() + ms, at, colour }; }
 
 // ---------- sound
@@ -296,7 +297,7 @@ function start(fresh) {
   if (fresh) { save.stack = [ANT]; save.xp = 0; store(); } // the rival stays: it remembers you
   s = create(Number(query.get('seed')) || (Math.random() * 1e9 | 0), save.stack, save.xp, SPAWN_WEIGHTS, !!save.wild, save.nem?.sim);
   if (save.nem && !s.nemesis) { save.nem = null; store(); }
-  floats.length = 0; bits.length = 0; flash = 0; glow = 0; bubble = null; noticeAt = -99; riseNow = false; pendingOffer = false; offerAt = 0; hud(); show('play');
+  floats.length = 0; bits.length = 0; flash = 0; glow = 0; beam = 0; bubble = null; noticeAt = -99; riseNow = false; pendingOffer = false; offerAt = 0; hud(); show('play');
   say(level(s) === 1 ? 'Eat the little bugs with green numbers' : `You are ${article(me(s).name)}`);
   if (save.nem) speak(fill(save.nem.persona.lines.notice), 'notice', 3000); // it remembers you
 }
@@ -322,7 +323,7 @@ function offer() {
     const k = s.player.stack.filter(id => FORMS[id].role === F.role).length; // earlier picks of this kind make this one better
     if (k && F.role === 'runner') b.append(Object.assign(document.createElement('small'), { textContent: `Fast again: +${Math.round((fastBoost(k + 1) - 1) * 100)}% speed`, style: 'color:#8dff8a' }));
     if (k && F.role === 'sneak') b.append(Object.assign(document.createElement('small'), { textContent: `Sneaky again: ${Math.round((1 - SAME_SNEAK ** k) * 100)}% harder to see`, style: 'color:#8dff8a' }));
-    b.onclick = () => { if (!s.choosing) return; choose(s, i); save.stack = s.player.stack.slice(); save.xp = 0; keepNem(); const fresh = !save.seen.includes(F.id); saw(save.stack); store(); blip(520, 0.3, 'triangle', 0.14, 500); hud(); show('play'); say(fresh ? `New in your book: ${F.name}` : `You are ${article(F.name)} now`); };
+    b.onclick = () => { if (!s.choosing) return; choose(s, i); beam = 1; buzz([20, 30, 60]); for (const [k, f] of [660, 880, 1320].entries()) setTimeout(() => blip(f, 0.25, 'sine', 0.1, f * 1.5), k * 90); save.stack = s.player.stack.slice(); save.xp = 0; keepNem(); const fresh = !save.seen.includes(F.id); saw(save.stack); store(); blip(520, 0.3, 'triangle', 0.14, 500); hud(); show('play'); say(fresh ? `New in your book: ${F.name}` : `You are ${article(F.name)} now`); };
     box.append(b);
   });
   show('evolve');
@@ -437,7 +438,7 @@ let hudBottom = 0; // screen y of the bottom of the HUD, read once a frame
 function mobLabel(m, x, y, size, F) {
   const T = g.getTransform(); if ((T.b * x + T.d * y + T.f) / dpr < hudBottom) return; // a number under the HUD only makes both unreadable
   const M = FORMS[m.f], pw = powerOf(m), mark = m.nem && P();
-  label(x, y, String(pw), pw < F.power ? '#8dff8a' : pw > F.power ? '#ff7a6a' : '#fff8e6', size, M.speed > F.speed ? '»' : '');
+  label(x, y, String(pw), pw < F.power ? '#8dff8a' : pw > F.power ? '#ff7a6a' : '#fff8e6', size, mobSpeed(M) > F.speed ? '»' : '');
   if (mark) crownMark(x, y - size * 1.05, size * 1.3, '#ffd23a');
   if (m.alert && pw !== F.power) label(x + (mark ? size * 1.2 : 0), y - size * 0.95, '!', '#ffe23a', size * 1.25);
 }
@@ -500,6 +501,21 @@ function rivalOverlay(p, view) {
     if (bubble.at) { const [x, y] = view.at(bubble.at.x, bubble.at.y); at = { x, y: y - 30 }; }
     if (at && colour) speech(bubble.text, clamp(at.x, 0, W), clamp(at.y, 0, H), colour, avoid, top);
   }
+}
+// A promotion: a beam of light from the new animal up into the sky (tester note #101). k runs from 1 down to 0.
+function lightBeam(b, k) {
+  const up = 1 - k, w = b.r * (0.5 + 1.1 * Math.min(1, up * 4)) * (0.6 + 0.4 * k), a = Math.min(1, k * 2.2), top = -20;
+  g.save(); g.globalCompositeOperation = 'lighter';
+  for (const [wide, col, al] of [[2.6, '255,214,90', 0.22], [1.5, '255,236,150', 0.4], [0.55, '255,255,255', 0.85]]) {
+    const x0 = b.x - w * wide / 2, gr = g.createLinearGradient(0, b.y, 0, top);
+    gr.addColorStop(0, `rgba(${col},${al * a})`); gr.addColorStop(0.7, `rgba(${col},${al * a * 0.7})`); gr.addColorStop(1, `rgba(${col},${al * a * 0.25})`);
+    g.fillStyle = gr; g.beginPath(); g.moveTo(x0, b.y); g.lineTo(x0 - w * wide * 0.15, top); g.lineTo(x0 + w * wide * 1.15, top); g.lineTo(x0 + w * wide, b.y); g.closePath(); g.fill();
+  }
+  // a ring on the ground, and sparks riding up the beam
+  g.strokeStyle = `rgba(255,236,150,${a})`; g.lineWidth = 4 * k + 1; g.beginPath(); g.ellipse(b.x, b.y + b.r * 0.3, b.r * (1 + up * 3), b.r * (0.5 + up * 1.5), 0, 0, 6.283); g.stroke();
+  g.fillStyle = `rgba(255,255,255,${a})`;
+  for (let i = 0; i < 14; i++) { const h = hash(i, 91), y = b.y - ((up * 1.6 + h) % 1) * (b.y - top), x = b.x + Math.sin(i * 2.4 + up * 9) * w * 0.7; g.beginPath(); g.arc(x, y, 1.5 + 2.5 * hash(i, 7), 0, 6.283); g.fill(); }
+  g.restore();
 }
 function edgeArrow(a, colour, z = 1) { // an arrow at the edge of the screen, pointing along world angle a from the player
   const k = Math.min((W / 2 - 24) / Math.abs(Math.cos(a) || 1e-6), (H / 2 - 24) / Math.abs(Math.sin(a) || 1e-6)), x = W / 2 + Math.cos(a) * k, y = H / 2 + Math.sin(a) * k;
@@ -599,6 +615,7 @@ function overlay(edge, p, view) {
     const a = Math.atan2(m.y - p.y, m.x - p.x), k = Math.min((W / 2 - 22) / Math.abs(Math.cos(a) || 1e-6), (H / 2 - 22) / Math.abs(Math.sin(a) || 1e-6));
     g.save(); g.translate(W / 2 + Math.cos(a) * k, H / 2 + Math.sin(a) * k); g.rotate(a); g.fillStyle = '#ff3a2a'; g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.moveTo(14, 0); g.lineTo(-10, -11); g.lineTo(-10, 11); g.closePath(); g.fill(); g.stroke(); g.restore();
   }
+  if (beam > 0) lightBeam(view.me, beam);
   if (save.nem || bubble) rivalOverlay(p, view);
   if (flash > 0) { g.fillStyle = `rgba(200,20,10,${0.45 * flash})`; g.fillRect(0, 0, W, H); }
   if (glow > 0 && glowColour) { g.globalAlpha = 0.35 * glow; g.fillStyle = glowColour; g.fillRect(0, 0, W, H); g.globalAlpha = 1; } // the rival was eaten
@@ -738,6 +755,7 @@ function frame(now) {
     for (let i = bits.length - 1; i >= 0; i--) if (bits[i].age > bits[i].life) bits.splice(i, 1);
     if (flash > 0) flash = Math.max(0, flash - dt * 1.6);
     if (glow > 0) glow = Math.max(0, glow - dt * 0.9);
+    if (beam > 0) beam = Math.max(0, beam - dt * 0.65);
   }
   if (pendingOffer && mode === 'play' && now >= offerAt && s?.choosing) { pendingOffer = false; offer(); }
   if (mode === 'dying' && now >= dying) { flash = 0; died(); }
