@@ -363,3 +363,31 @@ Other settings tried, same bot (top level for strong / fast / sneaky; kills near
 ### Left as a proposal (2026-11-23)
 - If the meadow should be bloodier still: a 25 to 40 second rest after a kill roughly doubles the kills near you (table above) and costs the careful bot one or two levels. The tester also says the game is too easy, so that cost may be welcome. One number to change: `PREY.fed`.
 - A chase is shown by a line from hunter to prey in every look, and a kill near you by a burst, a crunch and "X ate a Y". A louder sign of a chase starting (a growl, the hunter's number turning red) would make the striving easier to see.
+
+## 2026-11-23: hunters tire (owner)
+
+The owner: Wild "adds a good difficulty, but makes things impossible", and asked that a hunter slow down with time or stop after the player has run a while.
+
+- `TIRE = { fresh: 4, spent: 10, slow: 0.55, rest: 7 }`. A stronger animal chasing the player runs at full pace for 4 seconds, slows evenly to 55% of its pace by 10 seconds, then gives up. For the next 7 seconds it cannot notice the player. Touching it still gets the player eaten. Breath comes back at 1.5 seconds for each second not chasing.
+- It applies in Classic and Wild, and to the Wild hunt. The rival does not tire; its temperament already sets how long it chases.
+- The page says "A Wasp got tired and gave up", shows "phew..." over the animal and plays a rising note. The help list has a line for it.
+
+### Checks
+- `bots.mjs`, direct and placed: full speed while fresh, slowing in order, gives up at 10 s, cannot notice for 7 s and then does, fresh again after 5 s without a chase, the rival never tires. With the animal held outside its sight the give-up never came and the check failed, as it should.
+- `node bots.mjs 6 12`, careful bot, median highest level / median deaths. "Before" is this branch without tiring where measured, else main.
+
+| | main | with tiring |
+|---|---|---|
+| classic strong | 12 / 2 | 11 / 1 |
+| classic fast | 16 / 3 | 17 / 5 |
+| classic sneaky | 18 / 0 | 18 / 0 |
+| Wild strong | 8 / 3 | 7 / 4 |
+| Wild fast | 10 / 9 | 9 / 10 |
+| Wild sneaky | 10 / 9 | 13 / 4 |
+
+- WebKit, iPhone 13 profile: a Wasp held 90 units from the player gave up, the message showed, the player was alive, no page errors.
+- From a second attempt at notes #101 and #106 (closed pull request 101): an 8% speed step per level for fast animals, and hunters that see further and take prey 3 levels below, cut the classic strong-pick bot from level 12 to 5 to 8. Not used.
+
+### Not verified
+- Whether Wild now feels fair to a person, and whether the tester (who found the game too easy) now finds it easier still. The bots move little between main and this branch except for the sneaky pick in Wild.
+- A real phone.

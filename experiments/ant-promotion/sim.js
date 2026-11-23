@@ -101,7 +101,7 @@ export const powerOf = m => FORMS[m.f].power + (m.bonus || 0);
 
 // nemesis: what nemesisSave() returned on an earlier visit, or null for a world with no rival.
 export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS, wild = false, nemesis = null) {
-  const s = { wild, huntAt: HUNT_EVERY, hides: 0, hunts: 0, mobEats: 0, rand: rng(seed), nrand: rng((seed ^ 0x5bd1e995) >>> 0), t: 0, tick: 0, weights, mobs: [], events: [], choosing: null, dead: null, won: false, eaten: 0, deaths: 0, nextId: 1,
+  const s = { wild, huntAt: HUNT_EVERY, hides: 0, hunts: 0, mobEats: 0, tired: 0, rand: rng(seed), nrand: rng((seed ^ 0x5bd1e995) >>> 0), t: 0, tick: 0, weights, mobs: [], events: [], choosing: null, dead: null, won: false, eaten: 0, deaths: 0, nextId: 1,
     nemesis: null, player: { x: WORLD / 2, y: WORLD / 2, a: 0, ph: 0, stack: stack.slice(), xp, safe: 2.5, hideAt: 0, busy: 0 } };
   while (s.mobs.length < MOBS) spawn(s, 260);
   if (nemesis && FORMS[nemesis.f]) placeNemesis(s, nemesis);
@@ -123,6 +123,12 @@ export const PACE_UP = 1.06;
 // keeps its prey in mind once it has turned away and gives up later. It then stays full for 70 s, so the meadow is not
 // emptied of the player's food: shorter rests (10 to 40 s) gave 50 to 95 kills a minute and cut careful bots' levels.
 export const PREY = { run: 1, lunge: 1.3, close: 2.5, sight: 1, give: 8, fed: 70 };
+// A hunter tires (owner, 2026-11-23: Wild "makes things impossible"; a hunter should slow down with time or stop after you run a while).
+// A stronger animal chases the player at full pace for `fresh` seconds, slows evenly to `slow` of its pace by `spent` seconds, then
+// gives up and cannot notice the player for `rest` seconds. Time not spent chasing wins the breath back. The rival does not tire:
+// its temperament already sets how long it keeps at it.
+export const TIRE = { fresh: 4, spent: 10, slow: 0.55, rest: 7 };
+export const tirePace = m => { const k = ((m.tire || 0) - TIRE.fresh) / (TIRE.spent - TIRE.fresh); return k <= 0 ? 1 : 1 - (1 - TIRE.slow) * Math.min(1, k); };
 export const chasePace = (M, F) => { const b = F.speed / SPEED[F.pace]; return b > 1 ? M.speed * b * (M.pace === 'fast' ? PACE_UP : 1) : M.speed; };
 // How fast an animal is against the player, for the » mark: a stronger one at its chase pace, a weaker one at its own speed.
 export const paceAgainst = (m, F) => (powerOf(m) > F.power ? chasePace(FORMS[m.f], F) : FORMS[m.f].speed);
@@ -208,7 +214,8 @@ export function step(s, input) {
     if (m.hunt > 0) m.hunt -= dt;
     const T = m.nem ? TEMPERAMENTS[N.knobs.temperament] : null, power = powerOf(m);
     const range = M.range * (T ? T.sight : 1), cone = CONE * (T ? T.cone : 1);
-    const sees = p.safe <= 0 && (m.hunt > 0 || d < range * F.stealth + F.r && Math.abs(wrap(to - m.a)) < cone);
+    if (m.winded > 0) m.winded -= dt;
+    const sees = p.safe <= 0 && !(m.winded > 0) && (m.hunt > 0 || d < range * F.stealth + F.r && Math.abs(wrap(to - m.a)) < cone);
     const wasAlert = m.alert;
     if (sees) { if (!m.alert && power !== F.power) s.events.push({ t: 'notice', strong: power > F.power, id: m.id, nem: !!m.nem }); m.alert = true; m.lost = 0; }
     else if (m.alert) {
@@ -230,13 +237,17 @@ export function step(s, input) {
       if (m.chaseFor > PREY.give) { m.chase = null; m.fed = 5; } // gives up on prey it cannot catch
     }
     if (m.chase?.gone) m.chase = null; if (m.fear?.gone) m.fear = null;
-    let speed = 0, turn = 2.5;
+    let speed = 0, turn = 2.5, hunting = false;
     // a coward rival runs once the player's power gets close to its own
     const flees = power < F.power || (T && T.flee && power - F.power <= fleeMargin(T, power));
     if (m.alert && power !== F.power) {
       turn = 7; speed = M.speed;
       if (!flees) {
-        m.want = to; const pace = chasePace(M, F); speed = pace;
+        m.want = to; const pace = chasePace(M, F); speed = pace; hunting = true;
+        if (!T) {
+          speed = pace * tirePace(m); m.tire = (m.tire || 0) + dt;
+          if (m.tire >= TIRE.spent) { m.alert = false; m.hunt = 0; m.winded = TIRE.rest; m.tire = TIRE.fresh; s.tired++; s.events.push({ t: 'tired', id: m.id, name: M.name, x: m.x, y: m.y }); }
+        }
         if (T) {
           turn = T.turn; speed = pace * T.chase; N.chase += dt;
           if (N.knobs.temperament === 'stalker' && !N.commit) { // follow at the edge of sight; strike when the player is busy eating or comes close
@@ -276,6 +287,7 @@ export function step(s, input) {
       if (N.chase > 1.5 && power > F.power && !s.dead) { N.escapes++; s.events.push({ t: 'nemEscape', escapes: N.escapes }); }
       N.chase = 0; N.stalk = 0; N.commit = false;
     }
+    if (!hunting && m.tire > 0) m.tire = Math.max(0, m.tire - dt * 1.5);
     m.a += clamp(wrap(m.want - m.a), -turn * dt, turn * dt);
     m.x = clamp(m.x + Math.cos(m.a) * speed * dt, M.r, WORLD - M.r); m.y = clamp(m.y + Math.sin(m.a) * speed * dt, M.r, WORLD - M.r);
     m.ph += speed * dt * 0.09;
