@@ -423,3 +423,25 @@ header .brand strong {
   outline: 3px solid #edba65;
   outline-offset: 2px;
 }
+
+/* On a phone the tutorial cue takes its own row in the controls instead of floating over the people row
+   and the status text. The saved height comes from the one-line clock and dialogue rows. */
+@media (max-width: 700px) {
+  #tutorial {
+    position: static !important;
+    width: auto !important;
+    margin: 0 0 4px;
+  }
+  .smoke-clock {
+    min-height: 0;
+  }
+  .event-feed {
+    margin-bottom: 4px;
+  }
+  .walk {
+    margin-top: 4px;
+  }
+  .dialogue {
+    min-height: 17px;
+  }
+}
