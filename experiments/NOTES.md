@@ -21,3 +21,17 @@ The owner asked for the live games to be kept on shared code as a standing pract
 ## 2026-11-23: lane test under a path with a space
 
 `npm run check:lane` fails one test, "the real checkout plans without a collision", in a clone whose path contains a space, such as the feedback watcher's `~/Library/Application Support/...`. The test reads `new URL('..', import.meta.url).pathname`, which keeps the `%20` escape. Clean `main` fails the same way, and CI passes. Unresolved; the fix would be `fileURLToPath`.
+
+## 2026-11-23: no zoom on the game pages (tester t1, note #74)
+
+The tester zoomed in by accident with a double tap and could not zoom back out without closing the tab. iOS Safari ignores `user-scalable=no`. Both games set `touch-action: none` on the page, which blocks the pinch that would zoom back out.
+
+`kit/zoom.js` adds `noZoom()`, and Lantern and Ant Promotion both call it. It does four things:
+- Caps the viewport scale at 1.
+- Gives every element without its own `touch-action` the value `manipulation`, which turns off double-tap zoom. It uses a zero-specificity rule, so each game's own values still win, and the canvas keeps `none`.
+- Cancels pinch gestures, `dblclick`, and the second tap of a double tap on anything that is not a control.
+- If the page is zoomed anyway, sets the viewport again so the browser goes back to scale 1.
+
+The phone check now asserts, in both games, that the viewport caps the scale, that no visible element is left at `touch-action: auto`, and that a double click's default is cancelled. Without the `noZoom()` call, it fails.
+
+Not verified: a real phone. Emulated browsers do not zoom on a double tap, so the check shows the guards are in place, not that an iPhone stays at scale 1. Whether the snap-back works on the tester's iOS version is unknown.
