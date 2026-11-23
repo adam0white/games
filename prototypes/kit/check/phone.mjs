@@ -48,7 +48,7 @@ const GAMES = {
     const saved = () => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(k => k.startsWith('lantern-')).map(k => [k, localStorage.getItem(k)])));
     // A save in the format players already have.
     await page.goto(`${base}/proto/lantern/`);
-    await page.evaluate(() => { localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('notes.k', 'check'); });
+    await page.evaluate(() => { localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('lantern-best-endless', '55'); localStorage.setItem('lantern-best-tower', '4'); localStorage.setItem('lantern-stats', '{"red":1}'); localStorage.setItem('notes.k', 'check'); });
     await page.reload();
     let st = await state();
     assert.equal(st.opened, 3, 'old save: opened night'); assert.equal(st.bank, 120, 'old save: bank'); assert.ok(st.owned.includes('red'), 'old save: owned'); assert.equal(st.worn.boat, 'red', 'old save: worn');
@@ -84,7 +84,7 @@ const GAMES = {
     // Shop: a pack costs 50 and gives one new thing, which is put on.
     await page.click('#toMenu'); await page.click('#toShop');
     await page.click('[data-pack="water"]'); st = await state();
-    assert.equal(st.bank, 77, 'pack paid for'); assert.equal(st.owned.length, 5, 'pack gave one thing'); assert.notEqual(st.worn.water, 'blue', 'new thing is on');
+    assert.equal(st.bank, 77, 'pack paid for'); assert.equal(st.owned.length, 6, 'pack gave one thing'); assert.notEqual(st.worn.water, 'blue', 'new thing is on');
     // Reload keeps all of it.
     const before = st; await page.reload(); st = await state();
     assert.equal(st.bank, before.bank); assert.deepEqual(st.owned.sort(), before.owned.sort()); assert.deepEqual(st.worn, before.worn); assert.equal(st.opened, 3);
