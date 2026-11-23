@@ -39,6 +39,7 @@
   .item.off { opacity: .35; border-style: dashed; filter: grayscale(1); }
   .pack small.once { display: block; font-size: .8em; color: #ffb45a; margin: .1em 0 .3em; }
   #ready { color: #ffb45a; font-size: .9em; }
+  #stars { color: #ffe08a; margin-left: .5em; letter-spacing: .05em; } .pack.reborn b { color: #ffe08a; } .pack.reborn small { display: block; font-size: .8em; opacity: .75; margin: .1em 0 .3em; }
   .pack.test { border-top: 1px dashed #ff7a7a88; } .pack.test b { color: #ff9a9a; }
   #got { min-height: 1.6em; color: #ffe6bd; position: sticky; top: 0; z-index: 2; margin: 0; padding: .45em .3em; background: #070b14f2; border-radius: 0 0 12px 12px; } /* stays in view while the packs scroll */
   #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); display: none; text-align: left; pointer-events: none; text-shadow: 0 1px 6px #000; }
@@ -68,7 +69,7 @@
 <div id="menu" class="screen veil on"><div>
   <h1>Lantern</h1>
   <p>Carry the light down the river to dawn.</p>
-  <p class="bank"><span class="dot"></span><span id="bank">0</span> embers</p>
+  <p class="bank"><span class="dot"></span><span id="bank">0</span> embers<span id="stars"></span></p>
   <p><button id="less" class="small" aria-label="Earlier night">&lsaquo;</button><button id="play" class="main">Play</button><button id="more" class="small" aria-label="Later night">&rsaquo;</button></p>
   <p id="about"></p>
   <p id="ready"></p>
@@ -126,6 +127,12 @@ const PACKS = [
   { id: 'power', name: 'Abilities', items: [['boost', 'Boost', TINT.boost, 'Gold arrows. Fast, and nothing can break the boat.'], ['slow', 'Slow water', TINT.slow, 'Violet clock. The river slows; dawn keeps coming.'], ['size', 'Size', TINT.size, 'Teal rings. A smaller boat, four times in five.'], ['magnet', 'Magnet', TINT.magnet, 'Pink magnet. Embers swim to you.'], ['flare', 'Flare', TINT.flare, 'White sun. The flame is filled and holds.']] },
 ];
 const COST = 50;
+// Rebirth (tester t1, note #73): once every pack is found and all 50 nights are open, the player may start over from night 1 with nothing.
+// The reward is kept for good: each rebirth adds 25% to the embers every run banks, and a star by the ember count. Bests stay.
+// lantern-rebirths: the number of rebirths, a number.
+let reborn = Math.max(0, Math.floor(store.get('lantern-rebirths')) || 0);
+const boon = () => 1 + 0.25 * reborn, ALL = PACKS.reduce((n, p) => n + p.items.length, 0);
+const found = () => PACKS.reduce((n, p) => n + p.items.filter(i => owned.has(i[0])).length, 0), ripe = () => found() >= ALL && opened >= NIGHTS;
 // Stats: bought a level at a time for the next run only, then used up when that run starts (tester t1, 2026-11-23). They change the run itself, where packs change only its looks.
 // The save keeps its format: lantern-stats holds the levels ready for the next run.
 const STAT = [['hearts', 'Hearts', 'Start with one more heart'], ['barrier', 'Barrier', 'A shield takes one more hit'], ['calm', 'Calm water', 'The river runs a little slower'], ['wick', 'Long wick', 'The flame fades more slowly'], ['pull', 'Long reach', 'Take embers from further away']];
@@ -162,7 +169,7 @@ addEventListener('resize', resize); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', lastLevel = 1, nearFall = false, sayTimer = 0, shown = '', weather = '';
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
-window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), unit: unit / dpr }); // read by the browser checks
+window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, unit: unit / dpr }); // read by the browser checks
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 
 const cards = screens(['menu', 'shop', 'credits', 'card']);
@@ -175,6 +182,7 @@ function show(name) {
   if (name === 'menu') menu(); if (name === 'shop') shop();
 }
 function menu() {
+  $('stars').textContent = reborn ? ` · ${'★'.repeat(Math.min(5, reborn))}${reborn > 5 ? reborn : ''}` : '';
   $('bank').textContent = bank; $('play').textContent = `Play night ${stage}`;
   $('less').disabled = stage <= 1; $('more').disabled = stage >= opened;
   const best = store.get(`lantern-best-${stage}`), top = store.get('lantern-best-endless');
@@ -202,6 +210,28 @@ function shop(text) {
     row.append(txt, b); sdiv.append(row);
   }
   box.append(sdiv);
+  { // rebirth: shown as a goal until it is open, then as a button that asks twice
+    const r = document.createElement('div'); r.className = 'pack reborn'; const rn = document.createElement('b'); rn.textContent = reborn ? `Rebirth ${'★'.repeat(Math.min(5, reborn))}` : 'Rebirth'; const rs = document.createElement('small'); r.append(rn, rs);
+    if (!ripe()) rs.textContent = `Find everything (${found()} of ${ALL}) and open all ${NIGHTS} nights (${opened} of ${NIGHTS}). Then start over with nothing, and earn 25% more embers for good.${reborn ? ` Now: +${25 * reborn}%.` : ''}`;
+    else {
+      rs.textContent = `You have it all. Start over from night 1 with nothing found and no embers, and earn ${25 * (reborn + 1)}% more embers for good. Your bests stay.`;
+      const rb = document.createElement('button'); rb.id = 'rebirth'; rb.className = 'main'; rb.textContent = 'Rebirth';
+      rb.addEventListener('click', () => {
+        if (busy) return;
+        if (rb.dataset.sure !== '1') { rb.dataset.sure = '1'; rb.textContent = 'Tap again to be reborn'; return; }
+        reborn++; store.set('lantern-rebirths', reborn);
+        bank = 0; store.set('lantern-bank', 0); owned = new Set(['oak', 'blue', 'amber', 'boost']); store.set('lantern-owned', '[]');
+        worn = { boat: 'oak', water: 'blue', flame: 'amber' }; store.set('lantern-worn', JSON.stringify(worn)); off = new Set(); store.set('lantern-off', '[]');
+        stats = {}; store.set('lantern-stats', '{}'); opened = stage = 1; store.set('lantern-night', 1); store.set('lantern-tower-at', 1);
+        rec.event('rebirth', { rebirths: reborn });
+        const fl = $('flash'); fl.style.transition = 'none'; fl.style.background = '#ffe08a'; fl.style.opacity = 1; void fl.offsetWidth; fl.style.transition = 'opacity 1.8s ease-out'; fl.style.opacity = 0;
+        audio(); [392, 523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => setTimeout(() => tone(f, 1.2, 0.08, 'triangle'), i * 110));
+        shop(`Reborn. Every run now banks ${25 * reborn}% more embers.`);
+      });
+      r.append(rb);
+    }
+    box.append(r);
+  }
   for (const pack of PACKS) {
     const rest = pack.items.filter(i => !owned.has(i[0])), div = document.createElement('div'); div.className = 'pack';
     const name = document.createElement('b'); name.textContent = pack.name;
@@ -316,13 +346,13 @@ function begin() {
   rec.start({ mode: mode(), night: tower || endless ? 0 : stage, ...(tower ? { level: climb } : {}) });
 }
 const mode = () => tower ? 'tower' : endless ? 'endless' : 'night';
-function bankRun() { bank += s.taken; store.set('lantern-bank', bank); }
+function bankRun() { s.banked = Math.round(s.taken * boon()); bank += s.banked; store.set('lantern-bank', bank); } // a rebirth's bonus is added as the run banks
 function finish() {
   playing = false; ended = performance.now(); drag = null; bankRun();
   rec.end(s.over, { mode: mode(), night: tower || endless ? 0 : stage, reached: Math.floor(progress(s) * 100), score: endless ? score(s) : null, embers: s.taken, hearts: s.hearts, bank });
   $('hud').style.display = $('big').style.display = pauseButton.style.display = 'none'; $('warn').classList.remove('on');
   const won = s.over === 'dawn', why = { dark: 'The flame went out.', bank: 'You ran onto the bank.', ice: 'You struck the ice.', log: 'You struck a log.', pool: 'The whirlpool took you.', geyser: 'The geyser threw you over.', isle: 'You struck an island.' }[s.over] ?? 'You struck a rock.';
-  const gained = `+${s.taken} ember${s.taken === 1 ? '' : 's'}. You have ${bank}.`;
+  const gained = `+${s.banked} ember${s.banked === 1 ? '' : 's'}${s.banked > s.taken ? ` (${s.taken} and the rebirth bonus)` : ''}. You have ${bank}.`;
   $('toMenu').textContent = 'Menu';
   if (tower) { // after each level: climb on to a harder one, or stop. The next climb goes on where this one left off (tester t1, note #73)
     const at = Math.min(FLOORS, Math.floor(progress(s) * FLOORS)); store.set('lantern-best-tower', Math.max(at, store.get('lantern-best-tower'))); // the old best floor, still kept
