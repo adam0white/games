@@ -1046,8 +1046,11 @@ export class Game {
           }
         : null;
     if (noteBox) placed.push(noteBox);
+    // Drawn climbers and their names are obstacles too, except the speaker's own figure, which the bubble points at.
+    let fixed: { l: number; r: number; t: number; b: number }[] = [];
     const hits = (l: number, r: number, t: number, bt: number) =>
-      placed.find((q) => l < q.r + 4 && r > q.l - 4 && t < q.b + 3 && bt > q.t - 3);
+      placed.find((q) => l < q.r + 4 && r > q.l - 4 && t < q.b + 3 && bt > q.t - 3) ??
+      fixed.find((q) => l < q.r + 4 && r > q.l - 4 && t < q.b + 3 && bt > q.t - 3);
     const live = [...this.bubbles].filter(([who, b]) => {
       // A bubble lasts a few seconds and at most 20 minutes of the day, so fast time never leaves words hanging.
       const on = this.scene.at.has(who) && now <= b.until && this.climb.minute - b.minute <= 20;
@@ -1060,6 +1063,11 @@ export class Game {
     for (const [who, b] of live) {
       const at = this.scene.at.get(who);
       if (!at) continue;
+      fixed = [];
+      for (const [id, box] of this.scene.blocks ?? []) {
+        if (id !== who) fixed.push(box.figure);
+        if (box.label) fixed.push(box.label);
+      }
       const bw = b.el.offsetWidth;
       const bh = b.el.offsetHeight;
       const cx = Math.max(bw / 2 + 4, Math.min(W - bw / 2 - 4, at.x));
@@ -1078,7 +1086,7 @@ export class Game {
       const fits = (bt: number) => bt <= H - 4 && bt - bh >= 4 && !hits(l, r, bt - bh, bt);
       if (bw > W - 8 || !fits(bottom)) {
         // Try the free gaps between the scene edges and every placed obstacle, nearest the speaker first.
-        const edges = [bh + 4, H - 4, ...placed.flatMap((q) => [q.t - 3, q.b + 3 + bh])];
+        const edges = [bh + 4, H - 4, ...[...placed, ...fixed].flatMap((q) => [q.t - 3, q.b + 3 + bh])];
         const free = edges.filter(fits).sort((m, n) => Math.abs(m - (at.y - 26)) - Math.abs(n - (at.y - 26)));
         if (bw > W - 8 || free.length === 0) {
           b.el.classList.remove('on');
@@ -1146,9 +1154,14 @@ export class Game {
     this.whereEl.innerHTML =
       phase === 'title'
         ? '<a href="https://human.adamwhite.work/games/">All games</a>'
-        : esc(
-            `${m?.name ?? ''} · ${phase === 'debrief' ? 'today’s results' : phase === 'season' ? 'the season' : clock(c.minute)}${phase === 'hut' ? ' · at the hut' : c.promise ? ` · turn back at ${c.promise.hour}:00` : ''}`,
-          );
+        : // Each phrase stays whole when the title wraps; the visible text is unchanged.
+          [
+            `${m?.name ?? ''} ·`,
+            `${phase === 'debrief' ? 'today’s results' : phase === 'season' ? 'the season' : clock(c.minute)}${phase === 'hut' ? ' ·' : c.promise ? ' ·' : ''}`,
+            ...(phase === 'hut' ? ['at the hut'] : c.promise ? [`turn back at ${c.promise.hour}:00`] : []),
+          ]
+            .map((part) => `<span class="where-part">${esc(part)}</span>`)
+            .join(' ');
     const minute = c.minute % 1440;
     this.dayBar.style.setProperty('--dusk', `${(((m?.duskMinuteOfDay ?? 1170) - 240) / 1140) * 100}%`);
     this.dayBar.innerHTML = `<span class="day-dawn">04</span><span class="day-dusk"></span><span class="day-now" style="left:${Math.max(0, Math.min(100, ((minute - 240) / 1140) * 100))}%"></span>${c.promise ? `<span class="day-promise" aria-label="Turn at ${c.promise.hour}:00" style="left:${((c.promise.hour * 60 - 240) / 1140) * 100}%"></span>` : ''}`;
