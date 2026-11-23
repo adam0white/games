@@ -91,3 +91,79 @@ Fog, wind and rain each start their first stretch about a tenth of the way down,
 Not checked: whether nights 6 to 20 are too hard for a person now that they are faster and also hold new things (the careful bot's runs that end in the dark on night 20 rose from 21 to 49 in 100); a real phone; sound.
 
 Still left from note #35, in the tester's order: power-ups, stats to spend points on, better-looking boats and flames, an Abilities pack, the pack-opening animation, tower mode.
+
+## 2026-11-23: powers (note #35, second item)
+
+Three powers lie in open water, about four a night, on every night and the endless river.
+
+| Power | Looks like | Does | Lasts |
+|---|---|---|---|
+| Boost | gold arrows | the river runs 1.8 times as fast and nothing can break the boat | 2.5 s, then 0.6 s more of safety |
+| Slow water | violet clock | the river runs at half speed; the percent to dawn keeps its usual speed, and the flame fades by river passed, not by time | 5 s |
+| Size | teal rings | four times in five the boat is 0.6 of its size; one time in five it is 1.4 times its size. The pickup looks the same either way | 6 s |
+
+Decisions taken here, not asked for by the tester: a boost also makes the boat unbreakable (a faster river alone would be a penalty); the size gamble is hidden until taken; an arc round the boat shows the time left; powers are free on every night from night 1 until the Abilities pack exists; a boost on the endless river scores the extra river it covers (8 points a second) without bringing the next step harder any sooner.
+
+How it is built: powers draw from their own random stream and sit in their own list, so a seed's rocks and embers are the same as before. Which power, and whether a size power grows the boat, is fixed when the river is laid down. Ice now drifts by river passed. `create(seed, stage, endless, powers)` takes the list of powers allowed, ready for the Abilities pack.
+
+Checked:
+- 440 story rivers (nights 1 to 20 sampled, 40 seeds each) with powers switched off: rocks and embers identical to main.
+- With powers on, rocks matched main on all but 3 of 440 story rivers; one of them on night 5. In those a power taken shifted ice by a hair and one later pickup moved. Unresolved, judged harmless.
+- Audit, 200 rivers a night, each ridden five ways (no powers, boost only, slow only, all powers, all powers with calm water at its top level) because a power shifts when the boat meets each moving rock: no closed river, no buried pickup of any kind. Narrowest gap on story nights 0.048 for the usual boat and 0.030 for the bigger one; on the endless river, ridden 30 nights long, 0.038 and 0.020.
+- Chromium phone profile: each power taken, said aloud and drawn; under slow water the boat covered 0.55 of river in 1.5 s while the percent gained 1.01, the same as without it. No page errors.
+- Careful bot, 100 runs, dawn reached before and after: night 1 20 and 23, night 3 20 and 21, night 5 18 and 22. Not tuned.
+
+Not checked: a person playing; a real phone; sound; whether four a night is too many.
+
+## 2026-11-23: stats to spend embers on (note #35, third item)
+
+The shop has a Stats block above the packs. A level costs 40 embers times the level being bought (40, 80, 120). Stats are kept between runs and apply on every night and the endless river.
+
+| Stat | Levels | Each level |
+|---|---|---|
+| Hearts | 2 | start with one more heart (the most held is still 3) |
+| Barrier | 2 | a shield takes one more hit; one blue ring shows for each hit left |
+| Calm water | 3 | the river runs 4% slower; the flame fades by river passed, so calm water costs no light |
+| Long wick | 3 | the flame fades 8% more slowly |
+| Long reach | 3 | embers, gifts and powers are taken from further away (0.05 plus 0.012 a level); false embers are not |
+
+The tester named barrier strength, lives and game speed, and asked for others; long wick and long reach are the lab's additions. Reading taken for "game speed": slower, because a stat should help.
+
+Checked: full stats clamp bad saved values; a full barrier took three hits in the sim; 196 of 200 story rivers are identical with full stats and the other 4 differ by one pickup (same cause as the powers note); in a phone-sized Chromium the shop sold two heart levels for 40 and 80, the Back button stayed on screen, and the next run started with three hearts. No page errors.
+
+Not checked: whether the prices are right; how much easier night 5 is with full stats, for a person.
+
+## 2026-11-23: boats and flames (note #35, fourth item)
+
+The tester asked for different models and less plain colours. Drawing lives in `looks.js` and changes nothing in the run.
+
+- Boats are six different vessels, each shaded as if lit from the left: oak rowboat, red canoe, birch raft, iron barge with lit cabin windows, jade dragon with horns and a moving tail, golden barge with glints. A foam wake follows the boat. The boat is drawn 1.2 times the size it collides at.
+- Flames are a small particle simulation that streams out behind the lantern, leans away from a turn and shrinks as the light fades: candle, tight gas jet, slow marsh fire, sparkler that throws sparks, turning star, twin flame wound in a helix.
+- Shop buttons show the boat or flame itself, drawn small, in place of a plain colour.
+
+The lab's additions beyond the ask: the wake, the lean and fade of the flame, the shop previews.
+
+Checked: all six boats and flames drawn in a phone-sized Chromium with no page errors, and looked at. Not checked: frame rate on a real phone (about 35 soft particles a frame); whether the tester finds them better.
+
+## 2026-11-23: Abilities pack and the pack opening (note #35, fifth and sixth items)
+
+- A fourth pack, Abilities, holds the powers. A power lies in the river only once it is owned. Boost is owned from the start, as one boat, water and flame are, so a new player meets powers at once; the other four come from the pack. This replaces "powers are free on every night" from the powers note above. The other three packs still sell looks only.
+- The pack holds five powers: the tester's three and two from the lab. Magnet (pink): for 7 s embers within 0.32 swim to the boat. Flare (white sun): the flame is filled and does not fade for 6 s.
+- Opening any pack: a light hops between the things not yet found, slows, and stops on the find; then the whole screen fills with the find's colour and fades. The pack is paid for and the find saved at the tap, so leaving mid-animation loses nothing, and a second tap during it does nothing.
+
+Checked: in a phone-sized Chromium an Abilities pack cost 50, saved its find, showed the hop and the flash, and the next run laid only that power in the river; two fast taps on another pack charged once. Audit clean with all five powers (an ember a magnet has pulled is left out of the buried-pickup count). No page errors.
+
+Not checked: whether locking powers behind the pack is what the tester meant (to ask); the hop's feel and sound on a phone.
+
+## 2026-11-23: tower climb (note #35, last item)
+
+The tester's words: the river climbs upward first, and when it runs straight you reach dawn. Reading taken: a third way to play beside the story and the endless river.
+
+- The river is walled in stone and climbs in tight turns (about two and a half times as sharp as a story night). The turns ease as it rises and the last 15% runs dead straight into the dawn.
+- Ten floors. A dashed ledge with its number cut in the wall marks each one; the game says each floor and saves the best floor reached.
+- The tower holds the things of the nights already opened, never fewer than night 3's and never more than night 12's, so it grows with the player and does not hand a new player lightning.
+- Reaching the top does not open a story night.
+
+Checked: audit over 200 tower rivers at night 3's and night 12's things, each ridden four ways: narrowest gap 0.057, no buried pickup. Careful bot reached the top 15 and 18 times in 100. Phone-sized Chromium: the menu still fits, a climb ran to the top, the card and best floor were right, the story night stayed where it was. No page errors.
+
+Not checked: whether this is what the tester pictured (to ask); how the sharp turns feel under a thumb.

@@ -26,12 +26,17 @@
   #shop > div { max-height: 100dvh; box-sizing: border-box; overflow-y: auto; touch-action: pan-y; }
   .pack { border-top: 1px solid #ffd9a033; padding: .35em 0; }
   .pack b { font-weight: normal; font-size: 1.15em; color: #ffd9a0; letter-spacing: .06em; }
+  .stat { display: flex; align-items: center; justify-content: space-between; gap: .6em; max-width: 19em; margin: 0 auto; text-align: left; }
+  .stat small { display: block; font-size: .72em; opacity: .65; line-height: 1.2; }
+  .stat button { min-width: 6em; min-height: 40px; margin: .15em 0; font-size: .9em; }
   .items { display: flex; justify-content: center; gap: 8px; margin: .5em 0 .2em; }
   .item { width: 42px; height: 42px; min-width: 0; min-height: 0; padding: 0; margin: 0; border-radius: 50%; border: 2px solid #ffffff30; }
   .item.locked { background: #ffffff0c; border-style: dashed; }
   .item.locked::before { content: '?'; opacity: .5; }
+  .item.hop { border-color: #fff; border-style: solid; background: #ffffff55; box-shadow: 0 0 14px #fff; transform: scale(1.15); opacity: 1; }
+  #flash { position: fixed; inset: 0; opacity: 0; pointer-events: none; z-index: 9; }
   .item.worn { border-color: #fff; box-shadow: 0 0 0 2px #ffb45a; }
-  #got { min-height: 1.6em; color: #ffe6bd; }
+  #got { min-height: 1.6em; color: #ffe6bd; position: sticky; top: 0; z-index: 2; margin: 0; padding: .45em .3em; background: #070b14f2; border-radius: 0 0 12px 12px; } /* stays in view while the packs scroll */
   #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); display: none; text-align: left; pointer-events: none; text-shadow: 0 1px 6px #000; }
   #hearts { font: 26px/1 sans-serif; color: #ff4d5e; letter-spacing: 2px; }
   #embers { font-size: 26px; line-height: 1.3; color: #ffd9a0; }
@@ -51,6 +56,7 @@
 <div id="big"></div>
 <div id="warn">The lantern is beginning to fade</div>
 <div id="say"></div>
+<div id="flash"></div>
 <button id="pause" aria-label="Pause"></button>
 <div id="menu" class="screen veil on"><div>
   <h1>Lantern</h1>
@@ -58,14 +64,14 @@
   <p class="bank"><span class="dot"></span><span id="bank">0</span> embers</p>
   <p><button id="less" class="small" aria-label="Earlier night">&lsaquo;</button><button id="play" class="main">Play</button><button id="more" class="small" aria-label="Later night">&rsaquo;</button></p>
   <p id="about"></p>
-  <p><button id="endless">Endless river</button></p>
+  <p><button id="endless">Endless river</button><button id="tower">Tower climb</button></p>
   <p><button id="toShop">Shop</button><button id="toCredits">Credits</button></p>
 </div></div>
 <div id="shop" class="screen veil"><div>
   <h2>Shop</h2>
   <p class="bank"><span class="dot"></span><span id="bank2">0</span> embers</p>
   <p><button class="back">Back</button></p>
-  <p id="got">Each pack holds one surprise. A pack costs 50 embers.</p>
+  <p id="got">Stats make every run easier. Each pack holds one surprise for 50 embers. Abilities you own lie in the river.</p>
   <div id="packs"></div>
 </div></div>
 <div id="credits" class="screen veil"><div>
@@ -77,7 +83,8 @@
 </div></div>
 <div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p><p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p></div></div>
 <script type="module">
-import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, DT, GOAL, NIGHTS } from './sim.js?v=3'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
+import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS } from './sim.js?v=7'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
+import { hull, wake, flame, burn, glow as flameGlow, mark, TINT } from './looks.js?v=2';
 
 const query = new URLSearchParams(location.search);
 const gain = Number(query.get('gain')) || 1.3; // boat travel per finger travel; ?gain= to compare
@@ -88,7 +95,7 @@ const store = {
 };
 // Story: a night is one river. Reaching dawn opens the next night, up to night 20. Any opened night can be replayed.
 let opened = Math.min(NIGHTS, Math.max(1, Math.floor(Number(query.get('night')) || store.get('lantern-night') || 1)));
-let stage = opened, endless = false, bank = store.get('lantern-bank');
+let stage = opened, endless = false, tower = false, bank = store.get('lantern-bank');
 const NIGHT = [, 'Slide your thumb anywhere to steer. Embers feed the flame.', 'Ice drifts on the water.', 'The rocks are restless.', 'Some rocks ride up and down the current.', 'A waterfall waits halfway.',
   'Logs lie out from the banks.', 'Fog hides the way ahead.', 'Whirlpools pull you in.', 'A side wind pushes the boat.', 'False embers steal your light. They flicker green.',
   'Gates of logs leave one gap.', 'Some rocks follow you. They have red eyes.', 'Rain makes the flame fade faster.', 'The ice slides from side to side.', 'Rocks hide under the water until you are close.',
@@ -97,15 +104,33 @@ const ahead = n => NIGHT[n] ?? '';
 
 // The shop. Embers are the money. A pack gives one thing you do not own yet, picked at random.
 const PACKS = [
-  { id: 'boat', name: 'Boats', items: [['oak', 'Oak boat', '#6b4a2f'], ['red', 'Red boat', '#b3312c'], ['birch', 'Birch boat', '#e9e2d0'], ['iron', 'Iron boat', '#56657a'], ['jade', 'Jade boat', '#2f9e7a'], ['gold', 'Gold boat', '#e0b040']] },
+  { id: 'boat', name: 'Boats', items: [['oak', 'Oak rowboat', '#6b4a2f'], ['red', 'Red canoe', '#b3312c'], ['birch', 'Birch raft', '#e9e2d0'], ['iron', 'Iron barge', '#56657a'], ['jade', 'Jade dragon', '#2f9e7a'], ['gold', 'Golden barge', '#e0b040']] },
   { id: 'water', name: 'Waters', items: [['blue', 'Blue water', '#14304a', '#3d6f95'], ['redw', 'Red water', '#4a1420', '#a04a58'], ['moss', 'Moss water', '#17382a', '#4f8f6a'], ['violet', 'Violet water', '#2a1c4a', '#7a62b8'], ['teal', 'Teal water', '#0f3d42', '#48a3a8'], ['glass', 'Black glass', '#0c1016', '#4a5564']] },
-  { id: 'flame', name: 'Flames', items: [['amber', 'Amber flame', '255,170,80'], ['bluef', 'Blue flame', '110,180,255'], ['green', 'Green flame', '120,230,140'], ['rose', 'Rose flame', '255,120,170'], ['white', 'White flame', '235,235,255'], ['violetf', 'Violet flame', '190,130,255']] },
+  { id: 'flame', name: 'Flames', items: [['amber', 'Candle flame', '255,170,80'], ['bluef', 'Gas flame', '110,180,255'], ['green', 'Marsh fire', '120,230,140'], ['rose', 'Sparkler', '255,120,170'], ['white', 'Star light', '235,235,255'], ['violetf', 'Twin flame', '190,130,255']] },
+  { id: 'power', name: 'Abilities', items: [['boost', 'Boost', TINT.boost, 'Gold arrows. Fast, and nothing can break the boat.'], ['slow', 'Slow water', TINT.slow, 'Violet clock. The river slows; dawn keeps coming.'], ['size', 'Size', TINT.size, 'Teal rings. A smaller boat, four times in five.'], ['magnet', 'Magnet', TINT.magnet, 'Pink magnet. Embers swim to you.'], ['flare', 'Flare', TINT.flare, 'White sun. The flame is filled and holds.']] },
 ];
 const COST = 50;
-let owned = new Set(['oak', 'blue', 'amber', ...store.json('lantern-owned', [])]);
+// Stats: bought a level at a time and kept. They change the run itself, where packs change only its looks.
+const STAT = [['hearts', 'Hearts', 'Start with one more heart'], ['barrier', 'Barrier', 'A shield takes one more hit'], ['calm', 'Calm water', 'The river runs a little slower'], ['wick', 'Long wick', 'The flame fades more slowly'], ['pull', 'Long reach', 'Take embers from further away']];
+let stats = store.json('lantern-stats', {});
+const statCost = id => 40 * ((stats[id] || 0) + 1);
+let owned = new Set(['oak', 'blue', 'amber', 'boost', ...store.json('lantern-owned', [])]);
 let worn = { boat: 'oak', water: 'blue', flame: 'amber', ...store.json('lantern-worn', {}) };
+const powersOwned = () => POWERS.filter(k => owned.has(k)); // only abilities found in the shop lie in the river
 const skin = kind => { const pack = PACKS.find(p => p.id === kind); return pack.items.find(i => i[0] === worn[kind]) ?? pack.items[0]; };
-const swatch = (kind, it) => kind === 'flame' ? `radial-gradient(#fff, rgb(${it[2]}) 60%, #0000)` : it[2];
+// A shop button shows the thing itself: the boat drawn small, or the flame after half a second of burning.
+const shots = new Map();
+function swatch(kind, it) {
+  if (kind === 'water') return it[2];
+  if (kind === 'power' && !shots.has(it[0])) { const c = document.createElement('canvas'), q = c.getContext('2d'); c.width = c.height = 96; q.fillStyle = `rgba(${it[2]},.45)`; q.fillRect(0, 0, 96, 96); mark(q, it[0], 48, 50, 17, 5, 0.3); shots.set(it[0], `#0a1220 url(${c.toDataURL()}) center / cover`); }
+  if (!shots.has(it[0])) {
+    const c = document.createElement('canvas'), q = c.getContext('2d'); c.width = c.height = 96;
+    if (kind === 'boat') { q.fillStyle = '#14304a'; q.fillRect(0, 0, 96, 96); q.translate(48, 52); hull(q, it[0], 760, it[2], 0.7); }
+    else { q.fillStyle = '#05080f'; q.fillRect(0, 0, 96, 96); q.globalCompositeOperation = 'lighter'; const f = flame(); for (let i = 0; i < 40; i++) burn(f, it[0], 1 / 60, 0, 1); flameGlow(q, f, it[0], 48, 26, 900, it[2], 1, 0.4); const z = q.createRadialGradient(48, 26, 0, 48, 26, 20); z.addColorStop(0, '#fff6dc'); z.addColorStop(0.4, `rgba(${it[2]},.9)`); z.addColorStop(1, `rgba(${it[2]},0)`); q.fillStyle = z; q.fillRect(28, 6, 40, 40); }
+    shots.set(it[0], `url(${c.toDataURL()}) center / cover`);
+  }
+  return shots.get(it[0]);
+}
 
 const canvas = document.getElementById('c'), g = canvas.getContext('2d');
 const $ = id => document.getElementById(id);
@@ -119,7 +144,7 @@ addEventListener('resize', resize); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', lastLevel = 1, nearFall = false, sayTimer = 0, shown = '', weather = '';
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
-window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, score: score(s), bank, owned: [...owned], worn, unit: unit / dpr }); // read by the browser checks
+window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, unit: unit / dpr }); // read by the browser checks
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 
 function show(name) {
@@ -136,31 +161,67 @@ function menu() {
   const best = store.get(`lantern-best-${stage}`), top = store.get('lantern-best-endless');
   $('about').textContent = ahead(stage) + (best ? ` Best ${best}%.` : '');
   $('endless').textContent = top ? `Endless river · best ${top}` : 'Endless river';
+  const high = store.get('lantern-best-tower'); $('tower').textContent = high ? `Tower climb · best floor ${high}` : 'Tower climb';
 }
 function shop(text) {
   $('bank2').textContent = bank; if (text) $('got').textContent = text;
   const box = $('packs'); box.textContent = '';
+  const sdiv = document.createElement('div'); sdiv.className = 'pack'; const sname = document.createElement('b'); sname.textContent = 'Stats'; sdiv.append(sname);
+  for (const [id, label, what] of STAT) {
+    const lv = stats[id] || 0, top = STATS[id], row = document.createElement('div'); row.className = 'stat';
+    const txt = document.createElement('span'); txt.textContent = `${label} ${'●'.repeat(lv)}${'○'.repeat(top - lv)}`; const sm = document.createElement('small'); sm.textContent = what; txt.append(sm);
+    const b = document.createElement('button'); b.className = 'small'; b.dataset.stat = id; b.textContent = lv >= top ? 'Full' : `+1 · ${statCost(id)}`; b.disabled = lv >= top || bank < statCost(id); b.setAttribute('aria-label', `${label}: ${what}`);
+    b.addEventListener('click', () => {
+      const cost = statCost(id); if (busy || bank < cost || (stats[id] || 0) >= top) return;
+      bank -= cost; store.set('lantern-bank', bank); stats[id] = (stats[id] || 0) + 1; store.set('lantern-stats', JSON.stringify(stats));
+      audio(); tone(523.25, 0.3, 0.1, 'triangle'); setTimeout(() => tone(783.99, 0.5, 0.1, 'triangle'), 100);
+      shop(`${label} is now ${stats[id]} of ${top}. ${what}.`);
+    });
+    row.append(txt, b); sdiv.append(row);
+  }
+  box.append(sdiv);
   for (const pack of PACKS) {
     const rest = pack.items.filter(i => !owned.has(i[0])), div = document.createElement('div'); div.className = 'pack';
     const name = document.createElement('b'); name.textContent = pack.name;
     const row = document.createElement('div'); row.className = 'items';
     for (const it of pack.items) {
       const b = document.createElement('button'), has = owned.has(it[0]);
-      b.className = 'item' + (has ? '' : ' locked') + (worn[pack.id] === it[0] ? ' worn' : ''); b.setAttribute('aria-label', has ? it[1] : 'Not found yet');
-      if (has) { b.style.background = swatch(pack.id, it); b.addEventListener('click', () => { worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); shop(`${it[1]} is on.`); }); } else b.disabled = true;
+      b.className = 'item' + (has ? '' : ' locked') + (worn[pack.id] === it[0] || (pack.id === 'power' && has) ? ' worn' : ''); b.dataset.item = it[0]; b.setAttribute('aria-label', has ? it[1] : 'Not found yet');
+      if (has) { b.style.background = swatch(pack.id, it); b.addEventListener('click', () => { if (busy) return; if (pack.id === 'power') { shop(`${it[1]}: ${it[3]}`); return; } worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); shop(`${it[1]} is on.`); }); } else b.disabled = true;
       row.append(b);
     }
     const buy = document.createElement('button'); buy.dataset.pack = pack.id;
     buy.textContent = rest.length ? `Open a pack · ${COST}` : 'All found'; buy.disabled = !rest.length || bank < COST;
     buy.addEventListener('click', () => {
-      if (bank < COST || !rest.length) return;
+      if (bank < COST || !rest.length || busy) return;
       const it = rest[Math.floor(Math.random() * rest.length)];
-      bank -= COST; store.set('lantern-bank', bank); owned.add(it[0]); store.set('lantern-owned', JSON.stringify([...owned])); worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn));
-      audio(); tone(659.25, 0.5, 0.1, 'triangle'); setTimeout(() => tone(987.77, 0.8, 0.1, 'triangle'), 130);
-      shop(`You found: ${it[1]}!`);
+      // The pack is paid for and the find is saved at once; the hop and the flash only show it.
+      bank -= COST; store.set('lantern-bank', bank); owned.add(it[0]); store.set('lantern-owned', JSON.stringify([...owned])); if (pack.id !== 'power') { worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); }
+      $('bank2').textContent = bank; audio(); spin(row, rest.map(i => i[0]), it, pack);
     });
     div.append(name, row, buy); box.append(div);
   }
+}
+// Opening a pack: a light hops between the hidden things, slows, and stops on the find; then the whole screen fills with its colour.
+let busy = false;
+function spin(row, hidden, it, pack) {
+  busy = true; $('got').textContent = '…';
+  const tiles = hidden.map(id => row.querySelector(`[data-item="${id}"]`)), end = hidden.indexOf(it[0]), hops = (hidden.length > 1 ? 2 * hidden.length : 0) + end + (hidden.length > 1 ? hidden.length : 0);
+  let n = 0, at = -1;
+  const hop = () => {
+    if (screen !== 'shop') { busy = false; return; }
+    if (at >= 0) tiles[at].classList.remove('hop');
+    at = n % tiles.length; tiles[at].classList.add('hop'); tone(440 + 40 * (n % 8), 0.08, 0.06, 'square');
+    if (n++ < hops) { setTimeout(hop, 60 + 260 * (n / (hops + 1)) ** 3); return; }
+    setTimeout(() => {
+      busy = false; if (screen !== 'shop') return;
+      const col = pack.id === 'flame' || pack.id === 'power' ? `rgb(${it[2]})` : it[2], fl = $('flash');
+      fl.style.transition = 'none'; fl.style.background = col; fl.style.opacity = 0.9; void fl.offsetWidth; fl.style.transition = 'opacity 1.1s ease-out'; fl.style.opacity = 0;
+      tone(659.25, 0.5, 0.1, 'triangle'); setTimeout(() => tone(987.77, 0.8, 0.1, 'triangle'), 130); setTimeout(() => tone(1318.5, 1, 0.08, 'triangle'), 260);
+      shop(pack.id === 'power' ? `You found: ${it[1]}! ${it[3]}` : `You found: ${it[1]}!`);
+    }, 420);
+  };
+  hop();
 }
 function say(text, ms = 2200) { const el = $('say'); el.textContent = text; el.style.opacity = 1; clearTimeout(sayTimer); sayTimer = setTimeout(() => { el.style.opacity = 0; }, ms); }
 
@@ -185,22 +246,25 @@ function tone(freq, dur, vol, type = 'sine') {
 const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
 
 function begin() {
-  audio();
-  s = create((Math.random() * 2 ** 31) | 0, endless ? 1 : stage, endless); target = s.x; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; nearFall = false; weather = ''; drag = null; startTap = null;
+  audio(); // the tower holds the things of the nights you have opened, from 3 up to 12
+  s = create((Math.random() * 2 ** 31) | 0, tower ? Math.max(3, Math.min(12, opened)) : endless ? 1 : stage, tower ? 'tower' : endless, powersOwned(), stats); target = s.x; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; drag = null; startTap = null;
   shown = ''; show('play'); hud();
-  say(endless ? 'Endless river' : `Night ${stage}`, 1600);
+  say(tower ? 'The tower. Climb to the top' : endless ? 'Endless river' : `Night ${stage}`, 1800); floor = 0;
 }
 function bankRun() { bank += s.taken; store.set('lantern-bank', bank); }
 function finish() {
   playing = false; ended = performance.now(); drag = null; bankRun();
   $('hud').style.display = $('big').style.display = pauseButton.style.display = 'none'; $('warn').classList.remove('on');
   const won = s.over === 'dawn', why = { dark: 'The flame went out.', bank: 'You ran onto the bank.', ice: 'You struck the ice.', log: 'You struck a log.', pool: 'The whirlpool took you.', geyser: 'The geyser threw you over.', isle: 'You struck an island.' }[s.over] ?? 'You struck a rock.';
-  const gained = `+${s.taken} embers. You have ${bank}.`;
-  if (endless) {
+  const gained = `+${s.taken} ember${s.taken === 1 ? '' : 's'}. You have ${bank}.`;
+  if (tower) {
+    const at = Math.min(FLOORS, Math.floor(progress(s) * FLOORS)), best = Math.max(at, store.get('lantern-best-tower')); store.set('lantern-best-tower', best);
+    $('title').textContent = won ? 'The top' : `Floor ${at}`; $('line').textContent = won ? 'The river runs straight into the dawn. You climbed the whole tower.' : `${why} Best floor ${best} of ${FLOORS}.`; $('go').textContent = 'Climb again';
+  } else if (endless) {
     const pts = score(s), best = Math.max(pts, store.get('lantern-best-endless')); store.set('lantern-best-endless', best);
     $('title').textContent = `${pts}`; $('line').textContent = `${why} Best ${best}.`; $('go').textContent = 'Play again';
   } else {
-    const pct = Math.min(100, Math.floor(s.y / GOAL * 100)), key = `lantern-best-${stage}`, best = Math.max(pct, store.get(key)); store.set(key, best);
+    const pct = Math.floor(progress(s) * 100), key = `lantern-best-${stage}`, best = Math.max(pct, store.get(key)); store.set(key, best);
     $('title').textContent = won ? 'Dawn' : s.over === 'dark' ? 'Dark' : `Night ${stage}`;
     if (won && stage >= NIGHTS) { $('line').textContent = 'You carried the light through all twenty nights.'; $('go').textContent = `Play night ${stage} again`; }
     else if (won) { $('line').textContent = `You carried it through night ${stage}. Night ${stage + 1}: ${ahead(stage + 1)}`; stage++; opened = Math.max(opened, stage); store.set('lantern-night', opened); $('go').textContent = `Play night ${stage}`; }
@@ -210,7 +274,7 @@ function finish() {
   setTimeout(() => { if (!playing && screen === 'play') show('card'); }, won ? 2600 : 700);
 }
 function hud() {
-  const big = endless ? `${score(s)}` : `${Math.min(100, Math.floor(s.y / GOAL * 100))}%`, low = playing && !paused && s.light < 0.28, now = `${s.hearts}|${s.taken}|${big}|${low}`;
+  const big = endless ? `${score(s)}` : `${Math.floor(progress(s) * 100)}%`, low = playing && !paused && s.light < 0.28, now = `${s.hearts}|${s.taken}|${big}|${low}`;
   if (now === shown) return; shown = now; // touch the page only when a number changes
   $('hearts').textContent = '♥'.repeat(Math.max(0, s.hearts)); $('count').textContent = s.taken; $('big').textContent = big;
   $('warn').classList.toggle('on', low);
@@ -219,7 +283,8 @@ function hud() {
 // Steering. A finger steers by how far it has moved since it touched down, never by where it is,
 // so a tap anywhere does nothing and the thumb can rest wherever is comfortable. A mouse steers by position.
 const pauseButton = $('pause');
-let drag = null, startTap = null;
+let floor = 0;
+let drag = null, startTap = null, size = 1, fire0 = flame();
 function aim(x) { const c = centre(s, s.y), h = half(s, s.y) + 0.02; target = Math.max(c - h, Math.min(c + h, x)); }
 function anchor(e) { drag = { id: e.pointerId, x0: e.clientX, x: e.clientX, boat0: s.x }; }
 canvas.addEventListener('pointerdown', e => {
@@ -242,8 +307,9 @@ for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type,
 for (const type of ['pointerup', 'touchend', 'click']) addEventListener(type, () => { if (ac && ac.state === 'suspended' && !paused) ac.resume(); });
 
 // Buttons.
-$('play').addEventListener('click', () => { endless = false; begin(); });
-$('endless').addEventListener('click', () => { endless = true; begin(); });
+$('play').addEventListener('click', () => { endless = tower = false; begin(); });
+$('endless').addEventListener('click', () => { endless = true; tower = false; begin(); });
+$('tower').addEventListener('click', () => { tower = true; endless = false; begin(); });
 $('less').addEventListener('click', () => { stage = Math.max(1, stage - 1); menu(); });
 $('more').addEventListener('click', () => { stage = Math.min(opened, stage + 1); menu(); });
 $('toShop').addEventListener('click', () => show('shop'));
@@ -256,7 +322,7 @@ $('toMenu').addEventListener('click', () => { if (paused) { paused = false; play
 // Pause: the button, P or Escape, and whenever the page loses the screen (a phone call, another app).
 function pause() {
   if (!playing || paused) return; paused = true; drag = null; keys.clear();
-  $('title').textContent = 'Paused'; $('line').textContent = endless ? `Score ${score(s)}.` : `Night ${stage}, ${Math.floor(s.y / GOAL * 100)}% of the way to dawn.`; $('sub').textContent = 'Touch the river to go on.'; $('go').textContent = 'Go on';
+  $('title').textContent = 'Paused'; $('line').textContent = endless ? `Score ${score(s)}.` : tower ? `The tower, floor ${Math.floor(progress(s) * FLOORS)} of ${FLOORS}.` : `Night ${stage}, ${Math.floor(progress(s) * 100)}% of the way to dawn.`; $('sub').textContent = 'Touch the river to go on.'; $('go').textContent = 'Go on';
   show('card'); if (ac) ac.suspend();
 }
 function resume() {
@@ -295,6 +361,12 @@ function tick() {
       for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.9, vy: (Math.random() - 0.3) * 0.9, life: 0.7, red: true });
       say('You lost a heart', 1500);
     }
+    if (e === 'boost') { [392, 523.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.09, 'sawtooth'), i * 60)); glow = 1; say('Boost! Nothing can stop you', 1600); }
+    if (e === 'slow') { tone(440, 0.9, 0.1); setTimeout(() => tone(330, 1.1, 0.1), 160); glow = 1; say('Slow water. Dawn keeps coming', 1800); }
+    if (e === 'small') { tone(1046.5, 0.25, 0.1, 'triangle'); setTimeout(() => tone(1568, 0.4, 0.08, 'triangle'), 90); glow = 1; say('A smaller boat', 1500); }
+    if (e === 'big') { tone(196, 0.5, 0.2, 'square'); setTimeout(() => tone(147, 0.7, 0.2, 'square'), 120); shake = 0.4; say('Bad luck: a bigger boat!', 1700); }
+    if (e === 'magnet') { tone(660, 0.3, 0.1, 'triangle'); setTimeout(() => tone(990, 0.5, 0.1, 'triangle'), 90); glow = 1; say('Magnet: embers come to you', 1700); }
+    if (e === 'flare') { [523.25, 783.99, 1046.5, 1568].forEach((f, i) => setTimeout(() => tone(f, 0.7, 0.08), i * 70)); glow = 1; say('Flare: the flame holds', 1600); }
     if (e === 'hit') { tone(70, 0.5, 0.35, 'sawtooth'); shake = 1; }
     if (e === 'out') tone(110, 1.2, 0.2);
     if (e === 'dawn') [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 1.6, 0.1, 'triangle'), i * 180));
@@ -312,23 +384,35 @@ function tick() {
     weather = sky;
   }
   if (level(s) !== lastLevel) { lastLevel = level(s); if (endless) { say('The river runs harder', 1800); tone(330, 0.3, 0.1, 'triangle'); setTimeout(() => tone(440, 0.5, 0.1, 'triangle'), 140); } }
+  if (s.boost) for (let i = 0; i < 2; i++) sparks.push({ x: s.x + (Math.random() - 0.5) * 0.03, y: s.y - 0.03, vx: (Math.random() - 0.5) * 0.15, vy: -0.6 - Math.random() * 0.5, life: 0.45 });
+  if (tower) { const at = Math.floor(progress(s) * FLOORS); if (at > floor && at < FLOORS) { floor = at; say(at === FLOORS - 1 ? 'The last floor. The river runs straight' : `Floor ${at}`, 1500); tone(330 + 40 * at, 0.4, 0.09, 'triangle'); } }
   hud();
   if (s.over) finish();
 }
 
 function draw(now) {
-  const dawn = s.endless ? 0 : Math.max(0, (s.y / GOAL - 0.86) / 0.14), day = s.over === 'dawn' ? Math.min(1, (now - ended) / 2500) : 0;
+  const dawn = s.endless ? 0 : Math.max(0, (progress(s) - 0.86) / 0.14), day = s.over === 'dawn' ? Math.min(1, (now - ended) / 2500) : 0;
   const ox = shake * (Math.random() - 0.5) * 14 * dpr, oy = shake * (Math.random() - 0.5) * 14 * dpr;
   g.setTransform(1, 0, 0, 1, ox, oy);
   const wet = skin('water'), fire = skin('flame')[2];
-  g.fillStyle = '#1a2a20'; g.fillRect(-20, -20, W + 40, H + 40); // banks
+  g.fillStyle = s.tower ? '#26262e' : '#1a2a20'; g.fillRect(-20, -20, W + 40, H + 40); // banks, or the tower's stone
+  if (s.tower) { // courses of stone, with the joints staggered
+    g.strokeStyle = '#3a3a46'; g.lineWidth = 1.5 * dpr; g.beginPath();
+    for (let i = Math.floor((s.y - 0.4 * H / unit) / 0.12); i < (s.y + 0.8 * H / unit) / 0.12; i++) { const y = sy(i * 0.12); g.moveTo(0, y); g.lineTo(W, y); for (let x = (i % 2 ? 0.1 : 0) * unit + (left % (0.2 * unit)) - 0.2 * unit; x < W; x += 0.2 * unit) { g.moveTo(x, y); g.lineTo(x, sy((i + 1) * 0.12)); } }
+    g.stroke();
+  }
   // water
   g.beginPath();
   const top = s.y + 0.74 * H / unit + 0.1, bot = s.y - 0.3 * H / unit - 0.1;
   for (let y = bot; y <= top; y += 0.05) g.lineTo(sx(centre(s, y) - half(s, y)), sy(y));
   for (let y = top; y >= bot; y -= 0.05) g.lineTo(sx(centre(s, y) + half(s, y)), sy(y));
   g.closePath(); g.fillStyle = wet[2]; g.fill();
-  g.strokeStyle = '#6f9a7c'; g.lineWidth = 4 * dpr; g.stroke(); // reeds at the water's edge
+  g.strokeStyle = s.tower ? '#8d8d9c' : '#6f9a7c'; g.lineWidth = 4 * dpr; g.stroke(); // reeds at the water's edge, or a stone kerb
+  if (s.tower) for (let f = 1; f < FLOORS; f++) { // each floor is a ledge across the water with its number cut in the wall
+    const y = f * GOAL / FLOORS; if (y < s.y - 0.5 * H / unit || y > s.y + 0.8 * H / unit) continue;
+    const c = centre(s, y), h = half(s, y); g.strokeStyle = 'rgba(230,230,245,.5)'; g.lineWidth = 3 * dpr; g.setLineDash([10 * dpr, 8 * dpr]); g.beginPath(); g.moveTo(sx(c - h), sy(y)); g.lineTo(sx(c + h), sy(y)); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#b9b9cc'; g.font = `${0.07 * unit}px Georgia, serif`; g.textAlign = c > 0.5 ? 'right' : 'left'; g.textBaseline = 'middle'; g.fillText(`${f}`, sx(c > 0.5 ? c - h - 0.05 : c + h + 0.05), sy(y));
+  }
   // current streaks
   g.strokeStyle = wet[3]; g.lineWidth = 1.5 * dpr; g.globalAlpha = 0.5;
   for (let i = Math.floor(bot * 3); i < top * 3; i++) {
@@ -374,8 +458,8 @@ function draw(now) {
   }
   // boat
   const bx = sx(s.x), by = sy(s.y), lean = Math.max(-0.5, Math.min(0.5, (target - s.x) * 4));
-  g.save(); g.translate(bx, by); g.rotate(lean * 0.5);
-  g.fillStyle = skin('boat')[2]; g.beginPath(); g.moveTo(0, -0.05 * unit); g.quadraticCurveTo(0.028 * unit, -0.005 * unit, 0.016 * unit, 0.035 * unit); g.lineTo(-0.016 * unit, 0.035 * unit); g.quadraticCurveTo(-0.028 * unit, -0.005 * unit, 0, -0.05 * unit); g.fill();
+  g.save(); g.translate(bx, by); g.rotate(lean * 0.5); size += (boat(s) / BOAT - size) * 0.2; g.scale(size * 1.2, size * 1.2); // drawn a little larger than it collides
+  if (playing) wake(g, unit, now / 1000); hull(g, skin('boat')[0], unit, skin('boat')[2], now / 1000);
   g.restore();
   // darkness with a hole of light
   const flick = 1 + Math.sin(now / 90) * 0.015 + Math.sin(now / 37) * 0.01, r = (sight(s) + glow * 0.09) * unit * flick, flash = dazzle(s) < 0;
@@ -401,15 +485,30 @@ function draw(now) {
   }
   for (const p of sparks) { g.fillStyle = p.blue ? `rgba(150,210,255,${p.life})` : p.red ? `rgba(255,80,90,${p.life})` : `rgba(255,200,120,${p.life})`; g.fillRect(sx(p.x), sy(p.y), 3 * dpr, 3 * dpr); }
   // the shield: a blue ring while it is held, blinking just after it breaks
-  if (s.shield || (s.safe > 0 && Math.floor(now / 90) % 2)) {
+  // powers waiting in the water: gold arrows boost, violet clock slow water, teal rings size, pink magnet, white sun flare
+  for (const e of s.powers) if (!e.got) {
+    const ex = sx(e.x), ey = sy(e.y) + Math.sin(now / 300 + e.y * 9) * 2 * dpr, er = 0.06 * unit, col = TINT[e.kind];
+    const eg = g.createRadialGradient(ex, ey, 0, ex, ey, er); eg.addColorStop(0, `rgba(${col},.75)`); eg.addColorStop(0.35, `rgba(${col},.35)`); eg.addColorStop(1, `rgba(${col},0)`);
+    g.fillStyle = eg; g.fillRect(ex - er, ey - er, er * 2, er * 2);
+    mark(g, e.kind, ex, ey, 0.014 * unit, 2 * dpr, now / 1000);  }
+  // powers in use: an arc round the boat that runs down with the time left
+  let ring = 0.075 + 0.012 * Math.max(0, s.shield - 1);
+  for (const [left, full, col] of POWERS.map(k => [s[k], LAST[k], k === 'size' && s.big ? '255,110,90' : TINT[k]])) if (left > 0) {
+    g.strokeStyle = `rgba(${col},.85)`; g.lineWidth = 3 * dpr; g.beginPath(); g.arc(bx, by, ring * unit, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * left / full); g.stroke(); ring += 0.014;
+  }
+  if (s.shield || (s.safe > 0 && !s.boost && Math.floor(now / 90) % 2)) {
     g.strokeStyle = `rgba(120,190,255,${s.shield ? 0.8 : 0.5})`; g.lineWidth = 2.5 * dpr;
-    g.beginPath(); g.arc(bx, by - 0.005 * unit, 0.06 * unit * (1 + Math.sin(now / 240) * 0.05), 0, 7); g.stroke();
+    for (let i = 0; i < Math.max(1, s.shield); i++) { g.beginPath(); g.arc(bx, by - 0.005 * unit, (0.06 + 0.012 * i) * unit * (1 + Math.sin(now / 240) * 0.05), 0, 7); g.stroke(); } // one ring for each hit the barrier still takes
   }
   // the flame itself
-  const fg = g.createRadialGradient(bx, by, 0, bx, by, 0.03 * unit);
-  fg.addColorStop(0, '#fff6dc'); fg.addColorStop(0.4, `rgba(${fire},.9)`); fg.addColorStop(1, `rgba(${fire},0)`);
-  g.fillStyle = fg; g.fillRect(bx - 0.03 * unit, by - 0.03 * unit, 0.06 * unit, 0.06 * unit);
+  const fr = 0.02 * unit, fg = g.createRadialGradient(bx, by, 0, bx, by, fr); // small, so the boat under it still shows
+  fg.addColorStop(0, '#fff6dc'); fg.addColorStop(0.45, `rgba(${fire},.8)`); fg.addColorStop(1, `rgba(${fire},0)`);
+  g.fillStyle = fg; g.fillRect(bx - fr, by - fr, 2 * fr, 2 * fr);
+  flameGlow(g, fire0, skin('flame')[0], bx, by, unit, fire, s.light, now / 1000); // the flame streams out behind the lantern
   g.globalCompositeOperation = 'source-over';
+  // boost: streaks of speed down the screen. slow water: a violet hush at the edges.
+  if (playing && s.boost) { g.strokeStyle = `rgba(255,235,170,${0.5 * Math.min(1, s.boost * 2)})`; g.lineWidth = 2 * dpr; g.beginPath(); for (let i = 0; i < 18; i++) { const x = (Math.sin(i * 53.1) * 0.5 + 0.5) * W, y = ((Math.sin(i * 17.7) * 0.5 + 0.5) * H + now * 2.4 * dpr) % H; g.moveTo(x, y); g.lineTo(x, y + 46 * dpr); } g.stroke(); }
+  if (playing && s.slow) { const v = g.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.7); v.addColorStop(0, 'rgba(150,110,255,0)'); v.addColorStop(1, `rgba(150,110,255,${0.3 * Math.min(1, s.slow * 2)})`); g.fillStyle = v; g.fillRect(-20, -20, W + 40, H + 40); }
   // rain and lightning lie over everything
   if (playing && rain(s, s.y)) { g.strokeStyle = 'rgba(190,215,235,.4)'; g.lineWidth = 1.5 * dpr; g.beginPath(); for (let i = 0; i < 40; i++) { const x = (Math.sin(i * 91.7) * 0.5 + 0.5) * W, y = ((Math.sin(i * 47.3) * 0.5 + 0.5) * H + now * 1.6 * dpr) % H; g.moveTo(x, y); g.lineTo(x - 5 * dpr, y + 16 * dpr); } g.stroke(); }
   if (flash) { g.fillStyle = 'rgba(235,240,255,.35)'; g.fillRect(-20, -20, W + 40, H + 40); }
@@ -420,12 +519,13 @@ function draw(now) {
     g.fillStyle = d; g.fillRect(-20, -20, W + 40, H + 40);
   }
   // progress: a thin line at the top edge on a story night
-  if (!s.endless) { g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * Math.min(1, s.y / GOAL), 3 * dpr); }
+  if (!s.endless) { g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * progress(s), 3 * dpr); }
 }
 
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000 || 0); last = now;
   if (playing && !paused) { acc += dt; while (acc >= DT && playing) { tick(); acc -= DT; } }
+  if (!paused && !(s.over && s.over !== 'dawn')) burn(fire0, skin('flame')[0], dt, Math.max(-0.5, Math.min(0.5, (target - s.x) * 4)), s.light);
   shake = Math.max(0, shake - dt * 3); glow = Math.max(0, glow - dt * 2);
   for (const p of sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; } sparks = sparks.filter(p => p.life > 0);
   if (ac) { water.frequency.value = 400 + 500 * Math.min(1.4, s.y / GOAL); waterGain.gain.value = 0.05 + (playing ? 0.14 * Math.max(fall(s, s.y), fall(s, s.y + 0.8)) : 0); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0; }
