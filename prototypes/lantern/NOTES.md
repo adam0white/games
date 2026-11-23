@@ -167,3 +167,14 @@ The tester's words: the river climbs upward first, and when it runs straight you
 Checked: audit over 200 tower rivers at night 3's and night 12's things, each ridden four ways: narrowest gap 0.057, no buried pickup. Careful bot reached the top 15 and 18 times in 100. Phone-sized Chromium: the menu still fits, a climb ran to the top, the card and best floor were right, the story night stayed where it was. No page errors.
 
 Not checked: whether this is what the tester pictured (to ask); how the sharp turns feel under a thumb.
+
+## Looks taken from the 3D experiment (2026-11-23)
+
+The wildcard lab drew Lantern in 3D (`../lab/lantern-3d/`, log in `../lab/NOTES.md`). Four of its looks are now drawn flat in this game, in `looks.js`. Nothing in `sim.js` changed, so rivers, collisions and difficulty are the same.
+
+- **Reeds** (`reeds`). Blades stand on both banks, rooted outside the water's edge and leaning away from it, so they never cover water. They are drawn twice: dark under the night, then the blades inside the lantern's circle again with the flame's colour over the night. The tower keeps its stone kerb and has no reeds.
+- **Pickup lights on the water** (`shine`). Each ember, wisp, heart, shield and power lays a shimmering streak of its colour down the screen. A false ember's streak is fainter, as its glow is.
+- **Shield glow** (`halo`). A blue halo lies on the water under the shield rings, half strength while the boat blinks after a blow.
+- **Dawn flood** (`flood`). From 86% a low sun shows past the top edge. At dawn its light pours down the screen, then settles within 2.5 s so the card can be read. The first version stayed bright and made the card's title unreadable; the screenshot caught it.
+
+Checked: phone-sized Chromium, a night-1 run with each look on screen, 60 frames a second on this Mac, no page errors; the dawn card compared with the build before. Not checked: a real phone (about 350 reed blades a frame are new), a person's opinion. Full 3D stays in the lab until a person compares the two on a phone, because rocks ahead draw about 20% smaller there.
