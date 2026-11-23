@@ -10,6 +10,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
 import assert from 'node:assert/strict';
+import { gunzipSync } from 'node:zlib';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
@@ -34,6 +35,10 @@ const finger = (page, sel, steps) => page.evaluate(([sel, steps]) => {
   const el = document.querySelector(sel);
   for (const [type, x, y] of steps) el.dispatchEvent(new PointerEvent(type, { pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, pressure: type === 'pointerup' ? 0 : 0.5, bubbles: true, cancelable: true }));
 }, [sel, steps]);
+// Lab records the page sent. Every context answers the lab endpoint itself (see the runner), so no check reaches it.
+const labSent = page => page.context().labSent;
+const labRuns = (page, game) => labSent(page).filter(r => r.game === game && r.kind === 'run');
+const LAB_LOCAL = () => localStorage.setItem('hf-lab-send-localhost', '1'); // pages on 127.0.0.1 send only with this
 
 const GAMES = {
   async kit(page) {
@@ -48,6 +53,7 @@ const GAMES = {
     const saved = () => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(k => k.startsWith('lantern-')).map(k => [k, localStorage.getItem(k)])));
     // A save in the format players already have.
     await page.goto(`${base}/proto/lantern/`);
+    await page.evaluate(LAB_LOCAL);
     await page.evaluate(() => { localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('lantern-best-endless', '55'); localStorage.setItem('lantern-best-tower', '4'); localStorage.setItem('lantern-stats', '{"red":1}'); localStorage.setItem('notes.k', 'check'); });
     await page.reload();
     let st = await state();
@@ -86,15 +92,36 @@ const GAMES = {
     await page.click('[data-pack="water"]'); st = await state();
     assert.equal(st.bank, 77, 'pack paid for'); assert.equal(st.owned.length, 6, 'pack gave one thing'); assert.notEqual(st.worn.water, 'blue', 'new thing is on');
     // Reload keeps all of it.
+    await sleep(300); // let the purchase record leave before the reload
     const before = st; await page.reload(); st = await state();
     assert.equal(st.bank, before.bank); assert.deepEqual(st.owned.sort(), before.owned.sort()); assert.deepEqual(st.worn, before.worn); assert.equal(st.opened, 3);
+    // Lab recording: the notice is on the menu, the ended run was sent with its outcome, the purchase rides with the next run.
+    assert.match(await page.textContent('#menu'), /The game lab records play, links it to other lab play on this device, and keeps it for 180 days\. Turn recording off in the pause menu\. Privacy/);
+    let runs = labRuns(page, 'lantern'); assert.equal(runs.length, 2, 'the run and the purchase sent');
+    assert.equal(runs[0].data.outcome, 'dark'); assert.equal(runs[0].data.summary.embers, 7); assert.equal(runs[0].data.start.night, 3);
+    assert.ok(labSent(page).some(r => r.game === 'lantern' && r.kind === 'events' && r.runId === runs[0].runId), 'events record for the dashboard');
+    assert.ok(!runs[0].runSource, 'a person\'s run is not marked as an agent run');
+    await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.light = 0.0001; });
+    await until(page, () => !window.lanternState().playing, 'second run ends'); await sleep(300);
+    runs = labRuns(page, 'lantern'); assert.equal(runs.length, 3); assert.equal(runs[1].data.outcome, 'between-runs');
+    assert.equal(runs[1].data.events[0].type, 'buy', 'purchase recorded'); assert.equal(runs[1].data.events[0].data.pack, 'water'); assert.equal(runs[2].data.outcome, 'dark');
+    // The switch on the pause card turns recording off for this origin and drops the player id; nothing more is sent.
+    await until(page, () => window.lanternState().screen === 'card', 'end card'); await page.click('#go');
+    await finger(page, '#pause', [['pointerdown', 0, 0]]); await until(page, () => window.lanternState().paused, 'paused');
+    await page.uncheck('.lab-toggle input');
+    assert.equal(await page.evaluate(() => localStorage.getItem('hf-lab-recording-off')), '1'); assert.equal(await page.evaluate(() => localStorage.getItem('hf-lab-player')), null);
+    await page.click('#go'); await page.evaluate(() => { window.lanternSim().light = 0.0001; }); await until(page, () => !window.lanternState().playing, 'third run ends'); await sleep(300);
+    assert.equal(labRuns(page, 'lantern').length, 3, 'nothing is sent while recording is off');
+    await page.reload(); await page.click('#play'); await finger(page, '#pause', [['pointerdown', 0, 0]]);
+    assert.equal(await page.isChecked('.lab-toggle input'), false, 'the switch stays off after a reload');
   },
   async 'ant-promotion'(page) {
     const KEY = 'ant-promotion:v1';
     const mode = () => page.evaluate(() => window.__ant.mode);
     const saved = () => page.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
-    await page.goto(`${base}/proto/ant-promotion/`);
+    await page.goto(`${base}/proto/ant-promotion/?labRunSource=agent`);
     await until(page, () => window.__ant, 'game script');
+    await page.evaluate(LAB_LOCAL);
     // A save in the format players already have: a level-2 animal, a skin, the soft look.
     const stack = await page.evaluate(() => { const F = window.__ant.FORMS; return [F.findIndex(f => f && f.level === 1), F.findIndex(f => f && f.level === 2)]; });
     await page.evaluate(([k, stack]) => { localStorage.setItem(k, JSON.stringify({ skin: { c: '#c0271f', p: 'stripes' }, stack, xp: 3, sound: true, look: 2 })); localStorage.setItem('notes.k', 'check'); }, [KEY, stack]);
@@ -131,6 +158,21 @@ const GAMES = {
     await page.reload(); await until(page, () => window.__ant, 'game script');
     assert.deepEqual(await saved(), before); assert.equal(await page.textContent('#sound'), 'Sound: off');
     await page.click('#continue'); await page.click('#pause'); assert.equal(await page.evaluate(() => window.audioLog.made), 0, 'sound off: no audio is started');
+    // Lab recording: a death ends a life with its outcome; leaving for the menu ends the next one; an agent run is marked.
+    const runs = labRuns(page, 'ant-promotion');
+    assert.deepEqual(runs.map(r => r.data.outcome), ['died', 'menu', 'between-runs'], 'two lives and a skin choice sent');
+    assert.equal(runs[0].data.summary.level, 2); assert.equal(runs[0].data.start.how, 'continue');
+    assert.ok(runs.every(r => r.runSource === 'agent'), 'labRunSource=agent marks the records');
+    assert.deepEqual(runs[2].data.events[0].data, { c: '#d6b21c', p: 'stripes' }, 'the skin choice');
+  },
+  // The lab is down: every send fails, and the game plays on with no page error.
+  async 'lab down'(page) {
+    page.context().labDown = true;
+    await page.goto(`${base}/proto/lantern/`); await page.evaluate(LAB_LOCAL); await page.reload();
+    await page.click('#play'); await page.evaluate(() => { window.lanternSim().light = 0.0001; });
+    await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'end card');
+    await page.click('#go'); assert.ok((await page.evaluate(() => window.lanternState())).playing, 'plays on');
+    assert.ok(page.context().labTried > 0, 'a send was tried');
   },
 };
 
@@ -142,6 +184,16 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   for (const [game, run] of Object.entries(GAMES)) {
     if (onlyGame && onlyGame !== 'all' && onlyGame !== game) continue;
     const context = await browser.newContext({ ...device }), page = await context.newPage(), errors = [];
+    // Answer the lab endpoint here, so no check ever reaches it. Records are kept for the assertions.
+    context.labSent = []; context.labTried = 0;
+    await context.route('https://human.adamwhite.work/**', async route => {
+      const req = route.request(), cors = { 'access-control-allow-origin': base, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'Content-Type' };
+      context.labTried++;
+      if (context.labDown) return route.abort('connectionrefused');
+      if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+      const record = JSON.parse(gunzipSync(req.postDataBuffer()).toString()); context.labSent.push(record);
+      return route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ ok: true, id: record.id }) });
+    });
     // Count audio contexts and their suspend and resume calls, so the checks can see what the sound code did.
     await page.addInitScript(() => {
       const Real = window.AudioContext || window.webkitAudioContext; if (!Real) return;
@@ -154,7 +206,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     });
     page.on('pageerror', e => errors.push(String(e))); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     page.on('requestfailed', r => errors.push(`request failed: ${r.url()}`)); page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
-    try { await run(page); assert.deepEqual(errors, [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
+    try { await run(page); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
     catch (e) { failed++; console.log(`FAIL ${game} on ${phone}: ${e.message}`); if (errors.length) console.log('     ' + errors.join('\n     ')); }
     await context.close();
   }
