@@ -2,7 +2,9 @@
 // server; it is kept in localStorage and sent only as a request header.
 (() => {
   const KEY = 'notes.k';
-  const GAMES = [['lantern', 'Lantern'], ['long-road', 'The Long Road'], ['copper-afternoon', 'Copper Afternoon'], ['ant-promotion', 'Ant Promotion']];
+  // Games offered for a new note. Older notes about a dropped game still show under their own name.
+  const GAMES = [['lantern', 'Lantern'], ['ant-promotion', 'Ant Promotion']];
+  const NAMES = { 'long-road': 'The Long Road', 'copper-afternoon': 'Copper Afternoon' };
   const MAX_SECONDS = 180;
   const STRINGS = {
     tr: {
@@ -81,7 +83,7 @@
     $('notice').hidden = !text;
   }
 
-  const gameName = slug => (GAMES.find(([s]) => s === slug) || [null, slug])[1];
+  const gameName = slug => (GAMES.find(([s]) => s === slug) || [null, NAMES[slug] || slug])[1];
   const clock = ms => new Date(ms).toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   function bubble(message) {
