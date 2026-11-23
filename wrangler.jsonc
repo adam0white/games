@@ -53,10 +53,6 @@
       "zone_name": "adamwhite.work"
     },
     {
-      "pattern": "smoke.adamwhite.work/*",
-      "zone_name": "adamwhite.work"
-    },
-    {
       "pattern": "hearsay.adamwhite.work/*",
       "zone_name": "adamwhite.work"
     },
@@ -82,6 +78,10 @@
     },
     {
       "pattern": "island.adamwhite.work/*",
+      "zone_name": "adamwhite.work"
+    },
+    {
+      "pattern": "smoke.adamwhite.work/*",
       "zone_name": "adamwhite.work"
     }
   ],

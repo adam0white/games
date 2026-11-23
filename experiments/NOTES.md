@@ -62,7 +62,7 @@ Each directory has `sim.js` (rules, runs in Node), `bots.mjs` (proves the rules 
 - **Note #104, answering #44 ("Smoke on the Stairs: keep it or drop it?"):** "Drop". Recorded only. Dropping a game is the owner's decision, and Smoke (`games/smoke`) is a full game, not an experiment. One caution: #104 arrived 68 ms before #105, an answer the tester then withdrew as a mis-tap (#106). Both were sent from the same tap sequence, so #104 may also be a mis-tap.
 
 ### Left as a proposal (2026-11-23)
-- Smoke on the Stairs: the tester's answer is "drop". The owner decides whether to archive it.
+- Smoke on the Stairs: the tester's answer is "drop". Archived on 2026-11-23 on the owner's instruction (`archive/games/smoke/`; see `archive/README.md`).
 - Fix-It Stall: the next working session on the three new experiments goes to Fix-It Stall first.
 
 ## 2026-11-23: a new game idea from tester t1 (note #107)
