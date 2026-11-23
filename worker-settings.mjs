@@ -18,12 +18,10 @@ export const legacyRoutes = [
   'stairwell.adamwhite.work/*',
   'pass.adamwhite.work/*',
   'warren.adamwhite.work/*',
-  'commonstead.adamwhite.work/*',
   'child.adamwhite.work/*',
   'neighbours.adamwhite.work/*',
   'lefthand.adamwhite.work/*',
   'days.adamwhite.work/*',
   'word.adamwhite.work/*',
   'smoke.adamwhite.work/*',
-  'island.adamwhite.work/*',
 ];
