@@ -178,3 +178,181 @@ The wildcard lab drew Lantern in 3D (`../lab/lantern-3d/`, log in `../lab/NOTES.
 - **Dawn flood** (`flood`). From 86% a low sun shows past the top edge. At dawn its light pours down the screen, then settles within 2.5 s so the card can be read. The first version stayed bright and made the card's title unreadable; the screenshot caught it.
 
 Checked: phone-sized Chromium, a night-1 run with each look on screen, 60 frames a second on this Mac, no page errors; the dawn card compared with the build before. Not checked: a real phone (about 350 reed blades a frame are new), a person's opinion. Full 3D stays in the lab until a person compares the two on a phone, because rocks ahead draw about 20% smaller there.
+
+## 2026-11-23: tester t1 asks for a harder, longer game (note #69)
+
+The tester likes the game but finds it too easy: night 6 without a struggle, the tower cleared in one go, the whole game done in 15 to 30 minutes. They blame the stats and powers. They asked for a long list. In their words, shortened:
+
+1. Stats should last one night only, with a warning in the shop.
+2. Powers should be rarer; a player can switch some off so they stop appearing; only two at a time; hearts and the shield should count as powers and not be free; the shield and a heart should differ (now both are a spare life).
+3. Test commands to get as many embers and powers as wanted, removed at launch.
+4. The river colours barely differ (blue and a darker blue).
+5. Tower: about 50 levels, much harder each level, growing exponentially. After each level ask "go again or stop". Going to the menu after level 7 shows "best 7" and the next climb starts from 1 again, for competition.
+6. 50 more nights, with an exponential rise in difficulty between nights.
+7. A leaderboard so people compete.
+8. A river animations pack; a crash effects pack (choose two or three): crashes that differ by what you hit, with their own sounds (a rock: the boat sinks or breaks; the bank: it tips over the bank).
+
+### Done in this change
+
+| Ask | What changed |
+| --- | --- |
+| 1 | A stat level now lasts the next run only and is used up when that run starts, whatever the mode. The price fell to 15 embers times the level bought (15, 30, 45), since it is spent each time. The shop shows a warning in orange, the menu lists the stats ready for the next run, and the run opens with "Your stats are on for this run". Stats bought before this change are used by the next run. `lantern-stats` keeps its format; it now holds the levels for the next run. |
+| 2, rarer | About two powers a night (one every 26 to 40 river units, was 14 to 24). Careful bot, night 5: 0.33 powers taken a run before, 0.26 after; greedy bot 0.78 and 0.39. Hearts and shields are unchanged here. |
+| 2, switch off | Tapping an owned ability in the shop switches it off (dimmed, dashed); it stays owned and no longer lies in the river. Tap again to bring it back. New key `lantern-off`: a JSON list of ability ids. |
+| 3 | "Tester tools" at the bottom of the shop: +500 embers, open all nights, find everything. They show only in a browser that has the notes button, that is one that opened a tester's private link. Each use is recorded in the lab events as `test`. **Remove before launch.** |
+| 4 | Blue is a brighter cobalt, teal is clearly green-blue, black glass is darker with silver streaks. Screenshots of all six waters before and after were compared; blue and teal were the close pair. |
+
+The lab's own reading: "two at a time" is ambiguous (two chosen for a run, or two working at once), and it decides whether hearts and shields take a slot. A question went to the tester.
+
+Checks: `node experiments/kit/check/phone.mjs lantern` on WebKit iPhone 13 and Chromium Pixel 7 with new lines for the stat warning, the 15-ember price, the menu line, stats used up at run start, the switch and its saved key, and a tester tool. Making the run keep its stats makes the check fail (tried). `bots.mjs 60 audit` on nights 1 to 20, endless and tower: no closed river, no buried pickup. Not checked: a real phone; whether 15 embers a level is the right price now that a stat is spent each run.
+
+### Left as a proposal (2026-11-23, note #69)
+
+- **Only two powers, hearts and shield as powers, shield different from a heart.** Waiting on the tester's answer about "two at a time". A lab idea for the difference: the shield becomes a force field that lasts a few seconds and pushes rocks aside, while a heart stays a spare life.
+- **50 more nights and an exponential rise between nights.** Nights past 24 would be the same under the current caps on speed and density; it needs new hazards or a new curve, audited for closed rivers. The steeper rise should start at night 6, as the tester earlier asked nights 1 to 5 kept, and come with careful-bot numbers before and after.
+- **Leaderboard.** A shared leaderboard needs a server, which is the owner's decision. A best list on this device is possible without one.
+- **Crash effects pack and river animations pack.** A crash that differs by what is hit (sink or shatter on a rock, tip over on the bank, crack on ice), each with its own sound; the pack lets a player pick two or three. River animations: moving ripples, moonlight glints, mist.
+- **Tower of 50 levels:** built; see the next entry.
+
+## 2026-11-23: the tower is 50 levels (note #69, item 5)
+
+- A tower climb is now a chain of up to 50 levels. Each level is one climb of the old tower, with ten floors and a straight run into dawn.
+- After each level a card shows what the next level adds. Its buttons are "Climb on to level N" and "Stop".
+- Stopping, losing or leaving ends the climb. The best number of levels cleared is kept, and the next climb starts at level 1, as the tester asked for competition.
+- The menu shows "Tower climb · best level N of 50". New key: `lantern-best-level`, a number. `lantern-best-tower`, the best floor, is still written and no longer shown.
+- **The curve.** The pace grows geometrically, from 1.15 at level 1 to 2.2 at level 50. (Corrected below: level 1 now starts at 1.2.) Night 20 runs at 1.67. Rows come up to 15% closer and the river narrows by up to 0.012 by level 50.
+- **New things.** Level 1 holds night 4's things, and one more of the nights' new things joins every two levels: all twenty from level 33. The tower no longer depends on the nights opened.
+- **Stats.** A whole climb counts as one run: stats bought before it last every level of that climb.
+- The lab took "exponential" as a fixed share harder each level, about 1.3% faster plus a new thing every second level. A steeper curve over 50 levels would end far past what a person can react to.
+
+Checks:
+- `bots.mjs 100 audit` on levels 1, 17, 33 and 50 (and 10, 25 and 40 on the earlier curve): no closed river, no buried pickup. The narrowest gap is 0.040 at level 50; the endless river's is 0.038.
+- The phone check on WebKit and Chromium covers: clear level 1 and see "Stop", climb on to level 2, lose and see "cleared 1 level. Best 1 of 50", the next climb starting at level 1, and the menu line.
+- Screenshots of the cards after levels 1 and 7 and after a loss.
+
+Not checked:
+- How hard levels 10 to 50 feel to a person. Bots react instantly, so they clear 10% to 28% of levels at every height and cannot measure speed.
+- A real phone.
+
+## 2026-11-23: the tower starts harder; crashes differ (note #69, follow-up)
+
+**Correction.** The entry above said tower level 1 was "a little faster than the old tower at night 12's things". That was wrong. The old tower took the nights opened, clamped to 3 to 12. For a player on night 6 that meant pace 1.175 with logs. The first curve's level 1 was 1.15 with night 4's things, so it was easier than the tower the tester called too easy.
+
+**The fix.** Level 1 now runs at 1.2 with night 6's things. The pace still ends at 2.2 at level 50. A new thing joins every two levels, and all twenty are in from level 29. The level card gives the percent faster only from 5% up; below that it just says "faster". Audit, 100 rivers each ridden five ways, at levels 1, 15, 29 and 50: no closed river and no buried pickup. The narrowest gaps are 0.062, 0.055, 0.043 and 0.040.
+
+### Lab experiment: crashes that differ by what was hit
+
+This is the lab's own experiment, a first slice of the tester's crash-effects idea. Each kind of crash has its own look and sound:
+
+| Hit | Effect |
+| --- | --- |
+| A rock, log, island, spinning rock or hidden rock | Half the time the boat sinks: it shrinks and turns under expanding rings, with bubbles. The other half it smashes into flying planks with a crunch. |
+| The bank | The boat tips over onto the bank with a creak and a splash. |
+| Ice | Cracks run across the boat and white shards fly, with a glassy crack. |
+| A whirlpool | The boat spins down and fades, with a falling tone. |
+| A geyser | The boat is thrown up, turning, with a rush of spray. |
+
+The card waits 1.3 s after a crash (was 0.7 s), so the crash can play out. Each crash is recorded in the lab events as `crash` with its cause and effect. To remove the experiment, delete `crashFx`, `wreck` and the `crash` variable in `index.html`.
+
+Checked: each effect was screenshotted in a phone-sized Chromium. A first run found a negative radius, because the frame time can fall just before the crash time; it is clamped and the run is now clean.
+
+Not checked: the sounds on a phone, and whether the tester likes the effects.
+
+### Left as a proposal (2026-11-23)
+
+- The crash-effects pack, where a player picks two or three effects, is still to build on top of this experiment.
+- The flame stays lit over a sunk boat. It could go out with a hiss.
+
+## 2026-11-23: tester t1's note #73
+
+The tester asked for at least 50 nights; a rebirth that resets everything for a reward once everything is unlocked; a tower that goes on from where you left off, with a second sector of 50 more levels after the first 50; a tester tool that erases everything, so they can test again from the start; and, when a river, boat or flame is tapped in the shop, every button gone to show it, with a tap bringing them back. They said the new tower difficulty looks really good and asked for the same in the next 50 levels. They said again that the "trash bags" from the last test were not added. The lab reads "trash bags" as a dictation slip for "crash packs", the crash effects pack of note #69, but asked to be sure. Their bar: a game people would want to download from an app store.
+
+### Done in this change
+
+| Ask | What changed |
+| --- | --- |
+| Tower goes on where you left off | Reverses note #69's "the next climb starts at level 1". New key `lantern-tower-at`, a number: the level the next climb starts at. A cleared level moves it on by one; a lost level is tried again. The menu reads "Tower climb · go on at level N", and a second button, "New climb from level 1", appears once N is above 1. The best level is still kept under `lantern-best-level`. |
+| Stats on the tower | A climb is one run while the player taps "Climb on". Trying a lost level again, or starting from the menu, is a new run, so stats bought for the next run are used up there. |
+| Erase everything | A tester tool. The first tap asks again; the second removes every `lantern-` key and reloads. It leaves the notes link and the lab's keys alone. |
+| A look on the whole screen | Tapping a boat, water or flame you own wears it and hides every button, the notes button included. A calm river with no rocks flows by, lit wider than in play, with the boat and flame drawn 2.2 times their size. "Tap to go back" shows for a moment; one tap anywhere, or any key, brings the shop back. Abilities keep their on and off tap. |
+
+Checks: the phone check on WebKit iPhone 13 and Chromium Pixel 7 now covers resuming at level 2 after a loss, the menu button, a new climb from level 1, the look screen hiding the shop and the notes button and coming back on a tap, and the erase tool (one tap erases nothing; two leave no `lantern-` key and keep `notes.k`). With the old rule put back (a lost climb starts at level 1), the check fails at "after a loss the level is tried again". Screenshots of the jade boat, teal water and sparkler looks, and of the menu with the resume button, were looked at.
+
+Not checked: a real phone.
+
+## 2026-11-23: 50 nights and a second tower sector (note #73)
+
+| Ask | What changed |
+| --- | --- |
+| At least 50 nights | `NIGHTS` is 50. Nights 21 to 50 hold all twenty things. Each is a fixed share harder: the pace grows geometrically from night 20's 1.665 to 2.3 at night 50 (about 1.1% a night), rows come up to 15% closer and the river narrows by up to 0.012, the same as tower levels 1 to 50. Each night puts one old thing up front in turn (logs, whirlpools, gates, red-eyed rocks, hidden rocks, spinners, geysers, islands), and the menu says which. Night 50 is the last night. |
+| A second sector of 50 more levels | Tower climbs 51 to 100 are sector 2, shown as "sector 2, level N", built of violet stone. Clearing level 50 shows "Sector 1 cleared" and "Climb on to sector 2". `lantern-best-level` and `lantern-tower-at` keep their format and now go up to 100. |
+| Keep the difficulty change in the next 50 | Rows come closer at the first sector's rate. The pace grows from 2.2 to 3.0, which is slower than the first sector's rate; at that rate it would reach about 4 times level 1's pace by level 100. The river stops narrowing at level 50: with narrowing kept, the audit found gaps of 0.014 and no room for the big boat at levels 75 and 100. |
+
+Nights 1 to 20, the endless river and tower levels 1 to 50 are unchanged. A fingerprint of every rock and ember over 40 rivers of each, taken before and after, matched.
+
+Audit (`bots.mjs 100 audit`, each river ridden five ways):
+- Nights 21 to 50: no closed river and no buried pickup. The narrowest gap is 0.036, on night 45 (0.018 for the big boat).
+- Sector 2: no closed river and no buried pickup. The narrowest gap is 0.029 at levels 60 and 75 (0.011 for the big boat). That is below the 0.038 accepted for the endless river. The first round accepted 0.028. Capping row density in sector 2 did not change it, so pace is the likely cause. Unresolved.
+
+Careful bot, dawn reached out of 100 runs:
+- Nights: 20 → 15, 21 → 14, 30 → 7, 40 → 6, 50 → 8.
+- Tower levels: 50 → 23, 51 → 16, 75 → 12, 100 → 8.
+
+`bots.mjs` takes a comma-separated list of stages after the run count, and its default lists include the new nights and levels.
+
+Phone check, new lines:
+- Clearing level 50 shows the sector card.
+- Climbing on goes to climb 51.
+- A loss there resumes at "sector 2, level 1".
+- The tester tool opens night 50, and only night 50 says it is the last.
+
+Screenshots looked at: a sector 2 level, its card, and night 50.
+
+Not checked:
+- Whether a person can play at a pace of 2.3 to 3.0.
+- A real phone.
+
+## 2026-11-23: rebirth (note #73)
+
+The tester asked for a rebirth once everything is unlocked, so the game is not played once and done, and left the reward to the lab.
+
+- **When.** A Rebirth block in the shop, under Stats. Until it is open it shows the goal: "Find everything (N of 23) and open all 50 nights (N of 50)". When both are met it shows a Rebirth button that asks twice.
+- **What it resets.** Embers to 0. Finds back to the starting boat, water, flame and boost. Looks worn, abilities switched off, stats ready, nights opened, and the tower's resume level. Bests stay: they are records, and the tester asked for competition.
+- **Reward, chosen by the lab.** Each rebirth adds 25% to the embers every run banks, for good, and puts a star by the ember count on the menu. The end card says when the bonus added embers. New key `lantern-rebirths`, a number.
+- **Why this reward.** It shortens the second way through without making a run easier. The tester's earlier complaint was that stats and powers made runs too easy.
+
+Checks: the phone check on both profiles covers the goal text before the rebirth is open, one tap doing nothing, the second tap resetting the keys listed above, the star, and a 4-ember run banking 5. With the bonus removed, the check fails at "4 embers bank as 5". The shop's Rebirth block was screenshotted.
+
+Not checked: whether a person reaches night 50, which the rebirth requires (bots reach dawn on night 50 about 8 times in 100). Whether 25% feels like a reward.
+
+### Left as a proposal (2026-11-23, note #73)
+
+- **"Trash bags".** No earlier note mentions trash bags. The lab reads it as "crash packs", the crash effects pack of note #69, in which the player picks two or three crash effects. A question went to the tester before building it. If it is the crash pack, a plan: a fifth pack, Crashes, with the six effects there now (sink, smash, tip, crack, swirl, throw) and two new ones (the flame bursts into sparks, the boat freezes and shatters). The player turns on two or three. A crash uses the effect that fits what was hit when it is on, else one of those on.
+- **River animations pack** (note #69): still a proposal.
+- **The app-store bar.** The tester wants a game people would download from an app store. Recorded as the bar the tester holds the game to. Publishing is the owner's decision and is not asked for here.
+
+## 2026-11-23: tester t1's notes #74, #75 and #76
+
+- **#74, zoom stuck after a double tap.** Fixed in the kit for both games (`kit/zoom.js`, see `experiments/NOTES.md`). Not verified on a real phone.
+- **#75, 30 new nights.** Already built: 50 nights went live in the change above. The note was written before that build was deployed.
+- **#75, only two abilities, picked by the player.** This answers question #71 ("pick two"). See the table below. Question #72, on whether hearts and the shield take one of the two places, stays open.
+- **#75, "a crash pack or victory pack".** The crash pack is built; see below. The victory pack is left as a proposal.
+- **#76, leaderboard with Google sign-up or accounts, names, endless only.** Accounts, sign-in and a shared leaderboard need a server and accounts. Those are the owner's decision ("no new server infrastructure without an owner decision"; accounts are not authorized). Nothing is built for them. See the proposal below.
+
+### Done in this change
+
+| Ask | What changed |
+| --- | --- |
+| Two abilities at a time | At most two owned abilities are switched on. Tapping a third says "Only 2 abilities at a time. Switch one off first." A find from a pack that would make three arrives switched off, and the shop says so. A save with more than two on keeps the first two in the order they were found, and the rest go into `lantern-off`, which keeps its format. "Find everything" leaves two on. |
+| Crash pack | A fifth pack, Crashes, at 50 embers. It holds Fireworks (the lantern bursts into sparks of the flame's colour), Freeze (the boat ices over and shatters), Ghost (a pale ghost of the boat rises), Lightning (a bolt, a blackened boat and smoke) and Big splash (a column of water). Up to three are switched on; a crash plays one of them at random. With none on, a crash fits what was hit, as before. A find switches itself on if fewer than three are. New key `lantern-crash`, a JSON list of ids. Rebirth clears it. The rebirth goal now counts 28 things. |
+| (Lab) "New climb from level 1" | Asks twice, as Erase and Rebirth do, so a stray tap under the resume button does not lose the climb. |
+| (Lab) Sound fix | Lantern's `tone` wrapper dropped the slide argument, so the crash sounds of note #69 never slid in pitch. It now passes it on. |
+
+Checks: the phone check on both profiles covers two abilities after "Find everything", the refusal of a third, three crashes on and the refusal of a fourth, a crash playing the one crash switched on, and the two taps for a new climb. Making crashes ignore the switched-on list fails the check. Each new effect was screenshotted mid-crash in a phone-sized Chromium, with no page errors.
+
+Not checked: the new crash sounds on a phone.
+
+### Left as a proposal (2026-11-23, notes #75 and #76)
+
+- **Victory pack.** Dawn effects to pick from, like the crash pack: fireworks over the river, lanterns rising, a burst of birds, a rainbow.
+- **Leaderboard, names and sign-up.** The owner decides on a server and accounts. Without one, the lab could add a name field above the title and an endless best list on this phone only. That was not built, so as not to suggest names reach anyone else.
