@@ -14,11 +14,11 @@ export const LEVELS = 6; // levels 0..5
 export const HINT_AFTER = 1.5; // seconds with no progress before the faint hint
 export const WORKS = 0.6; // the "it works" moment
 export const LEAVE = 0.7; // a grumpy customer walking off
-export const KINDS = ['screw', 'pin', 'dent', 'wheel', 'rub', 'clock', 'chain', 'glue', 'sharpen'];
+export const KINDS = ['screw', 'pin', 'dent', 'wheel', 'rub', 'clock', 'chain', 'glue', 'sharpen', 'sew', 'pump'];
 export const TUTOR = ['screw', 'pin', 'dent']; // the first three jobs ever, one each, very patient
-export const WORD = { screw: 'Turn!', pin: 'Pull!', dent: 'Tap!', wheel: 'Flick!', rub: 'Rub!', clock: 'Set it!', chain: 'Hook it!', glue: 'Push & hold!', sharpen: 'Swipe!' };
-export const OBJECT = { screw: 'bell', pin: 'music box', dent: 'kettle', wheel: 'wheel', rub: 'lamp', clock: 'clock', chain: 'bike', glue: 'vase', sharpen: 'knife' };
-export const COIN = { screw: 2, pin: 2, dent: 2, wheel: 3, rub: 3, clock: 2, chain: 2, glue: 3, sharpen: 3 };
+export const WORD = { screw: 'Turn!', pin: 'Pull!', dent: 'Tap!', wheel: 'Flick!', rub: 'Rub!', clock: 'Set it!', chain: 'Hook it!', glue: 'Push & hold!', sharpen: 'Swipe!', sew: 'Sew!', pump: 'Pump!' };
+export const OBJECT = { screw: 'bell', pin: 'music box', dent: 'kettle', wheel: 'wheel', rub: 'lamp', clock: 'clock', chain: 'bike', glue: 'vase', sharpen: 'knife', sew: 'teddy', pump: 'ball' };
+export const COIN = { screw: 2, pin: 2, dent: 2, wheel: 3, rub: 3, clock: 2, chain: 2, glue: 3, sharpen: 3, sew: 3, pump: 3 };
 export const QUICK_BONUS = 1; // coins for a repair done with at least half the patience left
 export const PATIENCE = [13, 12, 10.5, 9.5, 8.5, 7.5]; // seconds for one repair, by ramp level
 export const TWO_PATIENCE = 1.6; // a two-repair job gets this many times the patience
@@ -26,12 +26,18 @@ export const TUTOR_PATIENCE = 45;
 export const NEW_PATIENCE = 30; // the first customer with a newly unlocked job
 export const REGULAR_AT = 5; // the regular is the sixth customer of a shift (after the tutorial)
 export const TWO_CHANCE = [0, 0.15, 0.25, 0.3, 0.4, 0.45];
+// The golden customer: rare, brings a gold object that needs two repairs, waits less than an ordinary two-repair
+// customer, and pays four times over. Decided when the customer joins the queue, so you see them coming.
+export const GOLDEN_CHANCE = 0.025;
+export const GOLDEN_PATIENCE = 1.45; // times the level's patience (an ordinary two-repair job gets TWO_PATIENCE)
+export const GOLDEN_PAY = 4;
+export const GOLDEN_FROM = 6; // no golden customer among the first six of a shift
 // Touch radii in local units. index.html scales 100 units to at least 300 px, so the smallest (dent, 17) is 51 px.
-export const HIT = { screw: 60, pin: 32, dent: 17, wheel: 52, rub: 38, clock: 54, chain: 26, glue: 30, sharpen: 36 };
+export const HIT = { screw: 60, pin: 32, dent: 17, wheel: 52, rub: 38, clock: 54, chain: 26, glue: 30, sharpen: 36, sew: 26, pump: 26 };
 
 const DENTS = [[28, 54], [50, 42], [72, 54], [38, 76], [62, 76]];
 // Where a second-job screw sits on each object (all at least 28 units from the box edge, so a thumb can circle it).
-const SCREW_SPOT = { pin: [72, 80], dent: [50, 20], wheel: [50, 54], rub: [50, 40], clock: [50, 52], chain: [68, 36], glue: [50, 60], sharpen: [32, 52] };
+const SCREW_SPOT = { pin: [72, 80], dent: [50, 20], wheel: [50, 54], rub: [50, 40], clock: [50, 52], chain: [68, 36], glue: [50, 60], sharpen: [32, 52], sew: [76, 50], pump: [74, 80] };
 
 // ---------- random numbers: mulberry32 on s.r, so a run is fixed by its seed
 export function rand(s) {
@@ -287,6 +293,71 @@ const K = {
   },
 };
 
+// The torn teddy's seam, a zigzag down its tummy, as a polyline in local units.
+const SEAM = [[40, 46], [58, 53], [42, 60], [58, 67], [42, 74], [56, 82]];
+const SEAM_LEN = [0]; for (let i = 1; i < SEAM.length; i++) SEAM_LEN.push(SEAM_LEN[i - 1] + dist(...SEAM[i - 1], ...SEAM[i]));
+export const SEAM_POINTS = SEAM;
+export function seamAt(u) {
+  u = clamp(u, 0, SEAM_LEN.at(-1));
+  let i = 1; while (i < SEAM.length - 1 && SEAM_LEN[i] < u) i++;
+  const k = (u - SEAM_LEN[i - 1]) / (SEAM_LEN[i] - SEAM_LEN[i - 1]);
+  return [SEAM[i - 1][0] + (SEAM[i][0] - SEAM[i - 1][0]) * k, SEAM[i - 1][1] + (SEAM[i][1] - SEAM[i - 1][1]) * k];
+}
+// The point on the seam nearest (x, y), not more than `back` units behind u0: [u, distance].
+function seamNear(x, y, u0, back) {
+  let best = [u0, Infinity];
+  for (let i = 1; i < SEAM.length; i++) {
+    if (SEAM_LEN[i] < u0 - back) continue;
+    const [ax, ay] = SEAM[i - 1], [bx, by] = SEAM[i], L = SEAM_LEN[i] - SEAM_LEN[i - 1];
+    const k = clamp(((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / (L * L), 0, 1);
+    const u = SEAM_LEN[i - 1] + k * L, d = dist(x, y, ax + (bx - ax) * k, ay + (by - ay) * k);
+    if (u >= u0 - back && d < best[1]) best = [u, d];
+  }
+  return best;
+}
+K.sew = {
+  // Torn teddy: drag the needle along the dotted seam. The thread is slow, so the needle follows the finger at its
+  // own pace (always in sight, never under the finger) and leaves stitches behind it.
+  make: () => ({ u: 0, L: SEAM_LEN.at(-1), fx: 0, fy: 0, st: 0 }),
+  down(r, x, y) {
+    const [nx, ny] = seamAt(r.u);
+    if (dist(x, y, nx, ny) > HIT.sew) return false;
+    r.grab = true; r.fx = x; r.fy = y;
+    return true;
+  },
+  move(r, x, y) { if (r.grab) { r.fx = x; r.fy = y; } },
+  up(r) { r.grab = false; },
+  tick(r, dt, s) {
+    if (!r.grab) return;
+    const [u, d] = seamNear(r.fx, r.fy, r.u, 2);
+    if (d <= 18 && u > r.u) r.u = Math.min(u, r.u + 40 * dt);
+    const n = Math.floor(r.u / 12);
+    if (n > r.st) { r.st = n; s.events.push({ e: 'stitch', n }); }
+    r.p = r.u >= r.L - 0.5 ? 1 : r.u / r.L;
+  },
+  guide: r => ({ type: 'path', pts: [seamAt(r.u), ...SEAM.filter((_, i) => SEAM_LEN[i] > r.u + 0.5)], hold: (r.L - r.u) / 40 + 0.25 }),
+};
+const PUMP_RATE = 140; // local units a second the pump handle can go down
+K.pump = {
+  // Flat ball: push the pump handle down and pull it up. Each full push puts in a puff of air; the handle
+  // goes down only as fast as the air will go.
+  make: () => ({ x: 74, h: 22, want: 22, gy: 0, armed: true, strokes: 0, need: 6 }),
+  down(r, x, y) {
+    if (Math.abs(x - r.x) > HIT.pump || y < r.h - 18 || y > r.h + 44) return false;
+    r.grab = true; r.gy = y - r.h; r.want = r.h;
+    return true;
+  },
+  move(r, x, y) { if (r.grab) r.want = clamp(y - r.gy, 22, 50); },
+  up(r) { r.grab = false; r.want = r.h; },
+  tick(r, dt, s) {
+    if (r.want > r.h) r.h = Math.min(r.want, r.h + PUMP_RATE * dt); // pushing down: the air resists
+    else r.h = Math.max(r.want, r.h - 400 * dt);
+    if (r.h <= 27) r.armed = true;
+    if (r.armed && r.h >= 46) { r.armed = false; r.strokes++; r.p = Math.min(1, r.strokes / r.need); s.events.push({ e: 'puff', n: r.strokes }); }
+  },
+  guide: r => ({ type: 'pump', x: r.x, top: 20, bottom: 52, at: [r.x, r.h + 6], n: r.need - r.strokes, rate: PUMP_RATE }),
+};
+
 function makeRepair(s, kind, spot) {
   const r = K[kind].make(s, spot);
   r.kind = kind; r.p = 0; r.idle = 0; r.best = 0; r.done = false; r.grab = false; r.spot = spot ?? null;
@@ -297,11 +368,11 @@ export const level = s => Math.min(LEVELS - 1, Math.floor(s.clock / RAMP));
 export const multiplier = s => 1 + Math.min(2, Math.floor(s.streak / 4)); // x2 after four quick jobs in a row, x3 after eight
 
 // ---------- the shift
-export function create({ seed = 1, unlocked = TUTOR, tutorial = false, hearts = 3, newJob = null, only = null, regular = -1, two = true, day = DAY, startLevel = 0 } = {}) {
+export function create({ seed = 1, unlocked = TUTOR, tutorial = false, hearts = 3, newJob = null, only = null, regular = -1, two = true, day = DAY, startLevel = 0, golden = GOLDEN_CHANCE, goldenFrom = GOLDEN_FROM } = {}) {
   const s = {
     seed, r: seed | 0, t: 0, clock: startLevel * RAMP, day, over: null, events: [],
     hearts, maxHearts: hearts, coins: 0, served: 0, lost: 0, streak: 0, bestStreak: 0, log: [],
-    unlocked: unlocked.filter(k => KINDS.includes(k)), tutorial, newJob, only, regular, two, made: 0, lastKind: null,
+    unlocked: unlocked.filter(k => KINDS.includes(k)), tutorial, newJob, only, regular, two, golden, goldenFrom, made: 0, lastKind: null,
     queue: [], cust: null, reps: [], rep: null, stepN: 0, phase: 'work', phaseT: 0,
     finger: { down: false, blocked: false, x: 0, y: 0 },
   };
@@ -313,7 +384,11 @@ export function create({ seed = 1, unlocked = TUTOR, tutorial = false, hearts = 
 
 function customer(s) {
   const n = s.made++;
-  const c = { n, look: Math.floor(rand(s) * 2 ** 30), tutor: false, fresh: false, regular: false, kinds: null };
+  const c = { n, look: Math.floor(rand(s) * 2 ** 30), tutor: false, fresh: false, regular: false, golden: false, kinds: null };
+  const g = rand(s); // drawn for every customer, so the golden chance never shifts the rest of the queue
+  // The queue's random numbers are drawn here and only here, so every player of a seed meets the same customers
+  // with the same repairs, however fast they play: the two-repair roll and the repairs' own layout come with them.
+  c.roll = rand(s); c.rs = Math.floor(rand(s) * 2 ** 31);
   if (s.only) c.kinds = [s.only];
   else if (s.tutorial && n < TUTOR.length) { c.kinds = [TUTOR[n]]; c.tutor = true; }
   else if (s.newJob && !s.newJobMade) { c.kinds = [s.newJob]; c.fresh = true; s.newJobMade = true; }
@@ -322,6 +397,7 @@ function customer(s) {
     c.kinds = [pick(s, pool)];
   }
   if (s.regular >= 0 && n === (s.tutorial ? TUTOR.length : 0) + REGULAR_AT) c.regular = true;
+  else if (!c.tutor && !c.fresh && n >= (s.tutorial ? TUTOR.length : 0) + s.goldenFrom && g < s.golden) c.golden = true;
   s.lastKind = c.kinds[0];
   return c;
 }
@@ -332,15 +408,17 @@ function nextCustomer(s) {
   const L = level(s);
   // A second job is decided when the customer steps up, so it follows the ramp.
   const chance = typeof s.two === 'number' ? s.two : s.two ? TWO_CHANCE[L] : 0;
-  if (!c.tutor && !c.fresh && rand(s) < chance) c.kinds = [c.kinds[0], c.kinds[0] === 'screw' ? 'dent' : 'screw'];
-  c.patience = c.tutor ? TUTOR_PATIENCE : c.fresh ? NEW_PATIENCE : PATIENCE[L] * (c.kinds.length > 1 ? TWO_PATIENCE : 1) * (c.regular ? 1.4 : 1);
+  if ((!c.tutor && !c.fresh && c.roll < chance) || c.golden) c.kinds = [c.kinds[0], c.kinds[0] === 'screw' ? 'dent' : 'screw'];
+  c.patience = c.tutor ? TUTOR_PATIENCE : c.fresh ? NEW_PATIENCE : c.golden ? PATIENCE[L] * GOLDEN_PATIENCE : PATIENCE[L] * (c.kinds.length > 1 ? TWO_PATIENCE : 1) * (c.regular ? 1.4 : 1);
   c.left = c.patience;
   s.cust = c;
+  const queueR = s.r; s.r = c.rs; // the repairs draw from the customer's own numbers
   s.reps = c.kinds.map((k, i) => makeRepair(s, k, i === 0 ? undefined : k === 'screw' ? SCREW_SPOT[c.kinds[0]] : undefined));
+  s.r = queueR;
   s.stepN = 0; s.rep = s.reps[0];
   s.phase = 'work'; s.phaseT = 0;
   s.finger.blocked = s.finger.down; // a finger still down from the last job must lift before it touches this one
-  s.events.push({ e: 'next', kinds: c.kinds, regular: c.regular, fresh: c.fresh, tutor: c.tutor });
+  s.events.push({ e: 'next', kinds: c.kinds, regular: c.regular, fresh: c.fresh, tutor: c.tutor, golden: c.golden });
 }
 
 export function input(s, ev) {
@@ -386,11 +464,11 @@ function pay(s) {
   const quick = c.left / c.patience >= 0.5;
   if (quick) { s.streak++; base += QUICK_BONUS; } else s.streak = 0;
   s.bestStreak = Math.max(s.bestStreak, s.streak);
-  const coins = base * multiplier(s) * (c.regular ? 2 : 1);
+  const coins = base * multiplier(s) * (c.regular ? 2 : 1) * (c.golden ? GOLDEN_PAY : 1);
   s.coins += coins; s.served++;
-  s.log.push({ kind: c.kinds.join('+'), ms: Math.round((c.patience - c.left) * 1000), ok: true });
+  s.log.push({ kind: c.kinds.join('+'), ms: Math.round((c.patience - c.left) * 1000), ok: true, ...(c.golden ? { golden: true } : {}) });
   s.phase = 'works'; s.phaseT = WORKS;
-  s.events.push({ e: 'paid', coins, quick, kinds: c.kinds, mult: multiplier(s), regular: c.regular });
+  s.events.push({ e: 'paid', coins, quick, kinds: c.kinds, mult: multiplier(s), regular: c.regular, golden: c.golden, streak: s.streak });
 }
 
 export function step(s) {
@@ -407,7 +485,7 @@ export function step(s) {
     settle(s);
     if (s.phase === 'work' && c.left <= 0) {
       c.left = 0; s.hearts--; s.lost++; s.streak = 0;
-      s.log.push({ kind: c.kinds.join('+'), ms: Math.round(c.patience * 1000), ok: false });
+      s.log.push({ kind: c.kinds.join('+'), ms: Math.round(c.patience * 1000), ok: false, ...(c.golden ? { golden: true } : {}) });
       s.phase = 'leave'; s.phaseT = LEAVE;
       s.events.push({ e: 'lost', hearts: s.hearts });
     }

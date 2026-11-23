@@ -1,6 +1,7 @@
 // Fix-It Stall: every picture, drawn in code. Objects are drawn in object-local units (the bench box is 100 x 100);
 // people, the stall and the cat in CSS pixels. Nothing here changes game state.
 import { ghost } from './moves.js';
+import { SEAM_POINTS, seamAt } from './sim.js';
 
 export const C = {
   ink: '#3a2216', cream: '#fff1d6', paper: '#fbe6c2',
@@ -51,7 +52,7 @@ function dents(g, r, t) {
   }
 }
 
-// ---------- the nine objects. Each draws its own repair's progress; w is the "it works" moment, 0..1.
+// ---------- the objects. Each draws its own repair's progress; w is the "it works" moment, 0..1.
 const OBJ = {
   // A brass bell hanging from a wooden bracket; the loose screw holds it on.
   screw(g, r, t, w) {
@@ -219,6 +220,75 @@ const OBJ = {
     for (const x of [14, 26]) circle(g, x, 51, 2.4, C.brassLt, 1.2);
     if (w) star(g, 90, 44, 9 * (1 - w) + 2, '#fff');
   },
+  // A teddy with its tummy torn open. The needle sews along the dotted zigzag and leaves stitches behind it.
+  sew(g, r, t, w) {
+    const u = r.kind === 'sew' ? r.u : Infinity, wave = w ? Math.sin(w * TAU * 3) * 0.5 * (1 - w) : 0;
+    const fur = '#c98a4e', furLt = '#e8b77c';
+    for (const x of [30, 70]) circle(g, x, 92, 10, fur); // feet
+    g.save(); g.translate(76, 46); g.rotate(-0.5 - wave); rrect(g, -6, -4, 12, 26, 6, fur); g.restore(); // the waving arm
+    g.save(); g.translate(24, 46); g.rotate(0.5); rrect(g, -6, -4, 12, 26, 6, fur); g.restore();
+    for (const x of [33, 67]) { circle(g, x, 10, 8, fur); circle(g, x, 10, 4, furLt, 0); }
+    g.beginPath(); g.ellipse(50, 66, 28, 28, 0, 0, TAU); shape(g, fur);
+    circle(g, 50, 26, 19, fur);
+    g.beginPath(); g.ellipse(50, 33, 8, 6, 0, 0, TAU); shape(g, furLt, 1.4);
+    circle(g, 50, 30, 2.6, C.ink, 0);
+    for (const x of [43, 57]) circle(g, x, 22, 2.4, C.ink, 0);
+    g.strokeStyle = C.ink; g.lineWidth = 1.4; g.beginPath(); g.arc(50, 33, 4, rad(20), rad(160)); g.stroke();
+    g.beginPath(); g.ellipse(49, 64, 15, 22, 0, 0, TAU); shape(g, furLt, 1.4); // the tummy patch
+    // the tear: a dark gap with white stuffing in it where it is not sewn yet; red stitches across it where it is
+    const pts = SEAM_POINTS;
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    g.strokeStyle = '#6a3a1f'; g.lineWidth = 7; g.beginPath(); g.moveTo(...seamAt(u)); for (const q of pts) if (pathLen(q) > u) g.lineTo(...q); g.stroke();
+    g.strokeStyle = '#fffaf0'; g.lineWidth = 3.4; g.stroke(); // stuffing showing in the gap
+    let len = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const [ax, ay] = pts[i - 1], [bx, by] = pts[i], L = Math.hypot(bx - ax, by - ay), nx = -(by - ay) / L, ny = (bx - ax) / L;
+      for (let d = 2; d < L; d += 5) {
+        if (len + d >= u) break;
+        const x = ax + (bx - ax) * d / L, y = ay + (by - ay) * d / L;
+        g.strokeStyle = C.red; g.lineWidth = 2; g.beginPath(); g.moveTo(x - nx * 4, y - ny * 4); g.lineTo(x + nx * 4, y + ny * 4); g.stroke();
+      }
+      len += L;
+    }
+    if (r.kind === 'sew' && !r.done) {
+      const [nx, ny] = seamAt(r.u), [ex, ey] = pts.at(-1);
+      star(g, ex, ey, 5 + Math.sin(t * 6), C.teal); // where the seam ends
+      // the thread runs from the needle back to the last stitch, then off the side
+      g.strokeStyle = C.red; g.lineWidth = 1.6; g.beginPath(); g.moveTo(nx, ny); g.quadraticCurveTo(nx - 18, ny + 10, nx - 24, ny - 4); g.stroke();
+      g.save(); g.translate(nx, ny); g.rotate(-0.8);
+      g.beginPath(); g.moveTo(0, -11); g.lineTo(2, 6); g.lineTo(0, 9); g.lineTo(-2, 6); g.closePath(); shape(g, C.steelLt, 1.6);
+      g.strokeStyle = C.ink; g.lineWidth = 1; g.beginPath(); g.ellipse(0, -7, 0.8, 2.2, 0, 0, TAU); g.stroke();
+      g.restore();
+      circle(g, nx, ny, 7.5 + Math.sin(t * 6) * 0.8, 'rgba(255,255,255,0)', 1.6); // a ring round the needle: grab here
+    }
+    if (w) for (let i = 0; i < 3; i++) circle(g, 30 + i * 20, 20 - w * 26 - i * 4, 3 * (1 - w) + 1, '#ff8fa8', 0);
+  },
+  // A flat ball and a bicycle pump. Push the handle down and pull it up; each push puffs the ball up a bit.
+  pump(g, r, t, w) {
+    const f = r.kind === 'pump' ? r.strokes / r.need : 1, h = r.kind === 'pump' ? r.h : 22;
+    const bounce = w ? Math.abs(Math.sin(w * TAU * 1.5)) * 18 * (1 - w) : 0;
+    const R = 12 + 16 * f, squash = 1 - 0.45 * (1 - f), bx = 34, by = 90 - R * squash - bounce;
+    // the hose from the pump's foot to the ball
+    g.strokeStyle = C.ink; g.lineWidth = 4.5; g.beginPath(); g.moveTo(74, 88); g.bezierCurveTo(60, 98, 50, 96, bx + R * 0.6, by + R * squash * 0.4); g.stroke();
+    g.strokeStyle = '#3d4d5c'; g.lineWidth = 2.6; g.stroke();
+    const rx = R / Math.sqrt(squash), ry = R * squash;
+    g.beginPath(); g.ellipse(bx, by, rx, ry, 0, 0, TAU); shape(g, C.red, 2.4);
+    g.save(); g.beginPath(); g.ellipse(bx, by, rx, ry, 0, 0, TAU); g.clip();
+    g.strokeStyle = C.amber; g.lineWidth = ry * 0.45; g.beginPath(); g.ellipse(bx, by + ry * 0.9, rx * 1.1, ry * 0.9, 0, Math.PI * 1.05, Math.PI * 1.95); g.stroke(); // a stripe round the ball
+    g.restore();
+    g.beginPath(); g.ellipse(bx, by, rx, ry, 0, 0, TAU); g.lineWidth = 2.4; g.strokeStyle = C.ink; g.stroke();
+    shine(g, bx - rx * 0.4, by - ry * 0.45, Math.max(2, R * 0.25), 0.6);
+    // the pump: a barrel on a foot, the rod and T handle at height h
+    rrect(g, 60, 88, 28, 6, 3, C.steelDk);
+    g.strokeStyle = C.ink; g.lineWidth = 4; g.beginPath(); g.moveTo(74, h); g.lineTo(74, 46); g.stroke();
+    g.strokeStyle = C.steelLt; g.lineWidth = 2.2; g.stroke();
+    rrect(g, 67, 44, 14, 46, 4, C.teal); g.strokeStyle = C.tealLt; g.lineWidth = 1.6; g.beginPath(); g.moveTo(70.5, 48); g.lineTo(70.5, 84); g.stroke();
+    rrect(g, 60, h - 5, 28, 9, 4.5, C.wood); shine(g, 66, h - 2, 3, 0.4);
+    if (r.kind === 'pump' && !r.done) {
+      // the strokes still to go, as little dots up the barrel
+      for (let i = 0; i < r.need; i++) circle(g, 86, 86 - i * 6, 1.8, i < r.strokes ? '#7fe0a0' : 'rgba(255,255,255,.55)', 0.8);
+    }
+  },
 };
 function gear(g, x, y, R, teeth, a) {
   g.save(); g.translate(x, y); g.rotate(a); g.beginPath();
@@ -229,6 +299,9 @@ function note(g, x, y, a) {
   g.save(); g.globalAlpha *= a; g.fillStyle = C.ink; g.strokeStyle = C.ink; g.lineWidth = 2;
   g.beginPath(); g.ellipse(x, y, 4, 3, -0.4, 0, TAU); g.fill(); g.beginPath(); g.moveTo(x + 3.5, y); g.lineTo(x + 3.5, y - 14); g.lineTo(x + 9, y - 11); g.stroke(); g.restore();
 }
+
+// How far along the teddy's seam a corner of it is.
+function pathLen(q) { let len = 0; for (let i = 1; i < SEAM_POINTS.length; i++) { len += Math.hypot(SEAM_POINTS[i][0] - SEAM_POINTS[i - 1][0], SEAM_POINTS[i][1] - SEAM_POINTS[i - 1][1]); if (SEAM_POINTS[i] === q) return len; } return 0; }
 
 // The job on the bench: the main object, then a second repair (a screw, or dents on the bell) drawn on top.
 export function drawJob(g, reps, stepN, t, works) {
@@ -270,11 +343,15 @@ export function drawGhost(g, gd, t, alpha) {
   else if (gd.type === 'arc') g.arc(gd.cx, gd.cy, gd.r, rad(gd.from), rad(gd.to));
   else if (gd.type === 'drag' || gd.type === 'swipe') { g.moveTo(gd.from[0], gd.from[1]); g.lineTo(gd.to[0], gd.to[1]); }
   else if (gd.type === 'rub') { g.moveTo(gd.cx - gd.w / 2, gd.cy); g.lineTo(gd.cx + gd.w / 2, gd.cy); }
+  else if (gd.type === 'path') { g.moveTo(...gd.pts[0]); for (const q of gd.pts.slice(1)) g.lineTo(...q); }
+  else if (gd.type === 'pump') { g.moveTo(gd.x - 9, gd.top + 6); g.lineTo(gd.x - 9, gd.bottom + 6); }
   g.stroke(); g.setLineDash([]);
   // arrowhead at the end of the path, so the way to go is plain
   const end = gd.type === 'circle' ? null : gd.type === 'arc' ? [gd.cx + Math.cos(rad(gd.to)) * gd.r, gd.cy + Math.sin(rad(gd.to)) * gd.r, rad(gd.to + 90)]
     : gd.type === 'flick' ? [gd.cx + Math.cos(rad(350)) * gd.r, gd.cy + Math.sin(rad(350)) * gd.r, rad(80)]
-    : gd.type === 'drag' || gd.type === 'swipe' ? [gd.to[0], gd.to[1], Math.atan2(gd.to[1] - gd.from[1], gd.to[0] - gd.from[0])] : null;
+    : gd.type === 'drag' || gd.type === 'swipe' ? [gd.to[0], gd.to[1], Math.atan2(gd.to[1] - gd.from[1], gd.to[0] - gd.from[0])]
+    : gd.type === 'path' && gd.pts.length > 1 ? [...gd.pts.at(-1), Math.atan2(gd.pts.at(-1)[1] - gd.pts.at(-2)[1], gd.pts.at(-1)[0] - gd.pts.at(-2)[0])]
+    : gd.type === 'pump' ? [gd.x - 9, gd.bottom + 6, Math.PI / 2] : null;
   if (end) { g.fillStyle = 'rgba(255,255,255,.8)'; g.save(); g.translate(end[0], end[1]); g.rotate(end[2]); g.beginPath(); g.moveTo(5, 0); g.lineTo(-4, -5); g.lineTo(-4, 5); g.closePath(); g.fill(); g.restore(); }
   if (tap && gd.all) for (const a of gd.all) { g.strokeStyle = `rgba(255,255,255,${0.5 + 0.4 * Math.sin(t * 8)})`; g.lineWidth = 2.5; g.beginPath(); g.arc(a[0], a[1], 13 + 2 * Math.sin(t * 8), 0, TAU); g.stroke(); }
   // the fingertip itself
