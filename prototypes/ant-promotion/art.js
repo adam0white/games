@@ -1,8 +1,9 @@
 // Draws every creature from its data, seen from above, facing right, centred on the origin. r is the body radius, t a walk phase.
 const TAU = Math.PI * 2;
-// Looks: 0 flat, 1 cartoon (dark outline, shaded), 2 soft (thin outline, shaded, glossy). Extra detail is drawn in looks 1 and 2.
+// Looks: 0 flat, 1 cartoon (dark outline, shaded), 2 soft (thin outline, shaded, glossy), 3 3D (look3d.js records these calls and builds solids).
+// Extra detail is drawn in looks 1 to 3.
 let look = 0, ink = null, ow = 0, lx = -0.6, ly = -0.8, unit = 10;
-export const LOOKS = ['Flat', 'Cartoon', 'Soft'];
+export const LOOKS = ['Flat', 'Cartoon', 'Soft', '3D'];
 export const setLook = n => { look = LOOKS[n] ? n : 0; };
 const tones = new Map();
 const tone = (hex, k) => { const key = hex + k; let v = tones.get(key); if (!v) tones.set(key, v = shade(hex, k)); return v; };
@@ -10,7 +11,7 @@ const path = (g, x, y, rx, ry, rot) => { g.beginPath(); g.ellipse(x, y, Math.max
 const ell = (g, x, y, rx, ry, fill, rot = 0) => {
   if (ink) { path(g, x, y, rx, ry, rot); g.fillStyle = g.strokeStyle = ink; g.lineWidth = ow * 2; g.fill(); g.stroke(); return; }
   const m = Math.min(rx, ry);
-  if (!look || m < unit * 0.13 || fill.length !== 7) { path(g, x, y, rx, ry, rot); g.fillStyle = fill; g.fill(); return; }
+  if (!look || look === 3 || m < unit * 0.13 || fill.length !== 7) { path(g, x, y, rx, ry, rot); g.fillStyle = fill; g.fill(); return; }
   path(g, x, y, rx, ry, rot); g.fillStyle = tone(fill, -0.26); g.fill();
   path(g, x + lx * m * 0.13, y + ly * m * 0.13, rx * 0.87, ry * 0.87, rot); g.fillStyle = fill; g.fill();
   path(g, x + lx * m * 0.36, y + ly * m * 0.36, rx * (look === 2 ? 0.5 : 0.4), ry * (look === 2 ? 0.5 : 0.4), rot); g.fillStyle = tone(fill, look === 2 ? 0.3 : 0.16); g.fill();
@@ -26,7 +27,7 @@ export function drawForm(g, F, r, t = 0, skin = null, rot = 0) {
   if (skin && F.role === 'ant') { c = skin.c; d = shade(skin.c, -0.4); }
   const kind = { bug, quad, bird, snake }[F.kind];
   unit = r; lx = -0.6 * Math.cos(rot) - 0.8 * Math.sin(rot); ly = 0.6 * Math.sin(rot) - 0.8 * Math.cos(rot);
-  if (look) { ink = look === 1 ? '#1d1410' : tone(d, -0.45); ow = Math.max(look === 1 ? 1.1 : 0.7, r * (look === 1 ? 0.11 : 0.06)); g.save(); kind(g, f, r, t, c, d, e); g.restore(); ink = null; }
+  if (look && look !== 3) { ink = look === 1 ? '#1d1410' : tone(d, -0.45); ow = Math.max(look === 1 ? 1.1 : 0.7, r * (look === 1 ? 0.11 : 0.06)); g.save(); kind(g, f, r, t, c, d, e); g.restore(); ink = null; }
   g.save();
   kind(g, f, r, t, c, d, e);
   if (skin && F.role === 'ant') pattern(g, skin.p, r, e);
@@ -47,7 +48,7 @@ function bug(g, f, r, t, c, d, e) {
     const x = (-0.35 + 0.75 * i / (pairs - 1)) * r, sw = Math.sin(t * 6 + i * Math.PI) * 0.3 * r, lean = (i - (pairs - 1) / 2) * 0.35 * r;
     line(g, [x, 0, x + lean * 0.6, -0.7 * r, x + lean + sw, -1.2 * r], r * 0.1, d);
     line(g, [x, 0, x + lean * 0.6, 0.7 * r, x + lean - sw, 1.2 * r], r * 0.1, d);
-    if (look) { dot(g, x + lean * 0.6, -0.7 * r, r * 0.08, c); dot(g, x + lean * 0.6, 0.7 * r, r * 0.08, c); }
+    if (look && look !== 3) { dot(g, x + lean * 0.6, -0.7 * r, r * 0.08, c); dot(g, x + lean * 0.6, 0.7 * r, r * 0.08, c); }
   }
   if (f.sting) { line(g, [-1.1 * r, 0, -1.8 * r, 0.2 * r, -2.0 * r, -0.5 * r, -1.5 * r, -0.8 * r], r * 0.22, c); ell(g, -1.4 * r, -0.85 * r, r * 0.16, r * 0.16, e); }
   if (f.claws) for (const s of [-1, 1]) { line(g, [0.3 * r, s * 0.2 * r, 0.9 * r, s * 0.85 * r], r * 0.16, d); ell(g, 1.15 * r, s * 0.8 * r, r * 0.34, r * 0.22, c, s * -0.5); line(g, [1.1 * r, s * 0.8 * r, 1.45 * r, s * 0.7 * r], r * 0.05, d); }
