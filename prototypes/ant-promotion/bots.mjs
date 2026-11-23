@@ -106,3 +106,14 @@ assert.equal(result['wild reckless/1'].hides + result['wild reckless/2'].hides, 
   const c = create(1, [ANT, brute.id]); c.player.safe = 0; c.mobs.length = 0; c.mobs.push({ ...s.mobs[0], x: c.player.x + 5, y: c.player.y }); step(c, null); assert.ok(c.dead, 'classic: the first bite kills');
 }
 console.log('wild rules: hide and hunt checks pass');
+{ // picking the same kind again builds on it
+  const fast = l => optionsFor(l)[1].id, sneak = l => optionsFor(l)[2].id;
+  const one = me(create(1, [ANT, optionsFor(1)[0].id, fast(2)])), three = me(create(1, [ANT, fast(1), fast(2)])), sn = me(create(1, [ANT, sneak(1), sneak(2)]));
+  assert.equal(one.speed, FORMS[fast(2)].speed, 'a first fast pick has the plain speed');
+  assert.ok(Math.abs(three.speed / one.speed - 1.05) < 1e-9, 'a second fast pick is 5% faster');
+  assert.ok(Math.abs(sn.stealth / FORMS[sneak(2)].stealth - 0.95) < 1e-9, 'a second sneaky pick is seen from 5% less far');
+  // animals hunt each other, and never the food bugs
+  const s = create(3); let eats = 0, food = 0; for (let i = 0; i < 3600 * 3; i++) { step(s, null); if (s.dead) revive(s, false); for (const e of s.events) if (e.t === 'mobeat') { eats++; if (FORMS.find(f => f.name === e.name).level < 1) food++; } }
+  assert.ok(eats > 0, 'animals eat each other'); assert.equal(food, 0, 'food bugs are never hunted by animals');
+  console.log(`same-kind picks and animal hunts pass (${eats} animal-on-animal eats in 3 minutes)`);
+}

@@ -491,3 +491,51 @@ form .choices {
 #guide button {
   min-height: 44px;
 }
+
+/* Phone, night: the map is what is played, so it comes first and takes what the compact controls
+   leave. The status text moves below the controls and scrolls inside a short box. */
+@media (max-width: 480px) {
+  [data-phase="night"] main {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  [data-phase="night"] header button {
+    padding-block: 6px;
+  }
+  [data-phase="night"] h1 {
+    font-size: 22px;
+    margin: 2px 0 2px;
+  }
+  [data-phase="night"] .village {
+    order: 1;
+    min-height: 160px;
+    margin-block: 4px;
+  }
+  [data-phase="night"] #night {
+    order: 2;
+  }
+  [data-phase="night"] #status {
+    order: 3;
+    height: 58px;
+    font-size: 14px;
+    line-height: 1.35;
+  }
+  [data-phase="night"] #status p,
+  [data-phase="night"] .chapter {
+    margin-block: 2px;
+  }
+  [data-phase="night"] .directions {
+    grid-template-rows: 44px 44px;
+    margin-block: 4px;
+  }
+  [data-phase="night"] .action-row button {
+    min-height: 44px;
+    padding-block: 6px;
+  }
+  [data-phase="night"] .warmth {
+    margin-top: 4px;
+  }
+  [data-phase="night"] #cold-warning {
+    min-height: 0;
+  }
+}

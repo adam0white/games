@@ -147,3 +147,31 @@ Wild brings the three picks within two levels of each other and puts careful pla
 Checks: `bots.mjs` asserts classic has no hide and no hunt, the first bite on a hide does not kill and the second does, only strong picks use the hide, hunts happen, and care still pays under Wild. In WebKit with the iPhone 13 profile: switch to Wild, hide takes a bite, second bite kills, no page errors.
 
 Not verified: whether Wild is more fun. That is the tester's call; a one-tap question asks which they prefer, and the winner becomes the default.
+
+## 2026-11-23: tester t1's round 3 (notes #45, #46)
+
+Asked for: animals hostile to each other, a percentage beside the progress bar, faster each time you pick fast again (and the same idea for the last option), more quality of life, and our own ideas.
+
+### Done
+- **Animals hunt each other** (both rule sets). A stronger animal that sees a weaker one, at most 2 levels below it, chases it at 80% speed and eats it on contact. The hunted animal runs. A hunter gives up after 6 seconds and rests 15 seconds after a meal. The little food bugs are never hunted, so an ant always has food. A red dashed line shows who is chasing whom; an eat in view shows "Wolf ate a Deer".
+- **Percentage** beside the progress bar.
+- **Same kind again builds on it.** Each earlier fast pick makes a fast animal 5% faster (16 fast picks: about 2.1 times). Each earlier sneaky pick shrinks the distance a sneaky animal is seen from by 5%. The promotion card shows the bonus before the pick and the HUD shows it after.
+  - Reading taken: "the middle one" is the fast option and "the last one" is the sneaky option. Strong is not changed here, because power is the level number other animals are compared with. Under Wild rules strong has the thick hide.
+  - 5% per pick, compounding, is the lab's number. The tester said "exponentially"; a bigger base made a level-18 runner faster than the screen can follow.
+
+### Bots after this round (6 seeds, 12 minutes, careful play, median top level)
+| pick | Classic | Wild |
+|---|---|---|
+| strong | 12, 2 deaths | 8, 3 deaths |
+| fast | 14, 3 deaths | 11, 8 deaths |
+| sneaky | 18, 0 deaths | 10, 9 deaths |
+
+Animals hunting each other makes the meadow less predictable: fleeing animals run into the player. Wild on top of that is hard for the bots.
+
+### Checks
+- `bots.mjs`: a second fast pick is 5% faster, a second sneaky pick is seen from 5% less far, animals eat each other, food bugs are never hunted, plus all earlier asserts.
+- WebKit, iPhone 13 profile: flow test in Cartoon and 3D, Wild rules test, a chase with its line on screen, promotion cards showing "Fast again: +22% speed". No page errors.
+- Local testing must serve `prototypes/` (not this folder), because the page imports `../kit/`. Served from this folder the module fails without a page error and tests that only click can pass falsely.
+
+### From the wildcard lab, next
+- The named rival (lab `ant-nemesis`) is picked to graduate into this game. The lab's animals-chase-each-other test (`ant-wilds`) overlaps with this round; its dashed red line is used here.
