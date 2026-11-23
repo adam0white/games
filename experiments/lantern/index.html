@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#05080f">
 <title>Lantern</title>
 <style>
@@ -98,6 +98,7 @@ import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { lab } from '../kit/lab.js'; // lab recording: the rec lines below
+import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
 import { hull, wake, flame, burn, glow as flameGlow, mark, TINT, reeds, shine, halo, flood } from './looks.js?v=3';
 
 const query = new URLSearchParams(location.search);

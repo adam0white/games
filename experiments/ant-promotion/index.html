@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#2f5a2a">
 <title>Ant Promotion</title>
 <style>
@@ -145,6 +145,7 @@ import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { lab } from '../kit/lab.js'; // lab recording: the rec lines below
+import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
 
 const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d');
 const KEY = 'ant-promotion:v1', query = new URLSearchParams(location.search);

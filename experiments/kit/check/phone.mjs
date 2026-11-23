@@ -46,6 +46,15 @@ const labSent = page => page.context().labSent;
 const labRuns = (page, game) => labSent(page).filter(r => r.game === game && r.kind === 'run');
 const LAB_LOCAL = () => localStorage.setItem('hf-lab-send-localhost', '1'); // pages on 127.0.0.1 send only with this
 
+// No zoom (note #74, kit/zoom.js): the viewport caps the scale, no visible element is left at touch-action auto, and a double tap's default is cancelled.
+async function noZoomed(page) {
+  const r = await page.evaluate(() => {
+    const loose = [...document.querySelectorAll('body *')].filter(el => el.getClientRects().length && getComputedStyle(el).touchAction === 'auto').map(el => el.id || el.tagName);
+    const ev = new MouseEvent('dblclick', { bubbles: true, cancelable: true }); document.body.dispatchEvent(ev);
+    return { meta: document.querySelector('meta[name=viewport]').content, loose, cancelled: ev.defaultPrevented };
+  });
+  assert.match(r.meta, /maximum-scale=1/); assert.deepEqual(r.loose, [], 'no visible element at touch-action auto'); assert.ok(r.cancelled, 'a double tap does not zoom');
+}
 const GAMES = {
   async kit(page) {
     await page.goto(`${base}/kit/`);
@@ -66,6 +75,7 @@ const GAMES = {
     assert.equal(st.opened, 3, 'old save: opened night'); assert.equal(st.bank, 120, 'old save: bank'); assert.ok(st.owned.includes('red'), 'old save: owned'); assert.equal(st.worn.boat, 'red', 'old save: worn');
     assert.equal(await page.textContent('#play'), 'Play night 3'); assert.match(await page.textContent('#about'), /Best 40%/);
     await until(page, () => document.getElementById('notes-button'), 'notes button');
+    await noZoomed(page);
     // Play, steer by a relative drag, and a tap alone does not steer.
     assert.equal((await audioLog()).made, 0, 'no audio before the first tap');
     await page.click('#play'); st = await state();
@@ -196,6 +206,7 @@ const GAMES = {
     await page.reload(); await until(page, () => window.__ant, 'game script');
     assert.match(await page.textContent('#continue'), /^Continue as /, 'old save: continues'); assert.match(await page.textContent('#look'), /^Look: /);
     await until(page, () => document.getElementById('notes-button'), 'notes button');
+    await noZoomed(page);
     assert.equal(await page.evaluate(() => window.audioLog.made), 0, 'no audio before the first tap');
     await page.click('#continue'); assert.equal(await mode(), 'play');
     assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'Play starts audio');
