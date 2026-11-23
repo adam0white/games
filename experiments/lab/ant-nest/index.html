@@ -79,12 +79,16 @@
 import { COLS, ROWS, DT, RAIN_AT, RAIN_FOR, WARN, END_AT, EARTH, CLAY, STONE, SEEDS, POCKET, OPEN, SCORE, KIND_NAME, idx, create, step, setMark, placeRoom, roomCells, touching, moundX } from './sim.js';
 import { drawForm, setLook } from '../../ant-promotion/art.js';
 import { FORMS, ANT } from '../../ant-promotion/sim.js';
+import { readJson, writeJson } from '../../kit/save.js';
+import { sound as kitSound } from '../../kit/audio.js';
+import { onLeave, isPauseKey } from '../../kit/pause.js';
+import { screens } from '../../kit/screens.js';
 
 const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d');
 const KEY = 'ant-nest:v1', query = new URLSearchParams(location.search);
 const ANTF = FORMS[ANT], QUEEN_SKIN = { c: '#7a2a1c', p: 'crown' };
-let best = 0; try { best = JSON.parse(localStorage.getItem(KEY) || '{}').best || 0; } catch {}
-const storeBest = () => { try { localStorage.setItem(KEY, JSON.stringify({ best })); } catch {} };
+let best = readJson(KEY, {}).best || 0;
+const storeBest = () => writeJson(KEY, { best });
 setLook(1);
 
 let s = null, mode = 'menu', tool = 'dig', W = 0, H = 0, dpr = 1, cell = 24, ox = 0, oy = 0, last = 0, acc = 0, sayTimer = 0, sound = true;
@@ -92,36 +96,30 @@ let rounds = 0, hint = 0, selected = null, selT = 0, drag = null, endAt = 0, mar
 const bits = [];
 
 // ---------- sound (the blip and crunch helpers from the main game)
-let ac = null, rainNode = null;
-function blip(freq, dur = 0.08, type = 'sine', vol = 0.12, slide = 0) {
-  if (!sound) return;
+let rainNode = null;
+const snd = kitSound({ on: () => sound, floor: 0.001 });
+const blip = (freq, dur = 0.08, type = 'sine', vol = 0.12, slide = 0) => snd.tone(freq, dur, vol, type, slide);
+const unlock = () => snd.unlock(); // phones keep audio silent until it is started inside a tap
+// a dig or a breach: the kit's fading burst of noise. loop: the rain, noise that runs until it is stopped (only this page needs it, so it is not in the kit)
+function crunch(dur, vol, hz, loop = false) {
+  if (!loop) { snd.noise(dur, vol, hz); return null; }
+  const ac = snd.unlock(); if (!ac) return null;
   try {
-    ac ??= new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume();
-    const o = ac.createOscillator(), v = ac.createGain(), t = ac.currentTime;
-    o.type = type; o.frequency.setValueAtTime(freq, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
-    v.gain.setValueAtTime(vol, t); v.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(v).connect(ac.destination); o.start(t); o.stop(t + dur);
-  } catch {}
-}
-function crunch(dur = 0.12, vol = 0.2, hz = 1800, loop = false) {
-  if (!sound) return null;
-  try {
-    ac ??= new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume();
     const n = Math.ceil(ac.sampleRate * dur), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
-    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (loop ? 1 : (1 - i / n) ** 2);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
     const src = ac.createBufferSource(), f = ac.createBiquadFilter(), v = ac.createGain();
-    src.buffer = buf; src.loop = loop; f.type = 'bandpass'; f.frequency.value = hz; f.Q.value = 0.8; v.gain.value = vol;
+    src.buffer = buf; src.loop = true; f.type = 'bandpass'; f.frequency.value = hz; f.Q.value = 0.8; v.gain.value = vol;
     src.connect(f).connect(v).connect(ac.destination); src.start();
     return src;
   } catch { return null; }
 }
-function unlock() { if (!sound) return; try { ac ??= new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch {} }
 function rainSound(on) { if (on && !rainNode && mode === 'play') rainNode = crunch(2, 0.07, 3200, true); if (!on && rainNode) { try { rainNode.stop(); } catch {} rainNode = null; } }
 
 // ---------- screens
+const cards = screens(['menu', 'paused', 'end']);
 function show(name) {
   mode = name;
-  for (const id of ['menu', 'paused', 'end']) $(id).classList.toggle('on', id === name);
+  cards(name);
   const inGame = name === 'play';
   $('tools').style.display = inGame || name === 'paused' ? 'flex' : 'none';
   if (name !== 'play') { drag = null; rainSound(false); }
@@ -155,8 +153,8 @@ for (const b of document.querySelectorAll('.toMenu')) b.onclick = () => { s = nu
 $('tDig').onclick = () => { tool = 'dig'; tools(); };
 $('tErase').onclick = () => { tool = 'erase'; tools(); };
 $('tRoom').onclick = () => { tool = 'room'; tools(); $('tRoom').classList.remove('pulse'); say("Tap the soil where the queen's room should go", 2.2); };
-document.addEventListener('visibilitychange', () => { if (document.hidden && mode === 'play') show('paused'); });
-addEventListener('keydown', e => { if (e.key === 'p' || e.key === 'Escape') { if (mode === 'play') show('paused'); else if (mode === 'paused') show('play'); } });
+onLeave(() => { if (mode === 'play') show('paused'); }); // another app, a call, a locked phone, another window
+addEventListener('keydown', e => { if (isPauseKey(e)) { if (mode === 'play') show('paused'); else if (mode === 'paused') show('play'); } });
 addEventListener('contextmenu', e => e.preventDefault());
 
 function finish() {
