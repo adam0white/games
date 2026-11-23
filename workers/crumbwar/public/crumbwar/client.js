@@ -26,7 +26,8 @@ function connect() {
   const u = new URL('play', location.href); u.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   if (session) { u.searchParams.set('room', session.room); u.searchParams.set('resume', session.token); }
   const s = ws = new WebSocket(u); s.binaryType = 'arraybuffer';
-  s.onmessage = e => { if (s === ws) { bytesIn += e.data.byteLength; receive(new P.Reader(e.data)); } };
+  heard = performance.now();
+  s.onmessage = e => { if (s === ws) { heard = performance.now(); bytesIn += e.data.byteLength; receive(new P.Reader(e.data)); } };
   s.onclose = e => {
     if (s !== ws) return;
     ws = null; playing = false;
@@ -36,6 +37,11 @@ function connect() {
     $('status').textContent = e.code === 4003 ? 'You were away, so your place went to someone else.' : e.code === 1006 || !e.code ? 'Could not reach the game. Try again.' : `Disconnected (${e.code}).`;
   };
 }
+
+// A socket can go quiet without closing (a dead network path, or a close that never completes). The server
+// sends at least ten messages a second, so five silent seconds means the socket is gone: end it and reconnect.
+let heard = 0;
+setInterval(() => { const s = ws; if (s && performance.now() - heard > 5000) { const end = s.onclose; try { s.close(); } catch {} end({ code: 0 }); } }, 1000);
 
 function receive(r) {
   const type = r.u8();

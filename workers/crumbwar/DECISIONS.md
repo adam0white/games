@@ -47,7 +47,7 @@ Measured bytes (local, Node bench, each person steering): 544 B/s per client wit
 - The server ignores everything but heading, move and sprint. Speed, position and damage cannot be claimed by a client.
 - A message must be binary and at most 8 bytes. Each socket has a token bucket: 30 messages a second, burst 60. Breaking either closes the socket (1008).
 - The socket's `Origin` must name the host that served the page, so another site cannot embed the game's sockets. A non-browser client can forge `Origin`; this stops embedding, not scripts.
-- At most 4 sockets per IP address per room. This limits one person filling a colony. It also limits a household or a school behind one address to 4 per room; the fifth lands in another room.
+- At most 4 sockets per IP address per room. This limits one person filling a colony. It also limits a household or a school behind one address to 4: the fifth is refused (429), because the directory offers the same room again. Sending the fifth to another room would let one address hold 4 sockets in every room, so that waits for an edge rate limit.
 - A client 8 seconds behind the room is closed (4004), so one stalled socket cannot hold memory. A person who sends nothing for 90 seconds is closed (4003).
 - Nobody picks a colony. A new person joins the colony with the fewest people, then the lowest score.
 - All bites in a tick land together, so ant id order gives nobody the first bite.
@@ -98,5 +98,6 @@ Not run yet. The first deploy follows the merge of this directory; the deployed 
 - No way for friends to share a room.
 - A deploy ends every round in progress.
 - The time a tick takes cannot be measured inside a deployed object, because the clock does not advance during execution there (from memory of the Workers security model; not re-read). The room counts how late each tick starts instead, which shows overload just as well.
-- Written but never exercised by a test or a run: resuming an ant after a dropped socket, the idle kick, the lag kick, the per-IP cap and the 3 retries when a room is full. Treat them as unverified until a socket-level test covers each.
+- Exercised once by hand over real sockets against `wrangler dev` (2026-11-23), not by an automated test: resume returns the same ant; a 9 byte message, a text message and a 200 message burst each close the socket with 1008; the fifth socket from one address is refused; a client that never pings is removed after 8 to 9 seconds. Never exercised: the idle kick and the 3 retries when a room is full.
+- When the room closes a lagging socket from its tick loop, a Node client under `wrangler dev` stayed in the closing state and never got a close event. The cause is not known and it is not checked on Cloudflare. The page does not depend on the close event: five seconds without a message ends the socket and reconnects.
 - The page was checked in headless Chromium at phone size only (joins through the directory, steers at 150 units a second in the direction dragged, stops on release, no console errors). It has not been checked on a real phone or in WebKit.
