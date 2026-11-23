@@ -126,6 +126,7 @@ import { readJson, writeJson } from '../../kit/save.js';
 import { sound } from '../../kit/audio.js';
 import { onLeave, isPauseKey } from '../../kit/pause.js';
 import { screens } from '../../kit/screens.js';
+import { stick } from '../../kit/stick.js';
 
 const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d');
 const KEY = 'ant-nemesis:v1', query = new URLSearchParams(location.search); // never the main game's key
@@ -144,7 +145,7 @@ save.trophies = save.trophies.filter(t => t && typeof t.name === 'string').slice
 const store = () => writeJson(KEY, save);
 
 let s = null, mode = 'menu', W = 0, H = 0, dpr = 1, zoom = 1, last = 0, acc = 0, shake = 0, sayTimer = 0;
-const floats = [], bits = [], keys = new Set(); let joy = null, flash = 0, dying = 0;
+const floats = [], bits = [], keys = new Set(); let flash = 0, dying = 0;
 
 // ---------- the rival: an offline persona table, used at once; a model's text replaces it when it answers
 const EPITHETS = ['Old Scar', 'Grim Pincers', 'Iron Jaw', 'Snaggle', 'Gloomtooth', 'Thornback', 'Crookleg', 'One Eye', 'Rumble', 'Nightfang', 'Mudclaw', 'Grizzle', 'Bristle', 'Gnash'];
@@ -259,7 +260,7 @@ function show(name) {
   $('hud').style.display = s && name !== 'menu' && name !== 'skins' && name !== 'how' ? 'block' : 'none';
   $('pause').style.display = play ? 'block' : 'none';
   if (name === 'menu') menu();
-  joy = null; keys.clear(); last = 0;
+  pad.drop(); keys.clear(); last = 0;
 }
 function menu() {
   const F = FORMS[save.stack.at(-1)], going = save.stack.length > 1;
@@ -362,17 +363,14 @@ function skins() {
 }
 
 // ---------- input: drag from where the finger lands; the distance dragged sets the speed
-cv.addEventListener('pointerdown', e => { if (mode !== 'play') return; joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY }; try { cv.setPointerCapture(e.pointerId); } catch {} });
-cv.addEventListener('pointermove', e => { if (joy && e.pointerId === joy.id) { joy.x = e.clientX; joy.y = e.clientY; const dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = Math.hypot(dx, dy); if (d > 70) { joy.ox = joy.x - dx / d * 70; joy.oy = joy.y - dy / d * 70; } } });
-for (const type of ['pointerup', 'pointercancel']) cv.addEventListener(type, e => { if (joy && e.pointerId === joy.id) joy = null; });
+const pad = stick(cv, { when: () => mode === 'play', reach: 55, leash: 70, dead: 0.15 }); // experiments/kit/stick.js
 addEventListener('keydown', e => { if (isPauseKey(e)) { if (mode === 'play') show('paused'); else if (mode === 'paused') show('play'); return; } keys.add(e.key.toLowerCase()); if (e.key.startsWith('Arrow')) e.preventDefault(); });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => keys.clear());
 onLeave(() => { if (mode === 'play') show('paused'); }); // another app, a call, a locked phone, another window
 addEventListener('contextmenu', e => e.preventDefault());
 function input() {
-  let x = 0, y = 0;
-  if (joy) { x = (joy.x - joy.ox) / 55; y = (joy.y - joy.oy) / 55; if (Math.hypot(x, y) < 0.15) x = y = 0; }
+  let { x, y } = pad.vector();
   if (keys.has('arrowleft') || keys.has('a')) x -= 1; if (keys.has('arrowright') || keys.has('d')) x += 1;
   if (keys.has('arrowup') || keys.has('w')) y -= 1; if (keys.has('arrowdown') || keys.has('s')) y += 1;
   return { x, y };
@@ -534,7 +532,7 @@ function draw(now) {
   } else if (bubble?.at && bubble.colour) speech(bubble.text, (bubble.at.x - p.x) * zoom + W / 2, (bubble.at.y - p.y) * zoom + H / 2 - 30, bubble.colour, avoid, top);
   if (flash > 0) { g.fillStyle = `rgba(200,20,10,${0.45 * flash})`; g.fillRect(0, 0, W, H); }
   if (glow > 0 && glowColour) { g.globalAlpha = 0.35 * glow; g.fillStyle = glowColour; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
-  if (joy && mode === 'play') {
+  const joy = pad.touch; if (joy && mode === 'play') {
     g.globalAlpha = 0.35; g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.arc(joy.ox, joy.oy, 55, 0, 7); g.stroke();
     g.fillStyle = '#fff'; g.beginPath(); g.arc(joy.x, joy.y, 22, 0, 7); g.fill(); g.globalAlpha = 1;
   }
@@ -580,7 +578,7 @@ function frame(now) {
           crunch(0.22, 0.3, 700); blip(220, 0.6, 'sawtooth', 0.14, -170);
           if (!e.nem && !s.nemesis) { const gen = (save.gens | 0) + 1, persona = offlinePersona(FORMS.find(f => f.name === s.dead.to).id, gen); if (crown(s, e.killer, persona.knobs)) { save.gens = gen; save.nem = { gen, persona, history: [], sim: nemesisSave(s) }; } }
           save.stack = s.player.stack.slice(0, Math.max(1, s.player.stack.length - 1)); save.xp = 0; store(); // closing the tab now still costs the level
-          dying = performance.now() + 900; mode = 'dying'; $('pause').style.display = 'none'; joy = null; keys.clear();
+          dying = performance.now() + 900; mode = 'dying'; $('pause').style.display = 'none'; pad.drop(); keys.clear();
         }
         if (e.t === 'nemRise' && save.nem) { riseNow = true; remember('rise'); keepNem(); store(); queueAsk('rise'); hud(); }
         if (e.t === 'nemKill' && save.nem) { remember('kill'); keepNem(); store(); speak(fill(save.nem.persona.lines.kill, e.kills), 'kill', 2500); queueAsk('kill'); hud(); }
