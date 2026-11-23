@@ -1,4 +1,4 @@
-// Ant Promotion: rules and world, no drawing. Deterministic for a given seed and input sequence.
+// Ant Promotion: rules and world, no drawing. Deterministic for a given seed, input sequence and rival. It never calls the network.
 export const WORLD = 2000, TOP = 18, MOBS = 64;
 const SPEED = { slow: 104, medium: 124, fast: 150 };
 const ROLE = {
@@ -67,10 +67,44 @@ export const SPAWN_WEIGHTS = [[-3, 1], [-2, 3], [-1, 5], [0, 3], [1, 2], [2, 1]]
 //   the hunt: every HUNT_EVERY seconds the nearest stronger animal within HUNT_REACH tracks you for HUNT_S seconds, wherever it is looking
 export const HIDE_S = 25, HUNT_EVERY = 45, HUNT_S = 5, HUNT_REACH = 700;
 export const hideReady = s => !!s.wild && me(s).role === 'brute' && s.t >= s.player.hideAt;
-export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS, wild = false) {
-  const s = { wild, huntAt: HUNT_EVERY, hides: 0, hunts: 0, mobEats: 0, rand: rng(seed), t: 0, tick: 0, weights, mobs: [], events: [], choosing: null, dead: null, won: false, eaten: 0, deaths: 0, nextId: 1,
-    player: { x: WORLD / 2, y: WORLD / 2, a: 0, ph: 0, stack: stack.slice(), xp, safe: 2.5, hideAt: 0 } };
+
+// ---------- the rival (from the wildcard lab, where it is called the Nemesis)
+// The animal that kills the player becomes the rival: one mob, marked `nem`, that stays in the world until the player eats it.
+// Power the rival gains each time it kills the player again (one level's worth), and the most it can gain in all.
+export const NEM_STEP = 10, NEM_MAX_BONUS = 30;
+// Bar points for eating the rival, on top of the normal gain.
+export const NEM_PRIZE = 6;
+// How each temperament changes behaviour. sight and cone scale the sight wedge; idle false means it stands still
+// when it has not noticed the player; chase scales chase speed; turn is the chase turn rate (radians/s);
+// hold and reach scale how long and how far it keeps chasing after losing sight; hunt scales the time between
+// trips to look for the player; flee is the power margin at which it runs from the player instead of chasing.
+export const TEMPERAMENTS = {
+  ambusher: { sight: 1.35, cone: 1.3, idle: false, chase: 1, turn: 7, hold: 0.8, reach: 0.9, hunt: 1.6, flee: 0 },
+  stalker: { sight: 1.15, cone: 1, idle: true, chase: 1.08, turn: 7, hold: 1.4, reach: 1.2, hunt: 1, flee: 0 },
+  brute: { sight: 1, cone: 1, idle: true, chase: 1.1, turn: 3.5, hold: 2, reach: 1.5, hunt: 1, flee: 0 },
+  coward: { sight: 1.1, cone: 1, idle: true, chase: 1, turn: 7, hold: 0.5, reach: 0.7, hunt: 1.2, flee: 12 },
+};
+export const TEMPERAMENT_NAMES = Object.keys(TEMPERAMENTS);
+// persistence 1-3: how long it keeps a chase going, how far it follows, and how often it comes looking for the player.
+// territory 1-3: how far it wanders from its home spot before walking back.
+const HOLD = [0, 1.5, 2.5, 3.5], FORGET = [0, 1.2, 1.5, 1.8], SEEK = [0, 45, 30, 18], RADIUS = [0, 250, 450, 700];
+export const DEFAULT_KNOBS = { temperament: 'stalker', persistence: 2, territory: 2 };
+export function cleanKnobs(k = {}) {
+  const int = (v, d) => (Number.isInteger(v) ? clamp(v, 1, 3) : d);
+  return { temperament: TEMPERAMENTS[k?.temperament] ? k.temperament : DEFAULT_KNOBS.temperament, persistence: int(k?.persistence, 2), territory: int(k?.territory, 2) };
+}
+// A coward runs once the player is within this much of its power: at most T.flee, and at most a quarter of its own power,
+// so a small rival does not run from the ant it has just eaten.
+const fleeMargin = (T, power) => Math.min(T.flee, power * 0.25);
+// Power of a mob, counting the rival's gains. Use this, not FORMS[m.f].power, wherever a mob is compared with the player.
+export const powerOf = m => FORMS[m.f].power + (m.bonus || 0);
+
+// nemesis: what nemesisSave() returned on an earlier visit, or null for a world with no rival.
+export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS, wild = false, nemesis = null) {
+  const s = { wild, huntAt: HUNT_EVERY, hides: 0, hunts: 0, mobEats: 0, rand: rng(seed), nrand: rng((seed ^ 0x5bd1e995) >>> 0), t: 0, tick: 0, weights, mobs: [], events: [], choosing: null, dead: null, won: false, eaten: 0, deaths: 0, nextId: 1,
+    nemesis: null, player: { x: WORLD / 2, y: WORLD / 2, a: 0, ph: 0, stack: stack.slice(), xp, safe: 2.5, hideAt: 0, busy: 0 } };
   while (s.mobs.length < MOBS) spawn(s, 260);
+  if (nemesis && FORMS[nemesis.f]) placeNemesis(s, nemesis);
   return s;
 }
 // What the player is now. Picking the same kind again builds on it: each earlier fast pick makes a fast animal faster (fastBoost),
@@ -88,6 +122,33 @@ export const me = s => {
   return p.me;
 };
 export const level = s => s.player.stack.length;
+export const nemesisMob = s => (s.nemesis ? s.mobs.find(m => m.id === s.nemesis.id) : null);
+
+// The rival uses its own random stream (nrand), so a world without one runs exactly as it did before the rival existed.
+function farSpot(s, from = 700) {
+  let x = 0, y = 0;
+  for (let i = 0; i < 40; i++) { x = 80 + s.nrand() * (WORLD - 160); y = 80 + s.nrand() * (WORLD - 160); if (Math.hypot(x - s.player.x, y - s.player.y) > from) break; }
+  return { x, y };
+}
+function placeNemesis(s, n) {
+  const { x, y } = farSpot(s);
+  const m = { id: s.nextId++, f: n.f, x, y, a: s.nrand() * 6.283, alert: false, lost: 0, timer: 0, want: 0, walk: false, ph: 0, nem: true, bonus: clamp(n.bonus | 0, 0, NEM_MAX_BONUS) };
+  s.mobs.push(m);
+  s.nemesis = { id: m.id, f: n.f, bonus: m.bonus, kills: n.kills | 0, escapes: n.escapes | 0, kin: n.kin | 0, knobs: cleanKnobs(n.knobs), home: { x, y }, rest: 0, hunt: 20, seek: 0, chase: 0, stalk: 0, commit: false };
+}
+// Make the mob that killed the player the rival. Only when no rival is alive. Call it after a 'die' event.
+// The rival takes no part in animals hunting each other: it drops its own chase, and whoever was chasing it lets go.
+export function crown(s, mobId, knobs) {
+  if (s.nemesis) return false;
+  const m = s.mobs.find(x => x.id === mobId); if (!m || m.gone) return false;
+  m.nem = true; m.bonus = 0; m.chase = m.fear = null; m.fed = 0; m.hunt = 0;
+  for (const o of s.mobs) { if (o.chase === m) o.chase = null; if (o.fear === m) o.fear = null; }
+  s.nemesis = { id: m.id, f: m.f, bonus: 0, kills: 1, escapes: 0, kin: 0, knobs: cleanKnobs(knobs), home: { x: m.x, y: m.y }, rest: 20, hunt: SEEK[2], seek: 0, chase: 0, stalk: 0, commit: false };
+  s.events.push({ t: 'nemRise', f: m.f });
+  return true;
+}
+// The part of the rival worth saving between visits.
+export const nemesisSave = s => (s.nemesis ? { f: s.nemesis.f, bonus: s.nemesis.bonus, kills: s.nemesis.kills, escapes: s.nemesis.escapes, kin: s.nemesis.kin, knobs: { ...s.nemesis.knobs } } : null);
 
 function spawn(s, minDist) {
   const pl = level(s), total = s.weights.reduce((n, w) => n + w[1], 0);
@@ -105,9 +166,10 @@ function spawn(s, minDist) {
 export function step(s, input) {
   s.events.length = 0;
   if (s.choosing || s.dead) return s;
-  const dt = 1 / 60, p = s.player, F = me(s);
+  const dt = 1 / 60, p = s.player, F = me(s), N = s.nemesis;
   s.t += dt; s.tick++;
   if (p.safe > 0) p.safe -= dt;
+  if (p.busy > 0) p.busy -= dt;
   let ix = input?.x || 0, iy = input?.y || 0; const il = Math.hypot(ix, iy);
   if (il > 1) { ix /= il; iy /= il; }
   if (il > 0.01) { p.a = Math.atan2(iy, ix); p.ph += Math.min(1, il) * dt * 10; }
@@ -115,24 +177,40 @@ export function step(s, input) {
 
   if (s.wild && s.t >= s.huntAt) {
     let hunter = null, near = HUNT_REACH;
-    for (const m of s.mobs) { const d = Math.hypot(m.x - p.x, m.y - p.y); if (FORMS[m.f].power > F.power && !m.alert && d < near) { near = d; hunter = m; } }
+    for (const m of s.mobs) { const d = Math.hypot(m.x - p.x, m.y - p.y); if (powerOf(m) > F.power && !m.alert && d < near) { near = d; hunter = m; } }
     if (hunter && p.safe <= 0) { hunter.hunt = HUNT_S; s.hunts++; s.huntAt = s.t + HUNT_EVERY; s.events.push({ t: 'hunt', id: hunter.id, name: FORMS[hunter.f].name }); }
     else s.huntAt = s.t + 2; // nobody in reach, or you are still safe: look again soon
+  }
+  if (N) {
+    if (N.rest > 0) N.rest -= dt;
+    else if ((N.hunt -= dt) <= 0) {
+      const T = TEMPERAMENTS[N.knobs.temperament], m = nemesisMob(s);
+      if (!(T.flee && m && powerOf(m) - F.power <= fleeMargin(T, powerOf(m)))) N.seek = 8 + 4 * N.knobs.persistence; // a coward stays home once the player is close to its power
+      N.hunt = SEEK[N.knobs.persistence] * T.hunt * (0.8 + s.nrand() * 0.4);
+    }
+    if (N.seek > 0) { N.seek -= dt; N.home = { x: p.x, y: p.y }; } // it comes looking for you
   }
   for (let i = s.mobs.length - 1; i >= 0; i--) {
     const m = s.mobs[i], M = FORMS[m.f], dx = p.x - m.x, dy = p.y - m.y, d = Math.hypot(dx, dy), to = Math.atan2(dy, dx);
     if (m.hunt > 0) m.hunt -= dt;
-    const sees = p.safe <= 0 && (m.hunt > 0 || d < M.range * F.stealth + F.r && Math.abs(wrap(to - m.a)) < CONE);
-    if (sees) { if (!m.alert && M.power !== F.power) s.events.push({ t: 'notice', strong: M.power > F.power, id: m.id }); m.alert = true; m.lost = 0; }
-    else if (m.alert) { m.lost = d > M.range * 1.8 ? m.lost + dt : 0; if (m.lost > 1.5 || p.safe > 0) m.alert = false; }
-    // animals hunt each other: a stronger animal that sees a weaker one (at most 2 levels below, never the little food bugs) chases it
+    const T = m.nem ? TEMPERAMENTS[N.knobs.temperament] : null, power = powerOf(m);
+    const range = M.range * (T ? T.sight : 1), cone = CONE * (T ? T.cone : 1);
+    const sees = p.safe <= 0 && (m.hunt > 0 || d < range * F.stealth + F.r && Math.abs(wrap(to - m.a)) < cone);
+    const wasAlert = m.alert;
+    if (sees) { if (!m.alert && power !== F.power) s.events.push({ t: 'notice', strong: power > F.power, id: m.id, nem: !!m.nem }); m.alert = true; m.lost = 0; }
+    else if (m.alert) {
+      const forget = T ? FORGET[N.knobs.persistence] * T.reach : 1.8, hold = T ? HOLD[N.knobs.persistence] * T.hold : 1.5;
+      m.lost = d > range * forget ? m.lost + dt : 0; if (m.lost > hold || p.safe > 0) m.alert = false;
+    }
+    // animals hunt each other: a stronger animal that sees a weaker one (at most 2 levels below, never the little food bugs) chases it.
+    // The rival takes no part: it hunts only the player, and no animal hunts it.
     if (m.fed > 0) m.fed -= dt;
-    if ((s.tick + m.id) % 12 === 0) {
+    if (!m.nem && (s.tick + m.id) % 12 === 0) {
       const was = m.chase; m.chase = m.fear = null; let bc = Infinity, bf = Infinity;
       if (M.level >= 1) for (const o of s.mobs) {
-        if (o === m || o.gone) continue; const O = FORMS[o.f]; if (O.power === M.power || O.level < 1) continue;
+        if (o === m || o.gone || o.nem) continue; const O = FORMS[o.f], op = powerOf(o); if (op === power || O.level < 1) continue;
         const ex = o.x - m.x, ey = o.y - m.y; if (ex > 220 || ex < -220 || ey > 220 || ey < -220) continue; const e = Math.hypot(ex, ey);
-        if (O.power > M.power) { if (o.chase === m && e < bf) { bf = e; m.fear = o; } }
+        if (op > power) { if (o.chase === m && e < bf) { bf = e; m.fear = o; } }
         else if (!(m.fed > 0) && M.level - O.level <= 2 && e < M.range * 0.85 && e < bc && Math.abs(wrap(Math.atan2(ey, ex) - m.a)) < CONE) { bc = e; m.chase = o; }
       }
       m.chaseFor = m.chase && m.chase === was ? (m.chaseFor || 0) + 0.2 : 0;
@@ -140,10 +218,21 @@ export function step(s, input) {
     }
     if (m.chase?.gone) m.chase = null; if (m.fear?.gone) m.fear = null;
     let speed = 0, turn = 2.5;
-    if (m.alert && M.power !== F.power) {
+    // a coward rival runs once the player's power gets close to its own
+    const flees = power < F.power || (T && T.flee && power - F.power <= fleeMargin(T, power));
+    if (m.alert && power !== F.power) {
       turn = 7; speed = M.speed;
-      if (M.power > F.power) m.want = to;
-      else { // run away; near a wall, slide along it
+      if (!flees) {
+        m.want = to;
+        if (T) {
+          turn = T.turn; speed = M.speed * T.chase; N.chase += dt;
+          if (N.knobs.temperament === 'stalker' && !N.commit) { // follow at the edge of sight; strike when the player is busy eating or comes close
+            N.stalk += dt;
+            if (p.busy > 0 || d < range * 0.45 || N.stalk > 7) N.commit = true;
+            else speed = d > range * 0.7 ? Math.min(M.speed, F.speed) * 0.95 : 0;
+          }
+        }
+      } else { // run away; near a wall, slide along it
         let fx = -dx / (d || 1), fy = -dy / (d || 1); const pad = 90;
         if (m.x < pad) fx += (pad - m.x) / 40; if (m.x > WORLD - pad) fx -= (m.x - WORLD + pad) / 40;
         if (m.y < pad) fy += (pad - m.y) / 40; if (m.y > WORLD - pad) fy -= (m.y - WORLD + pad) / 40;
@@ -159,27 +248,48 @@ export function step(s, input) {
       }
     } else {
       m.timer -= dt;
-      if (m.timer <= 0) { m.walk = s.rand() < 0.7; m.timer = 0.6 + s.rand() * 2.6; m.want = m.a + (s.rand() - 0.5) * 3.2; }
+      const rand = T ? s.nrand : s.rand;
+      if (m.timer <= 0) { m.walk = rand() < 0.7; m.timer = 0.6 + rand() * 2.6; m.want = m.a + (rand() - 0.5) * 3.2; }
       if (m.x < 70 || m.x > WORLD - 70 || m.y < 70 || m.y > WORLD - 70) m.want = Math.atan2(WORLD / 2 - m.y, WORLD / 2 - m.x);
       speed = m.walk ? M.speed * 0.38 : 0;
+      if (T) {
+        if (!T.idle) speed = 0; // an ambusher waits
+        const hx = N.home.x - m.x, hy = N.home.y - m.y;
+        if (Math.hypot(hx, hy) > RADIUS[N.knobs.territory]) { m.want = Math.atan2(hy, hx); speed = M.speed * 0.6; turn = 4; }
+      }
+    }
+    if (T && wasAlert && !m.alert) { // the player got away
+      if (N.chase > 1.5 && power > F.power && !s.dead) { N.escapes++; s.events.push({ t: 'nemEscape', escapes: N.escapes }); }
+      N.chase = 0; N.stalk = 0; N.commit = false;
     }
     m.a += clamp(wrap(m.want - m.a), -turn * dt, turn * dt);
     m.x = clamp(m.x + Math.cos(m.a) * speed * dt, M.r, WORLD - M.r); m.y = clamp(m.y + Math.sin(m.a) * speed * dt, M.r, WORLD - M.r);
     m.ph += speed * dt * 0.09;
 
     if (!m.gone && d < (M.r + F.r) * 0.85) {
-      const out = encounter(F, { power: M.power, speed: M.speed, alert: m.alert });
+      const out = encounter(F, { power, speed: M.speed, alert: m.alert });
       if (out === 'eat') {
-        const gain = M.level >= F.level - 1 ? 3 : M.level === F.level - 2 ? 2 : 1;
-        m.gone = true; s.mobs.splice(i, 1); s.eaten++; p.xp += gain;
-        s.events.push({ t: 'eat', name: M.name, gain, x: m.x, y: m.y });
+        let gain = M.level >= F.level - 1 ? 3 : M.level === F.level - 2 ? 2 : 1;
+        m.gone = true; s.mobs.splice(i, 1); s.eaten++; p.busy = 1.2;
+        if (m.nem) { // the payoff: a prize, and the world has no rival until the next death
+          gain += NEM_PRIZE;
+          s.events.push({ t: 'nemEaten', f: m.f, kills: N.kills, escapes: N.escapes, kin: N.kin, x: m.x, y: m.y });
+          s.nemesis = null;
+        } else if (N && m.f === N.f) { N.kin++; s.events.push({ t: 'kin', kin: N.kin }); }
+        p.xp += gain;
+        s.events.push({ t: 'eat', name: M.name, gain, x: m.x, y: m.y, nem: !!m.nem });
       } else if (out === 'die' && p.safe <= 0 && hideReady(s)) { // wild: the hide takes the bite and you are thrown clear
         p.hideAt = s.t + HIDE_S; p.safe = 1.5; s.hides++;
         p.x = clamp(p.x + dx / (d || 1) * 70, F.r, WORLD - F.r); p.y = clamp(p.y + dy / (d || 1) * 70, F.r, WORLD - F.r);
         s.events.push({ t: 'hide', name: M.name, x: p.x, y: p.y });
       } else if (out === 'die' && p.safe <= 0) {
-        s.dead = { as: F.name, to: M.name, level: level(s) }; s.deaths++;
-        s.events.push({ t: 'die' });
+        s.dead = { as: F.name, to: M.name, level: level(s), killer: m.id, nem: !!m.nem }; s.deaths++;
+        s.events.push({ t: 'die', killer: m.id, nem: !!m.nem });
+        if (m.nem) { // the rival gets stronger and goes home to rest
+          N.kills++; N.bonus = m.bonus = Math.min(NEM_MAX_BONUS, m.bonus + NEM_STEP);
+          N.rest = 25; N.seek = 0; N.chase = 0; N.stalk = 0; N.commit = false; m.alert = false; m.hunt = 0;
+          s.events.push({ t: 'nemKill', kills: N.kills, bonus: N.bonus });
+        }
         return s;
       } else if (d > 0.01) { // bump apart
         const push = (M.r + F.r) * 0.85 - d; m.x -= dx / d * push; m.y -= dy / d * push;
@@ -199,7 +309,7 @@ function upkeep(s) {
   const p = s.player, pl = level(s);
   for (let i = s.mobs.length - 1; i >= 0; i--) {
     const m = s.mobs[i], gap = FORMS[m.f].level - pl;
-    if ((gap < -3 || gap > 2) && Math.hypot(m.x - p.x, m.y - p.y) > 700) { m.gone = true; s.mobs.splice(i, 1); }
+    if (!m.nem && (gap < -3 || gap > 2) && Math.hypot(m.x - p.x, m.y - p.y) > 700) { m.gone = true; s.mobs.splice(i, 1); } // the rival is never cleared away
   }
   for (let i = 0; i < 4 && s.mobs.length < MOBS; i++) spawn(s, 520);
 }
@@ -216,11 +326,13 @@ export function revive(s, restart) {
   if (!s.dead) return;
   const p = s.player;
   if (restart) { p.stack = [ANT]; s.won = false; } else if (p.stack.length > 1) p.stack.pop();
-  p.xp = 0; p.safe = 2.5; p.x = WORLD / 2; p.y = WORLD / 2; s.dead = null;
+  p.xp = 0; p.safe = 2.5; p.busy = 0; p.x = WORLD / 2; p.y = WORLD / 2; s.dead = null;
   const F = me(s);
-  s.mobs = s.mobs.filter(m => FORMS[m.f].power <= F.power || Math.hypot(m.x - p.x, m.y - p.y) > 520);
+  s.mobs = s.mobs.filter(m => m.nem || powerOf(m) <= F.power || Math.hypot(m.x - p.x, m.y - p.y) > 520);
+  const n = nemesisMob(s); // the rival is not removed; if it is close it is moved away
+  if (n && Math.hypot(n.x - p.x, n.y - p.y) < 650) { const at = farSpot(s); n.x = at.x; n.y = at.y; n.alert = false; n.hunt = 0; s.nemesis.home = at; s.nemesis.seek = 0; }
   upkeep(s);
 }
 
 // Mobs the player could eat right now: weaker, and either not faster or not yet alert.
-export const catchable = s => { const F = me(s); return s.mobs.filter(m => encounter(F, { ...FORMS[m.f], alert: m.alert }) === 'eat' && (FORMS[m.f].speed <= F.speed || !m.alert)); };
+export const catchable = s => { const F = me(s); return s.mobs.filter(m => encounter(F, { power: powerOf(m), speed: FORMS[m.f].speed, alert: m.alert }) === 'eat' && (FORMS[m.f].speed <= F.speed || !m.alert)); };
