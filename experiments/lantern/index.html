@@ -41,6 +41,10 @@
   #ready { color: #ffb45a; font-size: .9em; }
   #stars { color: #ffe08a; margin-left: .5em; letter-spacing: .05em; } .pack.reborn b { color: #ffe08a; } .pack.reborn small { display: block; font-size: .8em; opacity: .75; margin: .1em 0 .3em; }
   .pack.test { border-top: 1px dashed #ff7a7a88; } .pack.test b { color: #ff9a9a; }
+  #name { font: inherit; font-size: 17px; color: #ffe6bd; background: #ffffff10; border: 1.5px solid #ffd9a088; border-radius: 999px; padding: .5em 1em; width: 11em; text-align: center; margin: .3em; }
+  #rows { list-style: none; padding: 0; margin: .6em auto; max-width: 20em; text-align: left; } #rows li { display: flex; gap: .6em; padding: .3em .2em; border-bottom: 1px solid #ffd9a022; } #rows li.me { color: #ffe08a; }
+  #rows .n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } #rows .k { width: 1.6em; opacity: .6; } #rows .d { opacity: .5; font-size: .85em; }
+  .hint { font-size: .85em; opacity: .7; }
   #got { min-height: 1.6em; color: #ffe6bd; position: sticky; top: 0; z-index: 2; margin: 0; padding: .45em .3em; background: #070b14f2; border-radius: 0 0 12px 12px; } /* stays in view while the packs scroll */
   #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); display: none; text-align: left; pointer-events: none; text-shadow: 0 1px 6px #000; }
   #hearts { font: 26px/1 sans-serif; color: #ff4d5e; letter-spacing: 2px; }
@@ -74,13 +78,14 @@
   <p id="about"></p>
   <p id="ready"></p>
   <p><button id="endless">Endless river</button><button id="tower">Tower climb</button><button id="anew" hidden>New climb from level 1</button></p>
-  <p><button id="toShop">Shop</button><button id="toCredits">Credits</button></p>
+  <p><button id="toShop">Shop</button><button id="toBoard">Leaderboard</button></p>
+  <p><button id="toCredits">Credits</button></p>
 </div></div>
 <div id="shop" class="screen veil"><div>
   <h2>Shop</h2>
   <p class="bank"><span class="dot"></span><span id="bank2">0</span> embers</p>
   <p><button class="back">Back</button></p>
-  <p id="got">Stats last for your next run only. Each pack holds one surprise for 50 embers. Pick two abilities and up to three crashes: tap one to switch it on or off.</p>
+  <p id="got">Stats last for your next run only. Each pack holds one surprise for 50 embers. Pick two abilities, up to three crashes and up to three victories: tap one to switch it on or off.</p>
   <div id="packs"></div>
 </div></div>
 <div id="credits" class="screen veil"><div>
@@ -90,10 +95,18 @@
   <p>Thank you to our first play-tester. Your notes shaped this version: the menu, the shop, the hearts and the endless river.</p>
   <p><button class="back">Back</button></p>
 </div></div>
+<div id="board" class="screen veil"><div>
+  <h2>Leaderboard</h2>
+  <p class="hint">Endless river, best runs on this phone. Your name and scores stay on this phone.</p>
+  <p><label for="name">Your name</label><br><input id="name" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p>
+  <ol id="rows"></ol>
+  <p><button id="boardPlay" class="main">Play the endless river</button></p>
+  <p><button class="back">Back</button></p>
+</div></div>
 <div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p><p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p></div></div>
 <script type="module">
 import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace, FIELD, REBORN_PACE } from './sim.js?v=12'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
-import { readNumber, readJson, write } from '../kit/save.js';
+import { read, readNumber, readJson, write } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
@@ -128,6 +141,7 @@ const PACKS = [
   { id: 'flame', name: 'Flames', items: [['amber', 'Candle flame', '255,170,80'], ['bluef', 'Gas flame', '110,180,255'], ['green', 'Marsh fire', '120,230,140'], ['rose', 'Sparkler', '255,120,170'], ['white', 'Star light', '235,235,255'], ['violetf', 'Twin flame', '190,130,255']] },
   { id: 'power', name: 'Abilities', items: [['boost', 'Boost', TINT.boost, 'Gold arrows. Fast, and nothing can break the boat.'], ['slow', 'Slow water', TINT.slow, 'Violet clock. The river slows; dawn keeps coming.'], ['size', 'Size', TINT.size, 'Teal rings. A smaller boat, four times in five.'], ['magnet', 'Magnet', TINT.magnet, 'Pink magnet. Embers swim to you.'], ['flare', 'Flare', TINT.flare, 'White sun. The flame is filled and holds.']] },
   { id: 'crash', name: 'Crashes', items: [['burst', 'Fireworks', '#ff9a3c', 'The lantern bursts into sparks.'], ['freeze', 'Freeze', '#9fd8ff', 'The boat ices over and shatters.'], ['ghost', 'Ghost', '#d8d8ff', 'The boat rises as a ghost.'], ['bolt', 'Lightning', '#ffe45a', 'A bolt strikes the boat.'], ['splash', 'Big splash', '#4fa3e0', 'A column of water swallows the boat.']] },
+  { id: 'win', name: 'Victories', items: [['vfire', 'Fireworks', '#ff6ad5', 'Fireworks burst over the river at dawn.'], ['vlamp', 'Sky lanterns', '#ffb347', 'Paper lanterns rise into the morning.'], ['vbird', 'Birds', '#e8eef8', 'A flock of birds takes off from the banks.'], ['vbow', 'Rainbow', '#7ad0ff', 'A rainbow opens over the river.'], ['vstar', 'Shooting stars', '#fff3a0', 'Stars streak across the last of the night.']] },
 ];
 const COST = 50;
 // Rebirth (tester t1, note #73): once every pack is found and all 50 nights are open, the player may start over from night 1 with nothing.
@@ -157,6 +171,16 @@ twoOn();
 // With none on, a crash plays the effect that fits what was hit, as before. lantern-crash: a JSON list of the crash effects switched on.
 const CRASH_ON = 3;
 let crashOn = [].concat(store.json('lantern-crash', [])).filter(k => typeof k === 'string' && owned.has(k)).slice(0, CRASH_ON);
+// The victory pack (tester t1, notes #75 and #96): dawn effects found in a pack, like the crash pack. Up to three are switched on, and
+// reaching dawn (a night or a tower level) plays one of them at random. With none on, dawn is as before. lantern-win: a JSON list of ids.
+const WIN_ON = 3;
+let winOn = [].concat(store.json('lantern-win', [])).filter(k => typeof k === 'string' && owned.has(k)).slice(0, WIN_ON);
+// The leaderboard on this phone (note #96). A shared board needs a server and accounts, which wait for the owner, so this one is
+// local and says so. lantern-name: the player's name, text up to 16 characters. lantern-board: a JSON list of up to 10
+// endless runs, best first, each { n: name, s: score, d: 'YYYY-MM-DD' }. Neither is sent anywhere, and neither goes into the lab recording.
+const BOARD = 10, cleanName = t => String(t ?? '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 16);
+let board = [].concat(store.json('lantern-board', [])).filter(r => r && typeof r.s === 'number' && Number.isFinite(r.s)).map(r => ({ n: cleanName(r.n), s: r.s, d: typeof r.d === 'string' ? r.d.slice(0, 10) : '' })).slice(0, BOARD);
+if (read('lantern-board') === null && store.get('lantern-best-endless') > 0) { board = [{ n: cleanName(read('lantern-name', '')), s: store.get('lantern-best-endless'), d: '' }]; store.set('lantern-board', JSON.stringify(board)); } // a best from before the board
 const skin = kind => { const pack = PACKS.find(p => p.id === kind); return pack.items.find(i => i[0] === worn[kind]) ?? pack.items[0]; };
 // A shop button shows the thing itself: the boat drawn small, or the flame after half a second of burning.
 const shots = new Map();
@@ -166,12 +190,17 @@ function icon(q, id, col) { // a crash effect, drawn small for its shop button
   else if (id === 'freeze') for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI; q.moveTo(48 - 30 * Math.cos(a), 48 - 30 * Math.sin(a)); q.lineTo(48 + 30 * Math.cos(a), 48 + 30 * Math.sin(a)); }
   else if (id === 'ghost') { q.arc(48, 42, 20, Math.PI, 0); q.lineTo(68, 72); for (let i = 0; i < 4; i++) q.lineTo(63 - 10 * i, i % 2 ? 72 : 64); q.lineTo(28, 72); q.closePath(); q.fill(); q.beginPath(); q.fillStyle = '#0a1220'; q.arc(40, 44, 4, 0, 7); q.arc(56, 44, 4, 0, 7); q.fill(); return; }
   else if (id === 'bolt') { q.moveTo(56, 10); q.lineTo(36, 50); q.lineTo(54, 50); q.lineTo(38, 88); q.lineWidth = 6; }
+  else if (id === 'vfire') { for (const [x, y, r, c] of [[34, 36, 20, col], [64, 30, 16, '#ffd25a'], [56, 66, 14, '#7ad0ff']]) { q.strokeStyle = c; q.beginPath(); for (let i = 0; i < 8; i++) { const a = i / 8 * 6.28; q.moveTo(x + r * 0.35 * Math.cos(a), y + r * 0.35 * Math.sin(a)); q.lineTo(x + r * Math.cos(a), y + r * Math.sin(a)); } q.stroke(); } return; }
+  else if (id === 'vlamp') { for (const [x, y, k] of [[30, 62, 1], [56, 40, 0.8], [72, 70, 0.6]]) { q.fillStyle = col; q.globalAlpha = 0.4 + 0.6 * k; q.fillRect(x - 9 * k, y - 12 * k, 18 * k, 24 * k); q.fillStyle = '#fff6dc'; q.fillRect(x - 3 * k, y + 4 * k, 6 * k, 6 * k); } q.globalAlpha = 1; return; }
+  else if (id === 'vbird') for (const [x, y, k] of [[28, 50, 1], [52, 34, 0.9], [70, 56, 0.8], [48, 66, 0.7]]) { q.moveTo(x - 12 * k, y - 6 * k); q.quadraticCurveTo(x - 5 * k, y - 8 * k, x, y); q.quadraticCurveTo(x + 5 * k, y - 8 * k, x + 12 * k, y - 6 * k); }
+  else if (id === 'vbow') { ['#ff6a6a', '#ffd25a', '#7ae07a', '#7ad0ff', '#b48aff'].forEach((c, i) => { q.strokeStyle = c; q.beginPath(); q.arc(48, 76, 40 - i * 5, Math.PI, 0); q.stroke(); }); return; }
+  else if (id === 'vstar') for (const [x, y] of [[66, 26], [44, 54], [72, 70]]) { q.moveTo(x, y); q.lineTo(x - 30, y - 16); q.moveTo(x + 4, y); q.arc(x, y, 4, 0, 7); }
   else { q.moveTo(30, 80); q.quadraticCurveTo(48, 0, 66, 80); for (const [x, y] of [[24, 40], [72, 36], [20, 60], [76, 58]]) { q.moveTo(x + 3, y); q.arc(x, y, 3, 0, 7); } }
   q.stroke();
 }
 function swatch(kind, it) {
   if (kind === 'water') return it[2];
-  if (kind === 'crash' && !shots.has(it[0])) { const c = document.createElement('canvas'), q = c.getContext('2d'); c.width = c.height = 96; q.fillStyle = '#0a1220'; q.fillRect(0, 0, 96, 96); icon(q, it[0], it[2]); shots.set(it[0], `url(${c.toDataURL()}) center / cover`); }
+  if ((kind === 'crash' || kind === 'win') && !shots.has(it[0])) { const c = document.createElement('canvas'), q = c.getContext('2d'); c.width = c.height = 96; q.fillStyle = '#0a1220'; q.fillRect(0, 0, 96, 96); icon(q, it[0], it[2]); shots.set(it[0], `url(${c.toDataURL()}) center / cover`); }
   if (kind === 'power' && !shots.has(it[0])) { const c = document.createElement('canvas'), q = c.getContext('2d'); c.width = c.height = 96; q.fillStyle = `rgba(${it[2]},.45)`; q.fillRect(0, 0, 96, 96); mark(q, it[0], 48, 50, 17, 5, 0.3); shots.set(it[0], `#0a1220 url(${c.toDataURL()}) center / cover`); }
   if (!shots.has(it[0])) {
     const c = document.createElement('canvas'), q = c.getContext('2d'); c.width = c.height = 96;
@@ -194,17 +223,17 @@ addEventListener('resize', resize); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', lastLevel = 1, nearFall = false, sayTimer = 0, shown = '', weather = '';
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
-window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, field: s.field, crashOn, crash: crash && crash.how, unit: unit / dpr }); // read by the browser checks
+window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, field: s.field, crashOn, crash: crash && crash.how, winOn, win: victory && victory.how, name: playerName(), board, unit: unit / dpr }); // read by the browser checks
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 
-const cards = screens(['menu', 'shop', 'credits', 'card']);
+const cards = screens(['menu', 'shop', 'credits', 'card', 'board']);
 function show(name) {
   screen = name;
   cards(name);
   const play = name === 'play';
   $('hud').style.display = $('big').style.display = play ? 'block' : 'none'; pauseButton.style.display = play ? 'grid' : 'none';
   if (!play) $('warn').classList.remove('on');
-  if (name === 'menu') menu(); if (name === 'shop') shop();
+  if (name === 'menu') menu(); if (name === 'shop') shop(); if (name === 'board') boardShow();
 }
 function menu() {
   $('stars').textContent = reborn ? ` · ${'★'.repeat(Math.min(5, reborn))}${reborn > 5 ? reborn : ''}` : '';
@@ -246,7 +275,7 @@ function shop(text) {
         if (rb.dataset.sure !== '1') { rb.dataset.sure = '1'; rb.textContent = 'Tap again to be reborn'; return; }
         reborn++; store.set('lantern-rebirths', reborn);
         bank = 0; store.set('lantern-bank', 0); owned = new Set(['oak', 'blue', 'amber', 'boost']); store.set('lantern-owned', '[]');
-        worn = { boat: 'oak', water: 'blue', flame: 'amber' }; store.set('lantern-worn', JSON.stringify(worn)); off = new Set(); store.set('lantern-off', '[]'); crashOn = []; store.set('lantern-crash', '[]');
+        worn = { boat: 'oak', water: 'blue', flame: 'amber' }; store.set('lantern-worn', JSON.stringify(worn)); off = new Set(); store.set('lantern-off', '[]'); crashOn = []; store.set('lantern-crash', '[]'); winOn = []; store.set('lantern-win', '[]');
         stats = {}; store.set('lantern-stats', '{}'); opened = stage = 1; store.set('lantern-night', 1); store.set('lantern-tower-at', 1);
         rec.event('rebirth', { rebirths: reborn });
         const fl = $('flash'); fl.style.transition = 'none'; fl.style.background = '#ffe08a'; fl.style.opacity = 1; void fl.offsetWidth; fl.style.transition = 'opacity 1.8s ease-out'; fl.style.opacity = 0;
@@ -266,11 +295,16 @@ function shop(text) {
       b.className = 'item' + (has ? '' : ' locked') + (worn[pack.id] === it[0] || (pack.id === 'power' && has) ? ' worn' : ''); b.dataset.item = it[0]; b.setAttribute('aria-label', has ? it[1] : 'Not found yet');
       if (has && pack.id === 'power' && off.has(it[0])) b.className = 'item off';
       if (pack.id === 'crash') b.className = 'item' + (!has ? ' locked' : crashOn.includes(it[0]) ? ' worn' : ' off');
+      if (pack.id === 'win') b.className = 'item' + (!has ? ' locked' : winOn.includes(it[0]) ? ' worn' : ' off');
       if (has) { b.style.background = swatch(pack.id, it); b.addEventListener('click', () => { if (busy) return;
         if (pack.id === 'crash') { // up to three crash effects on; with none on, a crash fits what was hit
           if (crashOn.includes(it[0])) crashOn = crashOn.filter(k => k !== it[0]); else if (crashOn.length >= CRASH_ON) { shop(`Only ${CRASH_ON} crashes at a time. Switch one off first.`); return; } else crashOn.push(it[0]);
           store.set('lantern-crash', JSON.stringify(crashOn)); rec.event('crash-pick', { crash: it[0], on: crashOn.includes(it[0]) });
           shop(crashOn.includes(it[0]) ? `${it[1]} is on. ${it[3]}` : crashOn.length ? `${it[1]} is off.` : `${it[1]} is off. With no crash on, each crash fits what you hit.`); return; }
+        if (pack.id === 'win') { // up to three victories on; with none on, dawn is plain
+          if (winOn.includes(it[0])) winOn = winOn.filter(k => k !== it[0]); else if (winOn.length >= WIN_ON) { shop(`Only ${WIN_ON} victories at a time. Switch one off first.`); return; } else winOn.push(it[0]);
+          store.set('lantern-win', JSON.stringify(winOn)); rec.event('win-pick', { win: it[0], on: winOn.includes(it[0]) });
+          shop(winOn.includes(it[0]) ? `${it[1]} is on. ${it[3]}` : winOn.length ? `${it[1]} is off.` : `${it[1]} is off. With no victory on, dawn comes plain.`); return; }
         if (pack.id === 'power') { // tap an ability to keep it out of the river, tap again to bring it back; two at most
         if (off.has(it[0]) && powersOwned().length >= PICK) { shop(`Only ${PICK} abilities at a time. Switch one off first.`); return; }
         if (off.has(it[0])) off.delete(it[0]); else off.add(it[0]); store.set('lantern-off', JSON.stringify([...off]));
@@ -284,9 +318,10 @@ function shop(text) {
       if (bank < COST || !rest.length || busy) return;
       const it = rest[Math.floor(Math.random() * rest.length)];
       // The pack is paid for and the find is saved at once; the hop and the flash only show it.
-      bank -= COST; store.set('lantern-bank', bank); owned.add(it[0]); store.set('lantern-owned', JSON.stringify([...owned])); if (pack.id !== 'power' && pack.id !== 'crash') { worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); }
+      bank -= COST; store.set('lantern-bank', bank); owned.add(it[0]); store.set('lantern-owned', JSON.stringify([...owned])); if (pack.id !== 'power' && pack.id !== 'crash' && pack.id !== 'win') { worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); }
       let after = '';
       if (pack.id === 'power' && twoOn().includes(it[0])) after = ` It is off: only ${PICK} abilities at a time. Switch one off to use it.`;
+      if (pack.id === 'win') { if (winOn.length < WIN_ON) { winOn.push(it[0]); store.set('lantern-win', JSON.stringify(winOn)); after = ' It is on.'; } else after = ` It is off: only ${WIN_ON} victories at a time.`; }
       if (pack.id === 'crash') { if (crashOn.length < CRASH_ON) { crashOn.push(it[0]); store.set('lantern-crash', JSON.stringify(crashOn)); after = ' It is on.'; } else after = ` It is off: only ${CRASH_ON} crashes at a time.`; }
       rec.event('buy', { pack: pack.id, item: it[0], bank });
       $('bank2').textContent = bank; audio(); spin(row, rest.map(i => i[0]), it, pack, after);
@@ -297,7 +332,7 @@ function shop(text) {
     const t = document.createElement('div'); t.className = 'pack test'; const tn = document.createElement('b'); tn.textContent = 'Tester tools'; const tw = document.createElement('small'); tw.className = 'once'; tw.textContent = 'For testing only. These go away when the game launches.'; t.append(tn, tw);
     for (const [id, label, act] of [['embers', '+500 embers', () => { bank += 500; store.set('lantern-bank', bank); return 'Added 500 embers.'; }],
       ['nights', 'Open all nights', () => { opened = NIGHTS; stage = NIGHTS; store.set('lantern-night', opened); return `All ${NIGHTS} nights are open.`; }],
-      ['all', 'Find everything', () => { for (const p of PACKS) for (const i of p.items) owned.add(i[0]); store.set('lantern-owned', JSON.stringify([...owned])); twoOn(); return `Every boat, water, flame, ability and crash is yours. Pick ${PICK} abilities and up to ${CRASH_ON} crashes.`; }]]) {
+      ['all', 'Find everything', () => { for (const p of PACKS) for (const i of p.items) owned.add(i[0]); store.set('lantern-owned', JSON.stringify([...owned])); twoOn(); return `Every boat, water, flame, ability, crash and victory is yours. Pick ${PICK} abilities, up to ${CRASH_ON} crashes and up to ${WIN_ON} victories.`; }]]) {
       const b = document.createElement('button'); b.dataset.test = id; b.textContent = label; b.addEventListener('click', () => { if (busy) return; const said = act(); rec.event('test', { tool: id, bank }); shop(said); }); t.append(b);
     }
     // Erase everything (tester t1, note #73): every lantern- key goes, so the game starts as a new player's would. Two taps, so a stray one does nothing.
@@ -329,7 +364,7 @@ function spin(row, hidden, it, pack, after = '') {
       const col = pack.id === 'flame' || pack.id === 'power' ? `rgb(${it[2]})` : it[2], fl = $('flash');
       fl.style.transition = 'none'; fl.style.background = col; fl.style.opacity = 0.9; void fl.offsetWidth; fl.style.transition = 'opacity 1.1s ease-out'; fl.style.opacity = 0;
       tone(659.25, 0.5, 0.1, 'triangle'); setTimeout(() => tone(987.77, 0.8, 0.1, 'triangle'), 130); setTimeout(() => tone(1318.5, 1, 0.08, 'triangle'), 260);
-      shop((pack.id === 'power' || pack.id === 'crash' ? `You found: ${it[1]}! ${it[3]}` : `You found: ${it[1]}!`) + after);
+      shop((pack.id === 'power' || pack.id === 'crash' || pack.id === 'win' ? `You found: ${it[1]}! ${it[3]}` : `You found: ${it[1]}!`) + after);
     }, 420);
   };
   hop();
@@ -375,7 +410,7 @@ function begin() {
   const fresh = !tower || !onward; onward = false; if (fresh) { runStats = stats; stats = {}; store.set('lantern-stats', '{}'); } // stats last one run; a whole climb is one run
   s = create((Math.random() * 2 ** 31) | 0, tower ? towerStage(climb) : endless ? 1 : stage, tower ? 'tower' : endless, powersOwned(), runStats, climb, reborn); // after a rebirth the story nights run faster
   const boosted = fresh && Object.values(runStats).some(v => v > 0);
-  target = s.x; crash = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; steer.reset();
+  target = s.x; crash = null; victory = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; steer.reset();
   shown = ''; show('play'); hud();
   say((tower ? (climb > LEVELS ? `Tower sector 2, level ${climb - LEVELS} of ${LEVELS}` : `Tower level ${climb} of ${LEVELS}`) : endless ? 'Endless river' : `Night ${stage}`) + (boosted ? '. Your stats are on for this run' : ''), 1800); floor = 0;
   rec.start({ mode: mode(), night: tower || endless ? 0 : stage, ...(tower ? { level: climb } : {}) });
@@ -403,7 +438,8 @@ function finish() {
     } else { $('title').textContent = head(climb); $('line').textContent = `${why} Best ${best > LEVELS ? tag(best) : `${best} of ${LEVELS}`}. Your climb goes on from ${tag(climb)}.`; $('go').textContent = `Try ${tag(climb)} again`; }
   } else if (endless) {
     const pts = score(s), best = Math.max(pts, store.get('lantern-best-endless')); store.set('lantern-best-endless', best);
-    $('title').textContent = `${pts}`; $('line').textContent = `${why} Best ${best}.`; $('go').textContent = 'Play again';
+    const place = onBoard(pts);
+    $('title').textContent = `${pts}`; $('line').textContent = `${why} Best ${best}.${place ? ` Number ${place} on this phone's leaderboard.` : ''}`; $('go').textContent = 'Play again';
   } else {
     const pct = Math.floor(progress(s) * 100), key = `lantern-best-${stage}`, best = Math.max(pct, store.get(key)); store.set(key, best);
     $('title').textContent = won ? 'Dawn' : s.over === 'dark' ? 'Dark' : `Night ${stage}`;
@@ -414,6 +450,64 @@ function finish() {
   $('sub').textContent = gained;
   setTimeout(() => { if (!playing && screen === 'play') show('card'); }, won ? 2600 : crash ? 1300 : 700); // a crash plays out before the card
 }
+// The leaderboard on this phone: a run's score goes in if it beats the tenth. Returns its place, 1 to 10, or 0.
+const playerName = () => cleanName(read('lantern-name', ''));
+let lastRun = null; // the entry the last endless run made, shown in gold
+function onBoard(pts) {
+  if (!(pts > 0)) return 0;
+  const d = new Date(), row = { n: playerName(), s: pts, d: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` };
+  board = [...board, row].sort((a, b) => b.s - a.s).slice(0, BOARD); store.set('lantern-board', JSON.stringify(board));
+  const at = board.indexOf(row); lastRun = at >= 0 ? row : null; return at + 1;
+}
+function boardShow() {
+  if (document.activeElement !== $('name')) $('name').value = playerName();
+  const ol = $('rows'); ol.textContent = '';
+  if (!board.length) { const li = document.createElement('li'); li.textContent = 'No runs yet. Play the endless river to get on the board.'; ol.append(li); return; }
+  board.forEach((r, i) => {
+    const li = document.createElement('li'); if (r === lastRun) li.className = 'me';
+    for (const [c, t] of [['k', `${i + 1}`], ['n', r.n || 'No name'], ['s', `${r.s}`], ['d', r.d ? r.d.slice(5).replace('-', '/') : '']]) { const sp = document.createElement('span'); sp.className = c; sp.textContent = t; li.append(sp); }
+    ol.append(li);
+  });
+}
+
+// Victories: one plays over the river as dawn comes (see the victory pack above). Screen space, drawn over the dawn light.
+let victory = null;
+function winFx(how) {
+  const R = Math.random, N = { vfire: 7, vlamp: 16, vbird: 22, vbow: 1, vstar: 9 }[how] ?? 1;
+  victory = { how, t0: performance.now(), bits: Array.from({ length: N }, (_, i) => ({ i, x: R(), y: R(), d: R(), c: ['#ff2fa8', '#ffb000', '#1e8cff', '#22c55e', '#a855f7', '#ff5a1f'][i % 6], a: Array.from({ length: 26 }, () => [R() * 6.28, 0.5 + R() * 0.5]) })) };
+  rec.event('victory', { how });
+  if (how === 'vfire') for (let i = 0; i < 7; i++) setTimeout(() => { if (snd.ctx) { snd.noise(0.35, 0.12, 1800); tone(880 + i * 90, 0.25, 0.04, 'triangle'); } }, 500 + victory.bits[i].d * 1400);
+  if (how === 'vbird') [659.25, 783.99, 987.77, 1174.66, 987.77].forEach((f, i) => setTimeout(() => tone(f * 2, 0.09, 0.04, 'sine', f * 2.4), 300 + i * 120));
+  if (how === 'vstar') for (let i = 0; i < 5; i++) setTimeout(() => tone(1568 + i * 200, 0.5, 0.04, 'sine', 700), 200 + i * 300);
+}
+function winDraw(now) {
+  const e = (now - victory.t0) / 1000; if (e > 3.2) { victory = null; return; }
+  const fade = Math.min(1, (3.2 - e) / 0.6), u = Math.min(W, H);
+  g.save(); // drawn as paint, not added light: added light washes out to white on the dawn sky
+  if (victory.how === 'vfire') for (const b of victory.bits) { // rockets climb, then burst into falling sparks
+    const t0 = 0.2 + b.d * 1.4, k = e - t0; if (k < 0) continue; const x = W * (0.15 + 0.7 * b.x), top = H * (0.12 + 0.3 * b.y);
+    if (k < 0.5) { const y = H - (H - top) * (k / 0.5); g.fillStyle = '#fff2c0'; g.beginPath(); g.arc(x, y, 2.5 * dpr, 0, 7); g.fill(); continue; }
+    const q = k - 0.5, al = Math.max(0, 1 - q / 1.4) * fade; g.fillStyle = b.c;
+    for (const [a, v] of b.a) { const r = v * u * 0.22 * Math.min(1, q * 2.5), px = x + Math.cos(a) * r, py = top + Math.sin(a) * r + q * q * u * 0.08; g.globalAlpha = al; g.fillStyle = b.c; g.beginPath(); g.arc(px, py, 3.4 * dpr, 0, 7); g.fill(); g.fillStyle = '#ffffff'; g.beginPath(); g.arc(px, py, 1.3 * dpr, 0, 7); g.fill(); }
+    g.globalAlpha = 1;
+  }
+  else if (victory.how === 'vlamp') for (const b of victory.bits) { // paper lanterns rise from the river and sway
+    const k = e - b.d * 0.9; if (k < 0) continue; const x = W * (0.1 + 0.8 * b.x) + Math.sin(k * 2 + b.i) * 10 * dpr, y = H * (0.95 - 0.28 * k * (0.7 + b.y * 0.6)), r = (7 + 7 * b.y) * dpr;
+    const z = g.createRadialGradient(x, y, 0, x, y, r * 3.2); z.addColorStop(0, `rgba(255,190,90,${0.5 * fade})`); z.addColorStop(1, 'rgba(255,190,90,0)'); g.globalCompositeOperation = 'lighter'; g.fillStyle = z; g.fillRect(x - r * 3.2, y - r * 3.2, r * 6.4, r * 6.4); g.globalCompositeOperation = 'source-over';
+    g.globalAlpha = fade; g.fillStyle = '#e8742a'; g.fillRect(x - r * 0.7, y - r, r * 1.4, r * 2); g.fillStyle = '#ffb347'; g.fillRect(x - r * 0.55, y - r * 0.85, r * 1.1, r * 1.7); g.fillStyle = '#fff3d0'; g.fillRect(x - r * 0.3, y + r * 0.2, r * 0.6, r * 0.6); g.globalAlpha = 1;
+  }
+  else if (victory.how === 'vbird') { g.strokeStyle = `rgba(30,30,40,${0.85 * fade})`; g.lineWidth = 2.2 * dpr; g.lineCap = 'round'; // a flock takes off from the banks
+    for (const b of victory.bits) { const k = e - b.d * 0.6; if (k < 0) continue; const side = b.i % 2 ? 1 : -1, x = W / 2 + side * (W * (0.45 - 0.2 * b.y) - k * W * 0.16 * (0.6 + b.x)), y = H * (0.75 - 0.25 * k * (0.8 + b.x)) - b.y * H * 0.1, w = (9 + 6 * b.x) * dpr, f = Math.sin(now / 70 + b.i * 1.7) * w * 0.6;
+      g.beginPath(); g.moveTo(x - w, y - f); g.quadraticCurveTo(x - w * 0.4, y - w * 0.5, x, y); g.quadraticCurveTo(x + w * 0.4, y - w * 0.5, x + w, y - f); g.stroke(); } }
+  else if (victory.how === 'vbow') { const k = Math.min(1, e / 1.2), cy = H * 0.62, r0 = Math.max(W, H * 0.5) * 0.55; g.lineWidth = Math.max(6, u * 0.025); // a rainbow opens across the sky
+    ['235,60,60', '245,150,40', '240,210,40', '70,190,90', '60,140,235', '140,90,220'].forEach((c, i) => { g.strokeStyle = `rgba(${c},${0.55 * fade})`; g.beginPath(); g.arc(W / 2, cy, r0 - i * g.lineWidth, Math.PI, Math.PI + Math.PI * k); g.stroke(); }); }
+  else if (victory.how === 'vstar') for (const b of victory.bits) { // shooting stars across what is left of the night
+    const k = (e - b.d * 2) / 0.7; if (k < 0 || k > 1) continue; const x0 = W * (0.3 + 0.8 * b.x), y0 = H * 0.05 * b.y, x = x0 - k * W * 0.6, y = y0 + k * H * 0.3;
+    const z = g.createLinearGradient(x, y, x + W * 0.15, y - H * 0.075); z.addColorStop(0, `rgba(255,246,200,${fade})`); z.addColorStop(1, 'rgba(255,246,200,0)'); g.strokeStyle = z; g.lineWidth = 2.5 * dpr; g.beginPath(); g.moveTo(x, y); g.lineTo(x + W * 0.15, y - H * 0.075); g.stroke();
+    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(x, y, 2.5 * dpr, 0, 7); g.fill(); }
+  g.restore();
+}
+
 // Crashes look and sound different by what was hit (the lab's experiment from note #69's crash idea; remove crashFx and its drawing to go back).
 // A rock sinks the boat or smashes it, at random; the bank tips it over the bank; ice cracks it; a whirlpool swallows it; a geyser throws it.
 let crash = null;
@@ -464,6 +558,11 @@ $('less').addEventListener('click', () => { stage = Math.max(1, stage - 1); menu
 $('more').addEventListener('click', () => { stage = Math.min(opened, stage + 1); menu(); });
 $('toShop').addEventListener('click', () => show('shop'));
 $('toCredits').addEventListener('click', () => show('credits'));
+$('toBoard').addEventListener('click', () => show('board'));
+$('boardPlay').addEventListener('click', () => { if (busy) return; endless = true; tower = false; begin(); });
+$('name').addEventListener('input', () => { store.set('lantern-name', cleanName($('name').value)); });
+$('name').addEventListener('change', () => { $('name').value = playerName(); boardShow(); });
+$('name').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') $('name').blur(); });
 for (const b of document.querySelectorAll('.back')) b.addEventListener('click', () => show('menu'));
 $('go').addEventListener('click', () => { if (paused) resume(); else if (performance.now() - ended > 600) { if (tower) { onward = s.over === 'dawn' && climbNext > climb; climb = climbNext; } begin(); } });
 // Lab recording (experiments/kit/lab.js): the notice on the menu, the switch on the pause card; begin, finish, quit and the shop call rec.
@@ -523,7 +622,7 @@ function tick() {
     if (e === 'flare') { [523.25, 783.99, 1046.5, 1568].forEach((f, i) => setTimeout(() => tone(f, 0.7, 0.08), i * 70)); glow = 1; say('Flare: the flame holds', 1600); }
     if (e === 'hit') crashFx(s.over);
     if (e === 'out') tone(110, 1.2, 0.2);
-    if (e === 'dawn') [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 1.6, 0.1, 'triangle'), i * 180));
+    if (e === 'dawn') { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 1.6, 0.1, 'triangle'), i * 180)); if (winOn.length) winFx(winOn[Math.floor(Math.random() * winOn.length)]); }
   }
   // Things worth saying aloud: the waterfall coming up, and each step harder on the endless river.
   const soon = fall(s, s.y + 1.3) > 0 || fall(s, s.y + 0.6) > 0;
@@ -725,6 +824,7 @@ function draw(now) {
     g.fillStyle = d; g.fillRect(-20, -20, W + 40, H + 40);
     g.globalCompositeOperation = 'lighter'; flood(g, W, H, dawn, day); g.globalCompositeOperation = 'source-over'; // the morning pours down the river
   }
+  if (victory) winDraw(now);
   // progress: a thin line at the top edge on a story night
   if (!s.endless) { g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * progress(s), 3 * dpr); }
 }
