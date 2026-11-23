@@ -1,0 +1,24 @@
+{
+  // Crumbwar: a many-player ant game. A separate Worker so games-static keeps no server bindings. Its routes
+  // are more specific than the games-static custom domain, so they run first on /crumbwar. Removing this
+  // Worker removes the game and leaves everything else as it was.
+  "name": "games-crumbwar",
+  "account_id": "a20259cba74e506296745f9c67c1f3bc",
+  "main": "./src/index.mjs",
+  "compatibility_date": "2026-11-05",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "play.adamwhite.work/crumbwar", "zone_name": "adamwhite.work" },
+    { "pattern": "play.adamwhite.work/crumbwar/*", "zone_name": "adamwhite.work" }
+  ],
+  // The page and the shared modules are static. Only the socket and the status endpoint run code.
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/crumbwar", "/crumbwar/play", "/crumbwar/api/*"], "not_found_handling": "none" },
+  "durable_objects": { "bindings": [{ "name": "ROOM", "class_name": "Room" }, { "name": "DIRECTORY", "class_name": "Directory" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room", "Directory"] }],
+  // People per room. Bots fill a room to 24 ants and leave as people arrive. See DECISIONS.md for the load numbers.
+  "vars": { "HUMAN_CAP": "60" },
+  // Secret, set with `wrangler secret put`: LOADTEST_KEY (lets the load test skip the origin and per-address limits).
+  // Logs hold no player data: there are no accounts, names are generated, and addresses are not logged.
+  "observability": { "enabled": true }
+}
