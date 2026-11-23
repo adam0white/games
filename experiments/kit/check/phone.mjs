@@ -196,6 +196,8 @@ const GAMES = {
   },
   async lantern(page) {
     const state = () => page.evaluate(() => window.lanternState());
+    // Since note #112 a tap on an owned thing shows it on the whole screen; the button under its pack switches it.
+    const pick = async (page, id) => { await page.click(`[data-item="${id}"]`); await page.click('#look'); await page.click(`[data-switch="${id}"]`); };
     const audioLog = () => page.evaluate(() => window.audioLog);
     const saved = () => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(k => k.startsWith('lantern-')).map(k => [k, localStorage.getItem(k)])));
     // A save in the format players already have.
@@ -271,7 +273,7 @@ const GAMES = {
     const bank0 = (await state()).bank; await page.click('[data-test="embers"]'); assert.equal((await state()).bank, bank0 + 500, 'tester tool adds embers');
     await page.click('[data-stat="hearts"]'); st = await state(); assert.equal(st.bank, bank0 + 500 - 15, 'a stat level costs 15'); assert.equal(JSON.parse((await saved())['lantern-stats']).hearts, 1);
     // An ability switched off stays owned and is kept out of the river; the choice is saved under lantern-off.
-    await page.click('[data-item="boost"]'); assert.equal((await saved())['lantern-off'], '["boost"]'); assert.ok((await state()).owned.includes('boost'), 'switched off, still owned');
+    await pick(page, 'boost'); assert.equal((await saved())['lantern-off'], '["boost"]'); assert.ok((await state()).owned.includes('boost'), 'switched off, still owned');
     await page.click('.back'); assert.match(await page.textContent('#ready'), /Hearts 1/, 'the menu shows the stats ready for the next run');
     await page.click('#play'); st = await state(); assert.equal(st.hearts, 2, 'the stat is on for this run'); assert.ok(!st.on.includes('boost'), 'a switched-off ability is not in the river');
     assert.equal((await saved())['lantern-stats'], '{}', 'the stat is used up when the run starts');
@@ -331,18 +333,18 @@ const GAMES = {
     const abilitiesOn = async () => { const s = await saved(), off = JSON.parse(s['lantern-off'] || '[]'); return ['boost', 'slow', 'size', 'magnet', 'flare'].filter(k => !off.includes(k)); };
     assert.equal((await abilitiesOn()).length, 2, 'finding every ability leaves two on');
     const offOne = (await page.evaluate(() => JSON.parse(localStorage.getItem("lantern-off"))))[0];
-    await page.click(`[data-item="${offOne}"]`); assert.match(await page.textContent('#got'), /Only 2 abilities at a time/); assert.equal((await abilitiesOn()).length, 2);
-    for (const id of ['burst', 'freeze', 'ghost']) await page.click(`[data-item="${id}"]`);
-    await page.click('[data-item="bolt"]'); assert.match(await page.textContent('#got'), /Only 3 crashes at a time/); assert.deepEqual(JSON.parse((await saved())['lantern-crash']), ['burst', 'freeze', 'ghost']);
-    await page.click('[data-item="ghost"]'); await page.click('[data-item="freeze"]'); assert.deepEqual(JSON.parse((await saved())['lantern-crash']), ['burst']);
+    await pick(page, offOne); assert.match(await page.textContent('#got'), /Only 2 abilities at a time/); assert.equal((await abilitiesOn()).length, 2);
+    for (const id of ['burst', 'freeze', 'ghost']) await pick(page, id);
+    await pick(page, 'bolt'); assert.match(await page.textContent('#got'), /Only 3 crashes at a time/); assert.deepEqual(JSON.parse((await saved())['lantern-crash']), ['burst', 'freeze', 'ghost']);
+    await pick(page, 'ghost'); await pick(page, 'freeze'); assert.deepEqual(JSON.parse((await saved())['lantern-crash']), ['burst']);
     await page.click('.back'); await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.hearts = 1; s.shield = 0; s.safe = 0; s.x = 5; });
     await until(page, () => window.lanternState().crash === 'burst', 'a crash plays the crash switched on');
     await until(page, () => window.lanternState().screen === 'card', 'crash card'); await page.click('#toMenu');
     // The victory pack (note #96): up to three on, and dawn plays one of them. lantern-win is a JSON list of ids.
     await page.click('#toShop');
-    for (const id of ['vfire', 'vlamp', 'vbird']) await page.click(`[data-item="${id}"]`);
-    await page.click('[data-item="vbow"]'); assert.match(await page.textContent('#got'), /Only 3 victories at a time/); assert.deepEqual(JSON.parse((await saved())['lantern-win']), ['vfire', 'vlamp', 'vbird']);
-    await page.click('[data-item="vlamp"]'); await page.click('[data-item="vbird"]'); assert.deepEqual(JSON.parse((await saved())['lantern-win']), ['vfire']);
+    for (const id of ['vfire', 'vlamp', 'vbird']) await pick(page, id);
+    await pick(page, 'vbow'); assert.match(await page.textContent('#got'), /Only 3 victories at a time/); assert.deepEqual(JSON.parse((await saved())['lantern-win']), ['vfire', 'vlamp', 'vbird']);
+    await pick(page, 'vlamp'); await pick(page, 'vbird'); assert.deepEqual(JSON.parse((await saved())['lantern-win']), ['vfire']);
     await page.click('.back'); await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.safe = 99; s.bonus = 1000; });
     await until(page, () => window.lanternState().win === 'vfire', 'dawn plays the victory switched on');
     await until(page, () => window.lanternState().screen === 'card', 'dawn card'); await page.click('#toMenu');
@@ -396,11 +398,23 @@ const GAMES = {
     await page.unroute('**/lab-api/board/lantern');
     await sleep(400); await page.reload(); st = await state(); assert.equal(st.name, 'Rio <b>river</b'); assert.equal(st.board.length, 3, 'the board is kept');
     await page.evaluate(() => localStorage.setItem('hf-lab-recording-off', '1')); await page.reload(); // recording off again, as the steps below expect
-    // A look on the whole screen (note #73): tapping an owned boat wears it and hides every button; a tap brings the shop back.
+    // A look on the whole screen (notes #73 and #112): tapping an owned boat shows it and hides every button; a tap brings the shop back,
+    // and the button under the pack wears it.
     await page.click('#toShop'); await page.click('[data-item="red"]'); st = await state();
-    assert.equal(st.looking, 'boat'); assert.equal(st.worn.boat, 'red'); assert.equal(await page.isVisible('#shop'), false, 'the shop hides'); assert.equal(await page.isVisible('#notes-button'), false, 'the notes button hides');
+    assert.equal(st.looking, 'boat'); assert.equal(st.peek, 'red'); assert.equal(st.worn.boat, 'oak', 'showing a boat does not wear it'); assert.equal(await page.isVisible('#shop'), false, 'the shop hides'); assert.equal(await page.isVisible('#notes-button'), false, 'the notes button hides');
     const y0 = (await state()).y; await page.waitForFunction(y => window.lanternSim().y > y + 0.05, y0);
     await page.click('#look'); st = await state(); assert.equal(st.looking, ''); assert.equal(st.screen, 'shop'); assert.equal(await page.isVisible('#shop'), true, 'the shop comes back');
+    await page.click('[data-switch="red"]'); assert.equal((await state()).worn.boat, 'red', 'Use it wears the boat'); assert.equal(await page.isDisabled('[data-switch="red"]'), true);
+    // Crashes, victories and abilities play on the whole screen (note #112), over and over, change nothing and send nothing.
+    for (const [id, field] of [['bolt', 'crash'], ['vbow', 'win']]) {
+      const before = await saved(); await page.locator(`[data-item="${id}"]`).scrollIntoViewIfNeeded(); const top = await page.evaluate(() => document.querySelector('#shop > div').scrollTop);
+      await page.click(`[data-item="${id}"]`); assert.equal(await page.isVisible('#shop'), false);
+      await until(page, x => window.lanternState()[x[1]] === x[0], `${id} plays in the shop`, 4000, [id, field]);
+      await until(page, x => window.lanternState()[x[1]] !== x[0], `${id} ends`, 5000, [id, field]); await until(page, x => window.lanternState()[x[1]] === x[0], `${id} plays again`, 5000, [id, field]);
+      await page.click('#look'); st = await state(); assert.equal(st.crash, null, 'no wreck is left after a look'); assert.equal(st.win, null);
+      assert.deepEqual(await saved(), before, 'showing changes no save'); assert.ok(Math.abs(await page.evaluate(() => document.querySelector('#shop > div').scrollTop) - top) < 2, 'the shop comes back where it was');
+    }
+    await page.click('[data-item="slow"]'); await until(page, () => window.lanternSim().slow > 0, 'the ability is taken in the look'); await page.click('#look');
     // Erase everything (note #73, tester tools): two taps; every lantern- key goes and nothing else.
     await page.click('[data-test="reset"]'); assert.ok(Object.keys(await saved()).length > 3, 'one tap erases nothing');
     await Promise.all([page.waitForEvent('load'), page.click('[data-test="reset"]')]);

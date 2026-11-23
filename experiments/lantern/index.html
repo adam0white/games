@@ -37,6 +37,8 @@
   #flash { position: fixed; inset: 0; opacity: 0; pointer-events: none; z-index: 9; }
   .item.worn { border-color: #fff; box-shadow: 0 0 0 2px #ffb45a; }
   .item.off { opacity: .35; border-style: dashed; filter: grayscale(1); }
+  .item.chosen { outline: 2px solid #ffd9a0; outline-offset: 3px; }
+  .pick { display: flex; align-items: center; justify-content: center; gap: .5em; font-size: .9em; min-height: 46px; } .pick.hint { opacity: .6; font-size: .8em; min-height: 0; } .pick button { min-height: 40px; margin: .1em 0; }
   .pack small.once { display: block; font-size: .8em; color: #ffb45a; margin: .1em 0 .3em; }
   #ready { color: #ffb45a; font-size: .9em; }
   #stars { color: #ffe08a; margin-left: .5em; letter-spacing: .05em; } .pack.reborn b { color: #ffe08a; } .pack.reborn small { display: block; font-size: .8em; opacity: .75; margin: .1em 0 .3em; }
@@ -86,7 +88,7 @@
   <h2>Shop</h2>
   <p class="bank"><span class="dot"></span><span id="bank2">0</span> embers</p>
   <p><button class="back">Back</button></p>
-  <p id="got">Stats last for your next run only. Each pack holds one surprise for 50 embers. Pick two abilities, up to three crashes and up to three victories: tap one to switch it on or off.</p>
+  <p id="got">Stats last for your next run only. Each pack holds one surprise for 50 embers. Tap anything you own to see it on the whole screen; the button under it switches it on or off. Two abilities, three crashes and three victories can be on.</p>
   <div id="packs"></div>
 </div></div>
 <div id="credits" class="screen veil"><div>
@@ -185,7 +187,7 @@ let winOn = [].concat(store.json('lantern-win', [])).filter(k => typeof k === 's
 const BOARD = 10, cleanName = t => String(t ?? '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 16);
 let board = [].concat(store.json('lantern-board', [])).filter(r => r && typeof r.s === 'number' && Number.isFinite(r.s)).map(r => ({ n: cleanName(r.n), s: r.s, d: typeof r.d === 'string' ? r.d.slice(0, 10) : '' })).slice(0, BOARD);
 if (read('lantern-board') === null && store.get('lantern-best-endless') > 0) { board = [{ n: cleanName(read('lantern-name', '')), s: store.get('lantern-best-endless'), d: '' }]; store.set('lantern-board', JSON.stringify(board)); } // a best from before the board
-const skin = kind => { const pack = PACKS.find(p => p.id === kind); return pack.items.find(i => i[0] === worn[kind]) ?? pack.items[0]; };
+const skin = kind => { if (looking === kind && peek) return peek; const pack = PACKS.find(p => p.id === kind); return pack.items.find(i => i[0] === worn[kind]) ?? pack.items[0]; };
 // A shop button shows the thing itself: the boat drawn small, or the flame after half a second of burning.
 const shots = new Map();
 function icon(q, id, col) { // a crash effect, drawn small for its shop button
@@ -227,7 +229,7 @@ addEventListener('resize', resize); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', lastLevel = 1, nearFall = false, sayTimer = 0, shown = '', weather = '';
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
-window.lanternState = () => ({ sharing, tab, asked, shared: shared ? shared.length : -1, x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, field: s.field, crashOn, crash: crash && crash.how, winOn, win: victory && victory.how, name: playerName(), board, unit: unit / dpr }); // read by the browser checks
+window.lanternState = () => ({ sharing, tab, asked, shared: shared ? shared.length : -1, x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, peek: peek && peek[0], field: s.field, crashOn, crash: crash && crash.how, winOn, win: victory && victory.how, name: playerName(), board, unit: unit / dpr }); // read by the browser checks
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 
 const cards = screens(['menu', 'shop', 'credits', 'card', 'board']);
@@ -300,20 +302,8 @@ function shop(text) {
       if (has && pack.id === 'power' && off.has(it[0])) b.className = 'item off';
       if (pack.id === 'crash') b.className = 'item' + (!has ? ' locked' : crashOn.includes(it[0]) ? ' worn' : ' off');
       if (pack.id === 'win') b.className = 'item' + (!has ? ' locked' : winOn.includes(it[0]) ? ' worn' : ' off');
-      if (has) { b.style.background = swatch(pack.id, it); b.addEventListener('click', () => { if (busy) return;
-        if (pack.id === 'crash') { // up to three crash effects on; with none on, a crash fits what was hit
-          if (crashOn.includes(it[0])) crashOn = crashOn.filter(k => k !== it[0]); else if (crashOn.length >= CRASH_ON) { shop(`Only ${CRASH_ON} crashes at a time. Switch one off first.`); return; } else crashOn.push(it[0]);
-          store.set('lantern-crash', JSON.stringify(crashOn)); rec.event('crash-pick', { crash: it[0], on: crashOn.includes(it[0]) });
-          shop(crashOn.includes(it[0]) ? `${it[1]} is on. ${it[3]}` : crashOn.length ? `${it[1]} is off.` : `${it[1]} is off. With no crash on, each crash fits what you hit.`); return; }
-        if (pack.id === 'win') { // up to three victories on; with none on, dawn is plain
-          if (winOn.includes(it[0])) winOn = winOn.filter(k => k !== it[0]); else if (winOn.length >= WIN_ON) { shop(`Only ${WIN_ON} victories at a time. Switch one off first.`); return; } else winOn.push(it[0]);
-          store.set('lantern-win', JSON.stringify(winOn)); rec.event('win-pick', { win: it[0], on: winOn.includes(it[0]) });
-          shop(winOn.includes(it[0]) ? `${it[1]} is on. ${it[3]}` : winOn.length ? `${it[1]} is off.` : `${it[1]} is off. With no victory on, dawn comes plain.`); return; }
-        if (pack.id === 'power') { // tap an ability to keep it out of the river, tap again to bring it back; two at most
-        if (off.has(it[0]) && powersOwned().length >= PICK) { shop(`Only ${PICK} abilities at a time. Switch one off first.`); return; }
-        if (off.has(it[0])) off.delete(it[0]); else off.add(it[0]); store.set('lantern-off', JSON.stringify([...off]));
-        rec.event('ability', { ability: it[0], on: !off.has(it[0]) }); shop(off.has(it[0]) ? `${it[1]} is off. It will not show up in the river.` : `${it[1]} is on. ${it[3]}`); return; }
-        worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); shop(`${it[1]} is on.`); look(pack.id); }); } else b.disabled = true;
+      if (has) { b.style.background = swatch(pack.id, it); b.addEventListener('click', () => { if (busy) return; chosen[pack.id] = it[0]; look(pack.id, it); }); } else b.disabled = true;
+      if (chosen[pack.id] === it[0]) b.classList.add('chosen');
       row.append(b);
     }
     const buy = document.createElement('button'); buy.dataset.pack = pack.id;
@@ -330,13 +320,22 @@ function shop(text) {
       rec.event('buy', { pack: pack.id, item: it[0], bank });
       $('bank2').textContent = bank; audio(); spin(row, rest.map(i => i[0]), it, pack, after);
     });
-    div.append(name, row, buy); box.append(div);
+    const it = pack.items.find(i => i[0] === chosen[pack.id] && owned.has(i[0])), pick = document.createElement('div'); pick.className = 'pick';
+    if (it) { // the thing last shown from this pack, and the button that switches it on or off (note #112)
+      const on = pack.id === 'crash' ? crashOn.includes(it[0]) : pack.id === 'win' ? winOn.includes(it[0]) : pack.id === 'power' ? !off.has(it[0]) : worn[pack.id] === it[0];
+      const what = document.createElement('span'); what.textContent = `${it[1]}: ${on ? (pack.id === 'boat' || pack.id === 'water' || pack.id === 'flame' ? 'in use' : 'on') : 'off'}`;
+      const sw = document.createElement('button'); sw.className = 'small'; sw.dataset.switch = it[0];
+      sw.textContent = pack.id === 'boat' || pack.id === 'water' || pack.id === 'flame' ? 'Use it' : on ? 'Switch off' : 'Switch on'; sw.disabled = on && (pack.id === 'boat' || pack.id === 'water' || pack.id === 'flame');
+      sw.addEventListener('click', () => { if (!busy) flip(pack, it); });
+      pick.append(what, sw);
+    } else { pick.className = 'pick hint'; pick.textContent = owned.size && pack.items.some(i => owned.has(i[0])) ? 'Tap one to see it.' : ''; }
+    div.append(name, row, pick, buy); box.append(div);
   }
   if (document.getElementById('notes-button')) { // tester tools: only in a browser that opened a tester's private link; to be removed before launch
     const t = document.createElement('div'); t.className = 'pack test'; const tn = document.createElement('b'); tn.textContent = 'Tester tools'; const tw = document.createElement('small'); tw.className = 'once'; tw.textContent = 'For testing only. These go away when the game launches.'; t.append(tn, tw);
     for (const [id, label, act] of [['embers', '+500 embers', () => { bank += 500; store.set('lantern-bank', bank); return 'Added 500 embers.'; }],
       ['nights', 'Open all nights', () => { opened = NIGHTS; stage = NIGHTS; store.set('lantern-night', opened); return `All ${NIGHTS} nights are open.`; }],
-      ['all', 'Find everything', () => { for (const p of PACKS) for (const i of p.items) owned.add(i[0]); store.set('lantern-owned', JSON.stringify([...owned])); twoOn(); return `Every boat, water, flame, ability, crash and victory is yours. Pick ${PICK} abilities, up to ${CRASH_ON} crashes and up to ${WIN_ON} victories.`; }]]) {
+      ['all', 'Find everything', () => { for (const p of PACKS) for (const i of p.items) owned.add(i[0]); store.set('lantern-owned', JSON.stringify([...owned])); twoOn(); return `Every boat, water, flame, ability, crash and victory is yours. Tap one to see it. Up to ${PICK} abilities, ${CRASH_ON} crashes and ${WIN_ON} victories can be on.`; }]]) {
       const b = document.createElement('button'); b.dataset.test = id; b.textContent = label; b.addEventListener('click', () => { if (busy) return; const said = act(); rec.event('test', { tool: id, bank }); shop(said); }); t.append(b);
     }
     // Erase everything (tester t1, note #73): every lantern- key goes, so the game starts as a new player's would. Two taps, so a stray one does nothing.
@@ -352,6 +351,23 @@ function shop(text) {
     t.append(wipe);
     box.append(t);
   }
+}
+// The button under a pack: what a tap on the thing itself did before note #112.
+const chosen = {};
+function flip(pack, it) {
+  if (pack.id === 'crash') { // up to three crash effects on; with none on, a crash fits what was hit
+    if (crashOn.includes(it[0])) crashOn = crashOn.filter(k => k !== it[0]); else if (crashOn.length >= CRASH_ON) { shop(`Only ${CRASH_ON} crashes at a time. Switch one off first.`); return; } else crashOn.push(it[0]);
+    store.set('lantern-crash', JSON.stringify(crashOn)); rec.event('crash-pick', { crash: it[0], on: crashOn.includes(it[0]) });
+    shop(crashOn.includes(it[0]) ? `${it[1]} is on. ${it[3]}` : crashOn.length ? `${it[1]} is off.` : `${it[1]} is off. With no crash on, each crash fits what you hit.`); return; }
+  if (pack.id === 'win') { // up to three victories on; with none on, dawn is plain
+    if (winOn.includes(it[0])) winOn = winOn.filter(k => k !== it[0]); else if (winOn.length >= WIN_ON) { shop(`Only ${WIN_ON} victories at a time. Switch one off first.`); return; } else winOn.push(it[0]);
+    store.set('lantern-win', JSON.stringify(winOn)); rec.event('win-pick', { win: it[0], on: winOn.includes(it[0]) });
+    shop(winOn.includes(it[0]) ? `${it[1]} is on. ${it[3]}` : winOn.length ? `${it[1]} is off.` : `${it[1]} is off. With no victory on, dawn comes plain.`); return; }
+  if (pack.id === 'power') { // switch an ability off to keep it out of the river; two at most
+    if (off.has(it[0]) && powersOwned().length >= PICK) { shop(`Only ${PICK} abilities at a time. Switch one off first.`); return; }
+    if (off.has(it[0])) off.delete(it[0]); else off.add(it[0]); store.set('lantern-off', JSON.stringify([...off]));
+    rec.event('ability', { ability: it[0], on: !off.has(it[0]) }); shop(off.has(it[0]) ? `${it[1]} is off. It will not show up in the river.` : `${it[1]} is on. ${it[3]}`); return; }
+  worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); shop(`${it[1]} is on.`);
 }
 // Opening a pack: a light hops between the hidden things, slows, and stops on the find; then the whole screen fills with its colour.
 let busy = false;
@@ -374,24 +390,37 @@ function spin(row, hidden, it, pack, after = '') {
   };
   hop();
 }
-// A look on the whole screen (tester t1, note #73): tapping a boat, water or flame you own wears it, hides every button and shows
-// a calm river with that look, lit wider than in play. One tap anywhere brings the shop back.
-let looking = '';
-function look(kind) {
+// A look on the whole screen (tester t1, notes #73 and #112): tapping anything you own in the shop hides every button and shows it
+// on a calm river, lit wider than in play: a boat, water or flame as it would look; a crash or a victory played over and over;
+// an ability floating down to the boat and taken. Showing changes nothing; the button under the pack switches it on or off.
+// One tap anywhere brings the shop back where it was.
+let looking = '', peek = null, peekT = 0, peekN = -1, peekScroll = 0;
+const PEEK = { crash: [2.8, 0.5], win: [3.8, 0.4], power: [3.4, 0.2] }; // seconds per showing, and the wait before it plays
+function look(kind, it) {
   if (looking) return;
-  looking = kind; s = create(7, 1, false, []); s.light = 1; target = s.x; crash = null; size = 1;
+  peekScroll = $('shop').firstElementChild.scrollTop;
+  looking = kind; peek = it ?? null; peekT = performance.now(); peekN = -1; s = create(7, 1, false, []); s.light = 1; target = s.x; crash = null; victory = null; shake = 0; size = 1;
   show('look'); $('look').classList.add('on'); document.body.classList.add('looking');
   say('Tap to go back', 1400);
 }
 function unlook() {
   if (!looking) return;
-  looking = ''; $('look').classList.remove('on'); document.body.classList.remove('looking'); $('say').style.opacity = 0;
-  s = create(1, stage); show('shop');
+  looking = ''; peek = null; crash = null; victory = null; shake = 0; $('look').classList.remove('on'); document.body.classList.remove('looking'); $('say').style.opacity = 0;
+  s = create(1, stage); show('shop'); $('shop').firstElementChild.scrollTop = peekScroll;
 }
 $('look').addEventListener('pointerdown', e => { e.preventDefault(); unlook(); });
 function drift(dt) { // the river flows by under the boat; no rocks, no pickups, nothing ends it
   s.t += dt; s.y += 0.45 * dt; s.light = 1;
   s.x = centre(s, s.y) + 0.06 * Math.sin(s.t * 0.7); target = centre(s, s.y + 0.3) + 0.06 * Math.sin(s.t * 0.7 + 0.5);
+  const [every, wait] = PEEK[looking] ?? [0, 0]; if (!every || !peek) return;
+  const e = (performance.now() - peekT) / 1000, n = Math.floor(e / every), at = e - n * every, fresh = n !== peekN && at >= wait; // by the clock, as the effects are
+  if (looking === 'crash') { if (at < wait) crash = null; if (fresh) { peekN = n; crashFx('', peek[0]); } }
+  if (looking === 'win' && fresh) { peekN = n; winFx(peek[0], true); }
+  if (looking === 'power') {
+    for (const k of POWERS) s[k] = Math.max(0, s[k] - dt);
+    if (fresh) { peekN = n; for (const k of POWERS) s[k] = 0; s.powers = [{ x: centre(s, s.y + 0.55), y: s.y + 0.55, got: false, kind: peek[0], big: false }]; }
+    for (const e of s.powers) if (!e.got) { e.y = s.y + Math.max(0, 0.55 - 0.45 * (at - wait)); e.x = centre(s, e.y); if (e.y <= s.y) { e.got = true; s[e.kind] = LAST[e.kind]; tone(880, 0.25, 0.08, 'triangle', 440); } } // it floats down by the clock
+  }
 }
 function say(text, ms = 2200) { const el = $('say'); el.textContent = text; el.style.opacity = 1; clearTimeout(sayTimer); sayTimer = setTimeout(() => { el.style.opacity = 0; }, ms); }
 
@@ -505,10 +534,10 @@ function boardShow() {
 
 // Victories: one plays over the river as dawn comes (see the victory pack above). Screen space, drawn over the dawn light.
 let victory = null;
-function winFx(how) {
+function winFx(how, shown = false) { // shown: a shop preview, not a dawn; it is not recorded
   const R = Math.random, N = { vfire: 7, vlamp: 16, vbird: 22, vbow: 1, vstar: 9 }[how] ?? 1;
   victory = { how, t0: performance.now(), bits: Array.from({ length: N }, (_, i) => ({ i, x: R(), y: R(), d: R(), c: ['#ff2fa8', '#ffb000', '#1e8cff', '#22c55e', '#a855f7', '#ff5a1f'][i % 6], a: Array.from({ length: 26 }, () => [R() * 6.28, 0.5 + R() * 0.5]) })) };
-  rec.event('victory', { how });
+  if (!shown) rec.event('victory', { how });
   if (how === 'vfire') for (let i = 0; i < 7; i++) setTimeout(() => { if (snd.ctx) { snd.noise(0.35, 0.12, 1800); tone(880 + i * 90, 0.25, 0.04, 'triangle'); } }, 500 + victory.bits[i].d * 1400);
   if (how === 'vbird') [659.25, 783.99, 987.77, 1174.66, 987.77].forEach((f, i) => setTimeout(() => tone(f * 2, 0.09, 0.04, 'sine', f * 2.4), 300 + i * 120));
   if (how === 'vstar') for (let i = 0; i < 5; i++) setTimeout(() => tone(1568 + i * 200, 0.5, 0.04, 'sine', 700), 200 + i * 300);
@@ -545,11 +574,11 @@ function winDraw(now) {
 // A rock sinks the boat or smashes it, at random; the bank tips it over the bank; ice cracks it; a whirlpool swallows it; a geyser throws it.
 let crash = null;
 const SINKS = ['rock', 'chaser', 'hidden', 'isle', 'spinner', 'log'];
-function crashFx(cause) {
-  const how = crashOn.length ? crashOn[Math.floor(Math.random() * crashOn.length)] : cause === 'bank' ? 'tip' : cause === 'ice' ? 'crack' : cause === 'pool' ? 'swirl' : cause === 'geyser' ? 'throw' : SINKS.includes(cause) && Math.random() < 0.5 ? 'sink' : 'smash';
+function crashFx(cause, shown = '') { // shown: a crash effect previewed in the shop; it is played as asked and not recorded
+  const how = shown || (crashOn.length ? crashOn[Math.floor(Math.random() * crashOn.length)] : cause === 'bank' ? 'tip' : cause === 'ice' ? 'crack' : cause === 'pool' ? 'swirl' : cause === 'geyser' ? 'throw' : SINKS.includes(cause) && Math.random() < 0.5 ? 'sink' : 'smash');
   const side = Math.sign(s.x - centre(s, s.y)) || 1;
   crash = { how, t0: performance.now(), side, sparks: Array.from({ length: 22 }, () => ({ a: Math.random() * 6.28, v: 0.12 + Math.random() * 0.16 })), bits: Array.from({ length: 9 }, (_, i) => ({ a: i / 9 * 6.28 + Math.random() * 0.5, v: 0.08 + Math.random() * 0.1, r: Math.random() * 6.28, w: (Math.random() - 0.5) * 14 })) };
-  rec.event('crash', { cause, how });
+  if (!shown) rec.event('crash', { cause, how });
   if (!snd.ctx) return;
   if (how === 'sink') { snd.noise(0.25, 0.25, 600); [0, 140, 300, 480].forEach((d, i) => setTimeout(() => tone(260 - 40 * i, 0.18, 0.12, 'sine', -90), d)); shake = 0.5; }
   else if (how === 'smash') { snd.noise(0.35, 0.45, 900); tone(90, 0.4, 0.3, 'square', -50); setTimeout(() => snd.noise(0.2, 0.2, 2400), 90); shake = 1.1; }
@@ -725,7 +754,7 @@ function wreck(now) {
   else { const up = Math.sin(Math.min(1, e / 1.1) * Math.PI) * 0.12 * unit; g.translate(0, -up); g.rotate(e * 5 * crash.side); g.scale(1 + up / unit * 3, 1 + up / unit * 3); hull(g, id, unit, col, 0); rings(2); }
 }
 function draw(now) {
-  const dawn = s.endless ? 0 : Math.max(0, (progress(s) - 0.86) / 0.14), day = s.over === 'dawn' ? Math.min(1, (now - ended) / 2500) : 0;
+  const dawn = looking === 'win' ? 1 : s.endless ? 0 : Math.max(0, (progress(s) - 0.86) / 0.14), day = looking === 'win' ? 0.7 : s.over === 'dawn' ? Math.max(0, Math.min(1, (now - ended) / 2500)) : 0; // a frame's time can be a little older than ended, and a day below 0 gave the dawn light a negative radius
   const ox = shake * (Math.random() - 0.5) * 14 * dpr, oy = shake * (Math.random() - 0.5) * 14 * dpr;
   g.setTransform(1, 0, 0, 1, ox, oy);
   const wet = skin('water'), fire = skin('flame')[2];
@@ -795,12 +824,12 @@ function draw(now) {
   }
   // boat
   const bx = sx(s.x), by = sy(s.y), lean = Math.max(-0.5, Math.min(0.5, (target - s.x) * 4));
-  g.save(); g.translate(bx, by); g.rotate(lean * 0.5); size += ((looking ? 2.2 : boat(s) / BOAT) - size) * 0.2; g.scale(size * 1.2, size * 1.2); // drawn a little larger than it collides; a look in the shop shows it larger still
+  g.save(); g.translate(bx, by); g.rotate(lean * 0.5); size += ((looking ? (s.size ? 1.3 : 2.2) : boat(s) / BOAT) - size) * 0.2; g.scale(size * 1.2, size * 1.2); // drawn a little larger than it collides; a look in the shop shows it larger still
   if (crash) wreck(now); else { if (playing || looking) wake(g, unit, now / 1000); hull(g, skin('boat')[0], unit, skin('boat')[2], now / 1000); }
   g.restore();
   // darkness with a hole of light
   const flick = 1 + Math.sin(now / 90) * 0.015 + Math.sin(now / 37) * 0.01, r = (sight(s) + glow * 0.09) * unit * flick, flash = dazzle(s) < 0;
-  const dark = flash ? 0.25 : looking ? 0.45 : Math.max(0, 0.97 - dawn * 0.75 - day); // a look shown in the shop is lit wider
+  const dark = flash ? 0.25 : looking === 'win' ? 0.2 : looking ? 0.45 : Math.max(0, 0.97 - dawn * 0.75 - day); // a look shown in the shop is lit wider
   const m = g.createRadialGradient(bx, by - 0.05 * unit, r * 0.15, bx, by - 0.05 * unit, r);
   m.addColorStop(0, 'rgba(4,6,12,0)'); m.addColorStop(0.7, `rgba(4,6,12,${dark * 0.55})`); m.addColorStop(1, `rgba(4,6,12,${dark})`);
   g.fillStyle = m; g.fillRect(-20, -20, W + 40, H + 40);
@@ -854,8 +883,8 @@ function draw(now) {
   flameGlow(g, fire0, skin('flame')[0], bx, by, looking ? unit * 2.2 : unit, fire, s.light, now / 1000); // the flame streams out behind the lantern
   g.globalCompositeOperation = 'source-over';
   // boost: streaks of speed down the screen. slow water: a violet hush at the edges.
-  if (playing && s.boost) { g.strokeStyle = `rgba(255,235,170,${0.5 * Math.min(1, s.boost * 2)})`; g.lineWidth = 2 * dpr; g.beginPath(); for (let i = 0; i < 18; i++) { const x = (Math.sin(i * 53.1) * 0.5 + 0.5) * W, y = ((Math.sin(i * 17.7) * 0.5 + 0.5) * H + now * 2.4 * dpr) % H; g.moveTo(x, y); g.lineTo(x, y + 46 * dpr); } g.stroke(); }
-  if (playing && s.slow) { const v = g.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.7); v.addColorStop(0, 'rgba(150,110,255,0)'); v.addColorStop(1, `rgba(150,110,255,${0.3 * Math.min(1, s.slow * 2)})`); g.fillStyle = v; g.fillRect(-20, -20, W + 40, H + 40); }
+  if ((playing || looking) && s.boost) { g.strokeStyle = `rgba(255,235,170,${0.5 * Math.min(1, s.boost * 2)})`; g.lineWidth = 2 * dpr; g.beginPath(); for (let i = 0; i < 18; i++) { const x = (Math.sin(i * 53.1) * 0.5 + 0.5) * W, y = ((Math.sin(i * 17.7) * 0.5 + 0.5) * H + now * 2.4 * dpr) % H; g.moveTo(x, y); g.lineTo(x, y + 46 * dpr); } g.stroke(); }
+  if ((playing || looking) && s.slow) { const v = g.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.7); v.addColorStop(0, 'rgba(150,110,255,0)'); v.addColorStop(1, `rgba(150,110,255,${0.3 * Math.min(1, s.slow * 2)})`); g.fillStyle = v; g.fillRect(-20, -20, W + 40, H + 40); }
   // rain and lightning lie over everything
   if (playing && rain(s, s.y)) { g.strokeStyle = 'rgba(190,215,235,.4)'; g.lineWidth = 1.5 * dpr; g.beginPath(); for (let i = 0; i < 40; i++) { const x = (Math.sin(i * 91.7) * 0.5 + 0.5) * W, y = ((Math.sin(i * 47.3) * 0.5 + 0.5) * H + now * 1.6 * dpr) % H; g.moveTo(x, y); g.lineTo(x - 5 * dpr, y + 16 * dpr); } g.stroke(); }
   if (flash) { g.fillStyle = 'rgba(235,240,255,.35)'; g.fillRect(-20, -20, W + 40, H + 40); }
@@ -868,7 +897,7 @@ function draw(now) {
   }
   if (victory) winDraw(now);
   // progress: a thin line at the top edge on a story night
-  if (!s.endless) { g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * progress(s), 3 * dpr); }
+  if (!s.endless && !looking) { g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * progress(s), 3 * dpr); }
 }
 
 function frame(now) {
