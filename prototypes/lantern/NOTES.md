@@ -109,7 +109,7 @@ How it is built: powers draw from their own random stream and sit in their own l
 Checked:
 - 440 story rivers (nights 1 to 20 sampled, 40 seeds each) with powers switched off: rocks and embers identical to main.
 - With powers on, rocks matched main on all but 3 of 440 story rivers; one of them on night 5. In those a power taken shifted ice by a hair and one later pickup moved. Unresolved, judged harmless.
-- Audit, 200 rivers a night, each ridden four ways (no powers, boost only, slow only, all three) because a power shifts when the boat meets each moving rock: no closed river, no buried pickup of any kind. Narrowest gap on story nights 0.048 for the usual boat and 0.030 for the bigger one; on the endless river, ridden 30 nights long, 0.038 and 0.020.
+- Audit, 200 rivers a night, each ridden five ways (no powers, boost only, slow only, all powers, all powers with calm water at its top level) because a power shifts when the boat meets each moving rock: no closed river, no buried pickup of any kind. Narrowest gap on story nights 0.048 for the usual boat and 0.030 for the bigger one; on the endless river, ridden 30 nights long, 0.038 and 0.020.
 - Chromium phone profile: each power taken, said aloud and drawn; under slow water the boat covered 0.55 of river in 1.5 s while the percent gained 1.01, the same as without it. No page errors.
 - Careful bot, 100 runs, dawn reached before and after: night 1 20 and 23, night 3 20 and 21, night 5 18 and 22. Not tuned.
 
@@ -147,13 +147,13 @@ Checked: all six boats and flames drawn in a phone-sized Chromium with no page e
 
 ## 2026-11-23: Abilities pack and the pack opening (note #35, fifth and sixth items)
 
-- A fourth pack, Abilities, holds the powers. A power lies in the river only once it has been found in the pack, so a new player meets none until the first Abilities pack is opened. This replaces "powers are free on every night" from the powers note above. The other three packs still sell looks only.
+- A fourth pack, Abilities, holds the powers. A power lies in the river only once it is owned. Boost is owned from the start, as one boat, water and flame are, so a new player meets powers at once; the other four come from the pack. This replaces "powers are free on every night" from the powers note above. The other three packs still sell looks only.
 - The pack holds five powers: the tester's three and two from the lab. Magnet (pink): for 7 s embers within 0.32 swim to the boat. Flare (white sun): the flame is filled and does not fade for 6 s.
 - Opening any pack: a light hops between the things not yet found, slows, and stops on the find; then the whole screen fills with the find's colour and fades. The pack is paid for and the find saved at the tap, so leaving mid-animation loses nothing, and a second tap during it does nothing.
 
 Checked: in a phone-sized Chromium an Abilities pack cost 50, saved its find, showed the hop and the flash, and the next run laid only that power in the river; two fast taps on another pack charged once. Audit clean with all five powers (an ember a magnet has pulled is left out of the buried-pickup count). No page errors.
 
-Not checked: whether locking powers behind the pack is what the tester meant (asked); the hop's feel and sound on a phone.
+Not checked: whether locking powers behind the pack is what the tester meant (to ask); the hop's feel and sound on a phone.
 
 ## 2026-11-23: tower climb (note #35, last item)
 
@@ -166,4 +166,4 @@ The tester's words: the river climbs upward first, and when it runs straight you
 
 Checked: audit over 200 tower rivers at night 3's and night 12's things, each ridden four ways: narrowest gap 0.057, no buried pickup. Careful bot reached the top 15 and 18 times in 100. Phone-sized Chromium: the menu still fits, a climb ran to the top, the card and best floor were right, the story night stayed where it was. No page errors.
 
-Not checked: whether this is what the tester pictured (asked); how the sharp turns feel under a thumb.
+Not checked: whether this is what the tester pictured (to ask); how the sharp turns feel under a thumb.

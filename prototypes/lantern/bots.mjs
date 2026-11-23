@@ -39,8 +39,8 @@ if (process.argv[3] !== 'audit') for (const stage of [1, 3, 5, 6, 8, 11, 12, 15,
 if (process.argv[3] === 'audit') for (const stage of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 0, -3, -12]) { // 0 is the endless river; -n is the tower with night n's things
   let worst = Infinity, worstBig = Infinity, tight = 0, buried = 0, pickups = 0; const swing = Array(10).fill(0), all = Array(10).fill(0), seen = new Set();
   for (let seed = 1; seed <= (stage ? runs : Math.ceil(runs / 10)); seed++) { // the endless river is ridden far past its last step harder, on fewer seeds
-    for (const set of [[], ['boost'], ['slow'], undefined]) { // powers shift when the boat meets each moving rock, so every river is ridden four ways
-    const s = create(seed, Math.abs(stage) || 1, stage < 0 ? 'tower' : !stage, set); let min = Infinity; seen.clear(); const checked = new Set();
+    for (const [set, stats] of [[[]], [['boost']], [['slow']], [undefined], [undefined, { calm: 3 }]]) { // powers and calm water shift when the boat meets each moving rock, so every river is ridden five ways
+    const s = create(seed, Math.abs(stage) || 1, stage < 0 ? 'tower' : !stage, set, stats); let min = Infinity; seen.clear(); const checked = new Set();
     while (!s.over && s.y < 30 * GOAL) {
       s.safe = 1e9; s.light = 1; step(s, centre(s, s.y));
       // A pickup is buried if a boat sitting on it at the moment it comes level would touch a rock.

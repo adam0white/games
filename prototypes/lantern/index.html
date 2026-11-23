@@ -36,7 +36,7 @@
   .item.hop { border-color: #fff; border-style: solid; background: #ffffff55; box-shadow: 0 0 14px #fff; transform: scale(1.15); opacity: 1; }
   #flash { position: fixed; inset: 0; opacity: 0; pointer-events: none; z-index: 9; }
   .item.worn { border-color: #fff; box-shadow: 0 0 0 2px #ffb45a; }
-  #got { min-height: 1.6em; color: #ffe6bd; }
+  #got { min-height: 1.6em; color: #ffe6bd; position: sticky; top: 0; z-index: 2; margin: 0; padding: .45em .3em; background: #070b14f2; border-radius: 0 0 12px 12px; } /* stays in view while the packs scroll */
   #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); display: none; text-align: left; pointer-events: none; text-shadow: 0 1px 6px #000; }
   #hearts { font: 26px/1 sans-serif; color: #ff4d5e; letter-spacing: 2px; }
   #embers { font-size: 26px; line-height: 1.3; color: #ffd9a0; }
@@ -71,7 +71,7 @@
   <h2>Shop</h2>
   <p class="bank"><span class="dot"></span><span id="bank2">0</span> embers</p>
   <p><button class="back">Back</button></p>
-  <p id="got">Stats make every run easier. Each pack holds one surprise for 50 embers. Abilities you find will lie in the river.</p>
+  <p id="got">Stats make every run easier. Each pack holds one surprise for 50 embers. Abilities you own lie in the river.</p>
   <div id="packs"></div>
 </div></div>
 <div id="credits" class="screen veil"><div>
@@ -114,7 +114,7 @@ const COST = 50;
 const STAT = [['hearts', 'Hearts', 'Start with one more heart'], ['barrier', 'Barrier', 'A shield takes one more hit'], ['calm', 'Calm water', 'The river runs a little slower'], ['wick', 'Long wick', 'The flame fades more slowly'], ['pull', 'Long reach', 'Take embers from further away']];
 let stats = store.json('lantern-stats', {});
 const statCost = id => 40 * ((stats[id] || 0) + 1);
-let owned = new Set(['oak', 'blue', 'amber', ...store.json('lantern-owned', [])]);
+let owned = new Set(['oak', 'blue', 'amber', 'boost', ...store.json('lantern-owned', [])]);
 let worn = { boat: 'oak', water: 'blue', flame: 'amber', ...store.json('lantern-worn', {}) };
 const powersOwned = () => POWERS.filter(k => owned.has(k)); // only abilities found in the shop lie in the river
 const skin = kind => { const pack = PACKS.find(p => p.id === kind); return pack.items.find(i => i[0] === worn[kind]) ?? pack.items[0]; };
@@ -172,7 +172,7 @@ function shop(text) {
     const txt = document.createElement('span'); txt.textContent = `${label} ${'●'.repeat(lv)}${'○'.repeat(top - lv)}`; const sm = document.createElement('small'); sm.textContent = what; txt.append(sm);
     const b = document.createElement('button'); b.className = 'small'; b.dataset.stat = id; b.textContent = lv >= top ? 'Full' : `+1 · ${statCost(id)}`; b.disabled = lv >= top || bank < statCost(id); b.setAttribute('aria-label', `${label}: ${what}`);
     b.addEventListener('click', () => {
-      const cost = statCost(id); if (bank < cost || (stats[id] || 0) >= top) return;
+      const cost = statCost(id); if (busy || bank < cost || (stats[id] || 0) >= top) return;
       bank -= cost; store.set('lantern-bank', bank); stats[id] = (stats[id] || 0) + 1; store.set('lantern-stats', JSON.stringify(stats));
       audio(); tone(523.25, 0.3, 0.1, 'triangle'); setTimeout(() => tone(783.99, 0.5, 0.1, 'triangle'), 100);
       shop(`${label} is now ${stats[id]} of ${top}. ${what}.`);
