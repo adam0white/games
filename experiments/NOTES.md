@@ -82,3 +82,8 @@ Not built in this run. The idea fits several very different games (a story with 
 ## 2026-11-23: Borrowed Time, from tester t1's note #107
 
 Tester t1 asked for a game where you have forgotten who you are, have several abilities, and every use of an ability shortens your life. It is built as `experiments/borrowed/` (served at `/borrowed/`): three chapters on one candle, four abilities, and at the end of each chapter you pick your own face out of six. It is a new idea, not a rebuild of an archived game. See its `NOTES.md` for rules, bot results and what is not verified. The same day tester t1 picked Fix-It Stall as the game to work on more (note #103); that round is recorded in `experiments/fixit/NOTES.md`.
+
+## 2026-11-23: two check findings (from the Lantern note #112 run)
+
+- **`npm run check:lane` fails in a path with a space.** `scripts/experiments.test.mjs` builds a path with `new URL('..', import.meta.url).pathname`, which keeps `%20`. So "the real checkout plans without a collision" fails in any clone under `~/Library/Application Support/`, which includes every notes watcher run. It passes in a path without spaces. `fileURLToPath` would fix it. Not changed here, because it is shared code outside `experiments/`.
+- **The kit self-test is flaky on Chromium.** The line `hint: not before the delay` (from `kit/hint.js`, PR #110) failed in 2 of 3 runs on the lab Mac and passed in the third. Not investigated.

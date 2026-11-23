@@ -302,7 +302,7 @@ function shop(text) {
       if (has && pack.id === 'power' && off.has(it[0])) b.className = 'item off';
       if (pack.id === 'crash') b.className = 'item' + (!has ? ' locked' : crashOn.includes(it[0]) ? ' worn' : ' off');
       if (pack.id === 'win') b.className = 'item' + (!has ? ' locked' : winOn.includes(it[0]) ? ' worn' : ' off');
-      if (has) { b.style.background = swatch(pack.id, it); b.addEventListener('click', () => { if (busy) return; chosen[pack.id] = it[0]; rec.event('look', { pack: pack.id, item: it[0] }); look(pack.id, it); }); } else b.disabled = true;
+      if (has) { b.style.background = swatch(pack.id, it); b.addEventListener('click', () => { if (busy) return; chosen[pack.id] = it[0]; look(pack.id, it); }); } else b.disabled = true;
       if (chosen[pack.id] === it[0]) b.classList.add('chosen');
       row.append(b);
     }
