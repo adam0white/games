@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#f2b37a">
+<title>Fix-It Stall</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #6a3a1f; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { font: 17px/1.4 ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif; color: #3a2216; }
+  canvas#c { display: block; width: 100vw; height: 100dvh; }
+  #probe { position: fixed; top: 0; left: 0; width: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); visibility: hidden; pointer-events: none; }
+  .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: #3a221688; overflow-y: auto; touch-action: pan-y; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-sizing: border-box; }
+  .screen.on { display: grid; }
+  .card { max-width: 22em; width: calc(100% - 32px); box-sizing: border-box; padding: 18px 18px 14px; margin: 12px 0; background: #fff1d6; border: 3px solid #3a2216; border-radius: 22px; box-shadow: 0 8px 0 #3a221655; }
+  h1 { font-size: 2.3em; line-height: 1.05; margin: 0 0 .15em; color: #c8743a; text-shadow: 0 3px 0 #3a2216; -webkit-text-stroke: 1.5px #3a2216; letter-spacing: .01em; }
+  h2 { font-size: 1.7em; margin: 0 0 .2em; color: #c8743a; text-shadow: 0 2px 0 #3a2216; -webkit-text-stroke: 1px #3a2216; }
+  p { margin: .35em 0; }
+  .sub { font-size: .95em; opacity: .85; }
+  .big { font-size: 2.4em; font-weight: bold; color: #9c7420; line-height: 1.1; }
+  .stats { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; margin: .5em 0; font-size: .95em; }
+  .stats b { color: #1d5e5b; }
+  button { font: inherit; font-weight: bold; color: #3a2216; background: #fbe6c2; border: 2.5px solid #3a2216; border-radius: 14px; padding: .45em 1em; margin: .25em; min-height: 48px; min-width: 8em; touch-action: manipulation; cursor: pointer; box-shadow: 0 4px 0 #3a2216; }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 #3a2216; }
+  button.main { background: #2f8f8a; color: #fff6e4; font-size: 1.3em; min-width: 9em; }
+  button:disabled { opacity: .45; }
+  button.small { min-width: 0; font-size: .9em; }
+  #pause { position: fixed; top: calc(6px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); width: 46px; height: 46px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; place-items: center; box-shadow: 0 3px 0 #3a2216; background: #fff1d6; }
+  #pause::before { content: ''; width: 4px; height: 16px; border: solid #3a2216; border-width: 0 5px; }
+  .items { text-align: left; margin: .4em 0; }
+  .item { display: flex; align-items: center; gap: 10px; border-top: 2px dashed #3a221633; padding: 6px 0; }
+  .item canvas { width: 48px; height: 48px; flex: none; border-radius: 12px; background: #f6d9a8; border: 2px solid #3a2216; }
+  .item div { flex: 1; line-height: 1.2; }
+  .item small { display: block; opacity: .75; font-size: .8em; }
+  .item button { min-width: 5.6em; min-height: 44px; font-size: .9em; margin: 0; }
+  .item button.on { background: #2f8f8a; color: #fff6e4; }
+  .coin { display: inline-block; width: .85em; height: .85em; border-radius: 50%; background: radial-gradient(#f6d77e 55%, #d9a93e 60%); border: 2px solid #9c7420; vertical-align: -.1em; margin-right: .25em; box-sizing: border-box; }
+  .lab-notice, .lab-toggle { font-size: 12px !important; }
+  #newjob { color: #1d5e5b; font-weight: bold; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="probe"></div>
+<button id="pause" aria-label="Pause"></button>
+
+<div id="menu" class="screen on"><div class="card">
+  <h1>Fix-It Stall</h1>
+  <p class="sub">Fix things fast. Get paid.</p>
+  <div class="stats"><span><span class="coin"></span><b id="bank">0</b></span><span>Best <b id="best">0</b></span><span>Jobs <b id="jobs">3</b>/9</span></div>
+  <p><button id="play" class="main">Play</button></p>
+  <p><button id="toShop">Stall shop</button><button id="sound1" class="small">Sound: on</button></p>
+</div></div>
+
+<div id="shop" class="screen"><div class="card">
+  <h2>Stall shop</h2>
+  <p class="stats"><span><span class="coin"></span><b id="bank2">0</b></span></p>
+  <div id="items" class="items"></div>
+  <p><button class="back">Back</button></p>
+</div></div>
+
+<div id="paused" class="screen"><div class="card">
+  <h2>Paused</h2>
+  <p><button id="resume" class="main">Keep going</button></p>
+  <p><button id="quit">Menu</button><button id="sound2" class="small">Sound: on</button></p>
+</div></div>
+
+<div id="end" class="screen"><div class="card">
+  <h2 id="endTitle">Closed!</h2>
+  <p class="big"><span class="coin"></span><span id="earned">0</span></p>
+  <div class="stats"><span>Fixed <b id="served">0</b></span><span>Best streak <b id="streak">0</b></span><span>Best <b id="best2">0</b></span></div>
+  <p id="endLine" class="sub"></p>
+  <p id="newjob"></p>
+  <p><button id="again" class="main">Play again</button></p>
+  <p><button id="toMenu">Menu</button></p>
+</div></div>
+
+<script type="module" src="./main.js"></script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>
