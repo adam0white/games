@@ -6,8 +6,9 @@ export const GOAL = 78; // river length; about ninety seconds
 export const BOAT = 0.022;
 export const NIGHTS = 20;
 // Powers are rare pickups: boost (fast and unbreakable for a moment), slow (the river slows, the way to dawn does not), size (a smaller boat four times in five, a bigger one otherwise).
-export const POWERS = ['boost', 'slow', 'size'];
-const LAST = { boost: 2.5, slow: 5, size: 6 };
+// magnet (embers swim to the boat) and flare (the flame is filled and does not fade) are the lab's own two.
+export const POWERS = ['boost', 'slow', 'size', 'magnet', 'flare'];
+export const LAST = { boost: 2.5, slow: 5, size: 6, magnet: 7, flare: 6 };
 // Stats are bought with embers and kept between runs. Each is a level from 0: hearts (start with more), barrier (hits a shield takes),
 // calm (the river runs 4% slower a level), wick (the flame fades 8% slower a level), pull (pickups are taken from further away).
 export const STATS = { hearts: 2, barrier: 2, calm: 3, wick: 3, pull: 3 }; // the top level of each
@@ -57,7 +58,7 @@ export function sight(s) { return reach(s.light) * (fog(s, s.y) ? 0.6 : 1) * (da
 export function create(seed, stage = 1, endless = false, powers = POWERS, stats = {}) {
   const st = Object.fromEntries(Object.entries(STATS).map(([k, top]) => [k, Math.max(0, Math.min(top, Math.floor(stats[k] || 0)))]));
   const r = rng(seed), q = rng(seed ^ 0x9e3779b9); // powers draw from their own stream, so the rocks and embers of a seed never change
-  const s = { seed, stage, endless, q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers, powers: [], nextPower: 6 + q() * 6, boost: 0, slow: 0, size: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
+  const s = { seed, stage, endless, q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers, powers: [], nextPower: 6 + q() * 6, boost: 0, slow: 0, size: 0, magnet: 0, flare: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
   s.x = centre(s, 0);
   return s;
 }
@@ -197,7 +198,9 @@ export function step(s, target) {
   s.x += Math.max(-max, Math.min(max, dx)) + wind(s, s.y) * 0.22 * DT;
   // An ember holds the flame steady for a moment before it starts to fade again.
   s.warm = Math.max(0, s.warm - DT); s.safe = Math.max(0, s.safe - DT);
-  s.boost = Math.max(0, s.boost - DT); s.slow = Math.max(0, s.slow - DT);
+  s.boost = Math.max(0, s.boost - DT); s.slow = Math.max(0, s.slow - DT); s.magnet = Math.max(0, s.magnet - DT); s.flare = Math.max(0, s.flare - DT);
+  if (s.flare) { s.light = 1; s.warm = Math.max(s.warm, DT); }
+  if (s.magnet) for (const e of s.embers) if (!e.got && e.kind === 'ember') { const dx = s.x - e.x, dy = s.y - e.y, d = Math.hypot(dx, dy); if (d < 0.32 && d > 0.001) { const m = Math.min(d, 0.9 * DT); e.x += dx / d * m; e.y += dy / d * m; e.pulled = true; } }
   if (s.size) { s.size = Math.max(0, s.size - DT); if (!s.size && !s.big) s.safe = Math.max(s.safe, 0.5); } // growing back beside a rock is not a blow
   for (const e of s.powers) if (!e.got && Math.hypot(e.x - s.x, e.y - s.y) < s.take) {
     e.got = true; s[e.kind] = LAST[e.kind];

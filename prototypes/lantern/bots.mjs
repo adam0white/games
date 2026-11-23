@@ -44,7 +44,7 @@ if (process.argv[3] === 'audit') for (const stage of [1, 2, 3, 4, 5, 6, 7, 8, 9,
     while (!s.over && s.y < 30 * GOAL) {
       s.safe = 1e9; s.light = 1; step(s, centre(s, s.y));
       // A pickup is buried if a boat sitting on it at the moment it comes level would touch a rock.
-      for (const p of [...s.embers, ...s.powers]) if (!checked.has(p) && p.y <= s.y) { checked.add(p); pickups++; if (s.rocks.some(k => Math.hypot(Math.max(0, Math.abs(k.x - p.x) - k.len), k.y - p.y) < k.rad + BOAT)) buried++; }
+      for (const p of [...s.embers, ...s.powers]) if (!checked.has(p) && !p.pulled && p.y <= s.y) { checked.add(p); pickups++; if (s.rocks.some(k => Math.hypot(Math.max(0, Math.abs(k.x - p.x) - k.len), k.y - p.y) < k.rad + BOAT)) buried++; }
       for (const k of s.rocks) if (!seen.has(k)) { seen.add(k); const d = Math.min(9, Math.floor(k.y / GOAL * 10)); all[d]++; if (k.a || k.b || k.ice) swing[d]++; }
       const free = B => { // the widest gap a boat of radius B can sit in at this row
         const c = centre(s, s.y), e = half(s, s.y) - B, cuts = [];

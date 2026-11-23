@@ -108,3 +108,15 @@ export function glow(g, f, id, x, y, u, rgb, light, t = 0) {
     g.beginPath(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, d = i % 2 ? r * 0.16 : r; g.lineTo(Math.cos(a) * d, Math.sin(a) * d); } g.fill(); g.restore();
   }
 }
+
+// The mark of each power, in white line on its colour: used in the water and on the shop's buttons. t is seconds.
+export const TINT = { boost: '255,215,90', slow: '190,140,255', size: '90,230,205', magnet: '255,140,190', flare: '235,240,255' };
+export function mark(g, kind, x, y, u, w, t = 0) {
+  g.strokeStyle = '#fff'; g.lineWidth = w; g.lineJoin = g.lineCap = 'round'; g.beginPath();
+  if (kind === 'boost') { const b = (t * 2.5 % 1) * u * 0.5; for (const o of [-0.5, 0.6]) { g.moveTo(x - u, y + o * u + u * 0.5 - b); g.lineTo(x, y + o * u - u * 0.5 - b); g.lineTo(x + u, y + o * u + u * 0.5 - b); } }
+  else if (kind === 'slow') { const a = t * 1.1; g.arc(x, y, u * 1.1, 0, 7); g.moveTo(x, y); g.lineTo(x + Math.sin(a) * u * 0.8, y - Math.cos(a) * u * 0.8); g.moveTo(x, y); g.lineTo(x + u * 0.5, y); }
+  else if (kind === 'size') { const k = 0.75 + 0.35 * Math.sin(t * 3.8); g.arc(x, y, u * 1.2 * k, 0, 7); g.moveTo(x + u * 0.4 / k, y); g.arc(x, y, u * 0.4 / k, 0, 7); }
+  else if (kind === 'magnet') { g.moveTo(x - u * 0.8, y - u); g.lineTo(x - u * 0.8, y + u * 0.2); g.arc(x, y + u * 0.2, u * 0.8, Math.PI, 0, true); g.lineTo(x + u * 0.8, y - u); const p = (t * 2 % 1) * u * 0.6; g.moveTo(x - u * 0.3, y - u * 1.3 - p); g.lineTo(x - u * 0.3, y - u * 1.6 - p); g.moveTo(x + u * 0.3, y - u * 1.3 - p); g.lineTo(x + u * 0.3, y - u * 1.6 - p); }
+  else { g.arc(x, y, u * 0.5, 0, 7); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + t * 0.8; g.moveTo(x + Math.cos(a) * u * 0.85, y + Math.sin(a) * u * 0.85); g.lineTo(x + Math.cos(a) * u * 1.3, y + Math.sin(a) * u * 1.3); } }
+  g.stroke(); g.lineJoin = 'miter'; g.lineCap = 'butt';
+}

@@ -144,3 +144,13 @@ The tester asked for different models and less plain colours. Drawing lives in `
 The lab's additions beyond the ask: the wake, the lean and fade of the flame, the shop previews.
 
 Checked: all six boats and flames drawn in a phone-sized Chromium with no page errors, and looked at. Not checked: frame rate on a real phone (about 35 soft particles a frame); whether the tester finds them better.
+
+## 2026-11-23: Abilities pack and the pack opening (note #35, fifth and sixth items)
+
+- A fourth pack, Abilities, holds the powers. A power lies in the river only once it has been found in the pack, so a new player meets none until the first Abilities pack is opened. This replaces "powers are free on every night" from the powers note above. The other three packs still sell looks only.
+- The pack holds five powers: the tester's three and two from the lab. Magnet (pink): for 7 s embers within 0.32 swim to the boat. Flare (white sun): the flame is filled and does not fade for 6 s.
+- Opening any pack: a light hops between the things not yet found, slows, and stops on the find; then the whole screen fills with the find's colour and fades. The pack is paid for and the find saved at the tap, so leaving mid-animation loses nothing, and a second tap during it does nothing.
+
+Checked: in a phone-sized Chromium an Abilities pack cost 50, saved its find, showed the hop and the flash, and the next run laid only that power in the river; two fast taps on another pack charged once. Audit clean with all five powers (an ember a magnet has pulled is left out of the buried-pickup count). No page errors.
+
+Not checked: whether locking powers behind the pack is what the tester meant (asked); the hop's feel and sound on a phone.
