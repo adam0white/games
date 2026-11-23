@@ -330,3 +330,29 @@ Not checked: whether a person reaches night 50, which the rebirth requires (bots
 - **"Trash bags".** No earlier note mentions trash bags. The lab reads it as "crash packs", the crash effects pack of note #69, in which the player picks two or three crash effects. A question went to the tester before building it. If it is the crash pack, a plan: a fifth pack, Crashes, with the six effects there now (sink, smash, tip, crack, swirl, throw) and two new ones (the flame bursts into sparks, the boat freezes and shatters). The player turns on two or three. A crash uses the effect that fits what was hit when it is on, else one of those on.
 - **River animations pack** (note #69): still a proposal.
 - **The app-store bar.** The tester wants a game people would download from an app store. Recorded as the bar the tester holds the game to. Publishing is the owner's decision and is not asked for here.
+
+## 2026-11-23: tester t1's notes #74, #75 and #76
+
+- **#74, zoom stuck after a double tap.** Fixed in the kit for both games (`kit/zoom.js`, see `experiments/NOTES.md`). Not verified on a real phone.
+- **#75, 30 new nights.** Already built: 50 nights went live in the change above. The note was written before that build was deployed.
+- **#75, only two abilities, picked by the player.** This answers question #71 ("pick two"). See the table below. Question #72, on whether hearts and the shield take one of the two places, stays open.
+- **#75, "a crash pack or victory pack".** The crash pack is built; see below. The victory pack is left as a proposal.
+- **#76, leaderboard with Google sign-up or accounts, names, endless only.** Accounts, sign-in and a shared leaderboard need a server and accounts. Those are the owner's decision ("no new server infrastructure without an owner decision"; accounts are not authorized). Nothing is built for them. See the proposal below.
+
+### Done in this change
+
+| Ask | What changed |
+| --- | --- |
+| Two abilities at a time | At most two owned abilities are switched on. Tapping a third says "Only 2 abilities at a time. Switch one off first." A find from a pack that would make three arrives switched off, and the shop says so. A save with more than two on keeps the first two in the order they were found, and the rest go into `lantern-off`, which keeps its format. "Find everything" leaves two on. |
+| Crash pack | A fifth pack, Crashes, at 50 embers. It holds Fireworks (the lantern bursts into sparks of the flame's colour), Freeze (the boat ices over and shatters), Ghost (a pale ghost of the boat rises), Lightning (a bolt, a blackened boat and smoke) and Big splash (a column of water). Up to three are switched on; a crash plays one of them at random. With none on, a crash fits what was hit, as before. A find switches itself on if fewer than three are. New key `lantern-crash`, a JSON list of ids. Rebirth clears it. The rebirth goal now counts 28 things. |
+| (Lab) "New climb from level 1" | Asks twice, as Erase and Rebirth do, so a stray tap under the resume button does not lose the climb. |
+| (Lab) Sound fix | Lantern's `tone` wrapper dropped the slide argument, so the crash sounds of note #69 never slid in pitch. It now passes it on. |
+
+Checks: the phone check on both profiles covers two abilities after "Find everything", the refusal of a third, three crashes on and the refusal of a fourth, a crash playing the one crash switched on, and the two taps for a new climb. Making crashes ignore the switched-on list fails the check. Each new effect was screenshotted mid-crash in a phone-sized Chromium, with no page errors.
+
+Not checked: the new crash sounds on a phone.
+
+### Left as a proposal (2026-11-23, notes #75 and #76)
+
+- **Victory pack.** Dawn effects to pick from, like the crash pack: fireworks over the river, lanterns rising, a burst of birds, a rainbow.
+- **Leaderboard, names and sign-up.** The owner decides on a server and accounts. Without one, the lab could add a name field above the title and an endless best list on this phone only. That was not built, so as not to suggest names reach anyone else.
