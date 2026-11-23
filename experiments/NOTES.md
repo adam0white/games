@@ -55,3 +55,26 @@ Each directory has `sim.js` (rules, runs in Node), `bots.mjs` (proves the rules 
 
 ### Left as a proposal (2026-11-23)
 - Crumbwar rooms: a short code to share, and a field that holds only the people who joined with it, with bots filling the empty places. This needs an owner decision.
+
+## 2026-11-23: answers on which games to keep (tester t1, notes #103 and #104)
+
+- **Note #103, answering #100 ("Which of the three new games should we work on more?", Grapevine, Fix-It Stall, Follow Me or none):** "Fix-It Stall". Recorded here and in `fixit/NOTES.md`. The lane already puts most work on Lantern and Ant Promotion (note #33). Read this as: among the three new experiments, Fix-It Stall is the one to grow. Nothing was dropped; dropping Grapevine or Follow Me is the owner's decision.
+- **Note #104, answering #44 ("Smoke on the Stairs: keep it or drop it?"):** "Drop". Recorded only. Dropping a game is the owner's decision, and Smoke (`games/smoke`) is a full game, not an experiment. One caution: #104 arrived 68 ms before #105, an answer the tester then withdrew as a mis-tap (#106). Both were sent from the same tap sequence, so #104 may also be a mis-tap.
+
+### Left as a proposal (2026-11-23)
+- Smoke on the Stairs: the tester's answer is "drop". The owner decides whether to archive it.
+- Fix-It Stall: the next working session on the three new experiments goes to Fix-It Stall first.
+
+## 2026-11-23: a new game idea from tester t1 (note #107)
+
+The note, in short: a new game where you have several abilities and must uncover your own past, because you have forgotten everything about yourself. Every use of an ability takes time off your lifespan, so you must find out who you are before you die.
+
+Not built in this run. The idea fits several very different games (a story with choices, a small place to explore, an action game), and the lane starts a new game with a concept card, then looks. The lane's direction is also "fewer, focused directions" (owner, 2026-11-14). A question went to the tester about which form the game should take.
+
+### Left as a proposal (2026-11-23, note #107): concept card
+- **Working title:** Spent.
+- **One line:** you wake with no memory and a lifespan bar. Each power you use costs years, and each one shows you a piece of who you were. Find out before the bar runs out.
+- **Loop (one run, 10 to 15 minutes):** a small place (a house, a street, a ward) holds about 12 clues. Some can be read for free by looking. Most need a power: *Echo* (hear what was said in a room, 3 years), *Touch* (see an object's last owner, 2 years), *Open* (a locked door or box, 5 years), *Read* (a person's thoughts, 4 years), *Rewind* (relive the last minute, 8 years). Clues fill a portrait with name, work, who you loved and what you did. You win by naming yourself correctly before death; a wrong name costs 10 years.
+- **Why it can be fun:** every power is a spend decision, so the player weighs "is this clue worth a year?" as a shop does. Each run reshuffles which of several pasts is true (a doctor, a thief, a soldier...), so a second run is a new mystery, and what you learned of the powers carries over.
+- **Smallest slice that would test it:** one room, three powers, one true past out of three, a lifespan bar and the naming at the end. About a day's work as a no-build experiment under `experiments/`, once the tester has picked a form and the next lab session takes it up. To get the notes button, it also goes in the notes page's game list (`workers/feedback/public/notes/app.js`).
+- **Open questions:** the form (asked of the tester); whether death ends the run or loops back with memory kept (a time-loop variant).

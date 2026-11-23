@@ -425,6 +425,14 @@ const GAMES = {
     assert.equal(runs[0].data.summary.level, 2); assert.equal(runs[0].data.start.how, 'continue');
     assert.ok(runs.every(r => r.runSource === 'agent'), 'labRunSource=agent marks the records');
     assert.deepEqual(runs[2].data.events[0].data, { c: '#d6b21c', p: 'stripes' }, 'the skin choice');
+    // A promotion sends a beam of light up into the sky (note #101).
+    await page.click('#resume'); assert.equal(await page.evaluate(() => window.__ant.beam), 0, 'no beam before a promotion');
+    await page.evaluate(() => { window.__ant.s.player.xp = 999; });
+    await until(page, () => window.__ant.mode === 'evolve', 'promotion card');
+    await page.click('#opts .opt'); assert.equal(await mode(), 'play');
+    assert.ok(await page.evaluate(() => window.__ant.beam) > 0.5, 'a promotion starts the light beam');
+    await page.evaluate(() => { window.__ant.s.player.safe = 99; }); // nothing may eat the player while the beam plays out
+    await until(page, () => window.__ant.beam < 0.9, 'the beam fades', 8000); assert.equal(await mode(), 'play'); // headless WebKit draws few frames, so only the start of the fade is waited for
   },
   // The three games of 2026-11-23. Each has its own full check (experiments/<slug>/check.mjs); this is the shared part:
   // the page loads through the kit with no error, a run starts from Play, pause holds it, and leaving for the menu
@@ -536,10 +544,12 @@ const GAMES = {
 };
 
 const [onlyGame, onlyPhone] = process.argv.slice(2);
+// A check that never answers becomes a FAIL line naming it, not a job that runs until its time limit.
+const within = (p, ms, what) => { let t; return Promise.race([p, new Promise((_, no) => { t = setTimeout(() => no(new Error(`no answer in ${ms / 1000}s: ${what}`)), ms); })]).finally(() => clearTimeout(t)); };
 let failed = 0;
 for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   if (onlyPhone && onlyPhone !== phone) continue;
-  const browser = await engine.launch();
+  let browser = await engine.launch();
   for (const [game, run] of Object.entries(GAMES)) {
     if (onlyGame && onlyGame !== 'all' && onlyGame !== game) continue;
     const context = await browser.newContext({ ...device }), page = await context.newPage(), errors = [];
@@ -566,11 +576,12 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     });
     page.on('pageerror', e => errors.push(String(e))); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     page.on('requestfailed', r => errors.push(`request failed: ${r.url()}`)); page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
-    try { await run(page); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
+    try { await within(run(page), 150000, 'the whole check'); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
     catch (e) { failed++; console.log(`FAIL ${game} on ${phone}: ${e.message}`); if (errors.length) console.log('     ' + errors.join('\n     ')); }
-    await context.close();
+    try { await within(context.close(), 15000, 'closing the page'); }
+    catch (e) { console.log(`     ${e.message}; starting the browser again`); browser.close().catch(() => {}); browser = await engine.launch(); }
   }
-  await browser.close();
+  await within(browser.close(), 15000, 'closing the browser').catch(() => {});
 }
 server.close();
 process.exit(failed ? 1 : 0);

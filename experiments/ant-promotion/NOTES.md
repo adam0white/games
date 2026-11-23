@@ -310,3 +310,56 @@ Two lab fixtures were changed for the same kind of reason: the "other knobs give
 ### Not verified
 - That the silent switch was the cause, and that sound now plays on the tester's phone. No real iPhone was used. If the phone runs iOS older than 16.4, this change does nothing there.
 - How the arrow feels in play: it may show often at high levels, where food is sparse.
+
+## 2026-11-23: tester t1's notes #101, #105 and #106
+
+| Note | In short | What happened |
+|---|---|---|
+| #101 | Send a beam of light up into the sky at every promotion. Since the fast picks got faster, the game is too easy: no animal is faster than you any more. Make the animals as fast or faster, or make the player slower; the tester recommends faster animals | Built: the beam, and stronger animals keep up with a fast-boosted player (below). The player was not made slower |
+| #105 | Answer to #102 ("what went wrong with animals hunting each other?"): "Animals kill me too often" | Withdrawn by #106 as a mis-tap. Nothing done for it |
+| #106 | "The last text was a misclick; the animals don't strive and try enough to kill each other." Sent from the Lantern page, but it is about this game | Built: animals hunt each other harder (below) |
+
+### Done
+- **A beam of light at each promotion (#101).** When you pick your new animal, a column of light in the new animal's colour shoots from it up through the top of the screen. Sparks climb it, it glows on the ground, and it fades over 1.8 seconds, with a rising tone and a short buzz. It is drawn in the overlay that all four looks share (`lightBeam` in `index.html`). A dark animal colour falls back to its main colour, then to gold, because dark colours vanish when added as light.
+- **Stronger animals keep up (#101).** Picking fast again makes you up to 2.5 times the plain fast speed, and every animal was at most plain fast, so nothing could catch a boosted runner. Now a stronger animal that chases you runs with your fast boost, and a fast one runs 6% faster than that (`chasePace` and `PACE_UP` in `sim.js`). Medium and slow stronger animals still fall behind you, so the speed table's rule holds: you can outrun what is marked slower, and the » mark is shown on what is faster than you. The rival and the Wild hunt follow the same rule.
+  - Only a player with a fast boost is affected: every strong or sneaky animal, and a first fast pick, meets exactly the speeds it met before. Weaker animals are unchanged, so what you can eat and the green food arrow are unchanged.
+  - The » mark over an animal now uses the same function (`paceAgainst`), so it shows on stronger fast animals when you are boosted.
+- **Animals hunt each other harder (#106).** Before, a hunter chased at 0.8 of its speed while its prey fled at full speed, so only a faster hunter ever caught anything. Most chases trailed off: in bot runs a chase was on screen half the time, and about 4 kills a minute happened near the player. Now a hunter runs at full speed, lunges at 1.3 times its speed when close, keeps after prey that has slipped out of its view wedge, and gives up after 8 seconds instead of 6. After a kill it stays full for 70 seconds instead of 15 (`PREY` in `sim.js`), because shorter rests emptied the meadow of the player's food.
+
+### Numbers
+Wild rules, careful bot, 6 seeds × 12 minutes. Medians; kills are animal on animal, "near you" means inside about one screen.
+
+| Build | Pick | Top level | Deaths | Kills/min | Kills near you/min | A chase on screen |
+|---|---|---|---|---|---|---|
+| main | strong | 8 | 3 | 29 | 4.1 | 50% |
+| main | fast | 10 | 9 | 33 | 4.6 | 52% |
+| main | sneaky | 10 | 9 | 30 | 4.2 | 54% |
+| this change | strong | 7 | 4 | 39 | 4.2 | 25% |
+| this change | fast | 11 | 11 | 48 | 6.3 | 33% |
+| this change | sneaky | 9 | 9 | 45 | 5.7 | 32% |
+
+Chases are on screen less of the time because they now end in a kill instead of going on. The keep-up rule alone (with the old hunting) left strong and sneaky identical to main, and took the fast pick's deaths from 9 to 13.
+
+Other settings tried, same bot (top level for strong / fast / sneaky; kills near you a minute):
+
+| Hunter speed, lunge, rest after a kill | Top level | Kills near you/min |
+|---|---|---|
+| 1.0, 1.35, 10 s, with wider sight | 7 / 6 / 7 | 10.6 to 11.8 |
+| 0.9, 1.3, 15 s | 6 / 9 / 7 | 7.3 to 8.8 |
+| 1.0, 1.3, 25 s | 7 / 8 / 8 | 6.9 to 8.3 |
+| 1.0, 1.3, 40 s | 6 / 8 / 8 | 6.3 to 7.3 |
+| **1.0, 1.3, 70 s (built)** | 7 / 11 / 9 | 4.2 to 6.3 |
+
+### Checks
+- `bots.mjs`: new asserts that a boosted runner at every level below the top meets stronger animals faster than itself, that only fast animals outrun it, that a player with no boost meets plain speeds, and that a hunter runs at its full speed before it lunges. With the hunter at 0.8 speed the last assert fails (tried); against main's speeds the first one fails (tried).
+- One older `bots.mjs` assert, read from the rival temperament table, failed after the hunting change: "closing in" went from 100% to 0% for the brute and from 0% to 71% for the ambusher, on a few alert ticks each. The player in that column is a level 4 Crab with no fast boost, so the keep-up rule does not touch it; the hunting change moves animals and the bot. Like the two lab asserts above, it is now checked directly: a Crab of power 44 stands still before a Mole rival of power 54, a brute closes 50 in half a second and a coward backs away. With the coward's flee turned off, that check fails (tried). The table is still printed.
+- `kit/check/phone.mjs`: a promotion starts the beam and it fades, on WebKit iPhone 13 and Chromium Pixel 7.
+- Phone-sized Chromium screenshots of the beam in the Cartoon and 3D looks; no page errors.
+
+### Not verified
+- How the faster hunters feel to a person, and whether the meadow now looks like animals fighting. Bot numbers show kills, not drama.
+- The beam on a real phone.
+
+### Left as a proposal (2026-11-23)
+- If the meadow should be bloodier still: a 25 to 40 second rest after a kill roughly doubles the kills near you (table above) and costs the careful bot one or two levels. The tester also says the game is too easy, so that cost may be welcome. One number to change: `PREY.fed`.
+- A chase is shown by a line from hunter to prey in every look, and a kill near you by a burst, a crunch and "X ate a Y". A louder sign of a chase starting (a growl, the hunter's number turning red) would make the striving easier to see.

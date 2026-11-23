@@ -2,7 +2,7 @@
 // Bots play through the same input interface the page uses (down/move/up in object-local units), one step per tick,
 // with finger speeds capped at what a thumb can do (moves.js SKILLS). Exits non-zero when a claim fails.
 import assert from 'node:assert/strict';
-import { create, step, input, guide, rand, DT, KINDS, TUTOR, PATIENCE, LEVELS, HIT, RAMP } from './sim.js';
+import { create, step, input, guide, rand, DT, KINDS, TUTOR, PATIENCE, LEVELS, HIT, RAMP, TWO_PATIENCE } from './sim.js';
 import { plan, SKILLS, THUMB_MAX } from './moves.js';
 
 let failed = 0;
@@ -40,6 +40,7 @@ function play(opts, policy, maxSeconds = 400) {
   let rep = null, steps = [], i = 0, ctl = null, down = false, maxSpeed = 0, last = null;
   const times = {};
   let started = 0, firstLoss = null;
+  const paid = [];
   while (!s.over && s.t < maxSeconds) {
     if (s.rep !== rep) {
       if (rep && rep.done) (times[rep.kind] ??= []).push(s.t - started);
@@ -56,10 +57,11 @@ function play(opts, policy, maxSeconds = 400) {
     }
     step(s);
     if (firstLoss === null && s.events.some(e => e.e === 'lost')) firstLoss = s.clock;
+    for (const e of s.events) if (e.e === 'paid') paid.push(e);
     s.events.length = 0;
   }
   if (rep && rep.done && !times[rep.kind]?.includes(s.t - started)) (times[rep.kind] ??= []).push(s.t - started);
-  return { s, times, maxSpeed, firstLoss };
+  return { s, times, maxSpeed, firstLoss, paid };
 }
 const ALL = { unlocked: KINDS };
 const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
@@ -74,6 +76,14 @@ for (const [name, pol] of [['competent', skilled(SKILLS.competent)], ['scribbler
   claim(JSON.stringify([a.log, a.coins, a.t, a.r]) === JSON.stringify([b.log, b.coins, b.t, b.r]), `deterministic: ${name} plays seed 1234 the same twice (${a.served} served, ${a.coins} coins)`);
 }
 { const a = create({ seed: 5, ...ALL }), b = create({ seed: 6, ...ALL }); claim(JSON.stringify(a.queue) !== JSON.stringify(b.queue), 'different seeds give different queues'); }
+// The daily stall's promise: the same seed brings the same customers with the same jobs whoever plays it.
+{
+  const daily = { seed: 2026, ...ALL, two: true, hearts: 99 };
+  // (whether a customer also brings a second repair still follows the level when they step up, which is time)
+  const seen = pol => play(daily, pol).s.log.map(l => l.kind.split('+')[0]);
+  const a = seen(skilled(SKILLS.expert)), b = seen(skilled(SKILLS.slow)), n = Math.min(a.length, b.length);
+  claim(n >= 10 && a.slice(0, n).every((k, i) => k === b[i]), `same seed, any speed: an expert and a slow bot meet the same ${n} objects in the same order`);
+}
 
 // 2. Every repair alone, at the hardest ramp level, done by a competent bot inside its patience; and a slow bot's times.
 console.log('\nOne repair at the hardest level (patience ' + PATIENCE[LEVELS - 1] + ' s). Median seconds from the job appearing to fixed, 20 seeds:');
@@ -84,7 +94,7 @@ for (const kind of KINDS) {
     const all = [];
     let lost = 0;
     for (let seed = 1; seed <= 20; seed++) {
-      const { s } = play({ seed, ...ALL, only: kind, two: false, startLevel: LEVELS - 1, day: TOP + 60, hearts: 99 }, skilled(SKILLS[sk]), 70);
+      const { s } = play({ seed, ...ALL, only: kind, two: false, golden: 0, startLevel: LEVELS - 1, day: TOP + 60, hearts: 99 }, skilled(SKILLS[sk]), 70);
       all.push(...s.log.filter(l => l.ok).map(l => l.ms / 1000)); lost += s.lost;
     }
     row[sk] = { med: median(all), max: Math.max(...all), lost };
@@ -97,11 +107,27 @@ for (const kind of KINDS) {
 {
   let worst = 0, worstKind = '', lost = 0;
   for (const kind of KINDS) for (let seed = 1; seed <= 6; seed++) {
-    const { s } = play({ seed, ...ALL, only: kind, two: 1, startLevel: LEVELS - 1, day: TOP + 40, hearts: 99 }, skilled(SKILLS.competent), 50);
+    const { s } = play({ seed, ...ALL, only: kind, two: 1, golden: 0, startLevel: LEVELS - 1, day: TOP + 40, hearts: 99 }, skilled(SKILLS.competent), 50);
     lost += s.lost;
     for (const l of s.log) if (l.ok && l.kind.includes('+') && l.ms > worst) { worst = l.ms; worstKind = l.kind; }
   }
-  claim(lost === 0, `two-repair jobs at the top level: competent bot loses none (worst ${worstKind} in ${(worst / 1000).toFixed(2)} s, patience ${(PATIENCE[LEVELS - 1] * 1.75).toFixed(1)} s)`);
+  claim(lost === 0, `two-repair jobs at the top level: competent bot loses none (worst ${worstKind} in ${(worst / 1000).toFixed(2)} s, patience ${(PATIENCE[LEVELS - 1] * TWO_PATIENCE).toFixed(1)} s)`);
+}
+
+// Golden customers: with every eligible customer golden, a competent bot at the top level loses none of them,
+// and they pay four times over. In ordinary shifts they are rare: about one shift in three or four meets one.
+{
+  let lost = 0, golden = 0, paidOk = true, worst = 0;
+  for (let seed = 1; seed <= 10; seed++) {
+    const { s, paid } = play({ seed, ...ALL, golden: 1, startLevel: LEVELS - 1, day: TOP + 60, hearts: 99 }, skilled(SKILLS.competent), 90);
+    for (const l of s.log.filter(l => l.golden)) { golden++; if (!l.ok) lost++; else worst = Math.max(worst, l.ms); }
+    for (const e of paid) if (e.golden && e.coins < 4 * e.kinds.length * 2) paidOk = false;
+  }
+  claim(golden >= 20 && lost === 0, `golden jobs at the top level: competent bot fixes all ${golden} (worst ${(worst / 1000).toFixed(2)} s)`);
+  claim(paidOk, 'a golden job pays four times over (at least 8 coins a repair)');
+  let met = 0;
+  for (let seed = 1; seed <= 40; seed++) { const { s } = play({ seed, ...ALL }, skilled(SKILLS.average)); if (s.log.some(l => l.golden)) met++; }
+  claim(met >= 4 && met <= 20, `golden customers are rare: an average bot meets one in ${met} of 40 shifts`);
 }
 
 // 3. Wrong gestures do nothing: taps on a job that wants a drag, and taps beside the dents.
@@ -126,7 +152,7 @@ for (const kind of KINDS) {
 }
 
 // 4. Whole shifts by skill: idle fails early, slow fails late, skilled bots finish the day.
-console.log('\nWhole shifts, all nine jobs unlocked, 40 seeds each:');
+console.log(`\nWhole shifts, all ${KINDS.length} jobs unlocked, 40 seeds each:`);
 console.log('bot         coins  served  lost  ended by hearts  first heart lost at (s)');
 const table = {};
 const policies = { idle: () => idle, scribbler: seed => scribbler(seed), slow: () => skilled(SKILLS.slow), average: () => skilled(SKILLS.average), competent: () => skilled(SKILLS.competent), expert: () => skilled(SKILLS.expert) };

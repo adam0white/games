@@ -71,6 +71,24 @@ export function plan(g, skill, from = [50, 110]) {
       const p0 = onArc(g.cx, g.cy, g.r, g.from);
       return [...air(p0), at('down', p0), ...arc(g.cx, g.cy, g.r, g.from, g.to + 15, v), ...wait(0.6).map(() => at('move', onArc(g.cx, g.cy, g.r, g.to + 15))), at('up', onArc(g.cx, g.cy, g.r, g.to + 15))];
     }
+    case 'path': { // follow a polyline, then keep the finger at its end while the part catches up
+      const out = [...air(g.pts[0]), at('down', g.pts[0])];
+      for (let i = 1; i < g.pts.length; i++) out.push(...line(g.pts[i - 1], g.pts[i], v));
+      const end = g.pts.at(-1);
+      for (let i = 0; i < (g.hold ?? 0) / DT; i++) out.push(at('move', end));
+      out.push(at('up', end));
+      return out;
+    }
+    case 'pump': { // push the handle to the bottom, wait for it, pull it back up; as many times as are left
+      const top = [g.x, g.at[1]], low = [g.x, g.at[1] + (g.bottom - g.top)], out = [...air(top), at('down', top)];
+      for (let i = 0; i < g.n + 1; i++) {
+        const hold = Math.max(0.04, (g.bottom - g.top - 4) / g.rate - (g.bottom - g.top) / Math.min(v, THUMB_MAX) + 0.04); // wait at the bottom until the handle gets there
+        out.push(...line(top, low, v), ...Array(Math.round(hold / DT)).fill(0).map(() => at('move', low)));
+        out.push(...line(low, top, v), at('move', top), at('move', top));
+      }
+      out.push(at('up', top));
+      return out;
+    }
     case 'swipe': {
       const out = [...air(g.from), at('down', g.from)];
       for (let i = 0; i < 10; i++) out.push(...line(i % 2 ? g.to : g.from, i % 2 ? g.from : g.to, v));
@@ -92,6 +110,13 @@ export function ghost(g, t) {
     case 'flick': { const m = ease(Math.min(1, (k % 0.5) / 0.3)); return { p: onArc(g.cx, g.cy, g.r, 200 + 150 * m), press: (k % 0.5) < 0.3 }; }
     case 'rub': { const m = Math.sin(k * Math.PI * 6); return { p: [g.cx + m * g.w / 2, g.cy], press: k < 0.92 }; }
     case 'arc': { const m = ease(Math.min(1, k / 0.75)); return { p: onArc(g.cx, g.cy, g.r, g.from + (g.to - g.from) * m), press: k < 0.85 }; }
+    case 'path': { // along the polyline at an even pace
+      const L = []; let tot = 0; for (let i = 1; i < g.pts.length; i++) { L.push(Math.hypot(g.pts[i][0] - g.pts[i - 1][0], g.pts[i][1] - g.pts[i - 1][1])); tot += L.at(-1); }
+      let d = Math.min(1, k / 0.8) * tot, i = 0; while (i < L.length - 1 && d > L[i]) { d -= L[i]; i++; }
+      const a = g.pts[i], b = g.pts[Math.min(i + 1, g.pts.length - 1)], f = L[i] ? Math.min(1, d / L[i]) : 0;
+      return { p: [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f], press: k < 0.9 };
+    }
+    case 'pump': { const m = Math.sin(k * Math.PI * 4 - Math.PI / 2) * 0.5 + 0.5; return { p: [g.x, g.top + 6 + m * (g.bottom - g.top)], press: true }; }
     case 'swipe': { const m = ease((k * 2) % 1), back = Math.floor(k * 2) % 2; const x = back ? g.to[0] + (g.from[0] - g.to[0]) * m : g.from[0] + (g.to[0] - g.from[0]) * m; return { p: [x, g.from[1]], press: true }; }
   }
   return { p: [50, 50], press: false };
