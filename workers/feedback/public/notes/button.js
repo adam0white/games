@@ -3,7 +3,8 @@
 (() => {
   try {
     if (!localStorage.getItem('notes.k')) return;
-    const match = /^\/proto\/([a-z0-9]+(?:-[a-z0-9]+)*)\//.exec(location.pathname);
+    // /<slug>/ or the old /proto/<slug>/. A lab page (/lab/<name>/) is the game "lab", as it was under /proto/.
+    const match = /^(?:\/proto)?\/([a-z0-9]+(?:-[a-z0-9]+)*)\//.exec(location.pathname);
     if (!match || document.getElementById('notes-button')) return;
     const link = document.createElement('a');
     link.id = 'notes-button';

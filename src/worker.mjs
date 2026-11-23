@@ -4,6 +4,15 @@ import { validateRegistry } from '../scripts/lib.mjs';
 const PLAY = 'https://play.adamwhite.work';
 const SHELF = 'https://human.adamwhite.work/games/';
 
+// Experiments moved from /proto/<slug>/ to /<slug>/ (lab items from /proto/lab/<name>/ to /lab/<name>/) on
+// 2026-11-23. Returns the new path for an old one, or null. /proto/ had no page; it goes to the lab's index.
+// The caller puts its own origin in front, so a path such as //evil.example/ stays on this site.
+export function experimentPath(pathname) {
+  if (pathname !== '/proto' && !pathname.startsWith('/proto/')) return null;
+  const rest = pathname.slice('/proto'.length);
+  return rest === '' || rest === '/' ? '/lab/' : rest;
+}
+
 export function createHandler(games) {
   validateRegistry({ hfVersion: '0.0.0', games });
   const legacy = new Map(games.filter(game => game.redirectEnabled === true && game.legacyOrigin).map(game => [game.legacyOrigin, game.slug]));
@@ -13,6 +22,8 @@ export function createHandler(games) {
       const url = new URL(request.url);
       if (url.origin === PLAY) {
         if (url.pathname === '/') return Response.redirect(SHELF, 302);
+        const moved = experimentPath(url.pathname);
+        if (moved) return Response.redirect(`${PLAY}${moved}${url.search}`, 301);
         if (/^\/lefthand\/engine\/game-[a-f0-9]+\.wasm$/.test(url.pathname)) {
           if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
           url.pathname += '.gz';

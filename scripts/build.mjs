@@ -3,10 +3,13 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, write
 import { registry, run, head, clean } from './context.mjs';
 import { manifest, packageReleaseMetadata, scopedHeaders, scopedRedirects } from './lib.mjs';
 import { validateGame } from './game.mjs';
+import { planExperiments } from './experiments.mjs';
 if (!registry.games.length) throw new Error('Cannot build an empty game registry');
 const commit = head();
 if (!clean()) throw new Error('Build requires a clean checkout');
 run('node', ['scripts/check-redirects.mjs'], { stdio: 'inherit' });
+// Checked before the long game builds, so a slug collision fails at once.
+const experiments = planExperiments('.', registry);
 rmSync('dist', { recursive: true, force: true });
 const headers = [], redirects = [];
 function rejectRootWorker(dir) {
@@ -39,12 +42,10 @@ for (const game of registry.games) {
   }
   writeFileSync(`${target}/release.json`, JSON.stringify(manifest(registry, game, commit, false, labVersion, pkg.version, metadata)) + '\n');
 }
-// Prototype lane: static directories served at /proto/<slug>/. No registry entry, HF pin or release manifest.
-if (existsSync('prototypes')) for (const entry of readdirSync('prototypes', { withFileTypes: true })) {
-  if (!entry.isDirectory()) continue;
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry.name) || !existsSync(`prototypes/${entry.name}/index.html`)) throw new Error(`Invalid prototype: ${entry.name}`);
-  rejectRootWorker(`prototypes/${entry.name}`);
-  cpSync(`prototypes/${entry.name}`, `dist/proto/${entry.name}`, { recursive: true });
+// Experiment lane: static directories served at /<slug>/. No registry entry, HF pin or release manifest.
+for (const { slug, from } of experiments) {
+  rejectRootWorker(from);
+  cpSync(from, `dist/${slug}`, { recursive: true });
 }
 if (existsSync('dist/sw.js')) throw new Error('Root service worker forbidden');
 if (headers.length) writeFileSync('dist/_headers', headers.join('\n'));
