@@ -128,6 +128,7 @@ import { readJson, writeJson } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
+import { lab } from '../kit/lab.js'; // lab recording: the rec lines below
 
 const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d');
 const KEY = 'ant-promotion:v1', query = new URLSearchParams(location.search);
@@ -246,6 +247,13 @@ for (const b of document.querySelectorAll('.toMenu')) b.onclick = () => { if (s?
 $('goOn').onclick = () => back(false); $('restart').onclick = () => back(true);
 $('pause').onclick = () => show('paused'); $('resume').onclick = () => show('play');
 $('winOn').onclick = () => show('play'); $('winNew').onclick = () => start(true);
+// Lab recording (prototypes/kit/lab.js): the notice on the menu, the switch on the pause card, each life, promotions and skins.
+const rec = lab('ant-promotion'); rec.notice($('menu').firstElementChild); rec.toggle($('paused').firstElementChild);
+const life = () => s ? { level: level(s), form: me(s).name, xp: s.player.xp } : null;
+for (const id of ['continue', 'fresh', 'goOn', 'restart', 'winNew']) $(id).addEventListener('click', () => rec.start({ how: id, ...life() }));
+document.addEventListener('click', e => { if (e.target.closest?.('.toMenu')) rec.end('menu', life()); }, true);
+$('opts').addEventListener('click', e => { if (e.target.closest('.opt')) rec.event('promote', life()); });
+$('skins').addEventListener('click', e => { if (e.target.closest('button:not(.back)')) rec.event('skin', save.skin); });
 
 function skins() {
   const cs = $('colours'), ps = $('patterns'); cs.textContent = ps.textContent = '';
@@ -439,6 +447,8 @@ function frame(now) {
         if (e.t === 'hunt') { say(`${article(e.name).replace(/^a/, 'A')} is hunting you`); blip(140, 0.5, 'sawtooth', 0.1, 120); buzz(60); }
         if (e.t === 'hide') { say(`Your thick hide took the bite from ${article(e.name)}`); shake = 0.4; flash = 0.6; crunch(0.18, 0.28, 500); buzz([30, 40, 30]); bits.push({ ring: 1, x: e.x, y: e.y, r: me(s).r * 1.6, c: '#9ad8ff', age: 0, life: 0.6 }); hud(); }
         if (e.t === 'full') offer();
+        if (e.t === 'die') rec.end('died', { ...life(), by: s.dead?.to ?? null });
+        if (e.t === 'win') rec.event('win', life());
         if (e.t === 'die') { // show the bite for a moment, then the card
           const F = me(s), p = s.player;
           shake = 0.6; flash = 1; streak = 0; buzz([40, 60, 120]); burst(p.x, p.y, [F.c, F.d, '#c0271f', '#ff5a3a'], 30, 140 + F.r * 7, F.r * 0.36);
