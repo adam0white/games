@@ -1,0 +1,29 @@
+{
+  
+  // The private two-way notes page for outside testers. A separate Worker so games-static keeps no server
+  // bindings. Its route is more specific than the games-static custom domain, so it runs first on /notes.
+  "name": "games-feedback",
+  "account_id": "a20259cba74e506296745f9c67c1f3bc",
+  "main": "./src/index.mjs",
+  "compatibility_date": "2026-11-05",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "play.adamwhite.work/notes", "zone_name": "adamwhite.work" },
+    { "pattern": "play.adamwhite.work/notes/*", "zone_name": "adamwhite.work" }
+  ],
+  // The page, its script and the in-game button are static. Only /notes/api/* runs code.
+  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/notes/api/*"], "not_found_handling": "none" },
+  "d1_databases": [{ "binding": "DB", "database_name": "games-feedback", "database_id": "2ff3fcf2-a1a7-4cc7-be4c-b354414bd4a9", "migrations_dir": "./migrations" }],
+  // Voice notes are kept so a bad transcript can be redone. The lab's private bucket, under private/feedback/.
+  "r2_buckets": [{ "binding": "LAB", "bucket_name": "hf-lab" }],
+  // Inference is authenticated by the binding.
+  "ai": { "binding": "AI" },
+  "vars": {
+    "TRANSCRIBE_MODEL": "@cf/openai/whisper-large-v3-turbo",
+    "TRANSLATE_MODEL": "@cf/openai/gpt-oss-120b"
+  },
+  // Secrets, set with `wrangler secret put`: TESTERS (JSON list of {id, token, lang}) and STAFF_TOKEN.
+  // No request logging: note text, tokens and tester ids never reach logs.
+  "observability": { "enabled": false }
+}
