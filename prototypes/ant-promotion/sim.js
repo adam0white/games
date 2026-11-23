@@ -62,9 +62,14 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 export const CONE = 1.13; // half-angle a mob can see, radians
 export const SPAWN_WEIGHTS = [[-3, 1], [-2, 3], [-1, 5], [0, 3], [1, 2], [2, 1]];
 
-export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS) {
-  const s = { rand: rng(seed), t: 0, tick: 0, weights, mobs: [], events: [], choosing: null, dead: null, won: false, eaten: 0, deaths: 0, nextId: 1,
-    player: { x: WORLD / 2, y: WORLD / 2, a: 0, ph: 0, stack: stack.slice(), xp, safe: 2.5 } };
+// Wild rules (a variant; classic is the default and is unchanged):
+//   thick hide: a strong (brute) animal survives one bite, then the hide needs HIDE_S seconds to grow back
+//   the hunt: every HUNT_EVERY seconds the nearest stronger animal within HUNT_REACH tracks you for HUNT_S seconds, wherever it is looking
+export const HIDE_S = 25, HUNT_EVERY = 45, HUNT_S = 5, HUNT_REACH = 700;
+export const hideReady = s => !!s.wild && me(s).role === 'brute' && s.t >= s.player.hideAt;
+export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS, wild = false) {
+  const s = { wild, huntAt: HUNT_EVERY, hides: 0, hunts: 0, rand: rng(seed), t: 0, tick: 0, weights, mobs: [], events: [], choosing: null, dead: null, won: false, eaten: 0, deaths: 0, nextId: 1,
+    player: { x: WORLD / 2, y: WORLD / 2, a: 0, ph: 0, stack: stack.slice(), xp, safe: 2.5, hideAt: 0 } };
   while (s.mobs.length < MOBS) spawn(s, 260);
   return s;
 }
@@ -95,9 +100,16 @@ export function step(s, input) {
   if (il > 0.01) { p.a = Math.atan2(iy, ix); p.ph += Math.min(1, il) * dt * 10; }
   p.x = clamp(p.x + ix * F.speed * dt, F.r, WORLD - F.r); p.y = clamp(p.y + iy * F.speed * dt, F.r, WORLD - F.r);
 
+  if (s.wild && s.t >= s.huntAt) {
+    let hunter = null, near = HUNT_REACH;
+    for (const m of s.mobs) { const d = Math.hypot(m.x - p.x, m.y - p.y); if (FORMS[m.f].power > F.power && !m.alert && d < near) { near = d; hunter = m; } }
+    if (hunter && p.safe <= 0) { hunter.hunt = HUNT_S; s.hunts++; s.huntAt = s.t + HUNT_EVERY; s.events.push({ t: 'hunt', id: hunter.id, name: FORMS[hunter.f].name }); }
+    else s.huntAt = s.t + 2; // nobody in reach, or you are still safe: look again soon
+  }
   for (let i = s.mobs.length - 1; i >= 0; i--) {
     const m = s.mobs[i], M = FORMS[m.f], dx = p.x - m.x, dy = p.y - m.y, d = Math.hypot(dx, dy), to = Math.atan2(dy, dx);
-    const sees = p.safe <= 0 && d < M.range * F.stealth + F.r && Math.abs(wrap(to - m.a)) < CONE;
+    if (m.hunt > 0) m.hunt -= dt;
+    const sees = p.safe <= 0 && (m.hunt > 0 || d < M.range * F.stealth + F.r && Math.abs(wrap(to - m.a)) < CONE);
     if (sees) { if (!m.alert && M.power !== F.power) s.events.push({ t: 'notice', strong: M.power > F.power, id: m.id }); m.alert = true; m.lost = 0; }
     else if (m.alert) { m.lost = d > M.range * 1.8 ? m.lost + dt : 0; if (m.lost > 1.5 || p.safe > 0) m.alert = false; }
     let speed = 0, turn = 2.5;
@@ -126,6 +138,10 @@ export function step(s, input) {
         const gain = M.level >= F.level - 1 ? 3 : M.level === F.level - 2 ? 2 : 1;
         s.mobs.splice(i, 1); s.eaten++; p.xp += gain;
         s.events.push({ t: 'eat', name: M.name, gain, x: m.x, y: m.y });
+      } else if (out === 'die' && p.safe <= 0 && hideReady(s)) { // wild: the hide takes the bite and you are thrown clear
+        p.hideAt = s.t + HIDE_S; p.safe = 1.5; s.hides++;
+        p.x = clamp(p.x + dx / (d || 1) * 70, F.r, WORLD - F.r); p.y = clamp(p.y + dy / (d || 1) * 70, F.r, WORLD - F.r);
+        s.events.push({ t: 'hide', name: M.name, x: p.x, y: p.y });
       } else if (out === 'die' && p.safe <= 0) {
         s.dead = { as: F.name, to: M.name, level: level(s) }; s.deaths++;
         s.events.push({ t: 'die' });

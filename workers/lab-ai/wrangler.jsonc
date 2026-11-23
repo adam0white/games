@@ -1,0 +1,34 @@
+{
+  // Writes the rival ("Nemesis") persona for the lab experiment prototypes/lab/ant-nemesis/.
+  // One endpoint, POST /lab-api/persona. No secrets. One Durable Object holds the daily call count. See README.md for the guards and the cost.
+  "name": "games-lab-ai",
+  "account_id": "a20259cba74e506296745f9c67c1f3bc",
+  "main": "./src/index.mjs",
+  "compatibility_date": "2026-11-05",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "play.adamwhite.work/lab-api/*", "zone_name": "adamwhite.work" }
+  ],
+  // Inference is authenticated by the binding.
+  "ai": { "binding": "AI" },
+  "vars": {
+    "MODEL": "@cf/meta/llama-3.1-8b-instruct-fast",
+    // Hard cap on model calls per UTC day, for the whole world. Over it the Worker answers 503 without a model call.
+    "DAILY_CAP": "2000"
+  },
+  // The daily counter: one SQLite-backed Durable Object.
+  "durable_objects": {
+    "bindings": [{ "name": "DAILY", "class_name": "DailyCounter" }]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["DailyCounter"] }
+  ],
+  // Spend guards. Counts are kept per Cloudflare location and are approximate (see README).
+  "ratelimits": [
+    { "name": "PER_IP", "namespace_id": "4101", "simple": { "limit": 6, "period": 60 } },
+    { "name": "GLOBAL", "namespace_id": "4102", "simple": { "limit": 10, "period": 60 } }
+  ],
+  // No request logging.
+  "observability": { "enabled": false }
+}
