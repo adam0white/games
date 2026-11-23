@@ -62,4 +62,19 @@ A WebKit run at phone size (390 by 844, touch) loaded the page, changed the skin
 ### Left as a proposal (2026-11-22, note #34)
 
 - More detailed animal drawings: "too plain for modern games". The look is a taste decision, so it goes through look variants first.
-- Sound effects and eat and death effects are a small change, handled in a separate pull request.
+- Sound effects and eat and death effects: built, see the next entry.
+||||||| parent of 241c7de1 (Ant Promotion: eat and death effects, start sound in a tap)
+
+## 2026-11-22: eat and death effects (tester t1, note #34)
+
+Tester t1 asked for sound effects, an effect when you eat an animal and an effect when you die.
+
+| Note | What changed |
+| --- | --- |
+| Eat effect | Pieces in the eaten animal's colours burst out, with a yellow ring and a crunch sound under the old blip |
+| Death effect | Red and body-coloured pieces burst from the player, a red ring, a red screen flash, a heavier crunch and the old falling tone; the player disappears. The death card follows 0.9 s later (real time). The lost level is saved at the moment of death, as before |
+| Sound effects | The game already had sound. Phones keep audio off until it starts inside a tap, and the game used to start it in the animation loop, so a phone may never have played any. Play and Continue now start the audio |
+
+All of it is in `index.html`; `sim.js` is unchanged, so `bots.mjs` results are unchanged (checked).
+
+Checked in WebKit with an iPhone 13 profile: an eat and a death forced through `window.__ant`, the death burst on screen, the death card after the delay, "Keep going" back to play, the saved level, no script errors (the notes button script is a 404 on a local server only). Not verified: sound on a real phone, the effects at full frame rate (headless WebKit drew 7 to 8 frames a second), and whether the effects feel good.

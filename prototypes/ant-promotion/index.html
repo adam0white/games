@@ -117,7 +117,7 @@ if (!Array.isArray(save.stack) || !save.stack.length || save.stack.some((id, i) 
 const store = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch {} };
 
 let s = null, mode = 'menu', W = 0, H = 0, dpr = 1, zoom = 1, last = 0, acc = 0, shake = 0, sayTimer = 0;
-const floats = [], keys = new Set(); let joy = null;
+const floats = [], bits = [], keys = new Set(); let joy = null, flash = 0, dying = 0;
 
 // ---------- sound
 let ac = null;
@@ -130,6 +130,26 @@ function blip(freq, dur = 0.08, type = 'sine', vol = 0.12, slide = 0) {
     v.gain.setValueAtTime(vol, t); v.gain.exponentialRampToValueAtTime(0.001, t + dur);
     o.connect(v).connect(ac.destination); o.start(t); o.stop(t + dur);
   } catch {}
+}
+// a short burst of filtered noise: the crunch of a bite
+function crunch(dur = 0.12, vol = 0.2, hz = 1800) {
+  if (!save.sound) return;
+  try {
+    ac ??= new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume();
+    const n = Math.ceil(ac.sampleRate * dur), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n) ** 2;
+    const src = ac.createBufferSource(), f = ac.createBiquadFilter(), v = ac.createGain();
+    src.buffer = buf; f.type = 'bandpass'; f.frequency.value = hz; f.Q.value = 0.8; v.gain.value = vol;
+    src.connect(f).connect(v).connect(ac.destination); src.start();
+  } catch {}
+}
+// phones keep audio silent until it is started inside a tap
+function unlock() { if (!save.sound) return; try { ac ??= new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch {} }
+function burst(x, y, colours, n, speed, size) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * 6.283, v = speed * (0.35 + Math.random() * 0.65);
+    bits.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: size * (0.5 + Math.random() * 0.7), c: colours[i % colours.length], age: 0, life: 0.45 + Math.random() * 0.35 });
+  }
 }
 
 // ---------- screens
@@ -158,7 +178,7 @@ function portrait(canvas, F, r, t = 0) {
 function start(fresh) {
   if (fresh) { save.stack = [ANT]; save.xp = 0; store(); }
   s = create(Number(query.get('seed')) || (Math.random() * 1e9 | 0), save.stack, save.xp);
-  floats.length = 0; hud(); show('play');
+  floats.length = 0; bits.length = 0; flash = 0; hud(); show('play');
   say(level(s) === 1 ? 'Eat the little bugs with green numbers' : `You are ${article(me(s).name)}`);
 }
 function hud() {
@@ -192,7 +212,7 @@ function died() {
 }
 function back(restart) { revive(s, restart); save.stack = s.player.stack.slice(); save.xp = 0; store(); hud(); show('play'); say(`You are ${article(me(s).name)}`); }
 
-$('continue').onclick = () => start(false); $('fresh').onclick = () => start(true);
+$('continue').onclick = () => { unlock(); start(false); }; $('fresh').onclick = () => { unlock(); start(true); };
 $('toSkins').onclick = () => { skins(); show('skins'); }; $('toHow').onclick = () => show('how');
 $('sound').onclick = () => { save.sound = !save.sound; store(); menu(); blip(660); };
 for (const b of document.querySelectorAll('.back')) b.onclick = () => show('menu');
@@ -274,11 +294,20 @@ function draw(now) {
     if (strong && m.alert && (Math.abs(m.x - p.x) > W / zoom / 2 || Math.abs(m.y - p.y) > H / zoom / 2)) edge.push(m);
     g.save(); g.translate(m.x, m.y); g.rotate(m.a); g.fillStyle = '#00000026'; g.beginPath(); g.ellipse(0, 3, M.r * 1.1, M.r * 0.8, 0, 0, 7); g.fill(); drawForm(g, M, M.r, m.ph); g.restore();
   }
-  // the player
+  // bits of eaten animals, under the numbers
+  for (const b of bits) {
+    const k = b.age / b.life; g.globalAlpha = Math.max(0, 1 - k);
+    if (b.ring) { g.strokeStyle = b.c; g.lineWidth = 3 * (1 - k) + 1; g.beginPath(); g.arc(b.x, b.y, b.r * (1 + k * 1.6), 0, 6.283); g.stroke(); }
+    else { g.fillStyle = b.c; g.beginPath(); g.arc(b.x, b.y, b.r * (1 - k * 0.5), 0, 6.283); g.fill(); }
+  }
+  g.globalAlpha = 1;
+  // the player, unless it has just been eaten
+  if (!s.dead) {
   g.save(); g.translate(p.x, p.y);
   if (p.safe > 0) { g.strokeStyle = `rgba(160,220,255,${0.4 + 0.3 * Math.sin(now / 90)})`; g.lineWidth = 3; g.beginPath(); g.arc(0, 0, F.r * 1.9, 0, 7); g.stroke(); }
   g.strokeStyle = save.skin.c === '#3a2a22' ? '#fff8e6' : save.skin.c; g.lineWidth = 2.5; g.setLineDash([5, 5]); g.beginPath(); g.arc(0, 0, F.r * 1.55, now / 900, now / 900 + 6.283); g.stroke(); g.setLineDash([]);
   g.rotate(p.a); drawForm(g, F, F.r, p.ph, save.skin); g.restore();
+  }
   // numbers
   const size = Math.max(11, 15 / zoom);
   for (const m of s.mobs) {
@@ -287,7 +316,7 @@ function draw(now) {
     label(m.x, top, String(M.power), M.power < F.power ? '#8dff8a' : M.power > F.power ? '#ff7a6a' : '#fff8e6', size, M.speed > F.speed ? '»' : '');
     if (m.alert && M.power !== F.power) label(m.x, top - size * 0.95, '!', '#ffe23a', size * 1.25);
   }
-  label(p.x, p.y - F.r * (F.kind === 'bird' ? 1.5 : 1.25) - 6, String(F.power), '#ffffff', size * 1.1);
+  if (!s.dead) label(p.x, p.y - F.r * (F.kind === 'bird' ? 1.5 : 1.25) - 6, String(F.power), '#ffffff', size * 1.1);
   for (let i = floats.length - 1; i >= 0; i--) { const f = floats[i]; g.globalAlpha = Math.max(0, 1 - f.age); label(f.x, f.y - f.age * 30, f.text, '#ffe23a', size); g.globalAlpha = 1; }
   g.restore();
   // arrows to hunters off the screen
@@ -295,6 +324,7 @@ function draw(now) {
     const a = Math.atan2(m.y - p.y, m.x - p.x), k = Math.min((W / 2 - 22) / Math.abs(Math.cos(a) || 1e-6), (H / 2 - 22) / Math.abs(Math.sin(a) || 1e-6));
     g.save(); g.translate(W / 2 + Math.cos(a) * k, H / 2 + Math.sin(a) * k); g.rotate(a); g.fillStyle = '#ff3a2a'; g.strokeStyle = '#fff'; g.lineWidth = 2; g.beginPath(); g.moveTo(14, 0); g.lineTo(-10, -11); g.lineTo(-10, 11); g.closePath(); g.fill(); g.stroke(); g.restore();
   }
+  if (flash > 0) { g.fillStyle = `rgba(200,20,10,${0.45 * flash})`; g.fillRect(0, 0, W, H); }
   if (joy && mode === 'play') {
     g.globalAlpha = 0.35; g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.arc(joy.ox, joy.oy, 55, 0, 7); g.stroke();
     g.fillStyle = '#fff'; g.beginPath(); g.arc(joy.x, joy.y, 22, 0, 7); g.fill(); g.globalAlpha = 1;
@@ -309,16 +339,34 @@ function frame(now) {
     while (acc >= 1 / 60 && mode === 'play') {
       acc -= 1 / 60; step(s, inp);
       for (const e of s.events) {
-        if (e.t === 'eat') { floats.push({ x: e.x, y: e.y, text: '+' + e.gain, age: 0 }); blip(300 + e.gain * 90, 0.09, 'square', 0.07, 200); save.xp = s.player.xp; hud(); }
+        if (e.t === 'eat') {
+          const M = FORMS.find(f => f.name === e.name);
+          floats.push({ x: e.x, y: e.y, text: '+' + e.gain, age: 0 }); burst(e.x, e.y, [M.c, M.d, M.e, '#ffffff'], 16, 110 + M.r * 6, Math.max(3.5, M.r * 0.32));
+          bits.push({ ring: 1, x: e.x, y: e.y, r: Math.max(8, M.r), c: '#ffe23a', age: 0, life: 0.35 });
+          crunch(0.1, 0.22, 1400 + Math.random() * 900); blip(300 + e.gain * 90, 0.09, 'square', 0.06, 200); save.xp = s.player.xp; hud();
+        }
         if (e.t === 'notice') blip(e.strong ? 180 : 700, 0.12, e.strong ? 'sawtooth' : 'sine', 0.06);
         if (e.t === 'full') offer();
-        if (e.t === 'die') { shake = 0.5; blip(220, 0.5, 'sawtooth', 0.14, -170); died(); }
+        if (e.t === 'die') { // show the bite for a moment, then the card
+          const F = me(s), p = s.player;
+          shake = 0.6; flash = 1; burst(p.x, p.y, [F.c, F.d, '#c0271f', '#ff5a3a'], 30, 140 + F.r * 7, F.r * 0.36);
+          bits.push({ ring: 1, x: p.x, y: p.y, r: F.r * 1.4, c: '#ff3a2a', age: 0, life: 0.5 });
+          crunch(0.22, 0.3, 700); blip(220, 0.6, 'sawtooth', 0.14, -170);
+          save.stack = s.player.stack.slice(0, Math.max(1, s.player.stack.length - 1)); save.xp = 0; store(); // closing the tab now still costs the level
+          dying = performance.now() + 900; mode = 'dying'; $('pause').style.display = 'none'; joy = null; keys.clear();
+        }
         if (e.t === 'win') { store(); $('winSay').textContent = `You climbed all ${TOP} levels and became ${article(me(s).name)}. Nothing here can eat you.`; blip(660, 0.6, 'triangle', 0.14, 600); show('win'); }
       }
     }
     for (const f of floats) f.age += dt * 1.3;
     while (floats.length && floats[0].age > 1) floats.shift();
   } else acc = 0;
+  if (mode === 'play' || mode === 'dying') {
+    for (const b of bits) { b.age += dt; if (!b.ring) { b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= 1 - 3 * dt; b.vy *= 1 - 3 * dt; } }
+    for (let i = bits.length - 1; i >= 0; i--) if (bits[i].age > bits[i].life) bits.splice(i, 1);
+    if (flash > 0) flash = Math.max(0, flash - dt * 1.6);
+  }
+  if (mode === 'dying' && now >= dying) { flash = 0; died(); }
   if (shake > 0) shake -= dt;
   if (sayTimer > 0 && (sayTimer -= dt) <= 0) $('say').classList.remove('on');
   draw(now);
