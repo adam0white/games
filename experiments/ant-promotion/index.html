@@ -97,6 +97,7 @@
     <li><span class="r">&raquo;</span> means it is faster than you. A fast strong animal that notices you will catch you. A fast weak one will get away, so sneak up from behind.</li>
     <li>No food on the screen? A <span class="g">green arrow</span> at the edge points to the nearest animal you can eat. A red arrow points to a stronger animal that has seen you.</li>
     <li>Fill the bar to get promoted. You pick 1 of 3 new animals each time. Picking fast again makes you faster each time. Picking sneaky again makes you harder to see each time.</li>
+    <li>A hunter gets tired. Keep running: it slows down, then gives up and rests for a few seconds.</li>
     <li>Animals hunt each other too. A red dashed line shows who is chasing whom. A hunter that is busy is easier to sneak past.</li>
     <li><b>Wild rules</b> are the normal game; the Rules button in the menu switches to Classic. Wild adds two things. A strong animal has a thick hide: it lives through one bite, then the hide needs 25 seconds. And every 45 seconds a stronger animal nearby hunts you for 5 seconds, wherever it is looking.</li>
     <li><b>Your rival.</b> The animal that kills you becomes your rival. It gets a name, a crown and a coloured ring, and it talks in speech bubbles. When it is off the screen, an arrow in its colour shows where it is.</li>
@@ -714,6 +715,7 @@ function frame(now) {
           crunch(0.1, 0.22, 1400 + Math.random() * 900); blip((300 + e.gain * 90) * 2 ** (Math.min(streak - 1, 12) / 12), 0.09, 'square', 0.06, 200); save.xp = s.player.xp; hud();
         }
         if (e.t === 'mobeat' && Math.abs(e.x - s.player.x) < W / zoom && Math.abs(e.y - s.player.y) < H / zoom) { const M = FORMS.find(f => f.name === e.name); burst(e.x, e.y, [M.c, M.d, '#ffffff'], 10, 90 + M.r * 5, Math.max(3, M.r * 0.28)); floats.push({ x: e.x, y: e.y, text: `${e.by} ate ${article(e.name)}`, age: 0 }); crunch(0.08, 0.1, 900); }
+        if (e.t === 'tired') { floats.push({ x: e.x, y: e.y - 20, text: 'phew...', age: 0, c: '#cfe8ff', big: 1.1 }); say(`${article(e.name).replace(/^a/, 'A')} got tired and gave up`); blip(520, 0.25, 'sine', 0.08, 780); }
         if (e.t === 'notice') {
           blip(e.strong ? 180 : 700, 0.12, e.strong ? 'sawtooth' : 'sine', 0.06);
           if (e.nem && save.nem && s.t - noticeAt > 10) { noticeAt = s.t; speak(fill(e.strong ? save.nem.persona.lines.notice : pick(FEAR)), 'notice', 3000); }

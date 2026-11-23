@@ -3,7 +3,7 @@
 // 5. the rival: a death makes one, it persists and gains power, no animal eats it, temperaments differ, it can be eaten
 import assert from 'node:assert/strict';
 import { SPAWN_WEIGHTS, HIDE_S, hideReady, SAME_FAST, FAST_CAP, crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENT_NAMES, NEM_STEP, NEM_MAX_BONUS, NEM_PRIZE, MOBS,
-  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY } from './sim.js';
+  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY, TIRE } from './sim.js';
 const seeds = Number(process.argv[2] ?? 20), minutes = Number(process.argv[3] ?? 12);
 
 // 1. Rule table. Player: power 50, speed 124.
@@ -107,7 +107,31 @@ assert.equal(result['wild reckless/1'].hides + result['wild reckless/2'].hides, 
   s.player.safe = 0; s.mobs[0].x = s.player.x + 5; s.mobs[0].y = s.player.y; step(s, null); assert.ok(s.dead, 'the second bite kills');
   const c = create(1, [ANT, brute.id]); c.player.safe = 0; c.mobs.length = 0; c.mobs.push({ ...s.mobs[0], x: c.player.x + 5, y: c.player.y }); step(c, null); assert.ok(c.dead, 'classic: the first bite kills');
 }
-console.log('wild rules: hide and hunt checks pass');
+{ // a hunter tires: full pace while fresh, slower after, then it gives up and cannot notice the player while it rests
+  const s = create(3), big = FORMS.find(f => f.level === 3), p = s.player, m = { id: 1, f: big.id, x: p.x + 90, y: p.y, a: Math.PI, alert: false, lost: 0, timer: 9, want: 0, walk: false, ph: 0 };
+  p.safe = 0; s.mobs.length = 0; s.mobs.push(m);
+  const paces = []; let gaveUpAt = null, gaveUpTick = 0;
+  for (let i = 0; i < 60 * 30 && gaveUpAt === null; i++) {
+    m.x = p.x + 90; m.y = p.y; m.a = Math.PI; const before = m.x; step(s, null); // held at 90 units, facing the player, so it always sees and never arrives
+    if (s.events.some(e => e.t === 'tired' && e.id === 1)) { gaveUpAt = s.t; gaveUpTick = i; } else if (i % 60 === 30) paces.push(Math.round((before - m.x) * 60));
+    assert.equal(s.dead, null);
+  }
+  assert.ok(gaveUpAt !== null && Math.abs(gaveUpAt - TIRE.spent) < 0.5, `the hunter gives up after about ${TIRE.spent} s of chasing (${gaveUpAt?.toFixed(1)} s)`);
+  assert.equal(paces[0], Math.round(big.speed), 'fresh: full speed'); assert.equal(paces[TIRE.fresh - 1], paces[0], 'still full speed at the end of the fresh time');
+  assert.ok(paces.at(-1) < paces[0] * (TIRE.slow + 0.12) && paces.every((v, i) => !i || v <= paces[i - 1]), `it slows evenly toward ${TIRE.slow} of its pace: ${paces.join(' ')}`);
+  assert.equal(m.alert, false); assert.equal(s.tired, 1);
+  let noticedAt = null; const t0 = s.t;
+  for (let i = 0; i < 60 * 20 && noticedAt === null; i++) { m.x = p.x + 60; m.y = p.y; m.a = Math.PI; step(s, null); if (s.dead) break; if (m.alert) noticedAt = s.t - t0; }
+  assert.ok(noticedAt !== null && Math.abs(noticedAt - TIRE.rest) < 0.2, `it cannot notice the player while it rests, then does (${noticedAt?.toFixed(2)} s, rest is ${TIRE.rest} s)`);
+  // breath comes back when it is not chasing
+  const r = create(3), q = { ...m, alert: false, tire: 6, winded: 0, x: r.player.x + 900, y: r.player.y }; r.mobs.length = 0; r.mobs.push(q); r.player.safe = 0;
+  for (let i = 0; i < 60 * 5; i++) step(r, null); assert.equal(q.tire, 0, 'five seconds without a chase and it is fresh again');
+  // the rival does not tire
+  const n = create(3, [ANT], 0, SPAWN_WEIGHTS, false, { f: big.id, bonus: 0, kills: 1, knobs: { temperament: 'brute', persistence: 3, territory: 2 } }), nm = nemesisMob(n);
+  n.player.safe = 0; for (let i = 0; i < 60 * (TIRE.spent + 3); i++) { nm.x = n.player.x + 90; nm.y = n.player.y; nm.a = Math.PI; step(n, null); }
+  assert.equal(n.tired, 0, 'the rival does not tire'); assert.equal(nm.alert, true);
+}
+console.log('wild rules: hide and hunt checks pass; hunters tire');
 { // picking the same kind again builds on it
   const fast = l => optionsFor(l)[1].id, sneak = l => optionsFor(l)[2].id;
   const one = me(create(1, [ANT, optionsFor(1)[0].id, fast(2)])), three = me(create(1, [ANT, fast(1), fast(2)])), sn = me(create(1, [ANT, sneak(1), sneak(2)]));
