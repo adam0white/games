@@ -1,0 +1,435 @@
+// Fix-It Stall: the rules. Pure and seeded; no window or document, so bots.mjs runs it in Node.
+//
+// The page feeds pointer input in object-local units: the bench box is 100 x 100, (0,0) top left.
+//   const s = create({ seed, unlocked, tutorial, hearts });
+//   input(s, { type: 'down' | 'move' | 'up', x, y });   any time; the result shows in s.events at once
+//   step(s);                                             advances the shift by DT seconds
+//   s.events                                             what happened since the page last emptied it
+// Every repair is a small state machine driven by those three input types. Its progress p runs 0..1.
+
+export const DT = 1 / 60;
+export const DAY = 90; // seconds in a shift; the tutorial customers do not use up the day
+export const RAMP = 15; // seconds of shift per ramp level
+export const LEVELS = 6; // levels 0..5
+export const HINT_AFTER = 1.5; // seconds with no progress before the faint hint
+export const WORKS = 0.6; // the "it works" moment
+export const LEAVE = 0.7; // a grumpy customer walking off
+export const KINDS = ['screw', 'pin', 'dent', 'wheel', 'rub', 'clock', 'chain', 'glue', 'sharpen'];
+export const TUTOR = ['screw', 'pin', 'dent']; // the first three jobs ever, one each, very patient
+export const WORD = { screw: 'Turn!', pin: 'Pull!', dent: 'Tap!', wheel: 'Flick!', rub: 'Rub!', clock: 'Set it!', chain: 'Hook it!', glue: 'Push & hold!', sharpen: 'Swipe!' };
+export const OBJECT = { screw: 'bell', pin: 'music box', dent: 'kettle', wheel: 'wheel', rub: 'lamp', clock: 'clock', chain: 'bike', glue: 'vase', sharpen: 'knife' };
+export const COIN = { screw: 2, pin: 2, dent: 2, wheel: 3, rub: 3, clock: 2, chain: 2, glue: 3, sharpen: 3 };
+export const QUICK_BONUS = 1; // coins for a repair done with at least half the patience left
+export const PATIENCE = [13, 12, 10.5, 9.5, 8.5, 7.5]; // seconds for one repair, by ramp level
+export const TWO_PATIENCE = 1.6; // a two-repair job gets this many times the patience
+export const TUTOR_PATIENCE = 45;
+export const NEW_PATIENCE = 30; // the first customer with a newly unlocked job
+export const REGULAR_AT = 5; // the regular is the sixth customer of a shift (after the tutorial)
+export const TWO_CHANCE = [0, 0.15, 0.25, 0.3, 0.4, 0.45];
+// Touch radii in local units. index.html scales 100 units to at least 300 px, so the smallest (dent, 17) is 51 px.
+export const HIT = { screw: 60, pin: 32, dent: 17, wheel: 52, rub: 38, clock: 54, chain: 26, glue: 30, sharpen: 36 };
+
+const DENTS = [[28, 54], [50, 42], [72, 54], [38, 76], [62, 76]];
+// Where a second-job screw sits on each object (all at least 28 units from the box edge, so a thumb can circle it).
+const SCREW_SPOT = { pin: [72, 80], dent: [50, 20], wheel: [50, 54], rub: [50, 40], clock: [50, 52], chain: [68, 36], glue: [50, 60], sharpen: [32, 52] };
+
+// ---------- random numbers: mulberry32 on s.r, so a run is fixed by its seed
+export function rand(s) {
+  s.r = (s.r + 0x6d2b79f5) | 0;
+  let t = s.r;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+const pick = (s, list) => list[Math.floor(rand(s) * list.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
+const angle = (x, y, cx, cy) => Math.atan2(y - cy, x - cx) * 180 / Math.PI; // degrees, clockwise on screen
+const wrap = d => ((d + 540) % 360) - 180;
+
+// ---------- the repairs
+// Each has make(s, spot), down(r, x, y) -> touched something, move(r, x, y, s), up(r), tick(r, dt, s), guide(r) for hints and bots.
+const K = {
+  // Loose screw: circle a finger round it. Three turns either way drive it home; a click every quarter turn.
+  screw: {
+    make: (s, spot = [50, 56]) => ({ cx: spot[0], cy: spot[1], turned: 0, need: 1080, last: null, quarter: 0, slot: rand(s) * 180 }),
+    down(r, x, y) {
+      const d = dist(x, y, r.cx, r.cy);
+      if (d > HIT.screw) return false;
+      r.grab = true;
+      r.last = d >= 5 ? angle(x, y, r.cx, r.cy) : null;
+      return true;
+    },
+    move(r, x, y, s) {
+      if (!r.grab) return;
+      if (dist(x, y, r.cx, r.cy) < 5) { r.last = null; return; }
+      const a = angle(x, y, r.cx, r.cy);
+      if (r.last !== null) {
+        const d = clamp(wrap(a - r.last), -60, 60);
+        r.turned += d;
+        r.slot += d;
+        const p = Math.min(1, Math.abs(r.turned) / r.need);
+        if (p > r.p) r.p = p;
+        const q = Math.floor(r.p * r.need / 90);
+        if (q > r.quarter) { r.quarter = q; s.events.push({ e: 'click', n: q }); }
+      }
+      r.last = a;
+    },
+    up(r) { r.grab = false; },
+    tick() {},
+    guide: r => ({ type: 'circle', cx: r.cx, cy: r.cy, r: 24 }),
+  },
+  // Bent pin: grab it and pull it out of its hole. It is stiff, so it comes out at its own pace while you hold it.
+  pin: {
+    make: () => ({ hx: 50, hy: 64, tx: 50, ty: 40, need: 46, pull: 0, want: 0, ox: 0, oy: 0, creak: 0 }),
+    down(r, x, y) {
+      if (dist(x, y, r.tx, r.ty - r.pull * 30) > HIT.pin) return false;
+      r.grab = true; r.ox = x; r.oy = y;
+      return true;
+    },
+    move(r, x, y) {
+      if (!r.grab) return;
+      r.want = clamp(dist(x, y, r.ox, r.oy) / r.need, 0, 1);
+    },
+    up(r) { r.grab = false; r.want = 0; },
+    tick(r, dt, s) {
+      if (r.grab && r.want > r.pull) r.pull = Math.min(r.want, r.pull + 1.1 * dt);
+      else if (!r.grab) r.pull = Math.max(0, r.pull - 0.6 * dt); // let go too soon and it slides back in
+      const c = Math.floor(r.pull * 6);
+      if (c > r.creak) s.events.push({ e: 'creak', n: c });
+      r.creak = c;
+      if (r.pull > r.p) r.p = r.pull;
+      if (r.pull >= 1) r.p = 1;
+    },
+    guide: r => ({ type: 'drag', from: [r.tx, r.ty - r.pull * 30], to: [r.tx, r.ty - r.pull * 30 - r.need], hold: true }),
+  },
+  // Dents: tap each one and it pops out with a ping.
+  dent: {
+    make(s) {
+      const n = s.cust?.tutor ? 3 : [3, 3, 4, 4, 5, 5][level(s)];
+      const spots = DENTS.slice();
+      for (let i = spots.length - 1; i > 0; i--) { const j = Math.floor(rand(s) * (i + 1)); [spots[i], spots[j]] = [spots[j], spots[i]]; }
+      return { dents: spots.slice(0, n).map(([x, y]) => ({ x, y, out: false })), popped: 0 };
+    },
+    down(r, x, y, s) {
+      let best = null, bd = HIT.dent;
+      for (const d of r.dents) if (!d.out) { const e = dist(x, y, d.x, d.y); if (e <= bd) { bd = e; best = d; } }
+      if (!best) return false;
+      best.out = true; r.popped++;
+      r.p = r.popped / r.dents.length;
+      s.events.push({ e: 'ping', n: r.popped, x: best.x, y: best.y });
+      return true;
+    },
+    move() {}, up() {}, tick() {},
+    guide: r => { const d = r.dents.find(d => !d.out); return { type: 'tap', at: d ? [d.x, d.y] : [50, 50], all: r.dents.filter(d => !d.out).map(d => [d.x, d.y]) }; },
+  },
+  // Wobbly wheel: flick it round. It seats only while it spins fast; the wobble shrinks as it seats.
+  wheel: {
+    make: s => ({ cx: 50, cy: 54, R: 34, w: 0, ang: rand(s) * 360, seat: 0, last: null, acc: 0, win: [0, 0, 0, 0, 0, 0], tickN: 0, rev: 0 }),
+    down(r, x, y) {
+      if (dist(x, y, r.cx, r.cy) > HIT.wheel) return false;
+      r.grab = true;
+      r.last = dist(x, y, r.cx, r.cy) >= 8 ? angle(x, y, r.cx, r.cy) : null;
+      return true;
+    },
+    move(r, x, y) {
+      if (!r.grab) return;
+      if (dist(x, y, r.cx, r.cy) < 8) { r.last = null; return; }
+      const a = angle(x, y, r.cx, r.cy);
+      if (r.last !== null) { const d = clamp(wrap(a - r.last), -90, 90); r.acc += Math.abs(d); r.ang += d; }
+      r.last = a;
+    },
+    up(r) { r.grab = false; r.last = null; },
+    tick(r, dt, s) {
+      // finger speed over the last six ticks, so it does not matter how the page batches ticks
+      r.win[r.tickN++ % r.win.length] = r.acc; r.acc = 0;
+      const speed = r.win.reduce((a, b) => a + b, 0) / (r.win.length * dt);
+      r.w *= Math.exp(-0.6 * dt);
+      if (r.grab) r.w = Math.max(r.w, speed);
+      if (!r.grab || speed < r.w) r.ang += r.w * dt;
+      const SEAT = 360; // one turn a second seats it at full rate
+      r.seat = Math.min(1, r.seat + dt * Math.min(1, (r.w / SEAT) ** 2) / 1.1);
+      r.p = r.seat;
+      const rev = Math.floor(r.ang / 120);
+      if (rev !== r.rev && r.w > 60) s.events.push({ e: 'whirr', w: r.w });
+      r.rev = rev;
+    },
+    guide: r => ({ type: 'flick', cx: r.cx, cy: r.cy, r: 30 }),
+  },
+  // Dead lamp: rub the dirty contacts back and forth until they shine.
+  rub: {
+    make: () => ({ cx: 50, cy: 74, w: 34, travel: 0, need: 600, lx: 0, ly: 0, spark: 0 }),
+    down(r, x, y) {
+      if (dist(x, y, r.cx, r.cy) > HIT.rub) return false;
+      r.grab = true; r.lx = x; r.ly = y;
+      return true;
+    },
+    move(r, x, y, s) {
+      if (!r.grab) return;
+      const seg = dist(x, y, r.lx, r.ly);
+      r.lx = x; r.ly = y;
+      if (dist(x, y, r.cx, r.cy) > HIT.rub + 6) return;
+      r.travel += Math.min(seg, 25);
+      r.p = Math.min(1, r.travel / r.need);
+      const k = Math.floor(r.p * 10);
+      if (k > r.spark) { r.spark = k; s.events.push({ e: 'shine', n: k }); }
+    },
+    up(r) { r.grab = false; },
+    tick() {},
+    guide: r => ({ type: 'rub', cx: r.cx, cy: r.cy, w: r.w }),
+  },
+  // Stopped clock: push the minute hand round (it only goes forward) to the star.
+  clock: {
+    make: s => { const a0 = -90 + Math.floor(rand(s) * 4) * 30; return { cx: 50, cy: 50, R: 38, a0, hand: a0, want: a0, target: a0 + 210 + Math.floor(rand(s) * 4) * 30, last: null, tickA: 0 }; },
+    down(r, x, y) {
+      const d = dist(x, y, r.cx, r.cy);
+      if (d > HIT.clock) return false;
+      r.grab = true;
+      r.last = d >= 6 ? angle(x, y, r.cx, r.cy) : null;
+      return true;
+    },
+    move(r, x, y, s) {
+      if (!r.grab) return;
+      if (dist(x, y, r.cx, r.cy) < 6) { r.last = null; return; }
+      const a = angle(x, y, r.cx, r.cy);
+      if (r.last !== null) {
+        const d = clamp(wrap(a - r.last), -60, 60);
+        if (d > 0) r.want = Math.min(r.target + 20, r.want + d);
+        else if (d < -4) s.events.push({ e: 'ratchet' }); // backwards does nothing, and says so
+      }
+      r.last = a;
+    },
+    up(r) { r.grab = false; },
+    tick(r, dt, s) {
+      if (r.want > r.hand) r.hand = Math.min(r.want, r.hand + 240 * dt); // the gears turn at their own pace
+      const k = Math.floor((r.hand - r.a0) / 30);
+      if (k > r.tickA) { r.tickA = k; s.events.push({ e: 'tick', n: k }); }
+      r.p = clamp((r.hand - r.a0) / (r.target - r.a0), 0, 1);
+      if (r.hand >= r.target - 5) r.p = 1;
+    },
+    guide: r => ({ type: 'arc', cx: r.cx, cy: r.cy, r: 28, from: r.hand, to: r.target }),
+  },
+  // Slipped chain: drag the hanging loop up onto the front gear. The chain is heavy, so the loop trails
+  // behind the finger (and stays in sight beside it) and must itself reach the gear.
+  chain: {
+    make: () => ({ gx: 68, gy: 34, gr: 18, rx: 30, ry: 66, sx: 34, sy: 88, lx: 34, ly: 88, fx: 34, fy: 88, hooked: false, d0: Math.hypot(34, 54) - 18 }),
+    down(r, x, y) {
+      if (dist(x, y, r.lx, r.ly) > HIT.chain && dist(x, y, r.sx, r.sy) > HIT.chain) return false;
+      r.grab = true; r.fx = x; r.fy = y;
+      return true;
+    },
+    move(r, x, y) {
+      if (!r.grab || r.hooked) return;
+      r.fx = x; r.fy = y;
+    },
+    up(r) { r.grab = false; },
+    tick(r, dt, s) {
+      if (r.hooked) return;
+      const tx = r.grab ? r.fx : r.sx, ty = r.grab ? r.fy : r.sy, d = dist(tx, ty, r.lx, r.ly), v = (r.grab ? 95 : 160) * dt;
+      if (d > 0) { const k = Math.min(1, v / d); r.lx += (tx - r.lx) * k; r.ly += (ty - r.ly) * k; }
+      r.p = Math.max(r.p, clamp(0.9 * (1 - (dist(r.lx, r.ly, r.gx, r.gy) - r.gr) / r.d0), 0, 0.9) - 1e-6);
+      if (dist(r.lx, r.ly, r.gx, r.gy) <= r.gr + 6) { r.hooked = true; r.p = 1; s.events.push({ e: 'clank' }); }
+    },
+    guide: r => ({ type: 'drag', from: [r.lx, r.ly], to: [r.gx, r.gy], hold: true }),
+  },
+  // Cracked vase: push the loose half back on, then hold it while the glue sets.
+  glue: {
+    make: () => ({ fx: 56, fy: 56, ox: 18, oy: 6, o0: Math.hypot(18, 6), joined: false, set: 0, hold: false, gx: 0, gy: 0 }),
+    down(r, x, y) {
+      if (r.joined) {
+        if (dist(x, y, 46, 56) > HIT.glue + 22) return false;
+        r.hold = true;
+        return true;
+      }
+      if (dist(x, y, r.fx + r.ox, r.fy + r.oy) > HIT.glue) return false;
+      r.grab = true; r.gx = x - r.ox; r.gy = y - r.oy;
+      return true;
+    },
+    move(r, x, y, s) {
+      if (!r.grab || r.joined) return;
+      r.ox = x - r.gx; r.oy = y - r.gy;
+      const off = Math.hypot(r.ox, r.oy);
+      r.p = Math.max(r.p, 0.5 * clamp(1 - off / r.o0, 0, 1));
+      if (off < 9) { r.joined = true; r.ox = r.oy = 0; r.hold = true; r.grab = false; r.p = 0.5; s.events.push({ e: 'snap' }); }
+    },
+    up(r) { r.grab = false; r.hold = false; },
+    tick(r, dt) {
+      if (r.joined && r.hold) r.set = Math.min(1, r.set + dt / 1.0);
+      if (r.joined) r.p = 0.5 + 0.5 * r.set;
+    },
+    guide: r => ({ type: 'drag', from: [r.fx + r.ox, r.fy + r.oy], to: [r.fx, r.fy], hold: true }),
+  },
+  // Blunt knife: long swipes along the blade. Six strokes, either way.
+  sharpen: {
+    make: () => ({ y: 50, x0: 12, x1: 88, strokes: 0, need: 6, run: 0, dir: 0, lx: 0 }),
+    down(r, x, y) {
+      if (Math.abs(y - r.y) > HIT.sharpen || x < -5 || x > 105) return false;
+      r.grab = true; r.lx = x; r.run = 0; r.dir = 0;
+      return true;
+    },
+    move(r, x, y, s) {
+      if (!r.grab) return;
+      const dx = x - r.lx; r.lx = x;
+      if (Math.abs(y - r.y) > HIT.sharpen + 12 || dx === 0) return;
+      const sign = Math.sign(dx);
+      if (r.dir === 0 || sign === r.dir) r.run += Math.abs(dx);
+      else r.run = Math.abs(dx);
+      r.dir = sign;
+      if (r.run >= 48) {
+        r.run = 0; r.strokes++;
+        r.p = Math.min(1, r.strokes / r.need);
+        s.events.push({ e: 'shing', n: r.strokes, dir: sign });
+      }
+    },
+    up(r) { r.grab = false; },
+    tick() {},
+    guide: r => ({ type: 'swipe', from: [18, r.y], to: [82, r.y] }),
+  },
+};
+
+function makeRepair(s, kind, spot) {
+  const r = K[kind].make(s, spot);
+  r.kind = kind; r.p = 0; r.idle = 0; r.best = 0; r.done = false; r.grab = false; r.spot = spot ?? null;
+  return r;
+}
+export const guide = r => K[r.kind].guide(r);
+export const level = s => Math.min(LEVELS - 1, Math.floor(s.clock / RAMP));
+export const multiplier = s => 1 + Math.min(2, Math.floor(s.streak / 4)); // x2 after four quick jobs in a row, x3 after eight
+
+// ---------- the shift
+export function create({ seed = 1, unlocked = TUTOR, tutorial = false, hearts = 3, newJob = null, only = null, regular = -1, two = true, day = DAY, startLevel = 0 } = {}) {
+  const s = {
+    seed, r: seed | 0, t: 0, clock: startLevel * RAMP, day, over: null, events: [],
+    hearts, maxHearts: hearts, coins: 0, served: 0, lost: 0, streak: 0, bestStreak: 0, log: [],
+    unlocked: unlocked.filter(k => KINDS.includes(k)), tutorial, newJob, only, regular, two, made: 0, lastKind: null,
+    queue: [], cust: null, reps: [], rep: null, stepN: 0, phase: 'work', phaseT: 0,
+    finger: { down: false, blocked: false, x: 0, y: 0 },
+  };
+  if (!s.unlocked.length) s.unlocked = TUTOR.slice();
+  for (let i = 0; i < 4; i++) s.queue.push(customer(s));
+  nextCustomer(s);
+  return s;
+}
+
+function customer(s) {
+  const n = s.made++;
+  const c = { n, look: Math.floor(rand(s) * 2 ** 30), tutor: false, fresh: false, regular: false, kinds: null };
+  if (s.only) c.kinds = [s.only];
+  else if (s.tutorial && n < TUTOR.length) { c.kinds = [TUTOR[n]]; c.tutor = true; }
+  else if (s.newJob && !s.newJobMade) { c.kinds = [s.newJob]; c.fresh = true; s.newJobMade = true; }
+  else {
+    const pool = s.unlocked.length > 1 ? s.unlocked.filter(k => k !== s.lastKind) : s.unlocked;
+    c.kinds = [pick(s, pool)];
+  }
+  if (s.regular >= 0 && n === (s.tutorial ? TUTOR.length : 0) + REGULAR_AT) c.regular = true;
+  s.lastKind = c.kinds[0];
+  return c;
+}
+
+function nextCustomer(s) {
+  const c = s.queue.shift();
+  s.queue.push(customer(s));
+  const L = level(s);
+  // A second job is decided when the customer steps up, so it follows the ramp.
+  const chance = typeof s.two === 'number' ? s.two : s.two ? TWO_CHANCE[L] : 0;
+  if (!c.tutor && !c.fresh && rand(s) < chance) c.kinds = [c.kinds[0], c.kinds[0] === 'screw' ? 'dent' : 'screw'];
+  c.patience = c.tutor ? TUTOR_PATIENCE : c.fresh ? NEW_PATIENCE : PATIENCE[L] * (c.kinds.length > 1 ? TWO_PATIENCE : 1) * (c.regular ? 1.4 : 1);
+  c.left = c.patience;
+  s.cust = c;
+  s.reps = c.kinds.map((k, i) => makeRepair(s, k, i === 0 ? undefined : k === 'screw' ? SCREW_SPOT[c.kinds[0]] : undefined));
+  s.stepN = 0; s.rep = s.reps[0];
+  s.phase = 'work'; s.phaseT = 0;
+  s.finger.blocked = s.finger.down; // a finger still down from the last job must lift before it touches this one
+  s.events.push({ e: 'next', kinds: c.kinds, regular: c.regular, fresh: c.fresh, tutor: c.tutor });
+}
+
+export function input(s, ev) {
+  if (s.over) return;
+  const f = s.finger;
+  const { type, x, y } = ev;
+  if (type === 'down') { f.down = true; f.blocked = false; }
+  else if (type === 'up' || type === 'cancel') {
+    const was = f.blocked; f.down = false; f.blocked = false;
+    if (was) return;
+  } else if (!f.down || f.blocked) return; // a mouse moving with no button pressed, or a finger left over from the last job
+  f.x = x; f.y = y;
+  if (s.phase !== 'work' || !s.rep) return;
+  const r = s.rep, k = K[r.kind];
+  if (type === 'down') {
+    const hit = k.down(r, x, y, s);
+    if (!hit) { s.events.push({ e: 'miss', x, y }); r.idle = Math.max(r.idle, HINT_AFTER); } // a wasted tap shows the hint at once
+    else s.events.push({ e: 'grab', kind: r.kind, x, y });
+  } else if (type === 'move') k.move(r, x, y, s);
+  else { k.up(r, s); s.events.push({ e: 'lift', kind: r.kind }); }
+  settle(s);
+}
+
+// After input or a tick: progress resets the idle clock; a finished repair moves the job on.
+function settle(s) {
+  const r = s.rep;
+  if (!r || s.phase !== 'work') return;
+  if (r.p > r.best + 1e-9) { r.best = r.p; r.idle = 0; }
+  if (r.p >= 1 && !r.done) {
+    r.done = true;
+    s.events.push({ e: 'fixed', kind: r.kind, step: s.stepN });
+    if (s.stepN + 1 < s.reps.length) {
+      s.stepN++; s.rep = s.reps[s.stepN];
+      s.finger.blocked = s.finger.down;
+      s.events.push({ e: 'step', kind: s.rep.kind });
+    } else pay(s);
+  }
+}
+
+function pay(s) {
+  const c = s.cust;
+  let base = c.kinds.reduce((a, k) => a + COIN[k], 0);
+  const quick = c.left / c.patience >= 0.5;
+  if (quick) { s.streak++; base += QUICK_BONUS; } else s.streak = 0;
+  s.bestStreak = Math.max(s.bestStreak, s.streak);
+  const coins = base * multiplier(s) * (c.regular ? 2 : 1);
+  s.coins += coins; s.served++;
+  s.log.push({ kind: c.kinds.join('+'), ms: Math.round((c.patience - c.left) * 1000), ok: true });
+  s.phase = 'works'; s.phaseT = WORKS;
+  s.events.push({ e: 'paid', coins, quick, kinds: c.kinds, mult: multiplier(s), regular: c.regular });
+}
+
+export function step(s) {
+  if (s.over) return;
+  s.t += DT;
+  const c = s.cust;
+  if (!c.tutor) s.clock += DT;
+  if (s.clock >= s.day && s.phase === 'work') { end(s, 'time'); return; }
+  if (s.phase === 'work') {
+    const r = s.rep;
+    K[r.kind].tick(r, DT, s);
+    r.idle += DT;
+    c.left -= DT;
+    settle(s);
+    if (s.phase === 'work' && c.left <= 0) {
+      c.left = 0; s.hearts--; s.lost++; s.streak = 0;
+      s.log.push({ kind: c.kinds.join('+'), ms: Math.round(c.patience * 1000), ok: false });
+      s.phase = 'leave'; s.phaseT = LEAVE;
+      s.events.push({ e: 'lost', hearts: s.hearts });
+    }
+    return;
+  }
+  s.phaseT -= DT;
+  if (s.phaseT > 0) return;
+  if (s.hearts <= 0) { end(s, 'hearts'); return; }
+  if (s.clock >= s.day) { end(s, 'time'); return; }
+  nextCustomer(s);
+}
+
+function end(s, why) {
+  s.over = why;
+  s.events.push({ e: 'over', why });
+}
+
+// For the page: whether a hint should show, and how strongly. `seen` is how many times this kind was shown before.
+export function hint(s, seen) {
+  const r = s.rep;
+  if (!r || s.phase !== 'work') return 0;
+  if (seen < 2 && r.best < 0.05) return 1; // the first two times: the ghost finger until the job starts moving
+  if (seen < 2 && r.idle > 0.6) return 1;
+  return r.idle > HINT_AFTER ? 0.5 : 0;
+}
