@@ -503,10 +503,12 @@ const GAMES = {
 };
 
 const [onlyGame, onlyPhone] = process.argv.slice(2);
+// A check that never answers becomes a FAIL line naming it, not a job that runs until its time limit.
+const within = (p, ms, what) => { let t; return Promise.race([p, new Promise((_, no) => { t = setTimeout(() => no(new Error(`no answer in ${ms / 1000}s: ${what}`)), ms); })]).finally(() => clearTimeout(t)); };
 let failed = 0;
 for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   if (onlyPhone && onlyPhone !== phone) continue;
-  const browser = await engine.launch();
+  let browser = await engine.launch();
   for (const [game, run] of Object.entries(GAMES)) {
     if (onlyGame && onlyGame !== 'all' && onlyGame !== game) continue;
     const context = await browser.newContext({ ...device }), page = await context.newPage(), errors = [];
@@ -533,11 +535,12 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     });
     page.on('pageerror', e => errors.push(String(e))); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     page.on('requestfailed', r => errors.push(`request failed: ${r.url()}`)); page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
-    try { await run(page); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
+    try { await within(run(page), 150000, 'the whole check'); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
     catch (e) { failed++; console.log(`FAIL ${game} on ${phone}: ${e.message}`); if (errors.length) console.log('     ' + errors.join('\n     ')); }
-    await context.close();
+    try { await within(context.close(), 15000, 'closing the page'); }
+    catch (e) { console.log(`     ${e.message}; starting the browser again`); browser.close().catch(() => {}); browser = await engine.launch(); }
   }
-  await browser.close();
+  await within(browser.close(), 15000, 'closing the browser').catch(() => {});
 }
 server.close();
 process.exit(failed ? 1 : 0);
