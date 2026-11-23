@@ -262,3 +262,20 @@ Not checked: the sounds on a phone, and whether the tester likes the effects.
 
 - The crash-effects pack, where a player picks two or three effects, is still to build on top of this experiment.
 - The flame stays lit over a sunk boat. It could go out with a hiss.
+
+## 2026-11-23: tester t1's note #73
+
+The tester asked for at least 50 nights; a rebirth that resets everything for a reward once everything is unlocked; a tower that goes on from where you left off, with a second sector of 50 more levels after the first 50; a tester tool that erases everything, so they can test again from the start; and, when a river, boat or flame is tapped in the shop, every button gone to show it, with a tap bringing them back. They said the new tower difficulty looks really good and asked for the same in the next 50 levels. They said again that the "trash bags" from the last test were not added. The lab reads "trash bags" as a dictation slip for "crash packs", the crash effects pack of note #69, but asked to be sure. Their bar: a game people would want to download from an app store.
+
+### Done in this change
+
+| Ask | What changed |
+| --- | --- |
+| Tower goes on where you left off | Reverses note #69's "the next climb starts at level 1". New key `lantern-tower-at`, a number: the level the next climb starts at. A cleared level moves it on by one; a lost level is tried again. The menu reads "Tower climb · go on at level N", and a second button, "New climb from level 1", appears once N is above 1. The best level is still kept under `lantern-best-level`. |
+| Stats on the tower | A climb is one run while the player taps "Climb on". Trying a lost level again, or starting from the menu, is a new run, so stats bought for the next run are used up there. |
+| Erase everything | A tester tool. The first tap asks again; the second removes every `lantern-` key and reloads. It leaves the notes link and the lab's keys alone. |
+| A look on the whole screen | Tapping a boat, water or flame you own wears it and hides every button, the notes button included. A calm river with no rocks flows by, lit wider than in play, with the boat and flame drawn 2.2 times their size. "Tap to go back" shows for a moment; one tap anywhere, or any key, brings the shop back. Abilities keep their on and off tap. |
+
+Checks: the phone check on WebKit iPhone 13 and Chromium Pixel 7 now covers resuming at level 2 after a loss, the menu button, a new climb from level 1, the look screen hiding the shop and the notes button and coming back on a tap, and the erase tool (one tap erases nothing; two leave no `lantern-` key and keep `notes.k`). With the old rule put back (a lost climb starts at level 1), the check fails at "after a loss the level is tried again". Screenshots of the jade boat, teal water and sparkler looks, and of the menu with the resume button, were looked at.
+
+Not checked: a real phone.
