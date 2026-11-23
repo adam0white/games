@@ -23,10 +23,16 @@ node loadtest/bench.mjs                 # tick cost and bytes per client, in Nod
 echo "LOADTEST_KEY=$(openssl rand -hex 16)" > .dev.vars
 npx wrangler dev --port 8799            # local server at http://localhost:8799/crumbwar/
 node loadtest/load.mjs --url ws://localhost:8799/crumbwar/play --key <key> --clients 20 --seconds 15
-npx wrangler deploy                     # deploy
+npx wrangler deploy                     # deploy (first deployed 2026-11-23)
 ```
 
-A load test names its own room (`--room`, sent as `lt-<name>`) and may raise the room's cap (`--cap`). Both need the `LOADTEST_KEY` secret. `lt-` rooms never appear in the directory, so no player is sent to one. `GET /crumbwar/api/status?lt=<key>&room=<name>` returns a room's counters, and without `room` it lists the region's rooms.
+The production `LOADTEST_KEY` is a Worker secret. A copy is in the owner's macOS Keychain: `security find-generic-password -a crumbwar -s crumbwar-loadtest-key -w`.
+
+```sh
+node loadtest/load.mjs --url wss://play.adamwhite.work --key <key> --clients 60 --seconds 60
+```
+
+A load test names its own room (`--room`, sent as `lt-<name>`), may raise the room's cap (`--cap`) and may overload the room on purpose (`--burn`). Both need the `LOADTEST_KEY` secret. `lt-` rooms never appear in the directory, so no player is sent to one. `GET /crumbwar/api/status?lt=<key>&room=<name>` returns a room's counters, and without `room` it lists the region's rooms.
 
 ## Roll back
 
