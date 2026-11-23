@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -221,4 +221,11 @@ test('a live release from before an archive still reads, though its games.json l
   f.game.legacyOrigin = 'https://hearsay.adamwhite.work';
   const old = f.commit();
   assert.equal(repositoryEvidence(f.cwd).registry(old).games[0].legacyOrigin, 'https://hearsay.adamwhite.work');
+});
+test('a release manifest is built from a live registry that lists a host archivedHosts now holds', () => {
+  const live = JSON.parse(readFileSync(new URL('../games.json', import.meta.url), 'utf8'));
+  const game = { ...live.games[0], legacyOrigin: 'https://smoke.adamwhite.work', redirectEnabled: false };
+  live.games = [game];
+  const release = manifest(live, game, 'a'.repeat(40), false, '0.5.19', '1.0.0');
+  assert.equal(release.game, game.slug);
 });

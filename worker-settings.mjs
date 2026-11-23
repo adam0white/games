@@ -22,7 +22,6 @@ export const legacyRoutes = [
   'neighbours.adamwhite.work/*',
   'lefthand.adamwhite.work/*',
   'word.adamwhite.work/*',
-  'smoke.adamwhite.work/*',
 ];
 // Hostnames of archived games (archive/README.md). This Worker answers each one with a 302 to the games shelf,
 // so the games' original deployments no longer serve old builds there. A host leaves this list (and its route in
@@ -36,5 +35,6 @@ export const archivedHosts = [
   'child.adamwhite.work',
   'days.adamwhite.work',
   'island.adamwhite.work',
+  'smoke.adamwhite.work',
 ];
 export const archivedRoutes = archivedHosts.map(host => `${host}/*`);
