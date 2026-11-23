@@ -35,7 +35,9 @@
   #how li { text-align: left; margin: .35em 0; } #how ul { padding-left: 1.2em; margin: .4em 0; }
   .g { color: #8dff8a; font-weight: bold; } .r { color: #ff7a6a; font-weight: bold; } .y { color: #ffe23a; font-weight: bold; }
   #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); right: calc(64px + env(safe-area-inset-right)); display: none; pointer-events: none; text-shadow: 0 1px 4px #000; }
-  #bar { height: 16px; border-radius: 9px; background: #00000066; border: 2px solid #fff8e6aa; overflow: hidden; }
+  #row { display: flex; align-items: center; gap: 8px; }
+  #pct { font-size: 15px; min-width: 2.6em; text-align: right; text-shadow: 0 1px 3px #000; }
+  #bar { flex: 1; height: 16px; border-radius: 9px; background: #00000066; border: 2px solid #fff8e6aa; overflow: hidden; }
   #fill { height: 100%; width: 0; background: linear-gradient(#ffe23a, #ffb42a); transition: width .15s; }
   #who { font-size: 17px; font-weight: bold; margin-top: 3px; }
   #pause { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); width: 46px; height: 46px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; font-weight: bold; }
@@ -46,7 +48,7 @@
 <body>
 <canvas id="gl"></canvas>
 <canvas id="c"></canvas>
-<div id="hud"><div id="bar"><div id="fill"></div></div><div id="who"></div></div>
+<div id="hud"><div id="row"><div id="bar"><div id="fill"></div></div><b id="pct"></b></div><div id="who"></div></div>
 <button id="pause" aria-label="Pause">II</button>
 <div id="say"></div>
 
@@ -86,7 +88,8 @@
     <li><span class="r">Red number</span>: stronger than you. Touch it and you die.</li>
     <li>The pale wedge is what an animal can see. Walk into it and the animal notices you: <span class="y">!</span></li>
     <li><span class="r">&raquo;</span> means it is faster than you. A fast strong animal that notices you will catch you. A fast weak one will get away, so sneak up from behind.</li>
-    <li>Fill the bar to get promoted. You pick 1 of 3 new animals each time.</li>
+    <li>Fill the bar to get promoted. You pick 1 of 3 new animals each time. Picking fast again makes you faster each time. Picking sneaky again makes you harder to see each time.</li>
+    <li>Animals hunt each other too. A red dashed line shows who is chasing whom. A hunter that is busy is easier to sneak past.</li>
     <li><b>Wild rules</b> (menu button) add two things. A strong animal has a thick hide: it lives through one bite, then the hide needs 25 seconds. And every 45 seconds a stronger animal nearby hunts you for 5 seconds, wherever it is looking.</li>
     <li>If you die you go back one animal, or you can start again as an ant.</li>
   </ul>
@@ -121,7 +124,7 @@
 </div></div>
 
 <script type="module">
-import { FORMS, ANT, WORLD, TOP, CONE, create, step, choose, revive, me, level, needFor, article, SPAWN_WEIGHTS, hideReady } from './sim.js';
+import { FORMS, ANT, WORLD, TOP, CONE, create, step, choose, revive, me, level, needFor, article, SPAWN_WEIGHTS, hideReady, SAME_FAST, SAME_SNEAK } from './sim.js';
 import { drawForm, setLook, LOOKS } from './art.js';
 import { create3D } from './look3d.js';
 import { readJson, writeJson } from '../kit/save.js';
@@ -208,8 +211,9 @@ function start(fresh) {
 }
 function hud() {
   const F = me(s), need = needFor(level(s));
-  $('fill').style.width = Math.min(100, s.player.xp / need * 100) + '%';
-  $('who').textContent = `Level ${level(s)} · ${F.name}` + (s.wild && F.role === 'brute' ? (hideReady(s) ? ' · hide ready' : ' · hide growing') : '');
+  const pct = Math.min(100, Math.floor(s.player.xp / need * 100));
+  $('fill').style.width = pct + '%'; $('pct').textContent = pct + '%';
+  $('who').textContent = `Level ${level(s)} · ${F.name}` + (F.again > 1 && F.role === 'runner' ? ` · speed +${Math.round((F.speed / FORMS[F.id].speed - 1) * 100)}%` : F.again > 1 && F.role === 'sneak' ? ` · ${Math.round((1 - F.stealth / FORMS[F.id].stealth) * 100)}% harder to see` : '') + (s.wild && F.role === 'brute' ? (hideReady(s) ? ' · hide ready' : ' · hide growing') : '');
 }
 function say(text) { $('say').textContent = text; $('say').classList.add('on'); sayTimer = 2.6; }
 
@@ -221,6 +225,9 @@ function offer() {
     const pic = document.createElement('canvas'); pic.width = pic.height = 168; portrait(pic, F, 34);
     const pace = { slow: 'Slow', medium: 'Medium', fast: 'Fast' }[F.pace];
     b.append(pic, Object.assign(document.createElement('b'), { textContent: F.name }), Object.assign(document.createElement('small'), { textContent: `Power ${F.power} · ${pace}` }), Object.assign(document.createElement('small'), { textContent: F.trait }));
+    const k = s.player.stack.filter(id => FORMS[id].role === F.role).length; // earlier picks of this kind make this one better
+    if (k && F.role === 'runner') b.append(Object.assign(document.createElement('small'), { textContent: `Fast again: +${Math.round((SAME_FAST ** k - 1) * 100)}% speed`, style: 'color:#8dff8a' }));
+    if (k && F.role === 'sneak') b.append(Object.assign(document.createElement('small'), { textContent: `Sneaky again: ${Math.round((1 - SAME_SNEAK ** k) * 100)}% harder to see`, style: 'color:#8dff8a' }));
     b.onclick = () => { if (!s.choosing) return; choose(s, i); save.stack = s.player.stack.slice(); save.xp = 0; const fresh = !save.seen.includes(F.id); saw(save.stack); store(); blip(520, 0.3, 'triangle', 0.14, 500); hud(); show('play'); say(fresh ? `New in your book: ${F.name}` : `You are ${article(F.name)} now`); };
     box.append(b);
   });
@@ -330,6 +337,10 @@ function draw(now) {
     if (strong && m.alert && (Math.abs(m.x - p.x) > W / zoom / 2 || Math.abs(m.y - p.y) > H / zoom / 2)) edge.push(m);
     g.save(); g.translate(m.x, m.y); g.rotate(m.a); g.fillStyle = '#00000026'; g.beginPath(); g.ellipse(0, 3, M.r * 1.1, M.r * 0.8, 0, 0, 7); g.fill(); drawForm(g, M, M.r, m.ph, null, m.a); g.restore();
   }
+  // who is chasing whom
+  g.strokeStyle = '#ff3a2acc'; g.lineWidth = 2; g.setLineDash([7, 7]); g.lineDashOffset = -now / 40;
+  for (const m of s.mobs) if (m.chase && !m.chase.gone && Math.abs(m.x - p.x) < vw && Math.abs(m.y - p.y) < vh) { g.beginPath(); g.moveTo(m.x, m.y); g.lineTo(m.chase.x, m.chase.y); g.stroke(); }
+  g.setLineDash([]);
   // bits of eaten animals, under the numbers
   for (const b of bits) {
     const k = b.age / b.life; g.globalAlpha = Math.max(0, 1 - k);
@@ -402,6 +413,10 @@ function draw3d(now) {
     if (M.power !== F.power) R.wedge(m.x, m.y, M.range * F.stealth + F.r, m.a - CONE, m.a + CONE, m.alert ? (strong ? [1, 0.2, 0.15] : [1, 0.9, 0.2]) : [1, 1, 1], m.alert ? 0.26 : strong ? 0.17 : 0.07);
     rec.start(m.x, m.y, m.a, M.r, pose(M, m.ph)); drawForm(rec, M, M.r, m.ph, null, 0);
   }
+  for (const m of s.mobs) if (m.chase && !m.chase.gone && Math.abs(m.x - p.x) < vw && Math.abs(m.y - p.y) < vh) { // who is chasing whom: a dotted red line on the ground
+    const dx = m.chase.x - m.x, dy = m.chase.y - m.y, n = Math.floor(Math.hypot(dx, dy) / 14);
+    for (let i = 1; i < n; i++) { const k = (i + (now / 300) % 1) / n; R.ball(m.x + dx * k, 1.5, m.y + dy * k, 2.2, 0, 0, 2.2, 1.2, [1, 0.23, 0.16]); }
+  }
   for (const b of bits) {
     const k = b.age / b.life;
     if (b.ring) R.ring(b.x, b.y, b.r * (1 + k * 1.6) - 1.5, b.r * (1 + k * 1.6) + 1.5, R.rgb(b.c), 1 - k);
@@ -443,6 +458,7 @@ function frame(now) {
           bits.push({ ring: 1, x: e.x, y: e.y, r: Math.max(8, M.r), c: '#ffe23a', age: 0, life: 0.35 });
           crunch(0.1, 0.22, 1400 + Math.random() * 900); blip((300 + e.gain * 90) * 2 ** (Math.min(streak - 1, 12) / 12), 0.09, 'square', 0.06, 200); save.xp = s.player.xp; hud();
         }
+        if (e.t === 'mobeat' && Math.abs(e.x - s.player.x) < W / zoom && Math.abs(e.y - s.player.y) < H / zoom) { const M = FORMS.find(f => f.name === e.name); burst(e.x, e.y, [M.c, M.d, '#ffffff'], 10, 90 + M.r * 5, Math.max(3, M.r * 0.28)); floats.push({ x: e.x, y: e.y, text: `${e.by} ate ${article(e.name)}`, age: 0 }); crunch(0.08, 0.1, 900); }
         if (e.t === 'notice') blip(e.strong ? 180 : 700, 0.12, e.strong ? 'sawtooth' : 'sine', 0.06);
         if (e.t === 'hunt') { say(`${article(e.name).replace(/^a/, 'A')} is hunting you`); blip(140, 0.5, 'sawtooth', 0.1, 120); buzz(60); }
         if (e.t === 'hide') { say(`Your thick hide took the bite from ${article(e.name)}`); shake = 0.4; flash = 0.6; crunch(0.18, 0.28, 500); buzz([30, 40, 30]); bits.push({ ring: 1, x: e.x, y: e.y, r: me(s).r * 1.6, c: '#9ad8ff', age: 0, life: 0.6 }); hud(); }
