@@ -69,12 +69,12 @@ Each directory has `sim.js` (rules, runs in Node), `bots.mjs` (proves the rules 
 
 The note, in short: a new game where you have several abilities and must uncover your own past, because you have forgotten everything about yourself. Every use of an ability takes time off your lifespan, so you must find out who you are before you die.
 
-Not built in this run. A new experiment must also be added to the notes page's game list (`workers/feedback/public/notes/app.js`), which a run started by a tester's note may not change. The lane's direction is also "fewer, focused directions" (owner, 2026-11-14), so a new game is the owner's call as much as the tester's. A question went to the tester about which form the game should take.
+Not built in this run. The idea fits several very different games (a story with choices, a small place to explore, an action game), and the lane starts a new game with a concept card, then looks. The lane's direction is also "fewer, focused directions" (owner, 2026-11-14). A question went to the tester about which form the game should take.
 
 ### Left as a proposal (2026-11-23, note #107): concept card
 - **Working title:** Spent.
 - **One line:** you wake with no memory and a lifespan bar. Each power you use costs years, and each one shows you a piece of who you were. Find out before the bar runs out.
 - **Loop (one run, 10 to 15 minutes):** a small place (a house, a street, a ward) holds about 12 clues. Some can be read for free by looking. Most need a power: *Echo* (hear what was said in a room, 3 years), *Touch* (see an object's last owner, 2 years), *Open* (a locked door or box, 5 years), *Read* (a person's thoughts, 4 years), *Rewind* (relive the last minute, 8 years). Clues fill a portrait with name, work, who you loved and what you did. You win by naming yourself correctly before death; a wrong name costs 10 years.
 - **Why it can be fun:** every power is a spend decision, so the player weighs "is this clue worth a year?" as a shop does. Each run reshuffles which of several pasts is true (a doctor, a thief, a soldier...), so a second run is a new mystery, and what you learned of the powers carries over.
-- **Smallest slice that would test it:** one room, three powers, one true past out of three, a lifespan bar and the naming at the end. About a day's work as a no-build experiment under `experiments/`, once the owner or the next lab session agrees and someone adds it to the notes page.
+- **Smallest slice that would test it:** one room, three powers, one true past out of three, a lifespan bar and the naming at the end. About a day's work as a no-build experiment under `experiments/`, once the tester has picked a form and the next lab session takes it up. To get the notes button, it also goes in the notes page's game list (`workers/feedback/public/notes/app.js`).
 - **Open questions:** the form (asked of the tester); whether death ends the run or loops back with memory kept (a time-loop variant).
