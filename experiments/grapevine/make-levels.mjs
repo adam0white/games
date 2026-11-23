@@ -66,6 +66,9 @@ const SPECS = [
 ];
 // Seeds fixed after looking at the level in the page; a level not listed searches from its base seed.
 const PICK = {};
+// Levels that search more seeds. Follow-up of 2026-11-23: levels 16, 23, 25 and 26 sat off the ramp with eight seeds.
+// The first eight seeds are the same as before, so every other level is unchanged.
+const MORE_SEEDS = { 16: 48, 23: 48, 25: 48, 26: 48 };
 
 // The ramp: how often a player with no plan (wanderRate in sim.js) should still win, by level.
 // Eight villages that meet each spec are made; the one closest to the target is kept.
@@ -73,7 +76,7 @@ const target = n => 0.75 - 0.6 * (n - 4) / 26;
 const out = HAND.map(l => ({ ...l, min: solve(l).min }));
 SPECS.forEach((spec, i) => {
   const n = i + 4;
-  const seeds = PICK[n] ? [PICK[n]] : Array.from({ length: 8 }, (_, j) => 1000 * n + 17 + j * 100003);
+  const seeds = PICK[n] ? [PICK[n]] : Array.from({ length: MORE_SEEDS[n] ?? 8 }, (_, j) => 1000 * n + 17 + j * 100003);
   let best = null;
   for (const seed of seeds) {
     const lv = generate(seed, spec, 3000);

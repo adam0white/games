@@ -19,12 +19,15 @@
 <p><button id="beep">Play a sound</button> <span id="heard"></span></p>
 <div id="a" class="card">card a</div><div id="b" class="card">card b</div>
 <div id="labbox"></div>
+<div id="pad" style="width:300px;height:60px"></div>
 <script type="module">
 import { read, write, readNumber, readJson, writeJson } from './save.js';
 import { sound } from './audio.js';
 import { onLeave, isPauseKey } from './pause.js';
 import { screens } from './screens.js';
 import { lab } from './lab.js';
+import { stick } from './stick.js';
+import { drag } from './drag.js';
 
 const results = [], out = document.getElementById('out');
 function check(name, fn) {
@@ -60,6 +63,49 @@ enabled = true;
 check('audio: unlock makes one context and runs setup once', () => { const a = snd.unlock(), b = snd.unlock(); snd.tone(440, 0.01, 0.0001); snd.noise(0.01, 0.0001); return !!a && a === b && built === 1; });
 check('audio: hold and release do not throw', () => { snd.hold(); snd.release(); return true; });
 document.getElementById('beep').addEventListener('click', () => { snd.unlock(); snd.tone(523.25, 0.4, 0.15, 'triangle'); snd.noise(0.15, 0.1); document.getElementById('heard').textContent = `Context is ${snd.ctx?.state}. You should have heard a note and a crunch.`; });
+
+// stick.js and drag.js, with pointer events made here.
+const pad = document.getElementById('pad');
+const touch = (type, x, y = 0, id = 1, kind = 'touch') => pad.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: kind, isPrimary: true, clientX: x, clientY: y, pressure: type === 'pointerup' ? 0 : 0.5, bubbles: true }));
+const near = (a, b) => Math.abs(a - b) < 1e-9;
+let live = false; const st = stick(pad, { when: () => live, reach: 50, leash: 80, dead: 0.2 });
+touch('pointerdown', 100); touch('pointermove', 140);
+check('stick: ignores a finger while the game says no', () => st.touch === null && st.vector().x === 0);
+live = true; touch('pointerdown', 100); touch('pointermove', 109);
+check('stick: inside the dead zone the vector is zero', () => st.vector().x === 0 && st.vector().y === 0);
+touch('pointermove', 125);
+check('stick: travel over reach on each axis', () => near(st.vector().x, 0.5) && st.vector().y === 0 && st.touch.ox === 100);
+touch('pointermove', 200);
+check('stick: past the leash the centre is dragged along', () => near(st.touch.ox, 120) && near(st.vector().x, 1.6));
+touch('pointermove', 150, 0, 2);
+check('stick: another finger does not move it', () => st.touch.x === 200);
+touch('pointercancel', 150); check('stick: a cancelled finger stops it', () => st.touch === null && st.vector().x === 0);
+touch('pointerdown', 100); st.drop(); check('stick: drop forgets the finger', () => st.touch === null);
+touch('pointerup', 100);
+
+let on = true, still = false, resumed = 0, aimed = null, moused = null, at = 0.5;
+const steer = drag(pad, { playing: () => on, paused: () => still, resume: () => { still = false; resumed++; }, from: () => at, travel: dx => dx / 100 * 2, aim: x => { aimed = x; }, mouse: e => { moused = e.clientX; }, settle: 10 });
+touch('pointerdown', 100); touch('pointerup', 100);
+check('drag: a tap does not steer', () => aimed === null);
+touch('pointerdown', 100); touch('pointermove', 125);
+check('drag: steers by finger travel times the gain, from where play was at touch-down', () => near(aimed, 1));
+at = 0.8; steer.rebase(); touch('pointermove', 130);
+check('drag: rebase steers on from where play is now', () => near(aimed, 0.9));
+steer.drop(); aimed = null; touch('pointermove', 160);
+check('drag: drop lets go of the finger', () => aimed === null);
+touch('pointerup', 160);
+still = true; at = 0.5; touch('pointerdown', 100);
+check('drag: a touch while paused resumes', () => resumed === 1 && !still && aimed === null);
+touch('pointermove', 109); check('drag: the resuming finger does not steer inside settle', () => aimed === null);
+touch('pointermove', 111); check('drag: past settle it re-anchors there and does not jump', () => near(aimed, 0.5));
+touch('pointermove', 121); check('drag: then steers from the re-anchor', () => near(aimed, 0.7));
+touch('pointerup', 121); aimed = null;
+touch('pointerdown', 40, 0, 3, 'mouse'); touch('pointermove', 60, 0, 3, 'mouse');
+check('drag: a mouse goes to the game', () => moused === 60 && aimed === null);
+touch('pointerup', 60, 0, 3, 'mouse');
+on = false; touch('pointerdown', 100); touch('pointermove', 150);
+check('drag: nothing steers while not playing', () => aimed === null);
+touch('pointerup', 150); steer.reset();
 
 // lab.js, with a stand-in for the network: this page never sends anything to the lab.
 // It restores the shared player id afterwards, so opening this page changes nothing for a player.

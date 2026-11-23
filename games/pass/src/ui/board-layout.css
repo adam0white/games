@@ -14,6 +14,16 @@
 .teaching-cue button {
   min-height: 44px;
 }
+/* A cue inserted beside the Sunday promise buttons gets its own row instead of squeezing them. */
+.row:has(> .teaching-cue) {
+  flex-wrap: wrap;
+}
+.row > .teaching-cue {
+  order: 1;
+  flex: 1 1 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
 .teaching-target {
   outline: 3px solid #b16921;
   outline-offset: 2px;

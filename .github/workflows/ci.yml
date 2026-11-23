@@ -3,6 +3,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Every game, every night: the after-merge run on main is cancelled when the next merge arrives.
+  schedule:
+    - cron: '17 9 * * *'
+  workflow_dispatch:
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -40,6 +44,7 @@ jobs:
       games: ${{ steps.affected.outputs.games }}
       count: ${{ steps.affected.outputs.count }}
       total: ${{ steps.affected.outputs.total }}
+      phone: ${{ steps.affected.outputs.phone }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -50,6 +55,7 @@ jobs:
       - id: affected
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          EVENT: ${{ github.event_name }}
         run: |
           if [ -z "$BASE" ] || [ "$BASE" = 0000000000000000000000000000000000000000 ]; then BASE=$(git hash-object -t tree /dev/null); fi
           node scripts/affected.mjs "$BASE"
@@ -186,9 +192,50 @@ jobs:
           name: lefthand-browser-failure-${{ matrix.os }}-${{ matrix.browser }}
           path: games/lefthand/test-results/
           retention-days: 3
+  # The experiments' phone check (experiments/kit/check/phone.mjs) on Chromium and WebKit. It needs only `changes`,
+  # so an experiment-only PR does not wait on game suites. Playwright is not a repository dependency: it is installed
+  # at the exact version the check passes with locally into a temp directory that PLAYWRIGHT points at. The check
+  # answers the lab endpoint itself and never sends to it.
+  phone:
+    needs: changes
+    if: needs.changes.outputs.phone == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PLAYWRIGHT_VERSION: 1.64.1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .node-version
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ env.PLAYWRIGHT_VERSION }}-${{ matrix.browser }}
+      - run: npm install --prefix "$PLAYWRIGHT" --no-save --no-package-lock --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION"
+        env:
+          PLAYWRIGHT: ${{ runner.temp }}/playwright
+      # WebKit on Linux has not yet been seen green here (the check runs on macOS locally), so its WebKit steps are
+      # advisory: a failure shows in the log but the job, and the required ci gate, still pass. This sits on the steps,
+      # not the job, because a step's continue-on-error is documented to conclude success. Tighten both to false once
+      # a WebKit run passes on Linux.
+      - run: '"$PLAYWRIGHT/node_modules/.bin/playwright" install --with-deps "$BROWSER"'
+        continue-on-error: ${{ matrix.browser == 'webkit' }}
+        env:
+          PLAYWRIGHT: ${{ runner.temp }}/playwright
+          BROWSER: ${{ matrix.browser }}
+      - run: node experiments/kit/check/phone.mjs all "$BROWSER"
+        continue-on-error: ${{ matrix.browser == 'webkit' }}
+        env:
+          PLAYWRIGHT: ${{ runner.temp }}/playwright
+          BROWSER: ${{ matrix.browser }}
   ci:
     if: always()
-    needs: [tools, changes, workers, games, build, neighbours-browser, lefthand-browser]
+    needs: [tools, changes, workers, games, build, neighbours-browser, lefthand-browser, phone]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -212,3 +259,5 @@ jobs:
           NEIGHBOURS_BROWSER: ${{ needs.neighbours-browser.result }}
           LEFTHAND_REQUIRED: ${{ contains(needs.changes.outputs.games, '"lefthand"') }}
           LEFTHAND_BROWSER: ${{ needs.lefthand-browser.result }}
+          PHONE_REQUIRED: ${{ needs.changes.outputs.phone == 'true' }}
+          PHONE_CHECK: ${{ needs.phone.result }}

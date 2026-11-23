@@ -1,5 +1,6 @@
 import registry from '../games.json' with { type: 'json' };
 import { validateRegistry } from '../scripts/lib.mjs';
+import { archivedHosts } from '../worker-settings.mjs';
 
 const PLAY = 'https://play.adamwhite.work';
 const SHELF = 'https://human.adamwhite.work/games/';
@@ -13,13 +14,16 @@ export function experimentPath(pathname) {
   return rest === '' || rest === '/' ? '/lab/' : rest;
 }
 
-export function createHandler(games) {
-  validateRegistry({ hfVersion: '0.0.0', games });
+export function createHandler(games, archived = archivedHosts) {
+  validateRegistry({ hfVersion: '0.0.0', games }, archived);
+  // Archived games' old hosts (worker-settings.mjs). A 302, not a 301, so removing a host from the list rolls back.
+  const retired = new Set(archived);
   const legacy = new Map(games.filter(game => game.redirectEnabled === true && game.legacyOrigin).map(game => [game.legacyOrigin, game.slug]));
   const zoneManaged = new Set(games.filter(game => game.redirectEnabled === true && game.redirectMode === 'zone').map(game => game.legacyOrigin));
   return {
     async fetch(request, env) {
       const url = new URL(request.url);
+      if (retired.has(url.hostname)) return Response.redirect(SHELF, 302);
       if (url.origin === PLAY) {
         if (url.pathname === '/') return Response.redirect(SHELF, 302);
         const moved = experimentPath(url.pathname);

@@ -8,3 +8,7 @@ checkResults({tools:process.env.TOOLS, changes:process.env.CHANGES, workers:proc
 
 if (process.env.LEFTHAND_REQUIRED === "true" && process.env.LEFTHAND_BROWSER !== "success") throw new Error("Lefthand browser checks did not pass");
 if (process.env.LEFTHAND_REQUIRED !== "true" && process.env.LEFTHAND_REQUIRED !== "false") throw new Error("Missing Lefthand browser requirement");
+
+// The phone check runs, and must pass, only when its paths changed (scripts/lib.mjs phoneCheckNeeded).
+if (process.env.PHONE_REQUIRED !== "true" && process.env.PHONE_REQUIRED !== "false") throw new Error("Missing phone check requirement");
+if (process.env.PHONE_CHECK !== (process.env.PHONE_REQUIRED === "true" ? "success" : "skipped")) throw new Error(`Phone check ${process.env.PHONE_CHECK}`);

@@ -1,7 +1,8 @@
 import { neighboursSource } from './history.mjs';
-import { reservedPaths } from '../worker-settings.mjs';
+import { archivedHosts, reservedPaths } from '../worker-settings.mjs';
 const sha = /^[0-9a-f]{40}$/;
-export function validateRegistry(registry) {
+// `archived` is the archived-host list a legacy origin may not use; a historical registry is read with none.
+export function validateRegistry(registry, archived = archivedHosts) {
   if (!registry || !/^\d+\.\d+\.\d+$/.test(registry.hfVersion) || !Array.isArray(registry.games)) throw new Error('Invalid registry');
   const seen = new Set();
   const origins = new Set();
@@ -21,12 +22,18 @@ export function validateRegistry(registry) {
       let origin;
       try { origin = new URL(game.legacyOrigin); } catch { throw new Error('Invalid legacy origin'); }
       if (!/^https:\/\/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.adamwhite\.work$/.test(game.legacyOrigin) || origin.origin !== game.legacyOrigin || ['https://play.adamwhite.work', 'https://human.adamwhite.work'].includes(origin.origin) || origins.has(origin.origin)) throw new Error('Invalid or duplicate legacy origin');
+      if (archived.includes(origin.hostname)) throw new Error(`Legacy origin ${origin.hostname} is an archived host; remove it from archivedHosts in worker-settings.mjs first`);
       origins.add(origin.origin);
     }
     if (game.ciBrowsers !== undefined && (!Array.isArray(game.ciBrowsers) || game.ciBrowsers.some(b => !['chromium', 'chromium-headless-shell', 'webkit', 'firefox'].includes(b)))) throw new Error('Invalid CI browser');
     seen.add(game.slug);
   }
   return registry;
+}
+// Paths the phone check (experiments/kit/check/phone.mjs) reads or depends on. The CI phone job runs when one changes.
+const PHONE_PATHS = ['experiments/', 'prototypes/', 'workers/feedback/public/notes/', 'src/worker.mjs', 'scripts/experiments.mjs', '.github/workflows/ci.yml'];
+export function phoneCheckNeeded(paths) {
+  return paths.some(path => PHONE_PATHS.some(prefix => prefix.endsWith('/') ? path.startsWith(prefix) : path === prefix));
 }
 export function affectedGames(registry, paths) {
   validateRegistry(registry);
