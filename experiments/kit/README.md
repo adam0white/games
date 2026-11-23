@@ -10,7 +10,7 @@ Shared code for the games under `experiments/`. It is served at `/kit/` as plain
 | `screens.js` | `screens(ids, after)`: show one full-page card |
 | `lab.js` | `lab(slug)`: play recording for the game lab, with its notice and off switch; see below |
 | `/notes/button.js` | the notes button for testers (it lives in `workers/feedback/public/notes/`) |
-| `check/phone.mjs` | phone runs of every live experiment and of this kit, on WebKit iPhone 13 and Chromium Pixel 7 |
+| `check/phone.mjs` | phone runs of every live experiment, of the lab pages under `/lab/` and of this kit, on WebKit iPhone 13 and Chromium Pixel 7 |
 | `index.html` | a self-test page at `/kit/` |
 
 ## Rules
