@@ -21,26 +21,26 @@ function steer(s, wantEmbers) {
   }
   return best;
 }
-if (process.argv[3] !== 'audit') for (const stage of [1, 3, 5, 6, 8, 11, 12, 15, 17, 18, 20, 0]) for (const [name, policy] of Object.entries(policies)) {
+if (process.argv[3] !== 'audit') for (const stage of [1, 3, 5, 6, 8, 11, 12, 15, 17, 18, 20, 0, -3, -12]) for (const [name, policy] of Object.entries(policies)) {
   const ends = {}, dist = []; let grazes = 0, embers = 0, gifts = 0, powers = 0;
   for (let seed = 1; seed <= runs; seed++) {
-    const s = create(seed, stage || 1, !stage); // stage 0 is the endless river
+    const s = create(seed, Math.abs(stage) || 1, stage < 0 ? 'tower' : !stage); // stage 0 is the endless river, -n the tower
     while (!s.over) { step(s, policy(s)); for (const e of s.events) if (e === 'heart' || e === 'shield') gifts++; else if (['boost', 'slow', 'small', 'big'].includes(e)) powers++; }
     ends[s.over] = (ends[s.over] ?? 0) + 1; dist.push(stage ? progress(s) : score(s) / 100); grazes += s.grazes; embers += s.taken;
   }
   dist.sort((a, b) => a - b);
   const q = p => (dist[Math.floor(p * (runs - 1))] * 100).toFixed(0) + '%';
-  console.log(stage ? `stage ${stage}` : 'endless (score)', name.padEnd(8), JSON.stringify(ends), `distance p10 ${q(0.1)} median ${q(0.5)} p90 ${q(0.9)}`, `grazes/run ${(grazes / runs).toFixed(1)} embers/run ${(embers / runs).toFixed(1)} hearts+shields/run ${(gifts / runs).toFixed(2)} powers/run ${(powers / runs).toFixed(2)}`);
+  console.log(stage < 0 ? `tower ${-stage}` : stage ? `stage ${stage}` : 'endless (score)', name.padEnd(8), JSON.stringify(ends), `distance p10 ${q(0.1)} median ${q(0.5)} p90 ${q(0.9)}`, `grazes/run ${(grazes / runs).toFixed(1)} embers/run ${(embers / runs).toFixed(1)} hearts+shields/run ${(gifts / runs).toFixed(2)} powers/run ${(powers / runs).toFixed(2)}`);
 }
 
 // Passability audit: node prototypes/lantern/bots.mjs 200 audit. A ghost boat rides the centre line and cannot die;
 // each tick we measure the widest free gap across the river at the boat's row. A river is unfair if that gap closes.
 // Also prints where the hazards sit, by tenth of the river, to show the ramp.
-if (process.argv[3] === 'audit') for (const stage of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 0]) {
+if (process.argv[3] === 'audit') for (const stage of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 0, -3, -12]) { // 0 is the endless river; -n is the tower with night n's things
   let worst = Infinity, worstBig = Infinity, tight = 0, buried = 0, pickups = 0; const swing = Array(10).fill(0), all = Array(10).fill(0), seen = new Set();
   for (let seed = 1; seed <= (stage ? runs : Math.ceil(runs / 10)); seed++) { // the endless river is ridden far past its last step harder, on fewer seeds
     for (const set of [[], ['boost'], ['slow'], undefined]) { // powers shift when the boat meets each moving rock, so every river is ridden four ways
-    const s = create(seed, stage || 1, !stage, set); let min = Infinity; seen.clear(); const checked = new Set();
+    const s = create(seed, Math.abs(stage) || 1, stage < 0 ? 'tower' : !stage, set); let min = Infinity; seen.clear(); const checked = new Set();
     while (!s.over && s.y < 30 * GOAL) {
       s.safe = 1e9; s.light = 1; step(s, centre(s, s.y));
       // A pickup is buried if a boat sitting on it at the moment it comes level would touch a rock.
@@ -59,5 +59,5 @@ if (process.argv[3] === 'audit') for (const stage of [1, 2, 3, 4, 5, 6, 7, 8, 9,
     worst = Math.min(worst, min); if (min < 0.03) tight++;
     }
   }
-  console.log(`${stage ? 'stage ' + stage : 'endless'} narrowest gap ${worst.toFixed(3)} (big boat ${worstBig.toFixed(3)}) rides with a gap under 0.03: ${tight}; buried pickups ${buried}/${pickups};`, 'moving share by tenth', swing.map((n, i) => (all[i] ? Math.round(100 * n / all[i]) : 0)).join(' '));
+  console.log(`${stage < 0 ? 'tower ' + -stage : stage ? 'stage ' + stage : 'endless'} narrowest gap ${worst.toFixed(3)} (big boat ${worstBig.toFixed(3)}) rides with a gap under 0.03: ${tight}; buried pickups ${buried}/${pickups};`, 'moving share by tenth', swing.map((n, i) => (all[i] ? Math.round(100 * n / all[i]) : 0)).join(' '));
 }

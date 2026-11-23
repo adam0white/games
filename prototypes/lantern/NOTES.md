@@ -154,3 +154,16 @@ Checked: all six boats and flames drawn in a phone-sized Chromium with no page e
 Checked: in a phone-sized Chromium an Abilities pack cost 50, saved its find, showed the hop and the flash, and the next run laid only that power in the river; two fast taps on another pack charged once. Audit clean with all five powers (an ember a magnet has pulled is left out of the buried-pickup count). No page errors.
 
 Not checked: whether locking powers behind the pack is what the tester meant (asked); the hop's feel and sound on a phone.
+
+## 2026-11-23: tower climb (note #35, last item)
+
+The tester's words: the river climbs upward first, and when it runs straight you reach dawn. Reading taken: a third way to play beside the story and the endless river.
+
+- The river is walled in stone and climbs in tight turns (about two and a half times as sharp as a story night). The turns ease as it rises and the last 15% runs dead straight into the dawn.
+- Ten floors. A dashed ledge with its number cut in the wall marks each one; the game says each floor and saves the best floor reached.
+- The tower holds the things of the nights already opened, never fewer than night 3's and never more than night 12's, so it grows with the player and does not hand a new player lightning.
+- Reaching the top does not open a story night.
+
+Checked: audit over 200 tower rivers at night 3's and night 12's things, each ridden four ways: narrowest gap 0.057, no buried pickup. Careful bot reached the top 15 and 18 times in 100. Phone-sized Chromium: the menu still fits, a climb ran to the top, the card and best floor were right, the story night stayed where it was. No page errors.
+
+Not checked: whether this is what the tester pictured (asked); how the sharp turns feel under a thumb.

@@ -29,7 +29,12 @@ export function boat(s) { return BOAT * (s.size ? (s.big ? 1.4 : 0.6) : 1); }
 export function progress(s) { return Math.min(1, (s.y + s.bonus) / GOAL); }
 // Difficulty step: the night in story, one step per 300 points in endless.
 export function level(s) { return s.endless ? 1 + Math.floor(Math.floor(s.t * 10) / 300) : s.stage; }
-export function centre(s, y) { return 0.5 + 0.17 * Math.sin(y * 0.33 + s.p1) + 0.07 * Math.sin(y * 0.81 + s.p2); }
+// The tower: the river climbs in tight turns that ease as it rises, and runs dead straight for the last stretch before dawn.
+export const FLOORS = 10;
+export function centre(s, y) {
+  if (s.tower) { const a = Math.max(0, Math.min(1, 1 - y / (0.85 * GOAL))); return 0.5 + a * (0.25 * Math.sin(y * 0.55 + s.p1) + 0.06 * Math.sin(y * 1.3 + s.p2)); }
+  return 0.5 + 0.17 * Math.sin(y * 0.33 + s.p1) + 0.07 * Math.sin(y * 0.81 + s.p2);
+}
 // The river narrows all the way down. A story night pinches hard in its last tenth; the endless river keeps narrowing slowly.
 export function half(s, y) {
   const k = Math.min(1, y / GOAL);
@@ -55,10 +60,11 @@ export function dazzle(s) { if (level(s) < 19) return 0; const p = (s.t + 2) % 9
 // How far the boat can see: the flame's reach, cut by fog and by the moments after lightning.
 export function sight(s) { return reach(s.light) * (fog(s, s.y) ? 0.6 : 1) * (dazzle(s) > 0 ? 0.6 : 1); }
 
-export function create(seed, stage = 1, endless = false, powers = POWERS, stats = {}) {
+export function create(seed, stage = 1, mode = false, powers = POWERS, stats = {}) { // mode: false for a story night, true for the endless river, 'tower' for the climb
+  const endless = mode === true, tower = mode === 'tower';
   const st = Object.fromEntries(Object.entries(STATS).map(([k, top]) => [k, Math.max(0, Math.min(top, Math.floor(stats[k] || 0)))]));
   const r = rng(seed), q = rng(seed ^ 0x9e3779b9); // powers draw from their own stream, so the rocks and embers of a seed never change
-  const s = { seed, stage, endless, q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers, powers: [], nextPower: 6 + q() * 6, boost: 0, slow: 0, size: 0, magnet: 0, flare: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
+  const s = { seed, stage, endless, tower, q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers, powers: [], nextPower: 6 + q() * 6, boost: 0, slow: 0, size: 0, magnet: 0, flare: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
   s.x = centre(s, 0);
   return s;
 }

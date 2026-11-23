@@ -64,7 +64,7 @@
   <p class="bank"><span class="dot"></span><span id="bank">0</span> embers</p>
   <p><button id="less" class="small" aria-label="Earlier night">&lsaquo;</button><button id="play" class="main">Play</button><button id="more" class="small" aria-label="Later night">&rsaquo;</button></p>
   <p id="about"></p>
-  <p><button id="endless">Endless river</button></p>
+  <p><button id="endless">Endless river</button><button id="tower">Tower climb</button></p>
   <p><button id="toShop">Shop</button><button id="toCredits">Credits</button></p>
 </div></div>
 <div id="shop" class="screen veil"><div>
@@ -83,7 +83,7 @@
 </div></div>
 <div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p><p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p></div></div>
 <script type="module">
-import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST } from './sim.js?v=6'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
+import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS } from './sim.js?v=7'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
 import { hull, wake, flame, burn, glow as flameGlow, mark, TINT } from './looks.js?v=2';
 
 const query = new URLSearchParams(location.search);
@@ -95,7 +95,7 @@ const store = {
 };
 // Story: a night is one river. Reaching dawn opens the next night, up to night 20. Any opened night can be replayed.
 let opened = Math.min(NIGHTS, Math.max(1, Math.floor(Number(query.get('night')) || store.get('lantern-night') || 1)));
-let stage = opened, endless = false, bank = store.get('lantern-bank');
+let stage = opened, endless = false, tower = false, bank = store.get('lantern-bank');
 const NIGHT = [, 'Slide your thumb anywhere to steer. Embers feed the flame.', 'Ice drifts on the water.', 'The rocks are restless.', 'Some rocks ride up and down the current.', 'A waterfall waits halfway.',
   'Logs lie out from the banks.', 'Fog hides the way ahead.', 'Whirlpools pull you in.', 'A side wind pushes the boat.', 'False embers steal your light. They flicker green.',
   'Gates of logs leave one gap.', 'Some rocks follow you. They have red eyes.', 'Rain makes the flame fade faster.', 'The ice slides from side to side.', 'Rocks hide under the water until you are close.',
@@ -144,7 +144,7 @@ addEventListener('resize', resize); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', lastLevel = 1, nearFall = false, sayTimer = 0, shown = '', weather = '';
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
-window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, unit: unit / dpr }); // read by the browser checks
+window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, unit: unit / dpr }); // read by the browser checks
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 
 function show(name) {
@@ -161,6 +161,7 @@ function menu() {
   const best = store.get(`lantern-best-${stage}`), top = store.get('lantern-best-endless');
   $('about').textContent = ahead(stage) + (best ? ` Best ${best}%.` : '');
   $('endless').textContent = top ? `Endless river · best ${top}` : 'Endless river';
+  const high = store.get('lantern-best-tower'); $('tower').textContent = high ? `Tower climb · best floor ${high}` : 'Tower climb';
 }
 function shop(text) {
   $('bank2').textContent = bank; if (text) $('got').textContent = text;
@@ -245,18 +246,21 @@ function tone(freq, dur, vol, type = 'sine') {
 const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
 
 function begin() {
-  audio();
-  s = create((Math.random() * 2 ** 31) | 0, endless ? 1 : stage, endless, powersOwned(), stats); target = s.x; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; drag = null; startTap = null;
+  audio(); // the tower holds the things of the nights you have opened, from 3 up to 12
+  s = create((Math.random() * 2 ** 31) | 0, tower ? Math.max(3, Math.min(12, opened)) : endless ? 1 : stage, tower ? 'tower' : endless, powersOwned(), stats); target = s.x; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; drag = null; startTap = null;
   shown = ''; show('play'); hud();
-  say(endless ? 'Endless river' : `Night ${stage}`, 1600);
+  say(tower ? 'The tower. Climb to the top' : endless ? 'Endless river' : `Night ${stage}`, 1800); floor = 0;
 }
 function bankRun() { bank += s.taken; store.set('lantern-bank', bank); }
 function finish() {
   playing = false; ended = performance.now(); drag = null; bankRun();
   $('hud').style.display = $('big').style.display = pauseButton.style.display = 'none'; $('warn').classList.remove('on');
   const won = s.over === 'dawn', why = { dark: 'The flame went out.', bank: 'You ran onto the bank.', ice: 'You struck the ice.', log: 'You struck a log.', pool: 'The whirlpool took you.', geyser: 'The geyser threw you over.', isle: 'You struck an island.' }[s.over] ?? 'You struck a rock.';
-  const gained = `+${s.taken} embers. You have ${bank}.`;
-  if (endless) {
+  const gained = `+${s.taken} ember${s.taken === 1 ? '' : 's'}. You have ${bank}.`;
+  if (tower) {
+    const at = Math.min(FLOORS, Math.floor(progress(s) * FLOORS)), best = Math.max(at, store.get('lantern-best-tower')); store.set('lantern-best-tower', best);
+    $('title').textContent = won ? 'The top' : `Floor ${at}`; $('line').textContent = won ? 'The river runs straight into the dawn. You climbed the whole tower.' : `${why} Best floor ${best} of ${FLOORS}.`; $('go').textContent = 'Climb again';
+  } else if (endless) {
     const pts = score(s), best = Math.max(pts, store.get('lantern-best-endless')); store.set('lantern-best-endless', best);
     $('title').textContent = `${pts}`; $('line').textContent = `${why} Best ${best}.`; $('go').textContent = 'Play again';
   } else {
@@ -279,6 +283,7 @@ function hud() {
 // Steering. A finger steers by how far it has moved since it touched down, never by where it is,
 // so a tap anywhere does nothing and the thumb can rest wherever is comfortable. A mouse steers by position.
 const pauseButton = $('pause');
+let floor = 0;
 let drag = null, startTap = null, size = 1, fire0 = flame();
 function aim(x) { const c = centre(s, s.y), h = half(s, s.y) + 0.02; target = Math.max(c - h, Math.min(c + h, x)); }
 function anchor(e) { drag = { id: e.pointerId, x0: e.clientX, x: e.clientX, boat0: s.x }; }
@@ -302,8 +307,9 @@ for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type,
 for (const type of ['pointerup', 'touchend', 'click']) addEventListener(type, () => { if (ac && ac.state === 'suspended' && !paused) ac.resume(); });
 
 // Buttons.
-$('play').addEventListener('click', () => { endless = false; begin(); });
-$('endless').addEventListener('click', () => { endless = true; begin(); });
+$('play').addEventListener('click', () => { endless = tower = false; begin(); });
+$('endless').addEventListener('click', () => { endless = true; tower = false; begin(); });
+$('tower').addEventListener('click', () => { tower = true; endless = false; begin(); });
 $('less').addEventListener('click', () => { stage = Math.max(1, stage - 1); menu(); });
 $('more').addEventListener('click', () => { stage = Math.min(opened, stage + 1); menu(); });
 $('toShop').addEventListener('click', () => show('shop'));
@@ -316,7 +322,7 @@ $('toMenu').addEventListener('click', () => { if (paused) { paused = false; play
 // Pause: the button, P or Escape, and whenever the page loses the screen (a phone call, another app).
 function pause() {
   if (!playing || paused) return; paused = true; drag = null; keys.clear();
-  $('title').textContent = 'Paused'; $('line').textContent = endless ? `Score ${score(s)}.` : `Night ${stage}, ${Math.floor(progress(s) * 100)}% of the way to dawn.`; $('sub').textContent = 'Touch the river to go on.'; $('go').textContent = 'Go on';
+  $('title').textContent = 'Paused'; $('line').textContent = endless ? `Score ${score(s)}.` : tower ? `The tower, floor ${Math.floor(progress(s) * FLOORS)} of ${FLOORS}.` : `Night ${stage}, ${Math.floor(progress(s) * 100)}% of the way to dawn.`; $('sub').textContent = 'Touch the river to go on.'; $('go').textContent = 'Go on';
   show('card'); if (ac) ac.suspend();
 }
 function resume() {
@@ -379,6 +385,7 @@ function tick() {
   }
   if (level(s) !== lastLevel) { lastLevel = level(s); if (endless) { say('The river runs harder', 1800); tone(330, 0.3, 0.1, 'triangle'); setTimeout(() => tone(440, 0.5, 0.1, 'triangle'), 140); } }
   if (s.boost) for (let i = 0; i < 2; i++) sparks.push({ x: s.x + (Math.random() - 0.5) * 0.03, y: s.y - 0.03, vx: (Math.random() - 0.5) * 0.15, vy: -0.6 - Math.random() * 0.5, life: 0.45 });
+  if (tower) { const at = Math.floor(progress(s) * FLOORS); if (at > floor && at < FLOORS) { floor = at; say(at === FLOORS - 1 ? 'The last floor. The river runs straight' : `Floor ${at}`, 1500); tone(330 + 40 * at, 0.4, 0.09, 'triangle'); } }
   hud();
   if (s.over) finish();
 }
@@ -388,14 +395,24 @@ function draw(now) {
   const ox = shake * (Math.random() - 0.5) * 14 * dpr, oy = shake * (Math.random() - 0.5) * 14 * dpr;
   g.setTransform(1, 0, 0, 1, ox, oy);
   const wet = skin('water'), fire = skin('flame')[2];
-  g.fillStyle = '#1a2a20'; g.fillRect(-20, -20, W + 40, H + 40); // banks
+  g.fillStyle = s.tower ? '#26262e' : '#1a2a20'; g.fillRect(-20, -20, W + 40, H + 40); // banks, or the tower's stone
+  if (s.tower) { // courses of stone, with the joints staggered
+    g.strokeStyle = '#3a3a46'; g.lineWidth = 1.5 * dpr; g.beginPath();
+    for (let i = Math.floor((s.y - 0.4 * H / unit) / 0.12); i < (s.y + 0.8 * H / unit) / 0.12; i++) { const y = sy(i * 0.12); g.moveTo(0, y); g.lineTo(W, y); for (let x = (i % 2 ? 0.1 : 0) * unit + (left % (0.2 * unit)) - 0.2 * unit; x < W; x += 0.2 * unit) { g.moveTo(x, y); g.lineTo(x, sy((i + 1) * 0.12)); } }
+    g.stroke();
+  }
   // water
   g.beginPath();
   const top = s.y + 0.74 * H / unit + 0.1, bot = s.y - 0.3 * H / unit - 0.1;
   for (let y = bot; y <= top; y += 0.05) g.lineTo(sx(centre(s, y) - half(s, y)), sy(y));
   for (let y = top; y >= bot; y -= 0.05) g.lineTo(sx(centre(s, y) + half(s, y)), sy(y));
   g.closePath(); g.fillStyle = wet[2]; g.fill();
-  g.strokeStyle = '#6f9a7c'; g.lineWidth = 4 * dpr; g.stroke(); // reeds at the water's edge
+  g.strokeStyle = s.tower ? '#8d8d9c' : '#6f9a7c'; g.lineWidth = 4 * dpr; g.stroke(); // reeds at the water's edge, or a stone kerb
+  if (s.tower) for (let f = 1; f < FLOORS; f++) { // each floor is a ledge across the water with its number cut in the wall
+    const y = f * GOAL / FLOORS; if (y < s.y - 0.5 * H / unit || y > s.y + 0.8 * H / unit) continue;
+    const c = centre(s, y), h = half(s, y); g.strokeStyle = 'rgba(230,230,245,.5)'; g.lineWidth = 3 * dpr; g.setLineDash([10 * dpr, 8 * dpr]); g.beginPath(); g.moveTo(sx(c - h), sy(y)); g.lineTo(sx(c + h), sy(y)); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#b9b9cc'; g.font = `${0.07 * unit}px Georgia, serif`; g.textAlign = c > 0.5 ? 'right' : 'left'; g.textBaseline = 'middle'; g.fillText(`${f}`, sx(c > 0.5 ? c - h - 0.05 : c + h + 0.05), sy(y));
+  }
   // current streaks
   g.strokeStyle = wet[3]; g.lineWidth = 1.5 * dpr; g.globalAlpha = 0.5;
   for (let i = Math.floor(bot * 3); i < top * 3; i++) {
