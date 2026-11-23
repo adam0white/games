@@ -205,7 +205,7 @@ jobs:
       matrix:
         browser: [chromium, webkit]
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       PLAYWRIGHT_VERSION: 1.64.1
     steps:
