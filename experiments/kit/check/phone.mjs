@@ -226,18 +226,26 @@ const GAMES = {
     const stack = await page.evaluate(() => { const F = window.__ant.FORMS; return [F.findIndex(f => f && f.level === 1), F.findIndex(f => f && f.level === 2)]; });
     await page.evaluate(([k, stack]) => { localStorage.setItem(k, JSON.stringify({ skin: { c: '#c0271f', p: 'stripes' }, stack, xp: 3, sound: true, look: 2 })); localStorage.setItem('notes.k', 'check'); }, [KEY, stack]);
     await page.reload(); await until(page, () => window.__ant, 'game script');
-    assert.match(await page.textContent('#continue'), /^Continue as /, 'old save: continues'); assert.match(await page.textContent('#look'), /^Look: /);
+    assert.match(await page.textContent('#continue'), /^Continue as /, 'old save: continues'); assert.equal(await page.textContent('#rules'), 'Rules: Wild', 'Wild is the default (note #88)'); assert.match(await page.textContent('#look'), /^Look: /);
     await until(page, () => document.getElementById('notes-button'), 'notes button');
     await noZoomed(page);
     assert.equal(await page.evaluate(() => window.audioLog.made), 0, 'no audio before the first tap');
+    assert.notEqual(await page.evaluate(() => navigator.audioSession.type), 'playback', 'no audio session is asked for before the first tap');
     await page.click('#continue'); assert.equal(await mode(), 'play');
     assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'Play starts audio');
+    assert.equal(await page.evaluate(() => navigator.audioSession.type), 'playback', 'sound plays through the iPhone silent switch (note #80)');
     assert.equal(await page.evaluate(() => window.__ant.level(window.__ant.s)), 2, 'old save: level'); assert.equal(await page.evaluate(() => window.__ant.s.player.xp), 3, 'old save: xp');
     // Walk by dragging.
     const x0 = await page.evaluate(() => window.__ant.s.player.x);
     await finger(page, '#c', [['pointerdown', 150, 400], ['pointermove', 215, 400]]);
     await page.waitForFunction(x => window.__ant.s.player.x > x + 5, x0);
     await finger(page, '#c', [['pointerup', 215, 400]]);
+    // Food arrow (note #89): with no food on the screen a green arrow points to the nearest; with food in view there is none.
+    await page.evaluate(() => { const { s, powerOf, me } = window.__ant, p = s.player; s.mobs.filter(m => powerOf(m) < me(s).power).forEach((m, i) => { m.x = p.x + 700 + i * 40; m.y = p.y; }); });
+    await until(page, () => window.__ant.arrowTo !== null, 'green food arrow');
+    assert.ok(await page.evaluate(() => { const { s, powerOf, me, arrowTo } = window.__ant, m = s.mobs.find(m => m.id === arrowTo); return m && powerOf(m) < me(s).power; }), 'the arrow points to food');
+    await page.evaluate(() => { const { s, arrowTo } = window.__ant, m = s.mobs.find(m => m.id === arrowTo); m.x = s.player.x + 40; m.y = s.player.y; }); // the food the arrow points at now
+    await until(page, () => window.__ant.arrowTo === null, 'no arrow with food in view');
     // Pause by the button, by P, and when the page is hidden.
     await page.click('#pause'); assert.equal(await mode(), 'paused');
     const t0 = await page.evaluate(() => window.__ant.s.t); await sleep(300); assert.equal(await page.evaluate(() => window.__ant.s.t), t0, 'time stands still while paused');
@@ -247,7 +255,7 @@ const GAMES = {
     assert.equal(await mode(), 'paused', 'hiding the page pauses'); await page.click('#resume');
     await page.evaluate(() => dispatchEvent(new Event('blur'))); assert.equal(await mode(), 'paused', 'losing focus pauses'); await page.keyboard.press('P'); assert.equal(await mode(), 'play', 'capital P resumes');
     // Death costs one level and is saved at once.
-    await page.evaluate(() => { const { s, FORMS, me } = window.__ant, p = s.player, m = s.mobs.find(m => FORMS[m.f].power > me(s).power); p.safe = 0; p.x = m.x; p.y = m.y; });
+    await page.evaluate(() => { const { s, FORMS, me } = window.__ant, p = s.player, m = s.mobs.find(m => FORMS[m.f].power > me(s).power); p.safe = 0; p.hideAt = 1e9; p.x = m.x; p.y = m.y; }); // no Wild hide
     await until(page, () => window.__ant.mode === 'dead', 'death card');
     assert.equal((await saved()).stack.length, 1, 'death saved');
     await page.click('#goOn'); assert.equal(await mode(), 'play');
@@ -309,6 +317,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     await page.addInitScript(() => {
       const Real = window.AudioContext || window.webkitAudioContext; if (!Real) return;
       window.audioLog = { made: 0, suspend: 0, resume: 0 };
+      if (!navigator.audioSession) Object.defineProperty(navigator, 'audioSession', { value: { type: 'auto' }, configurable: true }); // a stand-in where the browser has none
       window.AudioContext = window.webkitAudioContext = class extends Real {
         constructor(...a) { super(...a); window.audioLog.made++; }
         suspend() { window.audioLog.suspend++; return super.suspend(); }
