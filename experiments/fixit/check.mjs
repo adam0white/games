@@ -61,9 +61,17 @@ async function doJob(page, label, pointerType = 'touch') {
   const done = await state();
   return done;
 }
+// Do the job with the keyboard: hold Space until the job is done, then let go.
+async function keyJob(page, label) {
+  const before = await state();
+  await page.keyboard.down('Space');
+  try { await until(page, ([job, step]) => { const s = window.fixitState(); return s.job !== job || s.step !== step || s.phase !== 'work' || s.over; }, `${label} by keyboard`, 15000, [before.job, before.step]); }
+  finally { await page.keyboard.up('Space'); }
+}
 async function playJob(page, label, pointerType) {
   const before = await state();
-  await doJob(page, label, pointerType);
+  if (pointerType === 'keyboard') { for (let i = 0; i < 3; i++) { const s = await state(); if (s.job !== before.job || s.phase !== 'work' || s.over) break; await keyJob(page, label); } }
+  else await doJob(page, label, pointerType);
   await until(page, ([job]) => { const s = window.fixitState(); return s.job !== job || s.over || s.screen === 'end'; }, `job ${label} to finish`, 15000, [before.job]);
   const after = await state();
   assert.ok(after.served + after.lost > before.served + before.lost || after.over, `${label}: job finished`);
@@ -118,7 +126,19 @@ async function run(page, phone) {
   await page.keyboard.press('p');
   assert.ok(!(await state()).paused, 'P resumes');
 
-  // Play the rest of the (shortened) shift to the end card.
+  // Play the rest of the (shortened) shift to the end card, watching every frame that no two people overlap.
+  await page.evaluate(() => {
+    window.__gap = Infinity; window.__alpha = []; window.__words = []; window.__confetti = 0;
+    const f = () => {
+      const st = window.fixitState(), p = st.people;
+      for (let i = 0; i < p.length; i++) for (let j = i + 1; j < p.length; j++) window.__gap = Math.min(window.__gap, Math.abs(p[i].x - p[j].x) - 1.5 * (p[i].R + p[j].R));
+      if (st.playing && window.__alpha.length < 400) window.__alpha.push(st.alpha);
+      if (st.word && !window.__words.includes(st.word)) window.__words.push(st.word);
+      window.__confetti = Math.max(window.__confetti, st.confetti);
+      if (st.screen !== 'end') requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  });
   let mid = false;
   for (let i = 0; i < 40; i++) {
     st = await state();
@@ -130,6 +150,11 @@ async function run(page, phone) {
   await until(page, () => window.fixitState().screen === 'end', 'end card');
   st = await state();
   assert.ok(st.served >= 5, `shift served ${st.served}`);
+  const gap = await page.evaluate(() => window.__gap), alphas = await page.evaluate(() => window.__alpha);
+  assert.ok(gap >= 0, `people never overlap during the shift (closest bodies ${gap.toFixed(1)} px apart)`);
+  assert.ok(alphas.length > 50 && alphas.every(a => a >= 0 && a <= 1), 'drawing blends between ticks by a fraction in 0..1');
+  const words = await page.evaluate(() => window.__words), confettiMax = await page.evaluate(() => window.__confetti);
+  assert.ok(words.some(w => ['Nice!', 'Great!', 'Hot!', 'On fire!', 'x2!', 'x3!'].includes(w)) && confettiMax > 0, `a streak is felt: words ${words.join(' ')}, up to ${confettiMax} confetti`);
   await sleep(300);
   await page.screenshot({ path: join(SHOTS, `${phone}-4-end.png`) });
   assert.equal(st.shifts, 1, 'one shift counted');
@@ -170,7 +195,7 @@ async function run(page, phone) {
     await page.click('#play');
     st = await state();
     assert.equal(st.kind, kind, `only=${kind}`);
-    if (['wheel', 'chain', 'glue', 'clock', 'rub', 'sharpen'].includes(kind) && phone === 'webkit') await sleep(400), await page.screenshot({ path: join(SHOTS, `${phone}-job-${kind}.png`) });
+    if (['wheel', 'chain', 'glue', 'clock', 'rub', 'sharpen', 'sew', 'pump'].includes(kind) && phone === 'webkit') await sleep(400), await page.screenshot({ path: join(SHOTS, `${phone}-job-${kind}.png`) });
     await playJob(page, kind);
     await leave(page);
   }
@@ -182,6 +207,19 @@ async function run(page, phone) {
   await sleep(300);
   await page.screenshot({ path: join(SHOTS, `${phone}-6-two-jobs.png`) });
   await playJob(page, `two: ${st.customer.kinds.join('+')}`);
+  await leave(page);
+
+  // A golden customer (?golden=1 makes every customer golden): two repairs, a gold glow, four times the pay.
+  await page.goto(`${base}/fixit/?seed=8&golden=1&level=1`);
+  await page.click('#play');
+  st = await state();
+  assert.ok(st.golden && st.customer.golden && st.steps === 2, 'a golden customer brings two repairs');
+  await sleep(500);
+  await page.screenshot({ path: join(SHOTS, `${phone}-8-golden.png`) });
+  const coins0 = st.coins;
+  await playJob(page, `golden ${st.customer.kinds.join('+')}`);
+  st = await state();
+  assert.ok(st.coins - coins0 >= 16, `a golden job pays four times over (${st.coins - coins0} coins)`);
   await leave(page);
 
   // The shop: buy the cheapest thing; it is kept.
@@ -285,18 +323,90 @@ async function lateShift(browser, device) {
   await context.close();
 }
 
-// Desktop: a wide window, a mouse, no touch.
+// Desktop: a wide window, a mouse, no touch. Every job by mouse, and every job by keyboard (hold Space).
 async function desktop(browser) {
   const { context, page, errors } = await open(browser, { viewport: { width: 1280, height: 800 } });
-  await page.goto(`${base}/fixit/?seed=3&only=clock`);
+  await page.goto(`${base}/fixit/`);
+  await setSave(page, { shifts: 2, seen: Object.fromEntries(KINDS.map(k => [k, 1])) });
+  for (const how of ['mouse', 'keyboard']) for (const kind of KINDS) {
+    await page.goto(`${base}/fixit/?seed=3&only=${kind}`);
+    if (how === 'mouse' && kind === 'screw') assert.ok(await page.isVisible('text=hold Space'), 'the menu says how to play with a mouse or keyboard');
+    await page.click('#play');
+    const st = await state();
+    assert.ok(st.minTouchPx >= 44);
+    if (kind === 'clock' && how === 'mouse') { await sleep(500); await page.screenshot({ path: join(SHOTS, 'desktop.png') }); }
+    await playJob(page, `${kind} by ${how}`, how);
+    if (kind === 'sew' && how === 'keyboard') await page.screenshot({ path: join(SHOTS, 'desktop-keyboard-sew.png') });
+    await leave(page);
+  }
+  // Space held through the end of a shift (the key repeating) must not start the next one from the end card.
+  await page.goto(`${base}/fixit/?seed=3&only=chain&day=5`);
   await page.click('#play');
-  const st = await state();
-  assert.ok(st.minTouchPx >= 44);
-  await sleep(500);
-  await page.screenshot({ path: join(SHOTS, 'desktop.png') });
-  await playJob(page, 'clock with a mouse', 'mouse');
+  await page.keyboard.down('Space');
+  await until(page, () => window.fixitState().screen === 'end', 'the short shift to end with Space held', 15000);
+  for (let i = 0; i < 4; i++) { await page.keyboard.down('Space'); await sleep(250); } // Playwright sends these as repeats
+  await page.keyboard.up('Space');
+  await sleep(300);
+  assert.equal((await state()).screen, 'end', 'a held Space does not skip the end card');
+  // Pausing with Space held lifts the keyboard's finger.
+  await page.goto(`${base}/fixit/?seed=3&only=glue`);
+  await page.click('#play');
+  await page.keyboard.down('Space');
+  await until(page, () => window.fixitState().keyboard && window.fixitState().p > 0, 'the glue job under way by keyboard');
+  await page.keyboard.press('p');
+  await page.keyboard.up('Space');
+  assert.ok(!(await state()).keyboard, 'pause lets go of the keyboard finger');
+  await page.click('#resume');
+  const p0 = (await state()).p; await sleep(1500);
+  assert.ok((await state()).p <= p0 + 0.01, 'nothing carries on after resume without a key held');
   await leave(page);
   assert.deepEqual(errors, [], 'page errors on desktop');
+  await context.close();
+}
+
+// The daily stall: the same queue for everyone on a date, all jobs, and the day's best kept.
+async function dailyStall(browser, device) {
+  const { context, page, errors } = await open(browser, { ...device });
+  await page.goto(`${base}/fixit/?date=2026-11-20&day=12`);
+  await setSave(page, { shifts: 0 });
+  await page.reload();
+  assert.ok(!(await page.isVisible('#daily')), 'no daily stall before the first shift');
+  await setSave(page, { shifts: 1, bank: 10, days: { '2026-11-19': 40, 'junk': 'x' } });
+  await page.reload();
+  assert.ok(await page.isVisible('#daily'), 'the daily stall shows after the first shift');
+  await page.click('#daily');
+  const a = await state();
+  assert.ok(a.daily && a.today === '2026-11-20' && a.hearts === 3, 'daily stall starts');
+  assert.deepEqual(a.days, { '2026-11-19': 40 }, 'old day kept, a bad entry dropped');
+  await leave(page);
+  await page.click('#daily');
+  const b = await state();
+  assert.deepEqual([b.customer.kinds, b.queue], [a.customer.kinds, a.queue], 'the same date gives the same queue');
+  await sleep(400);
+  await page.screenshot({ path: join(SHOTS, 'daily.png') });
+  for (let i = 0; i < 20; i++) {
+    const st = await state();
+    if (st.over || st.screen === 'end') break;
+    if (st.phase !== 'work') { await sleep(100); continue; }
+    await playJob(page, `daily ${st.kind}`);
+  }
+  await until(page, () => window.fixitState().screen === 'end', 'daily end card');
+  const end = await state();
+  assert.equal(end.days['2026-11-20'], end.coins, 'the day\'s best is saved');
+  assert.equal(end.bank, 10 + end.coins, 'daily coins are banked');
+  assert.match(await page.textContent('#end'), /Daily stall/, 'the end card names the daily stall');
+  await page.screenshot({ path: join(SHOTS, 'daily-end.png') });
+  await sleep(300);
+  const run = context.labSent.filter(r => r.game === 'fixit' && r.kind === 'run' && r.data.outcome === 'closed').at(-1);
+  assert.equal(run?.data.summary.daily, '2026-11-20', 'the lab run names the day');
+  await page.click('#toMenu');
+  assert.match(await page.textContent('#dailyLine'), new RegExp(`best ${end.coins}`), 'the menu shows today\'s best');
+  await page.goto(`${base}/fixit/?date=2026-11-21`);
+  await page.click('#daily');
+  const c = await state();
+  assert.notDeepEqual([c.customer.kinds, c.queue], [a.customer.kinds, a.queue], 'another date gives another queue');
+  await leave(page);
+  assert.deepEqual(errors, [], 'page errors in the daily stall');
   await context.close();
 }
 
@@ -312,6 +422,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     assert.deepEqual(errors, [], 'page errors');
     await context.close();
     await lateShift(browser, device);
+    await dailyStall(browser, device);
     if (phone === 'chromium') { await small(browser); await desktop(browser); }
     console.log(`ok   fixit on ${phone} (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
   } catch (e) {
