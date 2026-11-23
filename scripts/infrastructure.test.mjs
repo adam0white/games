@@ -5,7 +5,7 @@ import { validateGame } from './game.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { validateRegistry, affectedGames, checkResults, manifest, assertFrameworkGraph, scopedHeaders, scopedRedirects, checkRelease, checkMainCI } from './lib.mjs';
+import { validateRegistry, affectedGames, phoneCheckNeeded, checkResults, manifest, assertFrameworkGraph, scopedHeaders, scopedRedirects, checkRelease, checkMainCI } from './lib.mjs';
 const game = { slug: 'rope', source: { repository: 'https://github.com/adam0white/rope', commit: 'a'.repeat(40) }, saveSchema: 'v1' };
 const registry = { hfVersion: '4.17.0', games: [game] };
 test('interactive cloud suites honor one shared configured lock without a home checkout', () => {
@@ -39,6 +39,19 @@ test('rejects unsafe lineage and catches shared paths', () => {
   assert.deepEqual(affectedGames(registry, ['experiments.md']), registry.games.map(g => g.slug));
   assert.deepEqual(affectedGames(registry, ['archive/README.md', 'archive/prototypes/long-road/index.html']), []);
   assert.deepEqual(affectedGames(registry, ['docs/triage-2026-11-23.md', 'archive/README.md']), []);
+});
+test('the phone check runs for experiments, the notes button and what the check imports, not for games', () => {
+  for (const path of ['experiments/lantern/index.html', 'experiments/kit/check/phone.mjs', 'prototypes/x/index.html', 'workers/feedback/public/notes/button.js', 'src/worker.mjs', 'scripts/experiments.mjs', '.github/workflows/ci.yml']) assert.equal(phoneCheckNeeded([path]), true, path);
+  for (const path of ['games/rope/src/main.ts', 'workers/feedback/src/index.ts', 'workers/feedback/public/other.js', 'archive/README.md', 'docs/x.md', 'scripts/lib.mjs', 'experiments.md', '.github/workflows/deploy.yml', 'src/worker.mjs.bak']) assert.equal(phoneCheckNeeded([path]), false, path);
+  assert.equal(phoneCheckNeeded([]), false);
+});
+test('the ci gate requires the phone check exactly when its paths changed', () => {
+  const gate = env => spawnSync(process.execPath, ['scripts/aggregate.mjs'], { env: { ...process.env, TOOLS:'success', CHANGES:'success', WORKERS:'success', GAMES:'skipped', BUILD:'success', COUNT:'0', TOTAL:'1', LEFTHAND_REQUIRED:'false', LEFTHAND_BROWSER:'skipped', ...env } }).status;
+  assert.equal(gate({ PHONE_REQUIRED:'true', PHONE_CHECK:'success' }), 0);
+  assert.equal(gate({ PHONE_REQUIRED:'false', PHONE_CHECK:'skipped' }), 0);
+  for (const result of ['failure', 'skipped', 'cancelled']) assert.notEqual(gate({ PHONE_REQUIRED:'true', PHONE_CHECK:result }), 0, result);
+  assert.notEqual(gate({ PHONE_REQUIRED:'false', PHONE_CHECK:'failure' }), 0);
+  assert.notEqual(gate({ PHONE_CHECK:'success' }), 0, 'a missing requirement fails');
 });
 test('required CI results cannot be skipped or fail', () => {
   assert.throws(() => checkResults({ tools:'success', changes:'failure', workers:'success', games:'success', build:'success' }, 1));

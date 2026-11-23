@@ -29,6 +29,11 @@ export function validateRegistry(registry) {
   }
   return registry;
 }
+// Paths the phone check (experiments/kit/check/phone.mjs) reads or depends on. The CI phone job runs when one changes.
+const PHONE_PATHS = ['experiments/', 'prototypes/', 'workers/feedback/public/notes/', 'src/worker.mjs', 'scripts/experiments.mjs', '.github/workflows/ci.yml'];
+export function phoneCheckNeeded(paths) {
+  return paths.some(path => PHONE_PATHS.some(prefix => prefix.endsWith('/') ? path.startsWith(prefix) : path === prefix));
+}
 export function affectedGames(registry, paths) {
   validateRegistry(registry);
   // Standalone Workers have their own CI job and never enter a game's build.
