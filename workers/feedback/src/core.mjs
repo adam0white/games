@@ -8,6 +8,8 @@ const DAILY_VOICE = 60;
 const DAY = 24 * 60 * 60 * 1000;
 const AUDIO_TYPES = { 'audio/mp4': 'm4a', 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/aac': 'aac' };
 const LANGUAGES = { en: 'English', tr: 'Turkish' };
+const MAX_IMAGE = 3 * 1024 * 1024;
+const IMAGE_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -52,6 +54,10 @@ async function findTester(request, env) {
 
 const slug = value => (typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && value.length <= 40 ? value : null);
 const buildId = value => (typeof value === 'string' && /^[A-Za-z0-9._-]{1,40}$/.test(value) ? value : null);
+// A link in a reply may only point at a prototype on this site.
+const sitePath = value => (typeof value === 'string' && /^\/proto\/[a-z0-9]+(?:-[a-z0-9]+)*\/(?:\?[A-Za-z0-9=&_.-]{0,80})?$/.test(value) ? value : null);
+const choiceList = value => (Array.isArray(value) ? value.filter(c => typeof c === 'string' && c.trim()).map(c => c.trim().slice(0, 80)).slice(0, 6) : []);
+const parseChoices = text => { try { return choiceList(JSON.parse(text ?? '[]')); } catch { return []; } };
 const clientId = value => (typeof value === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(value) ? value : null);
 
 function toBase64(bytes) {
@@ -120,14 +126,19 @@ export async function processNote(env, id) {
   return env.DB.prepare('SELECT * FROM messages WHERE id = ?').bind(id).first();
 }
 
-const forTester = row => row.dir === 'in'
-  ? { id: row.id, dir: 'in', kind: row.kind, game: row.game, body: row.body, status: row.status, at: row.created_at }
-  : { id: row.id, dir: 'out', body: row.translated ?? row.body, original: row.translated ? row.body : null, at: row.created_at };
+const forTester = (row, answered) => row.dir === 'in'
+  ? { id: row.id, dir: 'in', kind: row.kind, game: row.game, body: row.body, status: row.status, at: row.created_at, reply_to: row.reply_to ?? null }
+  : {
+    id: row.id, dir: 'out', game: row.game, body: row.translated ?? row.body, original: row.translated ? row.body : null, at: row.created_at,
+    link: row.link ?? null, image: Boolean(row.image_key), ask: Boolean(row.ask), choices: row.ask ? parseChoices(row.choices) : [],
+    answered: Boolean(answered?.has(row.id)), closed: Boolean(row.closed_at),
+  };
 
 const forStaff = row => ({
   id: row.id, tester: row.tester, dir: row.dir, kind: row.kind, game: row.game, build: row.build, body: row.body, lang: row.lang,
   translated: row.translated, status: row.status, error: row.error, audio: Boolean(row.audio_key), at: row.created_at,
-  handled_at: row.handled_at, seen_at: row.seen_at,
+  handled_at: row.handled_at, seen_at: row.seen_at, reply_to: row.reply_to ?? null, ask: Boolean(row.ask),
+  choices: row.ask ? parseChoices(row.choices) : [], link: row.link ?? null, image: Boolean(row.image_key), closed_at: row.closed_at ?? null,
 });
 
 async function recentCount(env, tester, now, kind) {
@@ -144,7 +155,24 @@ async function testerThread(request, env, tester, now) {
   const after = Number(new URL(request.url).searchParams.get('after')) || 0;
   const { results } = await env.DB.prepare('SELECT * FROM messages WHERE tester = ? AND id > ? ORDER BY id LIMIT 500').bind(tester.id, after).all();
   await env.DB.prepare("UPDATE messages SET seen_at = ? WHERE tester = ? AND dir = 'out' AND seen_at IS NULL").bind(now, tester.id).run();
-  return json({ lang: tester.lang, messages: results.map(forTester) });
+  const replies = await env.DB.prepare('SELECT DISTINCT reply_to FROM messages WHERE tester = ? AND reply_to IS NOT NULL').bind(tester.id).all();
+  const answered = new Set(replies.results.map(row => row.reply_to));
+  return json({ lang: tester.lang, messages: results.map(row => forTester(row, answered)) });
+}
+
+async function testerImage(request, env, tester) {
+  const row = await env.DB.prepare("SELECT image_key, image_type FROM messages WHERE id = ? AND tester = ? AND dir = 'out'")
+    .bind(Number(new URL(request.url).searchParams.get('id')) || 0, tester.id).first();
+  const object = row?.image_key ? await env.LAB.get(row.image_key) : null;
+  if (!object) return fail(404, 'no-image');
+  return new Response(object.body, { headers: { 'Content-Type': row.image_type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
+}
+
+/** The question a note answers, if the id names an open question for this tester. */
+async function question(env, tester, value) {
+  const id = Number(value);
+  if (!Number.isSafeInteger(id) || id <= 0) return null;
+  return env.DB.prepare("SELECT id, game FROM messages WHERE id = ? AND tester = ? AND dir = 'out' AND ask = 1").bind(id, tester).first();
 }
 
 async function testerNote(request, env, tester, now) {
@@ -159,8 +187,9 @@ async function testerNote(request, env, tester, now) {
     const cid = clientId(input.client_id);
     const prior = await existing(env, tester.id, cid);
     if (prior) return json({ message: forTester(prior) });
-    const { meta } = await env.DB.prepare("INSERT INTO messages (tester, dir, kind, game, build, body, status, client_id, created_at) VALUES (?, 'in', 'text', ?, ?, ?, 'pending', ?, ?)")
-      .bind(tester.id, slug(input.game), buildId(input.build), text, cid, now).run();
+    const asked = await question(env, tester.id, input.reply_to);
+    const { meta } = await env.DB.prepare("INSERT INTO messages (tester, dir, kind, game, build, body, status, client_id, reply_to, created_at) VALUES (?, 'in', 'text', ?, ?, ?, 'pending', ?, ?, ?)")
+      .bind(tester.id, slug(input.game) ?? asked?.game ?? null, buildId(input.build), text, cid, asked?.id ?? null, now).run();
     return json({ message: forTester(await processNote(env, meta.last_row_id)) });
   }
   const extension = AUDIO_TYPES[type];
@@ -175,8 +204,9 @@ async function testerNote(request, env, tester, now) {
   if (prior) return json({ message: forTester(prior) });
   const key = `private/feedback/${tester.id}/${now}-${crypto.randomUUID()}.${extension}`;
   await env.LAB.put(key, bytes, { httpMetadata: { contentType: type } });
-  const { meta } = await env.DB.prepare("INSERT INTO messages (tester, dir, kind, game, build, audio_key, audio_type, status, client_id, created_at) VALUES (?, 'in', 'voice', ?, ?, ?, ?, 'pending', ?, ?)")
-    .bind(tester.id, slug(url.searchParams.get('game')), buildId(url.searchParams.get('build')), key, type, cid, now).run();
+  const asked = await question(env, tester.id, url.searchParams.get('reply_to'));
+  const { meta } = await env.DB.prepare("INSERT INTO messages (tester, dir, kind, game, build, audio_key, audio_type, status, client_id, reply_to, created_at) VALUES (?, 'in', 'voice', ?, ?, ?, ?, 'pending', ?, ?, ?)")
+    .bind(tester.id, slug(url.searchParams.get('game')) ?? asked?.game ?? null, buildId(url.searchParams.get('build')), key, type, cid, asked?.id ?? null, now).run();
   return json({ message: forTester(await processNote(env, meta.last_row_id)) });
 }
 
@@ -206,11 +236,23 @@ async function staff(request, env, path, now) {
     if (!tester || !text || text.length > MAX_TEXT) return fail(400, 'bad-reply');
     let translated = typeof input.translated === 'string' && input.translated.trim() ? input.translated.trim().slice(0, MAX_TEXT) : null;
     let warning = null;
-    if (!translated && tester.lang !== 'en') {
+    if (!translated && input.translate !== false && tester.lang !== 'en') {
       try { translated = await translate(env, text, tester.lang); } catch (error) { warning = `not translated: ${shortError(error)}`; }
     }
-    const { meta } = await env.DB.prepare("INSERT INTO messages (tester, dir, kind, game, body, lang, translated, status, created_at) VALUES (?, 'out', 'text', ?, ?, ?, ?, 'ready', ?)")
-      .bind(tester.id, slug(input.game), text, translated ? tester.lang : null, translated, now).run();
+    let imageKey = null;
+    let imageType = null;
+    if (input.image) {
+      const extension = IMAGE_TYPES[input.image.type];
+      let bytes = null;
+      try { bytes = Uint8Array.from(atob(String(input.image.data)), c => c.charCodeAt(0)); } catch { /* handled below */ }
+      if (!extension || !bytes || bytes.length < 50 || bytes.length > MAX_IMAGE) return fail(400, 'bad-image');
+      imageType = input.image.type;
+      imageKey = `private/feedback/${tester.id}/out-${now}-${crypto.randomUUID()}.${extension}`;
+      await env.LAB.put(imageKey, bytes, { httpMetadata: { contentType: imageType } });
+    }
+    const choices = input.ask ? choiceList(input.choices) : [];
+    const { meta } = await env.DB.prepare("INSERT INTO messages (tester, dir, kind, game, body, lang, translated, status, ask, choices, link, image_key, image_type, created_at) VALUES (?, 'out', 'text', ?, ?, ?, ?, 'ready', ?, ?, ?, ?, ?, ?)")
+      .bind(tester.id, slug(input.game), text, translated ? tester.lang : null, translated, input.ask ? 1 : 0, choices.length ? JSON.stringify(choices) : null, sitePath(input.link), imageKey, imageType, now).run();
     const handled = idList(input.handled);
     if (handled.length) await env.DB.prepare(`UPDATE messages SET handled_at = ? WHERE dir = 'in' AND handled_at IS NULL AND id IN (${marks(handled)})`).bind(now, ...handled).run();
     return json({ message: forStaff(await env.DB.prepare('SELECT * FROM messages WHERE id = ?').bind(meta.last_row_id).first()), warning });
@@ -219,6 +261,10 @@ async function staff(request, env, path, now) {
   if (!ids.length) return fail(400, 'no-ids');
   if (path === 'handled') {
     await env.DB.prepare(`UPDATE messages SET handled_at = ? WHERE dir = 'in' AND handled_at IS NULL AND id IN (${marks(ids)})`).bind(now, ...ids).run();
+    return json({ ok: true });
+  }
+  if (path === 'close') {
+    await env.DB.prepare(`UPDATE messages SET closed_at = ? WHERE dir = 'out' AND ask = 1 AND closed_at IS NULL AND id IN (${marks(ids)})`).bind(now, ...ids).run();
     return json({ ok: true });
   }
   if (path === 'retry') {
@@ -232,8 +278,8 @@ async function staff(request, env, path, now) {
     return json({ messages });
   }
   if (path === 'delete') {
-    const { results } = await env.DB.prepare(`SELECT audio_key FROM messages WHERE audio_key IS NOT NULL AND id IN (${marks(ids)})`).bind(...ids).all();
-    for (const row of results) await env.LAB.delete(row.audio_key);
+    const { results } = await env.DB.prepare(`SELECT audio_key, image_key FROM messages WHERE id IN (${marks(ids)})`).bind(...ids).all();
+    for (const row of results) for (const key of [row.audio_key, row.image_key]) if (key) await env.LAB.delete(key);
     await env.DB.prepare(`DELETE FROM messages WHERE id IN (${marks(ids)})`).bind(...ids).run();
     return json({ ok: true });
   }
@@ -250,6 +296,7 @@ export async function handleApi(request, env, now = Date.now()) {
   const tester = await findTester(request, env);
   if (!tester) return fail(401, 'unauthorized');
   if (path === 'thread' && request.method === 'GET') return testerThread(request, env, tester, now);
+  if (path === 'image' && request.method === 'GET') return testerImage(request, env, tester);
   if (path === 'notes' && request.method === 'POST') return testerNote(request, env, tester, now);
   return fail(404, 'not-found');
 }

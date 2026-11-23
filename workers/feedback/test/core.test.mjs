@@ -11,7 +11,7 @@ const STAFF = 'c'.repeat(40);
 // In-memory stand-ins for D1, R2 and Workers AI, with the real migration.
 function fakeEnv({ ai } = {}) {
   const sqlite = new DatabaseSync(':memory:');
-  sqlite.exec(readFileSync(new URL('../migrations/0001_init.sql', import.meta.url), 'utf8'));
+  for (const file of ['0001_init.sql', '0002_questions.sql']) sqlite.exec(readFileSync(new URL(`../migrations/${file}`, import.meta.url), 'utf8'));
   const prepare = (sql, args = []) => ({
     bind: (...next) => prepare(sql, next),
     first: async () => sqlite.prepare(sql).get(...args) ?? null,
@@ -70,7 +70,7 @@ test('secrets: empty and malformed values admit nobody', async () => {
 test('a typed note is stored with its game and build, translated, and visible only to its tester', async () => {
   const env = fakeEnv();
   const sent = await (await call(env, 'notes', { method: 'POST', body: { text: ' Fener çok güzel ', game: 'lantern', build: 'ab12cd34ef', client_id: 'client-0001' } })).json();
-  assert.deepEqual({ ...sent.message, at: 0 }, { id: 1, dir: 'in', kind: 'text', game: 'lantern', body: 'Fener çok güzel', status: 'ready', at: 0 });
+  assert.deepEqual({ ...sent.message, at: 0 }, { id: 1, dir: 'in', kind: 'text', game: 'lantern', body: 'Fener çok güzel', status: 'ready', at: 0, reply_to: null });
   // The same client id does not store a second note.
   await call(env, 'notes', { method: 'POST', body: { text: 'Fener çok güzel', client_id: 'client-0001' } });
   assert.equal((await (await call(env, 'thread')).json()).messages.length, 1);
@@ -157,4 +157,48 @@ test('the daily limit stops a flood', async () => {
   for (let i = 0; i < 150; i++) await insert.bind(Date.now()).run();
   assert.equal((await call(env, 'notes', { method: 'POST', body: { text: 'one more' } })).status, 429);
   assert.equal((await call(env, 'notes', { token: OTHER, method: 'POST', body: { text: 'other tester' } })).status, 200);
+});
+
+test('a question carries choices and a link; an answer is tied to it and marks it answered', async () => {
+  const env = fakeEnv();
+  const asked = await (await call(env, 'staff/reply', { token: STAFF, method: 'POST', body: { tester: 't1', text: 'Is night 6 too hard?', translated: '6. gece çok mu zor?', game: 'lantern', ask: true, choices: ['Kolay', 'Tam kararında', 'Çok zor', ''], link: '/proto/lantern/?night=6' } })).json();
+  assert.equal(asked.message.ask, true);
+  assert.deepEqual(asked.message.choices, ['Kolay', 'Tam kararında', 'Çok zor']);
+  let thread = await (await call(env, 'thread')).json();
+  assert.deepEqual({ ...thread.messages[0], at: 0 }, { id: 1, dir: 'out', game: 'lantern', body: '6. gece çok mu zor?', original: 'Is night 6 too hard?', at: 0, link: '/proto/lantern/?night=6', image: false, ask: true, choices: ['Kolay', 'Tam kararında', 'Çok zor'], answered: false, closed: false });
+  const answer = await (await call(env, 'notes', { method: 'POST', body: { text: 'Çok zor', reply_to: 1 } })).json();
+  assert.equal(answer.message.reply_to, 1);
+  assert.equal(answer.message.game, 'lantern');
+  thread = await (await call(env, 'thread')).json();
+  assert.equal(thread.messages[0].answered, true);
+  const staff = await (await call(env, 'staff/notes?unhandled=1', { token: STAFF })).json();
+  assert.equal(staff.messages[0].reply_to, 1);
+  // Another tester cannot answer it, and a plain reply is not a question.
+  const other = await (await call(env, 'notes', { token: OTHER, method: 'POST', body: { text: 'hi', reply_to: 1 } })).json();
+  assert.equal(other.message.reply_to, null);
+  await call(env, 'staff/reply', { token: STAFF, method: 'POST', body: { tester: 't1', text: 'Thanks', translate: false } });
+  const plain = await (await call(env, 'notes', { method: 'POST', body: { text: 'ok', reply_to: 4 } })).json();
+  assert.equal(plain.message.reply_to, null);
+  await call(env, 'staff/close', { token: STAFF, method: 'POST', body: { ids: [1] } });
+  assert.equal((await (await call(env, 'thread')).json()).messages[0].closed, true);
+});
+
+test('a reply can skip translation, refuses an outside link, and serves its image only to its tester', async () => {
+  const env = fakeEnv();
+  const png = Buffer.from(new Uint8Array(120).fill(9)).toString('base64');
+  const sent = await (await call(env, 'staff/reply', { token: STAFF, method: 'POST', body: { tester: 't1', text: 'Here is the new boat', translate: false, link: 'https://evil.example/', image: { type: 'image/png', data: png } } })).json();
+  assert.equal(sent.message.translated, null);
+  assert.equal(sent.message.link, null);
+  assert.equal(sent.message.image, true);
+  assert.equal(env.calls.length, 0);
+  const thread = await (await call(env, 'thread')).json();
+  assert.equal(thread.messages[0].body, 'Here is the new boat');
+  assert.equal(thread.messages[0].original, null);
+  const image = await call(env, 'image?id=1');
+  assert.equal(image.status, 200);
+  assert.equal(image.headers.get('Content-Type'), 'image/png');
+  assert.equal((await call(env, 'image?id=1', { token: OTHER })).status, 404);
+  assert.equal((await call(env, 'staff/reply', { token: STAFF, method: 'POST', body: { tester: 't1', text: 'x', image: { type: 'image/svg+xml', data: png } } })).status, 400);
+  await call(env, 'staff/delete', { token: STAFF, method: 'POST', body: { ids: [1] } });
+  assert.equal(env.objects.size, 0);
 });

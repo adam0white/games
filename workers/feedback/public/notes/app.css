@@ -28,3 +28,12 @@ button:disabled { opacity: .5; }
 #timer { font-variant-numeric: tabular-nums; font-size: 1.3em; color: var(--bad); min-width: 3.2em; }
 #timer::before { content: '● '; }
 [hidden] { display: none !important; }
+.msg.ask { border-color: var(--accent); max-width: 96%; }
+.msg img { display: block; max-width: 100%; border-radius: 10px; margin-top: .5em; }
+.msg a.open { display: inline-block; margin-top: .6em; padding: .55em .9em; border-radius: 12px; background: var(--accent); color: #2b1c05; font-weight: 700; text-decoration: none; }
+.msg .quote { margin: 0 0 .3em; border-left: 3px solid var(--soft); padding-left: .5em; }
+.choices { display: flex; flex-wrap: wrap; gap: .5em; margin-top: .6em; }
+.choices button { margin-top: 0; flex: 1 1 auto; }
+#answering { margin: 0; display: flex; gap: .5em; align-items: center; color: var(--accent); font-size: .9em; }
+#answering span { flex: 1 1 auto; }
+#answering button { min-height: 36px; padding: .2em .8em; }
