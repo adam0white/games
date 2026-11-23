@@ -52,7 +52,7 @@ export function bot(s: GameState, policy: Policy) {
           (a, b) =>
             (need[b] ?? 0) - (taken.includes(b) ? 8 : 0) - ((need[a] ?? 0) - (taken.includes(a) ? 8 : 0)),
         )[0];
-      const h = best ? hints(s, id).find((x) => x.verb === best) : undefined;
+      const h = best ? hints(s, id, false, best).find((x) => x.verb === best) : undefined;
       if (best && st !== best && h && h.verdict !== 'refused' && (!st || (need[st] ?? 0) < 2)) {
         queueInput(s, { kind: 'ask', cook: id, verb: best, insist: push });
         asked[id] = best;
@@ -61,7 +61,7 @@ export function bot(s: GameState, policy: Policy) {
       continue;
     }
     if (policy === 'care') {
-      const h = hints(s, id).find((x) => x.verb === want);
+      const h = hints(s, id, false, want).find((x) => x.verb === want);
       if (!st && open.length > 0 && h && (h.verdict === 'assented' || h.verdict === 'modified'))
         queueInput(s, { kind: 'ask', cook: id, verb: want });
       continue;
@@ -70,7 +70,7 @@ export function bot(s: GameState, policy: Policy) {
       !st &&
       open.length > 0 &&
       (!['pass@10', 'pass@11', 'pass@12'].includes(s.version) ||
-        hints(s, id, policy === 'insist').find((h) => h.verb === want)?.verdict !== 'refused')
+        hints(s, id, policy === 'insist', want).find((h) => h.verb === want)?.verdict !== 'refused')
     )
       queueInput(s, { kind: 'ask', cook: id, verb: want, insist: policy === 'insist' });
   }
