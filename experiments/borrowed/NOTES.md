@@ -48,6 +48,37 @@ I looked at the grown-up and old portraits at 360 × 640 (`small-5-lineup-grown.
 - **Held thing.** At first it was about 12 px, too small to tell apart at a glance. Portraits now draw it 1.6 times larger and further from the head (`toolSize`). The check shoots seed 2's old chapter, where two faces differ only by key against flower (`small-8-key-flower.png`). After the change the two read apart at a glance; before it, the flower hid behind the hat brim.
 - **Chapter 1** keeps `apart: 2`, as the brief allowed.
 
+## 2026-11-23: a rainy night, and a request for puzzles (tester t1, note #115)
+
+The note, in short: the tester wants a mystery game in which you solve puzzles to work out pieces of your life, not one where you walk up to pictures and remember. They also want it darker and gloomier: a rainy night with dead flowers around. The rest was left to the lab.
+
+### Done: the rainy night
+
+| Part | What changed |
+| --- | --- |
+| Sky | Near black, with low clouds that drift. No stars. |
+| Rain | Slanting streaks over the whole screen, the menu included, and small rings where drops land on the island. A faint far flash of lightning every 17 seconds. |
+| The dark | Darkness closes in round the player, with a warm pool of candle light at the player. The HUD and the ability bar stay bright. |
+| Ground | Dark wet grass and darker water. Flowers are dead: a bent stem, the head hanging down, a few dull petals, more fallen on the ground; some tiles have a dry tuft. |
+| Trees and rocks | Darker. About three in ten trees on the island's edge are dead and bare. Trees inside the island keep their crowns, so every wall still reads as a wall. |
+
+- `?gloom=0` shows the old look, to compare. `GLOOM` and its branches are the whole change; remove them to go back.
+- Found on the way: the page's `hash` gives values from -0.5 to 1, not 0 to 1. A negative value picked no colour, so some tree crowns were drawn in the trunk's brown. In the rainy night the crown colour uses the absolute value. The old look and `hash` itself are unchanged, because whether a wall draws as a rock or a tree depends on it.
+- No rule, save or sound changed. There is no rain sound: a looping noise would be the second copy of the rain loop in `lab/ant-nest`, and the kit rule says to move it to the kit first.
+
+Checks: `check.mjs` passes on Chromium (Pixel 7, 360 × 640 and desktop). On WebKit it fails at "the next chapter starts" with or without this change: it failed twice on clean `main` on the lab Mac on 2026-11-23. Unresolved. A first version drew a splash ring with a negative radius (`IndexSizeError`), which the check caught; fixed. Phone-sized screenshots of the menu and the first island were compared with `?gloom=0`.
+
+Not checked: a real phone; the frame rate on an older phone (about 70 rain streaks and up to 4 rings a tile each frame).
+
+### Left as a proposal (2026-11-23, note #115): puzzles that uncover your life
+
+The tester's main ask. It changes what the game is, so it is recorded for the next working session; a question went to the tester about which kind of puzzle. Ideas, not yet built or measured:
+
+- **Memories as locked puzzles.** A memory opens only when a small puzzle on its tile is solved: put torn photo pieces back together, set a music box's three dials to a tune heard earlier, or match footprints to a pet. The answer names one feature (the hat, the pet, the place).
+- **Clues that point, not show.** A memory gives a riddle or a half-burnt letter ("I never went anywhere without my flute") instead of a picture of the feature. The player has to read it against the six faces.
+- **Contradictions.** Two memories disagree; a third tells which one lied. Deduction replaces lookup.
+- **Years stay the cost.** Solving is free; a hint, or skipping a puzzle, burns years, so the candle still matters.
+
 ## Rules
 
 - **Who you were.** A person has four kinds of feature:
