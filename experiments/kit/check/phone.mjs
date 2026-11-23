@@ -1,6 +1,6 @@
-// Phone runs for the live prototypes. Run before and after any change to prototypes/kit/ or to a game's page:
-//   node prototypes/kit/check/phone.mjs            both games, WebKit iPhone 13 and Chromium Pixel 7
-//   node prototypes/kit/check/phone.mjs lantern webkit
+// Phone runs for the live experiments. Run before and after any change to experiments/kit/ or to a game's page:
+//   node experiments/kit/check/phone.mjs            both games, WebKit iPhone 13 and Chromium Pixel 7
+//   node experiments/kit/check/phone.mjs lantern webkit
 // It serves this checkout the way production does (/<slug>/, the 301 from /proto/<slug>/, /notes/button.js), seeds saves in the
 // formats players already have, and fails on any page error. Playwright is not a dependency of this repository:
 // set PLAYWRIGHT to a directory that has it installed, or install it anywhere Node can resolve it.

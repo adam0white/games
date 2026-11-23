@@ -1,6 +1,6 @@
-# Prototype lane notes
+# Experiment lane notes
 
-Notes that are about the lane as a whole, not one prototype.
+Notes that are about the lane as a whole, not one experiment.
 
 ## 2026-11-22: where the work goes (tester t1, note #33)
 
@@ -16,4 +16,4 @@ The owner dropped The Long Road and Copper Afternoon. Both moved to `archive/pro
 
 ## 2026-11-23: shared code (owner)
 
-The owner asked for the live games to be kept on shared code as a standing practice. The shared code is `prototypes/kit/`; its `README.md` holds the rules and lists what is deliberately not shared yet. `prototypes/kit/check/phone.mjs` runs every live prototype in two phone profiles with saves seeded in the formats players already have.
+The owner asked for the live games to be kept on shared code as a standing practice. The shared code is `experiments/kit/`; its `README.md` holds the rules and lists what is deliberately not shared yet. `experiments/kit/check/phone.mjs` runs every live experiment in two phone profiles with saves seeded in the formats players already have.

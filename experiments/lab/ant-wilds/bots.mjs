@@ -1,4 +1,4 @@
-// Checks and measured play for Ant Promotion: Wilds: node prototypes/lab/ant-wilds/bots.mjs [seeds] [minutes]
+// Checks and measured play for Ant Promotion: Wilds: node experiments/lab/ant-wilds/bots.mjs [seeds] [minutes]
 // 1. the player contact rule is the main game's   2. determinism   3. food and the refill   4. sneaking up on a busy eater
 // 5. bots play, next to the main game's careful bot   6. food-chain numbers: hunts in view, kills, leftovers
 import assert from 'node:assert/strict';
