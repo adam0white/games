@@ -51,7 +51,7 @@
 <div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p><p><button id="go" class="main">Play again</button></p><p><a href="/proto/lantern/">Back to Lantern</a></p></div></div>
 <div id="nogl"><div><p>This experiment needs WebGL2, which this browser does not have.</p><p><a href="/proto/lantern/">Play Lantern instead</a></p></div></div>
 <script type="module">
-import { create, step, centre, half, fall, fog, wind, rain, dazzle, DT, GOAL, NIGHTS } from '../../lantern/sim.js';
+import { create, step, centre, half, fall, fog, wind, rain, dazzle, progress, DT, GOAL, NIGHTS } from '../../lantern/sim.js';
 import { createRenderer } from './render.js';
 
 const $ = id => document.getElementById(id);
@@ -126,7 +126,7 @@ function finish() {
   playing = false; ended = performance.now(); drag = null;
   $('hud').style.display = $('big').style.display = pauseButton.style.display = 'none'; $('warn').classList.remove('on');
   const won = s.over === 'dawn', why = { dark: 'The flame went out.', bank: 'You ran onto the bank.', ice: 'You struck the ice.', log: 'You struck a log.', pool: 'The whirlpool took you.', geyser: 'The geyser threw you over.', isle: 'You struck an island.' }[s.over] ?? 'You struck a rock.';
-  const pct = Math.min(100, Math.floor(s.y / GOAL * 100));
+  const pct = Math.floor(progress(s) * 100);
   $('title').textContent = won ? 'Dawn' : s.over === 'dark' ? 'Dark' : `Night ${stage}`;
   if (won && stage >= NIGHTS) { $('line').textContent = 'You carried the light through all twenty nights.'; $('go').textContent = `Play night ${stage} again`; }
   else if (won) { $('line').textContent = `You carried it through night ${stage}. Night ${stage + 1}: ${ahead(stage + 1)}`; stage++; $('go').textContent = `Play night ${stage}`; }
@@ -135,7 +135,7 @@ function finish() {
   setTimeout(() => { if (!playing && screen === 'play') show('card'); }, won ? 2600 : 700);
 }
 function hud() {
-  const big = `${Math.min(100, Math.floor(s.y / GOAL * 100))}%`, low = playing && !paused && s.light < 0.28, now = `${s.hearts}|${s.taken}|${big}|${low}`;
+  const big = `${Math.floor(progress(s) * 100)}%`, low = playing && !paused && s.light < 0.28, now = `${s.hearts}|${s.taken}|${big}|${low}`;
   if (now === shown) return; shown = now; // touch the page only when a number changes
   $('hearts').textContent = '♥'.repeat(Math.max(0, s.hearts)); $('count').textContent = s.taken; $('big').textContent = big;
   $('warn').classList.toggle('on', low);
@@ -174,7 +174,7 @@ $('go').addEventListener('click', () => { if (paused) resume(); else if (perform
 // Pause: the button, P or Escape, and whenever the page loses the screen.
 function pause() {
   if (!playing || paused) return; paused = true; drag = null; keys.clear();
-  $('title').textContent = 'Paused'; $('line').textContent = `Night ${stage}, ${Math.floor(s.y / GOAL * 100)}% of the way to dawn.`; $('sub').textContent = 'Touch the river to go on.'; $('go').textContent = 'Go on';
+  $('title').textContent = 'Paused'; $('line').textContent = `Night ${stage}, ${Math.floor(progress(s) * 100)}% of the way to dawn.`; $('sub').textContent = 'Touch the river to go on.'; $('go').textContent = 'Go on';
   show('card'); if (ac) ac.suspend();
 }
 function resume() {
@@ -205,6 +205,12 @@ function tick() {
       tone(240, 0.35, 0.25, 'square'); tone(1760, 0.25, 0.06); shake = 0.6; target = s.x; if (drag) { drag.x0 = drag.x; drag.boat0 = s.x; }
       for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.9, vy: (Math.random() - 0.3) * 0.9, life: 0.7, blue: true });
     }
+    if (e === 'boost') { [392, 523.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.09, 'sawtooth'), i * 60)); glow = 1; say('Boost! Nothing can stop you', 1600); }
+    if (e === 'slow') { tone(440, 0.9, 0.1); setTimeout(() => tone(330, 1.1, 0.1), 160); glow = 1; say('Slow water. Dawn keeps coming', 1800); }
+    if (e === 'small') { tone(1046.5, 0.25, 0.1, 'triangle'); setTimeout(() => tone(1568, 0.4, 0.08, 'triangle'), 90); glow = 1; say('A smaller boat', 1500); }
+    if (e === 'big') { tone(196, 0.5, 0.2, 'square'); setTimeout(() => tone(147, 0.7, 0.2, 'square'), 120); shake = 0.4; say('Bad luck: a bigger boat!', 1700); }
+    if (e === 'magnet') { tone(660, 0.3, 0.1, 'triangle'); setTimeout(() => tone(990, 0.5, 0.1, 'triangle'), 90); glow = 1; say('Magnet: embers come to you', 1700); }
+    if (e === 'flare') { [523.25, 783.99, 1046.5, 1568].forEach((f, i) => setTimeout(() => tone(f, 0.7, 0.08), i * 70)); glow = 1; say('Flare: the flame holds', 1600); }
     if (e === 'wisp') { tone(150, 0.5, 0.2, 'sawtooth'); say('A false ember!', 1400); streak = 0; }
     if (e === 'heart') { tone(523.25, 0.4, 0.1, 'triangle'); setTimeout(() => tone(783.99, 0.6, 0.1, 'triangle'), 120); glow = 1; say('A heart: one more life', 1500); }
     if (e === 'hurt') {
@@ -238,7 +244,7 @@ function frame(now) {
   shake = Math.max(0, shake - dt * 3); glow = Math.max(0, glow - dt * 2);
   for (const p of sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; } sparks = sparks.filter(p => p.life > 0);
   if (ac) { water.frequency.value = 400 + 500 * Math.min(1.4, s.y / GOAL); waterGain.gain.value = 0.05 + (playing ? 0.14 * Math.max(fall(s, s.y), fall(s, s.y + 0.8)) : 0); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0; }
-  const dawn = Math.max(0, (s.y / GOAL - 0.86) / 0.14), day = s.over === 'dawn' ? Math.min(1, (now - ended) / 2500) : 0;
+  const dawn = Math.max(0, (progress(s) - 0.86) / 0.14), day = s.over === 'dawn' ? Math.min(1, (now - ended) / 2500) : 0;
   R.draw(s, { now, dt, target, shake, glow, sparks, dawn, day, playing, snap });
   snap = false;
   requestAnimationFrame(frame);
