@@ -374,7 +374,7 @@ The owner: Wild "adds a good difficulty, but makes things impossible", and asked
 
 ### Checks
 - `bots.mjs`, direct and placed: full speed while fresh, slowing in order, gives up at 10 s, cannot notice for 7 s and then does, fresh again after 5 s without a chase, the rival never tires. With the animal held outside its sight the give-up never came and the check failed, as it should.
-- `node bots.mjs 6 12`, careful bot, median highest level / median deaths. "Before" is this branch without tiring where measured, else main.
+- `node bots.mjs 6 12`, careful bot, median highest level / median deaths. The first column is main before this pull request; the second is this branch (keep-up pace, harder animal hunts and tiring together). The branch without tiring was not measured here.
 
 | | main | with tiring |
 |---|---|---|
