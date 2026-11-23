@@ -205,32 +205,23 @@ jobs:
       matrix:
         browser: [chromium, webkit]
     runs-on: ubuntu-24.04
+    # Playwright's own image already holds the browsers and their system packages. Installing WebKit's packages
+    # on a bare runner took almost 13 minutes of a 14 minute job; the check itself takes about one.
+    container: mcr.microsoft.com/playwright:v1.64.1-noble
     timeout-minutes: 30
     env:
       PLAYWRIGHT_VERSION: 1.64.1
+      HOME: /root
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .node-version
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ env.PLAYWRIGHT_VERSION }}-${{ matrix.browser }}
       - run: npm install --prefix "$PLAYWRIGHT" --no-save --no-package-lock --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION"
         env:
           PLAYWRIGHT: ${{ runner.temp }}/playwright
-      # WebKit on Linux has not yet been seen green here (the check runs on macOS locally), so its WebKit steps are
-      # advisory: a failure shows in the log but the job, and the required ci gate, still pass. This sits on the steps,
-      # not the job, because a step's continue-on-error is documented to conclude success. Tighten both to false once
-      # a WebKit run passes on Linux.
-      - run: '"$PLAYWRIGHT/node_modules/.bin/playwright" install --with-deps "$BROWSER"'
-        continue-on-error: ${{ matrix.browser == 'webkit' }}
-        env:
-          PLAYWRIGHT: ${{ runner.temp }}/playwright
-          BROWSER: ${{ matrix.browser }}
+      # Both browsers gate: WebKit passed on Linux on 2026-11-23 (13 of 13).
       - run: node experiments/kit/check/phone.mjs all "$BROWSER"
-        continue-on-error: ${{ matrix.browser == 'webkit' }}
         env:
           PLAYWRIGHT: ${{ runner.temp }}/playwright
           BROWSER: ${{ matrix.browser }}
