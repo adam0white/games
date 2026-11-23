@@ -61,9 +61,8 @@ A WebKit run at phone size (390 by 844, touch) loaded the page, changed the skin
 
 ### Left as a proposal (2026-11-22, note #34)
 
-- More detailed animal drawings: "too plain for modern games". The look is a taste decision, so it goes through look variants first.
+- More detailed animal drawings: "too plain for modern games". The look is a taste decision, so it goes through look variants first. Three looks are now built; see "look variants" below.
 - Sound effects and eat and death effects: built, see the next entry.
-||||||| parent of 241c7de1 (Ant Promotion: eat and death effects, start sound in a tap)
 
 ## 2026-11-22: eat and death effects (tester t1, note #34)
 
@@ -78,3 +77,19 @@ Tester t1 asked for sound effects, an effect when you eat an animal and an effec
 All of it is in `index.html`; `sim.js` is unchanged, so `bots.mjs` results are unchanged (checked).
 
 Checked in WebKit with an iPhone 13 profile: an eat and a death forced through `window.__ant`, the death burst on screen, the death card after the delay, "Keep going" back to play, the saved level, no script errors (the notes button script is a 404 on a local server only). Not verified: sound on a real phone, the effects at full frame rate (headless WebKit drew 7 to 8 frames a second), and whether the effects feel good.
+
+## 2026-11-23: look variants for the animal drawings (tester t1, note #34)
+
+Tester t1 found the animals too plain. The look is a taste decision, so this change adds three looks to choose from and does not settle it.
+
+| Look | What it is |
+| --- | --- |
+| Flat | The first drawings, unchanged |
+| Cartoon (now the default) | Dark outline, shaded bodies, bigger eyes with whites, toes, noses, inner ears, whiskers, fur ticks, a back stripe, feather and scale marks, segment lines and leg joints on insects |
+| Soft | The same extra detail with a thin outline in the animal's own dark colour and a stronger gloss |
+
+The menu has a Look button that cycles the three and saves the choice. `?look=0`, `?look=1` or `?look=2` in the address also sets it. Shading is lit from the top left whatever way the animal faces. All of it is in `art.js`; `sim.js` is unchanged, so `bots.mjs` results are unchanged.
+
+Checked in WebKit with an iPhone 13 profile: each look loads and plays with no script errors, and a frame took the same time in all three (about 14 ms headless). A side-by-side sheet of 14 animals in each look was checked by eye.
+
+Not verified: frame rate on a real phone, where the two detailed looks draw about four times as many shapes. Which look is right is the tester's and the owner's call; the question was sent to tester t1.
