@@ -7,6 +7,7 @@ Shared code for the games under `experiments/`. It is served at `/kit/` as plain
 | `save.js` | `read`, `write`, `readNumber`, `readJson`, `writeJson`: localStorage that never throws |
 | `audio.js` | `sound()`: phone audio unlock with the iOS retry, `tone`, `noise`, `hold` and `release` for pause |
 | `pause.js` | `onLeave(pause)`: pause when the page loses the screen; `isPauseKey` |
+| `zoom.js` | `noZoom()`: no double-tap or pinch zoom, and a zoomed page asked back to scale 1 (iOS ignores `user-scalable=no`) |
 | `screens.js` | `screens(ids, after)`: show one full-page card |
 | `stick.js` | `stick(el, { when, reach, leash, dead })`: a floating joystick; the game owns the numbers and draws it from `touch` |
 | `drag.js` | `drag(el, { playing, paused, resume, from, travel, aim, mouse, settle })`: steering by relative finger travel, with the settle distance after a pause; the game owns the gain |
