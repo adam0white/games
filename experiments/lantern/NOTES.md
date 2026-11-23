@@ -441,3 +441,28 @@ Owner's answer, 2026-11-23 21:23Z: "Yes shared stuff in any game is okay". A bas
 ## 2026-11-23: first-time help (the owner's request for beginners)
 
 After 1.5 s of play with no input, a see-through track near the bottom of the screen with a finger sliding along it shows how to steer (`experiments/kit/hint.js`, kind `drag`). It goes on the first touch or key in play and never shows again on that device. New key `lantern-hint`, `'1'` once the player has given input in play. A save with `lantern-bank` means a returning player, who never sees it. Erase everything removes the key with the other `lantern-` keys, so a tester sees the hint again. 1.5 s rather than 3 s because a boat left alone met a rock or the bank after 3.4 to 8.7 s in six emulated runs. Checks: `hint lantern` in the phone check. Not verified on a real phone.
+- **A shared leaderboard with accounts or sign-up** (notes #76 and #96). It needs a server, storage of names and scores from many players, and some way to stop fake scores. All of that waits on an owner decision ("no new server infrastructure without an owner decision"; accounts are not authorized). The local board's format (`{ n, s, d }`) could be sent as is if a shared board is approved.
+
+## 2026-11-23: see everything in the shop on the whole screen (tester t1, note #112)
+
+The note, in short: tapping a crash or victory effect should play it with all the buttons gone, and a separate button should switch it on or off. The same should go for every pack.
+
+### Done
+| Ask | What changed |
+| --- | --- |
+| See crash and victory effects with no buttons on screen | Tapping an owned crash shows the boat on a calm river and plays that crash every 2.8 seconds. Tapping an owned victory shows the river at dawn and plays it every 3.8 seconds. One tap anywhere goes back. Sounds play as they do in a run. |
+| The same for every pack | Abilities: the pickup floats down to the boat and is taken, with its ring and its screen effect (boost streaks, slow-water hush, the smaller boat for Size), every 3.4 seconds. Boats, waters and flames already had a whole-screen look (note #73). **A tap on them now only shows them. It no longer wears them.** |
+| A button to switch it on or off | Under each pack: the thing last shown, whether it is on, and a button: "Switch on" or "Switch off" for abilities, crashes and victories (the limits of 2, 3 and 3 are unchanged), and "Use it" for boats, waters and flames. Before this change, a tap on the thing itself did this. The thing last shown has an outline. |
+| (Lab) The shop comes back where it was | Crashes and Victories are at the bottom of the shop, so going back keeps the scroll position. |
+| (Lab) A rare blank dawn | A frame's time can be a little older than the moment dawn was reached. Dawn's light radius then went below zero, and the canvas threw an error. The phone check failed on this once in Chromium before this change. Dawn's progress is now kept at 0 or above. |
+
+A showing changes no save and is not recorded as a crash or a victory. The lab recording gets a `look` event (pack and item) instead. No storage key was added or changed.
+
+The previews run by the clock, not by frame time. Headless WebKit draws about two frames a second, and the frame time is capped at 0.1 s, so a preview timed by frames never finished there.
+
+Checks: `node experiments/kit/check/phone.mjs` passes for every experiment on WebKit iPhone 13 and Chromium Pixel 7. The Lantern lines now switch through the button. New lines check that showing a boat does not wear it, that "Use it" does wear it, that a crash and a victory each play twice, that a showing changes no save and leaves no wreck behind, that the scroll position comes back, and that an ability is taken during the look. If the crash is not cleared between showings, the check fails (tried). There are phone-sized Chromium screenshots of all five crashes, all five victories, three abilities and a boat, with no page errors.
+
+Not checked: sound and feel on a real phone. Magnet and Flare show only their ring and pickup, because a calm river has no embers to pull and the light is already full.
+
+### Left as a proposal (2026-11-23, note #112)
+- **A setting for showing on tap.** The note's "a button to enable and disable the feature" is read as the on/off button for each thing. If the tester meant a setting that turns the whole-screen showing itself off, that is a new saved setting. A question was sent.
