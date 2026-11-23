@@ -10,6 +10,16 @@ The full deployment assembles every game. Deploy only the exact clean commit wit
 Archived code lives under `archive/` and is not built, served or checked; `archive/README.md` lists what is there, why, and how to bring it back. Do not port, polish or upgrade archived code.
 
 
+## Shared code (owner, 2026-11-23)
+
+The live prototypes share plumbing through `kit/` in the experiments directory (`prototypes/kit/`, or `experiments/kit/` after the rename). Its `README.md` holds the rules.
+Before you write input, sound, pause, menu, save, shop or feedback-button code in a game, use or extend the kit.
+Run `node <dir>/kit/check/phone.mjs` (`<dir>` is `prototypes` or, after the rename, `experiments`) before and after your changes.
+Storage keys and formats never change.
+Reuse before you build. When two games need the same thing, move it to the kit in the same change.
+
+**Experiments (owner, 2026-11-23).** Call these small no-build games "experiments", not "prototypes". New ones go in `experiments/<slug>/` once the directory rename lands; until then `prototypes/<slug>/` works the same way, and the build reads both (a slug in both is a build error). Each is served at `/<slug>/`; lab items at `/lab/<name>/` and shared code at `/kit/`. Old `/proto/...` links get a 301 to the same path without `/proto`, query kept; `/proto/` goes to `/lab/`. A slug may not match a game, an archived name or a reserved path (`reservedPaths` in `worker-settings.mjs`). When several PRs merge within a few minutes, only the last merge's Deploy run succeeds; the earlier ones fail with "Latest main CI is not green". Confirm a change is live by fetching the live file, not by your commit's Deploy run.
+
 ## Current goal (owner, 2026-11-13 and 2026-11-14)
 
 Owner words are in [HF owner directions](https://github.com/adam0white/human-framework/blob/main/docs/owner-directions-2026-10-18.md). The reasoning is in [the direction document](docs/game-lab-direction-2026-11-13.md).
@@ -21,7 +31,7 @@ The earlier migration-first goal is superseded and "New-game prototypes wait" is
 Proposals from the direction document (owner approved the document on 2026-11-14 and may change any detail):
 
 - **Bake-off.** Build a few small entries in about two weeks; the owner plays each for ten minutes and picks one. The winner gets the remaining effort toward a game outsiders finish without help and recommend.
-- **Prototype lane.** A prototype needs signed commits and green CI only. It does not need HF, a replaying export, a cast registry entry, a design document or a hosted review until it graduates. A prototype is a static directory `prototypes/<slug>/` with an `index.html`; the build copies it to `/proto/<slug>/`. It has no `games.json` entry, so the HF pin and release-manifest checks do not apply. A prototype that graduates moves to `games/<slug>` and meets the game rules.
+- **Prototype lane.** A prototype needs signed commits and green CI only. It does not need HF, a replaying export, a cast registry entry, a design document or a hosted review until it graduates. A prototype is a static directory `experiments/<slug>/` (`prototypes/<slug>/` until the rename) with an `index.html`; the build copies it to `/<slug>/` (see Experiments above). It has no `games.json` entry, so the HF pin and release-manifest checks do not apply. A prototype that graduates moves to `games/<slug>` and meets the game rules.
 - **Taste gates.** Concept card, then two to four look variants, then a ten-minute play verdict, then outsider-ready. Each gate is one short ask to the owner.
 - **Spend.** Paid art, music or other assets are allowed only under a cap the owner has set, and each purchase is logged in the repository. No cap is set yet; spend nothing until one is.
 

@@ -176,6 +176,35 @@ Animals hunting each other makes the meadow less predictable: fleeing animals ru
 ### From the wildcard lab, next
 - The named rival (lab `ant-nemesis`) is picked to graduate into this game. The lab's animals-chase-each-other test (`ant-wilds`) overlaps with this round; its dashed red line is used here.
 
+## 2026-11-23: fast again, a bigger step (tester t1, note #46)
+
+Note #46 asked that each fast pick be "exponentially faster than the one before … not just the same speed". Round 3 gave 5% a pick. On screen that is about 2% a pick, because the view zooms out about 2.5% each level (`480 + 14 × level`). Over five fast picks the on-screen speed rose about 10%, which reads as the same speed.
+
+This revises the round-3 number:
+
+- Each fast pick is now 12% faster than your previous fast pick (`SAME_FAST = 1.12`). That shows as about 9% a pick on screen.
+- Capped at 2.5 times the plain fast speed (`FAST_CAP`). The cap is reached at the ninth fast pick. Round 3 kept 5% because a bigger base made a level-18 runner too fast to follow. With the cap, the top speed is 375, against 327 under round 3.
+- `fastBoost(k)` in `sim.js` is now the only place that computes the gain. The promotion card uses it, so the card cannot promise more than the cap. `bots.mjs` checks that every fast pick is faster or capped, and that the step is at least 10%.
+
+Bots, 6 seeds, 12 minutes, Classic, always picking fast:
+
+| | 5% (round 3) | 12% with cap (now) |
+|---|---|---|
+| careful | median top level 14, 3 deaths | 16, 3 deaths |
+| reckless | 15, 55 deaths | 17, 68 deaths |
+
+Careful play that always picks sneaky still reaches 18, so fast does not take over.
+
+Checked: `bots.mjs` passes, and `kit/check/phone.mjs ant-promotion` passes on WebKit and Chromium. A WebKit iPhone 13 run started from a save with Fire Ant, Wasp and Mouse. The HUD read "speed +25%", the fast card read "Fast again: +40% speed", and after the pick the HUD read "+40%" at speed 210.7. No page errors.
+
+Not verified: how 12% a pick feels on a real phone, and whether a speed near the cap stays steerable.
+
+### Left as a proposal (2026-11-23)
+These ideas come from a parallel build of #45 and #46 that was not merged, because round 3 shipped first:
+- **A green arrow at the screen edge.** It would point to the nearest food you can catch when none is on screen.
+- **Leftovers.** A kill between animals would leave a scrap worth 1 point for 12 seconds where the hunter ate. That pulls the player toward danger. In bot runs it changed the top level by at most one.
+- **Hunger.** That build made animals stay full for 60 seconds after a meal. It kept kills to about 20 to 26 a minute across the whole meadow. The first try, without hunger, gave over 100 a minute and cut careful bots from level 14–18 to 4–9. If the meadow feels too bloody, this is the setting to change.
+
 ## 2026-11-23: the named rival, from the wildcard lab
 
 Ported from the lab variant `prototypes/lab/ant-nemesis` (lab log: `prototypes/lab/NOTES.md`). In the code it keeps the lab's word, `nemesis`; the player sees "rival".

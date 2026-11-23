@@ -1645,6 +1645,17 @@ input[type="text"],
   font-size: 0.9rem;
   white-space: normal;
 }
+/* On a phone the cue joins the flow above the journal instead of floating over it, so the radio log and
+   the journal stay readable while it is shown. */
+@media (max-width: 767px) {
+  .tutorial-cue {
+    position: static;
+    order: 6;
+    flex: none;
+    margin: 4px 8px;
+    top: auto;
+  }
+}
 .tutorial-cue span {
   min-width: 0;
   overflow-wrap: anywhere;

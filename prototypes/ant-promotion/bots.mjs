@@ -2,7 +2,7 @@
 // 1. the contact rule, every cell   2. the form tree   3. food exists for every form   4. bots play
 // 5. the rival: a death makes one, it persists and gains power, no animal eats it, temperaments differ, it can be eaten
 import assert from 'node:assert/strict';
-import { SPAWN_WEIGHTS, HIDE_S, hideReady, crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENT_NAMES, NEM_STEP, NEM_MAX_BONUS, NEM_PRIZE, MOBS,
+import { SPAWN_WEIGHTS, HIDE_S, hideReady, SAME_FAST, FAST_CAP, crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENT_NAMES, NEM_STEP, NEM_MAX_BONUS, NEM_PRIZE, MOBS,
   FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article } from './sim.js';
 const seeds = Number(process.argv[2] ?? 20), minutes = Number(process.argv[3] ?? 12);
 
@@ -112,7 +112,10 @@ console.log('wild rules: hide and hunt checks pass');
   const fast = l => optionsFor(l)[1].id, sneak = l => optionsFor(l)[2].id;
   const one = me(create(1, [ANT, optionsFor(1)[0].id, fast(2)])), three = me(create(1, [ANT, fast(1), fast(2)])), sn = me(create(1, [ANT, sneak(1), sneak(2)]));
   assert.equal(one.speed, FORMS[fast(2)].speed, 'a first fast pick has the plain speed');
-  assert.ok(Math.abs(three.speed / one.speed - 1.05) < 1e-9, 'a second fast pick is 5% faster');
+  assert.ok(Math.abs(three.speed / one.speed - SAME_FAST) < 1e-9, `a second fast pick is ${Math.round((SAME_FAST - 1) * 100)}% faster`);
+  assert.ok(SAME_FAST >= 1.1, 'each fast pick is a visible step: the view zooms out about 2.5% a level, and 5% a pick looked the same');
+  { let st = [ANT], prev = 0; for (let l = 1; l < TOP; l++) { st = [...st, fast(l)]; const v = me(create(1, st)).speed; assert.ok(v > prev || v === FORMS[fast(l)].speed * FAST_CAP, `fast pick ${l} is faster, or capped`); prev = v; }
+    assert.equal(prev, FORMS[fast(TOP - 1)].speed * FAST_CAP, `all fast picks reach the cap of ${FAST_CAP} times`); }
   assert.ok(Math.abs(sn.stealth / FORMS[sneak(2)].stealth - 0.95) < 1e-9, 'a second sneaky pick is seen from 5% less far');
   // animals hunt each other, and never the food bugs
   const s = create(3); let eats = 0, food = 0; for (let i = 0; i < 3600 * 3; i++) { step(s, null); if (s.dead) revive(s, false); for (const e of s.events) if (e.t === 'mobeat') { eats++; if (FORMS.find(f => f.name === e.name).level < 1) food++; } }
