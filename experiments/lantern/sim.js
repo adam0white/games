@@ -1,10 +1,11 @@
 // Lantern: pure, seeded simulation. No DOM. One tick is 1/60 s; the only input is a target x in [0, 1].
 // Story: a night is one river of length GOAL; each night is harder and every night from 2 to 20 adds one new thing.
+// Nights 21 to 50 (tester t1, note #73) hold all twenty things; each is a fixed share faster, closer and narrower, and puts one old thing up front.
 // Endless: one river with no dawn; it gets harder every 300 points (10 points a second).
 export const DT = 1 / 60;
 export const GOAL = 78; // river length; about ninety seconds
 export const BOAT = 0.022;
-export const NIGHTS = 20;
+export const NIGHTS = 50;
 // Powers are rare pickups: boost (fast and unbreakable for a moment), slow (the river slows, the way to dawn does not), size (a smaller boat four times in five, a bigger one otherwise).
 // magnet (embers swim to the boat) and flare (the flame is filled and does not fade) are the lab's own two.
 export const POWERS = ['boost', 'slow', 'size', 'magnet', 'flare'];
@@ -31,6 +32,19 @@ export function progress(s) { return Math.min(1, (s.y + s.bonus) / GOAL); }
 export function level(s) { return s.endless ? 1 + Math.floor(Math.floor(s.t * 10) / 300) : s.stage; }
 // The tower: the river climbs in tight turns that ease as it rises, and runs dead straight for the last stretch before dawn.
 export const FLOORS = 10;
+// The tower is 50 levels, each one climb (tester t1, 2026-11-23). Each level is a fixed share harder than the last: the pace grows
+// geometrically from 1.2 at level 1 (the old tower's pace for a player on night 6 was 1.175) to 2.2 at level 50, rows come closer and the river narrows;
+// level 1 holds night 6's things and a new thing of the nights joins every two levels, so all twenty are in from level 29.
+export const LEVELS = 50;
+// A second sector of 50 more levels follows the first (tester t1, note #73): climb 51 to 100. It does not speed up at the first sector's rate, which
+// would reach about 4 times level 1's pace by level 100; the pace grows from 2.2 to 3.0 and rows come closer at the first sector's rate; the river is no narrower than at level 50.
+export const SECTORS = 2;
+export const towerStage = climb => Math.min(20, 6 + Math.floor((climb - 1) / 2));
+// 0 at tower level 1, 1 at level 50, 2 at level 100; on a story night 0 up to night 20 and 1 at night 50.
+const steep = s => s.tower ? (s.climb - 1) / (LEVELS - 1) : !s.endless && s.stage > 20 ? (s.stage - 20) / 30 : 0;
+export const climbPace = climb => climb <= LEVELS ? 1.2 * (2.2 / 1.2) ** ((climb - 1) / (LEVELS - 1)) : 2.2 * (3 / 2.2) ** ((climb - LEVELS) / LEVELS);
+// Night 20 runs at 1.665; nights 21 to 50 grow geometrically to 2.3 at night 50, about 1.1% a night.
+export const nightPace = n => n <= 20 ? 1 + 0.035 * (n - 1) : 1.665 * (2.3 / 1.665) ** ((n - 20) / 30);
 export function centre(s, y) {
   if (s.tower) { const a = Math.max(0, Math.min(1, 1 - y / (0.85 * GOAL))); return 0.5 + a * (0.25 * Math.sin(y * 0.55 + s.p1) + 0.06 * Math.sin(y * 1.3 + s.p2)); }
   return 0.5 + 0.17 * Math.sin(y * 0.33 + s.p1) + 0.07 * Math.sin(y * 0.81 + s.p2);
@@ -39,7 +53,7 @@ export function centre(s, y) {
 export function half(s, y) {
   const k = Math.min(1, y / GOAL);
   if (s.endless) return Math.max(0.16, 0.27 - 0.07 * k - 0.012 * Math.max(0, y / GOAL - 1));
-  return 0.27 - 0.07 * k - 0.035 * Math.max(0, (k - 0.88) / 0.12);
+  return 0.27 - 0.07 * k - 0.035 * Math.max(0, (k - 0.88) / 0.12) - 0.012 * Math.min(1, steep(s)); // the second sector does not narrow further: the audit found closed gaps when it did
 }
 // The waterfall: a short stretch of fast water, from night 5 at the halfway mark and every 60 units of the endless river.
 export function fall(s, y) {
@@ -47,7 +61,7 @@ export function fall(s, y) {
   if (s.endless) d = (y + 20) % 60; else if (s.stage >= 16 && y > GOAL * 0.7) d = y - GOAL * 0.8; else if (s.stage >= 5) d = y - GOAL * 0.5; else return 0;
   return d >= 0 && d < 3 ? Math.sin(d / 3 * Math.PI) : 0;
 }
-function pace(s) { return 1 + (s.endless ? 0.05 : 0.035) * Math.min(24, level(s) - 1); }
+function pace(s) { return s.tower ? climbPace(s.climb) : s.endless ? 1 + 0.05 * Math.min(24, level(s) - 1) : nightPace(s.stage); }
 export function speed(s) { return (0.62 + 0.62 * Math.min(1, s.y / GOAL)) * pace(s) * (1 + 0.7 * fall(s, s.y)) * (s.boost ? 1.8 : 1) * s.calm; }
 export function reach(light) { return 0.17 + 0.6 * light; }
 // Stretches of weather, each a fixed length of river that comes round again. Night 7 fog, night 9 wind, night 13 rain.
@@ -60,11 +74,11 @@ export function dazzle(s) { if (level(s) < 19) return 0; const p = (s.t + 2) % 9
 // How far the boat can see: the flame's reach, cut by fog and by the moments after lightning.
 export function sight(s) { return reach(s.light) * (fog(s, s.y) ? 0.6 : 1) * (dazzle(s) > 0 ? 0.6 : 1); }
 
-export function create(seed, stage = 1, mode = false, powers = POWERS, stats = {}) { // mode: false for a story night, true for the endless river, 'tower' for the climb
+export function create(seed, stage = 1, mode = false, powers = POWERS, stats = {}, climb = 1) { // mode: false for a story night, true for the endless river, 'tower' for the climb; climb: the tower level
   const endless = mode === true, tower = mode === 'tower';
   const st = Object.fromEntries(Object.entries(STATS).map(([k, top]) => [k, Math.max(0, Math.min(top, Math.floor(stats[k] || 0)))]));
   const r = rng(seed), q = rng(seed ^ 0x9e3779b9); // powers draw from their own stream, so the rocks and embers of a seed never change
-  const s = { seed, stage, endless, tower, q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers, powers: [], nextPower: 10 + q() * 10, boost: 0, slow: 0, size: 0, magnet: 0, flare: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
+  const s = { seed, stage, endless, tower, climb: Math.max(1, Math.min(LEVELS * SECTORS, Math.floor(climb) || 1)), q, st, calm: 1 - 0.04 * st.calm, take: 0.05 + 0.012 * st.pull, on: powers, powers: [], nextPower: 10 + q() * 10, boost: 0, slow: 0, size: 0, magnet: 0, flare: 0, big: false, bonus: 0, extra: 0, hearts: 1 + st.hearts, ice: -9, iceSide: 1, isle: -9, warm: 0, shield: 0, safe: 0, nextGift: 9 + r() * 5, r, p1: r() * 6.28, p2: r() * 6.28, t: 0, y: 0, x: 0.5, light: 0.8, rocks: [], embers: [], next: 2.2, events: [], over: null, taken: 0, grazes: 0 };
   s.x = centre(s, 0);
   return s;
 }
@@ -110,7 +124,7 @@ function special(s, y, c, h, k, lv) {
     const kinds = SPECIAL.filter(q => lv >= q[0]);
     if (s.r() > Math.min(0.34, 0.1 + 0.03 * kinds.length)) return false;
     let kind = kinds[Math.floor(s.r() * kinds.length)][1];
-    const tonight = SPECIAL.find(q => q[0] === s.stage);
+    const tonight = s.stage > 20 && !s.tower ? SPECIAL[(s.stage - 21) % SPECIAL.length] : SPECIAL.find(q => q[0] === s.stage); // from night 21 the old things take turns up front
     if (!s.endless && tonight && s.r() < 0.5) kind = tonight[1]; // tonight's new thing shows up most
     const u = s.r() * 2 - 1, side = u < 0 ? -1 : 1, tight = !s.endless && k > 0.85; // not in a story night's last pinch
     if (kind === 'log') { const q = rock(0, y, 0.018, 'log'); q.len = 0.05 + s.r() * 0.05; q.x = q.x0 = c + side * (h - q.len - 0.02); row.push(q); }
@@ -142,7 +156,7 @@ function spawn(s) {
   // One row at a time, well ahead of the light, so the same seed always gives the same river.
   while (s.next < s.y + 2.4) {
     const y = s.next, c = centre(s, y), h = half(s, y), k = Math.min(1, y / GOAL), lv = level(s);
-    s.next += (0.95 - 0.3 * k + s.r() * 0.35) / (1 + 0.012 * Math.min(24, lv - 1));
+    s.next += (0.95 - 0.3 * k + s.r() * 0.35) / (1 + 0.012 * Math.min(24, lv - 1)) / (1 + 0.15 * steep(s));
     if (fall(s, y) > 0 || fall(s, y + 0.8) > 0) continue; // the waterfall itself is the hazard
     if (lv >= 6 && special(s, y, c, h, k, lv)) continue;
     const rad = 0.03 + s.r() * 0.03;
