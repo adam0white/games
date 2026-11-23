@@ -275,3 +275,9 @@ Two lab fixtures were changed for the same kind of reason: the "other knobs give
 - Whether the temperaments feel different to a player. The bots show the rules differ.
 - The speech bubble's tail can cross the message line near the top of the screen (seen in a screenshot). The bubble's box keeps clear of it. When the bubble moves below the message line it can cover the rival's crown and the top of its number for the few seconds both show (seen in a screenshot).
 - The lab's own `prototypes/lab/ant-nemesis/bots.mjs` fails on main at its "matches the main game" check, before and after this change: it compares the lab copy with this folder's `sim.js`, which gained animal hunts after the lab copy was made. Not touched here.
+
+## 2026-11-23: numbers and the HUD, bubble tails
+
+- A number over an animal is not drawn while it is under the HUD. Before, in both looks, it sat on the bar and the percentage and neither could be read.
+- A speech bubble has no tail when the tail would end on the message line or on a name. The bubble still sits beside the speaker.
+- Checked in a WebKit phone profile, flat and 3D, with animals placed under the HUD. Not checked on a real phone.
