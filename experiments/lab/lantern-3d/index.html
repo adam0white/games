@@ -56,6 +56,7 @@ import { createRenderer } from './render.js';
 import { sound } from '../../kit/audio.js';
 import { onLeave, isPauseKey } from '../../kit/pause.js';
 import { screens } from '../../kit/screens.js';
+import { drag } from '../../kit/drag.js';
 
 const $ = id => document.getElementById(id);
 const query = new URLSearchParams(location.search);
@@ -85,7 +86,7 @@ function resize() {
 addEventListener('resize', resize); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', nearFall = false, sayTimer = 0, shown = '', weather = '', snap = true;
-window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, playing, paused, stage, hearts: s.hearts, light: s.light, taken: s.taken, target, screen, shield: s.shield });
+window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, playing, paused, stage, hearts: s.hearts, light: s.light, taken: s.taken, target, screen, shield: s.shield, unit: unit / dpr });
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 window.lanternView = R; // the browser checks read the camera and project points through this
 
@@ -117,12 +118,12 @@ const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
 
 function begin() {
   audio();
-  s = create((Math.random() * 2 ** 31) | 0, stage); target = s.x; playing = true; paused = false; acc = 0; streak = 0; sparks = []; nearFall = false; weather = ''; drag = null; startTap = null; snap = true;
+  s = create((Math.random() * 2 ** 31) | 0, stage); target = s.x; playing = true; paused = false; acc = 0; streak = 0; sparks = []; nearFall = false; weather = ''; steer.reset(); snap = true;
   shown = ''; show('play'); hud();
   say(`Night ${stage}`, 1600);
 }
 function finish() {
-  playing = false; ended = performance.now(); drag = null;
+  playing = false; ended = performance.now(); steer.drop();
   $('hud').style.display = $('big').style.display = pauseButton.style.display = 'none'; $('warn').classList.remove('on');
   const won = s.over === 'dawn', why = { dark: 'The flame went out.', bank: 'You ran onto the bank.', ice: 'You struck the ice.', log: 'You struck a log.', pool: 'The whirlpool took you.', geyser: 'The geyser threw you over.', isle: 'You struck an island.' }[s.over] ?? 'You struck a rock.';
   const pct = Math.floor(progress(s) * 100);
@@ -144,33 +145,17 @@ function hud() {
 // never by where it is, so a tap anywhere does nothing. A mouse steers by position: here, the point
 // across the river at the boat's own row on the screen.
 const pauseButton = $('pause');
-let drag = null, startTap = null;
 function aim(x) { const c = centre(s, s.y), h = half(s, s.y) + 0.02; target = Math.max(c - h, Math.min(c + h, x)); }
-function anchor(e) { drag = { id: e.pointerId, x0: e.clientX, x: e.clientX, boat0: s.x }; }
 function mouseX(e) { const row = R.boatRow(); return (e.clientX * dpr - row.left) / row.unit; }
-canvas.addEventListener('pointerdown', e => {
-  // The tap that ends a pause does not steer until that finger has moved a clear distance.
-  if (paused) { resume(); startTap = { id: e.pointerId, x: e.clientX, y: e.clientY }; anchor(e); return; }
-  if (!playing) return;
-  startTap = null;
-  if (e.pointerType === 'mouse') aim(mouseX(e)); else anchor(e);
-});
-canvas.addEventListener('pointermove', e => {
-  if (!playing || paused) return;
-  if (e.pointerType === 'pen' && !(e.pressure > 0)) return;
-  if (startTap && e.pointerId === startTap.id) { if (Math.hypot(e.clientX - startTap.x, e.clientY - startTap.y) < 12) return; startTap = null; if (drag) anchor(e); }
-  if (e.pointerType === 'mouse') { aim(mouseX(e)); return; }
-  if (!drag || e.pointerId !== drag.id) return;
-  drag.x = e.clientX; aim(drag.boat0 + (e.clientX - drag.x0) * dpr / unit * gain);
-});
-for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, e => { if (e.pointerType !== 'mouse') startTap = null; if (drag && e.pointerId === drag.id) drag = null; });
+// The tap that ends a pause does not steer until that finger has moved a clear distance (experiments/kit/drag.js).
+const steer = drag(canvas, { playing: () => playing, paused: () => paused, resume: () => resume(), from: () => s.x, travel: dx => dx * dpr / unit * gain, aim, mouse: e => aim(mouseX(e)), settle: 12 });
 
 $('play').addEventListener('click', begin);
 $('go').addEventListener('click', () => { if (paused) resume(); else if (performance.now() - ended > 600) begin(); });
 
 // Pause: the button, P or Escape, and whenever the page loses the screen.
 function pause() {
-  if (!playing || paused) return; paused = true; drag = null; keys.clear();
+  if (!playing || paused) return; paused = true; steer.drop(); keys.clear();
   $('title').textContent = 'Paused'; $('line').textContent = `Night ${stage}, ${Math.floor(progress(s) * 100)}% of the way to dawn.`; $('sub').textContent = 'Touch the river to go on.'; $('go').textContent = 'Go on';
   show('card'); snd.hold();
 }
@@ -198,7 +183,7 @@ function tick() {
     if (e === 'shield') { tone(880, 0.5, 0.1); setTimeout(() => tone(1320, 0.7, 0.08), 110); glow = 1; }
     if (e === 'break') {
       // The shield took the blow. Steering restarts from where the boat now is, so a held finger does not drag it back in.
-      tone(240, 0.35, 0.25, 'square'); tone(1760, 0.25, 0.06); shake = 0.6; target = s.x; if (drag) { drag.x0 = drag.x; drag.boat0 = s.x; }
+      tone(240, 0.35, 0.25, 'square'); tone(1760, 0.25, 0.06); shake = 0.6; target = s.x; steer.rebase();
       for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.9, vy: (Math.random() - 0.3) * 0.9, life: 0.7, blue: true });
     }
     if (e === 'boost') { [392, 523.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.09, 'sawtooth'), i * 60)); glow = 1; say('Boost! Nothing can stop you', 1600); }
@@ -211,7 +196,7 @@ function tick() {
     if (e === 'heart') { tone(523.25, 0.4, 0.1, 'triangle'); setTimeout(() => tone(783.99, 0.6, 0.1, 'triangle'), 120); glow = 1; say('A heart: one more life', 1500); }
     if (e === 'hurt') {
       // A heart took the blow. Steering restarts from where the boat now is.
-      tone(180, 0.4, 0.3, 'square'); shake = 0.8; target = s.x; if (drag) { drag.x0 = drag.x; drag.boat0 = s.x; }
+      tone(180, 0.4, 0.3, 'square'); shake = 0.8; target = s.x; steer.rebase();
       for (let i = 0; i < 14; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.9, vy: (Math.random() - 0.3) * 0.9, life: 0.7, red: true });
       say('You lost a heart', 1500);
     }

@@ -9,6 +9,8 @@ Shared code for the games under `experiments/`. It is served at `/kit/` as plain
 | `pause.js` | `onLeave(pause)`: pause when the page loses the screen; `isPauseKey` |
 | `zoom.js` | `noZoom()`: no double-tap or pinch zoom, and a zoomed page asked back to scale 1 (iOS ignores `user-scalable=no`) |
 | `screens.js` | `screens(ids, after)`: show one full-page card |
+| `stick.js` | `stick(el, { when, reach, leash, dead })`: a floating joystick; the game owns the numbers and draws it from `touch` |
+| `drag.js` | `drag(el, { playing, paused, resume, from, travel, aim, mouse, settle })`: steering by relative finger travel, with the settle distance after a pause; the game owns the gain |
 | `lab.js` | `lab(slug)`: play recording for the game lab, with its notice and off switch; see below |
 | `/notes/button.js` | the notes button for testers (it lives in `workers/feedback/public/notes/`) |
 | `check/phone.mjs` | phone runs of every live experiment, of the lab pages under `/lab/` and of this kit, on WebKit iPhone 13 and Chromium Pixel 7 |
@@ -44,7 +46,8 @@ A game calls `const rec = lab('<slug>')`, then `rec.notice(menuCard)`, `rec.togg
 
 ## Not shared yet, and why
 
-- **Steering.** Lantern steers by how far a finger has moved (with a gain and a dead zone after a pause). Ant Promotion uses a floating joystick. They are different models on purpose. A third game that wants one of them moves it here.
+- **One steering model.** Lantern steers by how far a finger has moved (`drag.js`, used by `lantern` and `lab/lantern-3d`); Ant Promotion uses a floating joystick (`stick.js`, used by `ant-promotion`, `lab/ant-nemesis` and `lab/ant-wilds`). They are different models on purpose, so each is shared among its own pages and they are not merged. The numbers stay in each page: gain 1.3 and settle 12 px; reach 55 px, leash 70 px, dead zone 0.15. Each page keeps its own keyboard keys, its mouse mapping (lantern-3d maps a mouse to the boat's row in 3D) and its drawing of the stick. The `?gain=` query on both Lantern pages stays a page option.
+- **The nest's soil painting.** `lab/ant-nest` paints cells along the finger's path and treats an unmoved touch on a tunnel as a tap on an ant. It is a third input model with one user.
 - **Shop.** Lantern has a bank and packs; Ant Promotion has free skins. When Ant Promotion gets a currency, the bank and the pack draw move here.
 - **Looping noise.** `lab/ant-nest` plays its rain as a noise loop that runs until it is stopped. It is the only page that needs one, so it stays in that page on the kit's audio context.
 - **Page styles.** Both games have the same card and button layout with different colours. A shared stylesheet needs before and after screenshots to prove nothing moved.
