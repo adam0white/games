@@ -180,7 +180,16 @@ const GAMES = {
     st = await state(); assert.equal(st.reborn, 1); assert.equal(st.bank, 0); assert.equal(st.opened, 1); assert.deepEqual(st.owned.sort(), ['amber', 'blue', 'boost', 'oak']);
     assert.equal((await saved())['lantern-rebirths'], '1'); assert.equal((await saved())['lantern-owned'], '[]'); assert.equal((await saved())['lantern-night'], '1');
     await page.click('.back'); assert.match(await page.textContent('#stars'), /★/);
-    await page.click('#play'); await page.evaluate(() => { const s = window.lanternSim(); s.taken = 4; s.light = 0.0001; s.warm = 0; });
+    // Reborn nights run faster and pay more at dawn (answer to question #79).
+    assert.match(await page.textContent('#about'), /Reborn night: 6% faster, \+10 embers at dawn/);
+    await page.click('#play'); assert.equal(await page.evaluate(() => window.lanternSim().hard), 1.06, 'a reborn night runs 6% faster');
+    // The force field (answer to question #72): a blue pickup pushes a rock out of the way for a few seconds; no heart is lost.
+    await page.evaluate(() => { const s = window.lanternSim(); s.embers.push({ x: s.x, y: s.y, got: false, kind: 'shield' }); });
+    await until(page, () => window.lanternState().field > 3, 'the force field is on');
+    const pushed = await page.evaluate(() => { const s = window.lanternSim(), k = { x: s.x, x0: s.x, y: s.y + 0.02, y0: s.y + 0.02, rad: 0.03, kind: '', len: 0, on: true, a: 0, w: 0, b: 0, wy: 0, ph: 0, phy: 0, vy: 0, ice: false, grazed: false }; s.rocks.push(k); window.__rock = k; return [s.hearts, k.x0]; });
+    await sleep(500); const after = await page.evaluate(() => [window.lanternSim().hearts, window.__rock.x0, window.lanternState().playing]);
+    assert.equal(after[0], pushed[0], 'no heart lost inside the field'); assert.ok(Math.abs(after[1] - pushed[1]) > 0.03, 'the rock was pushed aside'); assert.ok(after[2], 'still playing');
+    await page.evaluate(() => { const s = window.lanternSim(); s.taken = 4; s.light = 0.0001; s.warm = 0; });
     await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'reborn run ends'); assert.equal((await state()).bank, 5, '4 embers bank as 5 after one rebirth');
     await page.click('#toMenu'); await page.evaluate(() => localStorage.setItem('lantern-owned', '["red"]')); await page.reload(); // the look check below wears the red canoe
     // Two abilities at a time and the crash pack (note #75). lantern-off and lantern-crash are JSON lists of ids.
