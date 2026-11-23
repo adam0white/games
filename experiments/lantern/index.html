@@ -80,7 +80,7 @@
   <h2>Shop</h2>
   <p class="bank"><span class="dot"></span><span id="bank2">0</span> embers</p>
   <p><button class="back">Back</button></p>
-  <p id="got">Stats last for your next run only. Each pack holds one surprise for 50 embers. Tap an ability to switch it on or off.</p>
+  <p id="got">Stats last for your next run only. Each pack holds one surprise for 50 embers. Pick two abilities and up to three crashes: tap one to switch it on or off.</p>
   <div id="packs"></div>
 </div></div>
 <div id="credits" class="screen veil"><div>
@@ -126,6 +126,7 @@ const PACKS = [
   { id: 'water', name: 'Waters', items: [['blue', 'Blue water', '#173a63', '#5a95cc'], ['redw', 'Red water', '#4a1420', '#a04a58'], ['moss', 'Moss water', '#17382a', '#4f8f6a'], ['violet', 'Violet water', '#2a1c4a', '#7a62b8'], ['teal', 'Teal water', '#0b4a3c', '#4fd1b0'], ['glass', 'Black glass', '#06080b', '#9aa6b6']] },
   { id: 'flame', name: 'Flames', items: [['amber', 'Candle flame', '255,170,80'], ['bluef', 'Gas flame', '110,180,255'], ['green', 'Marsh fire', '120,230,140'], ['rose', 'Sparkler', '255,120,170'], ['white', 'Star light', '235,235,255'], ['violetf', 'Twin flame', '190,130,255']] },
   { id: 'power', name: 'Abilities', items: [['boost', 'Boost', TINT.boost, 'Gold arrows. Fast, and nothing can break the boat.'], ['slow', 'Slow water', TINT.slow, 'Violet clock. The river slows; dawn keeps coming.'], ['size', 'Size', TINT.size, 'Teal rings. A smaller boat, four times in five.'], ['magnet', 'Magnet', TINT.magnet, 'Pink magnet. Embers swim to you.'], ['flare', 'Flare', TINT.flare, 'White sun. The flame is filled and holds.']] },
+  { id: 'crash', name: 'Crashes', items: [['burst', 'Fireworks', '#ff9a3c', 'The lantern bursts into sparks.'], ['freeze', 'Freeze', '#9fd8ff', 'The boat ices over and shatters.'], ['ghost', 'Ghost', '#d8d8ff', 'The boat rises as a ghost.'], ['bolt', 'Lightning', '#ffe45a', 'A bolt strikes the boat.'], ['splash', 'Big splash', '#4fa3e0', 'A column of water swallows the boat.']] },
 ];
 const COST = 50;
 // Rebirth (tester t1, note #73): once every pack is found and all 50 nights are open, the player may start over from night 1 with nothing.
@@ -143,11 +144,33 @@ let owned = new Set(['oak', 'blue', 'amber', 'boost', ...store.json('lantern-own
 let worn = { boat: 'oak', water: 'blue', flame: 'amber', ...store.json('lantern-worn', {}) };
 let off = new Set([].concat(store.json('lantern-off', [])).filter(k => typeof k === 'string')); // abilities the player switched off in the shop
 const powersOwned = () => POWERS.filter(k => owned.has(k) && !off.has(k)); // only abilities found in the shop, and not switched off, lie in the river
+// Two abilities at a time (tester t1, note #75): the player picks which two lie in the river. Owned abilities past the first two on, in the order
+// they were found, are switched off; lantern-off keeps its format. Returns the abilities this switched off.
+const PICK = 2;
+function twoOn() {
+  const on = [...owned].filter(k => POWERS.includes(k) && !off.has(k)), extra = on.slice(PICK);
+  for (const k of extra) off.add(k); if (extra.length) store.set('lantern-off', JSON.stringify([...off])); return extra;
+}
+twoOn();
+// The crash pack (tester t1, notes #69 and #75): crash effects found in a pack; up to three are switched on, and a crash plays one of them at random.
+// With none on, a crash plays the effect that fits what was hit, as before. lantern-crash: a JSON list of the crash effects switched on.
+const CRASH_ON = 3;
+let crashOn = [].concat(store.json('lantern-crash', [])).filter(k => typeof k === 'string' && owned.has(k)).slice(0, CRASH_ON);
 const skin = kind => { const pack = PACKS.find(p => p.id === kind); return pack.items.find(i => i[0] === worn[kind]) ?? pack.items[0]; };
 // A shop button shows the thing itself: the boat drawn small, or the flame after half a second of burning.
 const shots = new Map();
+function icon(q, id, col) { // a crash effect, drawn small for its shop button
+  q.strokeStyle = q.fillStyle = col; q.lineWidth = 4; q.lineCap = 'round'; q.beginPath();
+  if (id === 'burst') for (let i = 0; i < 10; i++) { const a = i / 10 * 6.28; q.moveTo(48 + 12 * Math.cos(a), 48 + 12 * Math.sin(a)); q.lineTo(48 + 32 * Math.cos(a), 48 + 32 * Math.sin(a)); }
+  else if (id === 'freeze') for (let i = 0; i < 3; i++) { const a = i / 3 * Math.PI; q.moveTo(48 - 30 * Math.cos(a), 48 - 30 * Math.sin(a)); q.lineTo(48 + 30 * Math.cos(a), 48 + 30 * Math.sin(a)); }
+  else if (id === 'ghost') { q.arc(48, 42, 20, Math.PI, 0); q.lineTo(68, 72); for (let i = 0; i < 4; i++) q.lineTo(63 - 10 * i, i % 2 ? 72 : 64); q.lineTo(28, 72); q.closePath(); q.fill(); q.beginPath(); q.fillStyle = '#0a1220'; q.arc(40, 44, 4, 0, 7); q.arc(56, 44, 4, 0, 7); q.fill(); return; }
+  else if (id === 'bolt') { q.moveTo(56, 10); q.lineTo(36, 50); q.lineTo(54, 50); q.lineTo(38, 88); q.lineWidth = 6; }
+  else { q.moveTo(30, 80); q.quadraticCurveTo(48, 0, 66, 80); for (const [x, y] of [[24, 40], [72, 36], [20, 60], [76, 58]]) { q.moveTo(x + 3, y); q.arc(x, y, 3, 0, 7); } }
+  q.stroke();
+}
 function swatch(kind, it) {
   if (kind === 'water') return it[2];
+  if (kind === 'crash' && !shots.has(it[0])) { const c = document.createElement('canvas'), q = c.getContext('2d'); c.width = c.height = 96; q.fillStyle = '#0a1220'; q.fillRect(0, 0, 96, 96); icon(q, it[0], it[2]); shots.set(it[0], `url(${c.toDataURL()}) center / cover`); }
   if (kind === 'power' && !shots.has(it[0])) { const c = document.createElement('canvas'), q = c.getContext('2d'); c.width = c.height = 96; q.fillStyle = `rgba(${it[2]},.45)`; q.fillRect(0, 0, 96, 96); mark(q, it[0], 48, 50, 17, 5, 0.3); shots.set(it[0], `#0a1220 url(${c.toDataURL()}) center / cover`); }
   if (!shots.has(it[0])) {
     const c = document.createElement('canvas'), q = c.getContext('2d'); c.width = c.height = 96;
@@ -170,7 +193,7 @@ addEventListener('resize', resize); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', lastLevel = 1, nearFall = false, sayTimer = 0, shown = '', weather = '';
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
-window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, unit: unit / dpr }); // read by the browser checks
+window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, crashOn, crash: crash && crash.how, unit: unit / dpr }); // read by the browser checks
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 
 const cards = screens(['menu', 'shop', 'credits', 'card']);
@@ -191,7 +214,7 @@ function menu() {
   const ready = STAT.filter(([id]) => stats[id] > 0).map(([id, label]) => `${label} ${stats[id]}`); $('ready').textContent = ready.length ? `Stats for your next run: ${ready.join(', ')}.` : '';
   $('endless').textContent = top ? `Endless river · best ${top}` : 'Endless river';
   const high = store.get('lantern-best-level'), at = towerAt(); $('tower').textContent = at > 1 ? `Tower climb · go on at ${tag(at)}` : high ? `Tower climb · best ${high > LEVELS ? tag(high) : `level ${high} of ${LEVELS}`}` : 'Tower climb';
-  $('anew').hidden = at <= 1;
+  $('anew').hidden = at <= 1; $('anew').dataset.sure = ''; $('anew').textContent = 'New climb from level 1';
 }
 function shop(text) {
   $('bank2').textContent = bank; if (text) $('got').textContent = text;
@@ -222,7 +245,7 @@ function shop(text) {
         if (rb.dataset.sure !== '1') { rb.dataset.sure = '1'; rb.textContent = 'Tap again to be reborn'; return; }
         reborn++; store.set('lantern-rebirths', reborn);
         bank = 0; store.set('lantern-bank', 0); owned = new Set(['oak', 'blue', 'amber', 'boost']); store.set('lantern-owned', '[]');
-        worn = { boat: 'oak', water: 'blue', flame: 'amber' }; store.set('lantern-worn', JSON.stringify(worn)); off = new Set(); store.set('lantern-off', '[]');
+        worn = { boat: 'oak', water: 'blue', flame: 'amber' }; store.set('lantern-worn', JSON.stringify(worn)); off = new Set(); store.set('lantern-off', '[]'); crashOn = []; store.set('lantern-crash', '[]');
         stats = {}; store.set('lantern-stats', '{}'); opened = stage = 1; store.set('lantern-night', 1); store.set('lantern-tower-at', 1);
         rec.event('rebirth', { rebirths: reborn });
         const fl = $('flash'); fl.style.transition = 'none'; fl.style.background = '#ffe08a'; fl.style.opacity = 1; void fl.offsetWidth; fl.style.transition = 'opacity 1.8s ease-out'; fl.style.opacity = 0;
@@ -241,7 +264,14 @@ function shop(text) {
       const b = document.createElement('button'), has = owned.has(it[0]);
       b.className = 'item' + (has ? '' : ' locked') + (worn[pack.id] === it[0] || (pack.id === 'power' && has) ? ' worn' : ''); b.dataset.item = it[0]; b.setAttribute('aria-label', has ? it[1] : 'Not found yet');
       if (has && pack.id === 'power' && off.has(it[0])) b.className = 'item off';
-      if (has) { b.style.background = swatch(pack.id, it); b.addEventListener('click', () => { if (busy) return; if (pack.id === 'power') { // tap an ability to keep it out of the river, tap again to bring it back
+      if (pack.id === 'crash') b.className = 'item' + (!has ? ' locked' : crashOn.includes(it[0]) ? ' worn' : ' off');
+      if (has) { b.style.background = swatch(pack.id, it); b.addEventListener('click', () => { if (busy) return;
+        if (pack.id === 'crash') { // up to three crash effects on; with none on, a crash fits what was hit
+          if (crashOn.includes(it[0])) crashOn = crashOn.filter(k => k !== it[0]); else if (crashOn.length >= CRASH_ON) { shop(`Only ${CRASH_ON} crashes at a time. Switch one off first.`); return; } else crashOn.push(it[0]);
+          store.set('lantern-crash', JSON.stringify(crashOn)); rec.event('crash-pick', { crash: it[0], on: crashOn.includes(it[0]) });
+          shop(crashOn.includes(it[0]) ? `${it[1]} is on. ${it[3]}` : crashOn.length ? `${it[1]} is off.` : `${it[1]} is off. With no crash on, each crash fits what you hit.`); return; }
+        if (pack.id === 'power') { // tap an ability to keep it out of the river, tap again to bring it back; two at most
+        if (off.has(it[0]) && powersOwned().length >= PICK) { shop(`Only ${PICK} abilities at a time. Switch one off first.`); return; }
         if (off.has(it[0])) off.delete(it[0]); else off.add(it[0]); store.set('lantern-off', JSON.stringify([...off]));
         rec.event('ability', { ability: it[0], on: !off.has(it[0]) }); shop(off.has(it[0]) ? `${it[1]} is off. It will not show up in the river.` : `${it[1]} is on. ${it[3]}`); return; }
         worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); shop(`${it[1]} is on.`); look(pack.id); }); } else b.disabled = true;
@@ -253,9 +283,12 @@ function shop(text) {
       if (bank < COST || !rest.length || busy) return;
       const it = rest[Math.floor(Math.random() * rest.length)];
       // The pack is paid for and the find is saved at once; the hop and the flash only show it.
-      bank -= COST; store.set('lantern-bank', bank); owned.add(it[0]); store.set('lantern-owned', JSON.stringify([...owned])); if (pack.id !== 'power') { worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); }
+      bank -= COST; store.set('lantern-bank', bank); owned.add(it[0]); store.set('lantern-owned', JSON.stringify([...owned])); if (pack.id !== 'power' && pack.id !== 'crash') { worn[pack.id] = it[0]; store.set('lantern-worn', JSON.stringify(worn)); }
+      let after = '';
+      if (pack.id === 'power' && twoOn().includes(it[0])) after = ` It is off: only ${PICK} abilities at a time. Switch one off to use it.`;
+      if (pack.id === 'crash') { if (crashOn.length < CRASH_ON) { crashOn.push(it[0]); store.set('lantern-crash', JSON.stringify(crashOn)); after = ' It is on.'; } else after = ` It is off: only ${CRASH_ON} crashes at a time.`; }
       rec.event('buy', { pack: pack.id, item: it[0], bank });
-      $('bank2').textContent = bank; audio(); spin(row, rest.map(i => i[0]), it, pack);
+      $('bank2').textContent = bank; audio(); spin(row, rest.map(i => i[0]), it, pack, after);
     });
     div.append(name, row, buy); box.append(div);
   }
@@ -263,7 +296,7 @@ function shop(text) {
     const t = document.createElement('div'); t.className = 'pack test'; const tn = document.createElement('b'); tn.textContent = 'Tester tools'; const tw = document.createElement('small'); tw.className = 'once'; tw.textContent = 'For testing only. These go away when the game launches.'; t.append(tn, tw);
     for (const [id, label, act] of [['embers', '+500 embers', () => { bank += 500; store.set('lantern-bank', bank); return 'Added 500 embers.'; }],
       ['nights', 'Open all nights', () => { opened = NIGHTS; stage = NIGHTS; store.set('lantern-night', opened); return `All ${NIGHTS} nights are open.`; }],
-      ['all', 'Find everything', () => { for (const p of PACKS) for (const i of p.items) owned.add(i[0]); store.set('lantern-owned', JSON.stringify([...owned])); return 'Every boat, water, flame and ability is yours.'; }]]) {
+      ['all', 'Find everything', () => { for (const p of PACKS) for (const i of p.items) owned.add(i[0]); store.set('lantern-owned', JSON.stringify([...owned])); twoOn(); return `Every boat, water, flame, ability and crash is yours. Pick ${PICK} abilities and up to ${CRASH_ON} crashes.`; }]]) {
       const b = document.createElement('button'); b.dataset.test = id; b.textContent = label; b.addEventListener('click', () => { if (busy) return; const said = act(); rec.event('test', { tool: id, bank }); shop(said); }); t.append(b);
     }
     // Erase everything (tester t1, note #73): every lantern- key goes, so the game starts as a new player's would. Two taps, so a stray one does nothing.
@@ -281,7 +314,7 @@ function shop(text) {
 }
 // Opening a pack: a light hops between the hidden things, slows, and stops on the find; then the whole screen fills with its colour.
 let busy = false;
-function spin(row, hidden, it, pack) {
+function spin(row, hidden, it, pack, after = '') {
   busy = true; $('got').textContent = '…';
   const tiles = hidden.map(id => row.querySelector(`[data-item="${id}"]`)), end = hidden.indexOf(it[0]), hops = (hidden.length > 1 ? 2 * hidden.length : 0) + end + (hidden.length > 1 ? hidden.length : 0);
   let n = 0, at = -1;
@@ -295,7 +328,7 @@ function spin(row, hidden, it, pack) {
       const col = pack.id === 'flame' || pack.id === 'power' ? `rgb(${it[2]})` : it[2], fl = $('flash');
       fl.style.transition = 'none'; fl.style.background = col; fl.style.opacity = 0.9; void fl.offsetWidth; fl.style.transition = 'opacity 1.1s ease-out'; fl.style.opacity = 0;
       tone(659.25, 0.5, 0.1, 'triangle'); setTimeout(() => tone(987.77, 0.8, 0.1, 'triangle'), 130); setTimeout(() => tone(1318.5, 1, 0.08, 'triangle'), 260);
-      shop(pack.id === 'power' ? `You found: ${it[1]}! ${it[3]}` : `You found: ${it[1]}!`);
+      shop((pack.id === 'power' || pack.id === 'crash' ? `You found: ${it[1]}! ${it[3]}` : `You found: ${it[1]}!`) + after);
     }, 420);
   };
   hop();
@@ -333,7 +366,7 @@ const snd = sound({ setup: ac => { // the river and the low drone, built once
   droneGain = ac.createGain(); droneGain.gain.value = 0; drone.connect(droneGain).connect(ac.destination); drone.start();
 } });
 const audio = () => snd.unlock();
-const tone = (freq, dur, vol, type = 'sine') => { if (snd.ctx) snd.tone(freq, dur, vol, type); };
+const tone = (freq, dur, vol, type = 'sine', slide = 0) => { if (snd.ctx) snd.tone(freq, dur, vol, type, slide); }; // slide was dropped here before, so the crash sounds never slid
 const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
 
 function begin() {
@@ -384,9 +417,9 @@ function finish() {
 let crash = null;
 const SINKS = ['rock', 'chaser', 'hidden', 'isle', 'spinner', 'log'];
 function crashFx(cause) {
-  const how = cause === 'bank' ? 'tip' : cause === 'ice' ? 'crack' : cause === 'pool' ? 'swirl' : cause === 'geyser' ? 'throw' : SINKS.includes(cause) && Math.random() < 0.5 ? 'sink' : 'smash';
+  const how = crashOn.length ? crashOn[Math.floor(Math.random() * crashOn.length)] : cause === 'bank' ? 'tip' : cause === 'ice' ? 'crack' : cause === 'pool' ? 'swirl' : cause === 'geyser' ? 'throw' : SINKS.includes(cause) && Math.random() < 0.5 ? 'sink' : 'smash';
   const side = Math.sign(s.x - centre(s, s.y)) || 1;
-  crash = { how, t0: performance.now(), side, bits: Array.from({ length: 9 }, (_, i) => ({ a: i / 9 * 6.28 + Math.random() * 0.5, v: 0.08 + Math.random() * 0.1, r: Math.random() * 6.28, w: (Math.random() - 0.5) * 14 })) };
+  crash = { how, t0: performance.now(), side, sparks: Array.from({ length: 22 }, () => ({ a: Math.random() * 6.28, v: 0.12 + Math.random() * 0.16 })), bits: Array.from({ length: 9 }, (_, i) => ({ a: i / 9 * 6.28 + Math.random() * 0.5, v: 0.08 + Math.random() * 0.1, r: Math.random() * 6.28, w: (Math.random() - 0.5) * 14 })) };
   rec.event('crash', { cause, how });
   if (!snd.ctx) return;
   if (how === 'sink') { snd.noise(0.25, 0.25, 600); [0, 140, 300, 480].forEach((d, i) => setTimeout(() => tone(260 - 40 * i, 0.18, 0.12, 'sine', -90), d)); shake = 0.5; }
@@ -394,7 +427,13 @@ function crashFx(cause) {
   else if (how === 'tip') { tone(170, 0.6, 0.18, 'sawtooth', -110); setTimeout(() => snd.noise(0.4, 0.25, 500), 380); shake = 0.6; }
   else if (how === 'crack') { tone(2400, 0.25, 0.12, 'square', -1800); snd.noise(0.15, 0.3, 4200); setTimeout(() => tone(1800, 0.3, 0.08, 'triangle', -1200), 70); shake = 0.8; }
   else if (how === 'swirl') { tone(500, 1.1, 0.15, 'sine', -420); snd.noise(0.9, 0.12, 400); }
-  else { snd.noise(0.6, 0.3, 1400); tone(220, 0.7, 0.15, 'sine', 500); shake = 0.7; }
+  else if (how === 'throw') { snd.noise(0.6, 0.3, 1400); tone(220, 0.7, 0.15, 'sine', 500); shake = 0.7; }
+  // the crash pack's effects
+  else if (how === 'burst') { snd.noise(0.12, 0.35, 3000); [0, 90, 170, 260, 380].forEach((d, i) => setTimeout(() => { snd.noise(0.08, 0.18, 2600 + 500 * i); tone(700 + 260 * i, 0.25, 0.06, 'triangle', 300); }, d)); shake = 0.5; }
+  else if (how === 'freeze') { tone(1568, 0.5, 0.07, 'sine', -200); tone(2093, 0.6, 0.05, 'triangle'); setTimeout(() => { snd.noise(0.3, 0.35, 5200); tone(2600, 0.3, 0.08, 'square', -2000); }, 520); shake = 0.6; }
+  else if (how === 'ghost') { tone(440, 1.3, 0.09, 'sine', 440); setTimeout(() => tone(660, 1, 0.06, 'sine', 330), 200); snd.noise(0.2, 0.15, 700); }
+  else if (how === 'bolt') { snd.noise(0.5, 0.5, 6000); tone(60, 0.8, 0.3, 'sawtooth', -30); setTimeout(() => snd.noise(0.9, 0.2, 300), 150); shake = 1.2; }
+  else if (how === 'splash') { snd.noise(0.25, 0.4, 900); setTimeout(() => snd.noise(0.7, 0.25, 500), 300); tone(180, 0.6, 0.15, 'sine', -120); shake = 0.7; }
 }
 function hud() {
   const big = endless ? `${score(s)}` : `${Math.floor(progress(s) * 100)}%`, low = playing && !paused && s.light < 0.28, now = `${s.hearts}|${s.taken}|${big}|${low}`;
@@ -431,7 +470,9 @@ for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type,
 $('play').addEventListener('click', () => { endless = tower = false; begin(); });
 $('endless').addEventListener('click', () => { endless = true; tower = false; begin(); });
 $('tower').addEventListener('click', () => { tower = true; endless = false; climb = towerAt(); begin(); });
-$('anew').addEventListener('click', () => { tower = true; endless = false; climb = 1; store.set('lantern-tower-at', 1); begin(); });
+$('anew').addEventListener('click', () => { // two taps: the first only asks, so a stray tap does not lose the climb
+  const b = $('anew'); if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = `Tap again: back to level 1`; return; }
+  tower = true; endless = false; climb = 1; store.set('lantern-tower-at', 1); begin(); });
 $('less').addEventListener('click', () => { stage = Math.max(1, stage - 1); menu(); });
 $('more').addEventListener('click', () => { stage = Math.min(opened, stage + 1); menu(); });
 $('toShop').addEventListener('click', () => show('shop'));
@@ -524,6 +565,33 @@ function wreck(now) {
   else if (crash.how === 'tip') { g.translate(crash.side * 0.02 * unit * k, 0); g.rotate(crash.side * 1.35 * k); g.scale(1 - 0.35 * k, 1); hull(g, id, unit, col, 0); }
   else if (crash.how === 'crack') { hull(g, id, unit, col, 0); g.strokeStyle = '#eaf6ff'; g.lineWidth = 1.5 * dpr; g.beginPath(); for (const b of crash.bits.slice(0, 5)) { g.moveTo(0, 0); g.lineTo(Math.cos(b.a) * 0.04 * unit * Math.min(1, e * 5), Math.sin(b.a) * 0.05 * unit * Math.min(1, e * 5)); } g.stroke(); if (e > 0.4) bits('#dff2ff', 0.6); }
   else if (crash.how === 'swirl') { rings(4); g.rotate(e * 9); g.scale(1 - 0.85 * k, 1 - 0.85 * k); g.globalAlpha = 1 - 0.6 * k; hull(g, id, unit, col, 0); g.globalAlpha = 1; }
+  else if (crash.how === 'burst') { // the lantern bursts: the boat flashes away and sparks in the flame's colour fly out and fall
+    const fire = skin('flame')[2]; if (e < 0.15) { g.globalAlpha = 1 - e / 0.15; hull(g, id, unit, col, 0); g.globalAlpha = 1; }
+    g.globalCompositeOperation = 'lighter';
+    for (const p of crash.sparks) { const d = p.v * Math.min(1, e * 2.2) * unit, x = Math.cos(p.a) * d, y = Math.sin(p.a) * d + 0.05 * unit * e * e; g.fillStyle = `rgba(${fire},${Math.max(0, 1 - e / 1.25)})`; g.beginPath(); g.arc(x, y, 0.006 * unit * (1.2 - e * 0.6), 0, 7); g.fill(); }
+    g.globalCompositeOperation = 'source-over';
+  }
+  else if (crash.how === 'freeze') { // ice spreads over the boat, then it shatters
+    if (e < 0.55) { hull(g, id, unit, col, 0); g.globalAlpha = Math.min(0.85, e * 1.8); g.fillStyle = '#cfeaff'; g.beginPath(); g.ellipse(0, 0, 0.024 * unit, 0.042 * unit, 0, 0, 7); g.fill(); g.strokeStyle = '#ffffff'; g.lineWidth = 1.2 * dpr; g.beginPath(); for (const b of crash.bits.slice(0, 6)) { g.moveTo(0, 0); g.lineTo(Math.cos(b.a) * 0.02 * unit, Math.sin(b.a) * 0.035 * unit); } g.stroke(); g.globalAlpha = 1; }
+    else { const k2 = (e - 0.55) / 0.75; g.fillStyle = '#e6f6ff'; for (const p of crash.sparks.slice(0, 14)) { const d = p.v * k2 * 0.9 * unit; g.save(); g.translate(Math.cos(p.a) * d, Math.sin(p.a) * d); g.rotate(p.a + k2 * 6); g.globalAlpha = Math.max(0, 1 - k2); g.beginPath(); g.moveTo(0, -0.008 * unit); g.lineTo(0.004 * unit, 0.004 * unit); g.lineTo(-0.004 * unit, 0.004 * unit); g.fill(); g.restore(); } g.globalAlpha = 1; }
+  }
+  else if (crash.how === 'ghost') { // the boat sinks and a pale ghost of it rises and fades
+    g.globalAlpha = Math.max(0, 1 - e * 2); hull(g, id, unit, col, 0); rings(2);
+    g.globalAlpha = Math.max(0, 0.75 * (1 - k)); g.translate(Math.sin(e * 6) * 0.008 * unit, -e * 0.16 * unit); g.scale(1 + e * 0.3, 1 + e * 0.3); hull(g, id, unit, '#e8ecff', 0); g.globalAlpha = 1;
+  }
+  else if (crash.how === 'bolt') { // a bolt from the sky, a blackened boat, smoke
+    if (e < 0.3) { g.strokeStyle = `rgba(255,245,170,${1 - e / 0.3})`; g.lineWidth = 4 * dpr; g.beginPath(); g.moveTo(0, -H); let y = -H; for (let i = 0; y < -0.02 * unit; i++) { y += H / 9; g.lineTo((i % 2 ? 1 : -1) * 0.03 * unit * crash.bits[i % 9].v * 8, Math.min(-0.01 * unit, y)); } g.stroke(); }
+    hull(g, id, unit, '#1b1b1f', 0);
+    for (const [i, p] of crash.sparks.slice(0, 8).entries()) { const r = (0.008 + 0.02 * e) * unit, x = Math.cos(p.a) * 0.01 * unit, y = -e * (0.05 + 0.02 * i) * unit; g.fillStyle = `rgba(120,120,130,${Math.max(0, 0.5 - e * 0.35)})`; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+  }
+  else if (crash.how === 'splash') { // a column of water rises over the boat and falls back
+    if (e < 0.25) hull(g, id, unit, col, 0);
+    const up = Math.sin(Math.min(1, e / 1.1) * Math.PI), w = 0.035 * unit, h = 0.16 * unit * up;
+    const col2 = g.createLinearGradient(0, -h, 0, 0); col2.addColorStop(0, 'rgba(235,248,255,.9)'); col2.addColorStop(1, 'rgba(120,190,240,.7)'); g.fillStyle = col2;
+    g.beginPath(); g.moveTo(-w, 0); g.quadraticCurveTo(-w * 0.3, -h * 0.6, 0, -h); g.quadraticCurveTo(w * 0.3, -h * 0.6, w, 0); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(220,240,255,.85)'; for (const p of crash.sparks.slice(0, 12)) { const x = Math.cos(p.a) * p.v * e * 0.7 * unit, y = -h * 0.8 + e * e * 0.15 * unit - Math.abs(Math.sin(p.a)) * 0.03 * unit; g.beginPath(); g.arc(x, y, 0.004 * unit, 0, 7); g.fill(); }
+    rings(3);
+  }
   else { const up = Math.sin(Math.min(1, e / 1.1) * Math.PI) * 0.12 * unit; g.translate(0, -up); g.rotate(e * 5 * crash.side); g.scale(1 + up / unit * 3, 1 + up / unit * 3); hull(g, id, unit, col, 0); rings(2); }
 }
 function draw(now) {
