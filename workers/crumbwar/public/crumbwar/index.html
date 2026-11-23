@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<title>Crumbwar</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="hud" hidden>
+  <div id="colonies"></div>
+  <div id="clock"></div>
+  <ol id="top"></ol>
+  <div id="self"><span id="rank"></span><div class="bar"><i id="hp"></i></div><div class="bar thin"><i id="stamina"></i></div></div>
+  <div id="feed"></div>
+  <div id="net"></div>
+  <button id="sprint" type="button">Sprint</button>
+</div>
+<div id="card">
+  <h1>Crumbwar</h1>
+  <p id="you"></p>
+  <p>Four ant colonies share one field. Carry crumbs home to score for your colony. Bite enemy ants from behind: an ant bites what is in front of it, and a carrier cannot bite at all. Your own nest is safe. An enemy nest hurts.</p>
+  <p class="small">Drag to steer on a phone, or point with the mouse. Hold Sprint, Space or the mouse button to run. Ants marked <b>bot</b> are computer players that fill the room.</p>
+  <p id="status" class="small"></p>
+  <button id="play" type="button">Play</button>
+</div>
+<script type="module" src="client.js"></script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>

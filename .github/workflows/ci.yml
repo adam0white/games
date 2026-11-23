@@ -33,6 +33,7 @@ jobs:
           node-version-file: .node-version
       - run: pnpm install --frozen-lockfile --filter games-wai-daily
       - run: pnpm --filter games-wai-daily run check
+      - run: node --test workers/crumbwar/test/
   changes:
     runs-on: ubuntu-latest
     outputs:
