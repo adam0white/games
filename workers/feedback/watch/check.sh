@@ -11,6 +11,13 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOM
 mkdir -p "$STATE/work"
 LOG="$STATE/watch.log"
 log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $*" >> "$LOG"; }
+# One macOS notification per subject, so a failure nobody would read in the log is seen. It never carries note text.
+tell() {
+  touch "$STATE/told"
+  grep -qxF "$1" "$STATE/told" && return
+  echo "$1" >> "$STATE/told"
+  osascript -e "display notification \"$2\" with title \"Game notes watcher\"" >/dev/null 2>&1
+}
 
 # One run at a time. A lock older than three hours belongs to a run that died.
 LOCK="$STATE/lock"
@@ -36,11 +43,30 @@ for id in ${ids//,/ }; do
   [ "$(grep -cx "$id" "$STATE/failed")" -ge 3 ] && continue
   new="$new $id"
 done
+for id in ${ids//,/ }; do
+  [ "$(grep -cx "$id" "$STATE/failed")" -ge 3 ] && tell "gave-up-$id" "Note $id was tried three times and still waits. See watch.log."
+done
 [ -z "$new" ] && exit 0
 [ "${GAMES_FEEDBACK_DRY_RUN:-}" = 1 ] && { log "dry run: would start for$new"; exit 0; }
 
+# Prepare a clone for the run here, so a stalled network clone costs no model time.
+login="$(gh api user -q .login 2>/dev/null)"
+if [ "$login" != "adam0white" ]; then
+  log "gh is signed in as '${login:-nobody}', not adam0white; not starting"
+  tell "gh-login" "GitHub login is not adam0white. Notes are waiting."
+  exit 1
+fi
+find "$STATE/work" -mindepth 1 -maxdepth 1 -type d -mtime +7 -exec rm -rf {} + 2>/dev/null
+RUN="$STATE/work/games-$(date +%s)"
+SOURCE="$(git -C "$HERE" rev-parse --show-toplevel)"
+if ! { git clone -q --no-hardlinks "$SOURCE" "$RUN" && git -C "$RUN" remote set-url origin git@github.com:adam0white/games.git \
+  && perl -e 'alarm 120; exec @ARGV' git -C "$RUN" fetch -q origin main && git -C "$RUN" checkout -q -B main origin/main; }; then
+  log "could not prepare a clone; will try again"
+  rm -rf "$RUN"
+  exit 1
+fi
 log "starting for$new ($line)"
-cd "$STATE/work" || exit 1
+cd "$RUN" || exit 1
 # No connectors and only file and shell tools: the run reads text written by an outsider.
 "$CLAUDE" -p "$(cat "$HERE/handle-notes.md")" --strict-mcp-config --tools "Bash,Read,Edit,Write,Glob,Grep" \
   --allowedTools "Bash Read Edit Write Glob Grep" --permission-mode dontAsk > "$STATE/last-run.txt" 2>&1 &
@@ -55,6 +81,8 @@ if [ "$status" -eq 0 ] && [ "${result:0:9}" = "RESULT ok" ]; then
 elif grep -q 'Failed to authenticate' "$STATE/last-run.txt"; then
   # The command-line Claude on this computer is signed out. Not counted as a try; the next run tries again.
   log "claude is signed out; run 'claude' in a terminal and sign in. Waiting:$new"
+  tell "signed-out-$(date +%Y-%m-%d)" "Claude on this Mac is signed out. Run claude in a terminal and sign in. Notes are waiting."
+  rm -rf "$RUN"
 else
   for id in $new; do echo "$id" >> "$STATE/failed"; done
   log "failed for$new (exit $status): ${result:0:200}"

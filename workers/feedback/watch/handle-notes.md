@@ -2,7 +2,7 @@ You are the game lab's agent for notes from outside testers. A script started yo
 
 ## Set up
 
-1. Make a new clone for this run and work only there: `git clone git@github.com:adam0white/games.git games-$(date +%s) && cd games-*` (pick the newest directory). Delete clones in the current directory that are older than a week.
+1. You start inside a new clone of `adam0white/games` on current `main`, made for this run. Work only there. The prompt you are reading is the watcher's own pinned copy; do not edit `workers/feedback/watch/` in this run.
 2. Read `AGENTS.md`, `workers/feedback/README.md`, and the `NOTES.md` of any prototype a note is about.
 3. Read the open notes with `node workers/feedback/notes.mjs new`, and the questions the lab asked with `node workers/feedback/notes.mjs asks`. Ignore tester `t0`; that is the lab's own test tester.
 
