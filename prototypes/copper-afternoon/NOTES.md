@@ -69,3 +69,8 @@ One tester played the 2026-11-22 build on a phone and gave spoken notes, passed 
 The guide solves the bell spacer after one failed test and the lamp direction before any test. That trades the puzzle for clarity, on purpose, for this round. The earlier rules "no text before input" and the twelve-word budget are dropped; `client-smoke.mjs` now expects the start card and the guide.
 
 Checked: `bots.mjs` passes (one timing constant in the clamp test changed with the faster work); `client-smoke.mjs` passes; in a Chromium phone profile, tapping only where the blue ring points fixed the cart and the bell in 18 taps with no page errors. Not verified: a person following the guide, the lamp path in a browser, real-phone drag feel and sound.
+
+## 2026-11-22: tester t1's answer (notes #32, #33)
+
+- With the blue ring and guide line, could you fix the cart? "Yes, it was easy" (#32).
+- Tester t1 suggests dropping Copper Afternoon and The Long Road to focus on Lantern and Ant Promotion (#33). Recorded as a proposal in `prototypes/NOTES.md`; nothing is removed.

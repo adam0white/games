@@ -80,3 +80,8 @@ One tester played the 2026-11-22 build on a phone and gave spoken notes, passed 
 The earlier design rules "no visible words before input" and the twelve-word display budget are dropped; `verify.mjs` now expects the start card. This supersedes the wording in the sections above (`I can mend` is now `I’ll fix it`, and so on).
 
 Checked: `bots.mjs 12` endings unchanged; `verify.mjs` passes; played through the opening, a task, pace and a stop in a Chromium phone profile with no page errors. Not verified: a full journey by a person, real-phone feel and sound.
+
+## 2026-11-22: tester t1's answer (notes #31, #33)
+
+- Is it clear now what to do after the start card and messages? "A little" (#31).
+- Tester t1 suggests dropping The Long Road and Copper Afternoon to focus on Lantern and Ant Promotion (#33). Recorded as a proposal in `prototypes/NOTES.md`; nothing is removed.
