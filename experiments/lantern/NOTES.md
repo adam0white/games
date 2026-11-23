@@ -212,4 +212,24 @@ Checks: `node experiments/kit/check/phone.mjs lantern` on WebKit iPhone 13 and C
 - **50 more nights and an exponential rise between nights.** Nights past 24 would be the same under the current caps on speed and density; it needs new hazards or a new curve, audited for closed rivers. The steeper rise should start at night 6, as the tester earlier asked nights 1 to 5 kept, and come with careful-bot numbers before and after.
 - **Leaderboard.** A shared leaderboard needs a server, which is the owner's decision. A best list on this device is possible without one.
 - **Crash effects pack and river animations pack.** A crash that differs by what is hit (sink or shatter on a rock, tip over on the bank, crack on ice), each with its own sound; the pack lets a player pick two or three. River animations: moving ripples, moonlight glints, mist.
-- **Tower of 50 levels** (built in the next change if it lands; see below).
+- **Tower of 50 levels:** built; see the next entry.
+
+## 2026-11-23: the tower is 50 levels (note #69, item 5)
+
+- A tower climb is now a chain of up to 50 levels. Each level is one climb of the old tower, with ten floors and a straight run into dawn.
+- After each level a card shows what the next level adds. Its buttons are "Climb on to level N" and "Stop".
+- Stopping, losing or leaving ends the climb. The best number of levels cleared is kept, and the next climb starts at level 1, as the tester asked for competition.
+- The menu shows "Tower climb · best level N of 50". New key: `lantern-best-level`, a number. `lantern-best-tower`, the best floor, is still written and no longer shown.
+- **The curve.** The pace grows geometrically, from 1.15 at level 1 to 2.2 at level 50. Level 1 is a little faster than the old tower at night 12's things, and night 20 runs at 1.67. Rows come up to 15% closer and the river narrows by up to 0.012 by level 50.
+- **New things.** Level 1 holds night 4's things, and one more of the nights' new things joins every two levels: all twenty from level 33. The tower no longer depends on the nights opened.
+- **Stats.** A whole climb counts as one run: stats bought before it last every level of that climb.
+- The lab took "exponential" as a fixed share harder each level, about 1.3% faster plus a new thing every second level. A steeper curve over 50 levels would end far past what a person can react to.
+
+Checks:
+- `bots.mjs 100 audit` on levels 1, 17, 33 and 50 (and 10, 25 and 40 on the earlier curve): no closed river, no buried pickup. The narrowest gap is 0.040 at level 50; the endless river's is 0.038.
+- The phone check on WebKit and Chromium covers: clear level 1 and see "Stop", climb on to level 2, lose and see "cleared 1 level. Best 1 of 50", the next climb starting at level 1, and the menu line.
+- Screenshots of the cards after levels 1 and 7 and after a loss.
+
+Not checked:
+- How hard levels 10 to 50 feel to a person. Bots react instantly, so they clear 10% to 28% of levels at every height and cannot measure speed.
+- A real phone.
