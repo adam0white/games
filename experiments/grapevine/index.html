@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#241a46">
+<title>Grapevine</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #241a46; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { font: 17px/1.4 ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', sans-serif; color: #fff4dc; }
+  canvas#c { display: block; width: 100vw; height: 100dvh; touch-action: none; }
+  .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; pointer-events: none; }
+  .screen.on { display: grid; }
+  .screen > div { box-sizing: border-box; max-width: 22em; width: calc(100% - 24px); max-height: 100dvh; overflow-y: auto; touch-action: pan-y;
+    padding: calc(12px + env(safe-area-inset-top)) 14px calc(12px + env(safe-area-inset-bottom)); pointer-events: auto; }
+  .veil { background: #1a1233cc; }
+  #menu.veil { background: linear-gradient(#1a1233ee, #1a123388 45%, #1a1233ee); }
+  h1 { font-size: 2.7em; line-height: 1; margin: .1em 0 .1em; color: #ffd98a; letter-spacing: .02em; text-shadow: 0 3px 0 #7a3b5e, 0 0 24px #ff9a5a88; }
+  h2 { font-size: 2em; line-height: 1.1; margin: 0 0 .25em; color: #ffd98a; text-shadow: 0 3px 0 #7a3b5e; }
+  p { margin: .35em 0; }
+  .sub { opacity: .85; margin-bottom: .6em; }
+  button { font: inherit; font-weight: 600; color: #fff4dc; background: #ffffff14; border: 2px solid #ffd98a88; border-radius: 999px; padding: .45em 1.2em; margin: .25em; min-width: 8em; min-height: 46px; touch-action: manipulation; cursor: pointer; }
+  button.main { background: #ffb347; color: #3a1a10; border-color: #ffb347; font-size: 1.25em; min-width: 9em; box-shadow: 0 4px 0 #b8642a; }
+  button.main:active { transform: translateY(2px); box-shadow: 0 2px 0 #b8642a; }
+  button:disabled { opacity: .4; }
+  #grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: .5em 0; }
+  #grid button { min-width: 0; min-height: 0; height: 46px; margin: 0; padding: 0; border-radius: 12px; font-size: 15px; line-height: 1; display: grid; place-items: center; border-width: 2px; }
+  #grid button small { display: block; font-size: 9px; letter-spacing: -1px; color: #ffd24a; margin-top: 2px; height: 10px; }
+  #grid button.locked { border-style: dashed; color: #fff4dc66; background: transparent; }
+  #grid button.next { border-color: #ffb347; background: #ffb34733; box-shadow: 0 0 10px #ffb34788; }
+  #daily small { color: #ffd24a; }
+  .stars { font-size: 46px; line-height: 1; letter-spacing: 4px; margin: .1em 0 .2em; }
+  .stars span { display: inline-block; color: #ffffff22; transform: scale(.4); transition: transform .35s cubic-bezier(.3,1.8,.5,1), color .2s; }
+  .stars span.on { color: #ffd24a; text-shadow: 0 0 14px #ffb347; transform: scale(1); }
+  .stars span.off { transform: scale(.85); }
+  #strip { display: block; width: 100%; height: 92px; margin: .3em 0; }
+  #pause { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); width: 46px; height: 46px; min-width: 0; min-height: 0; margin: 0; padding: 0;
+    border: 2px solid #ffd98a66; border-radius: 50%; background: #1a1233e6; display: none; place-items: center; touch-action: none; }
+  #pause::before { content: ''; width: 4px; height: 16px; border: solid #ffd98a; border-width: 0 5px; }
+  #hint { position: fixed; left: calc(60px + env(safe-area-inset-left)); top: calc(9px + env(safe-area-inset-top)); display: none; width: 46px; height: 46px; min-width: 0; min-height: 0; margin: 0; padding: 0;
+    font-size: 24px; line-height: 1; background: #ffd24a; border: 2px solid #2b1830; border-radius: 50%; box-shadow: 0 3px 0 #b8862a; animation: nudge 1.2s ease-in-out infinite; }
+  @keyframes nudge { 50% { transform: scale(1.08); } }
+  .lab-notice { max-width: 26em; margin-left: auto !important; margin-right: auto !important; }
+  @media (prefers-reduced-motion: reduce) { #hint { animation: none; } }
+  @media (max-height: 600px) { h1 { font-size: 2.1em; } #grid button { height: 40px; } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<button id="pause" aria-label="Pause"></button>
+<button id="hint" aria-label="Hint">💡</button>
+<div id="menu" class="screen veil on"><div>
+  <h1>Grapevine</h1>
+  <p class="sub">Pass the news along. Everyone changes it a little.</p>
+  <p><button id="play" class="main">Play</button></p>
+  <p><button id="daily">Daily village <small></small></button></p>
+  <div id="grid"></div>
+  <p><button id="sound">Sound: on</button></p>
+</div></div>
+<div id="paused" class="screen veil"><div>
+  <h2>Paused</h2>
+  <p><button id="resume" class="main">Resume</button></p>
+  <p><button id="restart">Start over</button><button id="toMenu">Menu</button></p>
+  <p><button id="sound2">Sound: on</button></p>
+</div></div>
+<div id="done" class="screen veil"><div>
+  <h2 id="doneTitle">Heard it!</h2>
+  <div class="stars" id="stars"><span>★</span><span>★</span><span>★</span></div>
+  <p id="doneLine"></p>
+  <canvas id="strip"></canvas>
+  <p><button id="next" class="main">Next</button></p>
+  <p><button id="again">Again</button><button id="doneMenu">Menu</button></p>
+</div></div>
+<script type="module">
+import { LEVELS } from './levels.js';
+import { walk, refuse, solve, hint as hintRoute, stars as starsFor, same, daily, dailySeed, changeOf, MAX_HOPS } from './sim.js';
+import { token, villager, badge, bubble, hand, backdrop, lanterns, change, WIDE, BOARD_HALF, COLOUR, INK, CREAM, roundRect } from './art.js';
+import { readJson, writeJson } from '../kit/save.js';
+import { sound } from '../kit/audio.js';
+import { onLeave, isPauseKey } from '../kit/pause.js';
+import { screens } from '../kit/screens.js';
+import { lab } from '../kit/lab.js';
+
+const $ = id => document.getElementById(id);
+const query = new URLSearchParams(location.search);
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------------------------------------------------------------- save (one JSON blob)
+const KEY = 'grapevine-save';
+const save = { v: 1, sound: true, best: {}, opened: 1, daily: {}, ...readJson(KEY, {}) };
+const store = () => writeJson(KEY, save);
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const urlLevel = Math.floor(Number(query.get('level')));
+const urlSeed = query.has('seed') ? Number(query.get('seed')) >>> 0 : null;
+
+// ---------------------------------------------------------------- sound
+const snd = sound({ on: () => save.sound });
+const tone = (f, d, v, type = 'triangle', slide = 0) => { if (snd.ctx) snd.tone(f, d, v, type, slide); };
+const SCALE = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.5, 1567.98, 1760, 2093, 2349.3, 2637];
+const voice = kind => { // each kind of villager says something as they pass it on
+  if (!snd.ctx) return;
+  if (kind === 'more') tone(330, 0.22, 0.05, 'square', 330);
+  else if (kind === 'less') tone(140, 0.25, 0.06, 'sawtooth', -50);
+  else if (kind === 'parrot') { tone(1400, 0.07, 0.05, 'square', 500); setTimeout(() => tone(1500, 0.07, 0.05, 'square', 500), 80); }
+  else if (kind === 'paint') snd.noise(0.12, 0.12, 2500);
+  else if (kind === 'swap') tone(500, 0.2, 0.05, 'sine', -250);
+  else if (kind === 'carve') snd.noise(0.05, 0.2, 4000);
+  else if (kind === 'flip') tone(600, 0.15, 0.05, 'square', -300);
+};
+
+// ---------------------------------------------------------------- lab recording
+const rec = lab('grapevine');
+rec.notice($('menu').firstElementChild);
+rec.toggle($('paused').firstElementChild);
+
+// ---------------------------------------------------------------- canvas and layout
+const canvas = $('c'), g = canvas.getContext('2d');
+let W = 0, H = 0, dpr = 1, safe = { t: 0, b: 0, l: 0, r: 0 };
+const probe = document.createElement('div');
+probe.style.cssText = 'position:fixed;top:env(safe-area-inset-top);bottom:env(safe-area-inset-bottom);left:env(safe-area-inset-left);right:env(safe-area-inset-right);pointer-events:none;visibility:hidden';
+document.body.append(probe);
+let back = null; // the village backdrop, drawn once per size
+function resize() {
+  dpr = Math.min(2, devicePixelRatio || 1);
+  W = innerWidth; H = innerHeight;
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+  const cs = getComputedStyle(probe);
+  safe = { t: parseFloat(cs.top) || 0, b: parseFloat(cs.bottom) || 0, l: parseFloat(cs.left) || 0, r: parseFloat(cs.right) || 0 };
+  back = document.createElement('canvas'); back.width = canvas.width; back.height = canvas.height;
+  const bg = back.getContext('2d'); bg.scale(dpr, dpr); backdrop(bg, W, H, safe.t + 60);
+  layout();
+}
+addEventListener('resize', resize);
+
+// The board: villagers' screen positions from the level's 0..1 coordinates.
+let level = null, pos = [], R = 24;
+function layout() {
+  if (!level) return;
+  let left = safe.l + 18, right = W - safe.r - 18;
+  if (W >= WIDE) { left = Math.max(left, W / 2 - BOARD_HALF); right = Math.min(right, W / 2 + BOARD_HALF); } // phone-wide board, street on the sides
+  const top = safe.t + 150, bottom = H - safe.b - 58;
+  const rows = new Set(level.nodes.map(n => Math.round(n.y * 8))).size;
+  const rowGap = (bottom - top) / Math.max(1, rows - 1), colGap = (right - left) / 3;
+  R = Math.max(15, Math.min(30, colGap * 0.22, rowGap * 0.25));
+  pos = level.nodes.map(n => ({ x: left + n.x * (right - left), y: top + n.y * (bottom - top) }));
+  ghostAt = pos.map((p, v) => ghostSpot(v));
+}
+// Where a villager's "after me" token sits: of four spots beside the head, the one furthest from paths,
+// other villagers, their badges and the screen edge. Ties keep the first spot (up and to the right).
+let ghostAt = [];
+function ghostSpot(v) {
+  const p = pos[v];
+  const spots = [[1.3, -1.15], [-1.3, -1.15], [1.55, 0.15], [-1.55, 0.15]].map(([a, b]) => ({ x: p.x + a * R, y: p.y + b * R }));
+  const segDist = (q, A, B) => {
+    const dx = B.x - A.x, dy = B.y - A.y, k = Math.max(0, Math.min(1, ((q.x - A.x) * dx + (q.y - A.y) * dy) / (dx * dx + dy * dy || 1)));
+    return Math.hypot(q.x - A.x - k * dx, q.y - A.y - k * dy);
+  };
+  let best = spots[0], bestScore = -Infinity;
+  spots.forEach((q, i) => {
+    let d = Math.min(q.x - safe.l, W - safe.r - q.x, q.y - safe.t - 90) + R * 0.5;
+    d = Math.min(d, Math.hypot(q.x - p.x, q.y - p.y) - R); // clear of the villager's own head
+    for (const [a, b] of level.edges) d = Math.min(d, segDist(q, pos[a], pos[b]));
+    pos.forEach((o, u) => {
+      if (u === v) return;
+      d = Math.min(d, Math.hypot(q.x - o.x, q.y - o.y) - R, Math.hypot(q.x - o.x, q.y - o.y - R * 1.42) - R * 0.9);
+    });
+    const score = d - i * R * 0.05;
+    if (score > bestScore) { bestScore = score; best = q; }
+  });
+  return { x: best.x - p.x, y: best.y - p.y };
+}
+
+// ---------------------------------------------------------------- game state
+const DT = 1 / 60, HOP = 18; // ticks per hop of the message
+let screen = 'menu', paused = false, t = 0, acc = 0, last = performance.now();
+let mode = 'level', index = 0, dailyKey = null; // index: 0-based level
+let route = [], trail = null, sends = 0, fails = 0, hints = 0, hintAt = 0, touched = false, startT = 0;
+let sending = null, result = null, wrong = null, lastStars = 0;
+let react = [], refuseT = [], happyT = 0, puzzledT = 0, particles = [], shake = 0, ripples = [], grow = 0, gone = [];
+let endTimer = -1, stripT = 0, sentRoute = null;
+const next = () => Math.min(LEVELS.length, Math.max(1, save.opened));
+
+function begin(i, how = 'level') {
+  snd.unlock();
+  mode = how;
+  if (how === 'daily') {
+    dailyKey = today();
+    const d = new Date(), seed = urlSeed ?? dailySeed(d.getFullYear(), d.getMonth() + 1, d.getDate());
+    level = { ...daily(seed, LEVELS[20]), name: 'Daily village' };
+  } else { index = i; level = LEVELS[i]; }
+  route = [level.from]; trail = walk(level, route);
+  sends = 0; fails = 0; hints = 0; hintAt = 0; touched = false; startT = t;
+  sending = null; result = null; wrong = null; endTimer = -1; sentRoute = null;
+  react = level.nodes.map(() => 0); refuseT = level.nodes.map(() => 0); gone = level.nodes.map(() => 0);
+  happyT = 0; puzzledT = 0; particles = []; ripples = []; grow = 1;
+  $('hint').style.display = 'none';
+  layout(); paused = false; snd.release(); show('play');
+  rec.start({ level: how === 'daily' ? `daily-${dailyKey}` : i + 1 });
+}
+
+// ---------------------------------------------------------------- route editing (shared by tap and drag)
+function setRoute(r) { route = r; trail = walk(level, route); if (result === 'wrong') result = null; }
+function extend(v) {
+  const why = refuse(level, route, trail.msgs, v);
+  if (why) { refused(v, why); return false; }
+  setRoute([...route, v]); grow = 0;
+  const node = level.nodes[v];
+  tone(SCALE[Math.min(SCALE.length - 1, route.length - 2)], 0.14, 0.07, 'triangle');
+  react[v] = Math.max(react[v], 0.5);
+  if (node.once) gone[v] = 0;
+  return true;
+}
+function backtrack() {
+  if (route.length < 2) return;
+  setRoute(route.slice(0, -1)); grow = 1;
+  tone(SCALE[Math.max(0, route.length - 2)] / 2, 0.1, 0.05, 'sine');
+}
+let lastRefused = -1;
+function refused(v, why) {
+  if (lastRefused === v) return;
+  lastRefused = v;
+  if (why === 'far' || why === 'done' || why === 'long' || why === 'teller') {
+    // not next to the end of the route: point at where the route can go on
+    refuseT[route[route.length - 1]] = 1;
+    tone(220, 0.08, 0.05, 'sine');
+  } else {
+    refuseT[v] = 1; // a timid villager refusing red news, a sleepy one who went home, a U-turn
+    tone(150, 0.16, 0.07, 'square', -40);
+    if (!reduced) shake = Math.max(shake, 3);
+  }
+}
+
+// ---------------------------------------------------------------- input: one finger, drag or tap
+let finger = null; // { id, x, y, reached }
+const nodeAt = (x, y, reach) => {
+  let best = -1, bd = Infinity;
+  pos.forEach((p, i) => { const d = Math.hypot(p.x - x, p.y - y); if (d < reach && d < bd) { bd = d; best = i; } });
+  return best;
+};
+function enter(v) {
+  if (v < 0) return;
+  const end = route[route.length - 1];
+  if (v === end) return;
+  if (route.length >= 2 && v === route[route.length - 2]) { backtrack(); lastRefused = -1; return; }
+  if (extend(v)) { lastRefused = -1; if (v === level.to && finger) finger.reached = true; }
+}
+canvas.addEventListener('pointerdown', e => {
+  if (screen !== 'play' || paused) return;
+  e.preventDefault();
+  try { canvas.setPointerCapture(e.pointerId); } catch {}
+  const x = e.clientX, y = e.clientY;
+  ripples.push({ x, y, t: 0 });
+  touched = true;
+  finger = { id: e.pointerId, x, y, reached: false };
+  if (sending || result === 'won') return;
+  lastRefused = -1;
+  const v = nodeAt(x, y, R * 1.6);
+  if (v < 0) { tone(660, 0.04, 0.03, 'sine'); return; }
+  if (v === level.from) { if (route.length > 1) tone(300, 0.1, 0.05, 'sine'); setRoute([level.from]); react[v] = 0.6; return; }
+  const at = route.lastIndexOf(v);
+  if (at >= 0 && at < route.length - 1) { setRoute(route.slice(0, at + 1)); tone(SCALE[Math.max(0, at - 1)] / 2, 0.1, 0.05, 'sine'); return; }
+  if (at === route.length - 1) { react[v] = 0.4; tone(SCALE[Math.min(SCALE.length - 1, at)], 0.06, 0.04); return; }
+  enter(v);
+});
+canvas.addEventListener('pointermove', e => {
+  if (!finger || e.pointerId !== finger.id || screen !== 'play' || paused || sending || result === 'won') return;
+  // sample the finger's path so a quick drag cannot skip over a villager
+  const x = e.clientX, y = e.clientY, steps = Math.max(1, Math.ceil(Math.hypot(x - finger.x, y - finger.y) / 6));
+  for (let i = 1; i <= steps; i++) {
+    const px = finger.x + (x - finger.x) * i / steps, py = finger.y + (y - finger.y) * i / steps;
+    const v = nodeAt(px, py, R * 1.05);
+    if (v >= 0) enter(v); else lastRefused = -1;
+  }
+  finger.x = x; finger.y = y;
+});
+const lift = e => {
+  if (!finger || e.pointerId !== finger.id) return;
+  const reached = finger.reached; finger = null;
+  if (screen === 'play' && !paused && !sending && reached && route[route.length - 1] === level.to) send();
+};
+canvas.addEventListener('pointerup', lift);
+canvas.addEventListener('pointercancel', e => { finger = null; });
+
+// ---------------------------------------------------------------- sending the message
+function send() {
+  sends++;
+  sentRoute = [...route];
+  sending = { route: sentRoute, msgs: trail.msgs, changes: trail.changes, i: 0, p: 0, ok: trail.correct, shown: trail.msgs[0], squash: 0 };
+  wrong = null; puzzledT = 0;
+  rec.event('send', { route: sentRoute, ok: trail.correct });
+  tone(SCALE[0], 0.2, 0.08, 'triangle');
+}
+function arrive(s) {
+  const v = s.route[s.i], node = level.nodes[v], p = pos[v];
+  s.shown = s.msgs[s.i]; s.squash = 1;
+  react[v] = 1;
+  if (v !== level.to) {
+    tone(SCALE[Math.min(SCALE.length - 1, s.i + 1)], 0.3, 0.08, 'triangle');
+    voice(node.kind === 'parrot' ? kindOfChange(s.changes[s.i]) || 'parrot' : node.kind);
+    if (node.kind === 'parrot') voice('parrot');
+    if (node.once) gone[v] = 0.001;
+    burst(p.x, p.y - R * 1.9, COLOUR[s.shown.c], 10);
+    return;
+  }
+  // at the listener
+  sending = null;
+  if (s.ok) win(); else miss(s.msgs[s.msgs.length - 1]);
+}
+const kindOfChange = c => c === 0 ? null : c <= 4 ? 'paint' : c === 5 ? 'more' : c === 6 ? 'less' : c <= 8 ? 'swap' : c <= 12 ? 'carve' : 'flip';
+function win() {
+  result = 'won';
+  const hops = sentRoute.length - 1;
+  lastStars = starsFor(hops, level.min);
+  happyT = 1;
+  const p = pos[level.to];
+  for (let i = 0; i < 4; i++) burst(p.x, p.y - R, COLOUR[i], 14);
+  [0, 4, 7, 12].forEach((k, i) => setTimeout(() => tone(SCALE[2] * 2 ** (k / 12), 0.6, 0.07, 'triangle'), i * 90));
+  sentRoute.forEach(v => { react[v] = 1; });
+  if (mode === 'daily') save.daily[dailyKey] = Math.max(save.daily[dailyKey] || 0, lastStars);
+  else {
+    save.best[index + 1] = Math.max(save.best[index + 1] || 0, lastStars);
+    save.opened = Math.max(save.opened, Math.min(LEVELS.length, index + 2));
+    if (index + 1 >= LEVELS.length) save.opened = LEVELS.length + 1;
+  }
+  store();
+  rec.end('solved', { level: mode === 'daily' ? `daily-${dailyKey}` : index + 1, stars: lastStars, sends, hints });
+  endTimer = 70;
+}
+function miss(heard) {
+  result = 'wrong'; wrong = heard; fails++;
+  puzzledT = 1;
+  tone(311, 0.25, 0.07, 'sawtooth', -20); setTimeout(() => tone(293.7, 0.45, 0.06, 'sawtooth', -40), 160);
+  if (!reduced) shake = 5;
+  if (fails >= 3) $('hint').style.display = 'block';
+}
+function burst(x, y, col, n) {
+  if (reduced) n = Math.ceil(n / 4);
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 3;
+    particles.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1.5, life: 1, col, size: 2 + Math.random() * 3 });
+  }
+}
+
+// ---------------------------------------------------------------- hint
+$('hint').addEventListener('click', () => {
+  if (screen !== 'play' || paused || sending) return;
+  hintAt++; hints++;
+  setRoute(hintRoute(level, hintAt)); grow = 0;
+  const v = route[route.length - 1]; react[v] = 1;
+  tone(SCALE[Math.min(SCALE.length - 1, route.length)], 0.25, 0.07, 'sine');
+  rec.event('hint');
+});
+
+// ---------------------------------------------------------------- the fixed tick
+function tick() {
+  t++;
+  for (let i = 0; i < react.length; i++) { react[i] = Math.max(0, react[i] - 1 / 30); refuseT[i] = Math.max(0, refuseT[i] - 1 / 25); if (gone[i] > 0) gone[i] = Math.min(1, gone[i] + 1 / 40); }
+  if (!sending) for (let i = 0; i < gone.length; i++) gone[i] = 0; // after a send, the route decides who is asleep
+  grow = Math.min(1, grow + 1 / 8);
+  happyT = Math.max(0, happyT - (endTimer >= 0 ? 0 : 1 / 90));
+  puzzledT = Math.max(0, puzzledT - 1 / 150);
+  shake = Math.max(0, shake - 0.3);
+  for (const p of particles) { p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.life -= 1 / 45; }
+  particles = particles.filter(p => p.life > 0);
+  for (const r of ripples) r.t += 1 / 20;
+  ripples = ripples.filter(r => r.t < 1);
+  if (sending) {
+    sending.squash = Math.max(0, sending.squash - 1 / 12);
+    sending.p += 1 / HOP;
+    if (sending.p >= 1) { sending.p = 0; sending.i++; arrive(sending); }
+  }
+  if (endTimer > 0 && --endTimer === 0) { endTimer = -1; showEnd(); }
+  if (screen === 'done') stripT++;
+}
+function frame(now) {
+  const dt = Math.min(0.25, (now - last) / 1000); last = now;
+  if (!paused) { acc += dt; while (acc >= DT) { tick(); acc -= DT; } }
+  draw(paused ? 0 : acc / DT);
+  if (screen === 'done') drawStrip();
+  requestAnimationFrame(frame);
+}
+
+// ---------------------------------------------------------------- drawing
+const ease = p => p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2;
+function draw(alpha) {
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (back) g.drawImage(back, 0, 0, W, H);
+  const time = (t + alpha) / 60;
+  lanterns(g, W, safe.t + 4, time, H, safe.t + 60);
+  if (!level) { menuScene(time); return; }
+  g.save();
+  if (shake) g.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+  paths();
+  vine(time);
+  // villagers, back to front
+  const order = level.nodes.map((_, i) => i).sort((a, b) => pos[a].y - pos[b].y);
+  const onRoute = new Set(route);
+  for (const i of order) person(i, time, onRoute);
+  ghosts(time);
+  listenerBubble(time);
+  if (sending) flying(alpha);
+  else if (route.length && !result) headRing(time);
+  for (const p of particles) { g.globalAlpha = Math.max(0, p.life); g.fillStyle = p.col; g.beginPath(); g.arc(p.x, p.y, p.size, 0, Math.PI * 2); g.fill(); }
+  g.globalAlpha = 1;
+  for (const r of ripples) { g.beginPath(); g.arc(r.x, r.y, 10 + r.t * 26, 0, Math.PI * 2); g.strokeStyle = `rgba(255,244,220,${0.6 * (1 - r.t)})`; g.lineWidth = 3; g.stroke(); }
+  tutorial(time);
+  g.restore();
+  hud(time);
+}
+function paths() {
+  g.lineCap = 'round';
+  for (const [a, b] of level.edges) {
+    const A = pos[a], B = pos[b];
+    g.beginPath(); g.moveTo(A.x, A.y); g.lineTo(B.x, B.y);
+    g.strokeStyle = '#2a1d2e'; g.lineWidth = 18; g.stroke();
+    g.strokeStyle = '#8a6a52'; g.lineWidth = 13; g.stroke();
+    g.setLineDash([3, 11]); g.strokeStyle = '#b89474'; g.lineWidth = 5; g.stroke(); g.setLineDash([]);
+  }
+}
+// The route as a growing grapevine, with leaves and a grape at each villager.
+function vine(time) {
+  if (route.length < 2) return;
+  const hinted = hints > 0;
+  for (let i = 1; i < route.length; i++) {
+    const A = pos[route[i - 1]], B = pos[route[i]];
+    const f = i === route.length - 1 ? ease(grow) : 1;
+    const x2 = A.x + (B.x - A.x) * f, y2 = A.y + (B.y - A.y) * f;
+    const off = (i % 2 ? 1 : -1) * 3;
+    g.beginPath(); g.moveTo(A.x, A.y); g.quadraticCurveTo((A.x + x2) / 2 + off, (A.y + y2) / 2 - off, x2, y2);
+    g.strokeStyle = '#1d3a1c'; g.lineWidth = 9; g.stroke();
+    g.strokeStyle = hinted && i <= hintAt ? '#ffe07a' : '#7fd65a'; g.lineWidth = 5; g.stroke();
+    // leaves
+    const len = Math.hypot(x2 - A.x, y2 - A.y), n = Math.floor(len / 28), ang = Math.atan2(y2 - A.y, x2 - A.x);
+    for (let k = 1; k <= n; k++) {
+      const q = k / (n + 1), lx = A.x + (x2 - A.x) * q, ly = A.y + (y2 - A.y) * q, s = k % 2 ? 1 : -1;
+      g.save(); g.translate(lx, ly); g.rotate(ang + s * 0.9 + Math.sin(time * 2 + k) * 0.1);
+      g.beginPath(); g.ellipse(7, 0, 7, 3.6, 0, 0, Math.PI * 2); g.fillStyle = '#5cb84a'; g.fill(); g.strokeStyle = '#1d3a1c'; g.lineWidth = 1.2; g.stroke();
+      g.restore();
+    }
+    // a direction chevron in the middle of each hop
+    if (f === 1) {
+      g.save(); g.translate((A.x + B.x) / 2, (A.y + B.y) / 2); g.rotate(ang);
+      g.beginPath(); g.moveTo(-4, -6); g.lineTo(4, 0); g.lineTo(-4, 6); g.strokeStyle = '#1d3a1c'; g.lineWidth = 3; g.stroke();
+      g.restore();
+    }
+  }
+}
+function person(i, time, onRoute) {
+  const node = level.nodes[i], p = pos[i];
+  const blink = ((time * 0.7 + i * 0.37) % 4) < 0.12 ? 1 : 0;
+  const isTo = i === level.to;
+  const asleep = node.once && !sending && route.indexOf(i) >= 0 && route.indexOf(i) < route.length - 1;
+  const mood = {
+    t: time, blink, react: react[i], refuse: refuseT[i],
+    gone: node.once ? Math.max(gone[i], asleep ? 0.8 : 0) : 0,
+    happy: isTo ? happyT : (result === 'won' && onRoute.has(i) ? happyT * 0.7 : 0),
+    puzzled: isTo ? puzzledT : 0,
+    look: Math.sin(time * 0.5 + i) ,
+  };
+  // the route's head glows so the player sees where they are
+  if (onRoute.has(i) && i !== level.from) {
+    g.beginPath(); g.arc(p.x, p.y, R * 1.3, 0, Math.PI * 2); g.fillStyle = 'rgba(127,214,90,.18)'; g.fill();
+  }
+  villager(g, node, p.x, p.y, R, mood);
+  // the badge: what this villager does
+  let copy = null;
+  if (node.kind === 'parrot') { const k = route.lastIndexOf(i); if (k > 0) copy = trail.changes[k - 1] ?? null; }
+  badge(g, node, p.x, p.y + R * 1.42, R * 2.1, R * 0.86, { copy, dim: mood.gone > 0.5 });
+  // timid refusing red: a red cross over them
+  if (refuseT[i] > 0 && node.kind === 'timid') {
+    g.save(); g.globalAlpha = refuseT[i]; g.strokeStyle = '#ff4040'; g.lineWidth = 5; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(p.x - R * 0.7, p.y - R * 0.7); g.lineTo(p.x + R * 0.7, p.y + R * 0.7); g.moveTo(p.x + R * 0.7, p.y - R * 0.7); g.lineTo(p.x - R * 0.7, p.y + R * 0.7); g.stroke(); g.restore();
+  }
+}
+// What the message will be after each villager on the route: a small token above them.
+function ghosts(time) {
+  if (sending) { // only the teller's hand is empty while the message travels
+    return;
+  }
+  const lastAt = new Map();
+  route.forEach((v, k) => lastAt.set(v, k));
+  const head = route.length - 1;
+  for (const [v, k] of lastAt) {
+    if (v === level.to) continue;
+    const p = pos[v], m = trail.msgs[k];
+    const isHead = k === head;
+    const s = isHead ? R * 0.78 * (1 + 0.06 * Math.sin(time * 6)) : R * 0.6;
+    const pop = isHead ? 1 + 0.25 * (1 - grow) : 1;
+    const o = ghostAt[v] ?? { x: R * 1.3, y: -R * 1.15 }; // beside the head, away from paths (see ghostSpot)
+    token(g, m, p.x + o.x, p.y + o.y, s, { sx: pop, sy: 2 - pop });
+  }
+}
+function headRing(time) {
+  const v = route[route.length - 1];
+  if (v === level.to) return;
+  const p = pos[v], k = (time * 1.2) % 1;
+  g.beginPath(); g.arc(p.x, p.y, R * (1.25 + k * 0.5), 0, Math.PI * 2);
+  g.strokeStyle = `rgba(255,224,122,${0.7 * (1 - k)})`; g.lineWidth = 3; g.stroke();
+}
+// The message hopping from villager to villager, with squash and stretch.
+function flying(alpha) {
+  const s = sending, a = pos[s.route[s.i]], b = pos[s.route[Math.min(s.i + 1, s.route.length - 1)]];
+  const p = ease(Math.min(1, s.p + alpha / HOP));
+  // It arcs from above one head to above the next. The arc bows away from the line between them, and further
+  // on steep hops, so the token passes beside the badge under the next villager instead of over it.
+  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+  let nx = dy / len, ny = -dx / len;
+  if (ny > 0) { nx = -nx; ny = -ny; }
+  if (Math.abs(dx) < len * 0.35) { nx = a.x > W * 0.62 ? -1 : 1; ny = -0.25; }
+  const bow = Math.sin(p * Math.PI) * R * (1.2 + 1.3 * Math.abs(dy) / len);
+  const x = a.x + dx * p + nx * bow, y = a.y + dy * p - R * 1.9 + ny * bow;
+  const stretch = reduced ? 1 : 1 + Math.sin(p * Math.PI) * 0.18, sq = reduced ? 0 : s.squash;
+  token(g, s.shown, x, y, R * 0.85, { sx: (1 / stretch) * (1 + sq * 0.35), sy: stretch * (1 - sq * 0.3) });
+}
+function listenerBubble(time) {
+  const p = pos[level.to];
+  const toRight = p.x < W / 2;
+  const w = wrong ? R * 4.4 : R * 2.5, h = R * 2.3;
+  const bx = toRight ? p.x + R * 1.3 + w / 2 : p.x - R * 1.3 - w / 2;
+  const by = p.y - R * 1.25;
+  const pulse = touched ? 1 : 1 + 0.06 * Math.sin(time * 5);
+  g.save(); g.translate(bx, by); g.scale(pulse, pulse); g.translate(-bx, -by);
+  bubble(g, bx, by, w, h, p.x + (toRight ? R * 0.6 : -R * 0.6), p.y - R * 0.7);
+  if (wrong) {
+    const gx = toRight ? bx - w * 0.22 : bx + w * 0.22, wx = toRight ? bx + w * 0.24 : bx - w * 0.24;
+    token(g, level.want, gx, by, R * 0.85, { plate: false });
+    token(g, wrong, wx, by + R * 0.1, R * 0.62, { plate: false, alpha: 0.9 });
+    const cx = wx + R * 0.55, cy = by - R * 0.55;
+    g.beginPath(); g.arc(cx, cy, R * 0.32, 0, Math.PI * 2); g.fillStyle = '#e8283b'; g.fill(); g.lineWidth = 2; g.strokeStyle = INK; g.stroke();
+    g.strokeStyle = '#fff'; g.lineWidth = 2.5; g.lineCap = 'round'; const q = R * 0.13;
+    g.beginPath(); g.moveTo(cx - q, cy - q); g.lineTo(cx + q, cy + q); g.moveTo(cx + q, cy - q); g.lineTo(cx - q, cy + q); g.stroke();
+  } else token(g, level.want, bx, by, R * 0.9, { plate: false });
+  g.restore();
+}
+// The top bar: level, now and wanted message, hop dots for three stars.
+function hud(time) {
+  const top = safe.t + 10, cx = W / 2;
+  g.font = '700 15px ui-rounded, system-ui, sans-serif'; g.textBaseline = 'middle'; g.textAlign = 'left';
+  // level number in a lantern
+  const lx = safe.l + 30, ly = top + 22;
+  g.beginPath(); g.arc(lx, ly, 19, 0, Math.PI * 2); g.fillStyle = '#ffb347'; g.fill(); g.lineWidth = 2.5; g.strokeStyle = INK; g.stroke();
+  g.fillStyle = '#3a1a10'; g.textAlign = 'center'; g.font = '800 17px ui-rounded, system-ui, sans-serif';
+  g.fillText(mode === 'daily' ? '☀' : String(index + 1), lx, ly + 1);
+  // now -> wanted
+  const now = sending ? sending.shown : trail.msgs[trail.msgs.length - 1];
+  const ok = !sending && same(now, level.want);
+  const tw = 128, th = 46;
+  g.beginPath(); roundRect(g, cx - tw / 2, top, tw, th, 23); g.fillStyle = ok ? 'rgba(95,207,106,.35)' : 'rgba(20,12,36,.55)'; g.fill();
+  g.strokeStyle = ok ? '#7fe07a' : 'rgba(255,217,138,.5)'; g.lineWidth = 2; g.stroke();
+  token(g, now, cx - 34, top + th / 2, 17);
+  token(g, level.want, cx + 34, top + th / 2, 17);
+  g.strokeStyle = CREAM; g.lineWidth = 3; g.lineCap = 'round';
+  if (ok) { g.beginPath(); g.moveTo(cx - 8, top + th / 2); g.lineTo(cx - 2, top + th / 2 + 6); g.lineTo(cx + 9, top + th / 2 - 7); g.strokeStyle = '#7fe07a'; g.stroke(); }
+  else { g.beginPath(); g.moveTo(cx - 8, top + th / 2); g.lineTo(cx + 7, top + th / 2); g.moveTo(cx + 2, top + th / 2 - 6); g.lineTo(cx + 8, top + th / 2); g.lineTo(cx + 2, top + th / 2 + 6); g.stroke(); }
+  // hop dots: one per hop of the shortest route; a hop past it shows as a dim dot
+  const hops = (sending ? sending.route.length : route.length) - 1, n = Math.max(level.min, hops);
+  const gap = Math.min(16, (W - 120) / n), dy = top + th + 14;
+  for (let k = 0; k < n; k++) {
+    const x = cx + (k - (n - 1) / 2) * gap;
+    g.beginPath(); g.arc(x, dy, k < level.min ? 5 : 4, 0, Math.PI * 2);
+    if (k < hops) g.fillStyle = k < level.min ? '#ffd24a' : '#ff8a6a';
+    else g.fillStyle = 'rgba(255,244,220,.25)';
+    g.fill();
+  }
+}
+// First levels teach by doing: a ghost hand draws the route on level 1, and points at the teller on 2 and 3.
+let tutorialRoute = null;
+function tutorial(time) {
+  if (mode !== 'level' || index > 2 || touched || sending) return;
+  if (index === 0) {
+    tutorialRoute ??= solve(LEVELS[0]).best;
+    const per = 0.8, total = per * (tutorialRoute.length - 1) + 1.2, k = ((time - startT / 60) % total + total) % total;
+    const seg = Math.min(tutorialRoute.length - 2, Math.floor(k / per)), f = Math.min(1, (k - seg * per) / per);
+    const A = pos[tutorialRoute[seg]], B = pos[tutorialRoute[seg + 1]];
+    const e = ease(f), x = A.x + (B.x - A.x) * e, y = A.y + (B.y - A.y) * e;
+    g.save(); g.globalAlpha = 0.5; g.setLineDash([8, 8]); g.strokeStyle = '#ffe07a'; g.lineWidth = 4;
+    g.beginPath(); g.moveTo(pos[tutorialRoute[0]].x, pos[tutorialRoute[0]].y);
+    for (let s = 1; s <= seg; s++) g.lineTo(pos[tutorialRoute[s]].x, pos[tutorialRoute[s]].y);
+    g.lineTo(x, y); g.stroke(); g.restore();
+    // The finger runs beside the route, never over the badges: the badge is what this level teaches.
+    const side = x > W * 0.62 ? -1 : 1;
+    hand(g, x + side * (R * 1.1 + 8), y - R * 0.2, k < 0.3 ? k / 0.3 : 0, 1, side < 0);
+  } else {
+    const p = pos[level.from], k = (time * 0.8) % 1;
+    hand(g, p.x + 6, p.y + 6 - Math.sin(k * Math.PI) * 10, k, 1);
+  }
+}
+function menuScene(time) {
+  // a few villagers chatting in the square below the menu, when there is room for them
+  const box = $('menu').firstElementChild.getBoundingClientRect();
+  const r = Math.min(26, W / 15), room = H - safe.b - box.bottom;
+  if (room < r * 4.2) return;
+  const kinds = ['teller', 'paint', 'more', 'less', 'parrot', 'listener'];
+  const base = H - safe.b - Math.min(room / 2, r * 2.4);
+  const at = i => ({ x: W * (0.12 + 0.76 * i / (kinds.length - 1)), y: base + (i % 2 ? -r * 0.6 : r * 0.4) });
+  kinds.forEach((k, i) => {
+    const { x, y } = at(i);
+    villager(g, { kind: k, arg: 0 }, x, y, r, { t: time, blink: ((time * 0.7 + i * 0.37) % 4) < 0.12 ? 1 : 0, react: (Math.sin(time * 1.5 + i * 1.3) > 0.96 ? 0.6 : 0), look: Math.sin(time + i) });
+  });
+  const m = { s: Math.floor(time / 1.2) % 4, c: Math.floor(time / 1.2 + 1) % 4, n: 1 + (Math.floor(time / 1.2) % 3) };
+  const k = (time / 1.2) % 1, i = Math.floor(time / 1.2) % (kinds.length - 1), a = at(i), b = at(i + 1);
+  token(g, m, a.x + (b.x - a.x) * ease(k), a.y + (b.y - a.y) * ease(k) - r * 1.9 - Math.sin(k * Math.PI) * r, r * 0.7);
+}
+
+// ---------------------------------------------------------------- the end card and its comic strip
+const strip = $('strip'), sg = strip.getContext('2d');
+function showEnd() {
+  show('done');
+  stripT = 0;
+  const hops = sentRoute.length - 1;
+  $('doneTitle').textContent = ['Heard it!', 'Spot on!', 'Just right!'][lastStars - 1] ?? 'Heard it!';
+  [...$('stars').children].forEach((s, k) => { s.className = ''; setTimeout(() => { s.className = k < lastStars ? 'on' : 'off'; if (k < lastStars) tone(SCALE[6 + k * 2], 0.25, 0.06, 'triangle'); }, 250 + k * 260); });
+  const best = mode === 'daily' ? save.daily[dailyKey] : save.best[index + 1];
+  $('doneLine').textContent = hops === level.min ? `${hops} hops. The best way!` : `${hops} hops. It can be done in ${level.min}.`;
+  if (best > lastStars) $('doneLine').textContent += ` Best: ${'★'.repeat(best)}`;
+  const last = mode === 'level' && index + 1 >= LEVELS.length;
+  $('next').textContent = mode === 'daily' ? 'New village tomorrow' : last ? 'All done!' : 'Next';
+  $('next').disabled = mode === 'daily' || last;
+  const r = strip.getBoundingClientRect();
+  strip.width = Math.round(r.width * dpr); strip.height = Math.round(r.height * dpr);
+}
+// "What they heard": each villager on the route with the message as they passed it on.
+function drawStrip() {
+  if (!sentRoute) return;
+  const w = strip.width / dpr, h = strip.height / dpr;
+  sg.setTransform(dpr, 0, 0, dpr, 0, 0); sg.clearRect(0, 0, w, h);
+  const n = sentRoute.length, cell = Math.min(64, w / n), r = Math.min(13, cell * 0.24), x0 = (w - cell * n) / 2 + cell / 2;
+  const msgs = walk(level, sentRoute).msgs;
+  const shown = Math.min(n, Math.floor(stripT / 9) + 1);
+  for (let k = 0; k < shown; k++) {
+    const v = sentRoute[k], x = x0 + k * cell, y = h - r * 1.6 - 4;
+    const age = Math.min(1, (stripT - k * 9) / 9), pop = 1 + 0.3 * Math.sin(age * Math.PI);
+    sg.save(); sg.globalAlpha = age;
+    sg.beginPath(); roundRect(sg, x - cell / 2 + 2, 2, cell - 4, h - 4, 10); sg.fillStyle = k === n - 1 ? 'rgba(255,210,74,.22)' : 'rgba(255,244,220,.08)'; sg.fill();
+    villager(sg, level.nodes[v], x, y, r, { t: stripT / 60, react: age < 1 ? 1 - age : 0, happy: k === n - 1 ? 0.6 : 0 });
+    token(sg, msgs[k], x, y - r * 2.4, r * 0.95 * pop, { sx: pop, sy: 2 - pop });
+    sg.restore();
+    if (k > 0) { sg.fillStyle = 'rgba(255,244,220,.5)'; sg.beginPath(); const ax = x - cell / 2; sg.moveTo(ax - 3, h * 0.35 - 5); sg.lineTo(ax + 3, h * 0.35); sg.lineTo(ax - 3, h * 0.35 + 5); sg.fill(); }
+  }
+}
+
+// ---------------------------------------------------------------- menu, pause and cards
+const cards = screens(['menu', 'paused', 'done']);
+function show(name) {
+  screen = name; cards(name);
+  $('pause').style.display = name === 'play' ? 'grid' : 'none';
+  if (name !== 'play') $('hint').style.display = 'none';
+  else if (fails >= 3) $('hint').style.display = 'block';
+  if (name === 'menu') menu();
+}
+function menu() {
+  level = null; finger = null;
+  const n = Number.isFinite(urlLevel) && urlLevel >= 1 ? Math.min(LEVELS.length, urlLevel) : next();
+  $('play').textContent = save.opened > LEVELS.length && !urlLevel ? 'Play again' : `Play ${n}`;
+  $('play').dataset.level = n;
+  const ds = save.daily[today()] || 0;
+  $('daily').querySelector('small').textContent = ds ? '★'.repeat(ds) + '☆'.repeat(3 - ds) : 'new';
+  const grid = $('grid'); grid.textContent = '';
+  LEVELS.forEach((_, i) => {
+    const b = document.createElement('button'), stars = save.best[i + 1] || 0, open = i + 1 <= save.opened || i + 1 === urlLevel;
+    b.dataset.level = i + 1;
+    b.className = open ? (i + 1 === n && !stars ? 'next' : '') : 'locked';
+    b.innerHTML = open ? `${i + 1}<small>${stars ? '★'.repeat(stars) : ''}</small>` : '🔒';
+    b.setAttribute('aria-label', open ? `Level ${i + 1}` : `Level ${i + 1}, locked`);
+    b.addEventListener('click', () => { if (!open) { tone(150, 0.1, 0.05, 'square'); b.animate?.([{ transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], 200); return; } begin(i); });
+    grid.append(b);
+  });
+  soundLabel();
+}
+const soundLabel = () => { $('sound').textContent = $('sound2').textContent = `Sound: ${save.sound ? 'on' : 'off'}`; };
+const toggleSound = () => { save.sound = !save.sound; store(); soundLabel(); if (save.sound) { snd.unlock(); snd.release(); tone(660, 0.1, 0.06); } else snd.hold(); };
+$('sound').addEventListener('click', toggleSound);
+$('sound2').addEventListener('click', toggleSound);
+$('play').addEventListener('click', () => {
+  const n = Number($('play').dataset.level) || 1;
+  begin(save.opened > LEVELS.length && !urlLevel ? 0 : n - 1);
+});
+$('daily').addEventListener('click', () => begin(0, 'daily'));
+function pause() {
+  if (screen !== 'play' || paused) return;
+  paused = true; finger = null; show('paused'); snd.hold();
+}
+function resume() {
+  if (!paused) return;
+  paused = false; acc = 0; last = performance.now(); show('play'); snd.release();
+}
+$('pause').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); pause(); });
+$('resume').addEventListener('click', resume);
+$('restart').addEventListener('click', () => {
+  rec.end('left', { level: mode === 'daily' ? `daily-${dailyKey}` : index + 1, stars: 0, sends, hints });
+  begin(index, mode);
+});
+$('toMenu').addEventListener('click', () => {
+  rec.end('left', { level: mode === 'daily' ? `daily-${dailyKey}` : index + 1, stars: 0, sends, hints });
+  paused = false; snd.release(); show('menu');
+});
+$('next').addEventListener('click', () => { if (mode === 'level' && index + 1 < LEVELS.length) begin(index + 1); });
+$('again').addEventListener('click', () => begin(index, mode));
+$('doneMenu').addEventListener('click', () => show('menu'));
+onLeave(pause);
+addEventListener('keydown', e => {
+  if (isPauseKey(e)) { if (screen === 'play') paused ? resume() : pause(); else if (paused) resume(); return; }
+  if (screen !== 'play' || paused || sending) return;
+  if (e.key === 'Backspace' || e.key === 'z') { backtrack(); }
+  else if (e.key === 'Enter' && route[route.length - 1] === level.to) send();
+});
+
+// For browser checks: a small picture of the state.
+window.grapevineState = () => ({
+  screen: paused ? 'paused' : screen, paused, t, mode, level: mode === 'daily' ? 'daily' : index + 1, opened: save.opened,
+  route: [...route], hops: route.length - 1, min: level?.min ?? null, sending: !!sending, hop: sending ? sending.i + sending.p : null,
+  result, stars: lastStars, sends, fails, hints, sound: save.sound,
+  now: level ? (sending ? sending.shown : trail.msgs[trail.msgs.length - 1]) : null, want: level?.want ?? null,
+  nodes: level ? pos.map((p, i) => ({ x: Math.round(p.x), y: Math.round(p.y), kind: level.nodes[i].kind })) : [],
+  from: level?.from ?? null, to: level?.to ?? null, hintShown: $('hint').style.display === 'block',
+});
+window.grapevineLevel = () => level; // the check solves the level in Node from this
+
+resize();
+menu();
+requestAnimationFrame(frame);
+</script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>
