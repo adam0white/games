@@ -50,7 +50,7 @@
   <p><button id="continue" class="main"></button></p>
   <p><button id="fresh"></button></p>
   <p><button id="toSkins">Ant skins</button><button id="toHow">How to play</button></p>
-  <p><button id="sound" style="min-width:0"></button></p>
+  <p><button id="look" style="min-width:0"></button><button id="sound" style="min-width:0"></button></p>
 </div></div>
 
 <div id="skins" class="screen"><div>
@@ -105,14 +105,17 @@
 
 <script type="module">
 import { FORMS, ANT, WORLD, TOP, CONE, create, step, choose, revive, me, level, needFor, article } from './sim.js';
-import { drawForm } from './art.js';
+import { drawForm, setLook, LOOKS } from './art.js';
 
 const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d');
 const KEY = 'ant-promotion:v1', query = new URLSearchParams(location.search);
 const COLOURS = ['#3a2a22', '#c0271f', '#e08a1c', '#d6b21c', '#3f9a3c', '#2a7fd9', '#7a44c0', '#e05a9a', '#e8e2d6'];
 const PATTERNS = [['plain', 'Plain'], ['stripes', 'Stripes'], ['spots', 'Spots'], ['crown', 'Crown']];
-let save = { skin: { c: COLOURS[0], p: 'plain' }, stack: [ANT], xp: 0, sound: true };
+let save = { skin: { c: COLOURS[0], p: 'plain' }, stack: [ANT], xp: 0, sound: true, look: 1 };
 try { Object.assign(save, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch {}
+if (query.has('look')) save.look = Number(query.get('look')); // ?look=0 flat, 1 cartoon, 2 soft
+if (!LOOKS[save.look]) save.look = 1;
+setLook(save.look);
 if (!Array.isArray(save.stack) || !save.stack.length || save.stack.some((id, i) => !FORMS[id] || FORMS[id].level !== i + 1)) { save.stack = [ANT]; save.xp = 0; }
 const store = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch {} };
 
@@ -167,13 +170,14 @@ function menu() {
   $('continue').textContent = going ? `Continue as ${article(F.name)}` : 'Play';
   $('fresh').style.display = going ? '' : 'none'; $('fresh').textContent = 'New game as an Ant';
   $('sound').textContent = save.sound ? 'Sound: on' : 'Sound: off';
+  $('look').textContent = 'Look: ' + LOOKS[save.look];
   portrait($('hero'), F, 30);
 }
 function portrait(canvas, F, r, t = 0) {
   const x = canvas.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, canvas.width, canvas.height);
   const wide = F.kind === 'bird' ? 2.3 : F.kind === 'snake' ? (F.f.long ? 3.2 : 2.2) : 2.2, fit = Math.min(r, canvas.height / 2 / wide * 1.9, canvas.width / 2 / wide);
   x.translate(canvas.width / 2 + (F.kind === 'snake' ? fit * 1.6 : F.kind === 'quad' ? fit * 0.4 : 0), canvas.height / 2); x.rotate(-0.25);
-  drawForm(x, F, fit, t, save.skin);
+  drawForm(x, F, fit, t, save.skin, -0.25);
 }
 function start(fresh) {
   if (fresh) { save.stack = [ANT]; save.xp = 0; store(); }
@@ -214,6 +218,7 @@ function back(restart) { revive(s, restart); save.stack = s.player.stack.slice()
 
 $('continue').onclick = () => { unlock(); start(false); }; $('fresh').onclick = () => { unlock(); start(true); };
 $('toSkins').onclick = () => { skins(); show('skins'); }; $('toHow').onclick = () => show('how');
+$('look').onclick = () => { save.look = (save.look + 1) % LOOKS.length; setLook(save.look); store(); menu(); };
 $('sound').onclick = () => { save.sound = !save.sound; store(); menu(); blip(660); };
 for (const b of document.querySelectorAll('.back')) b.onclick = () => show('menu');
 for (const b of document.querySelectorAll('.toMenu')) b.onclick = () => { if (s?.dead) revive(s, false); if (s) { save.stack = s.player.stack.slice(); save.xp = s.player.xp; store(); } s = null; show('menu'); };
@@ -292,7 +297,7 @@ function draw(now) {
     const M = FORMS[m.f], strong = M.power > F.power;
     if (Math.abs(m.x - p.x) > vw || Math.abs(m.y - p.y) > vh) continue;
     if (strong && m.alert && (Math.abs(m.x - p.x) > W / zoom / 2 || Math.abs(m.y - p.y) > H / zoom / 2)) edge.push(m);
-    g.save(); g.translate(m.x, m.y); g.rotate(m.a); g.fillStyle = '#00000026'; g.beginPath(); g.ellipse(0, 3, M.r * 1.1, M.r * 0.8, 0, 0, 7); g.fill(); drawForm(g, M, M.r, m.ph); g.restore();
+    g.save(); g.translate(m.x, m.y); g.rotate(m.a); g.fillStyle = '#00000026'; g.beginPath(); g.ellipse(0, 3, M.r * 1.1, M.r * 0.8, 0, 0, 7); g.fill(); drawForm(g, M, M.r, m.ph, null, m.a); g.restore();
   }
   // bits of eaten animals, under the numbers
   for (const b of bits) {
@@ -306,7 +311,7 @@ function draw(now) {
   g.save(); g.translate(p.x, p.y);
   if (p.safe > 0) { g.strokeStyle = `rgba(160,220,255,${0.4 + 0.3 * Math.sin(now / 90)})`; g.lineWidth = 3; g.beginPath(); g.arc(0, 0, F.r * 1.9, 0, 7); g.stroke(); }
   g.strokeStyle = save.skin.c === '#3a2a22' ? '#fff8e6' : save.skin.c; g.lineWidth = 2.5; g.setLineDash([5, 5]); g.beginPath(); g.arc(0, 0, F.r * 1.55, now / 900, now / 900 + 6.283); g.stroke(); g.setLineDash([]);
-  g.rotate(p.a); drawForm(g, F, F.r, p.ph, save.skin); g.restore();
+  g.rotate(p.a); drawForm(g, F, F.r, p.ph, save.skin, p.a); g.restore();
   }
   // numbers
   const size = Math.max(11, 15 / zoom);
