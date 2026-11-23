@@ -9,19 +9,14 @@ export const assets = { notFoundHandling: 'none', runWorkerFirst: true };
 // against games.json before every build and deploy.
 export const legacyRoutes = [
   'rope.adamwhite.work/*',
-  'hearsay.adamwhite.work/*',
-  'goodhands.adamwhite.work/*',
   'glance.adamwhite.work/*',
   'repair.adamwhite.work/sw.js',
-  'valley.adamwhite.work/*',
   'murmur.adamwhite.work/*',
   'stairwell.adamwhite.work/*',
   'pass.adamwhite.work/*',
   'warren.adamwhite.work/*',
-  'child.adamwhite.work/*',
   'neighbours.adamwhite.work/*',
   'lefthand.adamwhite.work/*',
-  'days.adamwhite.work/*',
   'word.adamwhite.work/*',
   'smoke.adamwhite.work/*',
 ];

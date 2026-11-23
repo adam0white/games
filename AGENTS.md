@@ -10,6 +10,14 @@ The full deployment assembles every game. Deploy only the exact clean commit wit
 Archived code lives under `archive/` and is not built, served or checked; `archive/README.md` lists what is there, why, and how to bring it back. Do not port, polish or upgrade archived code.
 
 
+## Shared code (owner, 2026-11-23)
+
+The live prototypes share plumbing through `prototypes/kit/`. `prototypes/kit/README.md` holds the rules.
+Before you write input, sound, pause, menu, save, shop or feedback-button code in a game, use or extend the kit.
+Run `node prototypes/kit/check/phone.mjs` before and after your changes.
+Storage keys and formats never change.
+Reuse before you build. When two games need the same thing, move it to the kit in the same change.
+
 ## Current goal (owner, 2026-11-13 and 2026-11-14)
 
 Owner words are in [HF owner directions](https://github.com/adam0white/human-framework/blob/main/docs/owner-directions-2026-10-18.md). The reasoning is in [the direction document](docs/game-lab-direction-2026-11-13.md).

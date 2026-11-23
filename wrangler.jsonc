@@ -17,23 +17,11 @@
       "zone_name": "adamwhite.work"
     },
     {
-      "pattern": "hearsay.adamwhite.work/*",
-      "zone_name": "adamwhite.work"
-    },
-    {
-      "pattern": "goodhands.adamwhite.work/*",
-      "zone_name": "adamwhite.work"
-    },
-    {
       "pattern": "glance.adamwhite.work/*",
       "zone_name": "adamwhite.work"
     },
     {
       "pattern": "repair.adamwhite.work/sw.js",
-      "zone_name": "adamwhite.work"
-    },
-    {
-      "pattern": "valley.adamwhite.work/*",
       "zone_name": "adamwhite.work"
     },
     {
@@ -53,19 +41,11 @@
       "zone_name": "adamwhite.work"
     },
     {
-      "pattern": "child.adamwhite.work/*",
-      "zone_name": "adamwhite.work"
-    },
-    {
       "pattern": "neighbours.adamwhite.work/*",
       "zone_name": "adamwhite.work"
     },
     {
       "pattern": "lefthand.adamwhite.work/*",
-      "zone_name": "adamwhite.work"
-    },
-    {
-      "pattern": "days.adamwhite.work/*",
       "zone_name": "adamwhite.work"
     },
     {

@@ -13,34 +13,6 @@
       "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
-      "slug": "hearsay",
-      "source": {
-        "repository": "https://github.com/adam0white/hearsay",
-        "commit": "f6737badd333a7e889a8a9abb91653aae04b370a"
-      },
-      "saveSchema": "hearsay-hf4/1",
-      "ciBrowsers": [
-        "chromium-headless-shell"
-      ],
-      "legacyOrigin": "https://hearsay.adamwhite.work",
-      "redirectEnabled": true,
-      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
-    },
-    {
-      "slug": "goodhands",
-      "source": {
-        "repository": "https://github.com/adam0white/goodhands",
-        "commit": "b54fd4326954e5a74f5b9bd6ec1d08f07055cb6d"
-      },
-      "saveSchema": "goodhands-hf4/2",
-      "ciBrowsers": [
-        "chromium-headless-shell"
-      ],
-      "legacyOrigin": "https://goodhands.adamwhite.work",
-      "redirectEnabled": true,
-      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
-    },
-    {
       "slug": "glance",
       "source": {
         "repository": "https://github.com/adam0white/glance",
@@ -65,17 +37,6 @@
       "redirectEnabled": true,
       "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc",
       "redirectMode": "zone"
-    },
-    {
-      "slug": "valley",
-      "source": {
-        "repository": "https://github.com/adam0white/valley",
-        "commit": "f30f3f2391b2d677e0b5950fdb6ec96dac911aed"
-      },
-      "saveSchema": "valley-opening-2026-11",
-      "legacyOrigin": "https://valley.adamwhite.work",
-      "redirectEnabled": true,
-      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
       "slug": "murmur",
@@ -130,21 +91,6 @@
       "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },
     {
-      "slug": "child",
-      "source": {
-        "repository": "https://github.com/adam0white/child",
-        "commit": "5d9f5564100cacda1d8481f5a37c6ed45c811a51"
-      },
-      "saveSchema": "child-episode/6",
-      "ciBrowsers": [
-        "chromium",
-        "webkit"
-      ],
-      "legacyOrigin": "https://child.adamwhite.work",
-      "redirectEnabled": true,
-      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
-    },
-    {
       "slug": "neighbours",
       "source": {
         "repository": "https://github.com/adam0white/concordia",
@@ -175,21 +121,6 @@
         "webkit"
       ],
       "legacyOrigin": "https://lefthand.adamwhite.work",
-      "redirectEnabled": true,
-      "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
-    },
-    {
-      "slug": "days",
-      "source": {
-        "repository": "https://github.com/adam0white/days",
-        "commit": "b6371b31786d2f72ed863ddcfd1be592cade81fa"
-      },
-      "saveSchema": "three-days-5",
-      "ciBrowsers": [
-        "chromium",
-        "webkit"
-      ],
-      "legacyOrigin": "https://days.adamwhite.work",
       "redirectEnabled": true,
       "verifiedRelease": "fd4e4ad80580939e3903213950bd5b3a3b2e63cc"
     },

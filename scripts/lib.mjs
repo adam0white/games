@@ -31,8 +31,8 @@ export function affectedGames(registry, paths) {
   validateRegistry(registry);
   // Standalone Workers have their own CI job and never enter a game's build.
   // Prototypes are static files copied by the build; they never enter a game's checks.
-  // Nothing under archive/ is built, served or checked.
-  paths = paths.filter(path => !path.startsWith('workers/') && !path.startsWith('prototypes/') && !path.startsWith('archive/'));
+  // Nothing under archive/ is built, served or checked. Documents under docs/ never enter a game's checks.
+  paths = paths.filter(path => !path.startsWith('workers/') && !path.startsWith('prototypes/') && !path.startsWith('archive/') && !path.startsWith('docs/'));
   if (paths.some(path => !path.startsWith('games/') || !registry.games.some(g => path.startsWith(`games/${g.slug}/`)))) return registry.games.map(g => g.slug);
   return registry.games.filter(g => paths.some(p => p.startsWith(`games/${g.slug}/`))).map(g => g.slug);
 }
