@@ -59,6 +59,7 @@
   <p><button id="toSkins">Ant skins</button><button id="toHow">How to play</button></p>
   <p><button id="toBook"></button></p>
   <p><button id="look" style="min-width:0"></button><button id="sound" style="min-width:0"></button></p>
+  <p><button id="rules" style="min-width:0"></button></p>
 </div></div>
 
 <div id="skins" class="screen"><div>
@@ -86,6 +87,7 @@
     <li>The pale wedge is what an animal can see. Walk into it and the animal notices you: <span class="y">!</span></li>
     <li><span class="r">&raquo;</span> means it is faster than you. A fast strong animal that notices you will catch you. A fast weak one will get away, so sneak up from behind.</li>
     <li>Fill the bar to get promoted. You pick 1 of 3 new animals each time.</li>
+    <li><b>Wild rules</b> (menu button) add two things. A strong animal has a thick hide: it lives through one bite, then the hide needs 25 seconds. And every 45 seconds a stronger animal nearby hunts you for 5 seconds, wherever it is looking.</li>
     <li>If you die you go back one animal, or you can start again as an ant.</li>
   </ul>
   <p><button class="main back">Got it</button></p>
@@ -119,7 +121,7 @@
 </div></div>
 
 <script type="module">
-import { FORMS, ANT, WORLD, TOP, CONE, create, step, choose, revive, me, level, needFor, article } from './sim.js';
+import { FORMS, ANT, WORLD, TOP, CONE, create, step, choose, revive, me, level, needFor, article, SPAWN_WEIGHTS, hideReady } from './sim.js';
 import { drawForm, setLook, LOOKS } from './art.js';
 import { create3D } from './look3d.js';
 
@@ -127,10 +129,11 @@ const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d'
 const KEY = 'ant-promotion:v1', query = new URLSearchParams(location.search);
 const COLOURS = ['#3a2a22', '#c0271f', '#e08a1c', '#d6b21c', '#3f9a3c', '#2a7fd9', '#7a44c0', '#e05a9a', '#e8e2d6'];
 const PATTERNS = [['plain', 'Plain'], ['stripes', 'Stripes'], ['spots', 'Spots'], ['crown', 'Crown']];
-let save = { skin: { c: COLOURS[0], p: 'plain' }, stack: [ANT], xp: 0, sound: true, look: 1, seen: [] };
+let save = { skin: { c: COLOURS[0], p: 'plain' }, stack: [ANT], xp: 0, sound: true, look: 1, seen: [], wild: false };
 try { Object.assign(save, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch {}
 if (query.has('look')) save.look = Number(query.get('look')); // ?look=0 flat, 1 cartoon, 2 soft
 if (!LOOKS[save.look]) save.look = 1;
+if (query.has('wild')) save.wild = query.get('wild') === '1'; // ?wild=1 wild rules, ?wild=0 classic
 setLook(save.look);
 if (!Array.isArray(save.stack) || !save.stack.length || save.stack.some((id, i) => !FORMS[id] || FORMS[id].level !== i + 1)) { save.stack = [ANT]; save.xp = 0; }
 if (!Array.isArray(save.seen)) save.seen = [];
@@ -140,7 +143,7 @@ const buzz = ms => { try { if (save.sound) navigator.vibrate?.(ms); } catch {} }
 const store = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch {} };
 
 let s = null, mode = 'menu', W = 0, H = 0, dpr = 1, zoom = 1, last = 0, acc = 0, shake = 0, sayTimer = 0;
-const floats = [], bits = [], keys = new Set(); let joy = null, flash = 0, dying = 0, streak = 0, streakAt = 0;
+const floats = [], bits = [], keys = new Set(); let joy = null, flash = 0, dying = 0, streak = 0, streakAt = 0, hideWas = false;
 
 // ---------- sound
 let ac = null;
@@ -191,6 +194,7 @@ function menu() {
   $('fresh').style.display = going ? '' : 'none'; $('fresh').textContent = 'New game as an Ant';
   $('sound').textContent = save.sound ? 'Sound: on' : 'Sound: off';
   $('look').textContent = 'Look: ' + LOOKS[save.look];
+  $('rules').textContent = save.wild ? 'Rules: Wild' : 'Rules: Classic';
   $('toBook').textContent = `Animal book ${save.seen.length}/${PLAYABLE.length}`;
   portrait($('hero'), F, 30);
 }
@@ -213,14 +217,14 @@ function book() {
 }
 function start(fresh) {
   if (fresh) { save.stack = [ANT]; save.xp = 0; store(); }
-  s = create(Number(query.get('seed')) || (Math.random() * 1e9 | 0), save.stack, save.xp);
+  s = create(Number(query.get('seed')) || (Math.random() * 1e9 | 0), save.stack, save.xp, SPAWN_WEIGHTS, !!save.wild);
   floats.length = 0; bits.length = 0; flash = 0; hud(); show('play');
   say(level(s) === 1 ? 'Eat the little bugs with green numbers' : `You are ${article(me(s).name)}`);
 }
 function hud() {
   const F = me(s), need = needFor(level(s));
   $('fill').style.width = Math.min(100, s.player.xp / need * 100) + '%';
-  $('who').textContent = `Level ${level(s)} · ${F.name}`;
+  $('who').textContent = `Level ${level(s)} · ${F.name}` + (s.wild && F.role === 'brute' ? (hideReady(s) ? ' · hide ready' : ' · hide growing') : '');
 }
 function say(text) { $('say').textContent = text; $('say').classList.add('on'); sayTimer = 2.6; }
 
@@ -250,6 +254,7 @@ function back(restart) { revive(s, restart); save.stack = s.player.stack.slice()
 
 $('continue').onclick = () => { unlock(); start(false); }; $('fresh').onclick = () => { unlock(); start(true); };
 $('toSkins').onclick = () => { skins(); show('skins'); }; $('toHow').onclick = () => show('how'); $('toBook').onclick = () => { book(); show('book'); };
+$('rules').onclick = () => { save.wild = !save.wild; store(); menu(); say(save.wild ? 'Wild: strong animals get a thick hide, and you get hunted' : 'Classic rules'); };
 $('look').onclick = () => { save.look = (save.look + 1) % LOOKS.length; setLook(save.look); store(); menu(); };
 $('sound').onclick = () => { save.sound = !save.sound; store(); menu(); blip(660); };
 for (const b of document.querySelectorAll('.back')) b.onclick = () => show('menu');
@@ -447,6 +452,8 @@ function frame(now) {
           crunch(0.1, 0.22, 1400 + Math.random() * 900); blip((300 + e.gain * 90) * 2 ** (Math.min(streak - 1, 12) / 12), 0.09, 'square', 0.06, 200); save.xp = s.player.xp; hud();
         }
         if (e.t === 'notice') blip(e.strong ? 180 : 700, 0.12, e.strong ? 'sawtooth' : 'sine', 0.06);
+        if (e.t === 'hunt') { say(`${article(e.name).replace(/^a/, 'A')} is hunting you`); blip(140, 0.5, 'sawtooth', 0.1, 120); buzz(60); }
+        if (e.t === 'hide') { say(`Your thick hide took the bite from ${article(e.name)}`); shake = 0.4; flash = 0.6; crunch(0.18, 0.28, 500); buzz([30, 40, 30]); bits.push({ ring: 1, x: e.x, y: e.y, r: me(s).r * 1.6, c: '#9ad8ff', age: 0, life: 0.6 }); hud(); }
         if (e.t === 'full') offer();
         if (e.t === 'die') { // show the bite for a moment, then the card
           const F = me(s), p = s.player;
@@ -459,6 +466,7 @@ function frame(now) {
         if (e.t === 'win') { store(); $('winSay').textContent = `You climbed all ${TOP} levels and became ${article(me(s).name)}. Nothing here can eat you.`; blip(660, 0.6, 'triangle', 0.14, 600); show('win'); }
       }
     }
+    if (s.wild && hideReady(s) !== hideWas) { hideWas = hideReady(s); hud(); }
     for (const f of floats) f.age += dt * 1.3;
     while (floats.length && floats[0].age > 1) floats.shift();
   } else acc = 0;
