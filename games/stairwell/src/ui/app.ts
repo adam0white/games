@@ -1299,7 +1299,6 @@ function dayView(s: GameState, full: boolean) {
   root.classList.toggle('travelling', !!s.k.walk || s.k.busyTask !== null);
   requiredUiValue(root.querySelector('.scene-drawing'), 'day scene drawing').innerHTML = sceneSvg(s);
   sceneChoices(s, root.querySelectorAll<SVGElement>('.scene [data-go]'));
-  boostTargets(root.querySelector<HTMLElement>('.scene-drawing'), s);
   const voice = [...s.said].reverse().find((x) => x.kind === 'voice');
   requiredUiValue(root.querySelector<HTMLElement>('.speech-overlay'), 'day speech overlay').textContent =
     voice && performance.now() < ui.readUntil
@@ -1435,65 +1434,6 @@ function renderTutorial(s: GameState, root: HTMLElement) {
   target.insertAdjacentElement('afterend', note);
 }
 
-const MIN_TOUCH_PX = 40;
-/** The row a place is drawn in. The ground floor is three rows: the shop, the entrance with flat 1, and the street. */
-function drawnRow(place: Place): string {
-  if (place === 'shop') return 'shop';
-  if (place === 'room' || place === 'step' || place === 'bakery') return 'street';
-  return `floor${floorOf(place)}`;
-}
-const boostWatched = new WeakSet<HTMLElement>();
-let boostWorld: GameState | null = null;
-/**
- * On short phones the building is drawn small, so most map targets are under 40px tall. The targets on the
- * floor the player is on, and the selected destination, get an invisible taller hit area on top of the
- * others. It may reach over the neighbouring row. The drawing and the other rows keep their size.
- */
-function boostTargets(drawing: HTMLElement | null, s: GameState) {
-  if (!drawing) return;
-  boostWorld = s;
-  if (!boostWatched.has(drawing) && typeof ResizeObserver !== 'undefined') {
-    boostWatched.add(drawing);
-    new ResizeObserver(() => boostWorld && boostTargets(drawing, boostWorld)).observe(drawing);
-  }
-  const svg = drawing.querySelector<SVGSVGElement>('svg');
-  if (!svg) return;
-  for (const old of svg.querySelectorAll('.boost')) old.remove();
-  const box = svg.viewBox.baseVal;
-  const px = svg.getBoundingClientRect().height / box.height;
-  if (!(px > 0)) return;
-  const need = MIN_TOUCH_PX / px;
-  const row = drawnRow(s.k.walk?.to ?? s.k.at);
-  const wanted = (place: Place) => place === selection?.to || drawnRow(place) === row;
-  const made: SVGRectElement[] = [];
-  // The selected destination goes first so the player's own floor wins where they meet.
-  const hits = [...svg.querySelectorAll<SVGElement>('[data-go]')].sort(
-    (a, b) =>
-      Number(a.getAttribute('data-go') === selection?.to) -
-      Number(b.getAttribute('data-go') === selection?.to),
-  );
-  for (const el of hits.reverse()) {
-    const place = el.getAttribute('data-go') as Place;
-    if (!wanted(place)) continue;
-    const rect = el instanceof SVGRectElement ? el : el.querySelector<SVGRectElement>('.hit');
-    if (!rect) continue;
-    const h = rect.height.baseVal.value;
-    if (h >= need) continue;
-    const mid = rect.y.baseVal.value + h / 2;
-    const top = Math.max(box.y, Math.min(box.y + box.height - need, mid - need / 2));
-    const boost = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    boost.setAttribute('class', 'hit boost');
-    boost.setAttribute('data-hit-go', place);
-    boost.setAttribute('aria-hidden', 'true');
-    boost.setAttribute('x', String(rect.x.baseVal.value));
-    boost.setAttribute('y', top.toFixed(2));
-    boost.setAttribute('width', String(rect.width.baseVal.value));
-    boost.setAttribute('height', need.toFixed(2));
-    made.push(boost);
-  }
-  svg.append(...made);
-}
-
 function sceneChoices(s: GameState, hits: Iterable<SVGElement>) {
   for (const hit of hits) {
     hit.setAttribute('tabindex', s.k.walk || s.k.busyTask !== null ? '-1' : '0');
@@ -1505,9 +1445,9 @@ function sceneChoices(s: GameState, hits: Iterable<SVGElement>) {
 function bindSceneChoices(scene: Element | null, getWorld: () => GameState | null) {
   if (!scene) return;
   scene.addEventListener('click', (e) => {
-    const hit = (e.target as Element).closest('[data-go],[data-hit-go]');
+    const hit = (e.target as Element).closest('[data-go]');
     const s = getWorld();
-    if (hit && s) choose(s, (hit.getAttribute('data-go') ?? hit.getAttribute('data-hit-go')) as Place);
+    if (hit && s) choose(s, hit.getAttribute('data-go') as Place);
   });
   scene.addEventListener('keydown', (e) => {
     if ((e as KeyboardEvent).key === 'Enter' || (e as KeyboardEvent).key === ' ') {

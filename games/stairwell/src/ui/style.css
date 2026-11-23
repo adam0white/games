@@ -1238,6 +1238,6 @@ body {
     max-height: none;
   }
   .game {
-    grid-template-rows: 44px auto minmax(120px, 1.7fr) minmax(182px, 1fr) minmax(0, auto);
+    grid-template-rows: 44px auto minmax(120px, 1.7fr) minmax(192px, 1fr) minmax(0, auto);
   }
 }
