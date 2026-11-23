@@ -120,3 +120,52 @@ export function mark(g, kind, x, y, u, w, t = 0) {
   else { g.arc(x, y, u * 0.5, 0, 7); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + t * 0.8; g.moveTo(x + Math.cos(a) * u * 0.85, y + Math.sin(a) * u * 0.85); g.lineTo(x + Math.cos(a) * u * 1.3, y + Math.sin(a) * u * 1.3); } }
   g.stroke(); g.lineJoin = 'miter'; g.lineCap = 'butt';
 }
+
+// The four looks below came from the 3D experiment in ../lab/lantern-3d/ and are drawn flat here.
+
+const hash = (a, b) => { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); };
+
+// Reeds on both banks, from river height lo to hi. edge(y, side) is the screen x of the water's edge and sy(y) the screen y.
+// With no light this draws every blade dark, to go under the night. With a light { x, y, r, rgb, a } it draws only the blades
+// inside the light, brighter the nearer they are, to go over the night with the 'lighter' blend: light through the leaf tips.
+export function reeds(g, edge, sy, u, lo, hi, t, light) {
+  const STEP = 0.012, paths = light ? [new Path2D(), new Path2D(), new Path2D()] : [new Path2D(), new Path2D()];
+  for (let k = Math.floor(lo / STEP); k < hi / STEP; k++) for (const side of [-1, 1]) {
+    const h1 = hash(k * 0.731, side), h2 = hash(side * 1.3, k * 0.173), h3 = hash(k * 0.377, side * 3.1);
+    const y = (k + h1) * STEP, ht = (0.03 + 0.06 * h3) * (h2 < 0.15 ? 0.5 : 1) * u;
+    const x0 = edge(y, side) + side * (0.004 + 0.03 * h2 * h2) * u, y0 = sy(y);
+    const sway = Math.sin(t * 1.7 + y * 2.3 + h1 * 6) * 0.18 + (h3 - 0.5) * 0.4 + side * 0.3, x1 = x0 + sway * ht, y1 = y0 - ht;
+    if (!light) { const p = paths[h2 < 0.5 ? 0 : 1]; p.moveTo(x0, y0); p.quadraticCurveTo(x0, y0 - ht * 0.6, x1, y1); continue; }
+    const d = Math.hypot(x1 - light.x, y1 - light.y) / light.r; if (d > 1) continue;
+    const p = paths[d < 0.4 ? 0 : d < 0.7 ? 1 : 2]; p.moveTo(x0 + (x1 - x0) * 0.2, y0 - ht * 0.45); p.quadraticCurveTo(x0 + (x1 - x0) * 0.35, y0 - ht * 0.75, x1, y1);
+  }
+  g.lineCap = 'round'; g.lineWidth = Math.max(1, 0.006 * u);
+  if (light) [0.5, 0.3, 0.14].forEach((a, i) => { g.strokeStyle = `rgba(${light.rgb},${a * light.a})`; g.stroke(paths[i]); });
+  else ['#2f4a33', '#476a3c'].forEach((c, i) => { g.strokeStyle = c; g.stroke(paths[i]); });
+  g.lineCap = 'butt';
+}
+
+// A light's reflection on the water: a shimmering streak running down the screen from the light. Drawn with the 'lighter' blend.
+export function shine(g, x, y, u, rgb, a, t, seed) {
+  for (let i = 0; i < 9; i++) {
+    const k = i / 8, w = u * (0.02 - 0.011 * k) * (0.65 + 0.35 * Math.sin(t * 5 + i * 1.9 + seed * 7));
+    const xx = x + u * 0.006 * Math.sin(t * 6 - i * 1.4 + seed * 3) * (0.3 + k);
+    g.fillStyle = `rgba(${rgb},${a * (1 - k) * (1 - k)})`; g.fillRect(xx - w, y + u * (0.025 + 0.095 * k), 2 * w, Math.max(1, u * 0.005));
+  }
+}
+
+// The shield's glow: a soft blue halo on the water under the rings. a is its strength, 0 to 1. Drawn with the 'lighter' blend.
+export function halo(g, x, y, u, a, t) {
+  const r = u * (0.13 + 0.008 * Math.sin(t * 4.2)), z = g.createRadialGradient(x, y, r * 0.25, x, y, r);
+  z.addColorStop(0, `rgba(90,170,255,${0.1 * a})`); z.addColorStop(0.55, `rgba(90,170,255,${0.3 * a})`); z.addColorStop(1, 'rgba(60,120,255,0)');
+  g.fillStyle = z; g.fillRect(x - r, y - r, 2 * r, 2 * r);
+}
+
+// Dawn floods down the river from the top of the screen: a low sun past the top edge whose light spreads as the day comes and then settles.
+// near is how close dawn is (0 to 1), day how far the morning has come after the win (0 to 1). Drawn with the 'lighter' blend.
+export function flood(g, W, H, near, day) {
+  const e = 1 - (1 - day) * (1 - day), r = H * (0.35 + 0.35 * near + 0.7 * e), z = g.createRadialGradient(W / 2, -H * 0.08, 0, W / 2, -H * 0.08, r);
+  const a = near * 0.3 * (1 - day) + 0.45 * Math.sin(Math.PI * Math.min(1, day * 1.15)) ** 2 + 0.08 * day; // it pours in, then settles so the card can be read
+  z.addColorStop(0, `rgba(255,226,170,${a})`); z.addColorStop(0.4, `rgba(255,170,100,${a * 0.5})`); z.addColorStop(1, 'rgba(255,140,80,0)');
+  g.fillStyle = z; g.fillRect(0, 0, W, H);
+}
