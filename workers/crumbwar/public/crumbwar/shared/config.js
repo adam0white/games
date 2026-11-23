@@ -1,0 +1,32 @@
+// Constants shared by the server and the page. The page predicts its own ant with the same numbers and the
+// same movement function (move.js), so a change here changes both sides in one deploy.
+export const PROTO = 1;
+export const TICK_HZ = 20;
+export const DT = 1 / TICK_HZ;
+export const SNAP_EVERY = 2; // a client gets a snapshot every 2nd tick: 10 a second
+export const WORLD = 3200; // square, in units; an ant is about 20 long
+export const POS_Q = 4; // other ants and food: quarter-unit positions (u16, and i8 deltas)
+export const OWN_Q = 16; // own ant: sixteenth-unit positions, so prediction replays from a close base
+export const VIEW = 620; // half-size of the square each client (and each bot) is told about
+export const VIEW_LEAVE = 700; // an ant is forgotten past this, so one at the edge does not flicker
+export const COLONIES = 4;
+export const NEST_INSET = 480;
+export const NEST_R = 160; // enemies inside take guard damage
+export const DROP_R = 70; // a carrier this close to its own nest delivers
+export const NESTS = [[NEST_INSET, NEST_INSET], [WORLD - NEST_INSET, NEST_INSET], [WORLD - NEST_INSET, WORLD - NEST_INSET], [NEST_INSET, WORLD - NEST_INSET]];
+export const SPEED = 150; // units a second
+export const SPRINT = 1.6;
+export const CARRY_SLOW = [1, 0.8, 0.62]; // nothing, crumb, sugar
+export const TIER_SLOW = [1, 0.97, 0.94, 0.9];
+export const TIER_HP = [5, 7, 9, 12];
+export const TIER_BITE = [1, 1, 2, 2];
+export const TIER_AT = [5, 15, 30]; // food delivered in one life
+export const TURN = 9; // radians a second
+export const STAMINA = 100;
+export const STAMINA_DRAIN = 40; // a second while sprinting
+export const STAMINA_REGEN = 14;
+export const FOOD_VALUE = [0, 1, 5];
+export const MAX_FOOD = 512;
+export const NAMES_A = ['Amber', 'Brisk', 'Clay', 'Dusty', 'Ember', 'Fern', 'Gilded', 'Hazel', 'Ivory', 'Jet', 'Keen', 'Loam', 'Mossy', 'Nimble', 'Ochre', 'Pale', 'Quick', 'Rusty', 'Sandy', 'Tawny', 'Umber', 'Velvet', 'Wiry', 'Young', 'Zesty', 'Bold', 'Calm', 'Deft', 'Eager', 'Fleet', 'Grim', 'Hardy'];
+export const NAMES_B = ['Mandible', 'Forager', 'Scout', 'Digger', 'Carrier', 'Sentry', 'Tunneler', 'Raider', 'Nurse', 'Harvester', 'Drifter', 'Climber', 'Biter', 'Hauler', 'Walker', 'Runner', 'Tracker', 'Gnawer', 'Weaver', 'Keeper', 'Rover', 'Lifter', 'Packer', 'Marcher', 'Picker', 'Stalker', 'Warden', 'Seeker', 'Burrower', 'Skitter', 'Crumbler', 'Nibbler'];
+export const COLONY_NAMES = ['Red', 'Blue', 'Green', 'Gold'];
