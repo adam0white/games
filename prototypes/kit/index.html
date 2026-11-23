@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Prototype kit self-test</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; margin: 1.2em; background: #10141c; color: #e8e2d6; }
+  li.ok { color: #7fd48a; } li.bad { color: #ff7a7a; }
+  button { font: inherit; padding: .6em 1.2em; min-height: 46px; }
+  .card { display: none; } .card.on { display: block; }
+</style>
+</head>
+<body>
+<h1>Prototype kit</h1>
+<p>Shared code for the games under <code>/proto/</code>. This page runs each module in your browser.</p>
+<ul id="out"></ul>
+<p><button id="beep">Play a sound</button> <span id="heard"></span></p>
+<div id="a" class="card">card a</div><div id="b" class="card">card b</div>
+<script type="module">
+import { read, write, readNumber, readJson, writeJson } from './save.js';
+import { sound } from './audio.js';
+import { onLeave, isPauseKey } from './pause.js';
+import { screens } from './screens.js';
+
+const results = [], out = document.getElementById('out');
+function check(name, fn) {
+  let ok = false, why = '';
+  try { ok = fn() === true; } catch (e) { why = ` (${e.message})`; }
+  results.push({ name, ok });
+  const li = document.createElement('li'); li.className = ok ? 'ok' : 'bad'; li.textContent = `${ok ? 'ok' : 'FAIL'}: ${name}${why}`; out.append(li);
+}
+const K = 'kit-selftest';
+check('save: write then read text', () => write(K, 'a') && read(K) === 'a');
+check('save: a missing key gives the fallback', () => read(K + '-none', 'x') === 'x' && readNumber(K + '-none') === 0 && readJson(K + '-none', 7) === 7);
+check('save: numbers', () => write(K, 12) && readNumber(K) === 12);
+check('save: text that is not a number gives the fallback', () => write(K, 'abc') && readNumber(K, 5) === 5);
+check('save: JSON round trip', () => writeJson(K, { a: [1, 2] }) && readJson(K).a[1] === 2);
+check('save: broken JSON gives the fallback', () => write(K, '{oops') && readJson(K, 'd') === 'd');
+try { localStorage.removeItem(K); } catch {}
+
+let left = 0; onLeave(() => left++);
+dispatchEvent(new Event('blur')); dispatchEvent(new Event('pagehide'));
+check('pause: blur and pagehide call the game', () => left === 2);
+check('pause: P and Escape are pause keys, A is not', () => isPauseKey({ key: 'p' }) && isPauseKey({ key: 'Escape' }) && !isPauseKey({ key: 'a' }));
+
+let seen = ''; const show = screens(['a', 'b'], name => { seen = name; });
+show('b');
+check('screens: one card shows', () => !document.getElementById('a').classList.contains('on') && document.getElementById('b').classList.contains('on') && seen === 'b');
+show('play');
+check('screens: an unknown name hides every card', () => !document.querySelector('.card.on') && seen === 'play');
+
+let built = 0, enabled = false; const snd = sound({ on: () => enabled, setup: () => built++ });
+snd.tone(440); snd.noise();
+check('audio: stays silent and builds nothing while switched off', () => snd.ctx === null && built === 0);
+enabled = true;
+check('audio: unlock makes one context and runs setup once', () => { const a = snd.unlock(), b = snd.unlock(); snd.tone(440, 0.01, 0.0001); snd.noise(0.01, 0.0001); return !!a && a === b && built === 1; });
+check('audio: hold and release do not throw', () => { snd.hold(); snd.release(); return true; });
+document.getElementById('beep').addEventListener('click', () => { snd.unlock(); snd.tone(523.25, 0.4, 0.15, 'triangle'); snd.noise(0.15, 0.1); document.getElementById('heard').textContent = `Context is ${snd.ctx?.state}. You should have heard a note and a crunch.`; });
+
+window.kitResults = results; // read by check/phone.mjs
+</script>
+</body>
+</html>
