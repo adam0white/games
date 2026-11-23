@@ -32,12 +32,12 @@ export function level(s) { return s.endless ? 1 + Math.floor(Math.floor(s.t * 10
 // The tower: the river climbs in tight turns that ease as it rises, and runs dead straight for the last stretch before dawn.
 export const FLOORS = 10;
 // The tower is 50 levels, each one climb (tester t1, 2026-11-23). Each level is a fixed share harder than the last: the pace grows
-// geometrically from 1.15 at level 1 (a little above the old tower's) to 2.2 at level 50, rows come closer and the river narrows; level 1 holds night 4's things and a new
-// thing of the nights joins every two levels, so all twenty are in from level 33.
+// geometrically from 1.2 at level 1 (the old tower's pace for a player on night 6 was 1.175) to 2.2 at level 50, rows come closer and the river narrows;
+// level 1 holds night 6's things and a new thing of the nights joins every two levels, so all twenty are in from level 29.
 export const LEVELS = 50;
-export const towerStage = climb => Math.min(20, 4 + Math.floor((climb - 1) / 2));
+export const towerStage = climb => Math.min(20, 6 + Math.floor((climb - 1) / 2));
 const steep = s => s.tower ? (s.climb - 1) / (LEVELS - 1) : 0; // 0 at level 1, 1 at level 50
-export const climbPace = climb => 1.15 * (2.2 / 1.15) ** ((climb - 1) / (LEVELS - 1));
+export const climbPace = climb => 1.2 * (2.2 / 1.2) ** ((climb - 1) / (LEVELS - 1));
 export function centre(s, y) {
   if (s.tower) { const a = Math.max(0, Math.min(1, 1 - y / (0.85 * GOAL))); return 0.5 + a * (0.25 * Math.sin(y * 0.55 + s.p1) + 0.06 * Math.sin(y * 1.3 + s.p2)); }
   return 0.5 + 0.17 * Math.sin(y * 0.33 + s.p1) + 0.07 * Math.sin(y * 0.81 + s.p2);

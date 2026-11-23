@@ -17,3 +17,7 @@ The owner dropped The Long Road and Copper Afternoon. Both moved to `archive/pro
 ## 2026-11-23: shared code (owner)
 
 The owner asked for the live games to be kept on shared code as a standing practice. The shared code is `experiments/kit/`; its `README.md` holds the rules and lists what is deliberately not shared yet. `experiments/kit/check/phone.mjs` runs every live experiment in two phone profiles with saves seeded in the formats players already have.
+
+## 2026-11-23: lane test under a path with a space
+
+`npm run check:lane` fails one test, "the real checkout plans without a collision", in a clone whose path contains a space, such as the feedback watcher's `~/Library/Application Support/...`. The test reads `new URL('..', import.meta.url).pathname`, which keeps the `%20` escape. Clean `main` fails the same way, and CI passes. Unresolved; the fix would be `fileURLToPath`.
