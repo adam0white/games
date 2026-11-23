@@ -8,7 +8,8 @@ on:
     - cron: '17 9 * * *'
   workflow_dispatch:
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # The nightly and by-hand runs get their own group, so a merge does not cancel them and they do not cancel a push run.
+  group: ci-${{ github.workflow }}-${{ github.ref }}-${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'every-game' || 'change' }}
   cancel-in-progress: true
 permissions:
   contents: read
