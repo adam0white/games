@@ -20,6 +20,18 @@ test('each preflight re-reads main, latest push run and its jobs', () => {
   assert.equal(calls.filter(call => call.at(-1).includes('/jobs?')).length, 2);
 });
 
+test('a green commit that main has moved past still deploys; one that main does not contain does not', () => {
+  const sha = 'a'.repeat(40), head = 'b'.repeat(40);
+  const preflight = status => checkLatestMainCI(sha, (command, args) => {
+    if (command === 'git') return `${head}\trefs/heads/main`;
+    if (args.at(-1).includes('/compare/')) { assert.equal(args.at(-1), `repos/{owner}/{repo}/compare/${sha}...${head}`); return JSON.stringify({ status }); }
+    if (args.at(-1).includes('/jobs?')) return JSON.stringify([{ jobs: [{ name: 'ci', status: 'completed', conclusion: 'success' }] }]);
+    return JSON.stringify({ workflow_runs: [{ id: 42, head_sha: sha, head_branch: 'main', event: 'push', status: 'completed', conclusion: 'success' }] });
+  });
+  preflight('ahead');
+  for (const status of ['diverged', 'behind', 'identical']) assert.throws(() => preflight(status), /CI is not green/, status);
+});
+
 test('deployment checks latest CI again after redirects immediately before upload', () => {
   const source = readFileSync('scripts/deploy.mjs', 'utf8');
   assert.match(source, /checkLatestMainCI\(commit, run\);[\s\S]*check-redirects\.mjs[\s\S]*retainDeployBundle\([\s\S]*checkLatestMainCI\(commit, run\);\n\s*\/\/[^\n]*\n\s*if \(bundle\) verifyDeployBundle\(\{ dist: uploaded[^\n]*\n\s*\/\/[^\n]*\n\s*if \(process\.env\.GAMES_DEPLOYER === 'wrangler'\) run\('pnpm', \['exec', 'wrangler', 'deploy'\][^\n]*\n\s*else run\('pnpm', \['exec', 'cf', 'deploy', '--prebuilt', '--mode', 'production'\]/);

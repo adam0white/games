@@ -5,7 +5,7 @@ import { validateGame } from './game.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { validateRegistry, affectedGames, phoneCheckNeeded, checkResults, manifest, assertFrameworkGraph, scopedHeaders, scopedRedirects, checkRelease, checkMainCI } from './lib.mjs';
+import { validateRegistry, affectedGames, phoneCheckNeeded, checkResults, phoneChecks, manifest, assertFrameworkGraph, scopedHeaders, scopedRedirects, checkRelease, checkMainCI } from './lib.mjs';
 const game = { slug: 'rope', source: { repository: 'https://github.com/adam0white/rope', commit: 'a'.repeat(40) }, saveSchema: 'v1' };
 const registry = { hfVersion: '4.17.0', games: [game] };
 test('interactive cloud suites honor one shared configured lock without a home checkout', () => {
@@ -44,6 +44,12 @@ test('the phone check runs for experiments, the notes button and what the check 
   for (const path of ['experiments/lantern/index.html', 'experiments/kit/check/phone.mjs', 'prototypes/x/index.html', 'workers/feedback/public/notes/button.js', 'src/worker.mjs', 'scripts/experiments.mjs', '.github/workflows/ci.yml']) assert.equal(phoneCheckNeeded([path]), true, path);
   for (const path of ['games/rope/src/main.ts', 'workers/feedback/src/index.ts', 'workers/feedback/public/other.js', 'archive/README.md', 'docs/x.md', 'scripts/lib.mjs', 'experiments.md', '.github/workflows/deploy.yml', 'src/worker.mjs.bak']) assert.equal(phoneCheckNeeded([path]), false, path);
   assert.equal(phoneCheckNeeded([]), false);
+});
+test('a change inside one experiment runs only that experiment\'s phone checks', () => {
+  assert.equal(phoneChecks(['experiments/lantern/index.html', 'games/rope/src/main.ts']), 'lantern');
+  assert.equal(phoneChecks(['experiments/lab/ant-nest/game.js', 'experiments/lantern/a/b.js', 'experiments/lab/ant-nest/index.html']), 'lab/ant-nest,lantern');
+  for (const path of ['experiments/kit/save.js', 'experiments/kit/check/phone.mjs', 'prototypes/x/index.html', 'workers/feedback/public/notes/button.js', 'src/worker.mjs', 'scripts/experiments.mjs', '.github/workflows/ci.yml']) assert.equal(phoneChecks(['experiments/lantern/index.html', path]), 'all', path);
+  for (const paths of [[], ['games/rope/src/main.ts'], ['experiments/NOTES.md', 'experiments/lantern/README.md'], ['experiments/lab/index.html']]) assert.equal(phoneChecks(paths), '', paths.join());
 });
 test('the ci gate requires the phone check exactly when its paths changed', () => {
   const gate = env => spawnSync(process.execPath, ['scripts/aggregate.mjs'], { env: { ...process.env, TOOLS:'success', CHANGES:'success', WORKERS:'success', GAMES:'skipped', BUILD:'success', COUNT:'0', TOTAL:'1', LEFTHAND_REQUIRED:'false', LEFTHAND_BROWSER:'skipped', ...env } }).status;

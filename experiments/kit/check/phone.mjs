@@ -681,6 +681,10 @@ const GAMES = {
 };
 
 const [onlyGame, onlyPhone] = process.argv.slice(2);
+// The first argument is 'all' or a comma list of experiments. An experiment's name picks its own check, its
+// first-time help check, and for Lantern the three checks below that play Lantern.
+const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run'] };
+const picked = game => !onlyGame || onlyGame === 'all' || onlyGame.split(',').some(only => game === only || game === `hint ${only}` || WITH[only]?.includes(game));
 // A check that never answers becomes a FAIL line naming it, not a job that runs until its time limit.
 const within = (p, ms, what) => { let t; return Promise.race([p, new Promise((_, no) => { t = setTimeout(() => no(new Error(`no answer in ${ms / 1000}s: ${what}`)), ms); })]).finally(() => clearTimeout(t)); };
 let failed = 0;
@@ -688,7 +692,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   if (onlyPhone && onlyPhone !== phone) continue;
   let browser = await engine.launch();
   for (const [game, run] of Object.entries(GAMES)) {
-    if (onlyGame && onlyGame !== 'all' && onlyGame !== game) continue;
+    if (!picked(game)) continue;
     const context = await browser.newContext({ ...device }), page = await context.newPage(), errors = [];
     // Answer the lab endpoint here, so no check ever reaches it. Records are kept for the assertions.
     context.labSent = []; context.labTried = 0;
