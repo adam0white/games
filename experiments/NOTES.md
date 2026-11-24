@@ -87,3 +87,16 @@ Tester t1 asked for a game where you have forgotten who you are, have several ab
 
 - **`npm run check:lane` fails in a path with a space.** `scripts/experiments.test.mjs` builds a path with `new URL('..', import.meta.url).pathname`, which keeps `%20`. So "the real checkout plans without a collision" fails in any clone under `~/Library/Application Support/`, which includes every notes watcher run. It passes in a path without spaces. `fileURLToPath` would fix it. Not changed here, because it is shared code outside `experiments/`.
 - **The kit self-test is flaky on Chromium.** The line `hint: not before the delay` (from `kit/hint.js`, PR #110) failed in 2 of 3 runs on the lab Mac and passed in the third. Not investigated.
+
+## 2026-11-23: Crumbwar is boring for now (tester t1, notes #135 and #136)
+
+- **Note #135, answering #124 ("Crumbwar: was it fun?"):** "Sıkıcı" (boring).
+- **Note #136, answering #125 ("would you invite a friend to play it with you?"):** "Henüz değil, daha gelişmeli" (not yet, it needs to develop further).
+
+Recorded only. Crumbwar's page and server are in `workers/crumbwar/`, outside `experiments/` and `games/`, so a tester note does not change them. Nothing there was edited.
+
+What the lab saw on the live page the same evening (Chromium, Pixel 7 size, about ten seconds): one person in the room and 23 bots, a plain brown field with no food in view of the nest, and nothing on screen to aim for until the player walks out. That fits "boring", but which part bored the tester is unknown. One question went back to the tester asking what was missing.
+
+### Left as a proposal (2026-11-23, notes #135 and #136)
+- Ask the tester's answer to the "what was missing" question before building anything on Crumbwar.
+- With note #90 ("play in a room with friends"), the tester's wish list for Crumbwar is a friends room and more to do. Both need work in `workers/crumbwar/`, so both wait for a lab session that the owner sends there.
