@@ -49,18 +49,24 @@ function tables(sql) {
   sql.exec('CREATE TABLE IF NOT EXISTS days (day TEXT PRIMARY KEY, n INTEGER NOT NULL)');
   sql.exec('CREATE TABLE IF NOT EXISTS runs (r TEXT PRIMARY KEY, t INTEGER NOT NULL)');
   sql.exec('CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)');
+  // done: a used ticket with the score it carried, so the same post sent twice is answered twice. gone: an id whose row was taken away.
+  sql.exec('CREATE TABLE IF NOT EXISTS done (r TEXT PRIMARY KEY, id TEXT NOT NULL, s INTEGER NOT NULL, t INTEGER NOT NULL)');
+  sql.exec('CREATE TABLE IF NOT EXISTS gone (id TEXT PRIMARY KEY, t INTEGER NOT NULL)');
 }
 // A daily board keeps one day's rows. day is the UTC day (YYYY-MM-DD) for a daily board and nothing for the others.
+// The day only moves forward: a request stamped just before midnight can arrive after the first one of the new day,
+// and it must not empty the new day's board.
 function roll(sql, day) {
   tables(sql);
-  if (!day || sql.exec("SELECT v FROM meta WHERE k = 'day'").toArray()[0]?.v === day) return;
+  if (!day || (sql.exec("SELECT v FROM meta WHERE k = 'day'").toArray()[0]?.v ?? '') >= day) return;
   sql.exec('DELETE FROM scores');
   sql.exec("INSERT INTO meta (k, v) VALUES ('day', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", day);
 }
 /** A run ticket: the run's random id and the time it started. Old tickets go; a full table refuses new ones. */
 export function boardStart(sql, r, now) {
   tables(sql);
-  sql.exec('DELETE FROM runs WHERE t < ?', now - RUN.hours * 3600_000);
+  for (const table of ['runs', 'done', 'gone']) sql.exec(`DELETE FROM ${table} WHERE t < ?`, now - RUN.hours * 3600_000);
+  if (sql.exec('SELECT 1 FROM done WHERE r = ?', r).toArray().length) return { ok: true }; // a used ticket does not open again
   if (sql.exec('SELECT COUNT(*) AS c FROM runs').toArray()[0].c >= RUN.keep) return { ok: false };
   sql.exec('INSERT OR IGNORE INTO runs (r, t) VALUES (?, ?)', r, now);
   return { ok: true };
@@ -71,13 +77,18 @@ export function boardTop(sql, limit = BOARD.top, day = null) {
   return sql.exec('SELECT n, s FROM scores ORDER BY s DESC, t ASC LIMIT ?', limit).toArray().map(r => ({ n: r.n, s: r.s }));
 }
 /** Keep the player's best score and newest name. A new player counts against the day's cap. Returns { ok, place, rows };
- * a refusal carries why: 'run' (no ticket, or more score than the run's time allows) or 'cap'. A ticket works once. */
+ * a refusal carries why: 'run' (no ticket, a ticket older than RUN.hours, a ticket from another UTC day on a daily board, or
+ * more score than the run's time allows), 'gone' (the id's row was taken away) or 'cap'. A ticket works once; the same post
+ * sent again (the first answer was lost on the way) gets the answer again and changes nothing. */
 export function boardPut(sql, { id, n, s, r }, now, cap = BOARD.dailyNew, need = false, day = null) {
   roll(sql, day);
+  const no = why => ({ ok: false, why, place: 0, rows: [] });
+  if (sql.exec('SELECT 1 FROM gone WHERE id = ?', id).toArray().length) return no('gone');
   if (r) {
     const run = sql.exec('SELECT t FROM runs WHERE r = ?', r).toArray()[0];
-    if (!run || now < run.t || s > (now - run.t) / 1000 * RUN.perSecond + RUN.slack) return { ok: false, why: 'run', place: 0, rows: [] };
-  } else if (need) return { ok: false, why: 'run', place: 0, rows: [] };
+    if (!run) { const was = sql.exec('SELECT id, s FROM done WHERE r = ?', r).toArray()[0]; return was && was.id === id && was.s === s ? { ok: true, place: placeOf(sql, id), rows: boardTop(sql) } : no('run'); }
+    if (now < run.t || now - run.t > RUN.hours * 3600_000 || (day && utcDay(run.t) !== day) || s > (now - run.t) / 1000 * RUN.perSecond + RUN.slack) return no('run');
+  } else if (need) return no('run');
   const old = sql.exec('SELECT s FROM scores WHERE id = ?', id).toArray()[0];
   if (!old) {
     const day = utcDay(now), made = sql.exec('SELECT n FROM days WHERE day = ?', day).toArray()[0]?.n ?? 0;
@@ -89,14 +100,19 @@ export function boardPut(sql, { id, n, s, r }, now, cap = BOARD.dailyNew, need =
     sql.exec('DELETE FROM scores WHERE id NOT IN (SELECT id FROM scores ORDER BY s DESC, t ASC LIMIT ?)', BOARD.keep);
   } else if (s > old.s) sql.exec('UPDATE scores SET n = ?, s = ?, t = ? WHERE id = ?', n, s, now, id);
   else sql.exec('UPDATE scores SET n = ? WHERE id = ?', n, id);
-  if (r) sql.exec('DELETE FROM runs WHERE r = ?', r);
-  const mine = sql.exec('SELECT s, t FROM scores WHERE id = ?', id).toArray()[0];
-  const place = mine ? sql.exec('SELECT COUNT(*) AS c FROM scores WHERE s > ? OR (s = ? AND t < ?)', mine.s, mine.s, mine.t).toArray()[0].c + 1 : 0;
-  return { ok: true, place, rows: boardTop(sql) };
+  if (r) { sql.exec('DELETE FROM runs WHERE r = ?', r); sql.exec('INSERT OR REPLACE INTO done (r, id, s, t) VALUES (?, ?, ?, ?)', r, id, s, now); }
+  return { ok: true, place: placeOf(sql, id), rows: boardTop(sql) };
 }
-export function boardRemove(sql, id) {
-  tables(sql);
+function placeOf(sql, id) {
+  const mine = sql.exec('SELECT s, t FROM scores WHERE id = ?', id).toArray()[0];
+  return mine ? sql.exec('SELECT COUNT(*) AS c FROM scores WHERE s > ? OR (s = ? AND t < ?)', mine.s, mine.s, mine.t).toArray()[0].c + 1 : 0;
+}
+/** Take the id's row away and remember the id for RUN.hours, so a score still on its way cannot put the row back. */
+export function boardRemove(sql, id, now = Date.now(), day = null) {
+  roll(sql, day);
   sql.exec('DELETE FROM scores WHERE id = ?', id);
+  sql.exec('DELETE FROM gone WHERE t < ?', now - RUN.hours * 3600_000);
+  sql.exec('INSERT OR REPLACE INTO gone (id, t) VALUES (?, ?)', id, now);
   return { ok: true, place: 0, rows: boardTop(sql) };
 }
 
@@ -147,8 +163,8 @@ export async function handleBoard(request, env, ctx = { waitUntil() {} }, deps =
     try { return (await board().start(q.r, now)).ok ? json(200, { ok: true }, origin) : json(503, { error: 'runs' }, origin); } catch { return json(503, { error: 'board' }, origin); }
   }
   let out;
-  try { out = q.remove ? await board().remove(q.id) : await board().put(q, now, RUN.need.includes(game), day); } catch { return json(503, { error: 'board' }, origin); }
-  if (!out.ok) return out.why === 'run' ? json(422, { error: 'run' }, origin) : json(503, { error: 'daily cap' }, origin);
+  try { out = q.remove ? await board().remove(q.id, now, day) : await board().put(q, now, RUN.need.includes(game), day); } catch { return json(503, { error: 'board' }, origin); }
+  if (!out.ok) return out.why === 'run' ? json(422, { error: 'run' }, origin) : out.why === 'gone' ? json(410, { error: 'gone' }, origin) : json(503, { error: 'daily cap' }, origin);
   if (cache) ctx.waitUntil(cache.delete(key));
   return json(200, { place: out.place, rows: out.rows }, origin);
 }
