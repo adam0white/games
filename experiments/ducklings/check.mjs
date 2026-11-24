@@ -524,11 +524,21 @@ async function run(name, engine, device, localizationOnly = false) {
     await end();
     assert.equal((await state(page)).over, 'nest');
     assert.equal(await page.textContent('#next'), 'Next: Road', 'the chapter card names the next chapter');
+    // A chapter's last nest has its own picture and opens the album.
+    assert.equal((await state(page)).postcard, 'chapter', 'the chapter card has its own picture');
+    assert.ok(await page.locator('#endAlbum').isVisible(), 'the chapter card opens the album');
+    await tap(page, '#endAlbum');
+    assert.equal((await state(page)).screen, 'albumCard', 'the album opens after a chapter');
+    assert.match(await page.locator('#albumArt').getAttribute('aria-label'), /Ducklings you brought home: \d+ of 16 met/);
+    await shot('album-after-chapter');
+    await tap(page, '#albumBack');
+    assert.equal((await state(page)).screen, 'end', 'the album returns to the chapter card');
     await goto('?level=24');
     await tap(page, '#play');
     await follow(page, ROUTES[24]);
     await end();
     assert.equal((await state(page)).over, 'nest', 'the last stage is won by its route');
+    assert.equal((await state(page)).postcard, 'final', 'the final nest has its own picture');
     await until(page, () => getComputedStyle(document.querySelector('#endlessNext')).display !== 'none', 'the last nest offers the endless pond');
     await assertTargets(page);
     await shot('trail-complete');
@@ -545,6 +555,11 @@ async function run(name, engine, device, localizationOnly = false) {
       assert.equal((await state(page)).opened, 8);
       assert.match(await page.textContent('#endless'), /8,210/);
       assert.match(await page.textContent('#sound'), /off/);
+      await tap(page, '#albumOpen');
+      assert.equal((await state(page)).screen, 'albumCard', 'the album opens from the menu');
+      assert.match(await page.locator('#albumArt').getAttribute('aria-label'), /1 of 16 met/);
+      await tap(page, '#albumBack');
+      assert.equal((await state(page)).screen, 'menu');
       await page.click('#sound');
       await tap(page, '#play');
       await until(page, () => document.querySelector('.kit-hint.on')?.dataset.kind === 'hold-and-move', 'shared hint');
@@ -560,7 +575,22 @@ async function run(name, engine, device, localizationOnly = false) {
       await finger(page, [['pointerdown', st.mom.sx, st.mom.sy - 90]]);
       await until(page, () => window.ducklingsState().t > 1, 'endless advances from touch');
       assert.match(await page.locator('#sunRule:visible').getAttribute('aria-label'), /Cross sun pads for light/);
-      await shot('endless');
+      // Nothing playable sits under the counts, hearts or pause: the pond is framed below them.
+      const covers = await page.evaluate(() => ['flockHud', 'heartState', 'pause'].map(id => document.getElementById(id).getBoundingClientRect().bottom));
+      st = await state(page);
+      assert.ok(st.playTop > 0 && covers.every(b => b <= st.playTop), `endless HUD sits in the bank band (${covers} <= ${st.playTop})`);
+      assert.ok(st.mom.sy > st.playTop + 60, 'the mother swims below the band');
+      // The band is drawn bank, not water: sample the canvas just above its edge, clear of the HUD, hearts and pause.
+      assert.ok(await page.locator('#c').evaluate((canvas, top) => {
+        const g = canvas.getContext('2d'), k = canvas.height / innerHeight, y = Math.floor((top - 9) * k);
+        return [.25, .5, .75].every(x => { const p = g.getImageData(Math.floor(canvas.width * x), y, 1, 1).data; return p[1] - p[2] > 35; });
+      }, st.playTop || 64), 'the strip under the endless HUD is bank, not pond');
+      // The first endless row is always a log: its first look is shown once, while play goes on, and remembered.
+      await until(page, () => window.ducklingsState().intro === 'log', 'the log is introduced as it comes into view', 8000);
+      const introAt = (await state(page)).t;
+      await until(page, t => window.ducklingsState().t > t + .5, 'play goes on during the introduction', 4000, introAt);
+      assert.equal((await save()).met?.log, 1, 'the introduced kind is saved');
+      await shot('endless-intro');
       await finger(page, [['pointerup', 0, 0]]);
       const lowLightHeight = await page.waitForFunction(() => {
         if (!document.querySelector('#flockHud').classList.contains('low')) return false;
@@ -572,6 +602,22 @@ async function run(name, engine, device, localizationOnly = false) {
       await shot('low-light');
       await end();
       assert.match(await page.locator('#endLine [role=img]').first().getAttribute('aria-label'), /Sun pads crossed: 0/);
+      await goto('?fast=4');
+      await tap(page, '#endless');
+      st = await state(page);
+      await finger(page, [['pointerdown', st.mom.sx, st.mom.sy - 90]]);
+      await until(page, () => window.ducklingsState().t > 4, 'second endless run advances');
+      assert.ok(!(await state(page)).introRun.includes('log'), 'a kind already seen is not introduced again');
+      // Crossing a sun pad shows the gain as a picture on the pond; the HUD chip stays as screen-reader text.
+      for (let i = 0; i < 80 && !(st = await state(page)).padGain && !st.over; i++) {
+        await finger(page, [['pointermove', st.mom.sx, st.mom.sy - 90]]);
+        await page.waitForTimeout(250);
+      }
+      assert.ok(st.padGain, `a sun pad shows its gain on the pond (t ${st.t}, ${st.why})`);
+      const chip = await page.locator('#padReward').boundingBox();
+      assert.ok(!chip || chip.width <= 1, `the pad gain is not a HUD chip (${JSON.stringify(chip)})`);
+      await finger(page, [['pointerup', 0, 0]]);
+      await leave();
       await goto('?level=20&fast=5');
       await tap(page, '#play');
       st = await state(page);

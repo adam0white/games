@@ -400,20 +400,22 @@ export function leaves(g, x, y, r, kind, phase, t) {
   g.restore();
 }
 
-export function current(g, x, y0, y1, w, u, dx, t) {
+// marks: screen-space {x, y, angle, len, fade} from feedback.driftMarks, moving at the current's own speed.
+export function current(g, x, y0, y1, w, u, marks) {
   g.save();
   const shade = g.createLinearGradient(x - w, 0, x + w, 0);
   shade.addColorStop(0, '#2e8eaa00'); shade.addColorStop(.45, '#358eac8c');
   shade.addColorStop(.6, '#358eac8c'); shade.addColorStop(1, '#2e8eaa00');
   g.fillStyle = shade; g.fillRect(x - w, y0, 2 * w, y1 - y0);
-  g.strokeStyle = '#edfef0b8'; g.lineWidth = .006 * u; g.lineCap = 'round';
-  for (let i = 0; i < 3; i++) {
-    for (let y = y1 - (t * .24 + i * .10) % .22 * u; y > y0 + .05 * u; y -= .22 * u) {
-      const px = x + (i - 1) * w * .51;
-      g.save(); g.translate(px, y); g.rotate(Math.atan2(dx, .29));
-      g.beginPath(); g.moveTo(-.022 * u, 0); g.lineTo(0, -.026 * u); g.lineTo(.022 * u, 0); g.stroke();
-      g.restore();
-    }
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  for (const m of marks) {
+    g.save(); g.translate(m.x, m.y); g.rotate(m.angle); g.globalAlpha = m.fade;
+    // a streak behind the chevron: the longer the streak, the harder the push
+    g.strokeStyle = '#edfef070'; g.lineWidth = .005 * u;
+    g.beginPath(); g.moveTo(0, .004 * u); g.lineTo(0, m.len * u); g.stroke();
+    g.strokeStyle = '#edfef0e0'; g.lineWidth = .007 * u;
+    g.beginPath(); g.moveTo(-.022 * u, .012 * u); g.lineTo(0, -.014 * u); g.lineTo(.022 * u, .012 * u); g.stroke();
+    g.restore();
   }
   g.restore();
 }

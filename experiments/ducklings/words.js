@@ -110,6 +110,10 @@ export const tables = {
     holdTip: 'Keep your finger down ahead of her to keep swimming',
     nextChapterName: 'Next: {chapter}',
     endlessNext: 'On to the endless pond',
+    album: 'Album',
+    back: 'Back',
+    albumLabel: 'Ducklings you brought home: {n} of {total} met',
+    introLabel: 'New in the pond: watch out',
   },
   tr: {
     title: 'Peşimden Gel',
@@ -220,6 +224,10 @@ export const tables = {
     holdTip: 'Yüzmeye devam etmesi için parmağını önünde basılı tut',
     nextChapterName: 'Sıradaki: {chapter}',
     endlessNext: 'Sonsuz gölete geç',
+    album: 'Albüm',
+    back: 'Geri',
+    albumLabel: 'Yuvaya getirdiğin yavrular: {total} yavrudan {n} tanesiyle tanıştın',
+    introLabel: 'Gölette yeni bir şey var: dikkat',
   },
 };
 
