@@ -195,6 +195,7 @@ const GAMES = {
     assert.deepEqual(bad, [], 'kit self-test');
   },
   async lantern(page) {
+    const ABILITY = ['boost', 'slow', 'size', 'magnet', 'flare', 'heart', 'shield'];
     const state = () => page.evaluate(() => window.lanternState());
     // Since note #112 a tap on an owned thing shows it on the whole screen; the button under its pack switches it.
     const pick = async (page, id) => { await page.click(`[data-item="${id}"]`); await page.click('#look'); await page.click(`[data-switch="${id}"]`); };
@@ -203,12 +204,13 @@ const GAMES = {
     // A save in the format players already have.
     await page.goto(`${base}/lantern/`);
     await page.evaluate(LAB_LOCAL);
-    await page.evaluate(() => { localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('lantern-best-endless', '55'); localStorage.setItem('lantern-best-tower', '4'); localStorage.setItem('lantern-stats', '{"red":1}'); localStorage.setItem('lantern-off', '[]'); localStorage.setItem('lantern-best-level', '0'); localStorage.setItem('lantern-tower-at', '1'); localStorage.setItem('lantern-rebirths', '0'); localStorage.setItem('lantern-crash', '[]'); localStorage.setItem('lantern-hint', '1'); localStorage.setItem('notes.k', 'check'); });
+    await page.evaluate(() => { localStorage.setItem('lantern-night', '3'); localStorage.setItem('lantern-bank', '120'); localStorage.setItem('lantern-owned', '["red"]'); localStorage.setItem('lantern-worn', '{"boat":"red"}'); localStorage.setItem('lantern-best-3', '40'); localStorage.setItem('lantern-best-endless', '55'); localStorage.setItem('lantern-best-tower', '4'); localStorage.setItem('lantern-stats', '{"red":1}'); localStorage.setItem('lantern-off', '[]'); localStorage.setItem('lantern-best-level', '0'); localStorage.setItem('lantern-tower-at', '1'); localStorage.setItem('lantern-rebirths', '0'); localStorage.setItem('lantern-crash', '[]'); localStorage.setItem('lantern-hint', '1'); localStorage.setItem('notes.k', 'check'); localStorage.removeItem('lantern-start'); }); // the first visit above wrote a new player's lantern-start; this save is from before that key
     await page.reload();
     let st = await state();
     assert.equal(st.opened, 3, 'old save: opened night'); assert.equal(st.bank, 120, 'old save: bank'); assert.ok(st.owned.includes('red'), 'old save: owned'); assert.equal(st.worn.boat, 'red', 'old save: worn');
     assert.equal(await page.textContent('#play'), 'Play night 3'); assert.match(await page.textContent('#about'), /Best 40%/);
     assert.deepEqual(st.board.map(r => r.s), [55], 'old save: the endless best starts the leaderboard'); assert.deepEqual(st.winOn, []);
+    assert.equal(st.start, 'boost', 'old save: a player from before lantern-start keeps Boost'); assert.ok(st.owned.includes('boost')); assert.equal((await saved())['lantern-start'], 'boost');
     await until(page, () => document.getElementById('notes-button'), 'notes button');
     await noZoomed(page);
     // Play, steer by a relative drag, and a tap alone does not steer.
@@ -275,6 +277,13 @@ const GAMES = {
     // An ability switched off stays owned and is kept out of the river; the choice is saved under lantern-off.
     await pick(page, 'boost'); assert.equal((await saved())['lantern-off'], '["boost"]'); assert.ok((await state()).owned.includes('boost'), 'switched off, still owned');
     await page.click('.back'); assert.match(await page.textContent('#ready'), /Hearts 1/, 'the menu shows the stats ready for the next run');
+    // No stats on the endless river (notes #119 and #120): an endless run neither uses them nor spends them, and the shop and menu say so.
+    assert.match(await page.textContent('#ready'), /Not for the endless river/); assert.match(await page.textContent('#packs'), /never work on the endless river/);
+    await page.click('#endless'); st = await state(); assert.ok(st.endless && st.playing); assert.equal(st.hearts, 1, 'no stats on the endless river');
+    assert.equal(JSON.parse((await saved())['lantern-stats']).hearts, 1, 'the endless river does not spend stats');
+    await page.evaluate(() => { const s = window.lanternSim(); s.t = -1; s.extra = 0; s.light = 0.0001; s.warm = 0; }); // a score of 0 stays off the leaderboard
+    await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'endless run without stats ends'); await page.click('#toMenu');
+    assert.match(await page.textContent('#ready'), /Hearts 1/, 'the stat still waits after an endless run');
     await page.click('#play'); st = await state(); assert.equal(st.hearts, 2, 'the stat is on for this run'); assert.ok(!st.on.includes('boost'), 'a switched-off ability is not in the river');
     assert.equal((await saved())['lantern-stats'], '{}', 'the stat is used up when the run starts');
     await page.evaluate(() => { window.lanternSim().light = 0.0001; }); await until(page, () => !window.lanternState().playing, 'stat run ends');
@@ -310,10 +319,12 @@ const GAMES = {
     assert.equal(await page.textContent('#play'), 'Play night 50'); assert.match(await page.textContent('#about'), /This is the last night/);
     await page.click('#less'); assert.doesNotMatch(await page.textContent('#about'), /last night/);
     // Rebirth (note #73): a goal until everything is found and all 50 nights are open; then two taps start over with 25% more embers for good.
-    await page.click('#toShop'); assert.equal(await page.isVisible('#rebirth'), false, 'no rebirth before everything is found'); assert.match(await page.textContent('#packs'), /Find everything \(\d+ of 33\)/);
+    await page.click('#toShop'); assert.equal(await page.isVisible('#rebirth'), false, 'no rebirth before everything is found'); assert.match(await page.textContent('#packs'), /Find everything \(\d+ of 35\)/);
     await page.click('[data-test="all"]'); await page.click('[data-test="nights"]');
     await page.click('#rebirth'); assert.equal((await state()).reborn, 0, 'one tap is not a rebirth'); await page.click('#rebirth');
-    st = await state(); assert.equal(st.reborn, 1); assert.equal(st.bank, 0); assert.equal(st.opened, 1); assert.deepEqual(st.owned.sort(), ['amber', 'blue', 'boost', 'oak']);
+    st = await state(); assert.equal(st.reborn, 1); assert.equal(st.bank, 0); assert.equal(st.opened, 1);
+    // A rebirth starts with one ability at random (note #122), saved under lantern-start and not in lantern-owned.
+    assert.ok(ABILITY.includes(st.start), 'a random first ability'); assert.deepEqual(st.owned.sort(), ['amber', 'blue', 'oak', st.start].sort()); assert.equal((await saved())['lantern-start'], st.start);
     assert.equal((await saved())['lantern-rebirths'], '1'); assert.equal((await saved())['lantern-owned'], '[]'); assert.equal((await saved())['lantern-night'], '1');
     await page.click('.back'); assert.match(await page.textContent('#stars'), /★/);
     // Reborn nights run faster and pay more at dawn (answer to question #79).
@@ -330,7 +341,7 @@ const GAMES = {
     await page.click('#toMenu'); await page.evaluate(() => localStorage.setItem('lantern-owned', '["red"]')); await page.reload(); // the look check below wears the red canoe
     // Two abilities at a time and the crash pack (note #75). lantern-off and lantern-crash are JSON lists of ids.
     await page.click('#toShop'); await page.click('[data-test="all"]');
-    const abilitiesOn = async () => { const s = await saved(), off = JSON.parse(s['lantern-off'] || '[]'); return ['boost', 'slow', 'size', 'magnet', 'flare'].filter(k => !off.includes(k)); };
+    const abilitiesOn = async () => { const s = await saved(), off = JSON.parse(s['lantern-off'] || '[]'); return ABILITY.filter(k => !off.includes(k)); };
     assert.equal((await abilitiesOn()).length, 2, 'finding every ability leaves two on');
     const offOne = (await page.evaluate(() => JSON.parse(localStorage.getItem("lantern-off"))))[0];
     await pick(page, offOne); assert.match(await page.textContent('#got'), /Only 2 abilities at a time/); assert.equal((await abilitiesOn()).length, 2);
@@ -414,11 +425,29 @@ const GAMES = {
       await page.click('#look'); st = await state(); assert.equal(st.crash, null, 'no wreck is left after a look'); assert.equal(st.win, null);
       assert.deepEqual(await saved(), before, 'showing changes no save'); assert.ok(Math.abs(await page.evaluate(() => document.querySelector('#shop > div').scrollTop) - top) < 2, 'the shop comes back where it was');
     }
-    await page.click('[data-item="slow"]'); await until(page, () => window.lanternSim().slow > 0, 'the ability is taken in the look'); await page.click('#look');
+    // Each ability is shown doing its work (note #123): staged on a short real river, by the clock. Nothing is saved or sent.
+    const saves0 = await saved(), sent0 = labSent(page).length;
+    for (const [id, done, what] of [
+      ['boost', () => window.lanternSim().boost > 0 && window.lanternSim().y > 2.1, 'boost: taken, and the boat passes the rock in its path'],
+      ['slow', () => window.lanternSim().slow > 0, 'slow water taken'],
+      ['size', () => window.lanternSim().size > 0 && !window.lanternSim().big, 'a smaller boat'],
+      ['magnet', () => window.lanternSim().taken >= 3, 'the magnet pulls embers that were out of reach'],
+      ['flare', () => window.lanternSim().flare > 0 && window.lanternSim().light === 1, 'the flare fills a low flame'],
+      ['shield', () => window.lanternSim().rocks.some(k => k.pushed), 'the force field pushes a rock aside'],
+      ['heart', () => window.__hearts2 && window.lanternSim().hearts === 1 && !window.lanternSim().over, 'the heart is taken, then takes the hit'],
+    ]) {
+      await page.evaluate(() => { window.__hearts2 = false; });
+      await page.locator(`[data-item="${id}"]`).scrollIntoViewIfNeeded(); await page.click(`[data-item="${id}"]`);
+      assert.equal((await state()).scene, id); if (id === 'flare') assert.ok((await state()).light < 0.3, 'the flare starts on a low flame');
+      if (id === 'heart') await until(page, () => (window.__hearts2 = window.__hearts2 || window.lanternSim().hearts === 2), 'the heart is taken', 6000);
+      await until(page, done, what, 8000); await page.click('#look');
+    }
+    assert.deepEqual(await saved(), saves0, 'showing an ability changes no save'); assert.equal(labSent(page).length, sent0, 'showing an ability sends nothing');
     // Erase everything (note #73, tester tools): two taps; every lantern- key goes and nothing else.
     await page.click('[data-test="reset"]'); assert.ok(Object.keys(await saved()).length > 3, 'one tap erases nothing');
     await Promise.all([page.waitForEvent('load'), page.click('[data-test="reset"]')]);
-    assert.deepEqual(await saved(), {}, 'every lantern- key is gone'); assert.equal(await page.evaluate(() => localStorage.getItem('notes.k')), 'check', 'the tester link stays');
+    const fresh = await saved(); assert.deepEqual(Object.keys(fresh), ['lantern-start'], 'every lantern- key is gone; a new player gets a first ability');
+    assert.ok(ABILITY.includes(fresh['lantern-start'])); assert.ok((await state()).owned.includes(fresh['lantern-start']), 'a new player owns the first ability'); assert.equal(await page.evaluate(() => localStorage.getItem('notes.k')), 'check', 'the tester link stays');
     st = await state(); assert.equal(st.bank, 0); assert.equal(st.opened, 1);
   },
   async 'ant-promotion'(page) {
@@ -641,7 +670,8 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     });
     page.on('pageerror', e => errors.push(String(e))); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     page.on('requestfailed', r => errors.push(`request failed: ${r.url()}`)); page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
-    try { await within(run(page), 150000, 'the whole check'); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
+    // Lantern's check is the longest: its seven ability showings (note #123) took it past 150 s on WebKit.
+    try { await within(run(page), game === 'lantern' ? 240000 : 150000, 'the whole check'); assert.deepEqual(errors.filter(e => !(context.labDown && /human\.adamwhite\.work|Load failed|Failed to fetch|ERR_CONNECTION_REFUSED/.test(e))).filter(e => !(context.boardBad && /\/lab-api\/board\/|status of 401/.test(e))), [], 'page errors'); console.log(`ok   ${game} on ${phone}`); }
     catch (e) { failed++; console.log(`FAIL ${game} on ${phone}: ${e.message}`); if (errors.length) console.log('     ' + errors.join('\n     ')); }
     try { await within(context.close(), 15000, 'closing the page'); }
     catch (e) { console.log(`     ${e.message}; starting the browser again`); browser.close().catch(() => {}); browser = await engine.launch(); }
