@@ -600,7 +600,7 @@ function guideGesture(ctx, game, clock) {
   const progress = (clock % 5.8) / 5.8;
   const fade = Math.min(1, progress * 10, (1 - progress) * 9);
   ctx.save();
-  ctx.globalAlpha = fade * .63;
+  ctx.globalAlpha = .63;
   ctx.setLineDash([1, 6]);
   line(ctx, paper, 1.65, `M${dog.x} ${dog.y - 3}Q${dog.x + 8} ${under + 8} ${groupX} ${under}`);
   line(ctx, gold, 1.4, `M${groupX} ${groupY - 22}Q${groupX - 4} ${(groupY + gate.y) / 2} ${gate.x} ${gate.y + 21}`);

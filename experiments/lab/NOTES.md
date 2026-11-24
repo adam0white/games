@@ -75,6 +75,12 @@ Two new pages and a tuning pass on the second batch, by Codex builders. For this
 | 2026-11-24 | `lantern-race` (client) | Client follows the new room rules: ready list, countdown, racers only, watchers join the next round; `check.mjs` waits are bounded (it hung for an hour on main before) | Builder: check passes both profiles in 135 s | Keep testing with two real phones |
 | 2026-11-24 | `night-bells`, `night-lamp-keeper` (review fixes) | A reviewer played both to the end on both profiles and fixed landscape clipping, hit targets, rerouting, progress saves and the relight cue | Builder: all checks pass | Keep testing |
 
+| 2026-11-24 | `night-kite` | A kite as a rigid body on a string in a seeded wind field with gusts and thermals; the thumb is the hand on the line; 10 flights and an endless evening | Builder: 100 of 100 campaign runs; reversed tether tension fails the bots. Lab rerun results are in the pull request | Keep testing |
+| 2026-11-24 | `night-loaves` | Dough as a soft body: knead, rise, bake in a heat field, hand loaves to neighbours; sharing the last loaf scores 10 against 5 for selling it; 8 mornings and endless | Builder: 55 bot runs pass; constant-heat mutation fails. Lab rerun results are in the pull request | Keep testing; the bet is that the dough feels like dough |
+| 2026-11-24 | `night-splitlight` | Wildcard: dispersion. White light splits into colours through glass; six levels | Builder: 294 of 294 seeded runs; removing dispersion fails the bots. Lab rerun results are in the pull request | Keep testing |
+| 2026-11-24 | `lantern-tide` | Lantern with readable currents: fast water saves flame near rocks, eddies behind rocks relight. Rules imported from the main game | Builder: a current-reading bot reaches dawn in 22 of 48 runs against 9 of 48 for plain drag; tide off matches the main game for 63,679 ticks | Keep testing |
+| 2026-11-24 | `night-channels`, `night-flock`, `night-podwire` (review fixes) | A reviewer played all three to the end on both profiles and fixed rotation, landscape layout, save and accidental-input faults | Builder: 10 of 10, 10 of 10 and 6 of 6 levels on both profiles | Keep testing |
+
 - 2026-11-24: Codex was upgraded on the build machine while builders ran, and three builders stopped with a missing helper binary. Rerunning them worked. Do not upgrade Codex mid-run.
 
 ## Round of 2026-11-24 (ideas scan)

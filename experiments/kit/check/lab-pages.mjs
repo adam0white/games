@@ -19,6 +19,11 @@ const saves = {
   boat: { v: 1, best: 120, stars: [2, 1, 0, 0, 0, 0], runs: 3, sound: true },
   face: { v: 1, best: 300, runs: 3, stars: [2, 1, 0, 0], sound: true },
   pour: { v: 1, stars: [0, 0, 0, 0, 0, 0, 0, 0], sound: true, tries: 3 },
+  bells: { v: 1, stars: [2, 0, 0, 0, 0, 0, 0, 0], best: 120, sound: true, tries: 3, look: 'moon' },
+  keeper: { v: 1, unlocked: 2, sound: true, played: true, daily: { day: localDay, score: 1400 } },
+  channels: { unlocked: 3, completed: false, sound: true },
+  flock: { v: 1, unlocked: 2, best: 17, sound: true, played: true },
+  podwire: { v: 1, next: 2, complete: false, sound: true },
 };
 
 function pageEntry(key, value, hintKey, rest, secondary = {}) {
@@ -52,6 +57,91 @@ async function raceStart(page) {
   await page.click('#ready');
   await page.waitForFunction(() => window.raceState().phase === 'race', null, { timeout: 12000 });
   assert.equal(await page.evaluate(() => window.raceState().offline), true, 'offline race uses the pausable local clock');
+}
+
+async function ringBell(page, { until }) {
+  const count = await page.evaluate(() => {
+    const { hits, misses } = window.bellsState();
+    return hits + misses;
+  });
+  await page.tap('#pad0');
+  await until(page, n => {
+    const { hits, misses } = window.bellsState();
+    return hits + misses === n + 1;
+  }, 'one touch strikes the bell', 4000, count);
+}
+
+async function drawKeeperRoute(page, { finger, until }) {
+  const points = await page.evaluate(() => {
+    const { state: { edges, nodes, keeper }, transform: { scale, ox, oy } } = window.lampState();
+    const neighbor = edges.find(([a, b]) => a === keeper.node || b === keeper.node).find(id => id !== keeper.node);
+    return [keeper.node, neighbor].map(id => [ox + nodes[id].x * scale, oy + nodes[id].y * scale]);
+  });
+  await finger(page, '#c', [['pointerdown', ...points[0]], ['pointermove', ...points[1]], ['pointerup', ...points[1]]]);
+  await until(page, () => window.lampState().state.events.some(event => event.type === 'route'), 'touch commits a lamp route');
+}
+
+async function digChannel(page, { finger, until }) {
+  const { remaining, cell, start, bank } = await page.evaluate(() => {
+    const { state, geometry } = window.channelView();
+    const bounds = document.querySelector('#garden').getBoundingClientRect();
+    const point = id => [
+      bounds.left + geometry.x + (id % state.cols + .5) * geometry.size,
+      bounds.top + geometry.y + (Math.floor(id / state.cols) + .5) * geometry.size,
+    ];
+    // Both the seeded campaign garden and every daily keep this downhill bank diggable.
+    const furrow = state.source + state.cols;
+    const cell = furrow + state.cols;
+    return { remaining: state.remaining, cell, start: point(furrow), bank: point(cell) };
+  });
+  await finger(page, '#garden', [['pointerdown', ...start], ['pointermove', ...bank], ['pointerup', ...bank]]);
+  await until(page, ({ remaining, cell }) => {
+    const { state } = window.channelView();
+    return state.remaining === remaining - 1 && state.cells[cell].dug;
+  }, 'one touch digs the adjacent bank', 4000, { remaining, cell });
+}
+
+async function guideDog(page, { finger, until }) {
+  const { left, top, width, height } = await page.locator('#field').evaluate(el => el.getBoundingClientRect().toJSON());
+  const x = left + width * .5, y = top + height * .7;
+  const before = await page.evaluate(() => window.flockState().game.dog);
+  await finger(page, '#field', [['pointerdown', x, y], ['pointermove', x, y - height * .1]]);
+  await until(page, ({ x, y }) => {
+    const { game, pressed } = window.flockState();
+    return game.started && pressed && Math.hypot(game.dog.x - x, game.dog.y - y) >= 1;
+  }, 'held touch moves the sheepdog', 4000, before);
+  await finger(page, '#field', [['pointerup', x, y - height * .1]]);
+}
+
+async function pluckWire(page, { until }, depth = 12) {
+  const { zones, plucks } = await page.evaluate(() => window.podwireView());
+  const [low, high] = zones[0];
+  const { left, top, width, height } = await page.locator('#board').evaluate(el => el.getBoundingClientRect().toJSON());
+  const x = left + width * (low + high) / 720, y = top + height * 250 / 380;
+  const endY = y + height * depth / 380;
+  const chromium = page.context().browser().browserType().name() === 'chromium';
+  const session = chromium ? await page.context().newCDPSession(page) : null;
+  const touch = (type, touchPoints) => session.send('Input.dispatchTouchEvent', { type, touchPoints });
+  try {
+    // The wire uses native pointer capture. WebKit exposes only single-touch taps.
+    if (session) await touch('touchStart', [{ x, y }]);
+    else { await page.mouse.move(x, y); await page.mouse.down(); }
+    await until(page, () => window.podwireView().grip !== null, 'pointer grips the wire');
+    if (session) await touch('touchMove', [{ x, y: endY }]);
+    else await page.mouse.move(x, endY, { steps: 4 });
+  } finally {
+    if (session) {
+      try { await touch('touchEnd', []); } finally { await session.detach(); }
+    } else await page.mouse.up();
+  }
+  await until(page, n => window.podwireView().plucks === n + 1, 'releasing the wire plucks it', 4000, plucks);
+}
+
+async function openFirstPod(page, checks) {
+  await checks.until(page, () => window.podwireView?.().screen === 'play', 'first plate is ready');
+  if (await page.evaluate(() => window.podwireView().level) !== 1) return;
+  await pluckWire(page, checks, 83);
+  await checks.until(page, () => window.podwireView().screen === 'won', 'first pod opens');
 }
 
 export const labPages = {
@@ -145,4 +235,60 @@ export const labPages = {
     touch: dragTouch(() => window.pourState().angle, n => window.pourState().angle > n + .02, [[140, 430], [200, 430]]),
     hint: { before: () => window.pourState().angle, moved: n => window.pourState().angle > n + .02 },
   }, { 'wild-pour:daily': json({ v: 1, day: utcDay, off: 1, spilled: 2 }) }),
+  'lab/night-bells': pageEntry('night-bells:save', saves.bells, 'night-bells:hint', {
+    menu: '#quit', sound: '#sound2', changed: { 'night-bells:save': { tries: 1 } },
+    state: () => { const s = window.bellsState?.(); return s && { screen: s.screen, t: s.t }; },
+    verify: () => ({ save: window.bellsState().saved, play: document.querySelector('#play').ariaLabel }),
+    expect: { save: saves.bells, play: 'Play level 2' },
+    touch: ringBell,
+    hint: { delay: 1600, timing: { start: '#play' }, input: ringBell },
+  }),
+  'lab/night-lamp-keeper': pageEntry('night-lamp-keeper:save', saves.keeper, 'night-lamp-keeper:hint', {
+    menu: '#quit', sound: '#sound2',
+    state: () => { const s = window.lampState?.(); return s && { screen: s.screen, t: s.state?.t ?? 0 }; },
+    verify: () => ({
+      save: window.lampState().saved,
+      evening: document.querySelector('#levels .current').textContent,
+      daily: document.querySelector('#dailyBest').textContent,
+    }),
+    expect: { save: saves.keeper, evening: '2', daily: 'Today’s best on this device: 1400' },
+    touch: drawKeeperRoute,
+    hint: { delay: 4500, timing: { start: '#play' }, input: drawKeeperRoute },
+  }),
+  'lab/night-channels': pageEntry('night-channels:save', saves.channels, 'night-channels:hint', {
+    startsOnBoard: true, menu: '#gardens', sound: '#sound',
+    state: () => { const s = window.channelView?.(); return s && { screen: s.screen === 'selection' ? 'menu' : s.screen, t: s.state.ticks }; },
+    verify: () => {
+      const s = window.channelView();
+      return { level: s.level, unlocked: s.unlocked, sound: document.querySelector('#sound').getAttribute('aria-pressed') };
+    },
+    expect: { level: 3, unlocked: 3, sound: 'true' },
+    touch: digChannel,
+    hint: { delay: 4000, play: '#openList', timing: { start: '#pickDaily' }, input: digChannel,
+      start: async page => { await page.click('#openList'); await page.click('#pickDaily'); } },
+  }),
+  'lab/night-flock': pageEntry('night-flock:save', saves.flock, 'night-flock:hint', {
+    startsOnBoard: true, menu: '#evenings', sound: '#sound', pausePosition: { x: 8, y: 23 },
+    state: () => { const s = window.flockState?.(); return s && { screen: s.screen === 'evenings' ? 'menu' : s.screen, t: s.game.time }; },
+    verify: () => ({ save: window.flockState().saved, level: window.flockState().game.level }),
+    expect: { save: saves.flock, level: 2 },
+    touch: guideDog,
+    hint: { delay: 8500, play: '#pause', timing: { start: '#endless' }, input: guideDog,
+      start: async page => { await page.click('#pause'); await page.click('#evenings'); await page.click('#endless'); } },
+  }),
+  'lab/night-podwire': pageEntry('night-podwire:progress', saves.podwire, 'night-podwire:next-hint', {
+    startsOnBoard: true, sound: '#sound',
+    state: () => { const s = window.podwireView?.(); return s && { screen: s.screen, t: s.time }; },
+    verify: () => {
+      const s = window.podwireView();
+      return { level: s.level, sound: s.sound, completed: document.querySelectorAll('#marks .done').length };
+    },
+    expect: { level: 2, sound: true, completed: 1 },
+    touch: pluckWire,
+    hint: { delay: 5500, play: '#board', timing: { result: '#won.on' }, start: openFirstPod,
+      input: async (page, { until }) => {
+        await page.tap('#next');
+        await until(page, () => window.podwireView().level === 2 && window.podwireView().screen === 'play', 'Next opens the second plate');
+      } },
+  }),
 };

@@ -43,14 +43,15 @@ export function grab(s, x, y) {
       !s.zones.some(([a, b]) => x >= a && x <= b) ||
       Math.abs(y - BASE - at(s, x)) > 29) return false;
   const i = Math.round((x - LEFT) / SPACING);
-  s.grip = { i, y, start: s.u[i], depth: 0, oldU: s.u.slice(), oldV: s.v.slice() };
+  s.grip = { i, y, start: s.u[i], depth: 0, travel: 0, oldU: s.u.slice(), oldV: s.v.slice() };
   return true;
 }
 
 export function pull(s, y) {
   const g = s.grip;
   if (!g || !Number.isFinite(y)) return;
-  g.depth = Math.max(0, Math.min(MAX_PULL, y - g.y + g.start));
+  g.travel = y - g.y;
+  g.depth = Math.max(0, Math.min(MAX_PULL, g.travel + g.start));
   for (let i = 0; i < COUNT; i++) {
     const slope = i <= g.i ? i / g.i : (COUNT - 1 - i) / (COUNT - 1 - g.i);
     s.u[i] = slope * g.depth;
@@ -67,7 +68,7 @@ export function cancel(s) {
 
 export function release(s) {
   if (!s.grip) return false;
-  if (s.grip.depth < 5) { cancel(s); return false; }
+  if (s.grip.depth < 5 || s.grip.travel < 5) { cancel(s); return false; }
   s.grip = null;
   s.plucks++;
   s.ringing = true;

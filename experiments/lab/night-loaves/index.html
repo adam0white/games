@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f4e8cb">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./style.css">
+  <title>Night Loaves</title>
+</head>
+<body>
+  <main id="page">
+    <header><div><div class="kicker" id="chapter">Morning 01 / 08</div><h1>Night <i>Loaves</i></h1></div>
+      <button id="pause" class="round" aria-label="Pause"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12M16 6v12" stroke="currentColor" stroke-width="3.5"/></svg></button>
+    </header>
+    <div class="picture"><canvas id="bakery" width="360" height="490" aria-label="Bakery workbench. Drag the dough to fold it."></canvas></div>
+    <footer>
+      <div class="line"><strong id="instruction" aria-live="polite">Fold the dough</strong><span id="loaves">2 loaves</span></div>
+      <div id="track" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+      <div class="line small"><span id="flour">Country white</span><span id="points">0 points</span></div>
+    </footer>
+  </main>
+  <section id="paused" class="sheet" aria-labelledby="rest"><div class="card">
+    <div class="kicker" id="pause-chapter"></div><h2 id="rest">Oven break</h2>
+    <button id="resume" class="primary">Back to the bench</button>
+    <div class="pair"><select id="mornings" aria-label="Choose a morning"></select><button id="sound">Sound on</button></div>
+    <button id="endless">Endless morning ∞</button><p id="record"></p>
+  </div></section>
+  <section id="result" class="sheet" aria-labelledby="ending"><div class="card">
+    <div class="kicker" id="result-chapter"></div><h2 id="ending"></h2>
+    <p id="receipt"></p><p id="result-score"></p>
+    <button id="next" class="primary">Next morning →</button><button id="retry">Bake again</button>
+  </div></section>
+  <script type="module" src="./main.js"></script><script src="/notes/button.js" defer></script>
+</body></html>

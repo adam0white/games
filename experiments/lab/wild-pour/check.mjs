@@ -1,17 +1,20 @@
 // Phone check for Pour: PLAYWRIGHT=<dir with playwright> node experiments/lab/wild-pour/check.mjs [webkit|chromium]
 // Serves experiments/ on a free port, plays level 1 by real touch pointer events on WebKit (iPhone 13) and
-// Chromium (Pixel 7), and fails on any page or console error. Screenshots go to $SHOTS (default ./screenshots beside this file).
+// Chromium (Pixel 7), and fails on any page or console error. Set HEADED=1 to open a window.
+// Screenshots go to $SHOTS or a new folder in the system temp directory.
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { readFile, mkdir } from 'node:fs/promises';
+import { readFile, mkdir, mkdtemp } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
 import assert from 'node:assert/strict';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../..');
-const SHOTS = process.env.SHOTS || join(here, 'screenshots');
+const SHOTS = process.env.SHOTS || await mkdtemp(join(tmpdir(), 'wild-pour-check-'));
 await mkdir(SHOTS, { recursive: true });
+console.log(`Screenshots: ${SHOTS}`);
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript' };
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
@@ -30,6 +33,24 @@ const PHONES = { webkit: [webkit, devices['iPhone 13']], chromium: [chromium, de
 const sleep = ms => new Promise(done => setTimeout(done, ms));
 const state = page => page.evaluate(() => window.pourState());
 async function until(page, fn, what, ms = 15000) { try { await page.waitForFunction(fn, null, { timeout: ms }); } catch { throw new Error(`timed out waiting for: ${what}`); } }
+
+async function readyRenderer(page, name, headed) {
+  await page.bringToFront();
+  if (name !== 'webkit' || headed || process.platform !== 'darwin') return;
+  const viewport = page.viewportSize();
+  const framesReady = () => page.evaluate(() => new Promise(resolve => {
+    const timeout = setTimeout(() => resolve(false), 2000);
+    requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(timeout); resolve(true); }));
+  }));
+  if (await framesReady()) return;
+  // Reattach the display link, then check it at the original phone size.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.setViewportSize({ ...viewport, width: viewport.width + 1 });
+    await page.setViewportSize(viewport);
+    if (await framesReady()) return;
+  }
+  throw new Error('timed out waiting for: headless WebKit animation frames');
+}
 
 // One pour by a thumb: press under the jug, slide right until the juice runs, ease off as the glass nears the line, lift.
 async function pour(page, shot) {
@@ -55,12 +76,14 @@ async function pour(page, shot) {
 
 async function run(name) {
   const [type, device] = PHONES[name];
-  // Keep the display awake while measuring macOS WebKit's animation clock; release it after the test.
-  const awake = process.platform === 'darwin' ? spawn('/usr/bin/caffeinate', ['-diu', '-t', '180'], {stdio:'ignore'}) : null;
+  const headed = process.env.HEADED === '1';
+  // macOS WebKit can stop scheduling frames when the display sleeps, even headless.
+  const awake = name === 'webkit' && process.platform === 'darwin'
+    ? spawn('/usr/bin/caffeinate', ['-diu', '-t', '180'], { stdio: 'ignore' })
+    : null;
   let browser;
   try {
-  if (awake) await sleep(1000); // wake the display before WebKit creates its view
-  browser = await type.launch({ headless: process.env.HEADED !== '1' && !(name === 'webkit' && process.platform === 'darwin') });
+  browser = await type.launch({ headless: !headed });
   const ctx = await browser.newContext({ ...device });
   const page = await ctx.newPage();
   const errors = [];
@@ -68,8 +91,7 @@ async function run(name) {
   page.on('console', m => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
   await page.goto(`${base}/lab/wild-pour/?seed=3&perf=1`);
   await until(page, () => window.pourState && window.pourState().screen === 'menu', 'menu');
-  await sleep(300);
-  await page.bringToFront();
+  await readyRenderer(page, name, headed);
   const boot = await page.evaluate(() => new Promise(resolve => {
     let frames = 0, done = false;
     const tick = () => { frames++; if (!done) requestAnimationFrame(tick); };
@@ -126,6 +148,7 @@ async function run(name) {
   assert.equal(await page.locator('#levels button:not([disabled])').count(), 2, 'level 2 is open on the menu');
   await page.reload();
   await until(page, () => window.pourState && window.pourState().screen === 'menu', 'menu after reload');
+  await readyRenderer(page, name, headed);
   st = await state(page); assert.ok(st.saved[0] >= 1, 'stars survive a reload');
 
   // Profile the actual animation loop separately from screenshot capture and automation.
@@ -192,6 +215,7 @@ async function run(name) {
   assert.equal(retry.daily.day, dailyStart.daily.day, 'daily retry keeps day');
   await page.reload();
   await until(page, () => window.pourState?.().screen === 'menu', 'daily reload');
+  await readyRenderer(page, name, headed);
   assert.ok((await page.locator('#dailyBest').textContent()).includes(`${dailyEnd.daily.best.off} from the line`), 'device best survives reload');
   await page.tap('#daily');
   assert.deepEqual((await state(page)).daily.best, dailyEnd.daily.best, 'reload preserves exact daily best');

@@ -37,12 +37,14 @@ const audio = sound({ on: () => saved.sound });
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 let mode = 'campaign', level = saved.unlocked, wave = 1, carried = 0, endlessSeed = 0;
 let game, screen, lastFrame = null, owner = null, target = null, fromFields = 'paused';
+let gestureStart = null, tutorialMoved = false;
 let endWait = 0, message = '', messageUntil = 0, clock = 0;
 
 function release() {
   const previous = owner;
   owner = null;
   target = null;
+  gestureStart = null;
   if (previous !== null && canvas.hasPointerCapture(previous)) canvas.releasePointerCapture(previous);
 }
 const display = screens(['paused', 'evenings-screen', 'end'], id => {
@@ -56,6 +58,7 @@ function describe() {
 }
 function fresh() {
   release();
+  tutorialMoved = false;
   const seed = mode === 'campaign' ? level : (endlessSeed + Math.imul(wave, 2654435761)) >>> 0;
   game = createGame(mode === 'campaign' ? level : 10 + wave, seed);
   message = '';
@@ -176,6 +179,9 @@ el('sound').onclick = () => {
   } else audio.hold();
 };
 onLeave(pause);
+matchMedia('(orientation: portrait)').addEventListener('change', () => {
+  if (game.started || owner !== null) pause();
+});
 addEventListener('keydown', event => {
   if (!isPauseKey(event) || event.repeat) return;
   if (screen === 'play') pause();
@@ -197,6 +203,7 @@ canvas.addEventListener('pointerdown', event => {
   event.preventDefault();
   owner = event.pointerId;
   target = point(event);
+  gestureStart = target;
   try { canvas.setPointerCapture(owner); } catch { /* Dispatched pointers have no capture. */ }
   audio.release();
   audio.unlock();
@@ -206,7 +213,9 @@ canvas.addEventListener('pointerdown', event => {
   if (!game.started) step(game, 1 / 60, target);
 });
 canvas.addEventListener('pointermove', event => {
-  if (event.pointerId === owner) target = point(event);
+  if (event.pointerId !== owner) return;
+  target = point(event);
+  if (!tutorialMoved && Math.hypot(target.x - gestureStart.x, target.y - gestureStart.y) >= 14) tutorialMoved = true;
 });
 for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) {
   canvas.addEventListener(event, e => { if (e.pointerId === owner) release(); });
@@ -228,7 +237,9 @@ function resize() {
 }
 function paint() {
   ctx.setTransform(canvas.width / 360, 0, 0, canvas.height / 520, 0, 0);
-  draw(ctx, game, {clock: reducedMotion.matches && !game.started ? 1.7 : clock, look, pressed: target, guide: mode === 'campaign' && level === 1 && !game.started && !help.shown && query.get('hint') !== '0'});
+  const guide = mode === 'campaign' && level === 1 && !tutorialMoved && !target && game.status === 'play'
+    && !help.shown && query.get('hint') !== '0';
+  draw(ctx, game, { clock: reducedMotion.matches && (!game.started || guide) ? 1.7 : clock, look, pressed: target, guide });
 }
 function frame(now) {
   const dt = lastFrame === null ? 0 : Math.min(.12, (now - lastFrame) / 1000);

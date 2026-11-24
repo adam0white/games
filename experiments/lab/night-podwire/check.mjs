@@ -12,7 +12,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const experiments = resolve(here, '../..');
 const route = '/lab/night-podwire/';
 const progressKey = 'night-podwire:progress';
-const shots = '/private/tmp/night-r3-wild';
+const shots = '/private/tmp/night-r4-review/podwire';
 const modules = process.env.PLAYWRIGHT || join(homedir(), 'code/human-framework/node_modules');
 const require = createRequire(join(resolve(modules), 'check.cjs'));
 const { webkit, chromium, devices } = require('playwright');
@@ -81,7 +81,13 @@ async function shot(page, name) {
   }
   throw new Error(name + ': captured board is blank');
 }
-const ready = page => page.waitForFunction(() => window.podwireView?.().screen === 'play');
+const ready = page => page.waitForFunction(() => window.podwireView?.().screen === 'play', null, { polling: 100 });
+
+function timingSummary(samples) {
+  samples.sort((a, b) => a - b);
+  return { frames: samples.length, p95: +samples[Math.floor((samples.length - 1) * .95)].toFixed(2),
+    max: +samples.at(-1).toFixed(2), over16_7ms: samples.filter(ms => ms > 16.7).length };
+}
 
 async function wirePoint(page, x, y) {
   const board = await boardRect(page);
@@ -162,6 +168,19 @@ async function run(name, base) {
     page.on('response', response => { if (response.status() >= 400) errors.push(response.url() + ' ' + response.status()); });
     await page.addInitScript(() => {
       document.addEventListener('pointerdown', e => { window.checkPointerId = e.pointerId; }, true);
+      const requestFrame = window.requestAnimationFrame.bind(window);
+      let last;
+      window.checkFrames = { work: [], intervals: [] };
+      window.requestAnimationFrame = callback => {
+        if (callback.name !== 'frame') return requestFrame(callback);
+        return requestFrame(now => {
+          const began = performance.now();
+          callback(now);
+          window.checkFrames.work.push(performance.now() - began);
+          if (last !== undefined) window.checkFrames.intervals.push(now - last);
+          last = now;
+        });
+      };
     });
     if (name === 'webkit') {
       // Wake the display link on this test host and restore the exact device viewport.
@@ -177,7 +196,7 @@ async function run(name, base) {
     assert.deepEqual([start.level, start.opened, start.plucks], [1, 0, 0]);
     assert.match(await page.locator('meta[name=viewport]').getAttribute('content'), /maximum-scale=1/);
     await shot(page, name + '-01-opening');
-    await hand.pull();
+    await hand.pull(180, 44);
     assert.equal((await view(page)).opened, 0, 'holding alone must not open a pod');
     await shot(page, name + '-02-held');
     await hand.release();
@@ -189,6 +208,7 @@ async function run(name, base) {
     assert.equal(won.plucks, 1);
     await shot(page, name + '-03-opened');
     console.log(name, 'first plate opened');
+    const openingFrames = await page.evaluate(() => window.checkFrames);
 
     await page.tap('#next');
     await ready(page);
@@ -207,6 +227,7 @@ async function run(name, base) {
     await page.tap('#pause');
     const paused = await view(page);
     assert.equal(paused.screen, 'paused');
+    await shot(page, name + '-06-paused');
     await delay(300);
     assert.equal((await view(page)).time, paused.time, 'pause freezes the wire');
     await page.tap('#sound');
@@ -218,13 +239,36 @@ async function run(name, base) {
     await page.tap('#retry');
     await ready(page);
     assert.deepEqual([(await view(page)).level, (await view(page)).plucks], [2, 0]);
+    await page.goto('about:blank');
+    await page.goBack();
+    await page.waitForFunction(() => window.podwireView?.().level === 2, null, { polling: 100 });
+    if ((await view(page)).screen === 'paused') await page.tap('#resume');
+    await ready(page);
+    assert.equal((await view(page)).plucks, 0, 'returning to the game preserves the unlocked plate');
     await page.reload();
     await ready(page);
     assert.equal((await view(page)).sound, !paused.sound, 'sound preference survives reload');
+
+    // A rotation changes the coordinate system of a held finger.
+    const portrait = page.viewportSize();
+    const portraitBoard = await boardRect(page);
+    const landscape = devices[name === 'webkit' ? 'iPhone 13 landscape' : 'Pixel 7 landscape'].viewport;
+    await hand.pull(99, 64);
+    await page.setViewportSize(landscape);
+    await page.waitForFunction(() => window.podwireView().grip === null, null, { polling: 100 });
+    await hand.release();
+    const landscapeBoard = await boardRect(page);
+    assert.ok(landscapeBoard.height >= landscape.height - 24, 'landscape uses the screen height for the playable wire');
+    assert.ok(landscapeBoard.y + landscapeBoard.height <= landscape.height, 'landscape board fits on screen');
+    assert.deepEqual([(await view(page)).plucks, (await view(page)).opened], [0, 0],
+      'rotating and lifting cannot release an accidental pluck');
+    await shot(page, name + '-07-rotated');
     await hand.pull(99);
     await hand.release();
     await page.waitForFunction(() => window.podwireView().screen === 'won');
     assert.equal((await view(page)).plucks, 1, 'one deep pluck opens the remote pod');
+    await shot(page, name + '-08-rotated-win');
+    await page.setViewportSize(portrait);
 
     const campaign = [won.plucks, (await view(page)).plucks];
     for (let level = 3; level <= 6; level++) {
@@ -232,6 +276,18 @@ async function run(name, base) {
       await ready(page);
       const plate = await view(page);
       assert.equal(plate.level, level);
+      await shot(page, name + '-plate-' + level + '-start');
+      if (level === 4) {
+        await hand.pull(267, 86);
+        await hand.release();
+        await page.waitForFunction(() => window.podwireView().opened === 1);
+        await shot(page, name + '-plate-4-partial');
+        await page.reload();
+        await ready(page);
+        const replay = await view(page);
+        assert.deepEqual([replay.level, replay.opened, replay.plucks], [4, 0, 0],
+          'reload mid-plate restarts that attempt and keeps the unlocked plate');
+      }
       // Pull each marked sleeve to y=368. Even if the wire has drifted across
       // the touch tolerance while the finger lands, this reaches full tension.
       for (const [low, high] of plate.zones) {
@@ -258,9 +314,11 @@ async function run(name, base) {
       const finished = await view(page);
       assert.equal(finished.opened, plate.total);
       campaign.push(finished.plucks);
+      await shot(page, name + '-plate-' + level + '-end');
       console.log(name, 'plate', level, 'opened');
     }
     await shot(page, name + '-05-collection');
+    const laterFrames = await page.evaluate(() => window.checkFrames);
     const saved = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), progressKey);
     assert.equal(saved.complete, true, 'collecting every plate persists completion');
     assert.equal(saved.next, 6);
@@ -275,12 +333,36 @@ async function run(name, base) {
     await page.reload();
     await ready(page);
     assert.equal((await view(page)).level, 1, 'invalid save recovers');
+    const reverse = await page.evaluate(async () => {
+      const { create, grab, pull, release, tick, at, BASE } = await import('./sim.js');
+      const state = create(2, 834);
+      const x = 99;
+      grab(state, x, BASE);
+      pull(state, BASE + 12);
+      release(state);
+      for (let i = 0; i < 6; i++) tick(state);
+      const height = at(state, x);
+      const previous = state.u.slice();
+      grab(state, x, BASE + height);
+      pull(state, BASE + height);
+      return { height, released: release(state), plucks: state.plucks, restored: state.u.every((y, i) => y === previous[i]) };
+    });
+    assert.ok(reverse.height > 5, 'tap fixture starts on the downward deflection of the ringing wire');
+    assert.deepEqual([reverse.released, reverse.plucks, reverse.restored], [false, 1, true],
+      'a tap on the displaced wire neither plucks nor absorbs the previous wave');
     await hand.pull();
     await hand.cancel();
     const cancelled = await view(page);
     assert.deepEqual([cancelled.grip, cancelled.plucks], [null, 0]);
     await page.waitForFunction(t => window.podwireView().time > t + 0.8, cancelled.time);
     assert.equal((await view(page)).opened, 0, 'cancelled pull produces no seed burst');
+
+    await page.tap('#pause');
+    await page.evaluate(key => localStorage.setItem(key, JSON.stringify({ v: 1, next: 6, complete: true, sound: false })), progressKey);
+    await page.tap('#sound');
+    assert.deepEqual(await page.evaluate(key => JSON.parse(localStorage.getItem(key)), progressKey),
+      { v: 1, next: 6, complete: true, sound: true }, 'a stale tab sound tap preserves newer progress and toggles current sound');
+    await page.evaluate(key => localStorage.removeItem(key), progressKey);
 
     // A blocked write still permits play and progression for this visit.
     await page.addInitScript(() => {
@@ -299,7 +381,11 @@ async function run(name, base) {
     assert.deepEqual(errors, [], 'browser errors');
     assert.deepEqual(unapproved, [], 'unexpected requests');
     console.log(name, JSON.stringify({ firstWinSeconds: +seconds.toFixed(3), plucks: won.plucks,
-      opened: won.opened, total: won.total, campaignPlucks: campaign, errors: errors.length, unexpectedRequests: unapproved.length }));
+      opened: won.opened, total: won.total, campaignPlucks: campaign,
+      portraitBoardWidth: +portraitBoard.width.toFixed(2), landscapeBoardWidth: +landscapeBoard.width.toFixed(2),
+      openingTiming: { work: timingSummary(openingFrames.work), intervals: timingSummary(openingFrames.intervals) },
+      laterTiming: { work: timingSummary(laterFrames.work), intervals: timingSummary(laterFrames.intervals) },
+      errors: errors.length, unexpectedRequests: unapproved.length }));
   } finally {
     await browser.close();
   }

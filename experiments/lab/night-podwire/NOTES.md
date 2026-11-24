@@ -66,3 +66,31 @@ Outstanding evidence is first-time human play, physical thumb input, audible sou
 | Chromium, Pixel 7 | 31.668 | 1, 1, 1, 2, 3, 3 | 0 | 0 |
 
 The combined run exited 0. The opening clock started before navigation and included the opening and held-wire screenshot captures. Ten final phone screenshots were visually inspected, five per profile, covering the untouched first plate, held wire, first opening, second plate in blueprint and final collection.
+
+## 2026-11-24 — phone review
+
+- Landscape puts the controls beside the illustration. The check requires the board to use all but 24 CSS pixels of the short viewport's height. Rotation while holding the wire cancels the grip. Lifting the original finger leaves the attempt at 0 plucks and 0 open pods. A fresh landscape pull opens the remote pod on plate II.
+- A tap on a ringing wire used to release a new pluck if the wire was already deflected down. At 10.7535 board units below rest, a tap moved the counter from 1 to 2 and replaced the previous wave. Release now requires at least 5 board units of downward finger travel and 5 units of deflection. The same tap leaves the counter at 1 and restores the previous wave exactly.
+- A sound tap on a stale tab could overwrite a completed collection. The check opens a fresh plate I, writes a newer completed plate VI save and toggles sound from the stale page. The new write retains plate VI and completion and flips the stored sound preference in `night-podwire:progress`.
+
+The browser check uses the illustrated 44-unit pull on plate I. It exercises pause, resume, restart, navigation away and back, a held grip during rotation, landscape play, and a reload after opening 1 of 2 pods on plate IV. The reload retains plate IV and starts the attempt with 0 pods open and 0 plucks. All six plates are played through the canvas and buttons. The first opening has a 60-second wall-clock limit. The checks save captures to `/private/tmp/night-r4-review/podwire/`.
+
+The ordinary bots exited 0 with 192/192 clears over the original 32 seeds per plate. The 15-unit aim offset cleared 133/192. The momentum mutation exited 1 at the reflected-crest assertion.
+
+| Profile | First win (wall s) | Plucks on plates I–VI | Board width, portrait / landscape (CSS px) | Browser errors / unexpected requests |
+| --- | ---: | --- | ---: | ---: |
+| WebKit, iPhone 13 | 24.442 | 1, 1, 1, 2, 3, 3 | 346.00 / 312.63 | 0 / 0 |
+| Chromium, Pixel 7 | 46.351 | 1, 1, 1, 2, 3, 3 | 368.00 / 329.67 | 0 / 0 |
+
+The combined run exited 0. The opening sample runs through the first result capture. The later sample starts at the plate IV reload and ends at the collection capture.
+
+| Profile and sample | Work p95 / max (ms) | Work over 16.7 ms | Interval p95 / max (ms) | Interval over 16.7 ms |
+| --- | ---: | ---: | ---: | ---: |
+| WebKit, opening | 1.0 / 12.0 | 0 / 1,123 | 52.0 / 1,155.0 | 389 / 1,122 |
+| WebKit, after reload | 1.0 / 14.0 | 0 / 3,821 | 34.0 / 178.0 | 859 / 3,820 |
+| Chromium, opening | 0.2 / 17.5 | 1 / 1,764 | 16.7 / 19,999.2 | 503 / 1,763 |
+| Chromium, after reload | 0.3 / 7.5 | 0 / 4,659 | 16.7 / 50.1 | 1,476 / 4,658 |
+
+Work measures synchronous script and canvas calls. Intervals report callback delivery and include gaps during screen capture and scheduling on the shared host. The largest Chromium opening gap occurred in a run with host load above 170. Physical-device frame pacing remains unverified.
+
+All 34 phone captures were inspected, 17 per profile. They show the untouched cue, held wire, first opening, pause card, landscape before and after a pluck, the partially completed plate IV, and each later plate before and after its pods opened. Physical touch, audible sound and first-time human play remain unverified.

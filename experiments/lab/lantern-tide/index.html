@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1928">
+  <title>Lantern Tide</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./main.js"></script>
+  <script defer src="/notes/button.js"></script>
+</head>
+<body>
+  <canvas id="river" aria-label="River. Drag sideways or use the arrow keys to steer."></canvas>
+  <header id="hud" hidden>
+    <div class="instruments">
+      <div class="flame" id="flame" role="meter" aria-label="Flame" aria-valuemin="0" aria-valuemax="100" aria-valuenow="80">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M13 2c.8 5.3-3.6 6.3-3.4 10-1.3-.6-1.8-1.7-1.7-3.2-3 2.3-4.3 5.9-2 9.2 2.2 3.1 6.3 3.8 9.4 1.9 4.9-3 4.5-9.4-2.3-17.9Z"/></svg>
+        <span class="gauge"><i id="wick"></i></span>
+      </div>
+      <div id="hull"></div>
+    </div>
+    <div class="passage" id="passage" role="progressbar" aria-label="To dawn" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <svg aria-hidden="true" viewBox="0 0 26 21"><path d="M2 16h22M7 16a6 6 0 0 1 12 0M13 2v4M4 7l3 3m15-3-3 3M6 20h14"/></svg>
+      <span class="gauge"><i id="dawn"></i></span>
+    </div>
+    <button id="pause" class="icon" type="button" aria-label="Pause">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 6v12m6-12v12"/></svg>
+    </button>
+  </header>
+
+  <section id="ready" class="card opening" aria-labelledby="title">
+    <h1 id="title">Lantern<br>Tide</h1>
+    <button id="start" class="icon launch" type="button" aria-label="Launch">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 5 11 7-11 7Z"/></svg>
+    </button>
+  </section>
+  <section id="paused" class="card shade" aria-labelledby="pause-title">
+    <div class="panel">
+      <h2 id="pause-title">Paused</h2>
+      <button id="resume" type="button" class="action">Resume</button>
+      <button id="sound" type="button" aria-pressed="true">Sound on</button>
+      <button id="restart" type="button">Start again</button>
+    </div>
+  </section>
+  <section id="end" class="card shade" aria-labelledby="result">
+    <div class="panel">
+      <h2 id="result"></h2>
+      <p id="reading"></p>
+      <button id="next" type="button" class="action">Next night</button>
+      <button id="again" type="button">Try again</button>
+    </div>
+  </section>
+</body>
+</html>

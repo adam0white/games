@@ -96,7 +96,7 @@ function stone(ctx, x, y, width, height, angle, pale = false) {
 }
 
 function makeLandscape(layer, s, g, ratio, p) {
-  const ctx = layer.getContext('2d');
+  const ctx = layer.getContext('2d',{willReadFrequently:true});
   ctx.setTransform(g.size * ratio, 0, 0, g.size * ratio, g.x * ratio, g.y * ratio);
   const left = -g.x/g.size, top = -g.y/g.size;
   const width = layer.width/(ratio*g.size), height = layer.height/(ratio*g.size);
@@ -421,7 +421,9 @@ function dragHint(ctx, s, time) {
   ctx.restore();
 }
 
-export function render(canvas, s, {time=0, hint=false, look='moon', reduced=false}={}) {
+const landscapes = new WeakMap();
+
+export function render(canvas, terrain, s, {time=0, hint=false, look='moon', reduced=false}={}) {
   if (reduced) time=1.5;
   const g=geometry(canvas,s);
   if (!(g.size>0)) return;
@@ -429,8 +431,17 @@ export function render(canvas, s, {time=0, hint=false, look='moon', reduced=fals
   const w=Math.round(canvas.clientWidth*ratio), h=Math.round(canvas.clientHeight*ratio);
   if (canvas.width!==w || canvas.height!==h) {canvas.width=w;canvas.height=h;}
   const p=palettes[look] || palettes.moon;
+  const previous = landscapes.get(terrain);
+  if (!previous || previous.state !== s || previous.width !== w || previous.height !== h ||
+      previous.ratio !== ratio || previous.palette !== p) {
+    terrain.width = w;
+    terrain.height = h;
+    makeLandscape(terrain,s,g,ratio,p);
+    landscapes.set(terrain,{state:s,width:w,height:h,ratio,palette:p});
+  }
   const ctx=canvas.getContext('2d',{willReadFrequently:true});
-  makeLandscape(canvas,s,g,ratio,p);
+  ctx.resetTransform();
+  ctx.clearRect(0,0,w,h);
   ctx.setTransform(g.size*ratio,0,0,g.size*ratio,g.x*ratio,g.y*ratio);
   ctx.lineCap='round';ctx.lineJoin='round';
   channels(ctx,s,p);

@@ -65,3 +65,27 @@ The test harness foregrounds WebKit, changes the viewport by one CSS pixel for 1
 The shared kit self-test passed on both browsers. The two broad registered-game runs were interrupted after unrelated WebKit failures in the breath hint, race launch and a 3D page that lost its WebGL context. The full registered-game suite remains unverified. No shared files were edited.
 
 Still unverified: first-time human play, difficulty beyond the planner’s routes, physical-phone performance, and audio by ear. The screenshots and bot results describe local play.
+
+## 2026-11-24 — phone review
+
+- Render the unchanged soil, rocks and verge in a visible canvas behind the water and plants. Repaint that terrain on a new garden or backing-size change. The browser check counts terrain draws through digging and blooming and checks the composited soil pixels on both sides of a resize.
+- Keep the board in place when Next garden appears. Removing its 4 px top and bottom margins holds the control row at 45 px. The check compares the opening and winning board geometry exactly.
+- Cancel a held stroke when the board resizes and redraw the board even on pause. Otherwise its last point belongs to the previous coordinate system. The check holds on the spring while rotating, moves over a dry bank and requires zero cuts from that held stroke. A new tap must spend one cut on the landscape board. Reload then restores garden 2 with its full budget.
+- Remove the decorative instruments and narrow the sidebar margins in landscapes up to 720 CSS px wide. At 664 px the bloom reading previously overlapped the retry hit box. The check now measures the gap between readings and from the bloom reading to retry.
+
+The WebKit harness produced one completely black screenshot, including the header and footer. It now retries at most twice after a one-pixel viewport change and restores the original dimensions before the next capture. A screenshot with visible controls and missing terrain still fails the same 80% dry-soil pixel requirement.
+
+An independent Chromium opening sample before the split measured 165 animation callbacks at 2.50 ms p95 and 7.90 ms maximum. The callback interval was 33.40 ms p95. After the split, a separate opening-to-first-bloom run measured 825 callbacks at 0.50 ms p95 and 10.30 ms maximum. Zero callbacks took more than 16.7 ms. Its 824 callback intervals reached 16.80 ms p95 and 11,949.40 ms maximum, with 374 above 16.7 ms. These measurements include capture and shared-host scheduling delays and do not establish a sustained device frame rate.
+
+The WebKit native animation probe sampled the dry opening and the first wet furrow separately. Dry callback work fell from 2 ms p95 over 141 callbacks to 1 ms p95 over 224. Wet callback work fell from 2 ms p95 over 166 callbacks to 1 ms p95 over 232. The dry and wet callback interval p95 changed from 30 and 27 ms to 18 and 21 ms. The final maximum work took 1 and 6 ms. The final intervals exceeded 16.7 ms in 19/223 dry and 22/231 wet samples.
+
+The normal bot suite exited 0. All 10 gardens and all 365 daily layouts flowered. The mutated suite exited 1 on the 0.04659648444945441 mass discrepancy. The review left the rules and existing test thresholds unchanged.
+
+Both final browser checks exited 0. Each used real taps and drags to complete gardens 1–10, pause, retry, navigate away and return, and reload after tapping a bank in landscape. Chromium used trusted touch drags and WebKit used native mouse drags on the phone viewport. The two routes spent 3, 6, 7, 7, 10, 9, 12, 12, 13 and 11 cuts. Each check flowered all three daily beds and retained the 11-cut best after a 12-cut replay.
+
+| Profile | First bloom, wall s | First cell width, CSS px | Landscape gap, CSS px | Garden 1–10 ticks at win | Daily cuts / budget | Browser errors |
+| --- | ---: | ---: | ---: | --- | ---: | ---: |
+| WebKit, iPhone 13 | 5.75 | 43.1 | 38.20 | 166, 137, 184, 197, 276, 214, 502, 230, 318, 471 | 11 / 20 | 0 |
+| Chromium, Pixel 7 | 11.54 | 53.6 | 27.64 | 192, 150, 225, 222, 281, 259, 511, 256, 542, 388 | 11 / 20 | 0 |
+
+Fourteen accepted captures were inspected. They show the opening, growing bed, first bloom, rotated second garden, completed campaign and dry and completed daily. They live under `/private/tmp/night-r4-review/channels/`. First-time human play, difficulty without the tested routes, audio by ear, physical-phone frame rate and deployment remain unverified.
