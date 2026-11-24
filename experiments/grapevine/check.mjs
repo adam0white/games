@@ -10,7 +10,7 @@ import { dirname, extname, join, normalize, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
-import { solve, walk, step, startState, refuse } from './sim.js';
+import { solve, walk, step, startState, refuse, ONEWAY } from './sim.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = process.env.SHOTS || join(tmpdir(), 'grapevine-shots');
@@ -601,6 +601,168 @@ async function lateGame(page) {
   assert.deepEqual(misses, [], 'middle and late game');
 }
 
+// Open items after the audits (2026-11-24). A refused tap shows why for long enough to see after the thumb lifts;
+// a one-way lane reads in a still frame; the top bar tells "the news is right" from "right and deliverable"; the
+// bow and the sleepy villager have picture plates; a solved daily offers the days before it; Next stays put.
+// Short routes on a level, breadth first, that the game accepts (never through the listener).
+function routes(lv, maxLen, keep) {
+  const queue = [[lv.from]];
+  while (queue.length) {
+    const r = queue.shift(), run = walk(lv, r);
+    if (!run.valid) continue;
+    const hit = keep(r, run);
+    if (hit) return hit;
+    if (r.length > maxLen) continue;
+    lv.nodes.forEach((_, v) => { if (v !== lv.to && !refuse(lv, run.state, v)) queue.push([...r, v]); });
+  }
+  return null;
+}
+const sameMsg = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+async function openItems(page) {
+  const misses = [];
+  const expect = (condition, message) => { if (!condition) misses.push(message); };
+  const plate = [69, 51, 80], center = page.viewportSize().width / 2, gold = [255, 224, 122], noEntry = [232, 40, 59], lane = [255, 216, 74];
+  const painted = () => page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+  let visit = 0; // a fresh address each time, so a reload does not bring back the last route
+  const open = async (query, button = '#play') => { await page.goto(`${base}/grapevine/?${query}&visit=${++visit}`); await until(page, () => window.grapevineState, 'state hook'); await page.click(button); };
+  const day = k => { const d = new Date(); d.setDate(d.getDate() - k); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
+  // 1. A tap against a one-way lane: 0.7 s later the lane still has its red no-entry sign.
+  await open('level=31');
+  let st = await state(page), lv = await levelNow(page);
+  const against = routes(lv, 5, (r, run) => {
+    const v = lv.nodes.findIndex((_, u) => refuse(lv, run.state, u) === 'oneway');
+    return v >= 0 ? [...r, v] : null;
+  });
+  expect(!!against, 'level 31: a short route ends next to a lane that runs the other way');
+  if (against) {
+    for (const v of against.slice(1)) await tap(page, st.nodes[v]);
+    await sleep(700);
+    const [a, b] = against.slice(-2).map(v => st.nodes[v]), mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    expect((await state(page)).refusal?.why === 'oneway', 'level 31: the refusal is still on 0.7 s after the tap');
+    expect(await boardInk(page, [mid.x - 12, mid.y - 12, 24, 24], noEntry), 'level 31: a no-entry sign on the lane 0.7 s after the tap');
+  }
+  // A tap on a villager away from the end of the route: 0.7 s later the villagers it can go on to are ringed.
+  await open('level=31');
+  st = await state(page); lv = await levelNow(page);
+  const exits = lv.nodes.map((_, u) => u).filter(u => !refuse(lv, walk(lv, [lv.from]).state, u));
+  const far = lv.nodes.findIndex((_, u) => u !== lv.from && refuse(lv, walk(lv, [lv.from]).state, u) === 'far');
+  await tap(page, st.nodes[far]); await sleep(700);
+  expect((await state(page)).refusal?.why === 'far', 'level 31: a far tap is still shown 0.7 s later');
+  const R = st.R, ringed = [];
+  for (const u of exits) { const p = st.nodes[u]; ringed.push(await boardInk(page, [p.x + R * 1.2, p.y - R * 0.5, R * 0.3, R], gold) || await boardInk(page, [p.x - R * 1.5, p.y - R * 0.5, R * 0.3, R], gold)); }
+  expect(exits.length && ringed.every(Boolean), `level 31: every villager the route can go on to is ringed (${ringed})`);
+
+  // A one-way lane in a still frame (reduced motion): the yellow arrowhead is at the end it leads to and nothing
+  // yellow at the end it comes from.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await open('level=31');
+  st = await state(page); lv = await levelNow(page); await sleep(300);
+  for (const [a, b] of lv.edges.filter(e => e[2] === ONEWAY)) {
+    const A = st.nodes[a], B = st.nodes[b], len = Math.hypot(B.x - A.x, B.y - A.y), ux = (B.x - A.x) / len, uy = (B.y - A.y) / len;
+    const at = (P, d) => [P.x + ux * d - 4, P.y + uy * d - 4, 8, 8];
+    expect(await boardInk(page, at(B, -st.R * 1.4), lane), `level 31: lane ${a}→${b} has its arrowhead next to ${b}`);
+    expect(!await boardInk(page, at(A, st.R * 1.4), lane), `level 31: lane ${a}→${b} has no arrow next to ${a}`);
+  }
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+
+  // 2. The top bar: right news the listener cannot get from here shows no green tick; right and deliverable does.
+  let found = null;
+  for (const n of [49, 51, 58, 59, 60]) {
+    await open(`level=${n}`);
+    lv = await levelNow(page);
+    const r = routes(lv, lv.min + 2, (r, run) => r.length > 1 && sameMsg(run.msgs.at(-1), lv.want) && refuse(lv, run.state, lv.to) ? r : null);
+    if (r) { found = { n, r, lv }; break; }
+  }
+  expect(!!found, 'a late village has a route whose news is right but cannot reach the listener');
+  if (found) {
+    st = await state(page);
+    for (const v of found.r.slice(1)) await tap(page, st.nodes[v]);
+    await painted();
+    st = await state(page);
+    expect(st.right && !st.deliver, `level ${found.n}: right but not deliverable (${JSON.stringify([st.right, st.deliver])})`);
+    expect(!await boardInk(page, 'check', [127, 224, 122]), `level ${found.n}: no green tick while the listener is out of reach`);
+    await tap(page, st.nodes[found.lv.from]);
+    const best = solve(found.lv).best;
+    for (const v of best.slice(1, -1)) await tap(page, st.nodes[v]);
+    await painted();
+    expect((await state(page)).deliver, `level ${found.n}: one hop from the end of the best route is deliverable`);
+    expect(await boardInk(page, 'check', [127, 224, 122]), `level ${found.n}: the green tick when one more hop delivers`);
+  }
+
+  // 3. The bow refusing red news and the sleepy villager both get a picture plate with a sentence.
+  await open('level=19');
+  st = await state(page); lv = await levelNow(page);
+  const bow = lv.nodes.findIndex(v => v.kind === 'timid');
+  const red = routes(lv, 5, (r, run) => refuse(lv, run.state, bow) === 'red' ? r : null);
+  if (red) {
+    for (const v of red.slice(1)) await tap(page, st.nodes[v]);
+    await tap(page, st.nodes[bow]); await painted();
+    expect(/red news/i.test(await page.textContent('#boardCue')), 'level 19: the bow cue');
+    expect(await boardInk(page, [center - 88, 88, 176, 31], plate), 'level 19: the bow refusal has a picture plate');
+    expect(await boardInk(page, [center + 46, 92, 32, 22], noEntry), 'level 19: the plate ends in a no-entry sign');
+  } else expect(false, 'level 19: a short route brings red news next to the bow');
+  await open('level=22');
+  st = await state(page); lv = await levelNow(page);
+  const sleepy = lv.nodes.findIndex(v => v.once);
+  const toSleepy = routes(lv, 6, r => r.at(-1) === sleepy && !['swap', 'carve', 'flip'].includes(lv.nodes[sleepy].kind) ? r : null);
+  if (toSleepy) {
+    for (const v of toSleepy.slice(1)) await tap(page, st.nodes[v]);
+    await painted();
+    expect(/speaks once/i.test(await page.textContent('#boardCue')), 'level 22: the sleepy villager\'s cue');
+    expect(await boardInk(page, [center - 88, 88, 176, 31], plate), 'level 22: the sleepy villager has a picture plate');
+  } else expect(false, 'level 22: a route ends at the sleepy villager');
+  const again = routes(lv, 8, (r, run) => refuse(lv, run.state, sleepy) === 'asleep' ? r : null);
+  if (again) {
+    // by drag: a tap on a villager already on the route cuts the route back to them instead
+    await tap(page, st.nodes[lv.from]);
+    await finger(page, '#c', dragSteps(st.nodes, [...again, sleepy])); await painted();
+    expect((await state(page)).lesson === 'asleep', 'level 22: going back to the sleepy villager is refused as asleep');
+    expect(/went home/i.test(await page.textContent('#boardCue')), 'level 22: the asleep cue');
+    expect(await boardInk(page, [center - 88, 88, 176, 31], plate), 'level 22: the asleep refusal has a picture plate');
+  } else expect(false, 'level 22: a route comes back to the sleepy villager');
+
+  // 5. After today's daily village: the week under the result, Next opens yesterday's; a late solve has its own
+  // stars and leaves the streak alone. 6. Next stays at one height on every result card.
+  await page.goto(`${base}/grapevine/`);
+  const before = await page.evaluate(() => localStorage.getItem('grapevine-save'));
+  await page.evaluate(([d3]) => localStorage.setItem('grapevine-save', JSON.stringify({ v: 1, sound: true, best: { 1: 3 }, opened: 61, daily: { [d3]: 2 }, dailyHops: {}, dailyTier: {}, bestStreak: 4 })), [day(3)]);
+  const nextY = {};
+  const solveHere = async what => {
+    const s = await state(page), l = await levelNow(page);
+    await finger(page, '#c', dragSteps(s.nodes, solve(l).best));
+    await until(page, () => window.grapevineState().screen === 'done', what, 15000);
+    await sleep(900);
+    nextY[what] = Math.round((await page.locator('#next').boundingBox()).y);
+  };
+  await open('tier=1', '#daily');
+  await solveHere('daily today');
+  expect(await page.locator('#week').isVisible(), 'the daily result shows the week');
+  expect(await page.locator('#week button').count() === 7, 'seven days in the week');
+  expect(/yesterday/i.test(await page.textContent('#next')) && !(await page.locator('#next').isDisabled()), `Next offers yesterday (${await page.textContent('#next')})`);
+  if (!(await page.locator('#next').isDisabled())) {
+    await page.click('#next');
+    st = await state(page);
+    expect(st.day === day(1) && st.late, `Next starts yesterday's village (${st.day})`);
+    await solveHere('daily yesterday');
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('grapevine-save')));
+    expect(saved.dailyLate?.[day(1)] >= 1 && saved.daily[day(1)] === undefined, 'a late solve keeps its stars apart');
+    expect(saved.daily[day(0)] >= 1 && saved.daily[day(3)] === 2 && saved.bestStreak === 4 && saved.best[1] === 3, 'the old fields stay');
+    expect((await state(page)).streak === 1, 'a late solve does not join the streak');
+    expect(await page.locator(`#week button[data-day="${day(1)}"] small.late`).count() === 1, 'the week shows the late stars apart');
+  }
+  const cell = page.locator(`#week button[data-day="${day(3)}"]`);
+  if (await cell.count()) await cell.click();
+  expect((await state(page)).day === day(3), 'a day in the week opens its village');
+  for (const n of [1, 40, 45]) { await open(`level=${n}`); await solveHere(`level ${n}`); }
+  const ys = Object.values(nextY);
+  expect(Math.max(...ys) - Math.min(...ys) <= 1, `Next at one height on every card (${JSON.stringify(nextY)})`);
+  // Put the earlier save back, so the checks after this one start where they expect.
+  await page.goto(`${base}/grapevine/`);
+  await page.evaluate(before => { if (before === null) localStorage.removeItem('grapevine-save'); else localStorage.setItem('grapevine-save', before); }, before);
+  assert.deepEqual(misses, [], 'open items');
+}
+
 async function menuAndReload(page) {
   await page.goto(base + '/grapevine/?level=3');
   await until(page, () => window.grapevineState, 'village menu');
@@ -790,6 +952,7 @@ async function localizedScreens(browser, device, phone) {
       await tap(page, st.nodes[st.to]);
       await until(page, () => document.querySelectorAll('#done.on #stars .on').length === 3, 'first win finished appearing');
       await take('win');
+      const nextY = { win: Math.round((await page.locator('#next').boundingBox()).y) };
       await page.evaluate(() => {
         Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
         Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('denied'); } } });
@@ -844,6 +1007,7 @@ async function localizedScreens(browser, device, phone) {
       await take('daily-board');
       await finish(solve(await levelNow(page)).best, await state(page));
       await take('daily-win');
+      nextY['daily-win'] = Math.round((await page.locator('#next').boundingBox()).y);
       await page.locator('#share').tap();
       const daily = await page.evaluate(() => {
         const key = Object.keys(JSON.parse(localStorage.getItem('grapevine-save')).daily)[0];
@@ -855,12 +1019,16 @@ async function localizedScreens(browser, device, phone) {
       assert.ok(daily.drawn.includes(where) && daily.shareText.includes(where), 'daily date follows the chosen language');
       await take('daily-postcard');
 
-      for (const [level, name] of [['45', 'chapter-win'], ['60', 'campaign-win']]) {
+      for (const [level, name] of [['40', 'two-row-win'], ['45', 'chapter-win'], ['60', 'campaign-win']]) {
         await go({ level, hint: '0' });
         await page.locator('#play').tap();
         await finish(solve(await levelNow(page)).best, await state(page));
         await take(name);
+        nextY[name] = Math.round((await page.locator('#next').boundingBox()).y);
       }
+      // The result card keeps Next at one height whatever sits above it (one or two strip rows, a chapter line, the week).
+      const ys = Object.values(nextY);
+      assert.ok(Math.max(...ys) - Math.min(...ys) <= 1, `${phone} ${lang}: Next at one height on every card (${JSON.stringify(nextY)})`);
       await page.evaluate(() => {
         Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
         Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('denied'); } } });
@@ -895,6 +1063,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   try {
     await boardFeedback(page);
     await lateGame(page);
+    await openItems(page);
     await menuAndReload(page);
     await run(page, phone);
     await firstHint(page);

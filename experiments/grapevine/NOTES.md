@@ -563,3 +563,57 @@ What the replay showed was still weak:
 | `bots.mjs` | All passed: 60/60 villages, 180/180 stars, chapter 3 ramp 45% / 30% / 17%. |
 | `check.mjs` | ok on webkit, chromium, chromium 360x640, colour cues, chromium desktop 1280x800; English and Turkish screens ok on webkit-iphone13 and chromium-360x640. |
 | `kit/check/phone.mjs grapevine` | grapevine and hint grapevine ok on webkit and chromium (before and after the changes). |
+
+## 2026-11-24 — Open items after the audits
+
+The items the middle and late game audit left open (its findings 6, 7, 8, 10, 11, the sleepy plate and keeper 47's opening).
+
+### What changed, and the check that covers it
+
+Every check below was run against the code from before this section (a copy of the old directory with the new `check.mjs` and `bots.mjs`) and failed there.
+
+| Change | Why | Check |
+| --- | --- | --- |
+| A refused touch lasts 1.4 s (`REFUSE_TICKS`), with a `refusal` record in `grapevineState()`. A lane the other way throbs red with a no-entry sign in its middle; a shut gate throbs red and its barrier rattles; a tap away from the vine's end rings, in dashed gold, every villager the vine can go on to; the bow and a sleepy villager who went home shake for the same time. Each has a one-line screen-reader cue. | The old flash was about 0.4 s, often under the thumb. | `check.mjs` open items: on 31, 0.7 s after a tap against the lane the refusal is still on and the no-entry sign is drawn; 0.7 s after a far tap both exits are ringed. |
+| A one-way lane is a big yellow arrowhead with a dark outline just short of the villager it leads to, and small chevrons in the middle. Nothing yellow sits at the end it comes from. Under reduced motion the chevrons stand still. | The auditor misread a lane five times; the old double chevrons ran the full length and only read when moving. Shape and position carry the direction, so it reads in a still frame and without colour. | Open items, reduced motion on 31: yellow arrow ink next to the villager each lane leads to, none next to the one it comes from. |
+| The top bar has three pictures: arrow (not yet), an equals sign in a dashed pale frame (the news is right, but the listener cannot be reached from here), green tick in a green pill (right, and the route ends at the listener or one more hop gets there). When ready, a gold ring also pulses around the listener. `right` and `deliver` are in `grapevineState()`. | 49, 58 and 59 showed the tick when no legal hop reached the listener. | Open items: a searched route on 49 with the right news and no hop to the listener shows no green tick; one hop short of the best route shows it. |
+| Picture plates for the bow (her badge, the red news, a no-entry sign) and the sleepy villager (badge, the villager awake, then dim under the moon). The bow plate and an "asleep" plate show after the refusal and stay until the route changes; the sleepy plate shows while a sleepy villager ends the route, unless the villager is a swapper, shaper or colour swapper or changed nothing, whose own plates win. | The bow lesson was screen-reader text only and the sleepy villager had none. | Open items: plate ink and cue on the 19 bow refusal, plate ending in the no-entry sign; plate and cue at the end of a route on 22 and after a drag back to her. |
+| From chapter 2 on, `make-levels.mjs` rejects a village with a decoy (`sim.js decoys`: a bell, keeper, parrot, bow or sleepy flag that, made plain, leaves the shortest length, the number of shortest routes and the number of routes up to two hops longer all unchanged; the same for a gate made a plain path) or with two or more forced opening hops that do not shape the news (`sim.js filler`). Only villages that fail are made again; the others are made exactly as before. Remade: 35, 37, 38, 39, 40, 41, 42, 43, 44, 45, 47, 52, 53, 54, 56, 57, 58, 59, 60. 37, 45 and 52 then took the next best seed (`AVOID`) because the first strict pick left the first-time hint no clear spot on a 360 x 640 phone (`check.mjs` asserts this on 52). Rerunning `make-levels.mjs` gives a byte-identical `levels.js`. | The audit found decoy bells and gates in 37, 40, 42, 44 and 57, and forced filler in 47. | `bots.mjs` 9: no decoys and no forced filler on 31–60 (fails on 19 old villages). The chapter ramps still pass: chapter 2 52% / 34% / 20%, chapter 3 47% / 34% / 17%. |
+| After a daily village, the result card shows the last seven days (weekday, stars, today outlined, the day played ringed); a tap plays that day. Next opens the newest unsolved day: "Yesterday's village", then a weekday's village; "New village tomorrow" when none is left. A village solved after its day goes to a new save field `dailyLate` (best stars per date), so `daily` and the streak still count only days played on the day; `dailyHops` takes both. A route in progress on an earlier day survives a reload. | Replaying the daily gave nothing new. | Open items: after today's daily the week has seven days and Next says yesterday; Next starts yesterday's village; its solve writes `dailyLate`, leaves `daily`, the streak and the old fields alone and shows pale stars in the week; a week cell opens its day. |
+| The result card fills the screen: the story scrolls in the middle and Next, Again and Menu sit at the bottom. | Next moved between two heights and caused a mistap. | Open items: Next's top is within 1 px on today's and yesterday's daily cards and the cards of 1, 40 (two strip rows) and 45 (chapter line). English and Turkish screens: the same for 1, the daily, 40, 45 and 60 on iPhone 13 and on 360 x 640. On the old code Next sat at 510, 560 and 573 px. |
+
+New strings, English and Turkish: `sleepy`, `asleep`, `oneWay`, `gateShut`, `notNext`, `fewestOn`, `week`, `yesterday`, `dayVillage`.
+
+### Decisions
+
+- "Special" means bells, keepers, parrots, bows, the sleepy flag and gates; one-way lanes are not tested as decoys. "Matters to a tempting wrong route" is read as: making it plain changes the number of routes up to two hops past the shortest.
+- Six villages the audit had listed as good for keeping were remade because they held a decoy by this test: 39, 40, 44, 52, 58 and 60. Saved stars stay with the level number, so a player who had three stars on an old 40 keeps them for the new 40.
+- A village from an earlier day does not count for the streak: a late solve is catching up, not playing on the day.
+- The menu's daily button still opens today's village; the week is reached from a daily result.
+
+### Played by touch
+
+`page.touchscreen.tap` in WebKit (iPhone 13) and Chromium (360 x 640), locale tr-TR, reading the screenshots: the refusal against a lane on 31 and a far tap (the no-entry sign, the red lane and the ringed exits still shown about 0.7 s later, gone by 1.5 s; the Turkish cue), the "=" and the ready tick on 49 then winning 49, the bow plate on 19, the sleepy plate on 22, wins on the remade 37 and 47 (three stars each), today's daily, then yesterday's from Next ("Dünün köyü"), then the week and "Pazar köyü", and wins on 40 and 45 with Next at the same height on all four cards (516 px on Chromium, 540 px on WebKit).
+
+### Still open
+
+- The first-time hint covers a villager on 32 and 54 on a 360 x 640 phone (true before this change too; only 52 is asserted). It shows only to a player with no save who opens a late village by link.
+- The menu has no way into the week without solving today's village first.
+- The ringed exits after a far tap are drawn for any refused tap off the vine's end, including on the teller's first move; whether that is too busy on crowded boards was not judged by a player.
+- Finding 12 (the blank line in the recording notice) was not in this round.
+
+### Not verified
+
+- No Turkish speaker read the new strings.
+- No person new to the game has seen the new lanes, refusals, plates or the week. The lane reading was checked only by pixels and by this player's eye.
+- The decoy test is a proxy: it counts routes; it does not measure whether a player is tempted.
+- The remade villages were each won once by touch (37 and 47) or by the checks; the others were not played by a person.
+- No physical phone, sound, haptics or screen reader. The 1.4 s refusal was not tried with a real thumb.
+
+### Checks after all changes
+
+| Check | Result |
+| --- | --- |
+| `bots.mjs` | All passed, including the new section 9; chapter 2 ramp 52% / 34% / 20%, chapter 3 47% / 34% / 17%. |
+| `check.mjs` | ok on webkit, chromium, chromium 360x640, colour cues, chromium desktop 1280x800; English and Turkish screens ok on webkit-iphone13 and chromium-360x640. |
+| `kit/check/phone.mjs grapevine` | grapevine and hint grapevine ok on webkit and chromium. |

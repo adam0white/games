@@ -50,6 +50,21 @@
   #tabs button.locked { border-style: dashed; color: #fff4dc66; }
   #grid.five { grid-template-columns: repeat(5, 1fr); }
   #done > div { padding-block: calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-bottom)); }
+  /* The result card fills the screen: the story scrolls in the middle and the buttons stay at the bottom, so Next is
+     at the same place whatever the strip, the chapter line or the week above it need. */
+  #done > div { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+  #done .result-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; touch-action: pan-y; }
+  #done .result-body > div { margin: auto 0; }
+  #done .result-actions { flex: none; }
+  #done .result-actions p { margin: .1em 0; }
+  #week { display: flex; justify-content: center; gap: 3px; margin: .3em 0; }
+  #week[hidden] { display: none; }
+  #week button { flex: 1 1 0; max-width: 46px; min-width: 0; min-height: 50px; margin: 0; padding: 2px 0; border-radius: 12px; font-size: 13px; line-height: 1.1;
+    display: grid; place-items: center; border-width: 2px; }
+  #week button small { display: block; font-size: 10px; letter-spacing: -1px; color: #ffd24a; min-height: 11px; }
+  #week button small.late { color: #c9c3e0; }
+  #week button.today { border-color: #ffb347; background: #ffb34733; }
+  #week button.playing { box-shadow: 0 0 0 2px #fff4dc; }
   #done p { margin: .18em 0; }
   #doneLine, #payoff { color: #ffd98a; }
   #doneLine { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
@@ -116,15 +131,20 @@
   </div>
 </div></div>
 <div id="done" class="screen veil"><div>
-  <h2 id="doneTitle" class="sr-only"></h2>
-  <div class="result-check" aria-hidden="true">✓</div>
-  <div class="stars" id="stars" role="img"><span aria-hidden="true">★</span><span aria-hidden="true">★</span><span aria-hidden="true">★</span></div>
-  <p id="doneLine"></p>
-  <p id="payoff" hidden></p>
-  <canvas id="strip" role="img" data-i18n-aria="strip"></canvas>
-  <p><button id="share" data-i18n="viewCard"></button></p>
-  <p><button id="next" class="main"></button></p>
-  <p><button id="again" data-i18n="again"></button><button id="doneMenu" data-i18n="menu"></button></p>
+  <div class="result-body"><div>
+    <h2 id="doneTitle" class="sr-only"></h2>
+    <div class="result-check" aria-hidden="true">✓</div>
+    <div class="stars" id="stars" role="img"><span aria-hidden="true">★</span><span aria-hidden="true">★</span><span aria-hidden="true">★</span></div>
+    <p id="doneLine"></p>
+    <p id="payoff" hidden></p>
+    <canvas id="strip" role="img" data-i18n-aria="strip"></canvas>
+    <div id="week" role="group" data-i18n-aria="week" hidden></div>
+    <p><button id="share" data-i18n="viewCard"></button></p>
+  </div></div>
+  <div class="result-actions">
+    <p><button id="next" class="main"></button></p>
+    <p><button id="again" data-i18n="again"></button><button id="doneMenu" data-i18n="menu"></button></p>
+  </div>
 </div></div>
 <dialog id="postcardDialog" aria-labelledby="postcardHeading">
   <h2 id="postcardHeading" data-i18n="postcard"></h2>
@@ -160,12 +180,17 @@ const date = key => dates.format(new Date(`${key}T12:00:00`));
 
 // ---------------------------------------------------------------- save (one JSON blob)
 const KEY = 'grapevine-save';
-// Fields added later (dailyHops: fewest hops per date, dailyTier: which daily village a date showed, bestStreak) default
-// here, so an old save loads as it was.
-const save = { v: 1, sound: true, best: {}, opened: 1, daily: {}, dailyHops: {}, dailyTier: {}, bestStreak: 0, ...readJson(KEY, {}) };
+// Fields added later (dailyHops: fewest hops per date, dailyTier: which daily village a date showed, bestStreak,
+// dailyLate: best stars for a date's village solved on a later day) default here, so an old save loads as it was.
+// `daily` keeps only villages solved on their own day, so the streak counts days played on the day.
+const save = { v: 1, sound: true, best: {}, opened: 1, daily: {}, dailyHops: {}, dailyTier: {}, bestStreak: 0, dailyLate: {}, ...readJson(KEY, {}) };
 const store = () => writeJson(KEY, save);
 const dateKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const today = () => dateKey(new Date());
+const daysAgo = k => { const d = new Date(); d.setDate(d.getDate() - k); return dateKey(d); };
+const WEEK = 7; // the daily villages a player can still open: today and the six days before
+const inWeek = key => typeof key === 'string' && key >= daysAgo(WEEK - 1) && key <= today();
+const dayStars = key => Math.max(save.daily[key] || 0, save.dailyLate[key] || 0);
 // Days in a row with a solved daily village, ending today (or yesterday, while today is still open).
 function streak() {
   const d = new Date(); let n = 0;
@@ -292,6 +317,11 @@ let sending = null, result = null, wrong = null, lastStars = 0;
 let react = [], refuseT = [], happyT = 0, puzzledT = 0, particles = [], shake = 0, ripples = [], grow = 0, gone = [];
 let endTimer = -1, stripT = 0, sentRoute = null;
 let keepers = [], gateT = [], laneFlash = null, introT = 0, bannerT = 0, payoff = 0, tier = 0;
+// The last refused touch: why, the villager or path that said no, and how much of the feedback is left (1 to 0).
+// It lasts REFUSE_TICKS so a player whose thumb covered the spot still sees it after lifting. `lesson` is the picture
+// plate a refusal teaches (the bow and red news, a sleepy villager who went home); it stays until the route changes.
+const REFUSE_TICKS = 84;
+let refusal = null, lesson = null, late = false;
 const next = () => Math.min(LEVELS.length, Math.max(1, save.opened));
 // After the last village: the first village still short of three stars (0 before then, or when every village has them).
 const chase = () => save.opened > LEVELS.length ? LEVELS.findIndex((_, i) => (save.best[i + 1] || 0) < 3) + 1 : 0;
@@ -306,20 +336,22 @@ function dailyTier(key) {
   return save.dailyTier[key];
 }
 
-function begin(i, how = 'level') {
+function begin(i, how = 'level', day = null) {
   snd.unlock();
   mode = how;
   if (how === 'daily') {
-    dailyKey = today();
-    const d = new Date(), seed = urlSeed ?? dailySeed(d.getFullYear(), d.getMonth() + 1, d.getDate());
+    dailyKey = inWeek(day) ? day : today();
+    late = dailyKey !== today(); // a village from an earlier day of the week: its stars do not make a streak
+    const [y, m, dd] = dailyKey.split('-').map(Number);
+    const seed = (!late && urlSeed !== null) ? urlSeed : dailySeed(y, m, dd);
     tier = dailyTier(dailyKey);
     const lv = daily(seed, LEVELS[20], tier);
     level = { ...lv, name: 'Daily village' };
     setChapter(DAILY_LOOK[lv.tier ?? tier] ?? 1);
-  } else { index = i; level = LEVELS[i]; setChapter(chapterOf(i)); }
+  } else { index = i; level = LEVELS[i]; late = false; setChapter(chapterOf(i)); }
   keepers = level.nodes.map((n, v) => (n.kind === 'keeper' ? v : -1)).filter(v => v >= 0);
   gateT = level.edges.map(([, , type]) => (isGate(type) && gateOpen(type, 0) ? 1 : 0));
-  laneFlash = null; payoff = 0;
+  laneFlash = null; payoff = 0; refusal = null; lesson = null;
   introT = mode === 'level' && INTRO[i + 1] ? 1 : 0;
   bannerT = mode === 'level' && CHAPTERS.some(([a]) => a === i + 1) && i > 0 ? 1 : 0;
   route = [level.from]; trail = walk(level, route);
@@ -336,6 +368,7 @@ function begin(i, how = 'level') {
 // ---------------------------------------------------------------- route editing (shared by tap and drag)
 function setRoute(r) {
   route = r; trail = walk(level, route);
+  lesson = null; if (refusal && refusal.why === 'far') refusal = null; // the lit exits belong to the old end
   if (result === 'wrong') { result = null; wrong = null; puzzledT = 0; }
   checkpoint();
   updateBoardCue();
@@ -359,21 +392,28 @@ let lastRefused = -1;
 function refused(v, why) {
   if (lastRefused === v) return;
   lastRefused = v;
+  const end = route[route.length - 1];
+  refusal = { why, v, from: end, t: 1 };
+  let cue = '';
   if (why === 'far' || why === 'done' || why === 'long' || why === 'teller') {
-    // not next to the end of the route: point at where the route can go on
-    refuseT[route[route.length - 1]] = 1;
+    // not next to the end of the route: the end shakes and the villagers it can reach light up (see refusalCue)
+    refuseT[end] = 1;
+    cue = why === 'far' ? 'notNext' : '';
     tone(220, 0.08, 0.05, 'sine');
   } else if (why === 'oneway' || why === 'shut') {
-    // a lane that runs the other way, or a shut gate: the path itself flashes
-    laneFlash = { a: route[route.length - 1], b: v, t: 1, why };
+    // a lane that runs the other way, or a shut gate: the path itself flashes red; a lane gets a no-entry sign,
+    // a gate's barrier rattles
+    laneFlash = { a: end, b: v, t: 1, why };
+    cue = why === 'shut' ? 'gateShut' : 'oneWay';
     tone(why === 'shut' ? 180 : 200, 0.14, 0.06, 'square', -30);
     if (!reduced) shake = Math.max(shake, 2);
   } else {
     refuseT[v] = 1; // a timid villager refusing red news, a sleepy one who went home, a U-turn
-    if (why === 'red') $('boardCue').textContent = word('noRed');
+    if (why === 'red' || why === 'asleep') { lesson = { kind: why, v }; cue = why === 'red' ? 'noRed' : 'asleep'; }
     tone(150, 0.16, 0.07, 'square', -40);
     if (!reduced) shake = Math.max(shake, 3);
   }
+  if (cue) $('boardCue').textContent = word(cue);
 }
 
 // ---------------------------------------------------------------- input: one finger, drag or tap
@@ -467,7 +507,9 @@ function win() {
   [0, 4, 7, 12].forEach((k, i) => setTimeout(() => tone(SCALE[2] * 2 ** (k / 12), 0.6, 0.07, 'triangle'), i * 90));
   sentRoute.forEach(v => { react[v] = 1; });
   if (mode === 'daily') {
-    save.daily[dailyKey] = Math.max(save.daily[dailyKey] || 0, lastStars);
+    // a village from an earlier day keeps its stars apart, so the streak still counts only days played on the day
+    if (late) save.dailyLate[dailyKey] = Math.max(save.dailyLate[dailyKey] || 0, lastStars);
+    else save.daily[dailyKey] = Math.max(save.daily[dailyKey] || 0, lastStars);
     save.dailyHops[dailyKey] = Math.min(save.dailyHops[dailyKey] ?? Infinity, hops);
     save.bestStreak = Math.max(save.bestStreak || 0, streak());
   } else {
@@ -509,7 +551,7 @@ $('hint').addEventListener('click', () => {
 // ---------------------------------------------------------------- the fixed tick
 function tick() {
   t++;
-  for (let i = 0; i < react.length; i++) { react[i] = Math.max(0, react[i] - 1 / 30); refuseT[i] = Math.max(0, refuseT[i] - 1 / 25); if (gone[i] > 0) gone[i] = Math.min(1, gone[i] + 1 / 40); }
+  for (let i = 0; i < react.length; i++) { react[i] = Math.max(0, react[i] - 1 / 30); refuseT[i] = Math.max(0, refuseT[i] - 1 / REFUSE_TICKS); if (gone[i] > 0) gone[i] = Math.min(1, gone[i] + 1 / 40); }
   if (!sending) for (let i = 0; i < gone.length; i++) gone[i] = 0; // after a send, the route decides who is asleep
   grow = Math.min(1, grow + 1 / 8);
   happyT = Math.max(0, happyT - (endTimer >= 0 ? 0 : 1 / 90));
@@ -534,7 +576,8 @@ function tick() {
       gateT[e] = reduced ? want : gateT[e] + Math.sign(want - gateT[e]) * Math.min(Math.abs(want - gateT[e]), 1 / 10);
     });
   }
-  if (laneFlash && (laneFlash.t -= 1 / 30) <= 0) laneFlash = null;
+  if (laneFlash && (laneFlash.t -= 1 / REFUSE_TICKS) <= 0) laneFlash = null;
+  if (refusal && (refusal.t -= 1 / REFUSE_TICKS) <= 0) refusal = null;
   if (bannerT > 0 && t - startT > 150) bannerT = Math.max(0, bannerT - 1 / 30);
   // the end of a chapter: fireworks behind the card
   if (screen === 'done' && payoff && t % (reduced ? 90 : 24) === 0) {
@@ -571,6 +614,8 @@ function draw(alpha) {
   for (const i of order) person(i, time, onRoute);
   ghosts(time);
   listenerBubble(time);
+  readyRing(time);
+  refusalCue(time);
   if (sending) flying(alpha);
   else if (route.length && !result && !(mode === 'level' && index === 0)) headRing(time);
   for (const p of particles) { g.globalAlpha = Math.max(0, p.life); g.fillStyle = p.col; g.beginPath(); g.arc(p.x, p.y, p.size, 0, Math.PI * 2); g.fill(); }
@@ -593,23 +638,32 @@ function paths(time) {
     if (type !== ONEWAY) { g.setLineDash([3, 11]); g.strokeStyle = L[2]; g.lineWidth = 5; g.stroke(); g.setLineDash([]); }
   }
   for (const [a, b, type] of level.edges) if (type === ONEWAY) laneArrows(pos[a], pos[b], reduced ? 0 : time);
-  if (laneFlash) { // the lane or gate that just said no
-    const A = pos[laneFlash.a], B = pos[laneFlash.b];
+  if (laneFlash) { // the lane or gate that just said no: it throbs red for as long as the refusal lasts
+    const A = pos[laneFlash.a], B = pos[laneFlash.b], k = laneFlash.t;
+    const beat = reduced ? 1 : 0.7 + 0.3 * Math.cos((1 - k) * REFUSE_TICKS / 60 * Math.PI * 2 * 2.5);
     g.beginPath(); g.moveTo(A.x, A.y); g.lineTo(B.x, B.y);
-    g.strokeStyle = `rgba(255,80,70,${0.55 * laneFlash.t})`; g.lineWidth = 22; g.stroke();
+    g.strokeStyle = `rgba(255,60,55,${Math.min(1, 1.6 * k) * 0.7 * beat})`; g.lineWidth = 22; g.stroke();
   }
 }
+// A one-way lane: a big yellow arrowhead with a dark outline just short of the villager it leads to, and small
+// chevrons pointing the same way in the middle. The direction is in the shape, so it reads in a still frame,
+// with reduced motion and without colour; nothing yellow sits at the end the lane comes from.
 function laneArrows(A, B, time) {
   const dx = B.x - A.x, dy = B.y - A.y, len = Math.hypot(dx, dy), ang = Math.atan2(dy, dx);
-  const gap = 34, clear = R * 1.25, s = 8.5, shift = (time * 14) % gap;
+  const tip = len - R * 1.12, head = 17, half = 12;
   g.save(); g.lineJoin = 'round';
-  for (let d = clear + shift; d < len - clear; d += gap) {
+  // chevrons between the two ends, drifting towards B unless motion is reduced
+  const gap = 26, s = 6, from = R * 2.1, to = tip - head - 8, shift = (time * 12) % gap;
+  for (let d = from + shift; d <= to; d += gap) {
     g.save(); g.translate(A.x + dx * d / len, A.y + dy * d / len); g.rotate(ang);
-    g.beginPath(); g.moveTo(-s, -s); g.lineTo(s * 0.3, 0); g.lineTo(-s, s); g.lineTo(-s * 0.3, 0); g.closePath();
-    g.moveTo(s * 0.1, -s); g.lineTo(s * 1.4, 0); g.lineTo(s * 0.1, s); g.lineTo(s * 0.8, 0); g.closePath();
-    g.fillStyle = '#ffd84a'; g.fill(); g.lineWidth = 1.6; g.strokeStyle = INK; g.stroke();
+    g.beginPath(); g.moveTo(-s, -s); g.lineTo(s * 0.4, 0); g.lineTo(-s, s); g.lineTo(-s * 0.4, 0); g.closePath();
+    g.fillStyle = '#ffd84a'; g.fill(); g.lineWidth = 1.5; g.strokeStyle = INK; g.stroke();
     g.restore();
   }
+  g.translate(A.x + dx * tip / len, A.y + dy * tip / len); g.rotate(ang);
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(-head, -half); g.lineTo(-head * 0.72, 0); g.lineTo(-head, half); g.closePath();
+  g.lineWidth = 4.5; g.strokeStyle = INK; g.stroke();
+  g.fillStyle = '#ffd84a'; g.fill();
   g.restore();
 }
 // Gates: a striped barrier in the middle of the path. Across the path: shut. Swung aside along it: open.
@@ -621,8 +675,35 @@ function gates() {
       g.beginPath(); g.moveTo(A.x + (B.x - A.x) * 0.3, A.y + (B.y - A.y) * 0.3); g.lineTo(A.x + (B.x - A.x) * 0.7, A.y + (B.y - A.y) * 0.7);
       g.strokeStyle = `rgba(20,10,25,${0.45 * (1 - 2 * o)})`; g.lineWidth = 13; g.lineCap = 'butt'; g.stroke(); g.lineCap = 'round';
     }
-    barrier(g, x, y, R * 0.85, o, Math.atan2(B.y - A.y, B.x - A.x));
+    // the gate that just said no rattles across the path
+    const hit = refusal && refusal.why === 'shut' && ((refusal.from === a && refusal.v === b) || (refusal.from === b && refusal.v === a));
+    const rattle = hit && !reduced ? Math.sin(t * 1.4) * 4 * refusal.t : 0;
+    barrier(g, x + rattle, y, R * 0.85, o, Math.atan2(B.y - A.y, B.x - A.x));
   });
+}
+// The feedback of a refused touch, on top of the board, for as long as it lasts (REFUSE_TICKS).
+function refusalCue(time) {
+  if (!refusal || sending || result === 'won') return;
+  const k = refusal.t, fade = Math.min(1, k * 2.5);
+  const beat = reduced ? 0 : Math.sin(time * 12);
+  if (refusal.why === 'far') {
+    // where the route can go on: the villagers next to its end, ringed in gold
+    level.nodes.forEach((_, u) => {
+      if (u === refusal.from || refuse(level, trail.state, u)) return;
+      const p = pos[u];
+      g.save(); g.globalAlpha = fade;
+      g.beginPath(); g.arc(p.x, p.y, R * 1.32 + beat * 2, 0, Math.PI * 2);
+      g.strokeStyle = '#ffe07a'; g.lineWidth = 4; g.setLineDash([7, 5]); g.stroke();
+      g.restore();
+    });
+  } else if (refusal.why === 'oneway') {
+    // a no-entry sign in the middle of the lane
+    const A = pos[refusal.from], B = pos[refusal.v], x = (A.x + B.x) / 2, y = (A.y + B.y) / 2, r = 13 * (1 + 0.08 * beat);
+    g.save(); g.globalAlpha = fade;
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fillStyle = '#e8283b'; g.fill(); g.lineWidth = 3; g.strokeStyle = INK; g.stroke();
+    g.fillStyle = '#fff'; g.fillRect(x - r * 0.62, y - r * 0.2, r * 1.24, r * 0.4);
+    g.restore();
+  }
 }
 // A chapter's new villager or lane pulses until the player first touches the board.
 function intro(time) {
@@ -777,12 +858,14 @@ function hud(time) {
   g.fillStyle = '#3a1a10'; g.textAlign = 'center'; g.font = '800 17px ui-rounded, system-ui, sans-serif';
   if (mode === 'daily') sun(g, lx, ly, 10);
   else g.fillText(word('number', { n: number(index + 1) }), lx, ly + 1);
-  // now -> wanted
+  // now -> wanted. Three pictures: an arrow (not yet), an equals sign in a dashed frame (the news is right but the
+  // listener cannot be reached from here), a green tick in a green pill (right, and one more hop delivers it).
   const now = trail.msgs.at(-1);
-  const ok = same(now, level.want);
+  const right = same(now, level.want), ok = deliverable();
   const tw = 128, th = 46;
   g.beginPath(); roundRect(g, cx - tw / 2, top, tw, th, 23); g.fillStyle = ok ? 'rgba(95,207,106,.35)' : 'rgba(20,12,36,.55)'; g.fill();
-  g.strokeStyle = ok ? '#7fe07a' : 'rgba(255,217,138,.5)'; g.lineWidth = 2; g.stroke();
+  if (right && !ok) g.setLineDash([6, 5]);
+  g.strokeStyle = ok ? '#7fe07a' : right ? '#e8f4c8' : 'rgba(255,217,138,.5)'; g.lineWidth = 2; g.stroke(); g.setLineDash([]);
   token(g, now, cx - 34, top + th / 2, 17);
   token(g, level.want, cx + 34, top + th / 2, 17);
   if (goalCue()) {
@@ -791,6 +874,7 @@ function hud(time) {
   }
   g.strokeStyle = CREAM; g.lineWidth = 3; g.lineCap = 'round';
   if (ok) { g.beginPath(); g.moveTo(cx - 8, top + th / 2); g.lineTo(cx - 2, top + th / 2 + 6); g.lineTo(cx + 9, top + th / 2 - 7); g.strokeStyle = '#7fe07a'; g.stroke(); }
+  else if (right) { g.beginPath(); g.moveTo(cx - 7, top + th / 2 - 4); g.lineTo(cx + 7, top + th / 2 - 4); g.moveTo(cx - 7, top + th / 2 + 4); g.lineTo(cx + 7, top + th / 2 + 4); g.stroke(); }
   else { g.beginPath(); g.moveTo(cx - 8, top + th / 2); g.lineTo(cx + 7, top + th / 2); g.moveTo(cx + 2, top + th / 2 - 6); g.lineTo(cx + 8, top + th / 2); g.lineTo(cx + 2, top + th / 2 + 6); g.stroke(); }
   // hop dots: one per hop of the shortest route; a hop past it shows as a dim dot
   const hops = (sending ? sending.route.length : route.length) - 1, n = Math.max(level.min, hops);
@@ -802,6 +886,20 @@ function hud(time) {
     else g.fillStyle = 'rgba(255,244,220,.25)';
     g.fill();
   }
+}
+// The news is right and can be delivered: the route ends at the listener, or one more hop reaches them. While the
+// message travels, whether it will arrive right.
+function deliverable() {
+  if (sending) return sending.ok;
+  if (!same(trail.msgs.at(-1), level.want)) return false;
+  return route.at(-1) === level.to ? trail.correct : !refuse(level, trail.state, level.to);
+}
+// Ready to deliver: a gold ring around the listener says where the last tap goes.
+function readyRing(time) {
+  if (sending || result || route.at(-1) === level.to || !deliverable()) return;
+  const p = pos[level.to], k = reduced ? 0.3 : (time * 1.2) % 1;
+  g.beginPath(); g.arc(p.x, p.y, R * (1.2 + k * 0.45), 0, Math.PI * 2);
+  g.strokeStyle = `rgba(255,224,122,${0.9 * (1 - k * 0.8)})`; g.lineWidth = 3.5; g.stroke();
 }
 const goalCue = () => screen === 'play' && !sending && !result && mode === 'level'
   && (index === 1 || index === 2) && route.length === 1;
@@ -816,6 +914,7 @@ function updateBoardCue() {
   if (screen === 'play' && !sending && result !== 'won') {
     const node = level.nodes[route.at(-1)];
     if (result === 'wrong') text = word('retry');
+    else if (lesson) text = word(lesson.kind === 'red' ? 'noRed' : 'asleep');
     else if (mode === 'level' && index === 0) {
       text = word(route.length === 1 ? 'firstTap' : 'firstChanged');
     } else if (goalCue()) text = word(index === 1 ? 'yellowGoal' : 'greenGoal');
@@ -825,6 +924,7 @@ function updateBoardCue() {
     } else if (node.kind === 'carve') text = word('carved');
     else if (node.kind === 'flip') text = word('flipped');
     else if (idle()) text = word({ more: 'mostThree', less: 'leastOne', parrot: 'nothingToRepeat' }[node.kind]);
+    else if (node.once && route.length > 1) text = word('sleepy');
   }
   if ($('boardCue').textContent !== text) $('boardCue').textContent = text;
 }
@@ -832,6 +932,20 @@ function updateBoardCue() {
 function cuePlate(x, y, w, h) {
   g.beginPath(); roundRect(g, x - w / 2, y - h / 2, w, h, h / 2);
   g.fillStyle = '#453350'; g.fill(); g.strokeStyle = '#ffe07a'; g.lineWidth = 2; g.stroke();
+}
+function arrow(x, y) {
+  g.strokeStyle = CREAM; g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(x - 6, y); g.lineTo(x + 6, y); g.moveTo(x + 2, y - 4); g.lineTo(x + 6, y); g.lineTo(x + 2, y + 4); g.stroke();
+}
+function noEntry(x, y, r) {
+  g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fillStyle = '#e8283b'; g.fill(); g.lineWidth = 2; g.strokeStyle = INK; g.stroke();
+  g.fillStyle = '#fff'; g.fillRect(x - r * 0.62, y - r * 0.2, r * 1.24, r * 0.4);
+}
+// The same villager awake and then gone home (dimmed, under the moon), small, on a cue plate.
+function sleepyPair(node, x, y, time) {
+  villager(g, node, x - 24, y + 3, 9, { t: time });
+  arrow(x, y);
+  villager(g, node, x + 24, y + 3, 9, { t: time, gone: 0.8 });
 }
 function messagePair(before, after, x, y, size = 13) {
   token(g, before, x - 24, y, size);
@@ -854,7 +968,24 @@ function tutorial(time) {
   const first = mode === 'level' && index === 0;
   const retry = result === 'wrong', head = route.at(-1);
   const x = W / 2, y = safe.t + 103;
-  if (!retry && level.nodes[head].kind === 'swap') {
+  if (!retry && lesson) {
+    // A refusal that teaches a rule, shown until the route changes. The bow: red news, then a no-entry sign.
+    // A sleepy villager: awake, then home asleep under the moon.
+    const node = level.nodes[lesson.v];
+    cuePlate(x, y, 186, 34);
+    badge(g, node, x - 51, y, 66, 24);
+    if (lesson.kind === 'red') {
+      token(g, trail.msgs.at(-1), x + 14, y, 13);
+      arrow(x + 38, y);
+      noEntry(x + 62, y, 11);
+    } else sleepyPair(node, x + 38, y, time);
+  } else if (!retry && level.nodes[head].once && route.length > 1 && !['swap', 'carve', 'flip'].includes(level.nodes[head].kind) && !idle()) {
+    // The end of the route is a sleepy villager: they pass the news on once, then go home.
+    const node = level.nodes[head];
+    cuePlate(x, y, 186, 34);
+    badge(g, node, x - 51, y, 66, 24);
+    sleepyPair(node, x + 38, y, time);
+  } else if (!retry && level.nodes[head].kind === 'swap') {
     cuePlate(x, y, 186, 34);
     g.beginPath(); roundRect(g, x - 84, y - 12, 66, 24, 12); g.fillStyle = CREAM; g.fill();
     change(g, 7 + level.nodes[head].arg, x - 51, y, 59, 21);
@@ -951,20 +1082,51 @@ function labelledPicture(text, label) {
   pic.textContent = text;
   return pic;
 }
+const weekday = (key, style = 'short') => new Intl.DateTimeFormat(lang(), { weekday: style }).format(new Date(`${key}T12:00:00`));
+// The newest day of the last seven (today first) with its village unsolved, other than the one just played.
+function nextDay() {
+  for (let k = 0; k < WEEK; k++) { const key = daysAgo(k); if (key !== dailyKey && !dayStars(key)) return key; }
+  return null;
+}
+// The last seven days under a daily result: weekday and stars, pale stars for a day solved later, today outlined.
+// A tap plays that day's village.
+function week() {
+  const box = $('week');
+  box.hidden = mode !== 'daily';
+  if (box.hidden) return;
+  const cells = [];
+  for (let k = WEEK - 1; k >= 0; k--) {
+    const key = daysAgo(k), on = save.daily[key] || 0, later = save.dailyLate[key] || 0, n = Math.max(on, later);
+    const btn = document.createElement('button');
+    btn.dataset.day = key;
+    btn.className = [k === 0 ? 'today' : '', key === dailyKey ? 'playing' : ''].filter(Boolean).join(' ');
+    const sub = document.createElement('small');
+    sub.setAttribute('aria-hidden', 'true');
+    sub.textContent = n ? '★'.repeat(n) : '·';
+    if (n && on < later) sub.className = 'late';
+    btn.append(weekday(key), sub);
+    btn.setAttribute('aria-label', [date(key), n ? word('stars', { n: number(n), total: number(3) }) : ''].filter(Boolean).join(' · '));
+    if (key === dailyKey) btn.setAttribute('aria-current', 'true');
+    btn.addEventListener('click', () => begin(0, 'daily', key));
+    cells.push(btn);
+  }
+  box.replaceChildren(...cells);
+}
 function resultWords() {
   const hops = sentRoute.length - 1, n = number(hops), min = number(level.min);
   const last = mode === 'level' && index + 1 >= LEVELS.length;
   $('doneTitle').textContent = word(payoff ? 'chapterDone' : ['heard', 'spotOn', 'justRight'][lastStars - 1]);
   $('stars').setAttribute('aria-label', word('stars', { n: number(lastStars), total: number(3) }));
-  const best = mode === 'daily' ? save.daily[dailyKey] : save.best[index + 1];
+  const best = mode === 'daily' ? dayStars(dailyKey) : save.best[index + 1];
   const hopScore = hops === level.min ? `${n} ✓` : `${n} / ${min}`;
   const lines = [labelledPicture(`👣 ${hopScore}`, word(hops === level.min ? 'shortest' : 'hops', { n, min }))];
   if (best > lastStars) lines.push(labelledPicture(`🏅 ${'★'.repeat(best)}`, word('bestStars', { stars: '★'.repeat(best) })));
   if (mode === 'daily') {
     const fewest = number(save.dailyHops[dailyKey]), days = number(streak());
-    lines.push(labelledPicture(`🏅 ${fewest}`, word('fewestToday', { n: fewest })));
-    lines.push(labelledPicture(`🔥 ${days}`, word(streak() === 1 ? 'streakOne' : 'streak', { n: days })));
+    lines.push(labelledPicture(`🏅 ${fewest}`, late ? word('fewestOn', { n: fewest, date: date(dailyKey) }) : word('fewestToday', { n: fewest })));
+    if (!late) lines.push(labelledPicture(`🔥 ${days}`, word(streak() === 1 ? 'streakOne' : 'streak', { n: days })));
   }
+  week();
   $('doneLine').replaceChildren(...lines);
   const pay = $('payoff');
   pay.hidden = !payoff;
@@ -978,8 +1140,17 @@ function resultWords() {
   }
   // The last village: the button goes on to the first village still short of three stars, if there is one.
   const more = last ? chase() : 0;
-  $('next').textContent = word(mode === 'daily' ? 'tomorrow' : more ? 'chase' : last ? 'allDone' : payoff ? 'nextChapter' : 'next', { n: number(more) });
-  $('next').disabled = mode === 'daily' || (last && !more);
+  if (mode === 'daily') {
+    // The daily village: Next opens the newest day of the week still unsolved, yesterday first; when none is
+    // left, tomorrow brings a new one.
+    const day = nextDay();
+    $('next').textContent = !day ? word('tomorrow') : day === today() ? word('daily')
+      : day === daysAgo(1) ? word('yesterday') : word('dayVillage', { day: weekday(day, 'long') });
+    $('next').disabled = !day;
+  } else {
+    $('next').textContent = word(more ? 'chase' : last ? 'allDone' : payoff ? 'nextChapter' : 'next', { n: number(more) });
+    $('next').disabled = last && !more;
+  }
 
   // Draw the picture before the Share tap. The plain-text copy includes the same route and result.
   const run = walk(level, sentRoute);
@@ -1206,18 +1377,19 @@ $('pause').addEventListener('pointerdown', e => { e.preventDefault(); e.stopProp
 $('resume').addEventListener('click', resume);
 $('restart').addEventListener('click', () => {
   rec.end('left', { level: mode === 'daily' ? `daily-${dailyKey}` : index + 1, stars: 0, sends, hints });
-  begin(index, mode);
+  begin(index, mode, dailyKey);
 });
 $('toMenu').addEventListener('click', () => {
   rec.end('left', { level: mode === 'daily' ? `daily-${dailyKey}` : index + 1, stars: 0, sends, hints });
   paused = false; snd.release(); show('menu');
 });
 $('next').addEventListener('click', () => {
+  if (mode === 'daily') { const day = nextDay(); if (day) begin(0, 'daily', day); return; }
   if (mode !== 'level') return;
   if (index + 1 < LEVELS.length) begin(index + 1);
   else if (chase()) begin(chase() - 1);
 });
-$('again').addEventListener('click', () => begin(index, mode));
+$('again').addEventListener('click', () => begin(index, mode, dailyKey));
 $('doneMenu').addEventListener('click', () => show('menu'));
 onLeave(pause);
 addEventListener('keydown', e => {
@@ -1238,6 +1410,9 @@ window.grapevineState = () => ({
   R, chapter, tab, tier: mode === 'daily' ? tier : null, phase: level ? nowPhase() : null,
   memo: level ? nowMemo().map(fromKey) : [], gates: [...gateT], streak: streak(), bestStreak: save.bestStreak,
   dailyHops: save.dailyHops[today()] ?? null, shareText, shared, payoff, hintClear,
+  day: mode === 'daily' ? dailyKey : null, late: mode === 'daily' && late, dailyLate: { ...save.dailyLate },
+  refusal: refusal && { why: refusal.why, v: refusal.v, from: refusal.from, t: +refusal.t.toFixed(3) },
+  lesson: lesson && lesson.kind, right: level ? same(trail.msgs.at(-1), level.want) : null, deliver: level ? deliverable() : null,
 });
 window.grapevineLevel = () => level; // the check solves the level in Node from this
 window.grapevineCard = () => (sentRoute && cardWhere ? postcard(cardWhere).toDataURL('image/png') : null); // the share picture, for checks
@@ -1326,8 +1501,8 @@ function checkpoint() {
 function resumeReload() {
   const draft = history.state?.grapevineRoute;
   if (!draft || !Array.isArray(draft.route) || draft.route.length > MAX_HOPS + 1) return;
-  if (draft.mode === 'daily' ? draft.date !== today() : draft.mode !== 'level' || !LEVELS[draft.index] || !openTo(draft.index)) return;
-  begin(draft.index, draft.mode);
+  if (draft.mode === 'daily' ? !inWeek(draft.date) : draft.mode !== 'level' || !LEVELS[draft.index] || !openTo(draft.index)) return;
+  begin(draft.index, draft.mode, draft.date);
   if (draft.route.every(v => Number.isInteger(v) && level.nodes[v]) && walk(level, draft.route).valid) {
     setRoute(draft.route);
     touched = route.length > 1;

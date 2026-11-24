@@ -7,7 +7,7 @@
 // a hash of levels 1 to 30.
 // A level's seed is searched from its base seed upward; an entry in PICK fixes the seed after a look.
 import { writeFileSync } from 'node:fs';
-import { generate, solve, wanderRate, ONEWAY, GATE_OPEN, GATE_SHUT } from './sim.js';
+import { generate, solve, wanderRate, decoys, filler, ONEWAY, GATE_OPEN, GATE_SHUT } from './sim.js';
 
 const C = { circle: 0, square: 1, triangle: 2, star: 3 }, K = { red: 0, yellow: 1, blue: 2, green: 3 };
 const m = (shape, colour, n = 1) => ({ s: C[shape], c: K[colour], n });
@@ -146,24 +146,42 @@ const target = n => n <= 30 ? 0.75 - 0.6 * (n - 4) / 26
 // out of line with its neighbours; it aims a little lower.
 const TARGET = { 47: 0.47 };
 const aim = n => TARGET[n] ?? target(n);
-const out = [];
+// Open items after the audits, 2026-11-24: from chapter 2 on, every bell, keeper, parrot, timid or sleepy villager and
+// every gate must matter (sim.js decoys), and the route must not open with two or more forced hops that do nothing
+// (sim.js filler). A level whose village fails is made again from more seeds with that test inside the generator;
+// a level whose village passes is made exactly as before, so its saved stars still belong to the same puzzle.
+const tight = lv => !decoys(lv).length && !filler(lv);
+const STRICT_SEEDS = 96;
+// Villages made again that left the first-time hint (kit/hint.js, centred on the screen) no spot clear of the
+// villagers on a 360 x 640 phone, found with check.mjs hintClear: the next best seed is taken instead.
+const AVOID = { 37: [332051], 45: [8138962], 52: [4439255] };
+function pick(n, spec, seeds) {
+  let best = null;
+  for (const seed of seeds) {
+    const lv = generate(seed, spec, 3000);
+    if (!lv || handsOver(lv, n) || AVOID[n]?.includes(lv.seed)) continue;
+    const rate = wanderRate(lv, n);
+    if (!best || Math.abs(rate - aim(n)) < Math.abs(best.rate - aim(n))) best = { lv, rate };
+  }
+  return best;
+}
+const out = [], remade = [];
 for (let n = 1; n <= LAST; n++) {
   if (HAND[n]) { out.push({ ...HAND[n], min: solve(HAND[n]).min }); continue; }
   const spec = SPECS[n];
   if (!spec) throw new Error(`level ${n} has no spec`);
-  const seeds = PICK[n] ? [PICK[n]] : Array.from({ length: MORE_SEEDS[n] ?? 8 }, (_, j) => 1000 * n + 17 + j * 100003);
-  let best = null;
-  for (const seed of seeds) {
-    const lv = generate(seed, spec, 3000);
-    if (!lv || handsOver(lv, n)) continue;
-    const rate = wanderRate(lv, n);
-    if (!best || Math.abs(rate - aim(n)) < Math.abs(best.rate - aim(n))) best = { lv, rate };
+  const seeds = count => PICK[n] ? [PICK[n]] : Array.from({ length: count }, (_, j) => 1000 * n + 17 + j * 100003);
+  let best = pick(n, spec, seeds(MORE_SEEDS[n] ?? 8));
+  if (n > 31 && best && !tight(best.lv)) {
+    remade.push(`${n} (${[...decoys(best.lv), ...(filler(best.lv) ? ['forced start'] : [])].join(', ')})`);
+    best = pick(n, { ...spec, keep: tight }, seeds(STRICT_SEEDS));
   }
   if (!best) { console.error(`level ${n} (${spec.name}): no seed met the spec`); process.exitCode = 1; continue; }
   const { lv, rate } = best;
   out.push({ name: spec.name, must: spec.must ?? null, ...(spec.also ? { also: spec.also } : {}), ...lv });
   console.log(`level ${n} ${spec.name}: seed ${lv.seed}, ${lv.nodes.length} villagers, shortest ${lv.min}, wanderer wins ${(rate * 100).toFixed(0)}% (target ${(aim(n) * 100).toFixed(0)}%)`);
 }
+if (remade.length) console.log(`made again without decoys or a forced start: ${remade.join('; ')}`);
 const text = '// Made by make-levels.mjs from the specs there; verified by bots.mjs. Do not edit by hand.\n' +
   `export const CHAPTERS = ${JSON.stringify(CHAPTERS)};\n` +
   'export const LEVELS = [\n' + out.map(l => '  ' + JSON.stringify(l)).join(',\n') + '\n];\n';
