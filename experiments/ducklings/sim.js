@@ -284,6 +284,23 @@ function safeSpot(s, x, y) {
   return { x, y };
 }
 
+// A scattered duckling waits where the player can count it: never on top of another waiting duckling.
+// Two birds scared by the same log used to share one spot and read as one bird, so the other seemed to vanish.
+export const WAIT_APART = 0.07;
+function fleeSpot(s, x, y, side) {
+  const crowded = p => s.lost.some(l => Math.hypot(l.x - p.x, l.y - p.y) < WAIT_APART);
+  let spot = safeSpot(s, x, y);
+  // Try rings of spots round the first choice, nearest first, starting on the bird's own side.
+  for (let ring = 1; ring <= 3 && crowded(spot); ring++) {
+    for (let k = 0; k < 8; k++) {
+      const a = (side > 0 ? 0 : Math.PI) + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * Math.PI / 4;
+      const p = safeSpot(s, x + Math.cos(a) * 0.09 * ring, y + Math.sin(a) * 0.09 * ring);
+      if (!crowded(p)) return p;
+    }
+  }
+  return spot;
+}
+
 function duck(s) {
   const id = s.duckCount++;
   const pick = (id * 7 + (s.seed % 16)) % NAMES.length;
@@ -463,7 +480,7 @@ export function step(s, target, quack = false) {
       if (f.scared) { s.gone.push(f); s.events.push({ type: 'gone', id: f.id, by: k, x: p.x, y: p.y }); continue; }
       // The first time, it flees a short way back along the trail and waits there to be fetched.
       const back = pathAt(s, f.delay + 1.1), side = f.id % 2 ? 1 : -1;
-      const spot = safeSpot(s, back.x + side * 0.08, back.y - 0.04);
+      const spot = fleeSpot(s, back.x + side * 0.08, back.y - 0.04, side);
       s.lost.push({ id: f.id, name: f.name, trait: f.trait, x: spot.x, y: spot.y, flee: 0.8, fromX: p.x, fromY: p.y, by: k, scared: true });
       s.events.push({ type: 'scatter', id: f.id, by: k, x: p.x, y: p.y, tx: spot.x, ty: spot.y });
     }

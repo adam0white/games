@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { create, step, stars, LAST_STAGE, DT, SPEED, GAP, R_MOM, R_DUCK, LINE_MAX, QUACK_TIME, QUACK_SQUEEZE, TRAITS,
-  hitAny, moveMom, pathAt, stepDelay, duskRate } from './sim.js';
+  hitAny, moveMom, pathAt, stepDelay, duskRate, WAIT_APART } from './sim.js';
 import { bands, routeCheck } from './route.mjs';
 import { LEVELS } from './levels.js';
-import { starFeedback, warningOnScreen, nestMarkerShows, padCueShows } from './feedback.js';
+import { starFeedback, warningOnScreen, nestMarkerShows, padCueShows, leafLeft, leafQuackCue, LEAF_QUACK, driftMarks } from './feedback.js';
 
 assert.equal(warningOnScreen(-450, 640), false, 'a distant upstream hazard stays quiet');
 assert.equal(warningOnScreen(900, 640), false, 'a hazard behind the screen stays quiet');
@@ -134,21 +134,21 @@ export const ROUTES = [
   [[.50, .79], [.50, 1.49], 0.8, [.34, 2.20]],
   [[.31, .78], [.22, 1.45]],
   [[.58, .75], [.73, 1.33], [.64, 1.71], .2, [.27, 2.42]],
-  [[.20, .84], [.20, 1.39]],
+  [[.84, .80], [.84, 1.30]],
   [[.49, .82], [.59, 1.40]],
   [[.64, .86], [.70, 1.35], [.34, 1.55], [.30, 2.07]],
   [[.77, .81], [.77, 1.34]],
-  [[.59, .78], [.58, 1.08], [.30, 1.35], [.29, 1.97]],
-  [[.47, .86], [.47, 1.38], [.70, 1.62], [.72, 1.90]],
+  [[.59, .78], [.58, 1.08], [.30, 1.35], [.38, 1.95], [.82, 2.08]],
+  [[.47, .86], [.47, 1.38], [.30, 1.55]],
   [[.76, .90], [.75, 1.53], [.23, 1.91]],
   [[.77, .86], [.77, 1.38]],
   [[.66, .78], [.64, 1.15], [.33, 1.26], [.32, 1.93]],
-  [[.51, 1.76]],
+  [[.51, 1.30], [.51, 1.76], [.26, 1.98]],
   [[.30, 1.46], [.18, 1.80], [.20, 2.10], [.45, 2.55]],
   [],
   [[.45, .70], [.58, 1.20], [.25, 1.55], [.24, 1.94]],
   [[.31, .79], [.21, 1.39], [.18, 2.14], [.37, 2.38], [.74, 2.28]],
-  [[.25, .83], [.23, 1.25], [.24, 2.40]],
+  [[.25, .83], [.23, 1.25], [.24, 2.40], [.40, 2.70], [.80, 2.62]],
   [[.73, .76], [.72, .91], [.72, 1.43], [.34, 1.51], [.32, 2.12], [.24, 2.73], [.39, 3.40]],
 ];
 
@@ -170,6 +170,38 @@ function waypoints(points) {
 
 const straight = s => ({ target: s.nest });
 const idle = () => ({ target: null });
+export const SAME_FEEL = [7, 9, 11, 13, 14, 18, 22, 23, 24];
+// Tap where the opening ghost taps (or straight ahead when a stage has none), then hold on the nest.
+function ghostThenNest() {
+  let i = 0;
+  return s => {
+    const points = LEVELS[s.stage].guide ?? [[.5, .65]];
+    if (i < points.length) {
+      const [x, y] = points[i];
+      if (Math.hypot(s.mom.x - x, s.mom.y - y) < .045) i++;
+      else return { target: { x, y } };
+    }
+    return { target: s.nest };
+  };
+}
+// The same opening, then short taps toward the nest: she stops at each tap, and the next comes a moment later.
+function tapper() {
+  const opening = ghostThenNest();
+  let dest = null, arrived = null;
+  return s => {
+    const first = opening(s);
+    if (first.target !== s.nest) return first;
+    if (dest && Math.hypot(s.mom.x - dest.x, s.mom.y - dest.y) < .045) {
+      arrived ??= s.t;
+      if (s.t - arrived >= .25) dest = null;
+    }
+    if (!dest) {
+      const dx = s.nest.x - s.mom.x, dy = s.nest.y - s.mom.y, k = Math.min(1, .35 / Math.hypot(dx, dy));
+      dest = { x: s.mom.x + dx * k, y: s.mom.y + dy * k }; arrived = null;
+    }
+    return { target: dest };
+  };
+}
 function play(opts, act, limit = 135, sample) {
   const s = create(opts);
   let trace = 0;
@@ -215,6 +247,15 @@ function campaign() {
   const misled = table.map(row => row.level).filter(stage => ![1, 2, 5].includes(stage) && ghostHarm(stage) > 0);
   assert.deepEqual(misled, [], 'following the opening ghost never leads the flock into harm');
   assert.ok(table.filter(row => row.straight < 3).length >= 14, 'holding straight is worse than route choice');
+  // Stages the audit found same-feel or trivial: neither holding straight for the nest nor tapping the default
+  // heading (the opening ghost's points, then the nest) may earn two stars. Each still has a 3-star route above.
+  const naive = SAME_FEEL.map(stage => ({ stage, straight: stars(play({ stage }, straight, 40).s),
+    ghost: stars(play({ stage }, ghostThenNest(), 40).s), taps: stars(play({ stage }, tapper(), 40).s) }));
+  console.table(naive);
+  assert.deepEqual(naive.filter(row => Math.max(row.straight, row.ghost, row.taps) >= 2).map(row => row.stage), [],
+    'no same-feel stage gives two stars to holding straight or tapping the default heading');
+  // The search planner from the endless pond also finds the full flock on the retuned stages (it cannot clear 13, a weed stage).
+  for (const stage of [9, 14, 18, 23]) assert.equal(stars(play({ stage }, planner(true), 40).s), 3, `planner clears stage ${stage}`);
   const sticky = play({ stage: 12 }, straight, 12).s;
   assert.equal(sticky.hits, 0, 'the mother crosses the weeds unharmed');
   assert.equal(sticky.scatters, 2, 'both followers scatter from the same path');
@@ -228,6 +269,36 @@ function campaign() {
     return { target: s.nest, quack };
   }, 12).s;
   assert.equal(stars(closeUp), 3, 'quacking on the leaf rustle gets the whole line through');
+  // The green part of the leaf countdown is the quack that brings all three home while she keeps swimming:
+  // a quack on its first tick, and one on its last tick, both give three stars.
+  for (const at of ['first', 'last']) {
+    let done = false;
+    const cued = play({ stage: 16 }, s => {
+      const h = s.hazards[0], next = leafQuackCue(h.triggeredAt, s.t + DT);
+      const quack = !done && leafQuackCue(h.triggeredAt, s.t) && (at === 'first' || !next);
+      done ||= quack;
+      return { target: s.nest, quack };
+    }, 12).s;
+    assert.ok(done, `the leaf cue opened (${at} tick)`);
+    assert.equal(stars(cued), 3, `quacking on the ${at} tick of the leaf cue brings all three home`);
+  }
+  assert.equal(leafLeft(null, 1.55, 3), null, 'untouched leaves show no countdown');
+  assert.equal(leafLeft(2, 1.55, 2), 1, 'the countdown starts full');
+  assert.ok(Math.abs(leafLeft(2, 1.55, 2 + 1.55 * .75) - .25) < 1e-9, 'the countdown empties as the leaves fold');
+  assert.equal(leafLeft(2, 1.55, 3.6), null, 'folded leaves show no countdown');
+  assert.ok(LEAF_QUACK.to < 1.55, 'the quack cue closes before the leaves fold');
+  // Current: the marks in the water move at the current's own velocity, so they show its direction and strength.
+  for (const stage of [18, 19, 20, 21, 23, 24]) for (const h of LEVELS[stage].hazards.filter(h => h.kind === 'current')) {
+    const a = driftMarks(h, 3), b = driftMarks(h, 3.1);
+    const moved = a.map((m, i) => [b[i].x - m.x, b[i].y - m.y]).filter(([dx, dy]) => dy > 0);
+    assert.ok(moved.length >= a.length - 3, `stage ${stage}: most marks keep drifting over a tenth of a second`);
+    for (const [dx, dy] of moved) {
+      assert.ok(Math.abs(dx - h.dx * .1) < 1e-9 && Math.abs(dy - h.dy * .1) < 1e-9, `stage ${stage}: a mark moves with the current`);
+    }
+    assert.ok(a.every(m => m.y >= h.y0 && m.y <= h.y1 && Math.abs(m.x - h.x) < h.w + Math.abs(h.dx) * (h.y1 - h.y0) / h.dy), `stage ${stage}: marks stay in the current`);
+  }
+  const weak = driftMarks({ x: .5, y0: 0, y1: 1, w: .2, dx: 0, dy: .29 }, 1)[0], strong = driftMarks({ x: .5, y0: 0, y1: 1, w: .2, dx: .1, dy: .29 }, 1)[0];
+  assert.ok(strong.len > weak.len && strong.angle > weak.angle, 'a stronger, slanted current draws longer, tilted marks');
   const dash = play({ stage: 20 }, s => {
     s.hazards.length = 0;
     return straight(s);
@@ -280,6 +351,34 @@ function endless() {
   }
   assert.ok(totals.competent.filter((s, i) => s.score > totals.average[i].score).length >= 9);
   assert.ok(routeCheck(202, { yEnd: 15, n: 10 }).ok, 'full-flock route on the double-log regression seed');
+  removals();
+}
+
+// Endless "vanished" ducklings: log every removal from the line with its reason over many seeds.
+// Every removal must come with an event the page draws, and a scattered bird must wait where it can be
+// counted, apart from the other waiting birds (two birds on one spot read as one, so the other vanished).
+function removals() {
+  const chaser = s => {
+    const m = s.mom, near = s.lost.filter(l => l.y > m.y - .3).sort((a, b) => Math.hypot(a.x - m.x, a.y - m.y) - Math.hypot(b.x - m.x, b.y - m.y))[0];
+    return { target: near ? { x: near.x, y: near.y } : { x: .5, y: m.y + .5 } };
+  };
+  let scatters = 0, silent = 0, stacked = 0;
+  for (let k = 1; k <= 24; k++) for (const act of [chaser, planner(false)]) {
+    let before = new Set();
+    play({ endless: true, seed: k * 37 + 11 }, act, 90, s => {
+      const told = new Set(s.events.filter(e => ['scatter', 'gone', 'arrive'].includes(e.type)).map(e => e.id));
+      for (const id of before) if (!s.line.some(f => f.id === id) && !told.has(id)) silent++;
+      for (const e of s.events.filter(e => e.type === 'scatter')) {
+        scatters++;
+        if (s.lost.some(l => l.id !== e.id && Math.hypot(l.x - e.tx, l.y - e.ty) < WAIT_APART)) stacked++;
+      }
+      before = new Set(s.line.map(f => f.id));
+    });
+  }
+  console.log(`endless removals: ${scatters} scatters, ${silent} without an event, ${stacked} on top of another waiting bird`);
+  assert.ok(scatters > 100, 'the removal search sees enough scatters');
+  assert.equal(silent, 0, 'every duckling that leaves the line has a drawn reason');
+  assert.equal(stacked, 0, 'a scattered duckling never waits on top of another waiting duckling');
 }
 
 if (process.argv[1]?.endsWith('bots.mjs')) {

@@ -32,6 +32,7 @@
     background: conic-gradient(#ffb43a calc(var(--ready, 1) * 360deg), #f3e2c2 0); box-shadow: 0 3px 0 #d9801a; touch-action: none; }
   #quack[hidden] { display: none !important; }
   #quack.wait { color: #9a7a50; box-shadow: none; }
+  #quack.cue { box-shadow: 0 0 0 6px #5fbf6a, 0 0 18px 8px #5fbf6acc; }
   .icon { width: 23px; height: 23px; flex: none; vertical-align: middle; }
   .language { position: absolute; top: 8px; right: 0; margin: 0; min-width: 57px; min-height: 44px;
     padding: 0 5px; display: flex; align-items: center; justify-content: center; gap: 2px; font-size: 12px; }
@@ -70,10 +71,6 @@
   #flockHud.low #lightFill { background: #a93e2d; }
   #sunRule { display: flex; align-items: center; justify-content: center; gap: 1px; padding-top: 2px; }
   #sunRule .icon { width: 17px; height: 17px; }
-  #padReward { position: absolute; top: calc(100% + 3px); left: 50%; transform: translateX(-50%);
-    justify-content: center; align-items: center; gap: 3px; display: flex; padding: 0 4px; white-space: nowrap;
-    border-radius: 7px; background: #fff9df; border: 1px solid #b98230; }
-  #padReward .icon { width: 16px; height: 16px; }
   #flockHud.low #sunRule { outline: 1px dashed #a93e2d; border-radius: 5px; }
   #heartState { position: fixed; top: calc(17px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); pointer-events: none; }
   #heartState .icon { width: 19px; height: 19px; margin-right: 2px; }
@@ -110,7 +107,19 @@
   #nodes:has(> :nth-child(4):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   #nodes > :nth-child(4):last-child { grid-column: auto; }
   #menu #play { display: block; width: 100%; margin: 8px 0 6px; border-radius: 16px; font-size: 18px; }
-  #menu .extras { display: grid; grid-template-columns: 1.5fr 1fr; gap: 6px; }
+  #menu .extras { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 6px; }
+  #albumOpen { display: inline-flex; align-items: center; justify-content: center; gap: 3px; }
+  #albumOpen .icon, #endAlbum .icon { width: 18px; height: 18px; }
+  /* Endless: one compact row of counts, so the band it sits in stays shallow. Nothing playable is drawn under it. */
+  #flockHud.endless { display: grid; grid-template-columns: auto auto; column-gap: 9px; align-items: center; padding: 3px 8px; }
+  #flockHud.endless #runStats { margin-top: 0; }
+  #flockHud.endless #lightMeter, #flockHud.endless #sunRule { grid-column: 1 / -1; }
+  #flockHud.endless #lightMeter { margin-top: 2px; }
+  #flockHud.endless #sunRule { padding-top: 1px; }
+  #albumCard.screen { background: #173d3d9c; }
+  #albumCard > div { background: #fff9df; padding: 16px 12px; border: 2px solid #fffef0; border-radius: 27px; box-shadow: 0 9px 0 #265f5888; width: min(340px, calc(100% - 28px)); box-sizing: border-box; }
+  #albumCard h2 { margin: 0 0 6px; }
+  #albumArt { display: block; width: 100%; aspect-ratio: 1; }
   #menu .extras button { margin: 0; min-width: 0; min-height: 44px; font-size: 13px; padding: 4px; border-width: 1px; }
   #album { font-size: 12px; margin: .25em 0; }
   #end.screen, #paused.screen { background: #173d3d9c; }
@@ -149,7 +158,7 @@
   <div id="runStats"></div>
   <div id="lightMeter" aria-hidden="true" hidden><div id="lightFill"></div></div>
   <div id="sunRule" role="img" hidden></div>
-  <div id="padReward" hidden></div>
+  <div id="padReward" class="screen-reader" hidden></div>
 </div>
 <div id="guideLabel" class="screen-reader" hidden></div>
 <button id="pause" data-i18n-aria="pause"></button>
@@ -162,7 +171,7 @@
   <nav id="chapters" data-i18n-aria="chapters"></nav>
   <section id="map" data-i18n-aria="levelMap"><canvas id="mapPath" aria-hidden="true"></canvas><div id="nodes"></div></section>
   <button id="play" class="main"></button>
-  <div class="extras"><button id="endless"></button><button id="sound"></button></div>
+  <div class="extras"><button id="endless"></button><button id="sound"></button><button id="albumOpen"></button></div>
   <p id="album" role="img" hidden></p>
 </div></div>
 
@@ -184,14 +193,20 @@
   <div id="starTip"></div>
   <p class="score" id="endScore"></p>
   <p><button id="next" class="main"></button><button id="endlessNext" class="main" data-i18n="endlessNext" style="display:none"></button></p>
-  <div id="endActions"><button id="again" data-i18n="retry"></button><button id="endMenu" data-i18n="map"></button></div>
+  <div id="endActions"><button id="again" data-i18n="retry"></button><button id="endMenu" data-i18n="map"></button><button id="endAlbum" hidden></button></div>
+</div></div>
+
+<div id="albumCard" class="screen"><div>
+  <h2 data-i18n="album"></h2>
+  <canvas id="albumArt" width="600" height="600" role="img"></canvas>
+  <p><button id="albumBack" class="main" data-i18n="back"></button></p>
 </div></div>
 
 <script type="module">
-import { create, step, stars, timeLeft, pathAt, view, DT, SPEED, R_MOM, hits, LAST_STAGE, ENDLESS_AFTER, ENDLESS_TIME, TRAITS, QUACK_COOL, HEARTS, duskRate } from './sim.js?v=4';
-import { starFeedback, warningOnScreen, nestMarkerShows, padCueShows } from './feedback.js';
+import { create, step, stars, timeLeft, pathAt, view, DT, SPEED, R_MOM, hits, LAST_STAGE, ENDLESS_AFTER, ENDLESS_TIME, TRAITS, QUACK_COOL, HEARTS, duskRate, NAMES } from './sim.js?v=5';
+import { starFeedback, warningOnScreen, nestMarkerShows, padCueShows, leafLeft, leafQuackCue, LEAF_QUACK, driftMarks } from './feedback.js?v=5';
 import { CHAPTERS, LEVELS, chapterOf } from './levels.js';
-import * as art from './art.js?v=4';
+import * as art from './art.js?v=5';
 import { icon } from './icons.js';
 import { t, lang, setLang, apply, langs, number } from './words.js';
 import * as save from '../kit/save.js';
@@ -253,11 +268,13 @@ const sfx = {
 
 // ---------------------------------------------------------------- canvas and camera
 const canvas = $('c'), g = canvas.getContext('2d');
-let W = 0, H = 0, dpr = 1, u = 1, left = 0, anchor = 0, inset = { top: 0, bottom: 0 };
+// playTop: in the endless pond, the bank band under the counts; the pond is framed below it, so nothing playable sits under the HUD.
+let W = 0, H = 0, dpr = 1, u = 1, left = 0, anchor = 0, inset = { top: 0, bottom: 0 }, playTop = 0;
+const setAnchor = () => { anchor = playTop + (H - playTop) * 0.4; };
 function resize() {
   dpr = Math.min(2, devicePixelRatio || 1);
   W = canvas.width = Math.round(innerWidth * dpr); H = canvas.height = Math.round(innerHeight * dpr);
-  u = Math.min(W, H * 0.62); left = (W - u) / 2; anchor = H * 0.4;
+  u = Math.min(W, H * 0.62); left = (W - u) / 2; setAnchor();
   const cs = getComputedStyle($('safe')); inset = { top: parseFloat(cs.paddingTop) || 0, bottom: parseFloat(cs.paddingBottom) || 0 };
 }
 addEventListener('resize', resize); resize();
@@ -276,7 +293,7 @@ let padGain = null;
 let sawCar = false;
 let caller = null, peepUntil = 0;
 const rec = lab('ducklings');
-const cards = screens(['menu', 'paused', 'end']);
+const cards = screens(['menu', 'paused', 'end', 'albumCard']);
 
 function show(name) {
   screen = name; cards(name);
@@ -317,6 +334,7 @@ function menu() {
   album.hidden = !data.home;
   album.setAttribute('aria-label', countText(data.home === 1 ? 'oneHome' : 'ducksHome', data.home));
   album.innerHTML = icon('nest') + number(data.home);
+  $('albumOpen').innerHTML = icon('duck') + '<span>' + t('album') + '</span>';
   drawMap();
   soundLabels(); drawMenuArt();
 }
@@ -385,15 +403,22 @@ function begin(endless = false) {
   snd.unlock(); snd.release();
   mode = endless ? 'endless' : 'stage';
   s = create(endless ? { endless: true, seed: SEED ?? ((Math.random() * 2 ** 31) | 0) } : { stage, seed: SEED });
+  $('flockHud').classList.toggle('endless', s.endless);
+  playTop = 0; setAnchor(); intro = null; introRun = [];
   cam = camShown = s.mom.y + (s.endless ? .20 : s.stage === 1 ? .32 : .27) * H / u; acc = 0; last = performance.now(); prevMom = { x: s.mom.x, y: s.mom.y }; momA = 0;
   parts = []; ripples = []; disp = new Map(); heads = new Map(); hops = new Map(); runners = []; nestDucks = []; turnLog = [];
   finger = destination = null; keys.clear(); wantQuack = false; trailT = 0; trailShows = 0; shake = 0; flash = 0; recCount = 0; homeGlow = 0; quackShow = 0; hurtT = 0;
   waitTouch = true;
   caller = null; peepT = 0;
-  $('quack').hidden = true;
+  $('quack').hidden = true; $('quack').classList.remove('cue');
   lastTap = touchRing = padGain = null;
   sawCar = false;
   playing = true; paused = false; show('play');
+  if (s.endless) {
+    hudKey = ''; drawHud(performance.now());
+    playTop = measureTop(); setAnchor();
+    cam = camShown = s.mom.y + .20 * (H - playTop) / u;
+  }
   rec.start({ stage: s.stage, mode });
 }
 const note2 = (type, d) => { if (recCount < 150) { recCount++; rec.event(type, d); } };
@@ -458,7 +483,11 @@ function finish() {
   $('endlessNext').style.display = onward ? '' : 'none';
   $('again').className = nextOk || onward ? '' : 'main';
   if (won) burst(s.nest.x, s.nest.y, 'spark', still ? 8 : 40);
-  drawPostcard(won);
+  // A chapter's last nest and the final nest get their own picture, and open the album.
+  postcardKind = won && !s.endless ? (s.stage === LAST_STAGE ? 'final' : s.stage === CHAPTERS[chapter].last ? 'chapter' : 'plain') : 'plain';
+  drawPostcard(won, postcardKind);
+  $('endAlbum').hidden = postcardKind === 'plain';
+  $('endAlbum').innerHTML = icon('duck') + '<span>' + t('album') + '</span>';
   (won ? sfx.win : sfx.fail)();
   setTimeout(() => {
     if (playing) return;
@@ -770,7 +799,9 @@ function drawHazards(now) {
       art.sleepingCat(g, sx(h.x), sy(h.y), h.r * u, v.phase, now / 1000);
     }
     if (h.kind === 'bridge' || h.kind === 'weed') art.leaves(g, sx(h.x), sy(h.y), h.r * u, h.kind, v.phase, now / 1000);
-    if (h.kind === 'current') art.current(g, sx(h.x), sy(h.y1), sy(h.y0), h.w * u, u, h.dx, now / 1000);
+    if (h.kind === 'bridge') drawLeafClock(h);
+    if (h.kind === 'current') art.current(g, sx(h.x), sy(h.y1), sy(h.y0), h.w * u, u,
+      driftMarks(h, now / 1000).map(m => ({ ...m, x: sx(m.x), y: sy(m.y) })));
     if (h.kind === 'log') for (const l of v.logs) {
       if (l.warn) { // ripples at the bank where a log is about to drift in
         const x = h.dir > 0 ? 0.04 : 0.96, k = 1 + l.age; // age runs from -warn to 0
@@ -927,15 +958,16 @@ function drawGuide(now) {
   if (s.endless) {
     const pad = s.checkpoints.find(p => !p.got);
     if (pad && padCueShows(waitTouch, timeLeft(s), s.best, s.mom.y)) {
-      const edge = sy(pad.y) < (inset.top + 113) * dpr;
+      const edge = sy(pad.y) < playTop + 34 * dpr;
       const marker = $('padDirection');
       marker.hidden = !edge;
-      if (edge) marker.style.left = `${sx(.5) / dpr}px`;
+      if (edge) { marker.style.left = `${sx(.5) / dpr}px`; marker.style.top = `${playTop / dpr + 4}px`; }
       else {
         drawRing(sx(.5), sy(pad.y), 25, '#df9a32');
         if (!help.shown) art.chevron(g, sx(.5), sy(pad.y) + 34 * dpr, 8 * dpr, 0);
       }
     } else $('padDirection').hidden = true;
+    watchIntro(now); drawPadGain(now);
     return;
   }
   if (s.stage === 5) {
@@ -976,18 +1008,23 @@ function drawGuide(now) {
     return;
   }
   if (spec.lesson === 'bridge' && !s.home && !help.shown && s.hazards.some(h => h.kind === 'bridge' && view(h, s.t).phase === 'warn')) {
-    // The leaves fold under whoever is still on them. Point at the quack, and if she has stopped, at the water ahead.
+    // The leaves fold under whoever is still on them. Keep swimming for the nest, and quack while the clock on
+    // the leaves is green: the finger on Quack shows only then, so the lesson is the move that brings all three home.
     showGuideLabel(null);
-    const button = $('quack').getBoundingClientRect();
-    art.ghostFinger(g, (button.right + 7) * dpr, (button.top + 9) * dpr, u * .7, still ? .4 : now / 1000);
+    const leaf = s.hazards.find(h => h.kind === 'bridge' && view(h, s.t).phase === 'warn');
+    const end = [s.nest.x, Math.min(s.nest.y, s.mom.y + .45)];
+    drawRoute([s.mom.x, s.mom.y], [end], now);
     const idle = finger === null && (!destination || Math.hypot(destination.x - s.mom.x, destination.y - s.mom.y) < .045);
-    if (idle) {
-      const end = [s.nest.x, Math.min(s.nest.y, s.mom.y + .45)];
-      drawRoute([s.mom.x, s.mom.y], [end], now);
-      art.ghostFinger(g, sx(end[0]), sy(end[1]), u, .4);
+    if (idle) art.ghostFinger(g, sx(end[0]), sy(end[1]), u, .4);
+    const cue = leafQuackCue(leaf.triggeredAt, s.t);
+    $('quack').classList.toggle('cue', cue && s.quackCool <= 0);
+    if (cue) {
+      const button = $('quack').getBoundingClientRect();
+      art.ghostFinger(g, (button.right + 7) * dpr, (button.top + 9) * dpr, u * .7, still ? .4 : now / 1000);
     }
     return;
   }
+  $('quack').classList.remove('cue');
   showGuideLabel(null);
   const teaching = spec.guide && s.t < 5;
   if ((!waitTouch && !teaching) || help.shown) return;
@@ -1077,7 +1114,7 @@ function tailCanCross(road, delay) {
 
 let hudKey = '';
 function drawHud(now) {
-  const top = (inset.top + 12) * dpr, hudBottom = top + 72 * dpr;
+  const top = (inset.top + 12) * dpr, hudBottom = s.endless ? playTop : top + 72 * dpr;
   // Repeat a covered hazard warning below the HUD, at the same x.
   for (const w of warningsAt(s.t)) { const y = sy(w.y); if (y < hudBottom && y > hudBottom - 0.9 * u) { art.alert(g, sx(w.x), hudBottom + 0.07 * u + 16 * dpr, u * 0.8, now / 1000 + w.x, '#d94f3d'); hudPeeks++; } }
 
@@ -1167,7 +1204,7 @@ function drawParts(dt) {
 
 function updateCamera(dt) {
   // keep her between 30% and 60% down the screen; pull back to show a long tail, but never lose her off the top
-  const hu = H / u, m = s.mom;
+  const hu = (H - playTop) / u, m = s.mom;
   let want = Math.min(Math.max(cam, m.y - 0.04 * hu), m.y + 0.22 * hu);
   if (s.line.length) { const tail = pathAt(s, s.line[s.line.length - 1].delay); want = Math.max(m.y - 0.15 * hu, Math.min(want, tail.y + 0.53 * hu)); }
   if (s.nest) want = Math.min(want, s.nest.y - 0.14 * hu);
@@ -1222,12 +1259,16 @@ function frame(now) {
     }
     if (water) water.gain.value = 0.18;
   } else if (water) water.gain.value = 0;
+  if (s.endless) { const top = measureTop(); if (top > playTop + dpr) { playTop = top; setAnchor(); } }
   if (!waitTouch) updateCamera(dt);
   shake = Math.max(0, shake - dt * 2.5); flash = Math.max(0, flash - dt * 2);
   const k = still ? 0 : shake * 10 * dpr;
   g.setTransform(1, 0, 0, 1, (Math.random() - 0.5) * k, (Math.random() - 0.5) * k);
-  drawPond(now); drawHazards(now); drawNest(now); drawLost(now); drawLine(now, alpha); drawMother(now, alpha); drawParts(paused ? 0 : dt);
+  drawPond(now); drawHazards(now); drawNest(now);
+  if (screen === 'play' && s.endless) drawIntro(now); // under the birds, so the picture never hides one
+  drawLost(now); drawLine(now, alpha); drawMother(now, alpha); drawParts(paused ? 0 : dt);
   g.setTransform(1, 0, 0, 1, 0, 0);
+  if (s.endless && playTop) drawBand();
   if (flash > 0) { g.fillStyle = `rgba(255,90,80,${flash * 0.4})`; g.fillRect(0, 0, W, H); }
   if (screen === 'play') { drawGuide(now); drawHud(now); }
   requestAnimationFrame(frame);
@@ -1262,22 +1303,216 @@ function drawMenuArt() {
   q.restore();
 }
 
-function drawPostcard(won) {
+function drawPostcard(won, kind = 'plain') {
   const c = $('postcard'), q = c.getContext('2d');
   const w = c.width, h = c.height;
   q.clearRect(0, 0, w, h);
-  const water = q.createLinearGradient(0, 0, w, h);
-  water.addColorStop(0, '#d5ead1'); water.addColorStop(1, '#94cbc3');
+  const water = kind === 'final' ? q.createLinearGradient(0, 0, 0, h) : q.createLinearGradient(0, 0, w, h);
+  if (kind === 'final') { water.addColorStop(0, '#ffcf8a'); water.addColorStop(.45, '#f7a27a'); water.addColorStop(.46, '#9fcbc4'); water.addColorStop(1, '#6fb1b0'); }
+  else { water.addColorStop(0, '#d5ead1'); water.addColorStop(1, '#94cbc3'); }
   q.fillStyle = water; q.beginPath(); q.roundRect(12, 12, w - 24, h - 24, 70); q.fill();
-  art.lilyPad(q, 57, 120, 24, .28, true);
-  art.lilyPad(q, w - 49, 70, 30, 1.2, true);
-  const group = s.endless ? s.line : s.arrived;
+  const looks = Object.keys(TRAITS);
+  if (kind === 'final') {
+    // sunset over the pond: the sun sits on the water line, its light trailing across
+    q.save(); q.beginPath(); q.roundRect(12, 12, w - 24, h - 24, 70); q.clip();
+    q.fillStyle = '#ffe08a'; q.beginPath(); q.arc(w * .78, h * .47, 44, Math.PI, 0); q.fill();
+    q.fillStyle = '#ffe08a88'; for (let i = 0; i < 4; i++) { q.beginPath(); q.ellipse(w * .78, h * (.52 + i * .07), 46 - i * 9, 3, 0, 0, 7); q.fill(); }
+    q.restore();
+  } else art.lilyPad(q, 57, 120, 24, .28, true);
+  art.lilyPad(q, w - 49, kind === 'final' ? 160 : 70, 30, 1.2, true);
+  if (kind === 'chapter') {
+    // bunting in the chapter's colour and the chapter's own badge
+    const col = CHAPTERS[chapterOf(s.stage)].color, flags = 13;
+    q.strokeStyle = '#8a6a3c'; q.lineWidth = 3; q.beginPath(); q.moveTo(60, 24); q.quadraticCurveTo(w / 2, 62, w - 60, 24); q.stroke();
+    for (let i = 0; i < flags; i++) {
+      const k = (i + .5) / flags, x = 60 + (w - 120) * k, y = 24 + 4 * k * (1 - k) * 19;
+      q.fillStyle = i % 3 === 0 ? col : i % 3 === 1 ? '#ffd34d' : '#fff9df';
+      q.beginPath(); q.moveTo(x - 15, y); q.lineTo(x + 15, y); q.lineTo(x, y + 30); q.closePath(); q.fill();
+    }
+    q.fillStyle = '#fff9df'; q.beginPath(); q.arc(78, 118, 46, 0, 7); q.fill();
+    q.strokeStyle = col; q.lineWidth = 6; q.stroke();
+    art.chapterBadge(q, 78, 122, 160, CHAPTERS[chapterOf(s.stage)].icon);
+  }
+  const group = kind === 'final' ? albumCounts().map((n, i) => n ? { trait: looks[i % looks.length] } : null).filter(Boolean)
+    : s.endless ? s.line : s.arrived;
   if (won) art.nest(q, w / 2, h * .54, 390, 0, 1);
   art.mother(q, w / 2, h * .42, -.22, 610, 0, 0, false, !won && s.why === 'hearts');
+  const rows = group.length > 8 ? 2 : 1, per = Math.ceil(group.length / rows);
   group.forEach((f, i) => {
-    const dx = (i + .5 - group.length / 2) * Math.min(61, 475 / group.length);
-    art.duckling(q, w / 2 + dx, h * .75 + Math.cos(dx / 130) * 8, dx / 400, 590, 1, i, { trait: f.trait, open: won });
+    const row = Math.floor(i / per), j = i % per, inRow = row < rows - 1 ? per : group.length - per * (rows - 1);
+    const dx = (j + .5 - inRow / 2) * Math.min(61, 475 / inRow) + (rows > 1 ? (row ? 22 : -22) : 0);
+    const y = rows > 1 ? h * (row ? .86 : .69) : h * .75;
+    art.duckling(q, w / 2 + dx, y + Math.cos(dx / 130) * 8, dx / 400, rows > 1 ? 470 : 590, 1, i, { trait: f.trait, open: won });
   });
+}
+
+// ---------------------------------------------------------------- the album: every name, met or not yet
+let albumFrom = 'menu', postcardKind = 'plain';
+function albumCounts() {
+  const counts = NAMES.map(() => 0);
+  for (const [name, n] of Object.entries(data.album || {})) {
+    const i = NAMES.indexOf(String(name).split(' ')[0]);
+    if (i >= 0) counts[i] += Math.max(0, Number(n) || 0);
+  }
+  return counts;
+}
+function drawAlbum() {
+  const c = $('albumArt'), q = c.getContext('2d'), counts = albumCounts(), looks = Object.keys(TRAITS);
+  const cols = 4, cell = c.width / cols;
+  q.clearRect(0, 0, c.width, c.height);
+  counts.forEach((n, i) => {
+    const x0 = (i % cols) * cell, y0 = Math.floor(i / cols) * cell;
+    q.fillStyle = n ? '#e1eed6' : '#ece6cf'; q.beginPath(); q.roundRect(x0 + 6, y0 + 6, cell - 12, cell - 12, 24); q.fill();
+    // each name keeps one look; a name not met yet is a grey shape with a question mark
+    const sprite = document.createElement('canvas'); sprite.width = sprite.height = cell;
+    const p = sprite.getContext('2d');
+    art.duckling(p, cell / 2, cell * .44, 0, 1250, 0, i, { trait: looks[i % looks.length], open: n > 0, moving: 0 });
+    if (!n) { p.globalCompositeOperation = 'source-atop'; p.fillStyle = '#a9b39f'; p.fillRect(0, 0, cell, cell); }
+    q.drawImage(sprite, x0, y0);
+    q.font = 'bold 30px ui-rounded, system-ui, sans-serif'; q.textAlign = 'center'; q.textBaseline = 'middle';
+    q.fillStyle = n ? '#2f6b5e' : '#8c927f';
+    q.fillText(n ? '×' + number(n) : '?', x0 + cell / 2, y0 + cell * .83);
+  });
+  c.setAttribute('aria-label', t('albumLabel', { n: number(counts.filter(Boolean).length), total: number(NAMES.length) }));
+}
+function openAlbum(from) { albumFrom = from; drawAlbum(); show('albumCard'); }
+$('albumOpen').addEventListener('click', () => openAlbum('menu'));
+$('endAlbum').addEventListener('click', () => openAlbum('end'));
+$('albumBack').addEventListener('click', () => show(albumFrom));
+
+// ---------------------------------------------------------------- the endless band, the refill, the first look at each new thing
+function measureTop() {
+  let bottom = 0;
+  for (const id of ['flockHud', 'heartState', 'pause']) { const r = $(id).getBoundingClientRect(); if (r.height) bottom = Math.max(bottom, r.bottom); }
+  return bottom ? (bottom + 6) * dpr : 0;
+}
+function drawBand() {
+  const bank = g.createLinearGradient(0, 0, 0, playTop);
+  bank.addColorStop(0, '#b7d799'); bank.addColorStop(1, art.COL.bank);
+  g.fillStyle = bank; g.fillRect(0, 0, W, playTop);
+  g.fillStyle = art.COL.bankEdge; g.fillRect(0, playTop - 3 * dpr, W, 3 * dpr);
+}
+// The sunlight a pad gave, shown big beside her: a sun and +N, and a scared duckling with a minus when scares cut it.
+function drawPadGain(now) {
+  if (!padGain || now - padGain.t0 > 1700) return;
+  const k = (now - padGain.t0) / 1700, x = sx(s.mom.x), y = Math.max(playTop + 28 * dpr, sy(s.mom.y) - (.13 + .04 * k) * u);
+  const label = '+' + number(padGain.add);
+  g.save(); g.globalAlpha = Math.min(1, (1 - k) * 4);
+  g.font = `800 ${24 * dpr}px ui-rounded, system-ui, sans-serif`; g.textBaseline = 'middle'; g.textAlign = 'left';
+  const tw = g.measureText(label).width, extra = padGain.scares ? 60 * dpr : 0, h = 38 * dpr, w = tw + 44 * dpr + extra;
+  const x0 = Math.max(6 * dpr, Math.min(W - w - 6 * dpr, x - w / 2));
+  g.fillStyle = '#fff9df'; g.strokeStyle = '#b98230'; g.lineWidth = 2.5 * dpr;
+  g.beginPath(); g.roundRect(x0, y - h / 2, w, h, h / 2); g.fill(); g.stroke();
+  art.sun(g, x0 + 20 * dpr, y, 10 * dpr);
+  g.fillStyle = '#7a4a0c'; g.fillText(label, x0 + 36 * dpr, y + dpr);
+  if (padGain.scares) {
+    const mx = x0 + 36 * dpr + tw + 8 * dpr;
+    g.fillStyle = '#a93e2d'; g.fillText('−', mx, y + dpr);
+    art.duckling(g, mx + 30 * dpr, y + 4 * dpr, 1.2, 340 * dpr, now / 1000, 0, {});
+    art.alert(g, mx + 38 * dpr, y + 2 * dpr, 170 * dpr, now / 1000, '#d94f3d');
+  }
+  g.restore();
+}
+
+const INTRO_KINDS = ['log', 'pike', 'turtle', 'bike', 'heron', 'gust'], INTRO_MS = 4200;
+let intro = null, introRun = [];
+const introSpot = h => h.kind === 'pike' ? [h.cx, h.cy, h.R + .05] : h.kind === 'heron' ? [h.px, h.py, .12]
+  : h.kind === 'turtle' ? [h.x, h.y, h.r + .03] : h.kind === 'gust' ? [.5, (h.y0 + h.y1) / 2, 0] : [.5, h.y, 0];
+// The first time each kind comes into view in the endless pond, ring it and play a small picture of what it does.
+// Play goes on: nothing pauses or slows. Seen kinds are saved under the same key as everything else.
+function watchIntro(now) {
+  if (intro && now - intro.t0 > INTRO_MS) intro = null;
+  showGuideLabel(intro ? 'introLabel' : null);
+  if (intro || waitTouch) return;
+  for (const h of s.hazards) {
+    if (!INTRO_KINDS.includes(h.kind) || data.met?.[h.kind]) continue;
+    const [, hy, hr] = introSpot(h), y = sy(hy);
+    if (y - (hr || .08) * u < playTop + 10 * dpr || y > H * .75) continue; // as soon as all of it is in view
+    intro = { kind: h.kind, h, t0: now }; introRun.push(h.kind);
+    data.met = { ...data.met, [h.kind]: 1 }; store();
+    return;
+  }
+}
+function drawIntro(now) {
+  if (!intro) return;
+  const k = (now - intro.t0) / INTRO_MS, [hx, hy, hr] = introSpot(intro.h);
+  const pulse = still ? .5 : Math.sin(now / 160) * .5 + .5;
+  g.save(); g.globalAlpha = Math.max(0, Math.min(1, k * 8, (1 - k) * 6));
+  g.strokeStyle = '#fff3b6'; g.lineWidth = (3 + 2 * pulse) * dpr; g.setLineDash([10 * dpr, 6 * dpr]);
+  const half = intro.kind === 'gust' ? (intro.h.y1 - intro.h.y0) / 2 : .08;
+  if (hr) { g.beginPath(); g.arc(sx(hx), sy(hy), hr * u + 6 * dpr, 0, 7); g.stroke(); }
+  else { g.beginPath(); g.roundRect(sx(.03), sy(hy + half), sx(.97) - sx(.03), 2 * half * u, 14 * dpr); g.stroke(); }
+  const pw = Math.min(168 * dpr, W * .46), ph = pw * .7, px = W - pw - 10 * dpr, py = H - inset.bottom * dpr - ph - 14 * dpr;
+  g.lineWidth = 2 * dpr; g.setLineDash([4 * dpr, 5 * dpr]);
+  const toX = hr ? sx(hx) : Math.min(sx(.9), px + pw / 2), toY = sy(hy) + (hr ? hr * u + 6 * dpr : half * u);
+  if (toY < py) { g.beginPath(); g.moveTo(px + pw / 2, py); g.lineTo(toX, toY); g.stroke(); }
+  g.setLineDash([]);
+  introScene(g, intro.kind, px, py, pw, ph, still ? 1.6 : (now - intro.t0) / 1000);
+  g.restore();
+}
+// A looping picture, a little under three seconds: the warning, the thing itself, and a duckling jumping clear.
+function introScene(q, kind, x, y, w, h, time) {
+  const p = time % 2.8, S = w * 2.2, X = f => x + f * w, Y = f => y + f * h;
+  q.save();
+  q.fillStyle = '#fff9df'; q.beginPath(); q.roundRect(x, y, w, h, 16 * dpr); q.fill();
+  q.beginPath(); q.roundRect(x + 4 * dpr, y + 4 * dpr, w - 8 * dpr, h - 8 * dpr, 12 * dpr); q.fillStyle = '#86c2bd'; q.fill(); q.clip();
+  const warn = p < 1, act = p >= 1, f = Math.min(1, (p - 1) / .5);
+  let duck = kind === 'pike' ? [.78, .55] : [.5, .62];
+  const jump = Math.max(0, Math.min(1, (p - 1.55) / .3));
+  const scared = kind !== 'gust' && jump > 0;
+  if (kind === 'log' || kind === 'bike') {
+    if (kind === 'bike') art.path(q, Y(.62), S * .9, x, x + w);
+    const ax = -.3 + Math.max(0, p - 1) * 1.15;
+    if (warn) kind === 'log' ? art.alert(q, X(.1), Y(.62) + .07 * S, S, time, '#d94f3d') : art.bell(q, X(.1), Y(.62), S, time);
+    else kind === 'log' ? art.log(q, X(ax), Y(.62), .06, .025, S, 3) : art.bike(q, X(ax), Y(.62), 1, S, time);
+  }
+  if (kind === 'turtle') art.turtle(q, X(.5), Y(.62), .08, S, warn ? 'warn' : 'act', warn ? p : f, time);
+  if (kind === 'pike') {
+    q.strokeStyle = 'rgba(255,248,216,.6)'; q.lineWidth = 2 * dpr; q.setLineDash([5 * dpr, 6 * dpr]);
+    q.beginPath(); q.ellipse(X(.5), Y(.55), .28 * w, .3 * h, 0, 0, 7); q.stroke(); q.setLineDash([]);
+    const at = a => ({ x: X(.5) + Math.cos(a) * .28 * w, y: Y(.55) + Math.sin(a) * .3 * h });
+    const a = Math.PI + Math.min(p, 1.55) / 1.55 * Math.PI, hd = at(a), md = at(a - .45), tl = at(a - .9);
+    art.pike(q, { hx: hd.x, hy: hd.y, mx: md.x, my: md.y, tx: tl.x, ty: tl.y }, S, time);
+  }
+  if (kind === 'heron') {
+    const bx = X(.08), by = Y(.4), dx = X(.5) - bx, dy = Y(.62) - by, L = Math.hypot(dx, dy) * 1.25 / S;
+    art.heronBeam(q, bx, by, Math.atan2(-dy, dx), .3, L, S, warn ? 'warn' : 'act', warn ? p : f);
+    art.heronBird(q, bx, by, Math.atan2(dy, dx), S);
+    if (warn) art.alert(q, bx + .05 * S, by, S, time, '#d94f3d');
+  }
+  if (kind === 'gust') {
+    const push = act ? Math.min(1, (p - 1) / .8) : 0;
+    q.strokeStyle = `rgba(255,255,255,${warn ? .35 : .8})`; q.lineWidth = 2 * dpr;
+    for (let i = 0; i < 7; i++) {
+      const yy = Y(.2 + .1 * i), ph2 = (time * 1.3 + i * .29) % 1, xx = X(ph2);
+      q.beginPath(); q.moveTo(xx, yy); q.lineTo(xx - (warn ? .05 : .16) * w, yy); q.stroke();
+    }
+    if (warn) art.chevron(q, X(.08), Y(.5), .03 * S, Math.PI / 2);
+    art.mother(q, X(.42 + .3 * push), Y(.55), 0, S * .95, time, 1, false, false);
+    duck = [.42 + .3 * push, .78];
+  }
+  const away = kind === 'log' || kind === 'bike' ? -1 : 1; // clear of whatever passes
+  const dx = duck[0] + (scared ? away * .24 * jump : 0), dy = duck[1] + (scared ? .18 * jump : 0);
+  art.duckling(q, X(dx), Y(dy), scared ? 1.2 : 0, S, time, 1, {});
+  if (scared) art.alert(q, X(dx), Y(dy), S * .9, time, '#d94f3d');
+  q.restore();
+}
+
+// The folding leaves' countdown: a ring that empties as they fold. On the lesson stage, a green stretch on the ring
+// marks when to quack so the whole line crosses while she keeps swimming.
+function drawLeafClock(h) {
+  const left = leafLeft(h.triggeredAt, h.warning, s.t);
+  if (left === null) return;
+  const x = sx(h.x), y = sy(h.y), R = h.r * u + 8 * dpr, top = -Math.PI / 2, turn = 2 * Math.PI;
+  g.save(); g.lineCap = 'butt';
+  g.strokeStyle = 'rgba(255,255,255,.4)'; g.lineWidth = 8 * dpr; g.beginPath(); g.arc(x, y, R, 0, 7); g.stroke();
+  if (!s.endless && LEVELS[s.stage].lesson === 'bridge') {
+    g.strokeStyle = '#4fb85e'; g.lineWidth = 10 * dpr; g.beginPath();
+    g.arc(x, y, R, top + (1 - LEAF_QUACK.to / h.warning) * turn, top + (1 - LEAF_QUACK.from / h.warning) * turn); g.stroke();
+  }
+  g.strokeStyle = left > .35 ? '#ffd34d' : '#e2563b'; g.lineWidth = 5 * dpr;
+  g.beginPath(); g.arc(x, y, R, top, top + left * turn); g.stroke();
+  g.restore();
 }
 
 // ---------------------------------------------------------------- hooks for checks
@@ -1289,6 +1524,9 @@ window.ducklingsState = () => ({
   lesson: !s.endless ? LEVELS[s.stage].lesson ?? null : null,
   waitingDucks: s.lost.map(l => ({ sx: sx(l.x) / dpr, sy: sy(l.y) / dpr, y: l.y })),
   opened: data.opened, sound: data.sound, taught: data.taught, hudPeeks, rollCalls,
+  playTop: playTop / dpr, intro: intro?.kind ?? null, introRun: [...introRun], met: Object.keys(data.met || {}), postcard: postcardKind,
+  quackCue: $('quack').classList.contains('cue'),
+  padGain: padGain && performance.now() - padGain.t0 < 1700 ? { add: padGain.add, scares: padGain.scares } : null,
 });
 
 // A first-time player who does not touch for 3 s in play sees a finger hold and move (experiments/kit/hint.js).
