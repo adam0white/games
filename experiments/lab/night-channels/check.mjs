@@ -1,13 +1,13 @@
 // Exercise the served page through its controls. The state hook is read-only.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
-const shots = '/private/tmp/night-r3-new1';
+const shots = '/private/tmp/night-r4-review/channels';
 const experiments = resolve(import.meta.dirname, '../..');
 const modules = process.env.PLAYWRIGHT || join(homedir(), 'code/human-framework/node_modules');
 const require = createRequire(join(resolve(modules), 'check.cjs'));
@@ -20,6 +20,10 @@ const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 const pagePath = '/lab/night-channels/';
 const server = createServer(async (req, res) => {
   const { pathname } = new URL(req.url, 'http://localhost');
+  if (pathname === '/away') {
+    res.writeHead(200, { 'content-type': 'text/html' }).end('<title>Another page</title>');
+    return;
+  }
   let file;
   if (pathname === '/notes/button.js') file = resolve(experiments, '../workers/feedback/public/notes/button.js');
   else if (pathname === pagePath) file = join(import.meta.dirname, 'index.html');
@@ -37,14 +41,21 @@ const server = createServer(async (req, res) => {
 const view = page => page.evaluate(() => window.channelView());
 const levelGeometry = s => s.cells.map(c => [c.kind, c.dug, c.height]);
 const waitForPlay = page => page.waitForFunction(() => window.channelView?.().screen === 'play', null, { polling: 100 });
-async function stamp(page, name) {
+async function wakeDisplay(page) {
+  const viewport = page.viewportSize();
+  await page.setViewportSize({ ...viewport, width: viewport.width + 1 });
+  await delay(150);
+  await page.setViewportSize(viewport);
+}
+
+async function soilCapture(page) {
   const { state } = await view(page);
   const soil = state.cells.flatMap((c, i) => c.kind === 'soil' && !c.dug ? [i] : []);
   const samples = await points(page, soil);
-  const png = await page.screenshot({ path: join(shots, name + '.png'), timeout: 90000, scale: 'css' });
+  const png = await page.screenshot({ timeout: 90000, scale: 'css' });
   // Check the captured composite. WebKit once preserved water and plants while
   // dropping the terrain layer, even though the simulation was correct.
-  const painted = await page.evaluate(async ({ data, samples }) => {
+  const { painted, uniform } = await page.evaluate(async ({ data, samples }) => {
     const image = new Image();
     image.src = 'data:image/png;base64,' + data;
     await image.decode();
@@ -54,13 +65,30 @@ async function stamp(page, name) {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(image, 0, 0);
     const { data: pixels } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    return samples.filter(({ x, y }) => {
+    let uniform = true;
+    for (let i = 0; uniform && i < pixels.length; i += 68) {
+      uniform = pixels[i] === pixels[0] && pixels[i + 1] === pixels[1] && pixels[i + 2] === pixels[2];
+    }
+    const painted = samples.filter(({ x, y }) => {
       const i = (Math.floor(y) * canvas.width + Math.floor(x)) * 4;
       return pixels[i] > 80 && pixels[i] > pixels[i + 1] + 10 && pixels[i] > pixels[i + 2] + 20;
     }).length;
+    return { painted, uniform };
   }, { data: png.toString('base64'), samples });
-  assert.ok(soil.length >= 5 && painted >= soil.length * 0.8,
-    name + ': visible soil in ' + painted + '/' + soil.length + ' dry cells');
+  return { png, soil: soil.length, painted, uniform };
+}
+
+async function stamp(page, name) {
+  let capture = await soilCapture(page);
+  // A completely blank WebKit capture needs a display wake. A blank terrain
+  // under visible controls still fails the unchanged soil-pixel check.
+  for (let attempt = 0; name.startsWith('webkit') && capture.uniform && attempt < 2; attempt++) {
+    await wakeDisplay(page);
+    capture = await soilCapture(page);
+  }
+  assert.ok(capture.soil >= 5 && capture.painted >= capture.soil * 0.8,
+    name + ': visible soil in ' + capture.painted + '/' + capture.soil + ' dry cells');
+  await writeFile(join(shots, name + '.png'), capture.png);
 }
 
 async function points(page, ids) {
@@ -74,27 +102,32 @@ async function points(page, ids) {
 
 // Chromium can receive trusted touch gestures through its input protocol.
 // WebKit receives a paced native mouse drag through the same pointer handler.
+async function press(page, session, point) {
+  if (session) await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+  else { await page.mouse.move(point.x, point.y); await page.mouse.down(); }
+}
+async function move(page, session, point) {
+  if (session) await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point] });
+  else await page.mouse.move(point.x, point.y);
+}
+async function release(page, session) {
+  if (session) await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  else await page.mouse.up();
+}
 async function draw(page, session, ids) {
-  const coords = await points(page, ids);
-  const start = coords[0];
-  if (session) await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [start] });
-  else {
-    await page.mouse.move(start.x, start.y);
-    await page.mouse.down();
-  }
+  const [start, ...coords] = await points(page, ids);
+  await press(page, session, start);
   let from = start;
-  for (const to of coords.slice(1)) {
+  for (const to of coords) {
     for (let part = 1; part <= 4; part++) {
       const x = from.x + (to.x - from.x) * part / 4;
       const y = from.y + (to.y - from.y) * part / 4;
-      if (session) await session.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
-      else await page.mouse.move(x, y);
+      await move(page, session, { x, y });
       await delay(10);
     }
     from = to;
   }
-  if (session) await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  else await page.mouse.up();
+  await release(page, session);
 }
 
 function adjacent(s, i) {
@@ -108,7 +141,7 @@ function adjacent(s, i) {
 
 // A player can see the beds, rocks, sand and trenches. Join the nearest missing
 // bed with the fewest new cuts, preferring soil and short routes in a tie.
-function dailyRoutes(s) {
+function routesToBeds(s, uphillPenalty = 0) {
   const connected = new Set([s.source]);
   const plans = [];
   while (s.beds.some(i => !connected.has(i))) {
@@ -124,7 +157,9 @@ function dailyRoutes(s) {
         const cell = s.cells[n];
         if (cell.kind === 'rock') continue;
         const cut = !cell.dug && (cell.kind === 'sand' || cell.kind === 'soil');
-        const cost = costs.get(i) + 1 + (cut ? 1000 : 0) + (cell.kind === 'sand' ? 30 : 0);
+        const uphill = n === i - s.cols;
+        const cost = costs.get(i) + 1 + (cut ? 1000 : 0) + (cell.kind === 'sand' ? 30 : 0) +
+          (uphill ? uphillPenalty : 0);
         if (cost < (costs.get(n) ?? Infinity)) {
           costs.set(n, cost);
           parent.set(n, i);
@@ -132,7 +167,7 @@ function dailyRoutes(s) {
         }
       }
     }
-    assert.notEqual(target, undefined, 'every daily bed is reachable');
+    assert.notEqual(target, undefined, 'every bed is reachable');
     const path = [target];
     while (parent.has(path.at(-1))) path.push(parent.get(path.at(-1)));
     path.forEach(i => connected.add(i));
@@ -164,12 +199,49 @@ async function checkRelease(page, initial) {
   assert.deepEqual(remaining, Array(3).fill(initial.budget - 1), 'secondary and cancelled pointers leave soil alone');
 }
 
+async function checkRotation(page, session, profile, name, initial) {
+  const { width, height } = profile.viewport;
+  const [spring] = await points(page, [initial.source]);
+  const terrainPaints = await page.evaluate(() => window.terrainPaints);
+  await press(page, session, spring);
+  await page.setViewportSize({ width: height, height: width });
+  await page.waitForFunction(previous => window.terrainPaints > previous, terrainPaints);
+  const [bank] = await points(page, [29]);
+  await move(page, session, bank);
+  await release(page, session);
+  assert.equal((await view(page)).state.remaining, initial.budget, 'rotation ends the old stroke without a cut');
+  const [cuts, bloom] = await page.locator('.reading > div').all();
+  const [cutBox, bloomBox, retryBox] = await Promise.all([
+    cuts.boundingBox(), bloom.boundingBox(), page.locator('#retry').boundingBox(),
+  ]);
+  const landscapeGap = Math.min(bloomBox.x - cutBox.x - cutBox.width, retryBox.x - bloomBox.x - bloomBox.width);
+  assert.ok(landscapeGap >= 0, 'landscape stats fit without overlap or covering the retry button');
+  await stamp(page, name + '-06-landscape');
+  await page.touchscreen.tap(bank.x, bank.y);
+  assert.equal((await view(page)).state.remaining, initial.budget - 1, 'a new landscape touch cuts the chosen bank');
+  await page.setViewportSize(profile.viewport);
+  await page.reload();
+  await waitForPlay(page);
+  const reloaded = await view(page);
+  assert.equal(reloaded.level, 2, 'reload opens the highest unlocked garden');
+  assert.deepEqual(levelGeometry(reloaded.state), levelGeometry(initial), 'reload starts that garden fresh');
+  return +landscapeGap.toFixed(2);
+}
+
 async function run(name, engine, profile, origin) {
   const browser = await engine.launch();
   try {
     const context = await browser.newContext({ ...profile, timezoneId: 'America/Chicago' });
     const page = await context.newPage();
     page.setDefaultTimeout(30000);
+    await page.addInitScript(() => {
+      const fillRect = CanvasRenderingContext2D.prototype.fillRect;
+      window.terrainPaints = 0;
+      CanvasRenderingContext2D.prototype.fillRect = function (...args) {
+        if (this.canvas.id === 'terrain') window.terrainPaints++;
+        return fillRect.apply(this, args);
+      };
+    });
     const session = name === 'chromium' ? await context.newCDPSession(page) : null;
     const errors = [], outside = [], telemetry = [], failed = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -184,9 +256,7 @@ async function run(name, engine, profile, origin) {
     // Fixed calendar date; browser timers, animation frames and physics run in real time.
     await page.clock.setFixedTime(new Date('2026-11-24T18:00:00Z'));
     if (name === 'webkit') {
-      await page.setViewportSize({ ...profile.viewport, width: profile.viewport.width + 1 });
-      await delay(150);
-      await page.setViewportSize(profile.viewport);
+      await wakeDisplay(page);
       await page.waitForFunction(() => true);
     }
     const url = origin + pagePath;
@@ -208,6 +278,8 @@ async function run(name, engine, profile, origin) {
     assert.match(await page.locator('meta[name=viewport]').getAttribute('content'), /maximum-scale=1/);
     await page.waitForFunction(() => window.channelView().state.ticks >= 45);
     await stamp(page, name + '-01-spring');
+    const terrainPaints = await page.evaluate(() => window.terrainPaints);
+    assert.ok(terrainPaints > 0, 'the visible terrain has been painted');
     // The first garden presents a spring and a single seedbed on the same line.
     const bed = first.state.beds[0], spring = first.state.source;
     assert.equal(spring % first.state.cols, bed % first.state.cols);
@@ -216,7 +288,10 @@ async function run(name, engine, profile, origin) {
       const { cells, beds } = window.channelView().state;
       return cells[beds[0]].growth >= 0.5 && cells[beds[0]].growth < 1;
     });
+    assert.equal(await page.evaluate(() => window.terrainPaints), terrainPaints,
+      'ticking and digging do not repaint the terrain');
     await stamp(page, name + '-02-sprout');
+    const growingPaints = await page.evaluate(() => window.terrainPaints);
     await page.waitForFunction(() => window.channelView().screen === 'won', null, { timeout: 55000 });
     const firstSeconds = (performance.now() - entered) / 1000;
     assert.ok(firstSeconds < 60, 'the opening stroke brings a flower in under a minute');
@@ -224,11 +299,17 @@ async function run(name, engine, profile, origin) {
     assert.equal(finished.state.budget - finished.state.remaining, 3, 'one swipe cut all three dry cells');
     assert.equal(finished.state.cells[bed].growth, 1);
     assert.equal(finished.unlocked, 2);
+    assert.deepEqual(finished.geometry, first.geometry, 'the board stays still when Next garden appears');
+    assert.equal(await page.evaluate(() => window.terrainPaints), growingPaints,
+      'blooming does not repaint the terrain');
     await stamp(page, name + '-03-flower');
+    const finishedPaints = await page.evaluate(() => window.terrainPaints);
 
     await page.tap('#next');
     const second = await view(page);
     assert.equal(second.level, 2);
+    assert.ok(await page.evaluate(previous => window.terrainPaints > previous, finishedPaints),
+      'advancing repaints the new terrain');
     await checkRelease(page, second.state);
     await page.tap('#retry');
     assert.deepEqual(levelGeometry((await view(page)).state), levelGeometry(second.state), 'retry restores the original cuts and heights');
@@ -266,16 +347,37 @@ async function run(name, engine, profile, origin) {
     assert.match(await page.locator('#result').innerText(), /Isolated bed/);
     await page.tap('#retry');
     assert.deepEqual(levelGeometry((await view(page)).state), levelGeometry(second.state));
+    const landscapeGap = await checkRotation(page, session, profile, name, second.state);
+    await page.goto(origin + '/away');
+    await page.goBack();
+    await page.waitForFunction(() => !!window.channelView, null, { polling: 100 });
+    if ((await view(page)).screen === 'paused') await page.tap('#resume');
+    await waitForPlay(page);
+    assert.equal((await view(page)).level, 2, 'returning from a different page opens the garden');
+
+    const campaign = [{ cuts: 3, ticks: finished.state.ticks, beds: 1 }];
+    for (let level = 2; level <= 10; level++) {
+      assert.equal((await view(page)).level, level);
+      const paths = routesToBeds((await view(page)).state, 2000);
+      for (const path of paths) await draw(page, session, path);
+      await page.waitForFunction(() => window.channelView().screen === 'won', null, { timeout: 55000 });
+      const { state } = await view(page);
+      campaign.push({ cuts: state.budget - state.remaining, ticks: state.ticks, beds: state.beds.length });
+      if (level < 10) await page.tap('#next');
+    }
+    await stamp(page, name + '-07-last-garden');
+    await page.tap('#next');
+    assert.equal(await page.locator('#levels .completed').count(), 10, 'all ten gardens show their blooms as complete');
 
     await page.goto(url + '?look=clay');
     await waitForPlay(page);
-    assert.equal((await view(page)).unlocked, 2, 'reloading keeps campaign progress');
+    assert.equal((await view(page)).unlocked, 10, 'reloading keeps campaign progress');
     assert.equal(await page.locator('html').getAttribute('data-look'), 'clay');
     await page.tap('#daily');
     let daily = await view(page);
     assert.equal(daily.day, '2026-11-24');
     const dailyMap = levelGeometry(daily.state);
-    const routes = dailyRoutes(daily.state);
+    const routes = routesToBeds(daily.state);
     await stamp(page, name + '-04-daily-clay');
     for (const ids of routes) await draw(page, session, ids);
     await page.waitForFunction(() => window.channelView().screen === 'won', null, { timeout: 60000 });
@@ -322,7 +424,8 @@ async function run(name, engine, profile, origin) {
     assert.deepEqual(telemetry, [], 'telemetry or outbound writes');
     console.log(JSON.stringify({ name, firstSeconds: +firstSeconds.toFixed(2), firstDigs: 3,
       dailyDigs: digs, replayDigs: digs + 1, dailyBeds: daily.state.beds.length, dailyBudget: daily.state.budget,
-      cellPx: +first.geometry.size.toFixed(1), screenshots: 5, errors: errors.length, outside: outside.length }));
+      cellPx: +first.geometry.size.toFixed(1), landscapeGap, campaign,
+      screenshots: 7, errors: errors.length, outside: outside.length }));
   } finally {
     await browser.close();
   }

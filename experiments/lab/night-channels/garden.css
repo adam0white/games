@@ -27,7 +27,8 @@ button:active { filter:brightness(1.25) }
 .round { border:1px solid var(--line);border-radius:50%;width:44px;height:44px;display:grid;place-items:center;flex:none }
 .pause-bars { height:13px;width:10px;border-left:3px solid var(--ink);border-right:3px solid var(--ink) }
 .plate { position:relative; min-height:0 }
-#garden { display:block;width:100%;height:100%;touch-action:none;user-select:none;-webkit-user-select:none }
+#terrain { position:absolute;inset:0;width:100%;height:100%;pointer-events:none }
+#garden { position:relative;display:block;width:100%;height:100%;touch-action:none;user-select:none;-webkit-user-select:none }
 footer { border-top:1px solid var(--line) }
 .caption { display:flex;align-items:center;justify-content:space-between;gap:6px;margin:11px 0 7px }
 .caption h2 { font-style:italic;font-size:clamp(21px,5.6vw,28px);letter-spacing:-.035em }
@@ -51,7 +52,7 @@ footer { border-top:1px solid var(--line) }
 .calendar-icon::after { content:"";position:absolute;left:3px;right:3px;height:4px;top:-3px;border-inline:1.5px solid currentColor }
 .primary { padding:10px 18px;color:#24352a;background:#f0ca91;border:1px solid #f8dcac;border-radius:24px;font-weight:650 }
 .primary span { margin-left:5px }
-.next { font-size:13px;margin:4px 0 }
+.next { font-size:13px }
 #saveStatus:not(:empty),#dailyBest { display:block;color:var(--muted);font-size:12px;letter-spacing:0;margin:4px 0 }
 [hidden] { display:none!important }
 .screen { position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:12px;background:#091810b8;z-index:5 }
@@ -69,6 +70,11 @@ footer { border-top:1px solid var(--line) }
 #return { margin-top:12px }
 @media(max-height:660px) { main { padding-top:3px } header { padding-bottom:4px } h1 { font-size:30px }.caption { margin:4px 0 }.controls { margin-top:3px }.caption h2 { font-size:20px } }
 @media(orientation:landscape) and (max-height:540px) { main { width:min(100%,840px);grid-template-columns:minmax(220px,.8fr) 1.2fr;grid-template-rows:auto 1fr;align-items:center;gap:8px }.plate { grid-column:2;grid-row:1/3;height:100% }footer { grid-row:2;align-self:start } }
+@media(orientation:landscape) and (max-height:540px) and (max-width:720px) {
+  header,footer { margin-inline:16px }
+  .instruments { gap:8px }
+  .instruments .symbol { display:none }
+}
 
 #levels button.completed { position:relative }
 #levels button.completed::after { position:absolute;content:"";height:3px;width:3px;background:var(--bud);border-radius:50%;bottom:4px;left:calc(50% - 1.5px) }

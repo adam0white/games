@@ -11,9 +11,13 @@ noZoom();
 const $ = id => document.getElementById(id);
 const board = $('board'), ctx = board.getContext('2d');
 const key = 'night-podwire:progress';
-const stored = readJson(key);
-const valid = stored?.v === 1 && Number.isInteger(stored.next) && stored.next >= 1 && stored.next <= plates.length;
-const save = valid ? { v: 1, next: stored.next, complete: stored.complete === true, sound: stored.sound !== false }
+function readSave() {
+  const stored = readJson(key);
+  return stored?.v === 1 && Number.isInteger(stored.next) && stored.next >= 1 && stored.next <= plates.length
+    ? stored : null;
+}
+const stored = readSave();
+const save = stored ? { v: 1, next: stored.next, complete: stored.complete === true, sound: stored.sound !== false }
   : { v: 1, next: 1, complete: false, sound: true };
 const audio = sound({ on: () => save.sound });
 const look = new URLSearchParams(location.search).get('look') === 'blueprint' ? 'blueprint' : 'herbarium';
@@ -28,7 +32,14 @@ const show = screens(['paused', 'won'], name => {
   $('pause').disabled = name !== 'play';
   $('folio').inert = name === 'paused';
 });
-function store() {
+function store(toggleSound = false) {
+  const latest = readSave();
+  if (latest) {
+    save.next = Math.max(save.next, latest.next);
+    save.complete ||= latest.complete === true;
+    if (typeof latest.sound === 'boolean') save.sound = latest.sound;
+  }
+  if (toggleSound) save.sound = !save.sound;
   $('status').textContent = writeJson(key, save) ? '' : 'Progress saved for this visit only.';
 }
 function updateFooter() {
@@ -52,9 +63,10 @@ function start(level) {
 }
 function abandonGrip() {
   const previous = pointer;
+  if (previous === null) return;
   pointer = null;
   cancel(state);
-  if (previous !== null && board.hasPointerCapture(previous)) board.releasePointerCapture(previous);
+  if (board.hasPointerCapture(previous)) board.releasePointerCapture(previous);
 }
 function pause() {
   if (screen !== 'play') return;
@@ -70,10 +82,12 @@ $('resume').onclick = resume;
 $('retry').onclick = () => start(state.level);
 $('next').onclick = () => { nextHint.done(); start(state.level % plates.length + 1); };
 $('sound').onclick = () => {
-  save.sound = !save.sound;
-  $('sound').textContent = save.sound ? 'Sound on' : 'Sound off'; store();
+  store(true);
+  $('sound').textContent = save.sound ? 'Sound on' : 'Sound off';
+  updateFooter();
 };
 onLeave(pause);
+new ResizeObserver(abandonGrip).observe(board);
 addEventListener('keydown', e => {
   if (isPauseKey(e) && !e.repeat) {
     if (screen === 'paused') resume(); else pause();

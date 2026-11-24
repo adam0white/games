@@ -78,3 +78,22 @@ The fourteen phone captures were opened and inspected, seven per profile. They c
 ### Open play questions
 
 The remaining acceptance question is whether a stranger starts behind the sheep, keeps contact and brings all twelve home within a minute without reading. The automated opening drive supplies the gesture. Real thumbs, device performance, sound by ear and human enjoyment still need a playtest. The live deployment was outside this folder-only change.
+
+## 2026-11-24 — phone play review
+
+- On the opening field, a single tap started the timer and removed the only steering demonstration. The dotted route now stays at 0.63 opacity through the animation cycle. The route returns when a tap ends and stays available until a drag travels 14 world units. The phone check observes the route before input, after a tap and after a drag.
+- Rotating a held Chromium touch left the old pasture target active. After 400 ms without a new move event, the dog had reached (148.49, 361.71) from (180, 414). A change of orientation now pauses a running field and releases steering. The phone check holds a contact through rotation, verifies the field is frozen, and drives again in landscape with a new contact.
+- The landscape footer broke “Until dark” over two lines. The tally and countdown now occupy separate rows. On the 664 CSS pixel WebKit landscape viewport, the title and evening number also wrapped. The sidebar has 190 CSS pixels of space there, up from 159.36. The phone check measures all three labels as one line and checks that the full landscape field fits. It also retries a running evening through the field chooser, navigates away and back, and reloads in play.
+
+The local Chromium Pixel 7 campaign cleared all ten evenings in sequence. The first move was a centred upward drag. Later evenings used a pointer-driven herding policy based on the read-only game snapshot. Evening 5 finished 28/28 with a rescued stray in 27.450 simulated seconds. Evening 10 finished 60/60 with zero losses in 26.500 seconds. The evening 10 animation callback took 0.8 ms at the 95th percentile and at most 4.1 ms across 1,666 frames. Its frame interval was 16.7 ms at the 95th percentile and reached 133.3 ms. Evening 5 had one callback over budget in 1,798 samples, at 22.2 ms with a 0.5 ms 95th percentile. These measurements include local browser and host scheduling. No sustained callback cost above 16.7 ms was reproduced in that run.
+
+The separate WebKit iPhone 13 campaign also cleared all ten evenings in sequence with zero losses. It used the same steering policy after the opening drag. Evening 5 finished 28/28 with a rescued stray in 21.350 simulated seconds, and evening 10 finished 60/60 in 25.817 seconds. Across 1,905 evening 10 frames, the callback took 1 ms at the 95th percentile and at most 2 ms. Frame intervals were 15 ms at the 95th percentile and 37 ms at the maximum, with 12 intervals over 16.7 ms. Evening 4's frame intervals reached 31 ms at the 95th percentile while the callback was 1 ms at that percentile. The contiguous campaign run reported zero browser errors.
+
+The simulation suite exited 0 with 49/49 campaign and 20/20 endless runs. The mutation exited 1 with 0/12 home on the opening drive. The game and check retain the existing gameplay acceptance thresholds.
+
+| Browser profile | Evening 1 home / lost | Evening 1 simulated / wall seconds | Endless wave 1 home / simulated seconds | Saved best after reload | Rotated field, CSS px |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| WebKit, iPhone 13 | 12 / 0 | 9.650 / 10.363 | 32 / 18.083 | 33 | 258.296875 × 373.09375 |
+| Chromium, Pixel 7 | 12 / 0 | 9.633 / 10.429 | 32 / 19.850 | 34 | 273.53125 × 395.09375 |
+
+The two profile checks above exited 0 with zero browser errors, external requests and telemetry requests. An earlier Chromium run reached all gameplay assertions before recording two Web Audio output-device errors. A WebKit launch reached its 45-second deadline on the same busy host. Standard launches completed on retry. The browser captures use mouse drags on WebKit and touch drags on Chromium. Physical touch, audio output, device performance and a first-time human player remain unverified.

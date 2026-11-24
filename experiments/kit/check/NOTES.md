@@ -66,3 +66,36 @@ Unverified: real phones, audible output, live recording/quest/room services, qui
 Observed host conditions: the one-minute load average reached 406.06 during reruns. Browser navigation/stability timeouts and WebGL context loss occurred. Resource contention may explain some failures, but that explanation is unresolved for each failure. No error was filtered out to obtain a pass.
 
 Screenshot inspection found a blank Chromium Harvest canvas in `chromium-hint-harvest-hint.png`: only the HTML pause button and hint are visible. Its saved-play screenshots render the field correctly, and its functional hint assertions passed. The blank capture remains unresolved. No game folder was edited.
+
+## 2026-11-24 — five Night pages and headless Pour
+
+Registered five saved-play cases and five hint cases on both phone profiles. Each registration uses the page's existing progress and hint keys, for 10 keys total. Bells keeps its eight star entries, best score and palette and increments `tries` by one per start. Lamp Keeper restores evening 2 and a daily best of 1400. Channels restores garden 3, Flock restores evening 2 and an endless best of 17, and Podwire restores plate 2 with one completed plate. All five registrations check that sound stays off after a reload.
+
+The checks strike one bell, commit one route, spend one cut, move the dog at least one world unit, and count one released pluck. Podwire uses native touch in Chromium and a browser mouse drag in WebKit to exercise pointer capture. The Flock check presses the exposed left side of Pause because the tester Notes button overlaps its center on Pixel 7.
+
+Hint delays are 1600 ms for Bells, 4500 ms for Lamp Keeper, 4000 ms for Channels, 8500 ms for Flock and 5500 ms for Podwire. The check records the start action or the result card and the hint's first appearance in the browser. It allows 250 ms for the kit's first eligible frame, which can count time from the preceding frame. Channels uses the daily garden and Flock uses endless play to reach the kit hint. Podwire opens the first pod and verifies that Next dismisses the hint and opens plate 2. Its hint appears on the result card, where Pause is disabled. The saved-play case exercises pause and resume separately. Returning-player checks assert that the kit does not mount a hint for either a progress save or a dismissal key. Existing thresholds remain in force.
+
+On macOS the selected WebKit runs hold a display assertion while the browser runs. If no animation frames arrive, the harness restores the original viewport after a one-pixel resize and verifies two frames at that size. Wild Pour defaults both profiles to headless, opens a window only with `HEADED=1`, and writes captures to `SHOTS` or a new temporary directory. Its macOS WebKit display assertion is bounded at 180 seconds.
+
+Verification artifacts for this section are in `/private/tmp/night-r3-shared-verification/`. The initial WebKit runs captured black screens. Subsequent runs checked both animation frames and the captured images. The initial Chromium Pour run logged an audio-device error after completing its gameplay assertions. Error and frame-budget checks remain in place.
+
+The combined standalone Pour check exited 0, with zero page or console errors. Both profiles won the campaign on the first attempt. Inspected all 12 captures from that run, including the hint, full tilt and daily result.
+
+| Headless profile | Campaign (drops / target, spills, stars) | Daily (drops / target, spills) | Clearance (CSS px) | Stationary frames / mean interval / p95 work | Active frames / mean interval / p95 work |
+| --- | --- | --- | ---: | --- | --- |
+| WebKit iPhone 13 | 29 / 34, 13, 1 | 32 / 34, 9 | 13.92 | 353 / 14.235 ms / 2.0 ms | 300 / 14.250 ms / 2.0 ms |
+| Chromium Pixel 7 | 37 / 34, 4, 2 | 37 / 34, 6 | 15.82 | 308 / 16.666 ms / 2.2 ms | 263 / 16.666 ms / 1.9 ms |
+
+Each pass below is a separate `phone.mjs lab/<slug> <profile>` invocation covering both saved play and the hint. The final streaks contain 30 passing invocations and 60 passing sections.
+
+| Page | Consecutive WebKit passes | Consecutive Chromium passes |
+| --- | ---: | ---: |
+| night-bells | 3 | 3 |
+| night-lamp-keeper | 3 | 3 |
+| night-channels | 3 | 3 |
+| night-flock | 3 | 3 |
+| night-podwire | 3 | 3 |
+
+Inspected the 40 shared captures from the last pass on each profile and compared the hint captures to earlier frames where needed. Some captures landed during the hint's fade-in. Earlier WebKit runs hit compositor stalls and a 150-second whole-section deadline. The scoped kit self-test and shared Wild Pour saved-play and hint cases passed on both profiles. All six normal bot suites exited 0 and all six mutations exited 1. Syntax checks on the three edited modules and the scoped whitespace check passed.
+
+Physical phones, audible sound, windowed Pour, and a full run of every registered shared check remain unverified in this pass. All new verification images and logs were written outside the worktree.

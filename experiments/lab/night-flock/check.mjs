@@ -11,7 +11,7 @@ import { leftEdge, rightEdge } from './sim.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const notesButton = resolve(root, '../workers/feedback/public/notes/button.js');
-const shots = process.env.SHOTS || '/private/tmp/night-r3-new2';
+const shots = process.env.SHOTS || '/private/tmp/night-r4-review/flock';
 const saveKey = 'night-flock:save';
 const types = {
   '.css': 'text/css',
@@ -37,6 +37,11 @@ await mkdir(shots, { recursive: true });
 
 const server = createServer(async (request, response) => {
   const { pathname } = new URL(request.url, 'http://localhost');
+  if (pathname === '/lab/night-flock/check-away.html') {
+    response.writeHead(200, { 'content-type': types['.html'] });
+    response.end('<!doctype html><title>Away from the field</title>');
+    return;
+  }
   if (pathname === '/favicon.ico') {
     response.writeHead(204);
     response.end();
@@ -241,6 +246,53 @@ async function pauseAndRelease(page, input, name) {
   return afterSecondary.game.time;
 }
 
+async function rotateDuringSteering(page, input, name) {
+  const portrait = page.viewportSize();
+  const { x, y } = (await state(page)).game.dog;
+  await input.down(1, x - 80, y - 55);
+  assert.equal((await state(page)).pressed, true, 'the pre-rotation gesture is active');
+  await page.setViewportSize({ width: portrait.height, height: portrait.width });
+  await waitForScreen(page, 'paused');
+  const paused = await state(page);
+  assert.equal(paused.pressed, false, 'rotating cancels the old contact');
+  await input.up(1);
+  await readyToPaint(page, name);
+  assert.deepEqual((await state(page)).game, paused.game, 'orientation pause holds the field still');
+  await controls(page, ['resume', 'evenings', 'sound']);
+  await screenshot(page, name, '03a-rotated-pause');
+  await page.tap('#resume');
+  await waitForScreen(page, 'play');
+  assert.equal((await state(page)).pressed, false, 'the old drag does not resume in landscape');
+
+  const layout = await page.evaluate(() => {
+    const box = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
+    const lines = selector => {
+      const element = document.querySelector(selector);
+      return Math.round(element.getBoundingClientRect().height / parseFloat(getComputedStyle(element).lineHeight));
+    };
+    return { field: box('#field'), tally: box('.measure'), daylight: box('.daylight'),
+      timerLines: lines('.dusk-label .smallcaps'), titleLines: lines('h1'), chapterLines: lines('#chapter') };
+  });
+  assert.equal(layout.timerLines, 1, 'the landscape countdown label stays on one line');
+  assert.equal(layout.titleLines, 1, 'the landscape title stays on one line');
+  assert.equal(layout.chapterLines, 1, 'the landscape evening number stays on one line');
+  assert.ok(layout.tally.bottom <= layout.daylight.top, 'the landscape tally has a row above the countdown');
+  assert.ok(layout.field.top >= 0 && layout.field.bottom <= portrait.width, 'the full landscape field fits vertically');
+  const landscape = await steering(page, name);
+  await landscape.down(1, x - 90, y);
+  await page.waitForFunction(from => window.flockState().game.dog.x < from - 4, paused.game.dog.x, { polling: 30 });
+  await landscape.up(1);
+  await screenshot(page, name, '03b-landscape-field');
+  await page.setViewportSize(portrait);
+  await waitForScreen(page, 'paused');
+  await page.tap('#evenings');
+  await page.getByRole('button', { name: 'Evening 1', exact: true }).tap();
+  const retried = await state(page);
+  assert.equal(retried.game.level, 1, 'the current evening can be selected again mid-run');
+  assert.equal(retried.game.time, 0, 'selecting the current evening starts it over');
+  return { width: layout.field.width, height: layout.field.height };
+}
+
 // Guide the rear flock uphill. Recover sheep near the banks and meet a wolf
 // that is about to reach the flock before it drives sheep across the field.
 function destination(game) {
@@ -333,6 +385,16 @@ async function run({ name, engine, device }) {
       if (location.protocol !== 'http:') return;
       localStorage.setItem('hf-lab-send-localhost', '1');
       window.flockCheckFrames = 0;
+      window.flockGuideDraws = 0;
+      window.flockGuideMinAlpha = 1;
+      const setLineDash = CanvasRenderingContext2D.prototype.setLineDash;
+      CanvasRenderingContext2D.prototype.setLineDash = function (segments) {
+        if (this.canvas.id === 'field' && segments[0] === 1 && segments[1] === 6) {
+          window.flockGuideDraws++;
+          window.flockGuideMinAlpha = Math.min(window.flockGuideMinAlpha, this.globalAlpha);
+        }
+        return setLineDash.call(this, segments);
+      };
       requestAnimationFrame(function countFrame() {
         window.flockCheckFrames++;
         requestAnimationFrame(countFrame);
@@ -359,6 +421,8 @@ async function run({ name, engine, device }) {
     assert.equal(initial.game.sheep.length, 12, 'evening 1 starts with twelve sheep');
     assert.equal(initial.game.time, 0, 'the evening starts on first input');
     assert.equal(initial.saved.unlocked, 1);
+    assert.ok(await page.evaluate(() => window.flockGuideDraws > 0 && window.flockGuideMinAlpha >= 0.62),
+      'the uphill route remains visible through the animated hand cycle');
     await screenshot(page, name, '01-first-evening');
     let input = await steering(page, name);
     const first = await beginner(page, input);
@@ -372,17 +436,42 @@ async function run({ name, engine, device }) {
     assert.equal(retried.game.level, 1, 'retry keeps the current evening');
     assert.equal(retried.game.home, 0, 'retry resets arrivals');
     assert.equal(retried.game.time, 0, 'retry waits for input');
+    const field = await page.locator('#field').boundingBox();
+    await page.locator('#field').tap({ position: { x: field.width / 2, y: field.height * 414 / 520 } });
+    const afterTap = await state(page);
+    assert.ok(afterTap.game.started && !afterTap.pressed, 'a brief touch starts the field without a held gesture');
+    const guideDraws = await page.evaluate(() => window.flockGuideDraws);
+    await page.waitForFunction(n => window.flockGuideDraws > n + 1, guideDraws, { polling: 50, timeout: 5000 });
+    await screenshot(page, name, '02a-guide-after-tap');
     const secondaryAt = await pauseAndRelease(page, input, name);
+    const afterDrag = await page.evaluate(() => window.flockGuideDraws);
+    await readyToPaint(page, name);
+    assert.equal(await page.evaluate(() => window.flockGuideDraws), afterDrag, 'the guide stops after a steering drag');
     const pointers = await page.evaluate(() => window.flockCheckPointers);
     assert.ok(pointers.some(([type, trusted, primary]) => type === (name === 'webkit' ? 'mouse' : 'touch') && trusted && primary),
       'primary steering uses trusted browser input');
     assert.ok(pointers.some(([type, trusted, primary]) => type === 'touch' && trusted === (name === 'chromium') && !primary),
       'a distinct non-primary touch reached the field');
+    const landscape = await rotateDuringSteering(page, input, name);
+
+    await page.locator('#field').tap();
+    const leaving = await state(page);
+    assert.ok(leaving.game.time > 0, 'leaving interrupts a running evening');
+    await page.goto(new URL('check-away.html', url).href);
+    await page.goBack();
+    await readyToPaint(page, name);
+    const returned = await state(page);
+    assert.ok(returned.screen === 'paused' || returned.game.level === 2 && returned.game.time === 0,
+      'browser Back restores a paused field or reloads the highest unlocked evening');
+    if (returned.screen === 'paused') await page.tap('#resume');
+    if (!(await state(page)).game.started) await page.locator('#field').tap();
+    assert.ok((await state(page)).game.time > 0, 'reload interrupts a running evening');
 
     await page.reload();
     await waitForScreen(page, 'play');
     await readyToPaint(page, name);
     assert.equal((await state(page)).game.level, 2, 'reload opens the highest unlocked evening');
+    assert.equal((await state(page)).game.time, 0, 'reload clears the in-progress clock');
     await page.tap('#pause');
     await waitForScreen(page, 'paused');
     const soundOn = (await state(page)).saved.sound;
@@ -461,7 +550,7 @@ async function run({ name, engine, device }) {
     assert.deepEqual(errors, [], 'browser errors');
     assert.deepEqual(outside, [], 'external requests');
     assert.deepEqual(telemetry, [], 'telemetry requests');
-    console.log(JSON.stringify({ browser: name, device, first, secondaryAt, firstWave, secondWave, bestBeforeReload, warningAt,
+    console.log(JSON.stringify({ browser: name, device, first, secondaryAt, landscape, firstWave, secondWave, bestBeforeReload, warningAt,
       errors: errors.length, externalRequests: outside.length, telemetry: telemetry.length }));
     await context.close();
   } finally {

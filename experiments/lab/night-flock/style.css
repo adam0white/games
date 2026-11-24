@@ -62,9 +62,10 @@ footer {padding:14px 1px 9px;align-items:center}
   footer {padding:3px 0} .tally {font-size:17px} .ledger {min-height:18px}
 }
 @media(orientation:landscape) and (max-height:580px) {
-  .folio {display:grid;width:auto;grid-template-columns:clamp(130px,24vw,190px) min(68vw,calc((100dvh - 14px) * .6923));grid-template-rows:1fr auto auto 1fr;column-gap:18px}
+  .folio {display:grid;width:auto;grid-template-columns:clamp(130px,30vw,190px) min(68vw,calc((100dvh - 14px) * .6923));grid-template-rows:1fr auto auto 1fr;column-gap:18px}
   header {grid-column:1;grid-row:2;align-items:flex-start}
   .plate {grid-column:2;grid-row:1/5}
-  footer {grid-column:1;grid-row:3;gap:16px;padding:15px 0}
+  footer {grid-column:1;grid-row:3;flex-direction:column;align-items:stretch;gap:12px;padding:12px 0}
+  .daylight {width:auto}
   .ledger {grid-column:1;grid-row:4;align-self:start}
 }

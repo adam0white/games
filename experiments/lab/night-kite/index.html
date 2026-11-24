@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5eddc">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./style.css">
+  <title>Night Kite</title>
+</head>
+<body>
+  <main id="print">
+    <header>
+      <div class="mast"><span class="flight-mark" aria-hidden="true">✦</span><span id="edition">Flight 01 / 10</span></div>
+      <div class="title-row"><h1>Night <i>Kite</i></h1><button id="pause" class="round" aria-label="Pause flight"><span></span><span></span></button></div>
+    </header>
+    <div class="picture"><canvas id="field" width="360" height="520" tabindex="0" aria-label="Fly the kite. Drag across to move the spool. Pull down to reel in and ease up to let line out. Arrow keys also steer."></canvas></div>
+    <footer>
+      <div class="instrument objective">
+        <div class="cap"><span class="goal-glyph" aria-hidden="true"></span><span id="counter">Goal 1 / 1</span></div>
+        <div id="objective">Thread the birds</div>
+      </div>
+      <div class="instrument wind"><div class="cap">Wind</div>
+        <div class="wind-reading"><span id="needle" aria-hidden="true">➝</span><span id="weather">Breeze</span></div>
+      </div>
+    </footer>
+  </main>
+  <section id="paused" class="sheet" role="dialog" aria-modal="true" aria-labelledby="pause-title"><div class="card">
+    <div class="cap" id="paused-flight"></div><h2 id="pause-title">Flight paused</h2>
+    <p>Drag across to move the spool. Pull down to reel in. Ease up to let the kite climb.</p>
+    <button class="primary" id="resume">Resume flight</button>
+    <button id="chart-open">Choose a flight</button>
+    <div class="pair"><button id="look">Ink · Indigo</button><button id="sound">Sound on</button></div>
+    <button id="finish" hidden>Land the kite</button>
+  </div></section>
+  <section id="chart" class="sheet" role="dialog" aria-modal="true" aria-labelledby="chart-title"><div class="card">
+    <div class="cap">Night Kite</div><h2 id="chart-title">Flight book</h2>
+    <div id="levels" aria-label="Flights"></div>
+    <button id="endless" class="primary">Endless evening <span>∞</span></button>
+    <p id="record"></p>
+    <button id="chart-back">Back</button>
+  </div></section>
+  <section id="result" class="sheet" role="dialog" aria-modal="true" aria-labelledby="result-title"><div class="card">
+    <div id="result-flight" class="cap"></div><h2 id="result-title"></h2><p id="result-detail"></p>
+    <button id="next" class="primary">Next flight</button>
+    <div class="pair"><button id="retry">Fly again</button><button id="result-chart">Flight book</button></div>
+  </div></section>
+  <script type="module" src="./main.js"></script>
+  <script src="/notes/button.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b121d">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./style.css">
+  <title>Splitlight</title>
+</head>
+<body>
+  <main class="instrument">
+    <header class="masthead">
+      <h1 id="title">Splitlight</h1>
+      <button id="pause" type="button" aria-label="Pause"><span aria-hidden="true"></span></button>
+    </header>
+    <div class="bench">
+      <div class="readout">
+        <div>
+          <div id="plate" class="engraving">Plate 01 / 06</div>
+          <div id="plate-name">First light</div>
+        </div>
+        <div class="receivers">
+          <div class="engraving" id="receiver-label">Receivers</div>
+          <output id="captured" aria-labelledby="receiver-label">0 / 1</output>
+        </div>
+      </div>
+      <div class="window">
+        <canvas id="field" width="360" height="400" aria-label="A light beam passes through the prism. Turn the prism to align the beam with the receivers."></canvas>
+      </div>
+      <div class="dial">
+        <label class="engraving" for="angle">Turn prism</label>
+        <div class="control">
+          <span class="cue" aria-hidden="true"></span>
+          <input id="angle" type="range" min="0" max="1000" step="1" value="80">
+        </div>
+      </div>
+      <section id="result" aria-labelledby="result-title">
+        <h2 id="result-title">Plate exposed</h2>
+        <p id="result-line"></p>
+        <div class="pair">
+          <button class="primary" id="next" type="button">Next plate</button>
+          <button id="again" type="button">Replay plate</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <section id="paused" class="sheet" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+    <div class="card">
+      <h2 id="pause-title">Paused</h2>
+      <button class="primary" id="resume" type="button">Resume</button>
+      <div class="pair">
+        <button id="restart" type="button">Restart plate</button>
+        <button id="sound" type="button" aria-pressed="true">Sound on</button>
+      </div>
+      <button id="first" type="button">Replay plate 1</button>
+    </div>
+  </section>
+  <script type="module" src="./main.js"></script>
+  <script src="/notes/button.js" defer></script>
+</body>
+</html>

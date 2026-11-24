@@ -10,6 +10,7 @@ import { hint } from '../../kit/hint.js';
 noZoom();
 const get = id => document.getElementById(id);
 const canvas = get('garden');
+const terrain = get('terrain');
 const key = 'night-channels:save';
 const titles = ['First furrow', 'The bend', 'Between stones', 'Sandy banks', 'A fork in the hill',
   'Side by side', 'The long terrace', 'Three seedbeds', 'Across the slope', 'The lower garden'];
@@ -255,12 +256,18 @@ const hintControl = hint(canvas, {
   played:saved.unlocked > 1, delay:4000, label:'Drag from the spring to a seedbed',
 });
 function paint() {
-  render(canvas,state,{
+  render(canvas,terrain,state,{
     time:elapsed, hint:screen === 'play' && !day && level === 1 && pointer === null && state.remaining > 0 &&
       query.get('hint') !== '0' && !hintControl.shown,
     look, reduced:reduced.matches,
   });
 }
+// The old pointer coordinates belong to the pre-resize board. End that
+// stroke before accepting a new one, including when the page is paused.
+new ResizeObserver(() => {
+  lift();
+  paint();
+}).observe(canvas);
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = lastFrame === null ? 0 : Math.min(.2, (now - lastFrame)/1000);
