@@ -298,3 +298,24 @@ affected: the 18 points a second is Lantern's rule and applies only to a post th
 posted like any other board. The first read or post of a new UTC day deletes the day before's rows, and the read cache
 is keyed by the day. What is stored is the same as for the main board.
 
+
+### Review fixes (2026-11-24)
+
+An independent review (Codex, gpt-6.2-sol, read-only) found eleven faults in the board. Fixed here:
+
+- A used ticket is kept for `RUN.hours` in `done (r, id, s, t)`. The same post sent twice gets the same answer and changes
+  nothing; a different score or player on a used ticket is refused, and a start does not open a used ticket again.
+- A removal records the id in `gone (id, t)` for `RUN.hours`. A score under that id answers 410 `gone`, so a score still
+  on its way cannot put a removed row back. The page makes a new id when the player shares again.
+- A ticket older than `RUN.hours` is refused at the post, whether or not a start has swept it.
+- A daily board's day only moves forward. A request stamped before midnight that arrives late no longer empties the new
+  day. A removal also moves the day. A ticket from another UTC day is refused on a daily board.
+
+What is stored is still a random id, a name, a score and times. The two new tables hold run ids and player ids only.
+
+Reading a board is a plain GET with no id, name or score in it. The page sends that GET when the player opens the
+leaderboard, also before a yes. "Sends nothing before the player chooses to share" means nothing about the player.
+
+Known and left: the per-address limit counts starts apart from score posts, so one address gets six of each a minute;
+a score refused by the limit is retried once after 6 s and may be refused again. A low score on a full board is trimmed
+at once and still counts against the day's new-player cap. A cached read can be up to `BOARD.cacheSeconds` old.

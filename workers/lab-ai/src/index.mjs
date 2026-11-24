@@ -13,7 +13,7 @@ export class DailyCounter extends DurableObject {
 export class Board extends DurableObject {
   top(limit, day) { return boardTop(this.ctx.storage.sql, limit, day); }
   put(q, now, need, day) { return boardPut(this.ctx.storage.sql, q, now, undefined, need, day); }
-  remove(id) { return boardRemove(this.ctx.storage.sql, id); }
+  remove(id, now, day) { return boardRemove(this.ctx.storage.sql, id, now, day); }
   start(r, now) { return boardStart(this.ctx.storage.sql, r, now); }
 }
 
