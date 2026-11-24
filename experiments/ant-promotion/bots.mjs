@@ -3,7 +3,7 @@
 // 5. the rival: a death makes one, it persists and gains power, no animal eats it, temperaments differ, it can be eaten
 import assert from 'node:assert/strict';
 import { SPAWN_WEIGHTS, HIDE_S, hideReady, SAME_FAST, FAST_CAP, crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENT_NAMES, NEM_STEP, NEM_MAX_BONUS, NEM_PRIZE, MOBS,
-  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY, TIRE, POWER, powerFor, powerReady, POUNCE, pounces, sightOf } from './sim.js';
+  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY, TIRE, POWER, powerFor, powerReady, POUNCE, pounces, sightOf, placeOld, OLD_EVERY, OLD_HUNT, OLD_WEAK, OLD_PRIZE } from './sim.js';
 const seeds = Number(process.argv[2] ?? 20), minutes = Number(process.argv[3] ?? 12);
 
 // 1. Rule table. Player: power 50, speed 124.
@@ -482,3 +482,40 @@ function wary(s) {
   }
 }
 console.log('rival checks pass');
+
+// 6. Old animals (note #201): the top three of the last climb hunt the player in the next one.
+{
+  const chain = k => { const st = [ANT]; while (st.length < TOP) st.push(optionsFor(st.length)[k].id); return st; };
+  for (const k of [0, 1, 2]) {
+    const ids = chain(k).slice(-3), s = create(7 + k, [ANT], 0, SPAWN_WEIGHTS, false, null, ids);
+    assert.deepEqual(s.mobs.filter(m => m.old).map(m => m.f), ids, 'all three are there');
+    for (let i = 0; i < (OLD_EVERY + 2) * 60 && !s.oldHunts; i++) { s.player.safe = i < 200 ? s.player.safe : 0; s.mobs = s.mobs.filter(m => m.old); step(s, { x: 0, y: 0 }); if (s.dead) revive(s, false); }
+    assert.ok(s.oldHunts >= 1 || s.deaths, 'one comes hunting');
+    for (const id of ids) assert.ok(FORMS[id].power - OLD_WEAK < FORMS[chain(k).at(-1)].power, 'every old animal can be eaten at the top');
+  }
+  { // a hunting old animal is no faster than the player: running straight away from it keeps the gap
+    const s = create(3, [ANT], 0, SPAWN_WEIGHTS, false, null, [chain(1).at(-1)]), m = s.mobs.find(x => x.old); s.mobs = [m]; s.player.safe = 0; s.player.x = 300; s.player.y = 1000; m.x = 120; m.y = 1000; m.a = 0; m.hunt = OLD_HUNT;
+    const g0 = s.player.x - m.x; let pounced = 0; for (let i = 0; i < 240; i++) { s.mobs = [m]; step(s, { x: 1, y: 0 }); pounced += s.events.some(e => e.t === 'pounce') ? 1 : 0; }
+    assert.ok(!s.dead && s.player.x - m.x >= g0 && pounced === 0, 'it does not catch a player who runs, and never pounces');
+  }
+  { // grown past it, the player eats it: a prize, and one fewer
+    const st = chain(0), s = create(3, st, 0, SPAWN_WEIGHTS, false, null, [st.at(-3), st.at(-2)]), m = s.mobs.find(x => x.old); s.mobs = s.mobs.filter(x => x.old); m.x = s.player.x + 5; m.y = s.player.y; m.alert = false; m.a = 0; s.player.safe = 1;
+    step(s, { x: 0, y: 0 }); const e = s.events.find(x => x.t === 'oldEaten'); assert.ok(e && e.left === 1, 'eaten, one left'); assert.equal(s.events.find(x => x.t === 'eat').gain, 2 + OLD_PRIZE, 'two levels below pays 2, plus the prize');
+  }
+  { // it stays through upkeep and a revive, and a death to it does not make it the rival
+    const s = create(3, [ANT], 0, SPAWN_WEIGHTS, false, null, chain(2).slice(-3)); for (let i = 0; i < 600; i++) { s.player.safe = 9; step(s, { x: 0, y: 0 }); }
+    assert.equal(s.mobs.filter(m => m.old).length, 3, 'upkeep keeps them'); s.dead = {}; revive(s, false); assert.equal(s.mobs.filter(m => m.old).length, 3, 'a revive keeps them');
+    assert.equal(crown(s, s.mobs.find(m => m.old).id), false, 'never crowned');
+  }
+  const med = a => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
+  for (const wild of [false, true]) for (const pick of [0, 1, 2]) for (const old of [[], chain(0).slice(-3)]) {
+    const tops = [], deaths = []; let hunts = 0, got = 0, byOld = 0;
+    for (let seed = 1; seed <= seeds; seed++) {
+      const s = create(seed, [ANT], 0, SPAWN_WEIGHTS, wild, null, old); let top = 1;
+      for (let i = 0; i < minutes * 3600; i++) { step(s, careful(s)); for (const e of s.events) if (e.t === 'oldEaten') got++; if (s.choosing) choose(s, pick); if (s.dead) { if (s.mobs.find(m => m.id === s.dead.killer)?.old) byOld++; revive(s, false); } top = Math.max(top, level(s)); if (s.won) break; }
+      tops.push(top); deaths.push(s.deaths); hunts += s.oldHunts || 0;
+    }
+    console.log(`${wild ? 'WILD   ' : 'classic'} careful, ${['strong', 'fast', 'sneaky'][pick]}, ${old.length ? 'old animals' : 'none       '}: level median ${med(tops)}, deaths median ${med(deaths)}, hunts/run ${(hunts / seeds).toFixed(1)}, deaths to them/run ${(byOld / seeds).toFixed(1)}, eaten ${got}`);
+  }
+}
+console.log('old animals: checks pass');

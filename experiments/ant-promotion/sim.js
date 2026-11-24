@@ -111,12 +111,35 @@ const fleeMargin = (T, power) => Math.min(T.flee, power * 0.25);
 // Power of a mob, counting the rival's gains. Use this, not FORMS[m.f].power, wherever a mob is compared with the player.
 export const powerOf = m => FORMS[m.f].power + (m.bonus || 0);
 
+// Old animals (tester t1, note #201, 2026-11-24): after a climb to the top, the top three animals of that climb hunt the player in the next one.
+// A bit past their best (OLD_WEAK off their power), they can all be eaten on the way up. Every OLD_EVERY seconds one that is still stronger
+// comes from out of sight and hunts for OLD_HUNT seconds. It is slower than the player, never pounces, and tires like any hunter. Between hunts
+// its sight is OLD_DIM as far and it walks away from the player; with neither, it stayed near and bots fell from level 9 to 5.
+// They take no part in animals hunting each other. They use the rival's random stream, so a world without them runs exactly as before.
+export const OLD_WEAK = 12, OLD_EVERY = 90, OLD_HUNT = 6, OLD_PRIZE = 4, OLD_PACE = 0.88, OLD_DIM = 0.5;
+export function placeOld(s, ids = []) {
+  s.mobs = s.mobs.filter(m => !m.old); s.oldAt = s.t + OLD_EVERY; s.oldTurn = 0;
+  for (const f of ids) { if (!FORMS[f]) continue; const { x, y } = farSpot(s); s.mobs.push({ id: s.nextId++, f, x, y, a: s.nrand() * 6.283, alert: false, lost: 0, timer: 0, want: 0, walk: false, ph: 0, old: true, bonus: -OLD_WEAK }); }
+}
+function callOld(s) { // the next one in turn that is still stronger comes looking
+  const p = s.player, F = me(s), olds = s.mobs.filter(m => m.old && powerOf(m) > F.power && !(m.winded > 0));
+  if (!olds.length || p.safe > 0) { s.oldAt = s.t + 5; return; }
+  const m = olds[s.oldTurn++ % olds.length], a0 = s.nrand() * 6.283;
+  if (Math.hypot(m.x - p.x, m.y - p.y) > 650) for (let i = 0; i < 12; i++) { // it arrives out of sight, in a direction that is inside the world
+    const a = a0 + i * 0.52, x = p.x + Math.cos(a) * 560, y = p.y + Math.sin(a) * 560;
+    if (x > 60 && y > 60 && x < WORLD - 60 && y < WORLD - 60) { m.x = x; m.y = y; m.a = a + Math.PI; break; }
+  }
+  m.hunt = OLD_HUNT; m.tire = 0; s.oldHunts = (s.oldHunts || 0) + 1; s.oldAt = s.t + OLD_EVERY;
+  s.events.push({ t: 'oldHunt', id: m.id, name: FORMS[m.f].name });
+}
+
 // nemesis: what nemesisSave() returned on an earlier visit, or null for a world with no rival.
-export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS, wild = false, nemesis = null) {
+export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS, wild = false, nemesis = null, old = []) {
   const s = { wild, huntAt: HUNT_EVERY, hides: 0, hunts: 0, mobEats: 0, tired: 0, powers: 0, rand: rng(seed), nrand: rng((seed ^ 0x5bd1e995) >>> 0), t: 0, tick: 0, weights, mobs: [], events: [], choosing: null, dead: null, won: false, eaten: 0, deaths: 0, nextId: 1,
     nemesis: null, player: { x: WORLD / 2, y: WORLD / 2, a: 0, ph: 0, stack: stack.slice(), xp, safe: 2.5, hideAt: 0, busy: 0 } };
   while (s.mobs.length < MOBS) spawn(s, 260);
   if (nemesis && FORMS[nemesis.f]) placeNemesis(s, nemesis);
+  if (old.length) placeOld(s, old);
   return s;
 }
 // What the player is now. Picking the same kind again builds on it: each earlier fast pick makes a fast animal faster (fastBoost),
@@ -176,7 +199,7 @@ function placeNemesis(s, n) {
 // The rival takes no part in animals hunting each other: it drops its own chase, and whoever was chasing it lets go.
 export function crown(s, mobId, knobs) {
   if (s.nemesis) return false;
-  const m = s.mobs.find(x => x.id === mobId); if (!m || m.gone) return false;
+  const m = s.mobs.find(x => x.id === mobId); if (!m || m.gone || m.old) return false;
   m.nem = true; m.bonus = 0; m.chase = m.fear = null; m.fed = 0; m.hunt = 0;
   for (const o of s.mobs) { if (o.chase === m) o.chase = null; if (o.fear === m) o.fear = null; }
   s.nemesis = { id: m.id, f: m.f, bonus: 0, kills: 1, escapes: 0, kin: 0, knobs: cleanKnobs(knobs), home: { x: m.x, y: m.y }, rest: 20, hunt: SEEK[2], seek: 0, chase: 0, stalk: 0, commit: false };
@@ -214,9 +237,10 @@ export function step(s, input) {
   const pv = F.speed * (p.boost > 0 ? p.boostK : 1);
   p.x = clamp(p.x + ix * pv * dt, F.r, WORLD - F.r); p.y = clamp(p.y + iy * pv * dt, F.r, WORLD - F.r);
 
+  if (s.oldAt && s.t >= s.oldAt) callOld(s);
   if (s.wild && s.t >= s.huntAt) {
     let hunter = null, near = HUNT_REACH;
-    for (const m of s.mobs) { const d = Math.hypot(m.x - p.x, m.y - p.y); if (powerOf(m) > F.power && !m.alert && d < near) { near = d; hunter = m; } }
+    for (const m of s.mobs) { const d = Math.hypot(m.x - p.x, m.y - p.y); if (powerOf(m) > F.power && !m.alert && !m.old && d < near) { near = d; hunter = m; } }
     if (hunter && p.safe <= 0) { hunter.hunt = HUNT_S; s.hunts++; s.huntAt = s.t + HUNT_EVERY; s.events.push({ t: 'hunt', id: hunter.id, name: FORMS[hunter.f].name }); }
     else s.huntAt = s.t + 2; // nobody in reach, or you are still safe: look again soon
   }
@@ -233,7 +257,7 @@ export function step(s, input) {
     const m = s.mobs[i], M = FORMS[m.f], dx = p.x - m.x, dy = p.y - m.y, d = Math.hypot(dx, dy), to = Math.atan2(dy, dx);
     if (m.hunt > 0) m.hunt -= dt;
     const T = m.nem ? TEMPERAMENTS[N.knobs.temperament] : null, power = powerOf(m);
-    const [far, half] = sightOf(M), range = M.range * far * (T ? T.sight : 1), cone = Math.min(Math.PI, half * (T ? T.cone : 1));
+    const [far, half] = sightOf(M), range = M.range * far * (T ? T.sight : 1) * (m.old && !(m.hunt > 0) && !m.alert && power > F.power ? OLD_DIM : 1), cone = Math.min(Math.PI, half * (T ? T.cone : 1));
     if (m.winded > 0) m.winded -= dt;
     if (m.spring > 0) m.spring -= dt; if (m.pounce > 0) m.pounce -= dt;
     if (m.stun > 0) m.stun -= dt;
@@ -247,10 +271,10 @@ export function step(s, input) {
     // animals hunt each other: a stronger animal that sees a weaker one (at most 2 levels below, never the little food bugs) chases it.
     // The rival takes no part: it hunts only the player, and no animal hunts it.
     if (m.fed > 0) m.fed -= dt;
-    if (!m.nem && (s.tick + m.id) % 12 === 0) {
+    if (!m.nem && !m.old && (s.tick + m.id) % 12 === 0) {
       const was = m.chase; m.chase = m.fear = null; let bc = Infinity, bf = Infinity;
       if (M.level >= 1) for (const o of s.mobs) {
-        if (o === m || o.gone || o.nem) continue; const O = FORMS[o.f], op = powerOf(o); if (op === power || O.level < 1) continue;
+        if (o === m || o.gone || o.nem || o.old) continue; const O = FORMS[o.f], op = powerOf(o); if (op === power || O.level < 1) continue;
         const ex = o.x - m.x, ey = o.y - m.y; if (ex > 220 || ex < -220 || ey > 220 || ey < -220) continue; const e = Math.hypot(ex, ey);
         if (op > power) { if (o.chase === m && e < bf) { bf = e; m.fear = o; } }
         else if (!(m.fed > 0) && M.level - O.level <= 2 && e < M.range * PREY.sight && e < bc && (o === was || Math.abs(wrap(Math.atan2(ey, ex) - m.a)) < CONE)) { bc = e; m.chase = o; }
@@ -265,11 +289,11 @@ export function step(s, input) {
     if (m.alert && power !== F.power) {
       turn = 7; speed = M.speed;
       if (!flees) {
-        m.want = to; const pace = chasePace(M, F); speed = pace; hunting = true;
+        m.want = to; const pace = m.old ? Math.min(chasePace(M, F), F.speed * OLD_PACE) : chasePace(M, F); speed = pace; hunting = true;
         if (!T) {
           speed = pace * tirePace(m);
           if (m.pounce > 0) speed = Math.max(speed, F.speed * POUNCE.up);
-          else if (!(m.spring > 0) && pounces(M, F) && tirePace(m) === 1 && p.safe <= 0 && d < (range * F.stealth + F.r) * POUNCE.near) { m.pounce = POUNCE.secs; m.spring = POUNCE.rest; s.pounced = (s.pounced || 0) + 1; s.events.push({ t: 'pounce', id: m.id, name: M.name, x: m.x, y: m.y }); }
+          else if (!m.old && !(m.spring > 0) && pounces(M, F) && tirePace(m) === 1 && p.safe <= 0 && d < (range * F.stealth + F.r) * POUNCE.near) { m.pounce = POUNCE.secs; m.spring = POUNCE.rest; s.pounced = (s.pounced || 0) + 1; s.events.push({ t: 'pounce', id: m.id, name: M.name, x: m.x, y: m.y }); }
           m.tire = (m.tire || 0) + dt;
           if (m.tire >= TIRE.spent) { m.alert = false; m.hunt = 0; m.winded = TIRE.rest; m.tire = TIRE.fresh; s.tired++; s.events.push({ t: 'tired', id: m.id, name: M.name, x: m.x, y: m.y }); }
         }
@@ -298,10 +322,11 @@ export function step(s, input) {
       }
     } else {
       m.timer -= dt;
-      const rand = T ? s.nrand : s.rand;
+      const rand = T || m.old ? s.nrand : s.rand;
       if (m.timer <= 0) { m.walk = rand() < 0.7; m.timer = 0.6 + rand() * 2.6; m.want = m.a + (rand() - 0.5) * 3.2; }
       if (m.x < 70 || m.x > WORLD - 70 || m.y < 70 || m.y > WORLD - 70) m.want = Math.atan2(WORLD / 2 - m.y, WORLD / 2 - m.x);
       speed = m.walk ? M.speed * 0.38 : 0;
+      if (m.old && power > F.power && d < 750) { speed = M.speed * 0.6; turn = 4; if (m.x > 70 && m.x < WORLD - 70 && m.y > 70 && m.y < WORLD - 70) m.want = Math.atan2(-dy, -dx); }
       if (T) {
         if (!T.idle) speed = 0; // an ambusher waits
         const hx = N.home.x - m.x, hy = N.home.y - m.y;
@@ -331,6 +356,7 @@ export function step(s, input) {
           s.events.push({ t: 'nemEaten', f: m.f, kills: N.kills, escapes: N.escapes, kin: N.kin, x: m.x, y: m.y });
           s.nemesis = null;
         } else if (N && m.f === N.f) { N.kin++; s.events.push({ t: 'kin', kin: N.kin }); }
+        if (m.old) { gain += OLD_PRIZE; s.events.push({ t: 'oldEaten', f: m.f, left: s.mobs.filter(o => o.old).length }); }
         p.xp += gain;
         s.events.push({ t: 'eat', name: M.name, gain, x: m.x, y: m.y, nem: !!m.nem });
       } else if (out === 'die' && p.safe <= 0 && hideReady(s)) { // wild: the hide takes the bite and you are thrown clear
@@ -364,7 +390,7 @@ function upkeep(s) {
   const p = s.player, pl = level(s);
   for (let i = s.mobs.length - 1; i >= 0; i--) {
     const m = s.mobs[i], gap = FORMS[m.f].level - pl;
-    if (!m.nem && (gap < -3 || gap > 2) && Math.hypot(m.x - p.x, m.y - p.y) > 700) { m.gone = true; s.mobs.splice(i, 1); } // the rival is never cleared away
+    if (!m.nem && !m.old && (gap < -3 || gap > 2) && Math.hypot(m.x - p.x, m.y - p.y) > 700) { m.gone = true; s.mobs.splice(i, 1); } // the rival is never cleared away
   }
   for (let i = 0; i < 4 && s.mobs.length < MOBS; i++) spawn(s, 520);
 }
@@ -427,7 +453,9 @@ export function revive(s, restart) {
   if (restart) { p.stack = [ANT]; s.won = false; } else if (p.stack.length > 1) p.stack.pop();
   p.xp = 0; p.safe = 2.5; p.busy = 0; p.cd = 0; p.boost = 0; p.veil = 0; p.shell = 0; p.x = WORLD / 2; p.y = WORLD / 2; s.dead = null;
   const F = me(s);
-  s.mobs = s.mobs.filter(m => m.nem || powerOf(m) <= F.power || Math.hypot(m.x - p.x, m.y - p.y) > 520);
+  s.mobs = s.mobs.filter(m => m.nem || m.old || powerOf(m) <= F.power || Math.hypot(m.x - p.x, m.y - p.y) > 520);
+  for (const m of s.mobs) if (m.old && powerOf(m) > F.power) { m.alert = false; m.hunt = 0; if (Math.hypot(m.x - p.x, m.y - p.y) < 650) Object.assign(m, farSpot(s)); }
+  if (s.oldAt) s.oldAt = Math.max(s.oldAt, s.t + 20);
   const n = nemesisMob(s); // the rival is not removed; if it is close it is moved away
   if (n && Math.hypot(n.x - p.x, n.y - p.y) < 650) { const at = farSpot(s); n.x = at.x; n.y = at.y; n.alert = false; n.hunt = 0; s.nemesis.home = at; s.nemesis.seek = 0; }
   upkeep(s);
