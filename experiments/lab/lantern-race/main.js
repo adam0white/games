@@ -84,7 +84,7 @@ function receive(m) {
   if (m.t === 'you') {
     clearTimeout(timeout); id = m.id; peers = new Map(m.peers.map(p => [p.id, p])); peers.set(id, { id, n: cleanName($('name').value) });
     offline = false; $('connection').textContent = 'live · ' + (room === 'open' ? 'open river' : room); lobby();
-    if (m.round) { $('lobbyLine').textContent = 'Race in progress · Ready for the next river.'; } else if (ready) send({ t: 'ready' });
+    if (m.round) { $('lobbyLine').textContent = 'A race may be underway · Ready joins the next river.'; } else if (ready) send({ t: 'ready' });
   } else if (m.t === 'join') {
     peers.set(m.id, { id: m.id, n: m.n }); lobby();
     // A late arrival is a spectator until the next round. A second join updates its name.
@@ -137,7 +137,7 @@ function finish(reason = s.over) {
   const p = racers.get(id); p.d = Math.round(progress(s) * DISTANCE); p.s = Math.round(s.t * 1000); p.a = 0;
   publish(true); best = Math.max(best, p.d); write('lantern-race-best', best); write('lantern-race-played', '1');
   $('bestLine').textContent = `Best crossing · ${Math.round(best / 1000)}%`;
-  $('endTitle').textContent = reason === 'dawn' ? 'First light!' : reason === 'left' ? 'Boat retired' : 'Lantern out';
+  $('endTitle').textContent = reason === 'dawn' ? 'First light!' : reason === 'left' ? 'Boat retired' : reason === 'dark' ? 'Lantern out' : reason === 'bank' ? 'Run aground' : 'Wrecked';
   if (reason === 'dawn') { burst(W / 2, H * .3, '#ffe1a7', 65); [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, .5, .06), i * 90)); glow = 1; }
   else { tone(180, .4); shake = .6; burst(left + s.x * unit, H * .68, '#a7d7da', 25); }
   show('end'); renderResults();

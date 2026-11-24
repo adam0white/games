@@ -59,7 +59,8 @@ function prefetch(){
   }
 }
 function speak(q,kind='ask'){
-  const lines=activeLines??fallback(q),r=resident(q.giver);$('name').textContent=lines.name;
+  // A model nickname ("Buzzy-Bug") alone does not say who is talking; the meadow labels say "Beetle".
+  const lines=activeLines??fallback(q),r=resident(q.giver);$('name').textContent=lines.name===r.name?r.name:`${r.name} · ${lines.name}`;
   $('line').textContent=lines[kind];$('bubble').style.borderLeftColor=r.color||'#d46e52';bubbleFor=kind==='ask'?999:3.2;
   $('bubble').style.display=mode==='play'?'block':'none';
 }
