@@ -12,6 +12,7 @@ import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import { plan, SKILLS } from './moves.js';
 import { KINDS, TUTOR } from './sim.js';
+import { LEVELS as LIST } from './levels.js';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '..');
 const SHOTS = process.env.SHOTS || join(tmpdir(), 'fixit-shots'); // the build brief sets SHOTS to a scratch folder
@@ -423,7 +424,51 @@ async function dailyStall(browser, device) {
   await context.close();
 }
 
-const only = process.argv[2];
+// The levels: level 1 cleared with stars, saved, the next one's card; a lost list level; the map.
+async function levels(browser, device, phone) {
+  const { context, page, errors } = await open(browser, { ...device });
+  await page.goto(`${base}/fixit/`);
+  await setSave(page, { shifts: 2, bank: 5, best: 9, stars: 'junk' });
+  await page.reload();
+  assert.equal(await page.textContent('#level'), 'Level 1', 'an old save starts at level 1');
+  await page.screenshot({ path: join(SHOTS, `${phone}-lv-menu.png`) });
+  await page.click('#level');
+  assert.match(await page.textContent('#goalText'), /Fix 5 things/, 'the card says the goal');
+  await sleep(200); await page.screenshot({ path: join(SHOTS, `${phone}-lv-goal.png`) });
+  await page.click('#goalStart');
+  let st = await state();
+  assert.ok(st.playing && st.lvl === 0 && st.goal.served === 5, 'level 1 starts');
+  for (let i = 0; i < 60; i++) { st = await state(); if (st.over || st.screen === 'end') break; if (st.phase !== 'work') { await sleep(100); continue; } await playJob(page, `level 1 ${st.kind}`); if (i === 1) await page.screenshot({ path: join(SHOTS, `${phone}-lv-play.png`) }); }
+  await until(page, () => window.fixitState().screen === 'end', 'the level end card');
+  st = await state();
+  assert.equal(st.over, 'goal', 'five fixed clears level 1');
+  assert.ok(st.stars.length === 1 && st.stars[0] >= 2, `stars saved: ${st.stars}`);
+  assert.equal(st.best, 9, 'a level does not set the free shift best'); assert.equal(st.bank, 5 + st.coins, 'level coins are banked');
+  assert.equal(await page.textContent('#again'), 'Level 2');
+  await page.screenshot({ path: join(SHOTS, `${phone}-lv-end.png`) });
+  await sleep(600); await page.click('#again');
+  assert.equal(await page.textContent('#goalTitle'), 'Level 2');
+  await page.reload();
+  assert.equal(await page.textContent('#level'), 'Level 2', 'the cleared level is kept');
+  await page.click('#toLevels');
+  assert.equal(await page.locator('#levelGrid button').count(), LIST.length); assert.equal(await page.locator('#levelGrid button:disabled').count(), LIST.length - 2, 'levels after the next are closed');
+  await sleep(200); await page.screenshot({ path: join(SHOTS, `${phone}-lv-map.png`) });
+  await page.click('[data-level="2"]'); await page.click('#goalStart');
+  st = await state(); assert.equal(st.hearts, 1, 'a list level has one heart'); assert.equal(st.queue.length, 4, 'only the listed customers come');
+  await until(page, () => window.fixitState().screen === 'end', 'the level to be lost by doing nothing', 40000);
+  assert.equal((await state()).stars.length, 1, 'a lost level clears nothing'); assert.equal(await page.textContent('#again'), 'Try again');
+  await page.screenshot({ path: join(SHOTS, `${phone}-lv-lost.png`) });
+  await page.setViewportSize({ width: 360, height: 640 });
+  await page.reload(); await page.click('#toLevels'); await sleep(200);
+  await page.screenshot({ path: join(SHOTS, `${phone}-lv-map-small.png`) });
+  assert.ok(await page.evaluate(() => [...document.querySelectorAll('#levelGrid button')].every(b => b.getBoundingClientRect().height >= 44 && b.getBoundingClientRect().width >= 44)), 'level buttons at least 44 px');
+  await setSave(page, { stars: LIST.map(() => 3), shifts: 40 }); await page.reload();
+  assert.equal(await page.textContent('#level'), 'Levels', 'all cleared: the map');
+  assert.deepEqual(errors, [], 'page errors in the levels');
+  await context.close();
+}
+
+const only = process.argv[2], part = process.argv[3]; // a part: 'levels' runs that part alone
 let failed = 0;
 for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   if (only && only !== phone) continue;
@@ -431,11 +476,13 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   const { context, page, errors } = await open(browser, { ...device });
   const t0 = Date.now();
   try {
+    if (part === 'levels') { await levels(browser, device, phone); console.log(`ok   fixit levels on ${phone}`); await browser.close(); continue; }
     await run(page, phone);
     assert.deepEqual(errors, [], 'page errors');
     await context.close();
     await lateShift(browser, device);
     await dailyStall(browser, device);
+    await levels(browser, device, phone);
     if (phone === 'chromium') { await small(browser); await desktop(browser); }
     console.log(`ok   fixit on ${phone} (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
   } catch (e) {

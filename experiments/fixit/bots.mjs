@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { create, step, input, guide, rand, DT, KINDS, TUTOR, PATIENCE, LEVELS, HIT, RAMP, TWO_PATIENCE } from './sim.js';
 import { plan, SKILLS, THUMB_MAX } from './moves.js';
+import { LEVELS as LIST, options, stars, goalText, jobsAt } from './levels.js';
 
 let failed = 0;
 function claim(ok, text) { console.log(`${ok ? 'ok  ' : 'FAIL'} ${text}`); if (!ok) failed++; }
@@ -191,6 +192,31 @@ claim(fastest <= THUMB_MAX + 1, `no bot finger moved faster than ${THUMB_MAX} un
   claim(Math.min(...two) >= CHEAPEST, `first two shifts of an average player earn ${Math.min(...two)} to ${Math.max(...two)} coins; the cheapest item is ${CHEAPEST}`);
   const slowFirst = play({ seed: 1, unlocked: TUTOR, tutorial: true }, skilled(SKILLS.slow)).s;
   claim(slowFirst.lost === 0 || slowFirst.served >= 3, `the tutorial customers wait for a slow player (slow bot served ${slowFirst.served} on its first shift)`);
+}
+
+// 6. The levels: every one can be cleared, none by doing nothing, and they get harder.
+{
+  const win = (i, pol) => play(options(i), pol, 200).s;
+  console.log('\nlevel  goal                                idle slow average competent expert');
+  const cleared = { slow: 0, average: 0, competent: 0, expert: 0 };
+  const fails = { competent: [], average: [] };
+  for (let i = 0; i < LIST.length; i++) {
+    const row = {};
+    for (const sk of ['slow', 'average', 'competent', 'expert']) { const s = win(i, skilled(SKILLS[sk])); row[sk] = stars(s); if (row[sk]) cleared[sk]++; else fails[sk]?.push(i + 1); }
+    const id = stars(win(i, () => idle()));
+    console.log(`${String(i + 1).padStart(4)}   ${goalText(LIST[i]).padEnd(34)} ${id}    ${row.slow}      ${row.average}       ${row.competent}        ${row.expert}`);
+    claim(id === 0 && row.competent > 0, `level ${i + 1}: a competent bot clears it, an idle one does not`);
+    if (i < 10) claim(row.average > 0, `level ${i + 1}: an average bot clears it`);
+    const l = LIST[i];
+    for (const k of l.list ?? []) claim(jobsAt(i).includes(k), `level ${i + 1}: ${k} is out by then`);
+  }
+  claim(win(0, skilled(SKILLS.slow)).over === 'goal' && win(1, skilled(SKILLS.slow)).over === 'goal', 'a slow bot clears the first two levels');
+  claim(cleared.slow < cleared.average && cleared.average <= cleared.competent, `harder for the slower: slow ${cleared.slow}, average ${cleared.average}, competent ${cleared.competent} of ${LIST.length}`);
+  // a goal that cannot be met must show up as not cleared
+  const bad = { ...options(3), goal: { served: 200 } };
+  claim(play(bad, skilled(SKILLS.expert), 200).s.over !== 'goal', 'a level asking for 200 fixes is not cleared by an expert');
+  const bad2 = create({ seed: 3, ...ALL }), plain = create({ seed: 3, ...ALL, list: null, goal: null });
+  claim(JSON.stringify(bad2.queue) === JSON.stringify(plain.queue), 'without a level the queue is as before');
 }
 
 console.log(`\n${failed ? failed + ' claim(s) FAILED' : 'all claims hold'} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);

@@ -597,7 +597,16 @@ const GAMES = {
   // sends one lab record marked as an agent run. Run a game's own check after changing that game.
   grapevine: page => started(page, 'grapevine', 'grapevineState', '#toMenu'),
   ducklings: page => started(page, 'ducklings', 'ducklingsState', '#pauseMenu'),
-  fixit: page => started(page, 'fixit', 'fixitState', '#quit'),
+  async fixit(page) {
+    await started(page, 'fixit', 'fixitState', '#quit');
+    // A save from before the levels opens at level 1, and its coins stay.
+    await page.evaluate(() => localStorage.setItem('fixit-save', JSON.stringify({ v: 1, bank: 40, best: 12, shifts: 3 }))); await page.reload();
+    await page.waitForFunction(() => window.fixitState?.().screen === 'menu');
+    assert.equal(await page.textContent('#level'), 'Level 1'); assert.equal(await page.textContent('#bank'), '40', 'old save: coins kept');
+    await page.click('#toLevels'); assert.equal(await page.locator('#levelGrid button:not(:disabled)').count(), 1, 'one level open');
+    await page.click('[data-level="1"]'); await page.click('#goalStart');
+    await page.waitForFunction(() => window.fixitState().lvl === 0 && window.fixitState().playing, null, { timeout: 8000 });
+  },
   borrowed: page => started(page, 'borrowed', 'borrowedState', '#toMenu'),
   // Lab pages (/lab/<name>/): an old save survives, a finger steers, pause stops time, one audio context after the first tap.
   'lab/ant-nemesis': page => antLab(page, 'ant-nemesis', '?ai=0', { nem: null, trophies: [{ name: 'Old Scar the Beetle' }], gens: 1 }, async () => {

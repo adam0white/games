@@ -228,7 +228,22 @@ Not checked: closing the tab mid-shift still loses that shift's coins, as before
 
 ## 2026-11-23: what clears a level (tester t1, note #157)
 
-Asked (#154) what should clear a level, the tester chose "Mix: each level has its own goal". Nothing is built yet.
+Asked (#154) what should clear a level, the tester chose "Mix: each level has its own goal". Built on 2026-11-24, below.
 
-### Left as a proposal (2026-11-23, note #157)
-- The levels proposal under note #150 now has its rule. A goal per level, one of: fix N before time runs out; fix a set list without losing a customer; earn N coins. A first table: levels 1 to 11 introduce one job each and cycle the three goals; later levels combine two goals. Each goal shows as one line and an icon before the level and on the counter during it. Bots must show each level clearable before it ships. The daily stall stays as it is.
+## 2026-11-24: 30 levels, each with its own goal (tester t1, notes #150 and #157)
+
+- **Levels first.** The menu's main button is the next level; "All levels" is the map; the old random game is "Free shift". The daily stall is unchanged.
+- **Three goals** (`levels.js`): fix N things before closing; earn N coins before closing; fix a set list and lose nobody (no clock, one heart). Some later levels of the first two kinds also give one heart. The goal shows on a card before the level and as a count at the top during it.
+- **Jobs.** Level 1 is the tutorial. Each of levels 2 to 9 brings one new job, so all eleven are out by level 9; a level's jobs also join the free shift. Levels 10 to 30 mix them faster, with two repairs on one thing.
+- **Stars:** one for clearing, one for losing nobody, one when two fixes in three were quick. Every level keeps its best. A level's customers come from a fixed seed, so a retry meets the same ones.
+- Save: new field `stars` in `fixit-save` (0 to 3 for each cleared level, in order); absent or junk means level 1. Coins are banked as before; a level sets no free-shift best. No new stored key.
+
+Evidence: `bots.mjs` plays every level. An idle bot clears none, a slow one 11, an average one 29, a competent one all 30, and a level asking for 200 fixes is not cleared. With no level set, the old and new rules gave the same queues and log on 299 seeds. `check.mjs [engine] levels` plays level 1, the card, map, a lost level and an old save on both phone engines, and passes.
+
+Decisions: an existing player also starts at level 1. The lucky horseshoe counts only on three-heart levels. Replaying an old level pays coins again.
+
+Not verified: a person playing; a real phone. Competent bots get three stars on nearly every level, so the stars may be too easy for a quick player.
+
+### Left as a proposal (2026-11-24)
+- More kinds of puzzle (the list under note #150): the next thing to build here.
+- Two goals at once, and goals that name a thing ("fix 3 teddies").

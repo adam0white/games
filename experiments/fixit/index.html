@@ -36,6 +36,12 @@
   .item button.on { background: #2f8f8a; color: #fff6e4; }
   .coin { display: inline-block; width: .85em; height: .85em; border-radius: 50%; background: radial-gradient(#f6d77e 55%, #d9a93e 60%); border: 2px solid #9c7420; vertical-align: -.1em; margin-right: .25em; box-sizing: border-box; }
   .lab-notice, .lab-toggle { font-size: 12px !important; }
+  #goalText { font-size: 1.15em; font-weight: bold; }
+  #levelGrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: .5em 0; }
+  #levelGrid button { min-width: 0; min-height: 54px; margin: 0; padding: 2px; line-height: 1.1; }
+  #levelGrid button small { display: block; font-size: .62em; color: #9c7420; }
+  #levelGrid button.on { background: #2f8f8a; color: #fff6e4; } #levelGrid button.on small { color: #fff6e4; }
+  #endStars:empty, .sub:empty { display: none; }
   #newjob { color: #1d5e5b; font-weight: bold; }
   .desk { display: none; font-size: .85em; }
   @media (pointer: fine) { .desk { display: block; } }
@@ -50,7 +56,9 @@
   <h1>Fix-It Stall</h1>
   <p class="sub">Fix things fast. Get paid.</p>
   <div class="stats"><span><span class="coin"></span><b id="bank">0</b></span><span>Best <b id="best">0</b></span><span>Jobs <b id="jobs">3</b>/<span id="jobsAll">11</span></span></div>
-  <p><button id="play" class="main">Play</button></p>
+  <p><button id="level" class="main">Level 1</button></p>
+  <p id="levelLine" class="sub"></p>
+  <p><button id="toLevels">All levels</button><button id="play">Free shift</button></p>
   <p><button id="daily">Daily stall</button></p>
   <p id="dailyLine" class="sub"></p>
   <p class="desk sub">On a computer: drag with the mouse, or hold Space.</p>
@@ -70,8 +78,27 @@
   <p><button id="quit">Menu</button><button id="sound2" class="small">Sound: on</button></p>
 </div></div>
 
+<div id="levels" class="screen"><div class="card">
+  <h2>Levels</h2>
+  <p id="starCount" class="sub"></p>
+  <div id="levelGrid"></div>
+  <p><button class="back">Back</button></p>
+</div></div>
+
+<div id="goal" class="screen"><div class="card">
+  <h2 id="goalTitle">Level 1</h2>
+  <p id="goalIcon" class="big" aria-hidden="true"></p>
+  <p id="goalText"></p>
+  <p id="goalHearts" class="sub"></p>
+  <p id="goalJobs" class="sub"></p>
+  <p id="goalBest" class="sub"></p>
+  <p><button id="goalStart" class="main">Start</button></p>
+  <p><button id="goalBack">All levels</button></p>
+</div></div>
+
 <div id="end" class="screen"><div class="card">
   <h2 id="endTitle">Closed!</h2>
+  <p id="endStars" class="big"></p>
   <p class="big"><span class="coin"></span><span id="earned">0</span></p>
   <div class="stats"><span>Fixed <b id="served">0</b></span><span>Best streak <b id="streak">0</b></span><span>Best <b id="best2">0</b></span></div>
   <p id="endLine" class="sub"></p>

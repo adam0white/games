@@ -364,24 +364,27 @@ function makeRepair(s, kind, spot) {
   return r;
 }
 export const guide = r => K[r.kind].guide(r);
-export const level = s => Math.min(LEVELS - 1, Math.floor(s.clock / RAMP));
+export const level = s => Math.min(LEVELS - 1, s.steady ? s.startLevel : Math.floor(s.clock / RAMP)); // a steady level keeps its starting pace
 export const multiplier = s => 1 + Math.min(2, Math.floor(s.streak / 4)); // x2 after four quick jobs in a row, x3 after eight
 
 // ---------- the shift
-export function create({ seed = 1, unlocked = TUTOR, tutorial = false, hearts = 3, newJob = null, only = null, regular = -1, two = true, day = DAY, startLevel = 0, golden = GOLDEN_CHANCE, goldenFrom = GOLDEN_FROM } = {}) {
+export function create({ seed = 1, unlocked = TUTOR, tutorial = false, hearts = 3, newJob = null, only = null, regular = -1, two = true, day = DAY, startLevel = 0, golden = GOLDEN_CHANCE, goldenFrom = GOLDEN_FROM, list = null, goal = null, steady = false } = {}) {
   const s = {
     seed, r: seed | 0, t: 0, clock: startLevel * RAMP, day, over: null, events: [],
     hearts, maxHearts: hearts, coins: 0, served: 0, lost: 0, streak: 0, bestStreak: 0, log: [],
-    unlocked: unlocked.filter(k => KINDS.includes(k)), tutorial, newJob, only, regular, two, golden, goldenFrom, made: 0, lastKind: null,
+    unlocked: unlocked.filter(k => KINDS.includes(k)), tutorial, newJob, only, regular, two, golden, goldenFrom, list, goal, steady, startLevel, quicks: 0, made: 0, lastKind: null,
     queue: [], cust: null, reps: [], rep: null, stepN: 0, phase: 'work', phaseT: 0,
     finger: { down: false, blocked: false, x: 0, y: 0 },
   };
   if (!s.unlocked.length) s.unlocked = TUTOR.slice();
-  for (let i = 0; i < 4; i++) s.queue.push(customer(s));
+  for (let i = 0; i < 4; i++) enqueue(s);
   nextCustomer(s);
   return s;
 }
 
+// A level with a set list brings those customers and nobody after them.
+function enqueue(s) { if (!s.list || s.made < s.list.length) s.queue.push(customer(s)); }
+export const goalMet = s => !!s.goal && (s.goal.coins ? s.coins >= s.goal.coins : s.served >= s.goal.served);
 function customer(s) {
   const n = s.made++;
   const c = { n, look: Math.floor(rand(s) * 2 ** 30), tutor: false, fresh: false, regular: false, golden: false, kinds: null };
@@ -389,7 +392,8 @@ function customer(s) {
   // The queue's random numbers are drawn here and only here, so every player of a seed meets the same customers
   // with the same repairs, however fast they play: the two-repair roll and the repairs' own layout come with them.
   c.roll = rand(s); c.rs = Math.floor(rand(s) * 2 ** 31);
-  if (s.only) c.kinds = [s.only];
+  if (s.list) c.kinds = [s.list[n]];
+  else if (s.only) c.kinds = [s.only];
   else if (s.tutorial && n < TUTOR.length) { c.kinds = [TUTOR[n]]; c.tutor = true; }
   else if (s.newJob && !s.newJobMade) { c.kinds = [s.newJob]; c.fresh = true; s.newJobMade = true; }
   else {
@@ -404,7 +408,7 @@ function customer(s) {
 
 function nextCustomer(s) {
   const c = s.queue.shift();
-  s.queue.push(customer(s));
+  enqueue(s);
   const L = level(s);
   // A second job is decided when the customer steps up, so it follows the ramp.
   const chance = typeof s.two === 'number' ? s.two : s.two ? TWO_CHANCE[L] : 0;
@@ -462,7 +466,7 @@ function pay(s) {
   const c = s.cust;
   let base = c.kinds.reduce((a, k) => a + COIN[k], 0);
   const quick = c.left / c.patience >= 0.5;
-  if (quick) { s.streak++; base += QUICK_BONUS; } else s.streak = 0;
+  if (quick) { s.quicks++; s.streak++; base += QUICK_BONUS; } else s.streak = 0;
   s.bestStreak = Math.max(s.bestStreak, s.streak);
   const coins = base * multiplier(s) * (c.regular ? 2 : 1) * (c.golden ? GOLDEN_PAY : 1);
   s.coins += coins; s.served++;
@@ -493,6 +497,7 @@ export function step(s) {
   }
   s.phaseT -= DT;
   if (s.phaseT > 0) return;
+  if (goalMet(s)) { end(s, 'goal'); return; }
   if (s.hearts <= 0) { end(s, 'hearts'); return; }
   if (s.clock >= s.day) { end(s, 'time'); return; }
   nextCustomer(s);
