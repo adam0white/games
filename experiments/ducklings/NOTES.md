@@ -198,3 +198,40 @@ Open: a player holding the full line of 10 cannot cross a log lane straight with
 ## 2026-11-23: "not bad" (tester t1, note #139)
 
 The lab asked (#129) how Follow Me was. Answer: "Fena değil" (not bad), from the choices fun, not bad, boring, hard or annoying. Recorded; no change. Among the three new experiments the tester chose Fix-It Stall to grow (note #103), so Follow Me stays as it is.
+
+## Bug hunt and polish, 2026-11-23
+
+This pass supersedes the endless tuning and route-clock claims above. Stage rules and saves keep their existing formats and keys.
+
+The weak bot is the existing greedy bot. It checks the mother but ignores her followers. The strong bot is the existing planner. Both use the same goals and look-ahead. Before this pass, nine of twelve weak runs and all twelve strong runs still ran at the 240 s cap. Weak scores ranged from 120 to 10,060. Strong scores ranged from 10,950 to 17,520. The old difficulty stopped rising after 24 rows. Early windows only allowed a shorter line through.
+
+Endless windows now allow the full line of ten. Hazard speed rises with `3 * log2(1 + rows / 6)` instead of stopping at a cap. Sunlight drains at its original rate for 20 s. Its drain rate then rises by 1/44 each second. Pads keep the same line-dependent refill and score. The HUD calls this sunlight rather than seconds, because the drain rate changes. It says when sunlight fades faster. The start message explains that lily pads refill it. The route check now integrates that drain when reporting its budget. It checks geometry separately from survival: a safe route can exist beyond the run's sunlight budget.
+
+Twenty seeds (101 through 2020, step 101), run to the end with a 180 s safety cap:
+
+| Bot | Duration min / median / max | Score min / median / max |
+| --- | --- | --- |
+| Weak | 51.0 / 67.7 / 92.0 s | 630 / 1,930 / 3,580 |
+| Strong | 74.4 / 92.0 / 108.3 s | 3,040 / 4,970 / 8,250 |
+
+Nineteen of twenty weak runs last 40 to 90 s. The strong bot scores more on nineteen seeds. Every run ends before the safety cap. The bots assert those bounds. Increasing sunset pressure continues after the hazard mix settles. A bot's success does not establish human enjoyment.
+
+Missed waiting ducklings used to count against new spawns forever. Ten waiting far behind produced no new birds. The same test now produces two new birds ahead and keeps all ten old birds recoverable. Only waiting birds within 1.6 units behind the mother count against future spawns. The line cap stays ten.
+
+The independent route check passes all thirty seeds to 60 units with ten followers. A known bad case with sixteen followers fails on seed 101, with twenty-six unsafe bands. The sunlight budget intentionally ends a run sooner. The checks no longer require survival to 60 units.
+
+The Pause and Quack buttons only listened for pointer presses. Enter on a focused button did nothing. They now also accept button clicks. The browser check exercises Enter on both buttons. Quack now lights the copied trail and sends a ripple from the mother. Its button shows the recharge count. This makes the first few quacks easier to read. It uses the existing kit audio and adds no sound plumbing.
+
+The bot table now includes its missing `gone` column. Browser checks now assert that visible buttons have targets at least 40 px wide and high and fit the phone width.
+
+Pure bot checks pass. Page and check modules parse. Browser checks were attempted before and after the changes. The sandbox prevented the local HTTP listener from starting. A direct Chromium launch also failed with a Mach-port permission error. No new screenshots or browser interaction were verified in this session. The planned 360x640, 390x844, WebKit and Chromium checks remain required outside that sandbox. Real-phone sound and touch feel remain unverified. No kit files changed.
+
+### Browser verification, same day
+
+`node check.mjs` then failed on WebKit iPhone 13 and Chromium Pixel 7 at "at least one duckling home". The game code was not the cause. The new keyboard steps ran inside the stage 1 run, before the drive to the nest. They left the mother idle for about 6 s of game time while Quack recharged. That shifted when the drive reached the log. The drive steers toward the nest and ignores hazards. The end state was 2 hearts, 2 waiting ducklings and 0 of 2 home. That points to the log scattering the follower; the hit itself was not observed. With the keyboard steps removed, the same page passed on both engines with 2 of 2 home.
+
+The keyboard steps now run on their own stage 2 page after the stage 1 checks. The stage 1 drive keeps its old timing. The 360x640 and 390x844 runs now also quack with the Q key, check the recharge label, take a screenshot and check button sizes.
+
+Screenshots at 360x640 and 390x844 show the Quack dial and its "6s" count with no clipping. The ripple is faint but visible around the mother. Whether it should be stronger is a taste call. The endless HUD line "score · ☀ N · fading faster" fits at 360 px. The double pause from a touch (pointerdown, then click) is harmless because pause() returns when already paused.
+
+Results: `node bots.mjs` passes in 41 s. Weak endless runs last 51.0 to 92.0 s; 19 of 20 last 40 to 90 s. The planner beats the weak bot on 19 of 20 seeds. `node check.mjs` passes on webkit-iphone13, chromium-pixel7, chromium-390x844 and chromium-360x640. Real-phone sound and touch feel remain unverified.

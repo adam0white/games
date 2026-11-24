@@ -61,6 +61,8 @@ export const LAST_STAGE = STAGES.length - 1;
 // endless: each lily-pad checkpoint adds time, more for a longer line, so losing ducklings shortens the run
 export const CHECK_TIME = 2, CHECK_PER = 3, CHECK_CAP = 6;
 export const checkGain = n => CHECK_TIME + CHECK_PER * Math.min(n, CHECK_CAP);
+// The sunset accelerates after a gentle opening. It never changes hazard warnings.
+export const duskRate = t => 1 + Math.max(0, t - 20) / 44;
 export const ENDLESS_AFTER = 3; // endless opens when stage 3 is done
 export const stageSeed = n => 7919 * n + 13;
 
@@ -323,13 +325,15 @@ function spreadLost(lost, rows) {
 const ENDLESS_POOL = [['log', 'pike', 'log2', 'reeds'], ['turtle', 'bike', 'log2', 'pike'], ['gust', 'heron', 'bike', 'turtle', 'log2', 'pike']];
 export function endlessAhead(s) {
   while (s.top < s.mom.y + 3.5) {
-    const d = Math.min(8, Math.floor(s.rowCount / 3));
+    const d = 3 * Math.log2(1 + s.rowCount / 6);
     const g = rng(s.seed + s.rowCount * 131);
     const pool = ENDLESS_POOL[Math.min(2, Math.floor(s.rowCount / 4))].concat(s.rowCount >= 8 ? ENDLESS_POOL[2] : []);
     const kind = s.rowCount === 0 ? 'log' : pool[Math.floor(g() * pool.length)];
-    const room = LINE_MAX - s.line.length - s.lost.length;
+    // Waiting birds far behind still remain recoverable, but cannot stop new birds appearing ahead.
+    const nearbyLost = s.lost.filter(l => l.y >= s.mom.y - 1.6).length;
+    const room = LINE_MAX - s.line.length - nearbyLost;
     const lostHere = room > 0 ? (g() < 0.75 ? 1 : 0) + (g() < 0.25 && room > 1 ? 1 : 0) : 0;
-    layRow(s, kind, d, Math.min(LINE_MAX, 4 + d), lostHere);
+    layRow(s, kind, d, LINE_MAX, lostHere);
     s.total += lostHere;
     if (s.rowCount % 2 === 0) { s.checkpoints.push({ y: s.top, got: false }); s.top += 0.25; }
   }
@@ -387,6 +391,7 @@ export function step(s, target, quack = false) {
     if (h.kind === 'bike') for (const b of h.riders) if (mod(t + b.phase, b.P) < mod(s.t + b.phase, b.P)) s.events.push({ type: 'warn', kind: 'bike', x: b.dir > 0 ? 0 : 1, y: h.y });
   }
   s.t = t;
+  if (s.endless) s.time -= (duskRate(t) - 1) * DT;
   // quack: the ducklings sprint along the trail to close up, for a moment
   s.quackCool = Math.max(0, s.quackCool - DT); s.quackT = Math.max(0, s.quackT - DT);
   if (quack && s.quackCool <= 0 && !s.home && s.line.length) { s.quackT = QUACK_TIME; s.quackCool = QUACK_COOL; s.quacks++; s.events.push({ type: 'quack' }); }

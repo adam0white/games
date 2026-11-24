@@ -57,6 +57,14 @@ async function drive(page, ms, shotAt) {
   if (down) await finger(page, [['pointerup', 0, 0]]);
 }
 
+async function assertTargets(page) {
+  for (const b of await page.locator('button:visible').all()) {
+    const box = await b.boundingBox();
+    assert.ok(box.width >= 40 && box.height >= 40, `${await b.getAttribute('id')}: tap target is at least 40 px`);
+    assert.ok(box.x >= 0 && box.x + box.width <= page.viewportSize().width, 'button fits the phone width');
+  }
+}
+
 async function run(name, engine, device, full) {
   const browser = await engine.launch(), context = await browser.newContext({ ...device }), page = await context.newPage(), errors = [], sent = [];
   await context.route('https://human.adamwhite.work/**', async route => {
@@ -82,11 +90,19 @@ async function run(name, engine, device, full) {
     assert.match(await page.textContent('#menu'), /The game lab records play/, 'lab notice on the menu');
     assert.match(await page.textContent('#play'), /Play stage 1/);
     await page.waitForTimeout(200); await shot('1-menu');
+    await assertTargets(page);
     if (!full) {
       // small phone: the menu fits and play starts; then a few seconds of stage 4 for the look
+      await assertTargets(page);
       const box = await page.locator('#play').boundingBox(); assert.ok(box && box.y + box.height <= device.viewport.height, 'Play button on screen');
       await page.goto(`${base}/ducklings/?level=4`); await page.click('#play');
       await drive(page, 6000); await shot('2-stage4');
+      // Quack: the ripple and the recharge count on the button, which stays a full-size target
+      await until(page, () => window.ducklingsState().quackCool <= 0 && window.ducklingsState().line > 0, 'quack is ready', 8000);
+      await page.keyboard.press('q');
+      await until(page, () => /^[1-6]s$/.test(document.querySelector('#quackLabel').textContent), 'Quack shows its recharge time', 3000);
+      await page.waitForTimeout(150); await shot('2b-quack');
+      await assertTargets(page);
       await tap(page, '#pause'); await page.click('#pauseMenu');
       // bikes warn often: a warning under the HUD is repeated below it
       await page.goto(`${base}/ducklings/?level=5&seed=5`); await page.click('#play');
@@ -117,6 +133,7 @@ async function run(name, engine, device, full) {
     // pause freezes the sim; resume continues it
     await tap(page, '#pause');
     st = await state(page); assert.ok(st.paused && st.screen === 'paused', 'pause button pauses');
+    await assertTargets(page);
     const tp = st.t; await sleep(400); assert.equal((await state(page)).t, tp, 'time stands still while paused');
     await shot('3-paused');
     await page.click('#resume'); await until(page, t => window.ducklingsState().t > t + 0.2, 'resume continues', 4000, tp);
@@ -126,6 +143,7 @@ async function run(name, engine, device, full) {
     await drive(page, 40000, { t: 4, path: join(SHOTS, `${name}-4-play.png`) });
     await until(page, () => window.ducklingsState().screen === 'end', 'end card', 20000);
     await page.waitForTimeout(1400); await shot('5-end');
+    await assertTargets(page);
     st = await state(page);
     assert.equal(st.over, 'nest', 'stage 1 ends at the nest'); assert.ok(st.arrived >= 1, 'at least one duckling home');
     const blob = await page.evaluate(() => JSON.parse(localStorage.getItem('ducklings-save')));
@@ -145,6 +163,17 @@ async function run(name, engine, device, full) {
     // leave each one through the pause menu, as a player would. Navigating away mid-run instead makes WebKit report
     // "Cannot load blob ... access control checks" from the kit lab's flush on hide (see NOTES.md, Kit candidates).
     const leave = async () => { await tap(page, '#pause'); await page.click('#pauseMenu'); await until(page, () => window.ducklingsState().screen === 'menu', 'back on the menu', 4000); };
+    // keyboard on the buttons, on its own stage 2 run: idling stage 1 here would shift the stage 1 drive against the log
+    await page.goto(`${base}/ducklings/?fast=3&level=2`); await page.click('#play');
+    await page.focus('#pause'); await page.keyboard.press('Enter');
+    assert.ok((await state(page)).paused, 'keyboard activates the pause button');
+    await page.click('#resume');
+    await until(page, () => window.ducklingsState().quackCool <= 0, 'quack is ready', 8000);
+    await page.focus('#quack'); await page.keyboard.press('Enter');
+    await until(page, () => window.ducklingsState().quackCool > 0, 'keyboard activates Quack', 3000);
+    await until(page, () => /^[1-6]s$/.test(document.querySelector('#quackLabel').textContent), 'Quack shows its recharge time', 3000);
+    await page.waitForTimeout(250); await shot('3b-quack');
+    await leave();
     // the shared first-time hint (kit/hint.js), forced on with ?hint=hand: a finger holding and moving shows after 3 s of
     // idle play; a real touch removes it
     await page.goto(`${base}/ducklings/?hint=hand`); await page.click('#play'); await sleep(1000);
@@ -172,6 +201,7 @@ const only = process.argv[2];
 const runs = [
   ['webkit-iphone13', webkit, devices['iPhone 13'], true],
   ['chromium-pixel7', chromium, devices['Pixel 7'], true],
+  ['chromium-390x844', chromium, { ...devices['Pixel 7'], viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 } }, false],
   ['chromium-360x640', chromium, { ...devices['Pixel 7'], viewport: { width: 360, height: 640 }, screen: { width: 360, height: 640 } }, false],
 ];
 let ok = true;
