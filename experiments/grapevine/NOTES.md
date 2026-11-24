@@ -252,3 +252,7 @@ The game went live less than an hour before this round. Changes:
    - From 700 px wide, the board is now held to a 600 px column in the middle. Both sides become a street: rows of houses with lit windows, chimneys, trees and lamp posts, plus swaying lantern strings between the rows.
    - Phones (narrower than 700 px) are unchanged.
 
+
+## 2026-11-23: understood at once (tester t1, note #138)
+
+The lab asked (#127) whether the tester understood what to do without anyone explaining. Answer: "Evet, hemen" (yes, right away). Recorded; no change. This is the first sign that Grapevine's first minute works for a newcomer. Whether it is fun was not asked.
