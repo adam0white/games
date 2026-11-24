@@ -1,7 +1,86 @@
 import assert from 'node:assert/strict';
+import { fieldPoint, pointerDrag } from './lab-pages.mjs';
 
 const stars = (n, first = 2) => [first, ...Array(n - 1).fill(0)];
 const saved = (key, value, hint, extra = {}) => ({ [key]: JSON.stringify(value), [hint]: '1', ...extra });
+
+// Night Vine: a tap on the field (or on the first-time hand) moves the lamp and starts growth.
+async function moveVineLamp(page, { until, knob }) {
+  const box = await page.locator('#field').boundingBox();
+  const point = knob ? await knob.evaluate(el => {
+    const { x, y, width, height } = el.getBoundingClientRect(), p = { x: x + width / 2, y: y + height / 2 };
+    if (document.elementFromPoint(p.x, p.y)?.id !== 'field') throw new Error('hint is not over the field');
+    return p;
+  }) : { x: box.x + 270 * box.width / 360, y: box.y + 300 * box.height / 480 };
+  const { lamp: before, time } = await page.evaluate(() => window.vineState());
+  await page.touchscreen.tap(point.x, point.y);
+  await until(page, ({ before, time }) => {
+    const s = window.vineState();
+    return s.started && s.time > time && Math.hypot(s.lamp.x - before.x, s.lamp.y - before.y) > 10;
+  }, 'touch moves the lamp and starts growth', 8000, { before, time });
+}
+
+// Night Flock (was /lab/night-flock-2/, and keeps that page's storage keys). The dog runs to a held finger,
+// lies down under a still one, and goes on an outrun after a sideways flick.
+const flockSave = { v: 1, unlocked: 2, best: 31, sound: true, played: true };
+const flockStars = { 1: 5 };
+const flockDaily = { date: new Date().toISOString().slice(0, 10), stars: 3 };
+async function driveFlock(page, { until }) {
+  const at = await fieldPoint(page, 360, 520);
+  const { x, y } = await page.evaluate(() => window.flockState().game.dog);
+  await pointerDrag(page, at(x, y), at(x, y - 65), {
+    afterMove: () => until(page, y => {
+      const { game, pressed } = window.flockState();
+      return game.started && pressed && game.dog.y <= y - 4;
+    }, 'held drag moves the dog uphill', 4000, y),
+  });
+  await until(page, () => !window.flockState().pressed, 'dog releases after the drag');
+}
+async function commandFlock(page, { until }, command) {
+  const at = await fieldPoint(page, 360, 520);
+  const { dog, terrain } = await page.evaluate(() => window.flockState().game);
+  const start = at(dog.x, dog.y);
+  const acted = () => until(page, mode => window.flockState().game.dog.mode === mode, `dog obeys the ${command} command`, 4000, command);
+  if (command === 'hold') {
+    await pointerDrag(page, start, start, { beforeMove: acted });
+    await acted();
+    return;
+  }
+  const direction = Math.sign(terrain.outrun.x - dog.x);
+  await pointerDrag(page, start, at(dog.x + direction * 70, dog.y - 5), { flick: true });
+  await acted();
+  await until(page, () => window.flockState().game.terrain.outrun.gathered, 'the dog gathers the bellwether');
+}
+// The lie-down lesson appears once sheep wait at the closed cross-gate, so the check first drives them there:
+// short drags from the dog to a point below the lowest sheep, on the far side from the gate.
+async function flockToGate(page) {
+  await page.click('#play');
+  const at = await fieldPoint(page, 360, 520);
+  for (const end = Date.now() + 45000; Date.now() < end;) {
+    const { game, picture } = await page.evaluate(() => window.flockState());
+    assert.equal(game.status, 'play', 'the flock reaches the cross-gate before dark');
+    if (picture === 'hold' && game.dog.mode !== 'hold') {
+      // The sheep must still be waiting a moment after the finger lifts.
+      await page.waitForTimeout(300);
+      if (await page.evaluate(() => window.flockState().picture === 'hold')) return;
+      continue;
+    }
+    const sheep = game.sheep.filter(s => s.status === 'field'), gate = game.terrain.gate;
+    const rear = sheep.reduce((a, b) => a.y > b.y ? a : b);
+    const dx = rear.x - gate.x, dy = rear.y - gate.y, far = Math.hypot(dx, dy) || 1;
+    const aim = { x: Math.min(330, Math.max(30, rear.x + 18 * dx / far)), y: Math.min(505, rear.y + 18 * dy / far) };
+    // Each contact is shorter than the 0.43 s a still finger needs to lay the dog down.
+    await pointerDrag(page, at(game.dog.x, game.dog.y), at(aim.x, aim.y), { afterMove: () => page.waitForTimeout(220) });
+  }
+  assert.fail('sheep wait at the cross-gate');
+}
+const flockHints = ['drag', 'hold', 'outrun'].map((name, index) => ({
+  name, selector: `#hint-${name} + .kit-hint`, key: `night-flock-2:hint-${name}`, canvas: '#field',
+  delay: { drag: 6500, hold: 1200, outrun: 2200 }[name],
+  ...(name === 'hold' ? { start: flockToGate, timing: { result: '.plate.cue-hold' } } : { timing: { start: '#play' } }),
+  seed: { 'night-flock-2:save': JSON.stringify({ ...flockSave, unlocked: index + 1, played: false }) },
+  input: name === 'drag' ? driveFlock : (page, checks) => commandFlock(page, checks, name),
+}));
 
 export const pages = {
   breath: {
@@ -85,5 +164,37 @@ export const pages = {
       await page.waitForFunction(() => window.boatState().ripples > 0, null, { timeout: 3000 }).catch(() => assert.fail('a swipe makes a ripple'));
     },
     hint: { key: 'boat:hint', delay: 2500, releaseInput: true, before: () => window.boatState().ripples, moved: n => window.boatState().ripples > n, legacy: { 'boat-save': '{"v":1,"opened":2,"best":430}' } },
+  },
+  flock: {
+    sound: '#sound', saveKey: 'night-flock-2:save', pausePosition: { x: 8, y: 23 },
+    seeds: {
+      'night-flock-2:save': JSON.stringify(flockSave),
+      'night-flock-2:stars': JSON.stringify(flockStars),
+      'night-flock-2:daily': JSON.stringify(flockDaily),
+      ...Object.fromEntries(flockHints.map(({ key }) => [key, '1'])),
+    },
+    state: () => { const s = window.flockState?.(); return s && { screen: s.screen, t: s.game.time }; },
+    verify: () => {
+      const { saved, stars, mode, game } = window.flockState();
+      return { saved, stars, mode, level: game.level, play: document.querySelector('#play').textContent };
+    },
+    expect: { saved: flockSave, stars: flockStars, mode: 'campaign', level: 2, play: 'Play · Evening 2' },
+    verifyPaused: async page => {
+      await page.click('#evenings');
+      assert.equal(await page.textContent('#record'), 'Daily 2/3 stars · Endless · device best 31');
+      await page.click('#back');
+    },
+    touch: driveFlock,
+    hints: flockHints,
+  },
+  // Night Vine (was /lab/night-vine/): the bed waits for the first touch, which places the lamp and starts growth.
+  vine: {
+    seeds: saved('night-vine:save', { v: 1, unlocked: 3, level: 2, best: 7, sound: true, look: 'cobalt' }, 'night-vine:hint'),
+    saveKey: 'night-vine:save', startsOnBoard: true, pause: '#pauseButton', sound: '#sound',
+    state: () => { const s = window.vineState?.(); return s && { screen: s.screen === 'pause' ? 'paused' : s.screen, t: s.time }; },
+    verify: () => { const { level, unlocked, best } = window.vineState(); return { level, unlocked, best, look: document.body.dataset.look }; },
+    expect: { level: 2, unlocked: 3, best: 7, look: 'cobalt' },
+    touch: moveVineLamp,
+    hint: { key: 'night-vine:hint', delay: 3100, play: '#field', timing: { board: true }, input: moveVineLamp, legacy: { 'night-vine:save': '{"v":1,"unlocked":3,"level":2,"best":7,"sound":true,"look":"cobalt"}' } },
   },
 };

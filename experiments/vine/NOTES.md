@@ -30,12 +30,12 @@ The tending bot finished **240/240** campaign beds across 24 seeds. The table gi
 
 ### Reproduce
 
-Run from the repository root. The phone check finds Playwright through `$PLAYWRIGHT` or `~/code/human-framework/node_modules`, serves the static page locally and writes images to `/private/tmp/night-r6-review/vine/check/`.
+Run from the repository root. The phone check finds Playwright through `$PLAYWRIGHT` or `~/code/human-framework/node_modules`, serves the static page locally and writes images to `/private/tmp/night-r7-vine/check/` (before the promotion: `/private/tmp/night-r6-review/vine/check/`).
 
 ```sh
-fnm exec --using=26.12.0 node experiments/lab/night-vine/bots.mjs
-fnm exec --using=26.12.0 node experiments/lab/night-vine/bots.mjs --mutate
-fnm exec --using=26.12.0 node experiments/lab/night-vine/check.mjs
+fnm exec --using=26.12.0 node experiments/vine/bots.mjs
+fnm exec --using=26.12.0 node experiments/vine/bots.mjs --mutate
+fnm exec --using=26.12.0 node experiments/vine/check.mjs
 ```
 
 ### Complete campaign through the page
@@ -76,3 +76,43 @@ After the fixes, both profiles cleared all ten beds again. The final bed took 16
 The updated phone check exited 0 on both profiles. The opening took 8.00 simulated seconds on each, with 8.960 s wall time on WebKit and 14.618 s on Chromium. Bed 2 finished at 10.033 and 10.100 simulated seconds respectively. Each cut detached 25 nodes and brought flower shade from 0.52673 and 0.53549 to zero. Both retained an arbour best of 1 after reload and reported zero browser errors, external requests and telemetry requests.
 
 Screenshots are under `/private/tmp/night-r6-review/vine/`. The reviewed images include the opening and its delayed cue, both orientations, the open bed picker with the feedback link, reload and browser Back, wilt and retry, pruning and the final harvest. Physical-device rotation, OS backgrounding, audio by ear and unaided play by a new person remain unverified.
+
+## 2026-11-24 · Promoted to /vine/
+
+The lab page moved from `experiments/lab/night-vine/` to `experiments/vine/` and is served at `/vine/` as Night Vine. `/lab/night-vine/` is now a small redirect that keeps the query string and hash. The device keys did not change: `night-vine:save` and `night-vine:hint`.
+
+### What changed
+
+- **Teaching without words.** The instruction sentence under the glass and the help sentence on the pause card are gone. The footer shows a short goal label ("To the window", "Ripen the grapes", "Cut the shade") and a row of pictures: one bunch per fruit arm (filled when ripe), an arrow, the window (lit when reached), and the flowers (red when shaded). The pause card shows two picture rows: tap → lamp → vine, and flick → scissors → flower.
+- **A moving finger for every rule.** The kit first-time hint still points at the window on bed 1. After that the game draws its own finger on the canvas. The finger comes from `cue(s)` in `sim.js`, a pure function. It taps the next unripe arm after 4 s without input; before the window is reached it taps the window. It draws a flick across a stem after 1 s of flower shade over 0.3. The flick is chosen by `previewCut`, which tries a cut without changing the bed and keeps the smallest cut that clears the shade without losing fruit. Reduced motion shows a still hand. The finger is the game's own, not a new `kit/hint.js` kind, because the kit hint runs once and adding kinds would change a shared file.
+- **Turkish.** `words.js` holds en and tr tables for `kit/i18n.js`. A language button sits in the header and on the pause card; `?lang=tr` works. The title is "Gece Asması"; a bed is "Saksı" and the glasshouse "Sera".
+- **Recording.** `kit/lab.js` with slug `vine`. There is no menu, so the unstarted bed is the pre-play screen: the notice sits under the goal until the first touch. The toggle is on the pause card. Each bed starts a run with level, endless, seed and language. It ends with the outcome and time, cuts, ripe and arm counts, node count and score. Events: `touch`, `cut` (position, whether it followed the finger, shade), `cue` (kind), `grip`, `ripe`, `window`, `language`.
+- **End of bed.** A win sends light from the window and sparkles up the vine for 1.2 s before the result card; bed 10 adds falling petals. A loss dims the glass for 0.85 s, then the result card shows the scissors and "Cut the shade".
+- **Layout.** The language button made the header wrap and the page overflowed by 87 px on a 390 px phone. The sprig is now hidden below 440 px, the title does not wrap and the glass has a 208 px height budget. The page height equals the viewport on iPhone 13 and Pixel 7 in both languages. In landscape the Turkish recording notice ended 26 px below the viewport; the left column now puts the header at the top (`grid-template-rows:auto 1fr` instead of `1fr 1fr`) and the goal label is 22 px there.
+- **Notice on every unstarted bed.** The recording notice shows under the goal on every bed until its first touch, not only on the first. The game has no menu, so this keeps the notice in front of any bed a player opens from a link or a reload. The notice wording is the kit's (`kit/lab.js` `NOTICE`); the Turkish follows Follow Me's and names the pause card by its title, "Mola".
+- **Shared checks.** The phone-check entry moved from `kit/check/lab-pages.mjs` to `kit/check/pages.mjs` under `vine`. `games.json` lists `vine` as fresh.
+
+### Bots (`bots.mjs`, 60 fresh seeds plus the page seed per bed)
+
+- Careful bot (acts on the cue at once): 100% on all ten beds. The 85% wall line was never crossed, so nothing was retuned. All three bots read the same `cue()` the page draws, so these numbers show the finger is enough to win; they are not an independent measure of difficulty. The older campaign line in the same run (24 wins per bed, scripted marks) is independent of the cue.
+- Clumsy bot (reads the cue 150 ms late, at most one input per 0.6 s, 15% of inputs wrong: a tap 90 units off or a flick that only moves the lamp): 100, 100, 100, 100, 100, 100, 98, 100, 100, 100%. The check requires 85% on beds 1–3.
+- Naive bot (acts only when the page would show the finger, plus 1 s reaction; after a kind of cue has worked once it acts on that kind after 1 s): 100% on all beds. On the page seeds in order it reached bed 10 of 10 with one try per bed. With the tap cue delayed to 400 s it scored 0% and the reach check failed, so the check depends on the finger.
+- Time to wilt with no cut: bed 6 8.03 s, bed 8 8.23 s, bed 10 8.63 s.
+- `--mutate` exits 1.
+
+### Page checks
+
+- `check.mjs` passed on WebKit iPhone 13 and Chromium Pixel 7. It now intercepts the lab endpoint and never reaches it. It checks: nothing is sent before bed 1 ends; after bed 1 one `run` record for `vine` with outcome won, level 1 and a `window` event; the tap finger points at arm 0 on bed 2 after idling; a flick along the shown flick cue on bed 3 clears the shade (0.497 → 0 on WebKit); after the toggle is switched off nothing is sent and only `hf-lab-recording-off` remains. A Turkish run opens `/lab/night-vine/?lang=tr`, follows the redirect, and finds no English on the opening, the pause card with the bed picker open, and the first result; the language button switches back to English and sets `?lang=en`.
+- `kit/check/phone.mjs vine` passed on WebKit and Chromium.
+- A separate throwaway run (`/private/tmp/night-r7-vine/extra.mjs`, outside the repo) on both profiles and in both languages: bed 6 with no cut wilted at 8.03 s, the loss card showed "The flowers wilted" / "Çiçekler soldu" and its button replanted bed 6; bed 10, played by following only the page's finger (5 inputs, 1 cut), was won at 25.97 s on WebKit and 26.23–26.30 s on Chromium, showed "The glasshouse blooms" / "Sera çiçek açtı", and its button opened the endless arbour. In landscape before the first touch and on the pause card with the bed picker open, every button, the goal and the notice were inside the viewport and nothing scrolled. No English on the Turkish loss, final and landscape pause cards. Zero page errors; nothing reached the lab endpoint.
+- Screenshots looked at. English: opening, tap cue, flick cue, landscape board, landscape pause card, results, loss and win beats. Turkish: opening (both profiles), portrait pause card, first result, landscape opening, landscape pause card, loss card, final card. Not captured in Turkish: the tap and flick cues (the finger has no words).
+
+### Not verified
+
+- `words.js` and `experiments/lab/night-vine/index.html` are new, untracked files. They must be added with the move, or `/vine/` fails at import and the old address stops redirecting.
+
+- No person has played this version, and no native Turkish speaker has read the Turkish.
+- Real phones, audio by ear, and the real flick classifier (30 units in 320 ms): the bots act on the simulation, not through the page's gesture code.
+- Bed 6 leaves about 8 s before the first wilt. A first-time player may need a retry there; the bots cannot show that.
+- The naive bot assumes a person copies a shown flick within 1 s.
+- Production recording: the server accepts only listed games. `vine` must be added to `LAB_PROTOTYPES` in human-framework `apps/site/src/lab/games.ts` and deployed; until then every send is refused.

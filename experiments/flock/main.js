@@ -1,12 +1,15 @@
 import { command, createGame, LIMIT_LEVEL, RESCUE_POINTS, step } from './sim.js';
 import { farm, valley } from './valley.js';
 import { draw } from './art.js';
-import { readJson, writeJson } from '../../kit/save.js';
-import { sound } from '../../kit/audio.js';
-import { onLeave, isPauseKey } from '../../kit/pause.js';
-import { noZoom } from '../../kit/zoom.js';
-import { screens } from '../../kit/screens.js';
-import { hint } from '../../kit/hint.js';
+import { readJson, writeJson } from '../kit/save.js';
+import { sound } from '../kit/audio.js';
+import { onLeave, isPauseKey } from '../kit/pause.js';
+import { noZoom } from '../kit/zoom.js';
+import { screens } from '../kit/screens.js';
+import { hint } from '../kit/hint.js';
+import { lab } from '../kit/lab.js';
+import { cue, steerable } from './teach.js';
+import { t, lang, apply, setLang, num } from './words.js';
 
 noZoom();
 const el = id => document.getElementById(id);
@@ -51,7 +54,27 @@ let mode = 'campaign', level = saved.unlocked, wave = 1, carried = 0, endlessSee
 let game, screen, lastFrame = null, owner = null, target = null, fromFields = 'paused';
 let gesture = null, tutorialMoved = false;
 let dailyDate = '', dailySeed = 0;
-const starNames = ['None lost', 'Calm kept', 'Under par'];
+const starNames = ['noneLost', 'calmKept', 'underPar'];
+// Play recording for the game lab: one run for each evening the player touches.
+const rec = lab('flock');
+let running = false, tally = null, picture = null;
+function summary() {
+  const missing = game.sheep.find(sheep => sheep.status === 'lost');
+  return { level: game.level, mode, home: game.home, sheep: game.sheep.length, lost: game.lost, rescued: game.rescued,
+    t: Math.round(game.time * 10) / 10, calm: Math.round(game.minCalm * 100), stars: countStars(resultStars()),
+    ...tally, ...(missing ? { lostTo: missing.lostTo } : {}) };
+}
+function began() {
+  if (running || !game.started) return;
+  running = true;
+  tally = { holds: 0, flicks: 0, wrongFlicks: 0, gateAt: null, gatheredAt: null };
+  rec.start({ level: game.level, mode, wave: mode === 'endless' ? wave : undefined, seed: game.seed, sheep: game.sheep.length, lang: lang() });
+}
+function ended(outcome) {
+  if (!running) return;
+  running = false;
+  rec.end(outcome, summary());
+}
 const calmStar = .78;
 let endWait = 0, message = '', messageUntil = 0, clock = 0;
 
@@ -62,33 +85,41 @@ function release() {
   gesture = null;
   if (previous !== null && canvas.hasPointerCapture(previous)) canvas.releasePointerCapture(previous);
 }
-const display = screens(['paused', 'evenings-screen', 'end'], id => {
+const display = screens(['start', 'paused', 'evenings-screen', 'end'], id => {
   screen = id === 'evenings-screen' ? 'evenings' : id;
   document.querySelector('.folio').inert = screen !== 'play';
-  if (screen !== 'play') el(id).querySelector('button:not([hidden]):not(:disabled)')?.focus({preventScroll: true});
+  if (screen !== 'play') (el(id).querySelector('button.primary:not([hidden])') ?? el(id).querySelector('button:not([hidden]):not(:disabled)'))?.focus({preventScroll: true});
   lastFrame = null;
 });
+const farmName = n => t(farm(n));
 function describe() {
-  if (mode === 'endless') return 'Count them home · Flock ' + wave;
-  if (mode === 'daily') return 'Daily · ' + dailyDate.slice(5);
-  return 'Evening ' + String(level).padStart(2, '0') + ' / ' + LIMIT_LEVEL;
+  if (mode === 'endless') return t('endlessRun', { n: wave });
+  if (mode === 'daily') return t('dailyRun', { date: dailyDate.slice(5) });
+  return t('evening', { n: String(level).padStart(2, '0'), total: LIMIT_LEVEL });
+}
+// Every label that names the evening in play.
+function relabel() {
+  el('farm').textContent = mode === 'endless' ? t('common') : t('farmLine', { farm: farmName(level) });
+  const { mist, wind } = game.weather;
+  el('weather').textContent = [mist ? t('mist') : '', wind ? t('wind', { arrow: wind < 0 ? '←' : '→' }) : ''].filter(Boolean).join(' · ') || t('still');
+  for (const id of ['chapter', 'start-chapter', 'pause-chapter']) el(id).textContent = describe();
+  el('play').textContent = mode === 'campaign' ? t('playEvening', { n: level }) : t('play');
 }
 function fresh() {
+  if (game?.status === 'play') ended('left');
+  running = false;
   release();
   tutorialMoved = false;
   let seed = level;
   if (mode === 'endless') seed = (endlessSeed + Math.imul(wave, 2654435761)) >>> 0;
   if (mode === 'daily') seed = dailySeed;
   game = createGame(mode === 'endless' ? LIMIT_LEVEL + wave : level, seed);
-  el('farm').textContent = mode === 'endless' ? 'Common pasture' : farm(level) + ' farm';
   el('hint-outrun').classList.toggle('left', (game.terrain.outrun?.x ?? 180) < 180);
-  const { mist, wind } = game.weather;
-  el('weather').textContent = [mist ? 'Valley mist' : '', wind ? 'Wind ' + (wind < 0 ? '←' : '→') : ''].filter(Boolean).join(' · ') || 'Still evening';
-  message = '';
+  message = null;
   endWait = 0;
-  el('chapter').textContent = describe();
+  picture = cue(game);
+  relabel();
   el('total').textContent = game.sheep.length;
-  display('play');
   updateLedger();
 }
 function campaign(n) {
@@ -136,26 +167,12 @@ function award() {
     storageOK = writeJson(starsKey, stars) && storageOK;
   }
 }
+// Which moving-hand lesson is due: the page pictures the same thing on the field (teach.js).
 function lesson() {
-  if (game.terrain.outrun && !game.terrain.outrun.gathered) return 'outrun';
-  if (game.terrain.gate && !game.terrain.gate.open) return 'hold';
+  if (picture?.kind === 'outrun') return 'outrun';
+  if (picture?.kind === 'hold') return game.dog.mode === 'hold' ? null : 'hold';
+  if (picture && picture.kind !== 'drag' && picture.kind !== 'bring') return null;
   return game.lesson === 'drag' || mode === 'endless' && !saved.played ? 'drag' : null;
-}
-function guidance() {
-  const { gate, bridge, lane, bog, outrun } = game.terrain;
-  if (outrun && !outrun.gathered && game.dog.mode === 'outrun') return 'Dog circling · wait before dragging again.';
-  if (outrun && !outrun.gathered) return 'Flick ' + (outrun.x < 180 ? 'left' : 'right') + ' to gather the bellwether.';
-  if (gate && !gate.open) {
-    if (gate.progress > 0) return 'Hold the flock · gate opening ' + Math.round(100 * gate.progress) + '%';
-    return 'Drive to the cross-gate, then hold still.';
-  }
-  if (game.dog.mode === 'hold') return 'Dog lying down · drag to run again.';
-  if (game.level === 1 && !tutorialMoved) return 'Drag uphill behind the flock.';
-  if (bridge) return 'Bring the flock across the timber bridge.';
-  if (lane) return 'Guide the flock between the stone walls.';
-  if (bog) return 'Skirt the soft ground beside the reeds.';
-  if (game.weather.mist) return 'Mist shortens sight. Keep the flock close.';
-  return 'Bring every sheep to the lanterns.';
 }
 function recordCount() {
   if (mode === 'endless' && carried + game.home > saved.best) {
@@ -163,8 +180,8 @@ function recordCount() {
     store();
   }
 }
-function say(line) {
-  message = line;
+function say(key, vars) {
+  message = [key, vars];
   messageUntil = game.time + 3;
 }
 function setText(id, value) {
@@ -179,55 +196,76 @@ function updateLedger() {
   const calm = Math.round(game.calm * 100);
   if (el('calm').value !== calm) el('calm').value = calm;
   setText('calm-value', calm + '%');
-  setText('instruction', guidance());
-  setText('score', mode !== 'endless' ? game.score + ' points' : (carried + game.home) + ' counted · best ' + saved.best);
-  setText('remark', !storageOK ? 'Saved for this session only' : message && game.time < messageUntil ? message : '');
+  setText('score', mode !== 'endless' ? t('points', { n: num(game.score) }) : t('counted', { n: carried + game.home, best: saved.best }));
+  setText('remark', !storageOK ? t('sessionOnly') : message && game.time < messageUntil ? t(...message) : '');
 }
 function syncSound() {
-  el('sound').textContent = saved.sound ? 'Sound on' : 'Sound off';
+  el('sound').textContent = t(saved.sound ? 'soundOn' : 'soundOff');
   el('sound').setAttribute('aria-pressed', String(saved.sound));
 }
-function finish() {
-  release();
-  const won = game.status === 'won';
-  el('end-caption').textContent = describe();
-  const missing = game.sheep.find(sheep => sheep.status === 'lost');
-  el('end-title').textContent = won ? 'All safely in' : missing ? (missing.lostTo === 'woods' ? 'Lost in the woods' : 'Lost to the stream') : 'Night has fallen';
-  el('end-line').textContent = game.home + ' of ' + game.sheep.length + ' in the fold' +
-    (game.rescued ? ' · ' + game.rescued + (game.rescued === 1 ? ' stray brought back' : ' strays brought back') : '') + '.';
-  el('end-score').textContent = (mode === 'endless' ? game.score + ' points this flock · ' + (carried + game.home) + ' counted · device best ' + saved.best : game.score + ' points') +
-    (storageOK ? '' : ' · this session only');
-  const earned = resultStars();
-  el('stars').hidden = mode === 'endless';
-  el('stars').replaceChildren(...starNames.map((name, index) => {
+function starRow(holder, names, earned) {
+  holder.replaceChildren(...names.map((name, index) => {
     const wonStar = Boolean(earned & (1 << index));
     const item = document.createElement('div');
     item.className = wonStar ? 'star earned' : 'star';
+    item.style.setProperty('--order', index);
     const mark = document.createElement('span');
     mark.textContent = wonStar ? '★' : '☆';
-    mark.setAttribute('aria-label', wonStar ? 'Earned' : 'Missed');
+    mark.setAttribute('aria-label', t(wonStar ? 'earned' : 'missed'));
     item.append(mark, name);
     return item;
   }));
+}
+function renderEnd() {
+  const won = game.status === 'won';
+  const last = won && mode === 'campaign' && level === LIMIT_LEVEL;
+  el('end').classList.toggle('finale', last);
+  el('end-caption').textContent = describe();
+  const missing = game.sheep.find(sheep => sheep.status === 'lost');
+  el('end-title').textContent = t(last ? 'finale' : won ? 'won' : missing ? (missing.lostTo === 'woods' ? 'woods' : 'stream') : 'night');
+  el('end-line').textContent = last ? t('finaleLine') : t('inFold', { home: game.home, total: game.sheep.length }) +
+    (game.rescued ? ' · ' + t(game.rescued === 1 ? 'stray' : 'strays', { n: game.rescued }) : '') + '.';
+  el('end-score').textContent = (mode === 'endless'
+    ? t('endlessScore', { points: num(game.score), count: carried + game.home, best: saved.best }) : t('points', { n: num(game.score) })) +
+    (storageOK ? '' : ' · ' + t('sessionShort'));
+  el('stars').hidden = mode === 'endless';
+  starRow(el('stars'), starNames.map(name => t(name)), resultStars());
   if (mode !== 'endless') {
-    el('end-score').textContent += ' · ' + game.time.toFixed(1) + 's / ' + game.par + 's par · low calm ' + Math.round(game.minCalm * 100) + '%';
+    el('end-score').textContent += ' · ' + t('result', { time: game.time.toFixed(1), par: game.par, calm: Math.round(game.minCalm * 100) });
+  }
+  if (last) {
+    const all = Object.values(stars).reduce((n, bits) => n + countStars(bits), 0);
+    el('end-score').textContent += ' · ★ ' + all + ' / ' + LIMIT_LEVEL * 3;
   }
   el('next').hidden = !won;
-  el('next').textContent = mode === 'endless' ? 'Next flock' : mode === 'daily' ? 'Back to campaign' : level === LIMIT_LEVEL ? 'Count them home ∞' : 'Next evening';
-  el('retry').textContent = mode === 'endless' ? 'New count' : 'Try again';
+  el('retry').classList.toggle('primary', !won);
+  el('next').textContent = t(mode === 'endless' ? 'nextFlock' : mode === 'daily' ? 'toCampaign' : level === LIMIT_LEVEL ? 'endless' : 'next');
+  el('retry').textContent = t(mode === 'endless' ? 'newCount' : 'again');
+}
+function chime(notes, gap = 110) {
+  notes.forEach((note, index) => setTimeout(() => { if (screen === 'end') audio.tone(note, .3, .04, 'sine', 12); }, index * gap));
+}
+function finish() {
+  release();
+  renderEnd();
   display('end');
-  if (won) audio.tone(784, .45, .045, 'sine', 24);
+  const won = game.status === 'won';
+  if (won && mode === 'campaign' && level === LIMIT_LEVEL) chime([392, 494, 587, 784, 587, 784, 988], 150);
+  else if (won) chime([523, 659, 784]);
+  else audio.tone(196, .5, .04, 'sine', -40);
+}
+function renderPause() {
+  el('pause-stars').hidden = mode === 'endless';
+  starRow(el('pause-stars'), [t('noneLost'), t('calmGoal', { n: Math.round(calmStar * 100) }), t('parGoal', { n: game.par })],
+    mode === 'campaign' ? stars[level] || 0 : 0);
+  syncSound();
 }
 function pause() {
   if (screen !== 'play') return;
   if (game.status !== 'play') { finish(); return; }
   release();
   audio.hold();
-  el('pause-chapter').textContent = describe();
-  const weatherNote = (game.weather.mist ? ' Mist shortens the flock’s sight.' : '') +
-    (game.weather.wind ? ' The whistle carries farther downwind.' : '');
-  el('pause-goal').textContent = guidance() + weatherNote + (mode === 'endless' ? '' : ' For three stars, keep every sheep, hold calm at 78% or higher and finish within ' + game.par + ' seconds.');
-  syncSound();
+  renderPause();
   display('paused');
 }
 function resume() {
@@ -236,16 +274,16 @@ function resume() {
   audio.release();
 }
 function fields() {
-  fromFields = screen;
+  if (screen !== 'evenings') fromFields = screen;
   readStars();
-  valley(el('valley'), el('levels'), saved.unlocked, mode === 'campaign' ? level : null, stars, campaign);
+  valley(el('valley'), el('levels'), saved.unlocked, mode === 'campaign' ? level : null, stars, n => { campaign(n); display('play'); }, t);
   const starCount = Object.values(stars).reduce((n, bits) => n + countStars(bits), 0);
   el('total-stars').textContent = '★ ' + starCount + ' / ' + LIMIT_LEVEL * 3;
   const today = new Date().toISOString().slice(0,10);
   const lastDaily = readJson(dailyKey) || dailyRecord;
-  el('record').textContent = (lastDaily?.date === today ? 'Daily ' + countStars(lastDaily.stars) + '/3 stars · ' : '') +
-    'Endless · device best ' + saved.best + (storageOK ? '' : ' · this session only');
-  display('evenings-screen');
+  el('record').textContent = (lastDaily?.date === today ? t('dailyRecord', { n: countStars(lastDaily.stars) }) : '') +
+    t('endlessRecord', { n: saved.best }) + (storageOK ? '' : ' · ' + t('sessionShort'));
+  if (screen !== 'evenings') display('evenings-screen');
 }
 function countStars(bits) {
   return (bits & 1) + (bits >> 1 & 1) + (bits >> 2 & 1);
@@ -256,7 +294,14 @@ el('field-map').onclick = () => {
   fields();
   if (interrupted) fromFields = 'play';
 };
-el('daily').onclick = daily;
+el('daily').onclick = () => { daily(); display('play'); };
+el('play').onclick = () => {
+  if (screen !== 'start') return;
+  display('play');
+  audio.release();
+  audio.unlock();
+  audio.tone(523, .14, .03);
+};
 el('pause').onclick = pause;
 el('resume').onclick = resume;
 el('evenings').onclick = fields;
@@ -266,8 +311,8 @@ function closeMap() {
   if (fromFields === 'play') audio.release();
 }
 el('back').onclick = closeMap;
-el('endless').onclick = endless;
-el('retry').onclick = () => mode === 'endless' ? endless() : fresh();
+el('endless').onclick = () => { endless(); display('play'); };
+el('retry').onclick = () => { if (mode === 'endless') endless(); else fresh(); display('play'); };
 el('next').onclick = () => {
   if (mode === 'endless') {
     carried += game.home;
@@ -276,6 +321,7 @@ el('next').onclick = () => {
   } else if (mode === 'daily') campaign(saved.unlocked);
   else if (level === LIMIT_LEVEL) endless();
   else campaign(level + 1);
+  display('play');
 };
 el('sound').onclick = () => {
   saved.sound = !saved.sound;
@@ -319,6 +365,7 @@ canvas.addEventListener('pointerdown', event => {
   if (!saved.played) { saved.played = true; store(); }
   // A quick tap can end between two animation frames. Accept its first step here.
   if (!game.started) step(game, 1 / 60, target);
+  began();
 });
 canvas.addEventListener('pointermove', event => {
   if (event.pointerId !== owner) return;
@@ -344,6 +391,14 @@ canvas.addEventListener('pointermove', event => {
 });
 function whistle(kind, direction) {
   if (kind === 'hold' && lesson() === 'hold') hints.hold.done();
+  began();
+  if (kind === 'hold') {
+    if (tally.holds++ < 12) rec.event('hold', { t: Math.round(game.time * 10) / 10, asked: picture?.kind === 'hold' });
+  } else {
+    const asked = picture?.kind === 'outrun' ? picture.dir : 0;
+    if (asked && asked !== direction) tally.wrongFlicks++;
+    if (tally.flicks++ < 12) rec.event('flick', { t: Math.round(game.time * 10) / 10, dir: direction, asked });
+  }
   command(game, kind, direction);
   const high = kind === 'outrun';
   audio.tone(high ? 1100 : 660, high ? .21 : .13, .025, 'sine', high ? 360 : -120);
@@ -362,6 +417,8 @@ for (const name of ['pointercancel', 'lostpointercapture']) {
 }
 function holdIfStill(dt) {
   if (!gesture || gesture.held) return;
+  // The dog finishes its circle round the bellwether before it takes another order.
+  if (!steerable(game)) { gesture.stillFor = 0; return; }
   // A blocked display can also delay pointer events. Missing frames cannot certify a hold.
   gesture.stillFor += Math.min(dt, .05);
   if (gesture.stillFor < .43) return;
@@ -374,18 +431,24 @@ function holdIfStill(dt) {
 }
 const hints = {};
 const gestures = {
-  drag: ['hold-and-move', 'Drag behind the flock.'],
-  hold: ['tap', 'Hold still to lie down at the cross-gate.'],
-  outrun: ['drag', 'Flick toward the bellwether to send the dog wide.']
+  drag: ['hold-and-move', 'hintDrag', 6500],
+  hold: ['tap', 'hintHold', 1200],
+  outrun: ['drag', 'hintOutrun', 2200]
 };
-for (const [name, [kind, label]] of Object.entries(gestures)) {
+for (const [name, [kind, label, delay]] of Object.entries(gestures)) {
   // An inert anchor lets an unrelated gesture leave this lesson available.
   hints[name] = hint(el('hint-' + name), {
-    kind, label, key: 'night-flock-2:hint-' + name,
+    kind, label: t(label), key: 'night-flock-2:hint-' + name,
     when: () => screen === 'play' && game?.status === 'play' && owner === null &&
       game.dog.mode !== 'outrun' && lesson() === name,
-    delay: name === 'drag' ? 6500 : 2200, reach: 27
+    delay, reach: 27
   });
+}
+function hintLabels() {
+  for (const [name, [, label]] of Object.entries(gestures)) {
+    const words = document.querySelector('#hint-' + name + ' + .kit-hint .label');
+    if (words) words.textContent = t(label);
+  }
 }
 
 function resize() {
@@ -394,11 +457,20 @@ function resize() {
   canvas.width = Math.max(1, Math.round(box.width * scale));
   canvas.height = Math.max(1, Math.round(box.height * scale));
 }
+const plate = document.querySelector('.plate');
 function paint() {
   ctx.setTransform(canvas.width / 360, 0, 0, canvas.height / 520, 0, 0);
   const guide = mode === 'campaign' && level === 1 && !tutorialMoved && !target && game.status === 'play'
     && query.get('hint') !== '0';
-  draw(ctx, game, { clock: reducedMotion.matches && (!game.started || guide) ? 1.7 : clock, look, pressed: target, guide });
+  const shown = game.status === 'play' && picture?.kind !== 'drag' && query.get('hint') !== '0' ? picture : null;
+  plate.classList.toggle('cue-hold', shown?.kind === 'hold');
+  if (shown?.kind === 'hold') {
+    // The moving hand of the lie-down lesson sits where the field asks for the press.
+    plate.style.setProperty('--cue-x', shown.x / 3.6 + '%');
+    plate.style.setProperty('--cue-y', shown.y / 5.2 + '%');
+  }
+  draw(ctx, game, { clock: reducedMotion.matches && (!game.started || guide) ? 1.7 : clock, look, pressed: target, guide,
+    picture: shown, hand: !hints.hold.shown && !hints.outrun.shown });
 }
 function frame(now) {
   const dt = lastFrame === null ? 0 : Math.min(.12, (now - lastFrame) / 1000);
@@ -409,16 +481,27 @@ function frame(now) {
       const home = game.home, rescued = game.rescued, lost = game.lost;
       const flank = game.terrain.outrun;
       const gathering = flank && !flank.gathered;
+      const closed = game.terrain.gate && !game.terrain.gate.open;
       holdIfStill(dt);
-      step(game, dt, target);
-      if (gathering && flank.gathered) hints.outrun.done();
+      step(game, dt, steerable(game) ? target : null);
+      began();
+      picture = cue(game);
+      if (gathering && flank.gathered) {
+        hints.outrun.done();
+        if (running) { tally.gatheredAt = Math.round(game.time * 10) / 10; rec.event('gathered', { t: tally.gatheredAt }); }
+      }
+      if (closed && game.terrain.gate.open && running) {
+        tally.gateAt = Math.round(game.time * 10) / 10;
+        rec.event('gate', { t: tally.gateAt });
+      }
       if (game.home > home) {
         recordCount();
         audio.tone([392, 494, 587, 659][(game.home - 1) % 4], .24, .035, 'sine');
       }
-      if (game.rescued > rescued) say('Stray brought home +' + RESCUE_POINTS.toLocaleString());
-      else if (game.lost > lost) say('Lost from the flock');
+      if (game.rescued > rescued) say('rescued', { n: num(RESCUE_POINTS) });
+      else if (game.lost > lost) say('lostOne');
       if (game.status !== 'play') {
+        ended(game.status === 'won' ? 'won' : game.lost ? 'lost' : 'dark');
         award();
         release();
         endWait = .65;
@@ -429,11 +512,60 @@ function frame(now) {
   }
   requestAnimationFrame(frame);
 }
+// The recording notice is on the first card; its switch is on the pause card, where the notice says it is.
+const notice = rec.notice(el('start').firstElementChild);
+const recordingToggle = rec.toggle(el('paused').firstElementChild);
+const recordingChoice = recordingToggle?.querySelector('input');
+if (notice) notice.querySelector('a').dataset.i18n = 'privacy';
+function updateRecording() {
+  if (notice) notice.firstChild.data = t(recordingChoice?.checked ? 'recordingOn' : 'recordingOff') + ' ';
+  if (recordingToggle) recordingToggle.lastChild.data = ' ' + t('recordingToggle');
+}
+recordingChoice?.addEventListener('change', updateRecording);
+addEventListener('storage', updateRecording);
+function syncNotes() {
+  document.getElementById('notes-button')?.setAttribute('aria-label', t('notes'));
+}
+document.addEventListener('DOMContentLoaded', syncNotes, { once: true });
+function translatePage() {
+  document.title = t('title');
+  apply();
+  relabel();
+  updateLedger();
+  updateRecording();
+  syncNotes();
+  hintLabels();
+  for (const button of document.querySelectorAll('.language')) {
+    button.lastElementChild.textContent = t(lang() === 'en' ? 'enCode' : 'trCode');
+    button.setAttribute('aria-label', t('switchLanguage'));
+  }
+  if (screen === 'paused') renderPause();
+  if (screen === 'end') renderEnd();
+  if (screen === 'evenings') fields();
+  syncSound();
+}
+for (const id of ['lang-start', 'lang-pause']) {
+  const button = el(id);
+  button.append(el('language-icon').content.cloneNode(true));
+  button.onclick = () => {
+    setLang(lang() === 'en' ? 'tr' : 'en');
+    // Keep an explicit link consistent with the new choice after refresh.
+    const url = new URL(location.href);
+    if (url.searchParams.has('lang')) {
+      url.searchParams.set('lang', lang());
+      history.replaceState(history.state, '', url);
+    }
+    translatePage();
+  };
+}
 fresh();
+translatePage();
+display('start');
 new ResizeObserver(() => { resize(); paint(); }).observe(canvas);
 resize();
 paint();
 requestAnimationFrame(frame);
 
 // Read-only snapshot for phone checks. It cannot steer the dog or advance time.
-window.flockState = () => structuredClone({game, screen, mode, wave, saved, stars, dailyDate, pressed: owner !== null});
+window.flockState = () => structuredClone({game, screen, mode, wave, saved, stars, dailyDate, pressed: owner !== null,
+  lang: lang(), picture: picture?.kind ?? null, recording: rec.on, sent: rec.sent});

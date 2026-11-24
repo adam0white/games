@@ -445,7 +445,7 @@ function guideSheep(game, field, index, barriers, out) {
   const left = leftEdge(y);
   const right = rightEdge(y);
   const edgeDistance = Math.min(x - left, right - x);
-  if (game.level >= 6 && edgeDistance < 25 && !(patch && animal === leader && !patch.gathered)) {
+  if (game.level >= 2 && edgeDistance < 25 && !(patch && animal === leader && !patch.gathered)) {
     const foothold = Math.min(48, (25 - edgeDistance) * 1.7);
     vx += x < 180 ? foothold : -foothold;
   }

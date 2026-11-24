@@ -2,75 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#232421">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Night Vine</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="./style.css">
+  <script>location.replace('/vine/' + location.search + location.hash);</script>
+  <meta http-equiv="refresh" content="0; url=/vine/">
 </head>
-<body>
-  <svg width="0" height="0" class="definitions" aria-hidden="true"><defs>
-    <symbol id="i-window" viewBox="0 0 36 36">
-      <path d="M6 29V15a12 12 0 0 1 24 0v14H6Zm3 2h18M18 4v24M7 16h22M18 16 9 9m9 7 9-7"/>
-      <path d="M15 26c3-4 5-3 8-7M18 23q-5 0-4-5 4 1 4 5Z"/>
-    </symbol>
-    <symbol id="i-grapes" viewBox="0 0 36 36">
-      <path d="M18 11q0-8 7-9M19 9q-8 1-10-6 7-1 10 6Z"/>
-      <circle cx="13" cy="15" r="4"/><circle cx="23" cy="15" r="4"/><circle cx="18" cy="22" r="4"/><circle cx="18" cy="29" r="2.5"/>
-    </symbol>
-    <symbol id="i-flower" viewBox="0 0 36 36">
-      <path d="M18 32V18m0 10q-9-1-10-8 8 0 10 8Zm0-4q7 0 9-6-7-1-9 6Z"/>
-      <path d="M15 10c-7-11 8-12 6 0 9-8 15 5 3 6 9 7-2 15-6 4-5 11-15 1-7-5-12-2-5-12 4-5Z"/><circle cx="18" cy="14" r="2"/>
-    </symbol>
-    <symbol id="i-sprig" viewBox="0 0 72 68">
-      <path d="M15 61c15-14 15-27 35-47M28 46q-14 0-17-14 12 1 17 14ZM32 38q14-13 24-9-5 12-24 9ZM38 29q-13-3-13-17 12 5 13 17ZM44 22q12-1 17-11-12-1-17 11Z"/>
-      <path d="M30 44q8 2 11 8M21 54q-8-2-11-8m28-15q9-7 14-7c9 0 10-8 5-8-4 0-4 5-1 5"/>
-      <g fill="currentColor" stroke="none"><circle cx="39" cy="52" r="2.8"/><circle cx="46" cy="51" r="3"/><circle cx="41" cy="58" r="3"/><circle cx="47" cy="57" r="2.3"/><circle cx="44" cy="62" r="2"/></g>
-    </symbol>
-  </defs></svg>
-  <main id="book">
-    <header>
-      <div class="heading">
-        <div id="edition" class="small">Glasshouse · Bed 01 / 10</div>
-        <h1>Night <em>Vine</em></h1>
-      </div>
-      <svg class="sprig" viewBox="0 0 72 68" aria-hidden="true"><use href="#i-sprig"/></svg>
-      <button id="pauseButton" class="pause-button" aria-label="Pause tending"><b></b><b></b></button>
-    </header>
-    <div id="frame"><canvas width="360" height="480" id="field" tabindex="0" aria-label="Move the lamp by touch or with arrow keys. Flick across a stem to prune. With a keyboard, press X to prune at the lamp."></canvas></div>
-    <footer>
-      <svg id="goalMark" class="sign" viewBox="0 0 36 36" aria-hidden="true"><use href="#i-window"/></svg>
-      <div class="brief"><div id="goal" aria-live="polite">Reach the window</div><p id="instruction">Tap the lit window to start.</p></div>
-    </footer>
-    <section id="result" role="region" aria-labelledby="resultTitle">
-      <div class="finished">
-        <svg class="sign" viewBox="0 0 36 36" aria-hidden="true"><use id="finishIcon" href="#i-window"/></svg>
-        <div><h2 id="resultTitle"></h2><p id="outcome"></p></div>
-      </div>
-      <div class="actions">
-        <button id="next">Tend the next bed</button>
-        <button id="replay" aria-label="Replant this bed" title="Replant this bed">↺</button>
-      </div>
-    </section>
-  </main>
-  <section id="pause" class="sheet" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
-    <div class="card">
-      <div class="pause-help">
-        <div class="small" id="pausedBed">Glasshouse</div>
-        <h2 id="pauseTitle">Tending paused</h2>
-        <p>Place the lamp where you want the vine to grow. Flick across a stem to prune everything beyond the cut.</p>
-      </div>
-      <div class="pause-actions">
-        <button class="solid" id="resume">Resume tending</button>
-        <div class="pair"><button id="restart">Replant bed</button><button id="campaign">Choose a bed</button></div>
-        <div id="beds" hidden></div>
-        <button id="endless">Endless arbour <span aria-hidden="true">∞</span></button>
-        <p id="record"></p>
-      </div>
-      <div class="pair settings"><button id="ink">Ink · Vesper</button><button id="sound">Sound on</button></div>
-    </div>
-  </section>
-  <script type="module" src="./main.js"></script>
-  <script src="/notes/button.js" defer></script>
-</body>
+<body><a href="/vine/">Night Vine</a></body>
 </html>

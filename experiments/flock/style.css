@@ -86,9 +86,9 @@ header {margin-bottom:9px}
 #calm::-moz-meter-bar {background:#506f5d}
 .ledger {min-height:44px;font-size:12px;line-height:1.25}
 .map-link {font:italic 13px Georgia,serif;border:0;border-radius:0;white-space:nowrap;min-height:44px;padding:6px 0 6px 4px;color:#315748}
-#instruction {font:italic 13px/1.24 Georgia,serif;color:#425747}
 #remark {font-size:10px}
-#stars {display:flex;justify-content:space-evenly;gap:6px;margin:14px 0 10px}
+#stars,.goals {display:flex;justify-content:space-evenly;gap:6px;margin:14px 0 10px}
+.goals {margin:0 0 16px}
 .star {font-size:12px;color:var(--muted)}
 .star span {display:block;font:27px/1.15 Georgia,serif;color:#7b8071}
 .star.earned span {color:#ae633a}
@@ -163,3 +163,20 @@ header {margin-bottom:9px}
 }
 #hint-outrun.left + .kit-hint:not(.still) {transform:scaleX(-1)}
 .atlas-actions button {padding-inline:5px}
+/* First card, language switch, recording notice. */
+.card {position:relative}
+.card:has(.language) {padding-top:46px}
+.language {position:absolute;top:6px;right:6px;display:flex;align-items:center;gap:6px;min-height:44px;padding:6px 10px;border:0;font-size:12px;letter-spacing:.1em;color:var(--muted)}
+.language svg {width:18px;height:18px;flex:none}
+#start h2 {font-size:clamp(40px,13vw,50px);margin-bottom:22px}
+.card .lab-notice {display:flex;align-items:center;gap:6px;text-align:left;margin:12px 0 0!important;color:var(--muted)}
+.card .lab-notice a {display:grid;place-items:center;flex:none;min-width:48px;min-height:44px}
+.card .lab-toggle {font-size:12px;color:var(--muted);text-align:left;margin-top:8px}
+/* The lie-down hand sits where the field asks for the press. */
+.plate #hint-hold + .kit-hint {left:var(--cue-x,50%);top:var(--cue-y,80%)}
+/* End of an evening: the stars arrive one by one. */
+#end .star.earned span {animation:star-in .45s cubic-bezier(.3,1.6,.5,1) both;animation-delay:calc(.25s + var(--order) * .22s)}
+@keyframes star-in {from {transform:scale(.2) rotate(-40deg);opacity:0}}
+#end.finale h2 {color:#8a4f2b}
+#end.finale .card {box-shadow:0 0 0 2px #c9a35d,0 10px 40px #0b232a55}
+@media(prefers-reduced-motion:reduce) {#end .star.earned span {animation:none}}

@@ -1,4 +1,4 @@
-// fnm exec --using=26.12.0 node experiments/lab/night-vine/check.mjs [webkit|chromium]
+// fnm exec --using=26.12.0 node experiments/vine/check.mjs [webkit|chromium]
 import assert from 'node:assert/strict';
 import { mkdir, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -7,10 +7,13 @@ import { homedir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
+import { gunzipSync } from 'node:zlib';
+import { tables } from './words.js';
 
-const experiments = fileURLToPath(new URL('../../', import.meta.url));
-const shots = '/private/tmp/night-r6-review/vine/check';
-const path = '/lab/night-vine/';
+const experiments = fileURLToPath(new URL('../', import.meta.url));
+const shots = '/private/tmp/night-r7-vine/check';
+const endpoint = 'https://human.adamwhite.work/lab/api/linked';
+const path = '/vine/';
 const saveKey = 'night-vine:save';
 const feedback = '/notes/button.js';
 const types = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript' };
@@ -23,9 +26,9 @@ const profiles = [
 ].filter(({ name }) => !process.argv[2] || name === process.argv[2]);
 assert.ok(profiles.length, 'expected webkit or chromium');
 
-const allowed = p => p === path || p === feedback || p === '/favicon.ico' ||
-  /^\/lab\/night-vine\/[\w-]+\.(js|css|html)$/.test(p) ||
-  (/^\/kit\/[\w-]+\.js$/.test(p) && p !== '/kit/lab.js');
+const allowed = p => p === path || p === feedback || p === '/favicon.ico' || p === '/lab/night-vine/' ||
+  /^\/vine\/[\w-]+\.(js|css|html)$/.test(p) ||
+  /^\/kit\/[\w-]+\.js$/.test(p);
 const server = createServer(async (request, response) => {
   const p = new URL(request.url, 'http://localhost').pathname;
   if (p === '/favicon.ico') return response.writeHead(204).end();
@@ -111,6 +114,74 @@ function audit(page, origin) {
   } };
 }
 
+// Answer the lab endpoint here, as kit/check/phone.mjs does, and keep each record for the assertions.
+async function labRoute(context, origin, sent) {
+  await context.route(endpoint, async route => {
+    const request = route.request(), cors = { 'access-control-allow-origin': origin,
+      'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'Content-Type' };
+    if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    const record = JSON.parse(gunzipSync(request.postDataBuffer()).toString());
+    sent.push(record);
+    return route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ ok: true, id: record.id }) });
+  });
+}
+// English left on screen: any English string of three or more letters that Turkish says differently.
+const english = Object.entries(tables.en).filter(([key, value]) => tables.tr[key] !== value)
+  .flatMap(([, value]) => value.split(/\{\w+\}|·|\.|,|:/)).map(v => v.trim()).filter(v => /[A-Za-z]{3}/.test(v));
+async function leftover(page) {
+  const text = await page.evaluate(() => {
+    const seen = [];
+    for (const node of document.querySelectorAll('body *')) {
+      if (!node.checkVisibility?.() && node.offsetParent === null) continue;
+      for (const child of node.childNodes) if (child.nodeType === 3 && child.data.trim()) seen.push(child.data.trim());
+      for (const a of ['aria-label', 'title']) if (node.getAttribute(a)) seen.push(node.getAttribute(a));
+    }
+    return seen.join(' | ');
+  });
+  return english.filter(phrase => text.includes(phrase));
+}
+async function turkish({ engine, name, device }, origin) {
+  const browser = await engine.launch({ headless: true });
+  try {
+    const context = await browser.newContext(devices[device]);
+    const page = await context.newPage(), traffic = audit(page, origin), sent = [];
+    await context.route('**/*', traffic.route);
+    await labRoute(context, origin, sent);
+    await page.addInitScript(() => { if (location.protocol === 'http:') localStorage.setItem('hf-lab-send-localhost', '1'); });
+    await page.goto(origin + '/lab/night-vine/?lang=tr');
+    await page.waitForURL(origin + path + '?lang=tr');
+    await screen(page, 'play');
+    const capture = label => page.screenshot({ path: join(shots, 'vine-' + name + '-tr-' + label + '.png'), scale: 'css' });
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'tr');
+    assert.equal(await page.locator('#goal').textContent(), tables.tr.goalWindow);
+    assert.ok((await page.locator('#notice .lab-notice').textContent()).startsWith(tables.tr.recordingOn), 'the recording notice is in Turkish');
+    await until(page, () => Boolean(document.querySelector('#frame .kit-hint.on')));
+    assert.deepEqual(await leftover(page), [], 'no English on the opening');
+    await capture('01-opening');
+    await fits(page, '#notice');
+    await tapPoint(page, (await state(page)).window);
+    await until(page, () => window.vineState().time >= 1, null);
+    await button(page, 'pauseButton');
+    await screen(page, 'pause');
+    await button(page, 'campaign');
+    assert.deepEqual(await leftover(page), [], 'no English on the pause card');
+    assert.equal(await page.locator('#resume').textContent(), tables.tr.resume);
+    await capture('02-pause');
+    await button(page, 'resume');
+    await until(page, () => window.vineState().screen === 'result', null, 60000);
+    assert.deepEqual(await leftover(page), [], 'no English on the first result');
+    assert.equal(await page.locator('#next').textContent(), tables.tr.next);
+    await capture('03-result');
+    await button(page, 'langBoard').catch(async () => { await button(page, 'next'); await screen(page, 'play'); await button(page, 'langBoard'); });
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'en', 'the language button switches to English');
+    assert.ok(page.url().endsWith('?lang=en'), 'the address follows the language button');
+    for (const key of ['errors', 'external', 'unexpected']) assert.deepEqual(traffic[key], [], key);
+    console.log(JSON.stringify({ device, turkish: 'ok', records: sent.length }));
+  } finally {
+    await browser.close();
+  }
+}
+
 async function run({ engine, name, device }, origin) {
   const browser = await engine.launch({ headless: true });
   try {
@@ -118,6 +189,8 @@ async function run({ engine, name, device }, origin) {
     const page = await context.newPage();
     const traffic = audit(page, origin);
     await context.route('**/*', traffic.route);
+    const sent = [];
+    await labRoute(context, origin, sent);
     await page.addInitScript(() => {
       if (location.protocol !== 'http:') return;
       localStorage.setItem('hf-lab-send-localhost', '1');
@@ -132,7 +205,11 @@ async function run({ engine, name, device }, origin) {
     const first = await state(page);
     assert.equal(first.level, 1);
     assert.equal(first.started, false);
-    assert.equal(await page.locator('#instruction').textContent(), 'Tap the lit window to start.');
+    assert.equal(await page.locator('#goal').textContent(), tables.en.goalWindow);
+    assert.equal(await page.locator('#steps use').count(), 1, 'the opening shows only the window as its goal');
+    await fits(page, '#notice .lab-notice');
+    assert.equal(sent.length, 0, 'nothing is sent while the bed waits');
+    assert.equal(await page.evaluate(() => localStorage.getItem('hf-lab-player')), null, 'no player id before a bed ends');
     await capture('01-opening');
     await until(page, () => Boolean(document.querySelector('#frame .kit-hint.on')));
     assert.equal((await state(page)).time, 0, 'the opening waits for a finger');
@@ -151,12 +228,25 @@ async function run({ engine, name, device }, origin) {
     assert.deepEqual(await page.evaluate(() => window.vinePointers), [['touch', true, true]], 'single trusted touch');
     assert.equal((await save(page)).unlocked, 2);
     await capture('03-window');
+    for (let i = 0; i < 60 && !sent.some(r => r.kind === 'events'); i++) await sleep(100);
+    const firstRuns = sent.filter(r => r.kind === 'run');
+    assert.equal(firstRuns.length, 1, 'one run record after the first bed: ' + JSON.stringify(firstRuns.map(r => [r.data.outcome, r.data.events.map(e => e.type)])));
+    assert.equal(firstRuns[0].game, 'vine');
+    assert.equal(firstRuns[0].data.outcome, 'won');
+    assert.equal(firstRuns[0].data.start.level, 1);
+    assert.ok(firstRuns[0].data.events.some(e => e.type === 'window'), 'the run lists the window');
+    assert.ok(sent.some(r => r.kind === 'events'), 'the lab dashboard record is sent too');
     await button(page, 'next');
     await screen(page, 'play');
     const second = await state(page);
     assert.equal(second.level, 2);
     assert.ok(second.arms.length > 0);
-    assert.equal(await page.locator('#instruction').textContent(), 'Tap a marked trellis arm and let a shoot reach it.');
+    assert.equal(await page.locator('#goal').textContent(), tables.en.goalGrapes);
+    assert.equal(await page.locator('#steps use[href="#i-grapes"]').count(), second.arms.length, 'one bunch picture per trellis arm');
+    // A player who waits is shown a finger tapping the trellis arm.
+    await until(page, () => window.vineState().cue?.kind === 'tap', null, 9000);
+    assert.deepEqual((await state(page)).cue.at, { x: second.arms[0].x, y: second.arms[0].y }, 'the finger taps the trellis arm');
+    await capture('03a-arm-cue');
     const portrait = page.viewportSize();
     const landscape = { width: portrait.height, height: portrait.width };
     let held;
@@ -200,6 +290,12 @@ async function run({ engine, name, device }, origin) {
     assert.equal(after.sound, !before.sound);
     assert.notEqual(after.look, before.look);
     await capture('04-pause');
+    const toggle = page.locator('#recordSlot .lab-toggle input');
+    assert.ok(await toggle.isChecked(), 'recording is on by default');
+    await (await fits(page, '#recordSlot .lab-toggle')).tap();
+    assert.equal(await toggle.isChecked(), false);
+    assert.equal(await page.evaluate(() => localStorage.getItem('hf-lab-player')), null, 'switching off forgets the player id');
+    const sentBeforeOff = sent.length;
     await button(page, 'resume');
     await page.setViewportSize(portrait);
     await until(page, () => window.vineState().time > 1.2, null);
@@ -216,6 +312,7 @@ async function run({ engine, name, device }, origin) {
     const harvest = await state(page);
     assert.equal(harvest.status, 'won');
     assert.equal((await save(page)).unlocked, 3);
+    assert.equal(sent.length, sentBeforeOff, 'nothing is sent once recording is off');
     await button(page, 'next');
     await screen(page, 'play');
     const third = await state(page);
@@ -225,12 +322,13 @@ async function run({ engine, name, device }, origin) {
     await until(page, () => window.vineState().flowers[0].shade >= 0.45, null, 20000);
     const beforeCut = await state(page);
     await capture('06-shade');
-    const cutNode = beforeCut.nodes.filter(n => n.alive && n.depth === 0)
-      .sort((a, b) => Math.abs(a.y - 365) - Math.abs(b.y - 365))[0];
-    assert.ok(cutNode, 'reachable wood above the main fork');
-    await flick(page, name, { x: cutNode.x - 38, y: cutNode.y }, { x: cutNode.x + 38, y: cutNode.y });
+    // The bed shows a finger flicking across the stem that shades the flower; do what it shows.
+    await until(page, () => window.vineState().cue?.kind === 'flick', null, 5000);
+    await capture('06a-cut-cue');
+    const shownCut = (await state(page)).cue;
+    await flick(page, name, shownCut.from, shownCut.to);
     await until(page, n => window.vineState().cuts > n, beforeCut.cuts);
-    await until(page, () => window.vineState().flowers[0].shade < 0.15, null);
+    await until(page, () => window.vineState().flowers[0].shade < 0.3, null);
     const cut = await state(page);
     assert.ok(cut.nodes.filter(n => !n.alive).length > beforeCut.nodes.filter(n => !n.alive).length, 'flick detaches wood');
     await page.evaluate(() => window.dispatchEvent(new Event('blur')));
@@ -273,8 +371,9 @@ async function run({ engine, name, device }, origin) {
     assert.equal(stored.v, 1);
     assert.equal(await page.evaluate(() => localStorage.getItem('night-vine:hint')), '1');
     assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(k =>
-      k.startsWith('hf-lab-') && k !== 'hf-lab-send-localhost')), []);
-    for (const file of ['save', 'audio', 'pause', 'zoom', 'screens', 'hint']) {
+      k.startsWith('hf-lab-') && k !== 'hf-lab-send-localhost')), ['hf-lab-recording-off'], 'only the off switch is kept');
+    assert.equal(sent.length, sentBeforeOff, 'nothing is sent after recording is switched off');
+    for (const file of ['save', 'audio', 'pause', 'zoom', 'screens', 'hint', 'lab', 'i18n']) {
       assert.ok(traffic.assets.has('/kit/' + file + '.js'), 'uses kit/' + file);
     }
     assert.ok(traffic.assets.has(feedback), 'loads the feedback button');
@@ -282,7 +381,7 @@ async function run({ engine, name, device }, origin) {
     console.log(JSON.stringify({ device, firstSeconds: result.time, firstWallSeconds: firstWall,
       firstNodes: result.nodes.length, fruitAt: fruit.time, secondSeconds: harvest.time,
       cuts: cut.cuts, detachedNodes: cut.nodes.filter(n => !n.alive).length,
-      shadeBefore: beforeCut.flowers[0].shade, shadeAfter: cut.flowers[0].shade, best, errors: 0, external: 0, telemetry: 0 }));
+      shadeBefore: beforeCut.flowers[0].shade, shadeAfter: cut.flowers[0].shade, best, errors: 0, external: 0, records: sentBeforeOff }));
   } finally {
     await browser.close();
   }
@@ -292,7 +391,7 @@ await new Promise((done, reject) => { server.once('error', reject); server.liste
 try {
   const origin = 'http://127.0.0.1:' + server.address().port;
   for (const profile of profiles) {
-    try { await run(profile, origin); }
+    try { await run(profile, origin); await turkish(profile, origin); }
     catch (error) { console.error(profile.device, error); process.exitCode = 1; }
   }
 } finally {

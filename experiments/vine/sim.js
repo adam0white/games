@@ -235,3 +235,65 @@ export function prune(s, x1, y1, x2, y2) {
   }
   return removed;
 }
+
+// How long the page waits before it shows each finger: a tap after this much time with no touch, a flick
+// once a flower has been in shade this long. The bots read the same numbers.
+export const CUE = { tapIdle: 4, flickAfter: 1 };
+
+// ---- What the screen teaches. The page draws it as a finger; the naive bot reads nothing else.
+// A cut that the page would make from a flick from a to b, without changing the bed: which wood falls,
+// how much shade each flower keeps, and whether a tendril would let go.
+export function previewCut(s, x1, y1, x2, y2) {
+  const a = { x: x1, y: y1 }, b = { x: x2, y: y2 };
+  const gone = new Uint8Array(s.nodes.length);
+  let removed = 0;
+  s.nodes.forEach((n, i) => {
+    if (!n.alive || n.parent < 1) return;
+    const p = s.nodes[n.parent];
+    if (gone[n.parent] || crosses(a, b, p, n)) { gone[i] = 1; removed++; }
+  });
+  const shade = s.flowers.map(f => {
+    let sunlight = 1;
+    s.nodes.forEach((n, i) => {
+      if (gone[i] || !n.alive || !n.leaf || n.y >= f.y - 4) return;
+      const size = n.size * clamp((s.time - n.born) / 0.95, 0, 1);
+      if (!size) return;
+      const cover = 1 - Math.abs(f.x - (n.x + n.leaf * size * 0.53)) / (size * 0.78);
+      if (cover > 0) sunlight *= 1 - 0.72 * cover;
+    });
+    return 1 - sunlight;
+  });
+  const fruit = s.arms.some(arm => arm.grip >= 0 && gone[arm.grip]);
+  return { removed, shade, fruit };
+}
+
+// The cut that clears every shaded flower while dropping the least wood, as a flick across one stem.
+function shadeCut(s) {
+  const shaded = s.flowers.filter(f => f.shade > 0.38);
+  if (!shaded.length) return null;
+  let best = null;
+  for (let i = 1; i < s.nodes.length; i++) {
+    const n = s.nodes[i], p = s.nodes[n.parent];
+    if (!n.alive || n.parent < 1 || !p.alive) continue;
+    const mx = (n.x + p.x) / 2, my = (n.y + p.y) / 2;
+    const len = Math.hypot(n.x - p.x, n.y - p.y) || 1;
+    const ux = -(n.y - p.y) / len * 22, uy = (n.x - p.x) / len * 22;
+    const from = { x: mx - ux, y: my - uy }, to = { x: mx + ux, y: my + uy };
+    const view = previewCut(s, from.x, from.y, to.x, to.y);
+    if (!view.removed || view.shade.some(v => v > 0.3)) continue;
+    const cost = view.removed + (view.fruit ? 1000 : 0) + (n.depth === 0 ? 40 : 0);
+    if (!best || cost < best.cost) best = { cost, from, to };
+  }
+  return best && { kind: 'flick', from: best.from, to: best.to };
+}
+
+// The next thing to do, as the screen shows it: a flick across the stem that shades a flower, else a tap
+// on the next unripe trellis arm, else a tap on the window. Null while the lamp already sits on the goal.
+export function cue(s) {
+  if (s.status !== 'growing') return null;
+  const cut = shadeCut(s);
+  if (cut) return cut;
+  const target = s.arms.find(arm => !arm.ripe) ?? (s.window.reached ? null : s.window);
+  if (!target || dist(s.lamp, target) < 18) return null;
+  return { kind: 'tap', at: { x: target.x, y: target.y } };
+}
