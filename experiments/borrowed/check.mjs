@@ -1,7 +1,8 @@
 // Phone smoke test for Borrowed Time: node experiments/borrowed/check.mjs [webkit|chromium]
 // Serves experiments/ on a free port, answers /notes/button.js with an empty script and the lab endpoint itself,
 // and plays real three-chapter runs with touch pointer events on WebKit (iPhone 13) and Chromium (Pixel 7).
-// The answers of a fixed seed are worked out here in Node from sim.js; the page never exposes the current one.
+// The answers of a fixed seed, and which picture of each puzzle lies, are worked out here in Node from sim.js; the page
+// never exposes either.
 // Screenshots go to $SHOTS (default: a folder in the system temp directory, not the repo).
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
@@ -11,7 +12,7 @@ import { dirname, extname, join, normalize, resolve } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
-import { newRun, nextChapter, roleId, LIFE, WRONG } from './sim.js';
+import { newRun, nextChapter, roleId, solveLie, LIFE, WRONG, PICK, SHOW } from './sim.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = process.env.SHOTS || join(tmpdir(), 'borrowed-shots');
@@ -48,14 +49,21 @@ const state = page => page.evaluate(() => window.borrowedState());
 const shot = (page, phone, name) => page.screenshot({ path: join(SHOTS, `${phone}-${name}.png`) });
 
 // Walk to a tile by taps. A tile off screen is tapped at the edge of the view, then again once the camera follows.
+// A memory passed on the way opens its puzzle: it is left for later, and the walk goes on.
 async function goTo(page, tx, ty, done = st => st.player.tx === tx && st.player.ty === ty) {
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 14; i++) {
     let st = await state(page);
     if (done(st)) return st;
+    if (st.screen === 'puzzle') {
+      await until(page, () => window.borrowedState().puzzle && !window.borrowedState().puzzle.solving && window.borrowedState().puzzle.later.y > 0, 'a puzzle on the way');
+      await sleep(300); await tap(page, (await state(page)).puzzle.later);
+      await until(page, () => window.borrowedState().screen === 'play', 'left for later', 3000);
+      continue;
+    }
     const x = st.mapX + (tx + 0.5) * st.tile;
     const y = Math.max(st.viewTop + 8, Math.min(st.viewBottom - 8, st.viewTop + (ty + 0.5) * st.tile - st.cam));
     await tap(page, { x, y });
-    await until(page, () => { const s = window.borrowedState(); return !s.player.moving || s.memoryShowing; }, 'the walk ends', 12000);
+    await until(page, () => { const s = window.borrowedState(); return !s.player.moving || s.memoryShowing || s.screen === 'puzzle'; }, 'the walk ends', 12000);
     await sleep(250); // the camera catches up
   }
   const st = await state(page);
@@ -85,6 +93,83 @@ const SEED = 7;
 // The run of a seed as it stands at the start of chapter k (0, 1, 2).
 const chapterOf = (seed, k) => { const s = newRun(seed); for (let j = 0; j < k; j++) { s.status = 'named'; nextChapter(s); } return s; };
 const truths = [0, 1, 2].map(k => chapterOf(SEED, k)), answers = truths.map(s => s.answer);
+const liarOf = (seed, k, lock) => chapterOf(seed, k).spots.find(p => p.lock === lock).puzzle.liar;
+const atMemory = lock => s => s.screen === 'puzzle' || s.memoryShowing || s.spots.find(p => p.lock === lock).taken;
+// Wait for an open puzzle, fully faded in.
+async function waitPuzzle(page) {
+  await until(page, () => { const s = window.borrowedState(); return s.screen === 'puzzle' && s.puzzle && !s.puzzle.solving; }, 'a puzzle opens');
+  await sleep(450);
+  return (await state(page)).puzzle;
+}
+// Win the open puzzle: optionally a wrong tap first, then the lie (or "Show me"); then the memory scene.
+// shots: { open, wrong, found, shown } screenshot names.
+async function solve(page, phone, seed, k, lock, o = {}) {
+  const pz = await waitPuzzle(page);
+  assert.equal(pz.lock, lock, `the ${lock} puzzle is open`);
+  assert.ok(pz.cards.length === pz.n && pz.n >= 2, 'two or three pictures');
+  const vp = page.viewportSize();
+  assert.ok([...pz.cards, pz.later, pz.show].every(c => c.x > 20 && c.x < vp.width - 20 && c.y > 60 && c.y < vp.height - 20), 'the pictures and buttons are on screen');
+  if (o.teach !== undefined) assert.equal(pz.teach, o.teach, `teaching ${o.teach ? 'on' : 'off'} for this ${pz.form} puzzle`);
+  if (o.shots?.open) { if (pz.teach) await sleep(900); await shot(page, phone, o.shots.open); }
+  const liar = liarOf(seed, k, lock);
+  if (o.wrong) {
+    const other = [...Array(pz.n).keys()].find(i => i !== liar), y0 = (await state(page)).life;
+    await tap(page, pz.cards[other]);
+    const st = await state(page);
+    assert.ok(Math.abs(y0 - st.life - PICK) < 1e-6, `a wrong tap costs ${PICK} years (${y0} -> ${st.life})`);
+    assert.ok(st.puzzle.tried[other] && st.screen === 'puzzle', 'the wrong picture is shown true; the puzzle stays open');
+    await sleep(350); if (o.shots?.wrong) await shot(page, phone, o.shots.wrong);
+    await sleep(500);
+    await tap(page, pz.cards[other]); // tapping a picture already shown true does nothing
+    assert.ok(Math.abs((await state(page)).life - st.life) < 1e-6, 'a picture shown true cannot be tapped again');
+  }
+  if (o.show) {
+    const y0 = (await state(page)).life;
+    await tap(page, pz.show);
+    assert.ok(Math.abs(y0 - (await state(page)).life - SHOW) < 1e-6, `Show me costs ${SHOW} years`);
+    await sleep(300); if (o.shots?.shown) await shot(page, phone, o.shots.shown);
+  } else {
+    await tap(page, pz.cards[liar]);
+    assert.equal((await state(page)).puzzle?.how, 'found', 'the lie is found');
+    await sleep(380); if (o.shots?.found) await shot(page, phone, o.shots.found);
+  }
+  await until(page, () => window.borrowedState().memoryShowing, 'the memory shows after the puzzle', 5000);
+}
+// Walk to a memory and open what guards it; ends when its puzzle opens (or, without lies, its memory shows).
+async function openMemory(page, seed, k, lock) {
+  const t = chapterOf(seed, k), sp = t.spots.find(p => p.lock === lock);
+  const fill = () => page.evaluate(() => { const s = window.borrowedSim(); s.life = Math.max(s.life, 80); });
+  if (lock === 'push') {
+    const b = [[0, 1], [0, -1], [1, 0], [-1, 0]].map(([dx, dy]) => ({ x: sp.x + dx, y: sp.y + dy })).find(q => t.grid[q.y * t.w + q.x] === 'B');
+    await goTo(page, b.x, b.y, s => s.ready.push); await fill(); await tap(page, (await state(page)).buttons.push);
+  } else if (lock === 'leap') {
+    const st = await state(page);
+    if (!(await page.evaluate(() => window.borrowedSim().bridge))) {
+      await goTo(page, st.pad.tx, st.pad.ty, s => s.ready.leap); await fill(); await tap(page, (await state(page)).buttons.leap);
+      await until(page, () => !window.borrowedState().player.moving, 'the leap lands', 4000);
+    }
+  } else if (lock === 'dark') {
+    await goTo(page, sp.x, sp.y, s => s.ready.glow); await fill(); await tap(page, (await state(page)).buttons.glow);
+  } else if (lock === 'rewind') {
+    await goTo(page, sp.x, sp.y, s => s.ready.rewind); await fill(); await tap(page, (await state(page)).buttons.rewind);
+    return;
+  }
+  await goTo(page, sp.x, sp.y, atMemory(lock));
+}
+// In the grown-up chapter of a seed: a clue that hangs on another clue's kind (a chain), as [first, second].
+// The grown-up's chain: a clue [parent, child] where the free memory and the faces cannot settle the child, and the
+// parent's kinds can.
+function chainOf(seed) {
+  const t = chapterOf(seed, 1), a = t.faces[t.answer], free = t.spots.find(p => p.lock === 'free'), clues = t.spots.filter(p => p.puzzle.form === 'clue');
+  const knows = spots => { const k = [null, null, null, null]; for (const p of spots) for (const d of p.dims) k[d] = a[d]; return k; };
+  const settles = (k, p) => solveLie(t.faces, k, p.puzzle.frags) === p.puzzle.liar;
+  for (const b of clues) {
+    if (settles(knows([free]), b)) continue;
+    const p = clues.find(q => q !== b && settles(knows([free]), q) && settles(knows([free, q]), b));
+    if (p) return [p.lock, b.lock];
+  }
+  return null;
+}
 const truth = truths[0];
 // Name a face: tap it, then "That's me!" (or tap it again).
 async function nameFace(page, face, again = false) {
@@ -169,7 +254,8 @@ async function abilityTour(page, phone) {
   assert.ok((await state(page)).years <= LIFE - 13, 'Push costs 13 years');
   await sleep(120); await shot(page, phone, '13-push');
   await clockMoves(page, 'Push');
-  await goTo(page, pushSpot.x, pushSpot.y, s => s.memoryShowing || s.spots.find(p => p.lock === 'push').taken);
+  await goTo(page, pushSpot.x, pushSpot.y, atMemory('push'));
+  await solve(page, phone, SEED, 1, 'push', { show: true, shots: { shown: '13b-puzzle-shown' } });
   await skipMemory(page, phone, null);
   // Leap
   st = await state(page);
@@ -181,7 +267,17 @@ async function abilityTour(page, phone) {
   await until(page, () => !window.borrowedState().player.moving, 'the leap lands', 4000);
   await clockMoves(page, 'Leap');
   const leapSpot = st.spots.find(p => p.lock === 'leap');
-  await goTo(page, leapSpot.tx, leapSpot.ty, s => s.memoryShowing || s.spots.find(p => p.lock === 'leap').taken);
+  await goTo(page, leapSpot.tx, leapSpot.ty, atMemory('leap'));
+  // Later: the memory waits, marked on the island; a tap on your own tile opens it again
+  let pzl = await waitPuzzle(page);
+  await tap(page, pzl.later);
+  st = await state(page);
+  assert.equal(st.screen, 'play', 'Later closes the puzzle');
+  assert.deepEqual(st.waiting, ['leap'], 'the leap memory waits');
+  await sleep(400); await shot(page, phone, '14b-later');
+  await clockMoves(page, 'Later');
+  await tap(page, st.player);
+  await solve(page, phone, SEED, 1, 'leap', {});
   await skipMemory(page, phone, null);
   await sleep(700); await shot(page, phone, '15-bridge');
   // Rewind
@@ -190,11 +286,13 @@ async function abilityTour(page, phone) {
   await fill(); st = await state(page);
   await tap(page, st.buttons.rewind);
   assert.ok((await state(page)).years <= LIFE - 20, 'Rewind costs 20 years');
+  await solve(page, phone, SEED, 1, 'rewind', { shots: { open: '16a-puzzle-mirror' } });
   await skipMemory(page, phone, '16-rewind-memory');
   await sleep(600); await shot(page, phone, '17-mirror-mended');
   await clockMoves(page, 'Rewind');
   st = await state(page);
   assert.equal(st.found, 3, 'three memories from the three locks');
+  assert.equal(st.liesWon.shown, 1, 'one memory bought');
   assert.equal(st.chapter, 1);
   await finger(page, '#pause', [['pointerdown', 0, 0]]);
   await page.click('#toMenu');
@@ -219,11 +317,14 @@ async function run(page, phone) {
   await sleep(600); await shot(page, phone, '2-start-hint');
   const free = st.spots.find(p => p.lock === 'free'), dark = st.spots.find(p => p.lock === 'dark');
   assert.ok(!st.spots.some(p => p.lock === 'rewind'), 'the child has no mirror');
-  await goTo(page, free.tx, free.ty, s => s.found >= 1 || s.memoryShowing);
+  await goTo(page, free.tx, free.ty, atMemory('free'));
+  // the first puzzle of a first run: the ghost finger teaches it
+  await solve(page, phone, SEED, 0, 'free', { teach: true, shots: { open: '3a-puzzle-teach', found: '3b-puzzle-found' } });
   await skipMemory(page, phone, '3-memory');
   st = await state(page);
   assert.equal(st.found, 1, 'the free memory is found');
-  assert.ok(st.candidates.length >= 2 && st.candidates.length < 6, 'the first memory narrows the portraits');
+  assert.equal(st.taught & 3, 3, 'the first memory and the first kind of puzzle are taught');
+  assert.ok(st.candidates.length >= 1 && st.candidates.length < 6, 'the first memory narrows the portraits');
   assert.ok(st.known.filter(v => v !== null).length >= 1, 'a kind is known');
 
   // pause while walking: time and place stand still, then go on
@@ -250,8 +351,11 @@ async function run(page, phone) {
   st = await state(page);
   assert.ok(st.years <= before - 10, `Light costs ten years (${before} -> ${st.years})`);
   assert.ok(st.spots.find(p => p.lock === 'dark').open, 'the dark memory is lit');
-  await goTo(page, dark.tx, dark.ty, s => s.found >= 2 || s.memoryShowing);
+  await goTo(page, dark.tx, dark.ty, atMemory('dark'));
+  // a clue puzzle: a wrong tap first
+  await solve(page, phone, SEED, 0, 'dark', { wrong: true, shots: { open: '5a-puzzle-clue', wrong: '5b-puzzle-wrong' } });
   await skipMemory(page, phone, null);
+  assert.equal((await state(page)).found, 2, 'the dark memory is found');
   // a tap on an ability with nothing to use it on costs nothing
   const cheap = (await state(page)).years;
   st = await state(page);
@@ -358,6 +462,8 @@ async function run(page, phone) {
   assert.deepEqual(first.data.summary.chapters.map(c => c.right), [true, false, true], 'per-chapter results in the summary');
   assert.equal(first.data.events.filter(e => e.type === 'chapter').length, 3, 'a chapter event for each chapter');
   assert.ok(first.data.events.some(e => e.type === 'memory'), 'memory events recorded');
+  assert.ok(first.data.events.some(e => e.type === 'puzzle') && first.data.events.some(e => e.type === 'pick' && e.data.right === false) && first.data.events.some(e => e.type === 'pick' && e.data.right === true), 'puzzle and pick events recorded');
+  assert.equal(first.data.summary.lies.wrong, 1, 'the run summary counts the wrong tap');
   assert.ok(first.data.events.some(e => e.type === 'ability'), 'ability event recorded');
   const all = runs.find(r => r.data.outcome === 'remembered');
   assert.ok(all.data.summary.score > 300 && all.data.summary.right === 3);
@@ -381,7 +487,88 @@ async function run(page, phone) {
   await tap(page, (await state(page)).buttons.rewind);
   await until(page, () => window.borrowedState().outcome === 'faded', 'lethal Rewind fades');
   assert.equal((await state(page)).memoryShowing, false, 'a lethal Rewind does not leave a memory overlay');
+  assert.equal((await state(page)).puzzle, null, 'a lethal Rewind opens no puzzle');
   await until(page, () => window.borrowedState().screen === 'done', 'end card after lethal Rewind');
+  // A wrong tap that empties the candle, and a Show me that does: both fade, with no puzzle left over.
+  for (const how of ['wrong', 'show']) {
+    await page.click('#again');
+    await page.evaluate(() => { window.borrowedSim().life = 4; });
+    const f = (await state(page)).spots.find(p => p.lock === 'free');
+    await goTo(page, f.tx, f.ty, atMemory('free'));
+    const pz = await waitPuzzle(page), liar = liarOf(SEED, 0, 'free');
+    await tap(page, how === 'wrong' ? pz.cards[1 - liar] : pz.show);
+    await until(page, () => window.borrowedState().outcome === 'faded', `a lethal ${how} fades`);
+    assert.equal((await state(page)).puzzle, null, 'no puzzle over the fading scene');
+    await until(page, () => window.borrowedState().screen === 'done', `end card after a lethal ${how}`);
+  }
+}
+
+// The puzzles on a phone, from a fresh save: the first one taught, a wrong tap, a chain (a clue that needs a kind only
+// another clue gives), a bought answer on the mirror, and the old one's three pictures left for later.
+async function puzzleTour(page, tag, seed) {
+  await page.goto(`${base}/borrowed/?seed=${seed}`);
+  await page.evaluate(() => localStorage.clear());
+  await page.reload(); await until(page, () => window.borrowedState?.().screen === 'menu', 'menu');
+  await page.click('#play');
+  const ans = [0, 1, 2].map(k => chapterOf(seed, k).answer);
+  // Chapter 1: the free memory, taught; then the dark memory with a wrong tap.
+  await openMemory(page, seed, 0, 'free');
+  await solve(page, tag, seed, 0, 'free', { teach: true, shots: { open: 'p1-first-puzzle-taught', found: 'p1b-lie-found' } });
+  await skipMemory(page, tag, null);
+  await openMemory(page, seed, 0, 'dark');
+  await solve(page, tag, seed, 0, 'dark', { wrong: true, shots: { wrong: 'p2-wrong-tap' } });
+  await skipMemory(page, tag, null);
+  await nameFace(page, ans[0]); await goOn(page, tag, null);
+  // Chapter 2: the free memory, the chain, then the mirror bought.
+  const chain = chainOf(seed);
+  assert.ok(chain, `seed ${seed} has a chain in chapter 2`);
+  await openMemory(page, seed, 1, 'free'); await solve(page, tag, seed, 1, 'free', { teach: false }); await skipMemory(page, tag, null);
+  await openMemory(page, seed, 1, chain[0]); await solve(page, tag, seed, 1, chain[0], {}); await skipMemory(page, tag, null);
+  await openMemory(page, seed, 1, chain[1]);
+  await solve(page, tag, seed, 1, chain[1], { teach: false, shots: { open: 'p3-chained-puzzle' } }); await skipMemory(page, tag, null);
+  await openMemory(page, seed, 1, 'rewind');
+  await solve(page, tag, seed, 1, 'rewind', { teach: true, show: true, shots: { open: 'p4a-mirror-pair', shown: 'p4-bought-answer' } }); await skipMemory(page, tag, null);
+  await nameFace(page, ans[1]); await goOn(page, tag, null);
+  // Chapter 3: the mirror's three pictures, then Later.
+  await openMemory(page, seed, 2, 'rewind');
+  const pz = await waitPuzzle(page);
+  assert.equal(pz.n, 3, 'the old mirror shows three pictures'); assert.equal(pz.form, 'three'); assert.ok(pz.teach, 'three pictures are taught once');
+  await sleep(900); await shot(page, tag, 'p5-three-pictures');
+  await tap(page, pz.later);
+  await until(page, () => window.borrowedState().screen === 'play', 'Later on the mirror');
+  assert.deepEqual((await state(page)).waiting, ['rewind'], 'the mirror waits');
+  await sleep(400); await shot(page, tag, 'p6-later-on-island');
+  // A tap on your own tile opens it again. Pause on a puzzle freezes the candle and keeps the puzzle; P resumes it.
+  await tap(page, (await state(page)).player);
+  const again = await waitPuzzle(page);
+  assert.equal(again.form, 'three', 'the mirror opens again from your own tile');
+  await finger(page, '#pause', [['pointerdown', 0, 0]]);
+  await until(page, () => window.borrowedState().paused === true, 'pause on a puzzle');
+  const l0 = (await state(page)).life; await sleep(600);
+  let ps = await state(page);
+  assert.equal(ps.life, l0, 'the candle is frozen while paused on a puzzle'); assert.equal(ps.screen, 'puzzle', 'pause keeps the puzzle');
+  await page.keyboard.press('p');
+  ps = await state(page);
+  assert.ok(!ps.paused && ps.screen === 'puzzle' && ps.puzzle.form === 'three' && ps.puzzle.n === 3, 'P resumes the same puzzle');
+  await solve(page, tag, seed, 2, 'rewind', { teach: true }); await skipMemory(page, tag, null);
+  const taught = (await state(page)).taught;
+  assert.equal(taught & 31, 31, `taught bits: first memory and all four kinds of puzzle (${taught})`);
+  await nameFace(page, ans[2]);
+  await until(page, () => window.borrowedState().screen === 'done', 'end card after the puzzle tour');
+  assert.equal((await state(page)).status, 'remembered');
+  // The bits survive a reload, in the same save field.
+  await page.reload(); await until(page, () => window.borrowedState?.().screen === 'menu', 'menu after reload');
+  assert.equal((await state(page)).taught & 31, 31, 'taught survives a reload');
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('borrowed-save')).taught & 31), 31, 'taught is stored as a number');
+  // Pause on a puzzle, then Menu: the run is left and no puzzle stays open.
+  await page.click('#play'); await until(page, () => window.borrowedState().screen === 'play', 'a run starts');
+  await openMemory(page, seed, 0, 'free');
+  const fresh = await waitPuzzle(page);
+  assert.equal(fresh.teach, false, 'a taught kind of puzzle is not taught again');
+  await finger(page, '#pause', [['pointerdown', 0, 0]]);
+  await until(page, () => window.borrowedState().paused === true, 'pause on a puzzle');
+  await page.click('#toMenu'); await until(page, () => window.borrowedState().screen === 'menu', 'Menu from a paused puzzle');
+  assert.equal((await state(page)).puzzle, null, 'no puzzle left open');
 }
 
 const only = process.argv[2];
@@ -443,7 +630,8 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
       await p2.click('#resume');
       // the free memory and its portrait strip
       const freeSpot = st.spots.find(p => p.lock === 'free');
-      await goTo(p2, freeSpot.tx, freeSpot.ty, s => s.found >= 1 || s.memoryShowing);
+      await goTo(p2, freeSpot.tx, freeSpot.ty, atMemory('free'));
+      await solve(p2, tag, 11, 0, 'free', { teach: true });
       await skipMemory(p2, tag, '2b-memory');
       const small = [0, 1, 2].map(k => chapterOf(11, k).answer);
       await pick(p2, small[0]);
@@ -492,6 +680,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
       st = await state(p2); assert.ok(st.daily && st.screen === 'play', 'Daily starts a run');
       const d = new Date(), daily = (await import('./sim.js')).dailySeed(d.getFullYear(), d.getMonth() + 1, d.getDate());
       assert.equal(st.seed, daily, 'the daily seed comes from the date');
+      await puzzleTour(p2, tag, 28);
       assert.deepEqual(errs, []);
       console.log(`ok   borrowed on chromium ${vw}x${vh}`);
     } catch (e) { failed++; console.log(`FAIL borrowed on chromium ${vw}x${vh}: ${e.message}`); await shot(p2, tag, 'fail').catch(() => {}); }
@@ -517,7 +706,10 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
       // a mouse click walks too
       const free = st.spots.find(p => p.lock === 'free');
       await p3.mouse.click(free.x, free.y);
-      await until(p3, () => window.borrowedState().memoryShowing || window.borrowedState().found >= 1, 'mouse walk to the free memory', 8000);
+      await until(p3, () => window.borrowedState().screen === 'puzzle', 'mouse walk to the free memory opens its puzzle', 8000);
+      await sleep(400);
+      await p3.keyboard.press(String(liarOf(SEED, 0, 'free') + 1)); // keys 1 to 3 tap a picture
+      await until(p3, () => window.borrowedState().memoryShowing, 'the key finds the lie', 4000);
       await p3.keyboard.press(' '); // skips the memory scene
       await until(p3, () => !window.borrowedState().memoryShowing, 'memory skipped by key', 3000);
       await sleep(300); await shot(p3, 'desktop', '2-play');
@@ -539,6 +731,17 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
       const box = await p3.locator('#done > div').boundingBox();
       assert.ok(box.y >= 0 && box.y + box.height <= 800, 'end card fits');
       await sleep(500); await shot(p3, 'desktop', '3-end');
+      // ?lies=0: the old game, a memory is yours as you reach it
+      await p3.goto(`${base}/borrowed/?seed=${SEED}&lies=0`); await until(p3, () => window.borrowedState?.().screen === 'menu', 'menu with lies=0');
+      await p3.click('#play');
+      st = await state(p3);
+      assert.equal(st.lies, false, 'lies=0 turns the puzzles off');
+      const f0 = st.spots.find(p => p.lock === 'free');
+      assert.equal(f0.dims.length, 1, 'without lies the free memory holds one kind');
+      await p3.mouse.click(f0.x, f0.y);
+      await until(p3, () => window.borrowedState().memoryShowing, 'without lies the memory shows on arrival', 8000);
+      assert.equal((await state(p3)).puzzle, null, 'no puzzle without lies');
+      await sleep(300); await shot(p3, 'desktop', '4-lies-off');
       assert.deepEqual(errs3, []);
       console.log('ok   borrowed on chromium desktop 1280x800');
     } catch (e) { failed++; console.log(`FAIL borrowed on chromium desktop: ${e.message}`); if (errs3.length) console.log('     ' + errs3.join('\n     ')); await shot(p3, 'desktop', 'fail').catch(() => {}); }
