@@ -670,3 +670,14 @@ Not verified: a real phone's sensor, the iOS prompt, the screen staying on, and 
 - **#204, answering #168 (does the music made as you play fit the river?):** it fits. The music is already in the main game; no change.
 
 Not verified: whether the new numbers are right on a phone. The tester is asked.
+
+## 2026-11-24: other modes from the menu (tester t1, notes #207, #209)
+
+- **#207:** Lantern Race and Lantern Spark should be in the game, so a player can choose. Done as the first slice: "More modes" on the menu (English and Turkish) opens a card that leads to the two pages; Race has a way back (Spark had one). They stay separate pages with their own saves. The tester also named a third, "Lantern pulls", which matches no page; asked back.
+- **#209:** an optional tutorial the first time the game is opened. Ant Draft got one the same day (`lab/ant-draft`). It is not clear that #209 meant Lantern; asked back.
+
+Not verified: a real phone.
+
+### Left as a proposal (2026-11-24)
+- Lantern's own tutorial: one calm night without rocks that shows steering, embers, hearts, an ability and the fading lantern in turn, offered once and kept under the menu.
+- Race and Spark inside Lantern proper: the same boat, skins and bank, instead of separate pages.
