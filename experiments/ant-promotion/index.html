@@ -161,7 +161,7 @@
 
 <script type="module">
 import { FORMS, ANT, WORLD, TOP, sightOf, sightWords, create, step, choose, revive, me, level, needFor, article, SPAWN_WEIGHTS, hideReady, fastBoost, SAME_SNEAK,
-  crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENTS, TEMPERAMENT_NAMES, powerFor, paceAgainst, placeOld, OLD_DIM } from './sim.js';
+  crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENTS, TEMPERAMENT_NAMES, powerFor, paceAgainst, placeOld, OLD_DIM, oldAims } from './sim.js';
 import { drawForm, setLook, LOOKS } from './art.js';
 import { create3D } from './look3d.js';
 import { readJson, writeJson } from '../kit/save.js';
@@ -547,7 +547,7 @@ function edgeArrow(a, colour, z = 1) { // an arrow at the edge of the screen, po
   return { x, y };
 }
 
-const OLD_COLOUR = '#b9a8ff';
+const OLD_COLOUR = '#b9a8ff'; let oldTaught = false; // the first skill of a visit is explained once
 // The player's own way of seeing (note #200: "yes, but only a little"): the ground outside its sight shape is a little darker. Only a drawing:
 // what is out there is still drawn, numbers and arrows lie above it, and a round patch beside the player is never dark.
 let dimAt = 0;
@@ -594,6 +594,12 @@ function draw(now) {
       g.globalAlpha = 0.22; g.fillStyle = persona.colour; g.beginPath(); g.arc(0, 0, M.r * 1.6, 0, 6.283); g.fill(); g.globalAlpha = 1;
     }
     if (m.old) { g.strokeStyle = OLD_COLOUR; g.lineWidth = Math.max(2.5, 3 / zoom); g.setLineDash([3, 6]); g.beginPath(); g.arc(0, 0, M.r * 1.55, now / 900, now / 900 + 6.283); g.stroke(); g.setLineDash([]); } // an old animal of yours
+    const aim = m.old && oldAims(m); if (aim) { // it shows its skill before using it: how far a roar or a bite reaches, the line of a dash, a ring that fills for the rest
+      g.strokeStyle = '#ff5a3a'; g.fillStyle = '#ff5a3a2e'; g.lineWidth = Math.max(3, 3 / zoom);
+      if (aim.reach) { g.beginPath(); g.arc(0, 0, (aim.reach + M.r) * aim.k, 0, 6.283); g.fill(); g.beginPath(); g.arc(0, 0, aim.reach + M.r, 0, 6.283); g.stroke(); }
+      else if (aim.kind === 'leap' || aim.kind === 'dive') { g.save(); g.rotate(aim.a); g.fillRect(M.r, -M.r * 0.8, 170, M.r * 1.6); g.beginPath(); g.moveTo(M.r, 0); g.lineTo(M.r + 170 * aim.k, 0); g.stroke(); g.restore(); }
+      else { g.beginPath(); g.arc(0, 0, M.r * 2, -1.571, -1.571 + 6.283 * aim.k); g.stroke(); }
+    }
     g.rotate(m.a); g.fillStyle = '#00000026'; g.beginPath(); g.ellipse(0, 3, M.r * 1.1, M.r * 0.8, 0, 0, 7); g.fill(); drawForm(g, M, M.r, m.ph, null, m.a);
     if (m.nem && N) { // one scar for each repeat win
       g.lineCap = 'round';
@@ -722,6 +728,12 @@ function draw3d(now) {
     if (pw !== F.power) R.wedge(m.x, m.y, range * F.stealth + F.r, m.a - cone, m.a + cone, m.alert ? (strong ? [1, 0.2, 0.15] : [1, 0.9, 0.2]) : [1, 1, 1], m.alert ? 0.26 : strong ? 0.17 : 0.07);
     if (m.nem && P()) { const c = R.rgb(P().colour); R.ring(m.x, m.y, 0, M.r * 1.6, c, 0.22); R.ring(m.x, m.y, M.r * 1.6 - 1.6, M.r * 1.6 + 1.6, c, 0.95, 10, -now / 700); } // the rival's ring on the ground
     if (m.old) R.ring(m.x, m.y, M.r * 1.5, M.r * 1.5 + 2.4, R.rgb(OLD_COLOUR), 0.95, 14, now / 900);
+    const aim = m.old && oldAims(m); if (aim) {
+      const c = R.rgb('#ff5a3a');
+      if (aim.reach) { R.ring(m.x, m.y, 0, (aim.reach + M.r) * aim.k, c, 0.2); R.ring(m.x, m.y, aim.reach + M.r - 2, aim.reach + M.r + 2, c, 0.95); }
+      else if (aim.kind === 'leap' || aim.kind === 'dive') { for (let i = 0; i < 12; i++) { const k = M.r + 8 + i * 14; R.ball(m.x + Math.cos(aim.a) * k, 1.5, m.y + Math.sin(aim.a) * k, 5, 0, 0, i / 12 < aim.k ? 5 : 2.6, 1.6, [1, 0.35, 0.23]); } }
+      else R.ring(m.x, m.y, M.r * 2 - 2, M.r * 2 + 2, c, 0.35 + 0.6 * aim.k);
+    }
     rec.start(m.x, m.y, m.a, M.r, pose(M, m.ph)); drawForm(rec, M, M.r, m.ph, null, 0);
   }
   for (const m of s.mobs) if (m.chase && !m.chase.gone && Math.abs(m.x - p.x) < vw && Math.abs(m.y - p.y) < vh) { // who is chasing whom: a dotted red line on the ground
@@ -805,6 +817,13 @@ function frame(now) {
           say(t('ateRival', { name: rivalName(n.persona.name) }));
         }
         if (e.t === 'oldHunt') { say(t('oldHunt', nameVars(e.name))); blip(110, 0.6, 'sawtooth', 0.11, 80); buzz(60); }
+        if (e.t === 'oldWind') { const o = s.mobs.find(x => x.id === e.id); floats.push({ x: e.x, y: e.y - 24 - (o ? FORMS[o.f].r : 0), text: skill(e.label) + '!', age: 0, c: '#ff8a6a', big: 1.3 }); blip(260, 0.6, 'sawtooth', 0.07, 520); buzz(20); if (!oldTaught) { oldTaught = true; say(t('oldTell')); } }
+        if (e.t === 'oldSkill') {
+          if (e.kind === 'roar') { bits.push({ x: e.x, y: e.y, r: e.reach / 2.6, c: '#ff8a6a', age: 0, life: 0.6, ring: true }); blip(100, 0.5, 'sawtooth', 0.14, 60); shake = 0.3; }
+          else if (e.kind === 'shell') blip(190, 0.3, 'triangle', 0.12, 140);
+          else { burst(e.x, e.y, ['#e8d8a8', '#c8b070'], 8, 120, 4); blip(300, 0.25, 'sine', 0.1, 900); }
+          if (e.hit) { floats.push({ x: s.player.x, y: s.player.y - me(s).r - 26, text: t('slowed'), age: 0, c: '#cfe8ff', big: 1.2 }); buzz(40); }
+        }
         if (e.t === 'oldEaten') { save.old = save.old.filter(f => f !== e.f); store(); rec.event('old eaten', { form: FORMS[e.f].name }); say(t(e.left ? 'oldAte' : 'oldAll', nameVars(FORMS[e.f].name))); burst(s.player.x, s.player.y, ['#b9a8ff', '#ffffff', '#ffd23a'], 40, 220, 5); }
         if (e.t === 'hunt') { say(t('hunting', { who: e.id === s.nemesis?.id && save.nem ? rivalName(save.nem.persona.name) : nameVars(e.name).A })); blip(140, 0.5, 'sawtooth', 0.1, 120); buzz(60); }
         if (e.t === 'hide') { say(t('hideTook', nameVars(e.name))); shake = 0.4; flash = 0.6; crunch(0.18, 0.28, 500); buzz([30, 40, 30]); bits.push({ ring: 1, x: e.x, y: e.y, r: me(s).r * 1.6, c: '#9ad8ff', age: 0, life: 0.6 }); hud(); }

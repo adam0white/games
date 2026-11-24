@@ -3,7 +3,7 @@
 // 5. the rival: a death makes one, it persists and gains power, no animal eats it, temperaments differ, it can be eaten
 import assert from 'node:assert/strict';
 import { SPAWN_WEIGHTS, HIDE_S, hideReady, SAME_FAST, FAST_CAP, crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENT_NAMES, NEM_STEP, NEM_MAX_BONUS, NEM_PRIZE, MOBS,
-  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY, TIRE, POWER, powerFor, powerReady, POUNCE, pounces, sightOf, placeOld, OLD_EVERY, OLD_HUNT, OLD_WEAK, OLD_PRIZE } from './sim.js';
+  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY, TIRE, POWER, powerFor, powerReady, POUNCE, pounces, sightOf, placeOld, OLD_EVERY, OLD_HUNT, OLD_WEAK, OLD_PRIZE, OLD_SKILL, WORLD } from './sim.js';
 const seeds = Number(process.argv[2] ?? 20), minutes = Number(process.argv[3] ?? 12);
 
 // 1. Rule table. Player: power 50, speed 124.
@@ -497,6 +497,27 @@ console.log('rival checks pass');
     const s = create(3, [ANT], 0, SPAWN_WEIGHTS, false, null, [chain(1).at(-1)]), m = s.mobs.find(x => x.old); s.mobs = [m]; s.player.safe = 0; s.player.x = 300; s.player.y = 1000; m.x = 120; m.y = 1000; m.a = 0; m.hunt = OLD_HUNT;
     const g0 = s.player.x - m.x; let pounced = 0; for (let i = 0; i < 240; i++) { s.mobs = [m]; step(s, { x: 1, y: 0 }); pounced += s.events.some(e => e.t === 'pounce') ? 1 : 0; }
     assert.ok(!s.dead && s.player.x - m.x >= g0 && pounced === 0, 'it does not catch a player who runs, and never pounces');
+  }
+  { // its skill (note #225): every species with one, hunting every kind of player. Shown before it lands, never a catch of a player who runs straight on.
+    const kinds = new Map(); let tight = Infinity;
+    for (const M of FORMS.filter(f => f.level >= 2 && powerFor(f) && f.power - OLD_WEAK > FORMS[ANT].power)) for (const role of [0, 1, 2]) for (const dist of [60, 90, 130, 180, 240]) {
+      const stack = [ANT, optionsFor(1)[role].id]; if (M.power - OLD_WEAK <= FORMS[stack[1]].power) continue;
+      const s = create(3, stack, 0, SPAWN_WEIGHTS, false, null, [M.id]), m = s.mobs[s.mobs.length - 1], p = s.player; p.safe = 0; p.x = 300; p.y = 1000;
+      m.x = 300 - dist - M.r - FORMS[stack[1]].r; m.y = 1000; m.a = 0; m.hunt = OLD_HUNT; m.skillCd = 0; let wound = -1, used = -1;
+      for (let i = 0; i < 420; i++) { s.mobs = [m]; if (p.x > WORLD - 200) { p.x -= 800; m.x -= 800; } step(s, { x: 1, y: 0 }); for (const e of s.events) { if (e.t === 'oldWind' && wound < 0) wound = i; if (e.t === 'oldSkill' && used < 0) used = i; } assert.ok(!s.dead, `${M.name} at ${dist} does not catch a player who keeps running`); tight = Math.min(tight, p.x - m.x - M.r - FORMS[stack[1]].r); }
+      if (used >= 0) { assert.ok(wound >= 0 && used - wound >= 38, 'it is shown for 0.6 s or more before it lands'); kinds.set(powerFor(M).kind, (kinds.get(powerFor(M).kind) || 0) + 1); }
+    }
+    assert.ok(tight >= 40, `a player who runs straight keeps a gap (${tight.toFixed(0)})`);
+    assert.deepEqual([...kinds.keys()].sort(), ['dive', 'leap', 'roar', 'shell', 'sprint', 'sting'], 'all six kinds are used');
+    console.log(`old animals' skills: used ${[...kinds].map(k => k.join(' ')).join(', ')}; tightest gap to a player who runs straight ${tight.toFixed(0)}`);
+    const one = kind => { const M = FORMS.find(f => f.level >= 6 && powerFor(f)?.kind === kind), s = create(3, [ANT], 0, SPAWN_WEIGHTS, false, null, [M.id]), m = s.mobs.at(-1), p = s.player; p.safe = 0; m.x = p.x - 80 - M.r - FORMS[ANT].r; m.y = p.y; m.a = 0; m.hunt = OLD_HUNT; m.skillCd = 0; return { s, m, p, run(n, fn, inp = { x: 0, y: 0 }) { for (let i = 0; i < n; i++) { s.mobs = [m]; step(s, inp); if (fn?.()) return true; } return false; } }; };
+    for (const kind of ['sting', 'roar']) {
+      const a = one(kind); assert.ok(a.run(120, () => a.p.slow > 0), `${kind} slows a player who stays`); const x0 = a.p.x; a.run(30, null, { x: 1, y: 0 }); assert.ok(a.p.x > x0 + 5, 'slowed, not stopped'); a.s.dead = {}; revive(a.s, false); assert.equal(a.p.slow, 0, 'a revive ends it');
+      for (const block of ['shell', 'veil', 'safe']) { const b = one(kind); assert.ok(b.run(60, () => b.s.events.some(e => e.t === 'oldWind')), 'it starts'); b.p[block] = 2; let hit = false; b.run(60, () => { hit ||= b.p.slow > 0; }); assert.ok(!hit, `${block} blocks a ${kind}`); }
+    }
+    { const a = one('dive'); assert.ok(a.run(60, () => a.s.events.some(e => e.t === 'oldWind'))); const aim = a.m.aim; let bent = 0; a.run(150, () => { if (a.m.burst > 0) bent = Math.max(bent, Math.abs(ang(a.m.a, aim))); return a.s.dead; }, { x: 0, y: 1 }); assert.ok(bent < 0.05, 'it keeps to the line it showed'); assert.ok(!a.s.dead, 'a step aside makes a dive miss'); }
+    { const a = one('dive'); a.run(120, () => a.s.dead); assert.ok(a.s.dead, 'a dive catches a player who stands still in its line'); }
+    { const a = one('sprint'); a.run(60, () => a.m.wind > 0); a.m.stun = 1; a.run(2); assert.ok(!(a.m.wind > 0) && !a.s.events.some(e => e.t === 'oldSkill'), 'stopping it stops the skill'); }
   }
   { // grown past it, the player eats it: a prize, and one fewer
     const st = chain(0), s = create(3, st, 0, SPAWN_WEIGHTS, false, null, [st.at(-3), st.at(-2)]), m = s.mobs.find(x => x.old); s.mobs = s.mobs.filter(x => x.old); m.x = s.player.x + 5; m.y = s.player.y; m.alert = false; m.a = 0; s.player.safe = 1;

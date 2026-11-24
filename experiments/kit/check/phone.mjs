@@ -815,6 +815,7 @@ const GAMES = {
     await page.evaluate(() => { window.__ant.s.player.safe = 9; window.__ant.s.player.xp = 999; }); await until(page, () => window.__ant.mode === 'win', 'the winning card'); await page.click('#winNew');
     assert.deepEqual(await page.evaluate(() => [window.__ant.level(window.__ant.s), window.__ant.save.old, window.__ant.s.mobs.filter(m => m.old).map(m => m.f)]), [1, ladder.slice(-3), ladder.slice(-3)], 'the top three come back');
     await page.evaluate(() => { window.__ant.s.player.safe = 0; window.__ant.s.oldAt = window.__ant.s.t + 0.05; }); await until(page, () => (window.__ant.s.oldHunts || 0) > 0, 'one of them hunts');
+    await page.evaluate(() => { const s = window.__ant.s, m = s.mobs.find(o => o.old); Object.assign(m, { x: s.player.x + 130, y: s.player.y, a: Math.PI, hunt: 6, alert: true, skillCd: 0, tire: 0 }); s.mobs = [m]; s.player.safe = 0; }); await until(page, () => (window.__ant.s.oldSkills || 0) > 0, 'it uses its skill');
     await page.click('#pause'); await page.click('#paused .toMenu'); await page.reload(); assert.equal(await page.evaluate(() => window.__ant.save.old.length), 3, 'they are kept in the save');
     await page.evaluate(([k, v]) => localStorage.setItem(k, v), [KEY, kept]); await page.reload(); await page.click('#continue');
   },
