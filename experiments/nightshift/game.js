@@ -5,7 +5,7 @@ import { screens } from '../kit/screens.js';
 import { lab } from '../kit/lab.js';
 import { hint } from '../kit/hint.js';
 import { noZoom } from '../kit/zoom.js';
-import { create, step, dailyKey, dailyNight, DEFAULT_SEED, LAST, WIDTH, HEIGHT, DT, LIFT, REST } from './sim.js';
+import { create, step, dailyKey, dailyNight, DEFAULT_SEED, LAST, WIDTH, HEIGHT, DT, LIFT, REST, FUSE, CASE } from './sim.js';
 import { renderer, cover, clock } from './art.js';
 
 const $ = id => document.getElementById(id);
@@ -44,6 +44,9 @@ let state = create();
 let screen = 'menu';
 let aim = { ...REST };
 let pointer = null;
+let contact = null;
+let waitForAim = false;
+let returnCueUntil = 0;
 let effects = [];
 let day = '';
 let nextLevel = null;
@@ -89,6 +92,7 @@ function foot(x, kind) {
 const switchScreen = screens(['menu', 'paused', 'result', 'shareCard'], name => {
   screen = name;
   $('hud').hidden = name !== 'play';
+  $('shiftCaption').hidden = name !== 'play';
   if (name !== 'play') clearInput();
 });
 
@@ -103,6 +107,7 @@ function resize() {
 function clearInput() {
   const id = pointer;
   pointer = null;
+  contact = null;
   if (id !== null && canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
   keys.clear();
 }
@@ -149,7 +154,43 @@ function toggleSound() {
   }
 }
 
+const lessonGuide = {
+  drag: 'Tap a moving exhibit. Leave the light on it.',
+  hold: 'Keep the beam steady until the arc fills.',
+  painting: 'Catch the dancer when she leaves her frame.',
+  twins: 'Light either purple twin to stop both.',
+  mirror: 'Aim at the mirror to light the bear behind glass.',
+  shy: 'Keep the green mask in the dark.',
+  cat: 'Let the cat pass. Catch the exhibits.',
+  fuse: 'Hold the light on the fuse box to stop the flicker.',
+  stairs: 'Watch the stairs for the upstairs exhibit.',
+};
+
+function guide() {
+  if (waitForAim) return 'Tap the statue at the upper left.';
+  if (state.shy && state.actors.some(a => a.kind === 'shy' && a.lit)) return lessonGuide.shy;
+  if (state.fuse && !state.fused) return lessonGuide.fuse;
+  if (state.practice && !state.hintDone && state.time <= state.practice) {
+    if (state.lesson === 'mirror' && state.actors[state.tutorIds[0]].y < CASE.y) {
+      return 'The bear is out of the case. Tap the bear.';
+    }
+    return lessonGuide[state.lesson];
+  }
+  if (state.time < returnCueUntil) return 'Caught! Heading back to the plinth.';
+  if (state.mode === 'long') return 'Guard both doors as long as you can.';
+  if (state.mode === 'daily') return 'Guard both doors until dawn for today’s streak.';
+  return 'Guard both doors. Tap a runner or drag below it.';
+}
+
+function setText(id, value) {
+  const el = $(id);
+  if (el.textContent !== value) el.textContent = value;
+}
+
 function updateHud() {
+  const title = state.mode === 'long' ? 'Long Night' : state.mode === 'daily' ? 'Daily' : `Night ${state.level} of ${LAST}`;
+  setText('shiftStatus', `${title} · ${state.escapes}/3 escaped · ${state.returned} returned`);
+  setText('shiftGuide', guide());
   const lives = $('lives');
   lives.setAttribute('aria-label', `${3-state.escapes} escapes left`);
   [...lives.children].forEach((icon, i) => icon.classList.toggle('lost', i < state.escapes));
@@ -164,6 +205,8 @@ function start(mode = 'story', level = levelOverride ?? profile.unlocked) {
   const options = mode === 'daily' ? dailyNight(day) : { level: mode === 'long' ? LAST : level, seed: seedOverride ?? DEFAULT_SEED };
   state = create({ ...options, mode });
   aim = { ...REST };
+  waitForAim = mode === 'story' && state.level === 1 && !profile.played;
+  returnCueUntil = 0;
   effects = [];
   accumulator = 0;
   previous = null;
@@ -180,6 +223,14 @@ function start(mode = 'story', level = levelOverride ?? profile.unlocked) {
 function pause() {
   if (screen !== 'play') return;
   snd.hold();
+  const rules = ['Tap a runner or drag just below it. Keep it lit until it returns.',
+    state.mode === 'long' ? 'Three escapes end the shift.' : 'Reach dawn before three escapes.'];
+  if (state.twins) rules.push(lessonGuide.twins);
+  if (state.mirror) rules.push(lessonGuide.mirror);
+  if (state.shy) rules.push(lessonGuide.shy);
+  if (state.fuse) rules.push(lessonGuide.fuse);
+  if (state.cat) rules.push(lessonGuide.cat);
+  $('rules').textContent = rules.join(' ');
   view.draw(state, 1, performance.now(), [], reduced.matches, false);
   switchScreen('paused');
 }
@@ -216,9 +267,16 @@ function finish() {
   persist();
   rec.end(state.outcome, summary());
   $('outcome').textContent = won ? 'Dawn' : 'Escaped';
-  $('medals').textContent = state.mode === 'long' ? `${format(Math.floor(state.time))}  ·  ★ ${format(profile.best)}`
-    : state.mode === 'daily' && won ? `✦ ${visibleStreak(day)}`
-    : '★'.repeat(3 - state.escapes) + '☆'.repeat(state.escapes);
+  const stars = 3 - state.escapes;
+  const escapes = `${state.escapes} escaped`;
+  if (state.mode === 'long') {
+    $('medals').textContent = `Survived ${format(Math.floor(state.time))} · Best ${format(profile.best)}`;
+    $('resultDetail').textContent = `${state.returned} returned · ${escapes}`;
+  } else {
+    $('medals').textContent = '★'.repeat(stars) + '☆'.repeat(state.escapes);
+    const night = state.mode === 'daily' ? `Daily · Streak ${visibleStreak(day)}` : `Night ${state.level}`;
+    $('resultDetail').textContent = `${night} · ${escapes} · ${stars} ${stars === 1 ? 'star' : 'stars'}`;
+  }
   $('again').textContent = nextLevel ? 'Next' : 'Again';
   $('share').hidden = state.mode !== 'daily';
   cover($('resultPoster'), state.outcome);
@@ -226,12 +284,17 @@ function finish() {
   snd.tone(won ? 523 : 195, .22, .15, 'triangle', won ? 261 : -75);
 }
 
+function saveLongRecord() {
+  if (state.mode !== 'long' || (screen !== 'play' && screen !== 'paused')) return;
+  const seconds = Math.floor(state.time);
+  if (seconds <= profile.best) return;
+  profile.best = seconds;
+  persist();
+}
+
 function leave() {
   if (screen === 'paused') {
-    if (state.mode === 'long') {
-      profile.best = Math.max(profile.best, Math.floor(state.time));
-      persist();
-    }
+    saveLongRecord();
     rec.end('left', summary());
   }
   snd.release();
@@ -240,14 +303,20 @@ function leave() {
 
 function openShare() {
   const target = $('dailyPoster');
+  const status = $('shareStatus');
+  status.textContent = '';
+  target.setAttribute('aria-label', `Tiptoe Museum Daily · ${day} · ${state.escapes} escaped · Streak ${visibleStreak(day)}`);
   cover(target, state.outcome === 'dawn' ? 'share' : 'share-loss', visibleStreak(day), day, state.escapes);
   cardFile = null;
   $('saveCard').disabled = true;
   target.toBlob(blob => {
-    if (!blob) return;
+    if (!blob) {
+      status.textContent = 'Card unavailable. Open the card again to retry.';
+      return;
+    }
     cardFile = new File([blob], `nightshift-${day}.png`, { type: 'image/png' });
     const native = navigator.canShare?.({ files: [cardFile] });
-    $('saveCard').textContent = native ? 'Share' : 'Save';
+    $('saveCard').textContent = native ? 'Share' : 'Download PNG';
     $('saveCard').disabled = false;
   }, 'image/png');
   switchScreen('shareCard');
@@ -264,14 +333,14 @@ async function saveCard() {
   link.href = url;
   link.download = cardFile.name;
   link.click();
+  $('shareStatus').textContent = 'Download started';
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function pointerAim(event) {
+function floorPoint(event) {
   const rect = canvas.getBoundingClientRect();
   const x = (event.clientX - rect.left) * WIDTH / rect.width;
   const y = (event.clientY - rect.top) * HEIGHT / rect.height;
-  aim = { x, y: y - LIFT };
   return { x, y };
 }
 
@@ -279,7 +348,10 @@ function begin(event) {
   if (screen !== 'play' || pointer !== null || event.button !== 0) return;
   pointer = event.pointerId;
   if (event.isTrusted) canvas.setPointerCapture(pointer);
-  const point = pointerAim(event);
+  const point = floorPoint(event);
+  aim = point;
+  contact = point;
+  waitForAim = false;
   effects.push({ ...point, type: 'touch', at: performance.now(), life: 330 });
   snd.tone(353, .055, .048, 'sine', 104);
   if (!profile.played) {
@@ -288,12 +360,22 @@ function begin(event) {
   }
 }
 
+// A press can outlive the shift. Keep its compatibility click off the result buttons.
+canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
 canvas.addEventListener('pointerdown', begin);
 canvas.addEventListener('pointermove', e => {
-  if (screen === 'play' && (pointer === e.pointerId || pointer === null && e.pointerType === 'mouse')) pointerAim(e);
+  if (screen !== 'play' || (pointer !== e.pointerId && !(pointer === null && e.pointerType === 'mouse'))) return;
+  const point = floorPoint(e);
+  if (contact && Math.hypot(point.x - contact.x, point.y - contact.y) <= 8) return;
+  contact = null;
+  aim = { x: point.x, y: point.y - (e.pointerType === 'touch' ? LIFT : 0) };
+  if (e.pointerType === 'mouse') waitForAim = false;
 });
 for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-  canvas.addEventListener(event, e => { if (pointer === e.pointerId) clearInput(); });
+  canvas.addEventListener(event, e => {
+    if (pointer !== e.pointerId) return;
+    clearInput();
+  });
 }
 
 addEventListener('keydown', e => {
@@ -304,11 +386,16 @@ addEventListener('keydown', e => {
   if (screen === 'play' && moveKeys[e.key]) {
     e.preventDefault();
     if (!keys.size) aim = { ...state.light };
+    waitForAim = false;
     keys.add(e.key);
   }
 });
 addEventListener('keyup', e => keys.delete(e.key));
-onLeave(pause);
+onLeave(() => {
+  saveLongRecord();
+  pause();
+});
+addEventListener('pagehide', saveLongRecord);
 noZoom();
 
 $('play').onclick = () => start();
@@ -327,13 +414,13 @@ rec.notice($('menu').firstElementChild);
 rec.toggle($('paused').firstElementChild);
 const idleHint = hint(canvas, {
   kind: 'hold-and-move', key: 'nightshift:hint', when: () => screen === 'play',
-  played: profile.played, delay: 3100, bottom: 78, reach: 40, label: 'Drag',
+  played: profile.played, delay: 3100, reach: 40, label: 'Drag',
 });
 
 function react(event, now) {
   const { type, actor } = event;
   if (type === 'foot') {
-    if (!reduced.matches) effects.push({ type, x: actor.x, y: actor.y, at: now, life: 510 });
+    effects.push({ type, x: actor.x, y: actor.y, at: now, life: 510 });
     if (state.time - lastStepSound > .045) {
       foot(actor.x, actor.kind);
       lastStepSound = state.time;
@@ -344,10 +431,11 @@ function react(event, now) {
     lastCaughtSound = state.time;
   }
   if (type === 'return' || type === 'escape' || type === 'fuse') {
-    effects.push({ type, x: actor?.x ?? event.x, y: actor?.y ?? 480, at: now, life: 570 });
+    effects.push({ type, x: actor?.x ?? event.x, y: actor?.y ?? FUSE.y, at: now, life: 570 });
   }
   if (type === 'return') {
     snd.tone(579 + state.returned % 5 * 45, .09, .061, 'sine', 155);
+    returnCueUntil = state.time + 1.7;
     if (capturesLogged++ < 75) rec.event('return', { exhibit: actor.kind });
   }
   if (type === 'escape') {
@@ -369,6 +457,10 @@ function frame(now) {
         const [x, y] = moveKeys[key];
         aim.x = bounded(aim.x + x * 5.8, 22, WIDTH - 22);
         aim.y = bounded(aim.y + y * 5.8, 84, HEIGHT - 35);
+      }
+      if (waitForAim && state.time >= 1.25) {
+        accumulator = 0;
+        break;
       }
       step(state, aim);
       for (const event of state.events) react(event, now);

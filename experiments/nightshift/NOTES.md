@@ -6,9 +6,9 @@ The premise comes from the Nightshift brief. Alibi and Borrowed supplied referen
 
 ## Rules and tuning
 
-The torch aims 42 floor units above the thumb. The light circle has a 58-unit radius on a 390 × 660 floor. The beam travels up to 530 units per second. Lifting the thumb leaves the beam where it is. Mouse movement and arrow keys also aim. The moon-to-sun clock tracks dawn and the three door markers track losses. A third escape ends the run, including when several exhibits cross on the same simulation tick.
+A tap or stationary press aims at the contact point. A moving touch aims 42 floor units above the thumb. The light circle has a 58-unit radius on a 390 × 660 floor. The beam travels up to 530 units per second. Lifting the thumb leaves the beam where it is. Mouse movement and arrow keys also aim. The moon-to-sun clock tracks dawn and the three door markers track losses. A third escape ends the run, including when several exhibits cross on the same simulation tick.
 
-Normal exhibits stop when the light intersects their body. Hold for 0.82–1.83 seconds to send one home. Uninterrupted darkness gives a regular exhibit roughly 9–13 seconds to reach the exit, depending on the wing, seed and route. The return follows the same route backward. Lessons start with the featured mechanic and a ghost finger. A completed catch or fuse lesson makes the first mixed group arrive sooner. The kit supplies separate idle guidance for first-time players.
+Normal exhibits stop when the light intersects their body. Hold for 0.82–1.83 seconds to send one home. Uninterrupted darkness gives a regular exhibit roughly 9–13 seconds to reach a door, depending on the wing, seed and route. The return follows the same route backward. Lessons start with the featured mechanic and a ghost finger. A completed catch or fuse lesson makes the first mixed group arrive sooner. The kit supplies separate idle guidance for first-time players.
 
 | Wing | Nights | Dawn | Ordered encounters |
 | --- | --- | ---: | --- |
@@ -22,12 +22,12 @@ Normal exhibits stop when the light intersects their body. Hold for 0.82–1.83 
 - The fuse flickers until the beam is left on the box for 0.56 seconds. The upstairs exhibit starts on the balcony and descends through the visible stairs.
 - The campaign has a fixed default seed. `?seed=` selects another unsigned seed for campaign or Long Night. `?level=` opens a campaign night for inspection. Seeds set plinth offsets, routes, speeds and which exhibits wake in each wave.
 - Long Night ramps concurrency, wave frequency and movement pressure with no dawn. The save keeps its best survival time.
-- Daily uses the UTC date and cycles across nights 12–18 with a date-specific seed. One clear per date counts. A missed date resets the streak once the next win is recorded. The share image contains the date, escape marks and streak. The share sheet is used when file sharing is available, with a PNG download fallback.
+- Daily uses the UTC date and cycles across nights 12–18 with a date-specific seed. One clear per date counts. A missed date resets the streak once the next win is recorded. The share image names the game and labels the date, escapes and streak. The share sheet is used when file sharing is available, with a PNG download fallback.
 - `nightshift-save` holds campaign progress, sound, Long Night best and Daily streak. The kit owns its one-shot hint flag and shared recording keys. Lab outcomes are `dawn`, `escaped` and `left`. The start record contains mode, night, seed and the date in Daily. Events count returns, escapes and fuse repair.
 
 ## Bots
 
-Twelve seeds per campaign night. The blind sweep follows the same path throughout. The listening policy chooses the nearest recent footstep and uses the visible position to follow that exhibit. The average policy has delayed decisions, imperfect aim and occasional trips after the cat. The competent policy prioritizes threatened exits, commits to a catch and repairs the fuse.
+The following table records the original single-door build. Twelve seeds per campaign night. The blind sweep follows the same path throughout. The listening policy chooses the nearest recent footstep and uses the visible position to follow that exhibit. The average policy has delayed decisions, imperfect aim and occasional trips after the cat. The competent policy prioritizes threatened exits, commits to a catch and repairs the fuse.
 
 | Wing | Trials per policy | Idle wins | Sweep wins | Listener wins | Average wins | Competent wins | Competent max escapes | Furthest progress |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -35,7 +35,7 @@ Twelve seeds per campaign night. The blind sweep follows the same path throughou
 | Portrait | 72 | 0 | 0 | 72 | 51 | 72 | 0 | 80.4% |
 | Natural | 72 | 0 | 0 | 69 | 35 | 72 | 0 | 78.9% |
 
-The competent policy lasted 93.0–108.5 seconds in twelve Long Nights. Rules checks cover the twin link, reflected light, dark shy mask, independent cat, fuse repair, upstairs route, simultaneous escape limit, same-seed replay and 31 daily nights.
+Before the cold play audit, the competent policy lasted 93.0–108.5 seconds in twelve Long Nights. Rules checks cover the twin link, reflected light, dark shy mask, independent cat, fuse repair, upstairs route, simultaneous escape limit, same-seed replay and 31 daily nights.
 
 ## Browser checks
 
@@ -47,7 +47,7 @@ Screenshot review began with the large and small default layouts. Three revision
 
 Physical phone touch, speaker playback and stereo localization, native sharing, first-time comprehension and human difficulty are unverified. Browser audio checks observe the scheduled nodes. The listener is a policy with access to simulated footstep locations and rendered positions. The average policy models specific delays and distractions, so its rates describe that policy.
 
-Production deploy, live feedback button and remote recording acceptance are unverified. The local recording allowlist already contains `nightshift`. The shared phone suite requires a `kit/games.json` listing and stops before running profiles until that catalogue entry is present. The experiment-specific checks do not require the listing.
+Production deploy, live feedback button and remote recording acceptance are unverified. The local recording allowlist already contains `nightshift`. The original shared phone check stopped at catalogue discovery. See the dated rerun below. The experiment-specific checks do not require the listing.
 
 ## Builder
 
@@ -59,3 +59,50 @@ Production deploy, live feedback button and remote recording acceptance are unve
 ## Kit candidates
 
 A two-axis absolute drag helper could serve another overhead game. A panning option on the kit audio API would let games use stock footsteps without constructing their own Web Audio panner. The optional ring hint currently dereferences its absent hand element in the shared kit. The default hand hint is used here.
+
+## Cold play audit — 2026-11-24
+
+Evidence paths below are relative to `shots/audit-nightshift/` in scratchpad run `890fd34c-c985-4ecc-b377-d6a9f77fefa4`. Each range refers to individually numbered PNGs. The cold sessions served the experiment locally, with the feedback script stubbed. Each touch used a point chosen from the rendered phone screen. Each action produced an inspected screenshot. No cold session read the simulation, called a game function or used a level override. The WebKit campaign advanced unattended waits with the browser clock. The later automated checks use the state hook and controlled clocks.
+
+| Rank | Cold observation and evidence | Change and replay evidence |
+| --- | --- | --- |
+| 1 | One tap above the old exit earned three stars on every night from 1 through 8. The torch could also guard Long Night for 1:30 without another input. Chasing exhibits earned fewer stars. `campaign-002.png` through `campaign-019.png`, `wk-034.png` through `wk-041.png`, `chr-027.png` through `chr-036.png`. | Two doors split the routes. A returned exhibit tries the other door on its next outing. Within each seeded wave, exhibits with fewer outings take priority. Parking the torch at the former choke point lost the shift. Active touch guarding earned three stars. `campaign-fixed-004.png` through `campaign-fixed-006.png`, `campaign-fixed-008.png` through `campaign-fixed-015.png`. |
+| 2 | The hand pointed from the torch to a statue. It was unclear whether to tap the hand, drag the torch, or touch an exhibit. An untouched lesson could end in a loss. Tapping an exhibit aimed above it. The beam was still in transit after the finger lifted. `wk-002.png` through `wk-004.png`, `wk-044.png`, `wk-050.png` and `wk-051.png`, `chr-drag-004.png` through `chr-drag-007.png`. | The menu gives the goal. The first story shift on a fresh save waits with the upper-left statue visible until the first aim. A tap or stationary press aims directly. A drag keeps the light clear of the finger. The floor labels the night, returns and escapes. The pause menu repeats the controls and the loss condition. `after-wk-002.png` through `after-wk-005.png`, `chr-after-003.png` through `chr-after-007.png`. |
+| 3 | The mirror guide continued to point at the mirror while its bear crossed out of the case. The reflection lit empty glass. The green mask was highlighted like a target even though light made it advance. Daily started with glass, stairs, mirror and fuse without explaining what the box did. `chr-047.png` through `chr-050.png`, `chr-057.png` through `chr-061.png`, `wk-019.png` through `wk-022.png`. | The illustrated drag now aims the reflection at the bear inside the case, then guides the player directly to the bear outside. The floor explains the mask, twins and fuse at their introductions. Pause lists the special rules present in the room. A center tap repaired the fuse. `chr-after-reduce-014.png` through `chr-after-reduce-016.png`, `after-wk-007.png` and `after-wk-008.png`. |
+| 4 | The bear covered the bust and the dinosaur covered the knight while both crossed occupied plinths. At the old exit, several figures became one overlapping group. `chr-027.png` through `chr-035.png`, `chr-041.png`, `wk-021.png`. | Lower runners use an aisle to clear occupied plinths. The split exits reduce crowding. Rechecked side clearance after the dinosaur's tail touched the frame during replay. `campaign-fixed-014.png`, `campaign-fixed-018.png`, `campaign-fixed-019.png`, `campaign-fixed-022.png`. The final route and tail clearance are visible in `campaign-fixed-025.png`, `campaign-fixed-028.png` and `campaign-fixed-029.png`. Moving exhibits can still cross near a shared door or on the same aisle. |
+| 5 | A finger held on the floor could accidentally dismiss the result. The loss card appeared under the finger; releasing it selected Menu. Discovered during sustained-press replay. `final-touch-17.png` through `final-touch-19.png`. | The floor consumes the compatibility click from touches that started there. A separate touch still operates the result buttons. The Chromium regression holds a real contact across a loss. The result remained open on release, then a fresh tap selected Menu in `final-touch-23.png` through `final-touch-25.png`. |
+| 6 | Reload during Long Night discarded the current survival record. Two identical times on the loss screen were unlabeled. Campaign reload retained the unlocked night and restarted its clock. `chr-mode-017.png`, `chr-mode-018.png`, `chr-mode-021.png`, `wk-016.png`, `wk-018.png`, `chr-061.png` through `chr-063.png`. | A normal page exit writes a new Long Night best. The result labels survival and best separately. Reload still starts at the menu. The original WebKit save loaded in the revised game with night 2 and its 1:30 best intact. `chr-after-018.png`, `chr-after-019.png`, `result-replay-11.png`, `wk-052.png`, `wk-053.png`. A fresh record went from 0:00 to 0:01 across a mid-round reload in `chr-after-reduce-017.png` through `chr-after-reduce-020.png`. |
+| 7 | Dawn looked identical across early nights. The tiny progress diamond was the only night indicator on the floor. Three door marks and a row of stars never explained why chasing earned one star. The escaped cat covered the bear's face in the loss illustration. `wk-015.png`, `wk-016.png`, `chr-036.png`, `wk-022.png`. | The HUD counts escapes and returns. Results name the night or mode and show escapes beside the star count. The poster separates the cat and bear. `after-wk-004.png`, `result-replay-04.png`, `result-replay-11.png`. |
+| 8 | The Daily card displayed a date and two unlabeled symbols. The PNG download left no visible acknowledgement. `wk-023.png`, `wk-024.png`, `chr-mode-007.png`, `chr-mode-008.png`. | Both preview and exported pixels include the game, date, escapes and streak. The fallback button reads “Download PNG” and confirms when the download starts. Inspected the downloaded image separately. `result-replay-05.png`, `result-replay-06.png`, `result-replay-export.png`. |
+| 9 | The rendered Privacy link measured 42.47 × 15 CSS px at 360 × 640. The sound button met 44 px. The recording checkbox had a small visible square. `chr-drag-002.png`, `wk-006.png`. | Privacy measured 60 × 44 CSS px on replay. The full recording label has a minimum 44 px height. The pause and menu controls fit both requested sizes. `chr-after-002.png`, `after-wk-005.png`. |
+| 10 | The sound review found that reduced motion suppressed the footprint while footsteps still played. Repair stars appeared above the fuse. The cold Daily screenshots show the small box and how hard its state was to read. `wk-019.png`, `wk-020.png`. These two causes were identified after source access. | Reduced motion now shows stationary footprints. Repair stars surround the box and its face turns green. `chr-after-reduce-004.png`, `chr-after-reduce-015.png` and `chr-after-reduce-016.png`. |
+
+**Campaign and menu coverage.** Night 1 introduced aiming. Night 2 repeated the same gesture and added hold time. Night 3 brought the dancer out of its frame. Night 4 added a second dotted line between the purple twins. Nights 5 and 6 crowded the upper plinths. Night 7 introduced the mirror. Night 8 introduced the mask. All eight gave perfect results from the parked beam on WebKit. Chromium also reached night 8 by touch, tried the exhibits and obstacles, and reloaded during that night. Pause, resume, sound, recording toggle, return to menu, next night, retry, Daily, Long Night, loss, card, export and back were exercised across the two sessions. The Daily share and Long Night sequences are in `chr-mode-001.png` through `chr-mode-021.png`. The WebKit menu and pause sequence begins at `wk-001.png`; `wk-039.png` through `wk-042.png` cover the recording and sound controls.
+
+**Sound cues.** Enabling sound changes the button. The start cue opens the room. Touch shows a contact ring. Footsteps mark their source on the floor. A catch fills an arc and shows a sparkle. Returning exhibits move back and increase the count. An escape flashes at its door and consumes a life. The cat changes its eyes and color. A fuse repair changes the box and draws stars. Dawn and loss display different result art. Source inspection established the event pairings. The browser checks observe scheduled audio nodes and rendered cue geometry. Physical sound and stereo localization remain untested.
+
+**Regression evidence.** The original floor failed the stationary-beam check. The revised simulation checks both doors, the old door and nearby aim heights on nights 1–8 and Long Night. Removing the outing priority caused the six-exhibit rotation test to fail. Route sampling caught the plinth crossing and the side clearance failure. The original browser failed the fresh-save wait, direct touch, Privacy size, pause rules and three lesson text checks. The mirror, reduced-motion footprint and fuse-star assertions each failed before the cue changes. A sustained press on the fuse failed before the stationary-press fix. Separate result checks failed on the original loss text, card captions, preview description, download feedback, mid-run record, time labels and portrait overlap.
+
+**Replay correction.** On the 360 px phone, the new instruction strip covered the bottom of the kit hand. Its drawn bounds extended to y=612 while the strip began at y=586.25. Positioned the existing hint relative to the caption height and checked the animated fingertip at twelve points. Compare `replay-hint-clipped.png` with `iphone13-390-idle-hint.png` and `pixel7-idle-hint.png`. A real stationary press repaired the fuse before the finger lifted in `final-touch-11.png` through `final-touch-14.png`. These targeted replay shots used the built-in night selector.
+
+**Simulation rerun.** Each wing contributes 72 trials per policy. The competent guard completed all 216 campaign trials with zero escapes; idle completed none. The competent Long Night runs lasted 74.3–100.9 seconds. The final touch replay cleared night 2 with zero escapes in `campaign-fixed-030.png`.
+
+| Wing | Blind sweep wins | Footstep listener wins | Average policy wins | Competent wins |
+| --- | ---: | ---: | ---: | ---: |
+| Marble | 11 | 72 | 72 | 72 |
+| Portrait | 0 | 72 | 33 | 72 |
+| Natural | 0 | 66 | 23 | 72 |
+
+**Final checks.**
+
+| Check | Result |
+| --- | --- |
+| `check.mjs`, WebKit iPhone 13, 390 × 664 | Passed |
+| `check.mjs`, Chromium Pixel 7, 412 × 839 | Passed |
+| `check.mjs`, Chromium, 360 × 640 | Passed, including actual PNG download and touch release across a loss |
+| Shared phone check for `nightshift` | Passed on WebKit and Chromium before and after the changes |
+| `bots.mjs` | Passed campaign, 81 parked-beam cases, mechanics, seed replay and 31 Daily dates |
+
+The full three-profile run exited successfully. Earlier WebKit attempts timed out waiting for menu interaction during host contention. The final run used the normal assertions and timeouts.
+
+**Limits.** The tests sample fixed positions and seeds. They do not prove every stationary strategy loses. Brief overlap between moving runners remains possible. Campaign and Daily reload restart the attempt at the menu. There is no mid-round checkpoint format. Browser runs cover normal page exit, not an abrupt process kill. No physical handset, native share sheet, outside player, live feedback submission, production deploy or remote lab receipt was verified. The notes script was stubbed and lab outcomes were checked against a mocked endpoint.

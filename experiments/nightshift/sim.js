@@ -5,7 +5,7 @@ export const DT = 1 / 60;
 export const RADIUS = 58;
 export const LIFT = 42;
 export const REST = { x: 195, y: 543 };
-export const EXIT = { x: 195, y: 123 };
+export const EXITS = [{ x: 84, y: 123 }, { x: 306, y: 123 }];
 export const MIRROR = { x: 235, y: 326 };
 export const CASE = { x: 40, y: 253, width: 94, height: 114 };
 export const REFLECTION = { x: 83, y: 297 };
@@ -15,7 +15,7 @@ export const DEFAULT_SEED = 836361;
 export const LAST = 18;
 export const WINGS = ['Marble', 'Portrait', 'Natural'];
 export const POSES = ['statue', 'armor', 'bear', 'dino', 'painting', 'statue'];
-const HOMES = [[82, 241], [305, 239], [89, 352], [300, 358], [91, 482], [295, 485]];
+const HOMES = [[103, 241], [285, 239], [103, 352], [285, 358], [91, 482], [295, 485]];
 
 // Each entry specifies the opening lesson, then the size and cadence of the rounds.
 const NIGHTS = [
@@ -58,9 +58,15 @@ export function reflection(point) {
   };
 }
 
-function path(home, upstairs, curve) {
-  const hall = { x: clamp(home.x + curve, 48, 342), y: 167 };
-  const points = upstairs ? [home, STAIR, hall, EXIT] : [home, hall, EXIT];
+function path(home, upstairs, curve, exit) {
+  const hall = { x: clamp(exit.x + curve, 48, 342), y: 167 };
+  let points = upstairs ? [home, STAIR, hall, exit] : [home, hall, exit];
+  if (home.y > 300) {
+    const left = home.x < WIDTH / 2;
+    const crossesHall = left !== (exit === EXITS[0]);
+    const aisle = (crossesHall ? (left ? 164 : 174) : (left ? 43 : 347)) + curve * 0.05;
+    points = [home, { x: aisle, y: home.y - 32 }, { x: aisle, y: 163 }, exit];
+  }
   let length = 0;
   const segments = points.slice(1).map((end, i) => {
     const start = points[i];
@@ -103,9 +109,11 @@ export function create({ level = 1, seed = DEFAULT_SEED, mode = 'story' } = {}) 
       y = 236;
     }
     const home = { x: x + (rng() - 0.5) * 14, y: y + (rng() - 0.5) * 12 };
-    const route = path(home, id === 5 && stairs, (rng() - 0.5) * 42);
+    const curve = (rng() - 0.5) * 42;
+    const routes = EXITS.map(exit => path(home, id === 5 && stairs, curve, exit));
+    const route = routes[Number(home.x > WIDTH / 2)];
     return {
-      id, kind, home, route, x: home.x, y: home.y, prevX: home.x, prevY: home.y,
+      id, kind, home, route, routes, outings: 0, x: home.x, y: home.y, prevX: home.x, prevY: home.y,
       progress: 0, hold: 0, motion: 0, oldMotion: 0, stepAt: 0, lit: false,
       mirrored: mirror && id === 2, upstairs: stairs && id === 5, state: 'home',
       speed: 1 / (10.9 - wing * 0.85 + rng() * 2.3 + (id === 5 && stairs ? 1.4 : 0)),
@@ -130,6 +138,7 @@ export function create({ level = 1, seed = DEFAULT_SEED, mode = 'story' } = {}) 
 
 function awaken(s, actor) {
   if (actor.state !== 'home') return;
+  actor.outings++;
   actor.state = 'roam';
   actor.stepAt = actor.motion + actor.id * 0.103;
   s.events.push({ type: 'wake', actor });
@@ -144,6 +153,8 @@ function wave(s) {
     const j = Math.floor(s.rng() * (i + 1));
     [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
   }
+  // Give each exhibit a turn. The seeded shuffle breaks ties within a round.
+  candidates.sort((a, b) => a.outings - b.outings);
   for (const actor of candidates.slice(0, count)) awaken(s, actor);
   if (s.twins && candidates.slice(0, count).some(a => a.kind === 'twin')) {
     s.actors.filter(a => a.kind === 'twin').forEach(a => awaken(s, a));
@@ -246,7 +257,10 @@ export function step(s, aim = REST) {
       a.progress = Math.max(0, a.progress - DT * 0.81);
       a.motion += DT * 1.4;
       locate(a);
-      if (a.progress === 0) a.state = 'home';
+      if (a.progress === 0) {
+        a.state = 'home';
+        a.route = a.route === a.routes[0] ? a.routes[1] : a.routes[0];
+      }
       continue;
     }
     if (a.state !== 'roam') continue;

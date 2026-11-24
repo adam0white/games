@@ -1,4 +1,4 @@
-import { WIDTH, HEIGHT, EXIT, REST, CASE, MIRROR, FUSE, STAIR, LIFT, RADIUS, distance } from './sim.js';
+import { WIDTH, HEIGHT, EXITS, REST, CASE, MIRROR, FUSE, STAIR, LIFT, RADIUS, distance, targetFor } from './sim.js';
 
 const ink = '#221e37';
 const cream = '#fff1cc';
@@ -264,8 +264,7 @@ function arch(c, x, y, w, h, fill, edge, line = 1) {
   }
 }
 
-function doorway(c, dawn = 0) {
-  const { x } = EXIT;
+function doorway(c, x, dawn = false) {
   const y = 57;
   arch(c,x,y,87,77,'#3c435d','#a491b4',2);
   const light = c.createLinearGradient(0,y,0,y+76);
@@ -345,7 +344,7 @@ function floor(c, s) {
       diamond(c,x,y-2,3.4,brass);
     }
   }
-  doorway(c);
+  for (const exit of EXITS) doorway(c,exit.x);
   box(c,169,560,52,32,12,'#47425f','#b894a6',1.4);
   box(c,177,563,36,26,8,'#2a2948','#806a8a',1);
   for (const x of [173,217]) diamond(c,x,576,2.5,brass);
@@ -452,12 +451,12 @@ function gesture(c,s,reduced) {
   if (!s.practice || s.hintDone || s.time > s.practice) return;
   const a=s.actors[s.tutorIds[0]];
   const targets = {
-    drag:a, hold:a, painting:a, twins:a, mirror:MIRROR,
+    drag:a, hold:a, painting:a, twins:a, mirror:a && targetFor(a),
     shy:a, cat:s.catAt, fuse:FUSE, stairs:a,
   };
   const to=targets[s.lesson];
   if (!to || (a?.frozen && ['drag', 'hold', 'painting'].includes(s.lesson))) return;
-  const cycle=reduced ? 1.12 : (s.time+.25)%3.5;
+  const cycle=reduced ? 2 : (s.time+.25)%3.5;
   const park={x:REST.x,y:REST.y+LIFT};
   const subject={x:to.x,y:Math.min(HEIGHT-43,to.y+LIFT)};
   const avoid=s.lesson==='shy' || s.lesson==='cat';
@@ -483,8 +482,8 @@ function gesture(c,s,reduced) {
     ring(c,b.x,b.y,34,lilac,1.5);
   }
   if (s.lesson==='stairs') ring(c,STAIR.x,STAIR.y-18,20,mint,1.6);
-  if (s.lesson==='mirror' && !s.bounce) {
-    const subject=s.actors[s.tutorIds[0]];
+  if (s.lesson==='mirror' && !s.bounce && a.y>=CASE.y) {
+    const subject=a;
     c.setLineDash([4,7]);
     shape(c,[[to.x,to.y-12],[subject.x,subject.y-16]],null,mint,1.6);
     c.setLineDash([]);
@@ -559,7 +558,7 @@ export function renderer(canvas) {
       if (dawn) {
         c.fillStyle=`rgba(238,174,128,${dawn*.13})`;
         c.fillRect(20,118,350,475);
-        doorway(c,dawn>.38);
+        for (const exit of EXITS) doorway(c,exit.x,dawn>.38);
       }
       const x=s.oldLight.x+(s.light.x-s.oldLight.x)*alpha;
       const y=s.oldLight.y+(s.light.y-s.oldLight.y)*alpha;
@@ -568,7 +567,7 @@ export function renderer(canvas) {
       if (s.fuse) fuse(c,s);
       for (const e of effects) if (e.type==='foot') {
         c.save();
-        c.globalAlpha=.57*Math.max(0,1-(now-e.at)/e.life);
+        c.globalAlpha=reduced ? .92 : .75*Math.max(0,1-(now-e.at)/e.life);
         oval(c,e.x-4,e.y+5,3.2,5,'#ffd29c',-.35);
         oval(c,e.x+5,e.y+9,2.7,4,'#ffd29c',.38);
         c.restore();
@@ -582,26 +581,19 @@ export function renderer(canvas) {
         c.globalAlpha=1-age;
         if (e.type==='touch') ring(c,e.x,e.y,8+(reduced ? 6 : age*22),cream,2);
         if (e.type==='escape') {
-          ring(c,EXIT.x,EXIT.y-22,21+age*25,'#ff9b9f',3);
-          sparkle(c,EXIT.x+18,EXIT.y-28,10,'#ffd0b8');
+          ring(c,e.x,e.y-22,21+age*25,'#ff9b9f',3);
+          sparkle(c,e.x+18,e.y-28,10,'#ffd0b8');
         }
         if (e.type==='return' || e.type==='fuse') {
           for (let i=0;i<5;i++) {
-            const r=15+age*25;
-            sparkle(c,e.x+Math.cos(i*1.26)*r,e.y-23+Math.sin(i*1.26)*r,5,cream);
+            const r=reduced ? 24 : 15+age*25;
+            const centerY=e.y-(e.type==='fuse' ? 8 : 23);
+            sparkle(c,e.x+Math.cos(i*1.26)*r,centerY+Math.sin(i*1.26)*r,5,cream);
           }
         }
         c.restore();
       }
       if (tutorial) gesture(c,s,reduced);
-      box(c,20,623,350,23,11,'#292941','#655572');
-      for (let i=0;i<18;i++) {
-        const wx=43+i*17.9;
-        const active=s.mode==='story' && s.level===i+1;
-        if (i%6===0 && i) shape(c,[[wx-9,628],[wx-9,642]],null,'#776581',1.1);
-        if (active) diamond(c,wx,635,5,brass,cream);
-        else oval(c,wx,635,2.4,2.4,i<s.level && s.mode==='story' ? '#b49cb8' : '#655775');
-      }
     },
   };
 }
@@ -612,6 +604,27 @@ export function cover(canvas, mode = 'menu', count = 0, day = '', escapes = 0) {
   const h=canvas.height;
   const card=mode==='share' || mode==='share-loss';
   const win=mode==='dawn' || mode==='share';
+  if (card) {
+    const picture = document.createElement('canvas');
+    picture.width = 680;
+    picture.height = 364;
+    cover(picture, win ? 'dawn' : 'escaped');
+    c.setTransform(w / 340, 0, 0, h / 270, 0, 0);
+    c.fillStyle = '#302b46';
+    c.fillRect(0, 0, 340, 270);
+    c.fillStyle = cream;
+    c.textAlign = 'center';
+    c.font = 'bold 26px Georgia,serif';
+    c.fillText('Tiptoe Museum', 170, 31);
+    c.font = 'bold 15px system-ui';
+    c.fillText('Daily · ' + day, 170, 54);
+    c.drawImage(picture, 12, 64, 316, 169);
+    c.fillStyle = cream;
+    c.font = 'bold 17px system-ui';
+    c.fillText(escapes + ' escaped', 89, 258);
+    c.fillText('Streak ' + count, 251, 258);
+    return;
+  }
   c.setTransform(w/340,0,0,h/182,0,0);
   c.clearRect(0,0,340,182);
   const top=win ? '#724866' : '#302d50';
@@ -643,25 +656,8 @@ export function cover(canvas, mode = 'menu', count = 0, day = '', escapes = 0) {
   exhibit(c,'bear',180,155,{scale:1.02,lit:true,caught:true,motion:.18});
   exhibit(c,'dino',252,143,{scale:1.34,face:-1,caught:true,motion:.38});
   if (mode==='escaped') {
-    cat(c,173,153,2,true);
-    sparkle(c,207,130,8,cream);
-  }
-  if (card) {
-    box(c,15,145,89,26,9,'#292541','#c9a7b4');
-    c.font='bold 11px system-ui';
-    c.fillStyle=cream;
-    c.textAlign='center';
-    c.fillText(day,59,162);
-    box(c,132,145,76,26,9,'#292541','#c9a7b4');
-    for (let i=0;i<3;i++) {
-      const x=151+i*19;
-      if (i < escapes) ring(c,x,158,4,'#e8ab9f',1.6);
-      else sparkle(c,x,158,7,brass);
-    }
-    box(c,233,145,92,26,9,'#292541','#c9a7b4');
-    sparkle(c,255,158,7,brass);
-    c.font='bold 16px system-ui';
-    c.fillText(String(count),284,164);
+    cat(c,43,163,2,true);
+    sparkle(c,57,131,6,cream);
   }
   c.restore();
 }
