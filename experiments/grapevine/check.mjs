@@ -108,6 +108,10 @@ async function chapters(page, phone) {
   assert.equal(st.opened, 31, 'old save: progress kept'); assert.equal(st.tab, 1, 'old finished save opens on chapter 2');
   assert.match(await page.textContent('#play'), /Play 31/);
   assert.match(await page.textContent('#tabs'), /90\/90/, 'chapter 1 stars on its tab');
+  await page.locator('#tabs button').nth(0).tap();
+  assert.equal(await page.textContent('#play'), 'Play 1', 'Play follows the selected finished chapter');
+  await page.locator('#tabs button').nth(1).tap();
+  assert.equal(await page.textContent('#play'), 'Play 31');
   await sleep(300); await shot(page, phone, 'c1-menu-chapter2');
 
   // 31, one way: the lane from the listener refuses a route that runs against it.
@@ -191,24 +195,52 @@ async function chapters(page, phone) {
   await shot(page, phone, 'c12-daily-done');
   const nb2 = await page.locator('#again').boundingBox();
   assert.ok(nb2.y + nb2.height <= vp.height, 'the daily card fits');
-  // Share hands over a PNG and the text where the browser can share files, and copies the text where it cannot.
+  // Preview works even when a native sheet is cancelled or clipboard access is denied.
+  await page.click('#share');
+  const preview = page.locator('#postcardDialog');
+  assert.ok(await preview.isVisible(), 'share: a tap opens the visible postcard');
+  const picture = preview.locator('canvas');
+  const bounds = await picture.boundingBox();
+  assert.ok(bounds?.width >= 250 && bounds.height >= 140, 'share: preview large enough to read');
+  const captionSize = await picture.evaluate(c => {
+    const ctx = c.getContext('2d');
+    return 12 * c.getBoundingClientRect().width * ctx.getTransform().a / c.width;
+  });
+  assert.ok(captionSize >= 11, `postcard captions render at least 11 CSS pixels (${captionSize})`);
   await page.evaluate(() => {
     window.__shared = [];
     Object.defineProperty(navigator, 'canShare', { configurable: true, value: d => !!d.files });
-    Object.defineProperty(navigator, 'share', { configurable: true, value: async d => { window.__shared.push({ text: d.text, files: (d.files || []).map(f => ({ type: f.type, size: f.size })) }); } });
+    Object.defineProperty(navigator, 'share', { configurable: true, value: async d => {
+      window.__shared.push({ text: d.text, files: (d.files || []).map(f => ({ type: f.type, size: f.size })) });
+    } });
   });
-  await page.click('#share'); await sleep(300);
+  await page.click('#sendCard');
   const handed = await page.evaluate(() => window.__shared);
-  assert.equal(handed.length, 1, 'share: handed over once'); assert.equal(handed[0].files[0]?.type, 'image/png', 'share: a PNG');
-  assert.ok(handed[0].files[0].size > 10000, 'share: the PNG has a picture in it'); assert.match(handed[0].text, /Heard it!/);
+  assert.equal(handed.length, 1); assert.equal(handed[0].files[0]?.type, 'image/png');
+  assert.ok(handed[0].files[0].size > 10000); assert.match(handed[0].text, /Heard it!/);
+  assert.equal(await page.textContent('#shareStatus'), 'Card shared.');
+  await page.evaluate(() => Object.defineProperty(navigator, 'share', { configurable: true, value: async () => {
+    throw new DOMException('Cancelled', 'AbortError');
+  } }));
+  await page.click('#sendCard');
+  assert.equal(await page.textContent('#shareStatus'), 'Sharing cancelled.');
+  await page.click('#backToResult');
+  assert.equal(await preview.isVisible(), false);
   await page.evaluate(() => {
     Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { window.__copied = t; } } });
   });
-  await page.click('#share'); await sleep(200);
-  assert.match(await page.evaluate(() => window.__copied), /^Grapevine, Daily village/, 'share: no share sheet, so the text is copied');
-  assert.equal(await page.textContent('#share'), 'Copied!');
-  assert.equal((await state(page)).shared, 2, 'share pressed twice');
+  await page.click('#share');
+  assert.equal(await page.textContent('#sendCard'), 'Copy result');
+  await page.click('#sendCard');
+  assert.equal(await page.textContent('#shareStatus'), 'Result copied.');
+  assert.match(await page.evaluate(() => window.__copied), /Psst!.*Heard it!/);
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined }));
+  await page.click('#sendCard');
+  assert.ok(await page.locator('#manualShare').isVisible(), 'clipboard denied: player can select the result');
+  assert.equal(await page.inputValue('#manualShare'), (await state(page)).shareText);
+  await page.click('#backToResult');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'share', 'back returns focus to result');
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('grapevine-save')));
   assert.equal(saved.dailyTier[Object.keys(saved.dailyHops)[0]], undefined, '?tier= does not pin');
   assert.ok(saved.opened >= 31, 'progress kept'); assert.equal(saved.daily['2026-11-20'], 2, 'an old daily entry kept');
@@ -257,6 +289,64 @@ async function chapters(page, phone) {
   }
 }
 
+// Read the painted indicators themselves. A corrected route can coexist with stale canvas feedback.
+async function boardInk(page, region, rgb) {
+  return page.evaluate(([region, rgb]) => {
+    const canvas = document.querySelector('#c'), ctx = canvas.getContext('2d');
+    const scale = canvas.width / canvas.clientWidth, middle = canvas.clientWidth / 2;
+    const box = region === 'check' ? [middle - 12, 20, 24, 25] : [0, 80, canvas.clientWidth, 90];
+    const data = ctx.getImageData(...box.map(n => Math.round(n * scale))).data;
+    for (let i = 0; i < data.length; i += 4) {
+      if (rgb.every((c, k) => data[i + k] === c)) return true;
+    }
+    return false;
+  }, [region, rgb]);
+}
+
+async function boardFeedback(page) {
+  const visibleCopy = () => page.locator('#boardCue:visible').allTextContents().then(parts => parts.join(' '));
+  const misses = [];
+  const expect = (condition, message) => { if (!condition) misses.push(message); };
+  await page.goto(`${base}/grapevine/?level=1`);
+  await page.click('#play');
+  let st = await state(page);
+  expect(/Tap.*red hat/i.test(await visibleCopy()), 'first tap identifies the red hat');
+  await tap(page, st.nodes[st.from]); // a plausible first touch should not dismiss the instruction
+  expect(/Tap.*red hat/i.test(await visibleCopy()), 'instruction survives tapping the teller');
+  await tap(page, st.nodes.find(n => n.kind === 'paint'));
+  expect(/tap.*listener/i.test(await visibleCopy()), 'next instruction identifies the listener');
+  await tap(page, st.nodes[st.to]);
+  await until(page, () => window.grapevineState().hop > 0.05, 'sending has painted a frame');
+  expect(await boardInk(page, 'check', [127, 224, 122]), 'the HUD keeps the match during delivery');
+
+  await page.goto(`${base}/grapevine/?level=2`);
+  await page.click('#play');
+  st = await state(page);
+  const lv = await levelNow(page);
+  const wrong = lv.nodes.findIndex(n => n.kind === 'paint' && n.arg !== lv.want.c);
+  await tap(page, st.nodes[wrong]); await tap(page, st.nodes[lv.to]);
+  await until(page, () => window.grapevineState().result === 'wrong', 'wrong delivery');
+  expect(/tap.*teller.*again/i.test(await visibleCopy()), 'wrong delivery explains a legal retry');
+  const red = [232, 40, 59];
+  expect(await boardInk(page, 'bubble', red), 'wrong delivery marks the rejected message');
+  await tap(page, st.nodes[st.from]); await sleep(100);
+  expect(!await boardInk(page, 'bubble', red), 'editing clears the rejected message');
+  await page.goto(`${base}/grapevine/?level=10`);
+  await page.click('#play');
+  st = await state(page);
+  const swapRoute = solve(await levelNow(page)).best;
+  await tap(page, st.nodes[swapRoute[1]]);
+  expect(/Swaps circles and squares/i.test(await visibleCopy()), 'active swap names its two shapes');
+  await tap(page, st.nodes[swapRoute[2]]);
+  await tap(page, st.nodes[swapRoute[3]]);
+  expect(/only triangles and stars swap/i.test(await visibleCopy()), 'unchanged shape explains the swap restriction');
+  await tap(page, st.nodes[swapRoute[4]]);
+  await until(page, () => window.grapevineState().screen === 'done', 'swap route solved');
+  expect((await state(page)).shareText.includes('Swapsies! → Less! → No change → Heard it!'),
+    'receipt distinguishes a changed shape from a villager who passed the same shape');
+  assert.deepEqual(misses, [], 'board feedback');
+}
+
 async function run(page, phone) {
   const sent = page.context().labSent;
   await page.goto(`${base}/grapevine/?labRunSource=agent`);
@@ -290,6 +380,28 @@ async function run(page, phone) {
   st = await state(page);
   assert.equal(st.result, 'won'); assert.equal(st.stars, 3, 'shortest route: three stars');
   await sleep(1200); await shot(page, phone, '4-end-card');
+  const legibility = await page.evaluate(async () => {
+    const { change } = await import('./art.js');
+    const cv = document.createElement('canvas');
+    cv.width = 48; cv.height = 20;
+    const g = cv.getContext('2d');
+    const inkRows = [5, 6].map(id => {
+      g.clearRect(0, 0, 48, 20);
+      change(g, id, 24, 10, 44, 18);
+      const pixels = g.getImageData(0, 0, 48, 20).data;
+      let rows = 0;
+      for (let y = 0; y < 20; y++) {
+        if (pixels.slice(y * 48 * 4, (y + 1) * 48 * 4).some((a, i) => i % 4 === 3 && a >= 128)) rows++;
+      }
+      return rows;
+    });
+    const strip = document.querySelector('#strip');
+    const { data } = strip.getContext('2d').getImageData(0, Math.floor(strip.height / 2), strip.width, 1);
+    const solidWidth = [...data].filter((a, i) => i % 4 === 3 && a === 255).length / (strip.width / strip.clientWidth);
+    return { inkRows, solidWidth };
+  });
+  assert.ok(legibility.inkRows.every(h => h >= 10) && legibility.solidWidth >= 160,
+    `count marks need ten legible rows; three comic cells need opaque backs: ${JSON.stringify(legibility)}`);
 
   // Level 2 by taps: first a wrong route (the listener is puzzled), then the right one.
   await page.click('#next');
@@ -372,6 +484,40 @@ async function run(page, phone) {
   assert.ok(runs.every(r => r.runSource === 'agent'));
 }
 
+async function menuAndReload(page) {
+  await page.goto(base + '/grapevine/?level=3');
+  await until(page, () => window.grapevineState, 'village menu');
+  const issues = [];
+  const smallTargets = await page.locator('#menu button, #menu a').evaluateAll(nodes => nodes.filter(el => {
+    const { width, height } = el.getBoundingClientRect();
+    return width < 44 || height < 44;
+  }).map(el => el.textContent));
+  assert.deepEqual(smallTargets, [], 'menu touch targets span at least 44 CSS pixels');
+  const footer = await page.locator('#menu .lab-notice').boundingBox();
+  if (footer.y + footer.height > page.viewportSize().height) issues.push('recording notice is clipped');
+  await page.locator('#tabs button').nth(1).tap();
+  if (!(await page.locator('#menu').innerText()).includes('Finish village 30')) issues.push('Winter unlock condition missing');
+  await page.click('#play');
+  const st = await state(page), lv = await levelNow(page), nextHop = solve(lv).best[1];
+  await page.touchscreen.tap(st.nodes[nextHop].x, st.nodes[nextHop].y);
+  await page.reload();
+  await until(page, () => window.grapevineState, 'reloaded village');
+  const restored = await state(page);
+  if (restored.screen !== 'paused' || restored.level !== 3 || restored.route.join() !== [lv.from, nextHop].join()) issues.push('reload lost the route');
+  if (restored.paused) {
+    const target = await page.locator('#paused label').boundingBox();
+    if (target.height < 44) issues.push('recording toggle below 44px');
+    await page.click('#toMenu');
+    await page.reload();
+    assert.equal((await state(page)).screen, 'menu', 'explicitly leaving discards the route');
+  } else {
+    await page.click('#play');
+    await page.locator('#pause').tap();
+    if ((await page.locator('#paused label').boundingBox()).height < 44) issues.push('recording toggle below 44px');
+  }
+  assert.deepEqual(issues, []);
+}
+
 const only = process.argv[2];
 let failed = 0;
 for (const [phone, [engine, device]] of Object.entries(PHONES)) {
@@ -389,6 +535,8 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
   try {
+    await boardFeedback(page);
+    await menuAndReload(page);
     await run(page, phone);
     await firstHint(page);
     await chapters(page, phone);
@@ -407,6 +555,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     const p2 = await small.newPage(), errs = [];
     p2.on('pageerror', e => errs.push(String(e))); p2.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
     try {
+      await menuAndReload(p2);
       await p2.goto(`${base}/grapevine/?level=30`); await until(p2, () => window.grapevineState, 'state hook');
       assert.ok(await p2.evaluate(() => document.documentElement.scrollWidth <= 360), 'no sideways scroll');
       const play = await p2.locator('#play').boundingBox(); assert.ok(play.y + play.height <= 640, 'Play is on screen');

@@ -17,15 +17,20 @@
     <output id="longClock" hidden></output>
   </div>
 
+  <div id="shiftCaption" hidden>
+    <strong id="shiftStatus"></strong>
+    <span id="shiftGuide"></span>
+  </div>
   <section class="screen" id="menu" aria-label="Main menu">
     <div class="panel">
       <canvas id="poster" class="poster" width="680" height="364" aria-hidden="true"></canvas>
       <h1>Tiptoe Museum</h1>
+      <p class="premise">Keep the exhibits inside until dawn.</p>
       <div class="progress" id="progress" aria-label="Night progress"></div>
       <button class="primary" id="play"><span>Play</span><small aria-hidden="true" id="nightNumber"></small></button>
       <div class="row">
-        <button id="long"><span>Long Night</span><small id="best"></small></button>
-        <button id="daily"><span>Daily</span><small id="streak"></small></button>
+        <button id="long"><span>Long Night</span><span class="modeStat">Endless · <small id="best"></small></span></button>
+        <button id="daily"><span>Daily</span><span class="modeStat">Streak <small id="streak"></small></span></button>
       </div>
       <button class="quiet audio" id="menuSound"></button>
     </div>
@@ -35,6 +40,7 @@
     <div class="panel compact">
       <div class="motif" aria-hidden="true">Ⅱ</div>
       <h2>Paused</h2>
+      <p id="rules"></p>
       <button class="primary" id="resume">Resume</button>
       <div class="row">
         <button id="toMenu">Menu</button>
@@ -48,6 +54,7 @@
       <canvas id="resultPoster" class="poster" width="680" height="364" aria-hidden="true"></canvas>
       <h2 id="outcome"></h2>
       <p id="medals" aria-live="polite"></p>
+      <p id="resultDetail"></p>
       <button id="again" class="primary"></button>
       <div class="row">
         <button id="resultMenu">Menu</button>
@@ -58,7 +65,8 @@
 
   <section class="screen overlay" id="shareCard" aria-label="Daily share card">
     <div class="panel compact">
-      <canvas id="dailyPoster" class="poster" width="680" height="364" role="img" aria-label="Daily result and streak"></canvas>
+      <canvas id="dailyPoster" class="poster" width="680" height="540" role="img" aria-label="Daily result and streak"></canvas>
+      <p id="shareStatus" role="status"></p>
       <div class="row shareActions">
         <button id="closeShare">Back</button>
         <button id="saveCard" class="primary">Save</button>

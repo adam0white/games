@@ -21,8 +21,14 @@
   .sub { opacity: .9; margin-bottom: .6em; }
   button { font: inherit; font-weight: 600; color: #fff3dc; background: #ffffff14; border: 2px solid #ffd98a88; border-radius: 999px; padding: .45em 1.2em; margin: .25em; min-width: 8em; min-height: 46px; touch-action: manipulation; cursor: pointer; }
   button.main { background: #ffb347; color: #3a1a10; border-color: #ffb347; font-size: 1.25em; min-width: 9em; box-shadow: 0 4px 0 #b8642a; }
+  #continueRun { font-size: 1.05em; }
   button.main:active { transform: translateY(2px); box-shadow: 0 2px 0 #b8642a; }
   button small { font-weight: 500; opacity: .85; }
+  #powerTip { position: fixed; z-index: 1; left: 50%; transform: translateX(-50%); width: max-content; max-width: 90vw; box-sizing: border-box; padding: 7px 14px; background: #201730; color: #fff3dc; border: 1px solid #edd0a5; border-radius: 12px; text-align: center; font-weight: 650; pointer-events: none; }
+  #powerTip:empty { display: none; }
+  #shareImage { display: block; width: 100%; height: auto; border-radius: 14px; }
+  #saveCard { display: inline-grid; min-height: 44px; padding: 0 16px; border-radius: 99px; place-items: center; color: #391d10; background: #ffb347; text-decoration: none; font-weight: 700; touch-action: manipulation; }
+  #done .album-actions button { padding-left: .75em; padding-right: .75em; }
   #hero { display: block; width: 100%; height: 104px; margin: 0 auto -.2em; }
   #gallery { display: block; width: 100%; max-width: 330px; height: 92px; margin: .4em auto .1em; }
   .small { font-size: .85em; opacity: .85; }
@@ -40,17 +46,22 @@
   #pause { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: max(calc(8px + env(safe-area-inset-right)), calc((100vw - 460px) / 2 + 8px)); width: 46px; height: 46px; min-width: 0; min-height: 0; margin: 0; padding: 0;
     border: 2px solid #ffd98a66; border-radius: 50%; background: #120a26e6; display: none; place-items: center; touch-action: none; }
   #pause::before { content: ''; width: 4px; height: 16px; border: solid #ffd98a; border-width: 0 5px; }
+  .lab-notice a { display: inline-grid; min-width: 52px; min-height: 44px; place-items: center; touch-action: manipulation; }
+  .kit-hint[data-kind="tap"] { left: var(--memory-hint-x, 50%); }
+  @media (max-height: 720px) { #menu:has(#continueRun:not([hidden])) #hero { height: 52px; } }
   .lab-notice { max-width: 26em; margin-left: auto !important; margin-right: auto !important; }
   @media (max-height: 660px) { #hero { height: 72px; } #gallery { height: 80px; } h1 { font-size: 2.1em; } .sub { margin-bottom: .3em; } button { min-height: 44px; } #doneArt { height: 181px; } #done h2 { font-size: 1.7em; } #done p { margin: .25em 0; } }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<output id="powerTip" aria-live="polite"></output>
 <button id="pause" aria-label="Pause"></button>
 <div id="menu" class="screen veil on"><div>
   <canvas id="hero" aria-hidden="true"></canvas>
   <h1>Borrowed Time</h1>
-  <p class="sub">You forgot who you were: as a child, grown up and old. One candle to find all three.</p>
+  <p class="sub">You forgot who you were: as a child, grown up and old. Tap a glowing memory. Name all three before the candle goes out.</p>
+  <button id="continueRun" class="main" hidden>Continue</button>
   <p><button id="play" class="main">Play</button></p>
   <p><button id="daily">Daily <small></small></button></p>
   <canvas id="gallery" aria-label="Who you have been"></canvas>
@@ -73,7 +84,12 @@
   <p id="doneScore"></p>
   <p class="small" id="doneBest"></p>
   <p><button id="again" class="main">Play again</button></p>
-  <p class="album-actions"><button id="doneAlbum">Album</button><button id="doneMenu">Menu</button></p>
+  <p class="album-actions"><button id="doneAlbum">Album</button><button id="shareCard">Share card</button><button id="doneMenu">Menu</button></p>
+</div></div>
+<div id="share" class="screen veil"><div>
+  <h2>Your share card</h2>
+  <img id="shareImage" alt="">
+  <p class="album-actions"><a id="saveCard" download="borrowed-time.png">Save image</a><button id="shareBack">Back</button></p>
 </div></div>
 <div id="album" class="screen veil"><div>
   <h2>Keepsake album</h2>
@@ -192,7 +208,54 @@ let pz = null;
 let vignette = null, selected = -1, reveal = null, flash = null, nope = null, heartT = 0, newRoles = 0, chapterCard = { t: 0 }, nextBtn = null, chapterMenuBtn = null;
 const hints = { ability: {} };
 
+// Session storage is scoped to the tab. The permanent gallery save keeps its original format.
+function readCheckpoint() {
+  try {
+    const record = JSON.parse(sessionStorage.getItem(KEY));
+    if (performance.getEntriesByType('navigation')[0]?.type === 'reload' &&
+        record?.url === location.href && record.version === 1) return record;
+    sessionStorage.removeItem(KEY);
+  } catch { /* Storage can be unavailable. */ }
+  return null;
+}
+let interrupted = readCheckpoint();
+function checkpoint() {
+  if (!s || runOver()) return;
+  try {
+    sessionStorage.setItem(KEY, JSON.stringify({
+      version: 1, url: location.href, screen, mode, dayKey, touched, selected, vignette, newRoles,
+      s: { ...s, dark: [...s.dark], lit: [...s.lit], open: s.open?.lock ?? null },
+      pz: pz ? { ...pz, spot: pz.spot.lock } : null,
+    }));
+  } catch { /* A full or unavailable store must not interrupt play. */ }
+}
+addEventListener('pagehide', checkpoint);
+document.addEventListener('visibilitychange', () => { if (document.hidden) checkpoint(); });
+function clearCheckpoint() {
+  interrupted = null;
+  try { sessionStorage.removeItem(KEY); } catch { /* Storage can be unavailable. */ }
+}
+function continueRun() {
+  if (!interrupted) return;
+  const life = interrupted;
+  s = life.s; seed = s.seed; mode = life.mode; dayKey = life.dayKey;
+  s.dark = Uint8Array.from(s.dark); s.lit = Uint8Array.from(s.lit);
+  s.open = s.spots.find(spot => spot.lock === s.open) ?? null;
+  touched = life.touched; newRoles = life.newRoles; shownLife = s.life;
+  snd.unlock(); snd.release(); paused = false;
+  enterChapter();
+  selected = life.selected; vignette = life.vignette; pz = life.pz;
+  if (pz) pz.spot = s.spots.find(spot => spot.lock === pz.spot);
+  if (s.status === 'named') { chapterCard = { t: 1 }; show('chapter'); }
+  else if (life.screen === 'puzzle') { show('puzzle'); layoutPuzzle(); }
+  else if (life.screen === 'lineup') { show('lineup'); layoutLineup(); }
+  if (screen === 'lineup' || screen === 'puzzle') $('pause').style.display = 'grid';
+  rec.start({ seed, daily: mode === 'daily', islands: s.order.map(i => i + 1).join(''), continued: true });
+  interrupted = null;
+}
+$('continueRun').addEventListener('click', continueRun);
 function begin(daily = false) {
+  clearCheckpoint();
   snd.unlock();
   mode = daily ? 'daily' : 'free';
   const d = new Date();
@@ -257,11 +320,21 @@ function aim(x, y, first) {
   walkTo(s, tx, ty);
   if (first) tone(520 + Math.random() * 40, 0.05, 0.03, 'sine');
 }
+function powerAdvice(id) {
+  const spot = s.spots.find(p => p.lock === (id === 'glow' ? 'dark' : id));
+  if (id === 'rewind' && !spot) return 'No mirror on this island';
+  if (id === 'leap') return s.bridge ? 'Walk across the stepping stones' : 'Stand on a blue shore stone';
+  if (id === 'push') return s.grid.includes('B') ? 'Walk beside a cracked rock' : 'The cracked rock is already open';
+  if (spot?.open) return spot.taken ? 'You have this memory' : 'Walk to the open memory';
+  return id === 'glow' ? 'Walk near the patch of darkness' : 'Walk beside the broken mirror';
+}
 function press(id) {
   if (id === 'who') { openLineup(); return; }
+  nope = null;
   const ok = use(s, id);
   if (!ok) {
     nope = { id, t: 0 };
+    $('powerTip').textContent = powerAdvice(id);
     tone(150, 0.14, 0.06, 'square', -30);
   }
 }
@@ -276,7 +349,7 @@ const PRACTICE = {
 const practiceFaces = [[0, 2, 0, 1], [3, 3, 2, 3], [1, 0, 3, 2]];
 const promptFor = { lie: 'Which photo lies?', torn: 'Which half fits?', signed: 'Which photo lies?' };
 let puzzleCards = [], puzzleButtons = {}, puzzleFaces = null, puzzleTop = 0, reference = null;
-const FX_TEAR = 0.75, FX_POINT = 0.55;
+const FX_TEAR = 1.05;
 const targetOf = z => z.form === 'torn' ? 1 - z.liar : z.liar;
 function selectPhoto(i) {
   if (!pz || !puzzleCards[i]) return;
@@ -296,7 +369,11 @@ function selectPhoto(i) {
   }
   const z = pz.spot.puzzle;
   const reject = z.form === 'torn' ? 1 - i : i;
-  if (z.tried[reject]) { tone(150, 0.1, 0.05, 'square'); return; }
+  if (z.tried[reject]) {
+    pz.repeat = true;
+    tone(150, 0.1, 0.05, 'square');
+    return;
+  }
   puzzleAct(() => pickLie(s, reject));
 }
 function openPuzzle() {
@@ -304,7 +381,7 @@ function openPuzzle() {
   if (!spot) return;
   const form = spot.puzzle.form;
   const practice = (save.practice & PRACTICED[form]) ? null : { t: 0, wrong: -1, result: false };
-  pz = { spot, practice, wrong: [], fx: null, then: null };
+  pz = { spot, practice, wrong: [], repeat: false, fx: null, then: null };
   layoutPuzzle();
   screen = 'puzzle'; finger = null; selected = -1;
   tone(440, 0.25, 0.05, 'sine', 120); setTimeout(() => tone(330, 0.3, 0.04, 'sine', -60), 120);
@@ -320,7 +397,7 @@ function puzzleAct(fn) {
 function puzzleTick() {
   if (pz.practice) {
     pz.practice.t += DT;
-    if (pz.practice.result && pz.practice.t >= 0.48) {
+    if (pz.practice.result && pz.practice.t >= 1.05) {
       pz.practice = null;
       layoutPuzzle();
     }
@@ -329,7 +406,7 @@ function puzzleTick() {
   for (const w of pz.wrong) w.t += 1 / 60;
   if (pz.fx) {
     pz.fx.t += 1 / 60;
-    if (pz.fx.t >= FX_TEAR + (pz.fx.how === 'shown' ? FX_POINT : 0)) { screen = 'play'; vignette = pz.then; pz = null; }
+    if (pz.fx.t >= FX_TEAR) { screen = 'play'; vignette = pz.then; pz = null; }
   }
 }
 function puzzleTap(x, y) {
@@ -350,7 +427,7 @@ function layoutPuzzle() {
     later: { x: cx - bw - 6, y: by, w: bw, h: bh },
     show: { x: cx + 6, y: by, w: bw, h: bh },
   };
-  const gap = 12, top = puzzleTop + (form === 'signed' ? 104 : 64);
+  const gap = 12, top = puzzleTop + (form === 'signed' ? 120 : practice ? 64 : 86);
   const limit = practice ? bottom : by - 12;
   const cw = Math.min((cw0 - 32 - gap) / 2, 190);
   const available = limit - top;
@@ -489,13 +566,19 @@ function puzzleScene(time) {
       g.beginPath(); g.moveTo(x, y); g.lineTo(x - 3, y + 14); g.stroke();
     }
   }
-  const title = practice?.result ? 'That’s it!' : fx ? (torn ? 'Photo mended' : 'You found the lie!')
-    : warning ? (torn ? 'That edge doesn’t fit' : 'That photo is true') : promptFor[z.form];
+  const title = practice?.result ? 'Practice complete' : fx?.how === 'shown' ? 'Answer revealed'
+    : fx ? (torn ? 'Photo mended' : 'You found the lie!') : practice && practice.wrong >= 0 ? 'Try the other photo'
+    : pz.repeat ? 'Already checked · no cost' : warning ? (torn ? 'That edge doesn’t fit' : 'That photo is true') : practice ? 'Free practice' : promptFor[z.form];
   puzzleText(title, cx, ty, 24, warning && !fx ? '#ffb0a0' : '#ffd98a');
-  if (practice) puzzleText('Practice · free', cx, ty + 28, 14, '#decce8');
-  else if (!fx) {
-    flame(g, cx - 55, ty + 32, 4, time);
-    puzzleText(`Wrong tap  −${PICK}`, cx + 9, ty + 28, 14, '#f7b29d');
+  if (practice) {
+    const instruction = torn ? 'Tap the half that fits the torn edge.' : signed ? 'Tap the photo with this seal.' : 'Your pet is the cat. Tap the other photo.';
+    puzzleText(practice.result ? 'Keep the true photo as a clue.' : instruction, cx, ty + 28, 14, '#decce8');
+  } else if (fx) {
+    puzzleText('Keep the true photo as a clue.', cx, ty + 28, 14, '#decce8');
+  } else {
+    const instruction = torn ? 'Match the torn edges.' : signed && s.exposed.length ? 'Find the seal that marked a lie.' : 'Compare both photos with the possible faces.';
+    puzzleText(instruction, cx, ty + 24, 14, '#decce8');
+    puzzleText(`Wrong tap costs ${PICK} years`, cx, ty + 44, 13, '#f7b29d');
   }
 
   if (reference && torn) {
@@ -529,20 +612,21 @@ function puzzleScene(time) {
   }
   const exposed = practice && signed ? [z.seal] : s.exposed;
   if (signed && exposed.length) {
-    const label = 'False witness';
+    const label = 'Seal from a false photo';
     g.font = '700 13px system-ui, sans-serif';
     const start = cx - (30 + g.measureText(label).width) / 2;
-    sealMark(exposed[0], start + 10, ty + 61, 14, true);
-    puzzleText(label, start + 30, ty + 61, 13, '#decce8', 'left');
+    sealMark(exposed[0], start + 10, ty + (practice ? 62 : 76), 14);
+    puzzleText(label, start + 30, ty + (practice ? 62 : 76), 13, '#decce8', 'left');
   }
 
-  const finishing = practice?.result || (fx && (fx.how === 'found' || fx.t >= FX_POINT));
-  const progress = practice?.result ? practice.t / 0.48
-    : fx ? Math.max(0, fx.t - (fx.how === 'shown' ? FX_POINT : 0)) / FX_TEAR : 0;
+  const finishing = practice?.result || !!fx;
+  const progress = practice?.result ? practice.t / 1.05
+    : fx ? fx.t / FX_TEAR : 0;
   puzzleCards.forEach((card, i) => {
     const fr = z.frags[i];
     const wrong = !practice && pz.wrong.find(w => w.i === (torn ? 1 - i : i));
-    const rejected = finishing && i === (practice ? 1 - target : z.liar);
+    const liar = practice ? (torn ? 1 - target : target) : z.liar;
+    const rejected = finishing && i === liar;
     const proved = finishing && !rejected;
     const paint = { ...card };
     if (!reduced && torn && proved) {
@@ -567,12 +651,17 @@ function puzzleScene(time) {
     if (proved && torn) trueMark(x + w - 13, y + h - 12, 11);
     if (proved && !torn) trueMark(x + 13, y + 13, 11);
     const tried = !practice && actual.tried[torn ? 1 - i : i];
-    if (rejected || (!finishing && practice?.wrong === i)) cross(x + w / 2, y + h / 2, 25, '#e34b61', 5);
-    if (tried) {
+    if (rejected || (!finishing && torn && practice?.wrong === i)) cross(x + w / 2, y + h / 2, 25, '#e34b61', 5);
+    if (tried || (!finishing && !torn && practice?.wrong === i)) {
       if (torn) cross(x + w - 13, y + 19, 8, '#e34b61', 4);
       else trueMark(x + 13, y + 13, 11);
     }
-    if (wrong && wrong.t < 0.85) puzzleText(`−${PICK}`, x + w / 2, y - 12 - wrong.t * 15, 20, '#ffbea9');
+    if (finishing) {
+      g.fillStyle = rejected ? '#682435' : '#20382d';
+      g.fillRect(x + w / 2 - 22, y + 14, 44, 20);
+      puzzleText(rejected ? 'False' : 'True', x + w / 2, y + 24, 13, '#fff5dd');
+    }
+    if (wrong && wrong.t < 0.85 && !pz.repeat) puzzleText(`−${PICK}`, x + w / 2, y - 12 - wrong.t * 15, 20, '#ffbea9');
     g.restore();
   });
 
@@ -588,7 +677,7 @@ function puzzleScene(time) {
       });
     }
     const card = puzzleCards[target];
-    if (!practice.result && practice.t >= 0.5) hand(g, card.x + card.w * 0.73, card.y + card.h * 0.76, reduced ? 0.5 : time % 1);
+    if (!practice.result && practice.t >= 3) hand(g, card.x + card.w * 0.73, card.y + card.h * 0.76, reduced ? 0.5 : time % 1);
     g.restore();
     return;
   }
@@ -605,16 +694,13 @@ function puzzleScene(time) {
     }
   });
   if (!fx) {
-    for (const [key, label] of [['later', '← Later'], ['show', `Show me  −${SHOW}`]]) {
+    for (const [key, label] of [['later', '← Later'], ['show', `Reveal · −${SHOW} years`]]) {
       const b = puzzleButtons[key];
       g.beginPath(); roundRect(g, b.x, b.y, b.w, b.h, 18);
       g.fillStyle = key === 'show' ? '#523867' : '#2c233b'; g.fill();
       g.strokeStyle = key === 'show' ? '#c39bff' : '#81738d'; g.lineWidth = 1.5; g.stroke();
       puzzleText(label, b.x + b.w / 2, b.y + b.h / 2, 16, key === 'show' && SHOW >= s.life ? '#ff9a86' : CREAM);
     }
-  } else if (fx.how === 'shown' && fx.t < FX_POINT) {
-    const c = puzzleCards[target];
-    hand(g, c.x + c.w * 0.74, c.y + c.h * 0.77, reduced ? 0.5 : time % 1);
   }
   g.restore();
 }
@@ -629,7 +715,7 @@ function openLineup() {
   layoutLineup();
 }
 function layoutLineup() {
-  const top = safe.t + 118, bottom = H - safe.b - 76, gap = 10;
+  const top = safe.t + 137, bottom = H - safe.b - 76, gap = 10;
   const cw = Math.min((Math.min(W, 520) - 3 * gap) / 2, 230), ch = Math.min((bottom - top - 2 * gap) / 3, cw * 0.95);
   const x0 = (W - (2 * cw + gap)) / 2, y0 = top + ((bottom - top) - (3 * ch + 2 * gap)) / 2;
   cards = Array.from({ length: FACES }, (_, i) => ({ x: x0 + (i % 2) * (cw + gap), y: y0 + Math.floor(i / 2) * (ch + gap), w: cw, h: ch }));
@@ -640,12 +726,13 @@ function lineupTap(x, y) {
   if (inRect(lineupButtons.back, x, y)) { screen = 'play'; selected = -1; tone(330, 0.12, 0.05, 'sine', -100); return; }
   if (inRect(lineupButtons.sure, x, y)) { if (selected >= 0) choose(selected); else { tone(150, 0.1, 0.05, 'square'); flash = { t: 0, what: 'pick' }; } return; }
   const i = cards.findIndex(c => inRect(c, x, y));
-  if (i < 0) return;
+  if (i < 0 || !consistent(s.faces, s.known).includes(i)) return;
   if (selected === i) { choose(i); return; }
   selected = i;
   tone(SCALE[i % SCALE.length], 0.12, 0.06, 'triangle');
 }
 function choose(i) {
+  if (!consistent(s.faces, s.known).includes(i)) return;
   const right = guess(s, i);
   rec.event('guess', { right, chapter: s.chapter + 1, found: s.found });
   s.events = s.events.filter(e => e.type !== 'faded'); // a wrong name that empties the candle: shown by the reveal below
@@ -758,6 +845,7 @@ function startReveal(outcome) {
   }
   rec.event('chapter', { chapter: c.chapter + 1, id: c.id, right: c.right, years: Math.round(c.yearsSpent), uses: c.uses, found: c.found, seconds: Math.round(c.seconds), left: Math.round(s.life) });
   if (!runOver()) { store(); return; }
+  clearCheckpoint();
   save.best = Math.max(save.best, s.score);
   if (mode === 'daily') save.daily[dayKey] = Math.max(save.daily[dayKey] || 0, s.score);
   save.runs++;
@@ -769,9 +857,14 @@ function startReveal(outcome) {
   });
 }
 const TITLES = { remembered: 'You remember your life!', mistaken: 'A life, mostly remembered', faded: 'Your candle went out' };
+function lifeTitle(outcome, recovered) {
+  if (outcome === 'mistaken' && recovered === 0) return 'No names remembered';
+  if (outcome === 'mistaken' && recovered === 1) return 'One name remembered';
+  return outcome === 'left' ? 'Life left unfinished' : TITLES[outcome];
+}
 function showEnd() {
   const o = s.status;
-  $('doneTitle').textContent = TITLES[o];
+  $('doneTitle').textContent = lifeTitle(o, s.right);
   $('doneWho').textContent = s.chapters.filter(c => c.portrait).map(c => roleName(c.portrait)).join(' · ');
   const wrong = s.chapters.filter(c => c.right === false).length;
   // A perfect run keeps its one-line summary. After a wrong name, a second line shows the years share it still earned.
@@ -825,7 +918,7 @@ function tick() {
   sfx = sfx.filter(p => (p.word || p.pop !== undefined) ? p.t < 1 : p.life > 0);
   for (const r of rings) r.t += 1 / 24;
   rings = rings.filter(r => r.t < 1);
-  if (nope) { nope.t += 1 / 60; if (nope.t > 1.2) nope = null; }
+  if (nope) { nope.t += 1 / 60; if (nope.t > 2.8) nope = null; }
   if (flash) { flash.t += 1 / 60; if (flash.t > 1) flash = null; }
   if (screen === 'chapter') chapterCard.t += 1 / 60;
   if (reveal) {
@@ -836,6 +929,9 @@ function tick() {
 function frame(now) {
   const dt = Math.min(0.25, (now - last) / 1000); last = now;
   if (!paused) { acc += dt; while (acc >= DT) { tick(); acc -= DT; } }
+  const tip = $('powerTip');
+  tip.hidden = paused || screen !== 'play' || !nope || !!vignette;
+  if (!tip.hidden) tip.style.bottom = (H - barRect.y + 8) + 'px';
   draw(paused ? 0 : acc / DT);
   if (screen === 'done') drawAlbum($('doneArt'), save.album.at(-1));
   if (screen === 'album') drawAlbum($('albumArt'), save.album[albumIndex]);
@@ -855,7 +951,7 @@ function draw(alpha) {
     puzzleScene(time);
     return;
   }
-  if (screen === 'done' || screen === 'album') {
+  if (screen === 'done' || screen === 'album' || screen === 'share') {
     if (GLOOM) rain(time, null);
     return;
   }
@@ -1264,12 +1360,7 @@ function abilityBar(time) {
     }
     g.restore();
   }
-  if (nope && nope.t < 1) {
-    g.globalAlpha = 1 - nope.t; g.font = '700 15px ui-rounded, system-ui, sans-serif'; g.textAlign = 'center';
-    const b = bar.find(q => q.id === nope.id), word = 'Not here';
-    g.lineWidth = 4; g.strokeStyle = INK; g.strokeText(word, b.x + b.w / 2, b.y - 16 - nope.t * 10);
-    g.fillStyle = '#fff3dc'; g.fillText(word, b.x + b.w / 2, b.y - 16 - nope.t * 10); g.globalAlpha = 1;
-  }
+
 }
 
 // ---------------------------------------------------------------- first runs: point at what to touch
@@ -1342,18 +1433,29 @@ function lineup(time) {
     if (s.known[d] !== null) value(g, d, s.known[d], x, y, r, time);
     else { g.beginPath(); g.arc(x, y, r, 0, TAU); g.setLineDash([4, 4]); g.strokeStyle = 'rgba(255,233,168,.4)'; g.lineWidth = 2; g.stroke(); g.setLineDash([]); kindIcon(g, d, x, y, r * 0.5, 'rgba(255,233,168,.35)'); }
   }
+  const candidates = consistent(s.faces, s.known);
+  if (!rv) {
+    g.font = '700 14px ui-rounded, system-ui, sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffe2ad';
+    g.fillText(`Ends this chapter · Wrong name −${wrongCost(s)} years`, W / 2, safe.t + 117);
+  }
   cards.forEach((c, i) => {
+    const excluded = !rv && !candidates.includes(i);
     const isAnswer = rv && i === s.answer, isPick = i === (rv ? s.guessed : selected);
     let sc = 1, dx = 0;
     if (!rv && isPick) sc = 1.04 + 0.02 * Math.sin(time * 6);
     if (rv && isAnswer) sc = 1 + 0.06 * back(Math.min(1, rv.t * 2));
     if (rv && rv.outcome === 'wrong' && isPick && rv.t < 0.6 && !reduced) dx = Math.sin(rv.t * 50) * 6 * (1 - rv.t / 0.6);
     g.save(); g.translate(c.x + c.w / 2 + dx, c.y + c.h / 2); g.scale(sc, sc);
-    const dim = rv && !isAnswer;
+    const dim = excluded || (rv && !isAnswer);
     portrait(g, s.faces[i], -c.w / 2, -c.h / 2, c.w, c.h, time + i, { blink: blinkAt(time, i + 2), dim, mood: isAnswer && rv.outcome === 'right' ? 'happy' : null, age: s.chapter });
     g.beginPath(); roundRect(g, -c.w / 2, -c.h / 2, c.w, c.h, Math.min(16, c.w * 0.1));
     g.lineWidth = isPick || isAnswer ? 5 : 2.5;
     g.strokeStyle = isAnswer ? GOLD : isPick ? (rv ? '#ff5a4a' : '#fff3dc') : 'rgba(255,243,220,.35)'; g.stroke();
+    if (excluded) {
+      g.strokeStyle = '#e29a85'; g.lineWidth = 3; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(-c.w / 2 + 10, c.h / 2 - 10); g.lineTo(c.w / 2 - 10, -c.h / 2 + 10); g.stroke();
+    }
     if (rv && rv.outcome === 'wrong' && isPick && !isAnswer) {
       g.strokeStyle = '#ff5a4a'; g.lineWidth = 7; g.lineCap = 'round';
       g.beginPath(); g.moveTo(-c.w * 0.25, -c.h * 0.25); g.lineTo(c.w * 0.25, c.h * 0.25); g.moveTo(c.w * 0.25, -c.h * 0.25); g.lineTo(-c.w * 0.25, c.h * 0.25); g.stroke();
@@ -1504,7 +1606,6 @@ function drawGallery() {
     }
   }
 }
-const albumLabels = { ...TITLES, left: 'Life left unfinished' };
 let albumIndex = 0, albumFrom = 'menu';
 function savePage(outcome) {
   const chapters = s.chapters.map(c => ({ portrait: c.portrait, photos: c.photos }));
@@ -1527,13 +1628,16 @@ function drawAlbum(canvas, page) {
   const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
-  const row = (h - 12) / 3, width = Math.min((w - 49) / 6, row * 0.82), gap = 4;
+  const row = (h - 12) / 3, gap = 4;
   ctx.beginPath(); roundRect(ctx, 0, 0, w, h, 10); const paper = ctx.createLinearGradient(0, 0, w, 0);
   paper.addColorStop(0, '#281b30'); paper.addColorStop(.11, '#4f3745');
   paper.addColorStop(.14, '#493343'); paper.addColorStop(1, '#342438');
   ctx.fillStyle = paper; ctx.fill();
   CHAPTERS.forEach((ch, i) => {
-    const c = page.chapters[i], y = 6 + i * row, top = y + (row - width) / 2;
+    const c = page.chapters[i], y = 6 + i * row;
+    const count = 1 + (c?.photos.length ?? 0);
+    const width = Math.min((w - 20 - gap * (count - 1)) / count, row - 8);
+    const top = y + (row - width) / 2;
     if (i) { ctx.fillStyle = '#ad8a6b55'; ctx.fillRect(8, y, w - 16, 1); }
     if (c?.portrait) portrait(ctx, c.portrait, 7, top, width, width, 0, { age: i });
     else {
@@ -1558,7 +1662,8 @@ function drawAlbum(canvas, page) {
 function updateAlbum(index) {
   albumIndex = index;
   $('albumCount').textContent = `${index + 1} / ${save.album.length}`;
-  $('albumCaption').textContent = albumLabels[save.album[index].outcome];
+  const page = save.album[index];
+  $('albumCaption').textContent = lifeTitle(page.outcome, page.chapters.filter(c => c.portrait).length);
   $('albumPrev').disabled = index === 0;
   $('albumNext').disabled = index === save.album.length - 1;
 }
@@ -1569,13 +1674,43 @@ function openAlbum() {
   show('album');
 }
 $('menuAlbum').addEventListener('click', openAlbum);
+// The export contains the three chapter results. No seed or device identifiers leave the game.
+$('shareCard').addEventListener('click', () => {
+  const card = document.createElement('canvas');
+  card.width = 720; card.height = 650;
+  const ctx = card.getContext('2d');
+  ctx.fillStyle = '#221831'; ctx.fillRect(0, 0, card.width, card.height);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffe0a1'; ctx.font = '800 62px system-ui';
+  ctx.fillText('Borrowed Time', 360, 102);
+  ctx.font = '600 28px system-ui'; ctx.fillStyle = '#ecdbd2';
+  ctx.fillText(mode === 'daily' ? 'Daily · ' + dayKey : 'A life in three chapters', 360, 158);
+  CHAPTERS.forEach((chapter, i) => {
+    const x = 27 + i * 225, face = s.chapters[i]?.portrait;
+    if (face) portrait(ctx, face, x, 220, 216, 216, 0, { age: i });
+    else {
+      ctx.fillStyle = '#362842'; ctx.beginPath(); roundRect(ctx, x, 220, 216, 216, 14); ctx.fill();
+      ctx.fillStyle = '#e1cbaa'; ctx.font = '700 32px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText('Unknown', x + 108, 338);
+    }
+    ctx.textAlign = 'center'; ctx.font = '650 28px system-ui'; ctx.fillStyle = '#fff3dc';
+    ctx.fillText(chapter.name, x + 108, 481);
+  });
+  const score = s.right + ' of 3 right · ' + s.score + ' points';
+  ctx.fillStyle = '#ffe0a1'; ctx.font = '800 42px system-ui'; ctx.fillText(score, 360, 580);
+  const png = card.toDataURL('image/png');
+  $('shareImage').alt = 'Borrowed Time. ' + score;
+  $('shareImage').src = png; $('saveCard').href = png;
+  show('share');
+});
+$('shareBack').addEventListener('click', () => show('done'));
 $('doneAlbum').addEventListener('click', openAlbum);
 $('albumPrev').addEventListener('click', () => updateAlbum(albumIndex - 1));
 $('albumNext').addEventListener('click', () => updateAlbum(albumIndex + 1));
 $('albumBack').addEventListener('click', () => show(albumFrom));
 
 // ---------------------------------------------------------------- menu, pause and cards
-const cardsOn = screens(['menu', 'paused', 'done', 'album']);
+const cardsOn = screens(['menu', 'paused', 'done', 'album', 'share']);
 function show(name) {
   screen = name; cardsOn(name);
   $('pause').style.display = name === 'play' ? 'grid' : 'none';
@@ -1583,11 +1718,19 @@ function show(name) {
 }
 function menu() {
   finger = null;
+  $('continueRun').hidden = !interrupted;
+  if (interrupted) {
+    const life = interrupted.s;
+    const chapter = life.status === 'named' ? life.chapter + 1 : life.chapter;
+    $('continueRun').textContent = `Continue ${interrupted.mode === 'daily' ? 'Daily · ' : '· '}${CHAPTERS[chapter].name}`;
+  }
+  $('play').textContent = interrupted ? 'New life' : 'Play';
+  $('play').classList.toggle('main', !interrupted);
   $('menuAlbum').hidden = !save.album.length;
   const ds = save.daily[today()];
   $('daily').querySelector('small').textContent = ds === undefined ? '· new today' : `· today ${ds}`;
   const found = Object.keys(save.gallery).length;
-  $('bestLine').textContent = save.runs ? `Found ${found} of 16 · Best ${save.best}` : 'Tap where to walk. Use powers to find memories.';
+  $('bestLine').textContent = `Role gallery · Found ${found} of 16` + (save.runs ? ` · Best ${save.best}` : '');
   soundLabel();
 }
 const soundLabel = () => { $('sound').textContent = $('sound2').textContent = `Sound: ${save.sound ? 'on' : 'off'}`; };
@@ -1611,6 +1754,7 @@ $('pause').addEventListener('pointerdown', e => { e.preventDefault(); e.stopProp
 $('pause').addEventListener('click', e => { e.preventDefault(); pause(); });
 $('resume').addEventListener('click', resume);
 function leaveRun() {
+  clearCheckpoint();
   rec.end('left', { score: 0, years: Math.round(s.life), right: s.right, reached: s.chapter + 1, found: s.found, used: { ...s.used }, seconds: Math.round(s.t / 60), daily: mode === 'daily', chapters: s.chapters.map(c => ({ id: c.id, right: c.right, years: Math.round(c.yearsSpent), uses: c.uses })) });
   savePage('left');
   paused = false; snd.release(); s = null; pz = null; show('menu');
@@ -1624,8 +1768,15 @@ addEventListener('keydown', e => {
   if (paused) return;
   if (screen === 'lineup') {
     if (e.key === 'Backspace') { screen = 'play'; selected = -1; }
-    else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') selected = (selected + (e.key === 'ArrowDown' ? 2 : 1) + FACES) % FACES;
-    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') selected = (selected - (e.key === 'ArrowUp' ? 2 : 1) + FACES * 2) % FACES;
+    else if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(e.key)) {
+      const fits = consistent(s.faces, s.known);
+      const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1;
+      const vertical = e.key === 'ArrowUp' || e.key === 'ArrowDown';
+      const column = fits.filter(i => i % 2 === selected % 2);
+      const order = vertical && column.length > 1 ? column : fits;
+      if (selected < 0) selected = dir === 1 ? fits[0] : fits.at(-1);
+      else selected = order[(order.indexOf(selected) + dir + order.length) % order.length];
+    }
     else if (e.key === 'Enter' && selected >= 0) choose(selected);
     return;
   }
@@ -1683,35 +1834,19 @@ window.borrowedState = () => ({
 });
 window.borrowedSim = () => s; // checks may shorten a candle to reach the fading end quickly
 
-// The hint is drawn over the island's middle column (the island is 7 tiles wide and centred). It goes on the
-// nearest tile above the player, in that column, with no memory or player on it, on the tile above (the words) or on
-// the two tiles below (the hand hangs below the knob). Plain ground is preferred, so the copy taps somewhere the player
-// could walk. With no such tile it sits mid-screen.
-function clearSpot() {
-  const free = (x, y) => {
-    if (Math.floor(s.px) === x && Math.floor(s.py) === y) return false;
-    return !s.spots.some(p => !p.taken && p.x === x && p.y === y);
-  };
-  const plain = (x, y) => y >= 0 && y < s.h && s.grid[y * s.w + x] === '.' && free(x, y);
-  const me = Math.floor(s.py);
-  const rows = [];
-  for (let y = me - 2; y >= 0; y--) rows.push(y);
-  for (let y = me + 1; y < s.h; y++) rows.push(y);
-  const fits = y => {
-    const mid = sy(y) + T / 2;
-    return mid >= viewTop + T && mid <= viewBottom - T * 1.5 && free(3, y - 1) && free(3, y) && free(3, y + 1) && free(3, y + 2);
-  };
-  const best = rows.find(y => fits(y) && plain(3, y)) ?? rows.find(fits);
-  if (best === undefined) return Math.max(190, Math.round(H * 0.53));
-  return Math.round(H - safe.b - (sy(best) + T / 2));
+// Keep the shared walking hint on the same memory as the first-touch cue.
+function firstMemoryBottom() {
+  const memory = s.spots.find(p => p.lock === 'free' && !p.taken);
+  const x = memory ? sx(memory.x + 0.5) : W / 2;
+  const y = memory ? sy(memory.y + 0.5) : (viewTop + viewBottom) / 2;
+  document.documentElement.style.setProperty('--memory-hint-x', x + 'px');
+  return Math.round(H - safe.b - y);
 }
-// A first-time player who does not touch for 3 s in play sees a finger tap the island (experiments/kit/hint.js).
-// While it shows, the game's own pointing hand waits. It sits on a clear tile above the player (clearSpot).
 const help = hint(canvas, {
   kind: 'tap',
   key: 'borrowed:hint',
-  label: 'Tap the island to walk there',
-  bottom: clearSpot,
+  label: 'Tap the glowing memory',
+  bottom: firstMemoryBottom,
   when: () => screen === 'play' && !paused && !vignette && s?.status === 'play',
   played: readJson(KEY) !== null,
 });

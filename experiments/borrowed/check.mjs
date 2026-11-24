@@ -89,6 +89,23 @@ async function pick(page, face) {
   return lu;
 }
 
+async function checkKnownFaces(page) {
+  const st = await state(page);
+  await tap(page, st.buttons.who);
+  const lu = await state(page);
+  const excluded = lu.cards.findIndex((_, i) => !st.candidates.includes(i));
+  assert.ok(excluded >= 0, 'the clue excludes a face');
+  await tap(page, lu.cards[excluded]);
+  const problems = [];
+  if ((await state(page)).selected !== -1) problems.push('a contradicted face could be selected');
+  const words = (await canvasWords(page)).map(w => w.text);
+  if (!words.some(w => w.includes('Ends this chapter') && w.includes('−30 years'))) {
+    problems.push('the choice hid its cost or finality');
+  }
+  assert.deepEqual(problems, [], 'naming uses the evidence and discloses the stakes');
+  await tap(page, lu.back);
+}
+
 const SEED = 7;
 // The run of a seed as it stands at the start of chapter k (0, 1, 2).
 const chapterOf = (seed, k) => { const s = newRun(seed); for (let j = 0; j < k; j++) { s.status = 'named'; nextChapter(s); } return s; };
@@ -103,6 +120,41 @@ async function waitPuzzle(page) {
   }, 'a puzzle opens');
   return (await state(page)).puzzle;
 }
+// Read the words actually painted during a frame, including their position on each photo.
+async function canvasWords(page) {
+  return page.evaluate(() => new Promise(resolve => {
+    const canvas = document.querySelector('#c').getContext('2d'), words = [];
+    const fill = canvas.fillText;
+    canvas.fillText = function(text, x, ...args) {
+      words.push({ text, x });
+      return fill.call(this, text, x, ...args);
+    };
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      canvas.fillText = fill;
+      resolve(words);
+    }));
+  }));
+}
+// Observe before input so a slow browser round trip cannot miss transient feedback.
+async function tapShowing(page, point, label, side = null) {
+  const paint = await page.evaluateHandle(({ label, side }) => {
+    const canvas = document.querySelector('#c').getContext('2d');
+    const fill = canvas.fillText;
+    const mark = { seen: false, restore() { canvas.fillText = fill; } };
+    canvas.fillText = function(text, x, ...args) {
+      if (text === label && (side === null || (x < innerWidth / 2) === (side === 0))) mark.seen = true;
+      return fill.call(this, text, x, ...args);
+    };
+    return mark;
+  }, { label, side });
+  try {
+    await tap(page, point);
+    await until(page, mark => mark.seen, `painted feedback "${label}"`, 8000, paint);
+  } finally {
+    await paint.evaluate(mark => mark.restore());
+    await paint.dispose();
+  }
+}
 const practicePick = { lie: 0, torn: 1, signed: 0 };
 async function finishPractice(page, o = {}) {
   const pz = await waitPuzzle(page);
@@ -112,11 +164,14 @@ async function finishPractice(page, o = {}) {
   assert.equal(pz.show, null, 'practice has no paid hint');
   assert.equal(pz.later, null, 'practice has no live puzzle controls');
   const pick = practicePick[pz.form];
+  const instructions = { lie: 'Your pet is the cat. Tap the other photo.', torn: 'Tap the half that fits the torn edge.', signed: 'Tap the photo with this seal.' };
+  assert.ok((await canvasWords(page)).some(w => w.text === instructions[pz.form]), 'practice explains the evidence to use');
   if (o.shot) { await sleep(750); await o.shot(); }
   if (!pz.practiceResult) {
     await tap(page, pz.cards[1 - pick]);
     assert.equal((await state(page)).puzzle.practiceResult, false, 'a wrong practice tap is free and leaves practice open');
-    await tap(page, pz.cards[pick]);
+    const trueSide = pz.form === 'torn' ? pick : 1 - pick;
+    await tapShowing(page, pz.cards[pick], 'True', trueSide);
   }
   await until(page, () => window.borrowedState().puzzle?.practice === false, 'practice closes and the real puzzle opens');
   const after = await state(page);
@@ -143,12 +198,12 @@ async function solve(page, phone, seed, k, lock, o = {}) {
     assert.ok(Math.abs(y0 - st.life - PICK) < 1e-6, `a wrong tap costs ${PICK} years`);
     assert.ok(st.puzzle.tried[other] && st.screen === 'puzzle', 'the wrong pick is marked and the puzzle stays open');
     if (o.shots?.wrong) { await sleep(200); await shot(page, phone, o.shots.wrong); }
-    await tap(page, pz.cards[other]);
+    await tapShowing(page, pz.cards[other], 'Already checked · no cost');
     assert.equal((await state(page)).life, st.life, 'repeated wrong tap is free');
   }
   if (o.show) {
     const y0 = (await state(page)).life;
-    await tap(page, pz.show);
+    await tapShowing(page, pz.show, 'Answer revealed');
     assert.ok(Math.abs(y0 - (await state(page)).life - SHOW) < 1e-6, `Show me costs ${SHOW} years`);
     if (o.shots?.shown) await shot(page, phone, o.shots.shown);
   } else {
@@ -241,6 +296,8 @@ async function firstHint(page) {
   assert.equal(await page.evaluate(() => document.querySelector('.kit-hint').dataset.kind), 'tap', 'hint: a tap');
   const p = await page.evaluate(() => { const r = document.querySelector('.kit-hint .knob').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
   assert.ok(p.y < (await state(page)).buttons.who.y - 42 - 90, 'hint: the finger stays above the ability bar');
+  const memory = (await state(page)).spots.find(s => s.lock === 'free');
+  assert.ok(Math.hypot(p.x - memory.x, p.y - memory.y) < (await state(page)).tile / 2, 'the kit finger points to the free memory');
   await tap(page, p);
   assert.equal(await page.evaluate(() => document.querySelector('.kit-hint')), null, 'hint: a real tap removes it');
   assert.ok((await state(page)).touched, 'hint: the tap reached the game');
@@ -336,6 +393,7 @@ async function run(page, phone) {
   assert.equal(st.practice, 1, 'the first practice pair is done');
   assert.ok(st.candidates.length >= 1 && st.candidates.length < 6, 'the first memory narrows the portraits');
   assert.ok(st.known.filter(v => v !== null).length >= 1, 'a kind is known');
+  await checkKnownFaces(page);
 
   // pause while walking: time and place stand still, then go on
   const far = { x: st.mapX + (dark.tx + 0.5) * st.tile, y: Math.max(st.viewTop + 8, Math.min(st.viewBottom - 8, st.viewTop + (dark.ty + 0.5) * st.tile - st.cam)) };
@@ -570,6 +628,17 @@ async function puzzleTour(page, tag, seed) {
   await shot(page, tag, 'p9-album');
   assert.equal(await page.textContent('#albumCount'), '1 / 1');
 
+  // The first row contains a portrait and two photos. At phone size its third print
+  // should reach past the midpoint, even though a later row can hold five prints.
+  const colours = await page.locator('#albumArt').evaluate(el => {
+    const ctx = el.getContext('2d');
+    const pixels = ctx.getImageData(Math.floor(el.width * .55), Math.floor(el.height * .12),
+      Math.ceil(el.width * .14), Math.ceil(el.height * .11)).data;
+    const rgb = new Set();
+    for (let i = 0; i < pixels.length; i += 4) rgb.add(pixels[i] * 65536 + pixels[i + 1] * 256 + pixels[i + 2]);
+    return rgb.size;
+  });
+  assert.ok(colours > 24, 'short album rows use the available width for photos');
   const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('borrowed-save')));
   const { album, practice, taught } = await saved();
   assert.equal(practice, 7);
@@ -603,6 +672,44 @@ async function puzzleTour(page, tag, seed) {
   await page.click('#albumBack');
 }
 
+// Exercise the menu, field guidance and results without substituting internal state for visible feedback.
+async function auditFeedback(page) {
+  await page.goto(base + '/borrowed/?seed=7');
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  const failures = [];
+  const privacy = await page.locator('.lab-notice a').boundingBox();
+  if (privacy.width < 44 || privacy.height < 44) failures.push('Privacy has a 44 px target');
+  const expect = (value, message) => { if (!value) failures.push(message); };
+  expect(/gallery.*0 of 16/i.test(await page.textContent('#bestLine')), 'empty gallery has a visible label');
+  await page.click('#play');
+  await tap(page, (await state(page)).buttons.rewind);
+  expect(/no mirror/i.test(await page.locator('#powerTip').allTextContents().then(t => t.join(''))), 'Child explains why Rewind is unavailable');
+  await tap(page, (await state(page)).buttons.push);
+  expect(/cracked rock/i.test(await page.locator('#powerTip').allTextContents().then(t => t.join(''))), 'Push identifies its map target');
+  for (let k = 0; k < 3; k++) {
+    await nameFace(page, (answers[k] + 1) % 6);
+    if (k < 2) await goOn(page, 'audit', null);
+  }
+  await until(page, () => window.borrowedState().screen === 'done', 'zero names result');
+  expect(/no names/i.test(await page.textContent('#doneTitle')), 'zero names has an accurate result');
+  await page.click('#doneAlbum');
+  expect(/no names/i.test(await page.textContent('#albumCaption')), 'saved album agrees with the result');
+  await page.click('#albumBack');
+  const share = page.locator('#shareCard');
+  expect(await share.isVisible(), 'finished lives offer a share card');
+  if (await share.isVisible()) {
+    await share.click();
+    const img = page.locator('#shareImage');
+    await img.waitFor();
+    expect(await img.evaluate(i => i.complete && i.naturalWidth >= 600 && i.src.startsWith('data:image/png;')), 'share card contains an exportable PNG');
+    expect((await page.locator('#saveCard').getAttribute('href')) === await img.getAttribute('src'), 'download contains the pictured card');
+    await page.click('#shareBack');
+    expect(await page.locator('#doneTitle').isVisible(), 'Back returns to the same result');
+  }
+  assert.deepEqual(failures, [], 'cold play regressions');
+}
+
 const only = process.argv[2];
 let failed = 0;
 for (const [phone, [engine, device]] of Object.entries(PHONES)) {
@@ -629,9 +736,11 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
   try {
+    await auditFeedback(page);
     await run(page, phone);
     await firstHint(page);
     if (phone === 'webkit') await puzzleTour(page, phone, 28);
+    await reloadTour(page);
     assert.deepEqual(errors, [], 'page errors');
     console.log(`ok   borrowed on ${phone}`);
   } catch (e) {
@@ -753,8 +862,14 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
       await sleep(300); await shot(p3, 'desktop', '2-play');
       await p3.keyboard.press('Enter');
       assert.equal((await state(p3)).screen, 'lineup', 'Enter opens the lineup');
-      for (let i = 0; i <= answers[0]; i++) await p3.keyboard.press('ArrowRight');
-      assert.equal((await state(p3)).selected, answers[0], 'arrows choose a face');
+      const possible = (await state(p3)).candidates;
+      assert.ok(possible.length < 6 && possible.includes(answers[0]), 'the first clue excludes faces and keeps the answer');
+      for (const face of possible) {
+        await p3.keyboard.press('ArrowRight');
+        assert.equal((await state(p3)).selected, face, 'the keyboard visits only compatible faces');
+        if (face === answers[0]) break;
+      }
+      assert.equal((await state(p3)).selected, answers[0], 'arrows choose the matching face');
       await p3.keyboard.press('Enter');
       for (let k = 1; k < 3; k++) {
         await until(p3, () => window.borrowedState().screen === 'chapter', 'desktop chapter card', 6000);
@@ -786,6 +901,59 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     await desk.close();
   }
   await browser.close();
+}
+async function reloadTour(page) {
+  for (const button of ['#play', '#daily']) {
+    await page.goto(base + '/borrowed/');
+    await page.locator(button).tap();
+    const first = await state(page);
+    const spot = first.spots.find(p => p.lock === 'free');
+    await tap(page, spot);
+    await waitPuzzle(page);
+    const before = await state(page);
+    await page.reload();
+    await until(page, () => window.borrowedState, 'reloaded game');
+    assert.equal((await state(page)).screen, 'menu', 'the candle waits on reload');
+    assert.ok(await page.locator('#continueRun').isVisible(), 'reload offers the interrupted life');
+    await page.locator('#continueRun').tap();
+    const after = await state(page);
+    assert.equal(after.screen, 'puzzle', 'Continue keeps the open memory');
+    assert.equal(after.daily, button === '#daily');
+    assert.equal(after.seed, before.seed);
+    assert.equal(after.life, before.life);
+    assert.deepEqual(after.puzzle, before.puzzle);
+    const puzzle = await finishPractice(page);
+    await tap(page, puzzle.show);
+    await skipMemory(page);
+    const solved = await state(page);
+    assert.equal(solved.found, 1, 'the restored puzzle updates its island');
+    await page.locator('#pause').tap();
+    await page.reload();
+    await until(page, () => window.borrowedState, 'second reload');
+    await page.locator('#continueRun').tap();
+    assert.deepEqual((await state(page)).known, solved.known);
+    assert.ok((await state(page)).spots.find(p => p.lock === 'free').taken);
+    if (button === '#play') {
+      const lineup = await pick(page, chapterOf(first.seed, 0).answer);
+      await tap(page, lineup.sure);
+      await until(page, () => window.borrowedState().screen === 'chapter', 'named the child');
+      const named = await state(page);
+      await page.reload();
+      await page.locator('#continueRun').tap();
+      const card = await state(page);
+      assert.equal(card.screen, 'chapter', 'a named chapter resumes at its chapter card');
+      assert.equal(card.gallery, named.gallery);
+      assert.equal(card.right, named.right);
+      await until(page, () => window.borrowedState().next, 'restored chapter controls');
+      await tap(page, (await state(page)).next);
+      assert.equal((await state(page)).chapter, 1, 'the resumed life advances to grown-up');
+    }
+    await page.locator('#pause').tap();
+    await page.locator('#toMenu').tap();
+    await page.reload();
+    await until(page, () => window.borrowedState, 'reload after leaving');
+    assert.ok(await page.locator('#continueRun').isHidden(), 'leaving discards the checkpoint');
+  }
 }
 server.close();
 console.log(`screenshots in ${SHOTS}`);

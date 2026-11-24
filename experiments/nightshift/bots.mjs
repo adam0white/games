@@ -109,6 +109,30 @@ function mechanics() {
     for (let i = 0; i < 80; i++) step(state, aim);
     return state;
   };
+  const first = create();
+  const guard = policy('competent', first.seed);
+  const firstWakes = [];
+  while (firstWakes.length < first.actors.length && !first.outcome) {
+    step(first, guard(first));
+    firstWakes.push(...first.events.filter(e => e.type === 'wake').map(e => e.actor.id));
+  }
+  assert.equal(new Set(firstWakes).size, 6, 'all six exhibits get a turn before the first repeats');
+
+  for (const level of [1, 7, 14, 18]) {
+    const floor = create({ level });
+    for (const runner of floor.actors.filter(a => a.home.y > 300)) {
+      const plinths = floor.actors.filter(a => a.home.y < runner.home.y - 70);
+      for (const route of runner.routes) for (const { start, end } of route.segments) {
+        for (let i = 0; i <= 100; i++) {
+          const x = start.x + (end.x - start.x) * i / 100;
+          const y = start.y + (end.y - start.y) * i / 100;
+          assert.ok(x >= 41 && x <= 349, 'leave room for the full walking silhouette');
+          assert.ok(plinths.every(p => Math.abs(x - p.home.x) >= 50 || Math.abs(y - p.home.y) >= 55),
+            `night ${level} runner ${runner.id} passes beside occupied exhibits`);
+        }
+      }
+    }
+  }
   const twins = opening(4);
   const a = twins.actors[1], b = twins.actors[4];
   for (let i = 0; i < 62; i++) step(twins, a);
@@ -161,6 +185,18 @@ function mechanics() {
 }
 
 function main() {
+  // Touching (194,154) on the small phone parked the beam by the original door.
+  // Recheck the current doors too, including their touch-offset approaches.
+  for (const x of [84, 194, 306]) {
+    for (const y of [112, 123, 150]) {
+      for (const level of [1, 2, 3, 4, 5, 6, 7, 8, LAST]) {
+        const mode = level === LAST ? 'long' : 'story';
+        const state = create({ level, mode });
+        while (!state.outcome && state.time < 120) step(state, { x, y });
+        assert.equal(state.outcome, 'escaped', `camping at (${x},${y}) loses ${mode} night ${level}`);
+      }
+    }
+  }
   mechanics();
   const seeds = [DEFAULT_SEED, ...Array.from({ length: 11 }, (_, i) => Math.imul(i + 1, 95768963) >>> 0)];
   const names = ['idle', 'sweep', 'nearest', 'average', 'competent'];

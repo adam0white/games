@@ -2,6 +2,22 @@ import assert from 'node:assert/strict';
 import { create, step, stars, LAST_STAGE, DT, SPEED, GAP, R_MOM, R_DUCK, LINE_MAX, QUACK_TIME, QUACK_SQUEEZE, TRAITS,
   hitAny, moveMom, pathAt, stepDelay, duskRate } from './sim.js';
 import { bands, routeCheck } from './route.mjs';
+import { starFeedback, warningOnScreen } from './feedback.js';
+
+assert.equal(warningOnScreen(-450, 640), false, 'a distant upstream hazard stays quiet');
+assert.equal(warningOnScreen(900, 640), false, 'a hazard behind the screen stays quiet');
+assert.equal(warningOnScreen(200, 640), true, 'a visible hazard can sound its warning');
+
+for (const [arrived, hits, scatters, expected] of [
+  [3, 0, 0, 'For three stars, bring all 4 home.'],
+  [4, 1, 0, 'For three stars, avoid hits.'],
+  [4, 0, 1, 'For three stars, avoid scares.'],
+  [3, 1, 1, 'For three stars, bring all 4 home and avoid hits and scares.'],
+  [4, 0, 0, ''],
+]) {
+  assert.equal(starFeedback({ total: 4, arrived: Array(arrived), hits, scatters }), expected);
+}
+
 
 const LOOK = 0.15, STEPS = 30; // sample the next 4.5 s for the whole flock
 const DIRS = 10;

@@ -10,6 +10,8 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; touch-action: none; overscroll-behavior: none; user-select: none; -webkit-user-select: none; }
   #stage { position: fixed; inset: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  #playGuide { position: absolute; top: 62px; inset-inline: 14px; margin: 0 auto; width: fit-content; max-width: 332px; padding: 5px 12px; border-radius: 11px; background: #332538f2; color: #ffedce; font-size: 14px; text-align: center; white-space: pre-line; line-height: 1.25; }
+  #playGuide.with-alibi { top: 116px; }
   #c { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   #layout { position: absolute; width: 360px; height: 640px; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(var(--scale, 1)); pointer-events: none; }
   [hidden] { display: none !important; }
@@ -49,14 +51,19 @@
   #calendarGrid span { display: block; color: #ffd18b; height: 12px; }
   #calendarGrid [aria-current="date"] { border-color: #ffe3ad; }
   #calendarGrid .marked { background: #654b51; }
-  #calendar h2 { margin: 4px auto 11px; width: 42px; height: 39px; border: 2px solid #f9d6a1; border-radius: 6px; position: relative; }
-  #calendar h2::before { content: ""; position: absolute; top: 8px; inset-inline: 0; border-top: 2px solid #f9d6a1; }
-  #calendar h2::after { content: ""; position: absolute; top: 15px; left: 7px; width: 4px; height: 4px; border-radius: 1px; background: #f9d6a1; box-shadow: 10px 0 #f9d6a1, 20px 0 #f9d6a1, 0 9px #f9d6a1, 10px 9px #f9d6a1, 20px 9px #f9d6a1; }
+  #calendar h2 { font-size: 30px; }
   #calendarDates { display: block; margin: 4px 0; font: 700 13px Georgia, serif; color: #eed6bc; }
   #calendarHeading { margin-top: 4px; font: 700 19px Georgia, serif; color: #f9d6a1; }
-  #hardDaily:disabled { opacity: .48; cursor: default; }
+  #hardDaily { line-height: 1.15; }
+  #hardDaily small { display: block; margin-top: 2px; font-size: 12px; }
+  #resultDetail, #shareStatus { margin: 0 auto 12px; font-size: 14px; color: #f5d9b5; }
+  #shareStatus:empty { display: none; }
+  #menuSound { padding-inline: 3px; }
+  #menu .lab-notice a { display: block; min-height: 44px; width: max-content; min-width: 44px; margin: auto; align-content: center; }
+  #menu .panel { padding-bottom: 0; }
+  #hardDaily:disabled { color: #ebd1cf; background: #433044; cursor: default; }
   #skipReveal { position: absolute; bottom: 24px; left: 50%; translate: -50%; pointer-events: auto; min-width: 70px; font-size: 22px; }
-  #caseGrid button { padding: 0; min-height: 43px; font-size: 14px; }
+  #caseGrid button { padding: 0; min-height: 44px; font-size: 14px; }
   #caseGrid button span { display: block; font-size: 8px; color: #f7be69; min-height: 10px; }
   #caseGrid button:disabled { opacity: .5; cursor: default; }
 </style>
@@ -65,6 +72,7 @@
 <main id="stage">
   <canvas id="c" aria-label="Evening replay, suspects and time controls" aria-keyshortcuts="ArrowLeft ArrowRight"></canvas>
   <div id="layout">
+    <p id="playGuide" role="status" hidden></p>
     <button id="pause" aria-label="Pause" hidden><svg width="19" height="20" viewBox="0 0 19 20" aria-hidden="true"><path d="M6 4v12m7-12v12" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></svg></button>
     <section id="menu" class="screen">
       <h1>Alibi</h1>
@@ -73,11 +81,11 @@
         <div class="row">
           <button id="daily">Daily <span id="streak"></span></button>
           <button id="pickCase">Cases</button>
-          <button id="menuSound" aria-label="Sound"></button>
+          <button id="menuSound"></button>
         </div>
         <div class="row">
-          <button id="hardDaily" aria-label="Hard daily">◆ Daily</button>
-          <button id="openCalendar" aria-label="Streak calendar">▦ <span id="hardStreak"></span></button>
+          <button id="hardDaily" aria-label="Hard daily">Hard Daily</button>
+          <button id="openCalendar" aria-label="Streak calendar">Calendar</button>
         </div>
       </div>
     </section>
@@ -100,6 +108,7 @@
     <section id="done" class="screen">
       <div class="panel">
         <h2 id="result"></h2>
+        <p id="resultDetail" hidden></p>
         <canvas id="resultArt" width="480" height="214" aria-label="Case result"></canvas>
         <div class="row"><button id="again" class="primary">Again</button><button id="next">Next</button><button id="endMenu">Menu</button></div>
         <button id="share" hidden>Share</button>
@@ -107,17 +116,18 @@
     </section>
     <section id="calendar" class="screen">
       <div class="panel">
-        <h2 aria-label="Streak calendar"></h2>
+        <h2>Daily streaks</h2>
         <div id="calendarHeading"></div>
         <span id="calendarDates"></span>
         <div id="calendarGrid"></div>
-        <div class="row"><button id="calendarMenu">‹</button></div>
+        <div class="row"><button id="calendarMenu">Menu</button></div>
       </div>
     </section>
     <section id="sharing" class="screen">
       <div class="panel">
         <canvas id="shareArt" width="720" height="504" aria-label="Daily share card"></canvas>
-        <div class="row"><button id="sendShare" class="primary">Image</button><button id="closeShare">Back</button></div>
+        <p id="shareStatus" role="status"></p>
+        <div class="row"><button id="sendShare" class="primary">Save image</button><button id="closeShare">Back</button></div>
       </div>
     </section>
   </div>

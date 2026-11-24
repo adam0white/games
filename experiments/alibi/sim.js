@@ -64,10 +64,15 @@ function shuffle(items, draw) {
   return list;
 }
 
+// Recast two portraits in the fixed opening. Keep the actor ids, evidence
+// and random draws identical when revisiting a previously completed case.
+const campaignSeed = 32342;
+const openingCastSwaps = { 4: ['owl', 'rabbit'], 6: ['owl', 'bear'] };
+
 const range = size => Array.from({ length: size }, (_, i) => i);
 const pick = (list, draw) => list[Math.floor(draw() * list.length)];
 
-export function createCase({ seed = 32342, level = 1, culpritOverride, flipRooms = [], hard = false } = {}) {
+export function createCase({ seed = campaignSeed, level = 1, culpritOverride, flipRooms = [], hard = false } = {}) {
   const base = CASES[level - 1];
   if (!base) throw new RangeError('Unknown case');
   const spec = hard ? {
@@ -81,6 +86,11 @@ export function createCase({ seed = 32342, level = 1, culpritOverride, flipRooms
   const crimeRoom = CRIME_ROOM[crime];
   const otherRooms = shuffle(rooms.filter(room => room !== crimeRoom), draw);
   const species = shuffle(SPECIES, draw);
+  const swap = seed === campaignSeed && openingCastSwaps[level];
+  if (swap) {
+    const [a, b] = swap.map(face => species.indexOf(face));
+    [species[a], species[b]] = [species[b], species[a]];
+  }
   const signatures = shuffle(range(SPECIES.length), draw);
   const incident = tutorial ? 2 : 1;
   const shutterBeat = tutorial ? null : incident;
