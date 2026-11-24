@@ -681,3 +681,13 @@ Not verified: a real phone.
 ### Left as a proposal (2026-11-24)
 - Lantern's own tutorial: one calm night without rocks that shows steering, embers, hearts, an ability and the fading lantern in turn, offered once and kept under the menu.
 - Race and Spark inside Lantern proper: the same boat, skins and bank, instead of separate pages.
+
+## 2026-11-24: Echo joins the other modes (tester t1, notes #226, #234)
+
+- **#234, answering #229 (which game was "Lantern pulls"):** "Lantern spark/echo". Spark was already under "More modes"; Lantern Echo is now there too, in English and Turkish. It stays a separate page with no save of play, and it already links back to Lantern. This closes the open question under note #207.
+- **#226, answering #222 (how does the gentler tilt feel):** it feels right. The tilt numbers stay as they are; the open point under "gentler tilt" is closed.
+
+Checked: the phone check's line for the modes card; the card and Echo opened at phone size. Not verified: Echo is English only, has been tuned on night 1 only, and nobody has played it with headphones on a phone. The shared phone check has no section of its own for Echo.
+
+### Left as a proposal (2026-11-24, note #234)
+- Echo in Turkish, and tuned past night 1. The wish to have the modes inside Lantern proper (one boat, skins and bank) is recorded above and still stands.
