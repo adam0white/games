@@ -15,8 +15,10 @@ Normal exhibits stop when the light intersects their body. Hold for 0.82–1.83 
 | Wing | Nights | Dawn | Ordered encounters |
 | --- | --- | ---: | --- |
 | Marble | 1–6 | 60 s | Follow, hold, portrait, twins, three exhibits, twins in a crowd |
-| Portrait | 7–12 | 63 s | Mirror, shy mask, cat, mirror and mask, cat and twins, faster waves at the mirror |
-| Natural | 13–18 | 66 s | Fuse, upstairs gallery, fuse and stairs, linked twins and mask, mirror and fuse, full museum |
+| Portrait | 7–12 | 63 s | Mirror, mask, cat with mask, floor hatch, twins with cat and hatch, mirror with cat, hatch and mask |
+| Natural | 13–18 | 66 s | Fuse with cat, stairs with hatch, ghost with fuse and cat, twins with mask, fuse, stairs and hatch, mirror with fuse, stairs, cat and ghost, full museum |
+
+The Portrait and Natural rows were rewritten on 2026-11-24. See "Late nights get their own rules". Group sizes and wave intervals for nights 8–18 changed again the same day; see "Teaching nights eased, loss picture".
 
 - The portrait dancer steps out of its frame. The twins move when both are dark. The lit twin can stop its partner even from its plinth.
 - The mirror moves a reflected pool in the opposite direction from the torch. An exhibit behind the glass accepts reflected light. Direct light can reach it after it leaves the case.
@@ -229,3 +231,171 @@ Not verified:
 - the fuse balance, as felt by players other than the bots;
 - WebKit play by touch after the change;
 - a win by touch on nights 13 to 18 after the change. Whether a human can still win those nights rests on the bots alone.
+
+## Late nights get their own rules — 2026-11-24
+
+This section closes most items that "Middle and late game audit" left open.
+
+### What changed and why
+
+Parking the light on the two doors won nights 8, 10 and 16 without reading the room. Nights 9–18 were the same six exhibits piling up at the doors. Four rules now give reasons to leave the doors. Each one has a teaching night with a ring, an arrow and the ghost finger, and is then mixed in.
+
+| Rule | Teaching night | Effect | Picture |
+| --- | --- | --- | --- |
+| Mask | 8 | The mask paces in one doorway (seeded per night) and has no plinth. While the beam or the mirror pool touches it, the beam stops nothing else and does not startle the cat. A runner bound for that door must be caught before the mask can cover every aim that reaches it. | Torch ring turns dashed green; crossed-beam icon over the mask |
+| Cat | 9 | Lighting the cat wakes the nearest exhibit still on its plinth. | Dotted line from the cat to a ring on the woken exhibit |
+| Hatch | 10 | Lower exhibits (not the mask, the mirrored bear or the upstairs bust) cycle door, door, hatch. The hatch at the centre of the floor counts as an escape. | Grate in the floor; mint ring and down arrow when a runner heads for it |
+| Ghost | 15 | Exhibit 0 is a draped ghost. It creeps at half pace inside a dashed ring and can be caught there. Past the ring light passes through it and it hurries. | Dashed ring at its plinth; faded ghost with crossed-beam icon outside it |
+
+The fuse now buzzes for 1.5 s after a trip before the lights start to drop (`GRACE`). The night table is `NIGHTS` in `sim.js`; each entry is lesson, group size, wave interval and rule list. New random choices use a second seeded stream, so nights 1–7 are bit-identical to the previous build (420 runs compared, no differences).
+
+Overlapping figures are spread sideways for drawing only (`spread()` in `sim.js`, at most 24 px each, eased in the renderer). The mask is never shifted, so it is drawn where it blocks the light; figures beside it move the whole distance. The light still acts on the true positions; a tap on the drawn figure still reaches the exhibit.
+
+The menu's night row is now a button that opens a night picker. Unlocked nights replay; a replay keeps `unlocked` and stores the best stars in a new `stars` array under `nightshift-save`. Each wing has its own result picture: armor, bear and dinosaur; dancer, twins and mask; heron, ghost and dinosaur. The share card uses the same picture. The red warning ring now measures progress against the point where an exhibit can no longer be stopped, so it appears earlier at the mask's door and for the ghost. The pause card switches to four columns when a night has more than nine rules.
+
+### Bots after the change
+
+Twelve seeds per night, 72 trials per wing.
+
+| Wing | Idle | Sweep | Listener | Average | Competent | Competent max escapes | Furthest progress |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Marble | 0 | 11 | 72 | 72 | 72 | 0 | 31.3% |
+| Portrait | 0 | 0 | 64 | 21 | 72 | 0 | 75.8% |
+| Natural | 0 | 0 | 38 | 4 | 72 | 0 | 82.9% |
+
+The two blind two-door patrols win 0 of 12 seeds on every night 8–18 (before: 12 on night 8, 12 on 10, 12 on 16). Other blind loops measured outside the suite (12 seeds, periods 1.2, 2.3 and 3.5 s): a patrol below the doors wins at most 2 (night 16); a hall patrol wins 4 on night 18 at the 3.5 s period; a three-point loop through the hatch wins up to 5 on night 11 at the 2.3 s period. Every other cell is 0–3. Long Night lasts 71.9–101.3 s for the competent policy.
+
+Night 17 was on a knife edge: it passed at a 7.4 s wave interval and failed at 7.2 and 7.5. The competent policy now keeps its margin on nights 13–18 at every interval within 0.3 s of the table value (seven points per night, twelve seeds each). Measured wider: 13 passes 6.1–7.0 and 7.2–7.3; 16 passes 6.5–7.5 and 7.7; 17 passes 7.2–7.3 and 7.5–8.4; 18 passes 7.9–8.8.
+
+### New assertions
+
+In `bots.mjs`, `rules` takes the simulator module so each can be run against an older copy. Each rule below was run against the previous `sim.js` and failed there; `tripGrace` needed a copy patched to accept a group-size override, and `spreadFigures` fails there only because `spread()` does not exist.
+
+- `maskDarkensBeam`: a lit mask stops the light holding a runner beside it; with the mask dark the same runner is caught.
+- `catWakes`: lighting the cat wakes one sleeping exhibit.
+- `hatchEscape`: a lower exhibit leaves by the hatch and it counts as an escape.
+- `ghostZone`: the ghost is caught near its plinth and not after it leaves its ring.
+- `tripGrace`: after the breaker trips the lights stay up for the 1.5 s grace, then drop.
+- `spreadFigures`: on night 18, drawn figures in the same band touch (closer than 20 px) in at most 2% of the pair-ticks where the real figures do; every shift is at most 24 px; the mask is not shifted; a tap on the drawn figure reaches the exhibit. Three figures at the mask's door can still touch for a moment.
+- `blindPatrol`: both blind two-door patrols win nothing on nights 8–18. The old loop on nights 13, 15, 17 and 18 allowing two wins is kept.
+- `tuningRange`: the competent margin holds on nights 13–18 at the table interval ± 0.3 s. Its failure on the previous build was shown by a scratch replica that ran the previous competent policy against the previous `sim.js` patched to accept an interval override: it fails on nights 15–18, and night 17 fails at six of seven points.
+
+In `check.mjs`, `checkNightPicker` checks that the row opens the picker, the 18 tiles are at least 44 px, only unlocked nights open, a replay of night 2 won by `drive()` (synthetic touch pointer events) keeps `unlocked` at 5 and stores its stars, and the three wing posters differ. These browser checks were not run against the previous build; it has no picker and one poster. The language pass now also checks the picker for overflow and untranslated text, and the lesson captures include the hatch and ghost nights.
+
+### Design changes in tests
+
+- The route-clearance check no longer treats the mask as a plinth; it paces in a doorway.
+- The trip-darkness window grew by the 1.5 s grace.
+- The competent bot measures urgency as progress over the stoppable share of the route, weights the ghost by 1.6, aims below a runner to keep the mask dark, switches targets only with a clear lead and not more than once per 1.2 s, and finishes a fuse repair once started.
+- `drive()` in `check.mjs` follows the same rules through two new hook fields per exhibit: `reach` (where the beam stops it) and `urgency`. The hook also reports `trips`, `trippedAt`, `masked`, `stars` and each figure's `drawnX`.
+
+### Played by touch
+
+Nights 13, 16 and 18 were played with Playwright touchscreen taps in WebKit (iPhone 13, English) and Chromium (360 × 640, tr-TR), twice each:
+
+- Informed taps: the target came from the state hook's `reach` and `urgency`, the same rules as the competent bot. Won on the first try every time, no escapes.
+- Naive taps, closer to what a player can see: tap the drawn figure (`drawnX`, 14 px above its feet) that has walked furthest, and tap the fuse box when nothing is past 45% of its route. This ignores the mask, the ghost's ring and the hatch timing. Won on the first try in both browsers: night 13 with no escapes, night 16 with one, night 18 with two (one star).
+
+The fuse tripped three times in every run and was mended by tapping the box. Decisions came from the hook, not from screenshots. Screenshots at 12, 30 and 52 s and at the result were saved; a sample was opened (night 16 and 18 mid-play and result, night 13 mid-play, the night 18 mask door) and showed the hatch, ghost ring, linked twins and cat cue as intended. The default seed is fixed and the policies are deterministic, so "first try" says the nights can be won by taps, not how hard they are for a person. No night needed easing under the more-than-three-tries rule; night 18 was the closest call.
+
+### Still open
+
+- Superseded by "Teaching nights eased, loss picture" below. Human difficulty is unmeasured and the strongest open risk. The average policy (delayed decisions, imperfect aim, occasional chases after the cat; it does aim below runners to keep the mask dark) wins 2 of 12 on night 8 and on night 9, the nights that teach the mask and the cat, and 0 of 12 on nights 12, 13, 16 and 17. Unresolved whether that means the nights are too hard or that this policy's cat chases are now punished by the wake rule. Naive figure-tapping won nights 13, 16 and 18 on the default seed, night 18 with one escape to spare. A first-time player on nights 8, 9 and 16–18 would settle it; if they stall, raise the wave interval on those nights first.
+- Whether players read the green dashed ring as "the mask is soaking up the light", and the ghost's ring as its catch zone, needs a first-time player.
+- Some blind loops still win a few seeds: the three-point loop through the hatch on nights 9–11, 14 and 16, and a slow hall patrol on night 18 (4 of 12).
+- The mask is drawn over the lower edge of its doorway arch.
+
+### Not verified
+
+Physical phones, real thumbs, speakers and first-time comprehension. The bot rates describe those policies only.
+
+
+## Teaching nights eased, loss picture — 2026-11-24
+
+### Why the average policy lost
+
+The average policy wins 2 of 12 on nights 8 and 9 and 0 of 12 on nights 12, 13, 16 and 17 under the previous table. Variants of that policy were run on the same seeds (scratch script, not in the suite): one that never lights the cat, one that tracks with the mask-aware aim, one that mends the fuse when nothing is past half its route, and all three together.
+
+| Night | Average | Never lights the cat | Mask-aware tracking | Mends the fuse | All three |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 8 | 2 | 2 | 3 | 2 | 3 |
+| 9 | 2 | 2 | 1 | 2 | 4 |
+| 11 | 4 | 5 | 4 | 4 | 5 |
+| 12 | 0 | 2 | 0 | 0 | 2 |
+| 13 | 0 | 2 | 0 | 2 | 2 |
+| 15 | 1 | 3 | 1 | 1 | 2 |
+| 16 | 0 | 0 | 0 | 9 | 10 |
+| 17 | 0 | 1 | 0 | 1 | 1 |
+| 18 | 2 | 2 | 2 | 5 | 8 |
+
+The cat-wake rule is not what sank nights 8 and 9: never lighting the cat changes nothing there. Those nights were too fast for this policy at three exhibits per wave. Cat chases cost about two wins on nights 12, 13 and 15. On nights 16 and 18 the main cost is that the average policy never mends the fuse. The policy was left as it is so the yardstick does not move.
+
+### What changed
+
+Group size first, then wave interval (`NIGHTS` in `sim.js`). Lessons and rule lists are unchanged.
+
+| Night | Before | After | Average wins before → after |
+| ---: | --- | --- | --- |
+| 8 | 3 every 7.0 s | 2 every 7.5 s | 2 → 12 |
+| 9 | 3 every 6.9 s | 2 every 7.9 s | 2 → 10 |
+| 10 | 3 every 7.4 s | 3 every 8.7 s | 6 → 11 |
+| 11 | 4 every 7.4 s | unchanged | 4 → 4 |
+| 12 | 4 every 7.2 s | 2 every 7.7 s | 0 → 5 |
+| 13 | 3 every 6.7 s | 2 every 8.2 s | 0 → 10 |
+| 14 | 4 every 6.5 s | 3 every 6.6 s | 1 → 5 |
+| 15 | 3 every 7.6 s | 2 every 8.1 s | 1 → 10 |
+| 16 | 5 every 7.1 s | 3 every 7.6 s | 0 → 7 |
+| 17 | 4 every 7.8 s | 2 every 8.3 s | 0 → 9 |
+| 18 | 6 every 8.2 s | 5 every 11.0 s | 2 → 5 |
+
+Longer intervals alone did not work: the average policy's wins are not monotone in the interval, and the competent policy fails at some long intervals (night 18 at 9.2 s, night 16 at 10.1 s). Night 18 sits at 11.0 s because 11.4–11.7 s fail the competent margin; 10.7–11.3 s pass. Nights 10 and 14 were first set to 8.4 s and 7.0 s; there a blind loop through left door, right door and hatch every 2.3 s won 6 and 11 of 12, so they moved to 8.7 s and 6.6 s, where every measured blind loop wins at most 3 on those nights.
+
+The first loss on each night now shows one picture per escape under the result line: the exhibit, a red arrow and the way out (left door, right door, floor hatch), or for the ghost its dashed ring with the crossed-beam mark, the faded ghost outside it, and its exit. In story it shows on the first loss of each night only; a later loss on that night, even by another way out, shows nothing. Daily shows it on every loss and does not mark story nights, because Daily nights change by date. Long Night never shows it. The canvas has an aria label built from new words (`howOut`, `out_left`, `out_right`, `out_hatch`, `out_ghost`, English and Turkish). The save gains `lossShown`, one flag per night, under `nightshift-save`; older saves start with none shown. The hook gains `escapedBy` (kind, way, exit per escape) and `lossShown`. The poster canvas is not touched, so the bear-face check still compares the same pixels.
+
+### Bots after the change
+
+| Night | Idle | Sweep | Listener | Average | Competent |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1–6 | 0 | 11 on night 1, else 0 | 12 | 12 | 12 |
+| 7 | 0 | 0 | 12 | 7 | 12 |
+| 8 | 0 | 0 | 12 | 12 | 12 |
+| 9 | 0 | 0 | 12 | 10 | 12 |
+| 10 | 0 | 0 | 12 | 11 | 12 |
+| 11 | 0 | 0 | 12 | 4 | 12 |
+| 12 | 0 | 0 | 12 | 5 | 12 |
+| 13 | 0 | 0 | 12 | 10 | 12 |
+| 14 | 0 | 0 | 12 | 5 | 12 |
+| 15 | 0 | 0 | 12 | 10 | 12 |
+| 16 | 0 | 0 | 0 | 7 | 12 |
+| 17 | 0 | 0 | 12 | 9 | 12 |
+| 18 | 0 | 0 | 1 | 5 | 12 |
+
+Per wing (72 trials): Marble 72 average wins, Portrait 49, Natural 46; competent 72 in each with no escapes. Both blind two-door patrols still win 0 of 12 on nights 8–18. The wider blind loops measured in the earlier section (below the doors, through the hatch, across the hall; periods 1.2, 2.3 and 3.5 s) now win at most 5 of 12 on any night 8–18: the three-point loop through the hatch wins 5 on night 11; the loop below the doors wins 4 on night 18 at 2.3 s, and the hall loop wins 4 on night 16 at 3.5 s. Every other cell is 0–3. The earlier section's loop figures are for the previous table. Long Night lasts 71.9–101.3 s for the competent policy, the same twelve values as before the change. The competent margin holds on nights 13–18 at the table interval ± 0.3 s.
+
+### New assertions
+
+- `bots.mjs`: the average policy wins at least 9 of 12 on the teaching nights 8, 9, 10 and 15, and at least 4 of 12 on every other night from 11 to 18. Run against a copy of the current files with the previous night table, it fails at night 8 (2 of 12).
+- `bots.mjs` `blindLoops`: none of those fifteen blind loops wins more than 6 of 12 on nights 8–18. With night 14 back at 7.0 s it fails (the hatch loop wins 11).
+- `check.mjs`, after the night-2 loss: the hook lists three escapes with a known way, the loss picture is visible, its label names each way in order, and the save marks night 2 as shown. A second idle loss on night 2 hides the picture. With the once-per-night guard removed from `game.js`, the second-loss assertion fails.
+- `check.mjs` `checkLossWays`: idle losses on the default seed give literal ways out (night 10 hatch, hatch, right door; night 15 ghost, right, right; night 17 left, right, ghost), and the picture has paint on at least 30% of its pixels. Two Daily losses both show the picture and leave every story night unmarked. With the hatch mapped to a door in `game.js`, the night-10 assertion fails.
+- The first-loss assertions were not run against the previous build; they would fail there because it has no `escapedBy` or `#lossArt` (inferred).
+
+### Played by touch
+
+Nights 8, 9, 13, 16 and 18 on the new table (and naive taps on the retuned nights 10 and 14: both won with no escapes in both browsers), Playwright touchscreen taps, WebKit (iPhone 13, English) and Chromium (360 × 640, tr-TR), default seed, first try every time:
+
+- Informed taps (targets from the hook's `reach` and `urgency`): all ten runs won with no escapes.
+- Naive taps (the drawn figure that has walked furthest; the fuse box when nothing is past 45%): all ten won. Escapes: night 8 one, night 9 none (WebKit) and two (Chromium), night 13 none, night 16 one, night 18 two.
+
+The loss picture was reached by tapping Play and letting nights 2, 10, 15 and 17 run out (Chromium tr-TR) and nights 10 and 15 (WebKit, English). Screenshots showed right-door, left-door, hatch and ghost cells as intended and the result panel inside the 360 × 640 screen. A won night 9 showed no picture.
+
+### Still open
+
+- Nights 11 (4 of 12), 12 (5) and 14 (5) sit at or just above the floor of 4. The average policy's wins are noisy in the interval (night 14: 3, 5, 4, 5, 5, 7, 6 from 6.5 to 7.1 s; at 6.5 s it is below the floor), so a later small retune can cross the floor. Night 18's competent margin fails from 0.4 s above its interval.
+- The average policy never mends the fuse. A player who does not learn the fuse will lose nights 16 and 18 more often than these numbers say.
+- The loss picture is small at 360 px (each cell about 95 × 42 px). Whether a first-time player reads the arrow-to-door cell as "this is where it got out" needs a person.
+- The listener policy wins 0 on night 16 and 1 on night 18; it does not mend the fuse either.
+
+### Not verified
+
+Human difficulty; the bot rates describe those policies only. Physical phones.

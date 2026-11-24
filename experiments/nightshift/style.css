@@ -169,7 +169,29 @@ button.quiet {
   color: #ebd5df;
   font-size: .82rem;
 }
-.progress { display: flex; justify-content: center; gap: 6px; height: 22px; align-items: center; margin: 0 0 10px; }
+/* The night row opens the night picker. Its hit area overlaps the gaps, so the menu keeps its height. */
+.progress {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  justify-content: center;
+  gap: 6px;
+  align-items: center;
+  margin: -6px 0 -6px;
+  padding: 0 8px;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.progress::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border: solid #ffd697;
+  border-width: 2px 2px 0 0;
+  transform: rotate(45deg);
+}
 .progress i {
   width: 5px;
   height: 5px;
@@ -180,6 +202,27 @@ button.quiet {
 .progress i:nth-child(6n+1):not(:first-child) { margin-left: 8px; }
 .progress i.cleared { background: #c5a3c4; }
 .progress i.current { background: #ffd697; width: 8px; height: 8px; }
+#nights { background: radial-gradient(ellipse at 50% 38%, #634e72bf, #28253fe8 76%); }
+#nights h2 { font-size: clamp(30px, 9vw, 40px); }
+#nightGrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  margin: 6px 0 4px;
+}
+#nightGrid .night {
+  min-width: 0;
+  min-height: 52px;
+  padding: 4px 0;
+  display: grid;
+  place-items: center;
+  gap: 1px;
+  font: 800 1rem/1 system-ui, sans-serif;
+}
+#nightGrid .night:nth-child(n+7) { background: #574463; }
+#nightGrid .night:nth-child(n+13) { background: #3f4f60; }
+#nightGrid .night small { font-size: 9px; letter-spacing: -.05em; color: #ffd697; }
+#nightGrid .night:disabled { opacity: .38; cursor: default; }
 #menu .lab-notice {
   font: 500 .69rem/1.35 system-ui, sans-serif;
   color: #e5cfe0;
@@ -251,6 +294,8 @@ button.language {
 }
 .motif { display: inline-block; width: 26px; height: 22px; margin-top: 7px; border-inline: 7px solid #eab68b; }
 #paused h2 { margin: 8px 0 11px; }
+#lossArt { display: block; width: 100%; height: auto; margin: -6px 0 12px; }
+#lossArt[hidden] { display: none; }
 #medals { margin: 4px 0 16px; min-height: 24px; color: #ffd397; font-size: 1.15rem; letter-spacing: .09em; }
 .shareActions button { min-height: 49px; }
 @media (min-width: 700px) {

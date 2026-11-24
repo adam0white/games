@@ -11,23 +11,36 @@ export const CASE = { x: 40, y: 253, width: 94, height: 114 };
 export const REFLECTION = { x: 83, y: 297 };
 export const FUSE = { x: 250, y: 527 };
 export const STAIR = { x: 269, y: 201 };
+// A floor hatch to the cellar opens on some nights. Lower exhibits can drop through it.
+export const HATCH = { x: 195, y: 448 };
+// The draped ghost can be stopped only before it has walked this far along its route.
+export const GHOST_ZONE = 0.38;
+// The mask paces in front of its door. A beam that touches it stops working.
+export const MASK_Y = 166;
+export const MASK_SWAY = 34;
 export const RETRIP = 16;
+// After a trip the box buzzes for this long before the lights start to drop, so a catch can finish.
+export const GRACE = 1.5;
 export const DEFAULT_SEED = 836361;
 export const LAST = 18;
 export const WINGS = ['Marble', 'Portrait', 'Natural'];
 export const POSES = ['statue', 'armor', 'bear', 'dino', 'painting', 'statue'];
 const HOMES = [[103, 241], [285, 239], [103, 352], [285, 358], [91, 482], [295, 485]];
 
-// Each entry specifies the opening lesson, then the size and cadence of the rounds.
-const NIGHTS = [
-  ['drag', 1, 9], ['hold', 2, 9], ['painting', 2, 8.5],
-  ['twins', 2, 8.3], ['mixed', 3, 8.7], ['mixed', 3, 8.1],
-  ['mirror', 3, 7.1], ['shy', 3, 7], ['cat', 3, 6.9],
-  ['mirrors', 4, 7.7], ['pair', 4, 7.4], ['mixed', 4, 7.2],
-  ['fuse', 3, 6.9], ['stairs', 4, 6.5], ['upper', 5, 7.6],
-  ['pair', 5, 7.1], ['mirror-fuse', 5, 7.4], ['all', 6, 8],
+// Each entry specifies the opening lesson, the size and cadence of the rounds, and the room's rules.
+// Every night from 7 on has its own mix, and each has a rule that pulls the light away from the doors.
+export const NIGHTS = [
+  ['drag', 1, 9, ''], ['hold', 2, 9, ''], ['painting', 2, 8.5, ''],
+  ['twins', 2, 8.3, 'twins'], ['mixed', 3, 8.7, ''], ['mixed', 3, 8.1, 'twins'],
+  // Nights that teach a new rule wake fewer exhibits at once, so a player can watch the rule work.
+  ['mirror', 3, 7.1, 'mirror'], ['shy', 2, 7.5, 'shy'], ['cat', 2, 7.9, 'cat shy'],
+  ['hatch', 3, 8.7, 'hatch mirror'], ['pair', 4, 7.4, 'twins cat hatch'], ['mixed', 2, 7.7, 'mirror cat hatch shy'],
+  ['fuse', 2, 8.2, 'fuse cat'], ['stairs', 3, 6.6, 'stairs hatch'], ['ghost', 2, 8.1, 'ghost fuse cat'],
+  ['pair', 3, 7.6, 'twins shy fuse stairs hatch'], ['mirror-fuse', 2, 8.3, 'mirror fuse stairs cat ghost'],
+  // The last night sends the whole museum in five big, slow waves.
+  ['all', 5, 11, 'mirror twins shy cat fuse stairs hatch ghost'],
 ];
-const INTRO = new Set(['drag', 'hold', 'painting', 'twins', 'mirror', 'shy', 'cat', 'fuse', 'stairs']);
+const INTRO = new Set(['drag', 'hold', 'painting', 'twins', 'mirror', 'shy', 'cat', 'fuse', 'stairs', 'hatch', 'ghost']);
 const clamp = (n, low, high) => Math.max(low, Math.min(high, n));
 export const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const inside = (a, b, r) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2 <= r ** 2;
@@ -62,12 +75,17 @@ export function reflection(point) {
 function path(home, upstairs, curve, exit) {
   const hall = { x: clamp(exit.x + curve, 48, 342), y: 167 };
   let points = upstairs ? [home, STAIR, hall, exit] : [home, hall, exit];
-  if (home.y > 300) {
+  if (exit === HATCH) points = [home, { x: (home.x + HATCH.x) / 2, y: (home.y + HATCH.y) / 2 + curve * 0.4 }, HATCH];
+  else if (home.y > 300) {
     const left = home.x < WIDTH / 2;
     const crossesHall = left !== (exit === EXITS[0]);
     const aisle = (crossesHall ? (left ? 164 : 174) : (left ? 43 : 347)) + curve * 0.05;
     points = [home, { x: aisle, y: home.y - 32 }, { x: aisle, y: 163 }, exit];
   }
+  return line(points, exit);
+}
+
+function line(points, exit) {
   let length = 0;
   const segments = points.slice(1).map((end, i) => {
     const start = points[i];
@@ -76,47 +94,68 @@ function path(home, upstairs, curve, exit) {
     length += lengthHere;
     return segment;
   });
-  return { segments, length };
+  return { segments, length, exit };
+}
+
+export function pointAt(route, progress) {
+  const along = progress * route.length;
+  const seg = route.segments.findLast(s => along >= s.offset);
+  const t = clamp((along - seg.offset) / seg.length, 0, 1);
+  return { x: seg.start.x + (seg.end.x - seg.start.x) * t, y: seg.start.y + (seg.end.y - seg.start.y) * t };
 }
 
 function locate(actor) {
-  const along = actor.progress * actor.route.length;
-  const seg = actor.route.segments.findLast(s => along >= s.offset);
-  const t = clamp((along - seg.offset) / seg.length, 0, 1);
-  actor.x = seg.start.x + (seg.end.x - seg.start.x) * t;
-  actor.y = seg.start.y + (seg.end.y - seg.start.y) * t;
+  const { x, y } = pointAt(actor.route, actor.progress);
+  actor.x = x;
+  actor.y = y;
 }
 
-export function create({ level = 1, seed = DEFAULT_SEED, mode = 'story' } = {}) {
+// The share of its route an exhibit can walk before the light can no longer stop it.
+export function deadline(s, a) {
+  const guarded = s.shy && a.kind !== 'shy' && s.actors[3].state !== 'gone' && a.route.exit === s.maskExit ? a.route.guarded : 1;
+  return a.kind === 'ghost' ? Math.min(GHOST_ZONE, guarded) : guarded;
+}
+
+export function create({ level = 1, seed = DEFAULT_SEED, mode = 'story', ...tuning } = {}) {
   level = clamp(Math.trunc(level) || 1, 1, LAST);
   const wing = Math.floor((level - 1) / 6);
-  const [lesson, count, cadence] = mode === 'long' ? NIGHTS[17] : NIGHTS[level - 1];
+  const [lesson, size, base, rules] = mode === 'long' ? NIGHTS[17] : NIGHTS[level - 1];
+  const count = tuning.count ?? size;
+  const cadence = tuning.cadence ?? base;
   const rng = random((seed ^ Math.imul(level, 0x9e3779b1)) >>> 0);
+  // New choices draw from a second stream so the older nights keep their exact floors.
+  const extra = random((seed ^ Math.imul(level, 0x85ebca6b) ^ 0x5bd1e995) >>> 0);
   const duration = mode === 'long' ? Infinity : 60 + 3 * wing;
-  const mirror = ['mirror', 'mirrors', 'mirror-fuse', 'all'].includes(lesson) || level === 12;
-  const twins = ['twins', 'pair', 'all'].includes(lesson) || level === 6;
-  const shy = lesson === 'shy' || level === 10 || level === 16;
-  const cat = lesson === 'cat' || (level >= 11 && (level % 2 || level === 18));
-  const fuse = ['fuse', 'upper', 'mirror-fuse', 'all'].includes(lesson) || level === 16;
-  const stairs = ['stairs', 'upper', 'all'].includes(lesson) || level === 16 || level === 17;
+  const has = new Set(rules.split(' '));
+  const [mirror, twins, shy, cat, fuse, stairs, hatch, ghost] =
+    ['mirror', 'twins', 'shy', 'cat', 'fuse', 'stairs', 'hatch', 'ghost'].map(rule => has.has(rule));
+  const maskExit = shy ? Number(extra() < 0.5) : -1;
   const actors = HOMES.map(([x, y], id) => {
     let kind = POSES[id];
     if (id === 0 && lesson === 'painting') kind = 'painting';
+    if (id === 0 && ghost) kind = 'ghost';
     if (id === 4 && level < 3) kind = 'bird';
     if (twins && (id === 1 || id === 4)) kind = 'twin';
     if (id === 3 && shy) kind = 'shy';
+    // The balcony bust stands clear of the knight so the two never read as one figure.
+    if (id === 1 && stairs) x = 290;
     if (id === 5 && stairs) {
-      x = 238;
-      y = 236;
+      x = 222;
+      y = 222;
     }
-    const home = { x: x + (rng() - 0.5) * 14, y: y + (rng() - 0.5) * 12 };
+    let home = { x: x + (rng() - 0.5) * 14, y: y + (rng() - 0.5) * 12 };
     const curve = (rng() - 0.5) * 42;
-    const routes = EXITS.map(exit => path(home, id === 5 && stairs, curve, exit));
-    const route = routes[Number(home.x > WIDTH / 2)];
+    if (kind === 'shy') home = { x: EXITS[maskExit].x + (maskExit ? -8 : 8), y: MASK_Y };
+    const upstairs = id === 5 && stairs;
+    const drops = hatch && home.y > 300 && !upstairs && kind !== 'shy' && !(mirror && id === 2);
+    // The mask edges only a short way toward its door, so it stays where the doorway light falls.
+    const routes = kind === 'shy' ? [line([home, { x: home.x, y: MASK_Y - 24 }], EXITS[maskExit])]
+      : [...EXITS, ...(drops ? [HATCH] : [])].map(exit => path(home, upstairs, curve, exit));
+    const route = kind === 'shy' ? routes[0] : drops ? routes[2] : routes[Number(home.x > WIDTH / 2)];
     return {
       id, kind, home, route, routes, outings: 0, x: home.x, y: home.y, prevX: home.x, prevY: home.y,
       progress: 0, hold: 0, motion: 0, oldMotion: 0, stepAt: 0, lit: false,
-      mirrored: mirror && id === 2, upstairs: stairs && id === 5, state: 'home',
+      mirrored: mirror && id === 2, upstairs, state: 'home',
       speed: 1 / (10.9 - wing * 0.85 + rng() * 2.3 + (id === 5 && stairs ? 1.4 : 0)),
       holdTime: (lesson === 'drag' ? 0.82 : 1.22 + wing * 0.23) + (kind === 'dino' ? 0.15 : 0),
     };
@@ -124,14 +163,32 @@ export function create({ level = 1, seed = DEFAULT_SEED, mode = 'story' } = {}) 
 
   const tutorialIds = {
     drag: [0], hold: [1], painting: [0], twins: [1, 4], mirror: [2],
-    shy: [3], cat: [], fuse: [], stairs: [5],
+    shy: [3], cat: [], fuse: [], stairs: [5], ghost: [0],
+    hatch: actors.filter(a => a.route.exit === HATCH).map(a => a.id).slice(0, 1),
   };
+  // A runner bound for the mask's door must be caught before it is this far along,
+  // the first point where the pacing mask can block every aim that reaches it.
+  const mask = actors[3];
+  for (const a of actors) for (const route of a.routes) {
+    route.guarded = 1;
+    if (route.exit !== EXITS[maskExit] || a.kind === 'shy') continue;
+    for (let p = 0; p <= 1; p += 0.01) {
+      const at = pointAt(route, p);
+      const blocked = [-1, -0.5, 0, 0.5, 1].some(side => [0, 24, 40, 52, 60].every(dy => {
+        const point = { x: at.x, y: at.y + dy };
+        const pacing = { x: mask.home.x + side * MASK_SWAY, y: MASK_Y };
+        return !beamTouches(at, point) || beamTouches(pacing, point);
+      }));
+      if (blocked) { route.guarded = p; break; }
+    }
+  }
   const practice = mode === 'story' && INTRO.has(lesson) ? (lesson === 'cat' || lesson === 'fuse' ? 8 : 11) : 0;
   return {
-    level, wing, mode, seed, rng, duration, lesson, count, cadence, mirror, twins, shy, cat, fuse, stairs,
+    level, wing, mode, seed, rng, duration, lesson, count, cadence, mirror, twins, shy, cat, fuse, stairs, hatch, ghost,
+    maskExit: EXITS[maskExit] ?? null, masked: false,
     actors, tick: 0, time: 0, escapes: 0, returned: 0, events: [], outcome: null,
     light: { ...REST }, oldLight: { ...REST }, bounce: null, blackout: false,
-    catAt: null, catLit: false, catOff: 0, fused: false, fuseHold: 0, fuseTrip: Infinity, trips: 0,
+    catAt: null, catLit: false, catOff: 0, fused: false, fuseHold: 0, fuseTrip: Infinity, trips: 0, trippedAt: -Infinity,
     practice, hintDone: false, tutorIds: tutorialIds[lesson] ?? [],
     wave: 0, nextWave: practice || 1.15, activity: 0, closestEscape: 0,
   };
@@ -184,13 +241,53 @@ export function targetFor(actor) {
   return { x: actor.x, y: actor.y };
 }
 
-function beamTouches(actor, point) {
+// Where to put the beam to stop an exhibit: on it, or just below it when that keeps the mask dark.
+export function aimFor(s, a) {
+  const direct = targetFor(a);
+  if (!direct) return null;
+  if (a.kind === 'ghost' && a.state === 'roam' && a.progress >= GHOST_ZONE) return null;
+  const mask = s.shy && s.actors[3].state !== 'gone' ? s.actors[3] : null;
+  if (!mask || a.mirrored && a.y >= CASE.y) return mask && beamTouches(mask, direct) ? null : direct;
+  for (const dy of [0, 24, 40, 52, 60]) {
+    const point = { x: direct.x, y: direct.y + dy };
+    if (beamTouches(a, point) && !beamTouches(mask, point)) return point;
+  }
+  return null;
+}
+
+// Where to draw each figure so overlapping exhibits stay readable and tappable.
+// The offsets are for drawing only; the light still acts on the real positions.
+export const SPREAD = 24;
+export function spread(actors) {
+  const shown = actors.filter(a => a.state !== 'gone' && a.state !== 'home');
+  const offset = new Map(shown.map(a => [a.id, { x: 0, y: 0 }]));
+  for (let pass = 0; pass < 6; pass++) {
+    for (let i = 0; i < shown.length; i++) for (let j = i + 1; j < shown.length; j++) {
+      const a = shown[i], b = shown[j];
+      const oa = offset.get(a.id), ob = offset.get(b.id);
+      const dx = b.x + ob.x - a.x - oa.x;
+      const dy = b.y + ob.y - a.y - oa.y;
+      if (Math.abs(dx) >= 36 || Math.abs(dy) >= 40) continue;
+      const side = dx > 0 || (dx === 0 && a.id < b.id) ? 1 : -1;
+      // The mask stays where it blocks the light; anything beside it moves the whole way.
+      const push = (36 - Math.abs(dx)) / (a.kind === 'shy' || b.kind === 'shy' ? 1 : 2);
+      if (a.kind !== 'shy') oa.x = clamp(oa.x - side * push, -SPREAD, SPREAD);
+      if (b.kind !== 'shy') ob.x = clamp(ob.x + side * push, -SPREAD, SPREAD);
+    }
+  }
+  return offset;
+}
+
+export function beamTouches(actor, point) {
   const body = { x: actor.x, y: clamp(point.y, actor.y - 27, actor.y) };
   return inside(body, point, RADIUS + 7);
 }
 
 function lit(s, actor) {
   if (s.blackout) return false;
+  // Light passes through the ghost once it has left its ring.
+  if (actor.kind === 'ghost' && actor.state === 'roam' && actor.progress >= GHOST_ZONE) return false;
+  if (s.masked && actor.kind !== 'shy') return false;
   if (s.bounce && beamTouches(actor, s.bounce)) return true;
   return (!actor.mirrored || actor.y < CASE.y) && beamTouches(actor, s.light);
 }
@@ -203,8 +300,14 @@ function updateCat(s) {
   }
   const t = 1 - (s.catOff - s.time) / 4.4;
   s.catAt = { x: 32 + 322 * t, y: 399 + Math.sin(t * Math.PI * 2) * 31 };
-  const litNow = !s.blackout && inside(s.catAt, s.light, RADIUS);
-  if (litNow && !s.catLit) s.events.push({ type: 'cat', x: s.catAt.x });
+  const litNow = !s.blackout && !s.masked && inside(s.catAt, s.light, RADIUS);
+  if (litNow && !s.catLit) {
+    // A startled cat yowls and wakes the nearest exhibit that is still on its plinth.
+    const sleeper = s.actors.filter(a => a.state === 'home' && a.kind !== 'shy')
+      .sort((a, b) => distance(a.home, s.catAt) - distance(b.home, s.catAt))[0];
+    if (sleeper) awaken(s, sleeper);
+    s.events.push({ type: 'cat', x: s.catAt.x, y: s.catAt.y, woke: sleeper ?? null });
+  }
   s.catLit = litNow;
 }
 
@@ -224,12 +327,14 @@ function updateFuse(s) {
   if (s.fused && s.time >= s.fuseTrip) {
     s.fused = false;
     s.fuseTrip = Infinity;
+    s.trippedAt = s.time;
     s.trips++;
     s.events.push({ type: 'trip', x: FUSE.x });
   }
   const cycle = (s.time + 0.8) % 3.8;
   // A breaker left broken past the opening, or tripped again, keeps the lights out longer.
-  s.blackout = !s.fused && (cycle > 3.18 && cycle < 3.32 || cycle > (s.trips || s.time > 10 ? 2.6 : 3.49));
+  s.blackout = !s.fused && s.time >= s.trippedAt + GRACE &&
+    (cycle > 3.18 && cycle < 3.32 || cycle > (s.trips || s.time > 10 ? 2.6 : 3.49));
 }
 
 export function step(s, aim = REST) {
@@ -247,6 +352,18 @@ export function step(s, aim = REST) {
   s.light.y += dy / amount;
   s.bounce = s.mirror ? reflection(s.light) : null;
   updateFuse(s);
+  const mask = s.shy ? s.actors[3] : null;
+  if (mask && mask.state !== 'gone') {
+    // The mask paces across its doorway whether or not it is lit.
+    const sway = mask.state === 'roam' ? Math.sin(s.time * 0.95) * MASK_SWAY : 0;
+    mask.prevX = mask.x;
+    mask.prevY = mask.y;
+    const at = pointAt(mask.route, mask.progress);
+    mask.x = at.x + sway;
+    mask.y = at.y;
+  }
+  s.masked = !!mask && mask.state === 'roam' && !s.blackout &&
+    (beamTouches(mask, s.light) || (!!s.bounce && beamTouches(mask, s.bounce)));
   updateCat(s);
 
   if (s.practice && s.tick === 61) {
@@ -260,8 +377,10 @@ export function step(s, aim = REST) {
   const force = s.mode === 'long' ? 1 + Math.max(0, s.time - 54) / 12 : 1;
 
   for (const a of s.actors) {
-    a.prevX = a.x;
-    a.prevY = a.y;
+    if (a.kind !== 'shy') {
+      a.prevX = a.x;
+      a.prevY = a.y;
+    }
     a.oldMotion = a.motion;
     a.frozen = false;
     if (a.state === 'return') {
@@ -270,7 +389,8 @@ export function step(s, aim = REST) {
       locate(a);
       if (a.progress === 0) {
         a.state = 'home';
-        a.route = a.route === a.routes[0] ? a.routes[1] : a.routes[0];
+        // Each outing takes the next way out: the other door, then the hatch where there is one.
+        a.route = a.routes[(a.routes.indexOf(a.route) + 1) % a.routes.length];
       }
       continue;
     }
@@ -293,10 +413,13 @@ export function step(s, aim = REST) {
     }
 
     a.hold = Math.max(0, a.hold - DT * 2.1);
-    a.progress += DT * a.speed * force * (a.kind === 'shy' ? 1.28 : 1);
+    // The ghost creeps while it can still be caught, then hurries.
+    const pace = a.kind === 'shy' ? 0.7 : a.kind === 'ghost' ? (a.progress < GHOST_ZONE ? 0.5 : 1.3) : 1;
+    a.progress += DT * a.speed * force * pace;
     if (a.kind === 'shy' && a.progress >= 0.06) s.hintDone = true;
     a.motion += DT * force * (a.kind === 'shy' ? 1.5 : 1);
-    locate(a);
+    // The pacing mask is placed at the start of each step.
+    if (a.kind !== 'shy') locate(a);
     if (a.motion >= a.stepAt) {
       a.stepAt = a.motion + (a.kind === 'dino' ? 0.55 : 0.62);
       s.events.push({ type: 'foot', actor: a });

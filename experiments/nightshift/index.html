@@ -43,7 +43,7 @@
       <canvas id="poster" class="poster" width="680" height="364" aria-hidden="true"></canvas>
       <h1 data-i18n="title"></h1>
       <canvas id="goal" class="lesson-art" width="288" height="80" role="img" data-i18n-aria="goal"></canvas>
-      <div class="progress" id="progress" role="img" data-i18n-aria="progress"></div>
+      <button class="progress" id="progress"></button>
       <button class="primary" id="play"><span data-i18n="play"></span><small aria-hidden="true" id="nightNumber"></small></button>
       <div class="row">
         <button id="long"><span data-i18n="long"></span><span class="modeStat"><span data-i18n="endlessMark" aria-hidden="true"></span> <small id="best"></small></span></button>
@@ -52,6 +52,16 @@
       <div class="settings">
         <button class="quiet audio" id="menuSound"></button>
         <button class="language" id="menuLanguage" data-i18n-aria="changeLanguage"><svg class="icon" aria-hidden="true"><use href="#globeIcon"/></svg><span data-i18n="languageCode" aria-hidden="true"></span></button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="nights" data-i18n-aria="pickNight">
+    <div class="panel compact">
+      <h2 data-i18n="pickNight"></h2>
+      <div id="nightGrid"></div>
+      <div class="row">
+        <button id="nightsBack" data-i18n="back"></button>
       </div>
     </div>
   </section>
@@ -76,6 +86,7 @@
       <h2 id="outcome"></h2>
       <p id="medals" aria-live="polite"></p>
       <p id="resultDetail"></p>
+      <canvas id="lossArt" width="680" height="111" role="img" hidden></canvas>
       <button id="again" class="primary"></button>
       <div class="row">
         <button id="resultMenu" data-i18n="menu"></button>

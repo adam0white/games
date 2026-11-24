@@ -6,7 +6,7 @@ import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
-import { WIDTH, HEIGHT, LIFT, FUSE, REST, dailyNight, targetFor } from './sim.js';
+import { WIDTH, HEIGHT, LIFT, FUSE, REST, dailyNight } from './sim.js';
 
 const require = createRequire(process.env.PLAYWRIGHT ? join(resolve(process.env.PLAYWRIGHT), 'x.js') : import.meta.url);
 const { chromium, webkit, devices } = require('playwright');
@@ -59,18 +59,24 @@ async function finger(page, action, aim = REST, lift = LIFT) {
 async function drive(page, options = {}) {
   await finger(page, 'pointerdown');
   let lock = null;
+  let mending = false;
   let shot = false;
   for (let i = 0; i < 230; i++) {
     const s = await state(page);
     if (s.screen === 'result') break;
     assert.equal(s.screen, 'play');
-    const active = s.actors.filter(a => a.state === 'roam' && a.kind !== 'shy')
-      .sort((a, b) => b.progress - a.progress);
-    const a = active.find(other => other.id === lock) ?? active[0];
+    // Chase the exhibit closest to the point where it can no longer be stopped,
+    // aiming where the hook says the beam stops it without lighting the mask.
+    const weight = a => a.urgency * (a.kind === 'ghost' ? 1.6 : 1);
+    const active = s.actors.filter(a => a.state === 'roam' && a.kind !== 'shy' && a.reach)
+      .sort((a, b) => weight(b) - weight(a));
+    const held = active.find(other => other.id === lock);
+    const a = held && !(active[0] !== held && weight(active[0]) > weight(held) + 0.15 && weight(active[0]) > 0.78) ? held : active[0];
     lock = a?.id ?? null;
-    // The breaker trips again on these nights, so mend it whenever no exhibit is near a door.
-    const mend = [13, 15, 16, 17, 18].includes(s.level) && !s.fused && (s.time < 2.5 || !(a?.progress > 0.55));
-    const aim = mend ? FUSE : a && targetFor(a);
+    // The breaker trips again on these nights, so mend it whenever no exhibit is close to getting away.
+    mending = [13, 15, 16, 17, 18].includes(s.level) && !s.fused &&
+      (s.time < 2.5 || mending ? !(a?.urgency > 0.85) : !(a?.urgency > 0.55));
+    const aim = mending ? FUSE : a?.reach;
     await finger(page, 'pointermove', aim ?? REST);
     await tick(page, 340);
     if (options.mid && !shot && (await state(page)).actors.some(actor => actor.lit && actor.hold > .25)) {
@@ -193,6 +199,44 @@ async function checkFirstShift(page) {
   assert.deepEqual(problems, []);
 }
 
+async function checkNightPicker(page) {
+  await open(page);
+  await page.evaluate(() => localStorage.setItem('nightshift-save', JSON.stringify({ unlocked: 5, cleared: 4, played: true })));
+  await open(page);
+  await page.tap('#progress');
+  assert.equal((await state(page)).screen, 'nights', 'the night row opens the picker');
+  const tiles = await page.locator('#nightGrid .night').evaluateAll(list => list.map(el => {
+    const { width, height } = el.getBoundingClientRect();
+    return { width, height, disabled: el.disabled };
+  }));
+  assert.equal(tiles.length, 18);
+  assert.ok(tiles.every(tile => tile.width >= 44 && tile.height >= 44), 'every night tile is a thumb target');
+  assert.deepEqual(tiles.map(tile => tile.disabled), Array.from({ length: 18 }, (_, i) => i >= 5), 'only unlocked nights open');
+  await page.tap('#nightGrid .night[data-night="2"]');
+  assert.deepEqual([(await state(page)).mode, (await state(page)).level], ['story', 2], 'a tile replays that night');
+  await drive(page);
+  const saved = await save(page);
+  assert.equal(saved.unlocked, 5, 'a replay keeps the furthest night');
+  assert.equal(saved.stars[1], 3 - (await state(page)).escapes, 'a replay stores its stars');
+  await page.tap('#resultMenu');
+  await page.tap('#progress');
+  assert.match(await page.locator('#nightGrid .night[data-night="2"]').getAttribute('aria-label'), /star/);
+  await page.tap('#nightsBack');
+  assert.equal((await state(page)).screen, 'menu');
+  const posters = await page.evaluate(async () => {
+    const { cover } = await import('./art.js');
+    return [0, 1, 2].map(wing => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 680;
+      canvas.height = 364;
+      cover(canvas, 'dawn', {}, wing);
+      return canvas.toDataURL();
+    });
+  });
+  assert.equal(new Set(posters).size, 3, 'each wing has its own result picture');
+  await page.evaluate(() => localStorage.removeItem('nightshift-save'));
+}
+
 async function holdThroughLoss(page) {
   const touch = await page.context().newCDPSession(page);
   await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 232, y: 490 }] });
@@ -267,6 +311,19 @@ async function run(page, name, records) {
   const lossText = await page.locator('#result').innerText();
   assert.ok(lossText.includes('3 escaped') && lossText.includes('0 stars'), 'loss explains the three escapes and zero stars');
   await capture(page, name, 'escaped');
+  // The first loss on a night pictures each escape and its way out; a second loss on the same night does not.
+  assert.equal(lost.escapedBy.length, 3);
+  assert.ok(lost.escapedBy.every(escape => ['left', 'right', 'hatch', 'ghost'].includes(escape.way)), JSON.stringify(lost.escapedBy));
+  assert.ok(lost.lossShown && await page.locator('#lossArt').isVisible(), 'the first loss shows the escape picture');
+  const ways = { left: 'left door', right: 'right door', hatch: 'floor hatch', ghost: 'ghost past its ring' };
+  assert.equal(await page.locator('#lossArt').getAttribute('aria-label'), 'How they got out: ' + lost.escapedBy.map(escape => ways[escape.way]).join(', '));
+  assert.equal((await save(page)).lossShown[1], true);
+  await page.tap('#resultMenu');
+  await page.tap('#play');
+  await tick(page, 43500);
+  const lostAgain = await state(page);
+  assert.equal(lostAgain.outcome, 'escaped');
+  assert.ok(!lostAgain.lossShown && !(await page.locator('#lossArt').isVisible()), 'a second loss on the same night hides the escape picture');
   await page.tap('#resultMenu');
 
   await page.tap('#daily');
@@ -348,6 +405,40 @@ async function run(page, name, records) {
   for (const outcome of ['dawn', 'escaped', 'left']) {
     assert.ok(records.some(r => r.kind === 'run' && r.data.outcome === outcome && r.game === 'nightshift' && r.runSource === 'agent'), `mocked lab run contains ${outcome}`);
   }
+}
+
+// Idle losses on nights whose default seed sends exhibits out by the hatch, past the ghost ring and by the left door.
+async function checkLossWays(page) {
+  const painted = () => page.locator('#lossArt').evaluate(el => {
+    const data = el.getContext('2d').getImageData(0, 0, el.width, el.height).data;
+    let n = 0;
+    for (let i = 3; i < data.length; i += 4) if (data[i]) n++;
+    return n / (data.length / 4);
+  });
+  const loseIdle = async () => {
+    for (let i = 0; i < 40 && (await state(page)).screen !== 'result'; i++) await tick(page, 2000);
+    const lost = await state(page);
+    assert.equal(lost.outcome, 'escaped');
+    return lost;
+  };
+  for (const [level, ways] of [[10, ['hatch', 'hatch', 'right']], [15, ['ghost', 'right', 'right']], [17, ['left', 'right', 'ghost']]]) {
+    await page.evaluate(() => localStorage.clear());
+    await open(page, '&level=' + level);
+    await page.tap('#play');
+    const lost = await loseIdle();
+    assert.deepEqual(lost.escapedBy.map(escape => escape.way), ways, `night ${level} ways out`);
+    assert.ok(lost.lossShown && await painted() > .3, `night ${level} paints the escape picture`);
+  }
+  // Daily shows the picture on every loss and leaves the story nights' first losses alone.
+  await page.evaluate(() => localStorage.clear());
+  await open(page);
+  for (let round = 0; round < 2; round++) {
+    await page.tap('#daily');
+    const lost = await loseIdle();
+    assert.ok(lost.mode === 'daily' && lost.lossShown && await page.locator('#lossArt').isVisible(), 'a Daily loss shows the escape picture');
+    await page.tap('#resultMenu');
+  }
+  assert.ok((await save(page)).lossShown.every(shown => !shown), 'Daily losses leave story nights unmarked');
 }
 
 async function checkLanguageFrame(page, language, screen) {
@@ -437,6 +528,9 @@ async function checkLanguages(page, name, locale) {
     let hit = await page.locator('#menuLanguage').boundingBox();
     assert.ok(hit.width >= 44 && hit.height >= 44);
     await shot('menu');
+    await page.tap('#progress');
+    await shot('nights');
+    await page.tap('#nightsBack');
     await page.tap('#play');
     await tick(page, 2300);
     assert.equal(await page.getByRole('img', { name: table[language].floor }).getAttribute('aria-describedby'), 'playGuide');
@@ -496,7 +590,7 @@ async function checkLanguages(page, name, locale) {
     }
     if (['small-360', 'iphone13-full'].includes(name)) {
       for (const [level, lesson] of [[2, 'hold'], [3, 'painting'], [4, 'twins'], [7, 'mirror'],
-        [8, 'mask'], [9, 'cat'], [13, 'fuse'], [14, 'stairs']]) {
+        [8, 'mask'], [9, 'cat'], [10, 'hatch'], [13, 'fuse'], [14, 'stairs'], [15, 'ghost']]) {
         await open(page, '&level=' + level, language);
         await page.tap('#play');
         await tick(page, 1600);
@@ -556,6 +650,8 @@ try {
         await page.evaluate(() => localStorage.clear());
         await run(page, name, records);
         await checkLessonCues(page);
+        await checkNightPicker(page);
+        await checkLossWays(page);
       }
       await checkLanguages(page, name, locale);
       assert.deepEqual(errors, []);

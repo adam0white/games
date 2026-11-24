@@ -1,4 +1,6 @@
-import { WIDTH, HEIGHT, EXITS, REST, CASE, MIRROR, FUSE, STAIR, LIFT, RADIUS, distance, targetFor } from './sim.js';
+import {
+  WIDTH, HEIGHT, EXITS, REST, CASE, MIRROR, FUSE, STAIR, HATCH, LIFT, RADIUS, GHOST_ZONE, distance, targetFor, deadline, pointAt, spread,
+} from './sim.js';
 
 const ink = '#221e37';
 const cream = '#fff1cc';
@@ -14,6 +16,7 @@ const palettes = {
   twin: ['#8e7bc4', '#c0acef', '#f0d9ff'],
   shy: ['#83ac8a', '#b4de97', '#e5f5bc'],
   bird: ['#9d83b2', '#d4acdd', '#ffe0e3'],
+  ghost: ['#8fa3c6', '#cfdcf2', '#f4f8ff'],
 };
 
 function shape(c, points, fill, stroke, width = 1) {
@@ -198,6 +201,15 @@ function shy(c, [low, mid, high], caught, blink, stride) {
   if (!stride) shape(c,[[-12,-16],[-5,-23],[5,-23],[12,-16]],null,low,7);
 }
 
+function ghost(c, [low, mid, high], caught, blink, stride) {
+  const sway = stride * .6;
+  shape(c,[[-19,2],[-21,-24],[-15,-43],[0,-52],[15,-43],[21,-24],[19,2],[12,-5+sway],[6,3],[0,-5-sway],[-6,3],[-12,-5+sway]],mid,ink,1.8);
+  shape(c,[[-12,-40],[0,-47],[11,-41]],null,high,4);
+  shape(c,[[-16,-12],[-9,-6],[-3,-12]],null,low,2);
+  eyes(c,0,-30,7,caught,blink);
+  if (caught) oval(c,0,-19,3,4,ink);
+}
+
 export function exhibit(c, kind, x, y, { scale = 1, lit = false, caught = false, motion = 0, walk = false, blink = false, face = 1 } = {}) {
   const stride = walk || caught ? Math.sin(motion*11) * 5 : 0;
   const colors = palettes[kind];
@@ -212,6 +224,7 @@ export function exhibit(c, kind, x, y, { scale = 1, lit = false, caught = false,
   else if (kind === 'painting') portrait(c, toned, caught, blink, stride);
   else if (kind === 'shy') shy(c, toned, caught, blink, stride);
   else if (kind === 'bird') bird(c, toned, caught, blink, stride);
+  else if (kind === 'ghost') ghost(c, toned, caught, blink, stride);
   else bust(c, toned, caught, blink, stride, kind === 'twin');
   c.restore();
 }
@@ -300,6 +313,23 @@ function balcony(c) {
   shape(c,[[269,179],[269,169],[264,174]],null,cream,1.7);
 }
 
+function hatch(c, open = false) {
+  const { x, y } = HATCH;
+  oval(c,x,y+3,31,15,'#151a32');
+  oval(c,x,y,28,13,open ? '#100f22' : '#2a2945');
+  c.save();
+  c.beginPath();
+  c.ellipse(x,y,28,13,0,0,Math.PI*2);
+  c.clip();
+  for (let i=-3;i<=3;i++) shape(c,[[x+i*8,y-14],[x+i*8,y+14]],null,'#6f6a8a',2.2);
+  c.restore();
+  c.save();
+  c.translate(x,y);
+  c.scale(1,13/28);
+  ring(c,0,0,28,brass,2.2);
+  c.restore();
+}
+
 function floor(c, s) {
   const wall = c.createLinearGradient(0,0,0,HEIGHT);
   wall.addColorStop(0,'#292941');
@@ -349,7 +379,9 @@ function floor(c, s) {
   box(c,177,563,36,26,8,'#2a2948','#806a8a',1);
   for (const x of [173,217]) diamond(c,x,576,2.5,brass);
   if (s.stairs) balcony(c);
-  for (const a of s.actors) {
+  if (s.hatch) hatch(c);
+  // The mask paces in its doorway; it has no plinth.
+  for (const a of s.actors.filter(actor => actor.kind !== 'shy')) {
     const { x,y }=a.home;
     const tone=palettes[a.kind][0];
     c.save();
@@ -388,7 +420,7 @@ function glow(c, x, y, r, power = 1) {
   c.fillRect(x-r*1.3,y-r*1.3,r*2.6,r*2.6);
 }
 
-function torch(c,x,y,beam,blackout) {
+function torch(c,x,y,beam,blackout,masked=false) {
   if (beam) {
     const cone=c.createLinearGradient(0,y-9,0,y+LIFT+11);
     cone.addColorStop(0,'#ffe6a100');
@@ -404,7 +436,12 @@ function torch(c,x,y,beam,blackout) {
     c.fill();
     glow(c,x,y,RADIUS,blackout ? .13 : 1);
     ring(c,x,y,RADIUS,blackout ? '#ffeabb22' : '#ffedb966',1.2);
-    if (!blackout) {
+    if (masked && !blackout) {
+      // A lit mask soaks up the beam: the ring turns green and stops nothing else.
+      c.setLineDash([5,6]);
+      ring(c,x,y,RADIUS,mint,2.4);
+      c.setLineDash([]);
+    } else if (!blackout) {
       for (let i=0;i<4;i++) {
         const angle=(i+.5)*Math.PI/2;
         ring(c,x,y,RADIUS,'#ffeabea3',2,angle-.11,angle+.11);
@@ -502,6 +539,10 @@ function gesture(c,s,now,reduced,{ tutorial, waiting, firstDrag, repairCue }) {
 
   const twins=s.actors.filter(actor => actor.kind==='twin' && actor.state!=='gone');
   if ((practice && s.lesson==='twins') || twins.some(actor => actor.hold > 0)) linkedTwins(c,twins);
+  if ((practice && s.lesson==='hatch') || s.actors.some(actor => actor.route.exit===HATCH && actor.state==='roam' && !actor.frozen && actor.progress > .3)) {
+    ring(c,HATCH.x,HATCH.y,36,mint,1.8);
+    arrow(c,HATCH.x,HATCH.y-4,0,1,mint);
+  }
   if ((practice && s.lesson==='stairs') || s.actors.some(actor => actor.upstairs && actor.state==='roam' && actor.progress < .32)) {
     ring(c,STAIR.x,STAIR.y-18,20,mint,1.8);
     arrow(c,STAIR.x+28,STAIR.y+8,0,1,mint);
@@ -550,9 +591,9 @@ function gesture(c,s,now,reduced,{ tutorial, waiting, firstDrag, repairCue }) {
   c.restore();
 }
 
-function renderActor(c,s,a,alpha,reduce) {
+function renderActor(c,s,a,alpha,reduce,shift=0) {
   if (a.state==='gone') return;
-  const x=a.prevX+(a.x-a.prevX)*alpha;
+  const x=a.prevX+(a.x-a.prevX)*alpha+shift;
   const y=a.prevY+(a.y-a.prevY)*alpha;
   const walk=(a.state==='roam' && !a.frozen && a.motion>a.oldMotion) || a.state==='return';
   const caught=a.state==='roam' && a.frozen;
@@ -571,18 +612,26 @@ function renderActor(c,s,a,alpha,reduce) {
   oval(c,0,0,34,34,shade);
   c.restore();
   oval(c,x+2,y+3,14,4,'#211c3670');
+  // Warn by how close the exhibit is to the point where it can no longer be stopped.
+  const limit=deadline(s,a);
+  const urgent=a.kind!=='shy' && (limit <= 0 || a.progress/limit>.67);
+  const passing=a.kind==='ghost' && a.state==='roam' && a.progress>=GHOST_ZONE;
   if (a.state==='roam' && !caught) {
-    const dot = a.kind==='shy' ? mint : a.progress>.67 ? '#ffae9f' : brass;
+    const dot = a.kind==='shy' ? mint : urgent ? '#ffae9f' : brass;
     const ox = y <= 170 ? x+(x>195 ? 20 : -20) : x;
     diamond(c,ox,y+16,3.4,dot);
-    if (a.progress>.67) ring(c,x,y,27,'#ed9b8555',1.5);
+    if (urgent && !passing) ring(c,x,y,27,'#ed9b8555',1.5);
   }
+  c.save();
+  if (passing) c.globalAlpha=.42;
   exhibit(c,a.kind,x,y,{
     scale:a.upstairs && a.progress < .32 ? .82 : 1,
     caught:caught || a.state==='return',lit:a.lit,motion,walk,
     blink:!reduce && !caught && (s.time+a.id*.53)%4.1<.11,
     face:a.kind==='dino' && x>195 ? -1 : 1,
   });
+  c.restore();
+  if (passing) crossedBeam(c,x,y-64,11);
   if (caught && a.hold > 0) {
     ring(c,x,y+5,31,'#28203caf',3,-Math.PI*.9,-Math.PI*.1);
     ring(c,x,y+5,31,cream,3,-Math.PI*.9,-Math.PI*.9+Math.PI*.8*a.hold/a.holdTime);
@@ -599,12 +648,14 @@ export function renderer(canvas) {
   b.scale(2,2);
   let last=null;
   let repairUntil=0;
+  let shifts=new Map();
   return {
     draw(s, alpha, now, effects, reduced, hints) {
       if (last!==s) {
         floor(b,s);
         last=s;
         repairUntil=0;
+        shifts=new Map();
       }
       c.setTransform(canvas.width/WIDTH,0,0,canvas.height/HEIGHT,0,0);
       c.drawImage(backdrop,0,0,WIDTH,HEIGHT);
@@ -617,7 +668,14 @@ export function renderer(canvas) {
       }
       const x=s.oldLight.x+(s.light.x-s.oldLight.x)*alpha;
       const y=s.oldLight.y+(s.light.y-s.oldLight.y)*alpha;
-      torch(c,x,y,true,s.blackout);
+      // The ghost can be stopped only inside this ring around its plinth.
+      for (const a of s.actors) if (a.kind==='ghost' && a.state!=='gone') {
+        const edge=pointAt(a.route,GHOST_ZONE);
+        c.setLineDash([3,7]);
+        ring(c,a.home.x,a.home.y-14,distance(a.home,edge)+14,a.state==='roam' && a.progress<GHOST_ZONE ? '#cfdcf2cc' : '#cfdcf255',2);
+        c.setLineDash([]);
+      }
+      torch(c,x,y,true,s.blackout,s.masked);
       if (s.mirror) mirror(c,s);
       if (s.fuse) fuse(c,s);
       for (const e of effects) if (e.type==='foot') {
@@ -627,7 +685,13 @@ export function renderer(canvas) {
         oval(c,e.x+5,e.y+9,2.7,4,'#ffd29c',.38);
         c.restore();
       }
-      for (const a of [...s.actors].sort((p,q)=>p.y-q.y)) renderActor(c,s,a,alpha,reduced);
+      const goal=spread(s.actors);
+      for (const a of s.actors) {
+        const target=goal.get(a.id)?.x ?? 0;
+        const now=shifts.get(a.id) ?? 0;
+        shifts.set(a.id,reduced ? target : now+(target-now)*.22);
+      }
+      for (const a of [...s.actors].sort((p,q)=>p.y-q.y)) renderActor(c,s,a,alpha,reduced,shifts.get(a.id));
       if (s.catAt) cat(c,s.catAt.x,s.catAt.y,reduced ? 0 : Math.sin(time*18)*3,s.catLit);
       for (const e of effects) {
         if (e.type==='foot') continue;
@@ -635,6 +699,13 @@ export function renderer(canvas) {
         c.save();
         c.globalAlpha=1-age;
         if (e.type==='touch') ring(c,e.x,e.y,8+(reduced ? 6 : age*22),cream,2);
+        if (e.type==='wake') {
+          // The startled cat points at the exhibit it woke.
+          c.setLineDash([3,6]);
+          shape(c,[[e.x,e.y-12],[e.tx,e.ty-30]],null,'#ffb6ac',2.4);
+          c.setLineDash([]);
+          ring(c,e.tx,e.ty-24,24+(reduced ? 4 : age*14),'#ffb6ac',2.4);
+        }
         if (e.type==='escape') {
           ring(c,e.x,e.y-22,21+age*25,'#ff9b9f',3);
           sparkle(c,e.x+18,e.y-28,10,'#ffd0b8');
@@ -659,7 +730,14 @@ export function renderer(canvas) {
   };
 }
 
-export function cover(canvas, mode = 'menu', labels = {}) {
+// Each wing ends on its own trio of exhibits.
+const trios = [
+  [['armor',93,141,1.37,1,.41,true],['bear',180,155,1.02,1,.18,true],['dino',252,143,1.34,-1,.38,false]],
+  [['painting',94,146,1.2,1,.41,true],['twin',178,153,1.1,1,.18,true],['shy',254,146,1.25,-1,.38,false]],
+  [['bird',95,146,1.3,1,.41,true],['ghost',180,153,1.12,1,.18,true],['dino',252,143,1.34,-1,.38,false]],
+];
+
+export function cover(canvas, mode = 'menu', labels = {}, wing = 0) {
   const c=canvas.getContext('2d');
   const w=canvas.width;
   const h=canvas.height;
@@ -669,7 +747,7 @@ export function cover(canvas, mode = 'menu', labels = {}) {
     const picture = document.createElement('canvas');
     picture.width = 680;
     picture.height = 364;
-    cover(picture, win ? 'dawn' : 'escaped');
+    cover(picture, win ? 'dawn' : 'escaped', {}, wing);
     c.setTransform(w / 340, 0, 0, h / 270, 0, 0);
     c.fillStyle = '#302b46';
     c.fillRect(0, 0, 340, 270);
@@ -713,9 +791,9 @@ export function cover(canvas, mode = 'menu', labels = {}) {
   glow(c,171,119,51,.52);
   oval(c,96,147,47,12,'#251f39a0');
   oval(c,250,146,46,12,'#251f39a0');
-  exhibit(c,'armor',93,141,{scale:1.37,lit:true,caught:true,motion:.41});
-  exhibit(c,'bear',180,155,{scale:1.02,lit:true,caught:true,motion:.18});
-  exhibit(c,'dino',252,143,{scale:1.34,face:-1,caught:true,motion:.38});
+  for (const [kind,x,y,scale,face,motion,lit] of trios[wing] ?? trios[0]) {
+    exhibit(c,kind,x,y,{scale,face,lit,caught:true,motion});
+  }
   if (mode==='escaped') {
     cat(c,43,163,2,true);
     sparkle(c,57,131,6,cream);
@@ -800,10 +878,39 @@ function rulePicture(c,key) {
     oval(c,63,21,7,12,'#82b8b3',.28);
     hand(c,74,23,.55);
   }
-  if (key==='shyRule' || key==='catRule') {
-    if (key==='shyRule') exhibit(c,'shy',36,33,{scale:.55});
-    else cat(c,36,27,0,false);
-    crossedBeam(c,66,20,13);
+  if (key==='shyRule') {
+    exhibit(c,'shy',22,35,{scale:.5,lit:true});
+    ring(c,22,24,15,mint,1.8);
+    crossedBeam(c,50,20,10);
+    exhibit(c,'statue',76,36,{scale:.42,walk:true,motion:.3});
+  }
+  if (key==='catRule') {
+    cat(c,22,29,0,true);
+    ring(c,22,22,14,brass,1.6);
+    c.setLineDash([3,4]);
+    shape(c,[[38,22],[60,22]],null,'#ffb6ac',1.8);
+    c.setLineDash([]);
+    exhibit(c,'statue',74,36,{scale:.42,walk:true,motion:.3});
+    ring(c,74,25,14,'#ffb6ac',1.6);
+  }
+  if (key==='hatchRule') {
+    exhibit(c,'armor',24,34,{scale:.45,walk:true,motion:.3});
+    arrow(c,50,24,1,0,mint);
+    oval(c,72,28,17,8,'#151a32');
+    for (let i=-2;i<=2;i++) shape(c,[[72+i*6,21],[72+i*6,35]],null,'#6f6a8a',1.5);
+    arrow(c,72,22,0,1,mint);
+  }
+  if (key==='ghostRule') {
+    c.setLineDash([2,4]);
+    ring(c,24,22,17,'#cfdcf2',1.5);
+    c.setLineDash([]);
+    exhibit(c,'ghost',24,34,{scale:.45,lit:true,caught:true});
+    hand(c,28,25,.45);
+    c.save();
+    c.globalAlpha=.45;
+    exhibit(c,'ghost',70,34,{scale:.45});
+    c.restore();
+    crossedBeam(c,84,12,8);
   }
   if (key==='fuseRule') {
     box(c,27,10,40,23,5,'#648f7d',mint,1.4);
@@ -819,19 +926,85 @@ function rulePicture(c,key) {
 
 export function lessonArt(canvas, keys) {
   const c=canvas.getContext('2d');
-  const rows=Math.ceil(keys.length/3);
-  canvas.height=rows*96;
+  // Busy nights use four columns so every rule still fits a small phone.
+  const columns=keys.length > 9 ? 4 : 3;
+  const rows=Math.ceil(keys.length/columns);
+  canvas.height=columns===3 ? rows*96 : Math.round(rows*48*canvas.width/(columns*98));
   if (keys.length===1) {
     c.setTransform(canvas.width/94,0,0,canvas.height/48,0,0);
     goalPicture(c,47,23);
     return;
   }
-  c.setTransform(canvas.width/294,0,0,canvas.height/(rows*48),0,0);
+  c.setTransform(canvas.width/(columns*98),0,0,canvas.height/(rows*48),0,0);
   keys.forEach((key,i) => {
     c.save();
-    c.translate(i%3*98+2,Math.floor(i/3)*48+2);
+    c.translate(i%columns*98+2,Math.floor(i/columns)*48+2);
     box(c,0,0,94,42,8,'#342e4c','#7d6686',1);
     rulePicture(c,key);
+    c.restore();
+  });
+}
+
+function grate(c,x,y) {
+  oval(c,x,y,15,7,'#151a32');
+  for (let i=-2;i<=2;i++) shape(c,[[x+i*5,y-6],[x+i*5,y+6]],null,'#6f6a8a',1.5);
+  c.save();
+  c.translate(x,y);
+  c.scale(1,7/15);
+  ring(c,0,0,15,brass,1.4);
+  c.restore();
+}
+
+// One cell per escape: the exhibit that got out and the way it went, so a lost night shows the rule it broke.
+function lossPicture(c,{ kind, way, exit }) {
+  const red='#ffb6ac';
+  if (way==='ghost') {
+    c.setLineDash([2,4]);
+    ring(c,20,22,15,'#cfdcf2',1.5);
+    c.setLineDash([]);
+    crossedBeam(c,20,22,7);
+    c.save();
+    c.globalAlpha=.55;
+    exhibit(c,'ghost',47,35,{scale:.42,walk:true,motion:.3});
+    c.restore();
+    arrow(c,66,24,1,0,red);
+    if (exit==='hatch') grate(c,80,30);
+    else smallDoor(c,78,24,true);
+    return;
+  }
+  if (way==='left') {
+    // Mirror the open door so its arrow points out to the left.
+    c.save();
+    c.translate(36,0);
+    c.scale(-1,1);
+    smallDoor(c,18,24,true);
+    c.restore();
+    arrow(c,44,24,-1,0,red);
+    exhibit(c,kind,70,36,{scale:.42,walk:true,motion:.3,face:-1});
+    return;
+  }
+  exhibit(c,kind,24,36,{scale:.42,walk:true,motion:.3});
+  arrow(c,56,24,1,0,red);
+  if (way==='hatch') {
+    grate(c,76,30);
+    arrow(c,76,22,0,1,red);
+  } else smallDoor(c,76,24,true);
+}
+
+export function lossArt(canvas, escapes) {
+  const c=canvas.getContext('2d');
+  c.setTransform(1,0,0,1,0,0);
+  c.clearRect(0,0,canvas.width,canvas.height);
+  c.setTransform(canvas.width/294,0,0,canvas.height/48,0,0);
+  escapes.slice(0,3).forEach((escape,i) => {
+    c.save();
+    c.translate(i*98+2,2);
+    box(c,0,0,94,42,8,'#342e4c','#ffb6ac',1.2);
+    c.beginPath();
+    if (c.roundRect) c.roundRect(0,0,94,42,8);
+    else c.rect(0,0,94,42);
+    c.clip();
+    lossPicture(c,escape);
     c.restore();
   });
 }
