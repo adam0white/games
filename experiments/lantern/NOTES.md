@@ -644,3 +644,21 @@ already on screen (the night banner) stays in the old language until it fades, u
 Found and left alone: when a tower level is cleared, the line that should say so is commented out by a `//` earlier on
 the same line, so the end card shows whatever `#line` held before (for example the pause text). This was so before the
 Turkish work and behaves the same now.
+
+## 2026-11-24: tilt steering in first person (tester t1, note #203, answering #167)
+
+The note, in short: pressing left or right in first person feels like teleporting through the wall. Steer by tilting the phone instead.
+
+- **Cause, measured.** A press asked for a spot far to the side, so the boat ran at the rules' top sideways speed at once and coasted on after the finger lifted. On night 1 a press of 8 ticks (0.13 s) moved 0.21 of the river; the river's half-width is about 0.27. A held press drove through the bank and lost three hearts.
+- **Tilt.** First person steers by leaning the phone (`kit/tilt.js`, new). It is measured from gravity, so a sideways lean or a steering-wheel turn both work, upright, flat or landscape. How the phone is held at the start of a run or after a pause is straight. 2.5 degrees are ignored; 18 degrees is top speed, which is 0.8 of the rules' scale (the limit is 0.95). A bead under the moon's end of the river shows the lean; "Tilt the phone to steer" shows for four seconds. The screen is asked to stay on, because a run with no touches would dim.
+- **Press is kept** as the other choice: "Steering" on the menu and the pause card, in first person only. New key `lantern-steer`: 'tilt' or 'press'; absent means tilt. Press also works when the phone sends no readings or permission is refused. A press now builds up over about a quarter of a second and stops when the finger lifts: the same 8-tick press moves 0.04.
+- **Banks, a decision for the owner to overrule.** In first person, steering into a bank slides along it and costs nothing; a boat nobody steers can still drift into one. The shared endless board mixes views, so first-person scores get slightly safer banks. First person is harder otherwise; not measured.
+- **iPhone permission** is asked inside the click that picks first person or starts a run in it. The river waits while the prompt is open (20 s at most).
+- **Bug found on the way, fixed.** In 3D and first person the wind streaks and rain were never drawn: their line was commented out by a `//` earlier on the same line.
+
+Checks: new phone-check lines (press step, stop on release, held press, denied permission, tilt both ways, level stops, fallback when readings stop). With main's steering put back, the press values above fail them. `bots.mjs` unchanged; `sim.js` only exports `pace`. Screenshot looked at on WebKit iPhone 13.
+
+Not verified: a real phone's sensor, the iOS prompt, the screen staying on, and whether the numbers feel right. The readings in the checks are synthetic.
+
+### Left as a proposal (2026-11-24, note #203)
+- Tilt in the 2D and 3D views, and a sensitivity setting, if the tester likes it.

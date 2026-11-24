@@ -69,7 +69,7 @@ export function fall(s, y) {
   if (s.endless) d = (y + 20) % 60; else if (s.stage >= 16 && y > GOAL * 0.7) d = y - GOAL * 0.8; else if (s.stage >= 5) d = y - GOAL * 0.5; else return 0;
   return d >= 0 && d < 3 ? Math.sin(d / 3 * Math.PI) : 0;
 }
-function pace(s) { return s.tower ? climbPace(s.climb) : s.endless ? 1 + 0.05 * Math.min(24, level(s) - 1) : nightPace(s.stage) * s.hard; }
+export function pace(s) { return s.tower ? climbPace(s.climb) : s.endless ? 1 + 0.05 * Math.min(24, level(s) - 1) : nightPace(s.stage) * s.hard; }
 export function speed(s) { return (0.62 + 0.62 * Math.min(1, s.y / GOAL)) * pace(s) * (1 + 0.7 * fall(s, s.y)) * (s.boost ? 1.8 : 1) * s.calm; }
 export function reach(light) { return 0.17 + 0.6 * light; }
 // Stretches of weather, each a fixed length of river that comes round again. Night 7 fog, night 9 wind, night 13 rain.
