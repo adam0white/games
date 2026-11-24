@@ -3,9 +3,9 @@
 (() => {
   const KEY = 'notes.k';
   // Games offered for a new note. Older notes about a dropped game still show under their own name.
-  const GAMES = [['lantern', 'Lantern'], ['ant-promotion', 'Ant Promotion'], ['grapevine', 'Grapevine'], ['fixit', 'Fix-It Stall'], ['ducklings', 'Follow Me'], ['borrowed', 'Borrowed Time'], ['crumbwar', 'Crumbwar']];
+  const GAMES = [['lantern', 'Lantern'], ['ant-promotion', 'Ant Promotion'], ['grapevine', 'Grapevine'], ['fixit', 'Fix-It Stall'], ['ducklings', 'Follow Me'], ['borrowed', 'Borrowed Time'], ['crumbwar', 'Crumbwar'], ['breath', 'Hold Your Breath'], ['matchmaker', 'Good Match'], ['sling', 'Seed Sling']];
   // Shown as a row of links above the thread until each has been opened once on this device.
-  const FRESH = ['crumbwar', 'borrowed', 'grapevine', 'fixit', 'ducklings'];
+  const FRESH = ['breath', 'matchmaker', 'sling', 'crumbwar', 'borrowed', 'grapevine', 'fixit', 'ducklings'];
   const NAMES = { 'long-road': 'The Long Road', 'copper-afternoon': 'Copper Afternoon' };
   const MAX_SECONDS = 180;
   const STRINGS = {
