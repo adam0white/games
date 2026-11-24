@@ -10,6 +10,6 @@ Every day that has a light gets a place in a field of five rows, counted from th
 
 How it was built: Codex wrote the first version from a brief; the layout (it showed one day per screen, so a grown sky looked empty) and the three looks were then rewritten by the lab agent.
 
-Checks: `node experiments/lab/thankful/bots.mjs`; `PLAYWRIGHT=<dir with playwright> SHOTS=<dir> node experiments/lab/thankful/check.mjs` (WebKit iPhone 13 and Chromium Pixel 7 profiles; both passed on 2026-11-24). Not verified: sound and feel on a real phone, a second real day (the day change was only checked with `?day=`), and whether a person comes back the next day. Not wired yet: lab recording (`kit/lab.js` needs the slug added in human-framework first) and an entry in `kit/check/phone.mjs`.
+Checks: `node experiments/lab/thankful/bots.mjs`; `PLAYWRIGHT=<dir with playwright> SHOTS=<dir> node experiments/lab/thankful/check.mjs` (WebKit iPhone 13 and Chromium Pixel 7 profiles; both passed on 2026-11-24). Not verified: sound and feel on a real phone, a second real day (the day change was only checked with `?day=`), and whether a person comes back the next day. Not wired yet: lab recording (`kit/lab.js` needs the slug added in human-framework first) an entry in `kit/check/phone.mjs`, and the shared notes button (`/notes/button.js`; the page makes its own link for now).
 
 Ideas not built: a soft reminder at a chosen hour, a yearly view, sharing a picture of the sky, words of thanks from several traditions shown after the third light (needs the owner's choice of texts).
