@@ -101,3 +101,31 @@ From `docs/ideas/shortlist-2026-11-24.md`, a scan of forums and the web for game
 | 2026-11-24 | `pitch` | A traditional pencil game (paper soccer) brought back almost unchanged: the rules are old, the work is teaching without words (legal points pulse, a spring marks a bounce), a bot at three strengths, a daily "score in one turn" position, and the finished sheet as a picture to share | Bots: 2,000 random games against a rules oracle with its own geometry, Medium beat Easy 200 of 200, Hard beat Medium 200 of 200, 60 daily positions solved and distinct; the mutation run fails. Phone check: WebKit iPhone 13, Chromium Pixel 7, 360x640, 390x844. Known gaps: the bot levels are far apart; most dailies have a 3-line answer and may be easy | Keep testing; needs a person. Play a friend by link added the same day (PR 191): the server keeps the move list, so a dropped player gets the game back; two real browsers played on the live site |
 | 2026-11-24 | `ring` | The gesture is the verb: drag a thread, close a loop, catch what is inside. One-colour rings score n squared, mixed rings score nothing and startle; the thread burns from the tail; moths snap it; eight levels that end at dawn; a daily meadow and a picture | Bots (40 seeds): a careful planner fills all 8 levels in 37 of 40 runs, a small-ring spammer in 0 of 40, idle in 0; mixed rings never score; deterministic; the mutation run fails 2 checks. Phone check on WebKit iPhone 13, Chromium Pixel 7, 360x640, 390x844. Known gaps: the careful bot is a planner, so level 1 may be hard for a person (the spammer never fills it); frame rate on a phone not measured; a scored daily run was not played to its end in the check | Keep testing; needs a thumb. The bet is the feel of closing a ring |
 | 2026-11-24 | `pisti` | A traditional card game (Pişti, rules from pagat.com) with one change of ours: Today's deal gives every player the same shuffled pack against the same bot, and the bot's replies do not depend on unseen cards, so results compare play and not luck. One tap a turn, a hand in about two minutes, a match to 51, two players on one phone with a cover between turns | Bots: 5,000 hands against the rules, Medium over Easy by 4.44 points a hand (se 0.38), Hard over Medium by 1.45 (se 0.36), 60 distinct daily deals; the mutation run fails. Phone check: WebKit iPhone 13, Chromium Pixel 7, 360x640; the page's score equals a Node replay of the same plays. Known gaps: Hard is only a little stronger than Medium (Medium was simplified to make the gap); the level falling after two losses is not reached by a check; the daily result is kept on the device only | Keep testing; needs a person who knows the game and one who does not. Play a friend by link added the same day (PR 196): one hand per table game, Deal again by both votes, never feeding a shared board (both pages know the seed) |
+
+## Lab cleanup (owner, 2026-11-24)
+
+The owner went through the lab and decided each page that came from a live game. A page that leaves the lab has its old address sent on by `labMoved` in `worker-settings.mjs` (a 302 from the site Worker, query kept). Rows above describe pages as they were; the folders named below are no longer in `experiments/lab/`.
+
+| Page | Decision | Where it is now |
+| --- | --- | --- |
+| `lantern-3d`, `lantern-fp`, `lantern-song` | Already in Lantern (3D and first-person views, music) | Folder removed (`lantern-3d`, `lantern-song` were stubs) or in `archive/lab/` (`lantern-fp`) |
+| `ant-nemesis`, `ant-wilds` | Already in Ant Promotion (the rival, Wild rules) | `archive/lab/` |
+| `night-flock-2`, `night-vine` | Already promoted to `/flock/` and `/vine/` | Stub folders removed |
+| `lantern-echo`, `lantern-voice` | Rejected | `archive/lab/`. Echo left Lantern's "More modes" card |
+| `ant-swarm`, `ant-draft`, `ant-draft-b`, `ant-quests` | Rejected | `archive/lab/` |
+| `boat-b` | Rejected | `archive/lab/` |
+| `night-flock`, `ant-nest` | Retired by the lab (older duplicate of Night Flock; parked). The owner did not name these two | `archive/lab/` |
+| `ant-evolve` | Accepted after the lab proposed retiring it. Owner: "I like the idea of ant evolve, it can make things interesting for long time players." Fold into Ant Promotion as evolution a returning player can see: kept per player and built up over many runs | Stays here until the fold lands |
+| `ant-creatures` | Accepted: fold into Ant Promotion as a look | Stays here until the fold lands |
+| `lantern-spark`, `lantern-race`, `lantern-duet` | Accepted: modes inside Lantern, not links | Stay here until each fold lands |
+| `lantern-tide` | Accepted "but improve" | Stays until the fold lands |
+| `lantern-rhythm` | Accepted: the ember melody joins Lantern's music; the page then leaves | Stays until the fold lands |
+| `lantern-ripples` | Accepted "but improve it and only into 3d version" | Stays until the fold lands |
+| `ant-hide` | Accepted "but less prevalent": sparse rocks and grass in the main meadow (the lab's reading) | Stays until the fold lands |
+| Lantern's `music.js` | Accepted: move to the kit for Night Flock, Night Vine, Paper Boat, Harvest Morning | |
+| Friend play by link (`kit/room.js`, from `pitch` and `pisti`) | Accepted for Thumb Duel | `pitch` and `pisti` stay |
+
+Still in the lab for a promote-or-reject decision: `thankful`, `pitch`, `pisti`, `ring`, `night-bells`, `night-lamp-keeper`, `night-channels`, `night-kite`, `night-loaves`, `night-podwire`, `night-rubbing`, `night-saltplate`, `night-sand`, `night-splitlight`, `wild-pour`, `wild2-face-shift`.
+
+Play records: the lab accepted no records from any lab page up to this date (no lab page name is in human-framework `LAB_PROTOTYPES`; five pages import `kit/lab.js` and are refused). The site Worker's request log shows two real phones opening lab pages on 2026-11-24. Opens are the only evidence of play for these pages.
+

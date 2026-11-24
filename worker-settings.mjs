@@ -47,3 +47,26 @@ export const archivedHosts = [
   'smoke.adamwhite.work',
 ];
 export const archivedRoutes = archivedHosts.map(host => `${host}/*`);
+// Lab pages that left /lab/ (experiments/lab/NOTES.md, archive/README.md): the name under /lab/ and where its
+// old address goes. src/worker.mjs answers /lab/<name> and anything under it with a 302 that keeps the query, so
+// an entry can be changed or removed later. A page folded into a game points at that game; an archived page
+// points at the game it came from. scripts/redirects.test.mjs fails when a name here is still a folder in
+// experiments/lab/. One thread edits this list; a builder asks for an entry.
+export const labMoved = {
+  'lantern-3d': '/lantern/',
+  'lantern-fp': '/lantern/',
+  'lantern-song': '/lantern/',
+  'lantern-echo': '/lantern/',
+  'lantern-voice': '/lantern/',
+  'ant-nemesis': '/ant-promotion/',
+  'ant-wilds': '/ant-promotion/',
+  'ant-swarm': '/ant-promotion/',
+  'ant-draft': '/ant-promotion/',
+  'ant-draft-b': '/ant-promotion/',
+  'ant-quests': '/ant-promotion/',
+  'ant-nest': '/ant-promotion/',
+  'night-flock': '/flock/',
+  'night-flock-2': '/flock/',
+  'night-vine': '/vine/',
+  'boat-b': '/boat/',
+};

@@ -26,7 +26,7 @@ const profiles = [
 ].filter(({ name }) => !process.argv[2] || name === process.argv[2]);
 assert.ok(profiles.length, 'expected webkit or chromium');
 
-const allowed = p => p === path || p === feedback || p === '/favicon.ico' || p === '/lab/night-vine/' ||
+const allowed = p => p === path || p === feedback || p === '/favicon.ico' ||
   /^\/vine\/[\w-]+\.(js|css|html)$/.test(p) ||
   /^\/kit\/[\w-]+\.js$/.test(p);
 const server = createServer(async (request, response) => {
@@ -148,8 +148,7 @@ async function turkish({ engine, name, device }, origin) {
     await context.route('**/*', traffic.route);
     await labRoute(context, origin, sent);
     await page.addInitScript(() => { if (location.protocol === 'http:') localStorage.setItem('hf-lab-send-localhost', '1'); });
-    await page.goto(origin + '/lab/night-vine/?lang=tr');
-    await page.waitForURL(origin + path + '?lang=tr');
+    await page.goto(origin + path + '?lang=tr');
     await screen(page, 'play');
     const capture = label => page.screenshot({ path: join(shots, 'vine-' + name + '-tr-' + label + '.png'), scale: 'css' });
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'tr');

@@ -1,6 +1,6 @@
 import registry from '../games.json' with { type: 'json' };
 import { validateRegistry } from '../scripts/lib.mjs';
-import { archivedHosts } from '../worker-settings.mjs';
+import { archivedHosts, labMoved } from '../worker-settings.mjs';
 
 const PLAY = 'https://play.adamwhite.work';
 const SHELF = 'https://human.adamwhite.work/games/';
@@ -12,6 +12,13 @@ export function experimentPath(pathname) {
   if (pathname !== '/proto' && !pathname.startsWith('/proto/')) return null;
   const rest = pathname.slice('/proto'.length);
   return rest === '' || rest === '/' ? '/lab/' : rest;
+}
+
+// A lab page that left /lab/ (labMoved in worker-settings.mjs). Returns where /lab/<name> and anything under it
+// goes now, or null.
+export function labPath(pathname, moved = labMoved) {
+  const match = /^\/lab\/([a-z0-9-]+)(?:\/.*)?$/.exec(pathname);
+  return match && Object.hasOwn(moved, match[1]) ? moved[match[1]] : null;
 }
 
 export function createHandler(games, archived = archivedHosts) {
@@ -28,6 +35,8 @@ export function createHandler(games, archived = archivedHosts) {
         if (url.pathname === '/') return Response.redirect(SHELF, 302);
         const moved = experimentPath(url.pathname);
         if (moved) return Response.redirect(`${PLAY}${moved}${url.search}`, 301);
+        const left = labPath(url.pathname);
+        if (left) return Response.redirect(`${PLAY}${left}${url.search}`, 302);
         if (/^\/lefthand\/engine\/game-[a-f0-9]+\.wasm$/.test(url.pathname)) {
           if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
           url.pathname += '.gz';

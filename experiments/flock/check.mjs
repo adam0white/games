@@ -23,7 +23,7 @@ const types = {
   '.webp': 'image/webp',
 };
 const allowed = pathname => pathname === '/notes/button.js' || pathname === '/favicon.ico'
-  || pathname.startsWith('/flock/') || pathname.startsWith('/kit/') || pathname === '/lab/night-flock-2/';
+  || pathname.startsWith('/flock/') || pathname.startsWith('/kit/');
 
 const requirePlaywright = createRequire(join(resolve(process.env.PLAYWRIGHT || join(homedir(), 'code/human-framework/node_modules')), 'check.cjs'));
 const { chromium, devices, webkit } = requirePlaywright('playwright');
@@ -873,9 +873,7 @@ async function turkish(browser, profile, name) {
         await page.goto('about:blank');
         await wakeDisplay(page);
       }
-      // The old lab address hands the visitor on, with the link's settings.
-      await page.goto(`${origin}/lab/night-flock-2/?lang=tr&look=pine`);
-      await page.waitForURL(`${url}?lang=tr&look=pine`);
+      await page.goto(`${url}?lang=tr&look=pine`);
       await page.bringToFront();
       await waitForScreen(page, 'start');
       const tables = await page.evaluate(async () => (await import('/flock/words.js')).tables);

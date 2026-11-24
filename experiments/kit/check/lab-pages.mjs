@@ -4,25 +4,16 @@ const json = JSON.stringify;
 const now = new Date();
 const localDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 const utcDay = now.toISOString().slice(0, 10);
-const draftDay = now.toDateString();
-const draftBDay = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
 
 // These saves exercise the formats already read by each page. Sharing remains off.
 const saves = {
-  fp: { best: 24, opened: 1, runs: 3, sound: true, name: '', sharing: false, boardId: '', pendingRemove: '' },
-  swarm: { v: 1, best: 24, level: 0, runs: 3, stars: [1, 0, 0, 0, 0, 0, 0, 0], sound: true, look: 'dusk', daily: { [utcDay]: 8 }, name: '', sharing: false, removePending: false, id: '' },
-  quests: { v: 1, best: 3, runs: 3, sound: true, memory: { beetle: { visits: 2, failed: true, hearts: 1 }, snail: { visits: 1, failed: false, hearts: 2 } }, secrets: { 'snail-0': 'The pond is quiet.' } },
   spark: { v: 1, best: 1, stars: { 1: 2 }, played: 3 },
   creatures: { sound: true, best: 4, big: false, day: localDay, dayBest: 3 },
-  draft: { best: 120, wins: 2, runs: 3, sound: true, daily: { day: draftDay, score: 80 } },
-  draftB: { best: 120, bestWave: 2, sound: true, daily: { day: draftBDay, score: 80 } },
-  boat: { v: 1, best: 120, stars: [2, 1, 0, 0, 0, 0], runs: 3, sound: true },
   face: { v: 1, best: 300, runs: 3, stars: [2, 1, 0, 0], sound: true },
   pour: { v: 1, stars: [0, 0, 0, 0, 0, 0, 0, 0], sound: true, tries: 3 },
   bells: { v: 1, stars: [2, 0, 0, 0, 0, 0, 0, 0], best: 120, sound: true, tries: 3, look: 'moon' },
   keeper: { v: 1, unlocked: 2, sound: true, played: true, daily: { day: localDay, score: 1400 } },
   channels: { unlocked: 3, completed: false, sound: true },
-  flock: { v: 1, unlocked: 2, best: 17, sound: true, played: true },
   podwire: { v: 1, next: 2, complete: false, sound: true },
   kite: { v: 1, unlocked: 2, level: 2, best: 157, sound: true, look: 'copper' },
   loaves: { unlocked: 2, best: 240, sound: true },
@@ -229,15 +220,6 @@ const splitlightLegacy = { 'night-splitlight:plate': '2', 'night-splitlight:soun
 const tideLegacy = { 'lantern-tide:night': '2', 'lantern-tide:sound': '1' };
 
 export const labPages = {
-  'lab/lantern-fp': pageEntry('lantern-fp-save', saves.fp, 'lantern-fp:hint', {
-    menu: '#quit', sound: '#sound',
-    state: () => { const s = window.lanternFPState?.(); return s && { ...s, t: s.t ?? 0, paused: !!s.paused }; },
-    verify: () => { const s = window.lanternFPState(); return { screen: s.screen, best: s.best, opened: s.opened, runs: JSON.parse(localStorage.getItem('lantern-fp-save')).runs, sound: document.querySelector('#sound').textContent }; },
-    expect: { screen: 'menu', best: 24, opened: 1, runs: 3, sound: 'Sound: on' },
-    touch: dragTouch(() => window.lanternFPState().taps, n => window.lanternFPState().taps > n, [[90, 430], [100, 430]]),
-    hint: { delay: 2500, before: () => window.lanternFPState().taps, moved: n => window.lanternFPState().taps > n,
-      alive: () => { const s = window.lanternFPSim(); s.safe = 60; s.light = 1; } },
-  }),
   'lab/lantern-race': {
     seeds: { 'lantern-race-best': '100000', 'lantern-race-sound': '1', 'lantern-race-name': 'Test boat', 'lantern-race-played': '1', 'lantern-race:hint': '1' },
     play: '#quick', start: raceStart, menu: '#paused .toMenu', sound: '#sound', soundKey: 'lantern-race-sound', soundOff: '0',
@@ -248,23 +230,6 @@ export const labPages = {
     hint: { key: 'lantern-race:hint', delay: 1500, start: raceStart, before: () => window.raceState().target, moved: n => window.raceState().target !== n,
       legacy: { 'lantern-race-best': '100000', 'lantern-race-sound': '1', 'lantern-race-name': 'Test boat', 'lantern-race-played': '1' } },
   },
-  'lab/ant-swarm': pageEntry('ant-swarm:save', saves.swarm, 'ant-swarm:hint', {
-    menu: '#menuBack', sound: '#sound', soundOnMenu: true, changed: { 'ant-swarm:save': { runs: 1 } },
-    state: () => { const s = window.swarmState?.(); return s && { ...s, t: s.time, paused: s.screen === 'paused' }; },
-    verify: () => window.swarmState().save, expect: saves.swarm,
-    touch: dragTouch(() => window.swarmState().paintCount, n => window.swarmState().paintCount > n),
-    hint: { before: () => window.swarmState().paintCount, moved: n => window.swarmState().paintCount > n },
-  }),
-  'lab/ant-quests': pageEntry('ant-quests-save', saves.quests, 'ant-quests:hint', {
-    prepare: page => page.route('**/lab-api/quest', route => route.fulfill({ status: 200, json: {
-      name: 'Beetle', ask: 'Bring a seed.', thanks: 'Thank you.', scold: 'Try another path.', secret: 'The pond is quiet.',
-    } })),
-    menu: '#toMenu', sound: '#sound', changed: { 'ant-quests-save': { runs: 1 } },
-    state: () => { const s = window.meadowState?.(); return s && { screen: s.mode, paused: s.mode === 'paused', t: s.s?.t ?? 0 }; },
-    verify: () => window.meadowState().save, expect: saves.quests,
-    touch: dragTouch(() => window.meadowState().s.player.x, n => window.meadowState().s.player.x > n),
-    hint: { before: () => window.meadowState().s.player.x, moved: n => window.meadowState().s.player.x > n },
-  }),
   'lab/lantern-spark': pageEntry('lantern-spark:save', saves.spark, 'lantern-spark:hint', {
     menu: '#quit', pauseDown: true,
     state: () => { const s = window.echoState?.(); return s && { ...s, paused: !!s.paused }; },
@@ -280,29 +245,6 @@ export const labPages = {
     verify: () => ({ ...window.__ant.save }), expect: saves.creatures,
     touch: dragTouch(() => window.__ant.s.player.x, n => window.__ant.s.player.x > n),
     hint: { moved: () => window.__ant.input.x !== 0 },
-  }),
-  'lab/ant-draft': pageEntry('ant-draft:save', saves.draft, 'ant-draft:hint', {
-    menu: '#quit', sound: '#sound2',
-    state: () => { const s = window.antDraftState?.(); return s && { ...s, screen: s.mode, paused: !!s.paused, t: s.t ?? 0 }; },
-    verify: () => { const s = window.antDraftState(); return { best: s.best, runs: s.runs, daily: JSON.parse(localStorage.getItem('ant-draft:save')).daily, wins: JSON.parse(localStorage.getItem('ant-draft:save')).wins }; },
-    expect: { best: 120, runs: 3, daily: saves.draft.daily, wins: 2 },
-    touch: dragTouch(() => window.antDraftState().rally?.x, n => window.antDraftState().rally.x !== n, [[100, 430], [240, 430]]),
-    hint: { start: async page => { await page.click('#play'); if (await page.isVisible('#askNo')) await page.click('#askNo'); }, before: () => window.antDraftState().rally.x, moved: n => window.antDraftState().rally.x !== n },
-  }, { 'ant-draft:tutorial': '1', 'ant-draft:levels': json({ open: 4, stars: { 1: 3, 2: 2, 3: 1 } }) }),
-  'lab/ant-draft-b': pageEntry('ant-draft-b:save', saves.draftB, 'ant-draft-b:hint', {
-    menu: '#quit', sound: '#sound2',
-    state: () => { const s = window.antDraftState?.(); return s && { ...s, screen: s.mode, paused: !!s.paused, t: s.t ?? 0 }; },
-    verify: () => ({ best: document.querySelector('#best').textContent, sound: document.querySelector('#sound1').textContent, save: JSON.parse(localStorage.getItem('ant-draft-b:save')) }),
-    expect: { best: '120', sound: 'Sound: on', save: saves.draftB },
-    touch: dragTouch(() => window.antDraftState().rally.x, n => window.antDraftState().rally.x !== n, [[100, 430], [240, 430]]),
-    hint: { before: () => window.antDraftState().rally.x, moved: n => window.antDraftState().rally.x !== n },
-  }),
-  'lab/boat-b': pageEntry('boat-b-save', saves.boat, 'boat-b:hint', {
-    menu: '#home', sound: '#sound',
-    state: () => { const s = window.boatState?.(); return s && { screen: s.screen, paused: s.screen === 'paused', t: s.sim.t }; },
-    verify: () => window.boatState().save, expect: saves.boat,
-    touch: dragTouch(() => window.boatState().actions.ripple, n => window.boatState().actions.ripple > n),
-    hint: { delay: 1800, before: () => window.boatState().actions.ripple, moved: n => window.boatState().actions.ripple > n },
   }),
   'lab/wild2-face-shift': pageEntry('wild2-face-shift:save', saves.face, 'wild2-face-shift:hint', {
     menu: '#toMenu', sound: '#sound',
@@ -350,15 +292,6 @@ export const labPages = {
     touch: digChannel,
     hint: { delay: 4000, play: '#openList', timing: { start: '#pickDaily' }, input: digChannel,
       start: async page => { await page.click('#openList'); await page.click('#pickDaily'); } },
-  }),
-  'lab/night-flock': pageEntry('night-flock:save', saves.flock, 'night-flock:hint', {
-    startsOnBoard: true, menu: '#evenings', sound: '#sound', pausePosition: { x: 8, y: 23 },
-    state: () => { const s = window.flockState?.(); return s && { screen: s.screen === 'evenings' ? 'menu' : s.screen, t: s.game.time }; },
-    verify: () => ({ save: window.flockState().saved, level: window.flockState().game.level }),
-    expect: { save: saves.flock, level: 2 },
-    touch: guideDog,
-    hint: { delay: 8500, play: '#pause', timing: { start: '#endless' }, input: guideDog,
-      start: async page => { await page.click('#pause'); await page.click('#evenings'); await page.click('#endless'); } },
   }),
   'lab/night-podwire': pageEntry('night-podwire:progress', saves.podwire, 'night-podwire:next-hint', {
     startsOnBoard: true, sound: '#sound',
