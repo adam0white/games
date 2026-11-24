@@ -17,6 +17,7 @@ Shared code for the games under `experiments/`. It is served at `/kit/` as plain
 | `/notes/button.js` | the notes button for testers (it lives in `workers/feedback/public/notes/`) |
 | `check/phone.mjs` | phone runs of every live experiment, of the lab pages under `/lab/` and of this kit, on WebKit iPhone 13 and Chromium Pixel 7 |
 | `index.html` | a self-test page at `/kit/` |
+| `games.json` | the list of every game a tester can open; the notes page builds its games menu and game picker from it, and the phone check fails if an experiment is missing |
 
 ## Rules
 
