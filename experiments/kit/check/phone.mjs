@@ -617,7 +617,7 @@ const GAMES = {
     for (let i = 0; i < 4; i++) { await page.evaluate(() => { const s = window.lanternSim(); s.embers.push({ x: s.x, y: s.y + 0.02, got: false, kind: 'ember' }); }); await until(page, n => window.lanternMusic().played > n, 'an ember plays a note of the melody', 10000, i); }
     const tune = await page.evaluate(() => window.lanternMusic()), embers = tune.log.filter(l => l.kind === 'ember'), ticks = tune.log.filter(l => l.kind === 'walk' || l.kind === 'pad' || l.kind === 'bass');
     if (tune.ctx === 'running' && ticks.length) { const a = ticks[0].at - ticks[0].step * tune.STEP; assert.ok(embers.length >= 1 && embers.every(l => { const g = (l.at - a) / tune.HALF; return Math.abs(g - Math.round(g)) < 1e-3; }), `ember notes on the sixteenth grid (${embers.length})`); }
-    await page.evaluate(() => { const s = window.lanternSim(); s.safe = 0; s.light = 0.0001; }); await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'end card');
+    await page.evaluate(() => { const s = window.lanternSim(); s.safe = 0; s.light = 0.0001; }); await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'end card after the melody');
     assert.match(await page.textContent('#sub'), /Melody played: 100%\./, 'the end card says how much of the melody was played'); await page.click('#toMenu');
     await sleep(400); await page.reload(); st = await state(); assert.equal(st.name, 'Rio <b>river</b'); assert.equal(st.board.length, 5, 'the board is kept');
     await page.evaluate(() => localStorage.setItem('hf-lab-recording-off', '1')); await page.reload(); // recording off again, as the steps below expect
