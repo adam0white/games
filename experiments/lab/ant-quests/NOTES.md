@@ -89,3 +89,8 @@ Two read-only delegated reviews covered rules/bot evidence and UI/network/persis
 - Different daily task orders after the resident personalities have been tried by a person.
 - More legible hunter pursuit cues and a tongue animation for Frog's reward.
 - Owner taste and a real phone play verdict remain deliberately unclaimed.
+
+## Review fixes (2026-11-24)
+
+- The bubble shows the meadow name beside a model nickname ("Beetle · Buzzy-Bug").
+- The secrets book lists each friend's secrets under that friend, without duplicate lines; before, they sat below the scroll fold.

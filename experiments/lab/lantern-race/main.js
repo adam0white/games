@@ -70,7 +70,11 @@ function fallback(note) {
   disconnect(); offline = true; $('connection').textContent = note;
   peers = new Map([[id, { id, n: cleanName($('name').value) }]]);
   // A failed network never discards your river. Existing bot sims have advanced from its start.
-  if (['race', 'end', 'countdown', 'paused'].includes(phase)) {
+  if (phase === 'end' || finished) {
+    // Your result stands. Keep every recorded boat; ones still racing can no longer report.
+    for (const p of racers.values()) if (p.id !== id && p.a) { p.a = 0; p.left = true; }
+    if (phase === 'end') renderResults();
+  } else if (['race', 'countdown', 'paused'].includes(phase)) {
     botRound = true;
     racers = new Map([...racers].filter(([key]) => key === id));
     for (const b of bots) racers.set(b.id, botEntry(b));
@@ -91,7 +95,8 @@ function receive(m) {
     if (racers.has(m.id)) racers.get(m.id).n = m.n;
   } else if (m.t === 'leave') {
     peers.delete(m.id); tracks.delete(m.id); const p = racers.get(m.id); if (p) { p.a = 0; p.left = true; }
-    if (peers.size < 2 && bots.length) { botRound = true; for (const b of bots) racers.set(b.id, botEntry(b)); }
+    // Bots stand in for a vanished opponent only while you are still racing; they never join a race you finished.
+    if (peers.size < 2 && bots.length && !finished) { botRound = true; for (const b of bots) racers.set(b.id, botEntry(b)); }
     lobby(); if (phase === 'end') renderResults();
   } else if (m.t === 'round') beginRound(m);
   else if (m.t === 'p' && roundKey && m.id !== id && racers.has(m.id)) {
