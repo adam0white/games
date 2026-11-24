@@ -39,26 +39,23 @@ Sources: Cloudflare docs read on 2026-11-24 (Workers Logs, Traces spans and attr
 
 None. Until 2026-11-24 `games-feedback`, `games-lab-ai` and `human-framework` kept request logging off. The owner then decided: "I think it would be simpler to just enable all everywhere." All three now carry the standard block, and the human-framework lab privacy page states what the logs hold. `EXCEPTIONS` in `scripts/observability.test.mjs` is empty; adding an entry is an owner decision.
 
-Some Workers answer 5xx on purpose (`games-lab-ai` at its daily cap, `games-crumbwar` when a room is busy). Issues reports those too. The watcher's run marks one `ignored` and adds a line under "Ignored on purpose" below.
+Some Workers answer 5xx on purpose (`games-lab-ai` at its daily cap, `games-crumbwar` when a room is busy). Issues reports those too. The routine's run marks one `ignored` and adds a line under "Ignored on purpose" below.
 
-## The watcher
+## The routine
 
-`workers/observability/watch/check.sh` runs from launchd on the lab's Mac every five minutes.
+Cloudflare starts a Claude routine when an issue appears. Nothing runs on a timer, and nothing needs watching.
 
-1. `issues.mjs` lists active issues with the `cf` CLI (`cf o11y issues list`) and keeps those on a Worker named in a config in this repository, or in `ELSEWHERE`. A new Worker is covered as soon as its config is on main and the watcher's checkout is updated. Cloudflare's "Potential vulnerability scan" issues (type `security`) are skipped.
-2. With nothing new it exits. No model starts.
-3. A new issue, or one that was resolved and came back, starts headless `claude -p` with `handle-issue.md` in a fresh clone. The run fixes the fault, merges, deploys, and marks the issue resolved, or reports that the owner must decide.
-4. State and log: `~/Library/Application Support/worker-issues/` (`watch.log`, `fired`, `failed`, `last-run.txt`). A failure nobody would see in the log raises one macOS notification.
+1. Two Issues automations cover every Worker in the account, now and later: "All Workers: new issue to Claude routine" fires on an issue's first occurrence, and "All Workers: issue returned to Claude routine" fires when an issue recurs after 24 quiet hours. List them with `cf o11y issues automations list`.
+2. Both send to the routine "Fix Cloudflare Worker issues" (`trig_01RSFhq8pXhq1p4W79gh6xh3`, https://claude.ai/code/routines). Cloudflare's summary of the issue, with the issue id, arrives in the run as untrusted data.
+3. The routine runs on the lab's Mac, because the fix needs the `cf`, `wrangler` and `gh` sign-ins there. It works in a fresh clone under `~/code/lab/issue-runs/`. It fixes the fault, merges, deploys and marks the issue resolved, or it leaves the issue active for the owner. If the Mac is off, the run does not start; run the routine by hand afterwards.
+4. The record is a GitHub issue in this repository with the label `worker-issue`. An open one titled `needs owner` is a decision waiting for the owner.
+5. Issues on Workers outside this project and Cloudflare's "Potential vulnerability scan" issues (type `security`) also start a run. The run ends without acting on them.
 
-Install or update (the watcher runs from its own pinned checkout, so a change to `watch/` takes effect only after a reviewed `git pull` there):
+The routine's prompt is `workers/observability/routine/prompt.md`. The routine holds its own copy: after a change here merges, save the same text into the routine. Running the routine with no payload (the Run button, or its API) makes it sweep every active issue that has no record.
 
-```sh
-git clone https://github.com/adam0white/games.git "$HOME/Library/Application Support/worker-issues/watcher"
-cp workers/observability/watch/work.adamwhite.worker-issues-watch.plist ~/Library/LaunchAgents/
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/work.adamwhite.worker-issues-watch.plist
-```
+Tested 2026-11-24: a throwaway Worker that threw on every request started a run 20 seconds after its first error, with the issue id in the payload.
 
-Stop it: `launchctl bootout gui/$(id -u)/work.adamwhite.worker-issues-watch`. Try it without starting a model: `WORKER_ISSUES_DRY_RUN=1 bash workers/observability/watch/check.sh`.
+Until 2026-11-24 a launchd job on the Mac polled for issues every five minutes (`workers/observability/watch/`, removed). The owner replaced it because nobody watched the watcher.
 
 Any session can look by hand, from a folder outside the checkout: `CLOUDFLARE_ACCOUNT_ID=a20259cba74e506296745f9c67c1f3bc cf o11y issues list --status active --quiet`.
 
