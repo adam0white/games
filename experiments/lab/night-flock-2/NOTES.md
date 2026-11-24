@@ -22,7 +22,7 @@ fnm exec --using=26.12.0 node experiments/lab/night-flock-2/bots.mjs --mutate
 fnm exec --using=26.12.0 node experiments/lab/night-flock-2/check.mjs
 ```
 
-The mutation reverses uphill dog pressure. It should exit 1. The phone check serves the field, kit and feedback button from the checkout. Its screenshot directory defaults to `/private/tmp/night-r5-flock2/`. Chromium uses touch drags. WebKit uses a mouse for sustained gestures on the phone viewport and touch taps on menus.
+The mutation reverses uphill dog pressure. It should exit 1. The phone check serves the field, kit and feedback button from the checkout. The screenshots from this pass are in `/private/tmp/night-r5-flock2/`. Chromium uses touch drags. WebKit uses a mouse for sustained gestures on the phone viewport and touch taps on menus.
 
 ### Simulation results
 
@@ -70,3 +70,23 @@ Four short bursts per profile measured all 80 sheep still in the field. Two burs
 | --- | ---: | ---: | ---: |
 | iPhone 13 / webkit | 80 | 1.0 / 2.0 | 15.0 / 17.0 |
 | Pixel 7 / chromium | 83 | 1.6 / 1.8 | 16.7 / 16.8 |
+
+## 2026-11-24 — First-use phone review
+
+- The delayed opening hand swept sideways and replaced the uphill path. It now moves 48 CSS px uphill while the path stays visible. A tap or sideways drag leaves both cues available. An uphill drag of 14 world units dismisses the lesson.
+- Rotating the idle field left the visible hand 104 CSS px left of its intended anchor on both profiles, and 127.62 px above it on iPhone 13 or 170.39 px above it on Pixel 7. The cues now use the field itself for positioning. The phone check covers rotation before input and while steering.
+- Either flick direction previously marked the bellwether lesson complete. The footer now asks the player to wait while the dog circles. An opposite flick leaves the lesson available. The existing key is written after the bellwether joins the flock.
+- With the private feedback link visible, it covered 985.09 CSS px² of the pause button on Pixel 7, and 618.47 CSS px² of the field at 320 × 568. The link now clears the pause, field and valley map controls on both profiles at their portrait sizes and at 320 × 568.
+
+The Playwright check repeats the sideways and uphill drag, idle rotation, unsuccessful and successful flicks, and feedback hit areas. It also exercises pause, retry, navigation away and Back, mid-evening reload, the daily, and endless play. No game or acceptance threshold changed. A flick test retries only if the browser reports more than 300 ms from press to release. The first delivered gesture within the window must work. Against the original opening styles, the regression exited 1 at the sideways path assertion.
+
+Both profile checks exited 0 with zero browser errors, external requests or telemetry. Bots exited 0 with 99/99 campaign and 20/20 sampled endless clears. The reversed-pressure mutation exited 1 with 0/12 sheep home. The shared phone suite passed the three pages and their hints across the two profiles after rerunning one transient WebKit outrun timeout.
+
+| Profile | Opening / slow replay (sim s) | Hold / flank lesson (sim s) | Daily / first endless wave (sim s) | 80-sheep callbacks | Callback p95 / max (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| WebKit iPhone 13 | 9.87 / 22.03 | 23.65 / 18.07 | 18.05 / 19.55 | 83 | 2.0 / 2.0 |
+| Chromium Pixel 7 | 9.93 / 21.82 | 28.05 / 15.73 | 16.40 / 18.63 | 84 | 1.6 / 2.0 |
+
+The landscape anchor finished within 0.013 CSS px of its target on both profiles. Fresh campaign play cleared consecutive evenings 1–10 on WebKit and 1–6 on Chromium. An early pass stalled at the evening 7 cross-gate on both profiles, with 0/40 home after 89 simulated seconds. Holding again after bringing the sheep closer cleared it on the next WebKit run in 32.32 s. With the final evening opened using an unlocked save, trusted gestures brought home 80/80 sheep on both profiles in 46.10 and 44.78 simulated seconds respectively. Both runs used one flank flick and opened the drafting gate. The game checks use the native animation clock. The separate campaign runs advance the Playwright clock between inputs.
+
+Reviewed the 42 final check captures and both final-evening results under `/private/tmp/night-r6-review/flock/`. An uninterrupted 20-evening campaign, physical-device performance, audible feedback and unaided first-time play remain unverified.

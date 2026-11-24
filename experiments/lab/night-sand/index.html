@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#ede5cf">
+  <title>Night Sand</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs>
+      <symbol id="i-lamp" viewBox="0 0 32 32"><path d="M11 11V9a5 5 0 0 1 10 0v2M9 12h14l-2 13H11zM9 26h14M11 10h10"/><path class="filled" d="M16 15c1 3 3 4 3 6a3 3 0 0 1-6 0c0-2 2-3 3-6Z"/></symbol>
+      <symbol id="i-glass" viewBox="0 0 32 32"><path d="M7 4h18M7 28h18M9 5c0 7 2 8 7 11-5 3-7 5-7 11m14-22c0 7-2 8-7 11 5 3 7 5 7 11"/><path class="filled" d="M11 25l5-5 5 5z"/></symbol>
+      <symbol id="i-sieve" viewBox="0 0 32 32"><path d="M3 12h26M7 13l4 8h10l4-8M10 15h12m-11 3h10M14 23v2m4 1v2m-6-21v1m5-3v1m3 2v1"/></symbol>
+      <symbol id="i-seed" viewBox="0 0 32 32"><path d="M4 20h24M16 23V13m0 3c-6 0-8-3-8-7 6 0 8 3 8 7Zm0-2c0-6 3-9 9-9 0 6-3 9-9 9Z"/><ellipse cx="16" cy="25" rx="2.6" ry="3" transform="rotate(28 16 25)"/></symbol>
+      <symbol id="i-garden" viewBox="0 0 32 32"><path d="m7 25 13-13m-5-4 9 9m-11-6 4-4m0 8 4-4m0 8 4-4M3 25l3 3m-2-6 5 5"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 32 32"><path d="M6 16h19m-8-8 8 8-8 8"/></symbol>
+    </defs>
+  </svg>
+  <main id="table">
+    <header class="mast">
+      <div class="mast-copy"><div id="edition" class="small">Bed 01 / 10</div><h1>Night <i>Sand</i></h1></div>
+      <button class="round" id="pause" aria-label="Pause"><span></span><span></span></button>
+    </header>
+    <div class="frame"><canvas id="field" width="360" height="480" tabindex="0" aria-label="Sand bed"></canvas></div>
+    <footer>
+      <svg class="seal glyph" aria-hidden="true"><use id="goal-icon" href="#i-lamp"/></svg>
+      <div class="caption"><h2 id="objective">Uncover the lamp</h2><div class="meter" role="progressbar" aria-label="Goal progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div></div>
+      <div class="readings small"><span id="reading">0%</span><span id="garden-best" hidden></span></div>
+    </footer>
+  </main>
+  <section class="sheet" id="paused" role="dialog" aria-modal="true" aria-labelledby="pause-title"><div class="card">
+    <div class="small" id="pause-level"></div><h2 id="pause-title">Paused</h2>
+    <button id="resume" class="primary">Resume <span aria-hidden="true">▷</span></button>
+    <div class="pair"><button id="restart">Start over</button><button id="book">Choose a bed</button></div>
+    <button id="garden"><svg class="glyph" aria-hidden="true"><use href="#i-garden"/></svg>Endless garden</button>
+    <div class="settings"><button id="sound" aria-pressed="true">Sound on</button><button id="look">Ink · Basalt</button></div>
+  </div></section>
+  <section class="sheet" id="catalog" role="dialog" aria-modal="true" aria-labelledby="book-title"><div class="card">
+    <h2 id="book-title">Sand beds</h2><div id="levels"></div>
+    <button id="book-garden"><svg class="glyph" aria-hidden="true"><use href="#i-garden"/></svg>Endless garden</button><p id="record"></p><button id="back">Back</button>
+  </div></section>
+  <section class="sheet" id="result" role="dialog" aria-modal="true" aria-labelledby="result-title"><div class="card">
+    <svg class="result-seal glyph" aria-hidden="true"><use id="result-icon" href="#i-lamp"/></svg>
+    <h2 id="result-title"></h2>
+    <button id="next" class="primary"><span id="advance">Next bed</span><svg class="glyph" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+    <div class="pair"><button id="retry">Try again</button><button id="result-book">Choose a bed</button></div>
+  </div></section>
+  <script type="module" src="./main.js"></script>
+  <script defer src="/notes/button.js"></script>
+</body>
+</html>

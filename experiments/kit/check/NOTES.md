@@ -125,3 +125,31 @@ Each pass invokes `phone.mjs lab/<slug> <profile>` separately with Node 26.12.0.
 Repeated the affected streaks after concurrent page updates. Inspected 112 shared screenshots, including 32 opening, play, pause and hint captures from the final pass for each page and profile. Browser logs and images are in `/private/tmp/night-r3-phone-four.VXhW4h/`.
 
 The latest standalone `check.mjs` runs passed 7/8 profile cases. Kite, Loaves and Splitlight passed on both profiles. Tide passed in WebKit, reaching dawn on nights 1 and 2 in 23.63 and 34.47 simulated seconds. Its Chromium run hit a rock at y=51.39 on night 2 and exited 1. The previous Chromium run hit the bank at y=64.78 on night 2. These crossings are outside the shared cases. All three shared modules passed syntax checks, and the scoped diff passed the whitespace check. Physical phones, audible sound and a full run of the shared catalogue remain unverified.
+
+## 2026-11-24 — Flock II, Vine and Rubbing
+
+Added 3 saved-play and 5 hint sections across the 2 phone profiles. The saved-play sections load 10 existing keys and verify that muting sound preserves their values after reload. They also check pause, resume, blur and pagehide using the pages’ read-only state hooks.
+
+| Page | Seeded progress | Input checked | Hint delay |
+| --- | --- | --- | ---: |
+| Flock II | Evening 2, endless best 31, evening 1 star mask 5 and daily star mask 3 | A 65-unit uphill drag moves the dog at least 4 units. The lesson cases confirm the stationary hold and a 70-unit flick that gathers the bellwether. | Drag 6500 ms. Hold and outrun 2200 ms each. |
+| Vine | Bed 2 of 3 unlocked, best 7, Cobalt ink | A tap moves the lamp by more than 10 units and starts growth. The hint case taps the spot shown. | 3100 ms |
+| Rubbing | Plate 2 unlocked and selected, red chalk | A 200-unit stroke increases both distance and coverage. A paused stroke changes neither, and a new stroke increases both after resume. The hint case starts its stroke at the prompt. | 2200 ms |
+
+Vine uses trusted touch taps on both profiles. Flock II and Rubbing use native touch gestures in Chromium and browser mouse gestures in WebKit. The Chromium flick supplies press, move and release timestamps spaced 40 ms apart. The Flock II saved-play case presses 8 px from the left edge of Pause, which was clear when the tester Notes button covered its center in the initial Pixel 7 run.
+
+The hint sections use bounded waits for visibility, pause and resume, and the gameplay response. They check dismissal, its storage key, and reduced-motion rendering. Flock II tests each lesson on its own evening and checks each dismissal key separately. The outrun key is written after gathering. Vine and Rubbing also confirm suppression from a progress save alone. The shared checks observe animation frames over the existing 300 ms pause and 400 ms reduced-motion intervals, and compare the computed hint transform. No existing threshold changed.
+
+| Page | Consecutive WebKit passes | Consecutive Chromium passes |
+| --- | ---: | ---: |
+| night-flock-2 | 3 | 3 |
+| night-vine | 3 | 3 |
+| night-rubbing | 3 | 3 |
+
+The final streaks contain 18 separate `phone.mjs lab/<slug> <profile>` invocations and 48 passing sections. Each streak used the same page and harness files throughout. An earlier Flock II WebKit attempt failed on navigation and the flick command. The kit, Duel, Flock, Kite and Podwire regression run passed 18/18 sections across the two profiles. All 3 bot suites exited 0 and all 3 `--mutate` runs exited 1.
+
+Inspected all 84 captures from the qualifying streaks. All 6 final WebKit Vine opening and play captures showed the glasshouse background. Two earlier WebKit captures omitted it. One WebKit Rubbing play capture shows only the early part of the stroke while the meter reads 14%. The cause of those capture differences is unresolved. Screenshots and logs are in `/private/tmp/night-r3-phone-three.LVBwDs/`.
+
+The latest standalone `check.mjs` runs exited 0 on all 6 page/profile pairs, with zero reported browser errors. Flock II brought 16/16 sheep home in the hold lesson and 20/20 in the outrun lesson on both profiles. Vine cleared its first bed in 8.00 simulated seconds and recorded one cut on each profile. Rubbing filed 6/6 plates per profile. A final Podwire rerun passed 4/4 sections after the native gesture helper changed. Syntax checks passed for all 3 shared modules, and the scoped whitespace check passed.
+
+Physical handset behavior, audible output, the causes of the capture differences, and the full shared catalogue remain unverified.

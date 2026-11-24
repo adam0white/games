@@ -53,3 +53,21 @@ The headless check completed all six plates on both profiles. The figures are wa
 Both used 11, 12, 13, 12, 13 and 13 strokes respectively. Both exercised a stationary touch, progress during a stroke, pause, resume, restart, mute, the chalk switch, the feedback link and the filed drawer. Four additional strokes on the restored scallop darkened 1,119 of 1,260 sampled hinge pixels on WebKit and 1,092 on Chromium. The maximum difference between the original and restored prints was 1 of 255 per colour channel, including after retouching. Each profile reported zero browser or resource errors, zero unexpected requests and zero recording keys.
 
 All 20 phone screenshots were inspected, including the partial print, pause card, six filed specimens and the retouched hinge on each profile. Screenshots are in `/private/tmp/night-r5-wild/`. The shared kit's own phone checks passed on both profiles before and after the work. The full catalogue was outside this single-folder check. A stranger's unaided completion time, repeat play, physical phone performance and sound by ear remain unverified.
+
+## 2026-11-24 — Phone play review
+
+- In landscape the drawer started at y = 438 on both profiles, beyond their 390 and 412 CSS-pixel viewport heights. The sheet now sits alongside the header, progress and drawer. The drawer starts at y = 238.61 on WebKit and 253.22 on Chromium. The visible sheet increased from 206.39 × 240.78 to 257.94 × 300.92 CSS pixels on WebKit and from 205.84 × 240.14 to 274.16 × 319.84 on Chromium. All drawer buttons, the pause controls and the last-plate retry fit at 44 CSS pixels or larger. The shorter retry label keeps its arrow on the same line.
+- Rotating with a pointer down compared two coordinates from different layouts. Moving that contact just 2 CSS pixels made a false stroke of 163.01 sheet units on WebKit and 229.30 on Chromium. Rotation now ends the active stroke. The same motion adds 0 units on each profile. A new stroke after rotation darkened only the expected rows around the pencil. The delayed hand is now anchored to the sheet, with a 150 CSS-pixel track down from 198 to fit shorter sheets.
+- A stationary first tap dismissed the shared gesture demo and left a generic progress label. The status now says “Rub across the fossil” until the first stroke. The pause copy points to the pale tips. Sound and material switches keep keyboard focus, and Resume returns it to the sheet.
+- Both runs paused on navigation away, restored the completed sixth plate on return, and accepted another stroke of 154.04 sheet units on WebKit and 154.26 on Chromium. Reloading a partially rubbed plate kept its plate selection and started the unfinished sheet clean. Retry also cleared the incomplete sheet.
+
+An independent run started with empty storage and used broad diagonal sweeps on all six plates. WebKit used touch taps and trusted mouse drags. Chromium used touch for both. The six plates took 11, 12, 13, 11, 13 and 13 strokes on each profile. This is input replay with browser events. A first-time player's time and decision to keep playing remain unverified.
+
+| Profile | Wall seconds by plate | Animation callbacks, p95 / max | Pointer events, p95 / max |
+| --- | --- | --- | --- |
+| WebKit | 4.165, 1.565, 5.343, 8.691, 7.844, 4.237 | 432, 1.0 / 5.0 ms | 819, 1.0 / 8.0 ms |
+| Chromium | 7.529, 7.497, 6.813, 5.815, 9.582, 8.790 | 753, 1.7 / 2.8 ms | 819, 0.5 / 12.2 ms |
+
+The timings cover callback and event-handler work in headless browsers. Frame delivery on physical phones and sound by ear remain unverified. The bots cleared 48/48 cases and exited 0. The mutation exited 1 at the original directional pencil test. The 36 fresh-profile captures were inspected and are under `/private/tmp/night-r6-review/rubbing/after/`.
+
+The final `check.mjs` runs exited 0 on each profile. Both filed all six plates in 11, 12, 13, 12, 13 and 13 strokes. Opening and final plate times were 4.674 and 4.380 s on WebKit and 10.081 and 4.810 s on Chromium. Both reported zero browser errors and zero unexpected requests. All restored prints were within 1 of 255 per RGB channel. One WebKit opening screenshot timed out during concurrent runs. The profile-only retry passed with the existing 8 s timeout. The final checks captured 34 images under `/private/tmp/night-r6-review/rubbing/final-check/`.

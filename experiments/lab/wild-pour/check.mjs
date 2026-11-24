@@ -55,7 +55,7 @@ async function readyRenderer(page, name, headed) {
 // One pour by a thumb: press under the jug, slide right until the juice runs, ease off as the glass nears the line, lift.
 async function pour(page, shot) {
   return page.evaluate(async shotAt => {
-    const el = document.getElementById('c'), st = () => window.pourState();
+    const el = document.getElementById('c'), st = () => window.pourState(false);
     const send = (type, x, y) => el.dispatchEvent(new PointerEvent('pointer' + type, { pointerId: 5, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, pressure: type === 'up' ? 0 : 0.5, bubbles: true, cancelable: true }));
     const frame = () => new Promise(r => requestAnimationFrame(r));
     const s0 = st(), x0 = s0.W * 0.3, y = s0.H * 0.55, span = Math.max(120, Math.min(s0.W, 520) * 0.55);

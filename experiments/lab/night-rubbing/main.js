@@ -95,6 +95,7 @@ for (const [index, plate] of PLATES.entries()) {
 }
 
 function setMode(next, keepStroke = false) {
+  const openingPause = next === 'paused' && mode !== 'paused';
   if (!keepStroke) {
     previous = null;
     pad.drop();
@@ -106,11 +107,11 @@ function setMode(next, keepStroke = false) {
   el('figure').textContent = 'Fig. ' + String(s.level).padStart(2, '0') + (finished ? ' · Filed' : '');
   el('taxon').textContent = plate.taxon;
   el('medium').textContent = plate.age;
-  el('status').textContent = finished ? plate.name : 'Taking an impression';
+  el('status').textContent = finished ? plate.name : s.distance ? 'Taking an impression' : 'Rub across the fossil';
   el('percent').hidden = finished;
   el('percent').textContent = percent + '%';
   el('fill').style.width = percent + '%';
-  el('next').firstChild.textContent = s.level === PLATES.length ? 'Rub this plate again ' : 'Next plate ';
+  el('next').firstChild.textContent = s.level === PLATES.length ? 'Rub again ' : 'Next plate ';
   for (const [i, button] of Array.from(el('collection').children).entries()) {
     button.disabled = i + 1 > unlocked;
     button.setAttribute('aria-current', String(i + 1 === s.level));
@@ -120,7 +121,7 @@ function setMode(next, keepStroke = false) {
   tool.querySelector('span').textContent = red ? 'R' : '6B';
   paper.classList.toggle('unused', s.distance === 0 && next === 'play');
   tool.hidden = finished;
-  if (next === 'paused') el('resume').focus({ preventScroll: true });
+  if (openingPause) el('resume').focus({ preventScroll: true });
   requestPaint();
 }
 
@@ -192,6 +193,7 @@ function stroke(a, b) {
     tool.hidden = false;
     requestPaint();
   } else {
+    if (before === 0) el('status').textContent = 'Taking an impression';
     const percent = Math.min(99, Math.floor(s.coverage / s.goal * 100));
     el('percent').textContent = percent + '%';
     el('fill').style.width = percent + '%';
@@ -220,15 +222,23 @@ function pointerStroke(e) {
 field.addEventListener('pointermove', pointerStroke);
 // Consume the last displacement before the shared input releases the pointer.
 field.addEventListener('pointerup', pointerStroke, true);
-function release(e) {
-  if (pad.touch && pad.touch.id !== e.pointerId) return;
+function liftTool() {
   previous = null;
   fileProof();
   tool.hidden = s.done;
   tool.classList.remove('drawing');
   tool.style.removeProperty('left'); tool.style.removeProperty('top');
 }
+function release(e) {
+  if (pad.touch && pad.touch.id !== e.pointerId) return;
+  liftTool();
+}
 for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) field.addEventListener(type, release);
+addEventListener('resize', () => {
+  if (!previous) return;
+  pad.drop();
+  liftTool();
+});
 
 function pause() {
   if (mode === 'paused') return;
@@ -259,7 +269,6 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { if (e.key.startsWith('Arrow')) fileProof(); });
 
 hint(field, { kind: 'drag', key: 'night-rubbing:hint', when: () => mode === 'play',
-  played: unlocked > 1, delay: 2200, bottom: () => Math.round(innerHeight - field.getBoundingClientRect().top - field.clientHeight * .54),
-  label: 'Rub back and forth' });
+  played: unlocked > 1, delay: 2200, reach: 38, label: 'Rub back and forth' });
 window.rubbingState = () => ({ screen: mode, level: s.level, unlocked, sound: soundOn, coverage: s.coverage, goal: s.goal, distance: s.distance });
 open(plateNumber(prefs.level) && prefs.level <= unlocked ? prefs.level : unlocked);

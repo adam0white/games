@@ -9,7 +9,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
 const experiments = fileURLToPath(new URL('../../', import.meta.url));
-const shots = '/private/tmp/night-r5-new5';
+const shots = '/private/tmp/night-r6-review/vine/check';
 const path = '/lab/night-vine/';
 const saveKey = 'night-vine:save';
 const feedback = '/notes/button.js';
@@ -54,14 +54,17 @@ async function tapPoint(page, world) {
   const pixel = (await coordinates(page))(world);
   await page.touchscreen.tap(pixel.x, pixel.y);
 }
-async function flick(page, name, from, to) {
+async function drag(page, name, from, during) {
   const map = await coordinates(page);
-  const a = map(from), b = map(to);
+  const a = map(from);
   if (name === 'chromium') {
     const client = await page.context().newCDPSession(page);
     try {
-      for (const [type, touchPoints] of [['touchStart', [a]], ['touchMove', [b]], ['touchEnd', []]]) {
-        await client.send('Input.dispatchTouchEvent', { type, touchPoints });
+      await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [a] });
+      try {
+        await during(to => client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [map(to)] }));
+      } finally {
+        await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
       }
     } finally {
       await client.detach();
@@ -70,17 +73,24 @@ async function flick(page, name, from, to) {
     // WebKit exposes trusted touch taps and a trusted mouse drag.
     await page.mouse.move(a.x, a.y);
     await page.mouse.down();
-    await page.mouse.move(b.x, b.y);
-    await page.mouse.up();
+    try {
+      await during(to => { const b = map(to); return page.mouse.move(b.x, b.y); });
+    } finally {
+      await page.mouse.up();
+    }
   }
 }
-async function button(page, id) {
-  const btn = page.locator('#' + id);
-  assert.ok(await btn.isVisible(), id + ' is visible');
-  const box = await btn.boundingBox(), view = page.viewportSize();
+const flick = (page, name, from, to) => drag(page, name, from, move => move(to));
+async function fits(page, selector) {
+  const locator = page.locator(selector);
+  assert.ok(await locator.isVisible(), selector + ' is visible');
+  const box = await locator.boundingBox(), view = page.viewportSize();
   assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= view.width + 1 &&
-    box.y + box.height <= view.height + 1, id + ' fits the phone');
-  await btn.tap();
+    box.y + box.height <= view.height + 1, selector + ' fits the phone');
+  return locator;
+}
+async function button(page, id) {
+  await (await fits(page, '#' + id)).tap();
 }
 function audit(page, origin) {
   const errors = [], external = [], unexpected = [], assets = new Set();
@@ -122,8 +132,9 @@ async function run({ engine, name, device }, origin) {
     const first = await state(page);
     assert.equal(first.level, 1);
     assert.equal(first.started, false);
+    assert.equal(await page.locator('#instruction').textContent(), 'Tap the lit window to start.');
     await capture('01-opening');
-    await sleep(3300);
+    await until(page, () => Boolean(document.querySelector('#frame .kit-hint.on')));
     assert.equal((await state(page)).time, 0, 'the opening waits for a finger');
     const start = performance.now();
     await tapPoint(page, first.window);
@@ -145,6 +156,30 @@ async function run({ engine, name, device }, origin) {
     const second = await state(page);
     assert.equal(second.level, 2);
     assert.ok(second.arms.length > 0);
+    assert.equal(await page.locator('#instruction').textContent(), 'Tap a marked trellis arm and let a shoot reach it.');
+    const portrait = page.viewportSize();
+    const landscape = { width: portrait.height, height: portrait.width };
+    let held;
+    await drag(page, name, second.arms[0], async () => {
+      held = await state(page);
+      await page.setViewportSize(landscape);
+    });
+    const rotated = await state(page);
+    assert.deepEqual(rotated.lamp, held.lamp, 'a release across rotation does not move the lamp');
+    assert.equal(rotated.cuts, held.cuts, 'a release across rotation does not cut a branch');
+    await capture('03b-landscape-rotated');
+    const beforeShift = await page.locator('#field').boundingBox();
+    await drag(page, name, second.arms[0], async () => {
+      held = await state(page);
+      await page.setViewportSize({ ...landscape, width: landscape.width + 100 });
+    });
+    const afterShift = await page.locator('#field').boundingBox();
+    assert.equal(afterShift.width, beforeShift.width, 'a wider landscape only moves the field');
+    assert.ok(afterShift.x > beforeShift.x + 20, 'the wider viewport moves the field horizontally');
+    const shifted = await state(page);
+    assert.deepEqual(shifted.lamp, held.lamp, 'a release across a translated field does not move the lamp');
+    assert.equal(shifted.cuts, held.cuts, 'a release across a translated field does not cut a branch');
+    await page.setViewportSize(landscape);
     await tapPoint(page, second.arms[0]);
     await until(page, () => window.vineState().time >= 0.6, null);
     await button(page, 'pauseButton');
@@ -152,6 +187,12 @@ async function run({ engine, name, device }, origin) {
     const paused = await state(page);
     await sleep(400);
     assert.deepEqual(await state(page), paused, 'pause freezes the bed');
+    await button(page, 'campaign');
+    assert.equal(await page.locator('#pause').evaluate(sheet => sheet.scrollHeight <= sheet.clientHeight + 1), true,
+      'the open bed picker and settings fit in landscape together');
+    const lastBed = await fits(page, '#beds button:last-child');
+    assert.ok(await lastBed.isDisabled(), 'locked beds are visible but unavailable');
+    await fits(page, '#endless');
     const before = await save(page);
     await button(page, 'sound');
     await button(page, 'ink');
@@ -160,6 +201,7 @@ async function run({ engine, name, device }, origin) {
     assert.notEqual(after.look, before.look);
     await capture('04-pause');
     await button(page, 'resume');
+    await page.setViewportSize(portrait);
     await until(page, () => window.vineState().time > 1.2, null);
     for (let i = 0; i < second.arms.length; i++) {
       const arm = (await state(page)).arms[i];
@@ -208,11 +250,22 @@ async function run({ engine, name, device }, origin) {
     await until(page, () => window.vineState().best > 0, null, 65000);
     const best = (await state(page)).best;
     assert.equal((await save(page)).best, best);
+    await page.evaluate(() => localStorage.setItem('notes.k', 'phone-check'));
     await page.reload();
     await screen(page, 'play');
     const restored = await state(page);
     assert.equal(restored.best, best);
     assert.equal(restored.unlocked, 3);
+    assert.equal(restored.level, 3);
+    assert.equal(restored.time, 0, 'reload replants the current glasshouse bed');
+    const overlap = await page.locator('#notes-button').evaluate(link => {
+      const note = link.getBoundingClientRect();
+      const pause = document.querySelector('#pauseButton').getBoundingClientRect();
+      return Math.max(0, Math.min(note.right, pause.right) - Math.max(note.left, pause.left)) *
+        Math.max(0, Math.min(note.bottom, pause.bottom) - Math.max(note.top, pause.top));
+    });
+    assert.equal(overlap, 0, 'the feedback link leaves the full pause target tappable');
+    await capture('08-reloaded');
     const stored = await save(page);
     assert.equal(stored.best, best);
     assert.equal(stored.sound, after.sound);

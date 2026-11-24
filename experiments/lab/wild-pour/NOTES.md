@@ -155,3 +155,79 @@ The full shared kit phone suite was attempted before edits. Its first kit and La
 ### Remaining physical verification
 
 Device orientation permission and mapping, audio by ear, sustained frame rate and thermal behavior on a physical phone, and whether a person understands the fill target remain unverified. Phone profiles do not establish those outcomes. No deployment was attempted.
+
+## 2026-11-24 — fresh-seed difficulty and frame pacing
+
+### Failure analysis
+
+Ran the same reference planner on 64 previously untested seeds per level (1001–1064). The planner had 56 spill losses and 7 overfills on levels 5–8. The overfills finished 1–2 drops beyond the upper edge. No planner loss hit the 30 s deadline or ended short of the target without a spill-limit failure.
+
+| Level | Baseline planner wins / 64 | Spill losses | Overfills |
+| --- | ---: | ---: | ---: |
+| 1 | 64 | 0 | 0 |
+| 2 | 59 | 2 | 3 |
+| 3 | 60 | 2 | 2 |
+| 4 | 58 | 4 | 2 |
+| 5 | 59 | 4 | 1 |
+| 6 | 52 | 12 | 0 |
+| 7 | 43 | 20 | 1 |
+| 8 | 39 | 20 | 5 |
+
+Replayed the 56 late spill losses and sampled particle positions after each full simulation step. The glass was already in band at 40 of the 56 stops. Of the 1,034 spilled drops in those replays, 768 were observed below rim height outside the glass, and 266 spilled without an observed rim crossing. None had previously been observed inside the glass. The failures stopped at 3.68–12.12 s.
+
+To isolate particle variance from timing, fixed the glass phase at 1.1 rad on every seed, held the same 1.65 rad tilt request for 3 s, then released for 1 s with the spill cutoff disabled. On levels 5–8, changing only the particle seed produced 54–63, 55–64, 53–61, and 53–61 released drops. The corresponding spill ranges were 10–21, 17–34, 21–37, and 27–41. This control used identical timing on the deliberately moving glass.
+
+### Implementation
+
+- Retuned the level table. Spill allowances absorb some trajectory variance. The narrower bands on the final levels still reward precision. Level 1, used by the daily pour, retains its existing parameters. The fixed-step physics and reference and clumsy policies are unchanged.
+- Added `bots.mjs --sweep`. It requires at least 90% planner wins per level over 64 seeds (4201–4264) and requires both careless policies to win fewer than half their runs on each of levels 5–8 over 256 seeds (4201–4456). The sloppy-aim bot adjusts tilt for jug fill and stops near the target. It pours based on the current glass position, has a broad aim window, and keeps its pour rate as it approaches the target. The existing `--mutate` test still removes the glass floor.
+- Limited liquid field clearing, shading, upload and compositing to the particle bounds. The upload includes a transparent pixel outside the crop for interpolation. A repeated render with no simulation advance reuses the image. The main canvas is opaque, the kitchen tiles use cached paths, and spill indicators are filled in two batches. A direct comparison with the previous liquid renderer checked alpha across 405 frames and matched RGB on all 3,459,977 nontransparent pixels, including clip edges, an empty frame, a moved crop and a nonfinite coordinate.
+- The automated touch driver skips test-only layout and storage reads during movement. The test still reads and asserts both when it inspects the game. Existing check thresholds are unchanged.
+
+The early allowance increases give learners more recovery room as sway is introduced. Levels 5–7 sway one unit farther and allow more spills so waiting for a catch matters more than a few errant drops. Levels 5 and 7 need two and four fewer catches. Widths, drop counts, sway speeds and the deadline are unchanged.
+
+| Level | Target (before → after) | Half-band (before → after) | Spill allowance (before → after) | Sway amplitude (before → after) |
+| --- | ---: | ---: | ---: | ---: |
+| 2 | 38 → 38 | 6 → 7 | 20 → 23 | 0 → 0 |
+| 3 | 34 → 34 | 5 → 7 | 20 → 22 | 4 → 4 |
+| 4 | 40 → 40 | 5 → 6 | 19 → 22 | 6 → 6 |
+| 5 | 40 → 38 | 4 → 4 | 20 → 26 | 7 → 8 |
+| 6 | 42 → 42 | 6 → 4 | 18 → 29 | 8 → 9 |
+| 7 | 36 → 32 | 3 → 4 | 16 → 27 | 9 → 10 |
+| 8 | 44 → 44 | 3 → 4 | 18 → 25 | 10 → 10 |
+
+### Rule checks
+
+`bots.mjs` exited 0. Planner wins on seeds 1–6 were 6, 6, 6, 5, 5, 6, 6, and 6. Clumsy wins on seeds 1–16 were 14, 12, 7, 8, 8, 6, 5, and 8. `bots.mjs --mutate` exited 1 with three failed checks and zero planner or clumsy wins at any level. Full dumping won 0/70 runs. `grid-check.mjs` compared all state fields against the original physics using the current level table and passed 131 episodes and 42,481 steps. `daily.test.mjs` passed 11 checks.
+
+The 64-seed careless batches gave borderline outcomes, including 32/64 sloppy-aim wins on level 8. The 256-seed check includes those first 64 seeds. It changed the sample size and kept the same win-rate requirements. Level 5 initially gave the clumsy bot 134/256 wins, so its target, sway and spill allowance were adjusted again.
+
+| Level | Planner wins / 64 | Planner spill losses | Planner overfills | Clumsy wins / 256 | Sloppy-aim wins / 256 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | 63 | 0 | 1 | 168 | 221 |
+| 2 | 64 | 0 | 0 | 168 | 233 |
+| 3 | 63 | 1 | 0 | 138 | 176 |
+| 4 | 62 | 1 | 1 | 134 | 111 |
+| 5 | 60 | 3 | 1 | 119 | 90 |
+| 6 | 62 | 2 | 0 | 114 | 100 |
+| 7 | 59 | 4 | 1 | 95 | 71 |
+| 8 | 58 | 5 | 1 | 56 | 99 |
+
+All eight `--sweep --level=N` invocations exited 0. No planner run reached the deadline. The only level tuned against the 4201 batch was level 5. After its settings were frozen, an independent sweep starting at seed 5201 passed with 62/64 planner, 122/256 clumsy, and 108/256 sloppy-aim wins.
+
+### Frame profiling
+
+The five-second WebKit probe replayed a touch-drag sequence after a Play tap, with no screenshot capture in the measured interval. Blank-page and no-draw controls measured 15 ms interval p95. Under concurrent browser load, two original-page samples measured 28 and 31 ms p95. Paired crop-only samples measured 16 and 27 ms p95. A separate trial with a static background layer did not consistently improve those results, so the page keeps one visible canvas.
+
+In the quieter alternation, all four original and final page samples measured 15 ms interval p95. The original page's callback means were 0.936 and 0.981 ms. The final page's were 0.647 and 0.550 ms. This separates the reduction in rendering work from browser scheduling variance. Intermediate full checks under concurrent load still measured 25–28 ms active interval p95.
+
+The full touch checks on the final renderer produced these measurements. Neither profile reported a page or console error.
+
+| Profile and phase | Frames | Mean interval (ms) | p95 interval (ms) | p95 work (ms) |
+| --- | ---: | ---: | ---: | ---: |
+| WebKit iPhone 13, stationary | 360 | 13.89 | 15 | 1 |
+| WebKit iPhone 13, active | 313 | 13.89 | 15 | 3 |
+| Chromium Pixel 7, stationary | 300 | 16.67 | 16.8 | 0.7 |
+| Chromium Pixel 7, active | 270 | 16.67 | 16.7 | 1.4 |
+
+Inspected both profiles' menu, pouring, full-tilt and daily-result screenshots in `/private/tmp/night-r6-pour/`. The jug clears the HUD, the liquid shows a joined surface where drops meet, and the glass target remains visible. The legacy screenshots were moved out of the worktree. Real-device frame pacing, tilt, audio and human difficulty remain unverified.
