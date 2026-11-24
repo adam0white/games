@@ -213,7 +213,8 @@ async function run(page, phone) {
     await leave(page); assert.equal((await state()).unlocked.length, want, `left after ${jobs}: ${want} jobs`);
   }
 
-  // A two-repair job.
+  // A two-repair job. (A new job waiting from the part above would come first, with one repair.)
+  await setSave(page, { shifts: 1, bank: 11 });
   await page.goto(`${base}/fixit/?seed=4&two=1&level=3`);
   await page.click('#play');
   st = await state();

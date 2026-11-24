@@ -247,3 +247,5 @@ Not verified: a person playing; a real phone. Competent bots get three stars on 
 ### Left as a proposal (2026-11-24)
 - More kinds of puzzle (the list under note #150): the next thing to build here.
 - Two goals at once, and goals that name a thing ("fix 3 teddies").
+
+Check findings (2026-11-24): the full `check.mjs` was not seen passing in one run here. On Chromium it failed at "a job with two repairs", because the part before it (added for note #150) leaves a new job waiting, which comes first with one repair; the check now clears it. On WebKit it failed at "a streak is felt", the timing line noted under note #150, on a busy machine. The levels part and the shared phone check passed on both engines.
