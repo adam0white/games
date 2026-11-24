@@ -1,6 +1,6 @@
 {
   // Writes the rival ("Nemesis") persona for the lab experiment experiments/lab/ant-nemesis/.
-  // POST /lab-api/persona and /lab-api/quest, race rooms and the shared leaderboard at /lab-api/board/<game>. No secrets. One Durable Object holds the shared daily call count. See README.md for the guards and the cost.
+  // POST /lab-api/persona and /lab-api/quest, race rooms, friends' tables at /lab-api/table/<game>/<code> and the shared leaderboard at /lab-api/board/<game>. No secrets. One Durable Object holds the shared daily call count. See README.md for the guards and the cost.
   "name": "games-lab-ai",
   "account_id": "a20259cba74e506296745f9c67c1f3bc",
   "main": "./src/index.mjs",
@@ -19,17 +19,20 @@
   },
   // The daily counter, and one shared leaderboard per game: SQLite-backed Durable Objects.
   "durable_objects": {
-    "bindings": [{ "name": "DAILY", "class_name": "DailyCounter" }, { "name": "BOARD", "class_name": "Board" }, { "name": "ROOM", "class_name": "Room" }]
+    "bindings": [{ "name": "DAILY", "class_name": "DailyCounter" }, { "name": "BOARD", "class_name": "Board" }, { "name": "ROOM", "class_name": "Room" }, { "name": "TABLE", "class_name": "Table" }]
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["DailyCounter"] },
     { "tag": "v2", "new_sqlite_classes": ["Board"] },
-    { "tag": "v3", "new_sqlite_classes": ["Room"] }
+    { "tag": "v3", "new_sqlite_classes": ["Room"] },
+    { "tag": "v4", "new_sqlite_classes": ["Table"] }
   ],
   // Spend guards. Counts are kept per Cloudflare location and are approximate (see README).
   "ratelimits": [
     { "name": "PER_IP", "namespace_id": "4101", "simple": { "limit": 6, "period": 60 } },
-    { "name": "GLOBAL", "namespace_id": "4102", "simple": { "limit": 10, "period": 60 } }
+    { "name": "GLOBAL", "namespace_id": "4102", "simple": { "limit": 10, "period": 60 } },
+    // Joining a friends' table (/lab-api/table/...): looser, because friends on one Wi-Fi share an address and phones reconnect often.
+    { "name": "TABLE_JOIN", "namespace_id": "4103", "simple": { "limit": 60, "period": 60 } }
   ],
   // Logs, traces and Issues on (owner decision, 2026-11-24; workers/OBSERVABILITY.md).
   "upload_source_maps": true,
