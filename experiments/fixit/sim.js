@@ -216,7 +216,10 @@ const K = {
       }
       r.last = a;
     },
-    up(r) { r.grab = false; },
+    up(r, s, type) { // lifted on or just before the star: the gears finish the last few degrees
+      r.grab = false;
+      if (type === 'up' && r.want >= r.target - 20) r.want = Math.max(r.want, r.target);
+    },
     tick(r, dt, s) {
       if (r.want > r.hand) r.hand = Math.min(r.want, r.hand + 240 * dt); // the gears turn at their own pace
       const k = Math.floor((r.hand - r.a0) / 30);

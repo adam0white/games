@@ -430,7 +430,8 @@ function finishLevel() {
     else if (st < 3) line.push(starTarget(3, def.stars[0]));
     const note = added.length ? added.map(([id]) => metric(id, '', translate('unlockedItem', { item: translate(id) })))
       : opened || dailyNow ? [translate('unlockedMode', { mode: translate(opened ? 'open' : 'daily') })]
-      : upNext?.intro && !cleared(upNext.n) ? [jobMetric(upNext.intro, translate('newRepair', { object: translate(upNext.intro) }))] : [];
+      : upNext?.intro && !cleared(upNext.n) ? [jobMetric(upNext.intro, translate('newRepair', { object: translate(upNext.intro) }))]
+      : !upNext ? [translate('allCleared')] : nextMilestone();
     endCard({ title: translate('cleared', { n: num(n) }), stars: st, coins: reward,
       stats: [['time', seconds(secs)], ...(save.times[n] ? [['best', seconds(resultSeconds(save.times[n]))]] : []), ['fixed', num(s.served)]],
       line, note, again: 'retry', next: !!upNext });
@@ -444,6 +445,13 @@ function finishLevel() {
     [523, 392].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.08, 'triangle'), i * 160));
   }
   setTimeout(() => { if (!playing && screen === 'play') show('end'); }, 900);
+}
+// Between new repairs, the results card shows the next thing the stall is saving stars for.
+function nextMilestone() {
+  const total = starTotal(), next = MILESTONES.find(([, need]) => total < need);
+  if (!next) return [];
+  const [id, need] = next;
+  return [metric(id, num(total) + '/' + num(need) + ' ★', translate('milestoneLeft', { item: translate(id), n: num(need - total) }))];
 }
 function starTarget(target, time, label = translate('starTarget', { stars: starsLabel(target), time: seconds(time) })) {
   const span = document.createElement('span');
@@ -497,6 +505,23 @@ function quit() {
   if (mode !== 'level') save.bank += s.coins;
   save.served += s.served; earnJob(); store();
   playing = false; paused = false; card = 0; snd.release(); show('menu');
+}
+
+// Teach the ticket rules by pointing: a picky customer's next ticket glows as soon as the choice opens, and in a rush
+// the other customer's ticket glows once that customer will run out of patience first.
+function promptTicket() {
+  const box = $('tickets');
+  if (!benchControls) return box.classList.remove('prompt');
+  let on = s.choosing && s.phase === 'work';
+  if (s.lv.rule === 'rush') {
+    const other = s.lanes.findIndex((c, i) => i !== s.station && !c.done);
+    on = s.phase === 'work' && other >= 0 && s.lanes[other].left < s.cust.left;
+    for (const el of box.querySelectorAll('[data-lane]')) el.toggleAttribute('data-next', on && +el.dataset.lane === other);
+  }
+  box.classList.toggle('prompt', on);
+}
+function nudgeTicket() {
+  $('tickets').querySelector('[data-next]')?.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.12)' }, { transform: 'scale(1)' }], { duration: 320 });
 }
 
 // Each ticket shows the object itself. Picky customers request numbered tickets; rush tickets show both deadlines.
@@ -703,7 +728,7 @@ cv.addEventListener('pointerdown', e => {
   try { cv.setPointerCapture(e.pointerId); } catch {}
   if (s.choosing) {
     const { x, y } = toLocal(e);
-    ripple(x, y, C.amber); tone(280, 0.06, 0.05, 'triangle');
+    ripple(x, y, C.amber); tone(280, 0.06, 0.05, 'triangle'); nudgeTicket();
   }
   input(s, { type: 'down', ...toLocal(e) }); drain();
 });
@@ -1140,7 +1165,7 @@ function job(t, dt) {
     goalIcon(g, 'list', 50, 50, 12);
   } else if (s.lv?.tickets) drawJob(g, [V.reps[s.stepN]], 0, t, works);
   else drawJob(g, V.reps, s.stepN, t, works);
-  $('tickets').classList.toggle('prompt', s.choosing && s.rep.idle >= 1.5);
+  promptTicket();
   if (s.cust.regular) drawSilly(g, sillyList(save.regular), t);
   // the hint: a ghost finger doing the gesture on the thing
   const urgentCue = (r.kind === 'oil' || r.kind === 'zip' && zipStuck(r) && r.idle > 0.2) && !s.choosing;

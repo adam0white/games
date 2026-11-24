@@ -141,6 +141,35 @@ claim(goalLine(opening[2].goal).includes('One walk-off ends the level'),
   claim(snag.stuck && left[1] === right[1] && right[0] - left[0] >= 10, 'a blocked zipper shows a lateral wiggle');
   claim(!lines.some(([, y]) => y === snag.top), 'a blocked zipper no longer draws the upward trail to the collar');
 
+  // Middle and late game audit: the toy car and the needle only work if the finger stays down, but the demonstration
+  // showed a plain drag, so touch players let go early. The demonstration now shows the hold clock at the end of the drag.
+  for (const kind of ['spring', 'thread']) {
+    const arcs = [], gd = guide(create({ only: kind }).rep);
+    const meter = new Proxy({ arc: (x, y, r) => arcs.push(r) }, { get: (obj, key) => obj[key] ?? (() => {}) });
+    drawGhost(meter, gd, 1.8 * 0.8, 1);
+    claim(arcs.includes(4.6), `the ${kind} demonstration shows that the finger must stay down at the end`);
+  }
+
+  // Middle and late game audit: in both browsers the clock hand stopped just short of the star after the finger was lifted
+  // on it, and needed a second push. A release within 20 degrees of the star now finishes the turn.
+  {
+    const clock = create({ only: 'clock' }), r = clock.rep, at = a => [r.cx + 30 * Math.cos(a * Math.PI / 180), r.cy + 30 * Math.sin(a * Math.PI / 180)];
+    let a = r.hand;
+    input(clock, { type: 'down', x: at(a)[0], y: at(a)[1] });
+    while (a < r.target - 18) { a = Math.min(r.target - 18, a + 4); input(clock, { type: 'move', x: at(a)[0], y: at(a)[1] }); step(clock); }
+    input(clock, { type: 'up', x: at(a)[0], y: at(a)[1] });
+    for (let i = 0; i < 90; i++) step(clock);
+    claim(clock.served === 1, 'lifting the finger just short of the clock star still sets the clock');
+    const early = create({ only: 'clock' }), e = early.rep;
+    let b = e.hand;
+    const on = d => [e.cx + 30 * Math.cos(d * Math.PI / 180), e.cy + 30 * Math.sin(d * Math.PI / 180)];
+    input(early, { type: 'down', x: on(b)[0], y: on(b)[1] });
+    while (b < e.target - 60) { b = Math.min(e.target - 60, b + 4); input(early, { type: 'move', x: on(b)[0], y: on(b)[1] }); step(early); }
+    input(early, { type: 'up', x: on(b)[0], y: on(b)[1] });
+    for (let i = 0; i < 90; i++) step(early);
+    claim(early.served === 0, 'lifting the finger well before the clock star does not set it');
+  }
+
   const scale = create({ only: 'balance' }), g = guide(scale.rep);
   const approach = ghost(g, 0.25), holding = ghost(g, 1.2), stillHolding = ghost(g, 1.5);
   input(scale, { type: 'down', x: g.from[0], y: g.from[1] });
@@ -395,6 +424,9 @@ function levels() {
   claim(rows.every(r => r.c.stars >= 2), 'the plain competent bot earns at least two stars on each level');
   claim(rows.every(r => r.e.stars === 3) && expertThree >= total * 0.8, `the plain expert three-stars every level and expert three-stars ${expertThree}/${total} across all runs`);
   claim(skilledUnchanged, 'the retry policy changes no competent or expert clear, coins, stars or clear time');
+  // Middle and late game audit: two touch players lost level 42 on every first try; the slow bot needed the assist on 38 and 42.
+  const rushRows = rows.filter(r => MAP[r.n - 1].rule === 'rush');
+  claim(rushRows.every(r => r.slow >= 5), `a slow player can clear every rush level without the assist (${rushRows.map(r => `${r.n}: ${r.slow}/${wobble + 1}`).join(', ')})`);
   const stuck = rows.flatMap(r => r.assistFailures.map(k => `${r.n}/${k}`));
   claim(!stuck.length && rows.some(r => r.assists > 0), `the slow bot clears every level on each input profile with up to two failures and the assist when needed${stuck.length ? ' (stuck on ' + stuck.join(', ') + ')' : ''}`);
   const capped = level(MAP[0], skilled(SKILLS.expert), true);

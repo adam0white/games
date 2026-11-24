@@ -612,6 +612,9 @@ export function drawGhost(g, gd, t, alpha, still = false) {
   if (gd.type === 'balance' && (still || demonstration >= 0.5 && demonstration < 0.9)) {
     holdMeter(g, gd.targets[0], gd.from[1] - 16, still ? 0.75 : (demonstration - 0.5) / 0.4);
   }
+  if (gd.type === 'drag' && typeof gd.hold === 'number' && gd.hold > 0.25 && (still || demonstration >= 0.62 && demonstration < 0.92)) {
+    holdMeter(g, gd.to[0], gd.to[1] - 16, still ? 0.75 : (demonstration - 0.62) / 0.3); // keep the finger down here
+  }
   if (tap && gd.all) for (const a of gd.all) { g.strokeStyle = `rgba(255,255,255,${0.5 + 0.4 * Math.sin(t * 8)})`; g.lineWidth = 2.5; g.beginPath(); g.arc(a[0], a[1], 13 + 2 * Math.sin(t * 8), 0, TAU); g.stroke(); }
   // the fingertip itself
   const [x, y] = p;

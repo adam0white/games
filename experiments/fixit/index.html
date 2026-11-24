@@ -106,7 +106,9 @@
   #assist, #menuAssist { min-width: 80px; color: #203828; background: #d8edbc; }
   #shareStatus:empty { display: none; }
   .help-icon svg { margin-right: 5px; width: 26px; height: 24px; vertical-align: middle; }
-  .tickets.prompt .ticket[data-next] { outline: 3px solid #78c7ab; outline-offset: 1px; }
+  .tickets.prompt .ticket[data-next], .tickets.prompt .lane[data-next] { outline: 3px solid #78c7ab; outline-offset: 1px; }
+  @media (prefers-reduced-motion: no-preference) { .tickets.prompt [data-next] { animation: ticket-call .9s ease-in-out infinite alternate; } }
+  @keyframes ticket-call { to { outline-color: #f3c74f; box-shadow: 0 0 0 5px rgba(243, 199, 79, .35); } }
   #dailyShare { display: block; width: min(100%, 272px); height: auto; margin: 8px auto 4px; border: 2px solid #3a2216; border-radius: 12px; }
   #dailyResult button { min-height: 44px; min-width: 0; padding-inline: .68em; font-size: .85em; }
   #end .card:has(#dailyResult:not([hidden])) { padding-top: 16px; }
