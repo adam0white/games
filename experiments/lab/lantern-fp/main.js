@@ -67,7 +67,7 @@ function run() {
     playing=false;drop();ended=performance.now();clearTones();save.runs++;
     const won=s.over==='dawn', pct=Math.floor(progress(s)*100), result=(stage-1)*100+pct;
     save.best=Math.max(save.best,result);
-    $('endTitle').textContent=won?'Dawn':'Light lost';$('score').textContent=`${pct}%`;
+    $('endTitle').textContent=won?'Dawn':s.over==='dark'?'Light lost':s.over==='bank'?'Run aground':'Wrecked';$('score').textContent=`${pct}%`;
     $('endLine').textContent=won?`Night ${stage} complete · ${s.taken} embers`:`Night ${stage} · ${s.taken} embers · Best ${distance(save.best)}`;
     if(won){save.opened=Math.max(save.opened,Math.min(NIGHTS,stage+1));if(stage<NIGHTS)stage++;$('again').textContent=`Play night ${stage}`;burst(false,false,60);[523,659,784,1047].forEach((f,i)=>later(()=>tone(f,1,.08),i*150));}
     else{$('again').textContent='Try again';shake=1;burst(true);tone(90,.6,.12,'sine');snd.noise(.25,.13,500);}
@@ -81,7 +81,8 @@ function run() {
     snd.unlock();tone(side<0?220:294,.07,.035);glow=Math.max(glow,.12);
   }
   function press(side,x,y){tap(control,side);lastRepeat=control.taps;pulse(side,x,y);}
-  canvas.addEventListener('pointerdown',e=>{if(!playing||paused||pointer!==null||key)return;e.preventDefault();pointer=e.pointerId;try{canvas.setPointerCapture(e.pointerId);}catch{}press(e.clientX<innerWidth/2?-1:1,e.clientX,e.clientY);});
+  // Two thumbs overlap during quick alternating taps: the newest press wins, and lifting an older thumb does nothing.
+  canvas.addEventListener('pointerdown',e=>{if(!playing||paused||key)return;e.preventDefault();pointer=e.pointerId;try{canvas.setPointerCapture(e.pointerId);}catch{}press(e.clientX<innerWidth/2?-1:1,e.clientX,e.clientY);});
   function up(e){if(e.pointerId!==pointer)return;drop();}
   canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',up);canvas.addEventListener('lostpointercapture',up);
   // Pointer movement is deliberately ignored: the half where the press began owns the whole press.

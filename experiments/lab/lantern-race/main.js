@@ -70,7 +70,11 @@ function fallback(note) {
   disconnect(); offline = true; $('connection').textContent = note;
   peers = new Map([[id, { id, n: cleanName($('name').value) }]]);
   // A failed network never discards your river. Existing bot sims have advanced from its start.
-  if (['race', 'end', 'countdown', 'paused'].includes(phase)) {
+  if (phase === 'end' || finished) {
+    // Your result stands. Keep every recorded boat; ones still racing can no longer report.
+    for (const p of racers.values()) if (p.id !== id && p.a) { p.a = 0; p.left = true; }
+    if (phase === 'end') renderResults();
+  } else if (['race', 'countdown', 'paused'].includes(phase)) {
     botRound = true;
     racers = new Map([...racers].filter(([key]) => key === id));
     for (const b of bots) racers.set(b.id, botEntry(b));
@@ -84,14 +88,15 @@ function receive(m) {
   if (m.t === 'you') {
     clearTimeout(timeout); id = m.id; peers = new Map(m.peers.map(p => [p.id, p])); peers.set(id, { id, n: cleanName($('name').value) });
     offline = false; $('connection').textContent = 'live · ' + (room === 'open' ? 'open river' : room); lobby();
-    if (m.round) { $('lobbyLine').textContent = 'Race in progress · Ready for the next river.'; } else if (ready) send({ t: 'ready' });
+    if (m.round) { $('lobbyLine').textContent = 'A race may be underway · Ready joins the next river.'; } else if (ready) send({ t: 'ready' });
   } else if (m.t === 'join') {
     peers.set(m.id, { id: m.id, n: m.n }); lobby();
     // A late arrival is a spectator until the next round. A second join updates its name.
     if (racers.has(m.id)) racers.get(m.id).n = m.n;
   } else if (m.t === 'leave') {
     peers.delete(m.id); tracks.delete(m.id); const p = racers.get(m.id); if (p) { p.a = 0; p.left = true; }
-    if (peers.size < 2 && bots.length) { botRound = true; for (const b of bots) racers.set(b.id, botEntry(b)); }
+    // Bots stand in for a vanished opponent only while you are still racing; they never join a race you finished.
+    if (peers.size < 2 && bots.length && !finished) { botRound = true; for (const b of bots) racers.set(b.id, botEntry(b)); }
     lobby(); if (phase === 'end') renderResults();
   } else if (m.t === 'round') beginRound(m);
   else if (m.t === 'p' && roundKey && m.id !== id && racers.has(m.id)) {
@@ -121,7 +126,7 @@ function beginRound(round) {
   bots = [0, 1, 2].map((skill, i) => ({ id: 9 + i, n: ['Reed', 'Glimmer', 'Drift'][i] + ' · bots', s: create(seed, night, false, []), policy: { skill, id: i, next: 0 }, elapsed: null }));
   botRound = peers.size < 2; if (botRound) for (const b of bots) racers.set(b.id, botEntry(b));
   $('roomLine').textContent = room === 'open' ? 'OPEN RIVER' : `ROOM ${room}`; $('raceLabel').textContent = `Night ${night} · ${racers.size} boats`;
-  show('countdown'); updateBar();
+  disarm(); show('countdown'); updateBar();
 }
 function botEntry(b) { return { id: b.id, n: b.n, d: Math.round(progress(b.s) * DISTANCE), s: b.elapsed ?? undefined, a: b.s.over ? 0 : 1 }; }
 function burst(x, y, col, count = 12) {
@@ -133,11 +138,11 @@ function publish(final = false) {
   if (final) send({ t: 'done', s: Math.round(s.t * 1000) });
 }
 function finish(reason = s.over) {
-  if (finished) return; finished = true; steer.drop(); keys.clear();
+  if (finished) return; finished = true; steer.drop(); keys.clear(); disarm();
   const p = racers.get(id); p.d = Math.round(progress(s) * DISTANCE); p.s = Math.round(s.t * 1000); p.a = 0;
   publish(true); best = Math.max(best, p.d); write('lantern-race-best', best); write('lantern-race-played', '1');
   $('bestLine').textContent = `Best crossing · ${Math.round(best / 1000)}%`;
-  $('endTitle').textContent = reason === 'dawn' ? 'First light!' : reason === 'left' ? 'Boat retired' : 'Lantern out';
+  $('endTitle').textContent = reason === 'dawn' ? 'First light!' : reason === 'left' ? 'Boat retired' : reason === 'dark' ? 'Lantern out' : reason === 'bank' ? 'Run aground' : 'Wrecked';
   if (reason === 'dawn') { burst(W / 2, H * .3, '#ffe1a7', 65); [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, .5, .06), i * 90)); glow = 1; }
   else { tone(180, .4); shake = .6; burst(left + s.x * unit, H * .68, '#a7d7da', 25); }
   show('end'); renderResults();
@@ -191,7 +196,16 @@ $('quick').onclick = () => enter(linkedRoom || 'open'); $('friends').onclick = (
 $('create').onclick = () => { const buf = new Uint32Array(1); crypto.getRandomValues(buf); enter(makeCode(buf[0])); };
 $('join').onclick = () => { const code = roomCode($('code').value); if (!code || code === 'open') { $('codeError').textContent = 'Use four letters.'; tone(180); } else enter(code); };
 $('code').oninput = () => { $('code').value = $('code').value.replace(/[^a-z]/gi, '').toUpperCase(); $('codeError').textContent = ''; };
-$('ready').onclick = requestReady; $('rematch').onclick = requestReady; $('pause').onclick = pause; $('resume').onclick = resume;
+$('ready').onclick = requestReady; $('rematch').onclick = requestReady; $('resume').onclick = resume;
+// A live race cannot pause, so the button retires the boat. One stray tap must not end a race: the first tap asks.
+let retireArmed = 0, retireTimer = null;
+function disarm() { clearTimeout(retireTimer); retireArmed = 0; $('pause').textContent = 'Ⅱ'; $('pause').setAttribute('aria-label', 'Pause'); $('roomLine').textContent = room === 'open' ? 'OPEN RIVER' : `ROOM ${room}`; }
+$('pause').onclick = () => {
+  if (offline || !['race', 'countdown'].includes(phase)) { pause(); return; }
+  if (performance.now() < retireArmed) { disarm(); pause(); return; }
+  retireArmed = performance.now() + 2500; $('pause').textContent = '✕'; $('pause').setAttribute('aria-label', 'Retire boat'); $('roomLine').textContent = 'TAP ✕ AGAIN TO RETIRE'; tone(330, .08);
+  clearTimeout(retireTimer); retireTimer = setTimeout(disarm, 2500);
+};
 for (const b of document.querySelectorAll('.toMenu')) b.onclick = menu;
 $('sound').textContent = `Sound: ${muted ? 'off' : 'on'}`;
 $('sound').onclick = () => { muted = !muted; write('lantern-race-sound', muted ? '0' : '1'); $('sound').textContent = `Sound: ${muted ? 'off' : 'on'}`; if (!muted) { snd.unlock(); tone(); } };
@@ -248,7 +262,7 @@ function draw(now) {
   const visible = ghosts.filter(p => p.a && Math.abs(p.d / DISTANCE * 78 - s.y) < H / unit);
   visible.forEach((p, i) => {
     // The report's distance is progress to dawn, including slow-water credit. No powers in race setup.
-    let y = sy(p.y ?? p.d / DISTANCE * 78); if (Math.abs(y - H * .68) < 34) y -= 60 + i * 32;
+    let y = sy(p.y ?? p.d / DISTANCE * 78); if (Math.abs(y - H * .68) < 34) y -= 84 + i * 34; // label hangs 28-52 px below a ghost: clear your own boat
     boatDraw(sx((p.x + 1) / 2), y, color(p.id), p.n, true, now);
   });
   if (!finished || phase === 'menu' || phase === 'lobby') boatDraw(sx(s.x), sy(s.y), '#ffd28a', '', false, now, s.light, clamp((target - s.x) * 2, -.3, .3));
