@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#f6d7b0">
+<title>Pour</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #f6d7b0; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { font: 17px/1.4 ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif; color: #3b2a3f; }
+  canvas#c { display: block; width: 100vw; height: 100dvh; touch-action: none; }
+  #probe { position: fixed; top: 0; left: 0; width: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); visibility: hidden; pointer-events: none; }
+  .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: #3b2a3f66; overflow-y: auto; touch-action: pan-y; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-sizing: border-box; }
+  #menu.screen { background: transparent; align-items: end; }
+  .screen.on { display: grid; }
+  .card { max-width: 21em; width: calc(100% - 32px); box-sizing: border-box; padding: 18px 16px 14px; margin: 12px 0 24px; background: #fff6ea; border: 3px solid #3b2a3f; border-radius: 24px; box-shadow: 0 8px 0 #3b2a3f44; }
+  h1 { font-size: 3em; line-height: 1; margin: 0 0 .1em; color: #ff8a3d; -webkit-text-stroke: 2px #3b2a3f; text-shadow: 0 4px 0 #3b2a3f; letter-spacing: .02em; }
+  h2 { font-size: 2em; margin: 0 0 .1em; color: #ff8a3d; -webkit-text-stroke: 1.2px #3b2a3f; text-shadow: 0 3px 0 #3b2a3f; }
+  p { margin: .35em 0; }
+  .sub { font-size: .95em; opacity: .8; }
+  .stars { font-size: 2.2em; letter-spacing: .1em; color: #f4b521; -webkit-text-stroke: 1.5px #3b2a3f; line-height: 1.2; }
+  .stars .off { color: #e6d6c3; }
+  button { font: inherit; font-weight: bold; color: #3b2a3f; background: #ffe9cc; border: 2.5px solid #3b2a3f; border-radius: 16px; padding: .4em 1em; margin: .25em; min-height: 48px; min-width: 7em; touch-action: manipulation; cursor: pointer; box-shadow: 0 4px 0 #3b2a3f; }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 #3b2a3f; }
+  button.main { background: #ff8a3d; color: #fff8ee; font-size: 1.35em; min-width: 8em; }
+  button.small { min-width: 0; font-size: .9em; }
+  #levels { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: .4em 0; }
+  #levels button { min-width: 52px; width: 52px; height: 56px; padding: 0; margin: 0; font-size: 1em; line-height: 1; display: grid; place-items: center; border-radius: 14px; }
+  #levels button small { display: block; font-size: 14px; color: #c98a00; letter-spacing: -1px; }
+  #levels button.cur { background: #ffcf8f; }
+  #levels button:disabled { opacity: .35; }
+  #pause { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); width: 48px; height: 48px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; place-items: center; background: #fff6ea; box-shadow: 0 3px 0 #3b2a3f; }
+  #pause::before { content: ''; width: 4px; height: 16px; border: solid #3b2a3f; border-width: 0 5px; }
+  #tilt { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); width: 48px; height: 48px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; place-items: center; background: #fff6ea; box-shadow: 0 3px 0 #3b2a3f; }
+  #tilt svg { width: 26px; height: 26px; }
+  #tilt.on { background: #ff8a3d; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="probe"></div>
+<button id="pause" aria-label="Pause"></button>
+<button id="tilt" aria-label="Tilt the phone to pour"><svg viewBox="0 0 26 26"><rect x="8" y="3" width="11" height="19" rx="2.5" transform="rotate(28 13 13)" fill="none" stroke="#3b2a3f" stroke-width="2.4"/><path d="M3 20 q3 4 8 4" fill="none" stroke="#3b2a3f" stroke-width="2"/></svg></button>
+
+<div id="menu" class="screen on"><div class="card">
+  <h1>Pour</h1>
+  <p class="sub">Fill it to the line.</p>
+  <p><button id="play" class="main">Play</button></p>
+  <div id="levels"></div>
+  <p><button id="sound1" class="small">Sound: on</button></p>
+</div></div>
+
+<div id="paused" class="screen"><div class="card">
+  <h2>Paused</h2>
+  <p><button id="resume" class="main">Go on</button></p>
+  <p><button id="quit">Menu</button><button id="sound2" class="small">Sound: on</button></p>
+</div></div>
+
+<div id="end" class="screen"><div class="card">
+  <h2 id="endTitle">Just right!</h2>
+  <div id="endStars" class="stars"></div>
+  <p id="endLine" class="sub"></p>
+  <p><button id="next" class="main">Next</button></p>
+  <p><button id="retry">Again</button><button id="toMenu">Menu</button></p>
+</div></div>
+
+<script type="module" src="./main.js"></script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>
