@@ -536,3 +536,16 @@ Not checked: a real phone; whether three floors is the right cost at high levels
 ## 2026-11-23: abilities stay on the endless river (tester t1, note #141)
 
 The lab asked (#133) whether abilities should be the same for everyone on the endless river, now that stats are gone there. The tester chose "Keep my own two abilities". No change; each player keeps the two abilities they switched on. This closes the proposal "Abilities on the endless river" under notes #119 to #123.
+
+## 2026-11-23: endless scores go up by themselves (tester t1, notes #155 and #156)
+
+Note #155, in short: an endless game should share its score with everyone by itself, so people see who is really first; remove the share button. Note #156 (answering #153): starting three floors below where you fell is "just right"; no change.
+
+- **One choice, then automatic.** The owner's rule is that a game sends nothing before the player chooses to share, so sending every player's score without asking was not built. The card after an endless run asks once, with a name field: "Show your endless scores to everyone?" After a yes, every endless run is sent by itself and the card says the place among all players. After a no it is never asked again.
+- **The share button is gone.** A tick on the leaderboard, "Show my endless scores to everyone", shows the choice and changes it. Unticking takes the row away, as "Stop sharing" did. The leaderboard opens on all players when the shared board answers.
+- **Nobody is enrolled silently.** A name saved under the old "stays on this phone" words is not a yes. `lantern-share` keeps its values: '1' sharing, '' a no (or an old "Stop sharing"), absent not asked yet. What is sent is unchanged: a random id, the name, the score.
+- If a no comes while a score is on its way, the row is taken away when the answer arrives.
+
+Checks: the phone check passes on WebKit iPhone 13 and Chromium Pixel 7 with new lines for the question, no name, a yes, a no, and an unticked row. With the choice removed from the send, it fails. Phone-sized screenshots of the card and the board. Not checked: a real phone's keyboard over the card.
+
+`workers/lab-ai/README.md` still says "Share my best run" and "Stop sharing". A note's work may not edit it; the next working session should.

@@ -225,3 +225,10 @@ Not checked: closing the tab mid-shift still loses that shift's coins, as before
 - **"Only three types."** The game has eleven jobs, but a new player sees three (bell, music box, kettle), and each further job needs a whole shift with 4 or more fixed. So the tester saw three. Before this change, leaving through Menu also lost the unlock. Leaving after fixing 4 now keeps it.
 - **Levels.** Replace random shifts with numbered levels. Each level has a goal (for example "fix 6, lose at most 1"), introduces one new job and brings back the old ones. Stars come from coins or time. The eleven jobs give about 11 levels; levels 12 and up mix jobs at a rising pace. The daily stall stays as it is. This is a change of structure, so it goes to the next working session. Question #154 asks the tester what should clear a level.
 - **More kinds of puzzle.** Each new job is a new gesture and a new object. Candidates: thread a needle (hold steady), wind a watch (small circles), tighten a belt (pull and hook), unjam a zip (wiggle), oil a hinge (drip with timed taps).
+
+## 2026-11-23: what clears a level (tester t1, note #157)
+
+Asked (#154) what should clear a level, the tester chose "Mix: each level has its own goal". Nothing is built yet.
+
+### Left as a proposal (2026-11-23, note #157)
+- The levels proposal under note #150 now has its rule. A goal per level, one of: fix N before time runs out; fix a set list without losing a customer; earn N coins. A first table: levels 1 to 11 introduce one job each and cycle the three goals; later levels combine two goals. Each goal shows as one line and an icon before the level and on the counter during it. Bots must show each level clearable before it ships. The daily stall stays as it is.
