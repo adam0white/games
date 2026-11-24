@@ -9,6 +9,9 @@ import { originAllowed, utcDay } from './core.mjs';
 export const BOARD = { games: ['lantern'], top: 20, keep: 500, name: 16, maxScore: 1_000_000, body: 256, dailyNew: 2000, cacheSeconds: 20, cacheVersion: 1 };
 // Run tickets. perSecond: Lantern's endless score grows by 10 a second, 18 during a boost. slack covers clock and network delay.
 // need: the games whose scores are refused without a ticket. A game joins it once its page with tickets is live everywhere.
+// Daily boards: every player gets the same river for one UTC day, and the board starts empty each day. The first read or
+// post of a new day removes the day before's rows.
+export const DAILY = ['lantern-daily'];
 export const RUN = { perSecond: 18, slack: 50, hours: 6, keep: 20000, need: [] };
 
 // Stricter than the game's own name field: letters, digits, space and _ . - only, at most 16 characters. Markup characters never reach another player's screen as typed.
@@ -45,6 +48,14 @@ function tables(sql) {
   sql.exec('CREATE INDEX IF NOT EXISTS scores_best ON scores (s DESC, t ASC)');
   sql.exec('CREATE TABLE IF NOT EXISTS days (day TEXT PRIMARY KEY, n INTEGER NOT NULL)');
   sql.exec('CREATE TABLE IF NOT EXISTS runs (r TEXT PRIMARY KEY, t INTEGER NOT NULL)');
+  sql.exec('CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)');
+}
+// A daily board keeps one day's rows. day is the UTC day (YYYY-MM-DD) for a daily board and nothing for the others.
+function roll(sql, day) {
+  tables(sql);
+  if (!day || sql.exec("SELECT v FROM meta WHERE k = 'day'").toArray()[0]?.v === day) return;
+  sql.exec('DELETE FROM scores');
+  sql.exec("INSERT INTO meta (k, v) VALUES ('day', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v", day);
 }
 /** A run ticket: the run's random id and the time it started. Old tickets go; a full table refuses new ones. */
 export function boardStart(sql, r, now) {
@@ -55,14 +66,14 @@ export function boardStart(sql, r, now) {
   return { ok: true };
 }
 /** The best rows, best first. The ids stay inside: a row is { n, s }. */
-export function boardTop(sql, limit = BOARD.top) {
-  tables(sql);
+export function boardTop(sql, limit = BOARD.top, day = null) {
+  roll(sql, day);
   return sql.exec('SELECT n, s FROM scores ORDER BY s DESC, t ASC LIMIT ?', limit).toArray().map(r => ({ n: r.n, s: r.s }));
 }
 /** Keep the player's best score and newest name. A new player counts against the day's cap. Returns { ok, place, rows };
  * a refusal carries why: 'run' (no ticket, or more score than the run's time allows) or 'cap'. A ticket works once. */
-export function boardPut(sql, { id, n, s, r }, now, cap = BOARD.dailyNew, need = false) {
-  tables(sql);
+export function boardPut(sql, { id, n, s, r }, now, cap = BOARD.dailyNew, need = false, day = null) {
+  roll(sql, day);
   if (r) {
     const run = sql.exec('SELECT t FROM runs WHERE r = ?', r).toArray()[0];
     if (!run || now < run.t || s > (now - run.t) / 1000 * RUN.perSecond + RUN.slack) return { ok: false, why: 'run', place: 0, rows: [] };
@@ -99,20 +110,21 @@ const cacheKey = game => new Request(`https://games-lab-ai.cache/board/v${BOARD.
 export async function handleBoard(request, env, ctx = { waitUntil() {} }, deps = {}) {
   const url = new URL(request.url), origin = request.headers.get('Origin');
   const game = /^\/lab-api\/board\/([a-z0-9-]{1,40})$/.exec(url.pathname)?.[1];
-  if (!game || !BOARD.games.includes(game)) return json(404, { error: 'not found' }, origin);
+  if (!game || !(BOARD.games.includes(game) || DAILY.includes(game))) return json(404, { error: 'not found' }, origin);
   // A page on the game's own site sends no Origin header with a GET, so only a foreign Origin is refused.
   if (origin ? !originAllowed(origin) : request.method !== 'GET') return json(403, { error: 'origin' }, null);
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Methods': 'GET, POST', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '600', Vary: 'Origin' } });
   }
   const board = () => env.BOARD.get(env.BOARD.idFromName(game)), cache = deps.cache;
+  const now = deps.now ? deps.now() : Date.now(), day = DAILY.includes(game) ? utcDay(now) : null, key = cacheKey(day ? `${game}/${day}` : game);
 
   if (request.method === 'GET') {
     // Reads are answered from the cache for a few seconds, so a flood of reads does not reach the Durable Object.
-    if (cache) { const hit = await cache.match(cacheKey(game)); if (hit) return json(200, await hit.json(), origin); }
+    if (cache) { const hit = await cache.match(key); if (hit) return json(200, await hit.json(), origin); }
     let rows;
-    try { rows = await board().top(BOARD.top); } catch { return json(503, { error: 'board' }, origin); }
-    if (cache) ctx.waitUntil(cache.put(cacheKey(game), new Response(JSON.stringify({ rows }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${BOARD.cacheSeconds}` } })));
+    try { rows = await board().top(BOARD.top, day); } catch { return json(503, { error: 'board' }, origin); }
+    if (cache) ctx.waitUntil(cache.put(key, new Response(JSON.stringify({ rows }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${BOARD.cacheSeconds}` } })));
     return json(200, { rows }, origin);
   }
   if (request.method !== 'POST') return json(405, { error: 'method' }, origin);
@@ -130,14 +142,13 @@ export async function handleBoard(request, env, ctx = { waitUntil() {} }, deps =
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   try { if (!(await env.PER_IP.limit({ key: `${q.start ? 'boardrun' : 'board'}:${ip}` })).success) return json(429, { error: 'busy' }, origin); } catch { return json(429, { error: 'busy' }, origin); }
 
-  const now = deps.now ? deps.now() : Date.now();
   // A ticket changes no score, so it leaves the read cache alone. Its count is apart from the score posts' count.
   if (q.start) {
     try { return (await board().start(q.r, now)).ok ? json(200, { ok: true }, origin) : json(503, { error: 'runs' }, origin); } catch { return json(503, { error: 'board' }, origin); }
   }
   let out;
-  try { out = q.remove ? await board().remove(q.id) : await board().put(q, now, RUN.need.includes(game)); } catch { return json(503, { error: 'board' }, origin); }
+  try { out = q.remove ? await board().remove(q.id) : await board().put(q, now, RUN.need.includes(game), day); } catch { return json(503, { error: 'board' }, origin); }
   if (!out.ok) return out.why === 'run' ? json(422, { error: 'run' }, origin) : json(503, { error: 'daily cap' }, origin);
-  if (cache) ctx.waitUntil(cache.delete(cacheKey(game)));
+  if (cache) ctx.waitUntil(cache.delete(key));
   return json(200, { place: out.place, rows: out.rows }, origin);
 }

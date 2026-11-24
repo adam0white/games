@@ -9,8 +9,8 @@ export class DailyCounter extends DurableObject {
 
 // One instance per game (named by the game) holds that game's shared leaderboard. See board.mjs.
 export class Board extends DurableObject {
-  top(limit) { return boardTop(this.ctx.storage.sql, limit); }
-  put(q, now, need) { return boardPut(this.ctx.storage.sql, q, now, undefined, need); }
+  top(limit, day) { return boardTop(this.ctx.storage.sql, limit, day); }
+  put(q, now, need, day) { return boardPut(this.ctx.storage.sql, q, now, undefined, need, day); }
   remove(id) { return boardRemove(this.ctx.storage.sql, id); }
   start(r, now) { return boardStart(this.ctx.storage.sql, r, now); }
 }
