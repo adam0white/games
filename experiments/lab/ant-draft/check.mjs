@@ -74,7 +74,7 @@ async function runPhone(name) {
     assert.equal(mid.hint, false, 'the hint leaves on the first touch');
     assert.ok(s1.maxAimError < 0.01, `flag follows each dispatched finger position: error ${s1.maxAimError}`);
     out.frames = `${s1.frames} frames in ${Math.round(s1.ms)} ms, ${s1.slow} over 50 ms`;
-    assert.ok(s1.frames / (s1.ms / 1000) > 25, `frame rate while fighting: ${out.frames}`);
+    assert.ok(s1.frames / (s1.ms / 1000) > Number(process.env.MIN_FPS || 25), `frame rate while fighting: ${out.frames}`);
     await page.screenshot({ path: join(SHOTS, `${name}-3-fight.png`) });
     await steer(page, { ms: 60000 });
     await until(page, () => window.antDraftState().mode === 'end', 'the win card');
@@ -122,6 +122,30 @@ async function runPhone(name) {
     await page.tap('#pause'); assert.equal((await state(page)).paused, true); const t1 = (await state(page)).t; await sleep(300); assert.equal((await state(page)).t, t1, 'time stands still while paused');
     await page.tap('#resume'); await sleep(200); assert.ok((await state(page)).t > t1, 'time runs again');
     await page.close();
+
+    // ---- Run C (tester note #207): first Play asks about the tutorial, the tutorial plays to the end, then level 1, the level list, numbers and bars ----
+    await context.clearCookies(); const fresh = await browser.newContext({ ...device }); page = await fresh.newPage();
+    page.on('pageerror', e => errors.push(`pageerror: ${e.message}`)); page.on('console', m => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
+    await page.goto(`${base}/lab/ant-draft/?seed=3`); await until(page, () => !!window.antDraftState, 'load');
+    await page.tap('#play'); await until(page, () => window.antDraftState().mode === 'ask', 'the first-time question');
+    await page.screenshot({ path: join(SHOTS, `${name}-7-ask.png`) });
+    await page.tap('#askYes'); await until(page, () => window.antDraftState().cur === 0 && window.antDraftState().phase === 'fight', 'the tutorial');
+    await sleep(900); assert.match((await state(page)).tip, /Drag anywhere/); await page.screenshot({ path: join(SHOTS, `${name}-8-tutorial.png`) });
+    for (let i = 0; i < 2; i++) { await steer(page, { ms: 60000 }); await until(page, () => window.antDraftState().mode === 'draft', `tutorial draft ${i + 1}`); await sleep(500); await page.tap('.offer:nth-child(1)'); await until(page, n => window.antDraftState().mode === 'play' && window.antDraftState().wave === n, 'next step', 5000, i + 1); }
+    await steer(page, { ms: 60000 }); await until(page, () => window.antDraftState().mode === 'end', 'the end of the tutorial');
+    assert.equal(await page.textContent('#endTitle'), 'You are ready!'); assert.ok((await state(page)).hitsShown > 5, 'damage numbers were shown');
+    await page.screenshot({ path: join(SHOTS, `${name}-9-ready.png`) });
+    await page.tap('#again'); await until(page, () => window.antDraftState().cur === 1, 'level 1 after the tutorial');
+    await steer(page, { ms: 6000, untilPhase: false }); await page.screenshot({ path: join(SHOTS, `${name}-10-level.png`) });
+    const lvl = await state(page); assert.ok(lvl.peak > 0 && lvl.swarm <= lvl.peak, 'the swarm bar has a full mark');
+    for (let w = 0; w < 3; w++) { await steer(page, { ms: 60000 }); if (w < 2) { await until(page, () => window.antDraftState().mode === 'draft', 'level draft'); await sleep(500); await page.tap('.offer:nth-child(2)'); await until(page, n => window.antDraftState().mode === 'play' && window.antDraftState().wave === n, 'next wave', 5000, w + 1); } }
+    await until(page, () => window.antDraftState().mode === 'end', 'level 1 cleared'); assert.equal(await page.textContent('#again'), 'Next level');
+    await page.screenshot({ path: join(SHOTS, `${name}-11-cleared.png`) });
+    await page.tap('#toMenu'); await page.tap('#toLevels'); await sleep(200);
+    assert.deepEqual(await page.evaluate(() => [document.querySelectorAll('.lv').length, document.querySelectorAll('.lv:not(:disabled)').length]), [50, 2], 'fifty levels, two open');
+    await page.screenshot({ path: join(SHOTS, `${name}-12-levels.png`) });
+    await page.reload(); await until(page, () => !!window.antDraftState, 'reload'); assert.equal((await state(page)).open, 2, 'the open level is kept'); assert.equal(await page.textContent('#play'), 'Level 2');
+    await page.close(); await fresh.close();
     assert.deepEqual(errors, [], 'no page or console errors');
     console.log(`ok   ${name}: menu, hint, win, draft (${draft.map(d => d.id).join(' ')}), loss shows ${chips[0].id}, instant retry, pause; ${out.frames}`);
   } finally { await browser.close(); }

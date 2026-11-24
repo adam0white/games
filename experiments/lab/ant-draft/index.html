@@ -28,6 +28,11 @@
   #pause::before { content: ''; width: 4px; height: 16px; border: solid #3a2a22; border-width: 0 5px; }
   #menuArt { width: 150px; height: 110px; display: block; margin: 0 auto -4px; }
 
+  #levelGrid h3 { margin: .5em 0 .2em; font-size: 1em; }
+  .five { display: flex; gap: 6px; justify-content: center; }
+  .lv { min-width: 0; width: 52px; height: 56px; margin: 0; padding: 0; line-height: 1.1; box-shadow: 0 3px 0 #3a2a22; } .lv small { display: block; font-size: 11px; color: #c0271f; }
+  .lv.now { background: #ffb42a; } .lv:disabled { opacity: .45; box-shadow: none; }
+
   /* The draft: three big cards, icon first. */
   .draftBox { width: min(100% - 20px, 30em); }
   .draftBox h2 { color: #ffe23a; margin-bottom: .4em; }
@@ -68,8 +73,22 @@
   <p class="sub">Guard the queen. Pick a promotion.</p>
   <div class="stats"><span>Best <b id="best">0</b></span><span>Wins <b id="wins">0</b></span></div>
   <p><button id="play" class="main">Play</button></p>
-  <p><button id="daily">Daily run</button><button id="sound1" class="small">Sound: on</button></p>
+  <p><button id="toLevels">Levels</button><button id="learn">How to play</button></p>
+  <p><button id="long">Long run</button><button id="daily">Daily run</button><button id="sound1" class="small">Sound: on</button></p>
   <p id="dailyLine" class="sub"></p>
+</div></div>
+
+<div id="ask" class="screen"><div class="card">
+  <h2>First time?</h2>
+  <p>A short tutorial shows what everything does.</p>
+  <p><button id="askYes" class="main">Tutorial</button></p>
+  <p><button id="askNo">Skip</button></p>
+</div></div>
+
+<div id="levels" class="screen"><div class="card">
+  <h2>Levels</h2>
+  <p><button id="levelsBack">Back</button></p>
+  <div id="levelGrid"></div>
 </div></div>
 
 <div id="draft" class="screen"><div class="draftBox">
@@ -87,11 +106,11 @@
 <div id="end" class="screen"><div class="card">
   <h2 id="endTitle">The nest fell</h2>
   <p class="big" id="endScore">0</p>
-  <div class="stats"><span>Wave <b id="endWave">1</b>/<span id="endWaves">8</span></span><span>Best <b id="best2">0</b></span></div>
+  <div class="stats" id="endStats"><span>Wave <b id="endWave">1</b>/<span id="endWaves">8</span></span><span>Best <b id="best2">0</b></span></div>
   <div id="held"></div>
   <p id="endLine" class="sub"></p>
   <p><button id="again" class="main">Again</button></p>
-  <p><button id="toMenu">Menu</button></p>
+  <p><button id="replay">Play it again</button><button id="toMenu">Menu</button></p>
 </div></div>
 
 <script type="module" src="./main.js"></script>

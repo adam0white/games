@@ -287,8 +287,8 @@ export const labPages = {
     verify: () => { const s = window.antDraftState(); return { best: s.best, runs: s.runs, daily: JSON.parse(localStorage.getItem('ant-draft:save')).daily, wins: JSON.parse(localStorage.getItem('ant-draft:save')).wins }; },
     expect: { best: 120, runs: 3, daily: saves.draft.daily, wins: 2 },
     touch: dragTouch(() => window.antDraftState().rally?.x, n => window.antDraftState().rally.x !== n, [[100, 430], [240, 430]]),
-    hint: { before: () => window.antDraftState().rally.x, moved: n => window.antDraftState().rally.x !== n },
-  }),
+    hint: { start: async page => { await page.click('#play'); if (await page.isVisible('#askNo')) await page.click('#askNo'); }, before: () => window.antDraftState().rally.x, moved: n => window.antDraftState().rally.x !== n },
+  }, { 'ant-draft:tutorial': '1', 'ant-draft:levels': json({ open: 4, stars: { 1: 3, 2: 2, 3: 1 } }) }),
   'lab/ant-draft-b': pageEntry('ant-draft-b:save', saves.draftB, 'ant-draft-b:hint', {
     menu: '#quit', sound: '#sound2',
     state: () => { const s = window.antDraftState?.(); return s && { ...s, screen: s.mode, paused: !!s.paused, t: s.t ?? 0 }; },
