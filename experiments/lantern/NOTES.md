@@ -532,7 +532,6 @@ Checks:
 - Phone-sized screenshots of the menu, a start from floor 4, and the loss card.
 
 Not checked: a real phone; whether three floors is the right cost at high levels, where a floor is about 9 seconds of fast river.
-||||||| parent of 6aade3b6 (Notes: Grapevine understood at once, Follow Me not bad, Lantern keeps own abilities on the endless river (notes #138, #139, #141))
 
 ## 2026-11-23: abilities stay on the endless river (tester t1, note #141)
 
