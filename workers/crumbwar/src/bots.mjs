@@ -2,6 +2,7 @@
 // (VIEW), acts through setInput like a client, and gets no numbers a player lacks. It decides four times a
 // second, on a tick staggered by its id, with a small aim error, so it reacts later and steers worse than a
 // practised person. Bots are marked as bots on the wire and the page labels them.
+import { inGrass } from '../public/crumbwar/shared/modes.js';
 import * as C from '../public/crumbwar/shared/config.js';
 import { byteOf } from '../public/crumbwar/shared/move.js';
 import { addAnt, removeAnt, setInput, antsNear, foodNear } from './sim.mjs';
@@ -11,6 +12,10 @@ const THINK = 5;
 
 export function think(w, a) {
   if (!a.alive || (w.tick + a.id) % THINK) return;
+  if (w.rules.name === 'feast') return feastThink(w, a);
+  if (w.rules.name === 'rush' && a.id%4===2 && !a.carry && a.hp>2) {
+    setInput(w,a,byteOf(Math.atan2(1600-a.y,1600-a.x)+(w.rand()-.5)*.35),Math.hypot(a.x-1600,a.y-1600)>90,false); return;
+  }
   // Two foragers, one raider and one guard per four ids. Roles and passing
   // sides survive respawns; reaction time and aim error stay the same.
   const b = a.brain ??= { role: a.id % 4, side: a.id % 2 ? 1 : -1, retreat: false };
@@ -93,6 +98,13 @@ export function think(w, a) {
 // Makes the bot count match the people in the room. Every colony gets the same number of ants: the larger of
 // MIN_ANTS / 4 and the most people any colony has. Bots leave as people join, and return when they leave.
 export function balance(w) {
+  if (!w.rules.colonies) {
+    const ants=w.ants.filter(Boolean), people=ants.filter(a=>!a.bot).length, bots=ants.filter(a=>a.bot);
+    const want=Math.max(0,w.rules.minAnts-people);
+    while(bots.length>want) removeAnt(w,bots.pop());
+    while(bots.length<want){const a=addAnt(w,0,true,w.rand()*32|0,w.rand()*32|0);if(!a)return;bots.push(a);}
+    return;
+  }
   const people = [0, 0, 0, 0], bots = [[], [], [], []];
   for (const a of w.ants) if (a) (a.bot ? bots[a.colony].push(a) : people[a.colony]++);
   const each = Math.max(MIN_ANTS / C.COLONIES, ...people);
@@ -114,4 +126,21 @@ export function pickColony(w) {
   let best = 0;
   for (let c = 1; c < C.COLONIES; c++) if (people[c] < people[best] || (people[c] === people[best] && w.colonyScore[c] < w.colonyScore[best])) best = c;
   return best;
+}
+
+function feastThink(w,a) {
+  let tx=1600,ty=1600,best=Infinity, danger=null, prey=null;
+  antsNear(w,a.x,a.y,C.VIEW,b=>{
+    if(b===a || w.tick<b.protectUntil) return;
+    const d=Math.hypot(b.x-a.x,b.y-a.y);
+    if(b.mass>=a.mass*w.rules.eatRatio && d<230 && (!danger || d<danger.d)) danger={a:b,d};
+    if(a.mass>=b.mass*w.rules.eatRatio && d<140 && !inGrass(b.x,b.y) && (!prey || d<prey.d)) prey={a:b,d};
+  });
+  foodNear(w,a.x,a.y,C.VIEW,id=>{const d=(w.fx[id]-a.x)**2+(w.fy[id]-a.y)**2;if(d<best){best=d;tx=w.fx[id];ty=w.fy[id];}});
+  if(prey && a.id%4===1){tx=prey.a.x;ty=prey.a.y;}
+  if(danger){tx=a.x+(a.x-danger.a.x)*3;ty=a.y+(a.y-danger.a.y)*3;}
+  const close=Math.hypot(tx-a.x,ty-a.y)<8;
+  // Stable temperaments: hunter, grazer, wanderer, cautious. All use ordinary inputs.
+  const rest=!danger && ((Math.floor(w.tick/20)+a.id)% (a.id%4===2?3:6)===0);
+  setInput(w,a,byteOf(Math.atan2(ty-a.y,tx-a.x)+(w.rand()-.5)*.35),!close&&!rest,!!danger);
 }

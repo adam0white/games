@@ -10,9 +10,10 @@ import { stepMove, angleOf } from './move.js';
 import { writeInput } from './proto.js';
 
 export class Predictor {
-  constructor() {
+  constructor(mode = 'classic') {
+    this.mode = mode;
     this.tick = 0; this.seq = 0; this.sent = -1; this.hist = new Uint16Array(256); this.ringSeq = new Int32Array(256).fill(-1); this.ringTick = new Int32Array(256);
-    this.me = { x: 0, y: 0, heading: 0, stamina: 100, tier: 0, carry: 0, alive: false };
+    this.me = { mode, mass: 10, x: 0, y: 0, heading: 0, stamina: 100, tier: 0, carry: 0, alive: false };
     this.ex = 0; this.ey = 0; // what is left of the last correction, for the page to fade out
     this.cur = 0; this.replayed = 0; this.corrected = 0;
   }
@@ -34,7 +35,7 @@ export class Predictor {
   }
   onSnap(s) {
     const m = this.me, px = m.x, py = m.y, was = m.alive;
-    m.x = s.x; m.y = s.y; m.heading = angleOf(s.heading); m.stamina = s.stamina; m.tier = s.tier; m.carry = s.carry; m.alive = s.alive;
+    m.mass = s.mass ?? 10; m.boost = (s.boostLeft ?? 0) > 0; m.x = s.x; m.y = s.y; m.heading = angleOf(s.heading); m.stamina = s.stamina; m.tier = s.tier; m.carry = s.carry; m.alive = s.alive;
     let n = 0;
     if (s.alive && this.ringSeq[s.ackSeq & 255] === s.ackSeq && s.ackSeq > 0) {
       const from = this.ringTick[s.ackSeq & 255] + s.applied;

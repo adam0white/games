@@ -3,7 +3,7 @@
 // Server to client: WELCOME, SNAP, EVENT, SCORES, PONG. The layout of each is in the function that reads it.
 export const INPUT = 1, PING = 2;
 export const WELCOME = 1, SNAP = 2, EVENT = 3, SCORES = 4, PONG = 5;
-export const M_ABS = 1, M_DELTA = 2, M_HEAD = 4, M_STATE = 8, M_META = 16, M_NAMES = 32;
+export const M_ABS = 1, M_DELTA = 2, M_HEAD = 4, M_STATE = 8, M_META = 16, M_NAMES = 32, M_MASS = 64;
 
 export class Writer {
   constructor(size = 4096) { this.b = new Uint8Array(size); this.v = new DataView(this.b.buffer); this.n = 0; }
@@ -28,6 +28,7 @@ export function writePing(nonce, lastTick) { const w = new Writer(8); return w.u
 export function readWelcome(r) {
   const m = { proto: r.u8(), id: r.u8(), colony: r.u8(), nameA: r.u8(), nameB: r.u8(), tick: r.u32(), token: r.u32().toString(16).padStart(8, '0') + r.u32().toString(16).padStart(8, '0'), room: '' };
   for (let n = r.u8(); n > 0; n--) m.room += String.fromCharCode(r.u8());
+  if (r.n < r.v.byteLength) m.mode = r.u8();
   return m;
 }
 
@@ -50,10 +51,12 @@ export function readSnap(r, ants, food, POS_Q, OWN_Q) {
     if (mask & M_STATE) { const b = r.u8(); a.hp = b & 15; a.carry = b >> 4 & 3; a.tier = b >> 6 & 3; }
     if (mask & M_META) { const b = r.u8(); a.colony = b & 3; a.bot = !!(b & 4); a.prot = !!(b & 8); a.sprint = !!(b & 16); }
     if (mask & M_NAMES) { a.nameA = r.u8(); a.nameB = r.u8(); }
+    if (mask & M_MASS) { a.mass = r.u16() / 4; }
     a.x = a.qx / POS_Q; a.y = a.qy / POS_Q; a.tick = s.tick;
   }
   for (let n = r.u16(); n > 0; n--) { const id = r.u16(); food.set(id, { x: r.u16() / POS_Q, y: r.u16() / POS_Q, kind: r.u8() }); }
   for (let n = r.u16(); n > 0; n--) food.delete(r.u16());
+  if (r.n < r.v.byteLength) { s.mode = r.u8(); s.mass = r.u16()/4; s.rank = r.u8(); s.bestRank = r.u8(); if(s.mode===2) { s.goal=r.u8(); s.goalProgress=r.u16(); s.boostLeft=r.u8(); s.shieldLeft=r.u8(); s.participation=r.u8(); } }
   return s;
 }
 export function readScores(r) {
@@ -61,5 +64,6 @@ export function readScores(r) {
   const t = r.u16(); s.left = t & 0x7fff; s.inBreak = !!(t & 0x8000); s.people = r.u8(); s.ants = r.u8();
   for (let n = r.u8(); n > 0; n--) { const nameA = r.u8(), nameB = r.u8(), f = r.u8(); s.top.push({ nameA, nameB, colony: f & 3, bot: !!(f & 4), you: !!(f & 8), score: r.u16() }); }
   s.rank = r.u8();
+  if (r.n < r.v.byteLength) { s.mode = r.u8(); s.feature = { x: r.u16(), y: r.u16(), kind: r.u8() }; s.bestRank = r.u8(); s.delivered = r.u16(); s.kills = r.u16(); s.deaths = r.u16(); if(s.mode===2) s.awards=[{nameA:r.u8(),nameB:r.u8(),count:r.u8()},{nameA:r.u8(),nameB:r.u8(),count:r.u8()}]; }
   return s;
 }

@@ -312,7 +312,8 @@ Logged 2026-11-24. The gap, burn and rate limit tests used about 250 GB-s of dur
 
 ## Known gaps
 
-- No real play record from Crumbwar has been seen in the lab yet. `crumbwar` was added to `LAB_PROTOTYPES` in human-framework on 2026-11-24 (see "Telemetry").
+- A play record from the live page was accepted by the real lab on 2026-11-24 (two POSTs returned 200 from an agent-marked run). A full round ending with a record, and a record from Feast or Rush, have not been seen.
+- A 240-client, 10 minute live run on 2026-11-24 (`kick1`) closed all 240 sockets as lagging. The test machine was overloaded (its timer lagged up to 6966 ms), so the run says nothing about the room. The earlier unexplained kicks stay unexplained.
 - No lag compensation for bites.
 - No way for friends to share a room.
 - The `room_slow` alert has never been seen to fire, and an alert has not yet been seen to arrive as a GitHub issue (see "Alerts").
@@ -323,3 +324,125 @@ Logged 2026-11-24. The gap, burn and rate limit tests used about 250 GB-s of dur
 - Exercised once by hand over real sockets against `wrangler dev` (2026-11-23), not by an automated test: resume returns the same ant; a 9 byte message, a text message and a 200 message burst each close the socket with 1008; the fifth socket from one address is refused; a client that never pings is removed after 8 to 9 seconds. Never exercised: the idle kick and the 3 retries when a room is full.
 - Under `wrangler dev` only, a socket the room closes from its tick loop stays in the closing state. The page does not depend on the close event: five seconds without a message ends the socket and reconnects.
 - The page was checked in headless Chromium at phone size only (joins through the directory, steers at 150 units a second in the direction dragged, stops on release, no console errors). It has not been checked on a real phone or in WebKit.
+
+## Modes, 2026-11-24
+
+Three modes share one Worker, one simulation loop and one client module. Classic stays at `/crumbwar/`. Feast is at `/crumbwar/feast/`. Rush is at `/crumbwar/rush/`. Each card links to all three. Each mode has an accent colour.
+
+The rules objects live in `public/crumbwar/shared/modes.js`. The server imports them through `src/modes/`. Bots and the page read the same objects. Ant Promotion was read as a reference. Its promotions branch into animal species. Feast instead uses six ant ranks. It keeps visible power comparisons and a clear promotion message.
+
+### Rooms and protocol
+
+Classic keeps `enam-0` and `dir:enam`, and the equivalent names in other regions. Feast uses `feast:enam-0` and `dir:feast:enam`. Rush uses `rush:enam-0` and `dir:rush:enam`. The page still sees `enam-0`. Load-test directories are also separate. Unknown modes are refused before assignment. A room refuses a join for another mode or protocol. A reconnect cannot restore progress from a previous round.
+
+PROTO rose from 1 to 2. The first two WELCOME bytes stay type and protocol. New modes append a mode byte. Snapshots add size and rank data for Feast, and goal and boost data for Rush. Scoreboards add the public event marker and personal results. The fingerprint now includes `shared/modes.js`. The existing reload and stale-room guards remain. Classic's game rules and packet contents remain the same apart from PROTO.
+
+Alerts carry mode in their detail and response. Analytics Engine points append mode as a blob. Hourly totals live in each mode's directory. The metrics and status URLs take `mode=`. No binding changed.
+
+The recorder always calls `lab('crumbwar')`. Start info adds numeric `mode`: 0 Classic, 1 Feast, 2 Rush. The notice must be visible on the card when Play is pressed. A late import cannot arm a record. Summaries and event fields remain numbers. Feast records its six-rank maximum. No room or ant name is recorded.
+
+### Feast rules
+
+| Rule | Number |
+|---|---|
+| Round / break | 240 / 10 seconds |
+| Ant floor | 24, filled by labelled bots |
+| Starting size / cap | 10 / 500 |
+| Crumb / cake growth | 1 / 10 size |
+| Cake eating time | 60 uninterrupted ticks, 3 seconds |
+| Eating ratio | At least 1.25 times the victim's size |
+| Retained size | 60%, with a floor of 10 |
+| Eater's gain | 50% of the size the victim lost |
+| Respawn / protection | 2 / 4 seconds |
+| Walking speed | `190 / (1 + max(0, size - 10) * 0.009)` |
+| Sprint | 1.6 times speed; costs 0.6 size per second, floor 10 |
+| Shrink | 1.5% of size above 16 per second |
+| Cluster / cake schedule | A cluster every 25 seconds; a cake every 50 seconds |
+
+There are no colonies, nests, guard damage, carried food or stamina cost in Feast. Contact from any side can eat. Both ants must be unprotected and outside grass. The victim selects its largest touching predator. All victims retain size before any eater gains size. A three-ant chain therefore has the same result with any ant IDs. Respawn selects the safest of 24 seeded candidate positions against dangerous ants.
+
+Ranks start at sizes 10, 16, 28, 46, 75 and 120: Egg, Worker, Forager, Soldier, Major and Queen. Growth numbers live in the Feast rules object, not in `sim.mjs`. The page shows promotion progress and a promotion message. Queen leaves a crumb every two seconds, at a cost of one size. The other ranks have no extra button or special ability. This keeps the input unchanged.
+
+Grass patches are marked and hatched. They reject all food, including trails. Fresh clusters and cake have a map mark and an off-screen arrow. Ant outlines also use symbols: `+` for edible, `!` for danger, `=` for a similar size, and a diamond for safety. Symbols work without colour. Other ants' sizes use integer precision to reduce traffic. Own size uses quarter units on the wire. The outline comparison is conservative about that quantization: it understates edible targets and overstates possible danger near a threshold.
+
+Bots use the same vision square and four decisions per second. Their stable temperaments alter pursuit and rest. They flee dangerous ants and one temperament hunts nearby edible ants. They use the same movement and eating rules as people. During the break, movement, growth, eating and respawns freeze. The top five and personal best rank stay visible. The next round resets size and rank.
+
+### Rush rules
+
+Rush keeps four colonies, nests, carrying, directional bites, growth and stamina. A round lasts 120 seconds, then an 8-second frozen break. Starter crumbs appear near each nest every four seconds. A new arrival can deliver before crossing the field.
+
+Four features were selected. Heavy carrying, beetles and nest theft were left out.
+
+| Feature | Rule |
+|---|---|
+| Golden crumb | One scheduled every 20 seconds. Worth 5 at home. Has a public map mark. Ordinary random sugar does not spawn in Rush. |
+| Seeds | Eight every 12 seconds. Half give 1.3 times speed; half block damage. Both last 6 seconds. They consume no carry slot and give one personal point. |
+| Hill | Centre `(1600,1600)`, radius 140. A unique colony majority earns 2 every 4 seconds. Each ant of that colony inside also earns 2. A tie pays nothing. |
+| Frenzy | The final 20 seconds double deliveries, seeds, hill payments, kills and goal rewards. The HUD changes. No audio was added. |
+
+Golden and seed positions use a separate stream derived from room seed, round number and scheduled time. Bot noise and input do not choose their positions. A reset starts scheduled events at age one, not twice at ages zero and one.
+
+People cycle through four goals: deliver three loads; stand on the hill for five cumulative seconds; grab a golden crumb; bite an enemy carrier. Each pays 5 personal and colony points, doubled in frenzy. A goal with no progress for 30 seconds (`goalSkipSeconds`) moves to the next goal without a reward. Bots get no goal rewards. Their existing colony roles remain; one role holds the hill. They still use the same vision and decision cadence. The break shows the winning colony, food points delivered, kills and deaths. Awards name the most deliveries and most kills. Delivery totals survive a death. The next round starts by itself.
+
+### Acceptance and evidence
+
+Behavior targets were fixed in `loadtest/bots.mjs`: first growth within 10 seconds, first score within 15 seconds, at most two deaths per minute, and another ant on screen for at least 70% of sampled seconds. Feast also needs top half by 120 seconds and at least one leader change. Rush needs at least three participation kinds and colony score CV at most 0.4. These are synthetic gates. They do not establish enjoyment.
+
+The controller takes the nearest visible food and goes home with a load. In Feast it retreats from a visibly larger ant within 180 units. It stops on a cake to chew. In Rush it follows its hill and golden goals. It uses no combat policy or sprint. It has the same vision and four-Hz cadence as bots. A food-only Feast comparison failed the gentleness target in one 12-person seed: 3.25 deaths per minute. That result is retained as a negative comparison. Reading the visible danger mark matters.
+
+Measurements use pinned Node 26.12.0, seeds 1, 7 and 42, and both one and twelve people. Bots warm for ten seconds before people join, as in `Room.fresh`. The observation then covers the rest of that round: Classic 350 seconds, Feast 230, Rush 110. Times below start at the join. The screen is 390 by 844, with the page's 1100-unit long axis. Dead seconds count as no encounter. Leader changes mean changes in the highest-size living ant's ID. Rush participation kinds are delivery, golden pickup, seed pickup, hill presence and a frenzy payout.
+
+| Mode | First score or growth | Deaths per minute | Seconds with another ant on screen | Mode-specific result |
+|---|---|---|---|---|
+| Classic | 0.75–10.6 s | 0–1.029 | 93.7–100% | All six behavior cases pass |
+| Feast | 0.2–0.55 s | 0 | 100% | Top half in 2–97 s; 3–22 leader changes; Queen reached |
+| Rush | 1.95–3.75 s | 0 | 100% | 4–5 participation kinds; colony CV 0.015–0.106; score range 8–43 |
+
+The local benchmark includes decisions, simulation, per-client snapshots, scoreboards and correctly targeted event notices. It runs 200 warmup ticks and 3000 measured ticks. Twelve people must stay below 1200 bytes per client per second. Sixty must stay below 1800. The full tick at 240 ants must average below 1 ms. The benchmark drives its scripted people with the bot brain, so it also charges those decisions to the tick. It includes no sockets or actual send cost. Raw results are stored under `loadtest/results/`. The final CPU check uses three fresh Node processes per mode, each with the same workload. Mode order is counterbalanced. The table reports the pooled mean of all 9000 measured ticks, plus the median and range of the three per-run means. Every run is retained. `loadtest/repeat-bench.mjs` reproduces that recipe. `--assert-targets` fails on a missed byte target or pooled mean tick target.
+
+| Mode | Bytes/client/s, 12 people | Bytes/client/s, 60 people | Mean tick, 240 ants | Median / range of run means |
+|---|---:|---:|---:|---|
+| Classic | 1040.2 | 1522.9 | 0.820 ms | 0.836 / 0.747–0.877 ms |
+| Feast | 1147.4 | 1679.0 | 0.921 ms | 0.922 / 0.896–0.946 ms |
+| Rush | 952.5 | 1355.5 | **1.085 ms: fails** | 1.087 / 1.027–1.142 ms |
+
+All byte targets pass. Rush misses the 240-ant CPU target by 8.5%. This is an unresolved acceptance failure. Rush is implemented and linked, but it does not meet every requested gate.
+
+An optional ally-count optimization matched 460800 command tuples and world hashes in twelve seeded cases. A subsequent benchmark was aborted after nine rows during severe host slowdown: Rush measured 103.311 ms elapsed per tick versus 3.327 ms process CPU. A final test rerun also reached its 120-second limit without results. The optional optimization was reverted. The delivered bot code matches the completed benchmark and the completed 65-test suite. No performance pass is inferred from the interrupted runs.
+
+The completed pinned-Node test output is retained in `loadtest/results/modes-tests-2026-11-24.txt`: 65 tests, 65 pass, zero fail. That file predates the browser pass below, which added one test. The original Classic tests remain unchanged except for the protocol fingerprint. Tests cover mode isolation, protocol refusal, deterministic events, Feast predation and recovery, safety, ranks and breaks, Rush features and goals, packet deltas and snapshot cadence.
+
+Rush sends snapshots at 5 Hz above 120 ants. Every other case stays at 10 Hz. Simulation and input stay at 20 Hz. Interest bounds stay unchanged. The page interpolates crowded Rush ants 250 ms behind server time instead of 150 ms. The normal 60-person room does not enter this lane. This is a visible density tradeoff. It has not been seen in a browser. Before that change, the full 240-ant Rush benchmark averaged 1.527 ms even after direct view lookup and cached awards. The original Classic benchmark on the same machine also missed 1 ms in one comparison, so old recorded timing was not accepted as current evidence.
+
+Serialization now quantizes an ant once per tick, uses direct ID lookup with an ordered known-ant list, and caches Rush awards once per scoreboard tick. Food searches use the entry square; known food keeps the existing larger exit square. Reference comparisons preserved 3000 observer snapshot packets byte for byte across all three modes. Interest management and game rules did not change for these optimizations.
+
+### Browser pass, 2026-11-24
+
+The pages were played in headless Chromium through `wrangler dev`. A script played like a person: in Feast it ate crumbs, fled bigger ants, hid in grass and chased smaller ants; in Rush it carried food home, went for the golden crumb and seeds, and stood on the hill. Screenshots were taken every 6 to 8 seconds and at each promotion, eat and death. Requests to the lab host were answered locally, so nothing was recorded.
+
+Seen:
+
+- All three cards at 360×640, 390×844 and 1280×800: no clipped text, no scrolling, the recording notice and switch visible, mode links 46 px tall, the switch 44 px, each mode in its own accent.
+- Feast, full rounds at 360×640: promotion text with a ring, the eat burst, "+N" floats, the edge arrow to cake and fresh crumbs, the death message ("Eaten by X / Back in 2 as Worker · size 25"), the results panel, and the next round starting by itself.
+- Rush, full rounds at 360×640 and 390×844: the goal line under the score lists, event messages, the frenzy frame and clock, the last-ten-seconds countdown, the results panel with awards and counts, and the next round starting by itself.
+- Classic, 20 to 25 seconds at both phone sizes: no visible change apart from the shared page fixes.
+- No HUD element overlapped another in the final runs.
+
+Changed after looking:
+
+- Feast growth was too fast. A food-only player passed all six ranks within 20 to 35 seconds, and 18 to 19 of 23 bots ended as Queen. Growth now comes from the rules object: crumb 1 (was 2), cake 10 (was 14), shrink 1.5% (was 1%), eater's gain 50% (was 25%), ranks at 10, 16, 28, 46, 75 and 120. In headless traces most bots now end as Major and 0 to 5 as Queen. In the browser the scripted player reached Major once and Soldier once in four minutes.
+- Rush goals could stall. In one round "Hold hill 5 seconds" stayed from second 6 to the end. A goal with no progress for 30 seconds now moves on without a reward. The page says "New goal · …".
+- Awards now carry their count on the wire ("Most deliveries · name · 27"). `shared/proto.js`, `net.mjs` and `shared/modes.js` changed. PROTO stays 2 because PROTO 2 was never deployed. The fingerprint is `8b9e99349784bddd`.
+- Page effects, with no inline script or style: a pop on each new message, a ring on promotion and on goal completion, a burst on eating, "+N" floats that fly to the bottom left, a hill pulse, event messages (golden crumb, seeds, frenzy, cake, fresh crumbs), an edge arrow with a short label, a growing clock in the last ten seconds, a pulsing frame in the frenzy, and a results panel in the break.
+- Layout: the hill, grass, seed and golden-crumb labels are at least 12 CSS px; names are not drawn under the top HUD or over the own line at the bottom left; the top five has a dim backing; the frenzy clock stays clear of the lists on a 360 px screen.
+
+Tried and reverted: a Feast bot brain that sprints for 1.5 seconds and then walks for 3, so a person can catch a marked ant. A scripted hunter then ate 2 to 8 ants per round instead of 0 or 1. It raised Feast traffic to 1268.6 and 2161.5 bytes per client per second, over both byte targets. No tested variant passed at 60 people. The original brain stays. Its traffic with the new growth rules is 1157.8 and 1772.7.
+
+Measured after the changes, pinned Node 26.12.0:
+
+- `node --test test/`: 66 tests, 66 pass (Node 26.13.1).
+- `loadtest/bots.mjs`: 17 of 18 cases pass. Feast with 12 people, seed 42, reaches the top half at 155 seconds against a 120-second target. With the old growth rules in the same code that case never reached the top half.
+- Bytes per client per second are unchanged for Classic and Rush (1040.2 / 1522.9 and 954.5 / 1357.5).
+- CPU is inconclusive. The host load average was 8 to 104. Classic at 240 ants measured 1.02 to 1.91 ms against the recorded 0.82. Rush at 240 ants measured 1.02 ms at best. A profile puts 34% of Rush time in snapshot building, 14% in `antsNear` and 13% in bot decisions. No optimization was made.
+
+Still unverified: a real phone, touch input (the script used the mouse and the Space key), WebKit and Safari, safe areas on a notched phone, real people's difficulty and enjoyment, the live Cloudflare integration, and Rush CPU on a quiet host. `/notes/button.js` returns 404 under `wrangler dev` because another worker serves it.
