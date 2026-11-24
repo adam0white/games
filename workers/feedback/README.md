@@ -60,6 +60,7 @@ Each note carries the game the tester chose and a build id: the first ten hex di
 - It does not run while the Mac sleeps or is off.
 - It needs the command-line `claude` on that Mac to be signed in. When it is signed out the log says so and the note waits.
 - A run that fails is tried three times, then the note waits for a person.
+- Each run works in its own clone under `work/`. A run that ends well removes its clone, unless the clone holds uncommitted files, a stash, a linked worktree or a commit that is not on GitHub. A kept clone, or one from a failed run, is removed after two days.
 - When it cannot start Claude, or gives up on a note, it shows one macOS notification. It prepares the run's clone itself and stops if `gh` is not signed in as the repository's account.
 - The launch agent is `~/Library/LaunchAgents/work.adamwhite.games-feedback-watch.plist`; it is not in this repository. It runs `check.sh` from its own checkout at `~/Library/Application Support/games-feedback/watcher`, which nothing updates automatically: a run can merge to `main`, so the prompt it runs under must not change by itself. Update it by hand with `git -C <that checkout> pull` after reviewing a change to `watch/`. Stop it with `launchctl bootout gui/$(id -u)/work.adamwhite.games-feedback-watch`.
 
