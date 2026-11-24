@@ -59,8 +59,8 @@ export function cluster(g, ps, time, o) {
   for (let i = -2; i <= 2; i++) { const lean = Math.sin(time / 1900 + rx / 90 + i) * 2; g.beginPath(); g.moveTo(rx + i * 3, ry); g.quadraticCurveTo(rx + i * 4, ry - 5, rx + i * 5.5 + lean, ry - 7 - (2 - Math.abs(i)) * 2); g.stroke(); }
   const drawn = [...ps].sort((a, b) => a.y - b.y);
   for (const p of drawn) {
-    const key = p.day + ':' + p.index; if (!born.has(key)) born.set(key, frames > 20 && time ? time : -1e9);
-    const age = Math.max(0, Math.min(1, (time - born.get(key)) / 1400)), grow = 1 - (1 - age) ** 3;
+    const key = p.day + ':' + p.index; if (!born.has(key)) born.set(key, o.today && frames > 20 && time ? time : -1e9); // only a flower given just now grows in
+    const since = time - born.get(key), age = since < 0 ? 1 : Math.min(1, since / 1400), grow = 1 - (1 - age) ** 3;
     const [shape, hue, sat, li, rel] = SPECIES[KIND[p.k] || p.k] || SPECIES.spark;
     const s = p.size * 3.9 * rel * depth * (o.today ? 1.12 : 1) * (0.25 + 0.75 * grow), wind = Math.sin(time / 1900 + p.x / 90) * 0.11 + Math.sin(time / 700 + p.phase) * 0.03;
     const tall = ['wheat', 'spike', 'sprig', 'tulip'].includes(shape), hx = rx + (p.x - rx) * grow + wind * 14, hy = ry + (p.y - ry) * grow, bend = rx + (hx - rx) * 0.15;
