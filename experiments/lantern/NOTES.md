@@ -562,7 +562,9 @@ The notes, in short: a switch between 2D, today's look, and a new improved 3D; a
 
 Lab's own additions, easy to remove (experiment): the moon and stars in first person, and the view turning with the river.
 
-Checks: phone-sized Chromium screenshots of 3D and first person on nights 1 and 12 and in the tower, a crash in each, no page errors. New phone-check lines: a failed 3D load stays 2D and says so, the saved view, a drag steers 3D, a press steers first person both ways, a sliding press does not change side, and the pause card's switch. Not checked: a real phone's frame rate and heat; whether a person can play first person at high nights; sound.
+Checks: phone-sized Chromium screenshots of 3D and first person on nights 1 and 12 and in the tower, a crash in each, no page errors. New phone-check lines: a failed 3D load stays 2D and says so, the saved view, a drag steers 3D, a press steers first person both ways, a sliding press does not change side, and the pause card's switch. The menu with every line and button on it overflowed an iPhone 13 size screen with the new row (it did not scroll); it is now tighter, fits there, and scrolls on an iPhone SE size.
+
+Not checked: a real phone's frame rate and heat; whether a person can play first person at high nights; sound.
 
 ### Left as a proposal (2026-11-23)
 - Boat models per skin in 3D; a separate first-person leaderboard if it proves harder.

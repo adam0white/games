@@ -9,6 +9,7 @@
   html, body { margin: 0; height: 100%; background: #05080f; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   body { font: 16px/1.5 Georgia, 'Times New Roman', serif; color: #f3e6cf; }
   canvas { display: block; width: 100vw; height: 100dvh; } #c3 { position: fixed; inset: 0; } #c3[hidden] { display: none; } #c { position: relative; }
+  #menu > div { max-height: 100dvh; box-sizing: border-box; overflow-y: auto; touch-action: pan-y; } #menu p { margin: .2em 0; } #menu button:not(.small) { margin: .15em; min-height: 42px; padding: .35em 1em; } #menu h1 { font-size: 2.2em; margin: 0; } /* a full menu fits a phone, and scrolls on the smallest */
   #views button { min-width: 0; min-height: 40px; margin: .15em; font-size: .9em; } #views button.on { color: #2a1606; background: #ffb45a; border-color: #ffb45a; }
   .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; pointer-events: none; }
   .screen.on { display: grid; }
