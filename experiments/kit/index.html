@@ -17,6 +17,8 @@
 <p>Shared code for the games under <code>/</code>. This page runs each module in your browser.</p>
 <ul id="out"></ul>
 <p><button id="beep">Play a sound</button> <span id="heard"></span></p>
+<p>Music (<code>music.js</code>): <select id="preset"><option>lantern</option><option>river</option><option>bell</option><option>flute</option></select>
+<button id="song">Start</button> <button id="pick">Take an ember</button> <button id="blow">A blow</button> <span id="songsays"></span></p>
 <div id="a" class="card">card a</div><div id="b" class="card">card b</div>
 <div id="labbox"></div>
 <div id="pad" style="width:300px;height:60px"></div>
@@ -31,6 +33,7 @@ import { stick } from './stick.js';
 import { drag } from './drag.js';
 import { hint } from './hint.js';
 import { table, newCode, cleanCode, linkFor, codeFromLink } from './room.js';
+import { music, PRESETS, NIGHT, DAWN, tune, ladder } from './music.js';
 
 const results = [], out = document.getElementById('out');
 function check(name, fn) {
@@ -66,6 +69,48 @@ enabled = true;
 check('audio: unlock makes one context and runs setup once', () => { const a = snd.unlock(), b = snd.unlock(); snd.tone(440, 0.01, 0.0001); snd.noise(0.01, 0.0001); return !!a && a === b && built === 1; });
 check('audio: hold and release do not throw', () => { snd.hold(); snd.release(); return true; });
 document.getElementById('beep').addEventListener('click', () => { snd.unlock(); snd.tone(523.25, 0.4, 0.15, 'triangle'); snd.noise(0.15, 0.1); document.getElementById('heard').textContent = `Context is ${snd.ctx?.state}. You should have heard a note and a crunch.`; });
+
+// music.js: on a clock this page drives (as the audio clock runs, stops for a pause, and jumps for a slow tab), then rendered offline for loudness.
+{
+  const Off = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const drive = (ac, preset, plan) => {
+    let clock = 0, run = true; const song = music(ac, { preset, timer: false, now: () => clock, running: () => run, log: 1e5 }); song.volume(1); song.start(42);
+    const got = [];
+    for (let i = 0; i < plan.len * 10; i++) { const t = i / 10, q = plan.at(t); run = !q.paused; if (run) clock += q.jump ? q.jump : 0.1; song.set(q); song.pump(); if (q.ember) got.push([clock, song.ember(), q.progress, t]); if (q.hit) { song.hit(); got.streakAfterHit = song.melody.streak; } }
+    return { song, got };
+  };
+  const probe = new Off(1, 4410, 44100), timing = drive(probe, 'lantern', { len: 20, at: t => ({ on: t > 0.5, progress: t / 20, danger: 0.5, light: 0.5, paused: t >= 6 && t < 8, jump: t === 12 ? 2 : 0, ember: t > 1 && Math.round(t * 10) % 7 === 0, hit: t === 15 }) });
+  const steps = timing.song.log.filter(l => ['pad', 'bass', 'walk', 'pulse', 'high', 'arp'].includes(l.kind)), STEP = timing.song.STEP;
+  const anchor = l => l.at - l.step * STEP, groups = [...new Set(steps.map(l => anchor(l).toFixed(6)))];
+  const first = steps.filter(l => anchor(l).toFixed(6) === groups[0]);
+  check('music: every note is on the eighth-note clock, the same clock before and after a pause', () => groups.length === 2 && first.some(l => l.at < 5.9) && first.some(l => l.at > 6.5));
+  check('music: after a slow tab the clock goes on from now instead of catching up', () => steps.filter(l => anchor(l).toFixed(6) === groups[1]).every(l => l.at > 12));
+  const notes = timing.got.filter(([, n]) => n);
+  check('music: a pickup plays the next note of the tune on the next sixteenth, 30 to 240 ms later, inside its chord', () => notes.length > 10 && notes.every(([t, n, p, planT], i) => {
+    const a = Number(groups[planT > 12 ? 1 : 0]), grid = (n.at - a) / (STEP / 2), c = (n.step >> 4) & 3;
+    return Math.abs(grid - Math.round(grid)) < 1e-4 && n.at - t >= 0.03 - 1e-9 && n.at - t <= 0.24 && n.midi === ladder((p > 0.86 ? DAWN : NIGHT)[c], tune(42)[n.index % 16]) && n.index === i; }));
+  check('music: a blow thins the music for two bars', () => { const b = timing.song.log.find(l => l.kind === 'bare'), r = timing.song.log.find(l => l.kind === 'back'); return !!b && !!r && (r.at - b.at) / STEP >= 16 - 1e-6 && (r.at - b.at) / STEP <= 18 + 1e-6 && timing.got.streakAfterHit === 0; });
+  check('music: a pickup while the song is off plays nothing and still counts', () => { const s2 = music(new Off(1, 441, 44100), { timer: false, now: () => 1, running: () => true }); s2.start(1); return s2.ember() === null && s2.melody.played === 1; });
+  // Loudness, the worst case for each preset: full danger, the ending, a nearly-out light, a pickup every 0.2 s (harmony and arpeggio on), a blow.
+  window.kitMusic = {};
+  for (const preset of Object.keys(PRESETS)) {
+    const ac = new Off(1, 44100 * 14, 44100);
+    drive(ac, preset, { len: 13, at: t => ({ on: true, progress: Math.min(1, t / 10), danger: 1, light: 0.2, ember: t > 1 && Math.round(t * 10) % 2 === 0, hit: t === 9 }) });
+    const d = (await ac.startRendering()).getChannelData(0); let peak = 0; for (const v of d) peak = Math.max(peak, Math.abs(v));
+    window.kitMusic[preset] = +peak.toFixed(3);
+    check(`music: the ${preset} preset at its loudest stays well under clipping`, () => peak > 0.02 && peak < 0.6);
+  }
+}
+let tuneNow = null, liveCtx = null;
+document.getElementById('song').addEventListener('click', () => {
+  liveCtx ??= new (window.AudioContext || window.webkitAudioContext)(); liveCtx.resume();
+  if (tuneNow) { tuneNow.set({ on: false }); tuneNow.stop(); tuneNow = null; document.getElementById('song').textContent = 'Start'; return; }
+  tuneNow = music(liveCtx, { preset: document.getElementById('preset').value }); tuneNow.start(Date.now() & 0xffff); const t0 = liveCtx.currentTime;
+  const frame = () => { if (!tuneNow) return; const p = Math.min(1, (liveCtx.currentTime - t0) / 90); tuneNow.set({ on: true, progress: p, danger: 0, light: 1 }); document.getElementById('songsays').textContent = `${Math.round(p * 100)}% of the way; streak ${tuneNow.melody.streak}${tuneNow.bare ? ', thinned' : ''}`; requestAnimationFrame(frame); };
+  frame(); document.getElementById('song').textContent = 'Stop';
+});
+document.getElementById('pick').addEventListener('click', () => tuneNow?.ember());
+document.getElementById('blow').addEventListener('click', () => tuneNow?.hit());
 
 // stick.js and drag.js, with pointer events made here.
 const pad = document.getElementById('pad');
