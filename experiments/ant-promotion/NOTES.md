@@ -494,3 +494,23 @@ Powers are mostly an escape, so they cut deaths, most in Wild. Wild sneaky now r
 - Other animals do not use powers.
 
 "The same game without the button" was checked directly: main's `sim.js` and this one, fed the same scripted steering for 4 simulated minutes, 24 runs (Classic and Wild, each pick, 4 seeds), end in the identical state. The earlier table's "classic fast 13 / 3" prints 13 / 4 on this machine today; that difference is not from this change.
+
+### 2026-11-24, later: what a skill does, and when to use it
+- Three seconds after a promotion the page says what the new skill does in one line ("Hard shell: nothing can bite you"). Before this the button only showed a name.
+- The button pulses when the skill would help now: a stronger animal has noticed you within 170 units (roar: two weaker animals in reach). With reduced motion it shows a still ring.
+- Checked in WebKit iPhone 13 after a real promotion: the line appears, and the button gets the pulse when a Dog that has noticed the player is 120 units away.
+
+### Wild with skills: measured, not tuned
+Wild, careful bot with skills, 6 seeds, 12 minutes, median top level / median deaths:
+
+| | sneaky | strong | fast |
+|---|---|---|---|
+| no skills | 12 / 4 | 6 / 2 | 11 / 10 |
+| all skills | 18 / 1 | 7 / 1 | 11 / 7 |
+| without roar | 16 / 0 | 7 / 1 | |
+| roar only | 12 / 6 | | |
+| without sting / shell / dive / leap | 17 / 2, 18 / 1, 16 / 2, 17 / 1 | | |
+| every wait twice as long | 17 / 2 | | 11 / 7 |
+| every wait three times as long | 14 / 2 | | 10 / 7 |
+
+No single kind carries it, and longer waits barely move it: the bot uses a skill only about 10 times a run, each at the exact moment it is noticed, and each use is a death avoided. Seeds differ a lot (top level 10 to 18 in one row). The numbers were left as they are until a person has played: a bot's reactions are not a person's, and six seeds cannot separate these rows.

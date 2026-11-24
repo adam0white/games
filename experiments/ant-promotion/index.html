@@ -48,6 +48,9 @@
   #pause { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); width: 46px; height: 46px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; font-weight: bold; }
   #power { position: fixed; right: calc(18px + env(safe-area-inset-right)); bottom: calc(26px + env(safe-area-inset-bottom)); width: 92px; height: 92px; min-width: 0; min-height: 0; margin: 0; padding: 4px; border-radius: 50%; display: none; font-weight: bold; font-size: 14px; line-height: 1.1; border: 3px solid #fff8e6; color: #1d1a14; touch-action: none; }
   #power.wait { color: #fff8e6; border-color: #ffffff66; }
+  #power.now { animation: powerNow 0.5s ease-in-out infinite alternate; }
+  @keyframes powerNow { to { transform: scale(1.12); box-shadow: 0 0 0 8px #ffd23a55; } }
+  @media (prefers-reduced-motion: reduce) { #power.now { animation: none; box-shadow: 0 0 0 8px #ffd23a55; } }
   #power small { display: block; font-size: 11px; font-weight: normal; }
   #say { position: fixed; left: 0; right: 0; top: 22%; text-align: center; font-size: 22px; font-weight: bold; pointer-events: none; opacity: 0; transition: opacity .3s; text-shadow: 0 2px 6px #000; padding: 0 1em; }
   #say.on { opacity: 1; }
@@ -332,7 +335,7 @@ function offer() {
     const k = s.player.stack.filter(id => FORMS[id].role === F.role).length; // earlier picks of this kind make this one better
     if (k && F.role === 'runner') b.append(Object.assign(document.createElement('small'), { textContent: `Fast again: +${Math.round((fastBoost(k + 1) - 1) * 100)}% speed`, style: 'color:#8dff8a' }));
     if (k && F.role === 'sneak') b.append(Object.assign(document.createElement('small'), { textContent: `Sneaky again: ${Math.round((1 - SAME_SNEAK ** k) * 100)}% harder to see`, style: 'color:#8dff8a' }));
-    b.onclick = () => { if (!s.choosing) return; choose(s, i); save.stack = s.player.stack.slice(); save.xp = 0; keepNem(); const fresh = !save.seen.includes(F.id); saw(save.stack); store(); blip(520, 0.3, 'triangle', 0.14, 500); blip(660, 0.9, 'sine', 0.1, 1400); beam = 1; beamColour = bright(F.e) ? F.e : bright(F.c) ? F.c : '#ffe27a'; buzz([20, 30, 60]); hud(); show('play'); say(fresh ? `New in your book: ${F.name}` : `You are ${article(F.name)} now`); };
+    b.onclick = () => { if (!s.choosing) return; choose(s, i); skillTip = powerFor(F) ? 3 : 0; save.stack = s.player.stack.slice(); save.xp = 0; keepNem(); const fresh = !save.seen.includes(F.id); saw(save.stack); store(); blip(520, 0.3, 'triangle', 0.14, 500); blip(660, 0.9, 'sine', 0.1, 1400); beam = 1; beamColour = bright(F.e) ? F.e : bright(F.c) ? F.c : '#ffe27a'; buzz([20, 30, 60]); hud(); show('play'); say(fresh ? `New in your book: ${F.name}` : `You are ${article(F.name)} now`); };
     box.append(b);
   });
   show('evolve');
@@ -405,11 +408,20 @@ addEventListener('contextmenu', e => e.preventDefault());
 let wantPower = false, powerShown = '';
 $('power').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (mode === 'play') wantPower = true; });
 addEventListener('keydown', e => { if (e.key === ' ' && mode === 'play') { wantPower = true; e.preventDefault(); } });
+// What each kind of skill does, said once after a promotion. The button pulses when the skill would help right now.
+const SKILL_DOES = { sting: 'stops the nearest animal', leap: 'a long jump, safe in the air', shell: 'nothing can bite you', roar: 'stops weaker animals near you', dive: 'fast, and nothing sees you', sprint: 'a burst of speed' };
+let skillTip = 0;
+function powerHelps(W) {
+  const p = s.player, F = me(s); let prey = 0;
+  for (const m of s.mobs) { const d = Math.hypot(m.x - p.x, m.y - p.y), pw = powerOf(m); if (W.kind !== 'roar' && pw > F.power && m.alert && d < 170) return true; if (pw < F.power && d < W.reach) prey++; }
+  return W.kind === 'roar' && prey >= 2;
+}
 function powerButton() { // once a frame while playing
   const b = $('power'), W = s && powerFor(me(s));
   if (!W || mode !== 'play') { b.style.display = 'none'; powerShown = ''; return; }
   const cd = Math.max(0, s.player.cd || 0), key = W.label + (cd > 0 ? Math.ceil(cd) : '');
   b.style.background = cd > 0 ? `conic-gradient(#ffd23a ${(1 - cd / W.cd) * 360}deg, #00000088 0)` : '#ffd23a';
+  b.classList.toggle('now', cd <= 0 && powerHelps(W)); if (skillTip > 0 && (skillTip -= 1 / 60) <= 0) say(`${W.label}: ${SKILL_DOES[W.kind]}`);
   if (key === powerShown) return; powerShown = key;
   b.style.display = 'block'; b.classList.toggle('wait', cd > 0); $('powerName').textContent = W.label; $('powerWait').textContent = cd > 0 ? Math.ceil(cd) + ' s' : 'ready';
 }
