@@ -1,5 +1,5 @@
 // Every Worker that runs code keeps logs, traces and Issues on (workers/OBSERVABILITY.md).
-// A Worker with a written privacy reason is listed in EXCEPTIONS with what it may leave off.
+// EXCEPTIONS is for a Worker the owner excuses; it is empty.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -9,11 +9,8 @@ import { observability } from '../worker-settings.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 // Worker name -> why its request logs and traces stay off. Issues must still be on unless `issues: false`.
-// Changing an entry is an owner decision: these Workers promise players or testers that requests are not logged.
-export const EXCEPTIONS = {
-  'games-feedback': { reason: 'note text, tokens and tester ids never reach logs (workers/feedback)', issues: false },
-  'games-lab-ai': { reason: 'no request logging (workers/lab-ai README)', issues: false },
-};
+// Empty since 2026-11-24: the owner chose everything on for every Worker. Adding an entry is an owner decision.
+export const EXCEPTIONS = {};
 
 /** Strips comments and trailing commas outside strings, then parses. */
 export function parseJsonc(text) {

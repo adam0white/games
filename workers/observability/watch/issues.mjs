@@ -43,14 +43,17 @@ export function select(issues, names) {
 
 export function cf(args) {
   // Run outside the checkout: cf loads a cloudflare.config.ts it finds in the working directory.
+  // The timeout is long because cf takes about 40 seconds to start under launchd's background priority (measured 2026-11-24).
   const out = execFileSync(process.env.CF_BIN || 'cf', [...args, '--quiet'], {
-    cwd: tmpdir(), encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe'],
+    cwd: tmpdir(), encoding: 'utf8', timeout: 240_000, stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: ACCOUNT },
   });
   return JSON.parse(out.slice(out.search(/[[{]/)));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  // One short line for the log instead of a stack.
+  process.on('uncaughtException', error => { console.error(`${error.code ?? error.name}: ${String(error.message).split('\n')[0]}`); process.exit(1); });
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   const issues = [];
   for (let page = 1; page <= 10; page++) {
