@@ -11,7 +11,7 @@
   const STRINGS = {
     tr: {
       title: 'Oyun notları',
-      game: 'Hangi oyun?', general: 'Genel / başka bir şey', placeholder: 'Yaz ya da 🎤 ile söyle…',
+      game: 'Hangi oyun?', general: 'Genel / başka bir şey', placeholder: 'Notunu yaz…',
       send: 'Gönder', mic: '🎤', games: 'Oyunlar', fresh: 'yeni', lab: 'Deneyler', stop: 'Bitir ve gönder', cancel: 'Vazgeç',
       earlier: 'Önceki mesajlar', empty: 'Henüz not yok. İlk notunu gönder!', sending: 'Gönderiliyor…', working: 'Ses yazıya çevriliyor…',
       voice: 'Sesli not', failedVoice: 'Sesli not alındı, ama yazıya çevrilemedi. Kaydın bizde, tekrar deneyeceğiz.',
@@ -19,11 +19,11 @@
       noKey: 'Bu sayfa özel bir bağlantıyla açılır. Sana gönderilen bağlantıyı kullan.',
       badKey: 'Bağlantı geçerli değil. Yeni bir bağlantı iste.', limit: 'Bugünlük not sınırına ulaşıldı. Yarın tekrar dene.',
       noMic: 'Mikrofon açılamadı. Tarayıcıya mikrofon izni ver ya da yazarak gönder.', original: 'İngilizce aslı', heard: 'Anladığımız',
-      question: 'Sana bir sorumuz var', open: 'Oyunu aç ▶', answer: 'Yazarak ya da sesle cevapla', answering: 'Cevaplanan soru', answered: 'Cevaplandı ✓', to: 'Soruya cevap',
+      question: 'Sana bir sorumuz var', open: 'Oyunu aç ▶', answer: 'Yazarak cevapla', answering: 'Cevaplanan soru', answered: 'Cevaplandı ✓', to: 'Soruya cevap',
     },
     en: {
       title: 'Game notes',
-      game: 'Which game?', general: 'General / something else', placeholder: 'Type, or say it with 🎤…',
+      game: 'Which game?', general: 'General / something else', placeholder: 'Write a note…',
       send: 'Send', mic: '🎤', games: 'Games', fresh: 'new', lab: 'Lab experiments', stop: 'Stop and send', cancel: 'Cancel',
       earlier: 'Earlier messages', empty: 'No notes yet. Send the first one!', sending: 'Sending…', working: 'Turning speech into text…',
       voice: 'Voice note', failedVoice: 'Voice note received, but we could not turn it into text. We kept the recording and will retry.',
@@ -31,7 +31,7 @@
       noKey: 'This page opens with a private link. Use the link that was sent to you.',
       badKey: 'This link is not valid. Ask for a new one.', limit: 'Daily note limit reached. Try again tomorrow.',
       noMic: 'Could not open the microphone. Allow microphone access, or type instead.', original: 'Original', heard: 'What we heard',
-      question: 'A question for you', open: 'Open the game ▶', answer: 'Answer by typing or voice', answering: 'Answering', answered: 'Answered ✓', to: 'Answer to',
+      question: 'A question for you', open: 'Open the game ▶', answer: 'Type an answer', answering: 'Answering', answered: 'Answered ✓', to: 'Answer to',
     },
   };
   const $ = id => document.getElementById(id);
@@ -65,10 +65,8 @@
     document.title = t.title;
     $('title').textContent = t.title;
     $('game').setAttribute('aria-label', t.game);
-    $('mic').setAttribute('aria-label', t.voice);
     $('text').placeholder = t.placeholder;
     $('send').textContent = t.send;
-    $('mic').textContent = t.mic;
     $('stop').textContent = t.stop;
     $('cancel').textContent = t.cancel;
     const select = $('game');
@@ -392,11 +390,13 @@
     $('text').style.height = '';
     queue({ text });
   });
-  $('mic').addEventListener('click', startRecording);
+  // The tester never used voice notes (0 of 64 by 2026-11-24), so the page has no microphone button. An older cached
+  // page may still have one; the recording code and the server side stay so it can come back.
+  $('mic')?.addEventListener('click', startRecording);
   $('answering-clear').addEventListener('click', () => answer(null));
   $('stop').addEventListener('click', () => recorder?.stop());
   $('cancel').addEventListener('click', () => recorder?.cancel());
-  if (!navigator.mediaDevices || typeof MediaRecorder === 'undefined') $('mic').hidden = true;
+  if ($('mic') && (!navigator.mediaDevices || typeof MediaRecorder === 'undefined')) $('mic').hidden = true;
   // The box starts one line high and grows with the note.
   const grow = () => { $('text').style.height = 'auto'; $('text').style.height = `${Math.min($('text').scrollHeight + 2, 160)}px`; };
   $('text').addEventListener('input', grow);
