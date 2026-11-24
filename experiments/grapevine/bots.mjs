@@ -201,6 +201,12 @@ GROUPS.forEach((groups, c) => {
   means.forEach((m, i) => { if (i) check(m <= means[i - 1] + RAMP_STEP, `ramp: chapter ${c + 1} levels ${groups[i].join('-')} average ${(100 * m).toFixed(0)}% is not easier than the group before (${(100 * means[i - 1]).toFixed(0)}%)`); });
   console.log(`ramp, chapter ${c + 1}: random-bot win rate by group (${groups.map(g => g.join('-')).join(', ')}): ${means.map(m => (100 * m).toFixed(0) + '%').join(' ')}`);
 });
+// 8. Middle and late game audit: after the keeper's teaching level (46), no keeper starts out holding the
+//    listener's news. Otherwise the level is "walk to the keeper, deliver", and every hop before her is wasted.
+for (let n = 47; n <= LEVELS.length; n++) {
+  const lv = LEVELS[n - 1], k = lv.nodes.find(v => v.kind === 'keeper' && v.memo.s === lv.want.s && v.memo.c === lv.want.c && v.memo.n === lv.want.n);
+  check(!k, `level ${n}: no keeper starts with the listener's news`);
+}
 for (const n of HANDMADE) check(rates[n] >= 0.5, `teaching level ${n} is easy for a wanderer (${(100 * rates[n]).toFixed(0)}%)`);
 check(randomWins / randomTrials < 0.6 && randomStars / randomTrials < 1.5, 'the random bot does clearly worse than the solver bot');
 check(Date.now() - t0 < 60000, 'bots finish in under 60 seconds');

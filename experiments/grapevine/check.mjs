@@ -10,7 +10,7 @@ import { dirname, extname, join, normalize, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
-import { solve, walk, step, startState } from './sim.js';
+import { solve, walk, step, startState, refuse } from './sim.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = process.env.SHOTS || join(tmpdir(), 'grapevine-shots');
@@ -512,6 +512,95 @@ async function run(page, phone) {
   assert.ok(runs.every(r => r.runSource === 'agent'));
 }
 
+// Middle and late game audit. A hop that changes nothing (a grump at one, an exaggerator at three, a parrot
+// with nothing to repeat) shows the same before-and-after plate as the swap, with a short reason; a finished
+// game points the menu and the last card at a village that still lacks stars.
+async function lateGame(page) {
+  const misses = [];
+  const expect = (condition, message) => { if (!condition) misses.push(message); };
+  const plate = [69, 51, 80], center = page.viewportSize().width / 2;
+  const painted = () => page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+  for (const [n, kind, cue] of [[11, 'less', /one is the least/i], [17, 'more', /three is the most/i], [25, 'parrot', /nothing to repeat/i]]) {
+    await page.goto(`${base}/grapevine/?level=${n}`); await page.click('#play');
+    const st = await state(page), lv = await levelNow(page), best = solve(lv).best, run = walk(lv, best);
+    const k = best.findIndex((v, i) => i > 0 && lv.nodes[v].kind === kind && JSON.stringify(run.msgs[i]) === JSON.stringify(run.msgs[i - 1]));
+    expect(k > 0, `level ${n}: the shortest route has a ${kind} who changes nothing`);
+    if (k <= 0) continue;
+    for (let i = 1; i <= k; i++) await tap(page, st.nodes[best[i]]);
+    await painted();
+    expect(cue.test(await page.textContent('#boardCue')), `level ${n}: the cue says why the ${kind} changed nothing`);
+    expect(await boardInk(page, [center - 88, 88, 176, 31], plate), `level ${n}: a before-and-after plate shows the unchanged news`);
+  }
+  // The hard-hat shaper and the colour swapper get the same picture plate as the swap, with a sentence.
+  for (const [n, kind, cue] of [[13, 'carve', /any shape/i], [16, 'flip', /red and green/i]]) {
+    await page.goto(`${base}/grapevine/?level=${n}`); await page.click('#play');
+    const st = await state(page), lv = await levelNow(page), best = solve(lv).best;
+    const k = best.findIndex(v => lv.nodes[v].kind === kind);
+    expect(k > 0, `level ${n}: the shortest route meets a ${kind}`);
+    if (k <= 0) continue;
+    for (let i = 1; i <= k; i++) await tap(page, st.nodes[best[i]]);
+    await painted();
+    expect(cue.test(await page.textContent('#boardCue')), `level ${n}: the cue says what the ${kind} does`);
+    expect(await boardInk(page, [center - 88, 88, 176, 31], plate), `level ${n}: the ${kind} has a before-and-after plate`);
+  }
+  // The bow who will not take red news says so when refused (search a short route that arrives next to her with red).
+  {
+    await page.goto(`${base}/grapevine/?level=19`); await page.click('#play');
+    const st = await state(page), lv = await levelNow(page), bow = lv.nodes.findIndex(v => v.kind === 'timid');
+    let found = null, queue = [[lv.from]];
+    while (queue.length && !found) {
+      const r = queue.shift(), run = walk(lv, r);
+      if (!run.valid || r.length > 5) continue;
+      if (refuse(lv, run.state, bow) === 'red') { found = r; break; }
+      lv.nodes.forEach((_, v) => { if (!refuse(lv, run.state, v) && v !== lv.to) queue.push([...r, v]); });
+    }
+    expect(!!found, 'level 19: a short route brings red news next to the bow');
+    if (found) {
+      for (const v of found.slice(1)) await tap(page, st.nodes[v]);
+      await tap(page, st.nodes[bow]);
+      expect(/red news/i.test(await page.textContent('#boardCue')), 'level 19: the cue says the bow will not take red news');
+    }
+  }
+  // Everything open, two villages short of three stars: the menu and the last card both point at the first one.
+  const best = {}; for (let n = 1; n <= 60; n++) best[n] = 3; best[45] = 2; best[59] = 2;
+  await page.goto(`${base}/grapevine/`);
+  const before = await page.evaluate(() => localStorage.getItem('grapevine-save'));
+  await page.evaluate(best => localStorage.setItem('grapevine-save', JSON.stringify({ v: 1, sound: true, best, opened: 61, daily: {} })), best);
+  await page.reload(); await until(page, () => window.grapevineState, 'state hook');
+  expect(/45/.test(await page.textContent('#play')), `menu after the last village points at village 45 (${await page.textContent('#play')})`);
+  // The chase label shares a row with the daily button, so it must stay on one line in every language.
+  const langBefore = await page.evaluate(() => localStorage.getItem('kit:lang'));
+  for (const lang of ['tr', 'en']) {
+    await page.goto(`${base}/grapevine/?lang=${lang}`); await until(page, () => window.grapevineState, 'state hook');
+    const lines = await page.evaluate(() => {
+      const el = document.getElementById('play'), r = document.createRange(); r.selectNodeContents(el);
+      const half = parseFloat(getComputedStyle(el).fontSize) / 2, mids = [];
+      for (const b of r.getClientRects()) if (b.width > 1 && !mids.some(m => Math.abs(m - (b.top + b.bottom) / 2) < half)) mids.push((b.top + b.bottom) / 2);
+      return mids.length;
+    });
+    expect(lines === 1, `${lang}: the chase label fits on one line (${lines} lines: ${await page.textContent('#play')})`);
+  }
+  await page.evaluate(v => { if (v === null) localStorage.removeItem('kit:lang'); else localStorage.setItem('kit:lang', v); }, langBefore);
+  await page.goto(`${base}/grapevine/`); await until(page, () => window.grapevineState, 'state hook');
+  await page.click('#play');
+  expect((await state(page)).level === 45, 'the play button starts village 45');
+  await page.goto(`${base}/grapevine/?level=60`); await until(page, () => window.grapevineState, 'state hook');
+  await page.click('#play');
+  const st = await state(page), lv = await levelNow(page);
+  await finger(page, '#c', dragSteps(st.nodes, solve(lv).best));
+  await until(page, () => window.grapevineState().screen === 'done', 'level 60 solved');
+  await sleep(1200);
+  expect(!(await page.locator('#next').isDisabled()), 'the last card has a live button');
+  expect(/45/.test(await page.textContent('#next')), `the last card points at village 45 (${await page.textContent('#next')})`);
+  if (!(await page.locator('#next').isDisabled())) { await page.click('#next'); expect((await state(page)).level === 45, 'the last card starts village 45'); }
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('grapevine-save')));
+  expect(saved.best[45] === 2 && saved.best[60] === 3 && saved.opened === 61, 'the save keeps its stars and progress');
+  // Put the earlier save back, so the checks after this one start where they expect.
+  await page.goto(`${base}/grapevine/`);
+  await page.evaluate(before => { if (before === null) localStorage.removeItem('grapevine-save'); else localStorage.setItem('grapevine-save', before); }, before);
+  assert.deepEqual(misses, [], 'middle and late game');
+}
+
 async function menuAndReload(page) {
   await page.goto(base + '/grapevine/?level=3');
   await until(page, () => window.grapevineState, 'village menu');
@@ -805,6 +894,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
   try {
     await boardFeedback(page);
+    await lateGame(page);
     await menuAndReload(page);
     await run(page, phone);
     await firstHint(page);
