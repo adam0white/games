@@ -102,7 +102,7 @@
     <li>No food on the screen? A <span class="g">green arrow</span> at the edge points to the nearest animal you can eat. A red arrow points to a stronger animal that has seen you.</li>
     <li>Fill the bar to get promoted. You pick 1 of 3 new animals each time. Picking fast again makes you faster each time. Picking sneaky again makes you harder to see each time.</li>
     <li>If you are a fast animal, a medium or fast hunter close to you can pounce: one quick dash. Keep your distance, or be far when it sees you. A slow one never pounces.</li>
-    <li>Every animal after the Ant has its own power. Tap the round yellow button (or press Space) to use it, then wait for it to fill again. A Wasp stings, a Frog hops, a Turtle hides in its shell, a Lion roars, an Eagle dives, a Cheetah sprints.</li>
+    <li>Every animal after the Ant has its own skill. Tap the round yellow button (or press Space) to use it, then wait for it to fill again. A Wasp stings, a Frog hops, a Turtle hides in its shell, a Lion roars, an Eagle dives, a Cheetah sprints.</li>
     <li>A hunter gets tired. Keep running: it slows down, then gives up and rests for a few seconds.</li>
     <li>Animals hunt each other too. A red dashed line shows who is chasing whom. A hunter that is busy is easier to sneak past.</li>
     <li><b>Wild rules</b> are the normal game; the Rules button in the menu switches to Classic. Wild adds two things. A strong animal has a thick hide: it lives through one bite, then the hide needs 25 seconds. And every 45 seconds a stronger animal nearby hunts you for 5 seconds, wherever it is looking.</li>
@@ -328,7 +328,7 @@ function offer() {
     const b = document.createElement('button'); b.className = 'opt';
     const pic = document.createElement('canvas'); pic.width = pic.height = 168; portrait(pic, F, 34);
     const pace = { slow: 'Slow', medium: 'Medium', fast: 'Fast' }[F.pace];
-    b.append(pic, Object.assign(document.createElement('b'), { textContent: F.name }), Object.assign(document.createElement('small'), { textContent: `Power ${F.power} · ${pace}` }), Object.assign(document.createElement('small'), { textContent: F.trait }), Object.assign(document.createElement('small'), { textContent: powerFor(F) ? `Power: ${powerFor(F).label}` : '', style: 'color:#ffd23a' }));
+    b.append(pic, Object.assign(document.createElement('b'), { textContent: F.name }), Object.assign(document.createElement('small'), { textContent: `Power ${F.power} · ${pace}` }), Object.assign(document.createElement('small'), { textContent: F.trait }), Object.assign(document.createElement('small'), { textContent: powerFor(F) ? `Skill: ${powerFor(F).label}` : '', style: 'color:#ffd23a' }));
     const k = s.player.stack.filter(id => FORMS[id].role === F.role).length; // earlier picks of this kind make this one better
     if (k && F.role === 'runner') b.append(Object.assign(document.createElement('small'), { textContent: `Fast again: +${Math.round((fastBoost(k + 1) - 1) * 100)}% speed`, style: 'color:#8dff8a' }));
     if (k && F.role === 'sneak') b.append(Object.assign(document.createElement('small'), { textContent: `Sneaky again: ${Math.round((1 - SAME_SNEAK ** k) * 100)}% harder to see`, style: 'color:#8dff8a' }));

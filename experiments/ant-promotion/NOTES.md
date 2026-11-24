@@ -455,7 +455,9 @@ The rival section of `bots.mjs` passes after that. One number moved: the bot tha
   Ask the tester which one before building.
 - **More species (#148).** Add one extra choice at some promotions, so the tree branches more. It costs art time (each animal is drawn in code in `art.js`, in all four looks).
 
-## 2026-11-24: a power for every animal (tester t1, note #148)
+## 2026-11-24: a skill for every animal (tester t1, note #148)
+
+The page calls it a "skill", because "Power" is already the strength number. The code says `power`.
 
 Every animal after the Ant has one power, used with a round button at the bottom right (Space on a keyboard). The button shows the power's name and fills up again while it waits. `POWER` and `POWERS` in `sim.js` hold the numbers and the 49 names.
 
@@ -490,3 +492,5 @@ Powers are mostly an escape, so they cut deaths, most in Wild. Wild sneaky now r
 - A real phone and a person: whether the button sits well under the right thumb while the left steers, and whether the powers are fun or only safe.
 - The roar is the only power that helps hunting. The others are escapes. A hunting use for each kind is a next step.
 - Other animals do not use powers.
+
+"The same game without the button" was checked directly: main's `sim.js` and this one, fed the same scripted steering for 4 simulated minutes, 24 runs (Classic and Wild, each pick, 4 seeds), end in the identical state. The earlier table's "classic fast 13 / 3" prints 13 / 4 on this machine today; that difference is not from this change.
