@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"
+    />
+    <meta name="theme-color" content="#101e2b" />
+    <title>Hold Your Breath</title>
+    <style>
+      :root {
+        --ink: #101e2b;
+        --paper: #f4ecd6;
+        --gold: #ffbf69;
+        --mint: #9ce3c2;
+        --muted: #b7c6c9;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+        background: var(--ink);
+        color: var(--paper);
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      body {
+        font:
+          16px/1.4 ui-rounded,
+          "Trebuchet MS",
+          system-ui,
+          sans-serif;
+      }
+      #c {
+        width: 100vw;
+        height: 100dvh;
+        display: block;
+        touch-action: none;
+      }
+      button {
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+        min-height: 48px;
+        min-width: 48px;
+        color: var(--paper);
+        border: 1px solid #ffffff40;
+        background: #ffffff0d;
+        border-radius: 16px;
+        padding: 11px 20px;
+        touch-action: manipulation;
+      }
+      button:active {
+        transform: translateY(2px);
+      }
+      button:focus-visible {
+        outline: 3px solid var(--mint);
+        outline-offset: 3px;
+      }
+      button.primary {
+        background: var(--gold);
+        color: var(--ink);
+        border: 0;
+        font-size: 21px;
+        box-shadow:
+          0 5px 0 #986643,
+          0 12px 28px #0004;
+        width: 100%;
+        margin: 14px 0 8px;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      .screen {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: calc(16px + env(safe-area-inset-top))
+          calc(16px + env(safe-area-inset-right))
+          calc(16px + env(safe-area-inset-bottom))
+          calc(16px + env(safe-area-inset-left));
+        background: #071320bb;
+        overflow: auto;
+        touch-action: pan-y;
+      }
+      .screen.on {
+        display: flex;
+      }
+      .card {
+        position: relative;
+        width: 100%;
+        max-width: 360px;
+        text-align: center;
+        border: 1px solid #d8eadc33;
+        border-radius: 28px;
+        padding: 24px;
+        background: linear-gradient(145deg, #263c48f5, #132632fa);
+        box-shadow: 0 28px 70px #0005;
+      }
+      .eyebrow {
+        font-size: 14px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--mint);
+        font-weight: 700;
+        margin: 0 0 10px;
+      }
+      h1 {
+        font-size: clamp(36px, 10vw, 48px);
+        line-height: 1.02;
+        letter-spacing: -0.045em;
+        margin: 0 0 16px;
+        font-weight: 900;
+      }
+      h1 span {
+        color: var(--gold);
+      }
+      h2 {
+        font-size: 32px;
+        line-height: 1.1;
+        margin: 0 0 14px;
+      }
+      p {
+        margin: 8px 0;
+      }
+      p.sub {
+        color: var(--muted);
+        font-size: 16px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin: 12px 0;
+      }
+      .row > * {
+        flex: 1;
+      }
+      #hero {
+        height: 100px;
+        width: 100%;
+        display: block;
+        margin: 6px 0 18px;
+      }
+      .lab-notice {
+        font-size: 14px !important;
+        line-height: 1.35 !important;
+        color: var(--muted) !important;
+        text-align: left;
+        margin: 16px 0 0 !important;
+      }
+      .lab-toggle {
+        font-size: 14px !important;
+        text-align: left;
+        margin-top: 14px !important;
+      }
+      .lab-toggle input {
+        min-width: 48px;
+        min-height: 48px;
+        vertical-align: middle;
+      }
+      .lab-toggle label {
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+      }
+      .lab-toggle a {
+        color: var(--mint);
+      }
+      #pause {
+        position: fixed;
+        right: max(
+          calc(12px + env(safe-area-inset-right)),
+          calc((100vw - 480px) / 2 + 12px)
+        );
+        top: calc(12px + env(safe-area-inset-top));
+        padding: 0;
+        width: 48px;
+        height: 48px;
+        background: #182e3d;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        border-radius: 16px;
+      }
+      #pause:before {
+        content: "";
+        height: 18px;
+        width: 13px;
+        border-left: 4px solid var(--paper);
+        border-right: 4px solid var(--paper);
+      }
+      #probe {
+        position: fixed;
+        visibility: hidden;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      #stars {
+        font-size: 45px;
+        letter-spacing: 8px;
+        color: var(--gold);
+        margin: 14px 0;
+      }
+      #resultArt {
+        width: 100%;
+        height: 100px;
+      }
+      .stat {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid #ffffff18;
+        padding: 8px 0;
+        font-size: 16px;
+      }
+      .stat b {
+        color: var(--mint);
+      }
+      #levels {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        margin: 16px 0;
+      }
+      #levels button {
+        padding: 8px 0;
+        border-radius: 12px;
+      }
+      #levels small {
+        display: block;
+        font-size: 14px;
+        color: var(--gold);
+      }
+      .looks {
+        display: flex;
+        gap: 6px;
+        margin: 10px 0;
+      }
+      .looks button {
+        padding: 10px 5px;
+        flex: 1;
+        font-size: 14px;
+      }
+      .looks button[aria-pressed="true"] {
+        border-color: var(--gold);
+      }
+      #menuMore {
+        display: none;
+      }
+      .has-played #menuMore {
+        display: block;
+      }
+      .has-played #hero {
+        height: 72px;
+      }
+      .has-played .card {
+        padding: 20px;
+      }
+      .has-played h1 {
+        font-size: 38px;
+      }
+      .has-played #hero {
+        margin: 0 0 12px;
+      }
+      .small {
+        font-size: 14px;
+        color: var(--muted);
+      }
+      .badge {
+        display: inline-block;
+        border: 1px solid #9ce3c24d;
+        border-radius: 99px;
+        padding: 5px 12px;
+        color: var(--mint);
+        font-size: 14px;
+        margin-bottom: 12px;
+      }
+      @media (max-height: 700px) {
+        .card {
+          padding: 18px;
+        }
+        #hero {
+          height: 70px;
+          margin: 0 0 12px;
+        }
+        h1 {
+          font-size: 38px;
+          margin-bottom: 10px;
+        }
+        .lab-notice {
+          margin-top: 10px !important;
+        }
+        .primary {
+          margin-top: 10px !important;
+        }
+        .has-played #hero {
+          display: none;
+        }
+        .has-played .card {
+          padding: 16px;
+        }
+        .row {
+          margin: 8px 0;
+        }
+        #resultArt {
+          height: 64px;
+        }
+        #stars {
+          margin: 8px 0;
+          font-size: 36px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas
+      id="c"
+      aria-label="Building. Hold to run. Release to crouch."
+    ></canvas>
+    <div id="probe"></div>
+    <button id="pause" aria-label="Pause"></button>
+    <div id="menu" class="screen on">
+      <div class="card">
+        <canvas id="hero" aria-hidden="true"></canvas>
+        <h1>Hold Your<br /><span>Breath</span></h1>
+        <p class="sub">Hold to run. Let go to shelter.</p>
+        <button id="play" class="primary">Play</button>
+        <div id="menuMore">
+          <p id="bestLine" class="small"></p>
+          <div class="row">
+            <button id="choose">Levels</button
+            ><button id="daily">Daily tower</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="select" class="screen">
+      <div class="card">
+        <p class="eyebrow">Twelve night shifts</p>
+        <h2>The building</h2>
+        <div id="levels"></div>
+        <button id="selectBack">Back</button>
+      </div>
+    </div>
+    <div id="paused" class="screen">
+      <div class="card">
+        <p class="eyebrow">Catch your breath</p>
+        <h2>Paused</h2>
+        <button id="resume" class="primary">Resume</button>
+        <div class="row">
+          <button id="restart">Restart</button><button id="toMenu">Menu</button>
+        </div>
+        <button id="sound">Sound: on</button>
+        <p class="small" style="margin-top: 16px">Building colours</p>
+        <div class="looks">
+          <button data-look="night" aria-pressed="true">Midnight</button
+          ><button data-look="ember" aria-pressed="false">Ember</button
+          ><button data-look="paper" aria-pressed="false">Blueprint</button>
+        </div>
+      </div>
+    </div>
+    <div id="end" class="screen">
+      <div class="card">
+        <p class="eyebrow" id="endLabel">Street reached</p>
+        <h2 id="endTitle">Everyone out!</h2>
+        <canvas id="resultArt" aria-hidden="true"></canvas>
+        <div id="stars">★ ★ ★</div>
+        <div class="stat"><span>Rescued</span><b id="rescued">1 / 1</b></div>
+        <div class="stat">
+          <span>Lowest breath</span><b id="breathLeft">100%</b>
+        </div>
+        <div class="stat"><span>Time</span><b id="time">60s</b></div>
+        <p id="endTip" class="small"></p>
+        <button id="next" class="primary">Next level</button>
+        <div class="row">
+          <button id="again">Retry</button><button id="endMenu">Menu</button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./main.js"></script>
+    <script src="/notes/button.js" defer></script>
+  </body>
+</html>

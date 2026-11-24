@@ -102,3 +102,13 @@ What the lab saw on the live page the same evening (Chromium, Pixel 7 size, abou
 ### Left as a proposal (2026-11-23, notes #135 and #136)
 - The answer is in (#146, #147). The first Crumbwar change the lab would make is a fuller field: food in sight of every nest, food that drifts in, and events every minute or so, such as a sugar spill in the middle that all four colonies race to.
 - With note #90 ("play in a room with friends"), the tester's wish list for Crumbwar is a friends room and more to do. Both need work in `workers/crumbwar/`, so both wait for a lab session that the owner sends there.
+
+## 2026-11-24: three more experiments (owner asked for further games)
+
+| Experiment | Served at | Idea | From |
+| --- | --- | --- | --- |
+| Hold Your Breath | `/breath/` | Smoke comes in waves on a visible clock; hold to run, release to shelter, and the line of neighbours behind you is the risk | Smoke on the Stairs (archived) |
+| Good Match | `/matchmaker/` | Match helpers to homes from clues that can mislead: seen beats heard beats said | Good Hands (archived) |
+| Seed Sling | `/sling/` | Fling seeds; each flower is a new launch point; a daily garden shared by everyone and a shared name board | new |
+
+Each was written by a Codex builder from a shared brief and has `sim.js`, `bots.mjs` (with a `--mutate` run that must fail), `check.mjs` and `NOTES.md`. The lab reran the bots, the mutation run and the phone check of each and looked at the screenshots. None has been played by a person or on a real phone. Not yet in the shared `kit/check/phone.mjs`; each game's own `check.mjs` covers it until then. Seed Sling's board is `/lab-api/board/sling` (a random device id, the typed name, the best score; sent only on Share).
