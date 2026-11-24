@@ -121,7 +121,7 @@ function beginRound(round) {
   bots = [0, 1, 2].map((skill, i) => ({ id: 9 + i, n: ['Reed', 'Glimmer', 'Drift'][i] + ' · bots', s: create(seed, night, false, []), policy: { skill, id: i, next: 0 }, elapsed: null }));
   botRound = peers.size < 2; if (botRound) for (const b of bots) racers.set(b.id, botEntry(b));
   $('roomLine').textContent = room === 'open' ? 'OPEN RIVER' : `ROOM ${room}`; $('raceLabel').textContent = `Night ${night} · ${racers.size} boats`;
-  show('countdown'); updateBar();
+  disarm(); show('countdown'); updateBar();
 }
 function botEntry(b) { return { id: b.id, n: b.n, d: Math.round(progress(b.s) * DISTANCE), s: b.elapsed ?? undefined, a: b.s.over ? 0 : 1 }; }
 function burst(x, y, col, count = 12) {
@@ -133,7 +133,7 @@ function publish(final = false) {
   if (final) send({ t: 'done', s: Math.round(s.t * 1000) });
 }
 function finish(reason = s.over) {
-  if (finished) return; finished = true; steer.drop(); keys.clear();
+  if (finished) return; finished = true; steer.drop(); keys.clear(); disarm();
   const p = racers.get(id); p.d = Math.round(progress(s) * DISTANCE); p.s = Math.round(s.t * 1000); p.a = 0;
   publish(true); best = Math.max(best, p.d); write('lantern-race-best', best); write('lantern-race-played', '1');
   $('bestLine').textContent = `Best crossing · ${Math.round(best / 1000)}%`;
@@ -191,7 +191,16 @@ $('quick').onclick = () => enter(linkedRoom || 'open'); $('friends').onclick = (
 $('create').onclick = () => { const buf = new Uint32Array(1); crypto.getRandomValues(buf); enter(makeCode(buf[0])); };
 $('join').onclick = () => { const code = roomCode($('code').value); if (!code || code === 'open') { $('codeError').textContent = 'Use four letters.'; tone(180); } else enter(code); };
 $('code').oninput = () => { $('code').value = $('code').value.replace(/[^a-z]/gi, '').toUpperCase(); $('codeError').textContent = ''; };
-$('ready').onclick = requestReady; $('rematch').onclick = requestReady; $('pause').onclick = pause; $('resume').onclick = resume;
+$('ready').onclick = requestReady; $('rematch').onclick = requestReady; $('resume').onclick = resume;
+// A live race cannot pause, so the button retires the boat. One stray tap must not end a race: the first tap asks.
+let retireArmed = 0, retireTimer = null;
+function disarm() { clearTimeout(retireTimer); retireArmed = 0; $('pause').textContent = 'Ⅱ'; $('pause').setAttribute('aria-label', 'Pause'); $('roomLine').textContent = room === 'open' ? 'OPEN RIVER' : `ROOM ${room}`; }
+$('pause').onclick = () => {
+  if (offline || !['race', 'countdown'].includes(phase)) { pause(); return; }
+  if (performance.now() < retireArmed) { disarm(); pause(); return; }
+  retireArmed = performance.now() + 2500; $('pause').textContent = '✕'; $('pause').setAttribute('aria-label', 'Retire boat'); $('roomLine').textContent = 'TAP ✕ AGAIN TO RETIRE'; tone(330, .08);
+  clearTimeout(retireTimer); retireTimer = setTimeout(disarm, 2500);
+};
 for (const b of document.querySelectorAll('.toMenu')) b.onclick = menu;
 $('sound').textContent = `Sound: ${muted ? 'off' : 'on'}`;
 $('sound').onclick = () => { muted = !muted; write('lantern-race-sound', muted ? '0' : '1'); $('sound').textContent = `Sound: ${muted ? 'off' : 'on'}`; if (!muted) { snd.unlock(); tone(); } };
