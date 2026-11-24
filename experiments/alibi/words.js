@@ -70,6 +70,10 @@ export const tables = {
     shareCanceled: 'Sharing canceled.',
     downloadStarted: 'Download started.',
     back: 'Back',
+    starTotal: 'Stars {n} of {total}',
+    chapterSolved: 'Chapter {n} solved.',
+    hardOpen: 'Hard Daily is open.',
+    allSolved: 'All {n} cases solved. A new Daily case comes every day.',
   },
   tr: {
     title: 'Alibi',
@@ -140,6 +144,10 @@ export const tables = {
     shareCanceled: 'Paylaşım iptal edildi.',
     downloadStarted: 'İndirme başladı.',
     back: 'Geri',
+    starTotal: 'Yıldız: {n}/{total}',
+    chapterSolved: '{n}. bölüm çözüldü.',
+    hardOpen: 'Günlük (Zor) açıldı.',
+    allSolved: '{n} vakanın hepsi çözüldü. Her gün yeni bir Günlük vaka var.',
   },
 };
 

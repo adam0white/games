@@ -653,6 +653,178 @@ async function runAdvanced(page, profile, url) {
   }
 }
 
+// Count canvas fills and strokes per style in the last complete frame, so a
+// check can see which training marks a case draws.
+function countDraws() {
+  let now = {};
+  let last = -1;
+  window.alibiDraws = {};
+  const frame = window.requestAnimationFrame.bind(window);
+  window.requestAnimationFrame = callback => frame(time => {
+    if (time !== last) {
+      window.alibiDraws = now;
+      now = {};
+      last = time;
+    }
+    callback(time);
+  });
+  const proto = CanvasRenderingContext2D.prototype;
+  for (const kind of ['fill', 'stroke']) {
+    const original = proto[kind];
+    proto[kind] = function (...args) {
+      const key = kind === 'fill' ? `fill|${this.fillStyle}` : `stroke|${this.strokeStyle}|${this.lineWidth}`;
+      now[key] = (now[key] || 0) + 1;
+      return original.apply(this, args);
+    };
+  }
+}
+
+async function draws(page, key) {
+  await pauseForRender(page);
+  await pauseForRender(page);
+  return page.evaluate(([kind, color, width]) => {
+    const probe = document.createElement('canvas').getContext('2d');
+    probe.fillStyle = color;
+    const style = probe.fillStyle;
+    // Canvas stores line widths as 32-bit floats.
+    return Object.entries(window.alibiDraws).filter(([drawn]) => {
+      const [k, s, w] = drawn.split('|');
+      return k === kind && s === style && (kind === 'fill' || Math.abs(w - width) < .001);
+    }).reduce((sum, [, n]) => sum + n, 0);
+  }, key);
+}
+
+// Training marks retire after their lesson: the circle on the chosen suspect
+// after chapter I, the sound bracket after the blackout lesson. Picture tags
+// name the animal under each mask in the mask lesson only.
+async function checkGuides(page, url) {
+  await page.addInitScript(countDraws);
+  const open = async level => {
+    await page.goto(url.replace('level=1', `level=${level}`));
+    await see(page, 'menu');
+    await page.locator('#play').evaluate(button => button.click());
+    await see(page, 'play');
+  };
+  const choose = async id => tap(page, (await state(page)).points.suspects[id]);
+  const halo = ['fill', '#fff0bb50'];
+  const tag = ['fill', '#fff4e0'];
+  const cream = ['stroke', '#fff1ce', 2.1];
+  await open(1);
+  await choose(1);
+  assert.ok(await draws(page, halo) > 0, 'chapter I circles the chosen suspect in the scene');
+  await open(16);
+  await choose(1);
+  assert.equal(await draws(page, halo), 0, 'chapter III leaves the chosen suspect unmarked in the scene');
+  for (const [level, shown] of [[15, true], [16, false]]) {
+    await open(level);
+    for (const beat of [3, 5]) {
+      await scrub(page, beat);
+      const tags = await draws(page, tag);
+      assert.equal(tags > 0, shown, `case ${level} mask tags at mark ${beat + 1}`);
+    }
+    await scrub(page, 4);
+    assert.equal(await draws(page, tag), 0, `case ${level} has no mask tags between mask changes`);
+  }
+  // A player who has not reached the mask lesson meets masks first in the
+  // Daily, so the Daily shows the tags until the campaign teaches them.
+  // bots.mjs asserts that every Daily puts its masks on at mark 4.
+  for (const [level, shown] of [[5, true], [20, false]]) {
+    await page.evaluate(level => localStorage.setItem('alibi-save', JSON.stringify({ level, campaignVersion: 2, stars: {} })), level);
+    await page.goto(url.replace('level=1', 'level=0'));
+    await see(page, 'menu');
+    await press(page, '#daily');
+    await see(page, 'play');
+    await scrub(page, 3);
+    assert.equal(await draws(page, tag) > 0, shown, `Daily mask tags for a player at case ${level}`);
+  }
+  const bracket = {};
+  for (const level of [22, 23]) {
+    await open(level);
+    await scrub(page, createCase({ level }).blackoutBeat);
+    const before = await draws(page, cream);
+    await choose(0);
+    bracket[level] = await draws(page, cream) - before;
+  }
+  assert.equal(bracket[22] - bracket[23], 4, `the sound bracket shows in the blackout lesson only: ${JSON.stringify(bracket)}`);
+}
+
+// WCAG relative-luminance contrast of two computed CSS colors.
+function contrast(a, b) {
+  const lum = color => {
+    const [r, g, b] = color.match(/[\d.]+/g).slice(0, 3).map(v => {
+      const c = v / 255;
+      return c <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4;
+    });
+    return .2126 * r + .7152 * g + .0722 * b;
+  };
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (hi + .05) / (lo + .05);
+}
+
+// The long goal is visible: star totals in the picker and on each campaign
+// result, a line at each chapter end, and a finale after the last case.
+async function checkProgress(page, profile, url) {
+  const campaign = new URL(url);
+  campaign.searchParams.delete('level');
+  const begin = async (level, stars) => {
+    await page.goto(campaign.href);
+    await page.evaluate(([level, stars]) => localStorage.setItem('alibi-save', JSON.stringify({
+      level, campaignVersion: 2, stars, sound: false,
+    })), [level, stars]);
+    await page.reload();
+    await see(page, 'menu');
+  };
+  const solve = async level => {
+    await press(page, '#play');
+    await see(page, 'play');
+    assert.equal((await state(page)).level, level);
+    await accuse(page, createCase({ seed, level }).culprit);
+    await see(page, 'reveal');
+    await press(page, '#skipReveal');
+    await see(page, 'done');
+    return page.locator('#goal').innerText();
+  };
+
+  await begin(36, { 1: 3, 2: 2, 36: 3 });
+  await press(page, '#pickCase');
+  await see(page, 'cases');
+  assert.equal(await page.locator('#caseStars').innerText(), 'Stars 8 of 108');
+  const current = page.locator('#caseGrid button.primary');
+  assert.equal(await current.locator('span').innerText(), '★★★');
+  const [ink, paper] = await current.evaluate(button => [
+    getComputedStyle(button.querySelector('span')).color, getComputedStyle(button).backgroundColor,
+  ]);
+  const ratio = contrast(ink, paper);
+  assert.ok(ratio >= 4.5, `stars on the current case read at ${ratio.toFixed(2)}:1`);
+  await shot(page, profile, 'picker-stars');
+  await press(page, '#caseMenu');
+  assert.match(await solve(36), /All 36 cases solved\.[\s\S]*Stars 8 of 108/);
+  await shot(page, profile, 'finale');
+
+  // A tab checkpoint is rebuilt from seed and level. One that already rejected
+  // the current liar (written before the liar changed) must not resume.
+  const liar = createCase({ seed, level: 16 }).culprit;
+  for (const [rejected, resumes] of [[[liar], false], [[(liar + 1) % 6], true]]) {
+    await page.goto(url.replace('level=1', 'level=16'));
+    await see(page, 'menu');
+    // The game clears the checkpoint on leaving the menu; this listener runs after it.
+    await page.evaluate(rejected => addEventListener('pagehide', () => sessionStorage.setItem('alibi-save', JSON.stringify({
+      version: 1, seed: 391, level: 16, daily: false, hard: false, day: '2026-11-24', frame: 0, selected: null,
+      rejected, notes: [], notebook: false, seen: [], scrolled: [], elapsed: 0,
+    }))), rejected);
+    await page.reload();
+    await pauseForRender(page);
+    assert.equal((await state(page)).screen !== 'menu', resumes, `checkpoint with rejected ${rejected} resumes: ${resumes}`);
+  }
+
+  await begin(7, { 7: 1 });
+  assert.match(await solve(7), /^Chapter 1 solved\.\s+Stars 3 of 108$/);
+  await begin(14, {});
+  assert.match(await solve(14), /^Chapter 2 solved\. Hard Daily is open\.\s+Stars 3 of 108$/);
+  await begin(9, {});
+  assert.equal(await solve(9), 'Stars 3 of 108', 'a mid-chapter case shows only the star total');
+}
+
 async function checkLanguages(page, profile, url) {
   const day = '2026-11-24';
   const date = new Date(`${day}T12:00:00Z`);
@@ -857,6 +1029,21 @@ async function runProfile(profile, engine, device, origin) {
       }
     }
     if (wordsOnly) return;
+    if (!shotsOnly) {
+      const guideContext = await browser.newContext(device);
+      try {
+        const errors = [];
+        await stubLab(guideContext, origin, [], errors);
+        const page = await guideContext.newPage();
+        page.on('pageerror', error => errors.push(error.message));
+        await checkGuides(page, url);
+        assert.deepEqual(errors, [], 'guide browser errors');
+        await checkProgress(page, profile, url);
+        console.log(`PASS ${profile} training marks retire after their lessons; star totals, chapter ends and finale show`);
+      } finally {
+        await guideContext.close();
+      }
+    }
     if (!shotsOnly) {
       const menuContext = await browser.newContext(device);
       try {

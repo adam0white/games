@@ -113,13 +113,11 @@ export function createCase({ seed = campaignSeed, level = 1, culpritOverride, fl
     return { pair, bit, beat: spec.staggered ? beats[id] : spec.blackout || tutorial ? firstClaim : commonBeat };
   });
   // A separate stream prevents changes in the replay generator or evidence
-  // choices from advancing the draw that selects the culprit.
-  const chosen = pick(ids, random((seed >>> 0) ^ Math.imul(level, 0x27d4eb2d) ^ 0x94d049bb));
-  const culprit = culpritOverride ?? chosen;
-  const cast = statements.map(({ pair, bit, beat }, id) => ({
-    id, species: species[id], sound: signatures[id],
-    claim: { beat, room: pair[bit ^ Number(!tutorial && id === culprit)] },
-  }));
+  // choices from advancing the draw that selects the culprit. Mask cases after
+  // the lesson pick the liar after the tape exists, from the masked suspects.
+  const culpritDraw = random((seed >>> 0) ^ Math.imul(level, 0x27d4eb2d) ^ 0x94d049bb);
+  const maskedLiar = spec.masks && !spec.tutorial && !hard;
+  let culprit = culpritOverride ?? (maskedLiar ? null : pick(ids, culpritDraw));
   const order = shuffle(ids, draw);
   const carrier = spec.carrier ? order[0] : null;
   const exchanged = spec.masks ? order.slice(0, 2) : [];
@@ -166,6 +164,21 @@ export function createCase({ seed = campaignSeed, level = 1, culpritOverride, fl
       return { room, mask, slot: slots[id] };
     }));
   }
+
+  if (culprit === null) {
+    // Prefer a liar whose false room holds another mask at the claimed time,
+    // so the lie needs the mask tracked. The public tape does not change.
+    const wearers = ids.filter(id => masks[id] !== null);
+    const covered = wearers.filter(id => {
+      const { pair, bit, beat } = statements[id];
+      return beat !== blackoutBeat && frames[beat].some((actor, other) => other !== id && actor.room === pair[bit ^ 1] && actor.mask !== null);
+    });
+    culprit = pick(covered.length ? covered : wearers, culpritDraw);
+  }
+  const cast = statements.map(({ pair, bit, beat }, id) => ({
+    id, species: species[id], sound: signatures[id],
+    claim: { beat, room: pair[bit ^ Number(!tutorial && id === culprit)] },
+  }));
 
   // The closed shutter is the one private mark. Establish the reveal there
   // after scheduling the public tape, so every suspect has identical cover.
