@@ -84,7 +84,6 @@ export function change(g, id, x, y, w, h, node = null) {
     g.stroke();
   };
   const blank = (bx, s = 0) => { shape(g, s, bx, y, u * 0.5); g.setLineDash([u * 0.18, u * 0.14]); g.strokeStyle = INK; g.lineWidth = Math.max(1.2, u * 0.12); g.stroke(); g.setLineDash([]); };
-  const dots = (bx, n) => { for (let i = 0; i < n; i++) { g.beginPath(); g.arc(bx + (i - (n - 1) / 2) * u * 0.42, y, u * 0.19, 0, Math.PI * 2); g.fillStyle = INK; g.fill(); } };
   const outline = (bx, s, fill = '#fff') => { shape(g, s, bx, y, u * 0.48); g.fillStyle = fill; g.fill(); g.strokeStyle = INK; g.lineWidth = Math.max(1.2, u * 0.13); g.stroke(); };
   const L = x - w * 0.3, R = x + w * 0.3;
   if (id === 0) { // nothing changes
@@ -95,9 +94,12 @@ export function change(g, id, x, y, w, h, node = null) {
     blank(L); arrow(x);
     g.beginPath(); g.arc(R, y, u * 0.5, 0, Math.PI * 2); g.fillStyle = COLOUR[id - 1]; g.fill(); g.strokeStyle = INK; g.lineWidth = Math.max(1.2, u * 0.13); g.stroke();
     mark(g, id - 1, R, y, u * 0.5);
-  } else if (id === 5) { dots(L, 1); arrow(x); dots(R + u * 0.05, 2); plus(g, R + u * 0.55, y - u * 0.55, u * 0.22); }
-  else if (id === 6) { dots(L - u * 0.05, 2); arrow(x); dots(R, 1); }
-  else if (id === 7 || id === 8) { const a = id === 7 ? 0 : 2; outline(L, a); arrow(x, true); outline(R, a + 1); }
+  } else if (id === 5 || id === 6) {
+    g.fillStyle = INK;
+    g.font = `bold ${Math.round(h * 0.96)}px system-ui, sans-serif`;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(id === 5 ? '+1' : '−1', x, y, w - 4);
+  } else if (id === 7 || id === 8) { const a = id === 7 ? 0 : 2; outline(L, a); arrow(x, true); outline(R, a + 1); }
   else if (id <= 12) { blank(L); arrow(x); outline(R, id - 9); }
   else if (id === 13) { // opposite colour: red and green trade, yellow and blue trade
     const chip = (cx, cy, c) => { g.beginPath(); g.arc(cx, cy, u * 0.26, 0, Math.PI * 2); g.fillStyle = COLOUR[c]; g.fill(); g.strokeStyle = INK; g.lineWidth = Math.max(1, u * 0.1); g.stroke(); mark(g, c, cx, cy, u * 0.3); };
@@ -106,7 +108,6 @@ export function change(g, id, x, y, w, h, node = null) {
   }
   g.restore();
 }
-function plus(g, x, y, r) { g.strokeStyle = INK; g.lineWidth = Math.max(1.2, r * 0.6); g.beginPath(); g.moveTo(x - r, y); g.lineTo(x + r, y); g.moveTo(x, y - r); g.lineTo(x, y + r); g.stroke(); }
 function arrowSmall(g, x, y, w) {
   g.strokeStyle = INK; g.lineWidth = Math.max(1, w * 0.12); g.beginPath();
   g.moveTo(x - w * 0.35, y); g.lineTo(x + w * 0.35, y);

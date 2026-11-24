@@ -36,6 +36,10 @@
   #strip { display: block; width: 100%; height: 104px; margin: .3em 0; }
   #pause { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); width: 46px; height: 46px; min-width: 0; min-height: 0; margin: 0; padding: 0;
     border: 2px solid #ffd98a66; border-radius: 50%; background: #1a1233e6; display: none; place-items: center; touch-action: none; }
+  #boardCue { position: fixed; top: calc(78px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+    box-sizing: border-box; width: max-content; max-width: calc(100% - 12px); margin: 0; padding: 2px 10px;
+    pointer-events: none; border-radius: 8px; background: #271c39; color: #fff4dc; font-size: 15px; font-weight: 650; text-align: center; }
+  #boardCue:empty { display: none; }
   #pause::before { content: ''; width: 4px; height: 16px; border: solid #ffd98a; border-width: 0 5px; }
   #hint { position: fixed; left: calc(60px + env(safe-area-inset-left)); top: calc(9px + env(safe-area-inset-top)); display: none; width: 46px; height: 46px; min-width: 0; min-height: 0; margin: 0; padding: 0;
     font-size: 24px; line-height: 1; background: #ffd24a; border: 2px solid #2b1830; border-radius: 50%; box-shadow: 0 3px 0 #b8862a; animation: nudge 1.2s ease-in-out infinite; }
@@ -50,18 +54,35 @@
   #grid.five { grid-template-columns: repeat(5, 1fr); }
   #payoff { display: none; font-weight: 700; color: #ffd98a; }
   #share { min-width: 9em; }
-  @media (max-height: 600px) { h1 { font-size: 2.1em; } #grid button { height: 40px; } }
+  #postcardDialog { box-sizing: border-box; width: min(95vw, 480px); max-height: 92dvh; overflow-y: auto; touch-action: pan-y; padding: 14px; text-align: center; color: #fff4dc; background: #281e3d; border: 2px solid #ffd98a; border-radius: 18px; }
+  #postcardDialog::backdrop { background: #130d24dc; }
+  #cardPreview canvas { display: block; width: 100%; height: auto; border-radius: 10px; }
+  #shareStatus:empty { display: none; }
+  #manualShare { box-sizing: border-box; width: 100%; font: inherit; color: inherit; background: #21172f; -webkit-user-select: text; user-select: text; touch-action: auto; }
+
+  .start-actions { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 8px 0; }
+  .start-actions button { min-width: 0; margin: 0; padding-inline: .7em; }
+  .start-actions #play { flex: 1; }
+  #menu .lab-notice a { display: inline-grid; place-items: center; min-height: 44px; min-width: 52px; }
+  @media (max-height: 720px) {
+    #menu > div { padding-block: calc(4px + env(safe-area-inset-top)) calc(4px + env(safe-area-inset-bottom)); }
+    #menu h1 { font-size: 2.25em; }
+    #menu .sub { margin: 2px 0; }
+    #grid { gap: 4px; margin: 6px 0; }
+    #grid button { height: 44px; }
+  }
+  @media (max-height: 600px) { h1 { font-size: 2.1em; } }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<p id="boardCue" role="status"></p>
 <button id="pause" aria-label="Pause"></button>
 <button id="hint" aria-label="Hint">💡</button>
 <div id="menu" class="screen veil on"><div>
   <h1>Grapevine</h1>
-  <p class="sub">Pass the news along. Everyone changes it a little.</p>
-  <p><button id="play" class="main">Play</button></p>
-  <p><button id="daily">Daily village <small></small></button></p>
+  <p class="sub" id="menuHelp" role="status">Match the listener’s news.</p>
+  <div class="start-actions"><button id="play" class="main">Play</button><button id="daily">Daily village <small></small></button></div>
   <div id="tabs"></div>
   <div id="grid"></div>
   <p><button id="sound">Sound: on</button></p>
@@ -78,14 +99,21 @@
   <p id="doneLine"></p>
   <p id="payoff"></p>
   <canvas id="strip" aria-label="What they heard"></canvas>
-  <p><button id="share">Share this</button></p>
+  <p><button id="share">View share card</button></p>
   <p><button id="next" class="main">Next</button></p>
   <p><button id="again">Again</button><button id="doneMenu">Menu</button></p>
 </div></div>
+<dialog id="postcardDialog" aria-labelledby="postcardHeading">
+  <h2 id="postcardHeading">Your postcard</h2>
+  <div id="cardPreview"></div>
+  <p id="shareStatus" role="status"></p>
+  <textarea id="manualShare" readonly hidden rows="4" aria-label="Result to copy"></textarea>
+  <button id="sendCard">Share card</button><button id="backToResult">Back</button>
+</dialog>
 <script type="module">
 import { LEVELS, CHAPTERS } from './levels.js';
-import { walk, refuse, solve, hint as hintRoute, stars as starsFor, same, daily, dailySeed, ONEWAY, isGate, gateOpen, lane, tierFor, fromKey, SHAPES, COLOURS } from './sim.js';
-import { token, villager, badge, bubble, hand, backdrop, lanterns, barrier, look, emblem, WIDE, BOARD_HALF, COLOUR, INK, CREAM, roundRect } from './art.js';
+import { MAX_HOPS, walk, refuse, hint as hintRoute, stars as starsFor, same, daily, dailySeed, ONEWAY, isGate, gateOpen, lane, tierFor, fromKey, SHAPES, COLOURS } from './sim.js';
+import { token, villager, badge, bubble, backdrop, lanterns, barrier, look, emblem, WIDE, BOARD_HALF, COLOUR, INK, CREAM, roundRect } from './art.js';
 import { readJson, writeJson } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
@@ -179,7 +207,7 @@ function layout() {
   if (!level) return;
   let left = safe.l + 18, right = W - safe.r - 18;
   if (W >= WIDE) { left = Math.max(left, W / 2 - BOARD_HALF); right = Math.min(right, W / 2 + BOARD_HALF); } // phone-wide board, street on the sides
-  const top = safe.t + 150, bottom = H - safe.b - 58;
+  const top = safe.t + 174, bottom = H - safe.b - 58;
   const rows = new Set(level.nodes.map(n => Math.round(n.y * 8))).size;
   const rowGap = (bottom - top) / Math.max(1, rows - 1), colGap = (right - left) / 3;
   R = Math.max(15, Math.min(30, colGap * 0.22, rowGap * 0.25));
@@ -255,11 +283,17 @@ function begin(i, how = 'level') {
   happyT = 0; puzzledT = 0; particles = []; ripples = []; grow = 1;
   $('hint').style.display = 'none';
   layout(); paused = false; snd.release(); show('play');
+  checkpoint();
   rec.start({ level: how === 'daily' ? `daily-${dailyKey}` : i + 1 });
 }
 
 // ---------------------------------------------------------------- route editing (shared by tap and drag)
-function setRoute(r) { route = r; trail = walk(level, route); if (result === 'wrong') result = null; }
+function setRoute(r) {
+  route = r; trail = walk(level, route);
+  if (result === 'wrong') { result = null; wrong = null; puzzledT = 0; }
+  checkpoint();
+  updateBoardCue();
+}
 function extend(v) {
   const why = refuse(level, trail.state, v);
   if (why) { refused(v, why); return false; }
@@ -354,6 +388,7 @@ function send() {
   sentRoute = [...route];
   sending = { route: sentRoute, msgs: trail.msgs, changes: trail.changes, phases: trail.phases, memos: trail.memos, i: 0, p: 0, ok: trail.correct, shown: trail.msgs[0], squash: 0 };
   wrong = null; puzzledT = 0;
+  updateBoardCue();
   rec.event('send', { route: sentRoute, ok: trail.correct });
   tone(SCALE[0], 0.2, 0.08, 'triangle');
 }
@@ -376,6 +411,7 @@ function arrive(s) {
 const kindOfChange = c => c === 0 ? null : c <= 4 ? 'paint' : c === 5 ? 'more' : c === 6 ? 'less' : c <= 8 ? 'swap' : c <= 12 ? 'carve' : 'flip';
 function win() {
   result = 'won';
+  checkpoint();
   const hops = sentRoute.length - 1;
   lastStars = starsFor(hops, level.min);
   happyT = 1;
@@ -400,6 +436,7 @@ function win() {
 function miss(heard) {
   result = 'wrong'; wrong = heard; fails++;
   puzzledT = 1;
+  updateBoardCue();
   tone(311, 0.25, 0.07, 'sawtooth', -20); setTimeout(() => tone(293.7, 0.45, 0.06, 'sawtooth', -40), 160);
   if (!reduced) shake = 5;
   if (fails >= 3) $('hint').style.display = 'block';
@@ -488,7 +525,7 @@ function draw(alpha) {
   ghosts(time);
   listenerBubble(time);
   if (sending) flying(alpha);
-  else if (route.length && !result) headRing(time);
+  else if (route.length && !result && !(mode === 'level' && index === 0)) headRing(time);
   for (const p of particles) { g.globalAlpha = Math.max(0, p.life); g.fillStyle = p.col; g.beginPath(); g.arc(p.x, p.y, p.size, 0, Math.PI * 2); g.fill(); }
   g.globalAlpha = 1;
   for (const r of ripples) { g.beginPath(); g.arc(r.x, r.y, 10 + r.t * 26, 0, Math.PI * 2); g.strokeStyle = `rgba(255,244,220,${0.6 * (1 - r.t)})`; g.lineWidth = 3; g.stroke(); }
@@ -688,8 +725,8 @@ function hud(time) {
   g.fillStyle = '#3a1a10'; g.textAlign = 'center'; g.font = '800 17px ui-rounded, system-ui, sans-serif';
   g.fillText(mode === 'daily' ? '☀' : String(index + 1), lx, ly + 1);
   // now -> wanted
-  const now = sending ? sending.shown : trail.msgs[trail.msgs.length - 1];
-  const ok = !sending && same(now, level.want);
+  const now = trail.msgs.at(-1);
+  const ok = same(now, level.want);
   const tw = 128, th = 46;
   g.beginPath(); roundRect(g, cx - tw / 2, top, tw, th, 23); g.fillStyle = ok ? 'rgba(95,207,106,.35)' : 'rgba(20,12,36,.55)'; g.fill();
   g.strokeStyle = ok ? '#7fe07a' : 'rgba(255,217,138,.5)'; g.lineWidth = 2; g.stroke();
@@ -709,27 +746,34 @@ function hud(time) {
     g.fill();
   }
 }
-// First levels teach by doing: a ghost hand draws the route on level 1, and points at the teller on 2 and 3.
-let tutorialRoute = null;
-function tutorial(time) {
-  if (mode !== 'level' || index > 2 || touched || sending || help.shown) return; // the shared first-time hint stands in while it shows
-  if (index === 0) {
-    tutorialRoute ??= solve(LEVELS[0]).best;
-    const per = 0.8, total = per * (tutorialRoute.length - 1) + 1.2, k = ((time - startT / 60) % total + total) % total;
-    const seg = Math.min(tutorialRoute.length - 2, Math.floor(k / per)), f = Math.min(1, (k - seg * per) / per);
-    const A = pos[tutorialRoute[seg]], B = pos[tutorialRoute[seg + 1]];
-    const e = ease(f), x = A.x + (B.x - A.x) * e, y = A.y + (B.y - A.y) * e;
-    g.save(); g.globalAlpha = 0.5; g.setLineDash([8, 8]); g.strokeStyle = '#ffe07a'; g.lineWidth = 4;
-    g.beginPath(); g.moveTo(pos[tutorialRoute[0]].x, pos[tutorialRoute[0]].y);
-    for (let s = 1; s <= seg; s++) g.lineTo(pos[tutorialRoute[s]].x, pos[tutorialRoute[s]].y);
-    g.lineTo(x, y); g.stroke(); g.restore();
-    // The finger runs beside the route, never over the badges: the badge is what this level teaches.
-    const side = x > W * 0.62 ? -1 : 1;
-    hand(g, x + side * (R * 1.1 + 8), y - R * 0.2, k < 0.3 ? k / 0.3 : 0, 1, side < 0);
-  } else {
-    const p = pos[level.from], k = (time * 0.8) % 1;
-    hand(g, p.x + 6, p.y + 6 - Math.sin(k * Math.PI) * 10, k, 1);
+function updateBoardCue() {
+  let text = '';
+  if (screen === 'play' && !sending && result !== 'won') {
+    const node = level.nodes[route.at(-1)];
+    if (result === 'wrong') text = 'Tap the orange teller to try again.';
+    else if (mode === 'level' && index === 0) {
+      text = route.length === 1 ? 'Tap the villager in the red hat.' : 'It turned red! Tap the listener at the top.';
+    } else if (mode === 'level' && route.length === 1 && index === 1) text = 'Which hat will paint the square yellow?';
+    else if (mode === 'level' && route.length === 1 && index === 2) text = 'Find a path that turns the triangle green.';
+    else if (node.kind === 'swap') {
+      const pair = node.arg === 0 ? 'circles and squares' : 'triangles and stars';
+      const before = trail.msgs.at(-2), after = trail.msgs.at(-1);
+      text = before.s === after.s ? `Only ${pair} swap here.` : `Swaps ${pair}.`;
+    }
   }
+  $('boardCue').textContent = text;
+}
+
+// Mark the next head. Tapping the teller or empty ground keeps the first instruction available.
+function tutorial(time) {
+  if (screen !== 'play' || sending || result === 'won' || help.shown) return;
+  let target;
+  if (result === 'wrong') target = level.from;
+  else if (mode === 'level' && index === 0) target = route.length === 1 ? level.nodes.findIndex(n => n.kind === 'paint') : level.to;
+  else return;
+  const p = pos[target], radius = R + 7 + (reduced ? 0 : 2 * Math.sin(time * 5));
+  g.beginPath(); g.arc(p.x, p.y, radius, 0, Math.PI * 2);
+  g.strokeStyle = '#ffe07a'; g.lineWidth = 3; g.setLineDash([5, 5]); g.stroke(); g.setLineDash([]);
 }
 function menuScene(time) {
   // a few villagers chatting in the square below the menu, when there is room for them
@@ -762,6 +806,7 @@ function says(k, msgs, changes) {
   if (node.kind === 'keeper') return 'Old news!';
   if (node.kind === 'timid') return 'Phew, not red';
   const c = changes[k];
+  if (c && same(msgs[k], msgs[k - 1])) return 'No change';
   if (node.kind === 'parrot') return c ? 'Same again!' : 'Er... same?';
   if (!c) return 'Word for word';
   return { paint: 'Splash!', more: 'And more!', less: 'Less!', swap: 'Swapsies!', carve: 'Snip!', flip: 'Opposite day!' }[kindOfChange(c)] ?? 'Hmm';
@@ -805,9 +850,15 @@ function showEnd() {
   const where = mode === 'daily' ? `Daily village ${dailyKey}` : `Level ${index + 1}, ${level.name}`;
   shareText = `Grapevine, ${where} ${'★'.repeat(lastStars)}\n${sentRoute.map((v, k) => says(k, run.msgs, run.changes)).join(' → ')}\n`
     + `${words(run.msgs[0])[0].toUpperCase()}${words(run.msgs[0]).slice(1)} became ${words(run.msgs[run.msgs.length - 1])} in ${hops} hops.`;
-  shareBlob = null; $('share').textContent = 'Share this';
+  shareBlob = null;
   cardWhere = where;
-  try { postcard(where).toBlob(b => { shareBlob = b; }, 'image/png'); } catch {}
+  const picture = postcard(where);
+  picture.setAttribute('role', 'img');
+  picture.setAttribute('aria-label', shareText);
+  $('cardPreview').replaceChildren(picture);
+  picture.toBlob(blob => {
+    if (picture === $('cardPreview').firstChild) shareBlob = blob;
+  }, 'image/png');
 }
 // "What they heard": each villager on the route, saying the news as they passed it on, in a speech bubble.
 function stripScene(ctx, w, shown, time, top = 0) {
@@ -821,15 +872,15 @@ function stripScene(ctx, w, shown, time, top = 0) {
     if (age <= 0) continue;
     const v = sentRoute[k], end = k === n - 1;
     ctx.save(); ctx.globalAlpha = age;
-    ctx.beginPath(); roundRect(ctx, x - cell / 2 + 2, y0 + 2, cell - 4, ROW_H - 4, 10); ctx.fillStyle = end ? 'rgba(255,210,74,.22)' : 'rgba(255,244,220,.08)'; ctx.fill();
+    ctx.beginPath(); roundRect(ctx, x - cell / 2 + 2, y0 + 2, cell - 4, ROW_H - 4, 10); ctx.fillStyle = end ? '#584023' : '#393044'; ctx.fill();
     const vy = y0 + ROW_H - r * 2.6;
     villager(ctx, level.nodes[v], x, vy, r, { t: time, react: age < 1 ? 1 - age : 0, happy: end ? 0.7 : 0, look: col % 2 ? -0.6 : 0.6 });
     // the speech bubble, tail down to the mouth
     const bw = Math.min(cell - 8, r * 3.2), bh = r * 2.3, by = y0 + 6 + bh / 2;
     bubble(ctx, x, by, bw, bh, x + (col % 2 ? -r * 0.4 : r * 0.4), vy - r * 0.9);
     token(ctx, msgs[k], x, by, r * 0.95 * pop, { sx: pop, sy: 2 - pop, plate: false });
-    ctx.font = `700 ${cell < 62 ? 9.5 : 10.5}px ui-rounded, system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-    ctx.fillStyle = end ? '#ffd98a' : 'rgba(255,244,220,.9)';
+    ctx.font = '700 12px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = end ? '#ffe3a8' : CREAM;
     ctx.fillText(says(k, msgs, changes), x, y0 + ROW_H - 5, cell - 4);
     ctx.restore();
     if (col > 0) { ctx.fillStyle = 'rgba(255,244,220,.5)'; ctx.beginPath(); const ax = x - cell / 2, ay = by; ctx.moveTo(ax - 3, ay - 5); ctx.lineTo(ax + 3, ay); ctx.lineTo(ax - 3, ay + 5); ctx.fill(); }
@@ -843,7 +894,8 @@ function drawStrip() {
 }
 // The picture that Share hands over: the chapter's sky, the name, the strip with every bubble shown, the stars.
 function postcard(where) {
-  const w = 480, { rows } = stripCells(sentRoute.length, w - 24), h = 150 + rows * ROW_H + 60, s = 2;
+  // Lay out at phone reading size, then rasterize at sharing resolution.
+  const w = 312, { rows } = stripCells(sentRoute.length, w - 24), h = 150 + rows * ROW_H + 60, s = 3;
   const c = document.createElement('canvas'); c.width = w * s; c.height = h * s;
   const x = c.getContext('2d'); x.scale(s, s);
   backdrop(x, w, h, 70, chapter);
@@ -858,19 +910,42 @@ function postcard(where) {
   x.fillText(shareText.split('\n')[2], w / 2, h - 30, w - 30);
   return c;
 }
-$('share').addEventListener('click', async () => {
-  if (!shareText) return;
+$('share').addEventListener('click', () => {
+  $('shareStatus').textContent = '';
+  $('manualShare').hidden = true;
+  $('sendCard').textContent = navigator.share ? 'Share card' : 'Copy result';
+  $('postcardDialog').showModal();
+});
+$('backToResult').addEventListener('click', () => $('postcardDialog').close());
+$('postcardDialog').addEventListener('close', () => $('share').focus());
+$('sendCard').addEventListener('click', async () => {
+  const button = $('sendCard'), status = $('shareStatus');
   shared++;
-  const say = text => { $('share').textContent = text; };
-  let file = null;
-  try { if (shareBlob && typeof File === 'function') file = new File([shareBlob], 'grapevine.png', { type: 'image/png' }); } catch {}
+  button.disabled = true;
+  $('manualShare').hidden = true;
   try {
-    if (file && navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], text: shareText });
-    else if (navigator.share) await navigator.share({ text: shareText });
-    else { await navigator.clipboard.writeText(shareText); say('Copied!'); }
-  } catch (e) {
-    if (e?.name === 'AbortError') return;
-    try { await navigator.clipboard.writeText(shareText); say('Copied!'); } catch { say('Could not share'); }
+    if (navigator.share) {
+      const file = shareBlob && new File([shareBlob], 'grapevine.png', { type: 'image/png' });
+      const payload = file && navigator.canShare?.({ files: [file] }) ? { files: [file], text: shareText } : { text: shareText };
+      try {
+        await navigator.share(payload);
+        status.textContent = payload.files ? 'Card shared.' : 'Result shared.';
+        return;
+      } catch (error) {
+        if (error.name === 'AbortError') { status.textContent = 'Sharing cancelled.'; return; }
+      }
+    }
+    await navigator.clipboard.writeText(shareText);
+    status.textContent = 'Result copied.';
+  } catch {
+    status.textContent = 'Select the result below to copy it.';
+    const field = $('manualShare');
+    field.value = shareText;
+    field.hidden = false;
+    field.focus();
+    field.select();
+  } finally {
+    button.disabled = false;
   }
 });
 
@@ -878,17 +953,16 @@ $('share').addEventListener('click', async () => {
 const cards = screens(['menu', 'paused', 'done']);
 function show(name) {
   screen = name; cards(name);
+  updateBoardCue();
   $('pause').style.display = name === 'play' ? 'grid' : 'none';
   if (name !== 'play') $('hint').style.display = 'none';
   else if (fails >= 3) $('hint').style.display = 'block';
-  if (name === 'menu') menu();
+  if (name === 'menu') { menu(); checkpoint(); }
 }
 let tab = 0; // the chapter (0-based) whose levels the menu shows
 function menu() {
   level = null; finger = null;
   const n = Number.isFinite(urlLevel) && urlLevel >= 1 ? Math.min(LEVELS.length, urlLevel) : next();
-  $('play').textContent = save.opened > LEVELS.length && !urlLevel ? 'Play again' : `Play ${n}`;
-  $('play').dataset.level = n;
   const ds = save.daily[today()] || 0, run = streak();
   $('daily').querySelector('small').textContent = (ds ? '★'.repeat(ds) + '☆'.repeat(3 - ds) : 'new') + (run > 1 ? ` · ${run} days` : '');
   tab = chapterOf(n - 1) - 1;
@@ -896,10 +970,15 @@ function menu() {
   soundLabel();
 }
 const openTo = i => i + 1 <= save.opened || i + 1 === urlLevel; // can the player start 0-based level i?
-const nope = b => { tone(150, 0.1, 0.05, 'square'); b.animate?.([{ transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], 200); };
+const nope = (b, prerequisite) => { $('menuHelp').textContent = `Finish village ${prerequisite} to unlock this.`; tone(150, 0.1, 0.05, 'square'); b.animate?.([{ transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], 200); };
 function levelGrid() {
+  $('menuHelp').textContent = 'Match the listener’s news.';
   setChapter(tab + 1);
-  const n = Number($('play').dataset.level);
+  const [a, b] = CHAPTERS[tab];
+  const preferred = urlLevel > 0 ? Math.min(LEVELS.length, urlLevel) : save.opened;
+  const n = preferred >= a && preferred <= b ? preferred : a;
+  $('play').dataset.level = n;
+  $('play').textContent = `Play ${n}`;
   const tabs = $('tabs'); tabs.textContent = '';
   CHAPTERS.forEach(([a, b], c) => {
     const btn = document.createElement('button'), open = openTo(a - 1);
@@ -907,11 +986,10 @@ function levelGrid() {
     btn.className = c === tab ? 'on' : open ? '' : 'locked';
     btn.innerHTML = `${CHAPTER_NAMES[c]}<small>${open ? `${got}/${3 * (b - a + 1)} ★` : '🔒'}</small>`;
     btn.setAttribute('aria-pressed', c === tab ? 'true' : 'false');
-    btn.addEventListener('click', () => { if (!open) return nope(btn); tab = c; levelGrid(); });
+    btn.addEventListener('click', () => { if (!open) return nope(btn, a - 1); tab = c; levelGrid(); });
     tabs.append(btn);
   });
   const grid = $('grid'); grid.textContent = '';
-  const [a, b] = CHAPTERS[tab];
   grid.className = b - a + 1 <= 15 ? 'five' : '';
   for (let i = a - 1; i < b; i++) {
     const btn = document.createElement('button'), stars = save.best[i + 1] || 0, open = openTo(i);
@@ -919,7 +997,7 @@ function levelGrid() {
     btn.className = open ? (i + 1 === n && !stars ? 'next' : '') : 'locked';
     btn.innerHTML = open ? `${i + 1}<small>${stars ? '★'.repeat(stars) : ''}</small>` : '🔒';
     btn.setAttribute('aria-label', open ? `Level ${i + 1}` : `Level ${i + 1}, locked`);
-    btn.addEventListener('click', () => { if (!open) return nope(btn); begin(i); });
+    btn.addEventListener('click', () => { if (!open) return nope(btn, i); begin(i); });
     grid.append(btn);
   }
 }
@@ -929,7 +1007,7 @@ $('sound').addEventListener('click', toggleSound);
 $('sound2').addEventListener('click', toggleSound);
 $('play').addEventListener('click', () => {
   const n = Number($('play').dataset.level) || 1;
-  begin(save.opened > LEVELS.length && !urlLevel ? 0 : n - 1);
+  begin(n - 1);
 });
 $('daily').addEventListener('click', () => begin(0, 'daily'));
 function pause() {
@@ -977,7 +1055,7 @@ window.grapevineLevel = () => level; // the check solves the level in Node from 
 window.grapevineCard = () => (sentRoute && cardWhere ? postcard(cardWhere).toDataURL('image/png') : null); // the share picture, for checks
 
 // A first-time player who does not touch for 3 s in play sees a finger drag through a row of dots (experiments/kit/hint.js).
-// While it shows, the level's own ghost hand waits. The kit centres the copy across the screen; hintBottom picks the
+// While it shows, the first level's target ring waits. The kit centres the copy across the screen; hintBottom picks the
 // height where it covers least of the board: villagers with their hats and badges, the teller's news, the listener's
 // bubble and the top bar.
 function hintBottom() {
@@ -1017,8 +1095,30 @@ const help = firstHint(canvas, {
   played: readJson(KEY) !== null,
 });
 
+// Keep an unfinished route with this tab's history entry. A fresh visit still opens the menu.
+function checkpoint() {
+  const editing = level && (screen === 'play' || paused) && result !== 'won';
+  // A delivery in flight can be sent again after reload. Never award it twice.
+  const unfinished = editing && route.at(-1) === level.to ? route.slice(0, -1) : route;
+  const draft = editing ? { mode, index, date: dailyKey, route: unfinished } : null;
+  try { history.replaceState({ ...history.state, grapevineRoute: draft }, ''); } catch {}
+}
+
+function resumeReload() {
+  const draft = history.state?.grapevineRoute;
+  if (!draft || !Array.isArray(draft.route) || draft.route.length > MAX_HOPS + 1) return;
+  if (draft.mode === 'daily' ? draft.date !== today() : draft.mode !== 'level' || !LEVELS[draft.index] || !openTo(draft.index)) return;
+  begin(draft.index, draft.mode);
+  if (draft.route.every(v => Number.isInteger(v) && level.nodes[v]) && walk(level, draft.route).valid) {
+    setRoute(draft.route);
+    touched = route.length > 1;
+  }
+  pause();
+}
+
 resize();
 menu();
+resumeReload();
 requestAnimationFrame(frame);
 </script>
 <script src="/notes/button.js" defer></script>
