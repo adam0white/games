@@ -1,7 +1,7 @@
 // Fix-It Stall: every picture, drawn in code. Objects are drawn in object-local units (the bench box is 100 x 100);
 // people, the stall and the cat in CSS pixels. Nothing here changes game state.
 import { ghost } from './moves.js';
-import { SEAM_POINTS, seamAt, OIL_OPEN, THREAD_SIDE, THREAD_UP } from './sim.js';
+import { SEAM_POINTS, seamAt, oilReady, zipStuck, THREAD_SIDE, THREAD_UP } from './sim.js';
 import { crankPoint, SCALE_BAND, TRACE_OFFSET, WIND_STOPS } from './repairs.js';
 
 export const C = {
@@ -305,7 +305,7 @@ const OBJ = {
   // from the hinge, so the tapping thumb never covers the swing. The hinge glows while the door is open enough.
   oil(g, r, t, w) {
     const ph = r.kind === 'oil' ? r.ph : t * 0.3, open = r.kind === 'oil' && !r.done ? 0.5 - 0.5 * Math.cos(2 * Math.PI * ph) : w ? 0.5 - 0.5 * Math.cos(w * Math.PI * 2) : 0.15;
-    const ready = r.kind === 'oil' && !r.done && open >= OIL_OPEN, drops = r.kind === 'oil' ? r.drops : 3;
+    const ready = r.kind === 'oil' && oilReady(r), drops = r.kind === 'oil' ? r.drops : 3;
     rrect(g, 12, 6, 62, 74, 4, C.woodDk); rrect(g, 17, 11, 52, 69, 2, '#3a2a22', 1.4); // the frame and the dark room behind
     g.fillStyle = 'rgba(255,230,160,.25)'; g.fillRect(17, 11, 52 * open, 69); // light through the open door
     const dw = 52 * (1 - 0.78 * open), skew = 6 * open; // the door turns away on its hinge: narrower, its far edge taller
@@ -321,6 +321,10 @@ const OBJ = {
     for (let i = 0; i < drops; i++) { g.fillStyle = '#c9a43a'; g.beginPath(); g.ellipse(17, 29 + i * 3, 2.2, 1.6, 0, 0, TAU); g.fill(); }
     // the oil can: body, spout pointing up-left at the hinge, and the drops still to go as dots on it
     const cx = r.kind === 'oil' ? r.cx : 72, cy = r.kind === 'oil' ? r.cy : 80;
+    if (ready) {
+      g.strokeStyle = C.glow; g.lineWidth = 2;
+      g.beginPath(); g.arc(cx, cy, 16, 0, TAU); g.stroke();
+    }
     g.strokeStyle = C.ink; g.lineWidth = 5; g.lineCap = 'round'; g.beginPath(); g.moveTo(cx - 8, cy - 8); g.lineTo(cx - 20, cy - 24); g.stroke();
     g.strokeStyle = C.brassDk; g.lineWidth = 2.6; g.stroke();
     g.beginPath(); g.ellipse(cx, cy, 13, 11, 0, 0, TAU); shape(g, C.red); shine(g, cx - 5, cy - 5, 3.5, 0.5);
@@ -332,7 +336,7 @@ const OBJ = {
   // thumb holds it, so the teeth above stay in sight. Red threads mark the snags; stuck, the slider shakes.
   zip(g, r, t, w) {
     const y = r.kind === 'zip' ? r.y : 24, top = r.kind === 'zip' ? r.top : 24, y0 = r.kind === 'zip' ? r.y0 : 84;
-    const stuck = r.kind === 'zip' && !r.done && r.snags.length && y <= r.snags[0] + 0.5;
+    const stuck = r.kind === 'zip' && zipStuck(r);
     const gap = yy => yy < y ? Math.min(16, (y - yy) * 0.3) : 0; // how far apart the two sides are at height yy
     const side = sgn => { // one half of the jacket, its zip edge following the gap
       g.beginPath(); g.moveTo(50, 98); g.lineTo(50 + sgn * 44, 98); g.lineTo(50 + sgn * 46, 26); g.lineTo(50 + sgn * 30, 6); g.lineTo(50 + sgn * 12, 6);
@@ -578,7 +582,7 @@ export function drawGhost(g, gd, t, alpha) {
   else if (gd.type === 'path' && !gd.trace) { g.moveTo(...gd.pts[0]); for (const q of gd.pts.slice(1)) g.lineTo(...q); }
   else if (gd.type === 'balance') { g.moveTo(...gd.from); g.lineTo(gd.targets[0], gd.from[1]); }
   else if (gd.type === 'pump') { g.moveTo(gd.x - 9, gd.top + 6); g.lineTo(gd.x - 9, gd.bottom + 6); }
-  else if (gd.type === 'zip') { g.moveTo(gd.at[0] + 14, gd.at[1]); g.lineTo(gd.at[0] + 14, gd.top); }
+  else if (gd.type === 'zip' && !gd.stuck) { g.moveTo(gd.at[0] + 14, gd.at[1]); g.lineTo(gd.at[0] + 14, gd.top); }
   else if (gd.type === 'timing') g.arc(gd.at[0], gd.at[1], 16, 0, TAU);
   g.stroke(); g.setLineDash([]);
   // arrowhead at the end of the path, so the way to go is plain
@@ -587,7 +591,7 @@ export function drawGhost(g, gd, t, alpha) {
     : gd.type === 'drag' || gd.type === 'swipe' ? [gd.to[0], gd.to[1], Math.atan2(gd.to[1] - gd.from[1], gd.to[0] - gd.from[0])]
     : gd.type === 'path' && !gd.trace && gd.pts.length > 1 ? [...gd.pts.at(-1), Math.atan2(gd.pts.at(-1)[1] - gd.pts.at(-2)[1], gd.pts.at(-1)[0] - gd.pts.at(-2)[0])]
     : gd.type === 'pump' ? [gd.x - 9, gd.bottom + 6, Math.PI / 2]
-    : gd.type === 'zip' ? [gd.at[0] + 14, gd.top, -Math.PI / 2] : null;
+    : gd.type === 'zip' && !gd.stuck ? [gd.at[0] + 14, gd.top, -Math.PI / 2] : null;
   if (end) { g.fillStyle = 'rgba(255,255,255,.8)'; g.save(); g.translate(end[0], end[1]); g.rotate(end[2]); g.beginPath(); g.moveTo(5, 0); g.lineTo(-4, -5); g.lineTo(-4, 5); g.closePath(); g.fill(); g.restore(); }
   if (tap && gd.all) for (const a of gd.all) { g.strokeStyle = `rgba(255,255,255,${0.5 + 0.4 * Math.sin(t * 8)})`; g.lineWidth = 2.5; g.beginPath(); g.arc(a[0], a[1], 13 + 2 * Math.sin(t * 8), 0, TAU); g.stroke(); }
   // the fingertip itself

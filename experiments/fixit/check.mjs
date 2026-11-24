@@ -12,7 +12,7 @@ import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import { plan, SKILLS } from './moves.js';
 import { KINDS } from './sim.js';
-import { COUNT } from './levels.js';
+import { COUNT, levelReward } from './levels.js';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '..');
 const SHOTS = process.env.SHOTS || join(tmpdir(), 'fixit-shots'); // the build brief sets SHOTS to a scratch folder
@@ -115,7 +115,7 @@ async function playOut(page, label, shot) {
     const st = await state(page);
     if (st.over || st.screen === 'end') break;
     if (st.phase !== 'work') { await sleep(80); continue; }
-    if (shot && st.served === 3) { await sleep(200); await page.screenshot({ path: shot }); shot = null; }
+    if (shot && st.served === 1) { await sleep(200); await page.screenshot({ path: shot }); shot = null; }
     await playJob(page, `${label} ${st.kind}`);
   }
   await until(page, () => window.fixitState().screen === 'end', `${label}: the end card`, 15000);
@@ -166,6 +166,11 @@ async function chapter(page, phone) {
   await touch(page, [['down', x, y], ['up', x, y]]);
   const partial = (await state(page)).p;
   assert.ok(partial > 0 && partial < 1, 'one touch fixes only one dent');
+  await page.reload();
+  st = await state(page);
+  assert.ok(st.paused && st.station === to && st.lanes[to].p === partial,
+    'an active reload preserves the selected rush customer and unfinished repair');
+  await page.click('#resume');
   await page.locator(`.lane[data-lane="${from}"]`).click();
   assert.equal((await state(page)).station, from, 'the first customer remains selectable');
   await page.locator(`.lane[data-lane="${to}"]`).click();
@@ -196,6 +201,41 @@ async function chapter(page, phone) {
   assert.equal(done.served, st.served + 1, 'the boss pays after all three stages');
   if (done.playing) await leave(page);
   else await until(page, () => window.fixitState().screen === 'end', 'boss end card');
+}
+
+async function openingAndReload(page) {
+  await page.goto(`${base}/fixit/?level=1`);
+  const firstTile = page.locator('.lv[data-level="1"] .ss');
+  assert.equal(await firstTile.textContent(), '', 'an unplayed tile shows no earned stars');
+  await page.evaluate(() => {
+    const paint = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (value, ...args) {
+      if (value === 'COMBO') window.comboFont = this.font;
+      return paint.call(this, value, ...args);
+    };
+  });
+  await page.click('#play');
+  await sleep(3200);
+  const comboFont = await page.evaluate(() => window.comboFont);
+  assert.ok(Number(comboFont?.match(/(\d+)px/)?.[1]) >= 13, 'the combo label uses at least 13 CSS pixels');
+  const briefing = await state(page);
+  assert.ok(briefing.card > 0 && briefing.t === 0, 'Tap to start waits for the player to finish reading');
+  await startLevel(page);
+  const before = await playJob(page, 'first repair before reload');
+  await page.click('#pause');
+  await page.reload();
+  const restored = await state(page);
+  assert.ok(restored.paused && restored.screen === 'paused', 'reloading an active level restores it paused');
+  assert.deepEqual([restored.level, restored.served, restored.coins, restored.job, restored.bank],
+    [before.level, before.served, before.coins, before.job, before.bank], 'the same unpaid repair run survives reload');
+  await page.click('#resume');
+  await playOut(page, 'finish restored level');
+  const end = await state(page);
+  assert.equal(end.served, 3, 'the restored last two repairs finish the lesson');
+  assert.equal(end.bank, before.bank + levelReward(end.coins, end.stars, 0), 'the restored clear pays exactly once');
+  await page.reload();
+  assert.equal((await state(page)).screen, 'menu', 'a settled run cannot be restored twice');
+  assert.equal(await firstTile.textContent(), '★'.repeat(end.stars), 'a cleared tile shows exactly its earned stars');
 }
 
 async function run(page, phone) {
@@ -267,10 +307,12 @@ async function run(page, phone) {
   });
   st = await playOut(page, 'level 1', join(SHOTS, `${phone}-3-level-hud.png`));
   assert.ok(st.cleared && st.stars >= 1 && st.over === 'clear', `level 1 cleared with ${st.stars} stars`);
+  const resultStats = await page.locator('#endStats b').allTextContents();
+  assert.deepEqual(resultStats.slice(0, 2), [`${st.times[1]} s`, `${st.times[1]} s`], 'the first clear shows its saved time as both current and best');
   const gap = await page.evaluate(() => window.__gap), alphas = await page.evaluate(() => window.__alpha), have = await page.evaluate(() => window.__have);
   assert.ok(gap >= 0, `people never overlap (closest bodies ${gap.toFixed(1)} px apart)`);
   assert.ok(alphas.length > 50 && alphas.every(a => a >= 0 && a <= 1), 'drawing blends between ticks by a fraction in 0..1');
-  assert.deepEqual(have, [0, 1, 2, 3, 4, 5, 6], 'the goal counter counts each fix');
+  assert.deepEqual(have, [0, 1, 2, 3], 'the goal counter counts each fix');
   assert.equal(await page.evaluate(() => window.__settlementPaused), false, 'pause during the win animation cannot interrupt settlement');
   assert.match(await page.textContent('#endTitle'), /Level 1 cleared/, 'the cleared card');
   assert.ok(await page.isVisible('#next'), 'Next level on the cleared card');
@@ -281,7 +323,7 @@ async function run(page, phone) {
   const r1 = runs(ctx, 'closed');
   assert.equal(r1.length, 1, 'the level sent once, as closed');
   assert.ok(r1[0].data.summary.level === 1 && r1[0].data.summary.cleared === true && r1[0].data.summary.stars === st.stars, 'the run summary names the level, the clear and the stars');
-  assert.ok(r1[0].data.events.filter(e => e.type === 'repair').length >= 6, 'repairs recorded');
+  assert.ok(r1[0].data.events.filter(e => e.type === 'repair').length === 3, 'repairs recorded');
 
   // Next: level 2 with its goal card; then pause and Menu sends 'left' without banking its coins.
   await page.click('#next');
@@ -354,7 +396,7 @@ async function run(page, phone) {
   st = await state();
   assert.equal(st.attempts[19], 2, 'two failed runs unlock help for this level');
   assert.ok(await page.isVisible('#assist'), 'help is offered on the second failed card');
-  assert.ok(await page.getAttribute('#assist', 'aria-label'), 'the wordless helper has an accessible name');
+  assert.ok(await page.getAttribute('#assist', 'aria-label'), 'the helper has an accessible name');
   await page.screenshot({ path: join(SHOTS, `${phone}-assist-offer.png`) });
   await page.reload();
   assert.equal((await state()).attempts[19], 2, 'the offer survives reload');
@@ -477,6 +519,45 @@ async function open(browser, options) {
 }
 const setSave = (page, blob) => page.evaluate(b => { localStorage.setItem('fixit-save', JSON.stringify(b)); localStorage.setItem('hf-lab-send-localhost', '1'); }, blob);
 
+// Exercise the menu with the same controls a new player gets, including the kit's recording choice.
+async function checkPhoneMenus(browser, device) {
+  const { context, page, errors } = await open(browser, device);
+  try {
+    await page.goto(`${base}/fixit/`);
+    const menu = page.locator('#menu');
+    const notice = menu.locator('.lab-notice');
+    const privacy = await notice.getByRole('link').boundingBox();
+    const availableJobs = /jobs unlocked/i.test(await menu.locator('.stats').innerText());
+    await page.getByRole('button', { name: 'Busy street' }).tap();
+    const chapterExplained = /level 15/i.test(await page.locator('#playLine').innerText());
+    await page.getByRole('button', { name: 'Stall shop' }).tap();
+    const back = page.locator('#shop .back');
+    const bottom = await back.evaluate(el => el.getBoundingClientRect().bottom);
+    const backVisible = bottom <= await page.evaluate(() => innerHeight);
+    await back.tap();
+    await page.locator('#play').tap();
+    await page.locator('#pause').tap();
+    await page.getByRole('checkbox').uncheck();
+    await page.locator('#quit').tap();
+    await page.reload();
+    const optOutExplained = /recording is off/i.test(await notice.innerText());
+    await page.locator('#play').tap();
+    await page.locator('#pause').tap();
+    assert.equal(await page.getByRole('checkbox').isChecked(), false, 'recording choice survives reload');
+    await page.getByRole('checkbox').check();
+    await page.locator('#quit').tap();
+    assert.match(await notice.innerText(), /The game lab records play/, 'turning recording back on restores the disclosure');
+    assert.deepEqual(
+      { privacyTarget: privacy.width >= 44 && privacy.height >= 44, availableJobs, chapterExplained, backVisible, optOutExplained },
+      { privacyTarget: true, availableJobs: true, chapterExplained: true, backVisible: true, optOutExplained: true },
+      'menu offers a thumb-sized Privacy link, names the job unlocks and locked chapter, shows Back, and reflects recording consent'
+    );
+    assert.deepEqual(errors, [], 'phone menus have no page errors');
+  } finally {
+    await context.close();
+  }
+}
+
 // A small screen, 360 x 640: the map, a goal card, each new job, a cleared card and a failed card.
 async function small(browser) {
   const { context, page, errors } = await open(browser, { viewport: { width: 360, height: 640 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
@@ -493,6 +574,18 @@ async function small(browser) {
   await startLevel(page);
   await sleep(300);
   await page.screenshot({ path: join(SHOTS, 'small-3-thread.png') });
+  // The purchased radio on the shelf at 360 × 640 shows the tune even with sound off.
+  const radioFrames = new Set();
+  for (let i = 0; i < 6; i++) {
+    radioFrames.add(await page.locator('#c').evaluate(canvas => {
+      const scale = canvas.width / innerWidth;
+      const pixels = canvas.getContext('2d').getImageData(300 * scale, 147 * scale, 32 * scale, 19 * scale);
+      return pixels.data.join(',');
+    }));
+    await sleep(110);
+  }
+  assert.ok(radioFrames.size >= 2, 'the radio face visibly changes as its notes play');
+
   await leave(page);
   for (const kind of ['oil', 'zip', 'spring']) {
     await page.goto(`${base}/fixit/?seed=3&only=${kind}`);
@@ -614,6 +707,8 @@ async function dailyStall(browser, device, phone) {
   await setSave(page, { shifts: 1, bank: 10, days: { '2026-11-19': 40, 'junk': 'x' } });
   await page.reload();
   assert.ok(await page.isVisible('#daily'), 'the daily stall shows after the first shift');
+  assert.match(await page.textContent('#dailyLine'), /12 s.*coins/i, 'daily menu gives the shift duration and score goal');
+  assert.match(await page.textContent('#openLine'), /12 s.*coins/i, 'open menu gives the shift duration and score goal');
   await page.click('#daily');
   const a = await state();
   assert.ok(a.daily && a.today === '2026-11-20' && a.hearts === 3, 'daily stall starts');
@@ -651,10 +746,15 @@ async function dailyStall(browser, device, phone) {
   });
   await page.click('#shareDaily');
   await until(page, () => !!window.__shared, 'the daily PNG to reach the share call');
+  assert.match(await page.textContent('#shareStatus'), /share sheet/i, 'the card acknowledges the share handoff');
   const shared = await page.evaluate(() => window.__shared);
   assert.ok(shared.type === 'image/png' && shared.size > 1000 && shared.name.endsWith('.png'), 'the share call receives the generated PNG');
   const [download] = await Promise.all([page.waitForEvent('download'), page.click('#downloadDaily')]);
   assert.equal(download.suggestedFilename(), `fixit-stall-${end.today}.png`, 'the direct download receives the dated PNG');
+  assert.match(await page.textContent('#shareStatus'), /download started/i, 'the card acknowledges the download request');
+  await page.evaluate(() => Object.defineProperty(navigator, 'share', { value: async () => { throw new DOMException('Canceled', 'AbortError'); } }));
+  await page.click('#shareDaily');
+  assert.match(await page.textContent('#shareStatus'), /canceled/i, 'dismissing the share sheet changes the feedback');
   await page.screenshot({ path: join(SHOTS, `${phone}-daily-end.png`) });
   await sleep(300);
   const run = context.labSent.filter(r => r.game === 'fixit' && r.kind === 'run' && r.data.outcome === 'closed').at(-1);
@@ -716,6 +816,59 @@ async function visual(browser, device, width, height) {
   await context.close();
 }
 
+// Replay the map transition that exposed the early unlock and inspect the actual
+// canvas text painted during an assisted briefing.
+async function coldResults(browser, device) {
+  const { context, page } = await open(browser, device);
+  try {
+    await page.goto(`${base}/fixit/?day=1`);
+    await setSave(page, { levels: levelsUpTo(3), attempts: { 2: 2 } });
+    await page.reload();
+    const observed = {};
+    observed.menuHelp = /slow/i.test(await page.innerText('#menuAssist'));
+    observed.retryHelp = /slow/i.test(await page.textContent('#assist'));
+    await page.evaluate(() => {
+      window.painted = new Set();
+      const paint = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function (value, ...args) {
+        window.painted.add(String(value));
+        return paint.call(this, value, ...args);
+      };
+    });
+    await page.click('#menuAssist');
+    await until(page, () => window.painted.has('Tap to start'), 'painted goal card');
+    const deadline = Math.ceil((await state(page)).goal.time);
+    observed.brief = await page.evaluate(secs => [...window.painted].some(t => t.includes(String(secs)) && t.includes('seconds')), deadline);
+    observed.replayBrief = await page.evaluate(() => ![...window.painted].some(t => /^New job:/i.test(t)));
+    await startLevel(page);
+    await sleep(100);
+    observed.replayBanner = await page.evaluate(() => !window.painted.has('New job!'));
+    await leave(page);
+    await page.evaluate(() => {
+      window.lostBench = false;
+      function inspect() {
+        const s = window.fixitState();
+        if (s.over && s.screen === 'play' && !s.people.length) window.lostBench = true;
+        requestAnimationFrame(inspect);
+      }
+      requestAnimationFrame(inspect);
+    });
+    await page.click('#daily');
+    await until(page, () => window.fixitState().screen === 'end', 'short daily closes');
+    observed.keptBench = !await page.evaluate(() => window.lostBench);
+    await page.evaluate(() => Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => false }));
+    await Promise.all([page.waitForEvent('download'), page.click('#shareDaily')]);
+    observed.shareFallback = /download/i.test(await page.locator('#dailyResult').evaluate(el => el.querySelector('[role=status]')?.textContent ?? ''));
+    await page.click('#toMenu');
+    await page.reload();
+    observed.openLocked = !await page.isVisible('#open') && await page.isVisible('#daily');
+    const { resultSeconds } = await import('./levels.js');
+    observed.threshold = typeof resultSeconds === 'function' && resultSeconds(36 + 1/60) === 36.1 && resultSeconds(36 + 1e-11) === 36;
+    observed.bestMatchesTime = typeof resultSeconds === 'function' && resultSeconds(resultSeconds(48.49)) === resultSeconds(48.49);
+    assert.deepEqual(observed, Object.fromEntries(Object.keys(observed).map(key => [key, true])), 'cold result regressions');
+  } finally { await context.close(); }
+}
+
 const args = process.argv.slice(2);
 const only = args.find(a => Object.hasOwn(PHONES, a));
 let failed = 0;
@@ -732,14 +885,26 @@ if (args.includes('--shots')) {
 for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   if (only && only !== phone) continue;
   const browser = await engine.launch();
+  if (args.includes('--cold-results')) {
+    try { await coldResults(browser, device); console.log(`ok   cold results on ${phone}`); }
+    catch (e) { failed++; console.log(e); }
+    finally { await browser.close(); }
+    continue;
+  }
   const { context, page, errors } = await open(browser, { ...device });
   const t0 = Date.now();
   try {
+    await checkPhoneMenus(browser, phone === 'chromium' ? { ...device, viewport: { width: 360, height: 640 } } : device);
+    const audit = await open(browser, { ...device });
+    await openingAndReload(audit.page);
+    assert.deepEqual(audit.errors, [], 'reload recovery page errors');
+    await audit.context.close();
     await run(page, phone);
     assert.deepEqual(errors, [], 'page errors');
     await context.close();
     await lateShift(browser, device);
     await dailyStall(browser, device, phone);
+    await coldResults(browser, device);
     if (phone === 'chromium') { await small(browser); await desktop(browser); }
     console.log(`ok   fixit on ${phone} (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
   } catch (e) {

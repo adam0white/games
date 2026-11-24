@@ -167,7 +167,7 @@ export function ghost(g, t) {
       return { p: [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f], press: k < 0.9 };
     }
     case 'pump': { const m = Math.sin(k * Math.PI * 4 - Math.PI / 2) * 0.5 + 0.5; return { p: [g.x, g.top + 6 + m * (g.bottom - g.top)], press: true }; }
-    case 'timing': return { p: g.at, press: g.open >= 0.6, tap: true };
+    case 'timing': return { p: g.at, press: g.ready, tap: true };
     case 'zip': { // up to the first snag, a wiggle there, then on up
       const y1 = g.snags.length ? g.snags[0] : g.top;
       if (g.stuck) return { p: [g.at[0] + 7 * Math.sin(k * Math.PI * 8), g.at[1]], press: k < 0.92 };

@@ -5,7 +5,7 @@ const radians = a => a * Math.PI / 180;
 
 export const REPAIR_META = {
   wind: { word: 'Wind!', object: 'winding drum', coin: 3, hit: 23 },
-  balance: { word: 'Balance!', object: 'scale', coin: 3, hit: 24 },
+  balance: { word: 'Slide to the mark', object: 'scale', coin: 3, hit: 24 },
   trace: { word: 'Seal it!', object: 'tile', coin: 3, hit: 22 },
 };
 

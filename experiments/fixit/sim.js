@@ -19,7 +19,7 @@ export const WORKS = 0.6; // the "it works" moment
 export const LEAVE = 0.7; // a grumpy customer walking off
 export const KINDS = ['screw', 'pin', 'dent', 'wheel', 'rub', 'clock', 'chain', 'glue', 'sharpen', 'sew', 'pump', 'oil', 'zip', 'spring', 'thread', ...Object.keys(REPAIRS)];
 export const TUTOR = ['screw', 'pin', 'dent']; // the first three jobs ever, one each, very patient
-export const WORD = { screw: 'Turn!', pin: 'Pull!', dent: 'Tap!', wheel: 'Flick!', rub: 'Rub!', clock: 'Set it!', chain: 'Hook it!', glue: 'Push & hold!', sharpen: 'Swipe!', sew: 'Sew!', pump: 'Pump!', oil: 'Tap when open!', zip: 'Zip it up!', spring: 'Pull back!', thread: 'Thread it!', ...repairMeta('word') };
+export const WORD = { screw: 'Circle the screw', pin: 'Pull the pin up', dent: 'Tap!', wheel: 'Flick!', rub: 'Rub!', clock: 'Set it!', chain: 'Hook it!', glue: 'Push & hold!', sharpen: 'Swipe!', sew: 'Sew!', pump: 'Pump!', oil: 'Tap the glowing can', zip: 'Zip it up!', spring: 'Pull back!', thread: 'Thread it!', ...repairMeta('word') };
 export const OBJECT = { screw: 'bell', pin: 'music box', dent: 'kettle', wheel: 'wheel', rub: 'lamp', clock: 'clock', chain: 'bike', glue: 'vase', sharpen: 'knife', sew: 'teddy', pump: 'ball', oil: 'door', zip: 'jacket', spring: 'toy car', thread: 'needle', ...repairMeta('object') };
 export const COIN = { screw: 2, pin: 2, dent: 2, wheel: 3, rub: 3, clock: 2, chain: 2, glue: 3, sharpen: 3, sew: 3, pump: 3, oil: 3, zip: 3, spring: 2, thread: 3, ...repairMeta('coin') };
 export const QUICK_BONUS = 1; // coins for a repair done with at least half the patience left
@@ -105,15 +105,19 @@ const K = {
       if (!r.grab) return;
       r.want = clamp(dist(x, y, r.ox, r.oy) / r.need, 0, 1);
     },
-    up(r) { r.grab = false; r.want = 0; },
+    up(r, s, type) {
+      // A complete stroke also extracts the pin if the finger lifts before the animation catches up.
+      if (type === 'up' && r.grab && r.want >= 1) r.p = r.pull = 1;
+      r.grab = false;
+      r.want = 0;
+    },
     tick(r, dt, s) {
       if (r.grab && r.want > r.pull) r.pull = Math.min(r.want, r.pull + 1.1 * dt);
       else if (!r.grab) r.pull = Math.max(0, r.pull - 0.6 * dt); // let go too soon and it slides back in
       const c = Math.floor(r.pull * 6);
       if (c > r.creak) s.events.push({ e: 'creak', n: c });
       r.creak = c;
-      if (r.pull > r.p) r.p = r.pull;
-      if (r.pull >= 1) r.p = 1;
+      r.p = r.pull;
     },
     guide: r => ({ type: 'drag', from: [r.tx, r.ty - r.pull * 30], to: [r.tx, r.ty - r.pull * 30 - r.need], hold: true }),
   },
@@ -373,12 +377,13 @@ K.pump = {
 export const OIL_PERIOD = 1.0; // seconds for one swing
 export const OIL_OPEN = 0.6; // how far open the door must be (0 shut, 1 wide open) for a drop to land
 const oilOpen = r => 0.5 - 0.5 * Math.cos(2 * Math.PI * r.ph);
+export const oilReady = r => !r.done && oilOpen(r) >= OIL_OPEN && r.used !== Math.floor(r.ph);
 K.oil = {
   make: s => ({ ph: rand(s) * 0.25, cx: 72, cy: 80, drops: 0, need: 3, used: -1, wasOpen: false }),
   down(r, x, y, s) {
     if (dist(x, y, r.cx, r.cy) > HIT.oil) return false;
     const swing = Math.floor(r.ph);
-    if (oilOpen(r) >= OIL_OPEN && r.used !== swing) {
+    if (oilReady(r)) {
       r.used = swing; r.drops++; r.p = r.drops / r.need;
       s.events.push({ e: 'drip', n: r.drops });
     } else s.events.push({ e: 'splat' });
@@ -395,7 +400,7 @@ K.oil = {
   guide(r) {
     const f = r.ph - Math.floor(r.ph), swing = Math.floor(r.ph);
     const mid = (f <= 0.5 && r.used !== swing ? 0.5 - f : 1.5 - f) * OIL_PERIOD;
-    return { type: 'timing', at: [r.cx, r.cy], mid, period: OIL_PERIOD, open: oilOpen(r), n: r.need - r.drops };
+    return { type: 'timing', at: [r.cx, r.cy], mid, period: OIL_PERIOD, open: oilOpen(r), ready: oilReady(r), n: r.need - r.drops };
   },
 };
 
@@ -403,6 +408,7 @@ K.oil = {
 // up. It sticks at each snag; wiggle side to side to free it, then go on up to the collar.
 export const ZIP_RATE = 150; // local units a second the slider can climb
 const ZIP_TAB = 12; // the tab hangs this far below the slider
+export const zipStuck = r => !r.done && r.snags.length > 0 && r.y <= r.snags[0] + 0.5;
 K.zip = {
   make: s => ({ x: 50, y: 84, y0: 84, top: 24, snags: [64 + Math.floor(rand(s) * 3) * 3, 42 + Math.floor(rand(s) * 3) * 3], wig: 0, dir: 0, run: 0, lx: 0, fy: 84, gy: 0 }),
   down(r, x, y) {
@@ -414,7 +420,7 @@ K.zip = {
     if (!r.grab) return;
     r.fy = y - r.gy;
     const dx = x - r.lx; r.lx = x;
-    if (!r.snags.length || r.y > r.snags[0] + 0.5 || !dx) return;
+    if (!dx || !zipStuck(r)) return;
     // stuck at a snag: each change of direction after at least 4 units of travel is one wiggle
     const sign = Math.sign(dx);
     if (r.dir === 0 || sign === r.dir) r.run += Math.abs(dx);
@@ -430,7 +436,7 @@ K.zip = {
     }
     r.p = r.y <= r.top + 0.01 ? 1 : clamp((r.y0 - r.y + r.wig * 0.6) / (r.y0 - r.top), 0, 0.99);
   },
-  guide: r => ({ type: 'zip', at: [r.x, r.y + ZIP_TAB], top: r.top + ZIP_TAB, snags: r.snags.map(v => v + ZIP_TAB), stuck: r.snags.length > 0 && r.y <= r.snags[0] + 0.5, rate: ZIP_RATE }),
+  guide: r => ({ type: 'zip', at: [r.x, r.y + ZIP_TAB], top: r.top + ZIP_TAB, snags: r.snags.map(v => v + ZIP_TAB), stuck: zipStuck(r), rate: ZIP_RATE }),
 };
 
 // Wind-up toy car: hold it and pull it back. The spring resists, so the car comes back at its own pace and stays in sight
@@ -505,6 +511,11 @@ function makeRepair(s, kind, spot) {
   r.kind = kind; r.p = 0; r.idle = 0; r.best = 0; r.done = false; r.grab = false; r.spot = spot ?? null;
   return r;
 }
+export function repairWord(r) {
+  if (r.kind === 'zip' && zipStuck(r)) return 'Wiggle side to side';
+  if (r.kind === 'balance' && r.grab && r.dwell > 0) return 'Hold it there';
+  return WORD[r.kind];
+}
 export const guide = r => K[r.kind].guide(r);
 export const level = s => s.lv ? s.lv.ramp : Math.min(LEVELS - 1, Math.floor(s.clock / RAMP)); // a map level sets its own step
 export const multiplier = s => 1 + Math.min(2, Math.floor(s.streak / 4)); // x2 after four quick jobs in a row, x3 after eight
@@ -512,6 +523,7 @@ export const multiplier = s => 1 + Math.min(2, Math.floor(s.streak / 4)); // x2 
 // ---------- the shift: the open stall (a day of random customers) or a map level (levels.js) when `lv` is given
 export function create({ seed = 1, unlocked = TUTOR, tutorial = false, hearts = 3, newJob = null, only = null, regular = -1, two = true, day = DAY, startLevel = 0, golden = GOLDEN_CHANCE, goldenFrom = GOLDEN_FROM, lv = null, assisted = false } = {}) {
   if (lv) { // a map level brings its own seed, jobs, pace and goal
+    if (lv.goal.safe || lv.goal.list) hearts = 1;
     seed = lv.seed; unlocked = lv.pool; tutorial = false; newJob = lv.intro; two = lv.two; day = Infinity; startLevel = 0;
     golden = lv.golden; goldenFrom = 4; regular = lv.regular && !lv.goal.list ? 0 : -1;
   }
@@ -748,8 +760,8 @@ export function step(s) {
   s.phaseT -= DT;
   if (s.phaseT > 0) return;
   if (s.cleared) { end(s, 'clear'); return; }
-  if (s.hearts <= 0) { end(s, 'hearts'); return; }
   if (s.lv && s.lost > 0 && goalState(s).safe) { end(s, 'lost'); return; }
+  if (s.hearts <= 0) { end(s, 'hearts'); return; }
   if (s.clock >= s.day) { end(s, 'time'); return; }
   const i = s.lanes.findIndex(lane => !lane.done);
   if (i >= 0) {
