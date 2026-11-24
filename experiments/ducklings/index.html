@@ -51,7 +51,7 @@
 <canvas id="c"></canvas>
 <div id="safe"></div>
 <button id="pause" aria-label="Pause"></button>
-<button id="quack" aria-label="Quack: the ducklings hurry up"><svg width="34" height="22" viewBox="0 0 34 22"><circle cx="10" cy="11" r="8" fill="#7a4a1c"/><path d="M16 8 L27 10 L16 14 Z" fill="#4a2a06"/><circle cx="8" cy="9" r="1.6" fill="#fff"/><path d="M28 4 q4 7 0 14 M31 1 q6 10 0 20" stroke="#4a2a06" stroke-width="2" fill="none" stroke-linecap="round"/></svg>Quack</button>
+<button id="quack" aria-label="Quack: the ducklings hurry up"><svg width="34" height="22" viewBox="0 0 34 22"><circle cx="10" cy="11" r="8" fill="#7a4a1c"/><path d="M16 8 L27 10 L16 14 Z" fill="#4a2a06"/><circle cx="8" cy="9" r="1.6" fill="#fff"/><path d="M28 4 q4 7 0 14 M31 1 q6 10 0 20" stroke="#4a2a06" stroke-width="2" fill="none" stroke-linecap="round"/></svg><span id="quackLabel">Quack</span></button>
 <div id="say"></div>
 
 <div id="menu" class="screen on"><div>
@@ -85,7 +85,7 @@
 </div></div>
 
 <script type="module">
-import { create, step, stars, timeLeft, progress, pathAt, view, DT, SPEED, STAGES, LAST_STAGE, ENDLESS_AFTER, NEST_R, TRAITS, QUACK_COOL, HEARTS, LINE_MAX } from './sim.js?v=2';
+import { create, step, stars, timeLeft, progress, pathAt, view, DT, SPEED, STAGES, LAST_STAGE, ENDLESS_AFTER, NEST_R, TRAITS, QUACK_COOL, HEARTS, LINE_MAX, duskRate } from './sim.js?v=2';
 import * as art from './art.js?v=1';
 import * as save from '../kit/save.js';
 import { sound } from '../kit/audio.js';
@@ -201,7 +201,7 @@ function begin(endless = false) {
   finger = null; keys.clear(); wantQuack = false; roll = new Map(); rolled = false; trailT = 0; trailShows = 0; shake = 0; flash = 0; recCount = 0; endTimer = 0; homeGlow = 0;
   waitTouch = !endless && stage === 1 && !data.taught;
   playing = true; paused = false; show('play');
-  say(endless ? 'Endless pond' : waitTouch ? '' : `Stage ${stage}`, 1300);
+  say(endless ? 'Lily pads refill sunlight' : waitTouch ? '' : `Stage ${stage}`, 1300);
   rec.start({ stage: s.stage, mode });
 }
 const note2 = (type, d) => { if (recCount < 150) { recCount++; rec.event(type, d); } };
@@ -283,6 +283,8 @@ canvas.addEventListener('pointermove', e => { if (finger && e.pointerId === fing
 for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(type, e => { if (finger && e.pointerId === finger.id) finger = null; });
 $('quack').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (playing && !paused) wantQuack = true; });
 $('pause').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); pause(); });
+$('pause').addEventListener('click', pause);
+$('quack').addEventListener('click', () => { if (playing && !paused) wantQuack = true; });
 addEventListener('keydown', e => {
   if (isPauseKey(e)) { if (playing) paused ? resume() : pause(); return; }
   if (!playing) return;
@@ -352,10 +354,10 @@ function tick() {
     if (e.type === 'warn') {
       if (e.kind === 'bike') sfx.bell(); else if (e.kind === 'turtle') sfx.bubbles(); else if (e.kind === 'heron') sfx.heron(); else if (e.kind === 'gust') sfx.gust();
     }
-    if (e.type === 'quack') { sfx.quack(); quackShow = 0.5; rollCall(180, false); }
+    if (e.type === 'quack') { sfx.quack(); quackShow = 0.5; trailT = Math.max(trailT, 1.4); ripples.push({ x: s.mom.x, y: s.mom.y, t0: performance.now(), s: 2 }); rollCall(180, false); }
     if (e.type === 'home') { sfx.home(); homeGlow = 1; }
     if (e.type === 'arrive') { sfx.arrive(e.k); nestDucks.push({ id: e.id, x: e.x, y: e.y, t0: performance.now(), k: e.k, trait: (s.arrived.find(f => f.id === e.id) || {}).trait }); disp.delete(e.id); burst(s.nest.x, s.nest.y, 'spark', 6); }
-    if (e.type === 'check') { sfx.check(); say(`+${e.add} s  ×${e.n}`, 1000); burst(s.mom.x, s.mom.y, 'spark', 12); }
+    if (e.type === 'check') { sfx.check(); say(`+${e.add} sunlight  ×${e.n}`, 1400); burst(s.mom.x, s.mom.y, 'spark', 12); }
   }
   // the first curve the ducklings copy: show her path for a moment (stages 1 and 2)
   const sp = Math.hypot(s.mom.vx, s.mom.vy);
@@ -659,7 +661,7 @@ function drawHud(now) {
   g.fillStyle = '#ffde5a'; g.strokeStyle = '#f29a1a'; g.lineWidth = 2 * dpr; g.beginPath(); g.arc(bx + bw * frac, by + 4 * dpr, 8 * dpr, 0, 7); g.fill(); g.stroke();
   // progress up the pond (stage) or the score (endless), under the bar
   g.fillStyle = '#2f6b5e'; g.font = `bold ${Math.round(14 * dpr)}px ui-rounded, system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'top';
-  const txt = s.endless ? `${s.score}` : `${s.arrived.length ? s.arrived.length + ' home · ' : ''}${s.score}`;
+  const txt = s.endless ? `${s.score} · ☀ ${Math.ceil(left0)}${duskRate(s.t) > 1 ? ' · fading faster' : ''}` : `${s.arrived.length ? s.arrived.length + ' home · ' : ''}${s.score}`;
   g.lineWidth = 3 * dpr; g.strokeStyle = 'rgba(255,255,255,.8)'; g.strokeText(txt, W / 2, by + 13 * dpr); g.fillText(txt, W / 2, by + 13 * dpr);
   if (low && left0 > 0) label('Hurry!', W / 2, by + 50 * dpr);
   // stage 1 only: a word for what the trail means while it shows
@@ -709,6 +711,7 @@ function frame(now) {
     peepT -= dt;
     if (peepT <= 0) { peepT = 2.2 + Math.random() * 1.5; if (s.lost.some(l => Math.abs(l.y - s.mom.y) < 1)) peep(2600 + Math.random() * 500, 0.025); }
     const q = $('quack'); const ready = 1 - s.quackCool / QUACK_COOL; q.style.setProperty('--ready', ready.toFixed(3)); q.classList.toggle('wait', ready < 1);
+    $('quackLabel').textContent = ready < 1 ? `${Math.ceil(s.quackCool)}s` : 'Quack';
     if (water) water.gain.value = 0.18;
   } else if (water) water.gain.value = 0;
   if (playing && !paused || screen === 'play') updateCamera(dt);

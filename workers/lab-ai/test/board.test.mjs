@@ -193,4 +193,20 @@ test('the daily board: its own object, empty again on a new UTC day, cached by d
   assert.deepEqual(await res.json(), { place: 1, rows: [{ n: 'Ada', s: 20 }] }, 'a lower score counts on a new day');
   res = await handleBoard(get(), env, ctx(), deps); assert.deepEqual(await res.json(), { rows: [{ n: 'Main', s: 50 }] }, 'the main board keeps its rows across days');
   assert.deepEqual([...env.objects.keys()].sort(), ['lantern', 'lantern-daily']);
+
+});
+
+
+test('all six boards have independent rows and cache entries; unlisted games remain refused', async () => {
+  assert.deepEqual(BOARD.games, ['lantern', 'sling', 'breath', 'matchmaker', 'lantern-fp', 'ant-swarm']);
+  const env = fakeEnv(), cache = fakeCache(), c = ctx();
+  for (const [i, game] of BOARD.games.entries()) {
+    const path = `/lab-api/board/${game}`;
+    assert.equal((await handleBoard(req({ id: ID(1), n: game, s: i + 1 }, { path }), env, c, { cache })).status, 200);
+    const res = await handleBoard(get({ path }), env, c, { cache });
+    assert.deepEqual(await res.json(), { rows: [{ n: game, s: i + 1 }] });
+    await Promise.all(c.waits);
+  }
+  assert.equal(env.objects.size, 6); assert.equal(cache.store.size, 6);
+  assert.equal((await handleBoard(get({ path: '/lab-api/board/lantern-race' }), env, c)).status, 404);
 });

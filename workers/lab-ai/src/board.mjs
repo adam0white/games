@@ -6,7 +6,7 @@
 import { originAllowed, utcDay } from './core.mjs';
 
 // maxScore: Lantern's endless score is ten points a second, so one million is more than a day of play.
-export const BOARD = { games: ['lantern'], top: 20, keep: 500, name: 16, maxScore: 1_000_000, body: 256, dailyNew: 2000, cacheSeconds: 20, cacheVersion: 1 };
+export const BOARD = { games: ['lantern', 'sling', 'breath', 'matchmaker', 'lantern-fp', 'ant-swarm'], top: 20, keep: 500, name: 16, maxScore: 1_000_000, body: 256, dailyNew: 2000, cacheSeconds: 20, cacheVersion: 1 };
 // Run tickets. perSecond: Lantern's endless score grows by 10 a second, 18 during a boost. slack covers clock and network delay.
 // need: the games whose scores are refused without a ticket. A game joins it once its page with tickets is live everywhere.
 // Daily boards: every player gets the same river for one UTC day, and the board starts empty each day. The first read or

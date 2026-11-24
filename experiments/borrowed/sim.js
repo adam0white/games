@@ -22,7 +22,7 @@ export const DT = 1 / 60;
 export const LIFE = 150; // years on the candle at the start of the run
 export const BURN = 0.15; // years a second while you walk and look; frozen on the picture-choice screen, between chapters and on pause
 export const WRONG = 15; // years a wrong name costs
-export const SELF_POINTS = 100; // points for each self named right; when all three are right, each year left adds 10
+export const SELF_POINTS = 100; // points for each self named right; each right name keeps one third of the 10-points-per-year bonus
 export const SPEED = 3.2; // tiles a second
 export const LEAP_TICKS = 32;
 export const GLOW_R = 2.3; // the dark memory must be this close to light it
@@ -225,6 +225,9 @@ function buildChapter(s, k) {
   const dimsOf = ch.drop === 'M'
     ? { free: [freeDim], push: [rest[0]], leap: [rest[1]], dark: [rest[2]] }
     : { free: [freeDim], push: [lockDims[0]], leap: [lockDims[1]], dark: [lockDims[2]], rewind: [lockDims[3], second].sort() };
+  // In the old chapter Push also holds the kind otherwise exclusive to the mirror.
+  // Light, Push and Leap now cover every kind, while Rewind remains a two-kind shortcut.
+  if (ch.id === 'old') dimsOf.push = [lockDims[0], lockDims[3]].sort();
   if (s.opts.answers) answer = s.opts.answers[k];
 
   const rows = ISLANDS[tpl].map(row => (flip ? [...row].reverse().join('') : row).replaceAll(ch.drop || '@', '.'));
@@ -452,5 +455,5 @@ export function guess(s, i) {
   }
   return right;
 }
-export const score = s => s.right * SELF_POINTS + (s.right === CHAPTERS.length ? Math.ceil(Math.max(0, s.life)) * 10 : 0);
+export const score = s => s.right * SELF_POINTS + Math.floor(Math.ceil(Math.max(0, s.life)) * 10 * s.right / CHAPTERS.length);
 export const years = s => Math.max(0, Math.ceil(s.life));

@@ -4,6 +4,15 @@ export const name = 'games-static';
 export const compatibilityDate = '2026-11-05';
 export const domains = ['play.adamwhite.work'];
 export const zone = 'adamwhite.work';
+// Logs, traces and Issues for games-static. cloudflare.config.ts (the cf deploy) reads this; wrangler.jsonc (the
+// rollback deploy) repeats it, and scripts/observability.test.mjs keeps the two equal. See workers/OBSERVABILITY.md.
+export const observability = {
+  enabled: true,
+  redactQueryString: true,
+  logs: { enabled: true, invocationLogs: true, headSamplingRate: 1 },
+  traces: { enabled: true, headSamplingRate: 0.1 },
+  issues: { enabled: true },
+};
 export const assets = { notFoundHandling: 'none', runWorkerFirst: true };
 // Top-level paths on play.adamwhite.work that are not games or experiments: /proto/ redirects old experiment
 // links (src/worker.mjs), /notes/ and /lab-api/ are other Workers' routes (workers/*/wrangler.jsonc), and
