@@ -60,6 +60,18 @@ function rng(seed) { let a = seed >>> 0 || 1; return () => { a |= 0; a = a + 0x6
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 export const CONE = 1.13; // half-angle a mob can see, radians
+// How far and how wide each species sees (tester t1, note #148, 2026-11-23): [times its plain sight distance, half-angle].
+// A snake sees a long thin strip, a bird nearly all the way round but close. Others differ where the animal suggests it; the rest keep the
+// plain wedge [1, CONE]. Wide sights are shorter, so the area an animal watches stays about the same. Food bugs (level 0) keep the plain wedge.
+// Animals hunting each other still use the plain wedge.
+const SIGHT_KIND = { snake: [1.7, 0.42], bird: [0.62, 2.65] };
+const SIGHT = {
+  Spider: [0.75, 2.2], Mantis: [1.25, 0.8], Crab: [0.75, 2], Frog: [0.8, 2], Mole: [0.5, Math.PI], Lizard: [0.85, 1.7], Bat: [0.55, Math.PI], Turtle: [0.8, 0.9],
+  Rabbit: [0.65, 2.1], Owl: [0.9, 1.6], Eagle: [0.7, 2.2], Deer: [0.65, 1.9], Ostrich: [1.2, 1.4], Cheetah: [1.4, 0.65], Python: [1.5, 0.5], Zebra: [0.65, 1.8],
+  Giraffe: [1.35, 0.9], Pterodactyl: [0.7, 2.6], Griffin: [0.7, 2.3], Basilisk: [1.85, 0.34], Dragon: [0.8, 2.1], Hydra: [1, 1.9],
+};
+export const sightOf = F => (F.level < 1 ? [1, CONE] : SIGHT[F.name] || SIGHT_KIND[F.kind] || [1, CONE]);
+export const sightWords = F => { const [far, half] = sightOf(F), w = half > 2.5 ? 'almost all round' : half > 1.6 ? 'wide' : half < 0.95 ? 'narrow' : '', d = far < 0.9 ? 'close' : far > 1.15 ? 'far' : ''; return [w, d].filter(Boolean).join(', ') || 'straight ahead'; };
 export const SPAWN_WEIGHTS = [[-3, 1], [-2, 3], [-1, 5], [0, 3], [1, 2], [2, 1]];
 
 // Wild rules (a variant; classic is the default and is unchanged):
@@ -111,12 +123,17 @@ export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS,
 // each earlier sneaky pick shrinks the distance a sneaky animal is seen from by 5%. `again` counts the picks of this kind.
 // Fast again (revised 2026-11-23, note #46): 5% a pick showed as about 2% on screen, because the view zooms out each level.
 // Now SAME_FAST a pick, capped at FAST_CAP times the plain fast speed. fastBoost(k) is the factor after k fast picks.
-export const SAME_FAST = 1.12, FAST_CAP = 2.5, SAME_SNEAK = 0.95;
+export const SAME_FAST = 1.12, FAST_CAP = 1.8, SAME_SNEAK = 0.95;
 export const fastBoost = k => Math.min(FAST_CAP, SAME_FAST ** Math.max(0, k - 1));
 // Stronger animals keep up (tester t1, note #101, 2026-11-23): once repeat fast picks made the player faster than every animal,
 // nothing could catch them. A stronger animal now runs with the player's fast boost, and a fast one runs PACE_UP faster than that.
 // A player without a fast boost (every brute or sneak, and a first fast pick) meets exactly the speeds it met before.
 export const PACE_UP = 1.06;
+// A hunter pounces on a fast animal (tester t1, note #149, 2026-11-23: "you just outrun every mob"). A medium or fast stronger animal that
+// is fresh and within `near` of its sight distance dashes at `up` times the player's speed for `secs`, then needs `rest` seconds.
+// Only a player whose current animal is a fast pick meets it; slow hunters never pounce, so what is marked slow can still be outrun.
+export const POUNCE = { near: 0.62, up: 1.3, secs: 1, rest: 6 };
+export const pounces = (M, F) => F.role === 'runner' && M.pace !== 'slow';
 // Animals hunting each other try harder (note #106, 2026-11-23: "the animals don't strive and try enough to kill each other").
 // Before: chase at 0.8 of plain speed, see prey within 0.85 of sight range, give up after 6 s, full for 15 s after a kill;
 // prey flees at full speed, so only a faster hunter ever caught anything. Now a hunter runs at full speed, lunges when close,
@@ -213,8 +230,9 @@ export function step(s, input) {
     const m = s.mobs[i], M = FORMS[m.f], dx = p.x - m.x, dy = p.y - m.y, d = Math.hypot(dx, dy), to = Math.atan2(dy, dx);
     if (m.hunt > 0) m.hunt -= dt;
     const T = m.nem ? TEMPERAMENTS[N.knobs.temperament] : null, power = powerOf(m);
-    const range = M.range * (T ? T.sight : 1), cone = CONE * (T ? T.cone : 1);
+    const [far, half] = sightOf(M), range = M.range * far * (T ? T.sight : 1), cone = Math.min(Math.PI, half * (T ? T.cone : 1));
     if (m.winded > 0) m.winded -= dt;
+    if (m.spring > 0) m.spring -= dt; if (m.pounce > 0) m.pounce -= dt;
     const sees = p.safe <= 0 && !(m.winded > 0) && (m.hunt > 0 || d < range * F.stealth + F.r && Math.abs(wrap(to - m.a)) < cone);
     const wasAlert = m.alert;
     if (sees) { if (!m.alert && power !== F.power) s.events.push({ t: 'notice', strong: power > F.power, id: m.id, nem: !!m.nem }); m.alert = true; m.lost = 0; }
@@ -245,7 +263,10 @@ export function step(s, input) {
       if (!flees) {
         m.want = to; const pace = chasePace(M, F); speed = pace; hunting = true;
         if (!T) {
-          speed = pace * tirePace(m); m.tire = (m.tire || 0) + dt;
+          speed = pace * tirePace(m);
+          if (m.pounce > 0) speed = Math.max(speed, F.speed * POUNCE.up);
+          else if (!(m.spring > 0) && pounces(M, F) && tirePace(m) === 1 && p.safe <= 0 && d < (range * F.stealth + F.r) * POUNCE.near) { m.pounce = POUNCE.secs; m.spring = POUNCE.rest; s.pounced = (s.pounced || 0) + 1; s.events.push({ t: 'pounce', id: m.id, name: M.name, x: m.x, y: m.y }); }
+          m.tire = (m.tire || 0) + dt;
           if (m.tire >= TIRE.spent) { m.alert = false; m.hunt = 0; m.winded = TIRE.rest; m.tire = TIRE.fresh; s.tired++; s.events.push({ t: 'tired', id: m.id, name: M.name, x: m.x, y: m.y }); }
         }
         if (T) {
@@ -283,6 +304,7 @@ export function step(s, input) {
         if (Math.hypot(hx, hy) > RADIUS[N.knobs.territory]) { m.want = Math.atan2(hy, hx); speed = M.speed * 0.6; turn = 4; }
       }
     }
+    if (!m.alert) m.pounce = 0;
     if (T && wasAlert && !m.alert) { // the player got away
       if (N.chase > 1.5 && power > F.power && !s.dead) { N.escapes++; s.events.push({ t: 'nemEscape', escapes: N.escapes }); }
       N.chase = 0; N.stalk = 0; N.commit = false;

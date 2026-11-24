@@ -3,7 +3,7 @@
 // 5. the rival: a death makes one, it persists and gains power, no animal eats it, temperaments differ, it can be eaten
 import assert from 'node:assert/strict';
 import { SPAWN_WEIGHTS, HIDE_S, hideReady, SAME_FAST, FAST_CAP, crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENT_NAMES, NEM_STEP, NEM_MAX_BONUS, NEM_PRIZE, MOBS,
-  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY, TIRE } from './sim.js';
+  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY, TIRE, POUNCE, pounces, sightOf } from './sim.js';
 const seeds = Number(process.argv[2] ?? 20), minutes = Number(process.argv[3] ?? 12);
 
 // 1. Rule table. Player: power 50, speed 124.
@@ -52,7 +52,7 @@ function careful(s) {
     const M = FORMS[m.f], dx = m.x - p.x, dy = m.y - p.y, d = Math.hypot(dx, dy) || 1;
     const pw = powerOf(m);
     if (pw > F.power) {
-      const reach = M.range * F.stealth + 110, facing = ang(Math.atan2(-dy, -dx), m.a) < CONE + 0.4;
+      const [far, half] = sightOf(M), reach = M.range * far * F.stealth + 110, facing = ang(Math.atan2(-dy, -dx), m.a) < half + 0.4;
       if (d < reach * (facing || m.alert ? 1.5 : 0.7)) { const w = (m.alert ? 5 : facing ? 3 : 1.5) * reach / d; vx -= dx / d * w; vy -= dy / d * w; }
     } else if (pw < F.power && (M.speed <= F.speed || !m.alert) && d < bd) { bd = d; best = m; }
   }
@@ -165,6 +165,36 @@ console.log('wild rules: hide and hunt checks pass; hunters tire');
     assert.ok(moved >= FORMS[hunter.f].speed - 1, `a hunter runs at full speed (${moved.toFixed(0)} against ${FORMS[hunter.f].speed})`);
   }
   console.log(`stronger animals keep up with a boosted runner (fast ones ${Math.round((PACE_UP - 1) * 100)}% faster); hunters run at full speed`);
+}
+
+{ // each species has its own sight (note #148): who notices the player at a given angle and share of the plain sight distance
+  const notices = (name, angle, share, f = FORMS.find(f => f.name === name)) => {
+    const s = create(1, stackTo(FORMS.find(f => f.level === Math.max(1, FORMS.find(f => f.name === name).level - 1)))), p = s.player, F = me(s), d = (f.range * F.stealth) * share; p.safe = 0;
+    s.mobs = [{ id: 1, f: f.id, x: p.x + d, y: p.y, a: Math.PI + angle, alert: false, lost: 0, timer: 99, want: Math.PI + angle, walk: false, ph: 0 }]; step(s, null); return s.mobs[0].alert || !!s.dead;
+  };
+  assert.ok(notices('Snake', 0, 1.5) && !notices('Wolf', 0, 1.5), 'a snake sees far ahead'); assert.ok(!notices('Snake', 0.7, 0.8) && notices('Wolf', 0.7, 0.8), 'and only straight ahead');
+  assert.ok(notices('Eagle', 2.1, 0.6) && !notices('Wolf', 2.1, 0.6), 'a bird sees to its sides and back'); assert.ok(!notices('Thunderbird', 0, 0.9) && notices('Wolf', 0, 0.9), 'but not far');
+  assert.ok(!notices('Thunderbird', 3.1, 0.5), 'a bird has a blind spot right behind it');
+  const shapes = new Set(FORMS.filter(f => f.level >= 1).map(f => sightOf(f).join())); assert.ok(shapes.size >= 20, `${shapes.size} sight shapes`);
+  for (const f of FORMS) { const [far, half] = sightOf(f); assert.ok(half <= Math.PI && far > 0); if (f.level < 1) assert.deepEqual([far, half], [1, CONE], 'food bugs see as before'); }
+  console.log(`sight: ${shapes.size} shapes; snakes far and narrow, birds close and almost all round`);
+}
+{ // a hunter pounces on a fast animal (note #149). A hunter sees the player at a share of its sight; the player runs straight away.
+  const run = (pick, H, share) => {
+    const st = [ANT]; for (let l = 1; l < 8; l++) st.push(optionsFor(l)[pick].id);
+    const s = create(1, st), p = s.player, F = me(s); p.safe = 0; p.x = 400; p.y = 1000;
+    s.mobs = [{ id: 1, f: H.id, x: p.x - (H.range * F.stealth + F.r) * share, y: 1000, a: 0, alert: false, lost: 0, timer: 99, want: 0, walk: false, ph: 0 }]; const m = s.mobs[0];
+    for (let i = 0; i < 660 && !s.dead && p.x < 1900; i++) { s.mobs = [m]; step(s, { x: 1, y: 0 }); }
+    return { caught: !!s.dead, pounced: s.pounced || 0 };
+  };
+  const [slow, fast, medium] = optionsFor(8);
+  assert.deepEqual([slow.pace, fast.pace, medium.pace], ['slow', 'fast', 'medium']);
+  assert.ok(run(1, medium, 0.4).caught, 'a medium hunter that is close catches a fast player'); assert.ok(run(1, fast, 0.6).caught, 'a fast one from farther');
+  assert.ok(!run(1, medium, 0.8).caught, 'seen from far, it does not');
+  for (const share of [0.35, 0.6, 0.8]) assert.deepEqual(run(1, slow, share), { caught: false, pounced: 0 }, 'a slow hunter never pounces');
+  for (const pick of [0, 2]) for (const H of [slow, fast, medium]) assert.equal(run(pick, H, 0.5).pounced, 0, 'no pounce on a strong or sneaky animal');
+  assert.ok(POUNCE.secs < TIRE.fresh); assert.equal(pounces(slow, { role: 'runner' }), false);
+  console.log('pounce: a close medium or fast hunter catches a fast player; a far or a slow one does not');
 }
 
 // 5. The rival. With none passed to create() and nobody crowned, every line above is a world without a rival.
@@ -337,12 +367,13 @@ function wary(s) {
   // ambusher 0% -> 71%, on a few alert ticks each. The rule is checked directly below instead.
 }
 { // the rules behind the temperaments, one at a time, in a world with only the rival in it
-  const mole = optionsFor(4)[0], alone = (t, dx, dy) => {
-    const s = create(1, levelStack(3), 0, SPAWN_WEIGHTS, false, { f: mole.id, bonus: 0, kills: 1, knobs: KNOBS(t) }), m = nemesisMob(s);
+  const porcupine = FORMS.find(f => f.name === 'Porcupine'); assert.deepEqual(sightOf(porcupine), [1, CONE], 'the test animal has the plain wedge'); // a Mole sees all round and near since note #148
+  const mole = optionsFor(4)[0], alone = (t, dx, dy, f = porcupine) => {
+    const s = create(1, levelStack(3), 0, SPAWN_WEIGHTS, false, { f: f.id, bonus: 0, kills: 1, knobs: KNOBS(t) }), m = nemesisMob(s);
     s.mobs = [m]; s.player.safe = 0; m.x = s.player.x + dx; m.y = s.player.y + dy; m.a = Math.PI; m.timer = 99; s.nemesis.home = { x: m.x, y: m.y }; s.nemesis.hunt = 999;
     return { s, m };
   };
-  const reach = me(alone('brute', 0, 0).s).r + mole.range; // how far a plain Mole sees this player, straight ahead
+  const reach = me(alone('brute', 0, 0).s).r + porcupine.range; // how far a plain Porcupine sees this player, straight ahead
   // sight: just past a plain animal's range, straight ahead. Only the temperaments that see farther notice.
   const far = Object.fromEntries(TEMPERAMENT_NAMES.map(t => { const { s, m } = alone(t, reach * 1.05, 0); step(s, null); return [t, m.alert]; }));
   assert.deepEqual(far, { ambusher: true, stalker: true, brute: false, coward: true }, 'who sees past a plain animal\'s range');
@@ -361,7 +392,7 @@ function wary(s) {
   // an ambusher that has not noticed stands still inside its territory; the others wander
   const moved = Object.fromEntries(TEMPERAMENT_NAMES.map(t => { const { s, m } = alone(t, 600, 600); m.timer = 0; const x = m.x, y = m.y; let far = 0; for (let i = 0; i < 1200; i++) { step(s, null); far = Math.max(far, Math.hypot(m.x - x, m.y - y)); } return [t, far]; }));
   // a coward runs from a player close to its power; a brute closes in (the player: a level 4 Crab, power 44, against the Mole's 54)
-  const gap = Object.fromEntries(['brute', 'coward'].map(t => { const { s, m } = alone(t, reach * 0.5, 0); s.player.stack = levelStack(4); m.alert = true; // safe stays 0: a player who is safe is not seen
+  const gap = Object.fromEntries(['brute', 'coward'].map(t => { const { s, m } = alone(t, reach * 0.45, 0, mole); s.player.stack = levelStack(4); m.alert = true; // safe stays 0: a player who is safe is not seen
     const d0 = Math.hypot(m.x - s.player.x, m.y - s.player.y); for (let i = 0; i < 30; i++) step(s, null); return [t, Math.hypot(m.x - s.player.x, m.y - s.player.y) - d0]; }));
   assert.ok(gap.brute < -10 && gap.coward > 10, `a coward runs from a player close to its power; a brute closes in (${gap.brute.toFixed(0)}, ${gap.coward.toFixed(0)})`);
   assert.equal(moved.ambusher, 0, 'an ambusher waits'); assert.ok(moved.stalker > 20 && moved.brute > 20 && moved.coward > 20, 'the others wander');

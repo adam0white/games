@@ -395,3 +395,62 @@ The owner: Wild "adds a good difficulty, but makes things impossible", and asked
 ## 2026-11-23: first-time help (the owner's request for beginners)
 
 After 3 s of play with no input, a see-through joystick near the bottom of the screen, the size of the real one, with a finger pressing the knob and taking it once round (`experiments/kit/hint.js`, kind `stick`). It goes on the first touch or key in play and never shows again on that device. New key `ant-promotion:hint`, `'1'` once the player has given input in play. A player with an `ant-promotion:v1` save never sees it. `?hint=hand` or `?hint=ring` shows it anyway, in the two looks for the owner to pick from. Checks: `hint ant-promotion` in the phone check. Not verified on a real phone.
+
+## 2026-11-23: an ending that is not an end, a power for every animal, and speed again (tester t1, notes #148 and #149)
+
+The notes, in short:
+- **#148.** The game feels finished once you have every animal; it should not. Every animal should have its own ability, tied to its species. Animals should see differently: a snake narrow and far, a bird almost all the way round, and other shapes for others. Add more species, and make sure each has a unique ability.
+- **#149.** The speed is annoying and makes the game boring: you outrun every animal in the game. Fix it.
+
+### Done
+- **Hunters pounce on fast animals (#149).** A medium or fast stronger animal that is fresh and within 62% of its sight distance dashes at 1.3 times your speed for 1 second, then cannot pounce again for 6 seconds (`POUNCE` in `sim.js`). It shows "Pounce!", dust and a growl. Only a player whose current animal is a fast pick meets it; a strong or sneaky player meets exactly the hunters it met before. A slow hunter never pounces, so the owner's "a slower one can be outrun" stays true for slow ones. The rival does not pounce; its temperaments already cover this.
+- **The speed cap on fast picks is 1.8 times, was 2.5 (#149).** Six fast picks now reach it. Each pick before that is still +12% (note #46). A saved player with more fast picks is slower after this.
+- **The owner's "hunters tire" rule is unchanged.**
+- **Every species has its own sight (#148).** `SIGHT` in `sim.js`: snakes see a long thin strip (1.7 times as far, 0.42 rad each side), birds almost all round but close (0.62, 2.65), and 22 more animals have their own shape (a Mole all round and very near, a Cheetah far and narrow, a Spider wide). The rest keep the plain wedge. A bird keeps a blind spot right behind it, so it can still be sneaked up on. Food bugs, and animals hunting each other, use the old wedge.
+- The help list explains both. The Animal book says how each animal you have been sees.
+- **Fixed on the way:** a message from play ("You are a Rabbit") showed through the Animal book and the other menu pages.
+
+### Numbers
+A hunter one level up notices a fast player at 40%, 60% or 80% of its sight; the player runs straight away. Main: a first fast pick escaped all nine, and a medium hunter never caught a fast player. Now a medium hunter at 40% catches a level 2, 8 or 13 fast player, and from 60% on it does not. Strong and sneaky rows are the same as before.
+
+Careful bot, 6 seeds, 12 minutes, median top level / median deaths:
+
+| | main | pounce and cap | pounce, cap and sight (built) |
+|---|---|---|---|
+| classic strong | 11 / 1 | 11 / 1 | 9 / 1 |
+| classic fast | 17 / 5 | 15 / 5 | 13 / 3 |
+| classic sneaky | 18 / 0 | 18 / 0 | 18 / 0 |
+| Wild strong | 7 / 4 | 7 / 4 | 6 / 2 |
+| Wild fast | 9 / 10 | 11 / 9 | 11 / 10 |
+| Wild sneaky | 13 / 4 | 13 / 4 | 12 / 4 |
+
+The first sight table (birds 2.85, Rabbit, Deer and Zebra wider) took classic strong to 7: wide-eyed fast prey cannot be caught by a slow animal. Their blind spots were made larger for that reason.
+
+### Checks
+`bots.mjs` has direct checks of the pounce and the sight shapes; with the dash set to 0.1 the pounce check fails (tried). WebKit iPhone 13 screenshots of seven animals in Cartoon and 3D, no page errors. The phone check covers the book line.
+
+The first full `bots.mjs 6 12` failed in the rival rules: their test animal, the Mole, no longer has the plain wedge. They now use a Porcupine, which has it (asserted); every assertion is kept, and the bite-range one still uses the Mole. The bot play printed before that point matches the table above.
+
+The rival section of `bots.mjs` passes after that. One number moved: the bot that is reckless until its first death ate its rival in 3 of 6 Classic runs and 2 of 6 Wild runs. The build that added the rival had 6 and 6; main just before this change was not measured, so part of the drop may be from the changes in between.
+
+### Not verified
+- How a pounce feels to a person, and whether it is enough. Bots show fast picks rise less high in Classic; their deaths barely change.
+- Whether the tester meant the animals' sight, the player's own view, or both. Only the animals' sight changed; a question went to the tester.
+- A real phone.
+
+### Left as a proposal (2026-11-23, notes #148 and #149)
+- **Speed (#149): other levers, if the pounce is not enough.** (`FAST_CAP` went to 1.8 above.) The speed history is: fast picks grew to 2.5× (note #46); stronger animals were made to keep up with a boosted player (note #101); then the owner made a hunter slow down after 4 s and give up at 10 s, because Wild was "impossible". With tiring, running away always works, which matches "you outrun every mob". The candidates are:
+  1. A lower cap on fast picks (`FAST_CAP` 2.5 → about 1.6).
+  2. Tiring only in Wild, not Classic.
+  3. Tiring later (`TIRE.fresh` 4 → 7 s, `spent` 10 → 16 s).
+  4. Hunters that cut the corner (aim where you will be). This alone does not answer #149: against a player who runs straight away, aiming ahead gives the same heading.
+
+  Measure with `bots.mjs` before choosing. Option 2 contradicts the owner's ruling for Classic and needs the owner.
+- **Ways of seeing for the player (#148).** Light the meadow in the shape of the player's own species and dim the rest. It must stay fair: a hunter outside the light still needs its arrow.
+- **An ability per animal (#148).** Group the 51 promoted animals into about 12 ability families, each with a key and a cooldown, for example: Wasp and Scorpion sting (stun), Frog and Rabbit leap, Mole digs (hide underground), Lizard blends in, Eagle and Owl dive, Porcupine spikes (an attacker bounces off), Bat echolocates (see through grass). The species then sets the strength and cooldown. One button on the right of the screen. This is a large change, and bots need a policy for each family.
+- **After every animal (#148).** Two candidates:
+  - a New Game+ meadow where the top animals of the last run are the hunters;
+  - a collection screen of every animal you have been, with the rare ones only reachable through particular picks.
+
+  Ask the tester which one before building.
+- **More species (#148).** Add one extra choice at some promotions, so the tree branches more. It costs art time (each animal is drawn in code in `art.js`, in all four looks).

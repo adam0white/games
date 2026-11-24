@@ -93,10 +93,11 @@
     <li>Every animal has a power number over its head. So do you.</li>
     <li><span class="g">Green number</span>: weaker than you. Touch it to eat it.</li>
     <li><span class="r">Red number</span>: stronger than you. Touch it and you die.</li>
-    <li>The pale wedge is what an animal can see. Walk into it and the animal notices you: <span class="y">!</span></li>
+    <li>The pale shape is what an animal can see. Each species sees differently: a snake sees a long thin strip, a bird sees almost all round but not far. Walk into it and the animal notices you: <span class="y">!</span></li>
     <li><span class="r">&raquo;</span> means it is faster than you. A fast strong animal that notices you will catch you. A fast weak one will get away, so sneak up from behind.</li>
     <li>No food on the screen? A <span class="g">green arrow</span> at the edge points to the nearest animal you can eat. A red arrow points to a stronger animal that has seen you.</li>
     <li>Fill the bar to get promoted. You pick 1 of 3 new animals each time. Picking fast again makes you faster each time. Picking sneaky again makes you harder to see each time.</li>
+    <li>If you are a fast animal, a medium or fast hunter close to you can pounce: one quick dash. Keep your distance, or be far when it sees you. A slow one never pounces.</li>
     <li>A hunter gets tired. Keep running: it slows down, then gives up and rests for a few seconds.</li>
     <li>Animals hunt each other too. A red dashed line shows who is chasing whom. A hunter that is busy is easier to sneak past.</li>
     <li><b>Wild rules</b> are the normal game; the Rules button in the menu switches to Classic. Wild adds two things. A strong animal has a thick hide: it lives through one bite, then the hide needs 25 seconds. And every 45 seconds a stronger animal nearby hunts you for 5 seconds, wherever it is looking.</li>
@@ -138,7 +139,7 @@
 </div></div>
 
 <script type="module">
-import { FORMS, ANT, WORLD, TOP, CONE, create, step, choose, revive, me, level, needFor, article, SPAWN_WEIGHTS, hideReady, fastBoost, SAME_SNEAK,
+import { FORMS, ANT, WORLD, TOP, sightOf, sightWords, create, step, choose, revive, me, level, needFor, article, SPAWN_WEIGHTS, hideReady, fastBoost, SAME_SNEAK,
   crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENTS, TEMPERAMENT_NAMES, paceAgainst } from './sim.js';
 import { drawForm, setLook, LOOKS } from './art.js';
 import { create3D } from './look3d.js';
@@ -257,6 +258,7 @@ function burst(x, y, colours, n, speed, size) {
 const cards = screens(['menu', 'skins', 'how', 'book', 'evolve', 'dead', 'paused', 'win']);
 function show(name) {
   mode = name;
+  if (name !== 'play') { $('say').classList.remove('on'); sayTimer = 0; } // a message from play must not show through a card
   cards(name);
   const play = name === 'play';
   $('hud').style.display = s && name !== 'menu' && name !== 'skins' && name !== 'how' && name !== 'book' ? 'block' : 'none';
@@ -292,7 +294,7 @@ function book() {
     const known = save.seen.includes(F.id), d = document.createElement('div'), pic = document.createElement('canvas'); pic.width = pic.height = 144;
     portrait(pic, F, 28, 0, known ? save.skin : null);
     if (!known) { const x = pic.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#0b1808'; x.fillRect(0, 0, 144, 144); x.globalCompositeOperation = 'source-over'; d.className = 'no'; }
-    d.append(pic, known ? F.name : `Level ${F.level}`); box.append(d);
+    d.append(pic, known ? F.name : `Level ${F.level}`); if (known) d.append(Object.assign(document.createElement('div'), { textContent: 'Sees: ' + sightWords(F), style: 'background:none;opacity:.8;padding:0' })); box.append(d);
   }
 }
 function start(fresh) {
@@ -431,7 +433,7 @@ function label(x, y, text, colour, size, extra) {
 
 // ----- shared by the flat looks and the 3D look
 // What an animal can see: [distance before the player's stealth, half-angle]. The rival's temperament changes both.
-const sight = m => { const M = FORMS[m.f], T = m.nem && s.nemesis ? TEMPERAMENTS[s.nemesis.knobs.temperament] : null; return [M.range * (T ? T.sight : 1), CONE * (T ? T.cone : 1)]; };
+const sight = m => { const M = FORMS[m.f], T = m.nem && s.nemesis ? TEMPERAMENTS[s.nemesis.knobs.temperament] : null; const [far, half] = sightOf(M); return [M.range * far * (T ? T.sight : 1), Math.min(Math.PI, half * (T ? T.cone : 1))]; };
 function crownMark(x, y, w, colour) { // a small crown: the rival's mark
   g.beginPath(); g.moveTo(x - w / 2, y); g.lineTo(x - w / 2, y - w * 0.5); g.lineTo(x - w / 4, y - w * 0.25); g.lineTo(x, y - w * 0.6); g.lineTo(x + w / 4, y - w * 0.25); g.lineTo(x + w / 2, y - w * 0.5); g.lineTo(x + w / 2, y); g.closePath();
   g.fillStyle = colour; g.strokeStyle = '#0b1408'; g.lineWidth = Math.max(1.5, w / 12); g.lineJoin = 'round'; g.fill(); g.stroke();
@@ -718,6 +720,7 @@ function frame(now) {
         }
         if (e.t === 'mobeat' && Math.abs(e.x - s.player.x) < W / zoom && Math.abs(e.y - s.player.y) < H / zoom) { const M = FORMS.find(f => f.name === e.name); burst(e.x, e.y, [M.c, M.d, '#ffffff'], 10, 90 + M.r * 5, Math.max(3, M.r * 0.28)); floats.push({ x: e.x, y: e.y, text: `${e.by} ate ${article(e.name)}`, age: 0 }); crunch(0.08, 0.1, 900); }
         if (e.t === 'tired') { floats.push({ x: e.x, y: e.y - 20, text: 'phew...', age: 0, c: '#cfe8ff', big: 1.1 }); say(`${article(e.name).replace(/^a/, 'A')} got tired and gave up`); blip(520, 0.25, 'sine', 0.08, 780); }
+        if (e.t === 'pounce') { floats.push({ x: e.x, y: e.y - 18, text: 'Pounce!', age: 0, c: '#ff8a3a', big: 1.3 }); burst(e.x, e.y, ['#e8d8a8', '#c8b070'], 8, 120, 4); blip(240, 0.18, 'sawtooth', 0.1, 420); buzz(30); }
         if (e.t === 'notice') {
           blip(e.strong ? 180 : 700, 0.12, e.strong ? 'sawtooth' : 'sine', 0.06);
           if (e.nem && save.nem && s.t - noticeAt > 10) { noticeAt = s.t; speak(fill(e.strong ? save.nem.persona.lines.notice : pick(FEAR)), 'notice', 3000); }
