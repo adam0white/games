@@ -17,6 +17,7 @@
 import {
   newRun, step, walkTo, use, ready, guess, nextChapter, consistent, tileOf, route, hamming, ABILITIES, COST, LOCK_ABILITY,
   LIFE, BURN, SPEED, FACES, WRONG, PICK, SHOW, CHAPTERS, roleId, score, solvePuzzle, liarFor, fits, pickLie, showMe, later, rng,
+  ISLANDS, NEAR,
 } from './sim.js';
 
 const t0 = Date.now(), cpu0 = process.cpuUsage();
@@ -248,7 +249,12 @@ function idle(seed) { const s = newRun(seed); let n = 0; while (s.status === 'pl
 
 // ---------------------------------------------------------------- 1. determinism
 const snapshot = s => JSON.stringify({ ...s, dark: [...s.dark], lit: [...s.lit], bot: undefined });
-const PERMS = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+// Every ordered choice of three different islands; the coverage runs walk through them so every island plays every chapter.
+const ORDERS = [];
+for (let a = 0; a < ISLANDS.length; a++) for (let b = 0; b < ISLANDS.length; b++) for (let c = 0; c < ISLANDS.length; c++) {
+  if (a !== b && b !== c && a !== c) ORDERS.push([a, b, c]);
+}
+const orderFor = seed => ORDERS[(seed * 37) % ORDERS.length];
 {
   const a = careful(4242), b = careful(4242);
   check(snapshot(a) === snapshot(b), 'careful bot run is deterministic (state and event log)');
@@ -267,6 +273,76 @@ const PERMS = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]]
     }
   }
   check(same === 900, `with and without lies a seed deals the same faces, answer and island (${same}/900 chapters)`);
+}
+
+// ---------------------------------------------------------------- 1b. the islands
+// A proof for every island, both ways round, as each chapter deals it (the child has no mirror, the old one no free
+// memory): on foot from the start you reach the free memory, the dark memory, the mirror, the shore stone and a tile
+// beside the cracked rock, but not the memory behind the rock nor the one on the island. Breaking the rock opens the
+// first; the island is closed water all round, reached by the leap stone, and the raised stones join it to the shore.
+function islandProblems(rows) {
+  const h = rows.length, w = rows[0].length, out = [];
+  const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? '#' : rows[y][x]);
+  const find = c => { const all = []; rows.forEach((r, y) => [...r].forEach((v, x) => { if (v === c) all.push({ x, y }); })); return all; };
+  if (rows.some(r => r.length !== 7) || h !== 16) out.push('not 7 x 16');
+  if (rows.some((r, y) => r[0] !== '#' || r[6] !== '#' || ((y === 0 || y === h - 1) && r !== '#######'))) out.push('no wall all round');
+  const one = {};
+  for (const c of 'SPBLj>D') { const f = find(c); if (f.length !== 1) out.push(`${f.length} of ${c}`); one[c] = f[0]; }
+  for (const c of 'FM') { const f = find(c); if (f.length > 1) out.push(`${f.length} of ${c}`); one[c] = f[0]; }
+  if (!find('=').length) out.push('no stones under water');
+  if (out.length) return out;
+  const walk = (from, open) => {
+    const seen = new Set([from.x + ',' + from.y]), q = [from];
+    for (let k = 0; k < q.length; k++) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const x = q[k].x + dx, y = q[k].y + dy, c = at(x, y), key = x + ',' + y;
+      if (seen.has(key) || c === '#' || c === '~' || (c === 'B' && !open.rock) || (c === '=' && !open.stones)) continue;
+      seen.add(key); q.push({ x, y });
+    }
+    return seen;
+  };
+  const has = (set, p) => p && set.has(p.x + ',' + p.y);
+  const foot = walk(one.S, {}), rock = walk(one.S, { rock: true }), stones = walk(one.S, { stones: true }), isle = walk(one.j, {});
+  for (const c of 'FDM>') if (one[c] && !has(foot, one[c])) out.push(`${c} not reached on foot`);
+  for (const c of 'PLj') if (has(foot, one[c])) out.push(`${c} reached on foot`);
+  if (Math.abs(one.B.x - one.P.x) + Math.abs(one.B.y - one.P.y) !== 1) out.push('the rock is not beside its memory');
+  if (![...foot].some(k => { const [x, y] = k.split(',').map(Number); return Math.hypot(x - one.B.x, y - one.B.y) <= NEAR; })) out.push('no tile near the rock');
+  if (!has(rock, one.P) || has(rock, one.L)) out.push('breaking the rock does not open just its memory');
+  if (!has(isle, one.L) || [...isle].some(k => foot.has(k))) out.push('the island is not closed');
+  if (!has(stones, one.L)) out.push('the raised stones do not reach the island');
+  const dark = find(',');
+  if (!dark.some(p => Math.max(Math.abs(p.x - one.D.x), Math.abs(p.y - one.D.y)) === 1)) out.push('the dark memory has no dark ground');
+  return out;
+}
+{
+  let proven = 0;
+  const bad = [];
+  ISLANDS.forEach((rows, i) => {
+    for (const flip of [false, true]) for (const ch of CHAPTERS) {
+      const dealt = rows.map(r => (flip ? [...r].reverse().join('') : r).replaceAll(ch.drop || '@', '.'));
+      const problems = islandProblems(dealt);
+      if (problems.length) bad.push(`island ${i + 1}${flip ? ' mirrored' : ''} ${ch.name}: ${problems.join('; ')}`);
+      else proven++;
+    }
+  });
+  check(bad.length === 0 && ISLANDS.length >= 6, `every island is proven as each chapter deals it, both ways round (${proven} of ${ISLANDS.length * 6}; ${bad.join(' | ') || 'none bad'})`);
+  // The proof must catch a broken island: a gap in the rock pocket, a land bridge to the island.
+  const broken = [ISLANDS[0].map((r, y) => y === 6 ? '#P...M#' : r), ISLANDS[0].map((r, y) => y === 1 ? '#Lj.,D#' : r)];
+  check(broken.every(rows => islandProblems(rows).length > 0), 'the island proof catches a memory reached without its ability');
+  // Two lives in a row: how often a chapter is dealt the very island (same shape, same way round) the last life had there,
+  // and how often a life uses the same three shapes as the last one.
+  let sameChapter = 0, sameSet = 0;
+  const dealOf = seed => { const s = newRun(seed, { lies: false }), out = [];
+    for (let k = 0; k < 3; k++) { if (k) { s.status = 'named'; nextChapter(s); } out.push(`${s.island}${s.flip}`); } return { out, set: [...s.order].sort().join() }; };
+  let prev = dealOf(1);
+  for (let seed = 2; seed <= 3001; seed++) {
+    const next = dealOf(seed);
+    sameChapter += next.out.filter((x, k) => x === prev.out[k]).length;
+    if (next.set === prev.set) sameSet++;
+    prev = next;
+  }
+  const chapterRate = sameChapter / 9000, setRate = sameSet / 3000;
+  check(chapterRate < 0.1 && setRate < 0.1, `two lives in a row: a chapter on the same island ${(100 * chapterRate).toFixed(1)}% (under 10%), the same three islands ${(100 * setRate).toFixed(1)}% (under 10%)`);
+  console.log(`islands: ${ISLANDS.length}; two lives in a row share a chapter's island ${(100 * chapterRate).toFixed(1)}% of chapters, all three shapes ${(100 * setRate).toFixed(1)}% of lives`);
 }
 
 // ---------------------------------------------------------------- 2. the faces
@@ -405,10 +481,38 @@ const puzzleRows = {}, chainRows = CHAPTERS.map(() => ({})), needsRows = CHAPTER
   check(tried > 100 && caught === tried, `a free-memory lie that fits another face is caught (${caught}/${tried})`);
 }
 
+// The first memory of each chapter (free; Push for the old one) asks for one small deduction: every value its lie shows is
+// on some face, only the pair is on none. It is still settled from the portraits alone, never names anyone by itself, and
+// a bot that takes it and then guesses among the faces that fit is right less often chapter by chapter.
+{
+  const ramp = CHAPTERS.map(() => ({ n: 0, right: 0, deduce: 0, cold: 0, named: 0 }));
+  for (let seed = 1; seed <= 3000; seed++) {
+    const s = newRun(seed);
+    for (let k = 0; k < CHAPTERS.length; k++) {
+      if (k) { s.status = 'named'; nextChapter(s); }
+      const z = s.spots.find(p => p.lock === (k === 2 ? 'push' : 'free')).puzzle, lie = z.frags[z.liar], a = s.faces[s.answer];
+      const known = [null, null, null, null]; for (const d of z.dims) known[d] = a[d];
+      const fit = consistent(s.faces, known), row = ramp[k];
+      row.n++; row.right += 1 / fit.length; // a uniform guess among the faces that fit
+      if (fit.length < 2) row.named++;
+      if (solvePuzzle(s.faces, [null, null, null, null], z) === z.liar) row.cold++;
+      if (lie.dims.every((d, i) => s.faces.some(f => f[d] === lie.vals[i]))) row.deduce++;
+    }
+  }
+  const pct = (x, n) => (100 * x / n).toFixed(1);
+  check(ramp.every(r => r.cold === r.n && r.named === 0), `the first memory is always settled from the portraits and never names anyone (${ramp.map(r => `${r.cold - r.named}/${r.n}`).join(', ')})`);
+  check(ramp.every(r => r.deduce >= 0.88 * r.n), `the first memory's lie shows only values some face has, so finding it takes a deduction (${ramp.map(r => pct(r.deduce, r.n) + '%').join(', ')}; at least 88%)`);
+  const rates = ramp.map(r => 100 * r.right / r.n);
+  check(rates[0] > rates[1] + 1 && rates[1] > rates[2] + 1, `after the first memory a guess among the faces that fit gets harder chapter by chapter (${rates.map(x => x.toFixed(1) + '%').join(' > ')}, by more than 1 point each)`);
+  console.log(`first memory: needs a deduction in ${ramp.map((r, k) => `${CHAPTERS[k].name} ${pct(r.deduce, r.n)}%`).join(', ')}; then a guess among the faces that fit is right ${ramp.map((r, k) => `${CHAPTERS[k].name} ${rates[k].toFixed(1)}%`).join(', ')}`);
+}
+
 // Exercise the actual walks and abilities in dependency order on every island order. Each
 // chapter starts with a full candle here, so visiting every lock is independent of run budget.
-let reached = 0;
-for (const [i, order] of PERMS.entries()) {
+let reached = 0, routeRuns = 0;
+const routeOrders = ISLANDS.flatMap((_, t) => [0, 1, 2].map(k => { const o = [t, (t + 1) % ISLANDS.length, (t + 2) % ISLANDS.length]; [o[0], o[k]] = [o[k], o[0]]; return o; }));
+for (const [i, order] of [...routeOrders, ...routeOrders].entries()) {
+  routeRuns++;
   const s = newRun(i + 1, { order });
   const orders = [
     ['free', 'push', 'leap', 'dark'],
@@ -427,7 +531,7 @@ for (const [i, order] of PERMS.entries()) {
     if (k < 2) nextChapter(s);
   }
 }
-check(reached === 78, `actual ability routes reach all 78 memories across the six island orders (${reached})`);
+check(reached === routeRuns * 13, `actual ability routes reach every memory, every island in every chapter, two seeds each (${reached} of ${routeRuns * 13})`);
 
 // A life is three different people: a chapter's answer never has the role of an earlier chapter's answer while one of
 // its faces has a new role. The answer stays a function of the seed alone, spread evenly over the six places.
@@ -463,7 +567,7 @@ const SEEDS = 180;
 const stats = (list, f) => { const v = list.map(f); return { min: Math.min(...v), mean: v.reduce((a, b) => a + b, 0) / v.length, max: Math.max(...v) }; };
 const runs = [], slow = [], spend = [], noRewind = [], person = [];
 for (let seed = 1; seed <= SEEDS; seed++) {
-  const order = PERMS[seed % 6];
+  const order = orderFor(seed);
   for (let a = 0; a < FACES; a++) {
     const answers = [a, (a + 2) % FACES, (a + 4) % FACES];
     runs.push(careful(seed, { order, answers }));
@@ -536,7 +640,7 @@ const tapperRows = {};
 const tappers = { random: 'taps at random', first: 'always taps the first picture', buyer: 'always pays to be shown' };
 for (const [policy, label] of Object.entries(tappers)) {
   const list = [];
-  for (let seed = 1; seed <= SEEDS; seed += 2) for (let a = 0; a < FACES; a += 2) list.push(careful(seed, { order: PERMS[seed % 6], answers: [a, (a + 2) % FACES, (a + 4) % FACES], puzzle: policy }));
+  for (let seed = 1; seed <= SEEDS; seed += 2) for (let a = 0; a < FACES; a += 2) list.push(careful(seed, { order: orderFor(seed), answers: [a, (a + 2) % FACES, (a + 4) % FACES], puzzle: policy }));
   const sc = stats(list, s => s.score).mean;
   tapperRows[label] = {
     score: sc.toFixed(0), 'careful score': carefulScore.toFixed(0),
@@ -552,7 +656,7 @@ for (const [policy, label] of Object.entries(tappers)) {
 // puzzle could be settled) meets this often; paying must do at least as well as a blind tap.
 const hasty = { buy: [], guess: [] };
 for (let seed = 1; seed <= SEEDS; seed++) for (let a = 0; a < FACES; a += 2) {
-  const o = { order: PERMS[seed % 6], answers: [a, (a + 2) % FACES, (a + 4) % FACES], hasty: true };
+  const o = { order: orderFor(seed), answers: [a, (a + 2) % FACES, (a + 4) % FACES], hasty: true };
   hasty.buy.push(careful(seed, { ...o, puzzle: 'careful' }));
   hasty.guess.push(careful(seed, { ...o, puzzle: 'guess' }));
 }
@@ -567,7 +671,7 @@ check(spendFaded > 0.5 || spendScore < carefulScore * 0.6, `the spender dies or 
 
 // A wrong name costs years and the chapter; guessing between the last two must not beat paying for one more memory.
 const gamble = [];
-for (let seed = 1; seed <= SEEDS; seed++) for (let a = 0; a < FACES; a++) gamble.push(gambler(seed, { order: PERMS[seed % 6], answers: [a, (a + 2) % FACES, (a + 4) % FACES] }));
+for (let seed = 1; seed <= SEEDS; seed++) for (let a = 0; a < FACES; a++) gamble.push(gambler(seed, { order: orderFor(seed), answers: [a, (a + 2) % FACES, (a + 4) % FACES] }));
 const gambleScore = stats(gamble, s => s.score).mean;
 const gambleAll = gamble.filter(s => s.status === 'remembered').length / gamble.length;
 check(gambleScore < carefulScore * 0.8 && gambleAll < 0.5, `guessing between the last two scores worse than paying and names all three less than half the time (${gambleScore.toFixed(0)} against ${carefulScore.toFixed(0)}, ${(100 * gambleAll).toFixed(0)}%)`);

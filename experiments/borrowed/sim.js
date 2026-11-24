@@ -127,13 +127,86 @@ export const ISLANDS = [
     '#...S.#',
     '#######',
   ],
+  [
+    '#######',
+    '#,,,#M#',
+    '#,D,#.#',
+    '#,,,..#',
+    '#.#...#',
+    '#....##',
+    '#..#BP#',
+    '#...###',
+    '#..~~~#',
+    '#..~jL#',
+    '#..~=~#',
+    '#...>.#',
+    '##....#',
+    '#.F...#',
+    '#..S..#',
+    '#######',
+  ],
+  [
+    '#######',
+    '#~~~.M#',
+    '#Lj=>.#',
+    '#~~~..#',
+    '#.....#',
+    '#.#.#.#',
+    '#.....#',
+    '###.#B#',
+    '#,,,#P#',
+    '#,D,###',
+    '#,,,..#',
+    '#.....#',
+    '#..#..#',
+    '#....F#',
+    '#.S...#',
+    '#######',
+  ],
+  [
+    '#######',
+    '#..,,,#',
+    '#M.,D,#',
+    '#..,,,#',
+    '#.....#',
+    '#.#.#.#',
+    '#.....#',
+    '#.###.#',
+    '#.#P#.#',
+    '#..B..#',
+    '#.....#',
+    '#..~~~#',
+    '#.>=jL#',
+    '#..~~~#',
+    '#.S.F.#',
+    '#######',
+  ],
+  [
+    '#######',
+    '#~~~#P#',
+    '#Lj~.B#',
+    '#~=~..#',
+    '#.>...#',
+    '#.....#',
+    '##.#..#',
+    '#...M.#',
+    '#.#...#',
+    '#.....#',
+    '#.##,,#',
+    '#..,D,#',
+    '#..,,,#',
+    '#.F...#',
+    '#...S.#',
+    '#######',
+  ],
 ];
 // The three chapters. Each later one is harder in a way you can see:
 //  - the child: no mirror, and any two faces differ in at least two kinds, so one memory often settles it;
 //  - the grown-up: every lock, and two faces may differ in a single kind;
 //  - the old one: no free memory (every clue costs years) and the candle burns faster.
 // With lies, each chapter also brings one new kind of puzzle (see makePuzzles).
-// Each run deals the three islands to the three chapters in a random order, so the island shapes vary too.
+// Each run deals three different islands of the seven to the three chapters, each maybe mirrored, so two lives in a row
+// rarely look alike. bots.mjs proves every island: each lock opens only with its ability, and opens with it.
 export const CHAPTERS = [
   { id: 'child', name: 'Child', apart: 2, drop: 'M', burn: 1 },
   { id: 'grown', name: 'Grown-up', apart: 1, drop: '', burn: 1 },
@@ -244,17 +317,43 @@ export function solvePuzzle(faces, known, puzzle, exposed = []) {
 const KINDS = [0, 1, 2, 3];
 const otherValue = (r, value) => shuffle(r, KINDS.filter(v => v !== value))[0];
 
-// The entry shows one kind, which always leaves at least two faces. Each of the other
-// kinds comes from a paid memory. Choose a rival who agrees on the entry kind. The rival's
-// dependent photo remains plausible until the parent tells the first kind they disagree on.
+// The entry shows two kinds. Each value of its lie is on some face, but no face has the two together, so it is settled
+// by one small deduction from the portraits alone: find a face with both. The true photo leaves at least two faces.
+// Which second kind the entry shows sets how much it tells: the child's tells the most and the old one's the least
+// (counted as the pairs of values the faces show), so a guess after the first memory gets harder chapter by chapter.
+// Each other kind comes from a paid memory. A rival agrees with the answer on both entry kinds; the dependent photo
+// stays plausible for the rival until the parent tells the first kind they disagree on.
+function entryOf(r, ch, faces, self) {
+  const options = [];
+  const used = d => KINDS.filter(v => faces.some(f => f[d] === v));
+  for (const [a, x] of shuffle(r, [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]])) {
+    const pairs = new Set(faces.map(f => f[a] * 4 + f[x]));
+    const left = faces.filter(f => f[a] === self[a] && f[x] === self[x]).length;
+    if (left < 2) continue;
+    const lies = [];
+    for (const u of used(a)) for (const v of used(x)) {
+      if (!pairs.has(u * 4 + v)) lies.push({ vals: [u, v], near: (u === self[a]) + (v === self[x]) });
+    }
+    if (!lies.length) continue;
+    const near = Math.max(...lies.map(l => l.near));
+    options.push({ anchor: a, x, left, lie: shuffle(r, lies.filter(l => l.near === near))[0].vals });
+  }
+  if (!options.length) return null;
+  options.sort((p, q) => p.left - q.left);
+  return ch.id === 'child' ? options[0] : ch.id === 'old' ? options.at(-1) : options[options.length >> 1];
+}
 function makePuzzles(r, ch, faces, answer, dimsOf) {
   const self = faces[answer];
   const entry = ch.id === 'old' ? 'push' : 'free';
-  const anchor = dimsOf[entry][0];
-  const rivals = shuffle(r, faces.filter((f, i) => i !== answer && f[anchor] === self[anchor]));
+  const two = entryOf(r, ch, faces, self);
+  const anchor = two ? two.anchor : dimsOf[entry][0];
+  // Rarely no second kind works; the entry then shows the one kind with a value no face has, as before.
+  const x = two ? two.x : null;
+  const rivals = shuffle(r, faces.filter((f, i) => i !== answer && f[anchor] === self[anchor] && (x === null || f[x] === self[x])));
   const rival = rivals.reduce((best, f) => hamming(f, self) > hamming(best, self) ? f : best);
-  const unseen = shuffle(r, KINDS.filter(d => d !== anchor));
+  const unseen = shuffle(r, KINDS.filter(d => d !== anchor && d !== x));
   const [first, next, spare] = unseen.sort((a, b) => Number(rival[b] !== self[b]) - Number(rival[a] !== self[a]));
+  const other = x ?? spare; // the kind the entry or a spare memory adds beside first and next
   const falseSeal = pick(r, 4);
   const [parentSeal, dependentSeal] = shuffle(r, KINDS.filter(v => v !== falseSeal));
 
@@ -276,35 +375,41 @@ function makePuzzles(r, ch, faces, answer, dimsOf) {
   }
 
   const out = {
-    [entry]: pair([anchor], [shuffle(r, KINDS.filter(v => !faces.some(f => f[anchor] === v)))[0]]),
+    [entry]: two ? pair([anchor, x], two.lie)
+      : pair([anchor], [shuffle(r, KINDS.filter(v => !faces.some(f => f[anchor] === v)))[0]]),
   };
   const mismatch = d => otherValue(r, self[d]);
+  const witnessed = (a, d) => {
+    const witness = faces.find(f => f[a] !== self[a] && f[d] !== self[d]);
+    return pair([a, d].sort(), [a, d].sort().map(k => witness ? witness[k] : mismatch(k)));
+  };
   if (ch.id === 'child') {
-    for (const [lock, d] of [['push', first], ['leap', next], ['dark', spare]]) {
-      const witness = faces.find(f => f[anchor] !== self[anchor] && f[d] !== self[d]);
-      out[lock] = pair([anchor, d], witness ? [witness[anchor], witness[d]] : [mismatch(anchor), mismatch(d)]);
-    }
+    out.push = witnessed(anchor, first);
+    out.leap = witnessed(anchor, next);
+    out.dark = witnessed(other, x === null ? spare : next);
   } else if (ch.id === 'grown') {
     out.push = pair([first], [rival[first]], 'torn');
     out.dark = pair([first, next], [rival[first], rival[next]]);
-    out.leap = pair([anchor, spare], [mismatch(anchor), mismatch(spare)]);
-    out.rewind = pair([first, spare], [rival[first], mismatch(spare)], 'torn');
+    out.leap = pair([other, next].sort(), [other, next].sort().map(d => mismatch(d)));
+    if (x === null) out.leap = pair([anchor, spare], [mismatch(anchor), mismatch(spare)]);
+    out.rewind = pair([first, other].sort(), [first, other].sort().map(d => d === first ? rival[first] : mismatch(d)), 'torn');
   } else {
     const witness = faces.find(f => f[anchor] !== self[anchor] && f[first] !== self[first]);
     const falseParent = witness ?? KINDS.map(d => d === anchor ? mismatch(anchor) : rival[d]);
-    out.leap = pair([anchor, first, spare], [falseParent[anchor], falseParent[first], falseParent[spare]], 'signed', parentSeal);
+    const parentDims = [anchor, first, other].sort();
+    out.leap = pair(parentDims, parentDims.map(d => falseParent[d]), 'signed', parentSeal);
     out.dark = pair([first, next], [rival[first], rival[next]], 'signed', dependentSeal);
-    out.rewind = pair([first, spare], [rival[first], mismatch(spare)], 'torn');
+    out.rewind = pair([first, other].sort(), [first, other].sort().map(d => d === first ? rival[first] : mismatch(d)), 'torn');
   }
   return out;
 }
 
-// A run: the islands' order is drawn from the seed; each chapter is drawn from its own seed, so a chapter is the same
+// A run: its three islands are drawn from the seed; each chapter is drawn from its own seed, so a chapter is the same
 // whatever happened before it. opts.order forces the island order, opts.answers forces the answer of each chapter,
 // opts.lies === false plays without the puzzles.
 export function newRun(seed, opts = {}) {
   const r = rng(seed);
-  const order = opts.order ?? shuffle(r, [0, 1, 2]);
+  const order = opts.order ?? shuffle(r, ISLANDS.map((_, i) => i)).slice(0, CHAPTERS.length);
   const s = {
     seed: seed >>> 0, order, opts: { answers: opts.answers ?? null }, lies: opts.lies !== false, chapter: 0, chapters: [],
     life: LIFE, t: 0, status: 'play', score: 0, right: 0,
