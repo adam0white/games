@@ -6,7 +6,8 @@ import { lab } from '../kit/lab.js';
 import { hint } from '../kit/hint.js';
 import { noZoom } from '../kit/zoom.js';
 import { create, step, dailyKey, dailyNight, DEFAULT_SEED, LAST, WIDTH, HEIGHT, DT, LIFT, REST, FUSE, CASE } from './sim.js';
-import { renderer, cover, clock } from './art.js';
+import { renderer, cover, clock, lessonArt } from './art.js';
+import { apply, count, date, lang, langs, number, padded, setLang, t, time } from './words.js';
 
 const $ = id => document.getElementById(id);
 const KEY = 'nightshift-save';
@@ -46,7 +47,8 @@ let aim = { ...REST };
 let pointer = null;
 let contact = null;
 let waitForAim = false;
-let returnCueUntil = 0;
+let showFirstDrag = false;
+let pauseRules = [];
 let effects = [];
 let day = '';
 let nextLevel = null;
@@ -91,6 +93,7 @@ function foot(x, kind) {
 
 const switchScreen = screens(['menu', 'paused', 'result', 'shareCard'], name => {
   screen = name;
+  canvas.setAttribute('aria-hidden', String(name !== 'play'));
   $('hud').hidden = name !== 'play';
   $('shiftCaption').hidden = name !== 'play';
   if (name !== 'play') clearInput();
@@ -101,7 +104,7 @@ function resize() {
   const ratio = Math.min(devicePixelRatio, 2);
   canvas.width = Math.max(1, Math.round(rect.width * ratio));
   canvas.height = Math.max(1, Math.round(rect.height * ratio));
-  if (screen !== 'play') view.draw(state, 1, performance.now(), [], reduced.matches, false);
+  if (screen !== 'play') view.draw(state, 1, performance.now(), [], reduced.matches);
 }
 
 function clearInput() {
@@ -112,32 +115,40 @@ function clearInput() {
   keys.clear();
 }
 
-const format = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+const fraction = (n, total) => t('progressFraction', { n, total: number(total) });
 const yesterday = date => dailyKey(new Date(Date.parse(date + 'T00:00:00Z') - 86400000));
 
 function visibleStreak(today) {
   return [today, yesterday(today)].includes(profile.daily.date) ? profile.daily.streak : 0;
 }
 
-function showMenu() {
+function renderMenu() {
   const level = levelOverride ?? profile.unlocked;
-  $('nightNumber').textContent = `${String(level).padStart(2, '0')} / ${LAST}`;
-  $('best').textContent = format(profile.best);
-  $('streak').textContent = `✦ ${visibleStreak(dailyKey())}`;
+  $('nightNumber').textContent = fraction(padded(level), LAST);
+  $('best').textContent = time(profile.best);
+  const streak = visibleStreak(dailyKey());
+  $('streak').textContent = count('streakMark', streak);
+  $('daily').setAttribute('aria-label', [t('daily'), count('streak', streak)].join(' · '));
+  $('long').setAttribute('aria-label', [t('long'), t('endless'), t('best', { time: time(profile.best) })].join(' · '));
   $('progress').replaceChildren(...Array.from({ length: LAST }, (_, i) => {
     const mark = document.createElement('i');
     if (i + 1 === level) mark.className = 'current';
     else if (i < profile.cleared) mark.className = 'cleared';
     return mark;
   }));
-  $('play').setAttribute('aria-label', `Play night ${level} of ${LAST}`);
+  $('play').setAttribute('aria-label', t('playNight', { n: number(level), total: number(LAST) }));
   cover($('poster'));
+  lessonArt($('goal'), ['goal']);
+}
+
+function showMenu() {
+  renderMenu();
   switchScreen('menu');
 }
 
 function refreshAudio() {
   for (const button of document.querySelectorAll('.audio')) {
-    button.textContent = profile.sound ? 'Sound on' : 'Sound off';
+    button.textContent = t(profile.sound ? 'soundOn' : 'soundOff');
     button.setAttribute('aria-pressed', String(profile.sound));
   }
 }
@@ -154,48 +165,48 @@ function toggleSound() {
   }
 }
 
-const lessonGuide = {
-  drag: 'Tap a moving exhibit. Leave the light on it.',
-  hold: 'Keep the beam steady until the arc fills.',
-  painting: 'Catch the dancer when she leaves her frame.',
-  twins: 'Light either purple twin to stop both.',
-  mirror: 'Aim at the mirror to light the bear behind glass.',
-  shy: 'Keep the green mask in the dark.',
-  cat: 'Let the cat pass. Catch the exhibits.',
-  fuse: 'Hold the light on the fuse box to stop the flicker.',
-  stairs: 'Watch the stairs for the upstairs exhibit.',
-};
-
-function guide() {
-  if (waitForAim) return 'Tap the statue at the upper left.';
-  if (state.shy && state.actors.some(a => a.kind === 'shy' && a.lit)) return lessonGuide.shy;
-  if (state.fuse && !state.fused) return lessonGuide.fuse;
-  if (state.practice && !state.hintDone && state.time <= state.practice) {
-    if (state.lesson === 'mirror' && state.actors[state.tutorIds[0]].y < CASE.y) {
-      return 'The bear is out of the case. Tap the bear.';
-    }
-    return lessonGuide[state.lesson];
-  }
-  if (state.time < returnCueUntil) return 'Caught! Heading back to the plinth.';
-  if (state.mode === 'long') return 'Guard both doors as long as you can.';
-  if (state.mode === 'daily') return 'Guard both doors until dawn for today’s streak.';
-  return 'Guard both doors. Tap a runner or drag below it.';
-}
-
 function setText(id, value) {
   const el = $(id);
   if (el.textContent !== value) el.textContent = value;
 }
 
+function setCounter(id, value, label) {
+  setText(id, value);
+  const badge = $(id).closest('.counter');
+  if (badge.getAttribute('aria-label') !== label) badge.setAttribute('aria-label', label);
+}
+
+function playGuide() {
+  if (waitForAim) return 'firstAim';
+  if (state.shy && state.actors.some(actor => actor.kind === 'shy' && actor.lit)) return 'shyRule';
+  if (state.fuse && !state.fused) return 'fuseRule';
+  if (state.practice && !state.hintDone && state.time <= state.practice) {
+    if (state.lesson === 'mirror' && state.actors[state.tutorIds[0]].y < CASE.y) return 'bearOut';
+    return {
+      drag: 'aimRule', hold: 'holdRule', painting: 'paintingRule', twins: 'twinsRule',
+      mirror: 'mirrorRule', shy: 'shyRule', cat: 'catRule', fuse: 'fuseRule', stairs: 'stairsRule',
+    }[state.lesson];
+  }
+  return 'aimRule';
+}
+
 function updateHud() {
-  const title = state.mode === 'long' ? 'Long Night' : state.mode === 'daily' ? 'Daily' : `Night ${state.level} of ${LAST}`;
-  setText('shiftStatus', `${title} · ${state.escapes}/3 escaped · ${state.returned} returned`);
-  setText('shiftGuide', guide());
+  setText('playGuide', t(playGuide()));
+  const story = state.mode === 'story';
+  const mode = story ? null : t(state.mode);
+  setCounter('shiftStatus', story ? fraction(number(state.level), LAST) : mode,
+    story ? t('nightProgress', { n: number(state.level), total: number(LAST) }) : mode);
+  setCounter('escapeCount', fraction(number(state.escapes), 3), count('escapedCount', state.escapes));
+  setCounter('returnCount', number(state.returned), count('returnedCount', state.returned));
+  for (const [id, type] of [['escapeCounter', 'escape'], ['returnCounter', 'return']]) {
+    $(id).classList.toggle('changed', effects.some(effect => effect.type === type));
+  }
   const lives = $('lives');
-  lives.setAttribute('aria-label', `${3-state.escapes} escapes left`);
+  const remaining = count('remaining', 3 - state.escapes);
+  if (lives.getAttribute('aria-label') !== remaining) lives.setAttribute('aria-label', remaining);
   [...lives.children].forEach((icon, i) => icon.classList.toggle('lost', i < state.escapes));
   $('longClock').hidden = state.mode !== 'long';
-  if (state.mode === 'long') $('longClock').textContent = format(Math.floor(state.time));
+  if (state.mode === 'long') setText('longClock', time(Math.floor(state.time)));
   clock($('clock'), state);
 }
 
@@ -206,7 +217,7 @@ function start(mode = 'story', level = levelOverride ?? profile.unlocked) {
   state = create({ ...options, mode });
   aim = { ...REST };
   waitForAim = mode === 'story' && state.level === 1 && !profile.played;
-  returnCueUntil = 0;
+  showFirstDrag = waitForAim;
   effects = [];
   accumulator = 0;
   previous = null;
@@ -223,16 +234,20 @@ function start(mode = 'story', level = levelOverride ?? profile.unlocked) {
 function pause() {
   if (screen !== 'play') return;
   snd.hold();
-  const rules = ['Tap a runner or drag just below it. Keep it lit until it returns.',
-    state.mode === 'long' ? 'Three escapes end the shift.' : 'Reach dawn before three escapes.'];
-  if (state.twins) rules.push(lessonGuide.twins);
-  if (state.mirror) rules.push(lessonGuide.mirror);
-  if (state.shy) rules.push(lessonGuide.shy);
-  if (state.fuse) rules.push(lessonGuide.fuse);
-  if (state.cat) rules.push(lessonGuide.cat);
-  $('rules').textContent = rules.join(' ');
-  view.draw(state, 1, performance.now(), [], reduced.matches, false);
+  pauseRules = ['aimRule'];
+  if (state.mode !== 'long') pauseRules.push('goal');
+  pauseRules.push('lossRule');
+  for (const feature of ['twins', 'mirror', 'shy', 'fuse', 'cat', 'stairs']) {
+    if (state[feature]) pauseRules.push(feature + 'Rule');
+  }
+  renderPause();
+  view.draw(state, 1, performance.now(), [], reduced.matches);
   switchScreen('paused');
+}
+
+function renderPause() {
+  $('rules').setAttribute('aria-label', pauseRules.map(key => t(key)).join(' '));
+  lessonArt($('rules'), pauseRules);
 }
 
 function resume() {
@@ -241,6 +256,7 @@ function resume() {
   previous = null;
   snd.release();
   snd.unlock();
+  updateHud();
   switchScreen('play');
 }
 
@@ -266,22 +282,30 @@ function finish() {
   profile.played = true;
   persist();
   rec.end(state.outcome, summary());
-  $('outcome').textContent = won ? 'Dawn' : 'Escaped';
-  const stars = 3 - state.escapes;
-  const escapes = `${state.escapes} escaped`;
-  if (state.mode === 'long') {
-    $('medals').textContent = `Survived ${format(Math.floor(state.time))} · Best ${format(profile.best)}`;
-    $('resultDetail').textContent = `${state.returned} returned · ${escapes}`;
-  } else {
-    $('medals').textContent = '★'.repeat(stars) + '☆'.repeat(state.escapes);
-    const night = state.mode === 'daily' ? `Daily · Streak ${visibleStreak(day)}` : `Night ${state.level}`;
-    $('resultDetail').textContent = `${night} · ${escapes} · ${stars} ${stars === 1 ? 'star' : 'stars'}`;
-  }
-  $('again').textContent = nextLevel ? 'Next' : 'Again';
-  $('share').hidden = state.mode !== 'daily';
-  cover($('resultPoster'), state.outcome);
+  renderResult();
   switchScreen('result');
   snd.tone(won ? 523 : 195, .22, .15, 'triangle', won ? 261 : -75);
+}
+
+function renderResult() {
+  $('outcome').textContent = t(state.outcome);
+  const stars = 3 - state.escapes;
+  const escapes = count('escapedCount', state.escapes);
+  $('medals').setAttribute('aria-hidden', String(state.mode !== 'long'));
+  if (state.mode === 'long') {
+    $('medals').textContent = [
+      t('survived', { time: time(Math.floor(state.time)) }),
+      t('best', { time: time(profile.best) }),
+    ].join(' · ');
+    $('resultDetail').textContent = [count('returnedCount', state.returned), escapes].join(' · ');
+  } else {
+    $('medals').textContent = t('starFilled').repeat(stars) + t('starEmpty').repeat(state.escapes);
+    const night = state.mode === 'daily' ? [t('daily'), count('streak', visibleStreak(day))].join(' · ') : count('night', state.level);
+    $('resultDetail').textContent = [night, escapes, count(stars === 1 ? 'oneStar' : 'stars', stars)].join(' · ');
+  }
+  $('again').textContent = t(nextLevel ? 'next' : 'again');
+  $('share').hidden = state.mode !== 'daily';
+  cover($('resultPoster'), state.outcome);
 }
 
 function saveLongRecord() {
@@ -305,18 +329,24 @@ function openShare() {
   const target = $('dailyPoster');
   const status = $('shareStatus');
   status.textContent = '';
-  target.setAttribute('aria-label', `Tiptoe Museum Daily · ${day} · ${state.escapes} escaped · Streak ${visibleStreak(day)}`);
-  cover(target, state.outcome === 'dawn' ? 'share' : 'share-loss', visibleStreak(day), day, state.escapes);
+  const labels = {
+    title: t('title'),
+    daily: t('dailyDate', { date: date(day) }),
+    escaped: count('escapedCount', state.escapes),
+    streak: count('streak', visibleStreak(day)),
+  };
+  target.setAttribute('aria-label', t('shareDescription', labels));
+  cover(target, state.outcome === 'dawn' ? 'share' : 'share-loss', labels);
   cardFile = null;
   $('saveCard').disabled = true;
   target.toBlob(blob => {
     if (!blob) {
-      status.textContent = 'Card unavailable. Open the card again to retry.';
+      status.textContent = t('cardUnavailable');
       return;
     }
     cardFile = new File([blob], `nightshift-${day}.png`, { type: 'image/png' });
     const native = navigator.canShare?.({ files: [cardFile] });
-    $('saveCard').textContent = native ? 'Share' : 'Download PNG';
+    $('saveCard').textContent = t(native ? 'share' : 'download');
     $('saveCard').disabled = false;
   }, 'image/png');
   switchScreen('shareCard');
@@ -333,7 +363,7 @@ async function saveCard() {
   link.href = url;
   link.download = cardFile.name;
   link.click();
-  $('shareStatus').textContent = 'Download started';
+  $('shareStatus').textContent = t('downloadStarted');
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
@@ -367,6 +397,7 @@ canvas.addEventListener('pointermove', e => {
   if (screen !== 'play' || (pointer !== e.pointerId && !(pointer === null && e.pointerType === 'mouse'))) return;
   const point = floorPoint(e);
   if (contact && Math.hypot(point.x - contact.x, point.y - contact.y) <= 8) return;
+  if (e.pointerType === 'touch') showFirstDrag = false;
   contact = null;
   aim = { x: point.x, y: point.y - (e.pointerType === 'touch' ? LIFT : 0) };
   if (e.pointerType === 'mouse') waitForAim = false;
@@ -410,11 +441,48 @@ $('share').onclick = openShare;
 $('closeShare').onclick = () => switchScreen('result');
 $('saveCard').onclick = saveCard;
 for (const button of document.querySelectorAll('.audio')) button.onclick = toggleSound;
-rec.notice($('menu').firstElementChild);
-rec.toggle($('paused').firstElementChild);
+const notice = rec.notice($('menu').firstElementChild);
+const privacy = notice?.querySelector('a');
+if (privacy) privacy.dataset.i18n = 'privacy';
+const toggle = rec.toggle($('paused').firstElementChild);
+if (toggle) {
+  const label = document.createElement('span');
+  label.dataset.i18n = 'record';
+  toggle.lastChild.replaceWith(label);
+}
+
+function localizeNotes() {
+  $('notes-button')?.setAttribute('aria-label', t('notes'));
+}
+$('feedbackScript').addEventListener('load', localizeNotes);
+
+function localize() {
+  apply();
+  document.title = t('title');
+  if (notice) notice.firstChild.textContent = t('notice', { days: number(180) }) + ' ';
+  const hintLabel = document.querySelector('.kit-hint .label');
+  if (hintLabel) hintLabel.textContent = t('dragHint');
+  localizeNotes();
+  refreshAudio();
+}
+
+function changeLanguage() {
+  setLang(langs.find(code => code !== lang()));
+  // Once the player chooses on this page, a reload should use that choice.
+  if (params.has('lang')) {
+    const address = new URL(location.href);
+    address.searchParams.delete('lang');
+    history.replaceState(history.state, '', address);
+  }
+  localize();
+  if (screen === 'menu') renderMenu();
+  if (screen === 'paused') renderPause();
+}
+
+$('menuLanguage').onclick = $('pauseLanguage').onclick = changeLanguage;
 const idleHint = hint(canvas, {
   kind: 'hold-and-move', key: 'nightshift:hint', when: () => screen === 'play',
-  played: profile.played, delay: 3100, reach: 40, label: 'Drag',
+  played: profile.played, delay: 3100, reach: 40, label: t('dragHint'),
 });
 
 function react(event, now) {
@@ -435,7 +503,6 @@ function react(event, now) {
   }
   if (type === 'return') {
     snd.tone(579 + state.returned % 5 * 45, .09, .061, 'sine', 155);
-    returnCueUntil = state.time + 1.7;
     if (capturesLogged++ < 75) rec.event('return', { exhibit: actor.kind });
   }
   if (type === 'escape') {
@@ -467,7 +534,10 @@ function frame(now) {
       accumulator -= DT;
     }
     effects = effects.filter(effect => now - effect.at < effect.life);
-    view.draw(state, state.outcome ? 1 : accumulator / DT, now, effects, reduced.matches, !idleHint.shown);
+    view.draw(state, state.outcome ? 1 : accumulator / DT, now, effects, reduced.matches, {
+      tutorial: !idleHint.shown, waiting: waitForAim,
+      firstDrag: showFirstDrag && pointer === null && state.returned === 1,
+    });
     updateHud();
     if (state.outcome) finish();
   }
@@ -484,7 +554,7 @@ window.nightshiftState = () => ({
     ({ id, kind, state, x, y, progress, hold, lit, mirrored })),
 });
 
-refreshAudio();
+localize();
 showMenu();
 resize();
 new ResizeObserver(resize).observe(canvas);

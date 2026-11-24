@@ -13,12 +13,13 @@ const { chromium, webkit, devices } = require('playwright');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const shots = process.env.SHOTS ?? join(tmpdir(), 'nightshift-shots');
 const visual = process.argv.includes('--visual');
+const feedbackScript = fileURLToPath(new URL('../../workers/feedback/public/notes/button.js', import.meta.url));
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
 const server = createServer(async (req, res) => {
   const path = new URL(req.url, 'http://localhost').pathname;
   if (path === '/notes/button.js' || path === '/favicon.ico') {
     res.writeHead(200, { 'content-type': 'text/javascript' });
-    return res.end('');
+    return res.end(path === '/notes/button.js' ? await readFile(feedbackScript) : '');
   }
   const file = resolve(root, '.' + path + (path.endsWith('/') ? 'index.html' : ''));
   try {
@@ -37,8 +38,8 @@ const save = page => page.evaluate(() => JSON.parse(localStorage.getItem('nights
 const tick = (page, ms) => page.clock.runFor(ms);
 const capture = (page, name, suffix) => page.screenshot({ path: join(shots, `${name}-${suffix}.png`), scale: 'css', timeout: 15000 });
 
-async function open(page, query = '') {
-  await page.goto(base + '?labRunSource=agent' + query);
+async function open(page, query = '', language = 'en') {
+  await page.goto(base + '?labRunSource=agent' + (language ? '&lang=' + language : '') + query);
   await page.waitForFunction(() => typeof window.nightshiftState === 'function');
   assert.equal((await state(page)).screen, 'menu');
 }
@@ -95,11 +96,16 @@ async function checkLessonCues(page) {
     const ctx = canvas.getContext('2d');
     const draw = renderer(canvas);
     const lineTo = ctx.lineTo.bind(ctx);
+    const arc = ctx.arc.bind(ctx);
     let finger;
+    let dragEnd;
     ctx.lineTo = (x, y) => {
-      // Read the endpoint of the dashed finger path shown to the player.
-      if (ctx.getLineDash()[0] === 2) finger = { x, y };
+      if (ctx.getLineDash()[0] === 2) dragEnd = { x, y };
       lineTo(x, y);
+    };
+    ctx.arc = (x, y, r, ...args) => {
+      if (r >= 12 && r <= 15) finger = { x, y };
+      arc(x, y, r, ...args);
     };
     return [CASE.y + 8, CASE.y - 18].map(y => {
       const s = create({ level: 7 });
@@ -107,8 +113,9 @@ async function checkLessonCues(page) {
       actor.y = y;
       actor.state = 'roam';
       s.time = 2;
-      draw.draw(s, 1, 0, [], true, true);
-      const beam = { x: finger.x, y: finger.y - LIFT };
+      draw.draw(s, 1, 0, [], true, { tutorial: true });
+      if (y >= CASE.y && (!dragEnd || Math.hypot(finger.x-dragEnd.x, finger.y-dragEnd.y) > 2)) return null;
+      const beam = { x: finger.x, y: finger.y - (y >= CASE.y ? LIFT : 0) };
       const light = y >= CASE.y ? reflection(beam) : beam;
       return light && Math.hypot(light.x - actor.x, light.y - actor.y);
     });
@@ -147,29 +154,6 @@ async function checkLessonCues(page) {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 }
 
-async function inspectVisual(page, name) {
-  await open(page);
-  await capture(page, name, 'menu');
-  await page.tap('#play');
-  await tick(page, 1200);
-  await capture(page, name, 'lesson');
-  const s = await state(page);
-  await finger(page, 'pointerdown', s.actors[0]);
-  await tick(page, 690);
-  await capture(page, name, 'play');
-  await open(page, '&level=7');
-  await page.tap('#play');
-  await tick(page, 1310);
-  const subject = (await state(page)).actors[2];
-  await finger(page, 'pointerdown', targetFor(subject));
-  await tick(page, 835);
-  await capture(page, name, 'mirror');
-  await open(page, '&level=14');
-  await page.tap('#play');
-  await tick(page, 1230);
-  await capture(page, name, 'stair');
-}
-
 async function checkFirstShift(page) {
   await open(page);
   const privacy = await page.getByRole('link', { name: 'Privacy' }).boundingBox();
@@ -181,8 +165,15 @@ async function checkFirstShift(page) {
   if (opening.screen !== 'play' || opening.escapes !== 0 || opening.time > 2) {
     problems.push('first shift ran before the first aim');
   }
-  const caption = page.locator('#shiftCaption');
-  if (!await caption.count() || !/tap/i.test(await caption.innerText())) problems.push('missing in-play aim instruction');
+  if (!/tap/i.test(await page.textContent('#playGuide'))) problems.push('missing accessible aim instruction');
+  const firstActor = opening.actors[0];
+  const hasTargetRing = await page.locator('#floor').evaluate((canvas, actor) => {
+    const cx = Math.round(actor.x / 390 * canvas.width);
+    const cy = Math.round((actor.y - 47) / 660 * canvas.height);
+    const pixels = canvas.getContext('2d').getImageData(cx - 6, cy - 6, 12, 12).data;
+    return pixels.some((red, i) => i % 4 === 0 && red >= 220 && pixels[i+1] > 170 && pixels[i+2] > 100);
+  }, firstActor);
+  assert.ok(hasTargetRing, 'the waiting statue has a visible touch target');
   if (opening.screen !== 'play') await page.tap('#again');
   const { width, height } = await page.locator('#floor').boundingBox();
   await page.touchscreen.tap(Math.round(width / 2), Math.round(height / 2));
@@ -191,16 +182,13 @@ async function checkFirstShift(page) {
   await tick(page, 2000);
   if (opening.screen === 'play') assert.ok((await state(page)).time > opening.time + 1);
   await page.tap('#pause');
-  if (!/three escapes/i.test(await page.locator('#paused').innerText())) problems.push('pause lacks rules');
+  if (!/three escapes/i.test(await page.locator('#rules').getAttribute('aria-label'))) problems.push('pause lacks accessible rules');
   for (const [level, cue] of [[4, /twin/i], [7, /mirror/i], [8, /dark/i]]) {
     await open(page, '&level=' + level);
     await page.tap('#play');
-    if (!await caption.count() || !cue.test(await caption.innerText())) {
-      problems.push('missing rule for night ' + level);
-      continue;
-    }
-    const bounds = await caption.boundingBox();
-    assert.ok(bounds.y + bounds.height <= height + 1, 'caption fits the phone');
+    if (!cue.test(await page.textContent('#playGuide'))) problems.push('missing accessible rule for night ' + level);
+    const bounds = await page.locator('#shiftCaption').boundingBox();
+    assert.ok(bounds.y + bounds.height <= height + 1, 'counters fit the phone');
   }
   assert.deepEqual(problems, []);
 }
@@ -303,10 +291,11 @@ async function run(page, name, records) {
   await page.waitForFunction(() => !document.querySelector('#saveCard').disabled);
   assert.match(await page.locator('#dailyPoster').evaluate(el => el.toDataURL()), /^data:image\/png/);
   const labels = (await page.evaluate(() => window.cardLabels)).join(' ');
-  for (const label of ['Tiptoe Museum', 'Daily', daily.day, `${dailyEscapes} escaped`, 'Streak 1']) {
+  const englishDate = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(daily.day));
+  for (const label of ['Tiptoe Museum', 'Daily', englishDate, `${dailyEscapes} escaped`, 'Streak 1']) {
     assert.ok(labels.includes(label), `exported image includes ${label}`);
   }
-  assert.ok((await page.locator('#dailyPoster').getAttribute('aria-label')).includes(daily.day), 'share preview describes this dated result');
+  assert.ok((await page.locator('#dailyPoster').getAttribute('aria-label')).includes(englishDate), 'share preview describes this dated result');
   await capture(page, name, 'daily');
   if (name === 'small-360') {
     const [download] = await Promise.all([page.waitForEvent('download'), page.tap('#saveCard')]);
@@ -352,11 +341,168 @@ async function run(page, name, records) {
   }
 }
 
+async function checkLanguageFrame(page, language, screen) {
+  assert.equal((await state(page)).screen, screen);
+  const frame = await page.evaluate(async language => {
+    const { tables } = await import('./words.js');
+    const elements = [...document.body.querySelectorAll('*')].filter(el => {
+      const bounds = el.getBoundingClientRect();
+      return bounds.width && bounds.height && !el.closest('.sr-only') &&
+        getComputedStyle(el).visibility === 'visible';
+    });
+    const describe = el => el.id || el.className || el.tagName;
+    const screenBounds = document.querySelector('.screen.on')?.getBoundingClientRect();
+    const overflow = elements.filter(el => {
+      const { x, y, right, bottom } = el.getBoundingClientRect();
+      return x < -1 || y < -1 || right > innerWidth + 1 || bottom > innerHeight + 1 ||
+        (screenBounds && el.closest('.screen') && (right > screenBounds.right + 1 || bottom > screenBounds.bottom + 1)) ||
+        (el instanceof HTMLElement && el.clientWidth > 0 && !el.closest('.kit-hint') && el.scrollWidth > el.clientWidth + 1) ||
+        (el.matches('.screen') && el.scrollHeight > el.clientHeight + 1);
+    }).map(describe);
+    const text = [document.title];
+    for (const el of elements) {
+      for (const node of el.childNodes) if (node.nodeType === Node.TEXT_NODE) text.push(node.textContent.trim());
+      if (el.closest('[aria-hidden="true"]')) continue;
+      for (const attr of ['aria-label', 'title']) if (el.hasAttribute(attr)) text.push(el.getAttribute(attr));
+      for (const id of (el.getAttribute('aria-describedby') || '').split(' ').filter(Boolean)) {
+        const desc = document.getElementById(id);
+        if (!desc.closest('[hidden]')) text.push(desc.textContent);
+      }
+    }
+    const escape = part => part.replace(/[.*+?^${}()|[\]\\]/g, c => '\\' + c);
+    const leaked = Object.entries(tables.en).filter(([key, en]) => {
+      if (en === tables.tr[key] || !/[A-Za-z]/.test(en.replace(/\{\w+\}/g, ''))) return false;
+      const expression = en.split(/\{\w+\}/g).map(escape).join('.+?');
+      const pattern = new RegExp('(^|[^\\p{L}])' + expression + '(?=$|[^\\p{L}])', 'u');
+      return language === 'tr' && text.some(value => pattern.test(value));
+    }).map(([key]) => key);
+    return { lang: document.documentElement.lang, overflow, leaked };
+  }, language);
+  assert.deepEqual(frame, { lang: language, overflow: [], leaked: [] }, `${language} ${screen}`);
+}
+
+async function checkLanguages(page, name, locale) {
+  await open(page);
+  const table = await page.evaluate(async () => (await import('./words.js')).tables);
+  assert.deepEqual(Object.keys(table.en).sort(), Object.keys(table.tr).sort());
+  for (const key of Object.keys(table.en)) {
+    assert.ok(table.en[key] && table.tr[key], key);
+    const placeholders = value => (value.match(/\{\w+\}/g) ?? []).sort();
+    assert.deepEqual(placeholders(table.en[key]), placeholders(table.tr[key]), key);
+  }
+
+  await page.evaluate(() => {
+    localStorage.clear();
+    localStorage.setItem('notes.k', 'test');
+  });
+  await open(page, '', null);
+  assert.equal(await page.locator('html').getAttribute('lang'), locale, 'browser language is used without an override or a save');
+  assert.equal(await page.locator('#notes-button').getAttribute('aria-label'), table[locale].notes);
+  await open(page, '&hint=hand', 'tr');
+  assert.equal(await page.locator('#play span').textContent(), 'Oyna');
+  await page.tap('#menuLanguage');
+  assert.equal(await page.locator('#play span').textContent(), 'Play');
+  assert.equal(new URL(page.url()).searchParams.has('lang'), false);
+  await page.reload();
+  assert.equal(await page.locator('#play span').textContent(), 'Play');
+  await page.tap('#play');
+  await page.tap('#pause');
+  const paused = await state(page);
+  await page.tap('#pauseLanguage');
+  assert.deepEqual(await state(page), paused, 'switching language while paused preserves the run');
+  assert.equal(await page.textContent('#resume'), 'Devam et');
+  assert.equal(await page.locator('#notes-button').getAttribute('aria-label'), 'Notlar');
+  await page.reload();
+  assert.equal(await page.locator('#play span').textContent(), 'Oyna', 'Turkish persists after reload');
+
+  for (const language of ['en', 'tr']) {
+    await page.evaluate(() => localStorage.removeItem('nightshift-save'));
+    const shot = async (screen, suffix = screen) => {
+      await checkLanguageFrame(page, language, screen);
+      if (name !== 'pixel7') await capture(page, `${language}-${name}`, suffix);
+    };
+    await open(page, '&hint=hand', language);
+    for (const id of ['menuLanguage', 'pauseLanguage']) {
+      assert.equal(await page.locator(`#${id} span`).textContent(), table[language].languageCode);
+    }
+    let hit = await page.locator('#menuLanguage').boundingBox();
+    assert.ok(hit.width >= 44 && hit.height >= 44);
+    await shot('menu');
+    await page.tap('#play');
+    await tick(page, 2300);
+    assert.equal(await page.getByRole('img', { name: table[language].floor }).getAttribute('aria-describedby'), 'playGuide');
+    assert.equal(await page.textContent('#playGuide'), table[language].firstAim);
+    await shot('play', 'first-lesson');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await tick(page, 2200);
+    assert.equal(await page.locator('.kit-hint .label').innerText(), table[language].dragHint);
+    await shot('play', 'still-hint');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.tap('#pause');
+    hit = await page.locator('#pauseLanguage').boundingBox();
+    assert.ok(hit.width >= 44 && hit.height >= 44);
+    await shot('paused', 'pause');
+    await page.tap('#resume');
+    await drive(page);
+    await shot('result', 'win');
+    await page.tap('#again');
+    await tick(page, 43500);
+    assert.equal((await state(page)).outcome, 'escaped');
+    await shot('result', 'loss');
+    await page.tap('#resultMenu');
+    await page.tap('#long');
+    await page.tap('#pause');
+    await shot('paused', 'pause-long');
+    await page.tap('#resume');
+    await tick(page, 45000);
+    await shot('result', 'loss-long');
+    await page.tap('#resultMenu');
+    await page.tap('#daily');
+    await drive(page);
+    await shot('result', 'win-daily');
+    await page.locator('#dailyPoster').evaluate(el => {
+      window.cardLabels = [];
+      const ctx = el.getContext('2d');
+      const fillText = ctx.fillText.bind(ctx);
+      ctx.fillText = (label, ...args) => {
+        window.cardLabels.push(label);
+        fillText(label, ...args);
+      };
+    });
+    await page.tap('#share');
+    await page.waitForFunction(() => !document.querySelector('#saveCard').disabled);
+    await shot('shareCard', 'share');
+    const daily = await state(page);
+    const formatDate = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeZone: 'UTC' });
+    const labels = await page.evaluate(() => window.cardLabels);
+    assert.deepEqual(labels, [table[language].title,
+      table[language].dailyDate.replace('{date}', formatDate.format(new Date(daily.day))),
+      table[language].escapedCount.replace('{n}', daily.escapes),
+      table[language].streak.replace('{n}', 1)]);
+    if (name === 'small-360') {
+      const [download] = await Promise.all([page.waitForEvent('download'), page.tap('#saveCard')]);
+      assert.equal(await page.textContent('#shareStatus'), table[language].downloadStarted);
+      assert.equal(download.suggestedFilename(), 'nightshift-2026-11-24.png');
+      await shot('shareCard', 'download');
+    }
+    if (['small-360', 'iphone13-full'].includes(name)) {
+      for (const [level, lesson] of [[2, 'hold'], [3, 'painting'], [4, 'twins'], [7, 'mirror'],
+        [8, 'mask'], [9, 'cat'], [13, 'fuse'], [14, 'stairs']]) {
+        await open(page, '&level=' + level, language);
+        await page.tap('#play');
+        await tick(page, 1600);
+        await shot('play', lesson);
+      }
+    }
+  }
+}
+
 const profiles = [
   ['iphone13-390', webkit, devices['iPhone 13'], { width: 390, height: 664 }],
   ['pixel7', chromium, devices['Pixel 7']],
   ['small-360', chromium, devices['Pixel 7'], { width: 360, height: 640 }],
-].filter(([name]) => !visual || name !== 'pixel7')
+  ['iphone13-full', webkit, devices['iPhone 13'], { width: 390, height: 844 }],
+].filter(([name]) => !visual || ['small-360', 'iphone13-full'].includes(name))
   .filter(([name]) => !process.env.NIGHTSHIFT_PROFILE || process.env.NIGHTSHIFT_PROFILE === name);
 
 await mkdir(shots, { recursive: true });
@@ -365,7 +511,8 @@ try {
   for (const [name, engine, device, viewport] of profiles) {
     const browser = await engine.launch();
     try {
-      const context = await browser.newContext({ ...device, ...(viewport && { viewport }) });
+      const locale = name === 'small-360' ? 'tr' : 'en';
+      const context = await browser.newContext({ ...device, locale, ...(viewport && { viewport }) });
       const records = [];
       await context.route('https://human.adamwhite.work/lab/api/linked', async route => {
         const request = route.request();
@@ -395,15 +542,15 @@ try {
       page.on('pageerror', error => errors.push(error.message));
       page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
       await page.clock.install({ time: new Date('2026-11-24T17:00:00Z') });
-      if (visual) await inspectVisual(page, name);
-      else {
+      if (!visual && name !== 'iphone13-full') {
         await checkFirstShift(page);
         await page.evaluate(() => localStorage.clear());
         await run(page, name, records);
         await checkLessonCues(page);
       }
+      await checkLanguages(page, name, locale);
       assert.deepEqual(errors, []);
-      console.log(`PASS ${name} ${JSON.stringify(page.viewportSize())} · ${visual ? 'screenshots' : 'menu, touch win, idle loss, pause, menu, audio nodes, reload, daily, share preview, long best, mocked lab'}`);
+      console.log(`PASS ${name} ${JSON.stringify(page.viewportSize())} · bilingual screens, layout, persistence, localized PNG${!visual && name !== 'iphone13-full' ? ', gameplay, audio nodes, save, Daily, Long Night, mocked lab' : ''}`);
     } finally {
       await browser.close();
     }

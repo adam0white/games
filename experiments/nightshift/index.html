@@ -4,52 +4,73 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#292941">
-<title>Tiptoe Museum</title>
+<title></title>
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
+<svg class="symbols" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="globeIcon" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>
+  </symbol>
+  <symbol id="doorIcon" viewBox="0 0 24 24">
+    <path d="M5 21V8a7 7 0 0 1 14 0v13zM9 21V8a3 3 0 0 1 6 0v13M2 21h20"/>
+  </symbol>
+  <symbol id="returnIcon" viewBox="0 0 24 24">
+    <path d="M9 7l-5 5 5 5M4 12h10a5 5 0 0 0 0-10M13 18h6l2 4H11z"/>
+  </symbol>
+  <symbol id="escapeIcon" viewBox="0 0 24 24">
+    <path d="M11 3H4v18h7M8 12h12m-5-5 5 5-5 5"/>
+  </symbol>
+</svg>
 <main id="stage">
-  <canvas id="floor" aria-label="Museum floor"></canvas>
+  <canvas id="floor" role="img" aria-describedby="playGuide" data-i18n-aria="floor"></canvas>
   <div id="hud" hidden>
-    <div id="lives" role="img" aria-label="Three escapes left"><i></i><i></i><i></i></div>
-    <canvas id="clock" width="236" height="100" aria-label="Clock"></canvas>
-    <button id="pause" aria-label="Pause"><span></span><span></span></button>
-    <output id="longClock" hidden></output>
+    <span id="playGuide" class="sr-only"></span>
+    <div id="lives" role="img"><i></i><i></i><i></i></div>
+    <canvas id="clock" width="236" height="100" role="img" data-i18n-aria="clock"></canvas>
+    <button id="pause" data-i18n-aria="pause"><span></span><span></span></button>
+    <div id="longClock" hidden></div>
   </div>
 
   <div id="shiftCaption" hidden>
-    <strong id="shiftStatus"></strong>
-    <span id="shiftGuide"></span>
+    <span class="counter" role="img"><svg class="icon" aria-hidden="true"><use href="#doorIcon"/></svg><span id="shiftStatus"></span></span>
+    <span class="counter" role="img" id="escapeCounter"><svg class="icon" aria-hidden="true"><use href="#escapeIcon"/></svg><span id="escapeCount"></span></span>
+    <span class="counter" role="img" id="returnCounter"><svg class="icon" aria-hidden="true"><use href="#returnIcon"/></svg><span id="returnCount"></span></span>
   </div>
-  <section class="screen" id="menu" aria-label="Main menu">
+
+  <section class="screen" id="menu" data-i18n-aria="menu">
     <div class="panel">
       <canvas id="poster" class="poster" width="680" height="364" aria-hidden="true"></canvas>
-      <h1>Tiptoe Museum</h1>
-      <p class="premise">Keep the exhibits inside until dawn.</p>
-      <div class="progress" id="progress" aria-label="Night progress"></div>
-      <button class="primary" id="play"><span>Play</span><small aria-hidden="true" id="nightNumber"></small></button>
+      <h1 data-i18n="title"></h1>
+      <canvas id="goal" class="lesson-art" width="288" height="80" role="img" data-i18n-aria="goal"></canvas>
+      <div class="progress" id="progress" role="img" data-i18n-aria="progress"></div>
+      <button class="primary" id="play"><span data-i18n="play"></span><small aria-hidden="true" id="nightNumber"></small></button>
       <div class="row">
-        <button id="long"><span>Long Night</span><span class="modeStat">Endless · <small id="best"></small></span></button>
-        <button id="daily"><span>Daily</span><span class="modeStat">Streak <small id="streak"></small></span></button>
+        <button id="long"><span data-i18n="long"></span><span class="modeStat"><span data-i18n="endlessMark" aria-hidden="true"></span> <small id="best"></small></span></button>
+        <button id="daily"><span data-i18n="daily"></span><span class="modeStat"><small id="streak"></small></span></button>
       </div>
-      <button class="quiet audio" id="menuSound"></button>
+      <div class="settings">
+        <button class="quiet audio" id="menuSound"></button>
+        <button class="language" id="menuLanguage" data-i18n-aria="changeLanguage"><svg class="icon" aria-hidden="true"><use href="#globeIcon"/></svg><span data-i18n="languageCode" aria-hidden="true"></span></button>
+      </div>
     </div>
   </section>
 
-  <section class="screen overlay" id="paused" aria-label="Pause menu">
+  <section class="screen overlay" id="paused" data-i18n-aria="pauseMenu">
     <div class="panel compact">
-      <div class="motif" aria-hidden="true">Ⅱ</div>
-      <h2>Paused</h2>
-      <p id="rules"></p>
-      <button class="primary" id="resume">Resume</button>
+      <div class="motif" aria-hidden="true"></div>
+      <h2 data-i18n="paused"></h2>
+      <canvas id="rules" class="lesson-art" width="600" height="176" role="img"></canvas>
+      <button class="primary" id="resume" data-i18n="resume"></button>
       <div class="row">
-        <button id="toMenu">Menu</button>
+        <button id="toMenu" data-i18n="menu"></button>
         <button class="audio" id="pauseSound"></button>
+        <button class="language" id="pauseLanguage" data-i18n-aria="changeLanguage"><svg class="icon" aria-hidden="true"><use href="#globeIcon"/></svg><span data-i18n="languageCode" aria-hidden="true"></span></button>
       </div>
     </div>
   </section>
 
-  <section class="screen overlay" id="result" aria-label="Night result">
+  <section class="screen overlay" id="result" data-i18n-aria="result">
     <div class="panel compact">
       <canvas id="resultPoster" class="poster" width="680" height="364" aria-hidden="true"></canvas>
       <h2 id="outcome"></h2>
@@ -57,24 +78,24 @@
       <p id="resultDetail"></p>
       <button id="again" class="primary"></button>
       <div class="row">
-        <button id="resultMenu">Menu</button>
-        <button id="share" hidden>Share</button>
+        <button id="resultMenu" data-i18n="menu"></button>
+        <button id="share" hidden data-i18n="share"></button>
       </div>
     </div>
   </section>
 
-  <section class="screen overlay" id="shareCard" aria-label="Daily share card">
+  <section class="screen overlay" id="shareCard" data-i18n-aria="shareCard">
     <div class="panel compact">
-      <canvas id="dailyPoster" class="poster" width="680" height="540" role="img" aria-label="Daily result and streak"></canvas>
+      <canvas id="dailyPoster" class="poster" width="680" height="540" role="img"></canvas>
       <p id="shareStatus" role="status"></p>
       <div class="row shareActions">
-        <button id="closeShare">Back</button>
-        <button id="saveCard" class="primary">Save</button>
+        <button id="closeShare" data-i18n="back"></button>
+        <button id="saveCard" class="primary" data-i18n="save"></button>
       </div>
     </div>
   </section>
 </main>
 <script type="module" src="./game.js"></script>
-<script src="/notes/button.js" defer></script>
+<script id="feedbackScript" src="/notes/button.js" defer></script>
 </body>
 </html>

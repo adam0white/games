@@ -444,56 +444,109 @@ function fuse(c,s) {
   box(c,x-20,y-23,40,31,6,'#242943','#9e839f',2);
   box(c,x-15,y-17,30,20,4,s.fused ? '#648f7d' : '#896987');
   shape(c,[[x+1,y-16],[x-5,y-6],[x+1,y-6],[x-1,y+1],[x+7,y-9],[x+1,y-9]],s.fused ? mint : brass);
-  if (s.fuseHold > 0 && !s.fused) ring(c,x,y-8,26,cream,3,-Math.PI/2,-Math.PI/2+Math.PI*2*s.fuseHold/.56);
+  if (s.fused) return;
+  c.setLineDash([3,5]);
+  ring(c,x,y-8,26,brass,1.6);
+  c.setLineDash([]);
+  if (s.fuseHold > 0) ring(c,x,y-8,26,cream,3,-Math.PI/2,-Math.PI/2+Math.PI*2*s.fuseHold/.56);
 }
 
-function gesture(c,s,reduced) {
-  if (!s.practice || s.hintDone || s.time > s.practice) return;
-  const a=s.actors[s.tutorIds[0]];
-  const targets = {
-    drag:a, hold:a, painting:a, twins:a, mirror:a && targetFor(a),
-    shy:a, cat:s.catAt, fuse:FUSE, stairs:a,
-  };
-  const to=targets[s.lesson];
-  if (!to || (a?.frozen && ['drag', 'hold', 'painting'].includes(s.lesson))) return;
-  const cycle=reduced ? 2 : (s.time+.25)%3.5;
-  const park={x:REST.x,y:REST.y+LIFT};
-  const subject={x:to.x,y:Math.min(HEIGHT-43,to.y+LIFT)};
-  const avoid=s.lesson==='shy' || s.lesson==='cat';
-  const from=avoid ? subject : park;
-  const end=avoid ? park : subject;
-  const travel=avoid
-    ? Math.min(1,Math.max(0,(cycle-.82)/.85))
-    : Math.min(1,Math.max(0,(cycle-.28)/1.18));
-  const x=from.x+(end.x-from.x)*travel;
-  const y=from.y+(end.y-from.y)*travel;
+function hand(c,x,y,scale=1) {
   c.save();
-  c.globalAlpha=cycle>3.03 ? (3.5-cycle)/.47 : .84;
-  const highlight=avoid ? mint : '#ffda92';
-  c.setLineDash([2,9]);
-  shape(c,[[from.x,from.y],[end.x,end.y]],null,'#fae4aeab',2);
+  c.translate(x,y);
+  c.scale(scale,scale);
+  shape(c,[[-4,10],[-4,-1],[0,-3],[4,0],[4,9],[10,7],[19,14],[18,27],[5,29],[-5,19],[-10,12],[-8,9]],cream,'#73627e',1.6);
+  c.restore();
+}
+
+function arrow(c,x,y,dx,dy,color=cream) {
+  c.save();
+  c.translate(x,y);
+  c.rotate(Math.atan2(dy,dx));
+  shape(c,[[-13,0],[0,0],[-5,-4]],null,color,2);
+  shape(c,[[0,0],[-5,4]],null,color,2);
+  c.restore();
+}
+
+function crossedBeam(c,x,y,r) {
+  oval(c,x,y,r,r,ink);
+  shape(c,[[x-5,y-5],[x+5,y-5],[x,y+5]],brass);
+  ring(c,x,y,r,'#ffb6ac',2.4);
+  shape(c,[[x-r*.67,y-r*.67],[x+r*.67,y+r*.67]],null,'#ffb6ac',2.4);
+}
+
+function linkedTwins(c,twins) {
+  if (twins.length !== 2) return;
+  const [a,b]=twins;
+  c.setLineDash([4,7]);
+  shape(c,[[a.x,a.y-24],[b.x,b.y-24]],null,lilac,2);
   c.setLineDash([]);
-  ring(c,to.x,to.y,s.lesson==='cat' ? 26 : 48,highlight,2);
-  if (s.lesson==='twins') {
-    const b=s.actors[s.tutorIds[1]];
-    c.setLineDash([4,7]);
-    shape(c,[[a.x,a.y],[b.x,b.y]],null,lilac,2);
+  for (const {x,y} of twins) ring(c,x,y-23,27,lilac,1.8);
+}
+
+function gesture(c,s,now,reduced,{ tutorial, waiting, firstDrag, repairCue }) {
+  const practice=(tutorial || waiting) && s.practice && !s.hintDone && s.time <= s.practice;
+  const a=firstDrag
+    ? s.actors.find(actor => actor.state==='roam' && !actor.frozen)
+    : s.actors[s.tutorIds[0]];
+  const mask=s.actors.find(actor => actor.kind==='shy' && actor.state!=='gone');
+  if (mask && (mask.lit || (practice && s.lesson==='shy'))) {
+    const {x,y}=mask;
+    crossedBeam(c,x,y-58,13);
+    if (mask.lit) arrow(c,x,y-79,0,-1,'#ffb6ac');
+  }
+  if (s.catAt) {
+    const {x,y}=s.catAt;
+    if (s.catLit || (practice && s.lesson==='cat')) crossedBeam(c,x,y-34,12);
+  }
+
+  const twins=s.actors.filter(actor => actor.kind==='twin' && actor.state!=='gone');
+  if ((practice && s.lesson==='twins') || twins.some(actor => actor.hold > 0)) linkedTwins(c,twins);
+  if ((practice && s.lesson==='stairs') || s.actors.some(actor => actor.upstairs && actor.state==='roam' && actor.progress < .32)) {
+    ring(c,STAIR.x,STAIR.y-18,20,mint,1.8);
+    arrow(c,STAIR.x+28,STAIR.y+8,0,1,mint);
+  }
+
+  const teachFuse=s.fuse && !s.fused && s.fuseHold===0 && (
+    (practice && s.lesson==='fuse') || s.time < 2.6 || repairCue
+  );
+  const following=(practice || firstDrag) && a && (a.state==='home' || a.state==='roam') && a.kind!=='shy' && !a.frozen;
+  const to=teachFuse ? FUSE : following ? targetFor(a) : null;
+  if (!to) return;
+
+  const reflecting=!teachFuse && s.lesson==='mirror' && a.y>=CASE.y;
+  const hold=teachFuse ? .56 : a.holdTime;
+  const teachingDrag=reflecting || (!teachFuse && !waiting && (firstDrag || s.lesson==='hold'));
+  const cycle=reduced ? 1.1 : (now/1000)%3.1;
+  const touch={x:to.x,y:to.y+(teachingDrag ? LIFT : 0)};
+  const from=teachingDrag ? {x:REST.x,y:REST.y+LIFT} : {x:touch.x+8,y:touch.y+15};
+  const travel=Math.min(1,Math.max(0,(cycle-.12)/(teachingDrag ? .86 : .26)));
+  const progress=Math.min(1,Math.max(0,(cycle-(teachingDrag ? .98 : .38))/hold));
+  const x=from.x+(touch.x-from.x)*travel;
+  const y=from.y+(touch.y-from.y)*travel;
+  c.save();
+  c.globalAlpha=.88;
+  if (teachingDrag) {
+    c.setLineDash([2,9]);
+    shape(c,[[from.x,from.y],[touch.x,touch.y]],null,'#fae4aeab',2);
     c.setLineDash([]);
-    ring(c,b.x,b.y,34,lilac,1.5);
+    shape(c,[[x,y],[x-10,y-LIFT],[x+10,y-LIFT]],'#ffe8a758');
   }
-  if (s.lesson==='stairs') ring(c,STAIR.x,STAIR.y-18,20,mint,1.6);
-  if (s.lesson==='mirror' && !s.bounce && a.y>=CASE.y) {
-    const subject=a;
+  if (reflecting) {
     c.setLineDash([4,7]);
-    shape(c,[[to.x,to.y-12],[subject.x,subject.y-16]],null,mint,1.6);
+    shape(c,[[to.x,to.y-12],[a.x,a.y-16]],null,mint,2);
     c.setLineDash([]);
+    ring(c,a.x,a.y-20,27,mint,1.8);
   }
-  if (avoid && travel>.2) {
-    shape(c,[[to.x-7,to.y-14],[to.x+7,to.y]],null,cream,2.5);
-    shape(c,[[to.x+7,to.y-14],[to.x-7,to.y]],null,cream,2.5);
+  const targetY=teachFuse ? to.y-8 : reflecting ? to.y : to.y-11;
+  ring(c,to.x,targetY,teachFuse ? 28 : 36,brass,2);
+  if (tutorial && progress > 0) ring(c,to.x,targetY,teachFuse ? 28 : 36,cream,3.5,-Math.PI/2,-Math.PI/2+Math.PI*2*progress);
+  if (tutorial && progress === 1) sparkle(c,to.x+24,targetY-25,7,mint);
+  if (tutorial) {
+    ring(c,x,y,12+3*progress,cream,2);
+    hand(c,x,y,.86);
   }
-  ring(c,x,y,12+2*travel,cream,2);
-  shape(c,[[x-4,y+10],[x-4,y-1],[x,y-3],[x+4,y],[x+4,y+9],[x+10,y+7],[x+19,y+14],[x+18,y+27],[x+5,y+29],[x-5,y+19],[x-10,y+12],[x-8,y+9]],'#fff1ce', '#73627e',1.6);
+  if (waiting) arrow(c,a.x,a.y-55,0,1,cream);
   c.restore();
 }
 
@@ -545,11 +598,13 @@ export function renderer(canvas) {
   const b=backdrop.getContext('2d');
   b.scale(2,2);
   let last=null;
+  let repairUntil=0;
   return {
-    draw(s, alpha, now, effects, reduced, tutorial) {
+    draw(s, alpha, now, effects, reduced, hints) {
       if (last!==s) {
         floor(b,s);
         last=s;
+        repairUntil=0;
       }
       c.setTransform(canvas.width/WIDTH,0,0,canvas.height/HEIGHT,0,0);
       c.drawImage(backdrop,0,0,WIDTH,HEIGHT);
@@ -593,12 +648,18 @@ export function renderer(canvas) {
         }
         c.restore();
       }
-      if (tutorial) gesture(c,s,reduced);
+      if (hints) {
+        for (const {x,y} of EXITS) {
+          if (time < 3) arrow(c,x,y+14,0,-1,'#f6ca8a');
+        }
+        if (s.blackout) repairUntil=now+1800;
+        gesture(c,s,now,reduced,{...hints,repairCue:now<repairUntil});
+      }
     },
   };
 }
 
-export function cover(canvas, mode = 'menu', count = 0, day = '', escapes = 0) {
+export function cover(canvas, mode = 'menu', labels = {}) {
   const c=canvas.getContext('2d');
   const w=canvas.width;
   const h=canvas.height;
@@ -615,14 +676,14 @@ export function cover(canvas, mode = 'menu', count = 0, day = '', escapes = 0) {
     c.fillStyle = cream;
     c.textAlign = 'center';
     c.font = 'bold 26px Georgia,serif';
-    c.fillText('Tiptoe Museum', 170, 31);
+    c.fillText(labels.title, 170, 31, 316);
     c.font = 'bold 15px system-ui';
-    c.fillText('Daily · ' + day, 170, 54);
+    c.fillText(labels.daily, 170, 54, 316);
     c.drawImage(picture, 12, 64, 316, 169);
     c.fillStyle = cream;
     c.font = 'bold 17px system-ui';
-    c.fillText(escapes + ' escaped', 89, 258);
-    c.fillText('Streak ' + count, 251, 258);
+    c.fillText(labels.escaped, 89, 258, 150);
+    c.fillText(labels.streak, 251, 258, 150);
     return;
   }
   c.setTransform(w/340,0,0,h/182,0,0);
@@ -684,4 +745,93 @@ export function clock(canvas, state) {
     const a=i*Math.PI/4;
     shape(c,[[97+Math.cos(a)*8,19+Math.sin(a)*8],[97+Math.cos(a)*10,19+Math.sin(a)*10]],null,brass,1.3);
   }
+}
+
+function smallDoor(c,x,y,open=false) {
+  arch(c,x,y-10,15,18,open ? '#5d3c54' : '#414260',brass,1.4);
+  shape(c,[[x-9,y+9],[x+9,y+9]],null,brass,1.4);
+  if (open) arrow(c,x+13,y,1,0,'#ffb6ac');
+}
+
+function sun(c,x,y) {
+  oval(c,x,y,5,5,brass);
+  for (let i=0;i<8;i++) {
+    const a=i*Math.PI/4;
+    shape(c,[[x+Math.cos(a)*8,y+Math.sin(a)*8],[x+Math.cos(a)*11,y+Math.sin(a)*11]],null,brass,1.5);
+  }
+}
+
+function goalPicture(c,x,y) {
+  smallDoor(c,x-32,y);
+  smallDoor(c,x+32,y);
+  sun(c,x,y-12);
+  shape(c,[[x,y+17],[x-11,y+2],[x+11,y+2]],'#ffe8a775');
+  exhibit(c,'statue',x,y+8,{scale:.29,caught:true,lit:true});
+  box(c,x-3,y+16,6,6,2,brass);
+}
+
+function rulePicture(c,key) {
+  if (key==='goal') goalPicture(c,47,22);
+  if (key==='lossRule') {
+    for (const x of [16,40,64]) smallDoor(c,x,22,true);
+    shape(c,[[83,17],[89,23]],null,'#ffb6ac',2);
+    shape(c,[[89,17],[83,23]],null,'#ffb6ac',2);
+  }
+  if (key==='aimRule') {
+    exhibit(c,'statue',27,30,{scale:.49,lit:true,caught:true});
+    ring(c,27,20,16,brass,2.2,-Math.PI/2,Math.PI*1.12);
+    hand(c,27,24,.54);
+    arrow(c,59,19,1,0);
+    ring(c,73,13,8,brass,1.5);
+    hand(c,73,27,.47);
+  }
+  if (key==='twinsRule') {
+    for (const x of [23,70]) exhibit(c,'twin',x,33,{scale:.52,lit:x===23,caught:true});
+    ring(c,23,21,15,brass,1.7);
+    c.setLineDash([3,4]);
+    shape(c,[[39,21],[54,21]],null,lilac,1.7);
+    c.setLineDash([]);
+    ring(c,70,21,15,lilac,1.7);
+  }
+  if (key==='mirrorRule') {
+    box(c,12,7,28,31,4,'#56788744',mint,1);
+    exhibit(c,'bear',26,34,{scale:.48,lit:true});
+    shape(c,[[32,17],[63,26],[78,37]],null,mint,2);
+    oval(c,63,21,7,12,'#82b8b3',.28);
+    hand(c,74,23,.55);
+  }
+  if (key==='shyRule' || key==='catRule') {
+    if (key==='shyRule') exhibit(c,'shy',36,33,{scale:.55});
+    else cat(c,36,27,0,false);
+    crossedBeam(c,66,20,13);
+  }
+  if (key==='fuseRule') {
+    box(c,27,10,40,23,5,'#648f7d',mint,1.4);
+    shape(c,[[48,12],[41,22],[47,22],[45,31],[54,19],[48,19]],mint);
+    ring(c,47,21,17,brass,1.7,-Math.PI/2,Math.PI);
+    hand(c,57,24,.53);
+  }
+  if (key==='stairsRule') {
+    shape(c,[[15,12],[29,12],[29,19],[43,19],[43,26],[57,26],[57,33],[75,33]],null,brass,2.3);
+    arrow(c,67,24,1,.5,mint);
+  }
+}
+
+export function lessonArt(canvas, keys) {
+  const c=canvas.getContext('2d');
+  const rows=Math.ceil(keys.length/3);
+  canvas.height=rows*96;
+  if (keys.length===1) {
+    c.setTransform(canvas.width/94,0,0,canvas.height/48,0,0);
+    goalPicture(c,47,23);
+    return;
+  }
+  c.setTransform(canvas.width/294,0,0,canvas.height/(rows*48),0,0);
+  keys.forEach((key,i) => {
+    c.save();
+    c.translate(i%3*98+2,Math.floor(i/3)*48+2);
+    box(c,0,0,94,42,8,'#342e4c','#7d6686',1);
+    rulePicture(c,key);
+    c.restore();
+  });
 }
