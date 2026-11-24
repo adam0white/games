@@ -34,14 +34,28 @@
   #play { font-size: 19px; min-height: 51px; width: 100%; margin-bottom: 8px; }
   #progress { font-size: .82em; padding-left: 7px; }
   #pause { position: absolute; top: 13px; left: 12px; width: 44px; padding: 0; pointer-events: auto; border-radius: 15px; color: #ffe5b3; }
-  #paused, #done, #cases, #sharing { background: #211a2bab; border-radius: 18px; }
+  #paused, #done, #cases, #sharing, #calendar { background: #211a2bab; border-radius: 18px; }
   #paused .row { margin-top: 12px; }
   .lab-toggle { margin: 10px 0 0; color: #ecd8c7; font-size: 12px; }
   .lab-toggle input { accent-color: #f7be69; }
   #resultArt { width: 240px; height: 107px; display: block; margin: 3px auto 10px; }
   #share { width: 100%; margin: 9px 0 0; }
   #shareArt { width: 240px; height: 168px; display: block; margin: 0 auto 10px; }
-  #caseGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 13px 0; }
+  #caseGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0 15px; }
+  #chapterTabs { display: flex; gap: 5px; margin: 12px 0 0; }
+  #chapterTabs button { flex: 1; padding: 0; min-width: 0; }
+  #calendarGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 13px 0; }
+  #calendarGrid div { background: #473249; min-height: 38px; border: 1px solid #72546a; border-radius: 6px; font: 700 12px Georgia, serif; padding: 4px 0; }
+  #calendarGrid span { display: block; color: #ffd18b; height: 12px; }
+  #calendarGrid [aria-current="date"] { border-color: #ffe3ad; }
+  #calendarGrid .marked { background: #654b51; }
+  #calendar h2 { margin: 4px auto 11px; width: 42px; height: 39px; border: 2px solid #f9d6a1; border-radius: 6px; position: relative; }
+  #calendar h2::before { content: ""; position: absolute; top: 8px; inset-inline: 0; border-top: 2px solid #f9d6a1; }
+  #calendar h2::after { content: ""; position: absolute; top: 15px; left: 7px; width: 4px; height: 4px; border-radius: 1px; background: #f9d6a1; box-shadow: 10px 0 #f9d6a1, 20px 0 #f9d6a1, 0 9px #f9d6a1, 10px 9px #f9d6a1, 20px 9px #f9d6a1; }
+  #calendarDates { display: block; margin: 4px 0; font: 700 13px Georgia, serif; color: #eed6bc; }
+  #calendarHeading { margin-top: 4px; font: 700 19px Georgia, serif; color: #f9d6a1; }
+  #hardDaily:disabled { opacity: .48; cursor: default; }
+  #skipReveal { position: absolute; bottom: 24px; left: 50%; translate: -50%; pointer-events: auto; min-width: 70px; font-size: 22px; }
   #caseGrid button { padding: 0; min-height: 43px; font-size: 14px; }
   #caseGrid button span { display: block; font-size: 8px; color: #f7be69; min-height: 10px; }
   #caseGrid button:disabled { opacity: .5; cursor: default; }
@@ -61,11 +75,17 @@
           <button id="pickCase">Cases</button>
           <button id="menuSound" aria-label="Sound"></button>
         </div>
+        <div class="row">
+          <button id="hardDaily" aria-label="Hard daily">◆ Daily</button>
+          <button id="openCalendar" aria-label="Streak calendar">▦ <span id="hardStreak"></span></button>
+        </div>
       </div>
     </section>
+    <button id="skipReveal" aria-label="Continue to result" hidden>»</button>
     <section id="cases" class="screen">
       <div class="panel">
         <h2>Cases</h2>
+        <div id="chapterTabs" aria-label="Chapters"></div>
         <div id="caseGrid"></div>
         <button id="caseMenu">Menu</button>
       </div>
@@ -83,6 +103,15 @@
         <canvas id="resultArt" width="480" height="214" aria-label="Case result"></canvas>
         <div class="row"><button id="again" class="primary">Again</button><button id="next">Next</button><button id="endMenu">Menu</button></div>
         <button id="share" hidden>Share</button>
+      </div>
+    </section>
+    <section id="calendar" class="screen">
+      <div class="panel">
+        <h2 aria-label="Streak calendar"></h2>
+        <div id="calendarHeading"></div>
+        <span id="calendarDates"></span>
+        <div id="calendarGrid"></div>
+        <div class="row"><button id="calendarMenu">‹</button></div>
       </div>
     </section>
     <section id="sharing" class="screen">

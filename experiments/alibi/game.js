@@ -6,11 +6,11 @@ import { lab } from '../kit/lab.js';
 import { hint } from '../kit/hint.js';
 import { noZoom } from '../kit/zoom.js';
 import {
-  CASES, CLOCK_START, CLOCK_STEP, createCase, dailyCase, dailyWin, dayKey, dossiers, freshRun, accuse, observe,
+  CASES, CHAPTER_TWO_END, CLOCK_START, CLOCK_STEP, createCase, dailyCase, dailyWin, dayKey, offsetDay, dossiers, freshRun, accuse, observe,
 } from './sim.js';
 import {
   W, H, INK, CREAM, GOLD, rect, text, star, clock, place, animal, costume, signature,
-  sky, roomLayout, roomPoint, house, trace, eventIcon, stamp, hand,
+  sky, roomLayout, roomPoint, house, trace, eventIcon, heldItem, stamp, hand,
 } from './art.js';
 
 const $ = id => document.getElementById(id);
@@ -23,27 +23,59 @@ const validStars = n => Number.isInteger(n) && n >= 1 && n <= 3;
 const seed = params.has('seed') && Number.isFinite(Number(params.get('seed'))) ? Number(params.get('seed')) >>> 0 : 32342;
 const forceLevel = Number(params.get('level'));
 const loaded = save.readJson(KEY);
+const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+const validDay = value => typeof value === 'string' && datePattern.test(value)
+  && Number.isFinite(Date.parse(value)) && dayKey(new Date(value)) === value;
+const HISTORY_LIMIT = 84;
+const validTime = value => Number.isSafeInteger(value) && value >= 0;
+
+function betterScore(a, b) {
+  if (!a || b.stars > a.stars) return b;
+  if (b.stars === a.stars && b.seconds !== null && (a.seconds === null || b.seconds < a.seconds)) return b;
+  return a;
+}
+
+function extendStreak(summary) {
+  if (!summary.last) return;
+  while (summary.days[offsetDay(summary.last, -summary.streak)]) summary.streak++;
+}
+
+function readDaily(value) {
+  const last = validDay(value?.last) ? value.last : '';
+  const best = validStars(value?.best) ? value.best : 0;
+  const streak = last && Number.isInteger(value?.streak) && value.streak > 0 && value.streak <= 36500 ? value.streak : 0;
+  const days = {};
+  for (const [date, score] of Object.entries(value?.days ?? {})) {
+    if (validDay(date) && score && (score.stars === null || validStars(score.stars))) {
+      days[date] = { stars: score.stars, seconds: validTime(score.seconds) ? score.seconds : null };
+    }
+  }
+  for (let i = 0; i < Math.min(streak, HISTORY_LIMIT); i++) {
+    days[offsetDay(last, -i)] ??= { stars: null, seconds: null };
+  }
+  if (last && best) days[last] = betterScore(days[last], { stars: best, seconds: null });
+  const summary = { last, streak, best, days };
+  extendStreak(summary);
+  return summary;
+}
+
 function readProfile(value) {
-  const { level, stars, sound, daily } = value ?? {};
+  const { level, stars, sound, daily, hardDaily, campaignVersion } = value ?? {};
   const best = Object.fromEntries(Object.entries(stars ?? {}).filter(([key, stars]) => validLevel(Number(key)) && validStars(stars)));
-  return {
-    level: validLevel(level) ? level : 1,
-    stars: best,
-    sound: sound !== false,
-    daily: {
-      last: typeof daily?.last === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(daily.last) ? daily.last : '',
-      streak: Number.isSafeInteger(daily?.streak) && daily.streak > 0 ? daily.streak : 0,
-      best: validStars(daily?.best) ? daily.best : 0,
-    },
-  };
+  const nextLevel = campaignVersion == null && level === 21 && best[21] ? 22 : level;
+  return { level: validLevel(nextLevel) ? nextLevel : 1, campaignVersion: 2, stars: best, sound: sound !== false,
+    daily: readDaily(daily), hardDaily: readDaily(hardDaily) };
 }
 const profile = readProfile(loaded);
 const rec = lab('alibi');
 const snd = sound({ on: () => profile.sound });
-const showCards = screens(['menu', 'cases', 'paused', 'done', 'sharing']);
+const showCards = screens(['menu', 'cases', 'paused', 'done', 'sharing', 'calendar']);
 const calm = matchMedia('(prefers-reduced-motion: reduce)');
 const replay = { x: 42, endX: 318, y: 561 };
 const homeStamp = { x: 180, y: 605 };
+const notebookButton = { x: 48, y: 605 };
+const HOLD = .46;
+const REVEAL_DURATION = 2.7;
 
 let c = createCase({ seed, level: 1 });
 let board = [];
@@ -51,12 +83,21 @@ let cast = [];
 let rooms = [];
 let screen = 'menu';
 let daily = false;
+let hard = false;
 let day = '';
 let run = freshRun();
 let time = 0;
 let selected = null;
 let pointer = null;
 let lastShot = null;
+let notes = [];
+let notebook = false;
+let noteFlash = null;
+let activeSince = 0;
+let playedMs = 0;
+let solvedSeconds = 0;
+let revealStart = 0;
+let revealSound = false;
 let justScrubbed = false;
 let seen = new Set();
 let scrolled = new Set();
@@ -72,6 +113,10 @@ const formatTime = beat => {
   const m = minute(beat);
   return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
 };
+const dailyProfile = () => hard ? profile.hardDaily : profile.daily;
+const hardUnlocked = () => profile.level > CHAPTER_TWO_END;
+const activeStreak = (summary, today) => summary.last >= offsetDay(today, -1) ? summary.streak : 0;
+const timeLabel = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 const tickX = beat => replay.x + (replay.endX - replay.x) * beat / (c.beatCount - 1);
 function syncProfile() {
   const latest = readProfile(save.readJson(KEY));
@@ -79,10 +124,18 @@ function syncProfile() {
   for (const [level, stars] of Object.entries(latest.stars)) {
     profile.stars[level] = Math.max(profile.stars[level] ?? 0, stars);
   }
-  if (latest.daily.last > profile.daily.last) profile.daily = latest.daily;
-  else if (latest.daily.last === profile.daily.last) {
-    profile.daily.best = Math.max(profile.daily.best, latest.daily.best);
-    profile.daily.streak = Math.max(profile.daily.streak, latest.daily.streak);
+  for (const key of ['daily', 'hardDaily']) {
+    const local = profile[key];
+    const incoming = latest[key];
+    for (const [date, score] of Object.entries(incoming.days)) {
+      local.days[date] = betterScore(local.days[date], score);
+    }
+    if (incoming.last > local.last) Object.assign(local, { last: incoming.last, best: incoming.best, streak: incoming.streak });
+    else if (incoming.last === local.last) {
+      local.best = Math.max(local.best, incoming.best);
+      local.streak = Math.max(local.streak, incoming.streak);
+    }
+    extendStreak(local);
   }
   profile.sound = latest.sound;
 }
@@ -92,22 +145,39 @@ const setScreen = next => {
   screen = next;
   showCards(next);
   $('pause').hidden = !playing();
+  $('skipReveal').hidden = next !== 'reveal';
 };
 
 function updateMenu() {
   const current = validLevel(forceLevel) ? forceLevel : profile.level;
   $('progress').textContent = `${current} /${CASES.length}`;
-  const yesterday = dayKey(new Date(Date.now() - 86400000));
-  const streak = profile.daily.last >= yesterday ? profile.daily.streak : 0;
+  const today = dayKey();
+  const streak = activeStreak(profile.daily, today);
+  const hardStreak = activeStreak(profile.hardDaily, today);
   $('streak').textContent = streak ? `✦${streak}` : '◇';
+  $('hardStreak').textContent = hardStreak ? `◆${hardStreak}` : '◇';
   $('daily').setAttribute('aria-label', `Daily case, streak ${streak}`);
+  $('hardDaily').disabled = !hardUnlocked();
+  $('hardDaily').textContent = hardUnlocked() ? '◆ Daily' : '◆ Ⅱ';
+  $('hardDaily').setAttribute('aria-label', hardUnlocked() ? 'Hard daily' : 'Hard daily unlocks after chapter 2');
   $('menuSound').textContent = profile.sound ? '♪' : '♪̸';
   $('pauseSound').textContent = profile.sound ? 'Sound on' : 'Sound off';
   for (const id of ['menuSound', 'pauseSound']) $(id).setAttribute('aria-pressed', profile.sound);
 }
 
-function openCases() {
-  const choices = CASES.map((spec, i) => {
+function openCases(chapter = CASES[profile.level - 1].chapter) {
+  const tabs = [...new Set(CASES.map(spec => spec.chapter))].map(number => {
+    const button = document.createElement('button');
+    button.textContent = ['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ'][number - 1];
+    button.classList.toggle('primary', number === chapter);
+    button.setAttribute('aria-label', `Chapter ${number}`);
+    button.setAttribute('aria-pressed', number === chapter);
+    button.onclick = () => openCases(number);
+    return button;
+  });
+  $('chapterTabs').replaceChildren(...tabs);
+  const choices = CASES.flatMap((spec, i) => {
+    if (spec.chapter !== chapter) return [];
     const button = document.createElement('button');
     const level = i + 1;
     button.disabled = level > profile.level;
@@ -124,6 +194,30 @@ function openCases() {
   setScreen('cases');
 }
 
+function openCalendar() {
+  if (save.readJson(KEY) !== null) syncProfile();
+  const today = dayKey();
+  const dates = Array.from({ length: 28 }, (_, i) => offsetDay(today, i - 27));
+  $('calendarHeading').textContent = `✦ ${activeStreak(profile.daily, today)}   ◆ ${activeStreak(profile.hardDaily, today)}`;
+  $('calendarDates').textContent = [dates[0], today].map(date => date.slice(5).replace('-', '·')).join(' – ');
+  const cells = dates.map(date => {
+    const cell = document.createElement('div');
+    const standard = Boolean(profile.daily.days[date]);
+    const advanced = Boolean(profile.hardDaily.days[date]);
+    cell.classList.toggle('marked', standard || advanced);
+    cell.dataset.day = date;
+    if (date === today) cell.setAttribute('aria-current', 'date');
+    cell.setAttribute('aria-label', `${date}: ${standard ? 'daily solved' : 'daily empty'}, ${advanced ? 'hard solved' : 'hard empty'}`);
+    cell.textContent = date.slice(8);
+    const marks = document.createElement('span');
+    marks.textContent = (standard ? '✦' : '') + (advanced ? '◆' : '');
+    cell.append(marks);
+    return cell;
+  });
+  $('calendarGrid').replaceChildren(...cells);
+  setScreen('calendar');
+}
+
 function loadBoard(next) {
   c = next;
   cast = dossiers(c);
@@ -131,48 +225,64 @@ function loadBoard(next) {
   board = Array.from({ length: c.beatCount }, (_, beat) => observe(c, beat));
 }
 
-function start(isDaily, level = profile.level) {
+function start(isDaily, level = profile.level, isHard = false, dailyDate = dayKey()) {
+  if (isHard && !hardUnlocked()) return;
   snd.release();
   snd.unlock();
   daily = isDaily;
-  day = daily ? dayKey() : '';
-  loadBoard(daily ? dailyCase(day) : createCase({ seed, level }));
+  hard = isHard;
+  day = daily ? dailyDate : '';
+  loadBoard(daily ? dailyCase(day, hard) : createCase({ seed, level }));
   time = 0;
   selected = null;
   pointer = null;
   lastShot = null;
+  notes = [];
+  notebook = false;
+  noteFlash = null;
+  activeSince = performance.now();
+  playedMs = 0;
+  solvedSeconds = 0;
   justScrubbed = false;
   seen = new Set();
   scrolled = new Set();
   run = freshRun();
   hintReady = phase;
   setScreen('play');
-  rec.start({ level: daily ? `daily-${day}` : c.level });
+  rec.start({ level: daily ? `${hard ? 'hard-daily' : 'daily'}-${day}` : c.level });
   snd.tone(494, .15, .09, 'triangle', 160);
 }
 
 function pause() {
   if (!playing()) return;
   pointer = null;
+  playedMs += performance.now() - activeSince;
   snd.hold();
   setScreen('paused');
 }
 
 function resume() {
   if (screen !== 'paused') return;
+  activeSince = performance.now();
   snd.release();
   snd.unlock();
   setScreen('play');
 }
 
 function endSummary() {
-  return { level: daily ? `daily-${day}` : c.level, stars: run.stars, marks: scrolled.size,
+  return { level: daily ? `${hard ? 'hard-daily' : 'daily'}-${day}` : c.level, stars: run.stars, marks: scrolled.size,
     statements: seen.size, guesses: run.rejected.length + Number(run.outcome === 'solved') };
 }
 
 function menu() {
   if (screen === 'paused' || playing()) rec.end('left', endSummary());
   pointer = null;
+  selected = null;
+  notebook = false;
+  daily = false;
+  hard = false;
+  day = '';
+  notes = [];
   loadBoard(createCase({ seed, level: 1 }));
   time = 0;
   if (save.readJson(KEY) !== null) syncProfile();
@@ -190,13 +300,17 @@ function toggleSound() {
 
 $('play').onclick = () => start(false, validLevel(forceLevel) ? forceLevel : profile.level);
 $('daily').onclick = () => start(true);
-$('pickCase').onclick = openCases;
+$('hardDaily').onclick = () => start(true, profile.level, true);
+$('openCalendar').onclick = openCalendar;
+$('calendarMenu').onclick = menu;
+$('pickCase').onclick = () => openCases();
+$('skipReveal').onclick = finishReveal;
 $('caseMenu').onclick = menu;
 $('pause').onclick = pause;
 $('resume').onclick = resume;
 $('toMenu').onclick = menu;
 $('endMenu').onclick = menu;
-$('again').onclick = () => start(daily, c.level);
+$('again').onclick = () => start(daily, c.level, hard, day);
 $('next').onclick = () => start(false, Math.min(CASES.length, c.level + 1));
 $('menuSound').onclick = toggleSound;
 $('pauseSound').onclick = toggleSound;
@@ -237,35 +351,51 @@ function portraitPoints() {
   }));
 }
 
+function walkPoint(start, end, amount, differentFloors) {
+  const left = start.x + end.x < W;
+  const rail = left ? 17 : 343;
+  const route = differentFloors ? [start, { x: rail, y: start.y }, { x: rail, y: end.y }, end] : [start, end];
+  const spans = route.slice(1).map((p, i) => Math.hypot(p.x - route[i].x, p.y - route[i].y));
+  let remaining = amount * spans.reduce((sum, span) => sum + span, 0);
+  for (let i = 0; i < spans.length; i++) {
+    const span = spans[i];
+    if (i !== spans.length - 1 && remaining > span) {
+      remaining -= span;
+      continue;
+    }
+    const a = route[i];
+    const b = route[i + 1];
+    const mix = span ? Math.min(1, remaining / span) : 0;
+    return { x: a.x + (b.x - a.x) * mix, y: a.y + (b.y - a.y) * mix,
+      walk: Number(span > 3), facing: b.x < a.x ? -1 : 1 };
+  }
+  return end;
+}
+
 function actorPositions() {
   const beat = beatNow();
   const frame = board[beat];
-  if (frame.blackout) return [];
+  if (frame.blackout || frame.shutter) return [];
   const a = Math.floor(time);
   const b = Math.ceil(time);
   const raw = time - a;
-  const f = Math.max(0, Math.min(1, (raw - .14) / .72));
+  const f = Math.max(0, Math.min(1, (raw - .08) / .84));
   const mix = f * f * (3 - 2 * f);
-  const walk = a !== b && f > 0 && f < 1 && !board[a].blackout && !board[b].blackout;
-  const publicActors = frame.actors;
-  return publicActors.map(actor => {
+  const walk = a !== b && !board[a].blackout && !board[b].blackout && !board[a].shutter && !board[b].shutter;
+  return frame.actors.map(actor => {
     const here = roomPoint(rooms[actor.room], actor.slot);
     if (!walk || actor.mask !== null && board[b].exchange) return { ...actor, ...here, walk: 0 };
-    // Match only the tags the camera shows. Interpolation uses the same
-    // information as inspecting two neighboring stills.
+    // Match only tags shown by the camera. Mask changes happen in place.
     const match = candidate => actor.mask === null ? candidate.portrait === actor.portrait : candidate.mask === actor.mask;
     const before = board[a].actors.find(match);
     const after = board[b].actors.find(match);
     if (!before || !after) return { ...actor, ...here, walk: 0 };
     const start = roomPoint(rooms[before.room], before.slot);
     const end = roomPoint(rooms[after.room], after.slot);
-    return {
-      ...actor, x: start.x + (end.x - start.x) * mix, y: start.y + (end.y - start.y) * mix - 6 * Math.sin(Math.PI * mix),
-      walk: Math.hypot(end.x - start.x, end.y - start.y) > 3 ? 1 : 0,
-    };
+    return { ...actor, ...walkPoint(start, end, mix, rooms[before.room].y !== rooms[after.room].y),
+      walk: Number(f > 0 && f < 1 && (start.x !== end.x || start.y !== end.y)) };
   });
 }
-
 function point(e) {
   const box = canvas.getBoundingClientRect();
   return { x: (e.clientX - box.left - originX) / scale, y: (e.clientY - box.top - originY) / scale };
@@ -291,7 +421,8 @@ function scrub(value, snap = false) {
   scrolled.add(beat);
   if (old === beat) return;
   hintReady = phase;
-  snd.tone(285 + beat * 33, .055, .055, 'triangle');
+  snd.noise(.035, .085, beat % 2 ? 2000 : 1450);
+  snd.tone(760 + beat * 23, .028, .036, 'triangle', -220);
   if (board[beat].blackout) snd.noise(.14, .065, 2350);
   if (board[beat].incident && !board[old].incident) snd.tone(535, .13, .045, 'sine', -180);
 }
@@ -308,43 +439,106 @@ function inspect(id) {
   hintReady = phase;
 }
 
+function finishReveal() {
+  if (screen !== 'reveal') return;
+  showResult(true);
+}
+
+function showResult(solved) {
+  $('result').textContent = solved ? 'Gotcha!' : 'Try again';
+  $('next').hidden = daily || !solved || c.level >= CASES.length;
+  $('share').hidden = !daily || !solved;
+  drawResult();
+  setScreen('done');
+}
+
+function saveWin() {
+  if (save.readJson(KEY) !== null) syncProfile();
+  if (daily) {
+    const summary = dailyProfile();
+    const previous = summary.last;
+    Object.assign(summary, dailyWin(previous, day, summary.streak));
+    const score = betterScore(summary.days[day], { stars: run.stars, seconds: solvedSeconds });
+    summary.days[day] = score;
+    if (summary.last === day) summary.best = score.stars;
+    extendStreak(summary);
+    for (const date of Object.keys(summary.days).sort().slice(0, -HISTORY_LIMIT)) delete summary.days[date];
+  } else {
+    profile.stars[c.level] = Math.max(profile.stars[c.level] ?? 0, run.stars);
+    if (c.level === profile.level) profile.level = Math.min(c.level + 1, CASES.length);
+  }
+  persist();
+}
+
 function accuseId(id) {
   const next = accuse(c, run, id);
   if (next === run) return;
   run = next;
   lastShot = { at: phase, id, solved: run.outcome === 'solved' };
   rec.event('accuse', { suspect: id, correct: lastShot.solved, stars: run.stars });
+  snd.noise(.105, .16, 465);
+  snd.tone(132, .18, .14, 'triangle', -73);
   if (lastShot.solved) {
-    for (const frequency of [523, 659, 784]) snd.tone(frequency, .38, .048, 'triangle', 32);
-    if (save.readJson(KEY) !== null) syncProfile();
-    if (daily) {
-      const previous = profile.daily.last;
-      Object.assign(profile.daily, dailyWin(previous, day, profile.daily.streak));
-      if (profile.daily.last === day) {
-        profile.daily.best = Math.max(previous === day ? profile.daily.best : 0, run.stars);
-      }
-    } else {
-      profile.stars[c.level] = Math.max(profile.stars[c.level] ?? 0, run.stars);
-      if (c.level >= profile.level) profile.level = Math.min(c.level + 1, CASES.length);
+    solvedSeconds = Math.floor((playedMs + performance.now() - activeSince) / 1000);
+    saveWin();
+    rec.end('solved', endSummary());
+    revealStart = phase;
+    revealSound = false;
+    time = c.incident;
+    selected = null;
+    notebook = false;
+    setScreen('reveal');
+  } else if (run.outcome) {
+    rec.end('wrong', endSummary());
+    showResult(false);
+  }
+}
+
+function markNote(id, actorRoom = null) {
+  const frame = board[beatNow()];
+  const person = cast[id];
+  const visible = frame.actors.find(actor => actor.portrait === id)
+    ?? frame.sounds.find(item => item.sound === person.sound);
+  const room = actorRoom ?? visible?.room;
+  const note = room === undefined || room === null
+    ? { id, ...person.claim, claim: true }
+    : { id, room, beat: frame.beat, claim: false };
+  const same = entry => entry.id === note.id && entry.beat === note.beat
+    && entry.room === note.room && entry.claim === note.claim;
+  const duplicate = notes.some(same);
+  const added = !duplicate && notes.length < 3;
+  if (added) notes.push(note);
+  notebook = true;
+  noteFlash = { at: phase, full: !added && !duplicate };
+  snd.tone(added ? 614 : 240, .11, .07, 'triangle', 66);
+}
+
+const noteRowY = i => 104 + 31 * i;
+function notebookInput(p) {
+  if (Math.abs(p.x - notebookButton.x) < 29 && Math.abs(p.y - notebookButton.y) < 24) {
+    notebook = !notebook;
+    snd.tone(notebook ? 574 : 437, .08, .06, 'triangle');
+    return true;
+  }
+  if (!notebook || p.x < 75 || p.x > 285 || p.y < 87 || p.y > 198) return false;
+  const index = Math.floor((p.y - 89) / 31);
+  const entry = notes[index];
+  if (entry) {
+    if (p.x > 238) notes.splice(index, 1);
+    else {
+      selected = null;
+      notebook = false;
+      scrub(entry.beat, true);
     }
-    persist();
-  } else {
-    snd.noise(.1, .085, 570);
-    snd.tone(182, .17, .082, 'triangle', -66);
+    snd.tone(454, .075, .06, 'triangle');
   }
-  if (run.outcome) {
-    rec.end(run.outcome, endSummary());
-    $('result').textContent = lastShot.solved ? 'Gotcha!' : 'Try again';
-    $('next').hidden = daily || !lastShot.solved || c.level >= CASES.length;
-    $('share').hidden = !daily;
-    drawResult();
-    setScreen('done');
-  }
+  return true;
 }
 
 function begin(e) {
   if (!playing() || pointer || e.button > 0) return;
   const p = point(e);
+  if (notebookInput(p)) { e.preventDefault(); return; }
   if (Math.abs(p.y - homeStamp.y) <= 25 && Math.abs(p.x - homeStamp.x) < 61) {
     pointer = { ...p, id: e.pointerId, type: 'stamp' };
     snd.tone(375, .06, .065, 'triangle', 60);
@@ -355,10 +549,13 @@ function begin(e) {
     if (before === beatNow()) snd.tone(280 + before * 33, .045, .05, 'triangle');
   } else {
     const id = nearestId(p);
-    if (id !== null) inspect(id);
-    else if (selected !== null && p.y >= 62 && p.y <= 123) scrub(cast[selected].claim.beat, true);
-    else return;
-    pointer = { ...p, id: e.pointerId, type: 'tap' };
+    if (id !== null) {
+      pointer = { ...p, id: e.pointerId, type: 'suspect', suspect: id, at: phase };
+      snd.tone(442 + id * 15, .045, .04, 'triangle');
+    } else if (!notebook && selected !== null && p.x >= 80 && p.x <= 280 && p.y >= 62 && p.y <= 115) {
+      scrub(cast[selected].claim.beat, true);
+      pointer = { ...p, id: e.pointerId, type: 'tap' };
+    } else return;
   }
   try { canvas.setPointerCapture(e.pointerId); } catch {}
   e.preventDefault();
@@ -368,6 +565,7 @@ function move(e) {
   if (pointer?.id !== e.pointerId) return;
   const p = point(e);
   if (pointer.type === 'clock') scrubAt(p.x);
+  if (pointer.type === 'suspect' && Math.hypot(p.x - pointer.x, p.y - pointer.y) > 13) pointer.type = 'tap';
   if (pointer.type === 'stamp') {
     const id = nearestId(p, true);
     if (id !== null && id !== pointer.target) snd.tone(645, .045, .035, 'sine', 110);
@@ -377,17 +575,19 @@ function move(e) {
 
 function release(e) {
   if (pointer?.id !== e.pointerId) return;
-  const type = pointer.type;
+  const { type, suspect } = pointer;
   pointer = null;
   if (e.type !== 'pointerup') return;
   const p = point(e);
   if (type === 'clock') scrubAt(p.x, true);
+  if (type === 'suspect') { notebook = false; inspect(suspect); }
   if (type === 'stamp') {
     const id = nearestId(p, true);
     if (id !== null) accuseId(id);
   }
 }
 
+canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('pointerdown', begin);
 canvas.addEventListener('pointermove', move);
 for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(event, release);
@@ -398,13 +598,16 @@ addEventListener('keydown', e => {
     return;
   }
   if (!playing()) return;
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+  if (e.key.toLowerCase() === 'n') {
+    if (selected !== null && e.shiftKey) markNote(selected);
+    else notebook = !notebook;
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
     e.preventDefault();
     scrub(beatNow() + (e.key === 'ArrowLeft' ? -1 : 1), true);
   } else if (/^[1-8]$/.test(e.key) && cast[Number(e.key) - 1]) {
     const id = Number(e.key) - 1;
     if (e.shiftKey) accuseId(id);
-    else inspect(id);
+    else { notebook = false; inspect(id); }
   } else if (e.key === 'Enter' && selected !== null) {
     e.preventDefault();
     accuseId(selected);
@@ -430,9 +633,9 @@ function line(points, color, width = 1.5) {
 
 function heading(frame) {
   rect(g, 67, 13, 125, 44, 14, '#412f46', '#b4808180');
-  eventIcon(g, 88, 34, 33, c.crime, frame.incident);
-  text(g, daily ? '◇' : '◆'.repeat(c.spec.chapter), 105, 28, 8, GOLD, 'system-ui', 'left');
-  text(g, daily ? 'Daily' : String(c.level).padStart(2, '0'), 105, 44, 15, CREAM, 'Georgia', 'left');
+  eventIcon(g, 88, 34, 33, c.crime, false);
+  text(g, daily ? (hard ? '◆' : '◇') : ['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ'][c.spec.chapter - 1], 105, 28, 8, GOLD, 'system-ui', 'left');
+  text(g, daily ? 'Daily' : String(c.level).padStart(2, '0'), 105, 44, daily ? 12 : 15, CREAM, 'Georgia', 'left');
   for (let i = 0; i < 3; i++) star(g, 146 + i * 16, 37, 6.3, i < run.stars ? GOLD : '#594054', '#cf936d', 1);
   rect(g, 208, 13, 140, 44, 14, '#412f46', '#b4808180');
   clock(g, 232, 35, 13, minute(frame.beat));
@@ -444,7 +647,7 @@ function heading(frame) {
 }
 
 function drawClaim(frame) {
-  if (selected === null) return;
+  if (selected === null || notebook) return;
   const { species, sound: sign, claim } = cast[selected];
   g.beginPath();
   g.moveTo(122, 111);
@@ -460,9 +663,12 @@ function drawClaim(frame) {
     rect(g, 99, 97, 22, 9, 4, '#5a4256');
     signature(g, 110, 101.5, 18, sign);
   }
-  place(g, 150, 85, 30, claim.room);
+  place(g, 150, 85, 30, claim.room, c.spec.site);
   clock(g, 190, 85, 14, minute(claim.beat));
-  text(g, formatTime(claim.beat), 234, 85, 18, INK, 'Georgia');
+  text(g, formatTime(claim.beat), 228, 85, 18, INK, 'Georgia');
+  if (frame.beat !== claim.beat) {
+    line([[257, 81], [261, 85], [257, 89]], '#a67469', 1.7);
+  }
   if (frame.beat === claim.beat) {
     rect(g, 85, 63, 190, 45, 13, null, '#c18468', 1);
   }
@@ -478,6 +684,10 @@ function drawReplay(frame) {
     const x = tickX(i);
     line([[x, replay.y - 11], [x, replay.y + 11]], '#896678', 1);
     dot(x, replay.y, seen.size && scrolled.has(i) ? 3.3 : 2.7, i <= time ? '#f6cf97' : '#987384');
+    if (i === c.shutterBeat) {
+      rect(g, x - 3.8, replay.y + 10, 7.6, 5.6, 1.2, null, '#dcb58d', 1.1);
+      dot(x, replay.y + 12.8, 1.2, '#dcb58d');
+    }
     if (claim?.beat === i) {
       g.beginPath();
       g.moveTo(x - 5, replay.y - 17);
@@ -496,10 +706,53 @@ function drawReplay(frame) {
   const held = pointer?.type === 'stamp';
   dot(180, 605, 15, '#734653', '#9d6977');
   star(g, 180, 605, 9, '#b16d78');
-  if (!held) stamp(g, homeStamp.x + 13, homeStamp.y - 1, .90);
+  if (!held) stamp(g, homeStamp.x + 8, homeStamp.y - 1, .90);
+  const { x, y } = notebookButton;
+  rect(g, x - 25, y - 19, 50, 38, 10, notebook ? '#70505c' : '#403047', '#987184');
+  bookIcon(x - 3, y, '#ffe1aa');
+  if (notes.length) {
+    dot(x + 14, y + 9, 6.5, '#e7a66c');
+    text(g, notes.length, x + 14, y + 9, 8, INK);
+  }
   for (const x of [137, 224]) {
     line([[x - 4, 605], [x, 601], [x + 4, 605]], '#d3a097', 1.5);
     line([[x - 4, 610], [x, 606], [x + 4, 610]], '#a47184', 1.5);
+  }
+}
+
+function bookIcon(x, y, color) {
+  rect(g, x - 9, y - 10, 18, 20, 2, color, INK, 1.3);
+  line([[x - 5, y - 9], [x - 5, y + 9]], '#a86369');
+  for (const dy of [-4, 0, 4]) line([[x - 2, y + dy], [x + 5, y + dy]], '#9d6c68', .9);
+}
+
+function drawNotebook() {
+  if (!notebook) return;
+  const fresh = noteFlash && phase - noteFlash.at < .5;
+  rect(g, 73, 68, 214, 128, 13, '#261c30a0');
+  rect(g, 75, 63, 210, 126, 12, '#f9e4be', fresh && noteFlash.full ? '#dc796d' : '#a76d72', fresh ? 3 : 2);
+  for (let j = 0; j < 4; j++) {
+    const y = 79 + j * 31;
+    line([[72, y], [81, y]], '#57364a', 2.6);
+    line([[73, y - .5], [80, y - .5]], '#f7c789', .8);
+  }
+  bookIcon(93, 77, '#f7c787');
+  for (let i = 0; i < 3; i++) {
+    const y = noteRowY(i);
+    const entry = notes[i];
+    rect(g, 86, y - 13, 189, 27, 6, entry ? '#f4cf9b' : '#efd9ae', '#ca9d85', .85);
+    if (!entry) {
+      dot(108, y, 4, '#c79d85');
+      line([[123, y], [253, y]], '#cba58a', 1);
+      continue;
+    }
+    animal(g, 108, y, 24, cast[entry.id].species, { head: true });
+    place(g, 145, y, 22, entry.room, c.spec.site);
+    clock(g, 178, y, 9, minute(entry.beat));
+    text(g, formatTime(entry.beat), 209, y, 13, INK, 'Georgia');
+    if (entry.claim) text(g, '“ ”', 131, y - 7, 10, '#87576b');
+    rect(g, 239, y - 12, 35, 25, 6, '#e7b68d');
+    text(g, '×', 256, y - .5, 20, '#784e60');
   }
 }
 
@@ -514,7 +767,16 @@ function drawPortraits() {
     rect(g, x - 24, y - 20, 48, 41, 10, wrong ? '#5c3d51' : chosen ? '#f7d49e' : '#ddac9c',
       target ? CREAM : chosen ? GOLD : '#9b6375', target || chosen ? 2.5 : 1.2);
     if (wrong) g.globalAlpha = .62;
-    animal(g, x, y - (c.spec.blackout ? 3 : 0), 39, person.species, { head: true });
+    const hurt = lastShot?.id === id && !lastShot.solved && (phase - lastShot.at < .75 || run.outcome === 'wrong');
+    animal(g, x, y - (c.spec.blackout ? 3 : 0), 39, person.species, { head: true, mood: hurt ? 'hurt' : null });
+    if (pointer?.type === 'suspect' && pointer.suspect === id) {
+      g.beginPath();
+      g.arc(x, y, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, (phase - pointer.at) / HOLD));
+      g.strokeStyle = CREAM;
+      g.lineWidth = 2.4;
+      g.stroke();
+    }
+    if (notes.some(entry => entry.id === id)) dot(x - 18, y - 13, 3, '#ffe9b4', '#a16c63');
     g.globalAlpha = 1;
     if (c.spec.blackout) {
       rect(g, x - 11, y + 10, 22, 9, 5, '#53405b');
@@ -543,7 +805,11 @@ function drawExchange(frame, actors) {
 
 function drawScene(frame, staticScene = false) {
   const claim = cast[selected]?.claim;
-  house(g, rooms, frame, c.crime, !staticScene && claim?.beat === frame.beat ? claim.room : null);
+  house(g, rooms, frame, c.crime, !staticScene && claim?.beat === frame.beat ? claim.room : null, c.spec.site);
+  if (frame.shutter) {
+    drawShutter();
+    return;
+  }
   if (frame.blackout) {
     for (const item of frame.sounds) {
       const { x, y } = roomPoint(rooms[item.room], item.slot);
@@ -559,20 +825,19 @@ function drawScene(frame, staticScene = false) {
       dot(actor.x, actor.y - 2, 19, '#fff0bb50', '#fff0ce', 1.5);
     }
     const species = actor.portrait === null ? null : cast[actor.portrait].species;
-    animal(g, actor.x, actor.y, staticScene ? 39 : 36, species, {
-      phase: (calm.matches ? 0 : actor.walk ? time * 39 : phase * 2.7) + actor.x * .14,
-      walk: calm.matches ? 0 : actor.walk, mask: actor.mask,
+    const hurt = actor.portrait !== null && lastShot?.id === actor.portrait && !lastShot.solved
+      && phase - lastShot.at < .75;
+    if (pointer?.type === 'suspect' && pointer.suspect === actor.portrait) {
+      dot(actor.x, actor.y - 3, 21, '#fff0bb50', '#fff0ce', 2);
+    }
+    animal(g, actor.x, actor.y, staticScene ? 36 : 34, species, {
+      phase: (calm.matches ? 0 : actor.walk ? time * 57 : phase * 3.2) + actor.x * .14,
+      walk: calm.matches ? 0 : actor.walk, mask: actor.mask, facing: actor.facing,
+      activity: actor.walk || actor.carry ? null : actor.room, mood: hurt ? 'hurt' : null,
     });
     if (actor.carry) {
-      dot(actor.x + 13, actor.y - 12, 10, '#fff1d3', '#90586c');
-      if (c.crime === 0) eventIcon(g, actor.x + 13, actor.y - 14, 20, 0, false);
-      else if (c.crime === 1) {
-        rect(g, actor.x + 10, actor.y - 15, 6, 9, 2, '#dc709d', INK, 1.1);
-        rect(g, actor.x + 11, actor.y - 17, 4, 2, 1, GOLD, INK, .7);
-      } else {
-        rect(g, actor.x + 9, actor.y - 17, 8, 8, 2, '#bd566a', INK, 1.2);
-        line([[actor.x + 6, actor.y - 9], [actor.x + 20, actor.y - 9]], INK, 1.7);
-      }
+      dot(actor.x + 12, actor.y - 12, 10, '#fff1d3', '#90586c');
+      heldItem(g, actor.x + 12, actor.y - 12, 19, c.crime);
     }
   }
   if (!staticScene) drawExchange(frame, actors);
@@ -585,7 +850,13 @@ function drawTutorial() {
   if (age < .45) return;
   const wave = calm.matches ? .62 : .5 - .5 * Math.cos(age * 3.6);
   const tickHand = (from, to) => hand(g, tickX(from + (to - from) * wave), replay.y + 4, -.19);
-  if (lesson === 'basics' && !justScrubbed) tickHand(0, Math.min(2.5, c.beatCount - 1));
+  if (lesson === 'compare' && !seen.size) {
+    const p = portraitPoints()[0];
+    dot(p.x, p.y, 22 + wave * 2, '#fff1ce10', CREAM, 1.4);
+    hand(g, p.x, p.y + 7);
+  } else if (lesson === 'compare' && selected !== null && beatNow() !== cast[selected].claim.beat) {
+    hand(g, 232, 86 + wave * 7);
+  } else if (lesson === 'basics' && !justScrubbed) tickHand(0, Math.min(2.5, c.beatCount - 1));
   else if ((lesson === 'basics' || lesson === 'cast' || lesson === 'times') && !seen.size) {
     const p = portraitPoints()[lesson === 'cast' ? cast.length - 1 : 0];
     dot(p.x, p.y, 22 + wave * 3, '#fff1ce10', CREAM, 1.4);
@@ -599,20 +870,90 @@ function drawTutorial() {
   } else if (lesson === 'times' && selected !== null && !scrolled.has(cast[selected].claim.beat)) {
     const tick = cast[selected].claim.beat;
     tickHand(tick, tick);
-  } else if (lesson === 'rooms' && !seen.size) {
-    const p = portraitPoints()[0];
-    hand(g, p.x, p.y + wave * 7);
-    const { x, y } = rooms[rooms.length - 1];
-    dot(x + 17, y + 17, 14 + wave * 3, '#fff1ce08', CREAM, 1.4);
-  } else if (lesson === 'masks' && !scrolled.has(4)) {
-    if (scrolled.has(1) && scrolled.has(2)) tickHand(3, 4);
-    else tickHand(1, 2);
-  } else if (lesson === 'overlap' && !scrolled.has(4)) tickHand(3, 4);
+  } else if (lesson === 'masks' && !scrolled.has(c.exchangeBeat)) {
+    if (scrolled.has(2) && scrolled.has(3)) tickHand(c.exchangeBeat - 1, c.exchangeBeat);
+    else tickHand(2, 3);
+  }
   else if (lesson === 'blackout' && !scrolled.has(c.blackoutBeat)) tickHand(c.blackoutBeat, c.blackoutBeat);
   else if (lesson === 'blackout' && !seen.size) {
     const p = portraitPoints()[0];
     hand(g, p.x, p.y + 13 + wave * 5);
-  } else if (lesson === 'accomplice' && !scrolled.has(c.carryBeat)) tickHand(c.carryBeat, c.carryBeat);
+  } else if (lesson === 'carrier' && !scrolled.has(c.carryBeat)) tickHand(c.carryBeat, c.carryBeat);
+}
+
+function drawShutter() {
+  for (const { x, y, w, h } of rooms) {
+    rect(g, x + 2, y + 5, w - 4, h - 9, 2, '#432c44', '#bd8c88', 1);
+    for (let panel = 0; panel < 5; panel++) {
+      const dx = x + 3 + panel * (w - 6) / 5;
+      rect(g, dx, y + 6, (w - 6) / 5, h - 11, 3, panel % 2 ? '#493048' : '#52354e');
+    }
+  }
+  const room = rooms[c.crimeRoom];
+  const x = room.x + room.w / 2;
+  const y = room.y + 55;
+  dot(x, y, 27, '#251c32', '#dba97e', 1.7);
+  pathShutter(x, y);
+}
+
+function pathShutter(x, y) {
+  for (let i = 0; i < 6; i++) {
+    const a = i * Math.PI / 3;
+    line([[x + 18 * Math.cos(a), y + 18 * Math.sin(a)],
+      [x + 7 * Math.cos(a + .9), y + 7 * Math.sin(a + .9)]], '#dfb188', 2);
+  }
+  dot(x, y, 5, '#f7c77e');
+}
+
+function drawReveal() {
+  const elapsed = phase - revealStart;
+  const after = elapsed >= 1.28;
+  const room = rooms[c.crimeRoom];
+  const x = room.x + room.w / 2 - 9;
+  const y = room.y + 78;
+  house(g, rooms, { incident: after, blackout: false }, c.crime, c.crimeRoom, c.spec.site);
+  rect(g, 14, 123, 332, 295, 10, '#211729bd');
+  const zoom = Math.min(2.05, 288 / room.w);
+  const inset = { x: (W - room.w * zoom) / 2, y: 183, w: room.w * zoom, h: room.h * zoom };
+  rect(g, inset.x - 5, inset.y - 5, inset.w + 10, inset.h + 10, 12, '#4d3347', '#e4b48d', 2.1);
+  g.save();
+  g.translate(inset.x, inset.y);
+  g.scale(zoom, zoom);
+  g.translate(-room.x, -room.y);
+  g.beginPath();
+  g.roundRect(room.x, room.y, room.w, room.h, 4);
+  g.clip();
+  house(g, rooms, { incident: after, blackout: false }, c.crime, c.crimeRoom, c.spec.site);
+
+  const person = cast[c.culprit];
+  const travel = calm.matches ? 1 : Math.min(1, elapsed / .95);
+  const fall = Math.max(0, Math.min(1, (elapsed - 1.67) / .49));
+  const jump = calm.matches ? Number(fall > 0) : fall;
+  const startX = room.x + room.w - 17;
+  const actorX = startX + (x - startX) * travel;
+  const itemY = y - 9 + jump * jump * 25;
+  if (after) {
+    if (c.crime === 1 && jump < .08) {
+      for (let i = 0; i < 3; i++) dot(x - 5 + i * 4, room.y + 55 - i * 3, 1.7, '#e977a6');
+    }
+    heldItem(g, actorX + 12 + jump * 15, itemY, 23, c.crime);
+  } else if (c.crime === 1) {
+    heldItem(g, actorX - 12, y - 5, 20, c.crime);
+  }
+  animal(g, actorX, y + (jump && jump < 1 && !calm.matches ? -4 : 0), 41, person.species, {
+    walk: travel < 1 ? 1 : 0, phase: elapsed * 22, facing: -1, mood: jump > 0 ? 'caught' : null,
+  });
+  if (jump > 0) {
+    const stampY = y - 50 - Math.sin(jump * Math.PI) * 9;
+    stamp(g, actorX + 1, stampY, .65, true);
+    if (jump > .72) star(g, actorX + 22, y - 22, 7, GOLD, INK);
+  }
+  g.restore();
+  rect(g, 123, 67, 114, 52, 15, '#39283e', '#cc9b83', 1.5);
+  clock(g, 148, 93, 13, minute(c.incident));
+  text(g, '↶', 181, 92, 24, GOLD);
+  eventIcon(g, 215, 92, 28, c.crime, after);
+  for (let i = 0; i < 3; i++) star(g, 155 + i * 25, 497, 9, i < run.stars ? GOLD : '#584054', '#a87372');
 }
 
 function drawShot() {
@@ -653,14 +994,26 @@ function draw() {
   g.lineJoin = 'round';
   g.lineCap = 'round';
   const frame = board[beatNow()];
-  sky(g, c.spec.chapter, calm.matches ? 0 : phase);
-  if (screen === 'menu' || screen === 'cases') { drawMenu(); return; }
+  sky(g, c.spec.site, calm.matches ? 0 : phase);
+  if (screen === 'reveal') { drawReveal(); return; }
+  if (screen === 'menu' || screen === 'cases' || screen === 'calendar') { drawMenu(); return; }
   drawScene(frame);
   heading(frame);
   drawClaim(frame);
   drawPortraits();
   drawReplay(frame);
-  drawTutorial();
+  drawNotebook();
+  if (!notebook) drawTutorial();
+  else if (!notes.length && !pointer) {
+    const { x, y } = portraitPoints()[0];
+    const progress = calm.matches ? .8 : phase % 1.2 / 1.2;
+    g.beginPath();
+    g.arc(x, y, 23, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+    g.strokeStyle = CREAM;
+    g.lineWidth = 2;
+    g.stroke();
+    hand(g, x + 6, y + 11);
+  }
   drawShot();
   if (pointer?.type === 'stamp') {
     g.save();
@@ -681,9 +1034,9 @@ function drawResult() {
     rect(context, 17, 22, 62, 65, 12, '#e6b59f', '#aa7181', 2);
     animal(context, 48, 54, 56, person.species, { head: true });
     star(context, 74, 24, 8, GOLD, '#aa7181');
-    place(context, 107, 47, 27, person.claim.room);
+    place(context, 107, 47, 27, person.claim.room, c.spec.site);
     text(context, '≠', 132, 47, 19, CREAM);
-    place(context, 157, 47, 27, c.crimeRoom);
+    place(context, 157, 47, 27, c.frames[person.claim.beat][person.id].room, c.spec.site);
     clock(context, 201, 47, 13, minute(person.claim.beat));
   } else {
     eventIcon(context, 120, 45, 47, c.crime);
@@ -702,20 +1055,27 @@ function openShare() {
   star(context, 51, 53, 6, GOLD);
   star(context, 189, 45, 4, GOLD);
   rect(context, 88, 23, 64, 56, 12, '#ead2b5', '#a6737a', 1.7);
-  eventIcon(context, 120, 49, 49, c.crime);
+  eventIcon(context, 120, 49, 49, c.crime, false);
   for (const i of [0, 1, 2]) star(context, 93 + i * 27, 101, 11, i < run.stars ? GOLD : '#6c4a63', '#e7ac89');
-  text(context, `${day.slice(5).replace('-', '·')}    ✦ ${profile.daily.streak}`, 120, 135, 17, CREAM, 'Georgia');
+  text(context, `${hard ? '◆' : '✦'} ${day.slice(5).replace('-', '·')}     ◷ ${timeLabel(solvedSeconds)}`, 120, 135, 17, CREAM, 'Georgia');
+  card.setAttribute('aria-label', `Alibi ${hard ? 'hard ' : ''}daily ${day}. ${run.stars} stars. Time ${timeLabel(solvedSeconds)}.`);
   shareFile = null;
+  $('sendShare').disabled = true;
   card.toBlob(blob => {
     if (blob) shareFile = new File([blob], 'alibi.png', { type: 'image/png' });
+    $('sendShare').disabled = false;
   });
   setScreen('sharing');
 }
 
 async function shareImage() {
-  if (shareFile && navigator.canShare?.({ files: [shareFile] })) {
-    try { await navigator.share({ files: [shareFile] }); return; }
-    catch (error) { if (error.name === 'AbortError') return; }
+  try {
+    if (shareFile && navigator.share && navigator.canShare?.({ files: [shareFile] })) {
+      await navigator.share({ files: [shareFile] });
+      return;
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') return;
   }
   const link = document.createElement('a');
   link.href = $('shareArt').toDataURL('image/png');
@@ -729,12 +1089,17 @@ function cssPoint(p) {
 }
 
 window.alibiState = () => ({
-  screen, paused: screen === 'paused', level: c.level, daily, day, time, frame: beatNow(), stars: run.stars,
-  selected, outcome: run.outcome, streak: profile.daily.streak,
+  screen, paused: screen === 'paused', level: c.level, daily, hard, day, time, frame: beatNow(), stars: run.stars,
+  selected, outcome: run.outcome, streak: profile.daily.streak, hardStreak: profile.hardDaily.streak,
+  site: c.spec.site, hardUnlocked: hardUnlocked(), notes: notes.map(entry => ({ ...entry })), notebook, solvedSeconds,
+  revealStage: screen === 'reveal' ? Math.min(2, Math.floor((phase - revealStart) / .86)) : null,
   points: {
     clock: { ...cssPoint(replay), endX: cssPoint({ x: replay.endX, y: replay.y }).x,
       ticks: board.map((_, beat) => cssPoint({ x: tickX(beat), y: replay.y })) },
     stamp: cssPoint(homeStamp),
+    notebook: cssPoint(notebookButton),
+    notes: notes.map((_, index) => ({ ...cssPoint({ x: 170, y: noteRowY(index) }),
+      remove: cssPoint({ x: 256, y: noteRowY(index) }) })),
     suspects: portraitPoints().map(cssPoint),
     actors: actorPositions().filter(a => a.portrait !== null).map(a => ({ id: a.portrait, ...cssPoint(a) })),
   },
@@ -742,9 +1107,20 @@ window.alibiState = () => ({
 
 let last = performance.now();
 function animate(now) {
-  const dt = Math.min(.05, Math.max(0, (now - last) / 1000));
+  const dt = Math.min(.1, Math.max(0, (now - last) / 1000));
   last = now;
-  if (screen !== 'paused' && screen !== 'done' && screen !== 'sharing') phase += dt;
+  if (!document.hidden && screen !== 'paused' && screen !== 'done' && screen !== 'sharing') phase += dt;
+  if (playing() && pointer?.type === 'suspect' && phase - pointer.at >= HOLD) {
+    markNote(pointer.suspect);
+    pointer.type = 'pinned';
+  }
+  if (screen === 'reveal') {
+    if (!revealSound && phase - revealStart >= 1.28) {
+      revealSound = true;
+      for (const frequency of [392, 523, 659]) snd.tone(frequency, .34, .052, 'triangle', 23);
+    }
+    if (phase - revealStart >= REVEAL_DURATION) finishReveal();
+  }
   draw();
   requestAnimationFrame(animate);
 }

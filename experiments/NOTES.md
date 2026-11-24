@@ -127,3 +127,7 @@ Paper Boat (`/boat/`, same day): a paper boat rides a gutter stream; the player 
 ## 2026-11-24: Alibi
 
 `experiments/alibi/` (served at `/alibi/`) is a new wordless whodunit: scrub a clock to replay the evening in a cutaway house, tap suspects for picture alibis, and stamp the one whose alibi the replay contradicts. 21 seeded cases in three chapters and a daily case, each proven to have exactly one visible contradiction. It is a new idea, not a rebuild of an archived game. See its `NOTES.md` for bot results and what is not verified.
+
+## 2026-11-24: Tiptoe Museum
+
+`experiments/nightshift/` (served at `/nightshift/`) is a new one-thumb game: a night guard drags a torch beam and exhibits creep toward the exit only while unlit. 18 nights in three wings, a long night and a daily night. It is a new idea, not a rebuild of an archived game. See its `NOTES.md` for bot results and what is not verified.
