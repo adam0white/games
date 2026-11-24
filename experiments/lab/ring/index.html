@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#05080f">
+<title>Firefly Ring</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; height: 100%; background: #05080f; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { font: 16px/1.45 Georgia, 'Times New Roman', serif; color: #f3e6cf; }
+  canvas { display: block; width: 100vw; height: 100dvh; touch-action: none; }
+  .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); box-sizing: border-box; }
+  .screen.on { display: grid; }
+  .screen > div { max-width: 21em; width: calc(100% - 32px); box-sizing: border-box; padding: 1em .6em; max-height: 100dvh; overflow-y: auto; touch-action: pan-y; }
+  .veil { background: #05080fcc; }
+  #menu.veil { background: #05080f88; }
+  h1 { font-weight: normal; font-size: 2.5em; letter-spacing: .1em; line-height: 1.1; margin: 0 0 .25em; color: #ffd9a0; text-shadow: 0 0 28px #ff9a3c88; }
+  h2 { font-weight: normal; font-size: 1.7em; letter-spacing: .08em; margin: 0 0 .3em; color: #ffd9a0; }
+  p { margin: .4em 0; opacity: .9; }
+  .quiet { font-size: .88em; opacity: .72; }
+  .eyebrow { font-size: .78em; letter-spacing: .22em; text-transform: uppercase; opacity: .7; }
+  button { font: inherit; color: #ffe6bd; background: #ffffff10; border: 1.5px solid #ffd9a088; border-radius: 999px; padding: .5em 1.2em; margin: .28em; min-width: 9em; min-height: 46px; touch-action: manipulation; cursor: pointer; }
+  button.main { background: #ffb45a; color: #2a1606; border-color: #ffb45a; font-size: 1.2em; min-width: 10em; }
+  button.line { background: none; border: 0; min-width: 0; min-height: 44px; padding: .3em .6em; text-decoration: underline; color: #ffd9a0; }
+  button:disabled { opacity: .45; }
+  .dot { display: inline-block; width: .6em; height: .6em; border-radius: 50%; background: radial-gradient(#fff6cf, #ffc04a); box-shadow: 0 0 9px #ffc04a; margin: 0 .3em; vertical-align: .05em; }
+  .dot.b { background: radial-gradient(#e8fff4, #63e6b0); box-shadow: 0 0 9px #63e6b0; }
+  .dot.c { background: radial-gradient(#ffeef5, #ff7fae); box-shadow: 0 0 9px #ff7fae; }
+  #pause { position: fixed; display: none; top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); width: 44px; height: 44px; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 50%; background: #ffffff12; place-items: center; }
+  #pause.on { display: grid; }
+  #pause::before { content: ''; width: 4px; height: 16px; border: solid #ffd9a0cc; border-width: 0 5px; }
+  #jarRow { display: block; margin: .6em auto .2em; width: 100%; max-width: 320px; height: auto; aspect-ratio: 8 / 1.5; }
+  #stars { font-size: 2em; letter-spacing: .15em; color: #ffd27a; text-shadow: 0 0 14px #ff9a3c88; margin: .1em 0; }
+  .stats { display: flex; justify-content: center; gap: 1.6em; margin: .3em 0 .5em; }
+  .stats b { display: block; font-weight: normal; font-size: 1.6em; color: #ffd9a0; line-height: 1.1; }
+  .stats span { font-size: .78em; opacity: .7; }
+  #saveNote { min-height: 1.2em; font-size: .85em; opacity: .8; }
+  @media (max-height: 680px) { h1 { font-size: 2.1em; } .screen > div { padding: .5em .4em; } button { min-height: 44px; margin: .2em; } #stars { font-size: 1.6em; } }
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Draw a ring around fireflies of one colour"></canvas>
+<button id="pause" aria-label="Pause"></button>
+<div id="menu" class="screen veil on"><div>
+  <h1>Firefly Ring</h1>
+  <p>Draw a ring with your finger around fireflies of <b>one colour</b><span class="dot"></span><span class="dot b"></span><span class="dot c"></span>. Bigger rings pay much more.</p>
+  <p class="quiet">Mixed colours<span class="dot"></span><span class="dot b"></span> scatter. Moths snap the thread.</p>
+  <p><button id="play" class="main">Play the night</button></p>
+  <p><button id="daily">Today's meadow</button><br><span id="dailyNote" class="quiet"></span></p>
+  <p><button id="endless">Endless meadow</button><br><span id="endlessNote" class="quiet"></span></p>
+  <p id="best" class="quiet"></p>
+  <p><button id="sound" class="line">Sound: on</button></p>
+</div></div>
+<div id="paused" class="screen veil"><div>
+  <h2>Paused</h2>
+  <p id="pauseLine" class="quiet"></p>
+  <p><button id="resume" class="main">Resume</button></p>
+  <p><button id="restart">Restart</button></p>
+  <p><button id="toMenu">Menu</button></p>
+  <p><button id="sound2" class="line">Sound: on</button></p>
+</div></div>
+<div id="end" class="screen veil"><div>
+  <div id="endTop" class="eyebrow">Dawn</div>
+  <h2 id="endTitle">First light</h2>
+  <canvas id="jarRow" width="640" height="120" aria-label="How full each level's jars were"></canvas>
+  <div id="stars"></div>
+  <div class="stats"><div><b id="total">0</b><span>total</span></div><div><b id="bestRing">0</b><span>best ring</span></div></div>
+  <p id="endLine" class="quiet"></p>
+  <p><button id="again" class="main">Play again</button></p>
+  <p><button id="savePic">Save picture</button><button id="endMenu">Menu</button></p>
+  <p id="saveNote" role="status"></p>
+</div></div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
