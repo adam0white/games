@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#04060c">
+<title>Lantern Voice</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #04060c; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { font: 16px/1.5 Georgia, 'Times New Roman', serif; color: #f3e6cf; }
+  canvas { display: block; width: 100vw; height: 100dvh; }
+  a { color: #ffd9a0; }
+  .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; pointer-events: none; }
+  .screen.on { display: grid; }
+  .screen > div { max-width: 21em; width: calc(100% - 2em); padding: 1em; pointer-events: auto; }
+  #card > div { pointer-events: none; } #card button, #card a { pointer-events: auto; }
+  .veil { background: #04060cc8; }
+  h1 { font-weight: normal; font-size: 2.4em; letter-spacing: .12em; margin: 0 0 .2em; color: #ffd9a0; text-shadow: 0 0 28px #ff9a3c66; }
+  p { margin: .4em 0; opacity: .88; }
+  .small { font-size: .88em; opacity: .75; }
+  button { font: inherit; color: #ffe6bd; background: #ffffff10; border: 1.5px solid #ffd9a088; border-radius: 999px; padding: .55em 1.2em; margin: .3em; min-width: 9em; min-height: 46px; touch-action: manipulation; }
+  button.main { background: #ffb45a; color: #2a1606; border-color: #ffb45a; font-size: 1.2em; min-width: 9.5em; }
+  button.line { background: none; border: 0; min-width: 0; min-height: 44px; padding: .3em .6em; text-decoration: underline; color: #ffd9a0; }
+  #micmsg { display: none; color: #ffc0a0; }
+  #micmsg.on { display: block; }
+  .dot { display: inline-block; width: .7em; height: .7em; border-radius: 50%; background: radial-gradient(#fff2c8, #ff9a3c); box-shadow: 0 0 10px #ff9a3c; margin-right: .35em; vertical-align: baseline; }
+  #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); display: none; text-align: left; pointer-events: none; text-shadow: 0 1px 6px #000; }
+  #hearts { font: 26px/1 sans-serif; color: #ff4d5e; letter-spacing: 2px; }
+  #embers { font-size: 26px; line-height: 1.3; color: #ffd9a0; }
+  #flame { width: 84px; height: 6px; border-radius: 3px; background: #ffffff18; margin-top: 4px; overflow: hidden; }
+  #flame i { display: block; height: 100%; width: 50%; background: linear-gradient(90deg, #ff7a2a, #ffd27a); }
+  #big { position: fixed; top: calc(6px + env(safe-area-inset-top)); left: 0; right: 0; display: none; text-align: center; font-size: 40px; line-height: 1.1; color: #fff3dc; pointer-events: none; text-shadow: 0 1px 8px #000; font-variant-numeric: tabular-nums; }
+  #warn, #say { position: fixed; left: 0; right: 0; text-align: center; pointer-events: none; opacity: 0; transition: opacity .3s; text-shadow: 0 1px 8px #000; padding: 0 1em; }
+  #warn { top: 20%; font-size: 26px; line-height: 1.2; font-weight: bold; color: #ff4a4a; }
+  #warn.on { opacity: 1; animation: pulse .9s infinite alternate; }
+  @keyframes pulse { to { opacity: .7; } }
+  #say { top: 31%; font-size: 22px; color: #ffe6bd; }
+  #pause { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); width: 44px; height: 44px; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 50%; background: #ffffff14; display: none; place-items: center; touch-action: none; }
+  #pause::before { content: ''; width: 4px; height: 16px; border: solid #ffd9a0aa; border-width: 0 5px; }
+  #meter { position: relative; height: 150px; width: 54px; margin: .8em auto; border-radius: 27px; background: #ffffff10; border: 1.5px solid #ffd9a055; overflow: hidden; }
+  #meter i { position: absolute; left: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: radial-gradient(#fff2c8, #ff9a3c); box-shadow: 0 0 14px #ff9a3c; top: 50%; opacity: .2; transition: opacity .1s; }
+  #ctime { height: 4px; width: 12em; margin: .5em auto; background: #ffffff18; border-radius: 2px; overflow: hidden; }
+  #ctime i { display: block; height: 100%; width: 0; background: #ffd27a; }
+  #cnote { min-height: 1.5em; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="hearts"></div><div id="embers"><span class="dot"></span><span id="count">0</span></div><div id="flame"><i id="fill"></i></div></div>
+<div id="big"></div>
+<div id="warn">The flame is fading</div>
+<div id="say"></div>
+<button id="pause" aria-label="Pause"></button>
+<div id="menu" class="screen veil on"><div>
+  <h1>Lantern Voice</h1>
+  <p>An experiment: steer the boat by humming. Hum low to go left and high to go right; go quiet and the boat keeps its line.</p>
+  <p class="small">Your voice is turned into a pitch on this device; nothing is recorded or sent.</p>
+  <p id="micmsg"></p>
+  <p><button id="play" class="main">Play by voice</button></p>
+  <p><button id="touch" class="line">Play with touch instead</button><button id="again" class="line">Sing my range again</button></p>
+  <p><button id="sound" class="line"></button></p>
+  <p><a href="/lantern/">Back to Lantern</a></p>
+</div></div>
+<div id="calib" class="screen veil"><div>
+  <h1>Your range</h1>
+  <p id="cprompt"></p>
+  <div id="meter"><i id="cdot"></i></div>
+  <p id="cnote"></p>
+  <div id="ctime"><i id="cbar"></i></div>
+  <p><button id="cstop" class="line">Back</button></p>
+</div></div>
+<div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p><p><button id="go" class="main">Play again</button></p><p><button id="tomenu" class="line">Menu</button></p><p><a href="/lantern/">Back to Lantern</a></p></div></div>
+<script type="module">
+import { create, step, centre, half, fall, boat, progress, sight, DT, GOAL, NIGHTS, BOAT } from '../../lantern/sim.js';
+import { hull, wake, TINT } from '../../lantern/looks.js';
+import { detect, semis, noteName } from './pitch.js';
+import { createVoice, hear, seat, toRiver, fromRiver, shape, ASSIST, MIN_RANGE } from './steer.js';
+import { sound } from '../../kit/audio.js';
+import { onLeave, isPauseKey } from '../../kit/pause.js';
+import { screens } from '../../kit/screens.js';
+import { drag } from '../../kit/drag.js';
+import { hint } from '../../kit/hint.js';
+import { read, write, readJson, writeJson } from '../../kit/save.js';
+
+const $ = id => document.getElementById(id);
+const KEY = 'lantern-voice:v1'; // { lo, hi } in semitones (MIDI numbers), the player's comfortable range
+const query = new URLSearchParams(location.search);
+const gain = Number(query.get('gain')) || 1.3; // finger steering, as on the main page
+const strength = query.get('assist') === '0' ? 0 : ASSIST;
+let stage = Math.min(NIGHTS, Math.max(1, Math.floor(Number(query.get('night')) || 1)));
+
+const canvas = $('c'), g = canvas.getContext('2d');
+let W = 0, H = 0, unit = 1, left = 0, dpr = 1;
+function resize() {
+  dpr = Math.min(2, devicePixelRatio || 1);
+  W = canvas.width = Math.round(innerWidth * dpr); H = canvas.height = Math.round(innerHeight * dpr);
+  unit = Math.min(W, H * 0.62); left = (W - unit) / 2; // the river is one unit wide, framed as on the main page
+}
+addEventListener('resize', resize); resize();
+const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
+
+let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, flash = 0, ended = -1e9, screen = 'menu', sayTimer = 0, shown = '';
+let mode = 'voice', range = readJson(KEY), voice = null, aimed = { target: 0.5, gap: null, pull: 0, y: null }, finger = false, quietUntil = 0;
+let soundOn = read('lantern-voice:sound', '1') !== '0', micError = '';
+const valid = r => r && Number.isFinite(r.lo) && Number.isFinite(r.hi) && r.hi - r.lo >= MIN_RANGE;
+if (!valid(range)) range = null;
+
+// The microphone: its own audio context (the game's sounds may be off or paused), an analyser, never connected to the speaker.
+let micCtx = null, analyser = null, buf = null, lastHz = null, lastClarity = 0, lastRms = 0, heardAt = 0;
+async function openMic() {
+  if (analyser) { try { await micCtx.resume(); } catch {} return true; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { micError = 'none'; return false; }
+  try { micCtx = micCtx || new (window.AudioContext || window.webkitAudioContext)(); } catch { micError = 'none'; return false; }
+  try { if (navigator.audioSession) navigator.audioSession.type = 'play-and-record'; } catch {} // iOS: the kit asks for 'playback', which cannot record
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false });
+    try { await micCtx.resume(); } catch {}
+    const src = micCtx.createMediaStreamSource(stream);
+    analyser = micCtx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0;
+    src.connect(analyser); buf = new Float32Array(analyser.fftSize);
+    micError = ''; return true;
+  } catch (e) {
+    micError = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError') ? 'refused' : e && (e.name === 'NotFoundError' || e.name === 'OverconstrainedError') ? 'none' : 'failed';
+    return false;
+  }
+}
+// One analysis of the newest 2048 samples. Frames heard while one of the game's own notes plays are dropped, so the
+// speaker cannot steer the boat.
+function listen() {
+  if (!analyser) { lastHz = null; return null; }
+  analyser.getFloatTimeDomainData(buf);
+  const r = detect(buf, micCtx.sampleRate); lastClarity = r.clarity; lastRms = r.rms;
+  lastHz = performance.now() < quietUntil ? null : r.hz;
+  if (lastHz) heardAt = performance.now();
+  return lastHz;
+}
+
+window.lanternState = () => ({ x: s.x, y: s.y, t: s.t, over: s.over, playing, paused, stage, hearts: s.hearts, light: s.light, taken: s.taken, target, screen, mode, unit: unit / dpr,
+  hz: lastHz, clarity: lastClarity, rms: lastRms, note: voice?.note ?? null, u: voice?.u ?? null, held: voice?.held ?? null, river: fromRiver(s, s.x), pull: aimed.pull, range, micError, calib: calib && { phase: calib.phase, t: calib.t, n: calib.notes.map(a => a.length) }, sound: soundOn, strength });
+window.lanternSim = () => s;
+
+const cards = screens(['menu', 'calib', 'card']);
+function show(name) {
+  screen = name;
+  cards(name);
+  const play = name === 'play';
+  $('hud').style.display = $('big').style.display = play ? 'block' : 'none'; pauseButton.style.display = play ? 'grid' : 'none';
+  if (!play) $('warn').classList.remove('on');
+  if (name === 'menu') { $('play').textContent = range ? `Play night ${stage} by voice` : 'Play by voice'; $('again').style.display = range ? '' : 'none'; micLine(); }
+}
+function micLine() {
+  const m = $('micmsg'), why = { refused: 'The microphone was refused, so the boat cannot hear you.', none: 'No microphone was found on this device.', failed: 'The microphone could not start.' }[micError];
+  m.classList.toggle('on', !!why);
+  m.textContent = why ? `${why} You can play with touch instead${micError === 'none' ? '.' : ", or allow the microphone in the browser's settings and try again."}` : '';
+  $('touch').classList.toggle('main', !!why); $('touch').classList.toggle('line', !why);
+}
+function say(text, ms = 2200) { const el = $('say'); el.textContent = text; el.style.opacity = 1; clearTimeout(sayTimer); sayTimer = setTimeout(() => { el.style.opacity = 0; }, ms); }
+function soundLine() { $('sound').textContent = soundOn ? 'Sound on, kept quiet so it does not steer the boat. Headphones help.' : 'Sound off.'; }
+$('sound').addEventListener('click', () => { soundOn = !soundOn; write('lantern-voice:sound', soundOn ? '1' : '0'); if (soundOn) snd.unlock(); soundLine(); });
+soundLine();
+
+// Sound: short, quiet notes only, and no loops or drones, so the microphone hears the player and not the game.
+const snd = sound({ on: () => soundOn });
+const tone = (freq, dur, vol, type = 'sine') => { if (snd.ctx && soundOn) { snd.tone(freq, Math.min(dur, 0.35), vol * 0.4, type); quietUntil = Math.max(quietUntil, performance.now() + Math.min(dur, 0.35) * 1000 + 60); } };
+const later = (ms, f) => setTimeout(f, ms);
+const scale = [392, 440, 523.25, 587.33, 659.25, 783.99, 880, 1046.5];
+let streak = 0;
+// What every sim event sounds like and says.
+const EVENTS = {
+  ember: () => { tone(scale[Math.min(streak++, scale.length - 1)], 0.18, 0.1, 'triangle'); flash = 1; },
+  graze: () => { tone(1320, 0.06, 0.05); say('Close!', 700); },
+  shield: () => { tone(880, 0.2, 0.1); say('A force field pushes rocks away', 1600); },
+  break: () => { tone(240, 0.2, 0.2, 'square'); shake = 0.6; say('The shield took the blow', 1400); },
+  push: () => { tone(500, 0.1, 0.06, 'triangle'); },
+  fieldEnd: () => { tone(660, 0.15, 0.05); say('The force field is gone', 1200); },
+  boost: () => { tone(523.25, 0.2, 0.08, 'triangle'); later(80, () => tone(1046.5, 0.2, 0.08, 'triangle')); say('Boost! Nothing can stop you', 1600); },
+  slow: () => { tone(440, 0.25, 0.1); say('Slow water. Dawn keeps coming', 1800); },
+  small: () => { tone(1046.5, 0.15, 0.1, 'triangle'); say('A smaller boat', 1500); },
+  big: () => { tone(196, 0.25, 0.15, 'square'); shake = 0.4; say('Bad luck: a bigger boat!', 1700); },
+  magnet: () => { tone(660, 0.2, 0.1, 'triangle'); say('Magnet: embers come to you', 1700); },
+  flare: () => { tone(783.99, 0.25, 0.08); say('Flare: the flame holds', 1600); },
+  wisp: () => { tone(150, 0.25, 0.15, 'sawtooth'); say('A false ember!', 1400); streak = 0; },
+  heart: () => { tone(523.25, 0.2, 0.1, 'triangle'); say('A heart: one more life', 1500); },
+  hurt: () => { tone(180, 0.25, 0.25, 'square'); shake = 0.8; target = s.x; steerFinger.rebase(); if (voice) seat(voice, fromRiver(s, s.x)); say('You lost a heart', 1500); },
+  hit: () => { tone(70, 0.3, 0.3, 'sawtooth'); shake = 1; say('Crash!', 1200); },
+  out: () => { tone(110, 0.3, 0.2); say('The flame went out', 1600); },
+  dawn: () => { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => later(i * 150, () => tone(f, 0.3, 0.1, 'triangle'))); say('Dawn!', 2000); },
+};
+window.lanternEvents = Object.keys(EVENTS);
+window.lanternEvent = name => EVENTS[name]();
+
+// Calibration: hum a low note for 3 s, then a high note for 3 s. Each is the median of the voiced frames heard.
+const PHASE = 3;
+let calib = null;
+function calibrate() { calib = { phase: 0, t: 0, notes: [[], []] }; show('calib'); prompt(); }
+function prompt(extra = '') { $('cprompt').textContent = (extra ? extra + ' ' : '') + (calib.phase ? 'Now hum a high note: comfortable, not a squeak.' : 'Hum a low note: comfortable, not a growl.'); }
+const median = a => { const b = [...a].sort((p, q) => p - q), k = b.length; return k % 2 ? b[k >> 1] : 0.5 * (b[k / 2 - 1] + b[k / 2]); };
+function calibTick(dt) {
+  const hz = listen(), m = hz ? semis(hz) : null;
+  calib.t += dt;
+  if (m !== null && calib.t > 0.4) calib.notes[calib.phase].push(m); // the first moment of each phase is the player getting started
+  $('cbar').style.width = `${Math.min(100, (calib.t / PHASE) * 100)}%`;
+  $('cnote').textContent = m !== null ? noteName(m) : '';
+  const lo = calib.phase ? median(calib.notes[0]) : 40, k = m === null ? 0.5 : Math.max(0, Math.min(1, (m - lo + 3) / 18));
+  $('cdot').style.top = `${88 - 76 * k}%`; $('cdot').style.opacity = m === null ? 0.2 : 1;
+  if (calib.t < PHASE) return;
+  const got = calib.notes[calib.phase];
+  if (got.length < 20) { calib.t = 0; calib.notes[calib.phase] = []; prompt('I did not hear a steady note. Hum a little louder, close to the phone.'); return; }
+  if (calib.phase === 0) { calib.phase = 1; calib.t = 0; prompt(`Low note: ${noteName(median(got))}.`); return; }
+  const lo2 = median(calib.notes[0]), hi2 = median(calib.notes[1]), span = hi2 - lo2;
+  if (span < MIN_RANGE) { calib = { phase: 0, t: 0, notes: [[], []] }; prompt(`Those notes were ${Math.max(0, Math.round(span))} semitones apart; the boat needs at least ${MIN_RANGE}. Try a lower low note and a higher high note.`); return; }
+  range = { lo: lo2, hi: hi2 }; writeJson(KEY, range); calib = null;
+  say(`Your range: ${noteName(range.lo)} to ${noteName(range.hi)}`, 2200);
+  begin('voice');
+}
+$('cstop').addEventListener('click', () => { calib = null; show('menu'); });
+
+async function startVoice(fresh) {
+  snd.unlock();
+  const ok = await openMic();
+  if (!ok) { show('menu'); return; }
+  if (fresh || !range) calibrate(); else begin('voice');
+}
+$('play').addEventListener('click', () => startVoice(false));
+$('again').addEventListener('click', () => startVoice(true));
+$('touch').addEventListener('click', () => { snd.unlock(); begin('touch'); });
+
+function begin(how) {
+  mode = how;
+  s = create((Math.random() * 2 ** 31) | 0, stage); target = s.x; playing = true; paused = false; acc = 0; streak = 0; flash = 0; finger = false; steerFinger.reset();
+  voice = mode === 'voice' ? createVoice(range) : null; if (voice) seat(voice, fromRiver(s, s.x));
+  aimed = { target: s.x, gap: null, pull: 0, y: null };
+  shown = ''; show('play'); hud();
+  say(mode === 'voice' ? 'Hum low to go left, high to go right' : `Night ${stage}`, mode === 'voice' ? 3500 : 1600);
+}
+function finish() {
+  playing = false; ended = performance.now(); steerFinger.drop(); finger = false;
+  $('hud').style.display = $('big').style.display = pauseButton.style.display = 'none'; $('warn').classList.remove('on');
+  const won = s.over === 'dawn', why = { dark: 'The flame went out.', bank: 'You ran onto the bank.', ice: 'You struck the ice.', log: 'You struck a log.', pool: 'The whirlpool took you.', geyser: 'The geyser threw you over.', isle: 'You struck an island.' }[s.over] ?? 'You struck a rock.';
+  const pct = Math.floor(progress(s) * 100), played = stage;
+  $('title').textContent = won ? 'Dawn' : s.over === 'dark' ? 'Dark' : `Night ${stage}`;
+  if (won && stage < NIGHTS) { $('line').textContent = mode === 'voice' ? `You sang your way through night ${stage}.` : `You came through night ${stage}.`; stage++; $('go').textContent = `Play night ${stage}`; }
+  else if (won) { $('line').textContent = 'You came through every night.'; $('go').textContent = 'Play again'; }
+  else { $('line').textContent = `${why} ${pct}% of the way to dawn.`; $('go').textContent = 'Play again'; }
+  $('sub').textContent = `${s.taken} ${s.taken === 1 ? 'ember' : 'embers'}. ${mode === 'voice' ? 'Steered by voice.' : 'Steered by touch.'}${played > 1 && mode === 'voice' ? ' The help with aiming is tuned for night 1.' : ''}`;
+  setTimeout(() => { if (!playing && screen === 'play') show('card'); }, won ? 2200 : 700);
+}
+function hud() {
+  const big = `${Math.floor(progress(s) * 100)}%`, low = playing && !paused && s.light < 0.28, now = `${s.hearts}|${s.taken}|${big}|${low}|${Math.round(s.light * 40)}`;
+  if (now === shown) return; shown = now;
+  $('hearts').textContent = '♥'.repeat(Math.max(0, s.hearts)); $('count').textContent = s.taken; $('big').textContent = big;
+  $('fill').style.width = `${Math.round(s.light * 100)}%`;
+  $('warn').classList.toggle('on', low);
+}
+
+// A finger steers as on the main page, by how far it has moved since it touched down; in voice play it overrides the
+// voice while it is down, and when it lifts the voice's held place is set to where the boat now is.
+const pauseButton = $('pause');
+function aim(x) { const c = centre(s, s.y), h = half(s, s.y) + 0.02; target = Math.max(c - h, Math.min(c + h, x)); }
+canvas.addEventListener('pointerdown', e => { if (playing && !paused && (e.pointerType !== 'mouse' || e.buttons)) finger = true; });
+for (const type of ['pointerup', 'pointercancel']) canvas.addEventListener(type, () => { if (finger && voice) { seat(voice, fromRiver(s, target)); voice.frames.length = 0; } finger = false; });
+const steerFinger = drag(canvas, { playing: () => playing, paused: () => paused, resume: () => resume(), from: () => s.x, travel: dx => dx * dpr / unit * gain, aim,
+  mouse: e => { if (mode === 'touch' || e.buttons) aim((e.clientX * dpr - left) / unit); }, settle: 12 });
+hint(canvas, { kind: 'drag', key: 'lantern-voice:hint', delay: 1500, bottom: 56, when: () => playing && !paused && screen === 'play' && mode === 'touch' });
+
+$('go').addEventListener('click', () => { if (paused) resume(); else if (performance.now() - ended > 600) { if (mode === 'voice' && analyser) begin('voice'); else begin('touch'); } });
+$('tomenu').addEventListener('click', () => { playing = false; paused = false; snd.release(); show('menu'); });
+
+function pause() {
+  if (!playing || paused) return; paused = true; steerFinger.drop(); finger = false; keys.clear();
+  $('title').textContent = 'Paused'; $('line').textContent = `Night ${stage}, ${Math.floor(progress(s) * 100)}% of the way to dawn.`; $('sub').textContent = 'Touch the river to go on.'; $('go').textContent = 'Go on';
+  show('card'); snd.hold();
+}
+function resume() {
+  if (!paused) return; paused = false; acc = 0; last = performance.now(); target = s.x;
+  if (voice) voice.frames.length = 0;
+  show('play'); snd.release();
+}
+pauseButton.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pause(); });
+onLeave(pause);
+const keys = new Set();
+addEventListener('keydown', e => {
+  if (isPauseKey(e)) { paused ? resume() : pause(); return; }
+  if (paused) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); resume(); } return; }
+  keys.add(e.key);
+});
+addEventListener('keyup', e => { keys.delete(e.key); if (voice && !keys.size) seat(voice, fromRiver(s, s.x)); });
+
+function tick() {
+  const key = keys.has('ArrowLeft') || keys.has('a') ? -1 : keys.has('ArrowRight') || keys.has('d') ? 1 : 0;
+  if (key) target = s.x + 0.1 * key;
+  else if (voice && !finger) { aimed = shape(s, voice.u, strength); target = aimed.target; }
+  if (finger || key || !voice) aimed = { target, gap: null, pull: 0, y: null };
+  step(s, target);
+  for (const e of s.events) EVENTS[e]?.();
+  hud();
+  if (s.over) finish();
+}
+
+// Drawing: the main game's flat view, simplified. Water and banks, rocks, the boat, the dark with a hole of light,
+// embers glowing through it; then the voice's aim, the assist's guide line and the pitch ladder.
+function draw(now) {
+  const dawn = Math.max(0, (progress(s) - 0.86) / 0.14), day = s.over === 'dawn' ? Math.max(0, Math.min(1, (now - ended) / 2500)) : 0;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  if (shake) g.translate((Math.random() - 0.5) * shake * 14 * dpr, (Math.random() - 0.5) * shake * 14 * dpr);
+  g.fillStyle = '#1a2a20'; g.fillRect(-20, -20, W + 40, H + 40);
+  const top = s.y + 0.74 * H / unit + 0.1, bot = s.y - 0.3 * H / unit - 0.1;
+  g.beginPath();
+  for (let y = bot; y <= top; y += 0.05) g.lineTo(sx(centre(s, y) - half(s, y)), sy(y));
+  for (let y = top; y >= bot; y -= 0.05) g.lineTo(sx(centre(s, y) + half(s, y)), sy(y));
+  g.closePath(); g.fillStyle = '#0d2236'; g.fill(); g.strokeStyle = '#5c8468'; g.lineWidth = 2.5 * dpr; g.stroke();
+  g.strokeStyle = '#2c5578'; g.lineWidth = 1.5 * dpr; g.globalAlpha = 0.5; // current streaks
+  for (let i = Math.floor(bot * 3); i < top * 3; i++) { const y = i / 3, k = (Math.sin(i * 12.9898) * 43758.5453) % 1, c = centre(s, y), h = half(s, y), x = c + (Math.abs(k) * 2 - 1) * (h - 0.03); g.beginPath(); g.moveTo(sx(x), sy(y)); g.lineTo(sx(x + (centre(s, y + 0.14) - c)), sy(y + 0.14)); g.stroke(); }
+  g.strokeStyle = '#eaf6ff'; g.lineWidth = 3 * dpr; // the waterfall
+  for (let i = Math.floor(bot * 14); i < top * 14; i++) { const y = i / 14 - (now / 260 % 1) / 14, f = fall(s, y); if (f <= 0) continue; const c = centre(s, y), h = half(s, y) - 0.01; g.globalAlpha = 0.15 + 0.5 * f; g.beginPath(); g.moveTo(sx(c - h), sy(y)); g.lineTo(sx(c + h), sy(y)); g.stroke(); }
+  g.globalAlpha = 1;
+  for (const k of s.rocks) {
+    const x = sx(k.x), y = sy(k.y), R = k.rad * unit;
+    if (k.kind === 'log') { g.fillStyle = '#7a5632'; g.fillRect(x - (k.len + k.rad) * unit, y - R, 2 * (k.len + k.rad) * unit, 2 * R); continue; }
+    g.fillStyle = k.ice ? '#a9c9dc' : '#2b2f36'; g.beginPath(); g.ellipse(x, y, R, R * 0.86, 0, 0, 7); g.fill();
+    g.fillStyle = k.ice ? '#e8f4fa' : '#59606b'; g.beginPath(); g.ellipse(sx(k.x - k.rad * 0.25), sy(k.y + k.rad * 0.3), R * 0.45, R * 0.3, -0.5, 0, 7); g.fill();
+    g.strokeStyle = '#9fc6e0'; g.globalAlpha = 0.35; g.lineWidth = 2 * dpr; g.beginPath(); g.arc(x, y, R * 1.18, 0.2, 2.9); g.stroke(); g.globalAlpha = 1;
+  }
+  const bx = sx(s.x), by = sy(s.y), lean = Math.max(-0.5, Math.min(0.5, (target - s.x) * 4));
+  g.save(); g.translate(bx, by); g.rotate(lean * 0.5); const z = boat(s) / BOAT * 1.2; g.scale(z, z);
+  if (playing) wake(g, unit, now / 1000); hull(g, 'oak', unit, '#6b5a48', now / 1000); g.restore();
+  // The dark, with a hole of light round the lantern.
+  const r = sight(s) * unit * (1 + Math.sin(now / 90) * 0.015), dark = Math.max(0, 0.95 - dawn * 0.75 - day);
+  const m = g.createRadialGradient(bx, by - 0.05 * unit, r * 0.15, bx, by - 0.05 * unit, r);
+  m.addColorStop(0, 'rgba(4,6,12,0)'); m.addColorStop(0.7, `rgba(4,6,12,${dark * 0.55})`); m.addColorStop(1, `rgba(4,6,12,${dark})`);
+  g.fillStyle = m; g.fillRect(-20, -20, W + 40, H + 40);
+  g.globalCompositeOperation = 'lighter';
+  const w = g.createRadialGradient(bx, by, 0, bx, by, r * 0.8); w.addColorStop(0, `rgba(255,170,80,${0.2 + 0.25 * flash})`); w.addColorStop(1, 'rgba(255,170,80,0)');
+  g.fillStyle = w; g.fillRect(bx - r, by - r, 2 * r, 2 * r);
+  for (const e of [...s.embers, ...s.powers]) if (!e.got) {
+    const ex = sx(e.x), ey = sy(e.y), er = 0.05 * unit, col = e.kind === 'ember' ? '255,150,60' : e.kind === 'wisp' ? '150,235,110' : TINT[e.kind] ?? '255,255,255';
+    const q = g.createRadialGradient(ex, ey, 0, ex, ey, er); q.addColorStop(0, 'rgba(255,240,210,.95)'); q.addColorStop(0.25, `rgba(${col},.6)`); q.addColorStop(1, `rgba(${col},0)`);
+    g.fillStyle = q; g.fillRect(ex - er, ey - er, 2 * er, 2 * er);
+  }
+  const fr = 0.022 * unit, fg = g.createRadialGradient(bx, by, 0, bx, by, fr); fg.addColorStop(0, '#fff6dc'); fg.addColorStop(0.45, 'rgba(255,170,80,.8)'); fg.addColorStop(1, 'rgba(255,170,80,0)');
+  g.fillStyle = fg; g.fillRect(bx - fr, by - fr, 2 * fr, 2 * fr);
+  g.globalCompositeOperation = 'source-over';
+  if (s.field) { g.strokeStyle = 'rgba(140,205,255,.7)'; g.lineWidth = 2.5 * dpr; g.beginPath(); g.arc(bx, by, 0.062 * unit, 0, 7); g.stroke(); }
+  if (dawn > 0 || day > 0) { const d = g.createLinearGradient(0, 0, 0, H); d.addColorStop(0, `rgba(255,196,140,${Math.min(0.85, dawn * 0.45 + day * 0.6)})`); d.addColorStop(1, `rgba(120,150,190,${Math.min(0.5, dawn * 0.15 + day * 0.4)})`); g.fillStyle = d; g.fillRect(-20, -20, W + 40, H + 40); }
+  if (playing && voice) drawVoice(now, bx, by);
+  g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * progress(s), 3 * dpr);
+}
+
+// Where the voice points on the river, the assist's guide line, and the pitch ladder at the right edge.
+function drawVoice(now, bx, by) {
+  const singing = performance.now() - heardAt < 150, u = voice.u ?? 0.5, ax = sx(toRiver(s, u)), ay = sy(s.y + 0.12);
+  if (aimed.gap && aimed.pull > 0) { // the guide line: from the boat to the middle of the gap it is being eased toward
+    const gx = sx(0.5 * (aimed.gap.lo + aimed.gap.hi)), gy = sy(aimed.y);
+    g.strokeStyle = `rgba(190,240,200,${0.12 + 0.3 * aimed.pull})`; g.lineWidth = 2 * dpr; g.setLineDash([5 * dpr, 6 * dpr]);
+    g.beginPath(); g.moveTo(bx, by - 0.03 * unit); g.lineTo(gx, gy); g.stroke(); g.setLineDash([]);
+    g.strokeStyle = `rgba(190,240,200,${0.1 + 0.25 * aimed.pull})`; g.beginPath(); g.moveTo(sx(aimed.gap.lo), gy); g.lineTo(sx(aimed.gap.hi), gy); g.stroke();
+  }
+  g.strokeStyle = `rgba(255,225,170,${singing ? 0.75 : 0.3})`; g.lineWidth = 2 * dpr; g.beginPath(); g.arc(ax, ay, 0.018 * unit, 0, 7); g.stroke(); // the voice's aim
+  // The ladder: low at the bottom, high at the top, one tick a semitone.
+  const lx = W - 26 * dpr - (W > 500 * dpr ? 30 * dpr : 0), y0 = H * 0.78, y1 = H * 0.22, L = (m) => y0 + (y1 - y0) * (m - range.lo) / (range.hi - range.lo);
+  g.fillStyle = 'rgba(8,12,20,.55)'; g.fillRect(lx - 14 * dpr, y1 - 18 * dpr, 28 * dpr, y0 - y1 + 36 * dpr);
+  if (aimed.gap) { const a = fromRiver(s, aimed.gap.lo), b = fromRiver(s, aimed.gap.hi); g.fillStyle = `rgba(190,240,200,${0.12 + 0.2 * aimed.pull})`; g.fillRect(lx - 12 * dpr, y0 + (y1 - y0) * b, 24 * dpr, (y1 - y0) * (a - b)); } // the gap, as notes
+  g.strokeStyle = 'rgba(255,217,160,.25)'; g.lineWidth = 1 * dpr; g.beginPath();
+  for (let k = Math.ceil(range.lo); k <= range.hi; k++) { const y = L(k); g.moveTo(lx - (k % 12 === 0 ? 10 : 5) * dpr, y); g.lineTo(lx + (k % 12 === 0 ? 10 : 5) * dpr, y); }
+  g.moveTo(lx, y0); g.lineTo(lx, y1); g.stroke();
+  g.fillStyle = 'rgba(255,217,160,.7)'; g.font = `${11 * dpr}px Georgia, serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('high', lx, y1 - 10 * dpr); g.fillText('low', lx, y0 + 10 * dpr);
+  // The boat's column: a small boat mark beside the ladder.
+  const by2 = y0 + (y1 - y0) * fromRiver(s, s.x); g.fillStyle = 'rgba(200,170,130,.9)'; g.beginPath(); g.moveTo(lx - 13 * dpr, by2 - 5 * dpr); g.lineTo(lx - 5 * dpr, by2); g.lineTo(lx - 13 * dpr, by2 + 5 * dpr); g.fill();
+  // The note: a dot that moves with the voice, solid while singing, a faint ring while silent (the held place).
+  const m = singing && voice.note !== null ? voice.note : null, dy = m !== null ? Math.max(y1 - 14 * dpr, Math.min(y0 + 14 * dpr, L(m))) : y0 + (y1 - y0) * u;
+  if (m !== null) { const q = g.createRadialGradient(lx, dy, 0, lx, dy, 12 * dpr); q.addColorStop(0, 'rgba(255,245,220,1)'); q.addColorStop(0.4, 'rgba(255,170,80,.9)'); q.addColorStop(1, 'rgba(255,150,60,0)'); g.fillStyle = q; g.fillRect(lx - 12 * dpr, dy - 12 * dpr, 24 * dpr, 24 * dpr); }
+  else { g.strokeStyle = 'rgba(255,217,160,.5)'; g.lineWidth = 1.5 * dpr; g.beginPath(); g.arc(lx, dy, 5 * dpr, 0, 7); g.stroke(); }
+}
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.1, (now - last) / 1000 || 0); last = now;
+  if (screen === 'calib' && calib) calibTick(dt);
+  else if (playing && !paused && voice) { const hz = listen(); if (!finger) hear(voice, hz, Math.max(dt, 1 / 120)); }
+  if (playing && !paused) { acc += dt; while (acc >= DT && playing) { tick(); acc -= DT; } }
+  shake = Math.max(0, shake - dt * 3); flash = Math.max(0, flash - dt * 1.2);
+  draw(now);
+}
+show('menu');
+requestAnimationFrame(frame);
+</script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>
