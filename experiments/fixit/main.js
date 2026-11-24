@@ -1,6 +1,6 @@
 // Fix-It Stall: the page. View, input, sound, save, cards. The rules are in sim.js.
-import { create, step, input, guide, hint, multiplier, goalState, stars, selectLane, chooseTicket, lampAt, DT, KINDS, TUTOR, WORD, OBJECT, HIT, WORKS, LEAVE, LEVELS } from './sim.js';
-import { COUNT, ORDER, OPEN_ORDER, INTRO, BUSY_END, CHAPTERS, ASSIST_RATE, STAR_BONUS, canAssist, levelDef, goalLine, levelReward } from './levels.js';
+import { create, step, input, guide, hint, repairWord, multiplier, goalState, stars, selectLane, chooseTicket, lampAt, DAY, RAMP, DT, KINDS, TUTOR, WORD, OBJECT, HIT, WORKS, LEAVE, LEVELS } from './sim.js';
+import { COUNT, ORDER, OPEN_ORDER, INTRO, BUSY_END, CHAPTERS, ASSIST_RATE, STAR_BONUS, canAssist, levelDef, goalLine, levelReward, resultSeconds } from './levels.js';
 import { plan, SKILLS } from './moves.js';
 import { drawJob, drawGhost, person, looks, REGULAR, cat, heart, coin, sillyList, drawSilly, goalIcon, starShape, C, circle, rrect, star } from './art.js';
 import { readJson, writeJson } from '../kit/save.js';
@@ -133,7 +133,6 @@ const dateSeed = d => { let h = 2166136261; for (const ch of 'fixit-daily-' + d)
 let daily = false;
 // ---------- the map: levels.js holds the levels; the save holds the stars
 let mode = 'level', lvN = 1, card = 0, cardFade = 0;
-const CARD = 2.6; // seconds the goal card shows before the level starts by itself (a tap starts it sooner)
 const OPEN_AT = 8, DAILY_AT = 3; // the open stall opens after level 8, the daily stall after level 3 (or any old shift)
 const cleared = n => (save.levels[n] ?? 0) > 0;
 const reachable = n => n === 1 || cleared(n) || cleared(n - 1);
@@ -161,7 +160,7 @@ function menu() {
   $('growth').textContent = next ? `${next[2]} at ${next[1]} ★` : 'Stall fully fitted';
   const n = only ? null : qLevel ?? nextLevel();
   $('play').textContent = n ? `Play level ${n}` : 'Play';
-  $('playLine').textContent = n ? goalLine(levelDef(n).goal) : '';
+  noticeText.data = recordingChoice.checked ? recordingOnText : 'Game lab recording is off. You can turn it on in the pause menu. ';
   menuHelp = n && (canAssist(save.attempts[n]) ? n
     : Object.keys(save.attempts).map(Number).find(i => reachable(i) && canAssist(save.attempts[i])));
   $('menuAssist').hidden = !menuHelp;
@@ -169,14 +168,15 @@ function menu() {
     const label = `Level ${menuHelp} with slower clocks, up to two stars`;
     $('menuAssist').setAttribute('aria-label', label);
     $('menuAssist').title = label;
-    $('menuAssist').lastElementChild.textContent = menuHelp === n ? '★ ★' : menuHelp;
+    $('menuAssist').lastElementChild.textContent = menuHelp === n ? 'Slower clocks · 2★ max' : `Level ${menuHelp} · slower clocks · 2★ max`;
   }
   map(n);
   $('migrated').textContent = migrated ? `Your stall's old jobs count: levels 1 to ${migrated} are done.` : '';
   $('open').style.display = openStall() ? '' : 'none';
   $('daily').style.display = dailyOpen() ? '' : 'none';
-  $('openLine').textContent = openStall() ? `Open stall: all day, as long as you last. Best ${save.best}.` : `Clear level ${OPEN_AT} to open the stall all day.`;
-  $('dailyLine').textContent = dailyOpen() ? (today in save.days ? `Today's stall: best ${save.days[today]}` : 'Daily stall: the same for everyone today.') : `Clear level ${DAILY_AT} for the daily stall.`;
+  const shiftSeconds = Math.max(0, (dayLen ?? DAY) - startLevel * RAMP);
+  $('openLine').textContent = openStall() ? `Open stall: ${shiftSeconds} s to earn coins. Best ${save.best}.` : `Clear level ${OPEN_AT} for the open stall.`;
+  $('dailyLine').textContent = dailyOpen() ? `Daily: ${shiftSeconds} s to earn coins. ${today in save.days ? `Today's best ${save.days[today]}.` : 'Same jobs for everyone.'}` : `Clear level ${DAILY_AT} for the daily stall.`;
 }
 // The map opens to the next chapter and keeps the three chapters one tap away.
 function map(next) {
@@ -185,6 +185,11 @@ function map(next) {
   const showChapter = current => {
     grids.forEach((grid, i) => { grid.hidden = i !== current; });
     buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(i === current)));
+    const [first, last, title] = CHAPTERS[current];
+    const locked = !grids[current].querySelector('button:enabled');
+    if (locked) $('playLine').textContent = `Clear level ${first - 1} to unlock ${title}.`;
+    else if (next && (next < first || next > last)) $('playLine').textContent = 'Tap a level below to replay it.';
+    else $('playLine').textContent = next ? goalLine(levelDef(next).goal) : '';
   };
   for (const [i, [a, b, title]] of CHAPTERS.entries()) {
     const tab = document.createElement('button');
@@ -199,7 +204,7 @@ function map(next) {
       t.dataset.level = n; t.disabled = !open;
       t.setAttribute('aria-label', `Level ${n}${open ? `, ${st} stars` : ', locked'}`);
       const num = document.createElement('span'); num.textContent = n;
-      const ss = document.createElement('span'); ss.className = 'ss'; ss.textContent = open ? '★'.repeat(st) + '☆'.repeat(3 - st) : '';
+      const ss = document.createElement('span'); ss.className = 'ss'; ss.textContent = '★'.repeat(st);
       t.append(num, ss);
       t.addEventListener('click', () => begin('level', n));
       grid.append(t);
@@ -244,6 +249,7 @@ function icon(q, id) {
 }
 
 // ---------- a level, or a shift of the open stall or the daily stall
+const runMetadata = () => mode === 'level' ? { mode: 'level', level: lvN, goal: goalLine(s.lv.goal) } : daily ? { mode: 'daily', date: today } : { mode: 'day', unlocked: save.unlocked.length, shift: save.shifts + 1, only };
 function begin(how = 'level', n = null, assisted = false) {
   snd.unlock();
   mode = only ? 'open' : how; daily = mode === 'daily';
@@ -252,7 +258,7 @@ function begin(how = 'level', n = null, assisted = false) {
   if (mode === 'level') {
     lvN = n ?? nextLevel();
     s = create({ lv: levelDef(lvN), hearts, assisted: assisted && canAssist(save.attempts[lvN]) });
-    card = CARD;
+    card = 1;
     newJob = null;
   } else {
     newJob = !only && !daily && save.pending && save.unlocked.includes(save.pending) ? save.pending : null;
@@ -271,7 +277,7 @@ function begin(how = 'level', n = null, assisted = false) {
   ripples = []; bits = []; flying = []; confetti = []; shownCoins = 0; leaving = []; spots = new Map(); word = null; banner = null; recCount = 0; multWas = 1; multPop = 0; finger = null; kb = null; jobKey = null; prev = null; counterReset();
   show('play');
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); // so Space drives the bench, not the last button
-  rec.start(mode === 'level' ? { mode: 'level', level: lvN, goal: goalLine(s.lv.goal) } : daily ? { mode: 'daily', date: today } : { mode: 'day', unlocked: save.unlocked.length, shift: save.shifts + 1, only });
+  rec.start(runMetadata());
   if (s.assisted) {
     save.assists[lvN] = (save.assists[lvN] ?? 0) + 1;
     store();
@@ -291,7 +297,9 @@ function finish() {
   playing = false; ended = performance.now();
   if (mode === 'level') return finishLevel();
   const why = s.over;
-  save.shifts++; save.bank += s.coins; save.served += s.served;
+  // Completed open-stall shifts also preserve access for players from before the map.
+  if (!daily) save.shifts++;
+  save.bank += s.coins; save.served += s.served;
   const newBest = !daily && s.coins > save.best; if (!daily) save.best = Math.max(save.best, s.coins); // the daily stall keeps its own best per day
   save.bestStreak = Math.max(save.bestStreak, s.bestStreak);
   let unlocked = null, dayBest = false;
@@ -311,7 +319,7 @@ function finish() {
 }
 // A level pays its repair coins on the first clear, plus a bonus for every new star.
 function finishLevel() {
-  const why = s.over, n = lvN, def = s.lv, st = stars(s), was = save.levels[n] ?? 0, secs = Math.round(s.clearT ?? s.clock);
+  const why = s.over, n = lvN, def = s.lv, st = stars(s), was = save.levels[n] ?? 0, secs = resultSeconds(s.clearT ?? s.clock);
   const bonus = Math.max(0, st - was) * STAR_BONUS, bestWas = save.times[n];
   const reward = levelReward(s.coins, st, was), beforeGrowth = stallGrowth();
   save.bank += reward; save.served += s.served; save.bestStreak = Math.max(save.bestStreak, s.bestStreak);
@@ -319,7 +327,7 @@ function finishLevel() {
   if (st) {
     delete save.attempts[n];
     save.levels[n] = Math.max(was, st);
-    if (!s.assisted) save.times[n] = Math.min(bestWas ?? Infinity, Math.round(s.clearT * 10) / 10);
+    if (!s.assisted) save.times[n] = Math.min(bestWas ?? Infinity, secs);
     if (def.intro && !save.unlocked.includes(def.intro)) save.unlocked.push(def.intro); // the job a level taught is the open stall's too
   } else {
     save.attempts[n] = Math.min(2, (save.attempts[n] ?? 0) + 1);
@@ -329,11 +337,11 @@ function finishLevel() {
   const added = MILESTONES.filter(([id]) => !beforeGrowth.includes(id) && stallGrowth().includes(id)).map(([, , label]) => label);
   const upNext = levelDef(n + 1);
   if (st) {
-    const tip = s.assisted ? 'Two stars available with help.' : st < 3 ? `Three stars: clear it in ${def.stars[0]} s.` : bestWas && s.clearT < bestWas ? `New best time!` : 'Three stars!';
+    const tip = s.assisted ? 'Two stars available with help.' : st < 3 ? `Three stars: clear it in ${def.stars[0]} s.` : bestWas && secs < bestWas ? `New best time!` : 'Three stars!';
     endCard({ title: `Level ${n} cleared!`, stars: st, coins: reward,
-      stats: [['Time', `${secs} s`], ...(save.times[n] ? [['Best', `${Math.round(save.times[n])} s`]] : []), ['Fixed', s.served]],
+      stats: [['Time', `${secs} s`], ...(save.times[n] ? [['Best', `${resultSeconds(save.times[n])} s`]] : []), ['Fixed', s.served]],
       line: (bonus ? `+${bonus} coins for ${st - was === 1 ? 'a new star' : 'new stars'}. ` : '') + tip,
-      note: added.length ? `New at the stall: ${added.join(', ')}!` : opened ? 'The open stall is open: play all day from the menu.' : dailyNow ? 'The daily stall is open on the menu.' : upNext ? (upNext.intro ? `Next: a new job, the ${OBJECT[upNext.intro]}.` : `Next: ${goalLine(upNext.goal)}`) : 'That was the last level. Can you three-star them all?',
+      note: added.length ? `New at the stall: ${added.join(', ')}!` : opened ? 'Open stall unlocked. Choose it on the menu.' : dailyNow ? 'The daily stall is open on the menu.' : upNext ? (upNext.intro && !cleared(upNext.n) ? `Next: a new job, the ${OBJECT[upNext.intro]}.` : `Next: ${goalLine(upNext.goal)}`) : 'That was the last level. Can you three-star them all?',
       again: 'Try again', next: !!upNext });
     [523, 659, 784, 1047].slice(0, 1 + st).forEach((f, i) => setTimeout(() => tone(f, 0.4, 0.09, 'triangle'), 300 + i * 160));
   } else {
@@ -342,7 +350,7 @@ function finishLevel() {
     endCard({ title: why === 'time' ? 'Out of time' : why === 'hearts' ? 'Out of hearts' : 'Someone walked off', stars: 0, coins: 0,
       stats: gs.parts.map(p => [p.kind === 'coins' ? 'Base pay' : 'Fixed', `${Math.min(p.have, p.need)}/${p.need}`]).concat([['Time', `${secs} s`]]),
       line: why === 'lost' && !left.length ? 'In this level nobody may walk off.' : `${close ? 'So close! ' : ''}${left.join(' and ') || 'Nearly there'}.`,
-      note: goalLine(def.goal), again: 'Try again', next: false, offer: canAssist(save.attempts[n]) });
+      note: activeGoalLine(), again: 'Try again', next: false, offer: canAssist(save.attempts[n]) });
     [523, 392].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.08, 'triangle'), i * 160));
   }
   setTimeout(() => { if (!playing && screen === 'play') show('end'); }, 900);
@@ -351,6 +359,7 @@ function finishLevel() {
 function endCard({ title, stars: st, coins, stats, line, note, again, next, offer = false }) {
   $('helpRow').hidden = !offer;
   $('dailyResult').hidden = true;
+  $('shareStatus').textContent = '';
   $('earnedLine').hidden = coins === 0;
   $('endTitle').textContent = title;
   $('endStars').style.display = st === null ? 'none' : '';
@@ -442,23 +451,31 @@ function dailyCard() {
   cat(ctx, 501, 306, 3.4, 0, true);
   dailyImage = canvas.toDataURL('image/png');
 }
-function downloadDaily() {
+function downloadDaily(message = 'PNG download started.') {
   if (!dailyImage) return;
   const a = document.createElement('a');
   a.download = `fixit-stall-${today}.png`; a.href = dailyImage; a.click();
+  $('shareStatus').textContent = message;
 }
-$('downloadDaily').addEventListener('click', downloadDaily);
+$('downloadDaily').addEventListener('click', () => downloadDaily());
 $('shareDaily').addEventListener('click', async () => {
   if (!dailyImage) return;
   const bytes = Uint8Array.from(atob(dailyImage.split(',')[1]), c => c.charCodeAt(0));
   const file = new File([bytes], `fixit-stall-${today}.png`, { type: 'image/png' });
   const data = { files: [file], title: 'Fix-It Stall daily', text: `${today} · ${s.coins} coins · ${s.served} fixed` };
   try {
-    if (navigator.share && navigator.canShare?.(data)) { await navigator.share(data); return; }
+    if (navigator.share && navigator.canShare?.(data)) {
+      await navigator.share(data);
+      $('shareStatus').textContent = 'Card handed to the share sheet.';
+      return;
+    }
   } catch (error) {
-    if (error.name === 'AbortError') return;
+    if (error.name === 'AbortError') {
+      $('shareStatus').textContent = 'Sharing canceled.';
+      return;
+    }
   }
-  downloadDaily();
+  downloadDaily('File sharing unavailable. PNG download started.');
 });
 
 // Everything the sim reported: sound, words, sparks. Called after each input and each tick, so a touch is answered in the same frame.
@@ -539,7 +556,7 @@ function react(e) {
     case 'next': {
       walkOff();
       if (e.golden) { banner = { text: 'Golden job!', t: 0, gold: true }; shimmer(); }
-      else if (e.fresh) { banner = { text: 'New job!', t: 0 }; [523, 784, 1047].forEach((f, i) => later(i * 110, () => tone(f, 0.25, 0.08, 'triangle'))); }
+      else if (e.fresh && (!s.lv || !cleared(s.lv.n))) { banner = { text: 'New job!', t: 0 }; [523, 784, 1047].forEach((f, i) => later(i * 110, () => tone(f, 0.25, 0.08, 'triangle'))); }
       else if (e.regular) { banner = { text: 'Me again!', t: 0 }; tone(392, 0.15, 0.08, 'triangle'); later(130, () => tone(523, 0.2, 0.08, 'triangle')); save.regular++; }
       else tone(300, 0.05, 0.05, 'triangle');
       break;
@@ -585,6 +602,9 @@ for (const type of ['pointerup', 'pointercancel']) cv.addEventListener(type, e =
 const rec = lab('fixit');
 rec.notice($('menu').firstElementChild);
 rec.toggle($('paused').firstElementChild);
+const recordingChoice = document.querySelector('#paused .lab-toggle input');
+const noticeText = document.querySelector('#menu .lab-notice').firstChild;
+const recordingOnText = noticeText.data;
 $('play').addEventListener('click', () => begin(only ? 'open' : 'level', qLevel ?? nextLevel()));
 for (const id of ['menuAssist', 'assist']) $(id).append($('helpIcon').content.cloneNode(true));
 $('menuAssist').addEventListener('click', () => { if (screen === 'menu' && menuHelp) begin('level', menuHelp, true); });
@@ -632,7 +652,7 @@ function pause() {
 function resume() {
   if (!paused) return;
   paused = false; acc = 0; last = performance.now();
-  show('play'); snd.release();
+  show('play'); snd.unlock(); snd.release();
 }
 $('pause').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); pause(); });
 $('pause').addEventListener('click', e => { e.preventDefault(); pause(); });
@@ -688,11 +708,11 @@ function draw(now, dt) {
   const growth = stallGrowth();
   street(t);
   furnishings(growth);
-  if (s?.lv?.rule === 'blackout' && (playing || screen === 'end' || paused)) lampHanger();
+  if (s?.lv?.rule === 'blackout' && (screen === 'play' || screen === 'end' || paused)) lampHanger();
   people(t, dt);
   awning(t, growth);
   bench(t);
-  if (s && (playing || screen === 'end' || screen === 'paused')) job(t, dt);
+  if (s && (screen === 'play' || screen === 'end' || screen === 'paused')) job(t, dt);
   else idleJob(t);
   for (const b of bits) { const [x, y] = local(b.x, b.y); g.globalAlpha = Math.max(0, 1 - b.t / b.life); star(g, x, y, 4, b.col); g.globalAlpha = 1; }
   hud(t, dt);
@@ -739,7 +759,7 @@ function furnishings(growth) {
 const QUEUE_GAP = () => Math.min(92, W * 0.22);
 function custTarget(i) { return { x: W / 2 - QUEUE_GAP() * (i + 0.95) - 10, R: Math.max(13, 23 - i * 3), base: benchTop - 26 - i * 3 }; }
 function people(t, dt) {
-  if (!s || !(playing || screen === 'end' || screen === 'paused')) { // menu: a customer waves at the empty stall
+  if (!s || !(screen === 'play' || screen === 'end' || screen === 'paused')) { // menu: a customer waves at the empty stall
     person(g, W / 2, benchTop + 6, 32, looks(12345), 'happy', t, { cheer: 0.5 + 0.5 * Math.sin(t * 3), bob: Math.sin(t * 2) * 2 });
     return;
   }
@@ -861,7 +881,13 @@ function awning(t, growth) {
     const x = W - 64, y = benchTop - (growth.includes('shelf') ? 48 : 22);
     rrect(g, x, y, 40, 26, 5, C.copper, 2);
     circle(g, x + 12, y + 13, 7, C.cream, 1.6);
-    g.fillStyle = C.ink; g.fillRect(x + 24, y + 6, 10, 3); g.fillRect(x + 24, y + 13, 10, 3);
+    rrect(g, x + 22, y + 3, 15, 16, 2, C.ink, 0);
+    const note = TUNE[(radioN - 1) % TUNE.length];
+    if (playing && !card && note) {
+      const noteY = y + 16 - 5 * Math.log2(note / 523);
+      circle(g, x + 27, noteY, 2.4, C.glow, 0);
+      g.fillStyle = C.glow; g.fillRect(x + 28, noteY - 7, 2, 7); g.fillRect(x + 30, noteY - 7, 3, 2);
+    }
   }
 }
 function bench(t) {
@@ -961,7 +987,7 @@ function idleJob(t) {
 }
 function easeBack(x) { const c = 1.7; return 1 + (c + 1) * (x - 1) ** 3 + c * (x - 1) ** 2; }
 function hud(t, dt) {
-  if (!s || !(playing || screen === 'end' || screen === 'paused')) return;
+  if (!s || !(screen === 'play' || screen === 'end' || screen === 'paused')) return;
   const y = top + 8;
   for (let i = 0; i < s.maxHearts; i++) heart(g, 22 + i * 28, y + 2 + (heartFlash > 0 && i === s.hearts ? Math.sin(t * 40) * 3 : 0), 24, i < s.hearts);
   // coins: the number counts up as the flying coins land
@@ -975,14 +1001,17 @@ function hud(t, dt) {
   }
   // Eight clean fixes build the pay multiplier. The bar resets when a fix is late.
   const bx = W - 106, by = Math.max(benchTop + 16, boxY + S + 8);
-  rrect(g, bx - 38, by - 9, 136, 28, 11, 'rgba(45,27,21,.86)', 1.5);
-  ink('COMBO', bx - 31, by + 5, 10, '#f9ddae');
+  rrect(g, bx - 49, by - 9, 147, 28, 11, 'rgba(45,27,21,.86)', 1.5);
+  ink('COMBO', bx - 42, by + 5, 13, '#f9ddae');
   for (let i = 0; i < 8; i++) {
     rrect(g, bx + 13 + i * 10, by, 7, 10, 2, i < s.streak ? (i < 4 ? '#93ddba' : '#ffd27d') : '#765943', 0);
   }
   if (s.lv) goalBar(t);
   else { // the day: a sun travelling along a line from open to close
-    const x0 = 14, x1 = W - 66, ly = top + 44, f = s.cust?.tutor ? 0 : Math.min(1, (V?.clock ?? s.clock) / s.day);
+    const ly = top + 46;
+    const secondsLeft = Math.max(0, Math.ceil(s.day - s.clock));
+    const labelWidth = ink(`${daily ? 'Daily' : 'Open'} · ${secondsLeft} s`, 10, ly, 15);
+    const x0 = 22 + labelWidth, x1 = W - 66, f = s.cust?.tutor ? 0 : Math.min(1, (V?.clock ?? s.clock) / s.day);
     g.strokeStyle = 'rgba(58,34,22,.35)'; g.lineWidth = 4; g.lineCap = 'round'; g.beginPath(); g.moveTo(x0, ly); g.lineTo(x1, ly); g.stroke();
     g.strokeStyle = '#fff6e4'; g.beginPath(); g.moveTo(x0, ly); g.lineTo(x0 + (x1 - x0) * f, ly); g.stroke();
     circle(g, x0 + (x1 - x0) * f, ly, 6, '#ffd860', 1.6);
@@ -1044,10 +1073,15 @@ function goalBar(t) {
   circle(g, x0 + (x1 - x0) * f, ly, 6, '#ffd860', 1.6);
 }
 // The goal card: what this level asks, shown before it starts (the sim waits), then fading as play begins.
+function activeGoalLine() {
+  const goal = s.lv.goal;
+  return goalLine(s.assisted && goal.time ? { ...goal, time: Math.ceil(s.deadline) } : goal);
+}
 function goalCard(t) {
-  const a = card > 0 ? Math.min(1, (CARD - card) * 6 + 0.4) : cardFade / 0.3;
+  const a = card > 0 ? 1 : cardFade / 0.3;
   if (a <= 0 || !s?.lv) return;
-  const lv = s.lv, cw = Math.min(W - 32, 340), lines = wrap(goalLine(lv.goal), cw - 40, 20), ch = 150 + lines.length * 26 + (lv.intro ? 30 : 0);
+  const lv = s.lv, intro = lv.intro && !cleared(lv.n);
+  const cw = Math.min(W - 32, 340), lines = wrap(activeGoalLine(), cw - 40, 20), ch = 150 + lines.length * 26 + (intro ? 30 : 0);
   const x = (W - cw) / 2, y = Math.max(top + 70, boxY + S / 2 - ch / 2 - 20);
   g.save(); g.globalAlpha = a;
   g.fillStyle = 'rgba(58,34,22,.35)'; g.fillRect(-20, -20, W + 40, H + 40);
@@ -1055,8 +1089,8 @@ function goalCard(t) {
   rrect(g, x, y, cw, ch, 22, '#fff1d6', 3);
   let yy = y + 30;
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = C.copper;
-  ink(`Level ${lv.n}`, W / 2, yy, 28, C.copperLt, 'center'); yy += 34;
-  if (lv.intro) { g.font = 'bold 17px ui-rounded, sans-serif'; g.fillStyle = C.tealDk; g.fillText(`New job: the ${OBJECT[lv.intro]}`, W / 2, yy); yy += 30; }
+  ink(`Level ${lv.n}${s.assisted ? ' · Slower clocks' : ''}`, W / 2, yy, 28, C.copperLt, 'center'); yy += 34;
+  if (intro) { g.font = 'bold 17px ui-rounded, sans-serif'; g.fillStyle = C.tealDk; g.fillText(`New job: the ${OBJECT[lv.intro]}`, W / 2, yy); yy += 30; }
   const icons = [lv.rule, lv.goal.list ? 'list' : lv.goal.fix ? 'fix' : null, lv.goal.coins ? 'coins' : null, lv.goal.time ? 'time' : null, lv.goal.safe || lv.goal.list ? 'safe' : null].filter(Boolean);
   icons.forEach((k, i) => objectiveIcon(k, W / 2 + (i - (icons.length - 1) / 2) * 44, yy + 4, 15, t));
   yy += 34;
@@ -1082,13 +1116,12 @@ function wrap(text, width, size) {
 // ---------- the loop: a fixed 60 Hz sim; a hidden tab or a pause never makes a catch-up burst
 function frame(now) {
   const dt = Math.min(0.1, Math.max(0, (now - last) / 1000)); last = now;
-  if (playing && !paused && card > 0) { card = Math.max(0, card - dt); if (!card) startNow(); }
-  else if (playing && !paused) {
+  if (playing && !paused && !card) {
     acc += dt; let n = 0;
     while (acc >= DT && playing && n < 6) { snap(); if (kb) kbStep(); step(s); drain(); acc -= DT; n++; }
     if (n >= 6) acc = 0;
     // the radio, when owned: a soft tune in time with the shift
-    if (has('radio') && save.sound) { radioT += dt; const beat = 0.3; while (radioT >= beat) { radioT -= beat; radio(); } }
+    if (has('radio')) { radioT += dt; const beat = 0.3; while (radioT >= beat) { radioT -= beat; radio(); } }
   }
   const live = !paused;
   if (live) {
@@ -1101,7 +1134,10 @@ function frame(now) {
     if (s && !flying.length) shownCoins = s.coins;
     if (word) { word.t += dt; if (word.then && word.t > 0.7) word = { text: word.then, t: 0, kind: 'job' }; else if (word.kind !== 'job' && word.t > 0.9) word = null; }
     if (banner) { banner.t += dt; if (banner.t > 1.6) banner = null; }
-    if (s && s.phase === 'work' && word === null) word = { text: WORD[s.rep.kind], t: 0.2, kind: 'job' };
+    if (s && s.phase === 'work') {
+      if (!word) word = { text: '', t: 0.2, kind: 'job' };
+      if (word.kind === 'job' && !word.then) word.text = repairWord(s.rep);
+    }
     shake = Math.max(0, shake - dt * 4); squash = Math.max(0, squash - dt * 8); wobble = Math.max(0, wobble - dt * 4); heartFlash = Math.max(0, heartFlash - dt * 1.5); catHappy = Math.max(0, catHappy - dt);
   }
   draw(now, live ? dt : 0);
@@ -1109,12 +1145,63 @@ function frame(now) {
 }
 const TUNE = [523, 659, 784, 659, 587, 698, 880, 698, 523, 659, 784, 1047, 988, 784, 659, 0];
 let radioN = 0;
-function radio() { const f = TUNE[radioN % TUNE.length]; if (f) tone(f, 0.22, 0.025, 'triangle'); if (radioN % 4 === 0) tone([131, 175, 196, 131][(radioN >> 2) % 4], 0.5, 0.03, 'sine'); radioN++; }
+function radio() {
+  if (save.sound) {
+    const f = TUNE[radioN % TUNE.length];
+    if (f) tone(f, 0.22, 0.025, 'triangle');
+    if (radioN % 4 === 0) tone([131, 175, 196, 131][(radioN >> 2) % 4], 0.5, 0.03, 'sine');
+  }
+  radioN++;
+}
 
 kitHint(cv, {
   kind: 'hold-and-move', key: 'fixit:hint', played: save.served > 0,
   when: () => playing && !paused && !card && s.lv?.n === 1 && s.cust.n === 0,
   delay: 3500, reach: 30, bottom: 64, label: 'Circle the screw',
 });
-show('menu');
+// A reload can resume only this tab's game. The permanent wallet is written at settlement.
+const RELOAD_KEY = 'fixit:reload';
+addEventListener('pagehide', event => {
+  if (!playing || event.persisted) return;
+  pause();
+  const state = { ...s, cust: s.lanes.length ? undefined : s.cust, reps: undefined, rep: undefined };
+  const checkpoint = { version: 1, url: location.href, mode, lvN, today, card, state, seenBase, jobKey };
+  try { sessionStorage.setItem(RELOAD_KEY, JSON.stringify(checkpoint)); }
+  catch { /* The campaign save remains available when tab storage is disabled. */ }
+});
+
+function restoreAfterReload() {
+  let checkpoint;
+  try {
+    const raw = sessionStorage.getItem(RELOAD_KEY);
+    sessionStorage.removeItem(RELOAD_KEY);
+    checkpoint = JSON.parse(raw);
+  } catch { return false; }
+  const navigation = performance.getEntriesByType('navigation')[0]?.type;
+  if (checkpoint?.version !== 1 || checkpoint.url !== location.href || (navigation && navigation !== 'reload')) return false;
+  if (checkpoint.mode === 'daily' && checkpoint.today !== today) return false;
+  const state = checkpoint.state;
+  if (!Array.isArray(state?.lanes) || !Array.isArray(state.log) || !Array.isArray(state.queue)) return false;
+  // Reconnect the active repair and lane to the objects the simulation updates.
+  state.cust = state.lanes.length ? state.lanes[state.station] : state.cust;
+  state.reps = state.cust?.reps;
+  state.rep = state.reps?.[state.stepN];
+  if (!KINDS.includes(state.rep?.kind)) return false;
+  if (state.lv) state.day = Infinity;
+  ({ mode, lvN, card, seenBase, jobKey } = checkpoint);
+  s = state;
+  daily = mode === 'daily';
+  playing = true;
+  paused = !s.cleared;
+  benchControls = ['order', 'rush', 'boss'].includes(s.lv?.rule);
+  layout();
+  recCount = s.log.length;
+  shownCoins = s.coins;
+  word = { text: WORD[s.rep.kind], t: 1, kind: 'job' };
+  rec.start({ ...runMetadata(), resumed: true });
+  renderTickets();
+  show(paused ? 'paused' : 'play');
+  return true;
+}
+if (!restoreAfterReload()) show('menu');
 requestAnimationFrame(frame);

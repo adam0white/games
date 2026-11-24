@@ -1,8 +1,9 @@
 // Proves the rules of Fix-It Stall: node experiments/fixit/bots.mjs
 // Bots play through the same input interface the page uses (down/move/up in object-local units), one step per tick,
 // with finger speeds capped at what a thumb can do (moves.js SKILLS). Exits non-zero when a claim fails.
-import { create, step, input, guide, rand, stars, chooseTicket, selectLane, goalState, DT, KINDS, TUTOR, PATIENCE, LEVELS, HIT, RAMP, TWO_PATIENCE } from './sim.js';
-import { plan, SKILLS, THUMB_MAX } from './moves.js';
+import { create, step, input, guide, repairWord, rand, stars, chooseTicket, selectLane, goalState, DT, KINDS, TUTOR, PATIENCE, LEVELS, HIT, RAMP, TWO_PATIENCE } from './sim.js';
+import { ghost, plan, SKILLS, THUMB_MAX } from './moves.js';
+import { drawGhost } from './art.js';
 import { MAP, COUNT, INTRO, BUSY_END, OPEN_ORDER, levelDef, goalLine, canAssist, levelReward } from './levels.js';
 
 let failed = 0;
@@ -89,6 +90,68 @@ const median = a => { const b = [...a].sort((x, y) => x - y); return b.length ? 
 const t0 = Date.now();
 if (process.argv.includes('--calibrate')) { calibrate(); process.exit(0); }
 const TOP = (LEVELS - 1) * RAMP; // the shift clock where the hardest level begins
+
+// The opening teaches one motion, then mixes it with the next two jobs.
+const opening = MAP.slice(0, 3);
+claim(opening[0].goal.fix === 3 && !goalState(create({ lv: opening[0] })).safe,
+  'three bells finish the first lesson and a single walk-off allows another try');
+claim(opening[1].goal.fix === 6 && opening[2].goal.list?.length === 6,
+  'the next two lessons mix new and familiar jobs over six customers');
+claim(goalLine(opening[2].goal).includes('One walk-off ends the level'),
+  'the set-list briefing names the consequence of losing a customer');
+
+// Phone gestures observed before reading the move plans.
+{
+  const pin = create({ only: 'pin' });
+  input(pin, { type: 'down', x: 50, y: 45 });
+  input(pin, { type: 'move', x: 50, y: -3 });
+  input(pin, { type: 'up', x: 50, y: -3 });
+  claim(pin.served === 1, 'a full upward swipe extracts the pin even if lifted before the next tick');
+  const partial = create({ only: 'pin' });
+  input(partial, { type: 'down', x: 50, y: 45 });
+  input(partial, { type: 'move', x: 50, y: 25 });
+  for (let i = 0; i < 20; i++) step(partial);
+  input(partial, { type: 'up', x: 50, y: 25 });
+  for (let i = 0; i < 90; i++) step(partial);
+  claim(partial.rep.p === 0 && partial.served === 0, 'the progress ring empties when a partly lifted pin slides back');
+  const canceled = create({ only: 'pin' });
+  input(canceled, { type: 'down', x: 50, y: 45 });
+  input(canceled, { type: 'move', x: 50, y: -3 });
+  input(canceled, { type: 'cancel', x: 50, y: -3 });
+  claim(canceled.served === 0, 'a canceled fast pull earns no repair');
+
+  const door = create({ only: 'oil' });
+  for (let i = 0; i < 60 && guide(door.rep).open < 0.7; i++) step(door);
+  const oilGuide = guide(door.rep);
+  input(door, { type: 'down', x: 72, y: 80 });
+  const afterDrop = guide(door.rep);
+  claim(ghost(oilGuide, 0).press && !ghost(afterDrop, 0).press,
+    'the oil-can cue turns off as soon as its drop lands, including while the door remains wide open');
+  claim(/can/i.test(repairWord(door.rep)) && /glow/i.test(repairWord(door.rep)), 'the door instruction names the lit tap target');
+
+  const jacket = create({ only: 'zip' });
+  input(jacket, { type: 'down', x: 50, y: 95 });
+  input(jacket, { type: 'move', x: 50, y: 35 });
+  for (let i = 0; i < 30; i++) step(jacket);
+  const snag = guide(jacket.rep);
+  const lines = [];
+  const pen = new Proxy({ lineTo: (x, y) => lines.push([x, y]) }, { get: (obj, key) => obj[key] ?? (() => {}) });
+  drawGhost(pen, snag, 0.5, 1);
+  claim(snag.stuck && /side|wiggle/i.test(repairWord(jacket.rep)), 'a blocked zipper asks for lateral movement');
+  claim(!lines.some(([, y]) => y === snag.top), 'a blocked zipper no longer draws the upward trail to the collar');
+
+  const scale = create({ only: 'balance' }), g = guide(scale.rep);
+  const approach = repairWord(scale.rep);
+  input(scale, { type: 'down', x: g.from[0], y: g.from[1] });
+  input(scale, { type: 'move', x: g.targets[0], y: g.from[1] });
+  for (let i = 0; i < 22; i++) step(scale);
+  claim(/slide/i.test(approach) && /hold/i.test(repairWord(scale.rep)), 'the scale teaches sliding, then holding on the mark');
+  claim(/circle/i.test(repairWord(create({ only: 'screw' }).rep)), 'the bell instruction specifies a circular gesture');
+}
+
+const setList = create({ lv: opening[2], hearts: 4 });
+claim(setList.maxHearts === 1 && setList.hearts === 1,
+  'the hearts on a set-list job show the one walk-off allowed before failure');
 
 // 1. Determinism: the same seed and the same inputs give the same shift, for a skilled bot and a scribbler.
 for (const [name, pol] of [['competent', skilled(SKILLS.competent)], ['scribbler', scribbler(9)]]) {
