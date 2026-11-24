@@ -8,7 +8,8 @@
 <style>
   html, body { margin: 0; height: 100%; background: #05080f; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   body { font: 16px/1.5 Georgia, 'Times New Roman', serif; color: #f3e6cf; }
-  canvas { display: block; width: 100vw; height: 100dvh; }
+  canvas { display: block; width: 100vw; height: 100dvh; } #c3 { position: fixed; inset: 0; } #c3[hidden] { display: none; } #c { position: relative; }
+  #views button { min-width: 0; min-height: 40px; margin: .15em; font-size: .9em; } #views button.on { color: #2a1606; background: #ffb45a; border-color: #ffb45a; }
   .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; pointer-events: none; }
   .screen.on { display: grid; }
   .screen > div { max-width: 21em; width: calc(100% - 2em); padding: 1em; pointer-events: auto; }
@@ -66,6 +67,7 @@
 </style>
 </head>
 <body>
+<canvas id="c3" hidden></canvas>
 <canvas id="c"></canvas>
 <div id="hud"><div id="hearts"></div><div id="embers"><span class="dot"></span><span id="count">0</span></div></div>
 <div id="big"></div>
@@ -83,6 +85,8 @@
   <p id="ready"></p>
   <p><button id="endless">Endless river</button><button id="tower">Tower climb</button><button id="anew" hidden>New climb from level 1</button></p>
   <p><button id="toShop">Shop</button><button id="toBoard">Leaderboard</button></p>
+  <p id="views"><button data-view="2d">2D</button><button data-view="3d">3D</button><button data-view="first">First person</button></p>
+  <p class="hint" id="viewNote" hidden></p>
   <p><button id="toCredits">Credits</button></p>
 </div></div>
 <div id="shop" class="screen veil"><div>
@@ -111,7 +115,7 @@
 </div></div>
 <div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p>
   <div id="ask" hidden><p>Show your endless scores to everyone on the leaderboard? After a yes, every run goes up by itself.</p><p><input id="askName" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p><p class="hint" id="askNote">Only your name and your best score are sent.</p><p><button id="askYes">Yes, show them</button><button id="askNo">No</button></p></div>
-  <p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p></div></div>
+  <p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p><p><button id="viewNext" hidden></button></p></div></div>
 <script type="module">
 import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace, FIELD, REBORN_PACE, GIFTS, ABILITIES, startAt } from './sim.js?v=14'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
 import { read, readNumber, readJson, write } from '../kit/save.js';
@@ -119,6 +123,7 @@ import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { drag } from '../kit/drag.js';
+import { sides } from '../kit/sides.js';
 import { hint } from '../kit/hint.js';
 import { lab } from '../kit/lab.js'; // lab recording: the rec lines below
 import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
@@ -238,11 +243,11 @@ function resize() {
   W = canvas.width = Math.round(innerWidth * dpr); H = canvas.height = Math.round(innerHeight * dpr);
   unit = Math.min(W, H * 0.62); left = (W - unit) / 2; // the river is one unit wide
 }
-addEventListener('resize', resize); resize();
+addEventListener('resize', () => { resize(); size3(); }); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', lastLevel = 1, nearFall = false, sayTimer = 0, shown = '', weather = '';
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
-window.lanternState = () => ({ sharing, tab, asked, shared: shared ? shared.length : -1, x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, peek: peek && peek[0], field: s.field, crashOn, crash: crash && crash.how, winOn, win: victory && victory.how, name: playerName(), board, unit: unit / dpr, start, magnet: s.magnet, flare: s.flare, scene: scene && scene.kind }); // read by the browser checks
+window.lanternState = () => ({ view, viewReady: !!R3, sharing, tab, asked, shared: shared ? shared.length : -1, x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, peek: peek && peek[0], field: s.field, crashOn, crash: crash && crash.how, winOn, win: victory && victory.how, name: playerName(), board, unit: unit / dpr, start, magnet: s.magnet, flare: s.flare, scene: scene && scene.kind }); // read by the browser checks
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 
 const cards = screens(['menu', 'shop', 'credits', 'card', 'board']);
@@ -253,6 +258,23 @@ function show(name) {
   $('hud').style.display = $('big').style.display = play ? 'block' : 'none'; pauseButton.style.display = play ? 'grid' : 'none';
   if (!play) $('warn').classList.remove('on');
   if (name === 'menu') menu(); if (name === 'shop') shop(); if (name === 'board') boardShow();
+}
+// Three ways to see the same river (notes #158, #159): 2d is this page's own drawing; 3d and first are drawn by view3d.js on a WebGL
+// canvas under this one, which then draws only what lies on top. lantern-view: '2d', '3d' or 'first'. The rules do not know the view.
+const VIEWS = ['2d', '3d', 'first'], VIEW_NAME = { '2d': '2D', '3d': '3D', first: 'First person' };
+let view = '2d', R3 = null, snap3 = true, loading3 = null;
+const canvas3 = $('c3');
+function views() { for (const b of document.querySelectorAll('#views button')) b.className = b.dataset.view === view ? 'on' : ''; $('viewNext').textContent = `View: ${VIEW_NAME[view]}`; }
+function size3() { if (R3) { const k = Math.min(1.5, dpr) / dpr; R3.resize(Math.round(W * k), Math.round(H * k)); } } // fewer pixels than the flat page: 3D costs more
+async function setView(v, keep = true) {
+  if (!VIEWS.includes(v)) v = '2d';
+  if (v !== '2d' && !R3) {
+    loading3 ??= import('./view3d.js?v=1').then(m => m.createRenderer(canvas3)).catch(() => null);
+    const made = await loading3;
+    if (!made || made.errors.length) { v = '2d'; loading3 = null; $('viewNote').hidden = false; $('viewNote').textContent = '3D does not start on this phone, so the river stays 2D.'; }
+    else if (!R3) { R3 = made; canvas3.addEventListener('webglcontextlost', () => { setView('2d', false); R3 = null; $('viewNote').hidden = false; $('viewNote').textContent = '3D stopped on this phone, so the river is 2D. Load the page again to try 3D.'; }); size3(); }
+  }
+  view = v; snap3 = true; canvas3.hidden = v === '2d'; pads.drop(); steer.drop(); if (keep) store.set('lantern-view', v); views();
 }
 function menu() {
   $('stars').textContent = reborn ? ` · ${'★'.repeat(Math.min(5, reborn))}${reborn > 5 ? reborn : ''}` : '';
@@ -508,21 +530,21 @@ function begin() {
   s = create((Math.random() * 2 ** 31) | 0, tower ? towerStage(climb) : endless ? 1 : stage, tower ? 'tower' : endless, powersOwned(), runStats, climb, reborn); // after a rebirth the story nights run faster
   if (!tower) fromFloor = 0; else if (fromFloor) startAt(s, fromFloor); // part-way up the level (note #142)
   const boosted = fresh && Object.values(runStats).some(v => v > 0);
-  target = s.x; crash = null; victory = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; steer.reset();
+  target = s.x; crash = null; victory = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; steer.reset(); pads.drop(); snap3 = true;
   shown = ''; show('play'); hud();
   say((tower ? (climb > LEVELS ? `Tower sector 2, level ${climb - LEVELS} of ${LEVELS}` : `Tower level ${climb} of ${LEVELS}`) + (fromFloor ? `, from floor ${fromFloor}` : '') : endless ? 'Endless river' : `Night ${stage}`) + (boosted ? '. Your stats are on for this run' : waiting ? '. No stats here: they wait for your next night or climb' : ''), waiting ? 2800 : 1800); floor = fromFloor;
-  rec.start({ mode: mode(), night: tower || endless ? 0 : stage, ...(tower ? { level: climb, floor: fromFloor } : {}) });
+  rec.start({ view, mode: mode(), night: tower || endless ? 0 : stage, ...(tower ? { level: climb, floor: fromFloor } : {}) });
 }
 const mode = () => tower ? 'tower' : endless ? 'endless' : 'night';
 function bankRun() { s.banked = Math.round(s.taken * boon()); bank += s.banked; store.set('lantern-bank', bank); } // a rebirth's bonus is added as the run banks
 function finish() {
   const paid = s.over === 'dawn' && !tower && !endless && reborn ? 10 * Math.min(5, reborn) : 0; s.taken += paid; // a reborn night pays more at dawn
-  playing = false; ended = performance.now(); steer.drop(); bankRun();
+  playing = false; ended = performance.now(); steer.drop(); pads.drop(); bankRun();
   rec.end(s.over, { mode: mode(), night: tower || endless ? 0 : stage, reached: Math.floor(progress(s) * 100), score: endless ? score(s) : null, embers: s.taken, hearts: s.hearts, bank });
   $('hud').style.display = $('big').style.display = pauseButton.style.display = 'none'; $('warn').classList.remove('on');
   const won = s.over === 'dawn', why = { dark: 'The flame went out.', bank: 'You ran onto the bank.', ice: 'You struck the ice.', log: 'You struck a log.', pool: 'The whirlpool took you.', geyser: 'The geyser threw you over.', isle: 'You struck an island.' }[s.over] ?? 'You struck a rock.';
   const gained = `+${s.banked} ember${s.banked === 1 ? '' : 's'}${s.banked > s.taken ? ` (${s.taken} and the rebirth bonus)` : ''}. You have ${bank}.`;
-  $('toMenu').textContent = 'Menu'; $('ask').hidden = true;
+  $('toMenu').textContent = 'Menu'; $('ask').hidden = $('viewNext').hidden = true;
   if (tower) { // after each level: climb on to a harder one, or stop. The next climb goes on where this one left off (tester t1, note #73)
     const at = Math.min(FLOORS, Math.floor(progress(s) * FLOORS)); store.set('lantern-best-tower', Math.max(at, store.get('lantern-best-tower'))); // the old best floor, still kept
     const cleared = won ? climb : climb - 1, best = Math.max(cleared, store.get('lantern-best-level')); store.set('lantern-best-level', best);
@@ -684,8 +706,11 @@ let floor = 0;
 let size = 1, fire0 = flame();
 function aim(x) { const c = centre(s, s.y), h = half(s, s.y) + 0.02; target = Math.max(c - h, Math.min(c + h, x)); }
 // The tap that ends a pause does not steer until that finger has moved a clear distance (experiments/kit/drag.js).
-const steer = drag(canvas, { playing: () => playing, paused: () => paused, resume: () => resume(), from: () => s.x, travel: dx => dx * dpr / unit * gain, aim, mouse: e => aim((e.clientX * dpr - left) / unit), settle: 12 });
-hint(canvas, { kind: 'drag', key: 'lantern-hint', delay: 1500, bottom: 56, when: () => playing && !paused && screen === 'play', played: read('lantern-bank') !== null }); // a first-time player who does not touch sees how (experiments/kit/hint.js); 1.5 s, as a boat left alone meets a rock in 3 to 9 s; low, below the boat
+const steer = drag(canvas, { playing: () => playing && view !== 'first', paused: () => paused && view !== 'first', resume: () => resume(), from: () => s.x, travel: dx => dx * dpr / unit * gain, aim, mouse: e => aim(mouseX(e)), settle: 12 });
+const mouseX = e => { if (view === '2d' || !R3) return (e.clientX * dpr - left) / unit; const row = R3.boatRow(), k = canvas3.width / innerWidth; return (e.clientX * k - row.left) / row.unit; };
+// First person: press the left or right half of the screen; hold to keep turning (experiments/kit/sides.js, note #159).
+const pads = sides(canvas, { on: () => view === 'first', playing: () => playing, paused: () => paused, resume: () => resume() });
+hint(canvas, { kind: 'drag', key: 'lantern-hint', delay: 1500, bottom: 56, when: () => playing && !paused && screen === 'play' && view !== 'first', played: read('lantern-bank') !== null }); // a first-time player who does not touch sees how (experiments/kit/hint.js); 1.5 s, as a boat left alone meets a rock in 3 to 9 s; low, below the boat
 
 // Buttons.
 $('play').addEventListener('click', () => { endless = tower = false; begin(); });
@@ -696,6 +721,8 @@ $('anew').addEventListener('click', () => { // two taps: the first only asks, so
   tower = true; endless = false; climb = 1; fromFloor = 0; store.set('lantern-tower-at', 1); store.set('lantern-tower-floor', 0); begin(); });
 $('less').addEventListener('click', () => { stage = Math.max(1, stage - 1); menu(); });
 $('more').addEventListener('click', () => { stage = Math.min(opened, stage + 1); menu(); });
+for (const b of document.querySelectorAll('#views button')) b.addEventListener('click', () => setView(b.dataset.view));
+$('viewNext').addEventListener('click', () => setView(VIEWS[(VIEWS.indexOf(view) + 1) % 3]));
 $('toShop').addEventListener('click', () => show('shop'));
 $('toCredits').addEventListener('click', () => show('credits'));
 $('toBoard').addEventListener('click', async () => { show('board'); const out = await boardCall(); shared = out ? out.rows : null; asked++; tab = shared ? 'all' : 'phone'; if (screen === 'board') boardShow(); });
@@ -725,12 +752,12 @@ $('toMenu').addEventListener('click', () => { if (paused) { rec.end('quit', { mo
 
 // Pause: the button, P or Escape, and whenever the page loses the screen (a phone call, another app).
 function pause() {
-  if (!playing || paused) return; paused = true; steer.drop(); keys.clear();
-  $('toMenu').textContent = 'Menu'; $('title').textContent = 'Paused'; $('line').textContent = endless ? `Score ${score(s)}.` : tower ? `Tower ${tag(climb)}, floor ${Math.floor(progress(s) * FLOORS)} of ${FLOORS}.` : `Night ${stage}, ${Math.floor(progress(s) * 100)}% of the way to dawn.`; $('sub').textContent = 'Touch the river to go on.'; $('go').textContent = 'Go on';
+  if (!playing || paused) return; paused = true; steer.drop(); pads.drop(); keys.clear(); $('viewNext').hidden = false;
+  $('toMenu').textContent = 'Menu'; $('title').textContent = 'Paused'; $('line').textContent = endless ? `Score ${score(s)}.` : tower ? `Tower ${tag(climb)}, floor ${Math.floor(progress(s) * FLOORS)} of ${FLOORS}.` : `Night ${stage}, ${Math.floor(progress(s) * 100)}% of the way to dawn.`; $('sub').textContent = view === 'first' ? 'Touch the river to go on. Press left or right to steer.' : 'Touch the river to go on.'; $('go').textContent = 'Go on';
   $('ask').hidden = true; show('card'); snd.hold();
 }
 function resume() {
-  if (!paused) return; paused = false; acc = 0; last = performance.now(); target = s.x;
+  if (!paused) return; paused = false; acc = 0; snap3 = true; last = performance.now(); target = s.x;
   show('play'); snd.release();
 }
 pauseButton.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); pause(); });
@@ -777,6 +804,7 @@ function react(e) {
 function tick() {
   if (keys.has('ArrowLeft') || keys.has('a')) target = s.x - 0.1;
   if (keys.has('ArrowRight') || keys.has('d')) target = s.x + 0.1;
+  const press = pads.side(); if (press) aim(s.x + 0.1 * press);
   step(s, target);
   for (const e of s.events) react(e);
   // Things worth saying aloud: the waterfall coming up, and each step harder on the endless river.
@@ -837,8 +865,47 @@ function wreck(now) {
   }
   else { const up = Math.sin(Math.min(1, e / 1.1) * Math.PI) * 0.12 * unit; g.translate(0, -up); g.rotate(e * 5 * crash.side); g.scale(1 + up / unit * 3, 1 + up / unit * 3); hull(g, id, unit, col, 0); rings(2); }
 }
+// 3D and first person. The WebGL canvas holds the river; this one holds what lies on top of it, placed where the 3D picture says.
+const rgb = t => t.split(',').map(v => v / 255), hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+function draw3(now, dt, dawn, day) {
+  const first = view === 'first', e = crash ? Math.max(0, Math.min(1, (now - crash.t0) / 900)) : 0;
+  R3.draw(s, { now, dt, target, shake, glow, sparks, dawn, day, playing, snap: snap3, cam: view, fire: rgb(skin('flame')[2]), wet: hex(skin('water')[2]).map(v => 0.02 + 0.5 * v), tint: skin('boat')[0] === 'oak' ? null : hex(skin('boat')[2]), hideBoat: !!crash && !first, sink: first ? e : 0 });
+  snap3 = false;
+  const k = W / canvas3.width, at = (x, y, h = 0) => R3.project(x, -(y - s.y), h).map(v => v * k), row = R3.boatRow().unit * k;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, W, H);
+  if (first && day < 0.5) { // a night sky above the water: stars, and a moon that sets as dawn comes
+    const hy = R3.project(s.x, -3.4, 0.1)[1] * k, f = Math.max(0, 1 - dawn) * (fog(s, s.y) ? 0.25 : 1), turn = centre(s, s.y) * W * 0.6;
+    for (let i = 0; i < 70; i++) { const q = Math.abs(Math.sin(i * 12.9898) * 43758.5453) % 1, z = Math.abs(Math.sin(i * 78.233) * 12543.123) % 1; g.fillStyle = `rgba(220,230,255,${f * (0.25 + 0.5 * q) * (0.7 + 0.3 * Math.sin(now / 600 + i))})`; g.fillRect(((q * 3 * W - turn) % W + W) % W, z * (hy - 12 * dpr), (1 + q) * dpr, (1 + q) * dpr); }
+    const mx = W * 0.95 - turn * 0.4, my = hy * (0.32 + 0.6 * progress(s)), mr = 13 * dpr, mg = g.createRadialGradient(mx, my, mr * 0.6, mx, my, mr * 4); mg.addColorStop(0, `rgba(230,235,255,${0.25 * f})`); mg.addColorStop(1, 'rgba(230,235,255,0)');
+    g.fillStyle = mg; g.fillRect(mx - mr * 4, my - mr * 4, mr * 8, mr * 8); g.fillStyle = `rgba(232,236,250,${0.85 * f})`; g.beginPath(); g.arc(mx, my, mr, 0, 7); g.fill();
+  }
+  if (s.tower) for (let f = 1; f < FLOORS; f++) { // each floor's ledge, with its number
+    const y = f * GOAL / FLOORS, d = y - s.y; if (d < 0.1 || d > 2.6) continue;
+    const c = centre(s, y), h = half(s, y), a = at(c - h, y, 0.01), b = at(c + h, y, 0.01), fade = Math.min(1, (2.6 - d) / 0.6);
+    g.globalAlpha = fade; g.strokeStyle = 'rgba(230,230,245,.5)'; g.lineWidth = 2 * dpr; g.setLineDash([10 * dpr, 8 * dpr]); g.beginPath(); g.moveTo(...a); g.lineTo(...b); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#d9d9ea'; g.font = `${Math.max(14 * dpr, (b[0] - a[0]) * 0.12)}px Georgia, serif`; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(`${f}`, (a[0] + b[0]) / 2, a[1] - 4 * dpr); g.globalAlpha = 1;
+  }
+  for (const e of s.powers) if (!e.got && e.y - s.y > 0.12 && e.y - s.y < 2.4) { const [x, y] = at(e.x, e.y, 0.07), u = R3.project(e.x + 0.1, -(e.y - s.y), 0.07)[0] * k - x; mark(g, e.kind, x, y, Math.max(3 * dpr, u * 0.14), 2 * dpr, now / 1000); }
+  const [bx, by] = first ? [W / 2, H * 0.86] : at(s.x, s.y);
+  if (crash && !first) { g.save(); g.translate(bx, by); const z = row / unit; g.scale(z, z); wreck(now); g.restore(); }
+  if (crash && first && e < 0.35) { g.fillStyle = `rgba(255,235,215,${0.5 * (1 - e / 0.35)})`; g.fillRect(0, 0, W, H); }
+  if (crash && first) { g.fillStyle = `rgba(6,18,34,${0.75 * e})`; g.fillRect(0, H * (1 - e), W, H); } // the water comes up
+  let ring = first ? 0.05 * W : 0.075 * row; // powers in use: an arc that runs down with the time left
+  for (const [left, full, col] of POWERS.map(q => [s[q], LAST[q], q === 'size' && s.big ? '255,110,90' : TINT[q]]).concat(s.field ? [[s.field, FIELD + 1.5 * s.st.barrier, '140,205,255']] : [])) if (left > 0) { g.strokeStyle = `rgba(${col},.85)`; g.lineWidth = 3 * dpr; g.beginPath(); g.arc(bx, by, ring, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * Math.min(1, left / full)); g.stroke(); ring += 7 * dpr; }
+  if (first && s.field) { const v = g.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.65); v.addColorStop(0, 'rgba(140,205,255,0)'); v.addColorStop(1, 'rgba(140,205,255,.3)'); g.fillStyle = v; g.fillRect(0, 0, W, H); }
+  if (playing && s.boost) { g.strokeStyle = `rgba(255,235,170,${0.5 * Math.min(1, s.boost * 2)})`; g.lineWidth = 2 * dpr; g.beginPath(); for (let i = 0; i < 18; i++) { const a = i * 2.4, r = (0.3 + ((i * 0.37 + now / 400) % 1) * 0.6) * H; g.moveTo(W / 2 + Math.cos(a) * r, H * 0.4 + Math.sin(a) * r); g.lineTo(W / 2 + Math.cos(a) * (r + 40 * dpr), H * 0.4 + Math.sin(a) * (r + 40 * dpr)); } g.stroke(); }
+  if (playing && s.slow) { const v = g.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.7); v.addColorStop(0, 'rgba(150,110,255,0)'); v.addColorStop(1, `rgba(150,110,255,${0.3 * Math.min(1, s.slow * 2)})`); g.fillStyle = v; g.fillRect(0, 0, W, H); }
+  if (first && playing && !paused) for (const d of [-1, 1]) { // the two halves to press
+    const on = pads.side() === d, x = W / 2 + d * W * 0.38, y = H * 0.9, r = 12 * dpr; g.strokeStyle = `rgba(255,217,160,${on ? 0.95 : 0.4})`; g.lineWidth = (on ? 5 : 3.5) * dpr; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(x - d * r * 0.5, y - r); g.lineTo(x + d * r * 0.5, y); g.lineTo(x - d * r * 0.5, y + r); g.stroke();
+  }
+  if (victory) winDraw(now);
+  if (!s.endless) { g.fillStyle = 'rgba(255,217,160,.5)'; g.fillRect(0, 0, W * progress(s), 3 * dpr); }
+}
+let lastDraw = 0;
 function draw(now) {
+  const step3 = Math.min(0.1, (now - lastDraw) / 1000 || 0); lastDraw = now;
   const dawn = looking === 'win' ? 1 : s.endless ? 0 : Math.max(0, (progress(s) - 0.86) / 0.14), day = looking === 'win' ? 0.7 : s.over === 'dawn' ? Math.max(0, Math.min(1, (now - ended) / 2500)) : 0; // a frame's time can be a little older than ended, and a day below 0 gave the dawn light a negative radius
+  const solid = view !== '2d' && R3 && !looking; canvas3.hidden = !solid; if (solid) { draw3(now, step3, dawn, day); return; } // a look in the shop stays flat
   const ox = shake * (Math.random() - 0.5) * 14 * dpr, oy = shake * (Math.random() - 0.5) * 14 * dpr;
   g.setTransform(1, 0, 0, 1, ox, oy);
   const wet = skin('water'), fire = skin('flame')[2];
@@ -995,6 +1062,7 @@ function frame(now) {
   if (snd.ctx) { water.frequency.value = 400 + 500 * Math.min(1.4, s.y / GOAL); waterGain.gain.value = 0.05 + (playing ? 0.14 * Math.max(fall(s, s.y), fall(s, s.y + 0.8)) : 0); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0; }
   try { draw(now); } catch (e) { g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; throw e; } // a bad frame must not leave the next one drawn in a blend mode
 }
+views(); if (read('lantern-view', '2d') !== '2d') setView(read('lantern-view'), false);
 show('menu');
 requestAnimationFrame(frame);
 </script>

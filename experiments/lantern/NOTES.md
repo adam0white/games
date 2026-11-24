@@ -549,3 +549,20 @@ Note #155, in short: an endless game should share its score with everyone by its
 Checks: the phone check passes on WebKit iPhone 13 and Chromium Pixel 7 with new lines for the question, no name, a yes, a no, and an unticked row. With the choice removed from the send, it fails. Phone-sized screenshots of the card and the board. Not checked: a real phone's keyboard over the card.
 
 `workers/lab-ai/README.md` still says "Share my best run" and "Stop sharing". A note's work may not edit it; the next working session should.
+
+## 2026-11-23: 2D, 3D and first person (tester t1, notes #158 and #159)
+
+The notes, in short: a switch between 2D, today's look, and a new improved 3D; also a first-person kind, steered by clicking left and right instead of dragging.
+
+- **The switch.** Three buttons on the menu, and "View" on the pause card. New key `lantern-view`: '2d', '3d' or 'first'; absent means 2D. Every mode plays in every view, and the rules, rivers and scores are the same (`sim.js` is untouched), so the endless leaderboard is shared between views.
+- **3D.** The wildcard lab's WebGL drawing, moved from `../lab/lantern-3d/render.js` to `view3d.js` here and used by both pages. New for Lantern: a low camera that turns with the river, the tower's stone walls with floor ledges, the player's own boat colour, water and flame colour, the force field, crash effects and victories, and a far end that fades into the night.
+- **First person.** The camera sits at the stern with the lantern in front and leans into turns; reeds are shorter so they hide less; stars and a moon that sets as dawn nears. A crash tilts the view and the water rises. Pressing the left or right half of the screen steers; a hold keeps turning and a short tap is one small step. The note does not say which it meant, so both work. The input is `kit/sides.js`. The other views keep the drag.
+- **Not drawn in 3D:** the six boat shapes (the hull is one model in the boat's colour) and flame shapes. The shop's look screen stays flat.
+- **If WebGL2 is missing or fails, or stops,** the page says so and stays 2D. A 2D player never loads the 3D code.
+
+Lab's own additions, easy to remove (experiment): the moon and stars in first person, and the view turning with the river.
+
+Checks: phone-sized Chromium screenshots of 3D and first person on nights 1 and 12 and in the tower, a crash in each, no page errors. New phone-check lines: a failed 3D load stays 2D and says so, the saved view, a drag steers 3D, a press steers first person both ways, a sliding press does not change side, and the pause card's switch. Not checked: a real phone's frame rate and heat; whether a person can play first person at high nights; sound.
+
+### Left as a proposal (2026-11-23)
+- Boat models per skin in 3D; a separate first-person leaderboard if it proves harder.
