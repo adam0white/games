@@ -479,3 +479,75 @@ test('a room that shrinks clears distant food and replenishes the middle', () =>
   for (let t = 0; t < 100; t++) step(w);
   assert.ok(w.foodCount >= 150);
 });
+
+// ---- Version check at join (DECISIONS.md, "Version check") ----
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { pageVerdict, mayReload, LEGACY_PROTO } from '../public/crumbwar/shared/version.js';
+import { ROOM_COUNTS, delta, fold, summarize, hourOf, HOUR } from '../src/metrics.mjs';
+
+test('the Worker reloads a page of any other version and lets a page from before the check through', () => {
+  assert.equal(pageVerdict(String(C.PROTO), C.PROTO), 'ok');
+  assert.equal(pageVerdict(String(C.PROTO - 1), C.PROTO), 'reload', 'an older page (cached, or open across a deploy)');
+  assert.equal(pageVerdict(String(C.PROTO + 1), C.PROTO), 'reload', 'a newer page (after a rollback): the reload fetches the page now served');
+  assert.equal(pageVerdict('x', C.PROTO), 'reload');
+  assert.equal(pageVerdict(null, C.PROTO), 'legacy');
+  assert.equal(pageVerdict('', C.PROTO), 'legacy');
+});
+
+test('a page reloads for an update once, not in a loop', () => {
+  const mem = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)) }; };
+  const s = mem();
+  assert.equal(mayReload(s, 1_000_000), true, 'first ask reloads');
+  assert.equal(mayReload(s, 1_000_500), false, 'the same ask right after the reload does not');
+  assert.equal(mayReload(s, 1_059_999), false);
+  assert.equal(mayReload(s, 1_060_000), true, 'a later update, a minute on, reloads again');
+  assert.equal(mayReload(null, 5), false, 'no storage: no reload, because nothing would stop a loop');
+  assert.equal(mayReload({ getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } }, 5), false);
+  assert.equal(mayReload({ getItem: () => null, setItem() {} }, 5), false, 'storage that drops writes: no reload');
+  const back = mem(); back.setItem('crumbwar:reloadAt', '9000000'); // a clock that went backwards does not block for ever
+  assert.equal(mayReload(back, 100), true);
+});
+
+test('the directory does not offer a room of another protocol to new people', () => {
+  const rooms = new Map([['enam-0', { people: 30, at: 0, pending: [], proto: C.PROTO + 1 }], ['enam-1', { people: 5, at: 0, pending: [], proto: C.PROTO }]]);
+  assert.equal(assign(rooms, 'enam', 58, [], 1000, C.PROTO), 'enam-1', 'the fuller room runs other code, so the other one is chosen');
+  // The known bad case: without the filter the old room wins, because it is the fullest.
+  assert.equal(assign(new Map([['enam-0', { people: 30, at: 0, pending: [], proto: C.PROTO + 1 }]]), 'enam', 58, [], 1000), 'enam-0');
+  // A room that never reported a protocol is from before the check and ran LEGACY_PROTO.
+  const legacy = new Map([['enam-0', { people: 10, at: 0, pending: [] }]]);
+  assert.equal(assign(legacy, 'enam', 58, [], 1000, LEGACY_PROTO), 'enam-0');
+  assert.equal(assign(legacy, 'enam', 58, [], 1000, LEGACY_PROTO + 1), 'enam-1', 'a new name is opened, not the old room');
+  assert.equal(legacy.get('enam-1').proto, LEGACY_PROTO + 1, 'a room opened by the directory is listed with the asking protocol');
+});
+
+// The page and the server mix only if these files agree. When one changes, decide whether a page and a room of
+// the two versions can still play together. If not, raise PROTO in config.js. Then record the new fingerprint here.
+test('a change to the wire format or the shared constants is a decision about PROTO', () => {
+  const files = ['public/crumbwar/shared/config.js', 'public/crumbwar/shared/proto.js', 'public/crumbwar/shared/move.js', 'public/crumbwar/shared/predict.js', 'src/net.mjs'];
+  const h = createHash('sha256');
+  for (const f of files) h.update(f).update('\0').update(readFileSync(new URL('../' + f, import.meta.url))).update('\0');
+  const now = [C.PROTO, h.digest('hex').slice(0, 16)];
+  assert.deepEqual(now, PROTO_FINGERPRINT, `shared code changed. Bump PROTO if old pages and new rooms (or the reverse) cannot play together, then set PROTO_FINGERPRINT to ${JSON.stringify(now)}`);
+});
+const PROTO_FINGERPRINT = [1, '606e02be16716637'];
+
+test('kick and refusal counters fold into hourly totals', () => {
+  const room = readFileSync(new URL('../src/room.mjs', import.meta.url), 'utf8');
+  const used = new Set([...room.matchAll(/'(kick[A-Z]\w+|refused[A-Z]\w+|sendFailed|closedByClient|socketErrors)'|stat\.(kick[A-Z]\w+|refused[A-Z]\w+|sendFailed|closedByClient|socketErrors)/g)].map(m => m[1] || m[2]));
+  assert.ok(used.size >= 13, `room.mjs counts ${[...used]}`);
+  for (const k of used) assert.ok(ROOM_COUNTS.includes(k), `${k} is a counter the room reports`);
+  const stat = Object.fromEntries(ROOM_COUNTS.map(k => [k, 0])), sent = {};
+  stat.joins = 3; stat.kickNoPing = 1;
+  assert.deepEqual(delta(stat, sent), { joins: 3, kickNoPing: 1 });
+  stat.joins = 4;
+  assert.deepEqual(delta(stat, sent), { joins: 1 }, 'only the change since the last report');
+  const t = {};
+  fold(t, { joins: 2, peakPeople: 7, roomMinutes: 1 }); fold(t, { joins: 1, peakPeople: 5, roomMinutes: 1, bad: -1, 'x y': 3, worse: 'a' });
+  assert.deepEqual(t, { joins: 3, peakPeople: 7, roomMinutes: 2 }, 'sums add, peaks keep the largest, bad input is dropped');
+  const h0 = hourOf(Date.UTC(2026, 10, 24, 5, 30)), h1 = h0 + HOUR;
+  const s = summarize({ enam: [{ hour: h0, key: 'joins', v: 2 }, { hour: h1, key: 'joins', v: 1 }, { hour: h1, key: 'peakPeople', v: 4 }], weur: [{ hour: h1, key: 'peakPeople', v: 9 }], lt: [{ hour: h1, key: 'joins', v: 50 }], sam: [] });
+  assert.deepEqual(s.regions.enam, [{ hour: new Date(h1).toISOString(), joins: 1, peakPeople: 4 }, { hour: new Date(h0).toISOString(), joins: 2 }]);
+  assert.deepEqual(s.totals, { joins: 3, peakPeople: 9 }, 'load test rooms stay out of the totals');
+  assert.equal(s.regions.sam, undefined);
+});
