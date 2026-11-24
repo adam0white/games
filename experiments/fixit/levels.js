@@ -228,9 +228,42 @@ export function resultSeconds(secs) {
   return Math.ceil((secs - 1e-9) * 10) / 10;
 }
 
-// A rival stall (tester t1, note #205): on these levels the deadline is the rival's. It fixes at a steady pace and reaches the
-// goal as the clock runs out, so beating the clock is beating the rival; the rules and limits are as before.
-export const rivalCount = (def, clock, deadline) => def.rival && deadline ? Math.min(def.goal.fix, Math.floor(def.goal.fix * clock / deadline + 1e-9)) : null;
+// The rival stall (tester t1, notes #205 and #233). It fixes a little faster than the clock asks (1.15), so its mistakes bring it home near the limit. It speeds up while
+// the player is RIVAL.lead or more ahead, and now and then makes a mistake: it drops a finished one, sneezes or nods off. If it
+// reaches the goal first, the level is lost. The clock still ends the level as before. A friend's run (`ghost`, the seconds at which
+// the friend fixed each) can stand in for it: it never hurries or slips, and is as fast as the friend was.
+export const RIVAL = { hurry: 1.4, lead: 2, gap: [11, 19], gags: { drop: 1.4, sneeze: 1.6, nap: 3 } };
+export function makeRival(def, deadline, ghost = null) {
+  if (!def?.rival || !deadline) return null;
+  const r = { r: (def.seed ^ 0x2f6e2b1) | 0, p: 0, n: 0, goal: def.goal.fix, pace: 1.15 * def.goal.fix / deadline, stall: 0, gag: null, next: 0, hurry: false, ghost };
+  r.next = 8 + rivalRand(r) * 6;
+  return r;
+}
+function rivalRand(r) { r.r = (r.r + 0x6D2B79F5) | 0; let t = Math.imul(r.r ^ r.r >>> 15, 1 | r.r); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+// One tick. `clock` is the level's clock, `mine` how many the player has fixed. Returns what happened: 'hurry', 'fixed', a gag, or null.
+export function stepRival(r, dt, clock, mine) {
+  const was = r.n;
+  if (r.ghost) { while (r.n < r.ghost.length && clock >= r.ghost[r.n]) r.n++; r.p = r.n + (r.n < r.ghost.length ? Math.max(0, clock - (r.ghost[r.n - 1] ?? 0)) / (r.ghost[r.n] - (r.ghost[r.n - 1] ?? 0)) : 0); return r.n > was ? 'fixed' : null; }
+  if (r.stall > 0) { r.stall -= dt; if (r.stall <= 0) r.gag = null; return null; }
+  if (clock >= r.next) {
+    const roll = rivalRand(r), [lo, hi] = RIVAL.gap;
+    r.gag = roll < 0.34 && r.n > 0 ? 'drop' : roll < 0.67 ? 'sneeze' : 'nap';
+    r.stall = RIVAL.gags[r.gag]; r.next = clock + lo + rivalRand(r) * (hi - lo); r.hurry = false;
+    if (r.gag === 'drop') { r.p = Math.max(0, r.p - 1); r.n = Math.floor(r.p + 1e-9); }
+    return r.gag;
+  }
+  const hurry = mine - r.n >= RIVAL.lead, began = hurry && !r.hurry;
+  r.hurry = hurry; r.p = Math.min(r.goal, r.p + r.pace * (hurry ? RIVAL.hurry : 1) * dt); r.n = Math.floor(r.p + 1e-9);
+  return r.n > was ? 'fixed' : began ? 'hurry' : null;
+}
+// A friend's run as text for a link: the level, then the tenths of a second between one fixed and the next, in base 36.
+export const raceText = (n, times) => `${n}.${times.map((t, i) => Math.max(1, Math.round(t * 10) - Math.round((times[i - 1] ?? 0) * 10)).toString(36)).join('-')}`;
+export function raceFrom(text) {
+  const m = /^(\d{1,2})\.([0-9a-z]{1,3}(?:-[0-9a-z]{1,3}){0,60})$/.exec(text ?? ''); if (!m) return null;
+  const def = levelDef(Number(m[1])); if (!def?.rival) return null;
+  let t = 0; const times = m[2].split('-').map(v => { t += parseInt(v, 36); return t / 10; });
+  return times.length === def.goal.fix && times.every((v, i) => v > (times[i - 1] ?? 0)) && t / 10 <= def.goal.time + 1 ? { n: def.n, times } : null;
+}
 
 export function starsFor(def, secs) {
   return secs <= def.stars[0] + 1e-9 ? 3 : secs <= def.stars[1] + 1e-9 ? 2 : 1;

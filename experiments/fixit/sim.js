@@ -7,7 +7,7 @@
 //   s.events                                             what happened since the page last emptied it
 // Every repair is a small state machine driven by those three input types. Its progress p runs 0..1.
 
-import { ASSIST_RATE, starsFor } from './levels.js';
+import { ASSIST_RATE, starsFor, makeRival, stepRival } from './levels.js';
 import { REPAIRS, REPAIR_META } from './repairs.js';
 
 export const DT = 1 / 60;
@@ -528,7 +528,7 @@ export const level = s => s.lv ? s.lv.ramp : Math.min(LEVELS - 1, Math.floor(s.c
 export const multiplier = s => 1 + Math.min(2, Math.floor(s.streak / 4)); // x2 after four quick jobs in a row, x3 after eight
 
 // ---------- the shift: the open stall (a day of random customers) or a map level (levels.js) when `lv` is given
-export function create({ seed = 1, unlocked = TUTOR, tutorial = false, hearts = 3, newJob = null, only = null, regular = -1, two = true, day = DAY, startLevel = 0, golden = GOLDEN_CHANCE, goldenFrom = GOLDEN_FROM, lv = null, assisted = false } = {}) {
+export function create({ seed = 1, unlocked = TUTOR, tutorial = false, hearts = 3, newJob = null, only = null, regular = -1, two = true, day = DAY, startLevel = 0, golden = GOLDEN_CHANCE, goldenFrom = GOLDEN_FROM, lv = null, assisted = false, ghost = null } = {}) {
   if (lv) { // a map level brings its own seed, jobs, pace and goal
     if (lv.goal.safe || lv.goal.list) hearts = 1;
     seed = lv.seed; unlocked = lv.pool; tutorial = false; newJob = lv.intro; two = lv.two; day = Infinity; startLevel = 0;
@@ -542,8 +542,9 @@ export function create({ seed = 1, unlocked = TUTOR, tutorial = false, hearts = 
     finger: { down: false, blocked: false, carry: false, x: 0, y: 0 },
     lv, cleared: false, clearT: null,
     assisted: !!(lv && assisted), lanes: [], station: null, choosing: false,
-    deadline: lv?.goal.time ? lv.goal.time / (assisted ? ASSIST_RATE : 1) : null,
+    deadline: lv?.goal.time ? lv.goal.time / (assisted ? ASSIST_RATE : 1) : null, times: [],
   };
+  s.rival = makeRival(lv, s.deadline, ghost);
   if (!s.unlocked.length) s.unlocked = TUTOR.slice();
   for (let i = 0; i < 4; i++) { const c = customer(s); if (c) s.queue.push(c); }
   nextCustomer(s);
@@ -721,7 +722,7 @@ function pay(s) {
   if (quick) { s.streak++; base += QUICK_BONUS; } else s.streak = 0;
   s.bestStreak = Math.max(s.bestStreak, s.streak);
   const coins = base * multiplier(s) * (c.regular ? 2 : 1) * (c.golden ? GOLDEN_PAY : 1);
-  s.coins += coins; s.served++;
+  s.coins += coins; s.served++; s.times?.push(s.clock);
   s.log.push({ kind: c.kinds.join('+'), ms: Math.round(c.elapsed * 1000), ok: true, ...(c.golden ? { golden: true } : {}) });
   s.phase = 'works'; s.phaseT = WORKS;
   s.events.push({ e: 'paid', coins, wage, quick, kinds: c.kinds, mult: multiplier(s), regular: c.regular, golden: c.golden, streak: s.streak });
@@ -756,6 +757,11 @@ export function step(s) {
   if (!c.tutor && !s.cleared) s.clock += DT;
   if (s.clock >= s.day && s.phase === 'work') { end(s, 'time'); return; }
   if (s.deadline && !s.cleared && s.clock >= s.deadline) { end(s, 'time'); return; }
+  if (s.rival && !s.cleared) {
+    const what = stepRival(s.rival, DT, s.clock, s.served);
+    if (what) s.events.push({ e: 'rival', what });
+    if (s.rival.n >= s.rival.goal) { end(s, 'rival'); return; }
+  }
 
   if (s.phase !== 'leave') {
     for (const lane of s.lanes) {

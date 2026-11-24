@@ -823,7 +823,28 @@ const GAMES = {
   // sends one lab record marked as an agent run. Run a game's own check after changing that game.
   grapevine: page => started(page, 'grapevine', 'grapevineState', '#toMenu'),
   ducklings: page => started(page, 'ducklings', 'ducklingsState', '#pauseMenu'),
-  fixit: page => started(page, 'fixit', 'fixitState', '#quit'),
+  async fixit(page) {
+    await started(page, 'fixit', 'fixitState', '#quit');
+    // A friend's link: the race is offered, won and lost, offers a link of its own, and saves nothing for a level not opened yet.
+    const link = await page.evaluate(async () => { const L = await import('./levels.js'), n = L.levelDef(8).goal.fix; return L.raceText(8, Array.from({ length: n }, (_, i) => (i + 1) * 4)); });
+    const race = async lang => {
+      await page.goto(`${base}/fixit/?labRunSource=agent&lang=${lang}&race=${link}`); await until(page, () => window.fixitState && document.querySelector('#raceFriend') && !document.querySelector('#raceFriend').hidden, 'the race is on the menu');
+      await page.evaluate(() => { window.copied = ''; Object.defineProperty(navigator, 'share', { value: undefined, configurable: true }); Object.defineProperty(navigator, 'clipboard', { value: { writeText: async t => { window.copied = t; } }, configurable: true }); });
+      await page.click('#raceFriend'); await until(page, () => window.fixitState().level === 8 && window.fixitState().card, 'the goal card of the race'); await page.click('#startLevel');
+    };
+    const levels = () => page.evaluate(() => JSON.stringify(Object.entries(localStorage).filter(([k]) => k.startsWith('fixit')).map(([, v]) => { try { return JSON.parse(v).levels; } catch { return null; } })));
+    await race('en'); const before = await levels();
+    await page.evaluate(() => { const s = window.fixitSim(); s.served = s.lv.goal.fix - 1; s.times = Array.from({ length: s.served }, (_, i) => (i + 1) * 0.5); s.clock = 10; Object.defineProperty(s.rep, 'p', { get: () => 1, set() {} }); });
+    await until(page, () => window.fixitState().screen === 'end', 'the race is won'); assert.equal(await page.textContent('#endTitle'), 'You beat your friend!'); assert.equal(await levels(), before, 'a race on a level not opened yet saves no stars');
+    await page.click('#challenge'); await until(page, () => window.copied, 'the challenge is copied');
+    const mine = await page.evaluate(async () => { const L = await import('./levels.js'); return [window.copied, L.raceFrom(new URL(window.copied).searchParams.get('race'))]; }); assert.equal(mine[1].n, 8); assert.ok(Math.abs(mine[1].times.at(-1) - 10) < 0.3, 'the link carries this run');
+    await race('tr'); await page.evaluate(() => { window.fixitSim().clock = window.fixitSim().rival.ghost.at(-1); });
+    await until(page, () => window.fixitState().screen === 'end', 'the race is lost'); assert.equal(await page.textContent('#endTitle'), 'Arkadaşın daha hızlıydı'); assert.ok(await page.isHidden('#raceRow'), 'a lost race offers no link');
+    await page.goto(`${base}/fixit/?labRunSource=agent&lang=en&race=8.nonsense`); await until(page, () => window.fixitState, 'a broken link'); assert.ok(await page.isHidden('#raceFriend'), 'a broken link is ignored');
+    // the rival of a race level: it hurries when the player leads, makes mistakes, and stands on the bar
+    await page.goto(`${base}/fixit/?labRunSource=agent&lang=en&level=8`); await page.click('#play'); await page.click('#startLevel'); await page.evaluate(() => { window.fixitSim().served = 5; });
+    await until(page, () => window.fixitSim().rival.hurry, 'the rival speeds up'); await page.evaluate(() => { const s = window.fixitSim(); s.rival.next = s.clock; }); await until(page, () => window.fixitSim().rival.gag, 'it makes a mistake');
+  },
   borrowed: page => started(page, 'borrowed', 'borrowedState', '#toMenu'),
   alibi: page => started(page, 'alibi', 'alibiState', '#toMenu'),
   nightshift: page => started(page, 'nightshift', 'nightshiftState', '#toMenu'),

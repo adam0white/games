@@ -104,7 +104,9 @@
   .tickets button.done { background: #d6e7c0; opacity: .68; }
   .lane i { position: absolute; left: 0; bottom: 0; width: 100%; height: 4px; background: #247963; transform-origin: left; }
   #assist, #menuAssist { min-width: 80px; color: #203828; background: #d8edbc; }
-  #shareStatus:empty { display: none; }
+  #shareStatus:empty, #raceStatus:empty { display: none; }
+  #raceStatus { margin: .2em 0; } #raceStatus.link { word-break: break-all; user-select: all; -webkit-user-select: all; }
+  #menu p:has(#raceFriend[hidden]) { margin: 0; }
   .help-icon svg { margin-right: 5px; width: 26px; height: 24px; vertical-align: middle; }
   .tickets.prompt .ticket[data-next], .tickets.prompt .lane[data-next] { outline: 3px solid #78c7ab; outline-offset: 1px; }
   @media (prefers-reduced-motion: no-preference) { .tickets.prompt [data-next] { animation: ticket-call .9s ease-in-out infinite alternate; } }
@@ -149,6 +151,7 @@
   <div class="stats"><span><span class="coin" role="img" data-i18n-aria="coins"></span><b id="bank"></b></span><span><span class="st">★</span> <b id="starsAll"></b>/<span id="starsMax"></span></span><span><span data-i18n="jobsUnlocked"></span> <b id="jobs"></b>/<span id="jobsAll"></span></span></div>
   <p id="playActions"><button id="play" class="main"></button><button id="menuAssist" class="help-icon" hidden></button></p>
   <p id="playLine" class="sub"></p>
+  <p><button id="raceFriend" class="small" hidden></button></p>
   <p id="migrated" class="sub" hidden></p>
   <div id="chapterTabs" data-i18n-aria="chapters"></div>
   <div id="map" class="map"></div>
@@ -196,6 +199,7 @@
     <p id="shareStatus" role="status" class="sub"></p>
     <div><button id="shareDaily" data-i18n="share"></button><button id="downloadDaily" data-i18n="download"></button></div>
   </div>
+  <div id="raceRow" hidden><button id="challenge" class="small" data-i18n="challenge"></button><p id="raceStatus" class="sub" role="status"></p></div>
   <p><button id="next" class="main" data-i18n="next"></button></p>
   <p><button id="again" class="main"></button><button id="toMenu" data-i18n="menu"></button></p>
 </div></div>

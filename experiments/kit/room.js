@@ -16,8 +16,8 @@ export function linkFor(code, where = globalThis.location) { const u = new URL(w
 export function codeFromLink(where = globalThis.location) { try { return cleanCode(new URL(where.href).searchParams.get('room')); } catch { return ''; } }
 
 // Hand the link to the phone's share sheet; where there is none, copy it. Resolves to 'shared', 'copied' or 'shown'.
-export async function share(code, words = 'Play with me') {
-  const url = linkFor(code);
+export async function share(code, words = 'Play with me') { return shareLink(linkFor(code), words); }
+export async function shareLink(url, words = 'Play with me') { // any link; the same three answers
   try { if (navigator.share) { await navigator.share({ text: words, url }); return 'shared'; } } catch (e) { if (e?.name === 'AbortError') return 'shown'; }
   try { await navigator.clipboard.writeText(url); return 'copied'; } catch { return 'shown'; }
 }

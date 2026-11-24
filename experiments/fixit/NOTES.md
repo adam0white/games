@@ -634,3 +634,22 @@ Asked what would make the levels better, the tester chose a rival stall to race 
 
 ### Left as a proposal (2026-11-24, note #205)
 - A rival stall: a second counter at the top of the screen fixes things at its own pace and shows its count; a level goal is to fix more before the bell. Needs a rule in `sim.js` (the rival's pace per level) and bots that win and lose against it.
+
+## 2026-11-24: the rival has moods, and a friend can race (tester t1, note #233, answering #224)
+
+Asked what the rival should do next, the tester asked for all three ideas: speed up when the player is ahead, make funny mistakes, race a friend. This builds the moods left as a proposal under note #205.
+
+- **Speeds up.** The rival (`makeRival`, `stepRival` in `levels.js`) fixes at 1.15 of the pace the clock asks for, and at 1.4 times that while the player leads by two or more. If it reaches the goal first the level is lost, even before the limit. The limit and the star times are unchanged.
+- **Mistakes.** Every 11 to 19 s it drops a finished one (one off its count), sneezes or nods off. A short bubble under its face on the bar says so, in English and Turkish. Its face now runs along the bar by its own progress; a small dot is the clock. At the limit, "The rival stall won" shows only if the rival is ahead; else "Out of time".
+- **Race a friend, without a server.** After a won race level (not with the slower clock), "Challenge a friend" shares a link that carries the level and the seconds at which each repair was finished. Nothing is sent to or stored on a server; nothing about the player is in the link. The friend opens it, taps "Race your friend" on the menu, and that run stands in for the rival. Winning offers a link back, so two friends can pass it to and fro. A race on a level not opened yet saves no stars, coins or unlocks. A lost race does not count towards the slower-clock offer.
+- The link sharing moved into `kit/room.js` as `shareLink` (`share` uses it).
+
+### Numbers and checks
+The bot table (slow unaided, stars, clears) is the same line for line as before the change; at 1.25 and above the slow bot loses more of level 11, so 1.15 was kept. Seconds the rival takes, against a player behind / far ahead, and the limit: level 8 99 / 67 / 85, 11 100 / 64 / 80, 14 82 / 58 / 75, 16 76 / 50 / 70, 23 96 / 65 / 85, 28 84 / 57 / 75. `bots.mjs` claims: against a player who is behind it needs longer than the limit, against one far ahead it is faster, it hurries on every race, makes every mistake, a player who stops one short loses; a run survives its link, an expert beats an average friend, a slow player loses to an expert friend at the friend's time, and broken links are refused. The phone check plays a friend race won and lost, copies the link, and opens a broken one. Screenshots of the bar, bubbles and cards looked at (WebKit iPhone 13).
+
+### Not verified
+A real phone and its share sheet; whether the rival feels fair or funny; a race against a real friend. The friend race uses a run already played, not two people at once.
+
+### Left as a proposal (2026-11-24, note #233)
+- Both friends at once on two phones. The kit's friend tables would need Fix-It added to their server's list, which a tester note cannot change.
+- Best of three between two friends, with a running score in the link.
