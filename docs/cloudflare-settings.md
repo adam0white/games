@@ -22,6 +22,8 @@ The first two preview builds failed at the redirect preflight, which needs full 
 
 Cloudflare documents no switch that stops production-branch builds while keeping previews; `versions upload` is its documented way to build without deploying. A push to `main` therefore still starts a Workers Builds run, which uploads an inactive version or fails. Neither changes what is served. The production build command is unchanged, so it fails at the redirect preflight like the first preview build did, which needs full Git history. Not verified by observation: a push to `main` after the change.
 
+Observed 2026-11-24: every push to `main` did fail there (`node scripts/check-redirects.mjs`, about one minute in) and showed a red `Workers Builds: games-static` check on the commit. `scripts/build.mjs` now fetches full history itself when the checkout is shallow, so the production build passes and uploads an inactive version.
+
 The `cf` CLI can read the Builds API; `wrangler` OAuth cannot.
 
 ## In repository config already

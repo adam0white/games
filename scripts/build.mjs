@@ -7,6 +7,9 @@ import { planExperiments } from './experiments.mjs';
 if (!registry.games.length) throw new Error('Cannot build an empty game registry');
 const commit = head();
 if (!clean()) throw new Error('Build requires a clean checkout');
+// Cloudflare's own Git build of main clones without history, and the redirect preflight below needs all of it.
+// That build failed on every merge and showed a red check; GitHub Actions and local checkouts are never shallow.
+if (run('git', ['rev-parse', '--is-shallow-repository']) === 'true') run('git', ['fetch', '--unshallow', 'origin'], { stdio: 'inherit' });
 run('node', ['scripts/check-redirects.mjs'], { stdio: 'inherit' });
 // Checked before the long game builds, so a slug collision fails at once.
 const experiments = planExperiments('.', registry);
