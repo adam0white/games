@@ -125,6 +125,8 @@ The owner went through the lab and decided each page that came from a live game.
 | Lantern's `music.js` | Accepted: move to the kit for Night Flock, Night Vine, Paper Boat, Harvest Morning | |
 | Friend play by link (`kit/room.js`, from `pitch` and `pisti`) | Accepted for Thumb Duel | `pitch` and `pisti` stay |
 
+`ant-creatures` landed (2026-11-24): its rig and drawing are Ant Promotion's fifth look, Living (`/ant-promotion/?look=4`, on the Look button), with the rig checks in `ant-promotion/rig-bots.mjs`. The page is in `archive/lab/ant-creatures/`; the zoo was not carried over.
+
 Still in the lab for a promote-or-reject decision: `thankful`, `pitch`, `pisti`, `ring`, `night-bells`, `night-lamp-keeper`, `night-channels`, `night-kite`, `night-loaves`, `night-podwire`, `night-rubbing`, `night-saltplate`, `night-sand`, `night-splitlight`, `wild-pour`, `wild2-face-shift`.
 
 Play records: the lab accepted no records from any lab page up to this date (no lab page name is in human-framework `LAB_PROTOTYPES`; five pages import `kit/lab.js` and are refused). The site Worker's request log shows two real phones opening lab pages on 2026-11-24. Opens are the only evidence of play for these pages.
