@@ -30,6 +30,7 @@ import { lab } from './lab.js';
 import { stick } from './stick.js';
 import { drag } from './drag.js';
 import { hint } from './hint.js';
+import { table, newCode, cleanCode, linkFor, codeFromLink } from './room.js';
 
 const results = [], out = document.getElementById('out');
 function check(name, fn) {
@@ -178,6 +179,26 @@ async function hintChecks() {
 try { await hintChecks(); } catch (e) { check(`hint: checks ran to the end (${e.message})`, () => false); }
 try { await labChecks(); } catch (e) { check(`lab: checks ran to the end (${e.message})`, () => false); }
 
+// room.js: codes, links, and a table kept in step through a stand-in socket (the real server is tested in workers/lab-ai/test/table.test.mjs).
+check('room: a new code is four letters and cleans to itself', () => { const c = newCode(); return /^[A-Z]{4}$/.test(c) && cleanCode(c.toLowerCase() + ' ') === c && cleanCode('ab1') === ''; });
+check('room: the link carries only the code, and reads back', () => { const at = { href: 'https://play.example/lab/pitch/?date=2026-01-01#x' }, link = linkFor('QWER', at); return link === 'https://play.example/lab/pitch/?room=QWER' && codeFromLink({ href: link }) === 'QWER' && codeFromLink(at) === ''; });
+{
+  const sent = [], got = [], states = []; let sock = null;
+  class Fake { constructor(url) { this.url = url; this.readyState = 1; sock = this; } send(text) { sent.push(JSON.parse(text)); } close() { this.readyState = 3; } }
+  const say = q => sock.onmessage({ data: JSON.stringify(q) });
+  const mem = new Map(), store = { getItem: k => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+  const t = table({ game: 'pitch', version: 3, name: () => 'Ada', Socket: Fake, where: { protocol: 'https:', host: 'play.example' }, store, timers: { setTimeout: () => 0, clearTimeout() {} }, onState: q => states.push(q), onMove: (seat, m, i) => got.push([seat, i, ...m]) });
+  t.open('qwer'); sock.onopen();
+  check('room: opens the table\'s own address and says hi with a kept key and the rules version', () => sock.url === 'wss://play.example/lab-api/table/pitch/QWER' && sent[0].t === 'hi' && sent[0].v === 3 && sent[0].n === 'Ada' && sent[0].k === mem.get('kit-room:pitch:QWER') && sent[0].k.length >= 16);
+  say({ t: 'you', seat: 1, v: 3, game: 0, seed: 7, seats: [{ n: 'Ben', on: true }, { n: 'Ada', on: true }], log: [[0, 4]], again: [] });
+  check('room: joining hands over the whole game so far', () => t.seat === 1 && t.status === 'live' && states.length === 1 && states[0].log.length === 1 && states[0].seed === 7);
+  const first = t.move([2]), second = t.move([5]);
+  check('room: one move at a time, numbered as the next place in the list', () => first && !second && sent[1].t === 'm' && sent[1].i === 1 && sent.length === 2 && got.length === 0);
+  say({ t: 'm', i: 1, s: 1, m: [2] }); say({ t: 'm', i: 1, s: 1, m: [2] }); say({ t: 'm', i: 2, s: 0, m: [6] });
+  check('room: moves are handed over once each, in the server\'s order, own move included', () => JSON.stringify(got) === '[[1,1,2],[0,2,6]]' && !t.waiting);
+  t.leave();
+  check('room: leaving closes the socket', () => sock.readyState === 3 && t.status === 'off');
+}
 window.kitResults = results; // read by check/phone.mjs
 </script>
 </body>

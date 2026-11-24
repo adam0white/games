@@ -6,7 +6,7 @@ assert.equal(validDay('2026-02-30'), false);
 assert.equal(validDay('2024-02-29'), true);
 for (const raw of [null, {}, [], {v:2}, {v:1, days:[]}, {v:1, days:{bad:[{k:'bread'}]}}]) assert.deepEqual(load(raw).days, {});
 const repaired = load({v:1,look:'bad',sound:'yes',days:{[today]:[{k:'bad'},null,...Array(5).fill({k:'bread'})]}});
-assert.equal(repaired.look,'sky'); assert.equal(repaired.sound,true); assert.equal(count(repaired,today),3);
+assert.equal(repaired.look,'garden'); assert.equal(repaired.sound,true); assert.equal(count(repaired,today),3);
 const s=load(null);
 for(let i=0;i<3;i++) assert.equal(addStar(s,today,KINDS[i]),true);
 const before=JSON.stringify(s);

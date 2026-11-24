@@ -8,11 +8,12 @@
 //   pad.touch     { ox, oy, x, y } (centre and finger, in client px) while a finger is down, for drawing; otherwise null
 //   pad.drop()    forget the finger (a card opened, the player died)
 // The finger is captured on touch-down, so it keeps steering when it slides off the element.
+// The first finger owns the stick until it lifts; a second finger on the element does nothing.
 export function stick(el, { when = () => true, reach, leash, dead }) {
   let joy = null;
-  el.addEventListener('pointerdown', e => { if (!when()) return; joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId); } catch {} });
+  el.addEventListener('pointerdown', e => { if (!when() || joy && joy.id !== e.pointerId) return; joy = { id: e.pointerId, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId); } catch {} });
   el.addEventListener('pointermove', e => { if (joy && e.pointerId === joy.id) { joy.x = e.clientX; joy.y = e.clientY; const dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = Math.hypot(dx, dy); if (d > leash) { joy.ox = joy.x - dx / d * leash; joy.oy = joy.y - dy / d * leash; } } });
-  for (const type of ['pointerup', 'pointercancel']) el.addEventListener(type, e => { if (joy && e.pointerId === joy.id) joy = null; });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(type, e => { if (joy && e.pointerId === joy.id) joy = null; });
   return {
     get touch() { return joy; },
     drop() { joy = null; },

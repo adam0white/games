@@ -1,3 +1,6 @@
+import { LEVELS, LAST_STAGE } from './levels.js';
+export { LEVELS as STAGES, LAST_STAGE } from './levels.js';
+
 // Follow Me: pure, seeded simulation. No DOM; runs in Node for the bots.
 // One tick is 1/60 s. The only input per tick is a target point in world units, or null.
 // World: x runs across the pond (0 to 1, the water is 0.04 to 0.96), y runs up the pond from the start.
@@ -44,25 +47,13 @@ export function rng(seed) {
 const mod = (a, n) => ((a % n) + n) % n;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-// Stages. rows are built bottom to top; each new hazard arrives alone in the stage that introduces it.
-// start: ducklings already following; lost: ducklings waiting along the way; par: arrivals for 1, 2 and 3 stars.
-export const STAGES = [
-  null,
-  { rows: ['bend', 'log1', 'bend'], start: 1, lost: 1, time: 60, par: [1, 2, 2] },
-  { rows: ['log', 'reeds', 'log', 'bend', 'log2', 'reeds'], start: 2, lost: 4, time: 75, par: [2, 4, 6] },
-  { rows: ['log', 'pike', 'log2', 'reeds', 'pike', 'log', 'pike'], start: 2, lost: 5, time: 80, par: [3, 5, 7] },
-  { rows: ['pike', 'turtle', 'log2', 'turtle', 'pike', 'turtle', 'log'], start: 2, lost: 5, time: 85, par: [3, 5, 7] },
-  { rows: ['log', 'bike', 'turtle', 'bike', 'pike', 'bike', 'log2'], start: 3, lost: 5, time: 85, par: [3, 6, 7] },
-  { rows: ['gust', 'bike', 'pike', 'gust', 'log2', 'gust', 'turtle'], start: 3, lost: 5, time: 85, par: [3, 6, 7] },
-  { rows: ['heron', 'log2', 'heron', 'turtle', 'pike', 'heron', 'bike'], start: 3, lost: 6, time: 95, par: [3, 6, 8] },
-  { rows: ['log2', 'pike', 'bike', 'gust', 'heron', 'turtle', 'log2', 'pike', 'heron'], start: 3, lost: 6, time: 110, par: [3, 6, 8] },
-];
-export const LAST_STAGE = STAGES.length - 1;
 // endless: each lily-pad checkpoint adds time, more for a longer line, so losing ducklings shortens the run
-export const CHECK_TIME = 2, CHECK_PER = 3, CHECK_CAP = 6;
-export const checkGain = n => CHECK_TIME + CHECK_PER * Math.min(n, CHECK_CAP);
+export const ENDLESS_TIME = 37;
+export const DUSK_ONSET = 18;
+const PAD_REFILL = [1, 2, 4, 7, 13, 16, 19];
+export const checkGain = n => PAD_REFILL[Math.min(n, PAD_REFILL.length - 1)];
 // The sunset accelerates after a gentle opening. It never changes hazard warnings.
-export const duskRate = t => 1 + Math.max(0, t - 20) / 44;
+export const duskRate = t => 1 + Math.max(0, t - DUSK_ONSET) / 36;
 export const ENDLESS_AFTER = 3; // endless opens when stage 3 is done
 export const stageSeed = n => 7919 * n + 13;
 
@@ -108,8 +99,26 @@ export function heronAngle(h, cyc) {
   const e = cyc.f < 0.5 ? 2 * cyc.f * cyc.f : 1 - 2 * (1 - cyc.f) * (1 - cyc.f);
   return cyc.phase === 'act' ? h.a0 + (h.a1 - h.a0) * e : cyc.phase === 'warn' ? h.a0 : h.a0;
 }
+// A horn and headlights mark the approach before the body enters the pond.
+function carAt(h, t) {
+  const age = mod(t + h.phase, h.period);
+  const warn = age < 0.85;
+  const x = (h.dir > 0 ? -0.12 : 1.12) + h.dir * h.speed * Math.max(0, age - 0.85);
+  return { x, warn, visible: x > -0.22 && x < 1.22 };
+}
+
+function reaction(h, t) {
+  if (h.triggeredAt === null) return { phase: 'rest', f: 0 };
+  const age = t - h.triggeredAt;
+  if (age < h.warning) return { phase: 'warn', f: age / h.warning };
+  if (h.kind === 'cat' && age >= h.warning + 0.85) return { phase: 'rest', f: 0 };
+  return { phase: 'act', f: Math.min(1, (age - h.warning) / 0.25) };
+}
+
 // What the page draws: positions and phases at time t.
 export function view(h, t) {
+  if (h.kind === 'car') return carAt(h, t);
+  if (h.kind === 'cat' || h.kind === 'bridge') return reaction(h, t);
   if (h.kind === 'log') return { logs: logsAt(h, t) };
   if (h.kind === 'bike') return { bikes: bikesAt(h, t) };
   if (h.kind === 'pike') return pikeAt(h, t);
@@ -119,8 +128,18 @@ export function view(h, t) {
 }
 
 // Does a body of radius r at (x, y) get hit at time t? Returns the hazard kind or null.
-export function hits(h, t, x, y, r) {
+export function hits(h, t, x, y, r, follower = false) {
   if (y < h.y0 - 0.2 || y > h.y1 + 0.2) return null;
+  if (h.kind === 'car') {
+    if (Math.abs(y - h.y) >= 0.063 + r) return null;
+    const car = carAt(h, t);
+    return !car.warn && car.visible && Math.abs(x - car.x) < 0.090 + r ? 'car' : null;
+  }
+  if (h.kind === 'weed' || h.kind === 'bridge' || h.kind === 'cat') {
+    if (h.kind !== 'cat' && !follower) return null;
+    if (h.kind !== 'weed' && reaction(h, t).phase !== 'act') return null;
+    return (x - h.x) ** 2 + (y - h.y) ** 2 < (h.r + r) ** 2 ? h.kind : null;
+  }
   if (h.kind === 'log') {
     const dy = Math.abs(y - h.y); if (dy > h.r + r) return null;
     for (const l of logsAt(h, t)) { if (l.warn) continue; const dx = Math.max(0, Math.abs(x - l.x) - h.half); if (dx * dx + dy * dy < (h.r + r) ** 2) return 'log'; }
@@ -160,8 +179,8 @@ export function slowAt(s, x, y) {
   for (const r of s.reeds) if ((x - r.x) ** 2 + (y - r.y) ** 2 < r.r * r.r) return 0.45;
   return 1;
 }
-export function hitAny(s, t, x, y, r) {
-  for (const h of s.hazards) { const k = hits(h, t, x, y, r); if (k) return k; }
+export function hitAny(s, t, x, y, r, follower = false) {
+  for (const h of s.hazards) { const k = hits(h, t, x, y, r, follower); if (k) return k; }
   return null;
 }
 
@@ -250,7 +269,10 @@ function safeSpot(s, x, y) {
     let bad = false;
     for (const h of s.hazards) {
       if (h.kind === 'gust') continue;
-      if (h.kind === 'log' || h.kind === 'bike') { if (Math.abs(y - h.y) < 0.1) { y = h.y - 0.12; bad = true; } }
+      if (h.kind === 'log' || h.kind === 'bike' || h.kind === 'car') { if (Math.abs(y - h.y) < 0.1) { y = h.y - 0.12; bad = true; } }
+      else if (h.kind === 'cat' || h.kind === 'weed' || h.kind === 'bridge') {
+        if (Math.hypot(x - h.x, y - h.y) < h.r + 0.07) { y = h.y - h.r - 0.08; bad = true; }
+      }
       else if (h.kind === 'pike') { const d = Math.hypot(x - h.cx, y - h.cy); if (Math.abs(d - h.R) < 0.09) { y = h.cy - h.R - 0.11; bad = true; } }
       else if (h.kind === 'turtle') { if (Math.hypot(x - h.x, y - h.y) < h.r + 0.07) { y = h.y - h.r - 0.09; bad = true; } }
       else if (h.kind === 'heron') { if (Math.hypot(x - h.px, y - h.py) < h.L + 0.06) { x = h.side > 0 ? 0.84 : 0.16; bad = Math.hypot(x - h.px, y - h.py) < h.L + 0.06; if (bad) y = h.py - h.L - 0.07; } }
@@ -265,7 +287,7 @@ function safeSpot(s, x, y) {
 function duck(s) {
   const id = s.duckCount++;
   const pick = (id * 7 + (s.seed % 16)) % NAMES.length;
-  const trait = TRAIT_ORDER[(id + (s.seed >> 3)) % TRAIT_ORDER.length];
+  const trait = TRAIT_ORDER[(id + (s.seed >>> 3)) % TRAIT_ORDER.length];
   return { id, name: NAMES[pick] + (id >= NAMES.length ? ' ' + (Math.floor(id / NAMES.length) + 1) : ''), trait };
 }
 
@@ -287,7 +309,8 @@ function layRow(s, kind, d, n, lostHere) {
 }
 
 export function create({ stage = 1, endless = false, seed } = {}) {
-  const spec = endless ? null : STAGES[clamp(stage, 1, LAST_STAGE)];
+  stage = clamp(Math.trunc(stage) || 1, 1, LAST_STAGE);
+  const spec = endless ? null : LEVELS[stage];
   seed = (seed ?? (endless ? 4242 : stageSeed(stage))) >>> 0;
   const s = {
     seed, stage: endless ? 0 : stage, endless, t: 0, tick: 0,
@@ -296,31 +319,28 @@ export function create({ stage = 1, endless = false, seed } = {}) {
     line: [], lost: [], arrived: [], gone: [], duckCount: 0,
     hazards: [], rocks: [], reeds: [], gusts: [], rowCount: 0, top: 0.75,
     score: 0, joins: 0, scatters: 0, hits: 0, quackT: 0, quackCool: 0, quacks: 0,
-    home: false, over: null, why: null, events: [], time: spec ? spec.time : 40, checkpoints: [], nextCheck: 0, total: 0,
+    home: false, over: null, why: null, events: [], time: spec ? spec.time ?? Infinity : ENDLESS_TIME, checkpoints: [], lastPadScatters: 0, total: 0,
     nest: null, best: 0.35,
   };
   // the trail before the start: a straight line below her, so the first ducklings stand in a row
-  for (let i = 0; i < HIST; i++) { const back = (HIST - 1 - i) * DT; s.hx[i] = 0.5; s.hy[i] = 0.35 - back * 0.2; }
+  for (let i = 0; i < HIST; i++) { const back = (HIST - 1 - i) * DT; s.hx[i] = 0.5; s.hy[i] = 0.35 - back * (endless ? 0.2 : 0.13); }
   s.tick = HIST - 1;
   const startCount = spec ? spec.start : 2;
   for (let i = 0; i < startCount; i++) { const d = duck(s); s.line.push({ ...d, delay: 0 }); }
   setDelays(s, true);
   if (spec) {
-    const n = spec.start + spec.lost, rows = spec.rows, per = spreadLost(spec.lost, rows.length);
-    rows.forEach((kind, i) => layRow(s, kind, Math.max(0, stage - 2), n, per[i]));
-    s.nest = { x: 0.5, y: s.top + 0.35 };
-    s.total = n;
+    s.nest = { ...spec.nest };
+    s.hazards = spec.hazards.map(h => ({ ...h, triggeredAt: null }));
+    s.rocks = spec.rocks;
+    s.lost = spec.lost.map(([x, y]) => ({
+      ...duck(s), x, y, flee: 0, fromX: x, fromY: y, born: true,
+    }));
+    s.total = spec.start + spec.lost.length;
   } else {
-    s.total = startCount; s.nextCheck = 0;
+    s.total = startCount;
     endlessAhead(s);
   }
   return s;
-}
-// Spread the waiting ducklings over the rows: stage 1 puts its one duckling right after the first row.
-function spreadLost(lost, rows) {
-  const per = Array(rows).fill(0);
-  for (let i = 0; i < lost; i++) per[Math.min(rows - 1, Math.floor(i * rows / lost))]++;
-  return per;
 }
 const ENDLESS_POOL = [['log', 'pike', 'log2', 'reeds'], ['turtle', 'bike', 'log2', 'pike'], ['gust', 'heron', 'bike', 'turtle', 'log2', 'pike']];
 export function endlessAhead(s) {
@@ -373,7 +393,14 @@ export function moveMom(s, m, target, t, dt, stunned = false) {
   }
   const k = Math.min(1, (stunned ? 6 : 9) * dt);
   m.vx += (dvx - m.vx) * k; m.vy += (dvy - m.vy) * k;
-  m.x += (m.vx + push(s, t, m.x, m.y)) * dt; m.y += m.vy * dt;
+  let fx = push(s, t, m.x, m.y), fy = 0;
+  for (const h of s.hazards) {
+    if (h.kind !== 'current' || m.y <= h.y0 || m.y >= h.y1 || Math.abs(m.x - h.x) >= h.w) continue;
+    fx += h.dx;
+    fy += h.dy;
+  }
+  m.x += (m.vx + fx) * dt;
+  m.y += (m.vy + fy) * dt;
   for (const r of s.rocks) { const dx = m.x - r.x, dy = m.y - r.y, d = Math.hypot(dx, dy), min = r.r + R_MOM; if (d < min && d > 1e-6) { m.x = r.x + dx / d * min; m.y = r.y + dy / d * min; } }
   m.x = clamp(m.x, X_MIN, X_MAX); m.y = Math.max(0.1, m.y);
   if (s.nest) m.y = Math.min(m.y, s.nest.y + 0.05);
@@ -388,6 +415,9 @@ export function step(s, target, quack = false) {
   for (const h of s.hazards) {
     if (h.y0 > s.mom.y + 1.4 || h.y1 < s.mom.y - 1.6) continue;
     if (h.kind === 'turtle' || h.kind === 'heron' || h.kind === 'gust') { if (cycle(h, t).phase === 'warn' && cycle(h, s.t).phase !== 'warn') s.events.push({ type: 'warn', kind: h.kind, x: h.x ?? h.px ?? 0.5, y: h.y ?? h.py ?? h.y0 }); }
+    if (h.kind === 'car' && carAt(h, t).warn && !carAt(h, s.t).warn) {
+      s.events.push({ type: 'warn', kind: 'car', x: h.dir > 0 ? 0.06 : 0.94, y: h.y });
+    }
     if (h.kind === 'bike') for (const b of h.riders) if (mod(t + b.phase, b.P) < mod(s.t + b.phase, b.P)) s.events.push({ type: 'warn', kind: 'bike', x: b.dir > 0 ? 0 : 1, y: h.y });
   }
   s.t = t;
@@ -404,6 +434,14 @@ export function step(s, target, quack = false) {
   // the line follows the trail
   setDelays(s, false);
   const m = s.mom;
+  for (const h of s.hazards) {
+    if (h.kind !== 'cat' && h.kind !== 'bridge') continue;
+    const ready = h.triggeredAt === null || (h.kind === 'cat' && t - h.triggeredAt >= 4.2);
+    if (ready && Math.hypot(m.x - h.x, m.y - h.y) < h.trigger) {
+      h.triggeredAt = t;
+      s.events.push({ type: 'warn', kind: h.kind, x: h.x, y: h.y });
+    }
+  }
   if (!s.home && s.safe <= 0) {
     const k = hitAny(s, t, m.x, m.y, R_MOM);
     if (k) {
@@ -418,7 +456,7 @@ export function step(s, target, quack = false) {
       s.score += 50 * s.arrived.length; s.events.push({ type: 'arrive', id: f.id, k: s.arrived.length, x: p.x, y: p.y });
       continue;
     }
-    const k = hitAny(s, t, p.x, p.y, R_DUCK);
+    const k = hitAny(s, t, p.x, p.y, R_DUCK, true);
     if (k) {
       s.line.splice(i--, 1); s.scatters++;
       // A second scare and it hides in the reeds for good.
@@ -444,12 +482,26 @@ export function step(s, target, quack = false) {
   // endless: lily-pad checkpoints give time and score the line
   if (s.endless) {
     s.best = Math.max(s.best, m.y);
-    for (const c of s.checkpoints) if (!c.got && m.y > c.y) { c.got = true; const n = s.line.length, add = checkGain(n); s.time += add; s.score += 20 * n * (n + 1) / 2 + 10; s.events.push({ type: 'check', n, add }); }
+    for (const c of s.checkpoints) {
+      if (c.got || m.y <= c.y) continue;
+      c.got = true;
+      const n = s.line.length;
+      const scares = s.scatters - s.lastPadScatters;
+      const add = Math.max(1, checkGain(n) - scares * 4);
+      s.lastPadScatters = s.scatters;
+      s.time += add;
+      s.score += 20 * n * (n + 1) / 2 + 10;
+      s.events.push({ type: 'check', n, add, scares });
+    }
   }
   // home
   if (s.nest && !s.home && Math.hypot(m.x - s.nest.x, m.y - s.nest.y) < NEST_R - 0.02) { s.home = true; s.events.push({ type: 'home' }); }
-  if (s.home && s.line.length === 0) { s.score += Math.floor(Math.max(0, s.time - s.t)) * 2 + 25 * s.hearts; end(s, 'nest', 'home'); return s; }
-  if (!s.home && s.t >= s.time) end(s, 'lost-all', 'dusk');
+  if (s.t >= s.time) { end(s, 'lost-all', 'dusk'); return s; }
+  if (s.home && s.line.length === 0) {
+    const enough = s.arrived.length >= LEVELS[s.stage].need;
+    s.score += 25 * s.hearts;
+    end(s, enough ? 'nest' : 'lost-all', enough ? 'home' : 'short');
+  }
   return s;
 }
 function end(s, outcome, why) {
@@ -460,8 +512,10 @@ function end(s, outcome, why) {
 
 export function stars(s) {
   if (s.endless || s.over !== 'nest') return 0;
-  const par = STAGES[s.stage].par, n = s.arrived.length;
-  return n >= par[2] ? 3 : n >= par[1] ? 2 : n >= par[0] ? 1 : 0;
+  const n = s.arrived.length;
+  if (n === s.total && !s.hits && !s.scatters) return 3;
+  if (n >= Math.max(LEVELS[s.stage].need, s.total - 1) && (n > LEVELS[s.stage].need || n === s.total)) return 2;
+  return 1;
 }
 export function timeLeft(s) { return Math.max(0, s.time - s.t); }
 export function progress(s) { return s.nest ? clamp((s.mom.y - 0.35) / (s.nest.y - 0.35), 0, 1) : 0; }

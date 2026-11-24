@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#2f5a2a">
+<title>Ant Hide</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #24451f; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { font: 16px/1.4 ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif; color: #fff8e6; }
+  canvas#c { display: block; width: 100vw; height: 100dvh; }
+  .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: #14280fd9; overflow-y: auto; touch-action: pan-y; }
+  .screen.on { display: grid; }
+  .screen > div { max-width: 24em; width: calc(100% - 1.6em); padding: .8em; box-sizing: border-box; }
+  h1 { font-size: 2.3em; margin: 0 0 .1em; color: #ffe08a; text-shadow: 0 3px 0 #5a3a0c; letter-spacing: .02em; }
+  h2 { font-size: 1.5em; margin: 0 0 .3em; color: #ffe08a; }
+  p { margin: .4em 0; }
+  button { font: inherit; color: #fff8e6; background: #ffffff1c; border: 2px solid #ffe08a99; border-radius: 16px; padding: .55em 1.1em; margin: .3em; min-height: 48px; min-width: 9em; touch-action: manipulation; cursor: pointer; }
+  button.main { background: #ffb42a; color: #33200a; border-color: #ffb42a; font-size: 1.2em; font-weight: bold; }
+  button:active { transform: scale(.97); }
+  .opts { display: flex; gap: 8px; justify-content: center; }
+  .opt { flex: 1 1 0; min-width: 0; margin: 0; padding: .5em .2em; display: flex; flex-direction: column; align-items: center; line-height: 1.25; }
+  .opt canvas { width: 84px; height: 84px; }
+  .opt b { font-size: 1.05em; color: #ffe08a; }
+  .opt small { opacity: .9; font-size: .8em; }
+  #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); right: calc(64px + env(safe-area-inset-right)); display: none; pointer-events: none; text-shadow: 0 1px 4px #000; }
+  #bar { height: 16px; border-radius: 9px; background: #00000066; border: 2px solid #fff8e6aa; overflow: hidden; }
+  #fill { height: 100%; width: 0; background: linear-gradient(#ffe23a, #ffb42a); transition: width .15s; }
+  #who { font-size: 17px; font-weight: bold; margin-top: 3px; }
+  #gen { font-size: 13px; opacity: .85; }
+  #pause { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); width: 46px; height: 46px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; font-weight: bold; }
+  #say { position: fixed; left: 0; right: 0; top: 22%; text-align: center; font-size: 22px; font-weight: bold; pointer-events: none; opacity: 0; transition: opacity .3s; text-shadow: 0 2px 6px #000; padding: 0 1em; }
+  #say.on { opacity: 1; }
+  .exp { font-size: .9em; opacity: .9; } .exp a { color: #ffe08a; }
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Meadow"></canvas>
+<div id="hud"><div id="bar"><div id="fill"></div></div><div id="who"></div><div id="gen"></div></div>
+<button id="pause" aria-label="Pause">II</button>
+<div id="say" role="status"></div>
+
+<div id="menu" class="screen on"><div>
+  <h1>Ant Hide</h1>
+  <p>Eat smaller animals to grow. Hide in tall grass or duck behind rocks to break a hunter’s line of sight.</p>
+  <canvas id="hero" width="240" height="150" style="width:160px;height:100px" aria-hidden="true"></canvas>
+  <p><button id="continue" class="main">Play</button></p>
+  <p><button id="fresh">New game as an Ant</button></p>
+  <p><button id="sound"></button></p>
+  <p class="exp"><a href="/ant-promotion/">Back to the main game</a></p>
+</div></div>
+
+<div id="evolve" class="screen"><div>
+  <h2>Promotion!</h2>
+  <p>Pick what you become.</p>
+  <div class="opts" id="opts"></div>
+</div></div>
+
+<div id="dead" class="screen"><div>
+  <h2 id="deadSay"></h2>
+  <p id="deadMore"></p>
+  <p><button id="goOn" class="main"></button></p>
+  <p><button id="restart">Start again as an Ant</button></p>
+  <p><button class="toMenu">Menu</button></p>
+</div></div>
+
+<div id="paused" class="screen"><div>
+  <h2>Paused</h2>
+  <p><button id="resume" class="main">Keep playing</button></p>
+  <p><button id="pauseSound"></button></p>
+  <p><button class="toMenu">Menu</button></p>
+</div></div>
+
+<div id="win" class="screen"><div>
+  <h2>Top of the food chain!</h2>
+  <p><button id="winOn" class="main">Keep roaming</button></p>
+  <p><button id="winNew">Start again as an Ant</button></p>
+</div></div>
+
+<script type="module">
+import { FORMS, ANT, WORLD, create, step, choose, revive, me, level, needFor, article, powerOf, visibilityPolygon } from './sim.js';
+import { drawForm, setLook } from '../../ant-promotion/art.js';
+import { readJson, writeJson } from '../../kit/save.js';
+import { sound } from '../../kit/audio.js';
+import { onLeave, isPauseKey } from '../../kit/pause.js';
+import { screens } from '../../kit/screens.js';
+import { stick } from '../../kit/stick.js';
+import { hint } from '../../kit/hint.js';
+
+const $ = id => document.getElementById(id);
+const cv = $('c'), g = cv.getContext('2d');
+const KEY = 'ant-hide:v1', query = new URLSearchParams(location.search);
+const saved = readJson(KEY);
+const save = { stack: [ANT], xp: 0, sound: true, escaped: false, ...saved };
+if (!Array.isArray(save.stack) || !save.stack.length || save.stack.some((id, i) => FORMS[id]?.level !== i + 1)) {
+  save.stack = [ANT];
+  save.xp = 0;
+}
+const played = saved !== null;
+const store = () => writeJson(KEY, save);
+const skin = { c: '#3a2a22', p: 'plain' };
+setLook(1);
+
+let s = null, mode = 'menu', W = 0, H = 0, dpr = 1, zoom = 1, last = 0, acc = 0, sayTimer = 0;
+let ticks = 0;
+const keys = new Set();
+const snd = sound({ on: () => save.sound });
+const cards = screens(['menu', 'evolve', 'dead', 'paused', 'win']);
+
+function soundLabel() {
+  const label = save.sound ? 'Sound on' : 'Sound off';
+  $('sound').textContent = $('pauseSound').textContent = label;
+  $('sound').ariaPressed = $('pauseSound').ariaPressed = String(save.sound);
+}
+function saveProgress() {
+  if (!s || s.dead) return;
+  save.stack = s.player.stack.slice();
+  save.xp = s.player.xp;
+  store();
+}
+function show(name) {
+  mode = name;
+  cards(name);
+  $('hud').style.display = name === 'play' || name === 'paused' ? 'block' : 'none';
+  $('pause').style.display = name === 'play' ? 'block' : 'none';
+  if (name === 'menu') {
+    const continuing = save.stack.length > 1 || save.xp > 0;
+    $('continue').textContent = continuing ? `Continue as ${article(FORMS[save.stack.at(-1)].name)}` : 'Play';
+    $('fresh').hidden = !continuing;
+    portrait($('hero'), FORMS[save.stack.at(-1)], 30);
+  }
+  soundLabel();
+  if (name === 'paused') {
+    saveProgress();
+    snd.hold();
+  } else snd.release();
+  if (name !== 'play') $('say').classList.remove('on');
+  pad.drop();
+  keys.clear();
+  acc = last = 0;
+}
+
+function portrait(canvas, F, r, t = 0) {
+  const x = canvas.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, canvas.width, canvas.height);
+  const wide = F.kind === 'bird' ? 2.3 : F.kind === 'snake' ? (F.f.long ? 3.2 : 2.2) : 2.2, fit = Math.min(r, canvas.height / 2 / wide * 1.9, canvas.width / 2 / wide);
+  x.translate(canvas.width / 2 + (F.kind === 'snake' ? fit * 1.6 : F.kind === 'quad' ? fit * 0.4 : 0), canvas.height / 2); x.rotate(-0.25);
+  drawForm(x, F, fit, t, skin, -0.25);
+}
+function hud() {
+  $('fill').style.width = Math.min(100, 100 * s.player.xp / needFor(level(s))) + '%';
+  $('who').textContent = `Level ${level(s)} · ${me(s).name}`;
+  $('gen').textContent = s.hidden ? 'In tall grass' : '';
+}
+function say(text) {
+  $('say').textContent = text;
+  $('say').classList.add('on');
+  sayTimer = 2.6;
+}
+function start(fresh) {
+  if (fresh) {
+    save.stack = [ANT];
+    save.xp = 0;
+  }
+  const seed = query.has('seed') ? Number(query.get('seed')) : Math.random() * 1e9 | 0;
+  s = create(Number.isFinite(seed) ? seed : 1, save.stack, save.xp);
+  ticks = 0;
+  saveProgress();
+  snd.unlock();
+  show('play');
+  hud();
+}
+function offer() {
+  const box = $('opts');
+  box.replaceChildren();
+  s.choosing.forEach((F, i) => {
+    const button = document.createElement('button');
+    button.className = 'opt';
+    const picture = document.createElement('canvas');
+    picture.width = picture.height = 168;
+    picture.ariaHidden = 'true';
+    portrait(picture, F, 34);
+    const title = document.createElement('b');
+    title.textContent = F.name;
+    const details = document.createElement('small');
+    details.textContent = `Power ${F.power} · ${F.pace}`;
+    button.append(picture, title, details);
+    button.onclick = () => {
+      choose(s, i);
+      saveProgress();
+      snd.tone(520, 0.3, 0.14, 'triangle', 500);
+      hud();
+      show('play');
+    };
+    box.append(button);
+  });
+  show('evolve');
+}
+function died() {
+  const d = s.dead;
+  $('deadSay').textContent = `Caught by ${article(d.to)}`;
+  $('deadMore').textContent = d.level > 1 ? `You drop to level ${d.level - 1}.` : 'Try using a rock or tall grass to get away.';
+  save.stack = s.player.stack.slice(0, Math.max(1, s.player.stack.length - 1));
+  save.xp = 0;
+  store();
+  $('goOn').textContent = `Try again as ${article(FORMS[save.stack.at(-1)].name)}`;
+  $('restart').hidden = d.level <= 2;
+  snd.noise(0.22, 0.3, 700);
+  show('dead');
+}
+function back(restart) {
+  revive(s, restart);
+  saveProgress();
+  hud();
+  show('play');
+}
+
+$('continue').onclick = () => start(false);
+$('fresh').onclick = () => start(true);
+$('sound').onclick = $('pauseSound').onclick = () => {
+  save.sound = !save.sound;
+  store();
+  soundLabel();
+  if (save.sound && mode !== 'paused') snd.tone(660);
+};
+for (const b of document.querySelectorAll('.toMenu')) b.onclick = () => {
+  saveProgress();
+  s = null;
+  show('menu');
+};
+$('goOn').onclick = () => back(false);
+$('restart').onclick = () => back(true);
+$('pause').onclick = () => show('paused');
+$('resume').onclick = $('winOn').onclick = () => show('play');
+$('winNew').onclick = () => start(true);
+
+const pad = stick(cv, { when: () => mode === 'play', reach: 55, leash: 70, dead: 0.15 }); // experiments/kit/stick.js
+hint(cv, { kind: 'stick', key: 'ant-hide:hint', when: () => mode === 'play', played });
+addEventListener('keydown', e => { if (isPauseKey(e)) { if (mode === 'play') show('paused'); else if (mode === 'paused') show('play'); return; } keys.add(e.key.toLowerCase()); if (e.key.startsWith('Arrow')) e.preventDefault(); });
+addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+addEventListener('blur', () => keys.clear());
+onLeave(() => { if (mode === 'play') show('paused'); });
+addEventListener('contextmenu', e => e.preventDefault());
+function input() {
+  let { x, y } = pad.vector();
+  if (keys.has('arrowleft') || keys.has('a')) x -= 1; if (keys.has('arrowright') || keys.has('d')) x += 1;
+  if (keys.has('arrowup') || keys.has('w')) y -= 1; if (keys.has('arrowdown') || keys.has('s')) y += 1;
+  return { x, y };
+}
+
+function resize() { dpr = Math.min(3, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+addEventListener('resize', resize); resize();
+const hash = (x, y) => { let h = x * 374761393 + y * 668265263 | 0; h = (h ^ h >>> 13) * 1274126177 | 0; return ((h ^ h >>> 16) >>> 0) / 4294967296; };
+
+function ground(cx, cy) {
+  g.fillStyle = '#24451f'; g.fillRect(-W, -H, W * 3, H * 3);
+  const x0 = cx - W / 2 / zoom, y0 = cy - H / 2 / zoom, x1 = cx + W / 2 / zoom, y1 = cy + H / 2 / zoom;
+  g.save(); g.scale(zoom, zoom); g.translate(-x0, -y0);
+  g.fillStyle = '#6fa558'; g.fillRect(0, 0, WORLD, WORLD);
+  const cell = 90;
+  for (let gx = Math.max(0, Math.floor(x0 / cell)); gx <= Math.min(WORLD / cell - 1, Math.floor(x1 / cell)); gx++) for (let gy = Math.max(0, Math.floor(y0 / cell)); gy <= Math.min(WORLD / cell - 1, Math.floor(y1 / cell)); gy++) {
+    const a = hash(gx, gy), b = hash(gy + 77, gx + 13), x = (gx + 0.15 + a * 0.7) * cell, y = (gy + 0.15 + b * 0.7) * cell;
+    if ((gx + gy) % 2 === 0) { g.fillStyle = '#69a053'; g.fillRect(gx * cell, gy * cell, cell, cell); }
+    if (a < 0.45) { g.strokeStyle = '#4f8a40'; g.lineWidth = 2; g.lineCap = 'round'; g.beginPath(); for (const k of [-5, 0, 5]) { g.moveTo(x + k, y); g.lineTo(x + k * 1.6, y - 9 - b * 5); } g.stroke(); }
+    else if (a < 0.6) { g.fillStyle = '#a8a89a'; g.beginPath(); g.ellipse(x, y, 7 + b * 6, 5 + b * 4, a * 6, 0, 7); g.fill(); }
+    else if (a < 0.72) { g.fillStyle = b < 0.5 ? '#f2e23a' : '#f2a6c6'; for (let k = 0; k < 5; k++) { g.beginPath(); g.arc(x + Math.cos(k * 1.257) * 4, y + Math.sin(k * 1.257) * 4, 2.6, 0, 7); g.fill(); } g.fillStyle = '#fff8e6'; g.beginPath(); g.arc(x, y, 2, 0, 7); g.fill(); }
+  }
+  g.strokeStyle = '#3a2a1a'; g.lineWidth = 8; g.strokeRect(-4, -4, WORLD + 8, WORLD + 8);
+}
+
+function label(x, y, text, colour, size) {
+  g.font = `bold ${size}px ui-rounded, 'Arial Rounded MT Bold', system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  g.lineWidth = Math.max(3, size / 4.5); g.strokeStyle = '#0b1408cc'; g.lineJoin = 'round'; g.strokeText(text, x, y); g.fillStyle = colour; g.fillText(text, x, y);
+}
+
+function visible(a, p, margin = 0) {
+  return Math.abs(a.x - p.x) < W / zoom / 2 + margin && Math.abs(a.y - p.y) < H / zoom / 2 + margin;
+}
+
+function drawGrass(p) {
+  for (const a of s.grass) {
+    if (!visible(a, p, a.r)) continue;
+    g.fillStyle = '#3e703f';
+    g.strokeStyle = '#355e31';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.arc(a.x, a.y, a.r, 0, 2 * Math.PI);
+    g.fill();
+    g.stroke();
+    for (let i = 0; i < Math.ceil(a.r); i++) {
+      const angle = i * 2.399963, spread = (a.r - 4) * Math.sqrt(hash(i + 7, 32));
+      const x = a.x + Math.cos(angle) * spread, y = a.y + Math.sin(angle) * spread;
+      g.strokeStyle = i % 3 === 0 ? '#b2c872' : '#78a457';
+      g.beginPath();
+      g.moveTo(x, y);
+      g.quadraticCurveTo(x - 3, y - 6, x - 7, y - 10);
+      g.moveTo(x, y);
+      g.quadraticCurveTo(x + 1, y - 8, x + 4, y - 13);
+      g.stroke();
+    }
+  }
+}
+
+function drawRock(a) {
+  g.save();
+  g.translate(a.x, a.y);
+  g.fillStyle = '#2e3e2b66';
+  g.beginPath();
+  g.ellipse(3, 7, a.r * 1.04, a.r * 0.99, 0, 0, 7);
+  g.fill();
+  g.fillStyle = '#666d66';
+  g.strokeStyle = '#343f38';
+  g.lineWidth = 2;
+  g.beginPath();
+  g.arc(0, 0, a.r, 0, 7);
+  g.fill();
+  g.stroke();
+  g.fillStyle = '#a8ada0';
+  g.beginPath();
+  g.moveTo(-0.87 * a.r, -0.33 * a.r);
+  g.lineTo(-0.32 * a.r, -0.86 * a.r);
+  g.lineTo(0.45 * a.r, -0.79 * a.r);
+  g.lineTo(0.71 * a.r, -0.20 * a.r);
+  g.lineTo(0.27 * a.r, 0.14 * a.r);
+  g.lineTo(-0.51 * a.r, 0.26 * a.r);
+  g.closePath();
+  g.fill();
+  g.restore();
+}
+
+function eye(x, y, size) {
+  g.save();
+  g.translate(x, y);
+  g.scale(size / 16, size / 16);
+  g.beginPath();
+  g.moveTo(-10, 0);
+  g.quadraticCurveTo(0, -12, 10, 0);
+  g.quadraticCurveTo(0, 12, -10, 0);
+  g.closePath();
+  g.fillStyle = '#ffe088';
+  g.strokeStyle = '#38260d';
+  g.lineWidth = 2;
+  g.fill();
+  g.stroke();
+  g.fillStyle = '#38260d';
+  g.beginPath();
+  g.arc(0, 0, 2.8, 0, 7);
+  g.fill();
+  g.restore();
+}
+
+function draw(now) {
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (!s) {
+    g.fillStyle = '#3f6a34';
+    g.fillRect(0, 0, W, H);
+    return;
+  }
+  const p = s.player, F = me(s);
+  zoom = Math.sqrt(W * H) / (492 + 14 * level(s));
+  ground(p.x, p.y);
+  drawGrass(p);
+  for (const m of s.mobs) {
+    if (powerOf(m) <= F.power || !visible(m, p, 340)) continue;
+    const poly = visibilityPolygon(s, m);
+    if (!poly.length) continue;
+    g.beginPath();
+    g.moveTo(poly[0].x, poly[0].y);
+    for (const v of poly.slice(1)) g.lineTo(v.x, v.y);
+    g.closePath();
+    g.fillStyle = m.seesPlayer ? '#b4232366' : '#fff1bb5c';
+    g.strokeStyle = m.seesPlayer ? '#8d292a99' : '#fff1bb88';
+    g.lineWidth = 1.2;
+    g.fill();
+    g.stroke();
+  }
+  for (const a of s.rocks) if (visible(a, p, a.r + 8)) drawRock(a);
+  const size = Math.max(11, 15 / zoom);
+  for (const m of s.mobs) {
+    const M = FORMS[m.f];
+    if (!visible(m, p, M.r * 4 + 45)) continue;
+    const power = powerOf(m);
+    g.save();
+    g.translate(m.x, m.y);
+    g.rotate(m.a);
+    drawForm(g, M, M.r, m.ph, null, m.a);
+    g.restore();
+    const top = m.y - M.r * 1.5 - 4;
+    label(m.x, top, String(power), power < F.power ? '#b5ff92' : power > F.power ? '#ff9580' : '#fff8e6', size);
+    if (power > F.power) {
+      if (m.search > 0) label(m.x, top - size, '?', '#ffe088', size * 1.2);
+      else if (m.seesPlayer) eye(m.x, top - 1.5 * size, size);
+    }
+  }
+  if (!s.dead) {
+    g.save();
+    g.translate(p.x, p.y);
+    g.strokeStyle = '#fff8e6';
+    g.lineWidth = 2;
+    g.setLineDash([5, 5]);
+    g.beginPath();
+    g.arc(0, 0, F.r * 1.55, now / 900, now / 900 + 2 * Math.PI);
+    g.stroke();
+    g.setLineDash([]);
+    g.rotate(p.a);
+    g.globalAlpha = s.hidden ? 0.4 : 1;
+    drawForm(g, F, F.r, p.ph, skin, p.a);
+    g.restore();
+    label(p.x, p.y + F.r * 1.55 + size, String(F.power), '#ffffff', size);
+  }
+  g.restore();
+  const joy = pad.touch;
+  if (joy && mode === 'play') {
+    g.globalAlpha = 0.35;
+    g.strokeStyle = '#fff';
+    g.lineWidth = 3;
+    g.beginPath();
+    g.arc(joy.ox, joy.oy, 55, 0, 7);
+    g.stroke();
+    g.fillStyle = '#fff';
+    g.beginPath();
+    g.arc(joy.x, joy.y, 22, 0, 7);
+    g.fill();
+    g.globalAlpha = 1;
+  }
+}
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = last ? Math.min(0.1, (now - last) / 1000) : 0;
+  last = now;
+  if (mode === 'play') {
+    acc += dt;
+    const inp = input();
+    while (acc >= 1 / 60 && mode === 'play') {
+      acc -= 1 / 60;
+      step(s, inp);
+      ticks++;
+      for (const e of s.events) {
+        if (e.t === 'eat') {
+          snd.noise(0.10, 0.12, 2000);
+          snd.tone(420, 0.07, 0.08, 'triangle', 180);
+          saveProgress();
+        }
+        if (e.t === 'notice' && e.strong) snd.tone(210, 0.14, 0.08, 'triangle', -40);
+        if (e.t === 'escape' && !save.escaped) {
+          save.escaped = true;
+          store();
+          say('It lost you.');
+          snd.tone(530, 0.12, 0.08, 'triangle', 170);
+        }
+        if (e.t === 'full') offer();
+        if (e.t === 'die') died();
+        if (e.t === 'win') {
+          saveProgress();
+          show('win');
+        }
+      }
+    }
+    hud();
+    if (sayTimer > 0 && (sayTimer -= dt) <= 0) $('say').classList.remove('on');
+  }
+  draw(now);
+}
+
+addEventListener('pagehide', saveProgress);
+window.__ant = {
+  get s() { return s; },
+  get mode() { return mode; },
+  get input() { return input(); },
+  get save() { return save; },
+  get ticks() { return ticks; },
+  FORMS, me, level, step, powerOf,
+};
+show('menu');
+requestAnimationFrame(frame);
+
+</script>
+</body>
+</html>

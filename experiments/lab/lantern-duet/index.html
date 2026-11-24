@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#020306">
+<title>Lantern Duet</title>
+<style>
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: #020306; color: #f3e6cf; overflow: hidden; touch-action: none;
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { font: 16px/1.5 Georgia, 'Times New Roman', serif; }
+  canvas { display: block; width: 100vw; height: 100dvh; }
+  a { color: #ffd9a0; }
+  .control { position: fixed; top: 64px; bottom: 0; width: 50%; touch-action: none; }
+  #left { left: 0; }
+  #right { right: 0; }
+  .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: #020306c8; }
+  .screen.on { display: grid; }
+  .screen > div { max-width: 21em; width: calc(100% - 2em); padding: 1em; }
+  h1 { font-weight: normal; font-size: 2.3em; letter-spacing: .1em; margin: 0 0 .2em; color: #ffe0ab; text-shadow: 0 0 28px #ffb45a55; }
+  p { margin: .45em 0; opacity: .9; }
+  button { font: inherit; color: #ffe6bd; background: #ffffff10; border: 1.5px solid #ffd9a088; border-radius: 999px;
+    padding: .5em 1.2em; margin: .3em; min-height: 46px; touch-action: manipulation; }
+  button.main { background: #ffb45a; color: #2a1606; border-color: #ffb45a; font-size: 1.15em; min-width: 9em; }
+  button.line { background: none; border: 0; min-height: 44px; padding: .3em .6em; text-decoration: underline; color: #ffd9a0; }
+  #hud { position: fixed; top: calc(12px + env(safe-area-inset-top)); left: 14px; pointer-events: none; font: 15px sans-serif; color: #ffe5bb; }
+  #meter { width: 110px; height: 5px; margin-top: 6px; background: #ffffff22; }
+  #fill { display: block; height: 100%; background: #ffba69; }
+  #pause { position: fixed; right: 10px; top: calc(6px + env(safe-area-inset-top)); min-width: 0; padding: .3em .9em; }
+  #say { position: fixed; top: calc(62px + env(safe-area-inset-top)); left: 12px; right: 12px; text-align: center; pointer-events: none;
+    color: #ffe5bb; font-size: 1em; line-height: 1.25; text-shadow: 0 2px 8px #000, 0 0 3px #000; }
+  #labels { position: fixed; bottom: calc(14px + env(safe-area-inset-bottom)); width: 100%; display: flex;
+    justify-content: space-around; pointer-events: none; font: 11px sans-serif; letter-spacing: .12em; color: #d8c6a888; }
+  #divider { position: fixed; top: 64px; bottom: 0; left: 50%; width: 1px; background: linear-gradient(#ffffff00, #ffffff14 40%, #ffffff00); pointer-events: none; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="control" id="left" aria-label="Left boat drag area"></div>
+<div class="control" id="right" aria-label="Right boat drag area"></div>
+<div id="divider"></div>
+<div id="hud"><span id="status"></span><div id="meter"><i id="fill"></i></div></div>
+<button id="pause" aria-label="Pause" hidden>II</button>
+<div id="say" role="status"></div>
+<div id="labels" hidden><span>LEFT BOAT · A / D</span><span>RIGHT BOAT · ← / →</span></div>
+
+<div id="menu" class="screen on"><div>
+  <h1>Lantern Duet</h1>
+  <p>An experiment: two boats share one flame, and each thumb steers one boat. Spread the rope of light to sweep up embers; bring both boats past the same side of a rock before it snags the rope.</p>
+  <p id="best"></p>
+  <p><button id="play" class="main">Play</button></p>
+  <p id="nights"></p>
+  <p><button id="sound" class="line"></button></p>
+  <p><a href="/lantern/">Back to Lantern</a> · <a href="/lab/">All lab experiments</a></p>
+</div></div>
+
+<div id="card" class="screen"><div>
+  <h1 id="title"></h1>
+  <p id="line"></p>
+  <p id="sub"></p>
+  <p><button id="go" class="main">Play again</button></p>
+  <p><button id="home" class="line">Menu</button> <button id="sound2" class="line"></button></p>
+  <p><a href="/lantern/">Back to Lantern</a> · <a href="/lab/">All lab experiments</a></p>
+</div></div>
+<script type="module" src="./page.js"></script>
+</body>
+</html>

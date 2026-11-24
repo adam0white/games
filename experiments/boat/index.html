@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+    <meta name="theme-color" content="#23303a" />
+    <title>Paper Boat</title>
+    <style>
+      :root { --ink: #16242c; --paper: #f7f1e1; --gold: #ffc857; --aqua: #8fd8d2; --muted: #b9c8cb; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: #23303a; color: var(--paper);
+        touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+      body { font: 16px/1.4 ui-rounded, "Trebuchet MS", system-ui, sans-serif; }
+      #c { width: 100vw; height: 100dvh; display: block; touch-action: none; }
+      button { font: inherit; font-weight: 700; cursor: pointer; min-height: 48px; min-width: 48px; color: var(--paper);
+        border: 1px solid #ffffff40; background: #ffffff12; border-radius: 16px; padding: 11px 18px; touch-action: manipulation; }
+      button:active { transform: translateY(2px); }
+      button:focus-visible { outline: 3px solid var(--aqua); outline-offset: 3px; }
+      button.primary { background: var(--gold); color: var(--ink); border: 0; font-size: 21px; width: 100%; margin: 14px 0 8px;
+        box-shadow: 0 5px 0 #a8762a, 0 12px 28px #0004; }
+      button:disabled { opacity: 0.4; cursor: default; }
+      .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; overflow: auto; touch-action: pan-y;
+        padding: calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+        background: #0d1a22a6; }
+      .screen.on { display: flex; }
+      #menu { background: #0d1a2266; }
+      .card { position: relative; width: 100%; max-width: 350px; text-align: center; border: 1px solid #d8eadc33; border-radius: 28px; padding: 22px;
+        background: linear-gradient(150deg, #2c4652f7, #17303bfa); box-shadow: 0 28px 70px #0006; animation: pop 0.32s cubic-bezier(0.2, 1.4, 0.4, 1); }
+      @keyframes pop { from { transform: scale(0.86) translateY(14px); opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) { .card { animation: none; } }
+      .eyebrow { font-size: 14px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--aqua); font-weight: 700; margin: 0 0 8px; }
+      h1 { font-size: clamp(38px, 11vw, 50px); line-height: 1; letter-spacing: -0.04em; margin: 0 0 10px; font-weight: 900; }
+      h1 span { color: var(--gold); }
+      h2 { font-size: 30px; line-height: 1.1; margin: 0 0 12px; }
+      p { margin: 8px 0; }
+      .sub { color: var(--muted); }
+      .small { font-size: 14px; color: var(--muted); }
+      .row { display: flex; gap: 8px; margin: 10px 0; }
+      .row > * { flex: 1; }
+      #hero { width: 150px; height: 96px; display: block; margin: 0 auto 10px; animation: bob 2.6s ease-in-out infinite; }
+      @keyframes bob { 50% { transform: translateY(5px) rotate(-3deg); } }
+      #menuMore { display: none; }
+      .has-played #menuMore { display: block; }
+      #stars { font-size: 44px; letter-spacing: 8px; color: var(--gold); margin: 6px 0 10px; }
+      #stars i { font-style: normal; display: inline-block; opacity: 0.22; }
+      #stars i.on { opacity: 1; animation: star 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) backwards; }
+      #stars i.on:nth-child(2) { animation-delay: 0.18s; }
+      #stars i.on:nth-child(3) { animation-delay: 0.36s; }
+      @keyframes star { from { transform: scale(0) rotate(-90deg); } }
+      #big { font-size: 54px; font-weight: 900; color: var(--gold); line-height: 1; margin: 4px 0 10px; }
+      .stat { display: flex; justify-content: space-between; border-bottom: 1px solid #ffffff18; padding: 7px 0; }
+      .stat b { color: var(--aqua); }
+      #levels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 14px 0; }
+      #levels button { padding: 6px 0; border-radius: 12px; font-size: 18px; }
+      #levels small { display: block; font-size: 14px; color: var(--gold); letter-spacing: -1px; min-height: 20px; }
+      #pause { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: max(calc(10px + env(safe-area-inset-right)), calc((100vw - 560px) / 2));
+        padding: 0; width: 48px; height: 48px; background: #16242cc9; display: none; align-items: center; justify-content: center; border-radius: 16px; }
+      #pause:before { content: ""; height: 18px; width: 13px; border-left: 4px solid var(--paper); border-right: 4px solid var(--paper); }
+      #probe { position: fixed; visibility: hidden; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+      .lab-notice { font-size: 14px !important; line-height: 1.35 !important; color: var(--muted) !important; text-align: left; margin: 14px 0 0 !important; }
+      .lab-toggle { font-size: 14px !important; text-align: left; margin-top: 12px !important; }
+      .lab-toggle input { min-width: 48px; min-height: 48px; vertical-align: middle; }
+      .lab-toggle label { min-height: 48px; display: flex; align-items: center; }
+      .lab-toggle a, .lab-notice a { color: var(--aqua); }
+      @media (max-height: 700px) {
+        .card { padding: 16px; }
+        #hero { height: 64px; margin-bottom: 4px; }
+        h1 { font-size: 38px; }
+        .has-played #hero { display: none; }
+        button.primary { margin-top: 8px; }
+        #stars { font-size: 36px; margin: 2px 0 6px; }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" aria-label="A rain gutter. Swipe the water to push the paper boat. Tap to drop a pebble."></canvas>
+    <div id="probe"></div>
+    <button id="pause" aria-label="Pause"></button>
+    <div id="menu" class="screen on">
+      <div class="card">
+        <svg id="hero" viewBox="0 0 150 96" aria-hidden="true">
+          <ellipse cx="75" cy="80" rx="62" ry="9" fill="#8fd8d2" opacity="0.25" />
+          <path d="M12 56 L138 56 L108 82 L42 82 Z" fill="#f7f1e1" />
+          <path d="M12 56 L75 56 L42 82 Z" fill="#dcd4bf" />
+          <path d="M75 8 L112 56 L38 56 Z" fill="#fffaf0" />
+          <path d="M75 8 L75 56 L38 56 Z" fill="#e6dfcb" />
+          <circle cx="96" cy="50" r="7" fill="#e5484d" /><circle cx="101" cy="46" r="3" fill="#16242c" />
+          <circle cx="94" cy="50" r="1.6" fill="#16242c" /><circle cx="98" cy="53" r="1.4" fill="#16242c" />
+          <path d="M20 88 q10 -6 20 0 t20 0 t20 0 t20 0 t20 0 t20 0" stroke="#8fd8d2" stroke-width="3" fill="none" opacity="0.7" stroke-linecap="round" />
+        </svg>
+        <h1>Paper <span>Boat</span></h1>
+        <p class="sub">Swipe the water. Tap for a pebble.</p>
+        <button id="play" class="primary">Play</button>
+        <div id="menuMore">
+          <p id="bestLine" class="small"></p>
+          <div class="row"><button id="choose">Streets</button><button id="daily">Today's stream</button></div>
+        </div>
+      </div>
+    </div>
+    <div id="select" class="screen">
+      <div class="card">
+        <p class="eyebrow">Ten streets to the pond</p>
+        <h2>Streets</h2>
+        <div id="levels"></div>
+        <button id="selectBack">Back</button>
+      </div>
+    </div>
+    <div id="paused" class="screen">
+      <div class="card">
+        <p class="eyebrow">The rain waits</p>
+        <h2>Paused</h2>
+        <button id="resume" class="primary">Resume</button>
+        <div class="row"><button id="restart">Restart</button><button id="toMenu">Menu</button></div>
+        <button id="sound">Sound: on</button>
+      </div>
+    </div>
+    <div id="end" class="screen">
+      <div class="card">
+        <p class="eyebrow" id="endLabel">Street 1</p>
+        <h2 id="endTitle">The pond!</h2>
+        <div id="stars"><i>★</i><i>★</i><i>★</i></div>
+        <div id="big"></div>
+        <div class="stat"><span>Passengers</span><b id="endRiders">0 / 0</b></div>
+        <div class="stat"><span id="endStatName">Dry paper left</span><b id="endStat">100%</b></div>
+        <p id="endTip" class="small"></p>
+        <button id="next" class="primary">Next street</button>
+        <div class="row"><button id="again">Retry</button><button id="endMenu">Menu</button></div>
+      </div>
+    </div>
+    <script type="module" src="./main.js"></script>
+    <script src="/notes/button.js" defer></script>
+  </body>
+</html>

@@ -13,10 +13,12 @@ Shared code for the games under `experiments/`. It is served at `/kit/` as plain
 | `drag.js` | `drag(el, { playing, paused, resume, from, travel, aim, mouse, settle })`: steering by relative finger travel, with the settle distance after a pause; the game owns the gain |
 | `sides.js` | `sides(el, { on, playing, paused, resume })`: press the left or right half to steer, hold to keep turning (Lantern's first-person view) |
 | `hint.js` | `hint(el, { kind, key, when, played, delay, look, label, reach, bottom })`: help for a first-time player who does not touch: a see-through copy of the control with a finger showing how; see below |
+| `room.js` | `table({ game, version, name, onState, onMove, ... })`, `newCode`, `linkFor`, `codeFromLink`, `share`: a table for friends by four-letter code or link, no account, for turn-based games; see below |
 | `lab.js` | `lab(slug)`: play recording for the game lab, with its notice and off switch; see below |
 | `/notes/button.js` | the notes button for testers (it lives in `workers/feedback/public/notes/`) |
 | `check/phone.mjs` | phone runs of every live experiment, of the lab pages under `/lab/` and of this kit, on WebKit iPhone 13 and Chromium Pixel 7 |
 | `index.html` | a self-test page at `/kit/` |
+| `games.json` | the list of every game a tester can open; the notes page builds its games menu and game picker from it, and the phone check fails if an experiment is missing |
 
 ## Rules
 
@@ -55,6 +57,18 @@ hint(canvas, { kind: 'stick', key: '<slug>:hint', when: () => mode === 'play', p
 - `?hint=hand` or `?hint=ring` on any page that uses it shows it whatever the save says, with that look; `?hint=0` turns it off. This is how to see it on a phone that has played already.
 
 Used by: `ant-promotion` (stick, 3 s), `lantern` (drag, 1.5 s, low, because a boat left alone meets a rock in 3 to 9 s), `lab/ant-nemesis`, `lab/ant-wilds` (stick), `lab/lantern-3d` (drag), `borrowed` (tap, `bottom` as a function that finds a clear tile above the player), `ducklings` (hold-and-move, above Quack), `grapevine` (path, between the teller's row and the next) and Crumbwar (`workers/crumbwar`, stick, loaded from `/kit/hint.js` on the same origin, so it shows only once this site serves that file). In Borrowed, Follow Me and Grapevine the game's own first-level ghost finger waits while the shared hint shows. Not verified on a real phone.
+
+## Friends' tables (`room.js`)
+
+For a turn-based game two friends play on two phones. One player makes a code (`newCode()`), shares the link (`share(code)` uses the phone's share sheet, else copies `linkFor(code)`), and both pages call `t.open(code)`; a page opened with `?room=CODE` reads it with `codeFromLink()`. The server side is the `Table` object in `workers/lab-ai` (`/lab-api/table/<game>/<CODE>`); its README says what is stored and for how long.
+
+- **The server orders, the page judges.** A move is a short array of integers (`t.move([direction])`). The page applies a move only when `onMove(seat, ints, index)` hands it over, its own moves included. `onState` gives the whole game (seat, seed, seats, move list) on joining and after every reconnect: rebuild the game from the seed and replay the list.
+- **Check every move with the game's own `sim.js`** before applying it, and ignore one that is not legal. The server does not know the rules.
+- **The game must be listed** in `TABLE.games` in `workers/lab-ai/src/table.mjs`, and that Worker deployed. Raise `version` when the rules or the meaning of a move change: two pages on different versions are not seated together.
+- **Seats.** `onSeats` gives `[{ n, on } | null]`; show `on` as a light so a player sees a friend drop and return. The seat belongs to a key kept in this browser (`kit-room:<game>:<code>`), so the same phone gets its seat back for 24 hours.
+- **Status.** `onStatus`: `connecting`, `live`, `waiting` (lost, retrying by itself), `full`, `version`, `closed` (the seat was opened in another tab, or the table expired), `off`.
+- **Rematch.** `t.again()` votes; `onAgain(seat)` shows who has; `onGame({ game, seed })` starts the next game when every seat has voted.
+- **Never feed a shared board from a table.** Both pages know the seed, and the server does not check moves.
 
 ## Lab recording (`lab.js`)
 

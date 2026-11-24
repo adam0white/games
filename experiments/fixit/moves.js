@@ -30,7 +30,8 @@ const at = (type, p) => ({ type, x: p[0], y: p[1] });
 const onArc = (cx, cy, r, a) => [cx + r * Math.cos(rad(a)), cy + r * Math.sin(rad(a))];
 
 // One attempt at the job, from the finger's resting place `from`. A runner plays it, then asks again if the job is not done.
-export function plan(g, skill, from = [50, 110]) {
+// `lead` is how many seconds pass between reading the guide and starting the plan (a reaction pause), for timed jobs.
+export function plan(g, skill, from = [50, 110], lead = 0) {
   const v = skill.speed, air = p => wait(Math.hypot(p[0] - from[0], p[1] - from[1]) / v);
   switch (g.type) {
     case 'circle': {
@@ -39,7 +40,7 @@ export function plan(g, skill, from = [50, 110]) {
     }
     case 'drag': {
       const out = [...air(g.from), at('down', g.from), ...line(g.from, g.to, v)];
-      if (g.hold) for (let i = 0; i < 1.4 / DT; i++) out.push(at('move', g.to));
+      if (g.hold) for (let i = 0; i < (typeof g.hold === 'number' ? g.hold : 1.4) / DT; i++) out.push(at('move', g.to));
       out.push(at('up', g.to));
       return out;
     }
@@ -89,6 +90,25 @@ export function plan(g, skill, from = [50, 110]) {
       out.push(at('up', top));
       return out;
     }
+    case 'timing': { // one tap on the middle of the next open swing (a runner plans again for the next drop)
+      let t = g.mid - lead;
+      const travel = Math.hypot(g.at[0] - from[0], g.at[1] - from[1]) / v;
+      while (t < travel) t += g.period;
+      return [...wait(t), at('down', g.at), at('up', g.at)];
+    }
+    case 'zip': { // drag the tab up; at each snag, stop and wiggle side to side, then go on
+      const up = Math.min(v, g.rate - 10), out = [...air(g.at), at('down', g.at)];
+      let p = g.at;
+      for (const y of [...g.snags, g.top]) {
+        const q = [g.at[0], y];
+        out.push(...line(p, q, up), ...wait(2 * DT).map(() => at('move', q)));
+        p = q;
+        if (y === g.top) break;
+        for (const dx of [7, -7, 7, -7, 0]) { const w = [g.at[0] + dx, y]; out.push(...line(p, w, Math.min(v, 160))); p = w; }
+      }
+      out.push(at('up', p));
+      return out;
+    }
     case 'swipe': {
       const out = [...air(g.from), at('down', g.from)];
       for (let i = 0; i < 10; i++) out.push(...line(i % 2 ? g.to : g.from, i % 2 ? g.from : g.to, v));
@@ -117,6 +137,12 @@ export function ghost(g, t) {
       return { p: [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f], press: k < 0.9 };
     }
     case 'pump': { const m = Math.sin(k * Math.PI * 4 - Math.PI / 2) * 0.5 + 0.5; return { p: [g.x, g.top + 6 + m * (g.bottom - g.top)], press: true }; }
+    case 'timing': return { p: g.at, press: g.open >= 0.6, tap: true };
+    case 'zip': { // up to the first snag, a wiggle there, then on up
+      const y1 = g.snags.length ? g.snags[0] : g.top;
+      if (g.stuck) return { p: [g.at[0] + 7 * Math.sin(k * Math.PI * 8), g.at[1]], press: k < 0.92 };
+      const m = ease(Math.min(1, k / 0.7)); return { p: [g.at[0], g.at[1] + (y1 - g.at[1]) * m], press: k < 0.92 };
+    }
     case 'swipe': { const m = ease((k * 2) % 1), back = Math.floor(k * 2) % 2; const x = back ? g.to[0] + (g.from[0] - g.to[0]) * m : g.from[0] + (g.to[0] - g.from[0]) * m; return { p: [x, g.from[1]], press: true }; }
   }
   return { p: [50, 50], press: false };

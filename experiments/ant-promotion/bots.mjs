@@ -3,7 +3,7 @@
 // 5. the rival: a death makes one, it persists and gains power, no animal eats it, temperaments differ, it can be eaten
 import assert from 'node:assert/strict';
 import { SPAWN_WEIGHTS, HIDE_S, hideReady, SAME_FAST, FAST_CAP, crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENT_NAMES, NEM_STEP, NEM_MAX_BONUS, NEM_PRIZE, MOBS,
-  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY, TIRE, POUNCE, pounces, sightOf } from './sim.js';
+  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY, TIRE, POWER, powerFor, powerReady, POUNCE, pounces, sightOf } from './sim.js';
 const seeds = Number(process.argv[2] ?? 20), minutes = Number(process.argv[3] ?? 12);
 
 // 1. Rule table. Player: power 50, speed 124.
@@ -132,6 +132,63 @@ assert.equal(result['wild reckless/1'].hides + result['wild reckless/2'].hides, 
   assert.equal(n.tired, 0, 'the rival does not tire'); assert.equal(nm.alert, true);
 }
 console.log('wild rules: hide and hunt checks pass; hunters tire');
+{ // 4b. A power for every animal (note #148)
+  const named = n => FORMS.find(f => f.name === n), mob = (f, x, y, extra = {}) => ({ id: 1, f: f.id, x, y, a: Math.PI, alert: false, lost: 0, timer: 99, want: Math.PI, walk: false, ph: 0, ...extra });
+  assert.equal(powerFor(FORMS[ANT]), null, 'the Ant has no power'); for (const f of FORMS) if (f.level === 0) assert.equal(powerFor(f), null);
+  const labels = new Set(); for (const f of FORMS) if (f.level > 1) { const W = powerFor(f); assert.ok(W && POWER[W.kind] && W.cd > 0, `${f.name} has a power`); labels.add(W.kind + '/' + W.label); }
+  assert.ok(labels.size >= 30, `${labels.size} different power names`);
+  const as = (name, wild = false) => { const s = create(3, [ANT, named(name).id], 0, SPAWN_WEIGHTS, wild); s.player.safe = 0; s.mobs.length = 0; return s; };
+  // no input, no power: the sim is unchanged for the other bots
+  { const s = as('Wasp'); s.mobs.push(mob(named('Dog'), s.player.x + 60, s.player.y)); step(s, { x: 0, y: 0 }); assert.equal(s.powers, 0); assert.equal(s.player.cd || 0, 0); }
+  // sting: a stronger animal in reach is stunned, cannot bite, wakes up; then the wait runs down
+  { const s = as('Wasp'), p = s.player, dog = mob(named('Dog'), p.x + 60, p.y); s.mobs.push(dog);
+    step(s, { x: 0, y: 0, power: true }); assert.ok(dog.stun > 0 && !dog.alert, 'sting stuns the nearest animal'); assert.equal(s.powers, 1); assert.ok(Math.abs(p.cd - POWER.sting.cd) < 0.05);
+    assert.equal(powerReady(s), false); dog.x = p.x + 3; step(s, { x: 0, y: 0, power: true }); assert.equal(s.dead, null, 'a stunned animal cannot bite'); assert.equal(s.powers, 1, 'no second use while waiting');
+    for (let i = 0; i < 60 * POWER.sting.stun + 5; i++) { dog.x = p.x + 400; dog.y = p.y; if (!s.mobs.includes(dog)) s.mobs.push(dog); s.mobs.length = 1; step(s, null); } assert.ok(!(dog.stun > 0), 'the stun ends');
+    for (let i = 0; i < 60 * POWER.sting.cd; i++) step(s, null); assert.equal(powerReady(s), true, 'ready again after the wait'); }
+  { const s = as('Wasp'); step(s, { x: 0, y: 0, power: true }); assert.equal(s.powers, 0, 'a sting with nothing in reach is not spent'); assert.ok(s.player.cd <= 1); }
+  // leap: moves at once along the heading, safe in the air
+  { const s = as('Frog'), p = s.player; step(s, { x: 1, y: 0 }); const x0 = p.x; step(s, { x: 1, y: 0, power: true }); assert.ok(p.x - x0 > POWER.leap.jump, `a leap covers ${Math.round(p.x - x0)} units at once`); assert.ok(p.safe > 0); }
+  // shell: a bite does nothing while it lasts
+  { const s = as('Turtle'), p = s.player, big = mob(named('Bear'), p.x + 3, p.y); s.mobs.push(big); step(s, { x: 0, y: 0, power: true }); for (let i = 0; i < 60 * (POWER.shell.time - 0.2); i++) { big.x = p.x + 3; big.y = p.y; step(s, null); } assert.equal(s.dead, null, 'the shell holds');
+    for (let i = 0; i < 60 * POWER.shell.daze + 30 && !s.dead; i++) { big.x = p.x + 3; big.y = p.y; step(s, null); } assert.ok(s.dead, 'and then it does not, once the biter wakes'); }
+  // roar: weaker animals in reach freeze, stronger and far ones do not
+  { const s = as('Lion'), p = s.player; const near = mob(named('Cat'), p.x + 100, p.y), far = mob(named('Cat'), p.x + 600, p.y, { id: 2 }), strong = mob(named('Dragon'), p.x - 100, p.y, { id: 3, a: Math.PI / 2 }); s.mobs.push(near, far, strong);
+    step(s, { x: 0, y: 0, power: true }); assert.ok(near.stun > 0 && !(far.stun > 0) && !(strong.stun > 0), 'roar freezes weaker animals in reach only'); }
+  // dive and sprint: faster for a while; a dive also goes unseen
+  for (const [name, kind] of [['Eagle', 'dive'], ['Cheetah', 'sprint']]) {
+    const s = as(name), p = s.player, F = me(s); step(s, { x: 1, y: 0 }); let x0 = p.x; step(s, { x: 1, y: 0 }); const plain = p.x - x0; x0 = p.x; step(s, { x: 1, y: 0, power: true }); x0 = p.x; step(s, { x: 1, y: 0 });
+    assert.ok(Math.abs((p.x - x0) / plain - POWER[kind].speed) < 0.01, `${kind}: ${POWER[kind].speed} times the speed`);
+    const watcher = mob(named('Dragon'), p.x + 60, p.y); s.mobs.push(watcher); step(s, { x: 0, y: 0 }); assert.equal(watcher.alert, kind !== 'dive', kind === 'dive' ? 'nothing notices a diving bird' : 'a sprinter is still seen');
+    for (let i = 0; i < 60 * POWER[kind].time + 2; i++) { s.mobs.length = 0; step(s, null); } x0 = p.x; step(s, { x: 1, y: 0 }); assert.ok(Math.abs(p.x - x0 - plain) < 1e-6, 'and then the plain speed again');
+  }
+  // hunting uses: a leap pins weaker animals where it lands and no others; a sprint catches prey that is faster and has noticed; a bitten shell dazes the biter
+  { const s = as('Frog'), p = s.player; step(s, { x: 1, y: 0 }); const d = POWER.leap.jump + me(s).r * 3, prey = mob(named('Beetle'), p.x + d + 20, p.y, { alert: true }), far = mob(named('Beetle'), p.x + d + 200, p.y, { id: 2 }), big = mob(named('Bear'), p.x + d + 20, p.y + 30, { id: 3, a: 0 }); s.mobs.push(prey, far, big);
+    step(s, { x: 1, y: 0, power: true }); assert.ok(prey.stun > 0 && !(far.stun > 0) && !(big.stun > 0), 'a leap pins weaker animals by the landing only'); }
+  for (const boosted of [false, true]) { const s = as('Panther'), p = s.player, F = me(s), quick = FORMS.filter(f => f.power < F.power && f.speed > F.speed && f.speed < F.speed * POWER.sprint.speed).pop(); assert.ok(quick, 'there is prey faster than a Panther');
+    const m = mob(quick, p.x + 2, p.y, { alert: true, timer: 99 }); s.mobs.push(m); const n = s.eaten; step(s, { x: 0, y: 0, power: boosted }); m.x = p.x + 2; m.y = p.y; if (s.mobs.includes(m)) step(s, { x: 0, y: 0 });
+    assert.equal(s.eaten - n, boosted ? 1 : 0, boosted ? 'a sprinting Panther catches faster prey' : 'a plain Panther does not'); }
+  { const s = as('Turtle'), p = s.player, big = mob(named('Bear'), p.x + 3, p.y, { alert: true }); s.mobs.push(big); step(s, { x: 0, y: 0, power: true }); big.x = p.x + 3; big.y = p.y; step(s, null); assert.ok(big.stun > 0 && !s.dead, 'biting a shell dazes the biter'); }
+  // found by a second reviewer: a leap pressed with a new direction goes that way; a stunned hunter does not eat its prey; a promotion ends the old animal's sprint
+  { const s = as('Frog'), p = s.player; step(s, { x: 1, y: 0 }); const x0 = p.x, y0 = p.y; step(s, { x: 0, y: 1, power: true }); assert.ok(p.y - y0 > POWER.leap.jump && Math.abs(p.x - x0) < 1, 'the leap follows the stick of the same step'); }
+  { const s = as('Wasp'), p = s.player, hunter = mob(named('Dog'), p.x + 60, p.y), prey = mob(named('Beetle'), p.x + 62, p.y, { id: 2 }); hunter.chase = prey; s.mobs.push(hunter, prey); const n = s.mobEats;
+    step(s, { x: 0, y: 0, power: true }); for (let i = 0; i < 30; i++) { hunter.chase = prey; step(s, null); } assert.ok(hunter.stun > 0); assert.equal(s.mobEats, n, 'a stunned hunter does not eat'); }
+  { const s = as('Cheetah'), p = s.player; step(s, { x: 1, y: 0, power: true }); s.choosing = optionsFor(3); choose(s, 0); assert.ok(!(p.boost > 0) && !(p.veil > 0), 'a promotion ends the old sprint'); }
+  // a promotion and a revive both reset the wait
+  { const s = as('Wasp'); s.mobs.push(mob(named('Dog'), s.player.x + 60, s.player.y)); step(s, { x: 0, y: 0, power: true }); s.choosing = optionsFor(3); choose(s, 0); assert.equal(s.player.cd, 0); }
+  // a bot that uses its power when a hunter has noticed it, or (roar) when two weaker animals are close
+  const withPower = s => { const inp = careful(s); if (powerReady(s)) { const p = s.player, F = me(s), W = powerFor(F); let danger = false, prey = 0;
+      for (const m of s.mobs) { const d = Math.hypot(m.x - p.x, m.y - p.y); if (powerOf(m) > F.power && m.alert && d < 130) danger = true; if (powerOf(m) < F.power && d < 200) prey++; }
+      inp.power = W.kind === 'roar' ? prey >= 2 : danger; } return inp; };
+  for (const wild of [false, true]) for (const pick of [0, 1, 2]) { const tops = [], deaths = []; let used = 0;
+    for (let seed = 1; seed <= seeds; seed++) { const s = create(seed, [ANT], 0, SPAWN_WEIGHTS, wild); let top = 1, dead = 0;
+      for (let i = 0; i < minutes * 3600; i++) { step(s, withPower(s)); if (s.choosing) choose(s, pick); if (s.dead) { dead++; revive(s, false); } top = Math.max(top, level(s)); if (s.won) break; }
+      tops.push(top); deaths.push(dead); used += s.powers; }
+    const med = a => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
+    console.log(`${wild ? 'WILD   ' : 'classic'} careful with powers, always picks ${['strong', 'fast', 'sneaky'][pick]}: highest level median ${med(tops)}, deaths median ${med(deaths)}, powers used/run ${Math.round(used / seeds)}`);
+    assert.ok(used > 0, 'the bot used its power'); }
+}
+console.log('powers: every promoted animal has one; sting, leap, shell, roar, dive and sprint checks pass');
 { // picking the same kind again builds on it
   const fast = l => optionsFor(l)[1].id, sneak = l => optionsFor(l)[2].id;
   const one = me(create(1, [ANT, optionsFor(1)[0].id, fast(2)])), three = me(create(1, [ANT, fast(1), fast(2)])), sn = me(create(1, [ANT, sneak(1), sneak(2)]));

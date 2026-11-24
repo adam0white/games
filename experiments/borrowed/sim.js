@@ -2,16 +2,23 @@
 //
 // You have forgotten who you are. A run is one life told in three chapters: the child, the grown-up and the old one,
 // each on its own island, all lit by one candle. In each chapter six faces could be you. Memories lie around the
-// island; each one shows one thing about you (your hat, what you held, your pet, where you lived); the broken mirror
-// shows two. Most are locked, and each lock needs an ability. Every use of an ability burns years off the candle, and
+// island. Most are locked, and each lock needs an ability. Every use of an ability burns years off the candle, and
 // the years left carry into the next chapter. Name all three selves before the candle goes out.
 //
-//   const s = newRun(seed)                 a run; the same seed gives the same islands, faces and answers
+// Each memory opens a pair of photographs. Exactly one lies. Compare the prints with a held fact,
+// a candidate face or an exposed witness seal, or match two torn edges. A wrong tap costs PICK
+// years, "Show me" costs SHOW years, and "Later" leaves the memory on the island.
+// With opts.lies === false (the page's ?lies=0), a memory is yours as soon as you reach it.
+//
+//   const s = newRun(seed)                 a run; the same seed gives the same islands, faces, answers and puzzles
 //   walkTo(s, x, y)                        walk to a tile (or as near as the island allows)
 //   ready(s, id)                           true when ability id has something to act on here
 //   use(s, id)                             spend its cost and act; with nothing to act on it does nothing and costs nothing
-//   step(s)                                one tick of 1/60 s
-//   guess(s, i)                            name face i; a wrong name costs WRONG years; ends the chapter (and after the
+//   step(s)                                one tick of 1/60 s (nothing moves or burns while a puzzle is open)
+//   pickLie(s, i)                          in an open puzzle, say picture i lies
+//   showMe(s)                              in an open puzzle, pay SHOW years to be shown the lie
+//   later(s)                               close the puzzle; the memory stays open on the island
+//   guess(s, i)                            name face i; a wrong name costs wrongCost(s) years; ends the chapter (and after the
 //                                          third, the run)
 //   nextChapter(s)                         after a named chapter: build the next island
 //   s.events                               what happened since the page last emptied it
@@ -20,8 +27,11 @@
 
 export const DT = 1 / 60;
 export const LIFE = 150; // years on the candle at the start of the run
-export const BURN = 0.15; // years a second while you walk and look; frozen on the picture-choice screen, between chapters and on pause
-export const WRONG = 15; // years a wrong name costs
+export const BURN = 0.15; // years a second while you walk and look; frozen on the puzzles, the picture choice, between chapters and on pause
+export const WRONG = 30; // years a wrong name costs with puzzles
+export const wrongCost = s => s.lies ? WRONG : 15;
+export const PICK = 12; // years a wrong pick in a puzzle costs (you said a true picture lies)
+export const SHOW = 5; // years "Show me" costs; below PICK / 2, so a blind tap never beats paying
 export const SELF_POINTS = 100; // points for each self named right; each right name keeps one third of the 10-points-per-year bonus
 export const SPEED = 3.2; // tiles a second
 export const LEAP_TICKS = 32;
@@ -32,7 +42,7 @@ export const ABILITIES = [
   { id: 'glow', name: 'Light', cost: 10 },
   { id: 'push', name: 'Push', cost: 13 },
   { id: 'leap', name: 'Leap', cost: 16 },
-  { id: 'rewind', name: 'Rewind', cost: 20 }, // the mirror shows two kinds of memory
+  { id: 'rewind', name: 'Rewind', cost: 20 }, // the mirror holds the biggest memory
 ];
 export const COST = Object.fromEntries(ABILITIES.map(a => [a.id, a.cost]));
 // Which ability opens which lock.
@@ -122,6 +132,7 @@ export const ISLANDS = [
 //  - the child: no mirror, and any two faces differ in at least two kinds, so one memory often settles it;
 //  - the grown-up: every lock, and two faces may differ in a single kind;
 //  - the old one: no free memory (every clue costs years) and the candle burns faster.
+// With lies, each chapter also brings one new kind of puzzle (see makePuzzles).
 // Each run deals the three islands to the three chapters in a random order, so the island shapes vary too.
 export const CHAPTERS = [
   { id: 'child', name: 'Child', apart: 2, drop: 'M', burn: 1 },
@@ -194,15 +205,111 @@ export function consistent(faces, known) {
   return out;
 }
 
+// ---------------------------------------------------------------- the puzzles: which picture lies?
+// A picture (fragment) is { dims, vals }: two kinds of you and a value for each. Exactly one picture of a puzzle lies:
+// it does not fit the true you. Every other picture fits.
+export const fits = (face, frag) => frag.dims.every((d, k) => face[d] === frag.vals[k]);
+// The picture that would lie if this face were you: its index, or -1 when no picture or more than one would lie
+// (then this face cannot be you).
+export function liarFor(face, frags) {
+  let liar = -1;
+  for (let i = 0; i < frags.length; i++) {
+    if (fits(face, frags[i])) continue;
+    if (liar >= 0) return -1;
+    liar = i;
+  }
+  return liar;
+}
+// What a careful player can work out from what they know: the faces still in the running (known clues), the pictures,
+// and any picture already shown to be true (tried). Returns the lie's index when every face still possible points at
+// the same picture, else -1 (not yet decidable). It never looks at the answer.
+export function solveLie(faces, known, frags, tried = []) {
+  let found = -1;
+  for (const i of consistent(faces, known)) {
+    const l = liarFor(faces[i], frags);
+    if (l < 0 || tried[l]) continue;
+    if (found >= 0 && found !== l) return -1;
+    found = l;
+  }
+  return found;
+}
+// A matching tear identifies the good half. A signed photo can also be ruled out by a seal
+// already exposed on a lie. The index returned is always the rejected photograph, for every form.
+export function solvePuzzle(faces, known, puzzle, exposed = []) {
+  if (puzzle.form === 'torn') return puzzle.frags.findIndex(f => f.edge !== puzzle.edge);
+  const signed = puzzle.frags.findIndex(f => f.seal !== undefined && exposed.includes(f.seal));
+  return signed >= 0 ? signed : solveLie(faces, known, puzzle.frags, puzzle.tried);
+}
+
+const KINDS = [0, 1, 2, 3];
+const otherValue = (r, value) => shuffle(r, KINDS.filter(v => v !== value))[0];
+
+// The entry shows one kind, which always leaves at least two faces. Each of the other
+// kinds comes from a paid memory. Choose a rival who agrees on the entry kind. The rival's
+// dependent photo remains plausible until the parent tells the first kind they disagree on.
+function makePuzzles(r, ch, faces, answer, dimsOf) {
+  const self = faces[answer];
+  const entry = ch.id === 'old' ? 'push' : 'free';
+  const anchor = dimsOf[entry][0];
+  const rivals = shuffle(r, faces.filter((f, i) => i !== answer && f[anchor] === self[anchor]));
+  const rival = rivals.reduce((best, f) => hamming(f, self) > hamming(best, self) ? f : best);
+  const unseen = shuffle(r, KINDS.filter(d => d !== anchor));
+  const [first, next, spare] = unseen.sort((a, b) => Number(rival[b] !== self[b]) - Number(rival[a] !== self[a]));
+  const falseSeal = pick(r, 4);
+  const [parentSeal, dependentSeal] = shuffle(r, KINDS.filter(v => v !== falseSeal));
+
+  function pair(dims, falseValues, form = 'lie', trueSeal) {
+    const liar = pick(r, 2);
+    const good = { dims, vals: dims.map(d => self[d]) };
+    const bad = { dims, vals: falseValues };
+    const edge = pick(r, 4);
+    if (form === 'torn') {
+      good.edge = edge;
+      bad.edge = otherValue(r, edge);
+    } else if (form === 'signed') {
+      good.seal = trueSeal;
+      bad.seal = falseSeal;
+    }
+    const frags = [good];
+    frags.splice(liar, 0, bad);
+    return { form, frags, liar, dims, ...(form === 'torn' ? { edge } : {}) };
+  }
+
+  const out = {
+    [entry]: pair([anchor], [shuffle(r, KINDS.filter(v => !faces.some(f => f[anchor] === v)))[0]]),
+  };
+  const mismatch = d => otherValue(r, self[d]);
+  if (ch.id === 'child') {
+    for (const [lock, d] of [['push', first], ['leap', next], ['dark', spare]]) {
+      const witness = faces.find(f => f[anchor] !== self[anchor] && f[d] !== self[d]);
+      out[lock] = pair([anchor, d], witness ? [witness[anchor], witness[d]] : [mismatch(anchor), mismatch(d)]);
+    }
+  } else if (ch.id === 'grown') {
+    out.push = pair([first], [rival[first]], 'torn');
+    out.dark = pair([first, next], [rival[first], rival[next]]);
+    out.leap = pair([anchor, spare], [mismatch(anchor), mismatch(spare)]);
+    out.rewind = pair([first, spare], [rival[first], mismatch(spare)], 'torn');
+  } else {
+    const witness = faces.find(f => f[anchor] !== self[anchor] && f[first] !== self[first]);
+    const falseParent = witness ?? KINDS.map(d => d === anchor ? mismatch(anchor) : rival[d]);
+    out.leap = pair([anchor, first, spare], [falseParent[anchor], falseParent[first], falseParent[spare]], 'signed', parentSeal);
+    out.dark = pair([first, next], [rival[first], rival[next]], 'signed', dependentSeal);
+    out.rewind = pair([first, spare], [rival[first], mismatch(spare)], 'torn');
+  }
+  return out;
+}
+
 // A run: the islands' order is drawn from the seed; each chapter is drawn from its own seed, so a chapter is the same
-// whatever happened before it. opts.order forces the island order, opts.answers forces the answer of each chapter.
+// whatever happened before it. opts.order forces the island order, opts.answers forces the answer of each chapter,
+// opts.lies === false plays without the puzzles.
 export function newRun(seed, opts = {}) {
   const r = rng(seed);
   const order = opts.order ?? shuffle(r, [0, 1, 2]);
   const s = {
-    seed: seed >>> 0, order, opts: { answers: opts.answers ?? null }, chapter: 0, chapters: [],
+    seed: seed >>> 0, order, opts: { answers: opts.answers ?? null }, lies: opts.lies !== false, chapter: 0, chapters: [],
     life: LIFE, t: 0, status: 'play', score: 0, right: 0,
     used: { glow: 0, push: 0, leap: 0, rewind: 0 }, spent: 0, found: 0, tiles: 0, events: [],
+    puzzles: { found: 0, wrong: 0, shown: 0, later: 0, years: 0 }, open: null,
   };
   buildChapter(s, 0);
   return s;
@@ -226,9 +333,11 @@ function buildChapter(s, k) {
     ? { free: [freeDim], push: [rest[0]], leap: [rest[1]], dark: [rest[2]] }
     : { free: [freeDim], push: [lockDims[0]], leap: [lockDims[1]], dark: [lockDims[2]], rewind: [lockDims[3], second].sort() };
   // In the old chapter Push also holds the kind otherwise exclusive to the mirror.
-  // Light, Push and Leap now cover every kind, while Rewind remains a two-kind shortcut.
+  // Light, Push and Leap now cover every kind, while Rewind remains a shortcut.
   if (ch.id === 'old') dimsOf.push = [lockDims[0], lockDims[3]].sort();
   if (s.opts.answers) answer = s.opts.answers[k];
+  // The puzzles come after the answer is fixed and use their own random stream.
+  const puzzles = s.lies ? makePuzzles(rng(chapterSeed(s.seed, k) ^ 0x2f6b1d37), ch, faces, answer, dimsOf) : null;
 
   const rows = ISLANDS[tpl].map(row => (flip ? [...row].reverse().join('') : row).replaceAll(ch.drop || '@', '.'));
   const h = rows.length, w = rows[0].length;
@@ -244,7 +353,14 @@ function buildChapter(s, k) {
       if (c === ',') { dark[y * w + x] = 1; c = '.'; }
       if (LOCK_OF[c]) {
         const lock = LOCK_OF[c];
-        spots.push({ x, y, lock, dims: dimsOf[lock], taken: false, open: lock !== 'dark' && lock !== 'rewind' });
+        const spot = { x, y, lock, dims: dimsOf[lock], taken: false, open: lock !== 'dark' && lock !== 'rewind' };
+        if (puzzles) {
+          const z = puzzles[lock];
+          spot.dims = z.dims;
+          spot.puzzle = { ...z, tried: z.frags.map(() => false), seen: false, solved: false, how: null };
+          spot.snooze = false;
+        }
+        spots.push(spot);
         if (lock === 'dark') dark[y * w + x] = 1;
         c = '.';
       }
@@ -253,9 +369,9 @@ function buildChapter(s, k) {
   }
   Object.assign(s, {
     chapter: k, island: tpl, flip, w, h, grid, dark, lit, spots, pad, landing, burn: BURN * ch.burn,
-    faces, answer, known: [null, null, null, null], guessed: -1, status: 'play',
+    faces, answer, known: [null, null, null, null], exposed: [], guessed: -1, status: 'play', open: null,
     px: start.x + 0.5, py: start.y + 0.5, path: [], target: null, face: 1, anim: null, bridge: false,
-    chapterStart: { life: s.life, t: s.t, spent: s.spent, found: s.found, uses: usesOf(s) },
+    chapterStart: { life: s.life, t: s.t, spent: s.spent, found: s.found, uses: usesOf(s), puzzles: { ...s.puzzles } },
   });
 }
 const usesOf = s => s.used.glow + s.used.push + s.used.leap + s.used.rewind;
@@ -294,10 +410,16 @@ export function route(s, from, goal) {
 }
 
 export function walkTo(s, x, y) {
-  if (s.status !== 'play' || s.anim) return;
+  if (s.status !== 'play' || s.anim || s.open) return;
   const goal = { x: Math.max(0, Math.min(s.w - 1, Math.floor(x))), y: Math.max(0, Math.min(s.h - 1, Math.floor(y))) };
+  // A tap on the tile you stand on reopens a memory you left for later.
+  const here = tileOf(s);
+  if (!s.path.length && goal.x === here.x && goal.y === here.y) {
+    const p = s.spots.find(q => q.snooze && q.x === here.x && q.y === here.y);
+    if (p) p.snooze = false;
+  }
   // Start from the tile we are stepping onto, so a new target never makes us turn back mid-step.
-  const from = s.path.length ? s.path[0] : tileOf(s);
+  const from = s.path.length ? s.path[0] : here;
   const rest = route(s, from, goal);
   s.path = s.path.length ? [s.path[0], ...rest] : rest;
   s.target = goal;
@@ -310,7 +432,7 @@ export function stop(s) {
 const dist = (s, x, y) => Math.hypot(s.px - (x + 0.5), s.py - (y + 0.5));
 const spotOf = (s, lock) => s.spots.find(p => p.lock === lock);
 export function ready(s, id) {
-  if (s.status !== 'play' || s.anim) return false;
+  if (s.status !== 'play' || s.anim || s.open) return false;
   if (id === 'glow') {
     const p = spotOf(s, 'dark');
     return !!p && !p.open && dist(s, p.x, p.y) <= GLOW_R;
@@ -357,7 +479,7 @@ export function use(s, id) {
     const p = spotOf(s, 'rewind');
     p.open = true;
     s.path = []; s.target = null;
-    collect(s, p); // the memory shows in the mended mirror
+    if (s.life > 0) reach(s, p); // the memory shows in the mended mirror
   }
   if (s.life <= 0) fade(s);
   return true;
@@ -377,6 +499,16 @@ function light(s, x, y) {
 }
 
 // ---------------------------------------------------------------- memories
+// Reaching an open memory: without lies it is yours at once; with lies its puzzle opens (unless left for later).
+function reach(s, p) {
+  if (p.taken) return;
+  if (!p.puzzle) { collect(s, p); return; }
+  if (p.snooze) return;
+  if (p.lock === 'leap') raise(s); // the stepping stones rise as you reach it, so leaving it for later does not strand you
+  s.open = p; p.puzzle.seen = true;
+  s.path = []; s.target = null;
+  s.events.push({ type: 'puzzle', lock: p.lock, form: p.puzzle.form, n: p.puzzle.frags.length, x: p.x, y: p.y });
+}
 function collect(s, p) {
   if (p.taken) return;
   p.taken = true; s.found++;
@@ -384,32 +516,85 @@ function collect(s, p) {
   const fresh = p.dims.some(d => s.known[d] === null);
   p.dims.forEach((d, k) => { s.known[d] = values[k]; });
   s.events.push({ type: 'memory', dims: p.dims, values, lock: p.lock, fresh, x: p.x, y: p.y });
-  if (p.lock === 'leap' && !s.bridge) {
-    s.bridge = true;
-    for (let i = 0; i < s.grid.length; i++) if (s.grid[i] === '=') s.grid[i] = '_';
-    s.events.push({ type: 'bridge' });
-  }
+  if (p.lock === 'leap') raise(s);
+}
+function raise(s) {
+  if (s.bridge) return;
+  s.bridge = true;
+  for (let i = 0; i < s.grid.length; i++) if (s.grid[i] === '=') s.grid[i] = '_';
+  s.events.push({ type: 'bridge' });
+}
+function solved(s, p, how) {
+  const z = p.puzzle;
+  z.solved = true; z.how = how; s.open = null;
+  const seal = z.frags[z.liar].seal;
+  if (seal !== undefined && !s.exposed.includes(seal)) s.exposed.push(seal);
+  if (how === 'found') s.puzzles.found++; else s.puzzles.shown++;
+  s.events.push({ type: 'solved', how, liar: z.liar, form: z.form, lock: p.lock });
+  collect(s, p);
+}
+// Say picture i lies. Right: the memory is yours. Wrong: PICK years, and that picture is shown to be true.
+export function pickLie(s, i) {
+  const p = s.open;
+  if (!p || s.status !== 'play') return null;
+  const z = p.puzzle;
+  if (!(i >= 0 && i < z.frags.length) || z.tried[i]) return null;
+  if (i === z.liar) { solved(s, p, 'found'); return true; }
+  z.tried[i] = true;
+  s.life -= PICK; s.puzzles.wrong++; s.puzzles.years += PICK;
+  s.events.push({ type: 'wrong', i, cost: PICK, lock: p.lock });
+  if (s.life <= 0) fade(s);
+  return false;
+}
+// Pay SHOW years to be shown the lie.
+export function showMe(s) {
+  const p = s.open;
+  if (!p || s.status !== 'play') return false;
+  s.life -= SHOW; s.puzzles.years += SHOW;
+  s.events.push({ type: 'shown', cost: SHOW, liar: p.puzzle.liar, lock: p.lock });
+  if (s.life <= 0) { fade(s); return true; }
+  solved(s, p, 'shown');
+  return true;
+}
+// Close the puzzle; the memory waits on the island until you step on it again (or tap the tile you stand on).
+export function later(s) {
+  const p = s.open;
+  if (!p) return false;
+  p.snooze = true; s.open = null; s.puzzles.later++;
+  s.events.push({ type: 'later', lock: p.lock });
+  return true;
 }
 
 // ---------------------------------------------------------------- the tick
 function fade(s, right = null) {
-  s.life = 0; s.status = 'faded'; s.path = []; s.anim = null;
+  s.life = 0; s.status = 'faded'; s.path = []; s.anim = null; s.open = null;
   record(s, right);
   s.score = s.right * SELF_POINTS;
   s.events.push({ type: 'faded', chapter: s.chapter });
 }
+// Only facts and photographs that were recovered go into the local album.
+export function keepsake(s, right) {
+  return {
+    portrait: right ? [...s.faces[s.answer]] : null,
+    photos: s.spots.filter(p => p.taken).flatMap(p => p.puzzle
+      ? p.puzzle.frags.filter((_, i) => i !== p.puzzle.liar).map(({ dims, vals }) => ({ dims, vals }))
+      : [{ dims: p.dims, vals: p.dims.map(d => s.known[d]) }]),
+  };
+}
 // What one chapter came to; the page and the lab read s.chapters.
 function record(s, right) {
-  const c = s.chapterStart;
+  const c = s.chapterStart, z = s.puzzles, z0 = c.puzzles;
   s.chapters.push({
     chapter: s.chapter, id: CHAPTERS[s.chapter].id, island: s.island, face: [...s.faces[s.answer]],
     guessed: s.guessed, named: s.guessed >= 0 ? [...s.faces[s.guessed]] : null, right,
     yearsSpent: Math.round((c.life - Math.max(0, s.life)) * 10) / 10, uses: usesOf(s) - c.uses,
+    ...keepsake(s, right),
     found: s.found - c.found, seconds: Math.round((s.t - c.t) / 6) / 10,
+    ...(s.lies ? { lies: { found: z.found - z0.found, wrong: z.wrong - z0.wrong, shown: z.shown - z0.shown, later: z.later - z0.later, years: z.years - z0.years } } : {}),
   });
 }
 export function step(s) {
-  if (s.status !== 'play') return;
+  if (s.status !== 'play' || s.open) return; // a puzzle is open: time stands still
   s.t++;
   s.life -= s.burn * DT;
   if (s.life <= 0) { fade(s); return; }
@@ -432,20 +617,21 @@ export function step(s) {
     } else { s.px += dx / d * v; s.py += dy / d * v; }
   }
   const t = tileOf(s);
+  if (s.lies) for (const q of s.spots) if (q.snooze && (q.x !== t.x || q.y !== t.y)) q.snooze = false; // stepped off: it can open again
   if (dist(s, t.x, t.y) < 0.3) {
     const p = s.spots.find(q => q.x === t.x && q.y === t.y && !q.taken && q.open);
-    if (p) collect(s, p);
+    if (p) reach(s, p);
   }
 }
 
 export function guess(s, i) {
   if (s.status !== 'play') return false;
-  s.guessed = i;
+  s.guessed = i; s.open = null;
   const right = i === s.answer;
   s.path = []; s.anim = null;
   if (right) s.right++;
-  else s.life -= WRONG;
-  s.events.push({ type: 'guess', i, right, chapter: s.chapter, cost: right ? 0 : WRONG });
+  else s.life -= wrongCost(s);
+  s.events.push({ type: 'guess', i, right, chapter: s.chapter, cost: right ? 0 : wrongCost(s) });
   if (s.life <= 0) { fade(s, right); return right; }
   record(s, right);
   if (s.chapter < CHAPTERS.length - 1) s.status = 'named';

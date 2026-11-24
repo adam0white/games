@@ -86,3 +86,8 @@ Harness lesson: hold assertions use the observed control counter (initial press 
 ## Independent review
 
 Two delegated lenses reviewed renderer/input/state correctness and phone/failure/recovery coverage. Two material verification findings were fixed: the rule check now proves natural dawn reachability for every offered night, and the mid-play capture is unobstructed instead of showing the pause card. The end-card animation now translates rather than shrinking its touch targets. A later failure/recovery review also found a race between an automatic score upload and Stop sharing. POST ordering and consent checks now prevent queued stale uploads, and failed removal keeps the ID with an explicit retry instead of discarding it. No material renderer or input-lifecycle defect remained in static review. Reviewers could not establish human hazard visibility from the bots, so that remains an explicit limit.
+
+## Review fixes (2026-11-24)
+
+- Overlapping thumbs: the newest press wins and lifting the older thumb does nothing (previously the second thumb was ignored). Checked in `check.mjs`.
+- End title names the cause: Run aground (bank), Wrecked (hazard), Light lost (dark).

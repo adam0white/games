@@ -454,3 +454,87 @@ The rival section of `bots.mjs` passes after that. One number moved: the bot tha
 
   Ask the tester which one before building.
 - **More species (#148).** Add one extra choice at some promotions, so the tree branches more. It costs art time (each animal is drawn in code in `art.js`, in all four looks).
+
+## 2026-11-24: a skill for every animal (tester t1, note #148)
+
+The page calls it a "skill", because "Power" is already the strength number. The code says `power`.
+
+Every animal after the Ant has one power, used with a round button at the bottom right (Space on a keyboard). The button shows the power's name and fills up again while it waits. `POWER` and `POWERS` in `sim.js` hold the numbers and the 49 names.
+
+| Kind | Who (examples) | What it does | Wait |
+|---|---|---|---|
+| sting | Wasp, Spider, Snake, Hydra | The nearest animal within 120 units cannot move, notice or bite for 3 s. Works on stronger animals. Nothing in reach: not spent, 1 s wait. | 10 s |
+| leap | Frog, Rabbit, Cat, Raptor | Jumps 150 units plus three body sizes the way you face; nothing can bite for 0.35 s. | 6 s |
+| shell | Turtle, Beetle, Mole, Crocodile | Nothing can bite or notice you for 3 s. | 16 s |
+| roar | Dog, Bear, Lion, Dragon | Every weaker animal within 230 units freezes for 2.5 s. | 14 s |
+| dive | Bat, Owl, Eagle, Griffin | 1.9 times the speed for 1.2 s, and nothing notices you; animals already chasing give up. | 10 s |
+| sprint | Cheetah, Fox, Lizard, Zebra | 1.6 times the speed for 2 s. | 8 s |
+
+Reach grows 2% per level. A promotion or a revive resets the wait. A game played without pressing the button is the same game as before: the earlier bot rows did not move.
+
+Careful bot that uses its power when a hunter has noticed it within 130 units (roar: when two weaker animals are within 200), 6 seeds, 12 minutes, median top level / median deaths, against the same bot without powers:
+
+| | no power | with power |
+|---|---|---|
+| classic strong | 9 / 1 | 7 / 0 |
+| classic fast | 13 / 4 | 13 / 3 |
+| classic sneaky | 18 / 0 | 18 / 0 |
+| Wild strong | 6 / 2 | 7 / 1 |
+| Wild fast | 11 / 10 | 11 / 7 |
+| Wild sneaky | 12 / 4 | 18 / 1 |
+
+Powers are mostly an escape, so they cut deaths, most in Wild. Wild sneaky now reaches the top band; that may be too easy and is the first number to tune.
+
+### Checks
+`bots.mjs` has a direct check of each kind (a stunned stronger animal on top of the player does not bite; the shell holds for its time and then does not; roar spares stronger and far animals; dive and sprint are exactly their speed and then the plain speed; a diving bird is not noticed), of the wait, and that the Ant has no power and every other animal has one. WebKit iPhone 13, Cartoon and 3D: the button is hidden for the Ant, shows "Sting / ready" for a Wasp, a tap stuns a Dog 70 units away and the button shows the wait, no page errors. The steering stick's numbers in the shared phone check are unchanged.
+
+### Not verified
+- A real phone and a person: whether the button sits well under the right thumb while the left steers, and whether the powers are fun or only safe.
+- The roar is the only power that helps hunting. The others are escapes. A hunting use for each kind is a next step.
+- Other animals do not use powers.
+
+"The same game without the button" was checked directly: main's `sim.js` and this one, fed the same scripted steering for 4 simulated minutes, 24 runs (Classic and Wild, each pick, 4 seeds), end in the identical state. The earlier table's "classic fast 13 / 3" prints 13 / 4 on this machine today; that difference is not from this change.
+
+### 2026-11-24, later: what a skill does, and when to use it
+- Three seconds after a promotion the page says what the new skill does in one line ("Hard shell: nothing can bite you"). Before this the button only showed a name.
+- The button pulses when the skill would help now: a stronger animal has noticed you within 170 units (roar: two weaker animals in reach). With reduced motion it shows a still ring.
+- Checked in WebKit iPhone 13 after a real promotion: the line appears, and the button gets the pulse when a Dog that has noticed the player is 120 units away.
+
+### Wild with skills: measured, not tuned
+Wild, careful bot with skills, 6 seeds, 12 minutes, median top level / median deaths:
+
+| | sneaky | strong | fast |
+|---|---|---|---|
+| no skills | 12 / 4 | 6 / 2 | 11 / 10 |
+| all skills | 18 / 1 | 7 / 1 | 11 / 7 |
+| without roar | 16 / 0 | 7 / 1 | |
+| roar only | 12 / 6 | | |
+| without sting / shell / dive / leap | 17 / 2, 18 / 1, 16 / 2, 17 / 1 | | |
+| every wait twice as long | 17 / 2 | | 11 / 7 |
+| every wait three times as long | 14 / 2 | | 10 / 7 |
+
+No single kind carries it, and longer waits barely move it: the bot uses a skill only about 10 times a run, each at the exact moment it is noticed, and each use is a death avoided. Seeds differ a lot (top level 10 to 18 in one row). The numbers were left as they are until a person has played: a bot's reactions are not a person's, and six seeds cannot separate these rows.
+
+## 2026-11-24: skills that hunt, and a second reviewer's bug hunt
+
+### Hunting uses
+Before this only the roar and the sting helped a hunt. Now:
+- **Leap:** weaker animals within 40 units of where you land are pinned for 0.9 s.
+- **Sprint and dive:** while they last, the catch rule uses your boosted speed, so you can catch prey that is faster than you and has noticed you.
+- **Shell:** a stronger animal that bites the shell is dazed for 2 s ("ouch!").
+
+### Bugs found by a second model reading main, and fixed
+1. The skill button could stay hidden after a pause (the button text had not changed, so the code that shows it again was skipped).
+2. A dive did not hide you from the rival, though the page says nothing sees you. A sting, roar, leap or dive now also resets the rival's stalk, so it starts its hunt again instead of resuming a committed charge.
+3. A second finger on the play area took the steering stick from the first (`kit/stick.js`). The first finger now owns the stick until it lifts. The lab ant pages use the same stick.
+4. A sprint overtook prey but could not eat it (the catch rule used the plain speed). Same change as "sprint and dive" above.
+5. Enter on the focused skill button, or a screen reader's activate, did nothing.
+6. A leap pressed together with a new direction went the old way.
+7. A promotion kept the old animal's sprint or dive running.
+8. A stunned hunter could still eat the animal it was chasing.
+9. The winning card said "Nothing here can eat you". A Dragon (184) eats a Hydra (180). It now says "You are at the top."
+
+Not fixed: in the 3D look the green food arrow decides "off screen" with the flat view's rectangle, so near the edges it can show for visible food or hide for food just off screen.
+
+### Checks
+`bots.mjs`: a direct check for each hunting use and for 6, 7 and 8. Main's rules and these, fed the same steering without the button, still end identical (24 runs). WebKit iPhone 13: pause and resume shows the button again; a second finger leaves the steering vector unchanged and the first finger still steers after it lifts; a click on the button uses the skill; a real promotion shows the skill line. Not verified: a real phone, and the rival fix (2) has no direct check.

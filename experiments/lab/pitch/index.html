@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#f6f1e4">
+<title>Paper Pitch</title>
+<style>
+  :root { --blue: #1d4fb8; --red: #c4302b; --ink: #26262a; --paper: #f6f1e4; --hand: 'Bradley Hand', 'Segoe Print', 'Chalkboard SE', 'Comic Sans MS', cursive; --turn: var(--blue); }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--paper); color: var(--ink); -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+  body { font: 16px/1.35 ui-rounded, system-ui, -apple-system, sans-serif; }
+  canvas { display: block; width: 100vw; height: 100dvh; touch-action: none; }
+  button { font: inherit; color: var(--ink); background: #fffdf7; border: 1.5px solid #26262a55; border-radius: 14px; min-height: 48px; padding: 10px 16px; font-weight: 650; cursor: pointer; touch-action: manipulation; box-shadow: 0 2px 0 #26262a22; }
+  button:active { transform: translateY(1px); box-shadow: none; }
+  button.primary { background: var(--blue); border-color: var(--blue); color: #fff; font-size: 19px; box-shadow: 0 3px 0 #123683; }
+  .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: calc(14px + env(safe-area-inset-top)) 16px calc(14px + env(safe-area-inset-bottom)); }
+  .screen.on { display: flex; }
+  .veil { background: #f6f1e4b8; }
+  .card { width: 100%; max-width: 360px; max-height: 100%; overflow: auto; background: #fffdf6f2; border: 1.5px solid #26262a30; border-radius: 22px; box-shadow: 0 14px 40px #4a3f2a24; padding: 22px 20px; text-align: center; }
+  h1, h2 { font-family: var(--hand); font-weight: 700; margin: 0; line-height: 1.05; }
+  h1 { font-size: 46px; letter-spacing: -1px; }
+  h1 .b { color: var(--blue); } h1 .r { color: var(--red); }
+  h2 { font-size: 34px; }
+  p { margin: 8px 0; }
+  .quiet { font-size: 14px; color: #5d5a52; }
+  .stack { display: grid; gap: 10px; margin-top: 16px; }
+  .stack button small { display: block; font-size: 13px; font-weight: 500; opacity: .85; margin-top: 2px; }
+  .row { display: flex; gap: 8px; margin-top: 10px; }
+  .row button { flex: 1; padding: 10px 6px; }
+  .field { display: grid; gap: 4px; text-align: left; font-size: 14px; font-weight: 650; }
+  .field input { min-width: 0; width: 100%; min-height: 48px; padding: 9px 12px; border: 1.5px solid #26262a55; border-radius: 12px; background: #fffdf7; color: var(--ink); font: 16px system-ui, sans-serif; user-select: text; -webkit-user-select: text; }
+  #joinForm { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+  #joinCode, #roomCode { font-family: ui-monospace, monospace; letter-spacing: .16em; text-transform: uppercase; }
+  #roomCode { display: block; color: var(--blue); font-size: 44px; font-weight: 800; }
+  #lobbyStatus:empty { display: none; }
+  .dots { display: inline-flex; gap: 6px; vertical-align: middle; }
+  .dots i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; display: inline-block; }
+  .dots i.used { background: currentColor; }
+  .dots i.won { background: #2f8a4a; border-color: #2f8a4a; }
+  #pic { display: block; width: auto; max-width: 100%; max-height: calc(100dvh - 300px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); margin: 10px auto 4px; border-radius: 6px; box-shadow: 0 2px 10px #4a3f2a30; transform: rotate(-1deg); background: var(--paper); }
+  #end .card { padding: 16px 16px 14px; }
+  #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: 12px; right: 12px; height: 48px; display: none; align-items: center; justify-content: space-between; pointer-events: none; }
+  #hud.on { display: flex; }
+  #hud button { pointer-events: auto; width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: #fffdf7cc; }
+  #pauseBtn::before { content: ''; width: 4px; height: 15px; border: solid var(--ink); border-width: 0 4px; }
+  #score { font: 800 26px/1 ui-rounded, system-ui, sans-serif; display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+  #score > span { align-self: flex-start; }
+  #score small { font: 600 12px/1 system-ui, sans-serif; color: #5d5a52; display: block; text-align: center; margin-top: 3px; }
+  #score .b { color: var(--blue); } #score .r { color: var(--red); }
+  .table #score { min-width: 0; justify-content: center; text-align: center; }
+  .table #score > div { min-width: 0; width: clamp(76px, 28vw, 155px); }
+  .table #score small { display: flex; gap: 5px; align-items: center; justify-content: center; min-width: 0; }
+  .seat-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .seat-light { flex: 0 0 8px; width: 8px; height: 8px; border: 1.5px solid #756b5d; border-radius: 50%; }
+  .seat-light.on { background: #267642; border-color: #267642; }
+  #roomStatus { position: fixed; left: 12px; right: 12px; top: calc(58px + env(safe-area-inset-top)); text-align: center; font-size: 13px; font-weight: 650; pointer-events: none; overflow-wrap: anywhere; }
+  #roomEndStatus { overflow-wrap: anywhere; }
+  #endLine, #endTitle { overflow-wrap: anywhere; }
+  #tag { min-width: 44px; text-align: right; font-size: 13px; font-weight: 650; color: #5d5a52; }
+  #turn { position: fixed; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom)); transform: translateX(-50%); display: none; align-items: center; gap: 8px; padding: 7px 16px 7px 10px; border-radius: 999px; background: #fffdf7e8; border: 2px solid var(--turn); color: var(--turn); font-weight: 700; white-space: nowrap; pointer-events: none; }
+  #turn.on { display: flex; }
+  #turn svg { width: 22px; height: 22px; flex-shrink: 0; }
+  .table #turn { max-width: calc(100% - 24px); white-space: normal; overflow-wrap: anywhere; text-align: center; }
+  #between { align-items: flex-end; pointer-events: none; }
+  #between .card { pointer-events: auto; padding: 14px 16px; margin-bottom: 44px; }
+  #between h2 { font-size: 30px; }
+  #toast { position: fixed; left: 0; right: 0; top: calc(64px + env(safe-area-inset-top)); text-align: center; font: 700 26px var(--hand); pointer-events: none; opacity: 0; transition: opacity .25s; }
+  #toast.on { opacity: 1; }
+  .table #toast { top: calc(95px + env(safe-area-inset-top)); }
+  #probe { position: fixed; visibility: hidden; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  body .kit-hint .ring { border-color: #1d4fb877; background: #1d4fb80d; }
+  body .kit-hint .ripple { border-color: #1d4fb8; }
+  body .kit-hint .knob { background: #1d4fb840; box-shadow: none; }
+  @media (max-height: 680px) { h1 { font-size: 40px; } .card { padding: 16px; } .stack { margin-top: 12px; gap: 8px; } #pic { max-height: calc(100dvh - 270px); } }
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Pitch. Tap a pulsing point next to the ball to draw a line to it."></canvas><div id="probe"></div>
+<div id="hud"><button id="pauseBtn" aria-label="Pause"></button><div id="score"></div><div id="tag"></div></div>
+<div id="roomStatus" role="status" hidden></div>
+<div id="turn"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 21l2.2-6.6L15.8 3.8a2 2 0 0 1 2.8 0l1.6 1.6a2 2 0 0 1 0 2.8L9.6 18.8zM6.4 15.6l2 2"/></svg><span id="turnText"></span></div>
+<div id="toast"></div>
+<section id="menu" class="screen veil on"><div class="card">
+  <h1><span class="b">Paper</span> <span class="r">Pitch</span></h1>
+  <p class="quiet">Draw the ball into the top goal. Land on ink and you go again.</p>
+  <div class="stack">
+    <button id="play" class="primary">Play<small id="playSub"></small></button>
+    <button id="daily">Today's pitch <span id="dailyDots" class="dots"></span></button>
+    <button id="friend">Play a friend</button>
+    <button id="two">Two players, one phone</button>
+  </div>
+  <div class="row"><button id="soundMenu"></button></div>
+</div></section>
+<section id="friendCard" class="screen veil" aria-labelledby="friendTitle"><div class="card">
+  <h2 id="friendTitle">Play a friend</h2>
+  <div id="friendEntry" class="stack">
+    <label class="field">Your name (optional)<input id="friendName" maxlength="24" autocomplete="nickname"></label>
+    <button id="newTable" class="primary">New table</button>
+    <form id="joinForm">
+      <label class="field">Table code<input id="joinCode" maxlength="4" autocapitalize="characters" autocomplete="off" spellcheck="false" pattern="[A-Za-z]{4}" required></label>
+      <button id="joinTable">Join</button>
+    </form>
+  </div>
+  <div id="roomInvite" hidden>
+    <output id="roomCode" aria-label="Table code"></output>
+    <button id="shareLink" class="primary">Share link</button>
+    <label id="roomLinkField" class="field" hidden>Table link<input id="roomLink" readonly></label>
+  </div>
+  <p id="lobbyStatus" class="quiet" role="status"></p>
+  <div class="row"><button id="roomLeave">Menu</button></div>
+</div></section>
+<section id="paused" class="screen veil"><div class="card">
+  <h2 id="pauseTitle">Pencils down</h2>
+  <div class="stack"><button id="resume" class="primary">Resume</button></div>
+  <div class="row"><button id="restart">Restart</button><button id="quit">Menu</button></div>
+  <div class="row"><button id="soundPause"></button></div>
+</div></section>
+<section id="between" class="screen"><div class="card">
+  <h2 id="betweenTitle"></h2><p id="betweenLine" class="quiet"></p>
+  <div class="stack"><button id="next" class="primary">Next kick-off</button></div>
+</div></section>
+<section id="end" class="screen veil"><div class="card">
+  <h2 id="endTitle"></h2>
+  <img id="pic" alt="The finished pitch">
+  <p id="endLine" class="quiet"></p>
+  <p id="roomEndStatus" class="quiet" role="status" hidden></p>
+  <div class="stack"><button id="again" class="primary">Rematch</button></div>
+  <div class="row"><button id="savePic">Save picture</button><button id="endMenu">Menu</button></div>
+</div></section>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

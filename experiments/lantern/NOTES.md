@@ -568,3 +568,52 @@ Not checked: a real phone's frame rate and heat; whether a person can play first
 
 ### Left as a proposal (2026-11-23)
 - Boat models per skin in 3D; a separate first-person leaderboard if it proves harder.
+
+## 2026-11-24: run tickets on the shared leaderboard
+
+The shared board took any score the page reported. Now a sharing player's endless run asks the server for a ticket at
+its start, and the score goes up with it; the server refuses more points than the run's time allows (see
+`workers/lab-ai/README.md`, "Run tickets"). Two things changed for the player. The yes (card or tick) sends nothing by
+itself, because an old best has no ticket; the card says "Your next run goes up." And no ticket is asked for before the
+yes, so the rule "nothing is sent before the player chooses to share" holds. Limit, stated plainly: this caps the rate
+of a false score; it does not prove a run was played. Rejected: replaying the run on the server from its inputs
+(floating-point differences between engines, and Worker CPU limits).
+
+## 2026-11-24: five faults from a bug hunt
+
+A helper played the game with damaged saves, slow answers and odd tap orders. Fixed: (1) `lantern-owned` holding an
+object or a number stopped the game from loading; (2) `lantern-stats` holding a non-object took the embers for a stat
+and then threw; (3) a slow answer from the shared board put the first run's place on the next run's card; (4) leaving
+the shop while a pack spun left the caption at "…"; (5) the shop's long opening text stayed pinned over the packs
+(about a fifth of a phone screen); now only a short text stays in view. Left alone: a heart picked up at three hearts
+gives nothing (sim rule; only with the Hearts stat at its top).
+
+## 2026-11-24: Today's river (an idea of the agent's, not from a note)
+
+One river a day, the same for every player: the seed is a hash of the UTC date, so "Today's river" on the menu gives
+everyone the same rocks and gifts until midnight UTC. It has its own shared board (`lantern-daily` on the server, the
+"Today" tab on the leaderboard), which starts empty each UTC day. A daily run stays off the endless boards and off
+`lantern-best-endless`, because a river that can be learned is a different contest. New save key: `lantern-daily`,
+`{ d, s }`, this phone's best of the day. Sharing follows the one yes; stopping sharing removes the row from both boards.
+Known gaps: a run that crosses midnight UTC counts for the new day; abilities a player owns still differ between players.
+
+## 2026-11-24: music, with a Music switch
+
+The score from the lab's Lantern Song is in the main game. `music.js` moved here from `experiments/lab/lantern-song/`
+(the lab page keeps a one-line file at the old path that re-exports it). Each river gets its own tune from its seed, so
+Today's river has the same tune for every player. On a night the music fills out towards dawn and turns to the major
+key near the end; on the endless river it fills out over two and a half minutes and stays in the night's key. Embers
+chime inside the chord while music is on. The switch is on the menu and on the card; `lantern-music` is `'0'` when off.
+It is on at first. Checked by machine: the song's clock advances during a run, and the switch is kept. Not checked: how
+it sounds on a phone, and how loud it is against the river and the crash sounds. Nobody has listened to it in this game.
+
+
+## 2026-11-24 — shared board, fixes from an independent review
+
+Codex (gpt-6.2-sol) read the board code and found eleven faults; `workers/lab-ai/README.md` ("Review fixes") lists the
+server side. In the page: a removal is kept in `lantern-board-gone` until both boards have answered, and is tried again
+at the next load or when the leaderboard opens, also after "Erase everything". The score post carries its ticket even
+when the ticket's own answer was lost. A run on Today's river that ends after midnight UTC counts for neither day and is
+not sent; the card says so. A name the server would empty (only symbols or emoji) is refused at the yes, with "Use
+letters or numbers in the name." The two boards count their answers apart. Checked by the Worker tests (46 pass). Not
+checked on a phone.

@@ -78,3 +78,9 @@ Read-only SHA-256 snapshots at verification:
 
 - `experiments/lantern/sim.js`: `2a8124b74e48b0d5b7278ea4dd465740558ec8114767d3ea3dd01ae209f87765`
 - `experiments/lantern/looks.js`: `6e983e4ee06927b23620c1577f53fa67b3ffd411049f7cc37eb513e02b27a696`
+
+## Review fixes (2026-11-24)
+
+- Online, the pause button now needs a second tap within 2.5 s to retire the boat (P, Escape and leaving the page still retire at once).
+- Bots no longer join a race you have finished when the last opponent leaves or the socket drops; recorded human results stay.
+- End titles name the cause: aground, wrecked, or lantern out. A stored `you.round` reads "may be underway", because the server keeps it after the round ends.

@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
-import { handleBoard, validateScore, tidyName, rudeName, shownName, boardTop, boardPut, boardRemove, BOARD } from '../src/board.mjs';
+import { handleBoard, validateScore, tidyName, rudeName, shownName, boardTop, boardPut, boardRemove, boardStart, BOARD, RUN } from '../src/board.mjs';
 
+// The shipped setting refuses Lantern scores without a ticket. The older tests below post without one, so they run with
+// the list empty; the ticket tests put a game back in to show the refusal.
+const NEED = [...RUN.need]; RUN.need.length = 0;
 const ID = n => `player-${String(n).padStart(4, '0')}-0123456789abcdef`;
 // A stand-in for ctx.storage.sql (exec returning a cursor with toArray) over a real SQLite database.
 function fakeSql() {
@@ -15,7 +18,7 @@ function fakeEnv({ perIp = 100, broken = false } = {}) {
   return {
     objects, keys,
     PER_IP: { limit: async ({ key }) => { keys.push(key); counts[key] = (counts[key] || 0) + 1; return { success: counts[key] <= perIp }; } },
-    BOARD: { idFromName: n => n, get: id => { if (broken) throw new Error('down'); if (!objects.has(id)) { const sql = fakeSql(); objects.set(id, { sql, top: async l => boardTop(sql, l), put: async (q, now) => boardPut(sql, q, now), remove: async i => boardRemove(sql, i) }); } return objects.get(id); } },
+    BOARD: { idFromName: n => n, get: id => { if (broken) throw new Error('down'); if (!objects.has(id)) { const sql = fakeSql(); objects.set(id, { sql, top: async (l, day) => boardTop(sql, l, day), put: async (q, now, need, day) => boardPut(sql, q, now, undefined, need, day), remove: async (i, now, day) => boardRemove(sql, i, now, day), start: async (r, now) => boardStart(sql, r, now) }); } return objects.get(id); } },
   };
 }
 function fakeCache() {
@@ -133,6 +136,70 @@ test('the endpoint: the per-address limit, a limiter error and a broken board al
   await handleBoard(req({ id: ID(2), n: 'B', s: 9 }), e, c, { cache }); await Promise.all(c.waits); assert.equal(cache.store.size, 0, 'a post clears the cached read');
 });
 
+test('run tickets, storage: a score needs the time it claims; a ticket works once; old tickets go; a full table refuses', () => {
+  const sql = fakeSql(), t0 = 1_800_000_000_000, R = n => `run-${String(n).padStart(20, '0')}`;
+  assert.deepEqual(validateScore({ start: true, r: R(1) }), { start: true, r: R(1) });
+  assert.equal(validateScore({ start: true, r: 'short' }), null); assert.equal(validateScore({ start: true, r: R(1), id: ID(1) }), null);
+  assert.deepEqual(validateScore({ id: ID(1), n: 'Ada', s: 5, r: R(1) }), { id: ID(1), n: 'Ada', s: 5, r: R(1) });
+  assert.equal(validateScore({ id: ID(1), n: 'Ada', s: 5, r: 7 }), null); assert.equal(validateScore({ id: ID(1), n: 'Ada', s: 5, x: 1 }), null);
+  assert.equal(boardStart(sql, R(1), t0).ok, true);
+  // Ten seconds allow 10 * 18 + 50 = 230 points.
+  let out = boardPut(sql, { id: ID(1), n: 'Ada', s: 231, r: R(1) }, t0 + 10_000);
+  assert.deepEqual([out.ok, out.why], [false, 'run']); assert.deepEqual(boardTop(sql), [], 'a refused score writes nothing');
+  out = boardPut(sql, { id: ID(1), n: 'Ada', s: 230, r: R(1) }, t0 + 10_000); assert.equal(out.ok, true); assert.equal(out.place, 1);
+  out = boardPut(sql, { id: ID(1), n: 'Eve', s: 1, r: R(1) }, t0 + 99_000);
+  assert.equal(out.why, 'run', 'a used ticket is gone'); assert.deepEqual(boardTop(sql), [{ n: 'Ada', s: 230 }], 'and a refused post does not rename');
+  assert.equal(boardPut(sql, { id: ID(2), n: 'Bo', s: 1, r: R(9) }, t0).why, 'run', 'an unknown ticket');
+  boardStart(sql, R(2), t0); assert.equal(boardPut(sql, { id: ID(2), n: 'Bo', s: 1, r: R(2) }, t0 - 5).why, 'run', 'a clock that ran backwards');
+  // Without a ticket: accepted for a game outside RUN.need, refused for one inside it.
+  assert.deepEqual(NEED, ['lantern', 'lantern-daily'], 'the shipped setting');
+  assert.equal(boardPut(sql, { id: ID(3), n: 'Cy', s: 77 }, t0).ok, true);
+  assert.equal(boardPut(sql, { id: ID(4), n: 'Di', s: 77 }, t0, BOARD.dailyNew, true).why, 'run');
+  // The first start after six hours removes the old tickets.
+  boardStart(sql, R(3), t0 + RUN.hours * 3600_000 + 1);
+  assert.deepEqual(sql.db.prepare('SELECT r FROM runs').all().map(x => x.r), [R(3)]);
+  assert.deepEqual(Object.keys(sql.db.prepare('SELECT * FROM runs').all()[0]).sort(), ['r', 't'], 'a ticket holds the run id and a time only');
+  const keep = RUN.keep; RUN.keep = 2;
+  try { assert.equal(boardStart(sql, R(4), t0 + RUN.hours * 3600_000 + 2).ok, true); assert.equal(boardStart(sql, R(5), t0 + RUN.hours * 3600_000 + 3).ok, false); } finally { RUN.keep = keep; }
+});
+
+test('run tickets, the endpoint: a start, a score in time, a score too soon; starts are limited apart and leave the cache alone', async () => {
+  const env = fakeEnv({ perIp: 2 }), cache = fakeCache(), R = n => `run-${String(n).padStart(20, '0')}`;
+  let now = 1_800_000_000_000; const deps = { cache, now: () => now };
+  let c = ctx(); await handleBoard(get(), env, c, deps); await Promise.all(c.waits); assert.equal(cache.store.size, 1);
+  let res = await handleBoard(req({ start: true, r: R(1) }), env, ctx(), deps);
+  assert.equal(res.status, 200); assert.deepEqual(await res.json(), { ok: true }); assert.equal(cache.store.size, 1, 'a start leaves the cache');
+  res = await handleBoard(req({ id: ID(1), n: 'Ada', s: 5000, r: R(1) }), env, c = ctx(), deps);
+  assert.equal(res.status, 422); assert.deepEqual(await res.json(), { error: 'run' }); await Promise.all(c.waits); assert.equal(cache.store.size, 1, 'a refusal leaves the cache');
+  now += 60_000;
+  res = await handleBoard(req({ id: ID(1), n: 'Ada', s: 1100, r: R(1) }), env, ctx(), deps);
+  assert.equal(res.status, 200); assert.deepEqual(await res.json(), { place: 1, rows: [{ n: 'Ada', s: 1100 }] });
+  assert.deepEqual(env.keys.slice(-3), ['boardrun:203.0.113.5', 'board:203.0.113.5', 'board:203.0.113.5']);
+  assert.equal((await handleBoard(req({ start: true, r: R(2) }), env, ctx(), deps)).status, 200);
+  assert.equal((await handleBoard(req({ start: true, r: R(3) }), env, ctx(), deps)).status, 429, 'the third start in the window');
+  assert.equal((await handleBoard(req({ start: true, r: R(4) }, { origin: 'https://evil.example' }), env, ctx(), deps)).status, 403);
+  const open = fakeEnv(); assert.equal((await handleBoard(req({ id: ID(5), n: 'Old', s: 9 }), open, ctx(), deps)).status, 200, 'an old page, no ticket: accepted');
+  RUN.need.push('lantern'); try { assert.equal((await handleBoard(req({ id: ID(6), n: 'Old', s: 9 }), open, ctx(), deps)).status, 422, 'refused once the game needs tickets'); } finally { RUN.need.length = 0; }
+});
+
+test('the daily board: its own object, empty again on a new UTC day, cached by day; the main board is untouched', async () => {
+  const env = fakeEnv(), cache = fakeCache(), path = '/lab-api/board/lantern-daily';
+  let now = Date.UTC(2026, 10, 24, 23, 59, 0); const deps = { cache, now: () => now };
+  await handleBoard(req({ id: ID(1), n: 'Main', s: 50 }), env, ctx(), deps);
+  let res = await handleBoard(req({ id: ID(1), n: 'Ada', s: 300 }, { path }), env, ctx(), deps);
+  assert.deepEqual(await res.json(), { place: 1, rows: [{ n: 'Ada', s: 300 }] });
+  let c = ctx(); res = await handleBoard(get({ path }), env, c, deps); await Promise.all(c.waits);
+  assert.deepEqual(await res.json(), { rows: [{ n: 'Ada', s: 300 }] }); assert.ok([...cache.store.keys()].some(k => k.endsWith('/lantern-daily/2026-11-24')));
+  now += 2 * 60_000; // past midnight UTC: the cached answer of the day before is not used, and the rows are gone
+  res = await handleBoard(get({ path }), env, ctx(), deps); assert.deepEqual(await res.json(), { rows: [] });
+  res = await handleBoard(req({ id: ID(1), n: 'Ada', s: 20 }, { path }), env, ctx(), deps);
+  assert.deepEqual(await res.json(), { place: 1, rows: [{ n: 'Ada', s: 20 }] }, 'a lower score counts on a new day');
+  res = await handleBoard(get(), env, ctx(), deps); assert.deepEqual(await res.json(), { rows: [{ n: 'Main', s: 50 }] }, 'the main board keeps its rows across days');
+  assert.deepEqual([...env.objects.keys()].sort(), ['lantern', 'lantern-daily']);
+
+});
+
+
 test('all six boards have independent rows and cache entries; unlisted games remain refused', async () => {
   assert.deepEqual(BOARD.games, ['lantern', 'sling', 'breath', 'matchmaker', 'lantern-fp', 'ant-swarm']);
   const env = fakeEnv(), cache = fakeCache(), c = ctx();
@@ -145,4 +212,49 @@ test('all six boards have independent rows and cache entries; unlisted games rem
   }
   assert.equal(env.objects.size, 6); assert.equal(cache.store.size, 6);
   assert.equal((await handleBoard(get({ path: '/lab-api/board/lantern-race' }), env, c)).status, 404);
+});
+
+test('review 2026-11-24: a repeated post, a removed id, an old ticket, and the daily board around midnight', () => {
+  const R = n => `run-${String(n).padStart(20, '0')}`, t0 = Date.UTC(2026, 10, 24, 12, 0, 0);
+  let sql = fakeSql();
+  // The same post twice: the first answer was lost, the retry gets the same answer and changes nothing.
+  boardStart(sql, R(1), t0); const first = boardPut(sql, { id: ID(1), n: 'Ada', s: 100, r: R(1) }, t0 + 10_000);
+  assert.deepEqual(boardPut(sql, { id: ID(1), n: 'Ada', s: 100, r: R(1) }, t0 + 16_000), first, 'the retry is answered');
+  assert.equal(boardPut(sql, { id: ID(1), n: 'Ada', s: 101, r: R(1) }, t0 + 16_000).why, 'run', 'another score on a used ticket is not');
+  assert.equal(boardPut(sql, { id: ID(2), n: 'Eve', s: 100, r: R(1) }, t0 + 16_000).why, 'run', 'nor another player');
+  assert.equal(boardStart(sql, R(1), t0 + 20_000).ok, true); assert.equal(boardPut(sql, { id: ID(1), n: 'Ada', s: 3000, r: R(1) }, t0 + 3600_000).why, 'run', 'a used ticket does not open again');
+  // A removed id: a score still on its way does not put the row back.
+  boardStart(sql, R(2), t0); boardRemove(sql, ID(1), t0 + 30_000);
+  assert.equal(boardPut(sql, { id: ID(1), n: 'Ada', s: 60, r: R(2) }, t0 + 40_000).why, 'gone'); assert.deepEqual(boardTop(sql), []);
+  // A ticket older than RUN.hours is refused even when no start has swept it.
+  boardStart(sql, R(3), t0); assert.equal(boardPut(sql, { id: ID(3), n: 'Cy', s: 5, r: R(3) }, t0 + RUN.hours * 3600_000 + 1).why, 'run');
+  // The daily board. A read stamped before midnight that arrives late leaves the new day alone.
+  sql = fakeSql(); const late = Date.UTC(2026, 10, 24, 23, 59, 50), next = Date.UTC(2026, 10, 25, 0, 0, 5);
+  boardStart(sql, R(4), late); boardStart(sql, R(5), next);
+  assert.equal(boardPut(sql, { id: ID(4), n: 'Di', s: 40, r: R(5) }, next + 10_000, BOARD.dailyNew, true, '2026-11-25').ok, true);
+  assert.deepEqual(boardTop(sql, 20, '2026-11-24'), [{ n: 'Di', s: 40 }], 'the day does not go back');
+  // A run that began on yesterday's river does not score on today's board.
+  assert.equal(boardPut(sql, { id: ID(5), n: 'Ed', s: 40, r: R(4) }, next + 10_000, BOARD.dailyNew, true, '2026-11-25').why, 'run');
+  // A removal that is the first request of a new day empties the old day first.
+  assert.deepEqual(boardRemove(sql, ID(9), next + 86400_000, '2026-11-26').rows, []);
+});
+
+test('review 2026-11-24, the endpoint as shipped: both Lantern boards need tickets; a removed id answers 410', async () => {
+  RUN.need.push(...NEED);
+  try {
+    const env = fakeEnv(), R = n => `run-${String(n).padStart(20, '0')}`, path = '/lab-api/board/lantern-daily';
+    let now = Date.UTC(2026, 10, 24, 23, 59, 30); const deps = { now: () => now };
+    assert.equal((await handleBoard(req({ id: ID(1), n: 'Ada', s: 9 }, { path }), env, ctx(), deps)).status, 422, 'no ticket');
+    await handleBoard(req({ start: true, r: R(1) }, { path }), env, ctx(), deps); now += 10_000;
+    let res = await handleBoard(req({ id: ID(1), n: 'Ada', s: 90, r: R(1) }, { path }), env, ctx(), deps); assert.equal(res.status, 200);
+    res = await handleBoard(req({ id: ID(1), n: 'Ada', s: 90, r: R(1) }, { path }), env, ctx(), deps); assert.equal(res.status, 200, 'the retry');
+    assert.deepEqual(await res.json(), { place: 1, rows: [{ n: 'Ada', s: 90 }] });
+    await handleBoard(req({ start: true, r: R(2) }, { path }), env, ctx(), deps); now += 40_000; // past midnight
+    assert.equal((await handleBoard(req({ id: ID(2), n: 'Bo', s: 90, r: R(2) }, { path }), env, ctx(), deps)).status, 422, 'yesterday\'s run');
+    assert.deepEqual(await (await handleBoard(get({ path }), env, ctx(), deps)).json(), { rows: [] });
+    assert.equal((await handleBoard(req({ id: ID(1), remove: true }, { path }), env, ctx(), deps)).status, 200);
+    await handleBoard(req({ start: true, r: R(3) }, { path }), env, ctx(), deps); now += 10_000;
+    res = await handleBoard(req({ id: ID(1), n: 'Ada', s: 90, r: R(3) }, { path }), env, ctx(), deps);
+    assert.equal(res.status, 410); assert.deepEqual(await res.json(), { error: 'gone' });
+  } finally { RUN.need.length = 0; }
 });

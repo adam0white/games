@@ -1,7 +1,8 @@
 // Fix-It Stall: the page. View, input, sound, save, cards. The rules are in sim.js.
-import { create, step, input, guide, hint, multiplier, DT, KINDS, TUTOR, WORD, OBJECT, HIT, WORKS, LEAVE, LEVELS } from './sim.js';
+import { create, step, input, guide, hint, multiplier, goalState, stars, DT, KINDS, TUTOR, WORD, OBJECT, HIT, WORKS, LEAVE, LEVELS } from './sim.js';
+import { MAP, COUNT, ORDER, INTRO, levelDef, goalLine, starsFor } from './levels.js';
 import { plan, SKILLS } from './moves.js';
-import { drawJob, drawGhost, person, looks, REGULAR, cat, heart, coin, sillyList, drawSilly, C, circle, rrect, star } from './art.js';
+import { drawJob, drawGhost, person, looks, REGULAR, cat, heart, coin, sillyList, drawSilly, goalIcon, starShape, C, circle, rrect, star } from './art.js';
 import { readJson, writeJson } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
@@ -10,12 +11,13 @@ import { lab } from '../kit/lab.js';
 
 const $ = id => document.getElementById(id);
 const query = new URLSearchParams(location.search);
-const ORDER = [...TUTOR, 'wheel', 'rub', 'clock', 'chain', 'glue', 'sharpen', 'sew', 'pump']; // the order new jobs unlock
+// ORDER (levels.js) is the order new jobs come: one per level on the map, and the open stall's unlock order.
 const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ---------- the save: one JSON blob. Fields are listed in NOTES.md and only ever grow.
 const KEY = 'fixit-save';
-const save = { v: 1, bank: 0, best: 0, shifts: 0, unlocked: TUTOR.slice(), seen: {}, owned: ['teal'], awning: 'teal', sound: true, regular: 0, pending: null, bestStreak: 0, served: 0, days: {} };
+const save = { v: 1, bank: 0, best: 0, shifts: 0, unlocked: TUTOR.slice(), seen: {}, owned: ['teal'], awning: 'teal', sound: true, regular: 0, pending: null, bestStreak: 0, served: 0, days: {}, levels: {}, times: {} };
+let migrated = 0; // levels given to an old save this load (shown once on the menu)
 {
   const old = readJson(KEY, null);
   if (old && typeof old === 'object') for (const k of Object.keys(save)) if (k in old && typeof old[k] === typeof save[k]) save[k] = old[k];
@@ -30,6 +32,16 @@ const save = { v: 1, bank: 0, best: 0, shifts: 0, unlocked: TUTOR.slice(), seen:
   // days: the best daily-stall coins for each UTC date, newest 30 kept
   const days = save.days && typeof save.days === 'object' && !Array.isArray(save.days) ? save.days : {};
   save.days = Object.fromEntries(Object.entries(days).filter(([d, v]) => /^\d{4}-\d{2}-\d{2}$/.test(d) && Number.isFinite(v) && v >= 0).sort().slice(-30));
+  // levels: best stars (1..3) per cleared map level; times: best clear seconds per level. Anything else is dropped.
+  const plain = o => o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  save.levels = Object.fromEntries(Object.entries(plain(save.levels)).filter(([n, v]) => levelDef(+n) && [1, 2, 3].includes(v)));
+  save.times = Object.fromEntries(Object.entries(plain(save.times)).filter(([n, v]) => save.levels[n] && Number.isFinite(v) && v > 0));
+  // A save from before the map (it has no levels field) that shows play starts past the levels that only teach jobs it
+  // already has: the longest run of levels from 1 whose new job is in its unlocked list, each with one star. Once.
+  if (old && typeof old === 'object' && !('levels' in old) && (old.shifts > 0 || old.served > 0 || (Array.isArray(old.unlocked) && old.unlocked.length > TUTOR.length))) {
+    for (let n = 1; n <= INTRO && save.unlocked.includes(ORDER[n - 1]); n++) { save.levels[n] = 1; migrated = n; }
+    writeJson(KEY, save);
+  }
 }
 const store = () => writeJson(KEY, save);
 
@@ -80,6 +92,10 @@ const WORKS_SOUND = {
   knife: () => { noise(0.3, 0.12, 7000); tone(2600, 0.45, 0.05, 'sine', 800); },
   teddy: () => { tone(392, 0.5, 0.07, 'triangle', 200); later(140, () => tone(587, 0.4, 0.06, 'triangle')); },
   ball: () => [0, 1, 2].forEach(i => later(i * 170 * (1 - i * 0.2), () => { tone(180, 0.1, 0.12, 'sine', -80); noise(0.05, 0.08, 900); })),
+  door: () => { tone(220, 0.5, 0.05, 'triangle', -40); later(380, () => { noise(0.08, 0.2, 500); tone(110, 0.15, 0.1, 'sine'); }); },
+  jacket: () => { noise(0.25, 0.08, 3000); later(200, () => tone(988, 0.2, 0.06, 'triangle')); },
+  'toy car': () => { tone(400, 0.6, 0.06, 'sawtooth', 900); noise(0.4, 0.05, 2500); },
+  needle: () => [1319, 1760].forEach((f, i) => later(i * 120, () => tone(f, 0.3, 0.06, 'triangle'))),
 };
 const shimmer = () => [1568, 2093, 2637, 3136].forEach((f, i) => later(i * 60, () => tone(f, 0.3, 0.04, 'triangle')));
 // A short buzz on phones that have one, tied to the sound setting.
@@ -95,13 +111,25 @@ const seed0 = Number(query.get('seed'));
 const only = KINDS.includes(query.get('only')) ? query.get('only') : null;
 const twoQ = query.has('two') ? Number(query.get('two')) : null;
 const dayLen = Number(query.get('day')) > 0 ? Number(query.get('day')) : undefined;
-const startLevel = Math.max(0, Math.min(LEVELS - 1, Number(query.get('level')) || 0));
+const startLevel = Math.max(0, Math.min(LEVELS - 1, Number(query.get('ramp')) || 0)); // the open stall's starting pace
+const qLevel = levelDef(Number(query.get('level'))) ? Number(query.get('level')) : null; // ?level=N: Play starts map level N
 let runN = 0;
 const goldenQ = query.get('golden') === '1';
 // The daily stall: one seed for everyone on the same UTC date (?date=YYYY-MM-DD to pick another day).
 const today = /^\d{4}-\d{2}-\d{2}$/.test(query.get('date') ?? '') ? query.get('date') : new Date().toISOString().slice(0, 10);
 const dateSeed = d => { let h = 2166136261; for (const ch of 'fixit-daily-' + d) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
 let daily = false;
+// ---------- the map: levels.js holds the levels; the save holds the stars
+let mode = 'level', lvN = 1, card = 0, cardFade = 0, lastEnd = null;
+const CARD = 2.6; // seconds the goal card shows before the level starts by itself (a tap starts it sooner)
+const STAR_BONUS = 5; // coins for each new star earned
+const OPEN_AT = 8, DAILY_AT = 3; // the open stall opens after level 8, the daily stall after level 3 (or any old shift)
+const cleared = n => (save.levels[n] ?? 0) > 0;
+const reachable = n => n === 1 || cleared(n) || cleared(n - 1);
+const nextLevel = () => { for (let n = 1; n <= COUNT; n++) if (!cleared(n)) return n; for (let n = 1; n <= COUNT; n++) if (save.levels[n] < 3) return n; return COUNT; };
+const starTotal = () => Object.values(save.levels).reduce((a, b) => a + b, 0);
+const openStall = () => cleared(OPEN_AT) || save.shifts >= 1;
+const dailyOpen = () => cleared(DAILY_AT) || save.shifts >= 1;
 
 const show = screens(['menu', 'shop', 'paused', 'end'], name => {
   screen = name;
@@ -111,9 +139,37 @@ const show = screens(['menu', 'shop', 'paused', 'end'], name => {
   for (const id of ['sound1', 'sound2']) $(id).textContent = `Sound: ${save.sound ? 'on' : 'off'}`;
 });
 function menu() {
-  $('bank').textContent = save.bank; $('best').textContent = save.best; $('jobs').textContent = save.unlocked.length; $('jobsAll').textContent = KINDS.length;
-  $('daily').style.display = save.shifts >= 1 ? '' : 'none';
-  $('dailyLine').textContent = save.shifts >= 1 ? (today in save.days ? `Today's stall: best ${save.days[today]}` : 'Same stall for everyone today. All jobs.') : '';
+  $('bank').textContent = save.bank; $('starsAll').textContent = starTotal(); $('starsMax').textContent = COUNT * 3;
+  $('jobs').textContent = new Set([...save.unlocked, ...ORDER.filter((k, i) => cleared(i + 1))]).size; $('jobsAll').textContent = KINDS.length;
+  const n = only ? null : qLevel ?? nextLevel();
+  $('play').textContent = n ? `Play level ${n}` : 'Play';
+  $('playLine').textContent = n ? goalLine(levelDef(n).goal) : '';
+  map(n);
+  $('migrated').textContent = migrated ? `Your stall's old jobs count: levels 1 to ${migrated} are done.` : '';
+  $('open').style.display = openStall() ? '' : 'none';
+  $('daily').style.display = dailyOpen() ? '' : 'none';
+  $('openLine').textContent = openStall() ? `Open stall: all day, as long as you last. Best ${save.best}.` : `Clear level ${OPEN_AT} to open the stall all day.`;
+  $('dailyLine').textContent = dailyOpen() ? (today in save.days ? `Today's stall: best ${save.days[today]}` : 'Daily stall: the same for everyone today.') : `Clear level ${DAILY_AT} for the daily stall.`;
+}
+// The map: a numbered tile per level, its stars, locked ones greyed, the next one marked. Two chapters.
+function map(next) {
+  const box = $('map'); box.textContent = '';
+  for (const [a, b, title] of [[1, INTRO, 'Learning the trade: a new job each level'], [INTRO + 1, COUNT, 'Busy street: mixed jobs, faster']]) {
+    const h = document.createElement('div'); h.className = 'chap'; h.textContent = title; box.append(h);
+    const grid = document.createElement('div'); grid.className = 'grid' + (a > 1 ? ' late' : '');
+    for (let n = a; n <= b; n++) {
+      const t = document.createElement('button'), st = save.levels[n] ?? 0, open = reachable(n);
+      t.className = 'lv' + (n === next ? ' next' : '') + (st ? ' done' : '');
+      t.dataset.level = n; t.disabled = !open;
+      t.setAttribute('aria-label', `Level ${n}${open ? `, ${st} stars` : ', locked'}`);
+      const num = document.createElement('span'); num.textContent = n;
+      const ss = document.createElement('span'); ss.className = 'ss'; ss.textContent = open ? '★'.repeat(st) + '☆'.repeat(3 - st) : '';
+      t.append(num, ss);
+      t.addEventListener('click', () => begin('level', n));
+      grid.append(t);
+    }
+    box.append(grid);
+  }
 }
 
 function shop() {
@@ -149,36 +205,45 @@ function icon(q, id) {
   if (id === 'charm') { q.strokeStyle = C.ink; q.lineWidth = 9; q.lineCap = 'round'; q.beginPath(); q.arc(24, 22, 12, Math.PI * 0.85, Math.PI * 2.15, true); q.stroke(); q.strokeStyle = C.steel; q.lineWidth = 5.5; q.stroke(); return; }
 }
 
-// ---------- a shift
-function begin(isDaily = false) {
+// ---------- a level, or a shift of the open stall or the daily stall
+function begin(how = 'level', n = null) {
   snd.unlock();
-  daily = isDaily === true;
-  const tutorial = save.shifts === 0 && !only && !daily;
-  newJob = !only && !daily && save.pending && save.unlocked.includes(save.pending) ? save.pending : null;
+  mode = only ? 'open' : how; daily = mode === 'daily';
   const hearts = daily ? 3 : 3 + (has('charm') ? 1 : 0);
-  const seed = daily ? dateSeed(today) : Number.isFinite(seed0) && query.has('seed') ? seed0 + runN : (Math.random() * 2 ** 31) | 0;
-  runN++;
-  const gold = goldenQ ? { golden: 1, goldenFrom: 0 } : {};
-  s = daily
-    ? create({ seed, unlocked: KINDS, hearts, two: true, day: dayLen, startLevel, ...gold })
-    : create({ seed, unlocked: save.unlocked, tutorial, hearts, newJob, only, regular: save.shifts >= 1 && !only ? save.regular : -1, two: twoQ !== null ? twoQ : only ? false : save.shifts >= 1, day: dayLen, startLevel, ...gold });
-  if (newJob) { save.pending = null; store(); }
+  card = 0; cardFade = 0;
+  if (mode === 'level') {
+    lvN = n ?? nextLevel();
+    s = create({ lv: levelDef(lvN), hearts });
+    card = CARD;
+    newJob = null;
+  } else {
+    newJob = !only && !daily && save.pending && save.unlocked.includes(save.pending) ? save.pending : null;
+    const seed = daily ? dateSeed(today) : Number.isFinite(seed0) && query.has('seed') ? seed0 + runN : (Math.random() * 2 ** 31) | 0;
+    runN++;
+    const gold = goldenQ ? { golden: 1, goldenFrom: 0 } : {};
+    s = daily
+      ? create({ seed, unlocked: KINDS, hearts, two: true, day: dayLen, startLevel, ...gold })
+      : create({ seed, unlocked: save.unlocked, tutorial: false, hearts, newJob, only, regular: !only ? save.regular : -1, two: twoQ !== null ? twoQ : !only, day: dayLen, startLevel, ...gold });
+    if (newJob) { save.pending = null; store(); }
+  }
   playing = true; paused = false; acc = 0; last = performance.now(); clock = 0; ended = 0;
   ripples = []; bits = []; flying = []; confetti = []; shownCoins = 0; leaving = []; spots = new Map(); word = null; banner = null; recCount = 0; multWas = 1; multPop = 0; finger = null; kb = null; jobKey = null; prev = null; counterReset();
   show('play');
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); // so Space drives the bench, not the last button
-  rec.start(daily ? { mode: 'daily', date: today } : { mode: 'day', unlocked: save.unlocked.length, shift: save.shifts + 1, tutorial, only });
+  rec.start(mode === 'level' ? { mode: 'level', level: lvN, goal: goalLine(s.lv.goal) } : daily ? { mode: 'daily', date: today } : { mode: 'day', unlocked: save.unlocked.length, shift: save.shifts + 1, only });
   drain();
 }
-// Four fixed in a shift earns the next job, whether the shift ends or the player leaves it (note #150).
+// In the open stall, four fixed in a shift earns the next job, whether the shift ends or the player leaves it (note #150).
 function earnJob() {
-  if (only || daily || s.served < 4) return null;
+  if (mode !== 'open' || only || s.served < 4) return null;
   const job = ORDER.find(k => !save.unlocked.includes(k)) ?? null;
   if (job) { save.unlocked.push(job); save.pending = job; }
   return job;
 }
+const summary = () => ({ coins: s.coins, served: s.served, lost: s.lost, bestStreak: s.bestStreak, ...(mode === 'level' ? { mode: 'level', level: lvN, cleared: s.cleared, stars: stars(s), secs: Math.round(s.clock * 10) / 10 } : {}) });
 function finish() {
   playing = false; ended = performance.now();
+  if (mode === 'level') return finishLevel();
   const why = s.over;
   save.shifts++; save.bank += s.coins; save.served += s.served;
   const newBest = !daily && s.coins > save.best; if (!daily) save.best = Math.max(save.best, s.coins); // the daily stall keeps its own best per day
@@ -187,22 +252,68 @@ function finish() {
   if (daily) { dayBest = !(today in save.days) || s.coins > save.days[today]; save.days[today] = Math.max(save.days[today] ?? 0, s.coins); save.days = Object.fromEntries(Object.entries(save.days).sort().slice(-30)); }
   unlocked = earnJob();
   store();
-  rec.end('closed', { coins: s.coins, served: s.served, lost: s.lost, bestStreak: s.bestStreak, why, ...(daily ? { daily: today } : {}) });
-  $('endTitle').textContent = daily ? (why === 'hearts' ? 'Daily stall: out of hearts' : 'Daily stall closed!') : why === 'hearts' ? 'Out of hearts' : 'Closed!';
-  $('earned').textContent = s.coins; $('served').textContent = s.served; $('streak').textContent = s.bestStreak; $('best2').textContent = daily ? save.days[today] ?? s.coins : save.best;
-  $('endLine').textContent = newBest && s.coins > 0 ? 'New best!' : why === 'hearts' ? `${s.lost} customers walked off.` : `You have ${save.bank} coins.`;
-  if (daily) $('endLine').textContent = dayBest && s.coins > 0 ? `Best today! ${s.coins} coins.` : `Today's best: ${save.days[today]}.`;
-  $('again').textContent = daily ? 'Daily again' : 'Play again';
-  $('newjob').textContent = daily ? `Daily stall ${today}. Come back tomorrow for a new one.` : unlocked ? `Next shift: a new job! (${OBJECT[unlocked]})` : save.unlocked.length < KINDS.length && s.served < 4 ? 'Fix 4 in a shift to get a new job.' : '';
+  rec.end('closed', { ...summary(), why, ...(daily ? { daily: today } : {}) });
+  endCard({ title: daily ? (why === 'hearts' ? 'Daily stall: out of hearts' : 'Daily stall closed!') : why === 'hearts' ? 'Out of hearts' : 'Closed!', stars: null, coins: s.coins,
+    stats: [['Fixed', s.served], ['Best streak', s.bestStreak], ['Best', daily ? save.days[today] ?? s.coins : save.best]],
+    line: daily ? (dayBest && s.coins > 0 ? `Best today! ${s.coins} coins.` : `Today's best: ${save.days[today]}.`) : newBest && s.coins > 0 ? 'New best!' : why === 'hearts' ? `${s.lost} customers walked off.` : `You have ${save.bank} coins.`,
+    note: daily ? `Daily stall ${today}. Come back tomorrow for a new one.` : unlocked ? `Next shift: a new job! (${OBJECT[unlocked]})` : save.unlocked.length < KINDS.length && s.served < 4 ? 'Fix 4 in a shift to get a new job.' : '',
+    again: daily ? 'Daily again' : 'Play again', next: false });
   if (newBest && s.coins > 0) [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 0.4, 0.09, 'triangle'), i * 120));
   else [523, 392].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.08, 'triangle'), i * 160));
   setTimeout(() => { if (!playing && screen === 'play') show('end'); }, 700);
 }
+// A level's end: bank the coins either way, the stars and a bonus for new ones if it was cleared.
+function finishLevel() {
+  const why = s.over, n = lvN, def = s.lv, st = stars(s), was = save.levels[n] ?? 0, secs = Math.round(s.clearT ?? s.clock);
+  const bonus = Math.max(0, st - was) * STAR_BONUS, bestWas = save.times[n];
+  save.bank += s.coins + bonus; save.served += s.served; save.bestStreak = Math.max(save.bestStreak, s.bestStreak);
+  const opened = st && !was && n === OPEN_AT, dailyNow = st && !was && n === DAILY_AT && save.shifts < 1;
+  if (st) {
+    save.levels[n] = Math.max(was, st);
+    save.times[n] = Math.min(bestWas ?? Infinity, Math.round(s.clearT * 10) / 10);
+    if (def.intro && !save.unlocked.includes(def.intro)) save.unlocked.push(def.intro); // the job a level taught is the open stall's too
+  }
+  store();
+  rec.end('closed', { ...summary(), why, bonus });
+  lastEnd = { n, st, why };
+  const upNext = levelDef(n + 1);
+  if (st) {
+    const tip = st < 3 ? `Three stars: clear it in ${def.stars[0]} s.` : bestWas && s.clearT < bestWas ? `New best time!` : 'Three stars!';
+    endCard({ title: `Level ${n} cleared!`, stars: st, coins: s.coins + bonus,
+      stats: [['Time', `${secs} s`], ['Best', `${Math.round(save.times[n])} s`], ['Fixed', s.served]],
+      line: (bonus ? `+${bonus} coins for ${st - was === 1 ? 'a new star' : 'new stars'}. ` : '') + tip,
+      note: opened ? 'The open stall is open: play all day from the menu.' : dailyNow ? 'The daily stall is open on the menu.' : upNext ? (upNext.intro ? `Next: a new job, the ${OBJECT[upNext.intro]}.` : `Next: ${goalLine(upNext.goal)}`) : 'That was the last level. Can you three-star them all?',
+      again: 'Try again', next: !!upNext });
+    [523, 659, 784, 1047].slice(0, 1 + st).forEach((f, i) => setTimeout(() => tone(f, 0.4, 0.09, 'triangle'), 300 + i * 160));
+  } else {
+    const gs = goalState(s), left = gs.parts.filter(p => p.have < p.need).map(p => p.kind === 'coins' ? `${p.need - p.have} more coins` : `${p.need - p.have} more to fix`);
+    const close = gs.parts.every(p => p.have >= p.need * 0.75);
+    endCard({ title: why === 'time' ? 'Out of time' : why === 'hearts' ? 'Out of hearts' : 'Someone walked off', stars: 0, coins: s.coins,
+      stats: gs.parts.map(p => [p.kind === 'coins' ? 'Coins' : 'Fixed', `${Math.min(p.have, p.need)}/${p.need}`]).concat([['Time', `${secs} s`]]),
+      line: why === 'lost' && !left.length ? 'In this level nobody may walk off.' : `${close ? 'So close! ' : ''}${left.join(' and ') || 'Nearly there'}.`,
+      note: goalLine(def.goal), again: 'Try again', next: false });
+    [523, 392].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.08, 'triangle'), i * 160));
+  }
+  setTimeout(() => { if (!playing && screen === 'play') show('end'); }, 900);
+}
+// The end card, for a level or a shift.
+function endCard({ title, stars: st, coins, stats, line, note, again, next }) {
+  $('endTitle').textContent = title;
+  $('endStars').style.display = st === null ? 'none' : '';
+  $('endStars').textContent = st === null ? '' : '★'.repeat(st) + '☆'.repeat(3 - st);
+  $('endStars').className = 'stars' + (st ? '' : ' none');
+  $('earned').textContent = coins;
+  const box = $('endStats'); box.textContent = '';
+  for (const [k, v] of stats) { const sp = document.createElement('span'); const b = document.createElement('b'); b.textContent = v; sp.append(`${k} `, b); box.append(sp); }
+  $('endLine').textContent = line; $('newjob').textContent = note;
+  $('again').textContent = again; $('next').style.display = next ? '' : 'none';
+  $('again').className = next ? '' : 'main';
+}
 function quit() {
   if (!s || !playing) { show('menu'); return; }
-  rec.end('left', { coins: s.coins, served: s.served, lost: s.lost, bestStreak: s.bestStreak, why: 'menu' });
-  save.bank += s.coins; save.served += s.served; earnJob(); store(); // a shift left early keeps its coins, and its new job if 4 were fixed (tester t1, note #150); it does not count as a shift or a best
-  playing = false; paused = false; snd.release(); show('menu');
+  rec.end('left', { ...summary(), why: 'menu' });
+  save.bank += s.coins; save.served += s.served; earnJob(); store(); // a level or shift left early keeps its coins, and in the open stall its new job if 4 were fixed (tester t1, note #150); it does not count as a shift, a best or a clear
+  playing = false; paused = false; card = 0; snd.release(); show('menu');
 }
 
 // Everything the sim reported: sound, words, sparks. Called after each input and each tick, so a touch is answered in the same frame.
@@ -236,6 +347,18 @@ function react(e) {
     case 'shing': noise(0.14, 0.12, 6500); tone(2200 + e.n * 120, 0.18, 0.04, 'sine', 500); for (let i = 0; i < 5; i++) sparks(34 + Math.random() * 56, 56, 1, C.glow); break;
     case 'stitch': tone(1100 + e.n * 40, 0.04, 0.07, 'triangle'); noise(0.02, 0.05, 4000); squash = 0.5; break;
     case 'puff': noise(0.18, 0.14, 1200); tone(240 + e.n * 40, 0.14, 0.07, 'sine', 120); squash = 1; sparks(34, 70, 3, '#fff'); buzz(10); break;
+    case 'drip': tone(900 + e.n * 120, 0.08, 0.1, 'sine', -500); sparks(30, 26, 4, '#e8c860'); squash = 0.6; buzz(10); break;
+    case 'splat': tone(170, 0.08, 0.1, 'triangle', -60); noise(0.05, 0.08, 1200); ripple(s.rep.cx, s.rep.cy, '#ffb0a0'); wobble = 0.6; break;
+    case 'squeak': tone(1500 - e.n * 300, 0.18, 0.05, 'sawtooth', 600); break;
+    case 'wiggle': noise(0.04, 0.08, 2600); tone(600 + e.n * 60, 0.04, 0.05, 'square'); wobble = 0.4; break;
+    case 'unsnag': tone(880, 0.12, 0.1, 'triangle', 300); sparks(50, s.rep.y - 4, 5, C.glow); buzz(12); break;
+    case 'wind': tone(500 + e.n * 160, 0.05, 0.09, 'square'); noise(0.03, 0.06, 2000); break;
+    case 'ready': tone(1320, 0.2, 0.1, 'triangle'); tone(1760, 0.25, 0.06); buzz(15); break;
+    case 'zoom': tone(300, 0.5, 0.1, 'sawtooth', 1200); squash = 1; break;
+    case 'unwind': tone(400, 0.3, 0.07, 'triangle', -250); word = { text: 'Hold till it glows!', t: 0, kind: 'bad' }; break;
+    case 'eye': tone(1250, 0.06, 0.06, 'triangle'); break;
+    case 'through': tone(700 + e.n * 140, 0.07, 0.07, 'triangle'); break;
+    case 'goal': banner = { text: 'Goal!', t: 0, gold: true }; [784, 988, 1175, 1568].forEach((f, i) => later(250 + i * 90, () => tone(f, 0.3, 0.07, 'triangle'))); party(24, true); break;
     case 'fixed': tone(1047, 0.15, 0.08, 'triangle'); break;
     case 'step': word = { text: 'One more!', t: 0, kind: 'job', then: WORD[e.kind] }; break;
     case 'paid': {
@@ -282,12 +405,14 @@ function sparks(x, y, n, col) { for (let i = 0; i < n; i++) bits.push({ x, y, vx
 // ---------- input: one finger (or the mouse) on the bench, in object-local units
 const toLocal = e => ({ x: (e.clientX - boxX) / unit, y: (e.clientY - boxY) / unit });
 cv.addEventListener('pointerdown', e => {
+  if (playing && !paused && card > 0) { e.preventDefault(); startNow(); return; } // a tap on the goal card starts the level
   if (!playing || paused || finger || kb) return;
   e.preventDefault();
   finger = { id: e.pointerId };
   try { cv.setPointerCapture(e.pointerId); } catch {}
   input(s, { type: 'down', ...toLocal(e) }); drain();
 });
+function startNow() { card = 0; cardFade = 0.3; last = performance.now(); acc = 0; }
 cv.addEventListener('pointermove', e => {
   if (!playing || paused || !finger || e.pointerId !== finger.id) return;
   input(s, { type: 'move', ...toLocal(e) }); drain();
@@ -302,9 +427,11 @@ for (const type of ['pointerup', 'pointercancel']) cv.addEventListener(type, e =
 const rec = lab('fixit');
 rec.notice($('menu').firstElementChild);
 rec.toggle($('paused').firstElementChild);
-$('play').addEventListener('click', () => begin(false));
-$('again').addEventListener('click', () => { if (performance.now() - ended > 500) begin(daily); });
-$('daily').addEventListener('click', () => begin(true));
+$('play').addEventListener('click', () => begin(only ? 'open' : 'level', qLevel ?? nextLevel()));
+$('again').addEventListener('click', () => { if (performance.now() - ended > 500) begin(mode, lvN); });
+$('next').addEventListener('click', () => { if (performance.now() - ended > 500) begin('level', Math.min(COUNT, lvN + 1)); });
+$('open').addEventListener('click', () => begin('open'));
+$('daily').addEventListener('click', () => begin('daily'));
 $('toShop').addEventListener('click', () => { snd.unlock(); show('shop'); });
 for (const b of document.querySelectorAll('.back')) b.addEventListener('click', () => show('menu'));
 $('toMenu').addEventListener('click', () => show('menu'));
@@ -350,8 +477,9 @@ $('pause').addEventListener('click', e => { e.preventDefault(); pause(); });
 onLeave(pause);
 addEventListener('keydown', e => {
   if (isPauseKey(e)) { if (paused) resume(); else pause(); return; }
+  if (isSpace(e) && playing && !paused && card > 0) { e.preventDefault(); if (!e.repeat) startNow(); return; }
   if (isSpace(e) && playing && !paused) { e.preventDefault(); if (!kb && !finger && !e.repeat) kb = { plan: [], i: 0, key: null, x: 50, y: 110, down: false }; return; }
-  if ((e.key === 'Enter' || e.key === ' ') && !e.repeat && !playing && screen !== 'play') { const b = screen === 'menu' ? $('play') : screen === 'end' ? $('again') : null; if (b) { e.preventDefault(); b.click(); } }
+  if ((e.key === 'Enter' || e.key === ' ') && !e.repeat && !playing && screen !== 'play') { const b = screen === 'menu' ? $('play') : screen === 'end' ? ($('next').style.display !== 'none' ? $('next') : $('again')) : null; if (b) { e.preventDefault(); b.click(); } }
 });
 
 // The state the browser check reads.
@@ -365,11 +493,13 @@ window.fixitState = () => ({
   customer: s?.cust ? { n: s.cust.n, kinds: s.cust.kinds, regular: s.cust.regular, golden: s.cust.golden, left: s.cust.left, patience: s.cust.patience } : null,
   word: word?.text ?? null, confetti: confetti.length, golden: !!s?.cust?.golden, queue: s ? s.queue.map(c => c.kinds[0]) : [], daily, today, days: { ...save.days }, keyboard: !!kb, alpha: Math.min(1, acc / DT),
   people: drawn.map(p => ({ x: Math.round(p.x * 10) / 10, R: Math.round(p.R * 10) / 10, who: p.who })),
+  mode, level: mode === 'level' ? lvN : null, card, goal: s ? goalState(s) : null, cleared: !!s?.cleared, stars: s ? stars(s) : 0, clearT: s?.clearT ?? null,
+  levels: { ...save.levels }, times: { ...save.times }, next: nextLevel(), migrated, openStall: openStall(), dailyOpen: dailyOpen(),
 });
 
 // ---------- interpolation: the sim runs at 60 Hz; the screen may run faster or out of step. Before each tick the
 // moving parts are noted, and drawing blends from that note to the current state by how far into the next tick we are.
-const LERP = ['p', 'u', 'h', 'ang', 'seat', 'w', 'hand', 'pull', 'ox', 'oy', 'set', 'lx', 'ly', 'slot', 'strokes'];
+const LERP = ['p', 'u', 'h', 'ang', 'seat', 'w', 'hand', 'pull', 'ox', 'oy', 'set', 'lx', 'ly', 'slot', 'strokes', 'x', 'y', 'ph', 'tx', 'ty', 'ex', 'inEye'];
 const keyOf = () => `${s.cust.n}:${s.stepN}:${s.phase}`;
 function snap() { prev = { key: keyOf(), reps: s.reps.map(r => Object.fromEntries(LERP.filter(k => typeof r[k] === 'number').map(k => [k, r[k]]))), left: s.cust.left, clock: s.clock, phaseT: s.phaseT }; }
 function view() {
@@ -397,10 +527,13 @@ function draw(now, dt) {
   for (const b of bits) { const [x, y] = local(b.x, b.y); g.globalAlpha = Math.max(0, 1 - b.t / b.life); star(g, x, y, 4, b.col); g.globalAlpha = 1; }
   hud(t, dt);
   if (has('cat')) cat(g, 38, benchTop + 8, 1.05, t, catHappy > 0);
+  if (s?.lv && (playing || screen === 'paused')) goalCard(t);
 }
 function street(t) {
-  const sky = g.createLinearGradient(0, 0, 0, benchTop);
-  sky.addColorStop(0, '#f7cf93'); sky.addColorStop(1, '#ee9f6a');
+  // the sky moves on through the day as the map goes on: afternoon for the first chapter, sunset, then dusk
+  const sky = g.createLinearGradient(0, 0, 0, benchTop), late = s?.lv && mode === 'level' && (playing || screen !== 'menu') ? (lvN > 24 ? 2 : lvN > INTRO ? 1 : 0) : 0;
+  const SKY = [['#f7cf93', '#ee9f6a'], ['#f2a37a', '#d9705a'], ['#8a6aa0', '#e08a6a']][late];
+  sky.addColorStop(0, SKY[0]); sky.addColorStop(1, SKY[1]);
   g.fillStyle = sky; g.fillRect(-20, -20, W + 40, benchTop + 40);
   const sun = g.createRadialGradient(W * 0.82, top + 70, 4, W * 0.82, top + 70, 120); sun.addColorStop(0, 'rgba(255,248,200,.9)'); sun.addColorStop(1, 'rgba(255,248,200,0)');
   g.fillStyle = sun; g.fillRect(0, 0, W, benchTop);
@@ -574,11 +707,13 @@ function hud(t, dt) {
     const bx = W / 2 - 16 + g.measureText(String(shownCoins)).width + 10, k = 1 + 0.5 * multPop * (calm ? 0.3 : 1);
     g.save(); g.translate(bx + 17, y + 16); g.scale(k, k); rrect(g, -17, -12, 34, 24, 10, multPop > 0.01 ? C.amber : C.teal, 2); g.fillStyle = '#fff6e4'; g.font = 'bold 16px ui-rounded, sans-serif'; g.textAlign = 'center'; g.fillText(`x${m}`, 0, 1); g.restore();
   }
-  // the day: a sun travelling along a line from open to close
-  const x0 = 14, x1 = W - 66, ly = top + 44, f = s.cust?.tutor ? 0 : Math.min(1, (V?.clock ?? s.clock) / s.day);
-  g.strokeStyle = 'rgba(58,34,22,.35)'; g.lineWidth = 4; g.lineCap = 'round'; g.beginPath(); g.moveTo(x0, ly); g.lineTo(x1, ly); g.stroke();
-  g.strokeStyle = '#fff6e4'; g.beginPath(); g.moveTo(x0, ly); g.lineTo(x0 + (x1 - x0) * f, ly); g.stroke();
-  circle(g, x0 + (x1 - x0) * f, ly, 6, '#ffd860', 1.6);
+  if (s.lv) goalBar(t);
+  else { // the day: a sun travelling along a line from open to close
+    const x0 = 14, x1 = W - 66, ly = top + 44, f = s.cust?.tutor ? 0 : Math.min(1, (V?.clock ?? s.clock) / s.day);
+    g.strokeStyle = 'rgba(58,34,22,.35)'; g.lineWidth = 4; g.lineCap = 'round'; g.beginPath(); g.moveTo(x0, ly); g.lineTo(x1, ly); g.stroke();
+    g.strokeStyle = '#fff6e4'; g.beginPath(); g.moveTo(x0, ly); g.lineTo(x0 + (x1 - x0) * f, ly); g.stroke();
+    circle(g, x0 + (x1 - x0) * f, ly, 6, '#ffd860', 1.6);
+  }
   // coins in flight towards the counter
   for (const c of flying) {
     if (c.t < 0) continue;
@@ -589,10 +724,77 @@ function hud(t, dt) {
   for (const p of confetti) { g.save(); g.globalAlpha = Math.max(0, 1 - p.t / p.life); g.translate(p.x, p.y); g.rotate(p.r); g.fillStyle = p.col; g.fillRect(-4, -2.5, 8, 5); g.restore(); }
 }
 
+// The goal, live: a pill with each part's icon and count, then the level clock as a bar with the star times marked on
+// it. A timed level's bar runs out at the limit; an untimed one shows how long the stars stay in reach.
+const ink = (text, x, y, size, col = '#fff6e4', align = 'left') => { g.font = `bold ${size}px ui-rounded, 'Arial Rounded MT Bold', sans-serif`; g.textAlign = align; g.textBaseline = 'middle'; g.lineWidth = Math.max(3, size / 5); g.strokeStyle = C.ink; g.lineJoin = 'round'; g.strokeText(text, x, y); g.fillStyle = col; g.fillText(text, x, y); return g.measureText(text).width; };
+function goalBar(t) {
+  const gs = goalState(s), ly = top + 47, lv = s.lv;
+  let x = 10;
+  const parts = gs.parts.map(p => ({ ...p, text: `${Math.min(p.have, p.need)}/${p.need}` }));
+  g.font = `bold 17px ui-rounded, sans-serif`;
+  const w = parts.reduce((a, p) => a + 26 + g.measureText(p.text).width + 8, 6) + (gs.safe ? 22 : 0);
+  rrect(g, x, ly - 15, w, 30, 15, gs.met ? '#3f9e6a' : 'rgba(58,34,22,.72)', 2);
+  x += 8;
+  for (const p of parts) {
+    goalIcon(g, p.kind, x + 10, ly, 10, t);
+    x += 24 + ink(p.text, x + 24, ly + 1, 17, p.have >= p.need ? '#9ff0b0' : '#fff6e4') + 8;
+  }
+  if (gs.safe) { heart(g, x + 8, ly - 10, 18, s.lost === 0); x += 22; }
+  // the clock bar
+  const x0 = 10 + w + 14, x1 = W - 66, span = gs.time ?? Math.ceil(lv.stars[1] * 1.3), now = V?.clock ?? s.clock, f = Math.min(1, now / span);
+  if (x1 - x0 < 50) return;
+  g.lineCap = 'round';
+  g.strokeStyle = 'rgba(58,34,22,.4)'; g.lineWidth = 8; g.beginPath(); g.moveTo(x0, ly); g.lineTo(x1, ly); g.stroke();
+  const late = gs.time && gs.time - now < 10 && !s.cleared;
+  g.strokeStyle = late ? (Math.sin(t * 12) > 0 ? C.red : '#ffb0a0') : '#fff6e4'; g.lineWidth = 5; g.beginPath(); g.moveTo(x0, ly); g.lineTo(x0 + (x1 - x0) * f, ly); g.stroke();
+  for (const [i, k] of [[0, 3], [1, 2]]) { // star marks under the bar: bright while still in reach
+    const tx = x0 + (x1 - x0) * Math.min(1, lv.stars[i] / span), gone = (s.cleared ? s.clearT : now) > lv.stars[i];
+    g.strokeStyle = C.ink; g.lineWidth = 2; g.beginPath(); g.moveTo(tx, ly - 6); g.lineTo(tx, ly + 6); g.stroke();
+    starShape(g, tx, ly + 14, k === 3 ? 7 : 5.5, gone ? 'rgba(255,255,255,.3)' : k === 3 ? '#ffd860' : '#f3ead8'); // gold: three stars; pale: two
+  }
+  if (gs.time) { const left = Math.max(0, Math.ceil(gs.time - now)); ink(`${left} s`, x1, ly - 13, 14, late ? '#ffb0a0' : '#fff6e4', 'right'); }
+  circle(g, x0 + (x1 - x0) * f, ly, 6, '#ffd860', 1.6);
+}
+// The goal card: what this level asks, shown before it starts (the sim waits), then fading as play begins.
+function goalCard(t) {
+  const a = card > 0 ? Math.min(1, (CARD - card) * 6 + 0.4) : cardFade / 0.3;
+  if (a <= 0 || !s?.lv) return;
+  const lv = s.lv, cw = Math.min(W - 32, 340), lines = wrap(goalLine(lv.goal), cw - 40, 20), ch = 150 + lines.length * 26 + (lv.intro ? 30 : 0);
+  const x = (W - cw) / 2, y = Math.max(top + 70, boxY + S / 2 - ch / 2 - 20);
+  g.save(); g.globalAlpha = a;
+  g.fillStyle = 'rgba(58,34,22,.35)'; g.fillRect(-20, -20, W + 40, H + 40);
+  g.translate(0, card > 0 ? 0 : (1 - a) * -30);
+  rrect(g, x, y, cw, ch, 22, '#fff1d6', 3);
+  let yy = y + 30;
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = C.copper;
+  ink(`Level ${lv.n}`, W / 2, yy, 28, C.copperLt, 'center'); yy += 34;
+  if (lv.intro) { g.font = 'bold 17px ui-rounded, sans-serif'; g.fillStyle = C.tealDk; g.fillText(`New job: the ${OBJECT[lv.intro]}`, W / 2, yy); yy += 30; }
+  const icons = [lv.goal.list ? 'list' : lv.goal.fix ? 'fix' : null, lv.goal.coins ? 'coins' : null, lv.goal.time ? 'time' : null, lv.goal.safe || lv.goal.list ? 'safe' : null].filter(Boolean);
+  icons.forEach((k, i) => goalIcon(g, k, W / 2 + (i - (icons.length - 1) / 2) * 44, yy + 4, 15, t));
+  yy += 34;
+  g.font = 'bold 20px ui-rounded, sans-serif'; g.fillStyle = C.ink;
+  for (const l of lines) { g.fillText(l, W / 2, yy); yy += 26; }
+  g.font = 'bold 16px ui-rounded, sans-serif';
+  const sw = g.measureText(`in ${lv.stars[0]} s or less`).width + 46;
+  for (let j = 0; j < 3; j++) starShape(g, W / 2 - sw / 2 + 6 + j * 13, yy + 1, 7, '#ffd860');
+  g.fillStyle = 'rgba(58,34,22,.85)'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(`in ${lv.stars[0]} s or less`, W / 2 - sw / 2 + 46, yy + 2); g.textAlign = 'center';
+  yy += 26;
+  if (card > 0) { g.globalAlpha = a * (0.75 + 0.25 * Math.sin(t * 5)); g.font = 'bold 17px ui-rounded, sans-serif'; g.fillStyle = C.tealDk; g.fillText('Tap to start', W / 2, yy); }
+  g.restore();
+}
+function wrap(text, width, size) {
+  g.font = `bold ${size}px ui-rounded, sans-serif`;
+  const out = []; let line = '';
+  for (const w of text.split(' ')) { const tryL = line ? line + ' ' + w : w; if (g.measureText(tryL).width > width && line) { out.push(line); line = w; } else line = tryL; }
+  if (line) out.push(line);
+  return out;
+}
+
 // ---------- the loop: a fixed 60 Hz sim; a hidden tab or a pause never makes a catch-up burst
 function frame(now) {
   const dt = Math.min(0.1, Math.max(0, (now - last) / 1000)); last = now;
-  if (playing && !paused) {
+  if (playing && !paused && card > 0) { card = Math.max(0, card - dt); if (!card) startNow(); }
+  else if (playing && !paused) {
     acc += dt; let n = 0;
     while (acc >= DT && playing && n < 6) { snap(); if (kb) kbStep(); step(s); drain(); acc -= DT; n++; }
     if (n >= 6) acc = 0;
@@ -606,7 +808,7 @@ function frame(now) {
     for (const c of flying) { c.t += dt; if (c.t >= 0.7 && !c.landed) { c.landed = true; shownCoins += c.value; tone(1800 + Math.random() * 300, 0.05, 0.04, 'square'); } }
     flying = flying.filter(c => !c.landed);
     for (const p of confetti) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 520 * dt; p.vx *= 1 - dt; p.r += p.vr * dt; } confetti = confetti.filter(p => p.t < p.life);
-    multPop = Math.max(0, multPop - dt * 2.5);
+    multPop = Math.max(0, multPop - dt * 2.5); cardFade = Math.max(0, cardFade - dt);
     if (s && !flying.length) shownCoins = s.coins;
     if (word) { word.t += dt; if (word.then && word.t > 0.7) word = { text: word.then, t: 0, kind: 'job' }; else if (word.kind !== 'job' && word.t > 0.9) word = null; }
     if (banner) { banner.t += dt; if (banner.t > 1.6) banner = null; }

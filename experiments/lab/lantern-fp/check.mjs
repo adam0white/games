@@ -109,6 +109,18 @@ async function testControls(page, label) {
   before = after;
   await page.mouse.move(v.width * 0.76, y); await page.mouse.down(); await waitState(page, taps => window.lanternFPState().taps >= taps + 2, before.taps, 10000); await page.mouse.up();
   after = await state(page); assert.ok(after.target >= before.target + TAP_STEP * 2 - 1e-10, 'holding right repeats tap steps');
+  // Review fix: quick alternating thumbs overlap. A second thumb down before the first lifts must still steer,
+  // and lifting the older thumb must not cancel the newer press.
+  const overlap = await page.evaluate(() => {
+    const c = document.querySelector('#c'), w = innerWidth, y = innerHeight * 0.72, t0 = window.lanternFPState().taps;
+    const ev = (type, id, x) => c.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', isPrimary: id === 81, clientX: x, clientY: y, bubbles: true, cancelable: true }));
+    ev('pointerdown', 81, w * 0.24); const leftTarget = window.lanternFPState().target;
+    ev('pointerdown', 82, w * 0.76); const rightTarget = window.lanternFPState().target;
+    ev('pointerup', 81, w * 0.24); ev('pointerup', 82, w * 0.76);
+    return { taps: window.lanternFPState().taps - t0, leftTarget, rightTarget };
+  });
+  assert.equal(overlap.taps, 2, 'overlapping two-thumb taps both count');
+  assert.ok(overlap.rightTarget > overlap.leftTarget, 'the newer thumb sets the side');
   await tapElement(page, '#pause'); before = await state(page); assert.ok(before.paused, 'pause button');
   await sleep(250); assert.equal((await state(page)).t, before.t, 'pause freezes rules');
   await noOverflow(page); await tapElement(page, '#resume');
