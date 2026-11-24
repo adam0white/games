@@ -7,6 +7,7 @@ import { noZoom } from '../../kit/zoom.js';
 import { screens } from '../../kit/screens.js';
 import { hint } from '../../kit/hint.js';
 import { table, newCode, cleanCode, linkFor, codeFromLink, share } from '../../kit/room.js';
+import { t, lang, apply, setLang, dateLabel } from './words.js';
 
 noZoom();
 const KEY = 'pisti:v1';
@@ -61,6 +62,7 @@ function startHand() {
   const myToken = ++token;
   g.s = deal(g.handNo === 0 ? g.seed : (g.seed + g.handNo * 7919) >>> 0, g.dealer);
   g.captures = [];
+  scoreView = null;
   g.viewer = g.s.turn;
   g.hints = save.hands < 3;
   show(null);
@@ -115,9 +117,9 @@ async function next(myToken) {
       g.viewer = s.turn;
       g.covered = true;
       render();
-      $('coverWho').textContent = `Player ${s.turn + 1}`;
+      $('coverWho').textContent = t('player', { n: s.turn + 1 });
       const last = s.log[s.log.length - 1];
-      $('coverMove').textContent = last ? `Player ${last.seat + 1} played ${cardName(last.card)}${last.capture ? ' and took the pile' : ''}.` : '';
+      $('coverMove').textContent = last ? t(last.capture ? 'coverTook' : 'coverPlayed', { who: t('player', { n: last.seat + 1 }), card: cardName(last.card) }) : '';
       show('cover');
       return;
     }
@@ -131,7 +133,7 @@ async function next(myToken) {
   await doPlay(card, myToken);
 }
 
-function cardName(c) { return RANKS[rank(c)] + SUITS[suit(c)]; }
+function cardName(c) { return t('cardOf', { rank: t('r' + rank(c)), suit: t('s' + suit(c)) }); }
 
 async function doPlay(card, myToken) {
   busy = true;
@@ -188,7 +190,7 @@ async function doPlay(card, myToken) {
 
 function celebratePisti(kind) {
   anim.burst = performance.now();
-  $('shout').textContent = kind === 'double' ? 'Pişti × 2!' : 'Pişti!';
+  $('shout').textContent = t(kind === 'double' ? 'shoutDouble' : 'shout');
   $('shout').classList.remove('on'); $('shout').getBoundingClientRect(); $('shout').classList.add('on');
   snd.tone(330, 0.7, 0.13, 'triangle', 660); snd.tone(495, 0.7, 0.08, 'sine', 990); snd.noise(0.6, 0.18, 700);
 }
@@ -226,27 +228,49 @@ async function finish(myToken) {
   showScore(sc, matchOver, myToken);
 }
 
-const ROWS = [
-  ['Jacks · 1 each', 'jacks'], ['Aces · 1 each', 'aces'], ['2♣ · 2', 'two'], ['10♦ · 3', 'ten'], ['Most cards · 3', 'most'], ['Pişti · 10 (J on J · 20)', 'pisti'],
-];
+const ROWS = [['rowJacks', 'jacks'], ['rowAces', 'aces'], ['rowTwo', 'two'], ['rowTen', 'ten'], ['rowMost', 'most'], ['rowPisti', 'pisti']];
+const mark = text => text.replace('♦', '♦︎').replace('♣', '♣︎');
+
+// The score card's words, drawn from the stored view so a language switch can redraw them at any moment.
+let scoreView = null;
+function paintScore() {
+  const v = scoreView;
+  if (!v || !g) return;
+  const names = v.atTable ? roomSeats.map(seat => seat.n) : g.mode === 'two' ? [t('player', { n: 1 }), t('player', { n: 2 })] : [t('you'), t('bot')];
+  const tb = $('scoreT').tBodies[0];
+  names.forEach((name, seat) => { tb.firstElementChild.children[seat + 1].textContent = name; });
+  for (const row of tb.querySelectorAll('tr[data-k]')) {
+    const k = row.dataset.k, key = ROWS.find(x => x[1] === k)[0];
+    row.children[0].textContent = mark(k === 'most' && row.dataset.shown ? t('rowMostCount', { a: v.sc[0].cards, b: v.sc[1].cards }) : t(key));
+  }
+  tb.querySelector('tr.total').children[0].textContent = t('total');
+  const lead = g.match ? g.totals[0] - g.totals[1] : v.sc[0].total - v.sc[1].total;
+  if (!v.counted) { $('scoreTitle').textContent = t('counting'); $('matchLine').textContent = ''; }
+  else {
+    $('scoreTitle').textContent = v.atTable || g.mode === 'two'
+      ? (lead > 0 ? t('wins', { name: names[0] }) : lead < 0 ? t('wins', { name: names[1] }) : t('draw'))
+      : (lead > 0 ? t('youWin') : lead < 0 ? t('botWins') : t('draw'));
+    if (g.match) $('matchLine').textContent = t(v.matchOver ? 'matchOver' : 'matchTo51', { a: g.totals[0], b: g.totals[1] });
+    else if (g.mode === 'daily') $('matchLine').textContent = t('margin', { n: fmt(v.sc[0].total - v.sc[1].total) });
+  }
+  $('again').textContent = v.atTable ? t('dealAgain') : g.match && !v.matchOver ? t('nextHand') : g.mode === 'daily' ? t('againDaily') : t('again');
+  const kept = save.daily[today]?.margin;
+  $('dailyNote').textContent = g.mode === 'daily' ? (!g.practice ? t('dailyScored', { date: dateLabel(today) }) : kept === undefined ? t('dailyUnfinished') : t('dailyKept', { margin: fmt(kept) })) : '';
+  if (v.atTable) updateRoomView();
+}
 
 async function showScore(sc, matchOver, myToken) {
   const atTable = g.mode === 'table';
-  const names = atTable ? roomSeats.map(seat => seat.n) : g.mode === 'two' ? ['Player 1', 'Player 2'] : ['You', 'Bot'];
+  scoreView = { sc, matchOver, atTable, counted: false };
   const tb = $('scoreT').tBodies[0];
-  const body = ROWS.map(([label, k]) => `<tr data-k="${k}"><td>${label.replace('♦', '♦︎').replace('♣', '♣︎')}</td><td></td><td></td></tr>`).join('');
-  tb.innerHTML = '<tr class="head"><th></th><th></th><th></th></tr>' + body
-    + '<tr class="total"><td>Total</td><td>0</td><td>0</td></tr>';
-  names.forEach((name, seat) => { tb.firstElementChild.children[seat + 1].textContent = name; });
+  const body = ROWS.map(([, k]) => `<tr data-k="${k}"><td></td><td></td><td></td></tr>`).join('');
+  tb.innerHTML = '<tr class="head"><th></th><th></th><th></th></tr>' + body + '<tr class="total"><td></td><td>0</td><td>0</td></tr>';
   const me = sc[0].total, them = sc[1].total;
-  $('scoreTitle').textContent = 'Counting…';
-  $('matchLine').textContent = '';
   $('daily').classList.toggle('on', g.mode === 'daily');
-  $('again').textContent = atTable ? 'Deal again' : g.match && !matchOver ? 'Next hand' : g.mode === 'daily' ? 'Play it again' : 'Play again';
   if (g.mode === 'daily') drawStrip($('strip'), g.captures);
   const kept = save.daily[today]?.margin;
-  $('dailyNote').textContent = g.mode === 'daily' ? (!g.practice ? `Today’s deal ${today} · scored` : kept === undefined ? 'Practice · today’s scored attempt was left unfinished' : `Practice · today’s scored result stays ${fmt(kept)}`) : '';
   $('savePic').style.display = kept === undefined ? 'none' : '';
+  paintScore();
   show('score');
   if (atTable) updateRoomView();
   const rows = [...tb.querySelectorAll('tr[data-k]')], total = tb.querySelector('tr.total');
@@ -257,7 +281,7 @@ async function showScore(sc, matchOver, myToken) {
     const k = row.dataset.k;
     const v = [sc[0][k], sc[1][k]];
     row.children[1].textContent = v[0]; row.children[2].textContent = v[1];
-    if (k === 'most') { row.children[1].textContent = `${v[0] || '–'}`; row.children[2].textContent = `${v[1] || '–'}`; row.children[0].textContent = `Most cards · 3 (${sc[0].cards}–${sc[1].cards})`; }
+    if (k === 'most') { row.children[1].textContent = `${v[0] || '–'}`; row.children[2].textContent = `${v[1] || '–'}`; row.dataset.shown = '1'; paintScore(); }
     if (k === 'pisti' && (v[0] || v[1])) row.children[v[0] > v[1] ? 1 : 2].classList.add('hot');
     row.classList.add('on');
     run[0] += v[0]; run[1] += v[1];
@@ -268,11 +292,8 @@ async function showScore(sc, matchOver, myToken) {
   await wait(250);
   if (myToken !== token) return;
   const lead = g.match ? g.totals[0] - g.totals[1] : me - them;
-  $('scoreTitle').textContent = atTable || g.mode === 'two'
-    ? (lead > 0 ? `${names[0]} wins` : lead < 0 ? `${names[1]} wins` : 'A draw')
-    : (lead > 0 ? 'You win' : lead < 0 ? 'The bot wins' : 'A draw');
-  if (g.match) $('matchLine').textContent = matchOver ? `Match ${g.totals[0]}–${g.totals[1]}` : `Match to 51: ${g.totals[0]}–${g.totals[1]}`;
-  else if (g.mode === 'daily') $('matchLine').textContent = `Margin ${fmt(me - them)}`;
+  scoreView.counted = true;
+  paintScore();
   if (lead > 0) [523, 659, 784].forEach((f, i) => setTimeout(() => snd.tone(f, 0.25, 0.08, 'triangle'), i * 120));
   g.scored = true;
   if (atTable) updateRoomView();
@@ -325,8 +346,8 @@ function picture() {
   grd.addColorStop(0, '#9a3d22'); grd.addColorStop(1, '#4a1a10');
   ctx.fillStyle = grd; ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = '#fbeedb'; ctx.textAlign = 'center';
-  ctx.font = '72px Georgia, serif'; ctx.fillText('Pişti', W / 2, 120);
-  ctx.font = '36px system-ui, sans-serif'; ctx.fillStyle = '#fbeedbcc'; ctx.fillText(`Today’s deal · ${today}`, W / 2, 180);
+  ctx.font = '72px Georgia, serif'; ctx.fillText(t('title'), W / 2, 120);
+  ctx.font = '36px system-ui, sans-serif'; ctx.fillStyle = '#fbeedbcc'; ctx.fillText(t('pictureDeal', { date: dateLabel(today) }), W / 2, 180);
   const info = save.daily[today];
   const margin = info?.margin ?? 0;
   ctx.font = 'bold 150px system-ui, sans-serif'; ctx.fillStyle = margin > 0 ? '#ffd36e' : '#fbeedb';
@@ -339,7 +360,7 @@ function picture() {
     drawIcon(ctx, cap.kind, (W - n * size) / 2 + col * size + 4, 440 + row * size * 1.15, size - 8, cap.seat === 0);
   });
   ctx.font = '28px system-ui, sans-serif'; ctx.fillStyle = '#fbeedb99';
-  ctx.fillText('bright: my captures · grey: the bot’s · flame: pişti', W / 2, H - 40);
+  ctx.fillText(t('pictureKey'), W / 2, H - 40);
   return c;
 }
 async function savePicture() {
@@ -348,7 +369,7 @@ async function savePicture() {
   if (!blob) return;
   const file = new File([blob], `pisti-${today}.png`, { type: 'image/png' });
   try {
-    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: `Pişti ${today}` }); return; }
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: t('pictureTitle', { date: dateLabel(today) }) }); return; }
   } catch (e) { if (e && e.name === 'AbortError') return; }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = file.name;
@@ -366,6 +387,7 @@ function cardEl(c, faceDown = false) {
   const s = SUITS[suit(c)] + '︎';
   el.innerHTML = `<span class="r">${RANKS[rank(c)]}</span><span class="s">${s}</span><span class="b">${isJack(c) ? 'J' : s}</span>`;
   el.setAttribute('aria-label', cardName(c));
+  el.cardId = c;
   return el;
 }
 
@@ -447,11 +469,15 @@ function render() {
   flames($('oppFlames'), s.piCount[them] + 2 * s.doubles[them], false);
   $('myDot').classList.toggle('them', g.mode === 'two' && me === 1);
   $('oppDot').classList.toggle('them', !(g.mode === 'two' && them === 0));
-  $('turnName').textContent = g.mode === 'table' && !s.done
-    ? (s.turn === me ? 'Your turn' : `Turn: ${roomSeats[them].n}`)
-    : g.mode === 'two' ? `Player ${me + 1}` : '';
+  turnText();
   anim.heat = Math.min(1, s.pile.length / 12);
   anim.lone = s.pile.length === 1;
+}
+function turnText() {
+  const s = g.s, me = bottomSeat(), them = 1 - me;
+  $('turnName').textContent = g.mode === 'table' && !s.done
+    ? (s.turn === me ? t('yourTurn') : t('turnOf', { name: roomSeats[them].n }))
+    : g.mode === 'two' ? t('player', { n: me + 1 }) : '';
 }
 function stack(el, n) {
   el.innerHTML = '';
@@ -606,7 +632,7 @@ function hero() {
 // Friends' tables.
 let room, roomActive = false, roomInviting = false;
 let roomSeat = null, roomSeats = [], roomGame = 0, roomSeed = 0, roomMoves = 0, roomVotes = [];
-let roomLagTimer = 0, roomLag = false;
+let roomLagTimer = 0, roomLag = false, shareCopied = false;
 
 function friendCard() {
   $('friendName').value = save.name;
@@ -627,7 +653,8 @@ function openRoom(code, inviting) {
   $('roomCode').textContent = code;
   $('roomLink').value = linkFor(code);
   $('roomLinkField').hidden = true;
-  $('shareLink').textContent = 'Share link';
+  shareCopied = false;
+  $('shareLink').textContent = t('shareLink');
   show('friendCard');
   const url = new URL(location.href);
   url.searchParams.set('room', code);
@@ -647,8 +674,7 @@ function leaveRoom() {
   room.leave();
   $('table').classList.remove('friends');
   $('score').classList.remove('friends');
-  $('pause').setAttribute('aria-label', 'Pause');
-  $('pauseTitle').textContent = 'Paused';
+  pauseLabels();
   $('again').disabled = false;
   const url = new URL(location.href);
   url.searchParams.delete('room');
@@ -667,6 +693,7 @@ function receiveRoomState(state) {
   busy = false;
   press = null;
   anim.burst = 0;
+  scoreView = null;
   $('shout').classList.remove('on');
   g = { mode: 'table', seed: state.seed, seat: state.seat, s, hints: save.hands < 3 };
   receiveRoomSeats(state.seats);
@@ -681,8 +708,7 @@ function receiveRoomSeats(seats) {
     $('roomInvite').hidden = true;
     $('table').classList.add('on', 'friends');
     $('score').classList.add('friends');
-    $('pause').setAttribute('aria-label', 'Table menu');
-    $('pauseTitle').textContent = 'Table menu';
+    pauseLabels();
     show(null);
     layout();
   }
@@ -728,17 +754,17 @@ function watchRoomLag() {
 
 function roomMessage() {
   switch (room.status) {
-    case 'connecting': return roomInviting ? 'Waiting for your friend' : 'Connecting';
-    case 'waiting': return 'Reconnecting';
-    case 'full': return 'This table is full';
-    case 'version': return 'Reload the page to get the same version as your friend';
-    case 'closed': return 'This table was opened in another tab, or has ended';
+    case 'connecting': return t(roomInviting ? 'waitingFriend' : 'connecting');
+    case 'waiting': return t('reconnecting');
+    case 'full': return t('full');
+    case 'version': return t('version');
+    case 'closed': return t('closed');
     case 'live': {
       const friend = roomSeats[1 - roomSeat];
-      if (!friend) return 'Waiting for your friend';
+      if (!friend) return t('waitingFriend');
       const messages = [];
-      if (!friend.on) messages.push(`${friend.n} dropped. Waiting for them to come back.`);
-      if (roomLag) messages.push('Sending move…');
+      if (!friend.on) messages.push(t('dropped', { name: friend.n }));
+      if (roomLag) messages.push(t('sending'));
       return messages.join(' ');
     }
     default: return '';
@@ -762,12 +788,12 @@ function updateRoomView() {
     const connected = player.on && (seat !== roomSeat || room.status === 'live');
     el.querySelector('.seat-light').classList.toggle('on', connected);
     el.querySelector('.seat-name').textContent = player.n;
-    el.setAttribute('aria-label', `${player.n} · ${connected ? 'connected' : 'disconnected'}`);
+    el.setAttribute('aria-label', t(connected ? 'seatOn' : 'seatOff', { name: player.n }));
   }
   $('hand').classList.toggle('wait', !canPlay());
   if (screen !== 'score') return;
   const friend = roomSeats[1 - roomSeat].n, voted = roomVotes.includes(roomSeat);
-  $('matchLine').textContent = voted ? `Waiting for ${friend}` : roomVotes.includes(1 - roomSeat) ? `${friend} wants another hand` : '';
+  $('matchLine').textContent = voted ? t('waitingFor', { name: friend }) : roomVotes.includes(1 - roomSeat) ? t('wantsAnother', { name: friend }) : '';
   $('again').disabled = !g.scored || voted || room.status !== 'live';
 }
 
@@ -783,15 +809,19 @@ function menu() {
   paused = false; busy = false;
   snd.release();
   g = null;
+  scoreView = null;
   $('table').classList.remove('on');
   $('practice').style.display = 'none';
   show('menu');
   $('levelDots').innerHTML = LEVELS.map((_, i) => `<i class="${i <= save.level ? 'on' : ''}"></i>`).join('');
-  $('levelDots').setAttribute('aria-label', `Bot strength: ${LEVELS[save.level]}`);
   for (const b of $('length').children) b.classList.toggle('on', b.dataset.len === save.len);
-  const d = save.daily[today];
-  $('todayNote').textContent = d?.done ? `${today} · played (${fmt(d.margin)}) · practice` : d ? `${today} · started · practice` : `${today} · the same cards for everyone`;
+  menuText();
   requestAnimationFrame(hero);
+}
+function menuText() {
+  $('levelDots').setAttribute('aria-label', t('botStrength', { level: t(LEVELS[save.level]) }));
+  const d = save.daily[today], date = dateLabel(today);
+  $('todayNote').textContent = d?.done ? t('todayPlayed', { date, margin: fmt(d.margin) }) : d ? t('todayStarted', { date }) : t('todaySame', { date });
 }
 $('play').addEventListener('click', () => { snd.unlock(); newGame('play'); });
 $('today').addEventListener('click', () => { snd.unlock(); newGame('daily'); });
@@ -809,9 +839,9 @@ $('joinForm').onsubmit = e => {
 };
 $('shareLink').onclick = async () => {
   const code = room.code;
-  const result = await share(code, 'Play Pişti with me');
+  const result = await share(code, t('shareText'));
   if (!roomActive || room.code !== code) return;
-  if (result === 'copied') $('shareLink').textContent = 'Link copied';
+  if (result === 'copied') { shareCopied = true; $('shareLink').textContent = t('linkCopied'); }
   if (result === 'shown') {
     $('roomLinkField').hidden = false;
     $('roomLink').select();
@@ -836,8 +866,8 @@ $('again').addEventListener('click', () => {
 });
 $('reveal').addEventListener('click', () => { if (g) g.covered = false; show(null); render(); });
 $('savePic').addEventListener('click', () => { savePicture().catch(() => {}); });
-const setSound = () => { $('sound').textContent = `Sound: ${save.sound ? 'on' : 'off'}`; };
-const setFour = () => { $('colours').textContent = `Four colours: ${save.four ? 'on' : 'off'}`; document.body.classList.toggle('four', !!save.four); };
+const setSound = () => { $('sound').textContent = t(save.sound ? 'soundOn' : 'soundOff'); };
+const setFour = () => { $('colours').textContent = t(save.four ? 'coloursOn' : 'coloursOff'); document.body.classList.toggle('four', !!save.four); };
 $('sound').addEventListener('click', () => { save.sound = !save.sound; store(); setSound(); });
 $('colours').addEventListener('click', () => { save.four = !save.four; store(); setFour(); });
 setSound(); setFour();
@@ -854,9 +884,39 @@ hint($('hand'), {
   kind: 'tap', key: 'pisti:hint', look: 'hand', delay: 4000,
   when: () => !!g && g.mode !== 'table' && canPlay(),
   played: save.hands > 0,
-  label: 'Tap a card to play it',
+  label: t('hint'),
   bottom: () => (L.ch || 108) / 2 + 14,
 });
+
+function pauseLabels() {
+  const friends = $('table').classList.contains('friends');
+  $('pause').setAttribute('aria-label', t(friends ? 'tableMenu' : 'pause'));
+  $('pauseTitle').textContent = t(friends ? 'tableMenu' : 'paused');
+}
+
+// Every word on the page again, in the language now in use: static text, open cards, labels of cards already drawn.
+function relang() {
+  document.title = t('title');
+  apply();
+  for (const id of ['langMenu', 'langPause']) $(id).lang = lang() === 'en' ? 'tr' : 'en';
+  pauseLabels(); setSound(); setFour(); menuText();
+  for (const el of document.querySelectorAll('button.card')) if (el.cardId !== undefined) el.setAttribute('aria-label', cardName(el.cardId));
+  $('shareLink').textContent = t(shareCopied ? 'linkCopied' : 'shareLink');
+  const words = document.querySelector('.kit-hint .label');
+  if (words) words.textContent = t('hint');
+  if (g) turnText();
+  paintScore();
+  updateRoomView();
+}
+for (const id of ['langMenu', 'langPause']) {
+  $(id).addEventListener('click', () => {
+    setLang(lang() === 'en' ? 'tr' : 'en');
+    const url = new URL(location.href);
+    if (url.searchParams.has('lang')) { url.searchParams.set('lang', lang()); history.replaceState(history.state, '', url); }
+    relang();
+  });
+}
+relang();
 
 const linkedRoom = codeFromLink();
 if (linkedRoom) openRoom(linkedRoom, false);

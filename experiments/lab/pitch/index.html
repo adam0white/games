@@ -29,6 +29,7 @@
   .stack button small { display: block; font-size: 13px; font-weight: 500; opacity: .85; margin-top: 2px; }
   .row { display: flex; gap: 8px; margin-top: 10px; }
   .row button { flex: 1; padding: 10px 6px; }
+  .row button.lang { flex: 0 0 auto; min-width: 64px; min-height: 48px; }
   .field { display: grid; gap: 4px; text-align: left; font-size: 14px; font-weight: 650; }
   .field input { min-width: 0; width: 100%; min-height: 48px; padding: 9px 12px; border: 1.5px solid #26262a55; border-radius: 12px; background: #fffdf7; color: var(--ink); font: 16px system-ui, sans-serif; user-select: text; -webkit-user-select: text; }
   #joinForm { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
@@ -77,57 +78,57 @@
 </style>
 </head>
 <body>
-<canvas id="c" aria-label="Pitch. Tap a pulsing point next to the ball to draw a line to it."></canvas><div id="probe"></div>
-<div id="hud"><button id="pauseBtn" aria-label="Pause"></button><div id="score"></div><div id="tag"></div></div>
+<canvas id="c" data-i18n-aria="canvasLabel"></canvas><div id="probe"></div>
+<div id="hud"><button id="pauseBtn" data-i18n-aria="pause"></button><div id="score"></div><div id="tag"></div></div>
 <div id="roomStatus" role="status" hidden></div>
 <div id="turn"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 21l2.2-6.6L15.8 3.8a2 2 0 0 1 2.8 0l1.6 1.6a2 2 0 0 1 0 2.8L9.6 18.8zM6.4 15.6l2 2"/></svg><span id="turnText"></span></div>
 <div id="toast"></div>
 <section id="menu" class="screen veil on"><div class="card">
-  <h1><span class="b">Paper</span> <span class="r">Pitch</span></h1>
-  <p class="quiet">Draw the ball into the top goal. Land on ink and you go again.</p>
+  <h1><span class="b" data-i18n="titleA">Paper</span> <span class="r" data-i18n="titleB">Pitch</span></h1>
+  <p class="quiet" data-i18n="tagline">Draw the ball into the top goal. Land on ink and you go again.</p>
   <div class="stack">
-    <button id="play" class="primary">Play<small id="playSub"></small></button>
-    <button id="daily">Today's pitch <span id="dailyDots" class="dots"></span></button>
-    <button id="friend">Play a friend</button>
-    <button id="two">Two players, one phone</button>
+    <button id="play" class="primary"><span data-i18n="play">Play</span><small id="playSub"></small></button>
+    <button id="daily"><span data-i18n="daily">Today's pitch</span> <span id="dailyDots" class="dots"></span></button>
+    <button id="friend" data-i18n="friend">Play a friend</button>
+    <button id="two" data-i18n="two">Two players, one phone</button>
   </div>
-  <div class="row"><button id="soundMenu"></button></div>
+  <div class="row"><button id="soundMenu"></button><button id="langMenu" class="lang" data-i18n-aria="switchLanguage"><span data-i18n="languageButton"></span></button></div>
 </div></section>
 <section id="friendCard" class="screen veil" aria-labelledby="friendTitle"><div class="card">
-  <h2 id="friendTitle">Play a friend</h2>
+  <h2 id="friendTitle" data-i18n="friend">Play a friend</h2>
   <div id="friendEntry" class="stack">
-    <label class="field">Your name (optional)<input id="friendName" maxlength="24" autocomplete="nickname"></label>
-    <button id="newTable" class="primary">New table</button>
+    <label class="field"><span data-i18n="friendName">Your name (optional)</span><input id="friendName" maxlength="24" autocomplete="nickname"></label>
+    <button id="newTable" class="primary" data-i18n="newTable">New table</button>
     <form id="joinForm">
-      <label class="field">Table code<input id="joinCode" maxlength="4" autocapitalize="characters" autocomplete="off" spellcheck="false" pattern="[A-Za-z]{4}" required></label>
-      <button id="joinTable">Join</button>
+      <label class="field"><span data-i18n="tableCode">Table code</span><input id="joinCode" lang="en" maxlength="4" autocapitalize="characters" autocomplete="off" spellcheck="false" pattern="[A-Za-z]{4}" required></label>
+      <button id="joinTable" data-i18n="join">Join</button>
     </form>
   </div>
   <div id="roomInvite" hidden>
-    <output id="roomCode" aria-label="Table code"></output>
-    <button id="shareLink" class="primary">Share link</button>
-    <label id="roomLinkField" class="field" hidden>Table link<input id="roomLink" readonly></label>
+    <output id="roomCode" lang="en" data-i18n-aria="tableCode"></output>
+    <button id="shareLink" class="primary" data-i18n="shareLink">Share link</button>
+    <label id="roomLinkField" class="field" hidden><span data-i18n="tableLink">Table link</span><input id="roomLink" readonly></label>
   </div>
   <p id="lobbyStatus" class="quiet" role="status"></p>
-  <div class="row"><button id="roomLeave">Menu</button></div>
+  <div class="row"><button id="roomLeave" data-i18n="menu">Menu</button></div>
 </div></section>
 <section id="paused" class="screen veil"><div class="card">
-  <h2 id="pauseTitle">Pencils down</h2>
-  <div class="stack"><button id="resume" class="primary">Resume</button></div>
-  <div class="row"><button id="restart">Restart</button><button id="quit">Menu</button></div>
-  <div class="row"><button id="soundPause"></button></div>
+  <h2 id="pauseTitle" data-i18n="pencilsDown">Pencils down</h2>
+  <div class="stack"><button id="resume" class="primary" data-i18n="resume">Resume</button></div>
+  <div class="row"><button id="restart" data-i18n="restart">Restart</button><button id="quit" data-i18n="menu">Menu</button></div>
+  <div class="row"><button id="soundPause"></button><button id="langPause" class="lang" data-i18n-aria="switchLanguage"><span data-i18n="languageButton"></span></button></div>
 </div></section>
 <section id="between" class="screen"><div class="card">
   <h2 id="betweenTitle"></h2><p id="betweenLine" class="quiet"></p>
-  <div class="stack"><button id="next" class="primary">Next kick-off</button></div>
+  <div class="stack"><button id="next" class="primary" data-i18n="nextKickoff">Next kick-off</button></div>
 </div></section>
 <section id="end" class="screen veil"><div class="card">
   <h2 id="endTitle"></h2>
   <img id="pic" alt="The finished pitch">
   <p id="endLine" class="quiet"></p>
   <p id="roomEndStatus" class="quiet" role="status" hidden></p>
-  <div class="stack"><button id="again" class="primary">Rematch</button></div>
-  <div class="row"><button id="savePic">Save picture</button><button id="endMenu">Menu</button></div>
+  <div class="stack"><button id="again" class="primary" data-i18n="rematch">Rematch</button></div>
+  <div class="row"><button id="savePic" data-i18n="savePicture">Save picture</button><button id="endMenu" data-i18n="menu">Menu</button></div>
 </div></section>
 <script type="module" src="./main.js"></script>
 </body>

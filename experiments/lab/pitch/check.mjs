@@ -7,12 +7,14 @@ import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { create, restore, snapshot, botTurn, mulberry32, daily, legal, apply, clone } from './sim.js';
+import { tables } from './words.js';
 import { TABLE, tableName, tableMessage, freshTable, sit, move, again, shown } from '../../../workers/lab-ai/src/table.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const SHOTS = process.env.SHOTS || '/private/tmp/claude-504/-Users-abdul-code/e727a231-6be3-4081-a695-31f6b5ca1a96/scratchpad/pitch-shots';
 const TABLE_SHOTS = join(dirname(SHOTS), 'pitch-table-shots');
-await Promise.all([mkdir(SHOTS, { recursive: true }), mkdir(TABLE_SHOTS, { recursive: true })]);
+const WORD_SHOTS = process.env.WORD_SHOTS || '/private/tmp/claude-504/-Users-abdul-code/e727a231-6be3-4081-a695-31f6b5ca1a96/scratchpad/i18n-shots/pitch';
+await Promise.all([mkdir(SHOTS, { recursive: true }), mkdir(TABLE_SHOTS, { recursive: true }), mkdir(WORD_SHOTS, { recursive: true })]);
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
   const pathname = new URL(req.url, 'http://localhost').pathname;
@@ -29,7 +31,7 @@ const base = `http://127.0.0.1:${server.address().port}`;
 const require = createRequire(import.meta.url);
 const { webkit, chromium, devices } = require(process.env.PLAYWRIGHT ? join(resolve(process.env.PLAYWRIGHT), 'playwright') : 'playwright');
 const PHONES = { webkit: [webkit, devices['iPhone 13']], chromium: [chromium, devices['Pixel 7']] };
-const DATE = '2026-11-24', URL_ = `${base}/lab/pitch/?date=${DATE}`;
+const DATE = '2026-11-24', URL_ = `${base}/lab/pitch/?date=${DATE}&lang=en`;
 const sleep = ms => new Promise(done => setTimeout(done, ms));
 const P = (page, expr, arg) => page.evaluate(expr, arg);
 const shot = (page, phone, name) => page.screenshot({ path: join(SHOTS, `${phone}-${name}.png`) });
@@ -68,7 +70,7 @@ async function tapPoint(page, x, y) {
     usedMouse++; console.log(`touch fallback at ${x|0},${y|0} canTap=${await P(page, () => __pitch.canTap)} mode=${await P(page, () => __pitch.mode)} seg=${await P(page, () => __pitch.segments)}`); await page.mouse.click(x, y); await drew();
   }
 }
-let usedMouse = 0;
+let usedMouse = 0, betweenCheck = null;
 async function tapDir(page, d) {
   await until(page, () => __pitch.canTap, 'input open before a tap');
   const t = (await P(page, () => __pitch.legal)).find(m => m.d === d);
@@ -437,6 +439,7 @@ async function playMatch(page, phone, name, mine = 1) {
     if (screen === 'between') {
       assert.ok(await visibleIn(page, '#next'), 'Next kick-off is on screen');
       if (name) await shot(page, phone, `${name}-between`);
+      if (betweenCheck) await betweenCheck(page);
       await page.click('#next'); continue;
     }
     const s = restore(await P(page, () => __pitch.state()));
@@ -641,7 +644,259 @@ async function small(browser, width, height) {
   } finally { await test.context.close(); }
 }
 
+
+// ---------- Turkish and the language switch
+
+const pairs = Object.keys(tables.en).map(k => [k, tables.en[k], tables.tr[k]]);
+const wordsInPage = { keys: Object.keys(tables.en), englishOnly: pairs.filter(([, en, tr]) => en !== tr).map(([, en]) => en) };
+const slots = text => [...String(text).matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort().join(',');
+function checkTables() {
+  const en = Object.keys(tables.en).sort(), tr = Object.keys(tables.tr).sort();
+  assert.deepEqual(tr, en, 'every key in the English table exists in the Turkish table and the reverse');
+  for (const k of en) {
+    assert.equal(slots(tables.tr[k]), slots(tables.en[k]), `${k}: the Turkish string uses the same {variables}`);
+    assert.ok(String(tables.tr[k]).trim() !== '' && String(tables.en[k]).trim() !== '', `${k}: not empty`);
+  }
+  console.log(`ok   words: ${en.length} keys in both tables, same variables`);
+}
+// Visible text, aria-labels and titles that are a raw key, or (in Turkish) an English string that has a different Turkish one.
+const strayWords = (page, lang) => P(page, ({ keys, englishOnly, lang }) => {
+  const seen = new Set(), bad = [];
+  const visible = el => { const st = getComputedStyle(el); return st.visibility !== 'hidden' && st.display !== 'none' && el.getClientRects().length > 0; };
+  const judge = (text, where) => {
+    text = text.replace(/\s+/g, ' ').trim();
+    if (!text) return;
+    if (keys.includes(text)) bad.push(`raw key "${text}" in ${where}`);
+    else if (lang === 'tr' && englishOnly.includes(text)) bad.push(`English "${text}" in ${where}`);
+  };
+  for (const el of document.body.querySelectorAll('*')) {
+    if (!visible(el) || seen.has(el)) continue;
+    const where = el.id ? `#${el.id}` : el.tagName.toLowerCase();
+    for (const n of el.childNodes) if (n.nodeType === 3) judge(n.nodeValue, where);
+    for (const a of ['aria-label', 'title', 'alt', 'placeholder']) if (el.hasAttribute(a)) judge(el.getAttribute(a), `${where}[${a}]`);
+  }
+  return bad;
+}, { ...wordsInPage, lang });
+const stray = async (page, lang, label) => assert.deepEqual(await strayWords(page, lang), [], `${label}: no raw key and no stray English`);
+const text = (page, sel) => page.evaluate(sel => document.querySelector(sel).textContent.replace(/\s+/g, ' ').trim(), sel);
+async function fitsCard(page, label) {
+  await noOverflow(page, label);
+  const clipped = await P(page, () => [...document.querySelectorAll('.screen.on .card, .screen.on .card *, #turn, #roomStatus, #hud *')]
+    .filter(el => el.getClientRects().length && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflow !== 'hidden' && !el.matches('input, output'))
+    .map(el => el.id || el.tagName.toLowerCase()));
+  assert.deepEqual(clipped, [], `${label}: nothing is wider than its box`);
+}
+async function turkish(browser, device, phone, tag) {
+  const tests = [], wire = tableWire();
+  const shotTr = (page, name) => page.screenshot({ path: join(WORD_SHOTS, `${tag}-${name}.png`), timeout: 25000 });
+  const TR = `${base}/lab/pitch/?date=${DATE}&lang=tr`;
+  async function mk() {
+    const test = await open(browser, device, true);
+    tests.push(test);
+    return test;
+  }
+  try {
+    // Menu, the hint, the pause card, an end card, the daily.
+    const main = await mk(), { page } = main;
+    await page.goto(TR);
+    await until(page, () => window.__pitch?.ready && __pitch.screen === 'menu', 'Turkish menu');
+    assert.equal(await P(page, () => document.documentElement.lang), 'tr', 'the document language is Turkish');
+    assert.equal(await page.title(), 'Kâğıt Futbolu');
+    assert.equal(await text(page, 'h1'), 'Kâğıt Futbolu');
+    assert.match(await text(page, '#menu .quiet'), /^Topu çizerek üstteki kaleye sok\./);
+    assert.match(await text(page, '#play'), /^Oyna/);
+    assert.equal(await text(page, '#playSub'), 'İlk maç: küçük saha, Kolay bot');
+    assert.match(await text(page, '#daily'), /^Günün sahası/);
+    assert.equal(await text(page, '#friend'), 'Arkadaşla oyna');
+    assert.equal(await text(page, '#two'), 'İki kişi, tek telefon');
+    assert.equal(await text(page, '#soundMenu'), 'Ses açık');
+    assert.equal(await text(page, '#langMenu'), 'EN');
+    assert.equal(await page.getAttribute('#langMenu', 'aria-label'), 'İngilizceye geç');
+    assert.equal(await page.getAttribute('#c', 'aria-label'), tables.tr.canvasLabel);
+    assert.ok((await page.locator('#langMenu').boundingBox()).height >= 44, 'the language button is at least 44 px tall');
+    for (const id of ['#play', '#daily', '#friend', '#two', '#soundMenu', '#langMenu']) assert.ok(await visibleIn(page, id), `${tag}: ${id} fits`);
+    await stray(page, 'tr', `${tag} menu`);
+    await fitsCard(page, `${tag} Turkish menu`);
+    await shotTr(page, '1-menu');
+
+    // The first match: the hint, the pause card, the play screen.
+    await page.click('#play');
+    await until(page, () => __pitch.mode === 'bot' && __pitch.canTap, 'Turkish first match');
+    assert.equal(await text(page, '#turnText'), 'Sıra sende');
+    assert.equal(await text(page, '#tag'), 'Küçük saha');
+    assert.equal(await text(page, '#score div:last-child small'), 'Kolay bot');
+    await shotTr(page, '2-play');
+    await page.waitForSelector('.kit-hint.on .label', { timeout: 12000 }).catch(() => null);
+    if (await P(page, () => !!document.querySelector('.kit-hint.on'))) {
+      assert.equal(await text(page, '.kit-hint .label'), 'Gitmek istediğin noktaya dokun');
+      await stray(page, 'tr', `${tag} hint`);
+      await shotTr(page, '3-hint');
+    } else console.log(`note: ${tag}: the first-play hint did not show in time, so its Turkish was not read`);
+    await P(page, () => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
+    await until(page, () => __pitch.paused, 'Turkish pause');
+    assert.equal(await text(page, '#pauseTitle'), 'Duraklatıldı');
+    assert.equal(await text(page, '#resume'), 'Devam');
+    assert.equal(await text(page, '#restart'), 'Yeniden başla');
+    assert.equal(await text(page, '#quit'), 'Menü');
+    assert.equal(await text(page, '#langPause'), 'EN');
+    assert.ok((await page.locator('#langPause').boundingBox()).height >= 44, 'the pause language button is at least 44 px tall');
+    await stray(page, 'tr', `${tag} pause`);
+    await fitsCard(page, `${tag} Turkish pause`);
+    await shotTr(page, '4-pause');
+    await P(page, () => { delete document.hidden; });
+    // The switch on the pause card changes the words under it without a reload.
+    await page.click('#langPause');
+    assert.equal(await text(page, '#resume'), 'Resume');
+    assert.equal(await text(page, '#pauseTitle'), 'Pencils down');
+    assert.equal(await text(page, '#turnText'), 'Your turn');
+    assert.equal(await P(page, () => document.documentElement.lang), 'en');
+    await stray(page, 'en', `${tag} pause after switch`);
+    await page.click('#langPause');
+    assert.equal(await text(page, '#resume'), 'Devam');
+    assert.equal(await text(page, '#turnText'), 'Sıra sende');
+    await page.click('#resume');
+    await until(page, () => __pitch.canTap || __pitch.screen !== 'play', 'play after Turkish resume');
+
+    // Play to the end card and read the Turkish on the between and end cards.
+    let shotBetween = false;
+    betweenCheck = async pg => {
+      assert.match(await text(pg, '#betweenTitle'), /^(Berabere|Öndesin \d–\d|Bot önde \d–\d)$/);
+      assert.match(await text(pg, '#betweenLine'), /gidecek yer|Kendi kalesine atılan gol|İlk iki golü atan kazanır/);
+      assert.equal(await text(pg, '#next'), 'Sıradaki santra');
+      await stray(pg, 'tr', `${tag} between card`);
+      await fitsCard(pg, `${tag} Turkish between card`);
+      if (!shotBetween) { shotBetween = true; await shotTr(pg, '5-between'); }
+    };
+    try { await playMatch(page, tag, null, 1); } finally { betweenCheck = null; }
+    await until(page, () => document.querySelector('#pic').naturalWidth > 0, 'Turkish picture');
+    assert.match(await text(page, '#endTitle'), /^(Kazandın!|Bot kazandı)$/);
+    assert.match(await text(page, '#endLine'), /^Sıradaki: (yine )?(Kolay|Orta|Zor) bot\.$|^Şimdi tam boy saha, rakip Orta bot\.$|^Sıradaki: tam boy saha\.$/);
+    assert.equal(await text(page, '#again'), 'Rövanş');
+    assert.equal(await text(page, '#savePic'), 'Resmi kaydet');
+    assert.equal(await text(page, '#endMenu'), 'Menü');
+    assert.equal(await page.getAttribute('#pic', 'alt'), 'Bitmiş saha');
+    for (const id of ['#endTitle', '#pic', '#again', '#savePic', '#endMenu']) assert.ok(await visibleIn(page, id), `${tag}: ${id} fits on the Turkish end card`);
+    await stray(page, 'tr', `${tag} end card`);
+    await fitsCard(page, `${tag} Turkish end card`);
+    await shotTr(page, '6-end');
+    const download = page.waitForEvent('download', { timeout: 5000 }).then(d => d.suggestedFilename()).catch(() => null);
+    await page.click('#savePic');
+    const shared = await page.waitForFunction(() => window.__shared.length > 0, null, { timeout: 3000 }).then(() => 1).catch(() => 0);
+    const file = shared ? null : await download;
+    assert.ok(shared === 1 || file === 'kagit-futbolu.png', `Turkish Save picture shares or downloads kagit-futbolu.png (shared ${shared}, file ${file})`);
+    await page.click('#endMenu');
+
+    // The daily: Turkish date and card.
+    await page.click('#daily');
+    await until(page, () => __pitch.mode === 'daily' && __pitch.canTap, 'Turkish daily');
+    assert.equal(await text(page, '#score div span'), 'Bugün');
+    assert.equal(await text(page, '#score div small'), '24 Kas 2026');
+    assert.equal(await text(page, '#turnText'), 'Bu turda gol at');
+    assert.equal(await page.getAttribute('#tag .dots', 'aria-label'), 'Denemeler');
+    await stray(page, 'tr', `${tag} daily`);
+    await shotTr(page, '7-daily');
+    const puzzle = daily(DATE);
+    for (const step of puzzle.solution) await tapDir(page, step);
+    await until(page, () => __pitch.screen === 'end', 'Turkish daily result');
+    await until(page, () => document.querySelector('#pic').naturalWidth > 0, 'Turkish daily picture');
+    assert.equal(await text(page, '#endTitle'), 'Gol oldu!');
+    assert.match(await text(page, '#endLine'), /^Yeni saha \d+ saat sonra\.$/);
+    await stray(page, 'tr', `${tag} daily result`);
+    await fitsCard(page, `${tag} Turkish daily card`);
+    await shotTr(page, '8-daily-end');
+    await page.click('#endMenu');
+
+    // Two players: Turkish colours.
+    await page.click('#two');
+    await until(page, () => __pitch.mode === 'two' && __pitch.canTap, 'Turkish two players');
+    assert.equal(await text(page, '#turnText'), "Sıra Mavi'de");
+    assert.deepEqual(await page.locator('#score small').allTextContents(), ['Mavi', 'Kırmızı']);
+    await page.click('#pauseBtn');
+    await page.click('#quit');
+    await until(page, () => __pitch.screen === 'menu', 'menu again');
+
+    // The switch on the menu: no reload, and the choice survives a reload.
+    if (!tag.endsWith('360x640')) {
+      await page.click('#langMenu');
+      assert.equal(await text(page, '#play'), 'Play' + (await text(page, '#playSub')));
+      assert.equal(await text(page, '#friend'), 'Play a friend');
+      assert.equal(await text(page, '#langMenu'), 'TR');
+      assert.equal(await page.title(), 'Paper Pitch');
+      assert.equal(await P(page, () => document.documentElement.lang), 'en');
+      assert.equal(await page.getAttribute('#c', 'aria-label'), tables.en.canvasLabel);
+      await stray(page, 'en', `${tag} English menu after switch`);
+      await page.goto(`${base}/lab/pitch/?date=${DATE}`);
+      await until(page, () => window.__pitch?.ready && __pitch.screen === 'menu', 'English menu after reload');
+      assert.equal(await text(page, '#friend'), 'Play a friend', 'English is remembered without ?lang=');
+      await page.click('#langMenu');
+      assert.equal(await text(page, '#friend'), 'Arkadaşla oyna');
+      await page.reload();
+      await until(page, () => window.__pitch?.ready && __pitch.screen === 'menu', 'Turkish menu after reload');
+      assert.equal(await text(page, '#friend'), 'Arkadaşla oyna', 'Turkish is remembered after a reload');
+      assert.equal(await P(page, () => document.documentElement.lang), 'tr');
+    }
+
+    // The friend card and the table messages, with two pages and a third turned away.
+    const a = await mk(), b = await mk(), c = await mk();
+    const aSocket = await wire.attach(a.page), bSocket = await wire.attach(b.page);
+    await wire.attach(c.page);
+    await a.page.goto(TR);
+    await until(a.page, () => window.__pitch?.ready, 'host menu');
+    await a.page.click('#friend');
+    assert.equal(await text(a.page, '#friendTitle'), 'Arkadaşla oyna');
+    assert.equal(await text(a.page, '#friendEntry label.field:first-child'), 'Adın (isteğe bağlı)');
+    assert.equal(await text(a.page, '#newTable'), 'Yeni masa');
+    assert.equal(await text(a.page, '#joinForm label'), 'Masa kodu');
+    assert.equal(await text(a.page, '#joinTable'), 'Katıl');
+    assert.equal(await text(a.page, '#roomLeave'), 'Menü');
+    await stray(a.page, 'tr', `${tag} friend card`);
+    await fitsCard(a.page, `${tag} Turkish friend card`);
+    await shotTr(a.page, '9-friend-card');
+    await a.page.fill('#friendName', 'Ada');
+    await a.page.click('#newTable');
+    await until(a.page, () => __pitch.room?.seat === 0 && document.querySelector('#lobbyStatus').textContent === 'Arkadaşın bekleniyor', 'Turkish waiting line');
+    assert.equal(await text(a.page, '#shareLink'), 'Bağlantıyı paylaş');
+    assert.equal(await a.page.getAttribute('#roomCode', 'aria-label'), 'Masa kodu');
+    await stray(a.page, 'tr', `${tag} waiting card`);
+    await fitsCard(a.page, `${tag} Turkish waiting card`);
+    await shotTr(a.page, '10-friend-waiting');
+    await a.page.click('#shareLink');
+    await until(a.page, () => !!window.__sharedLink, 'Turkish share text');
+    const link = await P(a.page, () => window.__sharedLink);
+    assert.equal(link.text, 'Benimle Kâğıt Futbolu oyna');
+    await b.page.goto(TR);
+    await P(b.page, () => localStorage.setItem('pitch:v1', JSON.stringify({ name: 'Ben' })));
+    await b.page.goto(`${link.url}&lang=tr`);
+    await Promise.all([a, b].map(({ page: pg }, seat) => pg.waitForFunction(seat => __pitch.room?.seat === seat && __pitch.room.status === 'live' && document.querySelectorAll('#score .seat-light.on').length === 2, seat, { timeout: 25000 })));
+    assert.equal(await text(a.page, '#turnText').then(x => x.startsWith('Sıra')), true, 'the table turn line is Turkish');
+    await c.page.goto(`${link.url}&lang=tr`);
+    await until(c.page, () => __pitch.room?.status === 'full' && document.querySelector('#lobbyStatus').textContent === 'Bu masa dolu', 'Turkish full table');
+    await fitsCard(c.page, `${tag} Turkish full table`);
+    await shotTr(c.page, '11-friend-full');
+    await bSocket.cut();
+    await until(a.page, () => document.querySelector('#roomStatus').textContent === 'Bağlantı koptu: Ben. Geri dönmesi bekleniyor.', 'Turkish dropped line');
+    await until(b.page, () => document.querySelector('#roomStatus').textContent === 'Yeniden bağlanıyor', 'Turkish reconnecting line');
+    assert.equal(await a.page.getAttribute('#score [data-seat="1"] .seat-light', 'aria-label'), 'Bağlı değil');
+    assert.equal(await a.page.getAttribute('#score [data-seat="0"] .seat-light', 'aria-label'), 'Bağlı');
+    await fitsCard(a.page, `${tag} Turkish dropped line`);
+    await stray(a.page, 'tr', `${tag} dropped line`);
+    await shotTr(a.page, '12-friend-dropped');
+    assert.equal(await a.page.getAttribute('#pauseBtn', 'aria-label'), 'Masa menüsü');
+    await a.page.click('#pauseBtn');
+    assert.equal(await text(a.page, '#pauseTitle'), 'Masa menüsü');
+    await a.page.click('#resume');
+    bSocket.reconnect();
+    await aSocket.navigateAway();
+    for (const t of tests) {
+      assert.deepEqual(t.outside, [], `${tag}: Turkish pages make no external requests`);
+      assert.deepEqual(t.errors, [], `${tag}: Turkish pages raise no page, console or network errors`);
+    }
+    console.log(`ok   turkish on ${phone} ${tag}: menu, hint, pause, between and end cards, daily, switch, friend card and table lines`);
+  } finally { await Promise.all(tests.map(test => test.context.close().catch(() => {}))); }
+}
+
 let failed = 0;
+checkTables();
 try {
   for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     const only = process.argv.slice(2).find(a => !a.startsWith('--'));
@@ -653,6 +908,10 @@ try {
         if (phone === 'chromium') for (const [w, h] of [[360, 640], [390, 844]]) { await small(browser, w, h); console.log(`ok   pitch on chromium ${w}x${h}`); }
       }
       await playFriend(browser, device, phone);
+      if (!process.argv.includes('--friends-only')) {
+        await turkish(browser, device, phone, `${phone}-${device.viewport.width}x${device.viewport.height}`);
+        await turkish(browser, { viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, phone, `${phone}-360x640`);
+      }
     } catch (e) {
       failed++; console.error(`FAIL pitch on ${phone}: ${e.stack}`);
       if (test.errors.length) console.error(test.errors.join('\n'));
@@ -663,4 +922,5 @@ try {
 if (usedMouse) console.log('note: some taps fell back to mouse clicks');
 console.log(`screenshots in ${SHOTS}`);
 console.log(`friend screenshots in ${TABLE_SHOTS}`);
+console.log(`Turkish screenshots in ${WORD_SHOTS}`);
 process.exitCode = failed ? 1 : 0;
