@@ -7,6 +7,8 @@ import * as P from '../public/crumbwar/shared/proto.js';
 import { createWorld, step, addAnt, removeAnt, setInput } from './sim.mjs';
 import { think, balance, pickColony } from './bots.mjs';
 import * as net from './net.mjs';
+import { STALE_ROOM_STATUS } from '../public/crumbwar/shared/version.js';
+import { ROOM_COUNTS, delta } from './metrics.mjs';
 
 const TICK_MS = 1000 / C.TICK_HZ;
 const PER_IP = 4, MSG_RATE = 1.5, MSG_BURST = 60; // messages: 30 a second sustained, per connection
@@ -17,7 +19,9 @@ export class Room extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.world = null; this.clients = new Map(); this.ghosts = new Map(); this.timer = null; this.name = ''; this.cap = 0; this.burn = 0;
-    this.stat = { wakes: 0, late10: 0, late50: 0, maxLate: 0, dropped: 0, bytesOut: 0, msgsOut: 0, msgsIn: 0, kicks: 0, joins: 0, quietMax: 0, stallMax: 0, slowWindows: 0 };
+    this.stat = { wakes: 0, late10: 0, late50: 0, maxLate: 0, dropped: 0, bytesOut: 0, msgsOut: 0, msgsIn: 0, kicks: 0, quietMax: 0, stallMax: 0, slowWindows: 0 };
+    for (const k of ROOM_COUNTS) this.stat[k] = 0; // joins, kicks by reason, refusals by reason: see metrics.mjs
+    this.sent = {}; // the counts as last reported to the directory
     // A running room leaves a mark in storage and removes it when it stops by itself. A mark found here means the
     // memory was lost while the room ran: Cloudflare reset it for using too much CPU, moved it, or new code was
     // deployed. The mark names the code version, so a deploy is told apart from a reset. See DECISIONS.md, "Alerts".
@@ -59,18 +63,22 @@ export class Room extends DurableObject {
     if (!this.cap || trusted && q.get('cap')) this.cap = Math.min(240, Number(trusted && q.get('cap') || this.env.HUMAN_CAP || 60));
     // A load test may ask for wasted work on every tick, to show what an overloaded room looks like in the counters.
     if (trusted && q.get('burn')) this.burn = Math.min(500, Number(q.get('burn')) || 0) * 1e6;
-    if (this.people() >= this.cap) return new Response('full', { status: 409 });
-    if (!trusted) { let n = 0; for (const c of this.clients.values()) if (c.ip === ip) n++; if (n >= PER_IP) return new Response('too many from one address', { status: 429 }); }
-    const w = this.world ??= this.fresh();
+    // The Worker sends its protocol. A room still running other code after a deploy takes no new people; the
+    // report tells the directory to stop offering it. People already here play on. See DECISIONS.md, "Version check".
+    if (q.get('v') && Number(q.get('v')) !== C.PROTO) { this.stat.refusedProtocol++; this.report(); return new Response('protocol', { status: STALE_ROOM_STATUS }); }
+    if (this.people() >= this.cap) { this.stat.refusedFull++; return new Response('full', { status: 409 }); }
+    if (!trusted) { let n = 0; for (const c of this.clients.values()) if (c.ip === ip) n++; if (n >= PER_IP) { this.stat.refusedIp++; return new Response('too many from one address', { status: 429 }); } }
     const ghost = this.ghosts.get(q.get('resume') || '');
-    if (q.get('resume') && !ghost && q.get('explicit') === '1') return new Response('gone', { status: 410 });
+    if (q.get('resume') && !ghost && q.get('explicit') === '1') { this.stat.refusedGone++; return new Response('gone', { status: 410 }); }
+    const w = this.world ??= this.fresh();
+    this.minuteTick ??= w.tick;
     const a = addAnt(w, ghost ? ghost.colony : pickColony(w), false, Math.random() * C.NAMES_A.length | 0, Math.random() * C.NAMES_B.length | 0);
     if (!a) return new Response('full', { status: 409 });
     if (ghost) { this.ghosts.delete(q.get('resume')); Object.assign(a, ghost.keep); a.hp = C.TIER_HP[a.tier]; }
     balance(w);
     const pair = new WebSocketPair(), ws = pair[1], t = crypto.getRandomValues(new Uint32Array(2));
     this.ctx.acceptWebSocket(ws);
-    const client = { ws, ant: a, view: net.newView(), ackSeq: 0, tokens: MSG_BURST, tokenTick: w.tick, changed: w.tick, seen: w.tick, joined: w.tick, ip, token: t[0].toString(16).padStart(8, '0') + t[1].toString(16).padStart(8, '0') };
+    const client = { ws, ant: a, view: net.newView(), ackSeq: 0, tokens: MSG_BURST, tokenTick: w.tick, changed: w.tick, seen: w.tick, pinged: w.tick, joined: w.tick, ip, token: t[0].toString(16).padStart(8, '0') + t[1].toString(16).padStart(8, '0') };
     a.client = client; this.clients.set(ws, client); this.stat.joins++;
     this.send(client, net.welcome(a, w.tick, t[0], t[1], this.name));
     this.start(); this.report();
@@ -85,9 +93,10 @@ export class Room extends DurableObject {
   }
 
   send(client, bytes) {
-    try { client.ws.send(bytes); this.stat.bytesOut += bytes.length; this.stat.msgsOut++; } catch { this.drop(client.ws, 0); }
+    try { client.ws.send(bytes); this.stat.bytesOut += bytes.length; this.stat.msgsOut++; } catch { if (this.clients.has(client.ws)) this.stat.sendFailed++; this.drop(client.ws, 0); }
   }
-  kick(client, code, why) { this.stat.kicks++; try { client.ws.close(code, why); } catch {} this.drop(client.ws, 0); }
+  // `reason` is one of the kick counters in metrics.mjs (kickIdle, kickNoPing, ...); the close code alone is shared by several.
+  kick(client, code, why, reason) { this.stat.kicks++; this.stat[reason]++; try { client.ws.close(code, why); } catch {} this.drop(client.ws, 0); }
 
   drop(ws, ghostFor = GHOST_TICKS) {
     const client = this.clients.get(ws);
@@ -124,7 +133,9 @@ export class Room extends DurableObject {
       this.winAt = now; this.winTick = w.tick;
     }
     client.tokens = Math.min(MSG_BURST, client.tokens + (w.tick - client.tokenTick) * MSG_RATE) - 1; client.tokenTick = w.tick;
-    if (typeof data === 'string' || data.byteLength > 8 || client.tokens < 0) return this.kick(client, 1008, 'bad message');
+    if (typeof data === 'string') return this.kick(client, 1008, 'bad message', 'kickText');
+    if (data.byteLength > 8) return this.kick(client, 1008, 'bad message', 'kickSize');
+    if (client.tokens < 0) return this.kick(client, 1008, 'bad message', 'kickRate');
     const b = new Uint8Array(data);
     if (b[0] === P.INPUT && b.length === 5) {
       const a = client.ant, angle = b[3], move = !!(b[4] & 1), sprint = !!(b[4] & 2);
@@ -132,12 +143,12 @@ export class Room extends DurableObject {
       // Every input restarts the count of ticks it has applied to, which is what the page replays from.
       setInput(w, a, angle, move, sprint); client.ackSeq = b[1] | b[2] << 8;
     } else if (b[0] === P.PING && b.length === 7) {
-      client.seen = (b[3] | b[4] << 8 | b[5] << 16 | b[6] << 24) >>> 0;
+      client.seen = (b[3] | b[4] << 8 | b[5] << 16 | b[6] << 24) >>> 0; client.pinged = w.tick;
       this.send(client, net.pong(b[1] | b[2] << 8));
-    } else this.kick(client, 1008, 'bad message');
+    } else this.kick(client, 1008, 'bad message', 'kickType');
   }
-  webSocketClose(ws) { this.drop(ws); }
-  webSocketError(ws) { this.drop(ws); }
+  webSocketClose(ws) { if (this.clients.has(ws)) this.stat.closedByClient++; this.drop(ws); }
+  webSocketError(ws) { if (this.clients.has(ws)) this.stat.socketErrors++; this.drop(ws); }
 
   start() {
     if (this.timer !== null) return;
@@ -173,31 +184,46 @@ export class Room extends DurableObject {
     if (tick % C.TICK_HZ === 0) {
       const ranked = w.ants.filter(Boolean).sort((p, q) => q.score - p.score), people = this.people();
       for (const c of [...this.clients.values()]) {
-        if (tick - c.changed > IDLE_TICKS) this.kick(c, 4003, 'idle');
-        else if (tick - c.joined > LAG_TICKS && tick - c.seen > LAG_TICKS) this.kick(c, 4004, 'lagging'); // it is not reading what it is sent
+        if (tick - c.changed > IDLE_TICKS) this.kick(c, 4003, 'idle', 'kickIdle');
+        // It is not reading what it is sent: either its pings stopped, or they arrive and name a tick 8 s old.
+        else if (tick - c.joined > LAG_TICKS && tick - c.seen > LAG_TICKS) this.kick(c, 4004, 'lagging', tick - c.pinged > LAG_TICKS ? 'kickNoPing' : 'kickBehind');
         else this.send(c, net.scores(w, ranked, c.ant, people));
       }
       for (const [token, g] of this.ghosts) if (tick > g.until) this.ghosts.delete(token);
-      if (tick % (15 * C.TICK_HZ) === 0) this.report();
       if (tick % MARK_TICKS === 0) {
-        const s = this.stat, last = this.sampled || { bytesOut: 0, msgsIn: 0 };
-        try { this.env.METRICS?.writeDataPoint({ indexes: ['room'], blobs: ['room', this.name, this.version], doubles: [people, w.count, this.rate ?? C.TICK_HZ, s.bytesOut - last.bytesOut, s.msgsIn - last.msgsIn, s.stallMax, s.quietMax] }); } catch {}
-        this.sampled = { bytesOut: s.bytesOut, msgsIn: s.msgsIn };
-      }
-      if (!this.people() && tick - this.emptyAt > EMPTY_TICKS) { this.world = null; this.ghosts.clear(); this.mark(); } // the loop ends; the room costs nothing
+        const s = this.stat, last = this.sampled || {}, d = k => (s[k] || 0) - (last[k] || 0);
+        // Doubles 1-7 are unchanged from before; 8-14 were added for kick reasons. Each is a change over the minute
+        // except people, ants, the tick rate, stallMax and quietMax. Analytics Engine takes up to 20 doubles.
+        try { this.env.METRICS?.writeDataPoint({ indexes: ['room'], blobs: ['room', this.name, this.version], doubles: [people, w.count, this.rate ?? C.TICK_HZ, d('bytesOut'), d('msgsIn'), s.stallMax, s.quietMax,
+          d('kickIdle'), d('kickNoPing'), d('kickBehind'), d('kickText') + d('kickSize') + d('kickRate') + d('kickType'), d('sendFailed'), d('closedByClient') + d('socketErrors'), d('joins')] }); } catch {}
+        this.sampled = { ...s };
+        this.report({ roomMinutes: this.minutes(), ...delta(s, this.sent) });
+      } else if (tick % (15 * C.TICK_HZ) === 0) this.report();
+      if (!this.people() && tick - this.emptyAt > EMPTY_TICKS) { this.report({ roomMinutes: this.minutes(), ...delta(this.stat, this.sent) }); this.world = null; this.minuteTick = null; this.ghosts.clear(); this.mark(); } // the loop ends; the room costs nothing
     }
   }
 
-  report() {
-    this.mark(); // on every join and leave and every 15 seconds, so an alert about a lost room says how many people it held
-    if (!this.name || this.name.startsWith('lt-')) return;
-    const dir = this.env.DIRECTORY.getByName('dir:' + this.name.split('-')[0]);
-    this.ctx.waitUntil(dir.report(this.name, this.people()).catch(() => {}));
+  // Minutes this room ran since the last report of them, to two decimals.
+  minutes() { const t = this.world.tick, m = Math.round((t - this.minuteTick) / MARK_TICKS * 100) / 100; this.minuteTick = t; return m; }
+
+  // On every join and leave and every 15 seconds: the head count and protocol, for the directory and the mark (so an
+  // alert about a lost room says how many people it held). Once a minute and when the room stops, also the counts
+  // since the last time (`counts`), which the directory adds to its hourly totals. A load test room sends only
+  // counts, to `dir:lt`, which never offers rooms.
+  report(counts) {
+    this.mark();
+    if (!this.name) return;
+    const lt = this.name.startsWith('lt-');
+    if (lt && !counts) return;
+    const dir = this.env.DIRECTORY.getByName(lt ? 'dir:lt' : 'dir:' + this.name.split('-')[0]);
+    this.ctx.waitUntil(dir.report(this.name, this.people(), C.PROTO, counts && Object.keys(counts).length ? counts : null).catch(() => {}));
   }
 
   stats() {
     const w = this.world;
-    return { room: this.name, version: this.version, running: !!w, windowTicksPerSecond: this.rate ?? null, tick: w?.tick ?? 0, people: this.people(), ants: w?.count ?? 0, food: w?.foodCount ?? 0, cap: this.cap, ...this.stat,
+    const s = this.stat, kicksByReason = {};
+    for (const k of ROOM_COUNTS) if (k.startsWith('kick') || k === 'sendFailed') kicksByReason[k] = s[k];
+    return { room: this.name, version: this.version, protocol: C.PROTO, running: !!w, kicksByReason, windowTicksPerSecond: this.rate ?? null, tick: w?.tick ?? 0, people: this.people(), ants: w?.count ?? 0, food: w?.foodCount ?? 0, cap: this.cap, ...this.stat,
       // The clock inside a timer does not show lateness on Cloudflare (the late counters stay 0 there), so the honest
       // measure of an overloaded room is ticks per real second, taken at this call, which carries a fresh clock.
       ticksPerSecond: w && this.t0 ? Math.round((w.tick - this.tick0) / Math.max(1, Date.now() - this.t0) * 10000) / 10 : 0 };

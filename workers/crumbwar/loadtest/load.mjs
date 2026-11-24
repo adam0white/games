@@ -4,7 +4,7 @@
 //   node loadtest/load.mjs --url wss://play.adamwhite.work --key <LOADTEST_KEY> --clients 60 --seconds 60 [--cap 60] [--room a1] [--burn 50]
 // --burn N wastes N million square roots on every tick of that room, to overload it on purpose.
 // Reported: joins, bytes per client, how regularly snapshots arrive, round trip time, how far prediction was
-// corrected, and the room's own counters (ticks late, ticks skipped, kicks). This process's own timer lag is
+// corrected, and the room's own counters (ticks late, ticks skipped, kicks by reason). This process's own timer lag is
 // reported too, because a busy load generator looks like a slow server.
 import * as C from '../public/crumbwar/shared/config.js';
 import * as P from '../public/crumbwar/shared/proto.js';
@@ -14,7 +14,7 @@ const arg = (name, fallback) => { const i = process.argv.indexOf('--' + name); r
 const url = arg('url', 'ws://localhost:8799'), key = arg('key', process.env.LOADTEST_KEY || ''), N = Number(arg('clients', 20)), seconds = Number(arg('seconds', 30));
 const room = 'lt-' + arg('room', Math.random().toString(36).slice(2, 8)), cap = arg('cap', String(Math.min(240, N)));
 const pct = (list, p) => list.length ? list.sort((a, b) => a - b)[Math.min(list.length - 1, list.length * p | 0)] : 0;
-const clients = [], gaps = [], rtts = [], fixes = [], replays = [], lag = [], closes = {};
+const clients = [], gaps = [], rtts = [], fixes = [], replays = [], lag = [], closes = {}, closeReasons = {};
 let joined = 0, refused = 0, bytes = 0, snaps = 0, skipped = 0, measuring = false;
 // Every gap over 300 ms is kept with what is needed to say where the time went: which client, when, how far the
 // room's tick moved across the gap, and how fast the next snapshots came. `heard` is the last message on any socket.
@@ -22,10 +22,10 @@ const BIG = 300, big = [], lagAt = [], t0 = performance.now();
 let heard = 0, silentMax = 0, silentAt = 0;
 
 function client(i) {
-  const c = { ws: new WebSocket(`${url}/crumbwar/play?lt=${key}&room=${room}&cap=${cap}${arg('burn', '') ? '&burn=' + arg('burn') : ''}`), p: null, ants: new Map(), food: new Map(), lastAt: 0, lastTick: 0, angle: Math.random() * 256 | 0, move: true, sprint: false, until: 0, pings: new Map(), n: 0 };
+  const c = { ws: new WebSocket(`${url}/crumbwar/play?lt=${key}&v=${C.PROTO}&room=${room}&cap=${cap}${arg('burn', '') ? '&burn=' + arg('burn') : ''}`), p: null, ants: new Map(), food: new Map(), lastAt: 0, lastTick: 0, angle: Math.random() * 256 | 0, move: true, sprint: false, until: 0, pings: new Map(), n: 0 };
   c.ws.binaryType = 'arraybuffer';
   c.ws.onerror = () => {};
-  c.ws.onclose = e => { if (!c.p) refused++; closes[e.code] = (closes[e.code] || 0) + 1; c.p = null; };
+  c.ws.onclose = e => { if (!c.p) refused++; closes[e.code] = (closes[e.code] || 0) + 1; if (e.reason) closeReasons[e.reason] = (closeReasons[e.reason] || 0) + 1; c.p = null; };
   c.ws.onmessage = e => {
     const r = new P.Reader(e.data), type = r.u8(), now = performance.now();
     if (measuring && heard && now - heard > silentMax) { silentMax = now - heard; silentAt = now - t0; }
@@ -94,7 +94,9 @@ setTimeout(async () => {
     snapshotGapMs: { p50: f(pct(gaps, 0.5)), p99: f(pct(gaps, 0.99)), max: f(pct(gaps, 1)) }, snapshotsOutOfStep: skipped,
     roundTripMs: { p50: f(pct(rtts, 0.5)), p99: f(pct(rtts, 0.99)) },
     predictionCorrectionUnits: { p50: f(pct(fixes, 0.5)), p99: f(pct(fixes, 0.99)), max: f(pct(fixes, 1)) }, replayedTicks: { p50: pct(replays, 0.5), p99: pct(replays, 0.99) },
-    loadGeneratorLagMs: { p99: f(pct(lag, 0.99)), max: f(pct(lag, 1)) }, closes,
+    loadGeneratorLagMs: { p99: f(pct(lag, 0.99)), max: f(pct(lag, 1)) }, closes, closeReasons,
+    // The room's own count of why it closed sockets (metrics.mjs lists the reasons). The full counters follow.
+    kicksByReason: stats?.kicksByReason ?? null,
     gapsOver300ms: big.length, gapIncidents, longestSilenceOnAllSockets: { ms: f(silentMax), atSecond: f(silentAt / 1000) }, measuringFromSecond: f(warm / 1000), roomCounters: stats,
   }, null, 1));
   for (const c of clients) try { c.ws.close(); } catch {}

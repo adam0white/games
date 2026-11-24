@@ -6,13 +6,14 @@ import * as C from './shared/config.js';
 import * as P from './shared/proto.js';
 import { byteOf, angleOf } from './shared/move.js';
 import { Predictor } from './shared/predict.js';
+import { UPDATE_CODE, mayReload } from './shared/version.js';
 
 const $ = id => document.getElementById(id), canvas = $('view'), g = canvas.getContext('2d');
 const COLORS = ['#e2574c', '#4c8fe2', '#5fbf6a', '#e8c84a'], TICK_MS = 1000 / C.TICK_HZ, DELAY = 3;
 const agent = new URLSearchParams(location.search).get('labRunSource') === 'agent';
 let ws = null, me = null, pred = null, ants = new Map(), food = new Map(), scores = null, snap = null;
 let offset = null, acc = 0, last = 0, retries = 0, bytesIn = 0, kbps = 0, rtt = 0, pingAt = new Map(), nonce = 0, lastTick = 0, session = null;
-let prevX = 0, prevY = 0, joined = false, feedUntil = 0, playing = false;
+let prevX = 0, prevY = 0, joined = false, feedUntil = 0, playing = false, avoid = '', avoided = 0;
 const input = { angle: 0, move: false, sprint: false, keys: new Set(), stick: null, mouse: false };
 
 function resize() { const d = Math.min(2, devicePixelRatio || 1); canvas.width = innerWidth * d; canvas.height = innerHeight * d; }
@@ -24,6 +25,8 @@ const nameOf = (a, b) => a === 255 ? 'the nest guards' : `${C.NAMES_A[a]} ${C.NA
 function connect() {
   $('play').disabled = true; $('status').textContent = 'Finding a room…';
   const u = new URL('play', location.href); u.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  u.searchParams.set('v', C.PROTO); // the Worker tells a page of another version to reload (UPDATE_CODE)
+  if (avoid) u.searchParams.set('avoid', avoid);
   if (session) { u.searchParams.set('room', session.room); u.searchParams.set('resume', session.token); }
   const s = ws = new WebSocket(u); s.binaryType = 'arraybuffer';
   heard = performance.now();
@@ -31,12 +34,23 @@ function connect() {
   s.onclose = e => {
     if (s !== ws) return;
     ws = null; playing = false;
+    if (e.code === UPDATE_CODE) return updated();
     // 4003: idle too long. Anything else is the network or a new version of the server: come back by itself.
     if (e.code !== 4003 && me && retries < 4) { say('Reconnecting…', 60000); setTimeout(connect, 400 * 2 ** retries++); return; }
     record.end(e.code === 4003 ? 'idle' : 'lost-connection');
     me = null; session = null; $('hud').hidden = true; $('card').hidden = false; $('play').disabled = false;
     $('status').textContent = e.code === 4003 ? 'You were away, so your place went to someone else.' : e.code === 1006 || !e.code ? 'Could not reach the game. Try again.' : `Disconnected (${e.code}).`;
   };
+}
+
+// The server runs another version of the game than this page. Reload once to fetch the page it serves. A second
+// ask within a minute means the reload did not help (a cache, or two versions served at once): say so and stop.
+function updated() {
+  ws = null; playing = false; record.end('lost-connection');
+  me = null; session = null; $('hud').hidden = true; $('card').hidden = false;
+  let store = null; try { store = sessionStorage; } catch {}
+  if (mayReload(store, Date.now())) { $('play').disabled = true; $('status').textContent = 'Game updated, reloading…'; location.reload(); return; }
+  $('play').disabled = false; $('status').textContent = 'The game was updated. Reload the page to play.';
 }
 
 // A socket can go quiet without closing (a dead network path, or a close that never completes). The server
@@ -47,8 +61,15 @@ setInterval(() => { const s = ws; if (s && performance.now() - heard > 5000) { c
 function receive(r) {
   const type = r.u8();
   if (type === P.WELCOME) {
-    me = P.readWelcome(r); session = { room: me.room, token: me.token };
-    if (me.proto !== C.PROTO) { location.reload(); return; } // the server is newer than this page
+    const hello = P.readWelcome(r);
+    // The Worker already checked that this page is its version, so a room of another protocol is old code still
+    // running after a deploy (from before rooms refused such joins). Leave it and ask for another room, twice at most.
+    if (hello.proto !== C.PROTO) {
+      const s = ws; ws = null; try { s.close(); } catch {}
+      if (avoided++ < 2) { avoid = hello.room; session = null; connect(); } else updated();
+      return;
+    }
+    me = hello; session = { room: me.room, token: me.token }; avoided = 0;
     pred = new Predictor(); ants = new Map(); food = new Map(); offset = null; acc = 0; retries = 0; playing = true; snap = null; joined = true;
     record.joined(); $('card').hidden = true; $('hud').hidden = false; say(`You are ${nameOf(me.nameA, me.nameB)} of ${C.COLONY_NAMES[me.colony]}`, 3500);
   } else if (type === P.SNAP && pred) {

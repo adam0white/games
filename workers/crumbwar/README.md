@@ -32,6 +32,10 @@ The production `LOADTEST_KEY` is a Worker secret. A copy is in the owner's macOS
 node loadtest/load.mjs --url wss://play.adamwhite.work --key <key> --clients 60 --seconds 60
 ```
 
+`GET /crumbwar/api/metrics?lt=<key>` returns hourly totals for the last 14 days, per region: joins, refusals and kicks by reason, room-minutes, peak people. See [DECISIONS.md](DECISIONS.md), "Metrics read path".
+
+**Before a deploy that changes `public/crumbwar/shared/` or `src/net.mjs`:** a test fails until you decide whether old pages and new rooms can still play together. If they cannot, raise `PROTO` in `shared/config.js`, then record the new fingerprint the test prints. The Worker then reloads old pages and stops sending people to rooms still running the old code. See [DECISIONS.md](DECISIONS.md), "Version check".
+
 A load test names its own room (`--room`, sent as `lt-<name>`), may raise the room's cap (`--cap`) and may overload the room on purpose (`--burn`). Both need the `LOADTEST_KEY` secret. `lt-` rooms never appear in the directory, so no player is sent to one. `GET /crumbwar/api/status?lt=<key>&room=<name>` returns a room's counters, and without `room` it lists the region's rooms.
 
 First-time hint: `public/crumbwar/client.js` loads the shared kit hint (`/kit/hint.js`, kind `stick`, key `crumbwar:hint`) with a dynamic import that does nothing if the file is missing. The static site serves that file, so deploy the static site first; until then the hint does not show, and in `wrangler dev` it never shows. The kit styles itself with a constructed stylesheet, so the page's `style-src 'self'` policy needs no change.
@@ -42,4 +46,4 @@ Lab recording: the page loads the shared kit recorder (`/kit/lab.js`) the same w
 
 Watching it: `GET /crumbwar/api/health` lists rooms that were lost or ran slow in the last 6 hours, and the workflow `.github/workflows/crumbwar-watch.yml` turns new entries into a GitHub issue labelled `crumbwar-alert`. Joins are limited to 60 a minute per address. Both are described in [DECISIONS.md](DECISIONS.md) under "Alerts" and "Rooms and scaling".
 
-`npx wrangler rollback` returns to the previous version. To remove the game, run `npx wrangler delete`: the routes go with the Worker, and `/crumbwar/` then falls through to the static site, which has no such path. Rooms store nothing, so there is no data to migrate or restore. A deploy closes every open socket; the page reconnects on its own and joins a fresh round.
+`npx wrangler rollback` returns to the previous version. To remove the game, run `npx wrangler delete`: the routes go with the Worker, and `/crumbwar/` then falls through to the static site, which has no such path. Rooms store nothing, so there is no data to migrate or restore. A deploy does not close open sockets at once: an occupied room can run the old code for minutes (seen 2026-11-24). Pages and rooms of another `PROTO` are kept apart by the version check. A rollback past the version check removes it.
