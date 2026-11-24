@@ -10,7 +10,7 @@ import { dirname, extname, join, normalize, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
-import { solve, walk } from './sim.js';
+import { solve, walk, step, startState } from './sim.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = process.env.SHOTS || join(tmpdir(), 'grapevine-shots');
@@ -71,6 +71,190 @@ async function firstHint(page) {
   assert.ok((await state(page)).touched, 'hint: the touch reached the game');
   await page.evaluate(() => { const el = document.querySelector('#pause'); el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 9, pointerType: 'touch', bubbles: true, cancelable: true })); el.click(); });
   await page.click('#toMenu'); await until(page, () => window.grapevineState().screen === 'menu', 'back on the menu');
+}
+
+// The kit's first-time hint must not cover a villager (head, hat or badge) on a crowded board. Reads the real rects of
+// the copy's dots and hand from the page.
+async function hintClear(page, url, name, phone) {
+  await page.goto(`${base}/grapevine/${url}`); await until(page, () => window.grapevineState, 'state hook');
+  await page.click('#play');
+  await until(page, () => !!document.querySelector('.kit-hint.on'), `hint shown on ${name}`, 9000);
+  await sleep(1700); // the finger is mid-drag
+  const hit = await page.evaluate(() => {
+    const st = window.grapevineState(), R = st.R, parts = [...document.querySelectorAll('.kit-hint svg circle, .kit-hint .hand, .kit-hint.still .label')];
+    const rects = parts.map(el => el.getBoundingClientRect()).filter(r => r.width && r.height);
+    const out = [];
+    for (const n of st.nodes) {
+      const box = { left: n.x - R * 1.15, right: n.x + R * 1.15, top: n.y - R * 1.25, bottom: n.y + R * 1.85 };
+      for (const r of rects) if (r.left < box.right && r.right > box.left && r.top < box.bottom && r.bottom > box.top) out.push(`${n.kind} at ${n.x},${n.y}`);
+    }
+    return { out, parts: rects.length, clear: st.hintClear };
+  });
+  await shot(page, phone, `hint-${name}`);
+  assert.ok(hit.parts >= 5, `${name}: the hint's dots and hand are on the page`);
+  assert.deepEqual(hit.out, [], `${name}: the hint covers no villager (clearance ${hit.clear})`);
+  await tap(page, { x: 5, y: page.viewportSize().height / 2 });
+}
+
+// Chapters 2 and 3: an old finished save opens chapter 2; each new kind of path or villager is learnt on its level, by
+// touch, with the wrong way refused; loops can be tapped; the end of a chapter has its card; the daily village keeps
+// hops and a streak and can be shared.
+async function chapters(page, phone) {
+  const old = { v: 1, sound: true, best: Object.fromEntries(Array.from({ length: 30 }, (_, i) => [i + 1, 3])), opened: 31, daily: { '2026-11-20': 2 } };
+  await page.goto(`${base}/grapevine/?labRunSource=agent`);
+  await page.evaluate(o => { localStorage.clear(); localStorage.setItem('grapevine-save', JSON.stringify(o)); }, old);
+  await page.reload(); await until(page, () => window.grapevineState, 'state hook');
+  let st = await state(page);
+  assert.equal(st.opened, 31, 'old save: progress kept'); assert.equal(st.tab, 1, 'old finished save opens on chapter 2');
+  assert.match(await page.textContent('#play'), /Play 31/);
+  assert.match(await page.textContent('#tabs'), /90\/90/, 'chapter 1 stars on its tab');
+  await sleep(300); await shot(page, phone, 'c1-menu-chapter2');
+
+  // 31, one way: the lane from the listener refuses a route that runs against it.
+  await page.click('#play'); st = await state(page); assert.equal(st.level, 31); assert.equal(st.chapter, 2);
+  let lv = await levelNow(page), best = solve(lv).best;
+  await sleep(500); await shot(page, phone, 'c2-level31-oneway');
+  const against = lv.edges.find(e => e[2] === 1); // [a, b, 1]: a to b only
+  const into = [lv.from, against[1]];
+  assert.equal(typeof step(lv, startState(lv), against[1]), 'object', 'level 31: the teller reaches the end of the lane');
+  await finger(page, '#c', dragSteps(st.nodes, [...into, against[0]]));
+  st = await state(page); assert.deepEqual(st.route, into, 'a drag against a one-way lane stops at it');
+  await sleep(150); await shot(page, phone, 'c3-level31-refused');
+  await tap(page, st.nodes[lv.from]);
+  await finger(page, '#c', dragSteps(st.nodes, best));
+  await until(page, () => window.grapevineState().screen === 'done', 'level 31 solved');
+
+  // 36, the bell: a shut gate refuses; after the bell rings it opens.
+  await page.click('#next'); st = await state(page); assert.equal(st.level, 32, 'Next goes on to 32');
+  await page.goto(`${base}/grapevine/?level=36`); await until(page, () => window.grapevineState, 'state hook');
+  await page.click('#play'); st = await state(page); lv = await levelNow(page); best = solve(lv).best;
+  await sleep(500); await shot(page, phone, 'c4-level36-bell');
+  const gate = lv.edges.findIndex(e => e[2] === 3), [ga, gb] = lv.edges[gate], gateNear = [ga, gb].find(v => v !== lv.to), bell = lv.nodes.findIndex(n => n.kind === 'bell');
+  await finger(page, '#c', dragSteps(st.nodes, [lv.from, gateNear, lv.to]));
+  st = await state(page); assert.deepEqual(st.route, [lv.from, gateNear], 'a shut gate stops the drag');
+  assert.equal(st.gates[gate], 0, 'the gate is shut');
+  await tap(page, st.nodes[lv.from]);
+  await finger(page, '#c', dragSteps(st.nodes, best, true));
+  st = await state(page); assert.ok(best.includes(bell), 'the best route rings the bell'); assert.equal(st.phase, 1, 'the bell rang');
+  await sleep(500); st = await state(page); assert.equal(st.gates[gate], 1, 'the gate swung open');
+  await shot(page, phone, 'c5-level36-open');
+  await finger(page, '#c', [['pointerup', st.nodes[lv.to].x, st.nodes[lv.to].y]]);
+  await until(page, () => window.grapevineState().screen === 'done', 'level 36 solved');
+
+  // 46, the keeper: hands on the news they hold and keeps the new.
+  await page.goto(`${base}/grapevine/?level=46`); await until(page, () => window.grapevineState, 'state hook');
+  await page.click('#play'); st = await state(page); lv = await levelNow(page); best = solve(lv).best;
+  assert.equal(st.chapter, 3);
+  await sleep(500); await shot(page, phone, 'c6-level46-keeper');
+  await finger(page, '#c', dragSteps(st.nodes, best.slice(0, -1), true));
+  st = await state(page); assert.deepEqual(st.memo[0], lv.start, 'the keeper now holds the teller\'s news');
+  await sleep(200); await shot(page, phone, 'c7-level46-midroute');
+  await finger(page, '#c', [['pointerup', st.nodes[best[best.length - 2]].x, st.nodes[best[best.length - 2]].y]]);
+
+  // Routes that loop back through a villager can be made by taps alone.
+  for (const n of [34, 40, 50]) {
+    await page.goto(`${base}/grapevine/?level=${n}`); await until(page, () => window.grapevineState, 'state hook');
+    await page.click('#play'); st = await state(page); lv = await levelNow(page); best = solve(lv).best;
+    assert.ok(new Set(best).size < best.length, `level ${n}: the best route loops`);
+    for (const v of best.slice(1)) await tap(page, st.nodes[v]);
+    assert.deepEqual((await state(page)).route, best, `level ${n}: taps drew the looping route`);
+    await until(page, () => window.grapevineState().screen === 'done', `level ${n} solved by taps`);
+    assert.equal((await state(page)).stars, 3);
+  }
+
+  // The end of a chapter: its own card, with the next button on screen.
+  await page.goto(`${base}/grapevine/?level=45`); await until(page, () => window.grapevineState, 'state hook');
+  await page.click('#play'); st = await state(page); lv = await levelNow(page); best = solve(lv).best;
+  await sleep(400); await shot(page, phone, 'c8-level45-winter');
+  await finger(page, '#c', dragSteps(st.nodes, best));
+  await until(page, () => window.grapevineState().screen === 'done', 'level 45 solved');
+  await sleep(1500);
+  assert.equal((await state(page)).payoff, 2); assert.match(await page.textContent('#doneTitle'), /Chapter done/);
+  const nb = await page.locator('#next').boundingBox(), vp = page.viewportSize();
+  assert.ok(nb.y + nb.height <= vp.height, 'Next chapter is on screen'); assert.match(await page.textContent('#next'), /Next chapter/);
+  await shot(page, phone, 'c9-chapter2-done');
+  await page.click('#next'); assert.equal((await state(page)).level, 46);
+  await page.goto(`${base}/grapevine/?level=60`); await until(page, () => window.grapevineState, 'state hook');
+  await page.click('#play'); await sleep(400); await shot(page, phone, 'c10-level60-autumn');
+
+  // The daily village at the newest tier: hops, streak and share.
+  await page.goto(`${base}/grapevine/?tier=3`); await until(page, () => window.grapevineState, 'state hook');
+  await page.click('#daily'); st = await state(page); lv = await levelNow(page); best = solve(lv).best;
+  assert.equal(st.tier, 3); assert.equal(st.chapter, lv.tier !== undefined ? [1, 2, 2, 3][lv.tier] : 3);
+  await sleep(300); await shot(page, phone, 'c11-daily-tier3');
+  await finger(page, '#c', dragSteps(st.nodes, best));
+  await until(page, () => window.grapevineState().screen === 'done', 'daily solved', 15000);
+  await sleep(1800);
+  st = await state(page);
+  assert.equal(st.dailyHops, best.length - 1, 'fewest hops today saved'); assert.equal(st.streak, 1); assert.equal(st.bestStreak, 1);
+  assert.match(st.shareText, /^Grapevine, Daily village/); assert.match(st.shareText, /Psst!.*Heard it!/);
+  await shot(page, phone, 'c12-daily-done');
+  const nb2 = await page.locator('#again').boundingBox();
+  assert.ok(nb2.y + nb2.height <= vp.height, 'the daily card fits');
+  // Share hands over a PNG and the text where the browser can share files, and copies the text where it cannot.
+  await page.evaluate(() => {
+    window.__shared = [];
+    Object.defineProperty(navigator, 'canShare', { configurable: true, value: d => !!d.files });
+    Object.defineProperty(navigator, 'share', { configurable: true, value: async d => { window.__shared.push({ text: d.text, files: (d.files || []).map(f => ({ type: f.type, size: f.size })) }); } });
+  });
+  await page.click('#share'); await sleep(300);
+  const handed = await page.evaluate(() => window.__shared);
+  assert.equal(handed.length, 1, 'share: handed over once'); assert.equal(handed[0].files[0]?.type, 'image/png', 'share: a PNG');
+  assert.ok(handed[0].files[0].size > 10000, 'share: the PNG has a picture in it'); assert.match(handed[0].text, /Heard it!/);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async t => { window.__copied = t; } } });
+  });
+  await page.click('#share'); await sleep(200);
+  assert.match(await page.evaluate(() => window.__copied), /^Grapevine, Daily village/, 'share: no share sheet, so the text is copied');
+  assert.equal(await page.textContent('#share'), 'Copied!');
+  assert.equal((await state(page)).shared, 2, 'share pressed twice');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('grapevine-save')));
+  assert.equal(saved.dailyTier[Object.keys(saved.dailyHops)[0]], undefined, '?tier= does not pin');
+  assert.ok(saved.opened >= 31, 'progress kept'); assert.equal(saved.daily['2026-11-20'], 2, 'an old daily entry kept');
+  assert.equal(saved.best[1], 3, 'old stars kept');
+
+  // Streaks: two solved days before today show on the menu; a gap breaks the run.
+  const day = k => { const d = new Date(); d.setDate(d.getDate() - k); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  await page.evaluate(([a, b, c]) => { const s = JSON.parse(localStorage.getItem('grapevine-save')); s.daily = { [a]: 3, [b]: 1, [c]: 2 }; localStorage.setItem('grapevine-save', JSON.stringify(s)); }, [day(1), day(2), day(4)]);
+  await page.goto(`${base}/grapevine/`); await until(page, () => window.grapevineState, 'state hook');
+  assert.equal((await state(page)).streak, 2, 'yesterday and the day before: a streak of 2');
+  assert.match(await page.textContent('#daily'), /2 days/);
+  await page.evaluate(([a, c]) => { const s = JSON.parse(localStorage.getItem('grapevine-save')); s.daily = { [a]: 3, [c]: 2 }; localStorage.setItem('grapevine-save', JSON.stringify(s)); }, [day(1), day(3)]);
+  await page.reload(); await until(page, () => window.grapevineState, 'state hook');
+  assert.equal((await state(page)).streak, 1, 'a gap breaks the streak');
+
+  // A six-villager route on a narrow phone: the strip has room for every villager.
+  await page.goto(`${base}/grapevine/?level=33`); await until(page, () => window.grapevineState, 'state hook');
+  await page.click('#play'); st = await state(page); lv = await levelNow(page); best = solve(lv).best;
+  await finger(page, '#c', dragSteps(st.nodes, best));
+  await until(page, () => window.grapevineState().screen === 'done', 'level 33 solved');
+  await sleep(1800); await shot(page, phone, 'c14-level33-strip');
+  const fit = await page.evaluate(n => { const c = document.querySelector('#strip'), w = c.getBoundingClientRect().width, h = c.getBoundingClientRect().height; const rows = Math.min(76, w / n) < 54 ? 2 : 1; return { rows, h }; }, best.length);
+  assert.ok(fit.h >= fit.rows * 100, `strip tall enough for ${fit.rows} row(s) (${fit.h} px)`);
+
+  // The share card itself, drawn for a long route (two rows) so its layout can be looked at.
+  await page.goto(`${base}/grapevine/?level=40`); await until(page, () => window.grapevineState, 'state hook');
+  await page.click('#play'); st = await state(page); lv = await levelNow(page); best = solve(lv).best;
+  await finger(page, '#c', dragSteps(st.nodes, best));
+  await until(page, () => window.grapevineState().screen === 'done', 'level 40 solved');
+  await sleep(2200); await shot(page, phone, 'c13-level40-strip');
+
+  // The first-time hint on crowded boards.
+  await page.evaluate(() => localStorage.clear());
+  for (const [url, name] of [['?level=1&hint=hand', 'level1'], ['?level=2&hint=hand', 'level2'], ['?level=3&hint=hand', 'level3'], ['?level=30&hint=hand', 'level30'], ['?level=52&hint=hand', 'level52'], ['?level=20&hint=hand', 'level20'], ['?tier=3&hint=hand', 'daily']]) {
+    if (name === 'daily') {
+      await page.goto(`${base}/grapevine/${url}`); await until(page, () => window.grapevineState, 'state hook');
+      await page.click('#daily');
+      await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint on the daily village', 9000); await sleep(1700);
+      const hit = await page.evaluate(() => {
+        const st = window.grapevineState(), R = st.R, rects = [...document.querySelectorAll('.kit-hint svg circle, .kit-hint .hand')].map(el => el.getBoundingClientRect());
+        return st.nodes.filter(n => rects.some(r => r.left < n.x + R * 1.15 && r.right > n.x - R * 1.15 && r.top < n.y + R * 1.85 && r.bottom > n.y - R * 1.25)).map(n => n.kind);
+      });
+      await shot(page, phone, 'hint-daily');
+      assert.deepEqual(hit, [], 'daily: the hint covers no villager');
+    } else await hintClear(page, url, name, phone);
+  }
 }
 
 async function run(page, phone) {
@@ -207,6 +391,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   try {
     await run(page, phone);
     await firstHint(page);
+    await chapters(page, phone);
     assert.deepEqual(errors, [], 'page errors');
     console.log(`ok   grapevine on ${phone}`);
   } catch (e) {
@@ -234,6 +419,8 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
       await p2.click('#play'); const s25 = await state(p2), lv25 = await levelNow(p2), b25 = solve(lv25).best;
       await finger(p2, '#c', dragSteps(s25.nodes, b25.slice(0, -1), true));
       await sleep(300); await shot(p2, 'small', '3-level25-parrot');
+      await p2.evaluate(() => localStorage.clear());
+      await chapters(p2, 'small');
       assert.deepEqual(errs, []);
       console.log('ok   grapevine on chromium 360x640');
     } catch (e) { failed++; console.log(`FAIL grapevine on chromium 360x640: ${e.message}`); }
@@ -335,6 +522,12 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
       await p3.click('#play'); const s29 = await state(p3);
       assert.ok(s29.nodes.every(n => Math.abs(n.x - 640) <= 300), 'the board stays a phone-wide column on desktop');
       await sleep(300); await shot(p3, 'desktop', '3-level29');
+      for (const n of [45, 60]) { // the wide street in winter and in autumn
+        await p3.goto(`${base}/grapevine/?level=${n}`); await until(p3, () => window.grapevineState, 'state hook');
+        await p3.click('#play'); const sn = await state(p3);
+        assert.ok(sn.nodes.every(q => Math.abs(q.x - 640) <= 300), `level ${n}: a phone-wide column`);
+        await sleep(400); await shot(p3, 'desktop', `4-level${n}`);
+      }
       assert.deepEqual(errs3, []);
       console.log('ok   grapevine on chromium desktop 1280x800');
     } catch (e) { failed++; console.log(`FAIL grapevine on chromium desktop: ${e.message}`); }

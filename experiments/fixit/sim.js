@@ -14,11 +14,11 @@ export const LEVELS = 6; // levels 0..5
 export const HINT_AFTER = 1.5; // seconds with no progress before the faint hint
 export const WORKS = 0.6; // the "it works" moment
 export const LEAVE = 0.7; // a grumpy customer walking off
-export const KINDS = ['screw', 'pin', 'dent', 'wheel', 'rub', 'clock', 'chain', 'glue', 'sharpen', 'sew', 'pump'];
+export const KINDS = ['screw', 'pin', 'dent', 'wheel', 'rub', 'clock', 'chain', 'glue', 'sharpen', 'sew', 'pump', 'oil', 'zip', 'spring', 'thread'];
 export const TUTOR = ['screw', 'pin', 'dent']; // the first three jobs ever, one each, very patient
-export const WORD = { screw: 'Turn!', pin: 'Pull!', dent: 'Tap!', wheel: 'Flick!', rub: 'Rub!', clock: 'Set it!', chain: 'Hook it!', glue: 'Push & hold!', sharpen: 'Swipe!', sew: 'Sew!', pump: 'Pump!' };
-export const OBJECT = { screw: 'bell', pin: 'music box', dent: 'kettle', wheel: 'wheel', rub: 'lamp', clock: 'clock', chain: 'bike', glue: 'vase', sharpen: 'knife', sew: 'teddy', pump: 'ball' };
-export const COIN = { screw: 2, pin: 2, dent: 2, wheel: 3, rub: 3, clock: 2, chain: 2, glue: 3, sharpen: 3, sew: 3, pump: 3 };
+export const WORD = { screw: 'Turn!', pin: 'Pull!', dent: 'Tap!', wheel: 'Flick!', rub: 'Rub!', clock: 'Set it!', chain: 'Hook it!', glue: 'Push & hold!', sharpen: 'Swipe!', sew: 'Sew!', pump: 'Pump!', oil: 'Tap when open!', zip: 'Zip it up!', spring: 'Pull back!', thread: 'Thread it!' };
+export const OBJECT = { screw: 'bell', pin: 'music box', dent: 'kettle', wheel: 'wheel', rub: 'lamp', clock: 'clock', chain: 'bike', glue: 'vase', sharpen: 'knife', sew: 'teddy', pump: 'ball', oil: 'door', zip: 'jacket', spring: 'toy car', thread: 'needle' };
+export const COIN = { screw: 2, pin: 2, dent: 2, wheel: 3, rub: 3, clock: 2, chain: 2, glue: 3, sharpen: 3, sew: 3, pump: 3, oil: 3, zip: 3, spring: 2, thread: 3 };
 export const QUICK_BONUS = 1; // coins for a repair done with at least half the patience left
 export const PATIENCE = [13, 12, 10.5, 9.5, 8.5, 7.5]; // seconds for one repair, by ramp level
 export const TWO_PATIENCE = 1.6; // a two-repair job gets this many times the patience
@@ -33,11 +33,11 @@ export const GOLDEN_PATIENCE = 1.45; // times the level's patience (an ordinary 
 export const GOLDEN_PAY = 4;
 export const GOLDEN_FROM = 6; // no golden customer among the first six of a shift
 // Touch radii in local units. index.html scales 100 units to at least 300 px, so the smallest (dent, 17) is 51 px.
-export const HIT = { screw: 60, pin: 32, dent: 17, wheel: 52, rub: 38, clock: 54, chain: 26, glue: 30, sharpen: 36, sew: 26, pump: 26 };
+export const HIT = { screw: 60, pin: 32, dent: 17, wheel: 52, rub: 38, clock: 54, chain: 26, glue: 30, sharpen: 36, sew: 26, pump: 26, oil: 30, zip: 22, spring: 26, thread: 22 };
 
 const DENTS = [[28, 54], [50, 42], [72, 54], [38, 76], [62, 76]];
 // Where a second-job screw sits on each object (all at least 28 units from the box edge, so a thumb can circle it).
-const SCREW_SPOT = { pin: [72, 80], dent: [50, 20], wheel: [50, 54], rub: [50, 40], clock: [50, 52], chain: [68, 36], glue: [50, 60], sharpen: [32, 52], sew: [76, 50], pump: [74, 80] };
+const SCREW_SPOT = { pin: [72, 80], dent: [50, 20], wheel: [50, 54], rub: [50, 40], clock: [50, 52], chain: [68, 36], glue: [50, 60], sharpen: [32, 52], sew: [76, 50], pump: [74, 80], oil: [58, 46], zip: [32, 44], spring: [50, 72], thread: [32, 46] };
 
 // ---------- random numbers: mulberry32 on s.r, so a run is fixed by its seed
 export function rand(s) {
@@ -358,31 +358,171 @@ K.pump = {
   guide: r => ({ type: 'pump', x: r.x, top: 20, bottom: 52, at: [r.x, r.h + 6], n: r.need - r.strokes, rate: PUMP_RATE }),
 };
 
+// ---------- round 3: four more repairs, each a gesture the first eleven do not use
+
+// Squeaky door: it swings open and shut by itself. Tap the oil can while the door is wide open and a drop lands in the
+// hinge; one drop per swing, three drops and it swings quietly. A tap while it is shut splashes and does no harm.
+export const OIL_PERIOD = 1.0; // seconds for one swing
+export const OIL_OPEN = 0.6; // how far open the door must be (0 shut, 1 wide open) for a drop to land
+const oilOpen = r => 0.5 - 0.5 * Math.cos(2 * Math.PI * r.ph);
+K.oil = {
+  make: s => ({ ph: rand(s) * 0.25, cx: 72, cy: 80, drops: 0, need: 3, used: -1, wasOpen: false }),
+  down(r, x, y, s) {
+    if (dist(x, y, r.cx, r.cy) > HIT.oil) return false;
+    const swing = Math.floor(r.ph);
+    if (oilOpen(r) >= OIL_OPEN && r.used !== swing) {
+      r.used = swing; r.drops++; r.p = r.drops / r.need;
+      s.events.push({ e: 'drip', n: r.drops });
+    } else s.events.push({ e: 'splat' });
+    return true;
+  },
+  move() {}, up() {},
+  tick(r, dt, s) {
+    r.ph += dt / OIL_PERIOD;
+    const open = oilOpen(r) >= OIL_OPEN;
+    if (open && !r.wasOpen && r.drops < r.need) s.events.push({ e: 'squeak', n: r.drops });
+    r.wasOpen = open;
+  },
+  // mid: seconds to the middle of the next swing that can still take a drop
+  guide(r) {
+    const f = r.ph - Math.floor(r.ph), swing = Math.floor(r.ph);
+    const mid = (f <= 0.5 && r.used !== swing ? 0.5 - f : 1.5 - f) * OIL_PERIOD;
+    return { type: 'timing', at: [r.cx, r.cy], mid, period: OIL_PERIOD, open: oilOpen(r), n: r.need - r.drops };
+  },
+};
+
+// Stuck zip on a jacket: hold the pull tab (it hangs below the slider, so the finger never covers the teeth) and drag it
+// up. It sticks at each snag; wiggle side to side to free it, then go on up to the collar.
+export const ZIP_RATE = 150; // local units a second the slider can climb
+const ZIP_TAB = 12; // the tab hangs this far below the slider
+K.zip = {
+  make: s => ({ x: 50, y: 84, y0: 84, top: 24, snags: [64 + Math.floor(rand(s) * 3) * 3, 42 + Math.floor(rand(s) * 3) * 3], wig: 0, dir: 0, run: 0, lx: 0, fy: 84, gy: 0 }),
+  down(r, x, y) {
+    if (dist(x, y, r.x, r.y + ZIP_TAB) > HIT.zip) return false;
+    r.grab = true; r.gy = y - r.y; r.lx = x; r.dir = 0; r.run = 0; r.fy = r.y;
+    return true;
+  },
+  move(r, x, y, s) {
+    if (!r.grab) return;
+    r.fy = y - r.gy;
+    const dx = x - r.lx; r.lx = x;
+    if (!r.snags.length || r.y > r.snags[0] + 0.5 || !dx) return;
+    // stuck at a snag: each change of direction after at least 4 units of travel is one wiggle
+    const sign = Math.sign(dx);
+    if (r.dir === 0 || sign === r.dir) r.run += Math.abs(dx);
+    else { if (r.run >= 4) { r.wig++; s.events.push({ e: 'wiggle', n: r.wig }); } r.run = Math.abs(dx); }
+    r.dir = sign;
+    if (r.wig >= 4) { r.snags.shift(); r.wig = 0; r.run = 0; r.dir = 0; s.events.push({ e: 'unsnag', left: r.snags.length }); }
+  },
+  up(r) { r.grab = false; },
+  tick(r, dt) {
+    if (r.grab) {
+      const stop = r.snags.length ? r.snags[0] : r.top, want = clamp(r.fy, stop, r.y0);
+      if (want < r.y) r.y = Math.max(want, r.y - ZIP_RATE * dt); // it only goes up: a zip stays where you leave it
+    }
+    r.p = r.y <= r.top + 0.01 ? 1 : clamp((r.y0 - r.y + r.wig * 0.6) / (r.y0 - r.top), 0, 0.99);
+  },
+  guide: r => ({ type: 'zip', at: [r.x, r.y + ZIP_TAB], top: r.top + ZIP_TAB, snags: r.snags.map(v => v + ZIP_TAB), stuck: r.snags.length > 0 && r.y <= r.snags[0] + 0.5, rate: ZIP_RATE }),
+};
+
+// Wind-up toy car: hold it and pull it back. The spring resists, so the car comes back at its own pace and stays in sight
+// beside the finger; when the key glows, let go and it zooms off. Let go too soon and it rolls back unwound.
+export const SPRING_RATE = 75; // local units a second the car can be pulled back
+K.spring = {
+  make: () => ({ x0: 64, x: 64, y: 60, need: 34, w: 0, fx: 64, gx: 0, zoom: 0, ready: false }),
+  down(r, x, y) {
+    if (r.zoom || dist(x, y, r.x - 8, r.y) > HIT.spring) return false;
+    r.grab = true; r.gx = x - r.x; r.fx = x;
+    return true;
+  },
+  move(r, x) { if (r.grab) r.fx = x; },
+  up(r, s, type) {
+    if (!r.grab) return;
+    r.grab = false;
+    if (type === 'up' && r.w >= 1) { r.zoom = 1; r.p = 1; s.events.push({ e: 'zoom' }); }
+    else if (r.w > 0.05) s.events.push({ e: 'unwind' });
+  },
+  tick(r, dt, s) {
+    if (r.zoom) return;
+    if (r.grab) {
+      const want = clamp(r.fx - r.gx, r.x0 - r.need - 6, r.x0);
+      r.x = want < r.x ? Math.max(want, r.x - SPRING_RATE * dt) : Math.min(want, r.x + 200 * dt);
+    } else r.x = Math.min(r.x0, r.x + 120 * dt); // let go: it rolls back to where it was, unwound
+    const w = clamp((r.x0 - r.x) / r.need, 0, 1);
+    if (Math.floor(w * 4) > Math.floor(r.w * 4)) s.events.push({ e: 'wind', n: Math.floor(w * 4) });
+    if (w >= 1 && !r.ready) s.events.push({ e: 'ready' });
+    r.ready = w >= 1; r.w = w; r.p = 0.9 * w;
+  },
+  guide: r => ({ type: 'drag', from: [r.x - 8, r.y], to: [r.x0 - r.need - 12, r.y], hold: Math.max(0, r.x - (r.x0 - r.need)) / SPRING_RATE + 0.2 }),
+};
+
+// Needle: hold the thread's end (its tip stands up above the finger) and steer the tip into the needle's eye, then hold
+// still while it goes through. Moving while it is in the eye pulls it back out.
+export const THREAD_HOLD = 1.0; // seconds of holding still in the eye
+const THREAD_UP = 16; // the tip stands this far above the finger
+K.thread = {
+  make: s => ({ tx: 26, ty: 56, fx: 26, fy: 72, ex: 64, ey: 28, ph: rand(s), jit: 0, inEye: 0, lx: 0, ly: 0, was: false, d0: Math.hypot(38, 28) - 4, held: false }),
+  down(r, x, y) {
+    if (dist(x, y, r.tx, r.ty + THREAD_UP) > HIT.thread) return false;
+    r.grab = true; r.held = true; r.fx = r.lx = x; r.fy = r.ly = y;
+    return true;
+  },
+  move(r, x, y) {
+    if (!r.grab) return;
+    r.jit += dist(x, y, r.lx, r.ly); r.lx = x; r.ly = y; r.fx = x; r.fy = y;
+  },
+  up(r) { r.grab = false; },
+  tick(r, dt, s) {
+    r.ph += dt / 2.4; r.ex = 64 + 2 * Math.sin(r.ph * 2 * Math.PI); // the needle sways a little
+    r.jit *= Math.exp(-dt / 0.1);
+    if (r.grab) { // the thread is floppy: its tip follows the finger at its own pace
+      const tx = r.fx, ty = r.fy - THREAD_UP, d = dist(tx, ty, r.tx, r.ty), v = 110 * dt;
+      if (d > 0) { const k = Math.min(1, v / d); r.tx += (tx - r.tx) * k; r.ty += (ty - r.ty) * k; }
+    }
+    const d = dist(r.tx, r.ty, r.ex, r.ey), near = d <= 6;
+    if (near && !r.was) s.events.push({ e: 'eye' });
+    r.was = near;
+    const before = Math.floor(r.inEye * 5);
+    if (near && r.grab && r.jit < 3) r.inEye = Math.min(1, r.inEye + dt / THREAD_HOLD);
+    else r.inEye = Math.max(0, r.inEye - dt * (near ? 0.5 : 2));
+    if (Math.floor(r.inEye * 5) > before) s.events.push({ e: 'through', n: Math.floor(r.inEye * 5) });
+    r.p = r.inEye >= 1 ? 1 : r.held ? 0.4 * clamp(1 - (d - 6) / r.d0, 0, 1) + 0.6 * r.inEye : 0;
+  },
+  guide: r => ({ type: 'drag', from: [r.tx, r.ty + THREAD_UP], to: [r.ex, r.ey + THREAD_UP], hold: dist(r.tx, r.ty, r.ex, r.ey) / 110 + (1 - r.inEye) * THREAD_HOLD + 0.35, eye: [r.ex, r.ey] }),
+};
+
 function makeRepair(s, kind, spot) {
   const r = K[kind].make(s, spot);
   r.kind = kind; r.p = 0; r.idle = 0; r.best = 0; r.done = false; r.grab = false; r.spot = spot ?? null;
   return r;
 }
 export const guide = r => K[r.kind].guide(r);
-export const level = s => Math.min(LEVELS - 1, Math.floor(s.clock / RAMP));
+export const level = s => s.lv ? s.lv.ramp : Math.min(LEVELS - 1, Math.floor(s.clock / RAMP)); // a map level sets its own step
 export const multiplier = s => 1 + Math.min(2, Math.floor(s.streak / 4)); // x2 after four quick jobs in a row, x3 after eight
 
-// ---------- the shift
-export function create({ seed = 1, unlocked = TUTOR, tutorial = false, hearts = 3, newJob = null, only = null, regular = -1, two = true, day = DAY, startLevel = 0, golden = GOLDEN_CHANCE, goldenFrom = GOLDEN_FROM } = {}) {
+// ---------- the shift: the open stall (a day of random customers) or a map level (levels.js) when `lv` is given
+export function create({ seed = 1, unlocked = TUTOR, tutorial = false, hearts = 3, newJob = null, only = null, regular = -1, two = true, day = DAY, startLevel = 0, golden = GOLDEN_CHANCE, goldenFrom = GOLDEN_FROM, lv = null } = {}) {
+  if (lv) { // a map level brings its own seed, jobs, pace and goal
+    seed = lv.seed; unlocked = lv.pool; tutorial = false; newJob = lv.intro; two = lv.two; day = Infinity; startLevel = 0;
+    golden = lv.golden; goldenFrom = 4; regular = lv.regular && !lv.goal.list ? 0 : -1;
+  }
   const s = {
     seed, r: seed | 0, t: 0, clock: startLevel * RAMP, day, over: null, events: [],
     hearts, maxHearts: hearts, coins: 0, served: 0, lost: 0, streak: 0, bestStreak: 0, log: [],
     unlocked: unlocked.filter(k => KINDS.includes(k)), tutorial, newJob, only, regular, two, golden, goldenFrom, made: 0, lastKind: null,
     queue: [], cust: null, reps: [], rep: null, stepN: 0, phase: 'work', phaseT: 0,
     finger: { down: false, blocked: false, x: 0, y: 0 },
+    lv, cleared: false, clearT: null,
   };
   if (!s.unlocked.length) s.unlocked = TUTOR.slice();
-  for (let i = 0; i < 4; i++) s.queue.push(customer(s));
+  for (let i = 0; i < 4; i++) { const c = customer(s); if (c) s.queue.push(c); }
   nextCustomer(s);
   return s;
 }
 
 function customer(s) {
+  const lv = s.lv, list = lv?.goal.list;
+  if (list && s.made >= list.length) return null; // a set list has no more customers after its last
   const n = s.made++;
   const c = { n, look: Math.floor(rand(s) * 2 ** 30), tutor: false, fresh: false, regular: false, golden: false, kinds: null };
   const g = rand(s); // drawn for every customer, so the golden chance never shifts the rest of the queue
@@ -390,10 +530,13 @@ function customer(s) {
   // with the same repairs, however fast they play: the two-repair roll and the repairs' own layout come with them.
   c.roll = rand(s); c.rs = Math.floor(rand(s) * 2 ** 31);
   if (s.only) c.kinds = [s.only];
+  else if (list) { c.kinds = [list[n]]; c.fresh = n === 0 && list[0] === lv.intro; }
+  else if (lv?.intro && (n % 2 === 0 || s.unlocked.length === 1)) { c.kinds = [lv.intro]; c.fresh = n === 0; } // a new job: every other customer
   else if (s.tutorial && n < TUTOR.length) { c.kinds = [TUTOR[n]]; c.tutor = true; }
-  else if (s.newJob && !s.newJobMade) { c.kinds = [s.newJob]; c.fresh = true; s.newJobMade = true; }
+  else if (!lv && s.newJob && !s.newJobMade) { c.kinds = [s.newJob]; c.fresh = true; s.newJobMade = true; }
   else {
-    const pool = s.unlocked.length > 1 ? s.unlocked.filter(k => k !== s.lastKind) : s.unlocked;
+    let pool = s.unlocked.length > 1 ? s.unlocked.filter(k => k !== s.lastKind) : s.unlocked;
+    if (lv?.intro && pool.length > 1) pool = pool.filter(k => k !== lv.intro);
     c.kinds = [pick(s, pool)];
   }
   if (s.regular >= 0 && n === (s.tutorial ? TUTOR.length : 0) + REGULAR_AT) c.regular = true;
@@ -404,12 +547,14 @@ function customer(s) {
 
 function nextCustomer(s) {
   const c = s.queue.shift();
-  s.queue.push(customer(s));
-  const L = level(s);
-  // A second job is decided when the customer steps up, so it follows the ramp.
-  const chance = typeof s.two === 'number' ? s.two : s.two ? TWO_CHANCE[L] : 0;
+  const more = customer(s);
+  if (more) s.queue.push(more);
+  const L = level(s), lv = s.lv;
+  // A second job is decided when the customer steps up; in the open stall it follows the ramp, in a level it is fixed.
+  const chance = lv ? lv.two : typeof s.two === 'number' ? s.two : s.two ? TWO_CHANCE[L] : 0;
   if ((!c.tutor && !c.fresh && c.roll < chance) || c.golden) c.kinds = [c.kinds[0], c.kinds[0] === 'screw' ? 'dent' : 'screw'];
-  c.patience = c.tutor ? TUTOR_PATIENCE : c.fresh ? NEW_PATIENCE : c.golden ? PATIENCE[L] * GOLDEN_PATIENCE : PATIENCE[L] * (c.kinds.length > 1 ? TWO_PATIENCE : 1) * (c.regular ? 1.4 : 1);
+  const base = lv ? lv.patience : PATIENCE[L];
+  c.patience = c.tutor ? TUTOR_PATIENCE : c.fresh ? NEW_PATIENCE : c.golden ? base * GOLDEN_PATIENCE : base * (c.kinds.length > 1 ? TWO_PATIENCE : 1) * (c.regular ? 1.4 : 1);
   c.left = c.patience;
   s.cust = c;
   const queueR = s.r; s.r = c.rs; // the repairs draw from the customer's own numbers
@@ -419,6 +564,23 @@ function nextCustomer(s) {
   s.phase = 'work'; s.phaseT = 0;
   s.finger.blocked = s.finger.down; // a finger still down from the last job must lift before it touches this one
   s.events.push({ e: 'next', kinds: c.kinds, regular: c.regular, fresh: c.fresh, tutor: c.tutor, golden: c.golden });
+}
+
+// A map level's goal: how far along each part is, and whether it is met.
+export function goalState(s) {
+  const g = s.lv?.goal;
+  if (!g) return null;
+  const parts = [];
+  if (g.list) parts.push({ kind: 'list', have: s.served, need: g.list.length });
+  if (g.fix) parts.push({ kind: 'fix', have: s.served, need: g.fix });
+  if (g.coins) parts.push({ kind: 'coins', have: s.coins, need: g.coins });
+  return { parts, met: parts.every(p => p.have >= p.need), time: g.time ?? null, safe: !!(g.safe || g.list) };
+}
+// Stars for a cleared level: 3 at or under the first star time, 2 at or under the second, else 1. 0 when not cleared.
+export function stars(s) {
+  if (!s.lv || !s.cleared) return 0;
+  const [t3, t2] = s.lv.stars;
+  return s.clearT <= t3 + 1e-9 ? 3 : s.clearT <= t2 + 1e-9 ? 2 : 1;
 }
 
 export function input(s, ev) {
@@ -438,7 +600,7 @@ export function input(s, ev) {
     if (!hit) { s.events.push({ e: 'miss', x, y }); r.idle = Math.max(r.idle, HINT_AFTER); } // a wasted tap shows the hint at once
     else s.events.push({ e: 'grab', kind: r.kind, x, y });
   } else if (type === 'move') k.move(r, x, y, s);
-  else { k.up(r, s); s.events.push({ e: 'lift', kind: r.kind }); }
+  else { k.up(r, s, type); s.events.push({ e: 'lift', kind: r.kind }); }
   settle(s);
 }
 
@@ -469,14 +631,20 @@ function pay(s) {
   s.log.push({ kind: c.kinds.join('+'), ms: Math.round((c.patience - c.left) * 1000), ok: true, ...(c.golden ? { golden: true } : {}) });
   s.phase = 'works'; s.phaseT = WORKS;
   s.events.push({ e: 'paid', coins, quick, kinds: c.kinds, mult: multiplier(s), regular: c.regular, golden: c.golden, streak: s.streak });
+  if (s.lv && !s.cleared && goalState(s).met) { // the level's clock stops the moment the goal is met
+    s.cleared = true; s.clearT = s.clock;
+    s.events.push({ e: 'goal', secs: s.clearT, stars: stars(s) });
+  }
 }
 
 export function step(s) {
   if (s.over) return;
   s.t += DT;
   const c = s.cust;
-  if (!c.tutor) s.clock += DT;
+  if (!c.tutor && !s.cleared) s.clock += DT;
   if (s.clock >= s.day && s.phase === 'work') { end(s, 'time'); return; }
+  const limit = s.lv?.goal.time;
+  if (limit && !s.cleared && s.clock >= limit) { end(s, 'time'); return; }
   if (s.phase === 'work') {
     const r = s.rep;
     K[r.kind].tick(r, DT, s);
@@ -493,14 +661,17 @@ export function step(s) {
   }
   s.phaseT -= DT;
   if (s.phaseT > 0) return;
+  if (s.cleared) { end(s, 'clear'); return; }
   if (s.hearts <= 0) { end(s, 'hearts'); return; }
+  if (s.lv && s.lost > 0 && goalState(s).safe) { end(s, 'lost'); return; } // a set list, or "nobody walks off"
   if (s.clock >= s.day) { end(s, 'time'); return; }
+  if (!s.queue.length) { end(s, 'lost'); return; } // a set list ran out with someone not fixed
   nextCustomer(s);
 }
 
 function end(s, why) {
   s.over = why;
-  s.events.push({ e: 'over', why });
+  s.events.push({ e: 'over', why, stars: stars(s) });
 }
 
 // For the page: whether a hint should show, and how strongly. `seen` is how many times this kind was shown before.

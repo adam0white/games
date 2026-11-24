@@ -1,7 +1,7 @@
 // Phone smoke test for Fix-It Stall: node experiments/fixit/check.mjs [webkit|chromium]
 // Serves experiments/ on a free port, plays with real touch pointer events on WebKit (iPhone 13) and Chromium (Pixel 7),
 // and fails on any page or console error. Screenshots go to $SHOTS (default: a folder in the OS temp directory).
-// The shift is shortened with ?day=16 so a whole shift fits in the check; everything else is the real game.
+// Levels are played to their end; the open and daily stalls are shortened with ?day= where a whole shift is played.
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import { plan, SKILLS } from './moves.js';
-import { KINDS, TUTOR } from './sim.js';
+import { KINDS } from './sim.js';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '..');
 const SHOTS = process.env.SHOTS || join(tmpdir(), 'fixit-shots'); // the build brief sets SHOTS to a scratch folder
@@ -82,39 +82,61 @@ async function playJob(page, label, pointerType) {
 // Quit to the menu and let the lab record leave before the next navigation (WebKit logs an error for a
 // record still being compressed when the page goes away).
 async function leave(page) { await page.click('#pause'); await page.click('#quit'); await sleep(300); }
+// A level opens on its goal card with the sim waiting; a tap on the canvas starts it.
+async function startLevel(page) {
+  await until(page, () => window.fixitState().card > 0, 'the goal card');
+  const st = await state(page);
+  await page.evaluate(([x, y]) => { const el = document.getElementById('c'); for (const t of ['down', 'up']) el.dispatchEvent(new PointerEvent('pointer' + t, { pointerId: 2, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, bubbles: true, cancelable: true })); }, [st.box.x + 50 * st.box.unit, st.box.y + 50 * st.box.unit]);
+  await until(page, () => window.fixitState().card === 0, 'the goal card to go');
+}
+// Play every customer until the level or shift ends.
+async function playOut(page, label, shot) {
+  for (let i = 0; i < 60; i++) {
+    const st = await state(page);
+    if (st.over || st.screen === 'end') break;
+    if (st.phase !== 'work') { await sleep(80); continue; }
+    if (shot && st.served === 3) { await sleep(200); await page.screenshot({ path: shot }); shot = null; }
+    await playJob(page, `${label} ${st.kind}`);
+  }
+  await until(page, () => window.fixitState().screen === 'end', `${label}: the end card`, 15000);
+  await sleep(250);
+  return state(page);
+}
+const runs = (ctx, outcome) => ctx.labSent.filter(r => r.game === 'fixit' && r.kind === 'run' && (!outcome || r.data.outcome === outcome));
+const levelsUpTo = n => Object.fromEntries(Array.from({ length: n }, (_, i) => [i + 1, 1]));
 
 async function run(page, phone) {
   cur = page;
-  const labSent = page.context().labSent;
-  await page.goto(`${base}/fixit/?seed=7&day=16`);
+  const ctx = page.context();
+  await page.goto(`${base}/fixit/`);
   await page.evaluate(() => localStorage.setItem('hf-lab-send-localhost', '1'));
   await page.reload();
   await until(page, () => window.fixitState && window.fixitState().screen === 'menu', 'menu');
   assert.match(await page.textContent('#menu'), /The game lab records play/, 'lab notice on the menu');
+  // The map: 32 numbered levels, level 1 marked next, the rest locked; no open or daily stall yet.
+  assert.equal(await page.locator('.lv').count(), 32, 'the map shows 32 levels');
+  assert.ok(await page.locator('.lv.next[data-level="1"]').count() === 1 && await page.locator('.lv[data-level="2"]').isDisabled(), 'level 1 next, level 2 locked');
+  assert.ok(!(await page.isVisible('#open')) && !(await page.isVisible('#daily')), 'no open or daily stall on a new save');
+  assert.match(await page.textContent('#play'), /level 1/, 'Play names the next level');
   await sleep(200);
-  await page.screenshot({ path: join(SHOTS, `${phone}-1-menu.png`) });
+  await page.screenshot({ path: join(SHOTS, `${phone}-1-map.png`) });
 
-  // The first shift: three patient customers, one job each, with the ghost finger.
+  // Level 1: the goal card, the sim waiting behind it, then a tap starts it.
   await page.click('#play');
   let st = await state();
-  assert.ok(st.playing && st.screen === 'play', 'Play starts a shift');
-  assert.equal(st.kind, 'screw', 'first job is the screw');
+  assert.ok(st.playing && st.screen === 'play' && st.mode === 'level' && st.level === 1, 'Play starts level 1');
+  assert.equal(st.kind, 'screw', 'level 1 teaches the screw');
   assert.ok(st.minTouchPx >= 44, `smallest touch target ${st.minTouchPx.toFixed(0)} px`);
-  await sleep(700);
+  await sleep(500);
   st = await state();
-  assert.equal(st.hint, 1, 'the ghost finger shows on the first job');
-  await page.screenshot({ path: join(SHOTS, `${phone}-2-first-job.png`) });
+  assert.ok(st.card > 0 && st.t === 0, 'the sim waits behind the goal card');
+  await page.screenshot({ path: join(SHOTS, `${phone}-2-goal-card.png`) });
+  await startLevel(page);
+  await sleep(500);
+  assert.equal((await state()).hint, 1, 'the ghost finger shows on the first job');
   // A tap beside the job is answered (sound and a ripple) and does no harm.
-  await page.evaluate(([x, y]) => { const el = document.getElementById('c'); for (const t of ['down', 'up']) el.dispatchEvent(new PointerEvent('pointer' + t, { pointerId: 3, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, bubbles: true })); }, [st.box.x + 2 * st.box.unit, st.box.y + 98 * st.box.unit]);
-  for (const kind of TUTOR) {
-    st = await state();
-    assert.equal(st.kind, kind, `tutorial job ${kind}`);
-    await playJob(page, kind);
-  }
   st = await state();
-  assert.equal(st.served, 3, 'three tutorial jobs fixed');
-  assert.ok(st.coins > 0, 'coins earned');
-
+  await page.evaluate(([x, y]) => { const el = document.getElementById('c'); for (const t of ['down', 'up']) el.dispatchEvent(new PointerEvent('pointer' + t, { pointerId: 3, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, bubbles: true })); }, [st.box.x + 2 * st.box.unit, st.box.y + 98 * st.box.unit]);
   // Pause by the button freezes the sim; Keep going resumes it. Losing focus pauses; P resumes.
   await page.click('#pause');
   st = await state(); assert.ok(st.paused && st.screen === 'paused', 'pause button pauses');
@@ -125,115 +147,133 @@ async function run(page, phone) {
   assert.ok((await state()).paused, 'losing focus pauses');
   await page.keyboard.press('p');
   assert.ok(!(await state()).paused, 'P resumes');
-
-  // Play the rest of the (shortened) shift to the end card, watching every frame that no two people overlap.
+  // Play it out, watching every frame that no two people overlap and the goal counts up.
   await page.evaluate(() => {
-    window.__gap = Infinity; window.__alpha = []; window.__words = []; window.__confetti = 0;
+    window.__gap = Infinity; window.__alpha = []; window.__words = []; window.__have = [];
     const f = () => {
       const st = window.fixitState(), p = st.people;
       for (let i = 0; i < p.length; i++) for (let j = i + 1; j < p.length; j++) window.__gap = Math.min(window.__gap, Math.abs(p[i].x - p[j].x) - 1.5 * (p[i].R + p[j].R));
       if (st.playing && window.__alpha.length < 400) window.__alpha.push(st.alpha);
       if (st.word && !window.__words.includes(st.word)) window.__words.push(st.word);
-      window.__confetti = Math.max(window.__confetti, st.confetti);
+      const h = st.goal?.parts[0]?.have; if (h !== undefined && h !== window.__have.at(-1)) window.__have.push(h);
       if (st.screen !== 'end') requestAnimationFrame(f);
     };
     requestAnimationFrame(f);
   });
-  let mid = false;
-  for (let i = 0; i < 40; i++) {
-    st = await state();
-    if (st.over || st.screen === 'end') break;
-    if (st.phase !== 'work') { await sleep(100); continue; }
-    if (!mid && st.served >= 4) { await sleep(250); await page.screenshot({ path: join(SHOTS, `${phone}-3-mid-shift.png`) }); mid = true; }
-    await playJob(page, `shift job ${st.kind}`);
-  }
-  await until(page, () => window.fixitState().screen === 'end', 'end card');
-  st = await state();
-  assert.ok(st.served >= 5, `shift served ${st.served}`);
-  const gap = await page.evaluate(() => window.__gap), alphas = await page.evaluate(() => window.__alpha);
-  assert.ok(gap >= 0, `people never overlap during the shift (closest bodies ${gap.toFixed(1)} px apart)`);
+  st = await playOut(page, 'level 1', join(SHOTS, `${phone}-3-level-hud.png`));
+  assert.ok(st.cleared && st.stars >= 1 && st.over === 'clear', `level 1 cleared with ${st.stars} stars`);
+  const gap = await page.evaluate(() => window.__gap), alphas = await page.evaluate(() => window.__alpha), have = await page.evaluate(() => window.__have);
+  assert.ok(gap >= 0, `people never overlap (closest bodies ${gap.toFixed(1)} px apart)`);
   assert.ok(alphas.length > 50 && alphas.every(a => a >= 0 && a <= 1), 'drawing blends between ticks by a fraction in 0..1');
-  const words = await page.evaluate(() => window.__words), confettiMax = await page.evaluate(() => window.__confetti);
-  assert.ok(words.some(w => ['Nice!', 'Great!', 'Hot!', 'On fire!', 'x2!', 'x3!'].includes(w)) && confettiMax > 0, `a streak is felt: words ${words.join(' ')}, up to ${confettiMax} confetti`);
+  assert.deepEqual(have, [0, 1, 2, 3, 4, 5, 6], 'the goal counter counts each fix');
+  assert.match(await page.textContent('#endTitle'), /Level 1 cleared/, 'the cleared card');
+  assert.ok(await page.isVisible('#next'), 'Next level on the cleared card');
+  assert.equal(st.levels[1], st.stars, 'stars saved');
+  assert.equal(st.bank, st.coins + st.stars * 5, 'coins and the star bonus banked');
+  await page.screenshot({ path: join(SHOTS, `${phone}-4-cleared.png`) });
   await sleep(300);
-  await page.screenshot({ path: join(SHOTS, `${phone}-4-end.png`) });
-  assert.equal(st.shifts, 1, 'one shift counted');
-  assert.ok(st.bank > 0 && st.bank === st.coins, 'coins banked');
-  assert.equal(st.pending, 'wheel', 'a new job is waiting for next shift');
+  const r1 = runs(ctx, 'closed');
+  assert.equal(r1.length, 1, 'the level sent once, as closed');
+  assert.ok(r1[0].data.summary.level === 1 && r1[0].data.summary.cleared === true && r1[0].data.summary.stars === st.stars, 'the run summary names the level, the clear and the stars');
+  assert.ok(r1[0].data.events.filter(e => e.type === 'repair').length >= 6, 'repairs recorded');
 
+  // Next: level 2 with its goal card; then pause and Menu keeps the coins and sends 'left'.
+  await page.click('#next');
+  st = await state();
+  assert.ok(st.level === 2 && st.card > 0 && st.kind === 'pin', 'Next starts level 2, which teaches the pin');
+  await startLevel(page);
+  await playJob(page, 'level 2 pin');
+  const before = await state(); assert.ok(before.coins > 0, 'coins earned before leaving');
+  await page.click('#pause'); await page.click('#quit');
+  st = await state();
+  assert.equal(st.screen, 'menu', 'Menu from the pause card');
+  assert.equal(st.bank, before.bank + before.coins, 'Menu keeps the coins of the level (note #150)');
+  assert.ok(!st.levels[2], 'a level left early is not cleared');
+  assert.equal(await page.textContent('#bank'), String(st.bank), 'the menu shows the kept coins');
+  await sleep(300);
+  assert.equal(runs(ctx).at(-1).data.outcome, 'left', 'quitting is sent as left');
+  assert.equal(await page.locator('.lv.next[data-level="2"]').count(), 1, 'level 2 is next on the map');
   // The save survives a reload.
   const blob = await page.evaluate(() => localStorage.getItem('fixit-save'));
   await page.reload();
   await until(page, () => window.fixitState && window.fixitState().screen === 'menu', 'menu after reload');
-  st = await state();
   assert.equal(await page.evaluate(() => localStorage.getItem('fixit-save')), blob, 'save blob unchanged by a reload');
-  assert.equal(st.shifts, 1); assert.ok(st.bank > 0); assert.ok(st.unlocked.includes('wheel'), 'unlock saved');
-  assert.equal(await page.textContent('#bank'), String(st.bank), 'menu shows the bank');
+  assert.ok((await state()).levels[1] >= 1, 'stars kept across a reload');
 
-  // Lab: the ended shift was sent with its outcome and its repairs.
+  // A failed level: level 19 asks that nobody walks off; with hands off the first customer does. One tap restarts it.
+  await setSave(page, { levels: levelsUpTo(18), bank: 0 });
+  await page.reload();
+  await page.click('.lv[data-level="19"]');
+  st = await state(); assert.equal(st.level, 19, 'a map tile starts its level');
+  await startLevel(page);
+  await until(page, () => window.fixitState().screen === 'end', 'level 19 to fail', 20000);
   await sleep(300);
-  const runs = labSent.filter(r => r.game === 'fixit' && r.kind === 'run' && r.data.outcome === 'closed');
-  assert.equal(runs.length, 1, 'the ended shift sent once, as closed');
-  assert.ok(runs[0].data.summary.served >= 5 && 'bestStreak' in runs[0].data.summary, 'run summary');
-  assert.ok(runs[0].data.events.filter(e => e.type === 'repair').length >= 5, 'repairs recorded');
-
-  // The next shift starts with the new job, announced.
-  await page.click('#play');
   st = await state();
-  assert.equal(st.kind, 'wheel', 'the new job comes first');
-  await sleep(500);
-  await page.screenshot({ path: join(SHOTS, `${phone}-5-new-job.png`) });
-  await playJob(page, 'new wheel');
-  const before = await state(); assert.ok(before.coins > 0, 'coins earned before leaving');
-  await page.click('#pause'); await page.click('#quit');
-  assert.equal((await state()).screen, 'menu', 'Menu from the pause card');
-  st = await state(); assert.equal(st.bank, before.bank + before.coins, 'Menu keeps the coins of the shift (note #150)'); assert.equal(st.shifts, before.shifts, 'a shift left early is not counted');
-  assert.equal(await page.textContent('#bank'), String(st.bank), 'the menu shows the kept coins');
-  assert.equal(JSON.parse(await page.evaluate(() => localStorage.getItem('fixit-save'))).bank, st.bank, 'the kept coins are saved');
-  await sleep(300);
-  assert.equal(labSent.filter(r => r.game === 'fixit' && r.kind === 'run').at(-1).data.outcome, 'left', 'quitting is sent as left');
+  assert.ok(!st.cleared && st.over === 'lost' && !st.levels[19], 'level 19 failed');
+  assert.equal(await page.textContent('#endTitle'), 'Someone walked off', 'the failed card says why');
+  assert.ok(!(await page.isVisible('#next')) && (await page.getAttribute('#again', 'class')) === 'main', 'Try again is the main button, no Next');
+  await page.screenshot({ path: join(SHOTS, `${phone}-5-failed.png`) });
+  await page.click('#again');
+  st = await state();
+  assert.ok(st.playing && st.level === 19 && st.card > 0, 'one tap restarts the level');
+  await sleep(200);
+  const fail = runs(ctx, 'closed').at(-1);
+  assert.ok(fail.data.summary.level === 19 && fail.data.summary.cleared === false && fail.data.summary.why === 'lost', 'the failed level is sent as closed, not cleared');
+  await leave(page);
 
-  // Every job, forced with ?only=, done once with real pointer events.
+  // Every job, forced with ?only= (the open stall with one job), done once with real pointer events.
   for (const kind of KINDS) {
     await page.goto(`${base}/fixit/?seed=3&only=${kind}`);
     await page.click('#play');
     st = await state();
-    assert.equal(st.kind, kind, `only=${kind}`);
-    if (['wheel', 'chain', 'glue', 'clock', 'rub', 'sharpen', 'sew', 'pump'].includes(kind) && phone === 'webkit') await sleep(400), await page.screenshot({ path: join(SHOTS, `${phone}-job-${kind}.png`) });
+    assert.ok(st.kind === kind && st.mode === 'open' && st.card === 0, `only=${kind}`);
+    if (['oil', 'zip', 'spring', 'thread'].includes(kind)) { await sleep(400); await page.screenshot({ path: join(SHOTS, `${phone}-job-${kind}.png`) }); }
     await playJob(page, kind);
     await leave(page);
   }
-  // Leaving a shift after four repairs keeps the new job; leaving after fewer does not (note #150).
+
+  // The open stall: shown after level 8 (or an old shift). Leaving after four repairs keeps a new job; fewer does not (note #150).
   for (const [jobs, want] of [[1, 3], [4, 4]]) {
-    await page.goto(`${base}/fixit/?seed=7&day=200&two=0`); await setSave(page, { shifts: 1 }); await page.goto(`${base}/fixit/?seed=7&day=200&two=0`);
-    await page.click('#play');
-    for (let i = 0; i < 12; i++) { st = await state(); if (st.served >= jobs) break; if (st.phase !== 'work') { await sleep(100); continue; } await playJob(page, `leave-early ${st.kind}`); }
+    await page.goto(`${base}/fixit/?seed=7&day=200&two=0`); await setSave(page, { shifts: 1 }); await page.reload();
+    await page.click('#open');
+    assert.equal((await state()).mode, 'open', 'the open stall');
+    for (let i = 0; i < 12; i++) { st = await state(); if (st.served >= jobs) break; if (st.phase !== 'work') { await sleep(100); continue; } await playJob(page, `open stall ${st.kind}`); }
     st = await state(); assert.ok(st.served >= jobs && st.playing, `${jobs} fixed and still in the shift`);
     await leave(page); assert.equal((await state()).unlocked.length, want, `left after ${jobs}: ${want} jobs`);
   }
-
   // A two-repair job.
-  await page.goto(`${base}/fixit/?seed=4&two=1&level=3`);
-  await page.click('#play');
+  await page.goto(`${base}/fixit/?seed=4&two=1&ramp=3`); await setSave(page, { shifts: 1 }); await page.reload();
+  await page.click('#open');
   st = await state();
   assert.equal(st.steps, 2, 'a job with two repairs');
-  await sleep(300);
-  await page.screenshot({ path: join(SHOTS, `${phone}-6-two-jobs.png`) });
   await playJob(page, `two: ${st.customer.kinds.join('+')}`);
   await leave(page);
-
-  // A golden customer (?golden=1 makes every customer golden): two repairs, a gold glow, four times the pay.
-  await page.goto(`${base}/fixit/?seed=8&golden=1&level=1`);
-  await page.click('#play');
+  // A golden customer (?golden=1 makes every customer golden): two repairs, four times the pay.
+  await page.goto(`${base}/fixit/?seed=8&golden=1&ramp=1`);
+  await page.click('#open');
   st = await state();
   assert.ok(st.golden && st.customer.golden && st.steps === 2, 'a golden customer brings two repairs');
-  await sleep(500);
-  await page.screenshot({ path: join(SHOTS, `${phone}-8-golden.png`) });
   const coins0 = st.coins;
   await playJob(page, `golden ${st.customer.kinds.join('+')}`);
   st = await state();
   assert.ok(st.coins - coins0 >= 16, `a golden job pays four times over (${st.coins - coins0} coins)`);
   await leave(page);
+
+  // An old save from before the map: coins and shop kept, the levels that teach its jobs done, once.
+  await setSave(page, { v: 1, bank: 321, best: 88, shifts: 4, served: 40, unlocked: ['screw', 'pin', 'dent', 'wheel', 'rub', 'clock'], owned: ['teal', 'copper'], awning: 'copper', sound: true, days: {} });
+  await page.goto(`${base}/fixit/`);
+  st = await state();
+  assert.deepEqual([st.bank, st.awning, st.migrated, st.next], [321, 'copper', 4, 5], 'old save: coins and awning kept, levels 1 to 4 done, level 5 next');
+  assert.deepEqual(st.levels, { 1: 1, 2: 1, 3: 1, 4: 1 }, 'old save: one star each');
+  assert.ok(st.openStall && st.dailyOpen && await page.isVisible('#open'), 'old save: the open and daily stalls stay open');
+  assert.match(await page.textContent('#migrated'), /levels 1 to 4/, 'the menu says what was carried over');
+  await page.screenshot({ path: join(SHOTS, `${phone}-6-old-save.png`) });
+  await page.reload();
+  st = await state();
+  assert.ok(st.migrated === 0 && st.levels[4] === 1 && st.bank === 321, 'the carry-over happens once and is saved');
+  await setSave(page, { v: 1, bank: 0, shifts: 0, sound: true });
+  await page.reload();
+  assert.deepEqual((await state()).levels, {}, 'an unplayed old save starts at level 1');
 
   // The shop: buy the cheapest thing; it is kept.
   await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('fixit-save')); s.bank = 500; localStorage.setItem('fixit-save', JSON.stringify(s)); });
@@ -248,9 +288,8 @@ async function run(page, phone) {
   await page.reload();
   st = await state();
   assert.ok(st.owned.includes('copper') && st.owned.includes('cat') && st.bank === 170, 'purchases saved');
-  const buys = labSent.filter(r => r.game === 'fixit' && r.data?.outcome === 'between-runs').map(r => r.data.events[0]);
+  const buys = ctx.labSent.filter(r => r.game === 'fixit' && r.data?.outcome === 'between-runs').map(r => r.data.events[0]);
   assert.deepEqual(buys.map(e => e.data.item), ['copper', 'cat'], 'purchases recorded');
-  // Sound toggle is saved.
   await page.click('#sound1');
   assert.equal((await state()).sound, false);
   await page.reload();
@@ -276,17 +315,40 @@ async function open(browser, options) {
 }
 const setSave = (page, blob) => page.evaluate(b => { localStorage.setItem('fixit-save', JSON.stringify(b)); localStorage.setItem('hf-lab-send-localhost', '1'); }, blob);
 
-// A small screen: the layout at 360 x 640 during play, with the shop items showing.
+// A small screen, 360 x 640: the map, a goal card, each new job, a cleared card and a failed card.
 async function small(browser) {
   const { context, page, errors } = await open(browser, { viewport: { width: 360, height: 640 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
-  await page.goto(`${base}/fixit/?seed=11&only=dent&two=1&level=2`);
-  await setSave(page, { shifts: 3, owned: ['teal', 'cat', 'lights', 'radio', 'charm'], awning: 'teal', sound: false });
-  await page.reload(); await page.click('#play'); await sleep(600);
-  const st = await state(page);
-  assert.ok(st.minTouchPx >= 44, `360 px wide: smallest touch target ${st.minTouchPx.toFixed(0)} px`);
+  await page.goto(`${base}/fixit/`);
+  await setSave(page, { owned: ['teal', 'cat', 'lights', 'radio', 'charm'], awning: 'teal', sound: false, levels: { ...levelsUpTo(13), 1: 3, 2: 3, 3: 2, 5: 3 } });
+  await page.reload();
+  await page.screenshot({ path: join(SHOTS, 'small-1-map.png') });
+  await page.click('#play');
+  let st = await state(page);
+  assert.ok(st.level === 14 && st.minTouchPx >= 44, `360 px wide: level 14, smallest touch target ${st.minTouchPx.toFixed(0)} px`);
   assert.equal(st.hearts, 4, 'the horseshoe gives a fourth heart');
-  await page.screenshot({ path: join(SHOTS, 'small-360.png') });
+  await sleep(400);
+  await page.screenshot({ path: join(SHOTS, 'small-2-goal-card.png') });
+  await startLevel(page);
+  await sleep(300);
+  await page.screenshot({ path: join(SHOTS, 'small-3-thread.png') });
   await leave(page);
+  for (const kind of ['oil', 'zip', 'spring']) {
+    await page.goto(`${base}/fixit/?seed=3&only=${kind}`);
+    await page.click('#play'); await sleep(500);
+    await page.screenshot({ path: join(SHOTS, `small-job-${kind}.png`) });
+    await leave(page);
+  }
+  await page.goto(`${base}/fixit/?level=1`);
+  await page.click('#play'); await startLevel(page);
+  await playOut(page, 'small level 1');
+  await page.screenshot({ path: join(SHOTS, 'small-4-cleared.png') });
+  await page.goto(`${base}/fixit/?level=19`);
+  await setSave(page, { levels: levelsUpTo(18), sound: false });
+  await page.reload();
+  await page.click('#play'); await startLevel(page);
+  await until(page, () => window.fixitState().screen === 'end', 'level 19 to fail', 20000);
+  await sleep(300);
+  await page.screenshot({ path: join(SHOTS, 'small-5-failed.png') });
   assert.deepEqual(errors, [], 'page errors on the small screen');
   await context.close();
 }
@@ -298,8 +360,8 @@ async function lateShift(browser, device) {
   await page.goto(`${base}/fixit/`);
   const seen = Object.fromEntries(KINDS.map(k => [k, 5]));
   await setSave(page, { shifts: 3, sound: true, regular: 4, seen, unlocked: KINDS, owned: ['teal', 'radio', 'charm', 'cat'], awning: 'teal' });
-  await page.goto(`${base}/fixit/?seed=5&level=5&day=200&two=0`);
-  await page.click('#play');
+  await page.goto(`${base}/fixit/?seed=5&ramp=5&day=200&two=0`);
+  await page.click('#open');
   let st = await state();
   assert.equal(st.hearts, 4, 'four hearts with the horseshoe');
   await sleep(300);
@@ -383,7 +445,10 @@ async function dailyStall(browser, device) {
   await page.goto(`${base}/fixit/?date=2026-11-20&day=12`);
   await setSave(page, { shifts: 0 });
   await page.reload();
-  assert.ok(!(await page.isVisible('#daily')), 'no daily stall before the first shift');
+  assert.ok(!(await page.isVisible('#daily')), 'no daily stall on a new save');
+  await setSave(page, { levels: levelsUpTo(3) });
+  await page.reload();
+  assert.ok(await page.isVisible('#daily'), 'the daily stall shows after level 3');
   await setSave(page, { shifts: 1, bank: 10, days: { '2026-11-19': 40, 'junk': 'x' } });
   await page.reload();
   assert.ok(await page.isVisible('#daily'), 'the daily stall shows after the first shift');
