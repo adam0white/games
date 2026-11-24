@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { createHandler } from '../src/worker.mjs';
 import { Script, runInNewContext } from 'node:vm';
 import { validateRegistry } from './lib.mjs';
-import { archivedHosts } from '../worker-settings.mjs';
+import { archivedHosts, labMoved } from '../worker-settings.mjs';
+import { existsSync } from 'node:fs';
 import { gzipSync, gunzipSync } from 'node:zlib';
 
 const base = { source: { repository: 'https://github.com/adam0white/rope', commit: 'a'.repeat(40) }, saveSchema: 'v1' };
@@ -26,7 +27,7 @@ test('play root opens shelf and game paths reach assets', async () => {
 test('old experiment links move permanently to the top level and keep the query', async () => {
   const cases = {
     '/proto/lantern/?x=1': '/lantern/?x=1', '/proto/lantern/': '/lantern/', '/proto/kit/save.js': '/kit/save.js',
-    '/proto/lab/ant-nest/?a=b&c=d': '/lab/ant-nest/?a=b&c=d', '/proto/': '/lab/', '/proto': '/lab/', '/proto?x=1': '/lab/?x=1',
+    '/proto/lab/thankful/?a=b&c=d': '/lab/thankful/?a=b&c=d', '/proto/': '/lab/', '/proto': '/lab/', '/proto?x=1': '/lab/?x=1',
     '/proto//evil.example/x': '//evil.example/x',
   };
   for (const [from, to] of Object.entries(cases)) {
@@ -35,9 +36,27 @@ test('old experiment links move permanently to the top level and keep the query'
     assert.equal(response.headers.get('location'), `https://play.adamwhite.work${to}`, from);
   }
   // Only the exact /proto segment moves; new paths and look-alikes reach the assets.
-  for (const path of ['/lantern/', '/lab/ant-nest/', '/kit/save.js', '/protocol/', '/proto-x/']) assert.equal(await (await get(`https://play.adamwhite.work${path}`)).text(), 'asset', path);
+  for (const path of ['/lantern/', '/lab/thankful/', '/kit/save.js', '/protocol/', '/proto-x/']) assert.equal(await (await get(`https://play.adamwhite.work${path}`)).text(), 'asset', path);
   // Another origin never gets this redirect.
   assert.equal((await get('https://rope.adamwhite.work/proto/lantern/')).headers.get('location'), 'https://play.adamwhite.work/rope/proto/lantern/');
+});
+test('a lab page that left the lab sends its old address on, with the query, by a 302', async () => {
+  const cases = {
+    '/lab/night-vine/?lang=tr': '/vine/?lang=tr', '/lab/night-flock-2/': '/flock/', '/lab/night-flock-2': '/flock/',
+    '/lab/lantern-echo/echo.js': '/lantern/', '/lab/ant-nest/?a=b&c=d': '/ant-promotion/?a=b&c=d', '/lab/boat-b/': '/boat/',
+  };
+  for (const [from, to] of Object.entries(cases)) {
+    const response = await get(`https://play.adamwhite.work${from}`);
+    assert.equal(response.status, 302, from);
+    assert.equal(response.headers.get('location'), `https://play.adamwhite.work${to}`, from);
+  }
+  // Pages still in the lab, the lab index and look-alike names reach the assets.
+  for (const path of ['/lab/', '/lab', '/lab/thankful/', '/lab/night-vines/', '/lab/night-vine-x/a.js', '/labs/night-vine/', '/flock/lab/night-vine/']) assert.equal(await (await get(`https://play.adamwhite.work${path}`)).text(), 'asset', path);
+  // Every target is a plain path on this site, and no moved name is still a folder in the lab.
+  for (const [name, to] of Object.entries(labMoved)) {
+    assert.match(to, /^\/[a-z0-9-]+\/(?:\?[a-z0-9=&-]+)?$/, name);
+    assert.equal(existsSync(new URL(`../experiments/lab/${name}`, import.meta.url)), false, `${name} is in labMoved and still in experiments/lab`);
+  }
 });
 test('old service worker is a same-origin non-cacheable tombstone', async () => {
   const response = await get('https://rope.adamwhite.work/sw.js');

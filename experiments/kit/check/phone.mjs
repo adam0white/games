@@ -198,50 +198,6 @@ async function dragNumbers(page) {
   await finger(page, '#c', [['pointercancel', 177, 400], ['pointermove', 140, 400]]); near((await state()).target - t13, -10 / u * 1.3, 'drag: a cancelled finger no longer steers');
 }
 
-// The Ant Promotion lab variants share the main game's save shape, joystick and cards. extra: the variant's own save fields.
-async function antLab(page, slug, query, extra, checkExtra) {
-  const KEY = `${slug}:v1`;
-  const mode = () => page.evaluate(() => window.__ant.mode);
-  const saved = () => page.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
-  await page.goto(`${base}/lab/${slug}/${query}`); await until(page, () => window.__ant, 'game script');
-  // A save in the format players already have: a level-2 animal, a skin, the soft look.
-  const stack = await page.evaluate(() => { const F = window.__ant.FORMS; return [F.findIndex(f => f && f.level === 1), F.findIndex(f => f && f.level === 2)]; });
-  await page.evaluate(([k, v]) => localStorage.setItem(k, JSON.stringify(v)), [KEY, { skin: { c: '#c0271f', p: 'stripes' }, stack, xp: 3, sound: true, look: 2, ...extra }]);
-  await page.reload(); await until(page, () => window.__ant, 'game script');
-  assert.match(await page.textContent('#continue'), /^Continue as /, 'old save: continues'); assert.match(await page.textContent('#look'), /^Look: /);
-  assert.equal(await page.textContent('#sound'), 'Sound: on'); await checkExtra();
-  assert.equal(await page.evaluate(() => window.audioLog.made), 0, 'no audio before the first tap');
-  await page.click('#continue'); assert.equal(await mode(), 'play');
-  assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'Play starts audio');
-  assert.equal(await page.evaluate(() => window.__ant.level(window.__ant.s)), 2, 'old save: level'); assert.equal(await page.evaluate(() => window.__ant.s.player.xp), 3, 'old save: xp');
-  await stickNumbers(page);
-  // Walk by dragging.
-  const x0 = await page.evaluate(() => window.__ant.s.player.x);
-  await finger(page, '#c', [['pointerdown', 150, 400], ['pointermove', 215, 400]]);
-  await page.waitForFunction(x => window.__ant.s.player.x > x + 5, x0);
-  await finger(page, '#c', [['pointerup', 215, 400]]);
-  // Pause by the button and by P; time stands still while paused.
-  await page.click('#pause'); assert.equal(await mode(), 'paused');
-  const t0 = await page.evaluate(() => window.__ant.s.t); await sleep(300); assert.equal(await page.evaluate(() => window.__ant.s.t), t0, 'time stands still while paused');
-  await page.click('#resume'); assert.equal(await mode(), 'play');
-  await page.keyboard.press('p'); assert.equal(await mode(), 'paused'); await page.keyboard.press('p'); assert.equal(await mode(), 'play');
-  await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); delete document.hidden; });
-  assert.equal(await mode(), 'paused', 'hiding the page pauses'); await page.click('#resume');
-  // From the kit (pause.js): losing focus and putting the page away pause too, and capital P is a pause key.
-  await page.evaluate(() => dispatchEvent(new Event('blur'))); assert.equal(await mode(), 'paused', 'losing focus pauses'); await page.keyboard.press('P'); assert.equal(await mode(), 'play', 'capital P resumes');
-  await page.evaluate(() => dispatchEvent(new Event('pagehide'))); assert.equal(await mode(), 'paused', 'putting the page away pauses'); await page.click('#resume');
-  assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'one audio context for the whole run');
-  // Leaving for the menu keeps the animal; a reload keeps all of it.
-  await page.click('#pause'); await page.click('#paused .toMenu'); assert.equal(await mode(), 'menu');
-  const before = await saved(); assert.equal(before.stack.length, 2); assert.equal(before.skin.c, '#c0271f'); assert.equal(before.look, 2);
-  for (const k of Object.keys(extra)) assert.deepEqual(before[k], extra[k], `old save: ${k} kept`);
-  await page.reload(); await until(page, () => window.__ant, 'game script');
-  assert.deepEqual(await saved(), before, 'reload keeps the save'); assert.match(await page.textContent('#continue'), /^Continue as /);
-  // Sound off is kept, and then no audio is started.
-  await page.click('#sound'); assert.equal(await page.textContent('#sound'), 'Sound: off'); assert.equal((await saved()).sound, false);
-  await page.reload(); await until(page, () => window.__ant, 'game script'); assert.equal(await page.textContent('#sound'), 'Sound: off');
-  await page.click('#continue'); await page.click('#pause'); assert.equal(await page.evaluate(() => window.audioLog.made), 0, 'sound off: no audio is started');
-}
 
 // No zoom (note #74, kit/zoom.js): the viewport caps the scale, no visible element is left at touch-action auto, and a double tap's default is cancelled.
 async function noZoomed(page) {
@@ -730,7 +686,7 @@ const GAMES = {
     await until(page, () => document.querySelector('#menu h1').textContent === 'Fener', 'the Turkish menu');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'tr');
     assert.equal(await page.textContent('#toShop'), 'Mağaza'); assert.equal(await page.textContent('#toBoard'), 'Sıralama');
-    await page.click('#toModes'); assert.deepEqual(await page.$$eval('#modes a.mode', as => as.map(a => a.getAttribute('href'))), ['/lab/lantern-race/', '/lab/lantern-spark/', '/lab/lantern-echo/'], 'the other modes are one tap away'); await page.click('#modes .back');
+    await page.click('#toModes'); assert.deepEqual(await page.$$eval('#modes a.mode', as => as.map(a => a.getAttribute('href'))), ['/lab/lantern-race/', '/lab/lantern-spark/'], 'the other modes are one tap away'); await page.click('#modes .back');
     await page.click('#menuLanguage');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
     assert.equal(await page.textContent('#menu h1'), 'Lantern'); assert.equal(await page.textContent('#toShop'), 'Shop');
@@ -850,10 +806,6 @@ const GAMES = {
   alibi: page => started(page, 'alibi', 'alibiState', '#toMenu'),
   nightshift: page => started(page, 'nightshift', 'nightshiftState', '#toMenu'),
   // Lab pages (/lab/<name>/): an old save survives, a finger steers, pause stops time, one audio context after the first tap.
-  'lab/ant-nemesis': page => antLab(page, 'ant-nemesis', '?ai=0', { nem: null, trophies: [{ name: 'Old Scar the Beetle' }], gens: 1 }, async () => {
-    assert.match(await page.textContent('#trophies'), /Old Scar the Beetle/, 'old save: trophies');
-  }),
-  'lab/ant-wilds': page => antLab(page, 'ant-wilds', '', {}, async () => {}),
   async 'lab/thankful'(page) {
     const KEY = 'thankful:v1';
     await page.goto(`${base}/lab/thankful/?day=2026-11-23`); await until(page, () => window.__thankful, 'game script');
@@ -909,79 +861,9 @@ const GAMES = {
     await page.evaluate(() => dispatchEvent(new Event('blur'))); await until(page, () => window.__pisti.paused, 'leaving the page pauses');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
   },
-  async 'lab/ant-nest'(page) {
-    const KEY = 'ant-nest:v1', nest = () => page.evaluate(() => { const n = window.__nest; return { mode: n.mode, t: n.s?.t, marks: n.s ? n.s.mark.reduce((a, b) => a + b, 0) : 0 }; });
-    await page.goto(`${base}/lab/ant-nest/`); await until(page, () => window.__nest, 'game script');
-    await page.evaluate(k => localStorage.setItem(k, JSON.stringify({ best: 42 })), KEY);
-    await page.reload(); await until(page, () => window.__nest, 'game script');
-    assert.equal(await page.textContent('#bestLine'), 'Best score: 42', 'old save: best');
-    assert.equal(await page.evaluate(() => window.audioLog.made), 0, 'no audio before the first tap');
-    await page.click('#play'); assert.equal((await nest()).mode, 'play');
-    assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'Play starts audio');
-    // A finger dragged across the soil marks it for digging.
-    const { ox, oy, cell } = await page.evaluate(() => window.__nest.layout), row = oy + 3.5 * cell;
-    await finger(page, '#c', [['pointerdown', ox + 0.5 * cell, row], ...[1, 2, 3, 4, 5, 6, 7].map(i => ['pointermove', ox + (i + 0.5) * cell, row]), ['pointerup', ox + 7.5 * cell, row]]);
-    assert.ok((await nest()).marks > 0, 'a drag marks soil');
-    // Pause by the button and by P; time stands still while paused.
-    await page.click('#pause'); assert.equal((await nest()).mode, 'paused');
-    const t0 = (await nest()).t; await sleep(300); assert.equal((await nest()).t, t0, 'time stands still while paused');
-    await page.click('#resume'); assert.equal((await nest()).mode, 'play');
-    await page.waitForFunction(t => window.__nest.s.t > t, t0);
-    await page.keyboard.press('p'); assert.equal((await nest()).mode, 'paused'); await page.keyboard.press('p'); assert.equal((await nest()).mode, 'play');
-    // From the kit (pause.js): losing focus and putting the page away pause too, and capital P is a pause key.
-    await page.evaluate(() => dispatchEvent(new Event('blur'))); assert.equal((await nest()).mode, 'paused', 'losing focus pauses'); await page.keyboard.press('P'); assert.equal((await nest()).mode, 'play', 'capital P resumes');
-    await page.evaluate(() => dispatchEvent(new Event('pagehide'))); assert.equal((await nest()).mode, 'paused', 'putting the page away pauses'); await page.click('#resume');
-    // A round ends; the best is kept across a reload.
-    await page.evaluate(() => window.__nest.skipTo(1e9)); await until(page, () => window.__nest.mode === 'end', 'end card');
-    await page.reload(); await until(page, () => window.__nest, 'game script');
-    assert.ok(JSON.parse(await page.evaluate(k => localStorage.getItem(k), KEY)).best >= 42, 'best kept'); assert.match(await page.textContent('#bestLine'), /^Best score: \d+$/);
-    assert.equal(await page.evaluate(() => window.audioLog.made), 0, 'no audio before the first tap after a reload');
-    await page.click('#sound'); assert.equal(await page.textContent('#sound'), 'Sound: off');
-    await page.click('#play'); await page.click('#pause'); assert.equal(await page.evaluate(() => window.audioLog.made), 0, 'sound off: no audio is started');
-  },
-  async 'lab/lantern-3d'(page) {
-    const state = () => page.evaluate(() => window.lanternState());
-    await page.goto(`${base}/lab/lantern-3d/?night=2`);
-    await until(page, () => window.lanternState, 'game script (needs WebGL2)');
-    assert.equal(await page.textContent('#play'), 'Play night 2');
-    assert.equal(await page.evaluate(() => window.audioLog.made), 0, 'no audio before the first tap');
-    await page.click('#play'); let st = await state();
-    assert.ok(st.playing && st.screen === 'play', 'play starts'); assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'Play starts audio');
-    // Steer by a relative drag; a tap alone does not steer.
-    const x0 = st.target;
-    await finger(page, '#c', [['pointerdown', 40, 400], ['pointerup', 40, 400]]);
-    assert.equal((await state()).target, x0, 'a tap does not steer');
-    await finger(page, '#c', [['pointerdown', 200, 400], ['pointermove', 230, 400]]);
-    assert.ok((await state()).target > x0, 'a drag to the right steers right');
-    await finger(page, '#c', [['pointerup', 230, 400]]);
-    // Pause by the button, resume by the card, P and Escape; time stands still while paused.
-    await finger(page, '#pause', [['pointerdown', 0, 0]]);
-    st = await state(); assert.ok(st.paused && st.screen === 'card', 'pause button pauses');
-    assert.equal(await page.evaluate(() => window.audioLog.suspend), 1, 'pause silences audio');
-    await sleep(300); assert.equal((await state()).t, st.t, 'time stands still while paused');
-    await page.click('#go'); await until(page, () => !window.lanternState().paused, 'resume');
-    const t1 = (await state()).t; await page.waitForFunction(t => window.lanternState().t > t, t1);
-    await page.keyboard.press('p'); assert.ok((await state()).paused, 'P pauses'); await page.keyboard.press('Escape'); assert.ok(!(await state()).paused, 'Escape resumes');
-    await page.evaluate(() => dispatchEvent(new Event('blur'))); assert.ok((await state()).paused, 'losing focus pauses'); await page.keyboard.press('p');
-    // The touch that ends a pause does not steer until the finger has moved a clear distance.
-    await finger(page, '#pause', [['pointerdown', 0, 0]]); const x1 = (await state()).x;
-    await finger(page, '#c', [['pointerdown', 200, 400], ['pointermove', 205, 400], ['pointermove', 210, 400]]);
-    st = await state(); assert.ok(!st.paused, 'a touch resumes'); assert.equal(st.target, x1, 'jitter after a pause does not steer');
-    await finger(page, '#c', [['pointerup', 210, 400]]);
-    await dragNumbers(page); await finger(page, '#c', [['pointerup', 140, 400]]);
-    assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'one audio context for the whole run');
-    // The run ends with an end card; the page keeps nothing in storage, so a reload starts clean.
-    // CI's software WebGL draws a few frames a second, so the flame takes many seconds of wall time to go out; warm = 0 stops a late ember from feeding it.
-    await page.evaluate(() => { const s = window.lanternSim(); s.light = 0.0001; s.warm = 0; });
-    await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'end card', 40000);
-    assert.deepEqual(await page.evaluate(() => Object.keys(localStorage).filter(k => k !== 'notes.k')), ['lantern-3d:hint'], 'no saved keys but the first-time help\'s (kit/hint.js)');
-    await page.reload(); await until(page, () => window.lanternState, 'game script'); assert.equal((await state()).screen, 'menu');
-  },
   // The first-time help (kit/hint.js) on each page that uses it.
   'hint ant-promotion': page => hinted(page, { path: '/ant-promotion/', play: '#continue', resume: '#resume', key: 'ant-promotion:hint', delay: 3000, moved: () => window.__ant.input.x > 0, legacy: { 'ant-promotion:v1': '{"skin":{"c":"#c0271f","p":"stripes"},"xp":0,"sound":true,"look":2}' } }),
   'hint lantern': page => hinted(page, { path: '/lantern/', play: '#play', resume: '#go', key: 'lantern-hint', delay: 1500, before: () => window.lanternState().target, moved: t => window.lanternState().target !== t, alive: () => { const s = window.lanternSim(); s.safe = 60; s.light = 1; }, legacy: { 'lantern-bank': '120', 'lantern-night': '3' } }),
-  'hint lab/ant-nemesis': page => hinted(page, { path: '/lab/ant-nemesis/?ai=0', play: '#continue', resume: '#resume', key: 'ant-nemesis:hint', delay: 3000, moved: () => window.__ant.input.x > 0, legacy: { 'ant-nemesis:v1': '{"sound":true}' } }),
-  'hint lab/ant-wilds': page => hinted(page, { path: '/lab/ant-wilds/', play: '#continue', resume: '#resume', key: 'ant-wilds:hint', delay: 3000, moved: () => window.__ant.input.x > 0, legacy: { 'ant-wilds:v1': '{"sound":true}' } }),
   'hint borrowed': page => hinted(page, { path: '/borrowed/', play: '#play', resume: '#resume', key: 'borrowed:hint', delay: 3000, moved: () => window.borrowedState().touched, legacy: { 'borrowed-save': '{"v":1,"sound":true,"best":530,"runs":4,"gallery":{"busker":1},"daily":{},"taught":1}' } }),
   'hint ducklings': page => hinted(page, { path: '/ducklings/', play: '#play', resume: '#resume', key: 'ducklings:hint', delay: 3000, before: () => window.ducklingsState().rollCalls, moved: n => window.ducklingsState().rollCalls > n, legacy: { 'ducklings-save': '{"v":1,"sound":true,"opened":2,"stars":{"1":2},"best":{"1":140},"endless":0,"home":2,"album":{},"taught":true}' } }),
   'hint grapevine': page => hinted(page, { path: '/grapevine/', play: '#play', resume: '#resume', key: 'grapevine:hint', delay: 3000, moved: () => window.grapevineState().touched, legacy: { 'grapevine-save': '{"v":1,"sound":true,"best":{"1":3},"opened":2,"daily":{}}' } }),
@@ -1011,7 +893,6 @@ const GAMES = {
     await until(page, () => !document.querySelector('.kit-hint.on'), 'hint: gone on the first input', 3000);
     assert.equal(await page.evaluate(() => localStorage.getItem('pisti:hint')), '1', 'hint: the player is remembered');
   },
-  'hint lab/lantern-3d': page => hinted(page, { path: '/lab/lantern-3d/', play: '#play', resume: '#go', key: 'lantern-3d:hint', delay: 1500, before: () => window.lanternState().target, moved: t => window.lanternState().target !== t, alive: () => { const s = window.lanternSim(); s.safe = 60; s.light = 1; } }),
   // Old /proto/ links move to the top level with their query; the new URL plays to its first frame.
   async 'old links'(page) {
     const response = await page.goto(`${base}/proto/lantern/?x=1`);
