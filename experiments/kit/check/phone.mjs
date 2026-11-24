@@ -514,6 +514,8 @@ const GAMES = {
     assert.equal((await saved()).stack.length, 1, 'death saved');
     await page.click('#goOn'); assert.equal(await mode(), 'play');
     await page.click('#pause'); await page.click('#paused .toMenu'); assert.equal(await mode(), 'menu');
+    // The animal book says how each animal you have been sees (note #148), and no message from play shows through it.
+    await page.click('#toBook'); assert.match(await page.textContent('#pages'), /Sees: /, 'the book says how an animal sees'); assert.ok(!await page.evaluate(() => document.getElementById('say').classList.contains('on')), 'no play message over the book'); await page.click('#book .back');
     // Skin and sound choices are kept.
     await page.click('#toSkins'); await page.click('#colours button:nth-child(4)'); await page.click('#skins .back');
     const sound = await page.textContent('#sound'); await page.click('#sound'); assert.notEqual(await page.textContent('#sound'), sound);

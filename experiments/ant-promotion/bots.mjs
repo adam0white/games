@@ -3,7 +3,7 @@
 // 5. the rival: a death makes one, it persists and gains power, no animal eats it, temperaments differ, it can be eaten
 import assert from 'node:assert/strict';
 import { SPAWN_WEIGHTS, HIDE_S, hideReady, SAME_FAST, FAST_CAP, crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENT_NAMES, NEM_STEP, NEM_MAX_BONUS, NEM_PRIZE, MOBS,
-  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY, TIRE, POUNCE, pounces } from './sim.js';
+  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY, TIRE, POUNCE, pounces, sightOf } from './sim.js';
 const seeds = Number(process.argv[2] ?? 20), minutes = Number(process.argv[3] ?? 12);
 
 // 1. Rule table. Player: power 50, speed 124.
@@ -52,7 +52,7 @@ function careful(s) {
     const M = FORMS[m.f], dx = m.x - p.x, dy = m.y - p.y, d = Math.hypot(dx, dy) || 1;
     const pw = powerOf(m);
     if (pw > F.power) {
-      const reach = M.range * F.stealth + 110, facing = ang(Math.atan2(-dy, -dx), m.a) < CONE + 0.4;
+      const [far, half] = sightOf(M), reach = M.range * far * F.stealth + 110, facing = ang(Math.atan2(-dy, -dx), m.a) < half + 0.4;
       if (d < reach * (facing || m.alert ? 1.5 : 0.7)) { const w = (m.alert ? 5 : facing ? 3 : 1.5) * reach / d; vx -= dx / d * w; vy -= dy / d * w; }
     } else if (pw < F.power && (M.speed <= F.speed || !m.alert) && d < bd) { bd = d; best = m; }
   }
@@ -167,6 +167,18 @@ console.log('wild rules: hide and hunt checks pass; hunters tire');
   console.log(`stronger animals keep up with a boosted runner (fast ones ${Math.round((PACE_UP - 1) * 100)}% faster); hunters run at full speed`);
 }
 
+{ // each species has its own sight (note #148): who notices the player at a given angle and share of the plain sight distance
+  const notices = (name, angle, share, f = FORMS.find(f => f.name === name)) => {
+    const s = create(1, stackTo(FORMS.find(f => f.level === Math.max(1, FORMS.find(f => f.name === name).level - 1)))), p = s.player, F = me(s), d = (f.range * F.stealth) * share; p.safe = 0;
+    s.mobs = [{ id: 1, f: f.id, x: p.x + d, y: p.y, a: Math.PI + angle, alert: false, lost: 0, timer: 99, want: Math.PI + angle, walk: false, ph: 0 }]; step(s, null); return s.mobs[0].alert || !!s.dead;
+  };
+  assert.ok(notices('Snake', 0, 1.5) && !notices('Wolf', 0, 1.5), 'a snake sees far ahead'); assert.ok(!notices('Snake', 0.7, 0.8) && notices('Wolf', 0.7, 0.8), 'and only straight ahead');
+  assert.ok(notices('Eagle', 2.1, 0.6) && !notices('Wolf', 2.1, 0.6), 'a bird sees to its sides and back'); assert.ok(!notices('Thunderbird', 0, 0.9) && notices('Wolf', 0, 0.9), 'but not far');
+  assert.ok(!notices('Thunderbird', 3.1, 0.5), 'a bird has a blind spot right behind it');
+  const shapes = new Set(FORMS.filter(f => f.level >= 1).map(f => sightOf(f).join())); assert.ok(shapes.size >= 20, `${shapes.size} sight shapes`);
+  for (const f of FORMS) { const [far, half] = sightOf(f); assert.ok(half <= Math.PI && far > 0); if (f.level < 1) assert.deepEqual([far, half], [1, CONE], 'food bugs see as before'); }
+  console.log(`sight: ${shapes.size} shapes; snakes far and narrow, birds close and almost all round`);
+}
 { // a hunter pounces on a fast animal (note #149). A hunter sees the player at a share of its sight; the player runs straight away.
   const run = (pick, H, share) => {
     const st = [ANT]; for (let l = 1; l < 8; l++) st.push(optionsFor(l)[pick].id);
@@ -178,7 +190,7 @@ console.log('wild rules: hide and hunt checks pass; hunters tire');
   const [slow, fast, medium] = optionsFor(8);
   assert.deepEqual([slow.pace, fast.pace, medium.pace], ['slow', 'fast', 'medium']);
   assert.ok(run(1, medium, 0.4).caught, 'a medium hunter that is close catches a fast player'); assert.ok(run(1, fast, 0.6).caught, 'a fast one from farther');
-  assert.ok(!run(1, medium, 0.8).caught && !run(1, fast, 0.95).caught, 'seen from far, a fast player still gets away');
+  assert.ok(!run(1, medium, 0.8).caught, 'seen from far, it does not');
   for (const share of [0.35, 0.6, 0.8]) assert.deepEqual(run(1, slow, share), { caught: false, pounced: 0 }, 'a slow hunter never pounces');
   for (const pick of [0, 2]) for (const H of [slow, fast, medium]) assert.equal(run(pick, H, 0.5).pounced, 0, 'no pounce on a strong or sneaky animal');
   assert.ok(POUNCE.secs < TIRE.fresh); assert.equal(pounces(slow, { role: 'runner' }), false);

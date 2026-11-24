@@ -60,6 +60,18 @@ function rng(seed) { let a = seed >>> 0 || 1; return () => { a |= 0; a = a + 0x6
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 export const CONE = 1.13; // half-angle a mob can see, radians
+// How far and how wide each species sees (tester t1, note #148, 2026-11-23): [times its plain sight distance, half-angle].
+// A snake sees a long thin strip, a bird nearly all the way round but close. Others differ where the animal suggests it; the rest keep the
+// plain wedge [1, CONE]. Wide sights are shorter, so the area an animal watches stays about the same. Food bugs (level 0) keep the plain wedge.
+// Animals hunting each other still use the plain wedge.
+const SIGHT_KIND = { snake: [1.7, 0.42], bird: [0.62, 2.65] };
+const SIGHT = {
+  Spider: [0.75, 2.2], Mantis: [1.25, 0.8], Crab: [0.75, 2], Frog: [0.8, 2], Mole: [0.5, Math.PI], Lizard: [0.85, 1.7], Bat: [0.55, Math.PI], Turtle: [0.8, 0.9],
+  Rabbit: [0.65, 2.1], Owl: [0.9, 1.6], Eagle: [0.7, 2.2], Deer: [0.65, 1.9], Ostrich: [1.2, 1.4], Cheetah: [1.4, 0.65], Python: [1.5, 0.5], Zebra: [0.65, 1.8],
+  Giraffe: [1.35, 0.9], Pterodactyl: [0.7, 2.6], Griffin: [0.7, 2.3], Basilisk: [1.85, 0.34], Dragon: [0.8, 2.1], Hydra: [1, 1.9],
+};
+export const sightOf = F => (F.level < 1 ? [1, CONE] : SIGHT[F.name] || SIGHT_KIND[F.kind] || [1, CONE]);
+export const sightWords = F => { const [far, half] = sightOf(F), w = half > 2.5 ? 'almost all round' : half > 1.6 ? 'wide' : half < 0.95 ? 'narrow' : '', d = far < 0.9 ? 'close' : far > 1.15 ? 'far' : ''; return [w, d].filter(Boolean).join(', ') || 'straight ahead'; };
 export const SPAWN_WEIGHTS = [[-3, 1], [-2, 3], [-1, 5], [0, 3], [1, 2], [2, 1]];
 
 // Wild rules (a variant; classic is the default and is unchanged):
@@ -116,7 +128,7 @@ export const fastBoost = k => Math.min(FAST_CAP, SAME_FAST ** Math.max(0, k - 1)
 // Stronger animals keep up (tester t1, note #101, 2026-11-23): once repeat fast picks made the player faster than every animal,
 // nothing could catch them. A stronger animal now runs with the player's fast boost, and a fast one runs PACE_UP faster than that.
 // A player without a fast boost (every brute or sneak, and a first fast pick) meets exactly the speeds it met before.
-export const PACE_UP = 1.12;
+export const PACE_UP = 1.06;
 // A hunter pounces on a fast animal (tester t1, note #149, 2026-11-23: "you just outrun every mob"). A medium or fast stronger animal that
 // is fresh and within `near` of its sight distance dashes at `up` times the player's speed for `secs`, then needs `rest` seconds.
 // Only a player whose current animal is a fast pick meets it; slow hunters never pounce, so what is marked slow can still be outrun.
@@ -218,7 +230,7 @@ export function step(s, input) {
     const m = s.mobs[i], M = FORMS[m.f], dx = p.x - m.x, dy = p.y - m.y, d = Math.hypot(dx, dy), to = Math.atan2(dy, dx);
     if (m.hunt > 0) m.hunt -= dt;
     const T = m.nem ? TEMPERAMENTS[N.knobs.temperament] : null, power = powerOf(m);
-    const range = M.range * (T ? T.sight : 1), cone = CONE * (T ? T.cone : 1);
+    const [far, half] = sightOf(M), range = M.range * far * (T ? T.sight : 1), cone = Math.min(Math.PI, half * (T ? T.cone : 1));
     if (m.winded > 0) m.winded -= dt;
     if (m.spring > 0) m.spring -= dt; if (m.pounce > 0) m.pounce -= dt;
     const sees = p.safe <= 0 && !(m.winded > 0) && (m.hunt > 0 || d < range * F.stealth + F.r && Math.abs(wrap(to - m.a)) < cone);
