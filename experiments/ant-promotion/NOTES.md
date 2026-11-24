@@ -429,6 +429,8 @@ The first sight table (birds 2.85, Rabbit, Deer and Zebra wider) took classic st
 ### Checks
 `bots.mjs` has direct checks of the pounce and the sight shapes; with the dash set to 0.1 the pounce check fails (tried). WebKit iPhone 13 screenshots of seven animals in Cartoon and 3D, no page errors. The phone check covers the book line.
 
+The first full `bots.mjs 6 12` failed in the rival rules: their test animal, the Mole, no longer has the plain wedge. They now use a Porcupine, which has it (asserted); every assertion is kept, and the bite-range one still uses the Mole. The bot play printed before that point matches the table above.
+
 ### Not verified
 - How a pounce feels to a person, and whether it is enough. Bots show fast picks rise less high in Classic; their deaths barely change.
 - Whether the tester meant the animals' sight, the player's own view, or both. Only the animals' sight changed; a question went to the tester.

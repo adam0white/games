@@ -367,12 +367,13 @@ function wary(s) {
   // ambusher 0% -> 71%, on a few alert ticks each. The rule is checked directly below instead.
 }
 { // the rules behind the temperaments, one at a time, in a world with only the rival in it
-  const mole = optionsFor(4)[0], alone = (t, dx, dy) => {
-    const s = create(1, levelStack(3), 0, SPAWN_WEIGHTS, false, { f: mole.id, bonus: 0, kills: 1, knobs: KNOBS(t) }), m = nemesisMob(s);
+  const porcupine = FORMS.find(f => f.name === 'Porcupine'); assert.deepEqual(sightOf(porcupine), [1, CONE], 'the test animal has the plain wedge'); // a Mole sees all round and near since note #148
+  const mole = optionsFor(4)[0], alone = (t, dx, dy, f = porcupine) => {
+    const s = create(1, levelStack(3), 0, SPAWN_WEIGHTS, false, { f: f.id, bonus: 0, kills: 1, knobs: KNOBS(t) }), m = nemesisMob(s);
     s.mobs = [m]; s.player.safe = 0; m.x = s.player.x + dx; m.y = s.player.y + dy; m.a = Math.PI; m.timer = 99; s.nemesis.home = { x: m.x, y: m.y }; s.nemesis.hunt = 999;
     return { s, m };
   };
-  const reach = me(alone('brute', 0, 0).s).r + mole.range; // how far a plain Mole sees this player, straight ahead
+  const reach = me(alone('brute', 0, 0).s).r + porcupine.range; // how far a plain Porcupine sees this player, straight ahead
   // sight: just past a plain animal's range, straight ahead. Only the temperaments that see farther notice.
   const far = Object.fromEntries(TEMPERAMENT_NAMES.map(t => { const { s, m } = alone(t, reach * 1.05, 0); step(s, null); return [t, m.alert]; }));
   assert.deepEqual(far, { ambusher: true, stalker: true, brute: false, coward: true }, 'who sees past a plain animal\'s range');
@@ -391,7 +392,7 @@ function wary(s) {
   // an ambusher that has not noticed stands still inside its territory; the others wander
   const moved = Object.fromEntries(TEMPERAMENT_NAMES.map(t => { const { s, m } = alone(t, 600, 600); m.timer = 0; const x = m.x, y = m.y; let far = 0; for (let i = 0; i < 1200; i++) { step(s, null); far = Math.max(far, Math.hypot(m.x - x, m.y - y)); } return [t, far]; }));
   // a coward runs from a player close to its power; a brute closes in (the player: a level 4 Crab, power 44, against the Mole's 54)
-  const gap = Object.fromEntries(['brute', 'coward'].map(t => { const { s, m } = alone(t, reach * 0.5, 0); s.player.stack = levelStack(4); m.alert = true; // safe stays 0: a player who is safe is not seen
+  const gap = Object.fromEntries(['brute', 'coward'].map(t => { const { s, m } = alone(t, reach * 0.45, 0, mole); s.player.stack = levelStack(4); m.alert = true; // safe stays 0: a player who is safe is not seen
     const d0 = Math.hypot(m.x - s.player.x, m.y - s.player.y); for (let i = 0; i < 30; i++) step(s, null); return [t, Math.hypot(m.x - s.player.x, m.y - s.player.y) - d0]; }));
   assert.ok(gap.brute < -10 && gap.coward > 10, `a coward runs from a player close to its power; a brute closes in (${gap.brute.toFixed(0)}, ${gap.coward.toFixed(0)})`);
   assert.equal(moved.ambusher, 0, 'an ambusher waits'); assert.ok(moved.stalker > 20 && moved.brute > 20 && moved.coward > 20, 'the others wander');
