@@ -5,7 +5,7 @@
 import { originAllowed, utcDay } from './core.mjs';
 
 // maxScore: Lantern's endless score is ten points a second, so one million is more than a day of play.
-export const BOARD = { games: ['lantern'], top: 20, keep: 500, name: 16, maxScore: 1_000_000, body: 256, dailyNew: 2000, cacheSeconds: 20, cacheVersion: 1 };
+export const BOARD = { games: ['lantern', 'sling', 'breath', 'matchmaker', 'lantern-fp', 'ant-swarm'], top: 20, keep: 500, name: 16, maxScore: 1_000_000, body: 256, dailyNew: 2000, cacheSeconds: 20, cacheVersion: 1 };
 
 // Stricter than the game's own name field: letters, digits, space and _ . - only, at most 16 characters. Markup characters never reach another player's screen as typed.
 export const tidyName = v => (typeof v === 'string' ? v.normalize('NFKC').replace(/[^\p{L}\p{N} _.-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, BOARD.name).trim() : '');
