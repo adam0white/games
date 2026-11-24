@@ -778,7 +778,7 @@ function draw3d(now) {
 }
 
 function frame(now) {
-  requestAnimationFrame(frame);
+  requestAnimationFrame(frame); const w0 = performance.now(); // page work in this frame: the sim's steps, the rigs, the drawing
   const dt = last ? Math.min(0.1, (now - last) / 1000) : 0; last = now;
   if (mode === 'play' && s) {
     acc += dt; const inp = input(); inp.power = wantPower; powerButton();
@@ -870,7 +870,7 @@ function frame(now) {
   if (shake > 0) shake -= dt;
   if (sayTimer > 0 && (sayTimer -= dt) <= 0) $('say').classList.remove('on');
   if (bubble && now > bubble.until) bubble = null;
-  const w0 = performance.now(); draw(now); work.push(performance.now() - w0); if (work.length > 120) work.shift();
+  draw(now); work.push(performance.now() - w0); if (work.length > 120) work.shift();
 }
 // ---------- language: English, or Turkish by ?lang=tr, the globe button or the browser (experiments/kit/i18n.js, words.js)
 // The How to play list, the recording notice and its switch keep the English the page and the kit wrote; only other languages replace them.
@@ -910,7 +910,7 @@ for (const id of ['langMenu', 'langPause']) {
 translatePage();
 
 addEventListener('pagehide', () => { if (s && !s.dead) { save.stack = s.player.stack.slice(); save.xp = s.player.xp; keepNem(); store(); } });
-window.__ant = { get s() { return s; }, get mode() { return mode; }, get input() { return input(); }, get arrowTo() { return arrowTo; }, get save() { return save; }, get bubble() { return bubble; }, get beam() { return beam; }, get living() { return isLiving() ? L4 : null; }, get work() { return work.slice(); }, FORMS, me, level, step, powerOf, nemesisMob };
+window.__ant = { get s() { return s; }, get mode() { return mode; }, get input() { return input(); }, get arrowTo() { return arrowTo; }, get save() { return save; }, get bubble() { return bubble; }, get beam() { return beam; }, get living() { return isLiving() ? L4 : null; }, get work() { return work.slice(); }, look(n) { save.look = n; setLook(n); }, FORMS, me, level, step, powerOf, nemesisMob };
 show('menu'); requestAnimationFrame(frame);
 </script>
 <script src="/notes/button.js" defer></script>
