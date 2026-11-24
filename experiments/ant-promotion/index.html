@@ -161,7 +161,7 @@
 
 <script type="module">
 import { FORMS, ANT, WORLD, TOP, sightOf, sightWords, create, step, choose, revive, me, level, needFor, article, SPAWN_WEIGHTS, hideReady, fastBoost, SAME_SNEAK,
-  crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENTS, TEMPERAMENT_NAMES, powerFor, paceAgainst } from './sim.js';
+  crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENTS, TEMPERAMENT_NAMES, powerFor, paceAgainst, placeOld, OLD_DIM } from './sim.js';
 import { drawForm, setLook, LOOKS } from './art.js';
 import { create3D } from './look3d.js';
 import { readJson, writeJson } from '../kit/save.js';
@@ -182,7 +182,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const pick = list => list[Math.floor(Math.random() * list.length)];
 // wild: Wild rules are the default from 2026-11-23 (tester t1, note #88). A save that already holds wild: false keeps Classic.
 // nem: the living rival (null when there is none). trophies: rivals eaten. gens: how many rivals there have been. Saves from before the rival have none of the three.
-let save = { skin: { c: COLOURS[0], p: 'plain' }, stack: [ANT], xp: 0, sound: true, look: 1, seen: [], wild: true, nem: null, trophies: [], gens: 0 };
+let save = { skin: { c: COLOURS[0], p: 'plain' }, stack: [ANT], xp: 0, sound: true, look: 1, seen: [], wild: true, nem: null, trophies: [], gens: 0, old: [] }; // old: the top animals of the last climb, still to be eaten (note #201); absent in older saves
 Object.assign(save, readJson(KEY, {}));
 if (query.has('look')) save.look = Number(query.get('look')); // ?look=0 flat, 1 cartoon, 2 soft
 if (!LOOKS[save.look]) save.look = 1;
@@ -190,6 +190,7 @@ if (query.has('wild')) save.wild = query.get('wild') === '1'; // ?wild=1 wild ru
 setLook(save.look);
 if (!Array.isArray(save.stack) || !save.stack.length || save.stack.some((id, i) => !FORMS[id] || FORMS[id].level !== i + 1)) { save.stack = [ANT]; save.xp = 0; }
 if (!Array.isArray(save.seen)) save.seen = [];
+save.old = (Array.isArray(save.old) ? save.old : []).filter(id => FORMS[id]?.level >= 2).slice(0, 3);
 save.trophies = (Array.isArray(save.trophies) ? save.trophies : []).filter(t => t && typeof t.name === 'string').slice(-50);
 const PLAYABLE = FORMS.filter(f => f.level >= 1);
 const saw = ids => { for (const id of ids) if (!save.seen.includes(id)) save.seen.push(id); }; saw(save.stack); // the animal book: every animal you have been
@@ -288,12 +289,15 @@ function book() {
     d.append(pic, known ? animal(F.name) : t('levelN', { n: F.level })); if (known) d.append(Object.assign(document.createElement('div'), { textContent: t('sees', { s: sightText(sightWords(F)) }), style: 'background:none;opacity:.8;padding:0' })); box.append(d);
   }
 }
+const topThree = stack => stack.slice(-3);
+function retire(stack) { if (stack.length < TOP) return false; save.old = topThree(stack); return true; } // a climb that reached the top leaves its top animals behind as hunters
 function start(fresh) {
+  const retired = fresh && retire(save.stack);
   if (fresh) { save.stack = [ANT]; save.xp = 0; store(); } // the rival stays: it remembers you
-  s = create(Number(query.get('seed')) || (Math.random() * 1e9 | 0), save.stack, save.xp, SPAWN_WEIGHTS, !!save.wild, save.nem?.sim);
+  s = create(Number(query.get('seed')) || (Math.random() * 1e9 | 0), save.stack, save.xp, SPAWN_WEIGHTS, !!save.wild, save.nem?.sim, save.old);
   if (save.nem && !s.nemesis) { save.nem = null; store(); }
   floats.length = 0; bits.length = 0; flash = 0; glow = 0; beam = 0; bubble = null; noticeAt = -99; riseNow = false; pendingOffer = false; offerAt = 0; hud(); show('play');
-  say(level(s) === 1 ? t('firstSay') : t('youAre', nameVars(me(s).name)));
+  say(retired ? t('oldStart') : level(s) === 1 ? t('firstSay') : t('youAre', nameVars(me(s).name)));
   if (save.nem) speakLine(save.nem.persona.lines.notice, 'notice', 3000); // it remembers you
 }
 function hud() {
@@ -353,7 +357,8 @@ function died() {
   show('dead');
 }
 function back(restart) {
-  revive(s, restart); save.stack = s.player.stack.slice(); save.xp = 0; keepNem(); store(); hud(); show('play'); say(t('youAre', nameVars(me(s).name)));
+  const retired = restart && retire(s.player.stack);
+  revive(s, restart); if (retired) placeOld(s, save.old); save.stack = s.player.stack.slice(); save.xp = 0; keepNem(); store(); hud(); show('play'); say(retired ? t('oldStart') : t('youAre', nameVars(me(s).name)));
   if (riseNow && save.nem) speakLine(save.nem.persona.lines.rise, 'rise', 4500);
   riseNow = false;
 }
@@ -367,7 +372,7 @@ for (const b of document.querySelectorAll('.back')) b.onclick = () => show('menu
 for (const b of document.querySelectorAll('.toMenu')) b.onclick = () => { if (s?.dead) revive(s, false); riseNow = false; if (s) { save.stack = s.player.stack.slice(); save.xp = s.player.xp; keepNem(); store(); } s = null; show('menu'); };
 $('goOn').onclick = () => back(false); $('restart').onclick = () => back(true);
 $('pause').onclick = () => show('paused'); $('resume').onclick = () => show('play');
-$('winOn').onclick = () => show('play'); $('winNew').onclick = () => start(true);
+$('winOn').onclick = () => show('play'); $('winNew').onclick = () => { save.stack = s.player.stack.slice(); start(true); };
 // Lab recording (experiments/kit/lab.js): the notice on the menu, the switch on the pause card, each life, promotions and skins.
 const rec = lab('ant-promotion'), notice = rec.notice($('menu').firstElementChild), recToggle = rec.toggle($('paused').firstElementChild);
 const life = () => s ? { level: level(s), form: me(s).name, xp: s.player.xp } : null;
@@ -461,7 +466,7 @@ function label(x, y, text, colour, size, extra) {
 
 // ----- shared by the flat looks and the 3D look
 // What an animal can see: [distance before the player's stealth, half-angle]. The rival's temperament changes both.
-const sight = m => { const M = FORMS[m.f], T = m.nem && s.nemesis ? TEMPERAMENTS[s.nemesis.knobs.temperament] : null; const [far, half] = sightOf(M); return [M.range * far * (T ? T.sight : 1), Math.min(Math.PI, half * (T ? T.cone : 1))]; };
+const sight = m => { const M = FORMS[m.f], T = m.nem && s.nemesis ? TEMPERAMENTS[s.nemesis.knobs.temperament] : null; const [far, half] = sightOf(M); return [M.range * far * (T ? T.sight : 1) * (m.old && !(m.hunt > 0) && !m.alert && powerOf(m) > me(s).power ? OLD_DIM : 1), Math.min(Math.PI, half * (T ? T.cone : 1))]; };
 function crownMark(x, y, w, colour) { // a small crown: the rival's mark
   g.beginPath(); g.moveTo(x - w / 2, y); g.lineTo(x - w / 2, y - w * 0.5); g.lineTo(x - w / 4, y - w * 0.25); g.lineTo(x, y - w * 0.6); g.lineTo(x + w / 4, y - w * 0.25); g.lineTo(x + w / 2, y - w * 0.5); g.lineTo(x + w / 2, y); g.closePath();
   g.fillStyle = colour; g.strokeStyle = '#0b1408'; g.lineWidth = Math.max(1.5, w / 12); g.lineJoin = 'round'; g.fill(); g.stroke();
@@ -542,6 +547,24 @@ function edgeArrow(a, colour, z = 1) { // an arrow at the edge of the screen, po
   return { x, y };
 }
 
+const OLD_COLOUR = '#b9a8ff';
+// The player's own way of seeing (note #200: "yes, but only a little"): the ground outside its sight shape is a little darker. Only a drawing:
+// what is out there is still drawn, numbers and arrows lie above it, and a round patch beside the player is never dark.
+let dimAt = 0;
+function dimSight(p, F, at, rect) {
+  if (s.dead) return;
+  const [far, half] = sightOf(F); let turn = p.a - dimAt; turn = Math.atan2(Math.sin(turn), Math.cos(turn)); dimAt += turn * 0.15;
+  const R = Math.max(170, 240 * far) + F.r * 2, near = 90 + F.r * 2, a0 = dimAt - Math.min(Math.PI, half), a1 = dimAt + Math.min(Math.PI, half);
+  for (const k of [1, 1.12]) { // two steps make a soft edge
+    g.fillStyle = 'rgba(8,18,40,.08)'; g.beginPath(); g.rect(...rect);
+    const all = half >= Math.PI, n = 40, pts = [];
+    for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; pts.push([Math.cos(a) * R * k, Math.sin(a) * R * k]); }
+    if (!all) for (let i = 0; i <= 20; i++) { const a = a1 + (2 * Math.PI - (a1 - a0)) * i / 20; pts.push([Math.cos(a) * near * k, Math.sin(a) * near * k]); }
+    let first = true;
+    for (const [x, y] of pts) { const q = at(p.x + x, p.y + y); if (q[2] <= 0) continue; if (first) g.moveTo(q[0], q[1]); else g.lineTo(q[0], q[1]); first = false; }
+    g.closePath(); g.fill('evenodd');
+  }
+}
 function draw(now) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   const three = !!s && use3d(); $('gl').style.display = three ? 'block' : 'none';
@@ -570,6 +593,7 @@ function draw(now) {
       g.strokeStyle = persona.colour; g.lineWidth = Math.max(3, 3.5 / zoom); g.setLineDash([9, 6]); g.beginPath(); g.arc(0, 0, M.r * 1.6, -now / 700, -now / 700 + 6.283); g.stroke(); g.setLineDash([]);
       g.globalAlpha = 0.22; g.fillStyle = persona.colour; g.beginPath(); g.arc(0, 0, M.r * 1.6, 0, 6.283); g.fill(); g.globalAlpha = 1;
     }
+    if (m.old) { g.strokeStyle = OLD_COLOUR; g.lineWidth = Math.max(2.5, 3 / zoom); g.setLineDash([3, 6]); g.beginPath(); g.arc(0, 0, M.r * 1.55, now / 900, now / 900 + 6.283); g.stroke(); g.setLineDash([]); } // an old animal of yours
     g.rotate(m.a); g.fillStyle = '#00000026'; g.beginPath(); g.ellipse(0, 3, M.r * 1.1, M.r * 0.8, 0, 0, 7); g.fill(); drawForm(g, M, M.r, m.ph, null, m.a);
     if (m.nem && N) { // one scar for each repeat win
       g.lineCap = 'round';
@@ -584,6 +608,7 @@ function draw(now) {
   g.strokeStyle = '#ff3a2acc'; g.lineWidth = 2; g.setLineDash([7, 7]); g.lineDashOffset = -now / 40;
   for (const m of s.mobs) if (m.chase && !m.chase.gone && Math.abs(m.x - p.x) < vw && Math.abs(m.y - p.y) < vh) { g.beginPath(); g.moveTo(m.x, m.y); g.lineTo(m.chase.x, m.chase.y); g.stroke(); }
   g.setLineDash([]);
+  dimSight(p, F, (x, y) => [x, y], [p.x - 4000, p.y - 4000, 8000, 8000]);
   // bits of eaten animals, under the numbers
   for (const b of bits) {
     const k = b.age / b.life; g.globalAlpha = Math.max(0, 1 - k);
@@ -696,6 +721,7 @@ function draw3d(now) {
     const M = FORMS[m.f], pw = powerOf(m), strong = pw > F.power, [range, cone] = sight(m); if (Math.abs(m.x - p.x) > vw || Math.abs(m.y - p.y) > vh) continue;
     if (pw !== F.power) R.wedge(m.x, m.y, range * F.stealth + F.r, m.a - cone, m.a + cone, m.alert ? (strong ? [1, 0.2, 0.15] : [1, 0.9, 0.2]) : [1, 1, 1], m.alert ? 0.26 : strong ? 0.17 : 0.07);
     if (m.nem && P()) { const c = R.rgb(P().colour); R.ring(m.x, m.y, 0, M.r * 1.6, c, 0.22); R.ring(m.x, m.y, M.r * 1.6 - 1.6, M.r * 1.6 + 1.6, c, 0.95, 10, -now / 700); } // the rival's ring on the ground
+    if (m.old) R.ring(m.x, m.y, M.r * 1.5, M.r * 1.5 + 2.4, R.rgb(OLD_COLOUR), 0.95, 14, now / 900);
     rec.start(m.x, m.y, m.a, M.r, pose(M, m.ph)); drawForm(rec, M, M.r, m.ph, null, 0);
   }
   for (const m of s.mobs) if (m.chase && !m.chase.gone && Math.abs(m.x - p.x) < vw && Math.abs(m.y - p.y) < vh) { // who is chasing whom: a dotted red line on the ground
@@ -714,6 +740,7 @@ function draw3d(now) {
   }
   R.end();
   g.clearRect(0, 0, W, H);
+  dimSight(p, F, (x, y) => R.project(x, 0, y), [0, 0, W, H]);
   const size = 15, high = M => M.r * (M.kind === 'bird' ? 2.6 : 1.7);
   for (const m of s.mobs) {
     const M = FORMS[m.f]; if (Math.abs(m.x - p.x) > vw || Math.abs(m.y - p.y) > vh) continue;
@@ -777,6 +804,8 @@ function frame(now) {
           save.nem = null; store();
           say(t('ateRival', { name: rivalName(n.persona.name) }));
         }
+        if (e.t === 'oldHunt') { say(t('oldHunt', nameVars(e.name))); blip(110, 0.6, 'sawtooth', 0.11, 80); buzz(60); }
+        if (e.t === 'oldEaten') { save.old = save.old.filter(f => f !== e.f); store(); rec.event('old eaten', { form: FORMS[e.f].name }); say(t(e.left ? 'oldAte' : 'oldAll', nameVars(FORMS[e.f].name))); burst(s.player.x, s.player.y, ['#b9a8ff', '#ffffff', '#ffd23a'], 40, 220, 5); }
         if (e.t === 'hunt') { say(t('hunting', { who: e.id === s.nemesis?.id && save.nem ? rivalName(save.nem.persona.name) : nameVars(e.name).A })); blip(140, 0.5, 'sawtooth', 0.1, 120); buzz(60); }
         if (e.t === 'hide') { say(t('hideTook', nameVars(e.name))); shake = 0.4; flash = 0.6; crunch(0.18, 0.28, 500); buzz([30, 40, 30]); bits.push({ ring: 1, x: e.x, y: e.y, r: me(s).r * 1.6, c: '#9ad8ff', age: 0, life: 0.6 }); hud(); }
         if (e.t === 'full') { if (now < offerAt) pendingOffer = true; else offer(); } // after the rival is eaten the card waits for the celebration
@@ -784,7 +813,7 @@ function frame(now) {
         if (e.t === 'win') rec.event('win', life());
         if (e.t === 'die') { // show the bite for a moment, then the card
           const F = me(s), p = s.player, killer = s.mobs.find(m => m.id === e.killer);
-          if (!e.nem && !s.nemesis && killer) { // the animal that killed you becomes your rival. crown() adds a 'nemRise' to the list being read here.
+          if (!e.nem && !s.nemesis && killer && !killer.old) { // the animal that killed you becomes your rival. crown() adds a 'nemRise' to the list being read here.
             const gen = (save.gens | 0) + 1, persona = newPersona(killer.f, gen);
             if (crown(s, e.killer, persona.knobs)) { save.gens = gen; save.nem = { gen, persona, history: [], sim: nemesisSave(s) }; }
           }
@@ -796,7 +825,7 @@ function frame(now) {
         }
         if (e.t === 'nemRise' && save.nem) { riseNow = true; remember('rise'); keepNem(); store(); hud(); }
         if (e.t === 'nemKill' && save.nem) { remember('kill'); keepNem(); store(); speakLine(save.nem.persona.lines.kill, 'kill', 2500, e.kills); hud(); }
-        if (e.t === 'win') { store(); $('winSay').textContent = t('winSay', { top: TOP, ...nameVars(me(s).name) }); blip(660, 0.6, 'triangle', 0.14, 600); show('win'); }
+        if (e.t === 'win') { store(); $('winSay').textContent = t('winSay', { top: TOP, ...nameVars(me(s).name) }) + ' ' + t('winOld', { list: topThree(s.player.stack).map(id => animal(FORMS[id].name)).join(', ') }); blip(660, 0.6, 'triangle', 0.14, 600); show('win'); }
       }
     }
     if (s.wild && hideReady(s) !== hideWas) { hideWas = hideReady(s); hud(); }

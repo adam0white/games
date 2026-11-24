@@ -804,6 +804,18 @@ const GAMES = {
     assert.ok(await page.evaluate(() => window.__ant.beam) > 0.5, 'a promotion starts the light beam');
     await page.evaluate(() => { window.__ant.s.player.safe = 99; }); // nothing may eat the player while the beam plays out
     await until(page, () => window.__ant.beam < 0.9, 'the beam fades', 8000); assert.equal(await mode(), 'play'); // headless WebKit draws few frames, so only the start of the fade is waited for
+    // Old top animals come back as hunters (note #201): a climb to the top, then an Ant again. A save without `old`, or with a bad one, plays on.
+    assert.deepEqual(await page.evaluate(() => window.__ant.save.old), [], 'a save from before has no old animals');
+    if (await mode() !== 'menu') { if (await mode() === 'play') await page.click('#pause'); await page.click('.screen.on .toMenu'); } // the menu: leaving the page now saves nothing over what is set here
+    const kept = await page.evaluate(k => localStorage.getItem(k), KEY);
+    const ladder = await page.evaluate(() => { const st = [3]; while (st.length < 18) st.push(window.__ant.FORMS.find(f => f.level === st.length + 1).id); return st; });
+    await page.evaluate(([k, st]) => localStorage.setItem(k, JSON.stringify({ skin: { c: '#3a2a22', p: 'plain' }, stack: st, xp: 0, sound: true, look: 1, wild: false, old: 'junk' })), [KEY, ladder]);
+    await page.reload(); await page.click('#continue');
+    await page.evaluate(() => { window.__ant.s.player.safe = 9; window.__ant.s.player.xp = 999; }); await until(page, () => window.__ant.mode === 'win', 'the winning card'); await page.click('#winNew');
+    assert.deepEqual(await page.evaluate(() => [window.__ant.level(window.__ant.s), window.__ant.save.old, window.__ant.s.mobs.filter(m => m.old).map(m => m.f)]), [1, ladder.slice(-3), ladder.slice(-3)], 'the top three come back');
+    await page.evaluate(() => { window.__ant.s.player.safe = 0; window.__ant.s.oldAt = window.__ant.s.t + 0.05; }); await until(page, () => (window.__ant.s.oldHunts || 0) > 0, 'one of them hunts');
+    await page.click('#pause'); await page.click('#paused .toMenu'); await page.reload(); assert.equal(await page.evaluate(() => window.__ant.save.old.length), 3, 'they are kept in the save');
+    await page.evaluate(([k, v]) => localStorage.setItem(k, v), [KEY, kept]); await page.reload(); await page.click('#continue');
   },
   // The three games of 2026-11-23. Each has its own full check (experiments/<slug>/check.mjs); this is the shared part:
   // the page loads through the kit with no error, a run starts from Play, pause holds it, and leaving for the menu

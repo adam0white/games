@@ -552,3 +552,34 @@ The game is now in English and Turkish, with the shared language kit (`experimen
 **To add a string:** add the key to `tables.en` and `tables.tr` in `words.js` and draw it with `t('key', { vars })`. A new animal or skill label needs only a Turkish entry (`'animal.<English name>'`, `'skill.<English label>'`); a check in node (all 55 names present and different) is in this change's report, not in the repo.
 
 **Not verified.** No native Turkish speaker has read the text. Ask the tester (or another Turkish reader) to play one life in Turkish and mark anything stiff or wrong, especially the animal names (Böcek for Beetle, Kılıç Dişli Kaplan for Sabertooth, Yıldırım Kuşu for Thunderbird), the rival's epithets and lines, and the skill labels.
+
+## 2026-11-24: your own way of seeing, and old animals that hunt (tester t1, notes #200 and #201)
+
+The answers, in short. #200 (to #163, should your own view change with your animal): yes, but only a little. #201 (to #164, what should happen after the top): your old top animals come back as hunters.
+
+### Done
+- **Your own sight (#200).** The ground outside your animal's sight shape is a little darker (two steps of 8%), in all four looks. A Snake lights a strip, a Bat a circle. A round patch beside you is never dark, and very short sights (Mole, Bat) are drawn at 170 units or more so they are not a small hole. Drawing only: everything out there is still drawn, and numbers, arrows and the speech bubble lie above it. `sim.js` does not know about it.
+- **Old animals (#201).** When a climb that reached the top ends in a new game (the winning card's "Start again as an Ant", New game on the menu, or Start over on the death card), its top three animals become hunters in the next climb. They carry 12 less power than before, so all three can be eaten on the way up; eating one pays 4 extra and takes it out of the save. Every 90 s one that is still stronger arrives from out of sight and hunts for 6 s, with a message and the red arrow. They wear a violet dotted ring.
+- **Fair by construction, decided here.** An old animal is never faster than 0.88 of you, never pounces, tires like any hunter, sees half as far between hunts and walks away from you then. It does not hunt or get hunted by other animals, and it never becomes your rival. Wild's own hunt does not pick it.
+- **Save.** `ant-promotion:v1` gains `old` (list of animal ids); a save without it, or with a bad value, has none. No other field changed.
+
+### Numbers
+Careful bot, 6 seeds, 12 minutes, median top level / median deaths (a run stops at the top):
+
+| | none | first try (every 50 s, 0.98 speed, stays near) | built |
+|---|---|---|---|
+| classic strong | 9 / 1 | 5 / 5 | 7 / 2 |
+| classic fast | 13 / 4 | 8 / 6 | 12 / 5 |
+| classic sneaky | 18 / 0 | 18 / 1 | 18 / 0 |
+| Wild strong | 6 / 2 | 5 / 6 | 5 / 3 |
+| Wild fast | 11 / 10 | 6 / 11 | 10 / 9 |
+| Wild sneaky | 12 / 4 | 9 / 7 | 12 / 4 |
+
+### Checks
+A game without old animals ends identical to main's rules under the same steering (24 runs). `bots.mjs` section 6 checks hunting, speed, the prize, upkeep, a revive, and that one is never crowned rival. The phone check climbs to the top, starts again and reloads, and plays a save with a bad `old`. Screenshots of Mole, Snake, Bat and Dog in Cartoon and 3D, of the winning card and of a hunt (WebKit iPhone 13) were looked at.
+
+### Not verified
+A real phone; whether the hunts are exciting or only a nuisance; whether the dimming is seen as "a little". In the bots an old animal was rarely eaten, because most runs did not get that far.
+
+### Left as a proposal (2026-11-24, note #201)
+- Keep roaming at the top is unchanged: the old animals come only after starting again. A harder meadow each time round (more than three, or stronger old animals on the third climb) needs the tester's word first.
