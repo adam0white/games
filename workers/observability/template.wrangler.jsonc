@@ -19,7 +19,7 @@
     "logs": { "enabled": true, "invocation_logs": true, "head_sampling_rate": 1 },
     // 1 for a Worker with little traffic; 0.1 for one that runs on every page or asset request.
     "traces": { "enabled": true, "head_sampling_rate": 1 },
-    // Cloudflare groups uncaught exceptions, 5xx responses and console.error into issues. The watcher starts Claude on a new one.
+    // Cloudflare groups uncaught exceptions, 5xx responses and console.error into issues. A Claude routine starts on a new one.
     "issues": { "enabled": true }
   }
 }
