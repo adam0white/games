@@ -392,7 +392,7 @@ const GAMES = {
       const b = r.postDataJSON(); posts.push(b); if (b.remove) kept.delete(b.id); else kept.set(b.id, { n: b.n, s: Math.max(b.s, kept.get(b.id)?.s ?? 0) });
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ place: b.remove ? 0 : listed().indexOf(kept.get(b.id)) + 1, rows: listed() }) });
     });
-    await page.click('#toBoard'); assert.equal(await page.isVisible('#name'), true); assert.match(await page.textContent('#rows'), /^1No name55/);
+    await page.click('#toBoard'); await until(page, () => window.lanternState().shared >= 0, 'the shared board answers'); await page.click('#tabPhone'); assert.equal(await page.isVisible('#name'), true); assert.match(await page.textContent('#rows'), /^1No name55/);
     await page.fill('#name', ' Rio <b>river</b>'); assert.equal((await saved())['lantern-name'], 'Rio <b>river</b', 'the name is trimmed and kept to 16 characters');
     await page.keyboard.press('p'); assert.equal((await state()).screen, 'board', 'typing P in the name does not pause or play');
     await page.click('#boardPlay'); assert.equal((await state()).endless, true);
@@ -400,32 +400,41 @@ const GAMES = {
     await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'endless run ends');
     assert.match(await page.textContent('#line'), /Number 1 on this phone's leaderboard/);
     st = await state(); assert.equal(st.board.length, 2); assert.equal(st.board[0].n, 'Rio <b>river</b'); assert.ok(st.board[0].s >= 900);
-    await page.click('#toMenu'); await page.click('#toBoard');
+    assert.equal(await page.isVisible('#ask'), true, 'the card asks once about showing scores to everyone'); assert.equal(await page.inputValue('#askName'), 'Rio <b>river</b'); assert.equal((await saved())['lantern-share'], undefined, 'a name alone is not a yes');
+    await page.click('#toMenu'); await page.click('#toBoard'); await until(page, () => window.lanternState().shared >= 0, 'the shared board answers'); await page.click('#tabPhone');
     assert.equal(await page.locator('#rows li.me .n').textContent(), 'Rio <b>river</b', 'the name is shown as text'); assert.equal(await page.locator('#rows b').count(), 0, 'no markup from the name');
     await sleep(300); const sent = labSent(page).slice(sentBefore); assert.ok(sent.some(r => r.kind === 'run' && r.data.summary?.score >= 900), 'the endless run was recorded');
     assert.ok(!JSON.stringify(sent).includes('Rio'), 'the name is not sent to the lab');
-    // The shared board. That run sent nothing: sharing is off until the player taps Share. Every bad answer leaves the phone's own board.
-    assert.equal(posts.length, 0, 'no score is sent before the player shares'); await page.click('#board .back');
+    // The shared board. That run sent nothing: sharing is off until the player says yes (note #155); the card asks once. Every bad answer leaves the phone's own board.
+    assert.equal(posts.length, 0, 'no score is sent before the player says yes'); await page.click('#board .back');
     const openBoard = async () => { const n = (await state()).asked; await page.click('#toBoard'); await until(page, n => window.lanternState().asked > n, 'the shared board answered or was given up', 9000, n); };
     page.context().boardBad = true; // the bad answers below are meant, so their network errors are not page errors
     for (const m of ['401', 'html', 'hang']) {
-      mode = m; await openBoard(); st = await state(); assert.equal(st.shared, -1, `${m}: no shared rows`); assert.equal(await page.isVisible('#tabs'), false, `${m}: no tabs`); assert.equal(await page.isVisible('#share'), false, `${m}: no share button`);
+      mode = m; await openBoard(); st = await state(); assert.equal(st.shared, -1, `${m}: no shared rows`); assert.equal(await page.isVisible('#tabs'), false, `${m}: no tabs`); assert.equal(await page.isVisible('#share'), false, `${m}: no tick`);
       assert.match(await page.textContent('#rows'), /Rio/, `${m}: the phone's board shows`); assert.match(await page.textContent('#boardHint'), /stay on this phone/); await page.click('#board .back');
     }
-    mode = 'ok'; await openBoard(); assert.equal(await page.isVisible('#tabs'), true, 'tabs when the shared board answers'); assert.match(await page.textContent('#rows'), /Rio/, 'the phone tab is first');
-    await page.click('#tabAll'); assert.match(await page.textContent('#rows'), /Zed99999/); assert.doesNotMatch(await page.textContent('#rows'), /Rio/); assert.match(await page.textContent('#shareNote'), /Share sends your name and your best score/);
-    await page.click('#share'); await until(page, () => document.querySelector('#rows li.me'), 'the shared row');
+    mode = 'ok'; await openBoard(); assert.equal(await page.isVisible('#tabs'), true, 'tabs when the shared board answers'); assert.match(await page.textContent('#rows'), /Zed/, 'all players come first');
+    await page.click('#tabAll'); assert.match(await page.textContent('#rows'), /Zed99999/); assert.doesNotMatch(await page.textContent('#rows'), /Rio/); assert.match(await page.textContent('#shareNote'), /A tick sends your name and your best score/);
+    await page.check('#share'); await until(page, () => document.querySelector('#rows li.me'), 'the shared row');
     assert.equal(posts.length, 1); assert.deepEqual(Object.keys(posts[0]).sort(), ['id', 'n', 's'], 'only the id, the name and the score are sent'); assert.equal(posts[0].n, 'Rio <b>river</b'); assert.ok(posts[0].s >= 900); assert.match(posts[0].id, /^[A-Za-z0-9-]{20,64}$/);
-    assert.match(await page.textContent('#rows li.me'), /^2Rio/); assert.equal(await page.locator('#rows b').count(), 0, 'no markup from a shared name'); assert.equal((await saved())['lantern-share'], '1'); assert.equal(await page.textContent('#share'), 'Stop sharing');
+    assert.match(await page.textContent('#rows li.me'), /^2Rio/); assert.equal(await page.locator('#rows b').count(), 0, 'no markup from a shared name'); assert.equal((await saved())['lantern-share'], '1'); assert.equal(await page.isChecked('#share'), true);
     await page.click('#boardPlay'); await page.evaluate(() => { const s = window.lanternSim(); s.extra = 40; s.light = 0.0001; s.warm = 0; });
     await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'second endless run ends'); await page.click('#toMenu');
     for (let i = 0; i < 40 && posts.length < 2; i++) await sleep(50);
-    assert.equal(posts.length, 2, 'a run is sent while sharing'); assert.equal(posts[1].id, posts[0].id); assert.ok(posts[1].s < 900);
-    await openBoard(); await page.click('#tabAll'); await page.click('#share'); for (let i = 0; i < 40 && posts.length < 3; i++) await sleep(50);
+    assert.equal(posts.length, 2, 'after one yes, a run is sent by itself'); assert.equal(posts[1].id, posts[0].id); assert.ok(posts[1].s < 900);
+    await openBoard(); await page.click('#tabAll'); await page.uncheck('#share'); for (let i = 0; i < 40 && posts.length < 3; i++) await sleep(50);
     assert.deepEqual(posts[2], { id: posts[0].id, remove: true }, 'stop sharing takes the row away'); assert.equal((await saved())['lantern-share'], ''); assert.equal((await saved())['lantern-board-id'], '');
     await until(page, () => !/Rio/.test(document.querySelector('#rows').textContent), 'the row is gone'); assert.ok(!JSON.stringify(labSent(page)).includes(posts[0].id), 'the board id is not sent to the lab');
+    // A no is kept: the next run asks nothing and sends nothing. Yes on the card (a player who has not chosen) sends the run at once.
+    const endlessRun = async () => { await page.evaluate(() => { const s = window.lanternSim(); s.extra = 30; s.light = 0.0001; s.warm = 0; }); await until(page, () => window.lanternState().screen === 'card' && !window.lanternState().playing, 'an endless run ends'); };
+    await page.click('#boardPlay'); await endlessRun(); await sleep(300); assert.equal(await page.isVisible('#ask'), false, 'no second question after a no'); assert.equal(posts.length, 3, 'nothing is sent after a no'); await page.click('#toMenu');
+    await page.evaluate(() => { localStorage.removeItem('lantern-share'); localStorage.removeItem('lantern-board-id'); localStorage.removeItem('lantern-name'); }); await page.reload();
+    await page.click('#endless'); await endlessRun(); assert.equal(await page.isVisible('#askYes'), true); await page.click('#askYes'); assert.match(await page.textContent('#askNote'), /Type a name first/); assert.equal(posts.length, 3, 'no name, nothing sent');
+    await page.fill('#askName', 'Rio'); await page.click('#askYes'); await until(page, () => /of all players/.test(document.querySelector('#sub').textContent), 'the card says the place among all players'); assert.equal(posts.length, 4); assert.equal(posts[3].n, 'Rio'); assert.equal(await page.isVisible('#ask'), false); assert.equal((await saved())['lantern-share'], '1');
+    await page.click('#toMenu'); await openBoard(); await page.uncheck('#share'); for (let i = 0; i < 40 && posts.length < 5; i++) await sleep(50); assert.equal(posts.length, 5); await page.click('#board .back');
+    await page.evaluate(() => localStorage.setItem('lantern-name', 'Rio <b>river</b')); // as the lines below expect
     await page.unroute('**/lab-api/board/lantern');
-    await sleep(400); await page.reload(); st = await state(); assert.equal(st.name, 'Rio <b>river</b'); assert.equal(st.board.length, 3, 'the board is kept');
+    await sleep(400); await page.reload(); st = await state(); assert.equal(st.name, 'Rio <b>river</b'); assert.equal(st.board.length, 5, 'the board is kept');
     await page.evaluate(() => localStorage.setItem('hf-lab-recording-off', '1')); await page.reload(); // recording off again, as the steps below expect
     // A look on the whole screen (notes #73 and #112): tapping an owned boat shows it and hides every button; a tap brings the shop back,
     // and the button under the pack wears it.
