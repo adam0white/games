@@ -16,6 +16,9 @@ function same(a, b) { // compares every character, so the time taken does not re
   return d === 0;
 }
 
+// Counts for Analytics Engine: what happened to a join, and where it came from (a continent, never an address).
+const count = (env, kind, what, where) => { try { env.METRICS?.writeDataPoint({ indexes: [kind], blobs: [kind, what, where || ''], doubles: [1] }); } catch {} };
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url), q = url.searchParams, trusted = same(q.get('lt'), env.LOADTEST_KEY);
@@ -26,12 +29,27 @@ export default {
       const body = q.get('room') ? await env.ROOM.getByName(q.get('room')).stats() : await env.DIRECTORY.getByName('dir:' + region).list();
       return Response.json(body, { headers: { 'Cache-Control': 'no-store' } });
     }
+    // The watch job reads this. It needs no key: an alert names a room, a head count and a tick rate, nothing about a
+    // player, and only the last six hours are shown. Alerts from load test rooms are shown to the load test key only.
+    if (url.pathname === '/crumbwar/api/health') {
+      const alerts = await env.DIRECTORY.getByName('alerts').alerts(Date.now() - 6 * 3600_000, trusted);
+      return Response.json({ now: Date.now(), alerts }, { headers: { 'Cache-Control': trusted ? 'no-store' : 'public, max-age=60' } });
+    }
     if (url.pathname !== '/crumbwar/play') return new Response('not found', { status: 404 });
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('expected a WebSocket', { status: 426 });
     // A browser on another site sends that site's Origin. Refuse it, so nobody can embed the game's sockets.
-    if (!trusted && !sameSite(request.headers.get('Origin'), url)) return new Response('forbidden', { status: 403 });
-    const hint = HINTS[request.cf?.continent] ?? 'enam', cap = Number(env.HUMAN_CAP || 60);
-    const ip = request.headers.get('CF-Connecting-IP') || 'local', resume = /^[0-9a-f]{16}$/.test(q.get('resume') || '') ? q.get('resume') : '';
+    const where = request.cf?.continent || '';
+    if (!trusted && !sameSite(request.headers.get('Origin'), url)) { count(env, 'join', 'forbidden', where); return new Response('forbidden', { status: 403 }); }
+    const hint = HINTS[where] ?? 'enam', cap = Number(env.HUMAN_CAP || 60);
+    const ip = request.headers.get('CF-Connecting-IP') || 'local';
+    // Joins from one address are limited before the directory or any room does work. The count is kept per
+    // Cloudflare location and is approximate (Cloudflare documentation). If the limiter fails, the join goes on.
+    if (!trusted && env.JOIN_LIMIT) {
+      let ok = true;
+      try { ok = (await env.JOIN_LIMIT.limit({ key: ip })).success; } catch {}
+      if (!ok) { count(env, 'join', 'limited', where); return new Response('too many joins, wait a minute', { status: 429, headers: { 'Retry-After': '30' } }); }
+    }
+    const resume = /^[0-9a-f]{16}$/.test(q.get('resume') || '') ? q.get('resume') : '';
     const join = (name, extra = '') => env.ROOM.get(env.ROOM.idFromName(name), { locationHint: REGIONS.has(name.split('-')[0]) ? name.split('-')[0] : hint })
       .fetch(new Request(`https://room/?name=${name}&ip=${encodeURIComponent(ip)}${trusted ? '&trusted=1' : ''}${resume ? '&resume=' + resume : ''}${extra}`, request));
     // A load test names its own room and size. Those rooms are never offered to anyone else.

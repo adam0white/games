@@ -18,6 +18,13 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room", "Directory"] }],
   // People per room. Bots fill a room to 24 ants and leave as people arrive. See DECISIONS.md for the load numbers.
   "vars": { "HUMAN_CAP": "60" },
+  // Joins per address: 60 a minute, counted in each Cloudflare location. A household of four that reconnects after a
+  // deploy makes at most 20 tries in six seconds, so it passes. The namespace id only has to be unique in the account.
+  "ratelimits": [{ "name": "JOIN_LIMIT", "namespace_id": "7001", "simple": { "limit": 60, "period": 60 } }],
+  // Counts only: joins by outcome and continent, one sample a minute for each running room, alerts.
+  "analytics_engine_datasets": [{ "binding": "METRICS", "dataset": "crumbwar" }],
+  // The id of the deployed code. A room uses it to tell a deploy from a reset.
+  "version_metadata": { "binding": "VERSION" },
   // Secret, set with `wrangler secret put`: LOADTEST_KEY (lets the load test skip the origin and per-address limits).
   // Logs hold no player data: there are no accounts, names are generated, and addresses are not logged.
   "observability": { "enabled": true }
