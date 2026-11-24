@@ -29,9 +29,9 @@ function draw(seed) {
 
 // Coin jobs are the calibration sample size. TUNE holds the target in base pay and each deadline.
 const SHAPE = {
-  1: { list: 6 },
-  2: { fix: 14, time: 'T' },
-  3: { list: 17 },
+  1: { fix: 3 },
+  2: { fix: 6, time: 'T' },
+  3: { list: 6 },
   4: { coinJobs: 17, time: 'T' },
   5: { fix: 14, time: 'T' },
   6: { list: 12 },
@@ -214,13 +214,18 @@ export function goalLine(goal) {
   else if (goal.coins) parts.push(`Earn ${goal.coins} base pay`);
   let line = parts.join(' ');
   if (goal.time) line += ` in ${goal.time} seconds`;
-  if (goal.safe || goal.list) line += '. Nobody walks off';
+  if (goal.safe || goal.list) line += '. One walk-off ends the level';
   return line + '.';
 }
 
 // A campaign level pays its repair coins once. New stars always pay, even on a replay.
 export function levelReward(coins, stars, previousStars) {
   return (stars && !previousStars ? coins : 0) + Math.max(0, stars - previousStars) * STAR_BONUS;
+}
+
+// Display the next tenth so a run just past a star deadline reads over it.
+export function resultSeconds(secs) {
+  return Math.ceil((secs - 1e-9) * 10) / 10;
 }
 
 export function starsFor(def, secs) {

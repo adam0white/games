@@ -27,6 +27,8 @@
   button.small { min-width: 0; font-size: .9em; }
   #pause { position: fixed; top: calc(6px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); width: 46px; height: 46px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; place-items: center; box-shadow: 0 3px 0 #3a2216; background: #fff1d6; }
   #pause::before { content: ''; width: 4px; height: 16px; border: solid #3a2216; border-width: 0 5px; }
+  #shop .card { display: flex; flex-direction: column; max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  #shop .items { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   .items { text-align: left; margin: .4em 0; }
   .item { display: flex; align-items: center; gap: 10px; border-top: 2px dashed #3a221633; padding: 6px 0; }
   .item canvas { width: 48px; height: 48px; flex: none; border-radius: 12px; background: #f6d9a8; border: 2px solid #3a2216; }
@@ -36,6 +38,8 @@
   .item button.on { background: #2f8f8a; color: #fff6e4; }
   .coin { display: inline-block; width: .85em; height: .85em; border-radius: 50%; background: radial-gradient(#f6d77e 55%, #d9a93e 60%); border: 2px solid #9c7420; vertical-align: -.1em; margin-right: .25em; box-sizing: border-box; }
   .lab-notice, .lab-toggle { font-size: 12px !important; }
+  #menu .lab-notice { display: flex; align-items: center; gap: 6px; text-align: left; }
+  #menu .lab-notice a { display: grid; place-items: center; flex: none; min-width: 48px; min-height: 44px; }
   #newjob { color: #1d5e5b; font-weight: bold; }
   .desk { display: none; font-size: .85em; }
   .st { color: #d9a93e; -webkit-text-stroke: .6px #3a2216; }
@@ -64,7 +68,8 @@
   .tickets button.done { background: #d6e7c0; opacity: .68; }
   .lane i { position: absolute; left: 0; bottom: 0; width: 100%; height: 4px; background: #247963; transform-origin: left; }
   #assist, #menuAssist { min-width: 80px; color: #203828; background: #d8edbc; }
-  .help-icon svg { width: 32px; height: 26px; vertical-align: middle; }
+  #shareStatus:empty { display: none; }
+  .help-icon svg { margin-right: 5px; width: 26px; height: 24px; vertical-align: middle; }
   .tickets.prompt .ticket[data-next] { outline: 3px solid #78c7ab; outline-offset: 1px; }
   #dailyShare { display: block; width: min(100%, 272px); height: auto; margin: 8px auto 4px; border: 2px solid #3a2216; border-radius: 12px; }
   #dailyResult button { min-height: 44px; min-width: 0; padding-inline: .68em; font-size: .85em; }
@@ -90,7 +95,7 @@
 
 <div id="menu" class="screen on"><div class="card">
   <h1>Fix-It Stall</h1>
-  <div class="stats"><span><span class="coin"></span><b id="bank">0</b></span><span><span class="st">★</span> <b id="starsAll">0</b>/<span id="starsMax">132</span></span><span>Jobs <b id="jobs">3</b>/<span id="jobsAll">18</span></span></div>
+  <div class="stats"><span><span class="coin"></span><b id="bank">0</b></span><span><span class="st">★</span> <b id="starsAll">0</b>/<span id="starsMax">132</span></span><span>Jobs unlocked <b id="jobs">3</b>/<span id="jobsAll">18</span></span></div>
   <p><button id="play" class="main">Play</button><button id="menuAssist" class="help-icon" hidden></button></p>
   <p id="playLine" class="sub"></p>
   <p id="migrated" class="sub"></p>
@@ -131,11 +136,12 @@
         <path d="M3 24h29c5 0 7-4 6-7l-1-5m-5 6 1-7M7 23a12 12 0 1 1 24 0M15 18a4 4 0 1 1 4 4"/>
         <circle cx="33" cy="10" r="1.5" fill="currentColor"/><circle cx="37" cy="10" r="1.5" fill="currentColor"/>
       </svg>
-      <span aria-hidden="true">★ ★</span>
+      <span>Slower clocks · 2★ max</span>
     </template>
   </div>
   <div id="dailyResult" hidden>
     <canvas id="dailyShare" width="600" height="340" role="img" aria-label="Daily stall result"></canvas>
+    <p id="shareStatus" role="status" class="sub"></p>
     <div><button id="shareDaily">Share card</button><button id="downloadDaily">Save image</button></div>
   </div>
   <p><button id="next" class="main">Next level</button></p>
