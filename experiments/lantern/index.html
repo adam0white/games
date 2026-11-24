@@ -281,7 +281,7 @@ const MODES = { spark: () => import('./modes/spark.js') }, made = {};
 let mod = null;
 const pct = () => mod ? mod.reach() : progress(s);
 async function chooseMode(id) {
-  if (!MODES[id]) return;
+  if (!Object.hasOwn(MODES, id ?? '')) return;
   const m = made[id] ??= (await MODES[id]()).mode({ canvas, g: () => g, size: () => ({ W, H, unit, left, dpr }), skin, live: () => playing && !paused, paused: () => paused, resume: () => resume(), play: () => begin(), say, tone, noise: (...a) => snd.ctx && snd.noise(...a), ctx: () => snd.ctx, boat: now => boatAt(now, sx(s.x), sy(s.y)), crashed: () => !!crash, win: now => { if (victory) winDraw(now); } });
   mod = m; setView('2d', false); show('mode');
 }
@@ -854,7 +854,7 @@ function pauseText() { // the pause card's words; the language button draws them
 function pause() {
   if (!playing || paused) return; paused = true; steer.drop(); pads.drop(); keys.clear(); $('viewNext').hidden = !!mod;
   pauseText();
-  $('ask').hidden = true; show('card'); snd.hold();
+  $('ask').hidden = true; $('say').style.opacity = 0; show('card'); snd.hold();
 }
 function resume() {
   if (!paused) return; paused = false; acc = 0; snap3 = true; last = performance.now(); target = s.x; slide = 0; tilt.zero();
@@ -1194,7 +1194,7 @@ for (const id of ['menuLanguage', 'pauseLanguage']) $(id).addEventListener('clic
   redraw();
 });
 redraw();
-views(); if (read('lantern-view', '2d') !== '2d' && !MODES[query.get('mode')]) setView(read('lantern-view'), false);
+views(); if (read('lantern-view', '2d') !== '2d' && !Object.hasOwn(MODES, query.get('mode') ?? '')) setView(read('lantern-view'), false);
 show('menu'); chooseMode(query.get('mode')); // /lantern/?mode=spark opens with Spark chosen
 requestAnimationFrame(frame);
 </script>

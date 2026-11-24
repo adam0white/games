@@ -747,7 +747,7 @@ The boat, water and flame are the player's own; the rings, lit rocks and banks t
 Owned abilities lie in Spark's river too; a ring or thunder lights them. Flare lights everything near the boat while it lasts.
 
 **Files.** `modes/spark.js` (page: drawing, sound, input, save), `modes/spark-sim.js` (the lab's layer, plus abilities and Flare),
-`modes/spark-bots.mjs` (the lab's 13 claims). index.html gained the seam above (`mod`, `pct()`, `boatAt()`, the `#mode` screen); about 25 changed lines.
+`modes/spark-bots.mjs` (the lab's 13 claims). index.html gained the seam above (`mod`, `pct()`, `boatAt()`, the `#mode` screen); 47 lines added and 26 changed in place.
 
 **Saves.** `lantern-mode-spark:save` is `{ v: 1, best, stars: { night: 0..3 }, played }`. `lantern-mode-spark:spark` is `'1'` after the first spark ever.
 `lantern-mode-spark:tips` holds the one-time tips shown (`f` fireflies, `h` holes in the stars).

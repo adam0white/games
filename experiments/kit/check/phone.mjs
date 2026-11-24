@@ -693,7 +693,7 @@ const GAMES = {
       const touch = (type, id, x) => page.evaluate(([type, id, x]) => document.getElementById('c').dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', isPrimary: id === 1, clientX: x, clientY: innerHeight * 0.7, bubbles: true, cancelable: true })), [type, id, x]);
       const aim = (await state()).target;
       await touch('pointerdown', 1, 195); await touch('pointerdown', 2, 300); await touch('pointermove', 2, 380);
-      m = await page.evaluate(() => window.lanternMode()); assert.equal(m.used, 1, 'a second finger strikes a spark'); assert.equal((await state()).target, aim, 'the second finger does not steer');
+      await until(page, () => window.lanternMode().used === 1, 'a second finger strikes a spark (counted on the next tick)'); assert.equal((await state()).target, aim, 'the second finger does not steer');
       await touch('pointerup', 2, 380); await touch('pointerup', 1, 195);
       await page.keyboard.press(' '); await until(page, () => window.lanternMode().used === 2, 'Space strikes a spark');
       await page.click('#sparkBtn'); await until(page, () => window.lanternMode().used === 3, 'the button strikes a spark');
@@ -715,7 +715,7 @@ const GAMES = {
       await page.click('#mode .back'); assert.equal((await state()).screen, 'menu'); assert.equal(await page.evaluate(() => window.lanternMode()), null, 'leaving Spark turns it off');
       page.off('request', spy); assert.deepEqual(board, [], 'Spark never calls the shared board');
       await page.evaluate(v => { if (v === undefined) localStorage.removeItem('lantern-view'); else localStorage.setItem('lantern-view', v); }, before['lantern-view'] === '3d' ? undefined : before['lantern-view']);
-      await page.goto(`${base}/lantern/`);
+      await page.goto(`${base}/lantern/`); await until(page, () => document.getElementById('notes-button'), 'notes button'); await page.click('#toShop'); // back where the erase below starts
     }
     // Erase everything (note #73, tester tools): two taps; every lantern- key goes and nothing else.
     await page.click('[data-test="reset"]'); assert.ok(Object.keys(await saved()).length > 3, 'one tap erases nothing');
