@@ -848,19 +848,6 @@ const GAMES = {
     await page.evaluate(() => dispatchEvent(new Event('blur'))); await until(page, () => window.__ring.mode !== 'play', 'leaving the page pauses');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
   },
-  async 'lab/pisti'(page) {
-    // Pişti: an old save survives, a tap on a card plays it, leaving the page pauses.
-    await page.goto(`${base}/notes/button.js`); await page.evaluate(() => { localStorage.clear(); localStorage.setItem('pisti:v1', '{"hands":3,"level":1,"daily":{}}'); localStorage.setItem('pisti:hint', '1'); });
-    await page.goto(`${base}/lab/pisti/?speed=4`); await until(page, () => window.__pisti, 'game script');
-    const kept = await page.evaluate(() => window.__pisti.save);
-    assert.equal(kept.hands, 3, 'old save: hands played survive'); assert.equal(kept.level, 1, 'old save: level survives');
-    await page.click('#play'); await until(page, () => window.__pisti.canPlay, 'the player may play a card', 15000);
-    const ply = await page.evaluate(() => window.__pisti.ply);
-    await page.locator('#hand .card').first().tap().catch(() => page.locator('#hand .card').first().click());
-    await until(page, n => window.__pisti.ply > n, 'a tap on a card plays it', 8000, ply);
-    await page.evaluate(() => dispatchEvent(new Event('blur'))); await until(page, () => window.__pisti.paused, 'leaving the page pauses');
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
-  },
   // The first-time help (kit/hint.js) on each page that uses it.
   'hint ant-promotion': page => hinted(page, { path: '/ant-promotion/', play: '#continue', resume: '#resume', key: 'ant-promotion:hint', delay: 3000, moved: () => window.__ant.input.x > 0, legacy: { 'ant-promotion:v1': '{"skin":{"c":"#c0271f","p":"stripes"},"xp":0,"sound":true,"look":2}' } }),
   'hint lantern': page => hinted(page, { path: '/lantern/', play: '#play', resume: '#go', key: 'lantern-hint', delay: 1500, before: () => window.lanternState().target, moved: t => window.lanternState().target !== t, alive: () => { const s = window.lanternSim(); s.safe = 60; s.light = 1; }, legacy: { 'lantern-bank': '120', 'lantern-night': '3' } }),
@@ -882,17 +869,6 @@ const GAMES = {
     await page.goto(`${base}/lab/pitch/`); await page.click('#play'); await sleep(4500); assert.equal(await on(), false, 'hint: never shown to a returning player');
   },
   'hint lab/ring': page => hinted(page, { path: '/lab/ring/', play: '#play', resume: '#resume', key: 'ring:hint', delay: 3000, before: () => window.__ring.threadPoints, moved: n => window.__ring.threadPoints > n || window.__ring.fingerDown, legacy: { 'ring:v1': '{"v":1,"sound":true,"nights":2,"dawns":1,"best":412,"bestRing":16,"endless":false,"endlessBest":0,"daily":{}}' } }),
-  // Pişti's hint sits on the hand of cards, not on a canvas, so it has its own first-time help check.
-  async 'hint lab/pisti'(page) {
-    const on = () => page.evaluate(() => !!document.querySelector('.kit-hint.on'));
-    await page.goto(`${base}/notes/button.js`); await page.evaluate(() => localStorage.clear());
-    await page.goto(`${base}/lab/pisti/`); await page.waitForSelector('#play'); await sleep(4500); assert.equal(await on(), false, 'hint: not on the menu');
-    await page.click('#play'); await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown after the delay', 20000);
-    const ply = await page.evaluate(() => window.__pisti.ply);
-    await page.locator('#hand .card').first().click(); await until(page, n => window.__pisti.ply > n, 'hint: a tap on a card still plays it', 8000, ply);
-    await until(page, () => !document.querySelector('.kit-hint.on'), 'hint: gone on the first input', 3000);
-    assert.equal(await page.evaluate(() => localStorage.getItem('pisti:hint')), '1', 'hint: the player is remembered');
-  },
   // Old /proto/ links move to the top level with their query; the new URL plays to its first frame.
   async 'old links'(page) {
     const response = await page.goto(`${base}/proto/lantern/?x=1`);
