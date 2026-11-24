@@ -117,7 +117,7 @@ const atMemory = lock => s => s.screen === 'puzzle' || s.memoryShowing || s.spot
 async function waitPuzzle(page) {
   await until(page, () => {
     const { screen, puzzle } = window.borrowedState();
-    return screen === 'puzzle' && puzzle?.cards.length === 2 && !puzzle.solving;
+    return screen === 'puzzle' && puzzle?.cards.length === 2 && !puzzle.solving && puzzle.settled;
   }, 'a puzzle opens');
   return (await state(page)).puzzle;
 }
@@ -206,6 +206,7 @@ async function finishPractice(page, o = {}) {
       pz.form === 'torn' ? null : trueSide);
   }
   await until(page, () => window.borrowedState().puzzle?.practice === false, 'practice closes and the real puzzle opens');
+  await until(page, () => window.borrowedState().puzzle?.settled, 'the real photos settle');
   const after = await state(page);
   assert.equal(after.life, before.life, 'practice costs zero years');
   assert.equal(after.found, before.found, 'practice wins no memory');
@@ -464,21 +465,29 @@ async function run(page, phone) {
   await solve(page, phone, SEED, 0, 'dark', { wrong: true, shots: { open: '5a-puzzle-clue', wrong: '5b-puzzle-wrong' } });
   await skipMemory(page, phone, null);
   assert.equal((await state(page)).found, 2, 'the dark memory is found');
-  // a tap on an ability with nothing to use it on costs nothing
-  const cheap = (await state(page)).years;
+  // a tap on an ability with nothing to use it on costs nothing. Exact: the years spent on abilities and the use counts
+  // must not move. The shown years cannot be compared, since the candle burns between two reads (a busy machine once
+  // read one year less with no ability used).
+  await until(page, () => !window.borrowedState().player.moving, 'the player stands still');
+  const spentBy = () => page.evaluate(() => { const s = window.borrowedSim(); return { spent: s.spent, used: { ...s.used } }; });
+  const cheap = await spentBy();
   st = await state(page);
   const idle = ['leap', 'rewind', 'push'].find(id => !st.ready[id]);
   await tap(page, st.buttons[idle]);
-  assert.ok((await state(page)).years >= cheap, 'a useless ability tap costs nothing');
+  assert.deepEqual(await spentBy(), cheap, `a useless ability tap costs nothing (${idle})`);
+  assert.ok(await page.textContent('#powerTip'), 'the useless tap was heard: a tip says what the ability needs');
   await pick(page, answers[0]);
   await sleep(300); await shot(page, phone, '6-lineup');
   await tap(page, (await state(page)).sure);
   await until(page, () => window.borrowedState().outcome === 'right', 'named right');
   await sleep(1200); await shot(page, phone, '6b-reveal');
-  const carried = (await state(page)).years;
+  const carried = (await state(page)).life;
   await goOn(page, phone, '7-chapter-card');
   st = await state(page);
-  assert.equal(st.chapter, 1, 'chapter 2'); assert.equal(st.years, carried, 'the years carry over');
+  // Exact: the new chapter starts with the life the last one ended with. The candle burns again once the island shows,
+  // so the years read a moment later can be one lower (a busy machine once read 127 against 128).
+  assert.equal(st.chapter, 1, 'chapter 2'); assert.equal(await page.evaluate(() => window.borrowedSim().chapterStart.life), carried, 'the years carry over');
+  assert.ok(st.life <= carried && st.life > carried - 5, 'the candle burns on from the carried years');
   assert.deepEqual(st.chapters.map(c => c.right), [true]);
   assert.ok(st.spots.some(p => p.lock === 'rewind'), 'the grown-up has the mirror');
   await sleep(300); await shot(page, phone, '7b-chapter-2');
@@ -625,7 +634,29 @@ async function puzzleTour(page, tag, seed) {
   }
 
   await visit(0, 'free', { practice: true, shots: { practice: 'p1-practice' } });
-  await visit(0, 'dark', { wrong: true, shots: { wrong: 'p2-wrong-tap' } });
+  // Standing on the dark memory, Light opens its photos at once. A second tap meant for the tile, landing in the same
+  // instant, must not pick a photo the player has not seen (it used to cost 12 years, or win the memory blind).
+  const darkTile = decks[0].spots.find(p => p.lock === 'dark');
+  await goTo(page, darkTile.x, darkTile.y);
+  await page.evaluate(() => { const s = window.borrowedSim(); s.life = Math.max(s.life, 80); });
+  const lifeBefore = (await state(page)).life;
+  const stray = await page.evaluateHandle(() => ({ tapped: new Promise(done => {
+    const look = () => {
+      const st = window.borrowedState();
+      if (st.screen !== 'puzzle' || !st.puzzle) { requestAnimationFrame(look); return; }
+      const c = document.querySelector('#c'), p = st.puzzle.cards[0];
+      for (const type of ['pointerdown', 'pointerup']) c.dispatchEvent(new PointerEvent(type, { pointerId: 8, pointerType: 'touch', isPrimary: true, clientX: p.x, clientY: p.y, bubbles: true, cancelable: true }));
+      done(true);
+    };
+    look();
+  }) }));
+  await tap(page, (await state(page)).buttons.glow);
+  await stray.evaluate(o => o.tapped); await stray.dispose();
+  const afterStray = await state(page);
+  assert.deepEqual([afterStray.screen, afterStray.puzzle.tried, afterStray.liesWon.wrong, afterStray.liesWon.found], ['puzzle', [false, false], 0, 1], 'a tap in the instant the photos appear picks nothing');
+  assert.ok(Math.abs(lifeBefore - 10 - afterStray.life) < 0.5, 'a tap in the instant the photos appear costs nothing');
+  await solve(page, tag, seed, 0, 'dark', { wrong: true, shots: { wrong: 'p2-wrong-tap' } });
+  await skipMemory(page, tag, null);
   await nameFace(page, decks[0].answer); await goOn(page, tag, null);
   await visit(1, 'free');
   const grown = decks[1], dark = puzzleOf(seed, 1, 'dark');
@@ -824,6 +855,23 @@ async function languageTour(browser, device, phone) {
         });
         assert.equal(seen.lang, language);
         assert.deepEqual(seen.spill, [], language + ' ' + name + ' has no DOM overflow');
+        if (expected === 'done') {
+          // No role name on the end card is split across two lines ("Bitki / büyücüsü" used to wrap).
+          const split = await page.evaluate(() => {
+            const who = document.getElementById('doneWho'), nodes = [], walk = document.createTreeWalker(who, NodeFilter.SHOW_TEXT);
+            let text = '';
+            while (walk.nextNode()) { nodes.push({ node: walk.currentNode, at: text.length }); text += walk.currentNode.textContent; }
+            const point = i => { const n = nodes.findLast(n => n.at <= i); return [n.node, i - n.at]; };
+            let from = 0;
+            return text.split(' · ').filter(Boolean).filter(name => {
+              const start = text.indexOf(name, from), range = document.createRange();
+              from = start + name.length;
+              range.setStart(...point(start)); range.setEnd(...point(from - 1)); range.setEnd(range.endContainer, range.endOffset + 1);
+              return new Set([...range.getClientRects()].filter(r => r.width > 1).map(r => Math.round(r.bottom))).size > 1;
+            });
+          });
+          assert.deepEqual(split, [], language + ' ' + name + ' keeps each role name on one line');
+        }
         assert.deepEqual([...new Set(seen.paint.filter(mark => mark.spill).map(mark => mark.id + ' ' + mark.value))], [], language + ' ' + name + ' has no canvas text overflow');
         if (language === 'tr') {
           const actual = [...new Set([...seen.strings, ...seen.paint.map(mark => mark.value)])];
@@ -853,6 +901,15 @@ async function languageTour(browser, device, phone) {
       await menu.tap();
       await page.locator('#daily').tap();
       await inspect('first-island', 'play');
+      // A Daily life carries a small calendar with today's day in the top strip, clear of the pause and notes buttons.
+      const daily = await state(page), mark = daily.dailyMark;
+      assert.ok(daily.daily && mark?.day === new Date().getDate(), 'a Daily life shows today on a calendar while playing');
+      const apart = (a, b) => !b || a.x + a.w <= b.x || b.x + b.width <= a.x || a.y + a.h <= b.y || b.y + b.height <= a.y;
+      for (const id of ['#pause', '#notes-button']) {
+        const box = await page.locator(id).boundingBox({ timeout: 2000 }).catch(() => null);
+        assert.ok(apart(mark, box), `the calendar does not cover ${id} (${JSON.stringify([mark, box])})`);
+      }
+      assert.ok(mark.y >= 0 && mark.y + mark.h <= daily.viewTop + 2, `the calendar sits inside the top strip (${JSON.stringify(mark)})`);
       if (language === 'tr') {
         await page.emulateMedia({ reducedMotion: 'reduce' });
         await page.locator('.kit-hint.still .label').waitFor();
@@ -890,8 +947,10 @@ async function languageTour(browser, device, phone) {
           await inspect(screen, 'puzzle');
           await tap(page, pz.cards[practicePick[pz.form]]);
           await until(page, () => window.borrowedState().puzzle?.practice === false, 'live puzzle');
+          await until(page, () => window.borrowedState().puzzle?.settled, 'live photos settle');
         }
         await inspect(screen + '-live', 'puzzle');
+        assert.ok((await state(page)).dailyMark, 'the Daily calendar stays on the photo puzzle');
         await tap(page, (await state(page)).puzzle.cards[correctTap(puzzleOf(seed, k, lock))]);
         await until(page, () => window.borrowedState().memoryShowing, 'earned photo');
         if (k === 0) await inspect('memory', 'play');
@@ -947,7 +1006,27 @@ async function languageTour(browser, device, phone) {
       assert.ok(sharePaint.includes(tables[language].dailyDate.replace('{date}', day)), 'the exported PNG formats the date in the selected language');
       await page.locator('#shareBack').tap();
       await page.locator('#doneMenu').tap();
+      // A found role in the gallery can be tapped: its name replaces the count line, and a button opens its keepsake page.
+      await until(page, () => window.borrowedState().galleryCells?.length === 16, 'the gallery is drawn');
+      const menuState = await state(page), found = menuState.galleryCells.filter(cell => cell.found);
+      assert.equal(found.length, 3, 'three roles found in the gallery');
+      await page.touchscreen.tap(found[1].x, found[1].y);
+      await until(page, () => window.borrowedState().galleryPick, 'a picked role');
+      assert.equal(await page.locator('#galleryRole').textContent(), tables[language]['role' + found[1].id], 'the picked circle shows its role name');
+      assert.ok(await page.locator('#bestLine').isHidden(), 'the role name takes the count line');
+      await inspect('gallery-pick', 'menu');
+      const keep = (await state(page)).galleryPick.page;
+      await page.locator('#galleryKeepsake').tap();
+      await until(page, () => window.borrowedState().screen === 'album', 'keepsake page');
+      const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('borrowed-save')).album);
+      assert.equal((await state(page)).albumPage, keep, 'the keepsake button opens that page');
+      assert.ok(kept[keep].chapters.some(c => c.portrait && roleId(c.portrait) === found[1].id), 'the keepsake page holds the picked role');
+      await page.locator('#albumBack').tap();
+      await until(page, () => window.borrowedState().screen === 'menu', 'menu after the keepsake');
       await page.locator('#play').tap();
+      await until(page, () => window.borrowedState().screen === 'play', 'a free life');
+      await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+      assert.equal((await state(page)).dailyMark, null, 'a free life shows no Daily calendar');
       await page.evaluate(() => { window.borrowedSim().life = 0.08; });
       await until(page, () => window.borrowedState().outcome === 'faded', 'loss reveal');
       await sleep(1200);
@@ -962,6 +1041,19 @@ async function languageTour(browser, device, phone) {
   }
 }
 
+// Torn edges are told apart by outline, not hue, so they must differ in shape by more than a few pixels: the smallest
+// mean vertical gap between any two edges, across the photo width, is at least 8 px (the old edges had 4.2).
+{
+  const html = await readFile(join(root, 'borrowed/index.html'), 'utf8');
+  const tears = JSON.parse(html.match(/const TEARS = (\[[\s\S]*?\]);/)[1].replace(/,\s*\]/g, ']'));
+  const at = (p, t) => { const f = t * (p.length - 1), i = Math.min(p.length - 2, Math.floor(f)); return p[i] + (p[i + 1] - p[i]) * (f - i); };
+  let gap = Infinity;
+  for (let a = 0; a < tears.length; a++) for (let b = a + 1; b < tears.length; b++) {
+    let sum = 0; for (let k = 0; k <= 100; k++) sum += Math.abs(at(tears[a], k / 100) - at(tears[b], k / 100));
+    gap = Math.min(gap, sum / 101);
+  }
+  assert.ok(tears.length === 4 && gap >= 8, `torn edges differ in outline by at least 8 px on average (${gap.toFixed(1)})`);
+}
 const args = process.argv.slice(2), only = args.find(arg => arg !== '--words');
 const wordsOnly = args.includes('--words');
 let failed = 0;
@@ -1115,6 +1207,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
       await waitPuzzle(p3);
       await p3.keyboard.press('1');
       await until(p3, () => window.borrowedState().puzzle?.practice === false, 'the key finishes practice');
+      await until(p3, () => window.borrowedState().puzzle?.settled, 'the live photos settle');
       await p3.keyboard.press(String(correctTap(puzzleOf(SEED, 0, 'free')) + 1));
       await until(p3, () => window.borrowedState().memoryShowing, 'the key finds the lie', 4000);
       await p3.keyboard.press(' '); // skips the memory scene
