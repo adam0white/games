@@ -3,6 +3,7 @@
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import * as C from '../public/crumbwar/shared/config.js';
+import { GRASS, inGrass } from '../public/crumbwar/shared/modes.js';
 import { byteOf } from '../public/crumbwar/shared/move.js';
 import { createWorld, addAnt, setInput, foodNear, antsNear, step } from '../src/sim.mjs';
 
@@ -205,13 +206,123 @@ export function measureMode(bots, mode, people = 1, seed = 42, warmupSeconds = 1
   return result;
 }
 
+// The controller reads only information drawn on the phone: positions and rounded
+// sizes in its 390×844 viewport, protection, grass and food. It writes normal input.
+// No velocity, bot intent, future state, global prey search or mass mutation.
+export function driveFeastPerson(w, a, passive = false) {
+  if (!a.alive || (w.tick + a.id) % 5) return;
+  const own = Math.round(a.mass * 4) / 4;
+  const visible = (x, y) => Math.abs(x-a.x) <= 1100*390/844/2 && Math.abs(y-a.y) <= 550;
+  let danger = null, dangerDistance = 200, prey = null, preyDistance = Infinity;
+  antsNear(w, a.x, a.y, C.VIEW, b => {
+    if (b === a || !visible(b.x,b.y) || w.tick < b.protectUntil || inGrass(b.x,b.y)) return;
+    const distance = Math.hypot(b.x-a.x,b.y-a.y), size = Math.floor(b.mass);
+    if (size+1 >= Math.max(10,own-.125)*w.rules.eatRatio && distance < dangerDistance) { danger=b; dangerDistance=distance; }
+    if (!passive && Math.max(10,own-.125) >= (size+1)*w.rules.eatRatio && distance < preyDistance) { prey=b; preyDistance=distance; }
+  });
+  let tx=1600,ty=1600,food=-1,foodDistance=Infinity,sprint=false;
+  foodNear(w,a.x,a.y,C.VIEW,id=>{
+    if (!visible(w.fx[id],w.fy[id]) || passive && w.fkind[id]===3) return;
+    const distance=Math.hypot(w.fx[id]-a.x,w.fy[id]-a.y);
+    if(distance<foodDistance){food=id;foodDistance=distance;tx=w.fx[id];ty=w.fy[id];}
+  });
+  if(prey && preyDistance < 330 && w.tick >= a.protectUntil) {tx=prey.x;ty=prey.y;sprint=true;}
+  if(danger) {
+    sprint=true;
+    tx=a.x+(a.x-danger.x)*3;ty=a.y+(a.y-danger.y)*3;
+    // Take a nearby grass refuge only when it lies away from the predator.
+    let best=Infinity;
+    for(const [gx,gy] of GRASS) {
+      const distance=Math.hypot(gx-a.x,gy-a.y);
+      if(distance<220 && distance<best && (gx-a.x)*(a.x-danger.x)+(gy-a.y)*(a.y-danger.y)>0){tx=gx;ty=gy;best=distance;}
+    }
+    if(inGrass(a.x,a.y)) {setInput(w,a,a.angle,false,false);return;}
+  }
+  const chewing=food>=0 && w.fkind[food]===3 && foodDistance<12 && !danger && !sprint;
+  setInput(w,a,byteOf(Math.atan2(ty-a.y,tx-a.x)),!chewing,sprint);
+}
+
+export function measureFeastFairness(bots, people=1, seed=42, passive=false, warmupSeconds=0) {
+  const w=createWorld(seed,'feast'), humans=[];
+  bots.balance(w);
+  for(let t=0;t<warmupSeconds*C.TICK_HZ;t++) {for(const a of w.ants) if(a?.bot) bots.think(w,a);step(w);}
+  const joinedTick=w.tick;
+  for(let i=0;i<people;i++){humans.push(addAnt(w,0,false,0,0));bots.balance(w);}
+  const ranks=humans.map(()=>[]),best=humans.map(()=>w.count),ratios=humans.map(()=>null);
+  let botEats=0,firstBotQueen=null;
+  const seconds=(w.roundEnd-joinedTick)/C.TICK_HZ;
+  for(let t=0;t<seconds*C.TICK_HZ;t++) {
+    for(const a of w.ants) if(a) a.bot?bots.think(w,a):driveFeastPerson(w,a,passive && a===humans[0]);
+    step(w);
+    const elapsed=(w.tick-joinedTick)/C.TICK_HZ;
+    for(const [type,killer,victim] of w.events) if(type===1 && w.ants[killer]?.bot && w.ants[victim]?.bot) botEats++;
+    const allBots=w.ants.filter(a=>a?.bot);
+    if(firstBotQueen===null && allBots.some(a=>a.bestRank>=5)) firstBotQueen=(w.tick-w.roundStart)/C.TICK_HZ;
+    if(w.tick%C.TICK_HZ===0) {
+      // Match room.mjs: integer score, stable ant-ID ties, including respawns.
+      // No dead seconds are excluded from the median.
+      const ordered=w.ants.filter(Boolean).sort((a,b)=>b.score-a.score || a.id-b.id);
+      humans.forEach((a,i)=>{const rank=ordered.indexOf(a)+1;ranks[i].push(rank);if(elapsed>=10)best[i]=Math.min(best[i],rank);
+        if(elapsed===60)ratios[i]=Math.max(0,...allBots.map(b=>b.mass))/a.mass;});
+    }
+  }
+  const ordered=w.ants.filter(Boolean).sort((a,b)=>b.score-a.score || a.id-b.id);
+  const persons=humans.map((a,i)=>({id:a.id,eats:a.kills,deaths:a.deaths,medianRank:median(ranks[i]),bestPosition:best[i],finalRank:ordered.indexOf(a)+1,largestBotRatio60:ratios[i]}));
+  return {mode:'feast',people,seed,passive,warmupSeconds,seconds,ants:w.count,botEats,firstBotQueen,person:persons[0],persons};
+}
+
+export function summarizeFeastFairness(runs) {
+  const groups=[];
+  const summarizePeople=persons=>({personRounds:persons.length,
+    medianEats:median(persons.map(p=>p.eats)),medianDeaths:median(persons.map(p=>p.deaths)),
+    maxDeaths:Math.max(...persons.map(p=>p.deaths)),medianRank:median(persons.map(p=>p.medianRank)),
+    topFiveCount:persons.filter(p=>p.bestPosition<=5).length,
+    topFiveFraction:persons.filter(p=>p.bestPosition<=5).length/persons.length,
+    maxLargestBotRatio60:Math.max(...persons.map(p=>p.largestBotRatio60))});
+  for(const people of [...new Set(runs.map(r=>r.people))]) {
+    const active=runs.filter(r=>r.people===people&&!r.passive),passive=runs.filter(r=>r.people===people&&r.passive);
+    const all=active.flatMap(r=>r.persons),allPassive=passive.map(r=>r.person);
+    const result={people,seeds:active.map(r=>r.seed),rounds:active.length,...summarizePeople(all),
+      designatedPerson:summarizePeople(active.map(r=>r.person)),
+      firstBotQueen:Math.min(...active.map(r=>r.firstBotQueen??Infinity)),minBotEats:Math.min(...active.map(r=>r.botEats)),
+      passiveMedianFinalRank:median(allPassive.map(p=>p.finalRank)),
+      passiveBottomHalfCount:allPassive.filter(p=>p.finalRank>12).length,
+      passiveRounds:allPassive.length,
+      passiveBottomHalfFraction:allPassive.filter(p=>p.finalRank>12).length/allPassive.length};
+    result.personFailures=active.flatMap(r=>r.persons.flatMap(p=>{
+      const failures=[];
+      if(p.eats<4)failures.push('eats');
+      if(p.deaths>6)failures.push('deaths');
+      if(p.medianRank>12)failures.push('rank');
+      if(p.bestPosition>5)failures.push('topFive');
+      if(p.largestBotRatio60>2)failures.push('sizeRatio');
+      return failures.length?[{seed:r.seed,id:p.id,failures}]:[];
+    }));
+    result.passiveFailures=passive.filter(r=>r.person.finalRank<=12).map(r=>({seed:r.seed,id:r.person.id,finalRank:r.person.finalRank}));
+    result.targets={eats:result.medianEats>=4,deaths:result.maxDeaths<=6,rank:result.medianRank<=12,
+      topFive:result.topFiveFraction>=.5,sizeRatio:result.maxLargestBotRatio60<=2,queen:result.firstBotQueen>=150,
+      passive:allPassive.length>0 && result.passiveBottomHalfCount===allPassive.length,botEats:result.minBotEats>=10};
+    if(!Number.isFinite(result.firstBotQueen))result.firstBotQueen=null;
+    groups.push(result);
+  }
+  return groups;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const value = flag => { const i = args.indexOf(flag); return i < 0 ? undefined : args[i + 1]; };
   const botsPath = value('--bots');
   const bots = await import(botsPath ? pathToFileURL(resolve(botsPath)).href : '../src/bots.mjs');
-  const seeds = (value('--seeds') ?? '1,7,42').split(',').map(Number);
+  const seeds = (value('--seeds') ?? (args.includes('--feast-fairness') ? '1,7,42,73,101,211' : '1,7,42')).split(',').map(Number);
   if (seeds.some(seed => !Number.isSafeInteger(seed))) throw new Error('Seeds must be integers');
+  if(args.includes('--feast-fairness')) {
+    const runs=[];
+    console.log(JSON.stringify({controller:'phone viewport, quantized size, 4 Hz, nearest edible hunt with sprint, flee to grass, nearest food; passive never hunts or eats cake',seeds}));
+    for(const people of [1,12])for(const seed of seeds)for(const passive of [false,true]){const run=measureFeastFairness(bots,people,seed,passive,Number(value('--warmup')??0));runs.push(run);console.log(JSON.stringify(run));}
+    const summary=summarizeFeastFairness(runs);console.log(JSON.stringify({summary}));
+    if(args.includes('--assert-targets') && summary.some(r=>Object.values(r.targets).some(pass=>!pass)))process.exitCode=1;
+    return;
+  }
   if (!args.includes('--classic-regression') && !args.includes('--timing-only')) {
     console.log(JSON.stringify({ targets: TARGETS, viewport: [390, 844], controller: 'nearest visible food, home when carrying, retreat from visible Feast predator within180, follow Rush hill/golden goals, no sprint or combat' }));
     for (const mode of (value('--modes') ?? 'classic,feast,rush').split(',')) for (const people of [1, 12]) for (const seed of seeds) console.log(JSON.stringify(measureMode(bots, mode, people, seed, Number(value('--warmup') ?? 10))));

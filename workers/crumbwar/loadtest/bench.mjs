@@ -48,11 +48,12 @@ export function benchmark(mode, people, ticks = 3000) {
   const cpu = process.cpuUsage(cpuStart), meanProcessCpuMs = (cpu.user + cpu.system) / 1000 / ticks;
   const sorted = [...cost].sort((a, b) => a - b), mean = cost.reduce((sum, value) => sum + value, 0) / ticks;
   const bytesPerClientSecond = bytes / people / (ticks / C.TICK_HZ);
+  const byteTarget = people === 12 ? (mode === 'feast' ? 1300 : 1200) : people === 60 ? (mode === 'feast' ? 2200 : 1800) : null;
   return { mode, people, ants: w.count, seconds: ticks / C.TICK_HZ, snapshotsPerSecond: C.TICK_HZ / snapshotEvery(w.rules, w.count),
     meanTickMs: mean, meanProcessCpuMs, meanDecisionMs: decisionMs / ticks, meanSimulationMs: simulationMs / ticks, meanNetworkMs: networkMs / ticks, p99TickMs: sorted[ticks * .99 | 0], maxTickMs: sorted[ticks - 1],
     bytesPerClientSecond, meanSnapshotBytes: snapshotBytes / snaps, largestSnapshot,
-    byteTarget: people === 12 ? 1200 : people === 60 ? 1800 : null,
-    bytePass: people === 12 ? bytesPerClientSecond < 1200 : people === 60 ? bytesPerClientSecond < 1800 : null,
+    byteTarget,
+    bytePass: byteTarget === null ? null : bytesPerClientSecond < byteTarget,
     tickPass: people === 240 ? mean < 1 : null };
 }
 

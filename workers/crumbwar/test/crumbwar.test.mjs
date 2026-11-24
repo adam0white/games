@@ -530,7 +530,7 @@ test('a change to the wire format or the shared constants is a decision about PR
   const now = [C.PROTO, h.digest('hex').slice(0, 16)];
   assert.deepEqual(now, PROTO_FINGERPRINT, `shared code changed. Bump PROTO if old pages and new rooms (or the reverse) cannot play together, then set PROTO_FINGERPRINT to ${JSON.stringify(now)}`);
 });
-const PROTO_FINGERPRINT = [2, '8b9e99349784bddd'];
+const PROTO_FINGERPRINT = [3, '0ef04c51a20ccc13'];
 
 test('kick and refusal counters fold into hourly totals', () => {
   const room = readFileSync(new URL('../src/room.mjs', import.meta.url), 'utf8');
@@ -622,7 +622,7 @@ test('feast: excess size shrinks, small ants move faster, and sprint costs size'
   stepMove(light, 0, true, false); stepMove(heavy, 0, true, false);
   assert.ok(light.x > heavy.x, 'small ants can outrun big ants');
   small.mass = 15; setInput(w, small, 0, true, true); const stamina = small.stamina;
-  step(w); closeTo(small.mass, 15 - .6 * C.DT); assert.equal(small.stamina, stamina);
+  step(w); closeTo(small.mass, 15 - FEAST.sprintCost * C.DT); assert.equal(small.stamina, stamina);
 });
 
 test('feast: cake needs sixty uninterrupted nearby ticks and is worth its cake growth', () => {
@@ -899,10 +899,13 @@ test('net: two observers receive identical shared-ant state and fresh deltas acr
 });
 
 import { getMode, snapshotEvery } from '../public/crumbwar/shared/modes.js';
-test('snapshot policy: only Rush above one hundred twenty ants drops to five Hz, simulation stays twenty Hz', () => {
+test('snapshot policy: dense Feast and Rush drop to five Hz, simulation stays twenty Hz', () => {
   assert.equal(snapshotEvery(getMode('rush'), 120), 2);
   assert.equal(snapshotEvery(getMode('rush'), 121), 4);
-  for (const mode of ['classic', 'feast']) assert.equal(snapshotEvery(getMode(mode), 240), 2);
+  assert.equal(snapshotEvery(getMode('classic'), 240), 2);
+  assert.equal(snapshotEvery(getMode('feast'), 48), 2);
+  assert.equal(snapshotEvery(getMode('feast'), 49), 4);
+  assert.equal(snapshotEvery(getMode('feast'), 240), 4);
   assert.equal(C.TICK_HZ, 20);
   for (const mode of ['classic', 'feast', 'rush']) {
     const w = createWorld(151, mode); stillSteps(w, 20); assert.equal(w.tick, 20);

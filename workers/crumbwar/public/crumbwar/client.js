@@ -348,7 +348,7 @@ function frame(now) {
       g.font = `bold ${12 * px}px system-ui`; g.textAlign = 'center'; g.fillStyle = '#402c00'; g.fillText('5', f.x, f.y + 4 * px); continue;
     }
     if (feast && f.kind === 3) { g.fillStyle = '#f5adce'; g.fillRect(f.x - 19, f.y - 16, 38, 32); g.fillStyle = '#fff2d5'; g.fillRect(f.x - 19, f.y - 6, 38, 7); g.fillStyle = '#e75b88'; g.beginPath(); g.arc(f.x, f.y - 20, 5, 0, 7); g.fill(); continue; } g.fillStyle = f.kind === 2 ? '#fff' : '#ecd9a4'; const s = f.kind === 2 ? 11 : 6; g.fillRect(f.x - s / 2, f.y - s / 2, s, s); }
-  const delay = rush && scores?.ants > mode.crowdedAt ? mode.crowdedSnapEvery + 1 : DELAY;
+  const delay = (rush || feast) && scores?.ants > mode.crowdedAt ? mode.crowdedSnapEvery + 1 : DELAY;
   const at = (now + offset) / TICK_MS - delay;
   // Names are 11 screen pixels high whatever the zoom, so they stay readable on a phone.
   g.font = `${11 * px}px system-ui`; g.textAlign = 'center';
