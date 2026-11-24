@@ -49,7 +49,7 @@
   .hint { font-size: .85em; opacity: .7; }
   #share { width: 20px; height: 20px; vertical-align: middle; } #ask { pointer-events: auto; background: #070b14e6; border-radius: 16px; padding: .4em; } #ask button { min-width: 6em; }
   #tabs button { min-width: 7em; min-height: 40px; margin: .15em; font-size: .9em; } #tabs button.on { color: #2a1606; background: #ffb45a; border-color: #ffb45a; }
-  #got { min-height: 1.6em; color: #ffe6bd; position: sticky; top: 0; z-index: 2; margin: 0; padding: .45em .3em; background: #070b14f2; border-radius: 0 0 12px 12px; } /* stays in view while the packs scroll */
+  #got.long { position: static; } #got { min-height: 1.6em; color: #ffe6bd; position: sticky; top: 0; z-index: 2; margin: 0; padding: .45em .3em; background: #070b14f2; border-radius: 0 0 12px 12px; } /* stays in view while the packs scroll */
   #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); display: none; text-align: left; pointer-events: none; text-shadow: 0 1px 6px #000; }
   #hearts { font: 26px/1 sans-serif; color: #ff4d5e; letter-spacing: 2px; }
   #embers { font-size: 26px; line-height: 1.3; color: #ffd9a0; }
@@ -89,7 +89,7 @@
   <h2>Shop</h2>
   <p class="bank"><span class="dot"></span><span id="bank2">0</span> embers</p>
   <p><button class="back">Back</button></p>
-  <p id="got">Stats last for your next run only. Each pack holds one surprise for 50 embers. Tap anything you own to see it on the whole screen; the button under it switches it on or off. Two abilities, three crashes and three victories can be on. Hearts and the force field are abilities too.</p>
+  <p id="got" class="long">Stats last for your next run only. Each pack holds one surprise for 50 embers. Tap anything you own to see it on the whole screen; the button under it switches it on or off. Two abilities, three crashes and three victories can be on. Hearts and the force field are abilities too.</p>
   <div id="packs"></div>
 </div></div>
 <div id="credits" class="screen veil"><div>
@@ -165,7 +165,8 @@ const found = () => PACKS.reduce((n, p) => n + p.items.filter(i => owned.has(i[0
 // Stats: bought a level at a time for the next run only, then used up when that run starts (tester t1, 2026-11-23). They change the run itself, where packs change only its looks.
 // The save keeps its format: lantern-stats holds the levels ready for the next run.
 const STAT = [['hearts', 'Hearts', 'Start with one more heart'], ['barrier', 'Barrier', 'The force field lasts longer'], ['calm', 'Calm water', 'The river runs a little slower'], ['wick', 'Long wick', 'The flame fades more slowly'], ['pull', 'Long reach', 'Take embers from further away']];
-let stats = store.json('lantern-stats', {});
+const plain = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : {}); // a damaged save must not stop the game
+let stats = plain(store.json('lantern-stats', {}));
 const statCost = id => 15 * ((stats[id] || 0) + 1);
 // The first ability (tester t1, note #122): a new player, and every rebirth, starts with one ability picked at random, not always Boost.
 // lantern-start: the id of that ability, text. It is not in lantern-owned, as the starting boat is not. A save from before this key
@@ -174,7 +175,7 @@ const pickStart = () => ABILITIES[Math.floor(Math.random() * ABILITIES.length)];
 let start = read('lantern-start', '');
 if (!ABILITIES.includes(start)) { start = ['lantern-bank', 'lantern-owned', 'lantern-night', 'lantern-stats', 'lantern-off'].some(k => read(k) !== null) ? 'boost' : pickStart(); store.set('lantern-start', start); }
 const BASE = () => ['oak', 'blue', 'amber', start];
-let owned = new Set([...BASE(), ...store.json('lantern-owned', [])]);
+let owned = new Set([...BASE(), ...[].concat(store.json('lantern-owned', []) ?? []).filter(x => typeof x === 'string')]);
 let worn = { boat: 'oak', water: 'blue', flame: 'amber', ...store.json('lantern-worn', {}) };
 let off = new Set([].concat(store.json('lantern-off', [])).filter(k => typeof k === 'string')); // abilities the player switched off in the shop
 const powersOwned = () => ABILITIES.filter(k => owned.has(k) && !off.has(k)); // only abilities found in the shop, and not switched off, lie in the river
@@ -265,8 +266,10 @@ function menu() {
   const high = store.get('lantern-best-level'), at = towerAt(); const fl = towerFloor(); $('tower').textContent = at > 1 || fl ? `Tower climb · go on at ${tag(at)}${fl ? `, floor ${fl}` : ''}` : high ? `Tower climb · best ${high > LEVELS ? tag(high) : `level ${high} of ${LEVELS}`}` : 'Tower climb';
   $('anew').hidden = at <= 1 && !fl; $('anew').dataset.sure = ''; $('anew').textContent = 'New climb from level 1';
 }
+const GOT0 = $('got').textContent;
 function shop(text) {
-  $('bank2').textContent = bank; if (text) $('got').textContent = text;
+  $('bank2').textContent = bank; if (text) $('got').textContent = text; else if (!busy && $('got').textContent === '…') $('got').textContent = GOT0; // a spin left half-way
+  $('got').classList.toggle('long', $('got').textContent.length > 90); // a long text scrolls away; a short one stays in view
   const box = $('packs'); box.textContent = '';
   const sdiv = document.createElement('div'); sdiv.className = 'pack'; const sname = document.createElement('b'); sname.textContent = 'Stats'; const warn = document.createElement('small'); warn.className = 'once'; warn.textContent = 'Warning: stats last one run. They are used up when your next night or tower climb starts. Stats never work on the endless river, so its leaderboard is fair.'; sdiv.append(sname, warn);
   for (const [id, label, what] of STAT) {
@@ -567,7 +570,7 @@ function onBoard(pts) {
 // absent before the player has chosen; lantern-board-id holds the id. Any bad answer (no server, an error, a slow network, not JSON) gives null, and the screen
 // stays the phone's own board, with no tabs and no tick. The server allows fewer characters in a name than this phone does.
 const BOARD_URL = '/lab-api/board/lantern', BOARD_WAIT = 4000;
-let decided = read('lantern-share') !== null, sharing = read('lantern-share', '') === '1', boardId = read('lantern-board-id', ''), shared = null, tab = 'all', mine = 0, asked = 0, ticket = null;
+let decided = read('lantern-share') !== null, sharing = read('lantern-share', '') === '1', boardId = read('lantern-board-id', ''), shared = null, tab = 'all', mine = 0, asked = 0, ticket = null, sends = 0;
 async function boardCall(body) {
   const stop = new AbortController(), timer = setTimeout(() => stop.abort(), BOARD_WAIT);
   try {
@@ -589,12 +592,13 @@ function boardTicket() {
 // Send a score when the player shares and has a name. The server keeps each player's best.
 async function boardSend(pts, run) {
   if (!sharing || !boardId || !playerName() || !(pts > 0)) return;
-  const sent = boardId, r = run && await run.ok ? run.r : null;
+  const sent = boardId, ran = s, k = ++sends, r = run && await run.ok ? run.r : null; // ran: the run this score is from
   if (!sharing || boardId !== sent) return;
   const out = await boardCall({ id: boardId, n: playerName(), s: Math.min(Math.floor(pts), 1000000), ...(r ? { r } : {}) });
   if (!out || !sharing || !boardId) { if (out && !sharing) boardCall({ id: sent, remove: true }); return; } // a no given while this was on its way takes the row away again
+  if (k !== sends) return; // a later run's answer already came or is on its way
   shared = out.rows; mine = out.place; if (screen === 'board') boardShow();
-  if (mine && !playing && endless && s.over && (screen === 'play' || screen === 'card')) $('sub').textContent += ` Number ${mine} of all players.`;
+  if (mine && s === ran && !playing && endless && s.over && (screen === 'play' || screen === 'card')) $('sub').textContent += ` Number ${mine} of all players.`;
 }
 // The one choice to show scores to everyone. Yes needs a name; a name typed under the old promise to stay on this phone is not a yes.
 async function share(yes) {
