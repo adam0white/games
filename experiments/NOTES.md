@@ -112,3 +112,12 @@ What the lab saw on the live page the same evening (Chromium, Pixel 7 size, abou
 | Seed Sling | `/sling/` | Fling seeds; each flower is a new launch point; a daily garden shared by everyone and a shared name board | new |
 
 Each was written by a Codex builder from a shared brief and has `sim.js`, `bots.mjs` (with a `--mutate` run that must fail), `check.mjs` and `NOTES.md`. The lab reran the bots, the mutation run and the phone check of each and looked at the screenshots. None has been played by a person or on a real phone. Not yet in the shared `kit/check/phone.mjs`; each game's own `check.mjs` covers it until then. Seed Sling's board is `/lab-api/board/sling` (a random device id, the typed name, the best score; sent only on Share).
+
+## 2026-11-24: two more (Thumb Duel, Harvest Morning)
+
+| Experiment | Served at | Idea | From |
+| --- | --- | --- | --- |
+| Thumb Duel | `/duel/` | Two players share one phone, the top half upside down; first to 3 of seven tiny duels; a solo ladder against three bots | new |
+| Harvest Morning | `/harvest/` | Cut wheat before the rain; hire neighbours who each cost grain and each help in one way; a daily field with a device-only board | new |
+
+Each was written by a Claude builder agent from a brief and has `sim.js`, `bots.mjs` (with a failing `--mutate` run), `check.mjs` and `NOTES.md`. The lab reran the bots and the mutation run and looked at the screenshots; the builders ran the phone checks. Neither has been played by a person or on a real phone. Thumb Duel has not had two real thumbs on one screen. Harvest Morning's fields 7 to 12 are probably too hard: the clumsy bot passes none of them. Not yet in the shared `kit/check/phone.mjs`.
