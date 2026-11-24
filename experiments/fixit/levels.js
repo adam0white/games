@@ -180,7 +180,7 @@ export function levelDef(n) {
   if (night) {
     const { rule, tickets, intro = null } = night;
     const band = Math.floor((n - BUSY_END - 1) / 4);
-    const patience = rule === 'rush' ? [23, 16, 12][band] : 12 - band;
+    const patience = rule === 'rush' ? [23, 20, 17][band] : 12 - band;
     return {
       n, intro, pool: OPEN_ORDER, tickets, rule,
       goal: { [rule]: tickets.length, safe: true },

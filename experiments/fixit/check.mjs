@@ -133,6 +133,17 @@ const runs = (ctx, outcome) => ctx.labSent.filter(r => r.game === 'fixit' && r.k
 const levelsUpTo = n => Object.fromEntries(Array.from({ length: n }, (_, i) => [i + 1, 1]));
 const threeStarsUpTo = n => Object.fromEntries(Array.from({ length: n }, (_, i) => [i + 1, 3]));
 
+// Middle and late game audit: between new repairs the results card was empty. It now shows the next stall item to earn.
+async function nextGoal(page) {
+  await setSave(page, { bank: 20, sound: false, levels: threeStarsUpTo(15) });
+  await startAt(page, 16);
+  const st = await playOut(page, 'level 16');
+  assert.ok(st.cleared, 'level 16 cleared');
+  await until(page, () => window.fixitState().screen === 'end', 'the results card');
+  const total = 45 + st.stars;
+  assert.match(await page.locator('#newjob [role=img]').first().getAttribute('aria-label'),
+    new RegExp(`${66 - total} more stars for the Stall cat`), 'a busy-street result names the next stall item and the stars it needs');
+}
 async function chapter(page, phone) {
   await setSave(page, { bank: 20, sound: false, levels: threeStarsUpTo(32) });
   await page.goto(`${base}/fixit/`);
@@ -142,6 +153,8 @@ async function chapter(page, phone) {
 
   let st = await startAt(page, 33);
   assert.ok(st.rule === 'order' && st.choosing && st.order.length > 1, 'picky order is shown before the first repair');
+  // Middle and late game audit: the next ticket waited 1.5 s before it glowed, and players tapped the empty bench.
+  assert.ok(await page.locator(`#tickets.prompt .ticket[data-ticket="${st.step}"][data-next]`).isVisible(), 'the next picky ticket glows as soon as the choice opens');
   await page.screenshot({ path: join(SHOTS, `${phone}-chapter-order.png`) });
   const wrong = (st.step + 1) % st.order.length;
   await page.locator(`.ticket[data-ticket="${wrong}"]`).click();
@@ -161,6 +174,9 @@ async function chapter(page, phone) {
   await page.screenshot({ path: join(SHOTS, `${phone}-chapter-rush.png`) });
   const from = st.station, to = 1 - from;
   const waited = st.lanes.map(l => l.left);
+  // Middle and late game audit: players never switched to the impatient customer; the switch was not shown.
+  assert.ok(st.lanes[to].left < st.lanes[from].left && await page.locator(`#tickets.prompt .lane[data-lane="${to}"][data-next]`).isVisible(),
+    'the rush ticket of the customer who will leave first glows');
   await sleep(250);
   st = await state(page);
   assert.ok(st.lanes.every((l, i) => l.left < waited[i]), 'both rush customers lose patience during play');
@@ -505,6 +521,7 @@ async function run(page, phone) {
   await page.reload();
   assert.equal(await page.textContent('#sound1'), 'Sound: off', 'sound setting kept');
 
+  await nextGoal(page);
   await chapter(page, phone);
 }
 
