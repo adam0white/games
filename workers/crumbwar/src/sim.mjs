@@ -74,8 +74,14 @@ export function antsNear(w, x, y, half, each) {
   }
 }
 
-function place(w, a) {
+function place(w, a, catchup = true) {
   if (!w.rules.colonies) {
+    // People join or return near the field's middle size, rather than as free meals.
+    if (!a.bot && catchup) {
+      const peers = w.ants.filter(b => b && b !== a && b.alive).map(b => b.mass).sort((x,y) => x-y);
+      if (peers.length >= w.rules.spawnPeers) a.mass = Math.min(500, Math.max(a.mass, peers[Math.floor((peers.length-1)*w.rules.spawnQuantile)] * w.rules.spawnMassFactor));
+      a.rank = rankOf(a.mass); a.bestRank = Math.max(a.bestRank, a.rank); a.score = Math.floor(a.mass);
+    }
     // Maximise distance from dangerous ants among seeded candidate positions.
     let best = -1;
     for (let i = 0; i < 24; i++) {
@@ -149,7 +155,7 @@ function spawnFood(w) {
 function newRound(w) {
   w.colonyScore = [0, 0, 0, 0]; w.goldenId = -1; w.round++; w.roundStart = w.tick; w.roundEnd = w.tick + w.rules.roundSeconds * C.TICK_HZ; w.breakUntil = 0;
   for (let id = 0; id < C.MAX_FOOD; id++) if (w.fkind[id]) takeFood(w, id);
-  for (const a of w.ants) if (a) { a.score = w.rules.name === 'feast' ? 10 : 0; a.delivered = 0; a.kills = 0; a.deaths = 0; a.tier = 0; a.mass = 10; a.rank = 0; a.bestRank = 0; a.chew = 0; a.roundDelivered = 0; a.deliveries = 0; a.goal = 0; a.goalProgress = 0; a.goalIndex = 0; a.goalSince = w.tick; a.participation = 0; a.boostUntil = 0; a.shieldUntil = 0; place(w, a); }
+  for (const a of w.ants) if (a) { a.score = w.rules.name === 'feast' ? 10 : 0; a.delivered = 0; a.kills = 0; a.deaths = 0; a.tier = 0; a.mass = 10; a.rank = 0; a.bestRank = 0; a.chew = 0; a.roundDelivered = 0; a.deliveries = 0; a.goal = 0; a.goalProgress = 0; a.goalIndex = 0; a.goalSince = w.tick; a.participation = 0; a.boostUntil = 0; a.shieldUntil = 0; place(w, a, false); }
   w.events.push([3, 0, 0]);
 }
 
@@ -252,14 +258,14 @@ function feastFood(w) {
   }
 }
 function feastForage(w, a) {
-  // Excess size has a half-life of about 69 seconds. Sprint is an escape paid in size.
-  a.mass = Math.max(10, a.mass - Math.max(0, a.mass - 16) * w.rules.shrink * C.DT);
-  if (a.sprint && a.move) a.mass = Math.max(10, a.mass - .6 * C.DT);
+  // Bots forage less efficiently and shed excess size faster. Sprint costs size.
+  a.mass = Math.max(10, a.mass - Math.max(0, a.mass - 16) * w.rules.shrink * C.DT - (a.bot ? Math.max(0, a.mass - w.rules.botShrinkAbove) * w.rules.botShrink * C.DT : 0));
+  if (a.sprint && a.move) a.mass = Math.max(10, a.mass - (a.bot ? w.rules.botSprintCost : w.rules.sprintCost) * C.DT);
   let best = -1, bd = 24 * 24;
   foodNear(w, a.x, a.y, 24, id => { const d=(w.fx[id]-a.x)**2+(w.fy[id]-a.y)**2; if(d<bd){best=id;bd=d;} });
   if (best >= 0) {
     if (w.fkind[best] !== 3 || (a.chewId === best && ++a.chew >= 60)) {
-      a.mass = Math.min(500, a.mass + (w.fkind[best] === 3 ? w.rules.cakeGrowth : w.rules.crumbGrowth)); a.delivered++; takeFood(w,best); a.chew=0;
+      a.mass = Math.min(500, a.mass + (w.fkind[best] === 3 ? w.rules.cakeGrowth : w.rules.crumbGrowth) * (a.bot ? w.rules.botGrowth : 1) * (a.mass >= (a.bot ? w.rules.botFoodSoftCap : w.rules.foodSoftCap) ? w.rules.foodAboveFactor : 1)); a.delivered++; takeFood(w,best); a.chew=0;
     } else if (a.chewId !== best) { a.chewId=best; a.chew=1; }
   } else { a.chew=0; a.chewId=-1; }
   if (a.rank === 5 && w.tick % 40 === 0 && !inGrass(a.x,a.y)) { a.mass=Math.max(10,a.mass-1); addFood(w,a.x-25*Math.cos(a.heading),a.y-25*Math.sin(a.heading),1); }
@@ -283,7 +289,7 @@ function feastContact(w) {
     b.alive=false; b.deaths++; b.mass=Math.max(10,mass*w.rules.retain); b.respawnAt=w.tick+w.rules.respawnSeconds*C.TICK_HZ;
   }
   for(const [a,b,mass] of meals) {
-    a.mass=Math.min(500,a.mass+Math.max(0,mass-Math.max(10,mass*w.rules.retain))*w.rules.gain); a.kills++;
+    a.mass=Math.min(500,a.mass+Math.max(0,mass-Math.max(10,mass*w.rules.retain))*w.rules.gain*(a.bot ? w.rules.botGrowth : 1)); a.kills++;
     w.events.push([1,a.id,b.id]);
   }
   for(const a of w.ants) if(a) { a.score=Math.floor(a.mass); a.rank=rankOf(a.mass); a.bestRank=Math.max(a.bestRank,a.rank); }

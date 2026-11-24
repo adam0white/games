@@ -121,6 +121,12 @@ export function play(prev, card) {
   return s;
 }
 
+// The table orders frames. Only the simulator can decide whether a card may be played.
+export function tableMove(s, seat, cards) {
+  if (s.done || seat !== s.turn || cards.length !== 1 || !s.hands[seat].includes(cards[0])) return s;
+  return play(s, cards[0]);
+}
+
 // Breakdown of a finished (or running) hand for both seats.
 export function score(s) {
   const n = [s.taken[0].length, s.taken[1].length];

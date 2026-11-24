@@ -63,6 +63,19 @@
   #practice { position: fixed; top: calc(74px + env(safe-area-inset-top)); left: 0; right: 0; text-align: center; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: #fbeedbaa; pointer-events: none; display: none; }
   #turnName { position: fixed; left: 0; right: 0; text-align: center; font-size: 15px; color: #fbeedbcc; pointer-events: none; }
 
+  .seat { display: none; align-items: center; gap: 6px; width: max-content; max-width: calc(100vw - 120px); font-size: 15px; }
+  .seat-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .seat-light { flex: none; width: 9px; height: 9px; border-radius: 50%; background: #a49180; }
+  .seat-light.on { background: #92dc93; box-shadow: 0 0 6px #92dc93; }
+  #table.friends .seat { display: flex; position: absolute; left: calc(14px + env(safe-area-inset-left)); }
+  #table.friends #oppPlayer { top: calc(10px + env(safe-area-inset-top)); }
+  #table.friends #oppRow { top: calc(36px + env(safe-area-inset-top)); justify-content: space-between; }
+  #table.friends #oppHand { flex: 0 0 108px; }
+  #table.friends #myPlayer { right: calc(14px + env(safe-area-inset-right)); left: auto; bottom: 25px; max-width: 46%; }
+  #table.friends .dot { display: none; }
+  #table.friends #turnName { padding-inline: 14px; overflow-wrap: anywhere; }
+  #roomStatus { position: absolute; top: calc(98px + env(safe-area-inset-top)); inset-inline: 14px; margin: 0; text-align: center; color: #fbeedb; font-size: 14px; overflow-wrap: anywhere; }
+
   #pause { position: absolute; right: calc(10px + env(safe-area-inset-right)); top: calc(10px + env(safe-area-inset-top)); width: 46px; height: 46px; border-radius: 50%; border: 0; background: #ffffff1a; display: grid; place-items: center; padding: 0; z-index: 3; }
   #pause::before { content: ''; width: 5px; height: 17px; border: solid #fbeedb; border-width: 0 5px; }
 
@@ -76,6 +89,13 @@
   .btn:active { transform: translateY(2px); box-shadow: none; }
   .btn.main { background: #b5361a; color: #fff4e0; font-size: 22px; min-height: 58px; }
   .btn small { display: block; font-weight: 500; font-size: 13px; opacity: .75; }
+  .btn:disabled { opacity: .6; cursor: default; }
+  .field { display: block; text-align: left; margin: 9px 0 0; font-size: 15px; color: #7b5a45; }
+  .field input { display: block; width: 100%; min-height: 44px; margin-top: 4px; padding: 6px 10px; border: 1px solid #d9c6a3; border-radius: 10px; background: #fffaf0; color: #3a1d12; font: inherit; font-size: 16px; touch-action: manipulation; -webkit-user-select: text; user-select: text; }
+  .field[hidden] { display: none; }
+  #joinCode { text-transform: uppercase; }
+  #roomCode { display: block; font-size: 36px; font-weight: 800; letter-spacing: .18em; }
+  #lobbyStatus, #roomEndStatus { color: #7b5a45; font-size: 15px; margin: 9px 0; overflow-wrap: anywhere; }
   .pair { display: flex; gap: 8px; } .pair .btn { flex: 1; }
   .seg { display: flex; gap: 0; margin: 10px 0 0; border-radius: 14px; overflow: hidden; background: #f1dfc2; }
   .seg button { flex: 1; min-height: 44px; border: 0; background: transparent; color: #7b5a45; font-weight: 600; font-size: 15px; }
@@ -89,6 +109,10 @@
   #scoreT td, #scoreT th { padding: 4px 6px; text-align: right; height: 28px; }
   #scoreT td:first-child, #scoreT th:first-child { text-align: left; color: #7b5a45; }
   #scoreT th { font-size: 14px; color: #7b5a45; font-weight: 600; }
+  #score.friends #scoreT { table-layout: fixed; overflow-wrap: anywhere; }
+  #score.friends #scoreTitle, #score.friends #matchLine { overflow-wrap: anywhere; }
+  #score.friends #scoreT th:first-child { width: 44%; }
+  #score.friends #scoreT th { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
   #scoreT tr { opacity: 0; transition: opacity .25s; }
   #scoreT tr.on, #scoreT tr.head { opacity: 1; }
   #scoreT tr.total td { border-top: 2px solid #3a1d1233; font-weight: 800; font-size: 20px; color: #3a1d12; }
@@ -109,12 +133,14 @@
 <body>
 <canvas id="fx" aria-hidden="true"></canvas>
 <div id="table" aria-label="Card table">
+  <div class="seat" id="oppPlayer"><span class="seat-light" aria-hidden="true"></span><span class="seat-name"></span></div>
   <div class="row" id="oppRow"><div class="who"><span class="dot them" id="oppDot"></span><div class="stack" id="oppStack"></div><div class="flames" id="oppFlames"></div></div><div id="oppHand"></div></div>
   <div id="stock"></div>
   <div id="pile"></div>
-  <div class="row" id="myRow"><div class="who"><span class="dot" id="myDot"></span><div class="stack" id="myStack"></div><div class="flames" id="myFlames"></div></div></div>
+  <div class="row" id="myRow"><div class="who"><span class="dot" id="myDot"></span><div class="stack" id="myStack"></div><div class="flames" id="myFlames"></div></div><div class="seat" id="myPlayer"><span class="seat-light" aria-hidden="true"></span><span class="seat-name"></span></div></div>
   <div id="hand" role="group" aria-label="Your cards"></div>
   <div id="turnName"></div>
+  <p id="roomStatus" role="status" hidden></p>
   <button id="pause" aria-label="Pause"></button>
 </div>
 <div id="practice">Practice</div>
@@ -127,11 +153,31 @@
   <button class="btn main" id="play">Play <span id="levelDots" aria-label="Bot strength"></span></button>
   <div class="seg" id="length"><button data-len="one" class="on">One hand</button><button data-len="51">Match to 51</button></div>
   <button class="btn" id="today">Today’s deal<small id="todayNote"></small></button>
+  <button class="btn" id="friend">Play a friend</button>
   <button class="btn" id="two">Two players, one phone</button>
 </div></div>
 
+<section class="screen" id="friendCard" aria-labelledby="friendTitle"><div class="panel">
+  <h2 id="friendTitle">Play a friend</h2>
+  <div id="friendEntry">
+    <label class="field">Your name (optional)<input id="friendName" maxlength="24" autocomplete="nickname"></label>
+    <button class="btn main" id="newTable">New table</button>
+    <form id="joinForm">
+      <label class="field">Table code<input id="joinCode" maxlength="4" autocapitalize="characters" autocomplete="off" spellcheck="false" pattern="[A-Za-z]{4}" required></label>
+      <button class="btn" id="joinTable">Join</button>
+    </form>
+  </div>
+  <div id="roomInvite" hidden>
+    <output id="roomCode" aria-label="Table code"></output>
+    <button class="btn main" id="shareLink">Share link</button>
+    <label class="field" id="roomLinkField" hidden>Table link<input id="roomLink" readonly></label>
+  </div>
+  <p id="lobbyStatus" role="status" hidden></p>
+  <button class="btn" id="roomLeave">Menu</button>
+</div></section>
+
 <div class="screen" id="paused"><div class="panel">
-  <h2>Paused</h2>
+  <h2 id="pauseTitle">Paused</h2>
   <button class="btn main" id="resume">Keep going</button>
   <div class="pair"><button class="btn" id="sound">Sound: on</button><button class="btn" id="colours">Four colours: off</button></div>
   <button class="btn" id="quit">Menu</button>
@@ -148,6 +194,7 @@
   <h2 id="scoreTitle">Hand over</h2>
   <table id="scoreT"><tbody></tbody></table>
   <p id="matchLine"></p>
+  <p id="roomEndStatus" role="status" hidden></p>
   <div id="daily"><canvas id="strip" aria-label="Your captures, in order"></canvas><p id="dailyNote"></p><button class="btn" id="savePic">Save picture</button></div>
   <button class="btn main" id="again">Play again</button>
   <button class="btn" id="scoreMenu">Menu</button>
