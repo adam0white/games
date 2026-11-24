@@ -113,7 +113,7 @@ export const powerOf = m => FORMS[m.f].power + (m.bonus || 0);
 
 // nemesis: what nemesisSave() returned on an earlier visit, or null for a world with no rival.
 export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS, wild = false, nemesis = null) {
-  const s = { wild, huntAt: HUNT_EVERY, hides: 0, hunts: 0, mobEats: 0, tired: 0, rand: rng(seed), nrand: rng((seed ^ 0x5bd1e995) >>> 0), t: 0, tick: 0, weights, mobs: [], events: [], choosing: null, dead: null, won: false, eaten: 0, deaths: 0, nextId: 1,
+  const s = { wild, huntAt: HUNT_EVERY, hides: 0, hunts: 0, mobEats: 0, tired: 0, powers: 0, rand: rng(seed), nrand: rng((seed ^ 0x5bd1e995) >>> 0), t: 0, tick: 0, weights, mobs: [], events: [], choosing: null, dead: null, won: false, eaten: 0, deaths: 0, nextId: 1,
     nemesis: null, player: { x: WORLD / 2, y: WORLD / 2, a: 0, ph: 0, stack: stack.slice(), xp, safe: 2.5, hideAt: 0, busy: 0 } };
   while (s.mobs.length < MOBS) spawn(s, 260);
   if (nemesis && FORMS[nemesis.f]) placeNemesis(s, nemesis);
@@ -206,10 +206,13 @@ export function step(s, input) {
   s.t += dt; s.tick++;
   if (p.safe > 0) p.safe -= dt;
   if (p.busy > 0) p.busy -= dt;
+  if (p.cd > 0) p.cd -= dt; if (p.boost > 0) p.boost -= dt; if (p.veil > 0) p.veil -= dt;
+  if (input?.power && !s.choosing) usePower(s);
   let ix = input?.x || 0, iy = input?.y || 0; const il = Math.hypot(ix, iy);
   if (il > 1) { ix /= il; iy /= il; }
   if (il > 0.01) { p.a = Math.atan2(iy, ix); p.ph += Math.min(1, il) * dt * 10; }
-  p.x = clamp(p.x + ix * F.speed * dt, F.r, WORLD - F.r); p.y = clamp(p.y + iy * F.speed * dt, F.r, WORLD - F.r);
+  const pv = F.speed * (p.boost > 0 ? p.boostK : 1);
+  p.x = clamp(p.x + ix * pv * dt, F.r, WORLD - F.r); p.y = clamp(p.y + iy * pv * dt, F.r, WORLD - F.r);
 
   if (s.wild && s.t >= s.huntAt) {
     let hunter = null, near = HUNT_REACH;
@@ -233,7 +236,8 @@ export function step(s, input) {
     const [far, half] = sightOf(M), range = M.range * far * (T ? T.sight : 1), cone = Math.min(Math.PI, half * (T ? T.cone : 1));
     if (m.winded > 0) m.winded -= dt;
     if (m.spring > 0) m.spring -= dt; if (m.pounce > 0) m.pounce -= dt;
-    const sees = p.safe <= 0 && !(m.winded > 0) && (m.hunt > 0 || d < range * F.stealth + F.r && Math.abs(wrap(to - m.a)) < cone);
+    if (m.stun > 0) m.stun -= dt;
+    const sees = p.safe <= 0 && !(p.veil > 0) && !(m.winded > 0) && !(m.stun > 0) && (m.hunt > 0 || d < range * F.stealth + F.r && Math.abs(wrap(to - m.a)) < cone);
     const wasAlert = m.alert;
     if (sees) { if (!m.alert && power !== F.power) s.events.push({ t: 'notice', strong: power > F.power, id: m.id, nem: !!m.nem }); m.alert = true; m.lost = 0; }
     else if (m.alert) {
@@ -309,13 +313,14 @@ export function step(s, input) {
       if (N.chase > 1.5 && power > F.power && !s.dead) { N.escapes++; s.events.push({ t: 'nemEscape', escapes: N.escapes }); }
       N.chase = 0; N.stalk = 0; N.commit = false;
     }
+    if (m.stun > 0) { speed = 0; turn = 0; m.alert = false; m.chase = null; }
     if (!hunting && m.tire > 0) m.tire = Math.max(0, m.tire - dt * 1.5);
     m.a += clamp(wrap(m.want - m.a), -turn * dt, turn * dt);
     m.x = clamp(m.x + Math.cos(m.a) * speed * dt, M.r, WORLD - M.r); m.y = clamp(m.y + Math.sin(m.a) * speed * dt, M.r, WORLD - M.r);
     m.ph += speed * dt * 0.09;
 
     if (!m.gone && d < (M.r + F.r) * 0.85) {
-      const out = encounter(F, { power, speed: M.speed, alert: m.alert });
+      let out = encounter(F, { power, speed: M.speed, alert: m.alert }); if (out === 'die' && m.stun > 0) out = 'none'; // a stunned animal cannot bite
       if (out === 'eat') {
         let gain = M.level >= F.level - 1 ? 3 : M.level === F.level - 2 ? 2 : 1;
         m.gone = true; s.mobs.splice(i, 1); s.eaten++; p.busy = 1.2;
@@ -363,9 +368,51 @@ function upkeep(s) {
 }
 
 // Pick one of the three offered forms.
+// ---- A power for every animal (tester note #148: "every animal should have its own ability, tied to its species").
+// Six kinds of power; each species has its own name for it, and bigger animals reach further. The Ant has none: you earn one.
+//   sting:  the nearest animal within reach cannot move or see for a while
+//   leap:   jump ahead at once, and nothing can bite you in the air
+//   shell:  nothing can bite or see you for a few seconds (you can still eat)
+//   roar:   every weaker animal within reach freezes
+//   dive:   a short burst of speed during which nothing notices you
+//   sprint: a longer burst of speed
+// cd is the wait in seconds before the next use. One button; input.power asks for it.
+export const POWER = {
+  sting: { cd: 10, reach: 120, stun: 3 }, leap: { cd: 6, jump: 150, air: 0.35 }, shell: { cd: 16, time: 3 },
+  roar: { cd: 14, reach: 230, stun: 2.5 }, dive: { cd: 10, time: 1.2, speed: 1.9 }, sprint: { cd: 8, time: 2, speed: 1.6 },
+};
+const POWERS = {
+  sting: { 'Fire Ant': 'Fire bite', Spider: 'Web', Scorpion: 'Sting', Wasp: 'Sting', Snake: 'Venom', Python: 'Squeeze', Komodo: 'Venom bite', Basilisk: 'Stone stare', Hydra: 'Three bites' },
+  leap: { Mouse: 'Scurry', Frog: 'Hop', Squirrel: 'Jump', Rabbit: 'Bound', Cat: 'Pounce', Lynx: 'Pounce', Deer: 'Bound', Raptor: 'Leap' },
+  shell: { Beetle: 'Hard shell', Crab: 'Shell', Mole: 'Dig', Porcupine: 'Spikes', Turtle: 'Shell', Badger: 'Dig', Crocodile: 'Dive under' },
+  roar: { Dog: 'Bark', Boar: 'Snort', Wolf: 'Howl', Gorilla: 'Chest beat', Bear: 'Roar', Tiger: 'Roar', Hippo: 'Bellow', Lion: 'Roar', Elephant: 'Trumpet', Sabertooth: 'Snarl', 'T-Rex': 'Roar', Yeti: 'Howl', Dragon: 'Fire breath' },
+  dive: { Bat: 'Swoop', Owl: 'Silent dive', Eagle: 'Dive', Pterodactyl: 'Dive', Griffin: 'Dive', Thunderbird: 'Storm dive' },
+  sprint: { Mantis: 'Strike', Lizard: 'Dart', Fox: 'Dash', Ostrich: 'Run', Panther: 'Dash', Cheetah: 'Sprint', Zebra: 'Gallop', Giraffe: 'Gallop' },
+};
+const POWER_OF = {}; for (const [kind, names] of Object.entries(POWERS)) for (const [name, label] of Object.entries(names)) POWER_OF[name] = { kind, label, ...POWER[kind] };
+export const powerFor = F => POWER_OF[F.name] || null;
+export const powerReady = s => !!powerFor(me(s)) && !(s.player.cd > 0) && !s.dead && !s.choosing;
+function usePower(s) {
+  const p = s.player, F = me(s), W = powerFor(F); if (!W || p.cd > 0) return;
+  const reach = (W.reach || 0) * (1 + F.level * 0.02); let hit = 0;
+  if (W.kind === 'sting') {
+    let best = null, bd = reach + F.r;
+    for (const m of s.mobs) { const d = Math.hypot(m.x - p.x, m.y - p.y) - FORMS[m.f].r; if (d < bd) { bd = d; best = m; } }
+    if (!best) { s.events.push({ t: 'powerMiss', label: W.label }); p.cd = 1; return; } // nothing in reach: try again in a second
+    best.stun = W.stun; best.alert = false; best.hunt = 0; hit = 1; s.events.push({ t: 'stun', x: best.x, y: best.y });
+  } else if (W.kind === 'roar') {
+    for (const m of s.mobs) if (powerOf(m) < F.power && Math.hypot(m.x - p.x, m.y - p.y) < reach) { m.stun = W.stun; m.alert = false; hit++; s.events.push({ t: 'stun', x: m.x, y: m.y }); }
+  } else if (W.kind === 'leap') {
+    const d = W.jump + F.r * 3; p.from = { x: p.x, y: p.y };
+    p.x = clamp(p.x + Math.cos(p.a) * d, F.r, WORLD - F.r); p.y = clamp(p.y + Math.sin(p.a) * d, F.r, WORLD - F.r); p.safe = Math.max(p.safe, W.air);
+  } else if (W.kind === 'shell') p.safe = Math.max(p.safe, W.time);
+  else { p.boost = W.time; p.boostK = W.speed; if (W.kind === 'dive') { p.veil = W.time; for (const m of s.mobs) if (!m.nem) { m.alert = false; m.hunt = 0; } } }
+  p.cd = W.cd; s.powers++; s.events.push({ t: 'power', kind: W.kind, label: W.label, hit, x: p.x, y: p.y, reach });
+}
+
 export function choose(s, i) {
   if (!s.choosing) return;
-  const f = s.choosing[i]; s.player.stack.push(f.id); s.player.xp = 0; s.player.safe = 1.5; s.choosing = null;
+  const f = s.choosing[i]; s.player.stack.push(f.id); s.player.xp = 0; s.player.safe = 1.5; s.player.cd = 0; s.choosing = null;
   s.events.push({ t: 'evolve', name: f.name });
 }
 
@@ -374,7 +421,7 @@ export function revive(s, restart) {
   if (!s.dead) return;
   const p = s.player;
   if (restart) { p.stack = [ANT]; s.won = false; } else if (p.stack.length > 1) p.stack.pop();
-  p.xp = 0; p.safe = 2.5; p.busy = 0; p.x = WORLD / 2; p.y = WORLD / 2; s.dead = null;
+  p.xp = 0; p.safe = 2.5; p.busy = 0; p.cd = 0; p.boost = 0; p.veil = 0; p.x = WORLD / 2; p.y = WORLD / 2; s.dead = null;
   const F = me(s);
   s.mobs = s.mobs.filter(m => m.nem || powerOf(m) <= F.power || Math.hypot(m.x - p.x, m.y - p.y) > 520);
   const n = nemesisMob(s); // the rival is not removed; if it is close it is moved away
