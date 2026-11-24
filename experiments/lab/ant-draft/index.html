@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#24451f">
+<title>Ant Draft</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #16300f; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { font: 17px/1.35 ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif; color: #3a2a22; }
+  canvas#c { display: block; width: 100vw; height: 100dvh; }
+  #probe { position: fixed; top: 0; left: 0; width: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); visibility: hidden; pointer-events: none; }
+  .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: #0b1408aa; overflow-y: auto; touch-action: pan-y; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-sizing: border-box; }
+  .screen.on { display: grid; }
+  #draft { background: #0b1408cc; }
+  .card { max-width: 22em; width: calc(100% - 32px); box-sizing: border-box; padding: 18px 16px 12px; margin: 12px 0; background: #fff8e6; border: 3px solid #3a2a22; border-radius: 22px; box-shadow: 0 8px 0 #0b140866; }
+  h1 { font-size: 2.5em; line-height: 1.05; margin: 0 0 .15em; color: #ffb42a; text-shadow: 0 3px 0 #3a2a22; -webkit-text-stroke: 1.5px #3a2a22; }
+  h2 { font-size: 1.7em; margin: 0 0 .2em; color: #ffb42a; text-shadow: 0 2px 0 #3a2a22; -webkit-text-stroke: 1px #3a2a22; }
+  p { margin: .4em 0; }
+  .sub { font-size: .95em; opacity: .85; }
+  .stats { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin: .5em 0; font-size: .95em; }
+  .stats b { color: #c0271f; }
+  button { font: inherit; font-weight: bold; color: #3a2a22; background: #ffe08a; border: 2.5px solid #3a2a22; border-radius: 14px; padding: .45em 1em; margin: .25em; min-height: 48px; min-width: 8em; touch-action: manipulation; cursor: pointer; box-shadow: 0 4px 0 #3a2a22; }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 #3a2a22; }
+  button.main { background: #c0271f; color: #fff8e6; font-size: 1.35em; min-width: 9em; }
+  button.small { min-width: 0; font-size: .9em; }
+  #pause { position: fixed; top: calc(6px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); width: 48px; height: 48px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; place-items: center; box-shadow: 0 3px 0 #3a2a22; background: #fff8e6; }
+  #pause::before { content: ''; width: 4px; height: 16px; border: solid #3a2a22; border-width: 0 5px; }
+  #menuArt { width: 150px; height: 110px; display: block; margin: 0 auto -4px; }
+
+  /* The draft: three big cards, icon first. */
+  .draftBox { width: min(100% - 20px, 30em); }
+  .draftBox h2 { color: #ffe23a; margin-bottom: .4em; }
+  #offers { display: flex; gap: 8px; justify-content: center; align-items: stretch; }
+  .offer { flex: 1 1 0; min-width: 0; max-width: 9.5em; margin: 0; padding: 10px 4px 10px; background: #fff8e6; border-radius: 18px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-weight: normal; box-shadow: 0 6px 0 #3a2a22; animation: deal .38s cubic-bezier(.2, 1.5, .4, 1) backwards; }
+  .offer:nth-child(2) { animation-delay: .08s; } .offer:nth-child(3) { animation-delay: .16s; }
+  .offer.held { background: #ffe9a8; }
+  .offer.chosen { animation: chosen .3s ease-out forwards; }
+  .offer.passed { opacity: .25; transition: opacity .2s; }
+  .offer canvas { width: 84px; height: 84px; max-width: 100%; }
+  .offer b { font-size: 1.1em; color: #c0271f; }
+  .offer span { font-size: 14px; line-height: 1.2; min-height: 3.6em; display: block; }
+  .pips { display: flex; gap: 4px; justify-content: center; height: 10px; }
+  .pips i { width: 9px; height: 9px; border-radius: 50%; border: 2px solid #3a2a22; box-sizing: border-box; background: #fff; }
+  .pips i.on { background: #ffb42a; }
+  @keyframes deal { from { transform: translateY(60px) rotate(-8deg) scale(.6); opacity: 0; } }
+  @keyframes chosen { 40% { transform: scale(1.14) rotate(2deg); } to { transform: scale(1.05) translateY(-10px); } }
+  #scoutRow { margin-top: 12px; color: #fff8e6; font-size: 15px; display: none; align-items: center; justify-content: center; gap: 6px; }
+  #scoutRow.on { display: flex; }
+  #scoutRow canvas { height: 44px; }
+  #held { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: .5em 0; min-height: 48px; }
+  .chip { position: relative; width: 48px; height: 54px; }
+  .chip canvas { width: 46px; height: 46px; background: #ffe9a8; border: 2px solid #3a2a22; border-radius: 12px; box-sizing: border-box; display: block; margin: 0 auto; }
+  .chip .pips { margin-top: -6px; position: relative; }
+  .chip .pips i { width: 8px; height: 8px; }
+  .big { font-size: 2.2em; font-weight: bold; color: #c0271f; line-height: 1.1; }
+  @media (prefers-reduced-motion: reduce) { .offer, .offer.chosen { animation: none; } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="probe"></div>
+<button id="pause" aria-label="Pause"></button>
+
+<div id="menu" class="screen on"><div class="card">
+  <canvas id="menuArt" width="300" height="220"></canvas>
+  <h1>Ant Draft</h1>
+  <p class="sub">Guard the queen. Pick a promotion.</p>
+  <div class="stats"><span>Best <b id="best">0</b></span><span>Wins <b id="wins">0</b></span></div>
+  <p><button id="play" class="main">Play</button></p>
+  <p><button id="daily">Daily run</button><button id="sound1" class="small">Sound: on</button></p>
+  <p id="dailyLine" class="sub"></p>
+</div></div>
+
+<div id="draft" class="screen"><div class="draftBox">
+  <h2 id="draftTitle">Pick one</h2>
+  <div id="offers"></div>
+  <div id="scoutRow"><span>Next</span><canvas id="scoutArt" width="520" height="88"></canvas></div>
+</div></div>
+
+<div id="paused" class="screen"><div class="card">
+  <h2>Paused</h2>
+  <p><button id="resume" class="main">Keep going</button></p>
+  <p><button id="quit">Menu</button><button id="sound2" class="small">Sound: on</button></p>
+</div></div>
+
+<div id="end" class="screen"><div class="card">
+  <h2 id="endTitle">The nest fell</h2>
+  <p class="big" id="endScore">0</p>
+  <div class="stats"><span>Wave <b id="endWave">1</b>/<span id="endWaves">8</span></span><span>Best <b id="best2">0</b></span></div>
+  <div id="held"></div>
+  <p id="endLine" class="sub"></p>
+  <p><button id="again" class="main">Again</button></p>
+  <p><button id="toMenu">Menu</button></p>
+</div></div>
+
+<script type="module" src="./main.js"></script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>

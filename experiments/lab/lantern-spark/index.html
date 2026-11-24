@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#03050a">
+<title>Lantern: Spark</title>
+<style>
+  :root { --gold: #ffd9a0; --ink: #03050a; }
+  html, body { margin: 0; height: 100%; background: var(--ink); overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { font: 16px/1.45 Georgia, 'Times New Roman', serif; color: #f3e6cf; }
+  canvas { display: block; width: 100vw; height: 100dvh; }
+  a { color: var(--gold); }
+  .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  .screen.on { display: grid; animation: fade .35s ease-out; }
+  @keyframes fade { from { opacity: 0; } }
+  .screen > div { max-width: 22em; width: calc(100% - 2em); padding: 1em; box-sizing: border-box; }
+  .veil { background: radial-gradient(ellipse at 50% 40%, #0a1226cc, #03050af2 70%); }
+  h1 { font-weight: normal; font-size: 2.5em; line-height: 1.1; letter-spacing: .06em; margin: 0 0 .25em; color: var(--gold); text-shadow: 0 0 26px #ff9a3c99; }
+  h1 small { display: block; font-size: .46em; letter-spacing: .4em; color: #9fc0ff; text-shadow: 0 0 18px #6f9cff99; margin-top: .3em; }
+  p { margin: .45em 0; opacity: .9; }
+  .line { font-size: 17px; color: #cfd8ee; }
+  button { font: inherit; color: #ffe6bd; background: #ffffff10; border: 1.5px solid #ffd9a088; border-radius: 999px; padding: .55em 1.2em; margin: .3em; min-width: 8em; min-height: 48px; touch-action: manipulation; cursor: pointer; }
+  button.main { background: linear-gradient(#ffc77a, #ff9f45); color: #2a1606; border-color: #ffb45a; font-size: 1.25em; min-width: 9.5em; min-height: 58px; box-shadow: 0 0 30px #ff9a3c55, 0 4px 14px #0008; }
+  button:active { transform: scale(.96); }
+  #nights { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: .9em 0 .4em; }
+  #nights button { min-width: 48px; width: 48px; height: 56px; padding: 0; margin: 0; border-radius: 14px; display: grid; place-items: center; line-height: 1; font-size: 18px; }
+  #nights button small { display: block; font-size: 14px; color: #ffcf6e; letter-spacing: -1px; margin-top: 2px; }
+  #nights button.on { border-color: #ffd9a0; background: #ffd9a022; box-shadow: 0 0 14px #ffb45a55; }
+  #nights button:disabled { opacity: .3; }
+  .stars { font-size: 30px; letter-spacing: 6px; color: #ffcf6e; text-shadow: 0 0 14px #ffb45a; min-height: 1.2em; }
+  .stars i { font-style: normal; color: #ffffff30; text-shadow: none; }
+  #hud { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); display: none; pointer-events: none; text-shadow: 0 1px 6px #000; }
+  #hearts { font: 24px/1 sans-serif; color: #ff5a6a; letter-spacing: 3px; }
+  #tinRow { font-size: 22px; line-height: 1.4; color: var(--gold); }
+  #big { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: 0; right: 0; display: none; text-align: center; font-size: 30px; line-height: 1.1; color: #e9eefc; pointer-events: none; text-shadow: 0 1px 8px #000; font-variant-numeric: tabular-nums; }
+  #say { position: fixed; left: 0; right: 0; top: 30%; text-align: center; pointer-events: none; opacity: 0; transition: opacity .35s; font-size: 26px; color: #ffe6bd; text-shadow: 0 0 18px #000, 0 1px 6px #000; padding: 0 1em; }
+  #pause { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); width: 48px; height: 48px; min-width: 0; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 50%; background: #ffffff14; display: none; place-items: center; touch-action: none; }
+  #pause::before { content: ''; width: 4px; height: 16px; border: solid #ffd9a0aa; border-width: 0 5px; }
+  #spark { position: fixed; right: calc(12px + env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); width: 72px; height: 72px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; touch-action: none;
+    background: radial-gradient(circle at 50% 42%, #ffe9b8 0, #ffb45a 34%, #6a3410 72%, #2a1606 100%); border: 2px solid #ffd9a0; box-shadow: 0 0 22px #ff9a3c88, inset 0 -6px 12px #0006; color: #2a1606; }
+  #spark svg { width: 34px; height: 34px; display: block; margin: 0 auto; filter: drop-shadow(0 0 4px #fff8); }
+  #spark b { position: absolute; right: -6px; top: -6px; min-width: 28px; height: 28px; border-radius: 14px; background: #0b1020; color: #ffe6bd; border: 1.5px solid #ffd9a0aa; font: bold 15px/25px system-ui, sans-serif; text-align: center; padding: 0 3px; box-sizing: border-box; }
+  #spark.hit { animation: hit .25s ease-out; }
+  @keyframes hit { 40% { transform: scale(.86); } 70% { transform: scale(1.08); } }
+  #spark.empty { filter: grayscale(.9) brightness(.55); }
+  #spark.pulse::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 3px solid #ffe9b8; animation: ring 1.3s ease-out infinite; pointer-events: none; }
+  @keyframes ring { from { transform: scale(1); opacity: .9; } to { transform: scale(1.7); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { #spark.pulse::after { animation: none; opacity: .8; transform: scale(1.25); } .screen.on { animation: none; } }
+  .small { font-size: 15px; opacity: .75; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="hearts"></div><div id="tinRow">✦ <span id="tin">12</span></div></div>
+<div id="big"></div>
+<div id="say"></div>
+<button id="pause" aria-label="Pause"></button>
+<button id="spark" aria-label="Strike a spark"><svg viewBox="0 0 32 32" aria-hidden="true"><path fill="#fff6dc" d="M16 1 L18.6 12.2 L29 8 L20.4 15.6 L31 20 L19.6 19.4 L21 31 L15.4 21.4 L8 30 L11.4 19 L1 17.2 L11.6 13.4 L6 4 L14.4 11 Z"/></svg><b id="tinBadge">12</b></button>
+<div id="menu" class="screen veil on"><div>
+  <h1>Lantern<small>ECHO</small></h1>
+  <p class="line">The lantern is out. Strike sparks to see.</p>
+  <div id="nights"></div>
+  <p><button id="play" class="main">Play</button></p>
+  <p class="small"><a href="/lantern/">Lantern</a> · <a href="/lab/">Lab</a></p>
+</div></div>
+<div id="paused" class="screen veil"><div>
+  <h1>Paused</h1>
+  <p class="line" id="pausedLine"></p>
+  <p><button id="resume" class="main">Go on</button></p>
+  <p><button id="quit">Menu</button></p>
+</div></div>
+<div id="end" class="screen veil"><div>
+  <h1 id="endTitle"></h1>
+  <div class="stars" id="endStars"></div>
+  <p class="line" id="endLine"></p>
+  <p><button id="again" class="main">Again</button></p>
+  <p><button id="toMenu">Menu</button></p>
+</div></div>
+<script type="module" src="./main.js"></script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>

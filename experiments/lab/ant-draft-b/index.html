@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#2f5a2a">
+<title>Ant Draft</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #24451f; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  body { font: 17px/1.35 ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif; color: #fff8e6; }
+  canvas#c { display: block; width: 100vw; height: 100dvh; }
+  #probe { position: fixed; top: 0; left: 0; width: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); visibility: hidden; pointer-events: none; }
+  .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: #14280fd0; overflow-y: auto; touch-action: pan-y; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-sizing: border-box; }
+  .screen.on { display: grid; }
+  #draft { background: linear-gradient(#14280f00, #14280fe0 30%); }
+  .card { max-width: 22em; width: calc(100% - 32px); box-sizing: border-box; padding: 18px 16px 14px; margin: 12px 0; background: #1d3a17f0; border: 3px solid #ffe08a88; border-radius: 22px; box-shadow: 0 10px 30px #0008; }
+  h1 { font-size: 2.6em; line-height: 1; margin: .1em 0 .1em; color: #ffe08a; text-shadow: 0 4px 0 #5a3a0c; letter-spacing: .02em; }
+  h2 { font-size: 1.7em; margin: 0 0 .2em; color: #ffe08a; text-shadow: 0 3px 0 #5a3a0c; }
+  p { margin: .35em 0; }
+  .sub { opacity: .85; }
+  button { font: inherit; color: #fff8e6; background: #ffffff1c; border: 2px solid #ffe08a99; border-radius: 16px; padding: .5em 1.1em; margin: .3em; min-height: 48px; min-width: 8em; touch-action: manipulation; cursor: pointer; }
+  button:active { transform: scale(.96); }
+  button.main { background: #ffb42a; color: #33200a; border-color: #ffb42a; font-size: 1.3em; font-weight: bold; min-width: 9em; box-shadow: 0 5px 0 #9a5a0a; }
+  button.main:active { transform: translateY(4px); box-shadow: 0 1px 0 #9a5a0a; }
+  #pause { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); width: 48px; height: 48px; min-width: 0; margin: 0; padding: 0; border-radius: 50%; display: none; place-items: center; background: #14280faa; }
+  #pause::before { content: ''; width: 4px; height: 16px; border: solid #fff8e6; border-width: 0 5px; }
+  .picks { display: flex; gap: 10px; justify-content: center; width: min(100vw - 24px, 30em); margin: 0 auto; }
+  .pick { flex: 1 1 0; min-width: 0; margin: 0; padding: 10px 6px 12px; border-radius: 18px; border: 3px solid var(--c); background: linear-gradient(#2b4a22, #18300f); display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 15px; line-height: 1.15; font-weight: bold; min-height: 170px; box-shadow: 0 6px 0 #0006, 0 0 22px color-mix(in srgb, var(--c) 40%, transparent); opacity: 0; transform: translateY(40px) rotateY(80deg) scale(.8); transition: transform .45s cubic-bezier(.2,1.6,.4,1), opacity .25s; }
+  .pick.in { opacity: 1; transform: none; }
+  .pick.go { transform: translateY(-30px) scale(1.12); transition: transform .25s; }
+  .pick.out { opacity: 0; transform: translateY(60px) scale(.7); }
+  .pick canvas { width: 84px; height: 84px; }
+  .pick .n { font-size: 14px; color: var(--c); }
+  .head { font-size: 1.5em; font-weight: bold; color: #ffe08a; text-shadow: 0 3px 0 #5a3a0c; margin: 0 0 .4em; }
+  .next { display: flex; gap: 8px; justify-content: center; align-items: center; margin: .8em 0 0; min-height: 48px; }
+  .next canvas { width: 40px; height: 40px; }
+  .next b { font-size: 15px; margin-right: 6px; }
+  .hand { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin: .5em 0; }
+  .hand canvas { width: 44px; height: 44px; border-radius: 10px; background: #00000033; }
+  .big { font-size: 2.2em; font-weight: bold; color: #ffe08a; line-height: 1.1; }
+  .stats { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; font-size: 15px; }
+  .stats b { color: #ffe08a; }
+  .desk { display: none; font-size: 15px; }
+  @media (pointer: fine) { .desk { display: block; } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="probe"></div>
+<button id="pause" aria-label="Pause"></button>
+
+<div id="menu" class="screen on"><div class="card">
+  <canvas id="logo" width="240" height="120" style="width:200px;height:100px"></canvas>
+  <h1>Ant Draft</h1>
+  <p class="sub">8 waves. Promote after each.</p>
+  <p><button id="play" class="main">Play</button></p>
+  <p><button id="daily">Daily run</button></p>
+  <div class="stats"><span>Best <b id="best">0</b></span><span id="dailyLine"></span></div>
+  <p class="desk sub">Mouse: hold and move to lead.</p>
+  <p><button id="sound1" style="min-width:0">Sound: on</button></p>
+</div></div>
+
+<div id="draft" class="screen"><div>
+  <div class="head" id="draftHead">Wave 1 cleared</div>
+  <div class="picks" id="picks"></div>
+  <div class="next" id="next"></div>
+</div></div>
+
+<div id="paused" class="screen"><div class="card">
+  <h2>Paused</h2>
+  <div class="hand" id="pauseHand"></div>
+  <p><button id="resume" class="main">Go on</button></p>
+  <p><button id="quit">Menu</button><button id="sound2" style="min-width:0">Sound: on</button></p>
+</div></div>
+
+<div id="end" class="screen"><div class="card">
+  <h2 id="endTitle">Nest fell</h2>
+  <canvas id="endArt" width="240" height="96" style="width:200px;height:80px"></canvas>
+  <p class="big" id="endWave">Wave 3</p>
+  <div class="hand" id="endHand"></div>
+  <div class="stats"><span>Score <b id="score">0</b></span><span>Best <b id="best2">0</b></span><span>Bugs <b id="kills">0</b></span></div>
+  <p><button id="again" class="main">Retry</button></p>
+  <p><button id="toMenu">Menu</button></p>
+</div></div>
+
+<script type="module" src="./main.js"></script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>
