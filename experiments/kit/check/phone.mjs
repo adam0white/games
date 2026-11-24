@@ -604,6 +604,23 @@ const GAMES = {
     assert.match(await page.textContent('#trophies'), /Old Scar the Beetle/, 'old save: trophies');
   }),
   'lab/ant-wilds': page => antLab(page, 'ant-wilds', '', {}, async () => {}),
+  async 'lab/thankful'(page) {
+    const KEY = 'thankful:v1';
+    await page.goto(`${base}/lab/thankful/?day=2026-11-23`); await until(page, () => window.__thankful, 'game script');
+    await page.evaluate(k => localStorage.setItem(k, JSON.stringify({ v: 1, days: { '2026-11-21': [{ k: 'bread' }, { k: 'water' }], '2026-11-22': [{ k: 'home' }, { k: 'family' }, { k: 'friend' }] }, look: 'sky', sound: true })), KEY);
+    await page.reload(); await until(page, () => window.__thankful?.lights.length === 5, 'five old lights');
+    assert.equal(await page.evaluate(() => window.__thankful.lights.length), 5, 'old save: five lights survive reload');
+    assert.equal(await page.evaluate(() => window.audioLog.made), 0, 'no audio before the first tap');
+    await page.click('[data-kind="bread"]');
+    assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'first tap starts audio');
+    await page.click('[data-kind="water"]'); await page.click('[data-kind="home"]');
+    assert.equal(await page.textContent('#line'), 'Today is in your sky.', 'three taps finish today');
+    assert.equal(await page.evaluate(() => window.__thankful.state.days['2026-11-23'].length), 3, 'today has three lights');
+    assert.equal(await page.evaluate(() => window.__thankful.give('friend')), false, 'a fourth thanks is refused');
+    assert.equal(await page.evaluate(() => window.__thankful.state.days['2026-11-23'].length), 3, 'the fourth thanks did not change today');
+    const picture = await page.evaluate(() => window.__thankful.picture());
+    assert.equal(picture.width, 1080); assert.equal(picture.height, 1350); assert.ok(picture.bytes > 20000, 'picture has PNG image data');
+  },
   async 'lab/ant-nest'(page) {
     const KEY = 'ant-nest:v1', nest = () => page.evaluate(() => { const n = window.__nest; return { mode: n.mode, t: n.s?.t, marks: n.s ? n.s.mark.reduce((a, b) => a + b, 0) : 0 }; });
     await page.goto(`${base}/lab/ant-nest/`); await until(page, () => window.__nest, 'game script');

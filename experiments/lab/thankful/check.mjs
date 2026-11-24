@@ -11,6 +11,7 @@ const shots=process.env.SHOTS || join(tmpdir(),'thankful-shots'); await mkdir(sh
 const server=createServer(async(req,res)=>{try {
  const url=new URL(req.url,'http://localhost');
  if(url.pathname==='/favicon.ico'){res.writeHead(204);res.end();return;}
+ if(url.pathname==='/notes/button.js'){res.writeHead(200,{'content-type':'text/javascript'});res.end('');return;} // served by the site, not this folder
  let file=resolve(root,'.'+decodeURIComponent(url.pathname)); if(url.pathname.endsWith('/'))file=join(file,'index.html');
  if(!file.startsWith(root+sep))throw Error('outside root');
  const body=await readFile(file);res.writeHead(200,{'content-type':({'.html':'text/html','.js':'text/javascript','.mjs':'text/javascript','.css':'text/css'})[extname(file)] || 'application/octet-stream','cache-control':'no-store'});res.end(body);
@@ -35,6 +36,8 @@ async function run(name,engine,device,base){
   assert.equal(total(await state(page)),0);await nonblank(page);await page.screenshot({path:join(shots,`${name}-${look}-empty.png`)});
   await page.locator('[data-kind="bread"]').tap();await page.locator('[data-kind="water"]').tap();await page.locator('[data-kind="home"]').tap();
   assert.equal(total(await state(page)),3,'three taps add three lights');
+  const picture=await page.evaluate(()=>window.__thankful.picture());
+  assert.equal(picture.width,1080,`${look} picture width`);assert.equal(picture.height,1350,`${look} picture height`);assert.ok(picture.bytes>20000,`${look} picture contains PNG data`);
   await page.waitForFunction(()=>window.__thankful.lights.some(p=>p.day==='2026-11-23'));
   const point=await page.evaluate(()=>window.__thankful.lights.find(p=>p.day==='2026-11-23'));
   assert.ok(point,'a recorded light has a hit target');
