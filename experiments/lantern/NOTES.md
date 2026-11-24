@@ -560,3 +560,12 @@ yes, so the rule "nothing is sent before the player chooses to share" holds. Lim
 of a false score; it does not prove a run was played. Rejected: replaying the run on the server from its inputs
 (floating-point differences between engines, and Worker CPU limits).
 
+## 2026-11-24: five faults from a bug hunt
+
+A helper played the game with damaged saves, slow answers and odd tap orders. Fixed: (1) `lantern-owned` holding an
+object or a number stopped the game from loading; (2) `lantern-stats` holding a non-object took the embers for a stat
+and then threw; (3) a slow answer from the shared board put the first run's place on the next run's card; (4) leaving
+the shop while a pack spun left the caption at "…"; (5) the shop's long opening text stayed pinned over the packs
+(about a fifth of a phone screen); now only a short text stays in view. Left alone: a heart picked up at three hearts
+gives nothing (sim rule; only with the Hearts stat at its top).
+
