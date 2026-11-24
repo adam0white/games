@@ -2,7 +2,7 @@
 import { create, step, input, guide, hint, multiplier, goalState, stars, selectLane, chooseTicket, lampAt, DAY, RAMP, DT, KINDS, TUTOR, OBJECT, HIT, zipStuck, WORKS, LEAVE, LEVELS } from './sim.js';
 import { COUNT, ORDER, OPEN_ORDER, INTRO, BUSY_END, CHAPTERS, ASSIST_RATE, STAR_BONUS, canAssist, levelDef, goalLine, levelReward, resultSeconds } from './levels.js';
 import { plan, SKILLS } from './moves.js';
-import { drawJob, drawGhost, person, looks, REGULAR, cat, heart, coin, sillyList, drawSilly, goalIcon, symbol, starShape, C, circle, rrect, star } from './art.js';
+import { drawJob, drawGhost, stepIcon, person, looks, REGULAR, cat, heart, coin, sillyList, drawSilly, goalIcon, symbol, starShape, C, circle, rrect, star, wage } from './art.js';
 import { readJson, writeJson } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
@@ -118,6 +118,8 @@ const buzz = ms => { if (save.sound && navigator.vibrate) try { navigator.vibrat
 // ---------- run state
 let s = null, playing = false, paused = false, screen = 'menu', acc = 0, last = performance.now(), clock = 0;
 let finger = null; // { id } of the pointer driving the bench
+// wages: green goal tokens in flight to the goal; payTags: the +numbers that rise by the wallet and the goal
+let catAt = null, benchObject = null, wages = [], shownWage = 0, payTags = [], lastPay = null, goalCoinAt = null;
 let ripples = [], bits = [], flying = [], confetti = [], multPop = 0, kb = null, prev = null, drawn = [], shownCoins = 0, feedback = null, banner = null, shake = 0, squash = 0, wobble = 0, pop = 1;
 let seenBase = 0, jobKey = null, leaving = [], spots = new Map(), heartFlash = 0, catHappy = 0, recCount = 0, multWas = 1, radioT = 0, newJob = null, hintNow = 0, ended = 0;
 let counterReset = () => { counter = null; };
@@ -357,7 +359,7 @@ function begin(how = 'level', n = null, assisted = false) {
   ticketKey = '';
   layout();
   playing = true; paused = false; acc = 0; last = performance.now(); clock = 0; ended = 0;
-  ripples = []; bits = []; flying = []; confetti = []; shownCoins = 0; leaving = []; spots = new Map(); feedback = null; banner = null; recCount = 0; multWas = 1; multPop = 0; finger = null; kb = null; jobKey = null; prev = null; counterReset();
+  ripples = []; bits = []; flying = []; confetti = []; shownCoins = 0; wages = []; shownWage = 0; payTags = []; lastPay = null; leaving = []; spots = new Map(); feedback = null; banner = null; recCount = 0; multWas = 1; multPop = 0; finger = null; kb = null; jobKey = null; prev = null; counterReset();
   show('play');
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); // so Space drives the bench, not the last button
   rec.start(runMetadata());
@@ -678,7 +680,7 @@ function react(e) {
     case 'switch':
     case 'ticket': tone(530, 0.07, 0.06, 'triangle'); break;
     case 'fixed': tone(1047, 0.15, 0.08, 'triangle'); break;
-    case 'step': feedback = { kind: 'step', t: 0 }; break;
+    case 'step': feedback = { kind: 'step', t: 0 }; stepBeat = { t: 0, n: s.stepN }; tone(660, 0.08, 0.07, 'triangle'); later(110, () => tone(990, 0.12, 0.07, 'triangle')); break;
     case 'paid': {
       (WORKS_SOUND[OBJECT[e.kinds[0]]] ?? (() => {}))();
       const m = multiplier(s), st = e.streak;
@@ -686,6 +688,16 @@ function react(e) {
       if (st >= 2) { const base = 523 * 2 ** (Math.min(st, 12) / 12); [1, 1.25, 1.5, 2, 2.5].slice(0, Math.min(st, 5)).forEach((k, i) => later(120 + i * 65, () => tone(base * k, 0.16, 0.05, 'triangle'))); }
       party(e.golden ? 30 : st >= 2 ? 6 + st * 4 : 0, e.golden);
       buzz(e.golden ? [30, 40, 30, 40, 60] : [20, 30, 20]);
+      // In a level with a coin goal the pay splits where it is seen: the repair's price flies to the goal as green tokens,
+      // the whole pay (price, tips and bonuses) to the wallet as gold coins, and each place shows its own +number.
+      const toGoal = !!s.lv?.goal.coins;
+      lastPay = { wage: e.wage, coins: e.coins, toGoal };
+      if (toGoal) {
+        const k = Math.min(8, e.wage);
+        for (let i = 0; i < k; i++) wages.push({ x: boxX + S / 2 + (Math.random() - 0.5) * 40, y: boxY + S * 0.4, vx: (Math.random() - 0.5) * 160, vy: -220 - Math.random() * 120, t: -i * 0.05, value: i === k - 1 ? e.wage - (k - 1) : 1 });
+        payTags.push({ to: 'goal', value: e.wage, t: -0.5 });
+      }
+      payTags.push({ to: 'wallet', value: e.coins, t: -0.5 });
       const n = Math.min(14, e.coins);
       for (let i = 0; i < n; i++) flying.push({ x: boxX + S / 2 + (Math.random() - 0.5) * 40, y: boxY + S * 0.4, vx: (Math.random() - 0.5) * 220, vy: -260 - Math.random() * 160, t: -i * 0.04, value: i === n - 1 ? e.coins - (n - 1) : 1 });
       if (m > multWas) multPop = 1;
@@ -892,12 +904,12 @@ window.fixitState = () => ({
   customer: s?.cust ? { n: s.cust.n, kinds: s.cust.kinds, regular: s.cust.regular, golden: s.cust.golden, left: s.cust.left, patience: s.cust.patience } : null,
   cue: s?.rep && s.phase === 'work' && !s.choosing ? (['zipStuck', 'balanceHold'].includes(repairCue(s.rep)) ? repairCue(s.rep) : guide(s.rep).type) : null,
   introCue: !!(card && s?.lv?.intro && !cleared(s.lv.n) || banner?.kind === 'new'), confetti: confetti.length, golden: !!s?.cust?.golden, queue: s ? s.queue.map(c => c.kinds[0]) : [], daily, today, days: { ...save.days }, keyboard: !!kb, alpha: Math.min(1, acc / DT),
-  people: drawn.map(p => ({ x: Math.round(p.x * 10) / 10, R: Math.round(p.R * 10) / 10, who: p.who })),
+  people: drawn.map(p => ({ x: Math.round(p.x * 10) / 10, R: Math.round(p.R * 10) / 10, who: p.who, ...(p.base ? { base: p.base } : {}) })),
   mode, level: mode === 'level' ? lvN : null, card, goal: s ? goalState(s) : null, cleared: !!s?.cleared, stars: s ? stars(s) : 0, clearT: s?.clearT ?? null,
   assisted: !!s?.assisted, attempts: { ...save.attempts }, assists: { ...save.assists }, growth: stallGrowth(),
   rule: s?.lv?.rule ?? null, order: s?.lv?.tickets ? s.cust.kinds : [], choosing: !!s?.choosing,
   station: s?.station ?? null, lanes: s?.lanes.map(c => ({ id: c.n, kind: c.kinds[c.stepN], left: c.left, done: c.done, p: c.reps[c.stepN].p })) ?? [],
-  lamp: s?.lv?.rule === 'blackout' ? calm ? 50 : lampAt(s) : null,
+  lamp: s?.lv?.rule === 'blackout' ? calm ? 50 : lampAt(s) : null, loupe: loupeAt, pay: lastPay, benchObject, cat: catAt, chips: chipsAt, slip: slipAt, stepBeat: stepBeat ? stepBeat.t : null,
   levels: { ...save.levels }, times: { ...save.times }, next: nextLevel(), migrated, openStall: openStall(), dailyOpen: dailyOpen(),
 });
 
@@ -934,7 +946,15 @@ function draw(now, dt) {
   else idleJob(t);
   for (const b of bits) { const [x, y] = local(b.x, b.y); g.globalAlpha = Math.max(0, 1 - b.t / b.life); star(g, x, y, 4, b.col); g.globalAlpha = 1; }
   hud(t, dt);
-  if (has('cat') || growth.includes('cat')) cat(g, 38, benchTop + 8, 0.88, t, catHappy > 0);
+  catAt = null;
+  if (has('cat') || growth.includes('cat')) { // on the bench in front of the queue, not over it
+    const y = benchControls ? benchTop + 8 : Math.min(benchTop + 30, boxY - 6); // with tickets on the bench, its old place beside them
+    const box = { x: Math.round(38 - 20 * 0.88), y: Math.round(y + 4 * 0.88), w: Math.round(62 * 0.88), h: Math.round(50 * 0.88) };
+    // the magnifier opens over the bench corner where the cat sits: the cat ducks away while it is up, so it never covers the view
+    const L = loupeAt, under = L && Math.max(box.x - L.x, 0, L.x - box.x - box.w) ** 2 + Math.max(box.y - box.h - L.y, 0, L.y - box.y) ** 2 < (L.r + 4) ** 2;
+    if (!under) { cat(g, 38, y, 0.88, t, catHappy > 0); catAt = box; }
+    else catAt = { ...box, hidden: true };
+  }
   if (s?.lv && (playing || screen === 'paused')) goalCard(t);
 }
 function street(t) {
@@ -975,7 +995,14 @@ function furnishings(growth) {
   }
 }
 const QUEUE_GAP = () => Math.min(92, W * 0.22);
-function custTarget(i) { return { x: W / 2 - QUEUE_GAP() * (i + 0.95) - 10, R: Math.max(13, 23 - i * 3), base: benchTop - 26 - i * 3 }; }
+// The queue: the next two people stand in full view (smaller on a narrow screen so both fit); the one after waits off
+// the left edge until a place frees.
+function custTarget(i) {
+  const R = Math.max(13, 23 - i * 3) * Math.min(1, W / 420);
+  let x = W / 2 - QUEUE_GAP() * (i + 0.95) - 10;
+  if (i < 2) x = Math.max(x, 4 + 1.5 * R);
+  return { x, R, base: benchTop - 26 - i * 3 };
+}
 function people(t, dt) {
   if (!s || !(screen === 'play' || screen === 'end' || screen === 'paused')) { // menu: a customer waves at the empty stall
     person(g, W / 2, benchTop + 6, 32, looks(12345), 'happy', t, { cheer: 0.5 + 0.5 * Math.sin(t * 3), bob: Math.sin(t * 2) * 2 });
@@ -1011,7 +1038,7 @@ function people(t, dt) {
     if (!sp) continue;
     if (c.golden) aura(sp.x, sp.base - sp.R * 1.3, sp.R * 2.2, t);
     person(g, sp.x, sp.base, sp.R, c.regular ? REGULAR : looks(c.look), 'ok', t, { blinkSeed: c.n, bob: Math.abs(Math.sin(t * 4 + c.n)) * 2 });
-    drawn.push({ x: sp.x, R: sp.R, who: 'queue' });
+    drawn.push({ x: sp.x, R: sp.R, who: 'queue', base: Math.round(sp.base) });
     if (c.regular) { g.fillStyle = C.ink; g.font = 'bold 13px sans-serif'; g.textAlign = 'center'; g.fillText('!', sp.x + sp.R * 1.2, sp.base - sp.R * 3); }
   }
   // people walking off, all at one pace so they never catch each other up
@@ -1041,6 +1068,16 @@ function people(t, dt) {
     g.strokeStyle = C.ink; g.lineWidth = 2.5; g.beginPath();
     g.moveTo(hx + nx * (rr * pulse - 6), hy + ny * (rr * pulse - 6));
     g.lineTo(hx + nx * (rr * pulse + 6), hy + ny * (rr * pulse + 6)); g.stroke();
+  }
+  // the customer's order slip: the job's steps as pictures, so a two-step job is known before it starts
+  slipAt = null;
+  if (s.reps.length > 1 && !benchControls && !s.choosing && (s.phase === 'work' || s.phase === 'works')) {
+    const size = 24, w = 2 * size + size * 0.5 + 16, x = Math.min(W - w / 2 - 6, hx + sp.R * 1.5 + w / 2 + 4), y = hy + sp.R * 0.55;
+    g.save(); g.translate(x, y); g.rotate(-0.06);
+    rrect(g, -w / 2, -size / 2 - 7, w, size + 14, 6, '#fff8e8', 1.6);
+    g.restore();
+    const row = stepRow(x, y, size, t);
+    slipAt = { x: x - w / 2, y: y - size / 2 - 7, w, h: size + 14, steps: row.length };
   }
   if (s.phase === 'works') reactionMark(hx + sp.R * 1.56, hy - sp.R * 0.67, cheer, true);
   else if (s.phase === 'leave' || frac < 0.2) reactionMark(hx + sp.R * 1.54, hy - sp.R * 0.67, 0.8, false);
@@ -1146,13 +1183,18 @@ function job(t, dt) {
   if (s.cust.golden) for (let i = 0; i < 6; i++) { const a = t * (calm ? 0.3 : 1.2) + i * Math.PI / 3; star(g, cx + Math.cos(a) * S * 0.5, cy + Math.sin(a) * S * 0.5, 6, '#fff3a8'); }
   if (prog > 0) { g.strokeStyle = s.phase === 'works' ? '#7fe0a0' : C.tealLt; g.lineWidth = 8; g.beginPath(); g.arc(cx, cy, S * 0.5, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog); g.stroke(); }
   // the object
-  const works = s.phase === 'works' ? 1 - V.phaseT / WORKS : 0, gone = s.phase === 'leave' ? 1 - V.phaseT / LEAVE : 0;
+  // gone: how far the unfixed object has been taken away, 0..1. It is clamped because the blended phase time can run
+  // past the end when a level ends during the walk-off; unclamped, the alpha went out of range (the canvas ignores it) and
+  // the object was drawn whole, far down the bench and off the screen.
+  const works = s.phase === 'works' ? 1 - V.phaseT / WORKS : 0, gone = s.phase === 'leave' ? Math.min(1, Math.max(0, 1 - V.phaseT / LEAVE)) : 0;
   pop = Math.min(1, pop + dt * 6);
   const k = (0.7 + 0.3 * easeBack(pop)) * (1 - 0.035 * squash) * (1 + (works ? 0.05 * Math.sin(works * Math.PI) : 0));
   g.save();
-  g.translate(cx + Math.sin(t * 50) * wobble * 4, cy + gone * S * 0.4);
-  g.scale(k * (1 + 0.02 * squash), k);
-  g.globalAlpha = 1 - gone;
+  const away = 1 - 0.2 * gone; // it shrinks and fades where it stands, so it never slides off the bench
+  benchObject = { dy: gone * S * 0.06, scale: k * away, alpha: 1 - 0.8 * gone };
+  g.translate(cx + Math.sin(t * 50) * wobble * 4, cy + benchObject.dy);
+  g.scale(k * (1 + 0.02 * squash) * away, k * away);
+  g.globalAlpha = benchObject.alpha;
   g.translate(-S / 2, -S / 2); g.scale(unit, unit);
   if (s.lv?.rule === 'boss' && s.reps.length === 3) {
     rrect(g, 3, 8, 94, 86, 13, '#5d5664', 1.3);
@@ -1171,6 +1213,12 @@ function job(t, dt) {
   const urgentCue = (r.kind === 'oil' || r.kind === 'zip' && zipStuck(r) && r.idle > 0.2) && !s.choosing;
   hintNow = playing && !paused && !card ? Math.max(hint(s, seenBase), urgentCue ? 0.9 : 0) : 0;
   if (hintNow && s.phase === 'work') drawGhost(g, guide(r), t, hintNow * (calm ? 1 : 0.82 + 0.18 * Math.sin(t * 5)), calm);
+  else if (stepBeat && s.phase === 'work' && !s.choosing && !benchControls) { // the next part: a ring calls the eye to it and the finger shows its move once
+    const b = stepBeat.t / STEP_BEAT, a = Math.min(1, (1 - b) * 3);
+    g.strokeStyle = `rgba(255,241,214,${a})`; g.lineWidth = 3; const gd = guide(r), [px, py] = gd.at ?? gd.from ?? gd.pts?.[0] ?? (gd.cx != null ? [gd.cx, gd.cy] : [50, 50]);
+    g.beginPath(); g.arc(px, py, 14 + 10 * (1 - b) + 3 * Math.sin(t * 12), 0, Math.PI * 2); g.stroke();
+    if (b > 0.2) drawGhost(g, gd, t, 0.9 * a, calm);
+  }
   if (kb && s.phase === 'work') { // the keyboard's finger: a fingertip that presses while Space is held
     g.fillStyle = kb.down ? 'rgba(255,255,255,.45)' : 'rgba(255,255,255,.2)'; g.beginPath(); g.arc(kb.x, kb.y, kb.down ? 7 : 5, 0, Math.PI * 2); g.fill();
     g.strokeStyle = C.ink; g.lineWidth = 1.2; g.stroke();
@@ -1179,11 +1227,12 @@ function job(t, dt) {
   g.restore();
   g.globalAlpha = 1;
   if (s.lv?.rule === 'blackout') blackout();
+  loupe(t);
   const y = boxY - 16;
   if (s.choosing) {
     const sequence = s.reps.map((_, i) => i < s.stepN ? '✓' : num(i + 1));
     ink(sequence.join(' → '), W / 2, y, 24, '#fff6e4', 'center');
-  } else if (feedback) {
+  } else if (feedback && !(feedback.kind === 'step' && s.reps.length > 1 && !benchControls)) { // a step change is shown by the step pictures instead
     g.save();
     g.globalAlpha = Math.min(1, (0.9 - feedback.t) * 5);
     const x = W / 2;
@@ -1191,13 +1240,8 @@ function job(t, dt) {
     symbol(g, feedback.kind, x, y, 11);
     g.restore();
   }
-  if (s.reps.length > 1 && s.phase === 'work' && !benchControls) {
-    for (let i = 0; i < s.reps.length; i++) {
-      const x = W / 2 + (i - (s.reps.length - 1) / 2) * 21;
-      if (i < s.stepN) symbol(g, 'fixed', x, boxY + 6, 7);
-      else circle(g, x, boxY + 6, 5, i === s.stepN ? C.cream : 'rgba(255,255,255,.3)', 2);
-    }
-  }
+  chipsAt = null;
+  if (s.reps.length > 1 && s.phase === 'work' && !benchControls && !s.choosing) chipsAt = stepRow(W / 2, boxY + 4, CHIP, t);
   if (banner && !benchControls && s.lv?.rule !== 'blackout') {
     const a = Math.min(1, banner.t * 6) * Math.min(1, (1.6 - banner.t) * 4);
     if (a > 0) {
@@ -1209,6 +1253,66 @@ function job(t, dt) {
       g.restore();
     }
   }
+}
+// The steps of a two-step job as pictures, joined by an arrow: over the bench and on the customer's slip. The step to do
+// now is lit, a done step carries a tick, and when a step is done the next picture pops so the change of job is seen.
+const CHIP = 34, STEP_BEAT = 1.1;
+let stepBeat = null, chipsAt = null, slipAt = null;
+function stepRow(cx, cy, size, t) {
+  const n = s.reps.length, gap = size * 0.5, w = n * size + (n - 1) * gap, out = [];
+  for (let i = 0; i < n; i++) {
+    const x = cx - w / 2 + size / 2 + i * (size + gap), now = i === s.stepN && s.phase === 'work', done = i < s.stepN || s.phase === 'works';
+    const beat = now && stepBeat?.n === i ? Math.sin(Math.min(1, stepBeat.t / 0.35) * Math.PI) : 0;
+    const R = size / 2 * (1 + 0.3 * beat);
+    if (i) { // the arrow from the last step to this one
+      const ax = x - size / 2 - gap / 2;
+      g.fillStyle = done || now ? '#fff1d6' : 'rgba(255,241,214,.55)'; g.beginPath(); g.moveTo(ax + 6, cy); g.lineTo(ax - 4, cy - 6); g.lineTo(ax - 4, cy + 6); g.closePath(); g.fill();
+    }
+    g.save();
+    g.globalAlpha = now || done ? 1 : 0.6;
+    circle(g, x, cy, R, now ? '#fff1d6' : '#e9d6b4', now ? 2.6 : 1.6);
+    g.beginPath(); g.arc(x, cy, R - 2, 0, Math.PI * 2); g.clip();
+    g.translate(x - R * 0.85, cy - R * 0.85); g.scale(R * 1.7 / 100, R * 1.7 / 100);
+    stepIcon(g, V.reps[i] ?? s.reps[i], i, t);
+    g.restore();
+    if (now) { g.strokeStyle = C.tealLt; g.lineWidth = 3; g.beginPath(); g.arc(x, cy, R + 3 + (calm ? 0 : 1.5 * Math.sin(t * 6)), 0, Math.PI * 2); g.stroke(); }
+    if (done) symbol(g, 'fixed', x + R * 0.62, cy + R * 0.62, R * 0.45);
+    out.push({ x, y: cy, r: R, now, done });
+  }
+  return out;
+}
+// While the thumb steers the needle's thread or the tile pen, a magnified circle in the top corner away from the thumb
+// shows the tip and its target, so the part under and above the thumb is always in sight.
+let loupeAt = null, loupeSide = 17;
+function loupe(t) {
+  loupeAt = null;
+  const r = V.reps[s.stepN];
+  if (s.phase !== 'work' || s.choosing || !r?.grab || (r.kind !== 'thread' && r.kind !== 'trace')) return;
+  const thread = r.kind === 'thread', [fx, fy] = thread ? [r.ex, r.ey] : [r.tx, r.ty];
+  // above the tile and level with the needle's top; the needle stands right, so its view sits left
+  if (thread || r.tx > 62) loupeSide = 17; else if (r.tx < 38) loupeSide = 83; // the tile view changes side only well past the middle
+  const R = 16, zoom = thread ? 1.6 : 2, lx = loupeSide, ly = 1;
+  g.save();
+  g.translate(boxX, boxY); g.scale(unit, unit);
+  g.save();
+  g.beginPath(); g.arc(lx, ly, R, 0, Math.PI * 2); g.clip();
+  g.fillStyle = '#b9764a'; g.fillRect(lx - R, ly - R, 2 * R, 2 * R);
+  g.translate(lx, ly); g.scale(zoom, zoom); g.translate(-fx, -fy);
+  if (s.lv?.tickets) drawJob(g, [r], 0, t, 0); else drawJob(g, V.reps, s.stepN, t, 0);
+  g.restore();
+  circle(g, lx, ly, R, 'rgba(0,0,0,0)', 1.6);
+  g.strokeStyle = '#fff1d6'; g.lineWidth = 1; g.beginPath(); g.arc(lx, ly, R - 1.2, 0, Math.PI * 2); g.stroke();
+  if (thread) { // a tip outside the magnified view: an arrow on the rim points to where it is
+    const dx = r.tx - r.ex, dy = r.ty - r.ey, d = Math.hypot(dx, dy);
+    if (d * zoom > R - 3) {
+      const a = Math.atan2(dy, dx);
+      g.fillStyle = '#e8f4ff'; g.strokeStyle = C.ink; g.lineWidth = 1;
+      g.save(); g.translate(lx + Math.cos(a) * (R - 4), ly + Math.sin(a) * (R - 4)); g.rotate(a);
+      g.beginPath(); g.moveTo(3, 0); g.lineTo(-2.5, -3); g.lineTo(-2.5, 3); g.closePath(); g.fill(); g.stroke(); g.restore();
+    }
+  }
+  g.restore();
+  loupeAt = { x: boxX + lx * unit, y: boxY + ly * unit, r: R * unit, kind: r.kind };
 }
 function idleJob(t) {
   g.save(); g.translate(boxX, boxY); g.scale(unit, unit);
@@ -1257,6 +1361,18 @@ function hud(t, dt) {
     const x = (c.x + c.vx * c.t) * (1 - e) + tx * e, yy = (c.y + c.vy * c.t + 300 * c.t * c.t) * (1 - e) + ty * e;
     coin(g, x, yy, 9);
   }
+  if (goalCoinAt) for (const c of wages) {
+    if (c.t < 0) continue;
+    const k = Math.min(1, c.t / 0.75), e = k * k;
+    wage(g, (c.x + c.vx * c.t) * (1 - e) + goalCoinAt.x * e, (c.y + c.vy * c.t + 300 * c.t * c.t) * (1 - e) + goalCoinAt.y * e, 9);
+  }
+  for (const p of payTags) { // +numbers: green under the goal's token, gold under the wallet
+    if (p.t < 0 || (p.to === 'goal' && !goalCoinAt)) continue;
+    const [x, yy] = p.to === 'goal' ? [goalCoinAt.x + 18, goalCoinAt.y + 26] : [W / 2 - 10, y + 44];
+    g.save(); g.globalAlpha = Math.min(1, (1.3 - p.t) * 3);
+    ink('+' + num(p.value), x, yy - (calm ? 0 : p.t * 10), 18, p.to === 'goal' ? '#9ff0b0' : '#ffd860', 'center');
+    g.restore();
+  }
   for (const p of confetti) { g.save(); g.globalAlpha = Math.max(0, 1 - p.t / p.life); g.translate(p.x, p.y); g.rotate(p.r); g.fillStyle = p.col; g.fillRect(-4, -2.5, 8, 5); g.restore(); }
 }
 
@@ -1299,7 +1415,9 @@ function goalBar(t) {
   const w = parts.reduce((a, p) => a + 26 + g.measureText(p.text).width + 8, 6) + (gs.safe ? 22 : 0);
   rrect(g, x, ly - 15, w, 30, 15, gs.met ? '#3f9e6a' : 'rgba(58,34,22,.72)', 2);
   x += 8;
+  goalCoinAt = null;
   for (const p of parts) {
+    if (p.kind === 'coins') { goalCoinAt = { x: x + 10, y: ly }; p.text = count(Math.min(Math.min(shownWage, p.have), p.need), p.need); }
     objectiveIcon(p.kind, x + 10, ly, 10, t);
     x += 24 + ink(p.text, x + 24, ly + 1, 17, p.have >= p.need ? '#9ff0b0' : '#fff6e4') + 8;
   }
@@ -1371,8 +1489,9 @@ function goalCard(t) {
     cardText(translate('safeGoal'), x + 38, yy, 14, cw - 51, 'left');
     yy += 21;
   }
-  if (lv.goal.coins) {
+  if (lv.goal.coins) { // gold bonus coins, crossed out: only the green tokens count
     coin(g, x + 23, yy, 8);
+    g.strokeStyle = C.red; g.lineWidth = 2.4; g.lineCap = 'round'; g.beginPath(); g.moveTo(x + 16, yy + 7); g.lineTo(x + 30, yy - 7); g.stroke();
     cardText(translate('baseRule'), x + 38, yy, 14, cw - 51, 'left');
     yy += 21;
   }
@@ -1403,10 +1522,15 @@ function frame(now) {
     for (const b of bits) { b.t += dt; b.x += b.vx * dt * 0.3; b.y += b.vy * dt * 0.3; b.vy += 120 * dt; } bits = bits.filter(b => b.t < b.life);
     for (const c of flying) { c.t += dt; if (c.t >= 0.7 && !c.landed) { c.landed = true; shownCoins += c.value; tone(1800 + Math.random() * 300, 0.05, 0.04, 'square'); } }
     flying = flying.filter(c => !c.landed);
+    for (const c of wages) { c.t += dt; if (c.t >= 0.75 && !c.landed) { c.landed = true; shownWage += c.value; tone(1300 + Math.random() * 200, 0.05, 0.04, 'triangle'); } }
+    wages = wages.filter(c => !c.landed);
+    if (s && !wages.length) shownWage = s.goalCoins;
+    for (const p of payTags) p.t += dt; payTags = payTags.filter(p => p.t < 1.3);
     for (const p of confetti) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 520 * dt; p.vx *= 1 - dt; p.r += p.vr * dt; } confetti = confetti.filter(p => p.t < p.life);
     multPop = Math.max(0, multPop - dt * 2.5); cardFade = Math.max(0, cardFade - dt);
     if (s && !flying.length) shownCoins = s.coins;
     if (feedback) { feedback.t += dt; if (feedback.t > 0.9) feedback = null; }
+    if (stepBeat) { stepBeat.t += dt; if (stepBeat.t > STEP_BEAT) stepBeat = null; }
     if (banner) { banner.t += dt; if (banner.t > 1.6) banner = null; }
     shake = Math.max(0, shake - dt * 4); squash = Math.max(0, squash - dt * 8); wobble = Math.max(0, wobble - dt * 4); heartFlash = Math.max(0, heartFlash - dt * 1.5); catHappy = Math.max(0, catHappy - dt);
   }

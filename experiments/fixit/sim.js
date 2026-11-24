@@ -41,6 +41,7 @@ function repairMeta(field) {
   return Object.fromEntries(Object.entries(REPAIR_META).map(([kind, meta]) => [kind, meta[field]]));
 }
 
+const TAPS = ['dent', 'oil']; // repairs done by separate taps, which a finger sliding on from the last repair must not do
 const DENTS = [[28, 54], [50, 42], [72, 54], [38, 76], [62, 76]];
 // Where a second-job screw sits on each object (all at least 28 units from the box edge, so a thumb can circle it).
 const SCREW_SPOT = { pin: [72, 80], dent: [50, 20], wheel: [50, 54], rub: [50, 40], clock: [50, 52], chain: [68, 36], glue: [50, 60], sharpen: [32, 52], sew: [76, 50], pump: [74, 80], oil: [58, 46], zip: [32, 44], spring: [50, 72], thread: [32, 46], wind: [50, 42], balance: [50, 41], trace: [50, 47] };
@@ -472,15 +473,24 @@ K.spring = {
   guide: r => ({ type: 'drag', from: [r.x - 8, r.y], to: [r.x0 - r.need - 12, r.y], hold: Math.max(0, r.x - (r.x0 - r.need)) / SPRING_RATE + 0.2 }),
 };
 
-// Needle: hold the thread's end (its tip stands up above the finger) and steer the tip into the needle's eye, then hold
-// still while it goes through. Moving while it is in the eye pulls it back out.
+// Needle: hold the thread anywhere (the blue knob, the stiff thread or its tip). The tip always stands straight above
+// the thumb, so the thumb sits below the eye and never covers it. Steer the tip into the eye and hold still while it goes
+// through. Moving while it is in the eye pulls it back out.
 export const THREAD_HOLD = 1.0; // seconds of holding still in the eye
-export const THREAD_UP = 16;
-export const THREAD_SIDE = 26; // the tip stays to the right of the thumb and clear of the shaft
+export const THREAD_UP = 28; // the tip stands this far above the touch
+export const THREAD_EYE = 9; // the tip counts as in the eye within this distance of it
+export const THREAD_RATE = 200; // units per second the tip follows the thumb at
+const segDist = (x, y, ax, ay, bx, by) => {
+  const dx = bx - ax, dy = by - ay, k = dx || dy ? clamp(((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy), 0, 1) : 0;
+  return dist(x, y, ax + k * dx, ay + k * dy);
+};
+export { segDist };
+// d0 is the tip's distance to the eye at rest, less the eye's 2-unit sway, so an untouched thread shows no progress.
 K.thread = {
-  make: s => ({ tx: 38, ty: 56, fx: 12, fy: 72, ex: 64, ey: 28, ph: rand(s), jit: 0, inEye: 0, lx: 0, ly: 0, was: false, d0: Math.hypot(26, 28) - 4, held: false }),
+  make: s => ({ tx: 36, ty: 46, fx: 36, fy: 46 + THREAD_UP, ex: 64, ey: 28, ph: rand(s), jit: 0, inEye: 0, lx: 0, ly: 0, was: false, d0: dist(36, 46, 64, 28) - 2.5, held: false }),
   down(r, x, y) {
-    if (dist(x, y, r.tx - THREAD_SIDE, r.ty + THREAD_UP) > HIT.thread) return false;
+    // the knob sits under the tip while nobody holds it; a press on the knob, the thread or the tip all take hold
+    if (segDist(x, y, r.tx, r.ty + THREAD_UP, r.tx, r.ty) > HIT.thread) return false;
     r.grab = true; r.held = true; r.fx = r.lx = x; r.fy = r.ly = y;
     return true;
   },
@@ -492,20 +502,20 @@ K.thread = {
   tick(r, dt, s) {
     r.ph += dt / 2.4; r.ex = 64 + 2 * Math.sin(r.ph * 2 * Math.PI); // the needle sways a little
     r.jit *= Math.exp(-dt / 0.1);
-    if (r.grab) { // the thread is floppy: its tip follows the finger at its own pace
-      const tx = r.fx + THREAD_SIDE, ty = r.fy - THREAD_UP, d = dist(tx, ty, r.tx, r.ty), v = 110 * dt;
+    if (r.grab) { // the tip glides to its place above the thumb
+      const tx = r.fx, ty = r.fy - THREAD_UP, d = dist(tx, ty, r.tx, r.ty), v = THREAD_RATE * dt;
       if (d > 0) { const k = Math.min(1, v / d); r.tx += (tx - r.tx) * k; r.ty += (ty - r.ty) * k; }
     }
-    const d = dist(r.tx, r.ty, r.ex, r.ey), near = d <= 6;
+    const d = dist(r.tx, r.ty, r.ex, r.ey), near = d <= THREAD_EYE;
     if (near && !r.was) s.events.push({ e: 'eye' });
     r.was = near;
     const before = Math.floor(r.inEye * 5);
     if (near && r.grab && r.jit < 3) r.inEye = Math.min(1, r.inEye + dt / THREAD_HOLD);
     else r.inEye = Math.max(0, r.inEye - dt * (near ? 0.5 : 2));
     if (Math.floor(r.inEye * 5) > before) s.events.push({ e: 'through', n: Math.floor(r.inEye * 5) });
-    r.p = r.inEye >= 1 ? 1 : r.held ? 0.4 * clamp(1 - (d - 6) / r.d0, 0, 1) + 0.6 * r.inEye : 0;
+    r.p = r.inEye >= 1 ? 1 : r.held ? 0.4 * clamp(1 - (d - THREAD_EYE) / (r.d0 - THREAD_EYE), 0, 1) + 0.6 * r.inEye : 0;
   },
-  guide: r => ({ type: 'drag', from: [r.tx - THREAD_SIDE, r.ty + THREAD_UP], to: [r.ex - THREAD_SIDE, r.ey + THREAD_UP], hold: dist(r.tx, r.ty, r.ex, r.ey) / 110 + (1 - r.inEye) * THREAD_HOLD + 0.35, eye: [r.ex, r.ey] }),
+  guide: r => ({ type: 'drag', from: [r.tx, r.ty + THREAD_UP], to: [r.ex, r.ey + THREAD_UP], hold: dist(r.tx, r.ty, r.ex, r.ey) / THREAD_RATE + (1 - r.inEye) * THREAD_HOLD + 0.35, eye: [r.ex, r.ey], tipUp: THREAD_UP }),
 };
 
 function makeRepair(s, kind, spot) {
@@ -529,7 +539,7 @@ export function create({ seed = 1, unlocked = TUTOR, tutorial = false, hearts = 
     hearts, maxHearts: hearts, coins: 0, goalCoins: 0, served: 0, lost: 0, streak: 0, bestStreak: 0, log: [],
     unlocked: unlocked.filter(k => KINDS.includes(k)), tutorial, newJob, only, regular, two, golden, goldenFrom, made: 0, lastKind: null,
     queue: [], cust: null, reps: [], rep: null, stepN: 0, phase: 'work', phaseT: 0,
-    finger: { down: false, blocked: false, x: 0, y: 0 },
+    finger: { down: false, blocked: false, carry: false, x: 0, y: 0 },
     lv, cleared: false, clearT: null,
     assisted: !!(lv && assisted), lanes: [], station: null, choosing: false,
     deadline: lv?.goal.time ? lv.goal.time / (assisted ? ASSIST_RATE : 1) : null,
@@ -595,6 +605,7 @@ function activate(s, c) {
   s.phase = 'work'; s.phaseT = 0;
   s.choosing = s.lv?.rule === 'order';
   s.finger.blocked = s.finger.down; // a finger still down must lift before touching the new job
+  s.finger.carry = false;
 }
 
 function announce(s, c) {
@@ -659,14 +670,18 @@ export function input(s, ev) {
   if (s.over) return;
   const f = s.finger;
   const { type, x, y } = ev;
-  if (type === 'down') { f.down = true; f.blocked = false; }
+  if (type === 'down') { f.down = true; f.blocked = false; f.carry = false; }
   else if (type === 'up' || type === 'cancel') {
-    const was = f.blocked; f.down = false; f.blocked = false;
+    const was = f.blocked || f.carry; f.down = false; f.blocked = false; f.carry = false;
     if (was) return;
   } else if (!f.down || f.blocked) return; // a mouse moving with no button pressed, or a finger left over from the last job
   f.x = x; f.y = y;
   if (s.phase !== 'work' || !s.rep || s.choosing) return;
   const r = s.rep, k = K[r.kind];
+  if (f.carry) { // a finger still down from this object's first repair takes hold of the next one where it touches it
+    if (k.down(r, x, y, s)) { f.carry = false; s.events.push({ e: 'grab', kind: r.kind, x, y }); k.move(r, x, y, s); settle(s); }
+    return;
+  }
   if (type === 'down') {
     const hit = k.down(r, x, y, s);
     if (!hit) { s.events.push({ e: 'miss', x, y }); r.idle = Math.max(r.idle, HINT_AFTER); } // a wasted tap shows the hint at once
@@ -687,7 +702,10 @@ function settle(s) {
     if (s.stepN + 1 < s.reps.length) {
       s.stepN++; s.cust.stepN = s.stepN; s.rep = s.reps[s.stepN];
       s.choosing = s.lv?.rule === 'order';
-      s.finger.blocked = s.finger.down;
+      // The same object stays on the bench, so a finger still down carries on into its next repair (a circle that goes
+      // straight on turns the screw). Tap repairs still want a fresh tap.
+      s.finger.blocked = s.finger.down && TAPS.includes(s.rep.kind);
+      s.finger.carry = s.finger.down && !s.finger.blocked;
       s.events.push({ e: 'step', kind: s.rep.kind });
     } else pay(s);
   }
@@ -696,7 +714,8 @@ function settle(s) {
 function pay(s) {
   const c = s.cust;
   let base = c.kinds.reduce((a, k) => a + COIN[k], 0);
-  s.goalCoins += base;
+  const wage = base; // the repair's price: the part of the pay that counts toward a level's coin goal
+  s.goalCoins += wage;
   c.done = true;
   const quick = s.assisted ? c.elapsed <= c.patience * 0.5 : c.left / c.patience >= 0.5;
   if (quick) { s.streak++; base += QUICK_BONUS; } else s.streak = 0;
@@ -705,7 +724,7 @@ function pay(s) {
   s.coins += coins; s.served++;
   s.log.push({ kind: c.kinds.join('+'), ms: Math.round(c.elapsed * 1000), ok: true, ...(c.golden ? { golden: true } : {}) });
   s.phase = 'works'; s.phaseT = WORKS;
-  s.events.push({ e: 'paid', coins, quick, kinds: c.kinds, mult: multiplier(s), regular: c.regular, golden: c.golden, streak: s.streak });
+  s.events.push({ e: 'paid', coins, wage, quick, kinds: c.kinds, mult: multiplier(s), regular: c.regular, golden: c.golden, streak: s.streak });
   if (s.lv && !s.cleared && goalState(s).met) { // the level's clock stops the moment the goal is met
     s.cleared = true; s.clearT = s.clock;
     s.events.push({ e: 'goal', secs: s.clearT, stars: stars(s) });
