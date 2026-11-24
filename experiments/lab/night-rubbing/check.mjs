@@ -10,8 +10,9 @@ import { setTimeout as sleep } from 'node:timers/promises';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const path = '/lab/night-rubbing/';
+const away = '/rubbing-test-away';
 const notes = '/notes/button.js';
-const shots = '/private/tmp/night-r5-wild';
+const shots = process.env.SHOTS || '/private/tmp/night-r6-review/rubbing/check';
 const require = createRequire(join(resolve(process.env.PLAYWRIGHT || join(homedir(), 'code/human-framework/node_modules')), 'check.cjs'));
 const { chromium, devices, webkit } = require('playwright');
 const profiles = [
@@ -22,7 +23,7 @@ assert.ok(profiles.length, 'choose webkit or chromium');
 await mkdir(shots, { recursive: true });
 
 function allowed(url) {
-  return url === path || url === notes || url === '/favicon.ico'
+  return url === path || url === away || url === notes || url === '/favicon.ico'
     || /^\/lab\/night-rubbing\/[\w.-]+$/.test(url)
     || /^\/kit\/(?:audio|drag|hint|pause|save|screens|stick|zoom)\.js$/.test(url);
 }
@@ -31,6 +32,7 @@ const server = createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost').pathname;
   if (!allowed(url) || request.method !== 'GET') return response.writeHead(404).end();
   if (url === '/favicon.ico') return response.writeHead(204).end();
+  if (url === away) return response.writeHead(200, { 'Content-Type': 'text/html' }).end('<title>Another page</title>');
   const file = url === notes ? resolve(root, '../workers/feedback/public/notes/button.js')
     : join(root, url, url === path ? 'index.html' : '');
   try {
@@ -192,6 +194,9 @@ async function run({ name, engine, device }) {
     page.on('websocket', s => unexpected.push(s.url()));
     const capture = scene => page.screenshot({ path: join(shots, name + '-' + scene + '.png'), scale: 'css' });
     const tap = id => page.locator('#' + id).tap();
+    const portrait = page.viewportSize();
+    const rotate = () => page.setViewportSize({ width: portrait.height, height: portrait.width });
+    const restorePortrait = () => page.setViewportSize(portrait);
 
     await page.goto(origin + path);
     await screen(page, 'play');
@@ -202,6 +207,16 @@ async function run({ name, engine, device }) {
     await controls(page, '#pause, #collection button');
     assert.equal(await page.locator('#collection button:enabled').count(), 1);
     await capture('opening');
+    await page.locator('.kit-hint.on').waitFor({ state: 'attached' });
+    await rotate();
+    const track = await page.locator('.kit-hint .track').boundingBox();
+    const rotatedSheet = await page.locator('#field').boundingBox();
+    assert.ok(track && rotatedSheet && track.x >= rotatedSheet.x
+      && track.x + track.width <= rotatedSheet.x + rotatedSheet.width
+      && track.y >= rotatedSheet.y && track.y + track.height <= rotatedSheet.y + rotatedSheet.height,
+      'the first-use demo stays on the sheet after rotation');
+    await capture('landscape-hint');
+    await restorePortrait();
     let input = await pointer(page, name);
     const center = input.at(120, 140);
     await page.touchscreen.tap(center.x, center.y);
@@ -210,6 +225,8 @@ async function run({ name, engine, device }) {
     await input.up();
     assert.equal((await state(page)).coverage, fresh.coverage, 'stationary contact deposits no pigment');
     assert.equal((await state(page)).distance, fresh.distance, 'stationary contact is not a stroke');
+    assert.equal(await page.locator('#status').innerText(), 'Rub across the fossil',
+      'a stationary first touch does not remove the instruction');
 
     const results = [await rubPlate(page, input, 1, capture)];
     const originalPrint = await printPixels(page);
@@ -225,23 +242,59 @@ async function run({ name, engine, device }) {
     await stroke(input, 140);
     const rubbed = await state(page);
     assert.ok(rubbed.distance > clean.distance && rubbed.coverage > clean.coverage, 'one stroke leaves a mark');
+    assert.equal(await page.locator('#status').innerText(), 'Taking an impression');
+    await input.down(156, 84);
+    await rotate();
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    await input.move(158, 84);
+    await input.up();
+    assert.deepEqual(await state(page), rubbed, 'rotation ends an active stroke without marking the sheet');
+    await input.close();
+    await controls(page, '#pause, #collection button');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollHeight), portrait.width,
+      'the cabinet fits in the rotated viewport');
+    input = await pointer(page, name);
+    const beforeLandscapeStroke = await printPixels(page);
+    await stroke(input, 100);
+    const rotated = await state(page);
+    assert.ok(rotated.distance > rubbed.distance, 'a rotated sheet accepts strokes');
+    const afterLandscapeStroke = await printPixels(page);
+    // The fern's contact radius is 28, with two pixels allowed for input rounding.
+    const firstRow = 70 * 240 * 4;
+    const rowAfterLast = 131 * 240 * 4;
+    assert.ok(!beforeLandscapeStroke.subarray(firstRow, rowAfterLast).equals(afterLandscapeStroke.subarray(firstRow, rowAfterLast))
+      && beforeLandscapeStroke.subarray(0, firstRow).equals(afterLandscapeStroke.subarray(0, firstRow))
+      && beforeLandscapeStroke.subarray(rowAfterLast).equals(afterLandscapeStroke.subarray(rowAfterLast)),
+      'the rotated stroke marks the rows under the pencil');
+    await capture('landscape');
     await tap('pause');
     await screen(page, 'paused');
     const paused = await state(page);
     await controls(page, '#paused button');
+    assert.match(await page.locator('#paused p').innerText(), /pale ridges, including the tips/);
     await sleep(350);
     assert.equal((await state(page)).coverage, paused.coverage);
     assert.equal((await state(page)).distance, paused.distance);
-    await tap('sound');
+    assert.equal(await page.locator('#resume').evaluate(button => button === document.activeElement), true);
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Enter');
     const muted = (await state(page)).sound;
     assert.equal(muted, !paused.sound);
+    assert.equal(await page.locator('#sound').evaluate(button => button === document.activeElement), true,
+      'toggling sound keeps keyboard focus on the switch');
     const previousInk = await page.locator('#ink').innerText();
-    await tap('ink');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Enter');
     assert.notEqual(await page.locator('#ink').innerText(), previousInk);
+    assert.equal(await page.locator('#ink').evaluate(button => button === document.activeElement), true,
+      'toggling medium keeps keyboard focus on the switch');
+    await capture('landscape-paused');
+    await restorePortrait();
     await capture('paused');
     await tap('resume');
     await screen(page, 'play');
-    assert.equal((await state(page)).coverage, rubbed.coverage);
+    assert.equal(await page.locator('#field').evaluate(canvas => canvas === document.activeElement), true);
+    assert.equal((await state(page)).coverage, rotated.coverage);
     await tap('pause');
     await screen(page, 'paused');
     await tap('restart');
@@ -250,6 +303,11 @@ async function run({ name, engine, device }) {
     assert.equal((await state(page)).coverage, clean.coverage);
     assert.equal((await state(page)).distance, clean.distance);
     await input.close();
+    input = await pointer(page, name);
+    await stroke(input, 140);
+    assert.ok((await state(page)).distance > 0, 'reload is tested with an unfinished print');
+    await capture('before-reload');
+    await input.close();
     await page.evaluate(() => localStorage.setItem('notes.k', 'local-phone-check'));
     await page.reload();
     await screen(page, 'play');
@@ -257,6 +315,8 @@ async function run({ name, engine, device }) {
     assert.equal(reloaded.level, 2);
     assert.equal(reloaded.unlocked, 2);
     assert.equal(reloaded.sound, muted);
+    assert.equal(reloaded.distance, 0, 'an unfinished print restarts on reload');
+    await capture('after-reload');
     await page.waitForFunction(() => {
       const button = document.getElementById('notes-button');
       return button?.pathname === '/notes/' && /^\?game=lab&build=[a-f0-9]{10}$/.test(button.search);
@@ -274,10 +334,35 @@ async function run({ name, engine, device }) {
     }
     assert.equal(await page.locator('#collection button:enabled').count(), 6, 'every plate can be selected');
     const finalPrint = await printPixels(page);
+    await rotate();
+    await controls(page, '#pause, #next, #collection button');
+    assert.ok(await page.locator('#next').evaluate(button => {
+      const label = new Range();
+      label.selectNode(button.firstChild);
+      const words = label.getBoundingClientRect();
+      const arrow = button.querySelector('b').getBoundingClientRect();
+      return Math.abs(words.top - arrow.top) < words.height;
+    }), 'the last-plate button fits its label and arrow on one line');
+    await pointer(page, name).then(input => input.close());
+    await capture('landscape-final');
+    await restorePortrait();
     await page.reload();
     await screen(page, 'result');
     const finalPrintError = comparePrints(finalPrint, await printPixels(page));
     assert.equal((await state(page)).level, 6, 'the finished last plate survives reload');
+    await page.evaluate(() => addEventListener('pagehide', () => {
+      sessionStorage.setItem('rubbing-test-departure', window.rubbingState().screen);
+    }, { once: true }));
+    await page.goto(origin + away);
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('rubbing-test-departure')), 'paused',
+      'leaving the game pauses the print');
+    await page.goBack();
+    await page.waitForFunction(() => ['paused', 'result'].includes(window.rubbingState?.().screen));
+    if ((await state(page)).screen === 'paused') await tap('resume');
+    await screen(page, 'result');
+    assert.equal((await state(page)).level, 6, 'the finished last plate survives leaving and returning');
+    comparePrints(finalPrint, await printPixels(page));
+    await capture('returned');
     await page.locator('#collection button').first().tap();
     await screen(page, 'result');
     const filed = await state(page);

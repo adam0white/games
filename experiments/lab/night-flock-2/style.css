@@ -28,6 +28,7 @@ button:active {transform:translateY(1px)}
 button:disabled {opacity:.43;cursor:default}
 .round {width:46px;height:46px;border-radius:50%;display:grid;place-items:center;border-color:#909b88}
 .bars {width:13px;height:16px;border-inline:4px solid var(--ink)}
+#notes-button {top:calc(8px + env(safe-area-inset-top)) !important}
 .plate {position:relative;border:1px solid #33483e;overflow:hidden;border-radius:4px;background:#274748;box-shadow:0 2px 0 #283f341a}
 canvas {display:block;width:100%;height:auto;aspect-ratio:360 / 520;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair}
 footer {padding:14px 1px 9px;align-items:center}
@@ -109,6 +110,16 @@ header {margin-bottom:9px}
 .atlas-actions button {font-size:13px}
 #daily {background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .atlas #record {font-size:11px;line-height:1.25;margin:8px 0}
+.plate .kit-hint {position:absolute;left:50%;top:80%;bottom:auto}
+.plate .kit-hint.still .label {left:-6em;width:12em}
+#hint-drag + .kit-hint .line {display:none}
+#hint-drag + .kit-hint:not(.still) .hand,#hint-drag + .kit-hint:not(.still) .knob {animation:command-drive 2.6s ease infinite}
+@keyframes command-drive {
+  0%,100% {transform:translateY(12px);opacity:0}
+  20%,32% {transform:translateY(0);opacity:1}
+  76%,86% {transform:translateY(-48px);opacity:1}
+  95% {transform:translateY(-48px);opacity:0}
+}
 #hint-hold + .kit-hint:not(.still) .hand,#hint-hold + .kit-hint:not(.still) .knob {animation:command-hold 2.1s ease infinite}
 @keyframes command-hold {0%,95%,100% {transform:translateY(-15px);opacity:.25} 15%,78% {transform:translateY(0);opacity:1}}
 #hint-hold + .kit-hint .ripple,#hint-outrun + .kit-hint .track {display:none}
@@ -125,7 +136,6 @@ header {margin-bottom:9px}
   footer {grid-row:4;gap:8px;padding:8px 0}
   .composure,.daylight {width:100%}
   .ledger {grid-row:5;flex-wrap:wrap;gap:0}.field-status {grid-column:1;grid-row:6}
-  .kit-hint {left:calc(50% + 100px)}
   .atlas {width:min(100%,610px);display:grid;grid-template-columns:1.15fr 1fr;gap:0 16px;align-items:center;padding:12px}
   .map {grid-column:1;grid-row:1/6;width:min(100%,calc((100dvh - 48px) * .9175));justify-self:center}
   .atlas-title,.atlas-actions,.atlas #back,.atlas #record {grid-column:2}
@@ -145,6 +155,7 @@ header {margin-bottom:9px}
 @media(orientation:portrait) and (max-height:600px) {
   .folio {width:min(100%,calc((100dvh - 158px) * .6923))}
   header {margin-bottom:2px} h1 {font-size:28px}
+  body:has(#notes-button) header {padding-right:36px}
   .fieldline {font-size:11px;padding-bottom:3px}
   footer {gap:8px;padding:4px 0}
   #time,#calm-value {font-size:14px}

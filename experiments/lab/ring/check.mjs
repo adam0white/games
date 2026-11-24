@@ -113,8 +113,8 @@ async function playLevel(page, wantN = 4, limitMs = 60000) {
   }
   return rings;
 }
-async function menu(page, q = '') {
-  await page.goto(`${base}/lab/ring/?hint=0&date=${DATE}${q}`);
+async function menu(page, q = '', language = 'en') {
+  await page.goto(`${base}/lab/ring/?hint=0&lang=${language}&date=${DATE}${q}`);
   await until(page, () => window.__ring?.ready && window.__ring.mode === 'menu', 'menu');
 }
 const noOverflow = page => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight);
@@ -122,6 +122,37 @@ async function visibleIn(page, selector) {
   const box = await page.locator(selector).boundingBox(), vp = page.viewportSize();
   return box && box.y >= 0 && box.y + box.height <= vp.height + 1 && box.x >= 0 && box.x + box.width <= vp.width + 1;
 }
+
+// Words: the two tables must match, and what the page shows must come from them.
+const { tables } = await import('./words.js');
+{
+  const keys = l => Object.keys(tables[l]).sort(), vars = text => (String(text).match(/\{\w+\}/g) || []).sort().join();
+  assert.deepEqual(keys('tr'), keys('en'), 'every English key has a Turkish one and the other way round');
+  for (const k of keys('en')) {
+    assert.equal(vars(tables.tr[k]), vars(tables.en[k]), `placeholders of ${k} match`);
+    assert.ok(tables.tr[k].trim() && tables.en[k].trim(), `${k} is not empty`);
+  }
+}
+const KEYS = Object.keys(tables.en), LEFT_IN_ENGLISH = Object.keys(tables.en).filter(k => tables.tr[k] !== tables.en[k] && tables.en[k].trim().length > 3).map(k => tables.en[k].trim());
+// Every piece of visible text and every aria-label on the page, one entry each.
+const seen = page => page.evaluate(() => {
+  const out = [];
+  for (const el of document.querySelectorAll('body *')) {
+    const box = el.getBoundingClientRect(), shown = box.width > 0 && box.height > 0 && getComputedStyle(el).visibility !== 'hidden';
+    if (!shown) continue;
+    if (!el.children.length && el.textContent.trim()) out.push(el.textContent.trim());
+    else for (const n of el.childNodes) if (n.nodeType === 3 && n.textContent.trim()) out.push(n.textContent.trim());
+    for (const a of ['aria-label', 'title']) if (el.getAttribute(a)) out.push(el.getAttribute(a));
+  }
+  return out;
+});
+async function cleanWords(page, label, turkish) {
+  for (const text of await seen(page)) {
+    assert.ok(!KEYS.includes(text) && !/\{\w+\}/.test(text), `${label}: "${text}" is a raw key or an unfilled placeholder`);
+    if (turkish) assert.ok(!LEFT_IN_ENGLISH.includes(text), `${label}: "${text}" is still English`);
+  }
+}
+const docLang = page => page.evaluate(() => document.documentElement.lang);
 
 async function run(test, phone) {
   const { page, errors, outside } = test;
@@ -243,6 +274,127 @@ async function run(test, phone) {
   assert.deepEqual(errors, [], 'no page, console or network errors');
   assert.deepEqual(outside, [], 'no requests leave the page\'s own origin');
 }
+async function turkish(browser, device, phone) {
+  const test = await open(browser, device), { page } = test, label = `${phone} tr`;
+  try {
+    await menu(page, '', 'tr');
+    assert.equal(await docLang(page), 'tr', 'lang=tr sets the document language');
+    assert.equal(await page.title(), 'Ateş Böceği Halkası');
+    assert.equal(await page.textContent('h1'), 'Ateş Böceği Halkası');
+    assert.equal(await page.textContent('#play'), 'Geceyi oyna');
+    assert.equal(await page.textContent('#daily'), 'Bugünün çayırı');
+    assert.equal(await page.textContent('#endless'), 'Sonsuz çayır');
+    assert.equal(await page.textContent('#sound'), 'Ses: açık');
+    assert.equal(await page.textContent('#dailyNote'), 'Bugün herkes için aynı çayır. Puanlı tek deneme.');
+    assert.equal(await page.textContent('#endlessNote'), 'İlk şafağından sonra açılır');
+    assert.equal(await page.getAttribute('#c', 'aria-label'), 'Aynı renkteki ateş böceklerinin etrafına halka çiz');
+    assert.equal(await page.textContent('#lang'), 'English');
+    assert.ok((await page.locator('#lang').boundingBox()).height >= 44, 'language button is at least 44 px tall');
+    assert.ok(await noOverflow(page), `${label}: menu has no overflow`);
+    for (const id of ['#play', '#daily', '#endless', '#sound', '#lang']) assert.ok(await visibleIn(page, id), `${label}: ${id} on screen`);
+    await cleanWords(page, `${label} menu`, true);
+    await shot(page, `tr-${phone}`, '1-menu');
+
+    // The switch changes the menu without a reload, and the choice outlives one (the address no longer says which).
+    await page.click('#lang');
+    assert.equal(await page.textContent('#play'), 'Play the night'); assert.equal(await page.textContent('#lang'), 'Türkçe');
+    assert.equal(await docLang(page), 'en'); assert.equal(await page.title(), 'Firefly Ring');
+    await cleanWords(page, `${label} menu after switch`, false);
+    await page.goto(`${base}/lab/ring/?hint=0&date=${DATE}`);
+    await until(page, () => window.__ring?.ready, 'menu after reload');
+    assert.equal(await page.textContent('#play'), 'Play the night', 'English survives a reload');
+    await page.click('#lang');
+    assert.equal(await page.textContent('#play'), 'Geceyi oyna');
+    await page.goto(`${base}/lab/ring/?hint=0&date=${DATE}`);
+    await until(page, () => window.__ring?.ready, 'menu after second reload');
+    assert.equal(await page.textContent('#play'), 'Geceyi oyna', 'Turkish survives a reload');
+    assert.equal(await docLang(page), 'tr');
+
+    // Play, the banner, the pause card (with its own switch), the hint's words.
+    await page.click('#play'); await sleep(600);
+    await shot(page, `tr-${phone}`, '2-play');
+    await page.click('#pause');
+    assert.equal(await page.textContent('#paused h2'), 'Duraklatıldı');
+    assert.equal(await page.textContent('#resume'), 'Devam et');
+    assert.equal(await page.textContent('#restart'), 'Yeniden başla');
+    assert.equal(await page.textContent('#toMenu'), 'Menü');
+    assert.equal(await page.textContent('#pauseLine'), 'Seviye 1/8 · 0');
+    assert.equal(await page.textContent('#sound2'), 'Ses: açık');
+    assert.equal(await page.textContent('#lang2'), 'English');
+    assert.ok((await page.locator('#lang2').boundingBox()).height >= 44, 'pause language button is at least 44 px tall');
+    assert.ok(await noOverflow(page), `${label}: pause card has no overflow`);
+    for (const id of ['#resume', '#restart', '#toMenu', '#sound2', '#lang2']) assert.ok(await visibleIn(page, id), `${label}: ${id} on screen`);
+    await cleanWords(page, `${label} pause`, true);
+    await shot(page, `tr-${phone}`, '3-paused');
+    await page.click('#lang2');
+    assert.equal(await page.textContent('#paused h2'), 'Paused'); assert.equal(await page.textContent('#pauseLine'), 'Level 1 of 8 · 0');
+    await page.click('#lang2');
+    assert.equal(await page.textContent('#paused h2'), 'Duraklatıldı');
+    assert.equal(await ring(page, 'r.mode'), 'paused', 'switching language does not resume play');
+    await page.click('#toMenu');
+
+    // An end card: practice level 1 left alone until dawn.
+    await menu(page, '&level=1', 'tr');
+    assert.equal(await page.textContent('#play'), '1. seviyeyi çalış');
+    await page.click('#play');
+    await until(page, () => window.__ring.mode === 'end', 'practice end card in Turkish', 60000);
+    assert.equal(await page.textContent('#endTitle'), 'Şafak önce söktü');
+    assert.equal(await page.textContent('#endTop'), 'Alıştırma · 1. seviye');
+    assert.equal(await page.textContent('#endLine'), 'Alıştırma denemeleri skor olarak kaydedilmez.');
+    assert.equal(await page.textContent('#again'), 'Tekrar oyna');
+    assert.equal(await page.textContent('#savePic'), 'Resmi kaydet');
+    assert.equal(await page.textContent('#endMenu'), 'Menü');
+    assert.equal(await page.textContent('#total + span'), 'toplam'); assert.equal(await page.textContent('#bestRing + span'), 'en iyi halka'); assert.equal(await page.textContent('#total'), '0');
+    assert.ok(await noOverflow(page), `${label}: end card has no overflow`);
+    for (const id of ['#endTitle', '#total', '#again', '#savePic', '#endMenu']) assert.ok(await visibleIn(page, id), `${label}: ${id} on screen`);
+    await cleanWords(page, `${label} end card`, true);
+    await shot(page, `tr-${phone}`, '4-end');
+    assert.deepEqual(test.errors, [], `${label}: no page, console or network errors`);
+    assert.deepEqual(test.outside, [], `${label}: nothing leaves the page's origin`);
+    console.log(`ok   ring in Turkish on ${phone}`);
+  } finally { await test.context.close(); }
+}
+// The hint (shown here by ?hint=hand with reduced motion, so its words are on screen) speaks the page's language.
+async function turkishHint(browser, device, phone) {
+  const test = await open(browser, { ...device, reducedMotion: 'reduce' }), { page } = test;
+  try {
+    await page.goto(`${base}/lab/ring/?hint=hand&lang=tr&date=${DATE}`);
+    await until(page, () => window.__ring?.ready && window.__ring.mode === 'menu', 'menu with hint');
+    await page.click('#play');
+    await until(page, () => document.querySelector('.kit-hint.on'), 'the hint shows', 15000);
+    assert.equal(await page.textContent('.kit-hint .label'), 'Parmağını bas ve yavaşça sürükle', 'the hint speaks Turkish');
+    assert.ok(await page.isVisible('.kit-hint .label'), 'the hint words are visible');
+    await shot(page, `tr-${phone}`, '5-hint');
+    await page.click('#pause'); await page.click('#lang2');
+    assert.equal(await page.textContent('.kit-hint .label'), 'Hold your finger down and move it slowly', 'the hint follows the switch');
+    assert.deepEqual(test.errors, [], `${phone} tr hint: no errors`);
+  } finally { await test.context.close(); }
+}
+async function turkishSmall(browser) {
+  const device = { viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 };
+  const test = await open(browser, device), { page } = test;
+  try {
+    await menu(page, '', 'tr');
+    assert.ok(await noOverflow(page), 'tr 360x640: menu has no overflow');
+    for (const id of ['#play', '#daily', '#endless', '#sound', '#lang']) assert.ok(await visibleIn(page, id), `tr 360x640: ${id} visible`);
+    await shot(page, 'tr-small', '1-menu');
+    await page.click('#play'); await sleep(600);
+    await shot(page, 'tr-small', '2-play');
+    await page.click('#pause');
+    assert.ok(await noOverflow(page), 'tr 360x640: pause card has no overflow');
+    for (const id of ['#resume', '#restart', '#toMenu', '#sound2', '#lang2']) assert.ok(await visibleIn(page, id), `tr 360x640: ${id} visible`);
+    await shot(page, 'tr-small', '3-paused');
+    await page.click('#toMenu');
+    await menu(page, '&level=1', 'tr');
+    await page.click('#play');
+    await until(page, () => window.__ring.mode === 'end', 'end card at 360x640', 60000);
+    assert.ok(await noOverflow(page), 'tr 360x640: end card has no overflow');
+    for (const id of ['#endTitle', '#total', '#again', '#savePic', '#endMenu']) assert.ok(await visibleIn(page, id), `tr 360x640: ${id} visible`);
+    await shot(page, 'tr-small', '4-end');
+    assert.deepEqual(test.errors, [], 'tr 360x640: no errors');
+    console.log('ok   ring in Turkish at 360x640');
+  } finally { await test.context.close(); }
+}
 async function small(browser) {
   for (const [name, device] of [['small', { viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }], ['iphone-390', { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 }]]) {
     const test = await open(browser, device), { page } = test;
@@ -272,7 +424,7 @@ try {
     if (only && only !== phone) continue;
     const browser = await engine.launch();
     const test = await open(browser, device);
-    try { await run(test, phone); console.log(`ok   ring on ${phone} (${device.viewport.width}x${device.viewport.height})`); if (phone === 'chromium') await small(browser); }
+    try { await run(test, phone); console.log(`ok   ring on ${phone} (${device.viewport.width}x${device.viewport.height})`); await turkish(browser, device, phone); await turkishHint(browser, device, phone); if (phone === 'chromium') { await small(browser); await turkishSmall(browser); } }
     catch (e) { failed++; console.error(`FAIL ring on ${phone}: ${e.stack}`); if (test.errors.length) console.error(test.errors.join('\n')); await shot(test.page, phone, 'failure').catch(() => {}); }
     finally { await test.context.close(); await browser.close(); }
   }

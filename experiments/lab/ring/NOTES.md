@@ -106,3 +106,13 @@ From `node bots.mjs`, run on 2026-11-24 with 40 seeds:
 
 - A shared board for Today's meadow, so players can compare scores on the same seed.
 - Two players on one phone, each with a thread in their own colour, on the same meadow.
+
+## Languages
+
+English and Turkish, through the shared kit (`../../kit/i18n.js`). Every string a player can see or hear read aloud lives in `words.js` (`tables.en`, `tables.tr`): HTML text, aria-labels, the document title, HUD and canvas words (level banner, score pops, the dawn bonus), the hint, the pause and end cards, and the share picture. `?lang=tr` picks Turkish and is remembered (`kit:lang`, shared with the other games). A small language button sits beside the sound button on the menu and on the pause card; it switches without a reload and redraws the card in view. Numbers and the date on the daily end card use `Intl` with the page language (Turkish groups thousands with a dot). Capitals come from CSS only, so Turkish i and I follow the document language. Save format, storage keys, `sim.js` and the `window.__ring` hooks are unchanged.
+
+Title: Turkish is "Ateş Böceği Halkası" (a literal, natural rendering; "Firefly" is "ateş böceği"). The share picture file is `ates-bocegi-halkasi-<name>.png` in Turkish.
+
+The Turkish was written by an AI and has not been read by a native speaker. Open items for the reader: "Mumlar söndü" / "Fitiller söndü" for the lost wicks, "çayır" for meadow, "Alıştırma" for practice, and the second line of the intro paragraph.
+
+`check.mjs` covers it on iPhone 13 (WebKit) and Pixel 7 (Chromium) plus 360x640: key parity of the two tables (and `{placeholder}` parity), no raw keys or English left on the Turkish menu, pause and end cards, exact Turkish strings, `lang="tr"`, the switch and its survival of a reload, the hint's words, no overflow, no console errors. The English checks open pages with `?lang=en`.

@@ -81,3 +81,8 @@ body.frenzy #clock { padding: 0 8px; }
 body.frenzy #clock.final { font-size: 16px; line-height: 20px; }
 /* The top five sits over the field; a dim backing keeps it readable over grass and ants. */
 #top { background: #241b1799; padding: 2px 6px; border-radius: 6px; }
+
+/* The mode links and the language button share one row, so the button adds no height to the card. */
+#card .modes { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
+#card .modes nav { margin: 0; }
+#card .language { margin-left: auto; min-width: 44px; min-height: 46px; padding: 0 9px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: 1px solid #fff3; border-radius: 8px; background: none; color: inherit; font: inherit; font-size: 13px; font-weight: 700; }

@@ -84,11 +84,15 @@ Two new pages and a tuning pass on the second batch, by Codex builders. For this
 | 2026-11-24 | `night-flock-2` | The deeper Night Flock (a copy; the first stays for comparison): three dog commands by gesture (run, lie down, outrun), bridge, lane, bog, second gate, mist and wind, 20 evenings on three farms and a daily | Builder: 99 of 99 campaign runs; a no-outrun bot clears 0 of 30 outrun fields and a never-lie-down bot 0 of 30 hold fields. Lab rerun results are in the pull request | Keep testing; whether a person plays twenty minutes is the question |
 | 2026-11-24 | `night-vine` | Growth as the game: a vine grows towards a lamp the thumb moves (phototropism, branching, shading); prune with a flick; 10 beds and an endless arbour | Builder: 240 of 240 campaign runs; skipping pruning wilts the flowers in 72 of 72 trials. Lab rerun results are in the pull request | Keep testing |
 | 2026-11-24 | `night-rubbing` | Wildcard (Carbon Cabinet): rubbing. Stroke direction decides which edges of a fossil plate catch pigment; six plates | Builder: 48 of 48 seeded runs; disabling directional transfer fails the bots. Lab rerun results are in the pull request | Keep testing |
+| 2026-11-24 | `night-sand` | Granular sand as the game: a 120 by 160 cellular sand bed; dig, hold sand with a board, fill an hourglass, sieve two colours, bury a seed; 10 beds and a rake garden | Builder stopped at its usage limit after its checks passed; lab reran bots (pass) and the mutation (fails as it should). Lab rerun results are in the pull request | Keep testing |
+| 2026-11-24 | `night-saltplate` | Wildcard (Saltplate): salt on a vibrating plate settles on the nodal lines; slide a tuner to match an engraved pattern; six plates | Builder: 72 of 72 seeded campaign trials; removing the force towards the pattern fails the bots. Lab rerun results are in the pull request | Keep testing |
 | 2026-11-24 | `night-kite`, `night-loaves`, `night-splitlight`, `lantern-tide` (review fixes) | A reviewer played all four on both profiles and fixed clipped or small controls, landscape layout, misleading cues, paused redraws and a save at dawn; Lantern Tide's finale seed replaced (15 of 20 jitter trials clear, was 7 of 20) | Builder: all checks pass | Keep testing |
 
 - 2026-11-24: Codex was upgraded on the build machine while builders ran, and three builders stopped with a missing helper binary. Rerunning them worked. Do not upgrade Codex mid-run.
 
 ## Round of 2026-11-24 (ideas scan)
+
+Languages (same day): `pitch`, `pisti` and `ring` play in English and Turkish through `kit/i18n.js` (each has a `words.js`, a switch on the menu and pause card, and Turkish checks in its `check.mjs`). The Turkish was written by an AI and has not been read by a native speaker.
 
 From `docs/ideas/shortlist-2026-11-24.md`, a scan of forums and the web for game ideas and old games to revive. Each page was built by one builder from one brief; the lab reran its `bots.mjs`, its `--mutate` run and its `check.mjs` and looked at the screenshots. No person and no real phone yet.
 

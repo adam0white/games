@@ -40,7 +40,7 @@
     <div id="frame"><canvas width="360" height="480" id="field" tabindex="0" aria-label="Move the lamp by touch or with arrow keys. Flick across a stem to prune. With a keyboard, press X to prune at the lamp."></canvas></div>
     <footer>
       <svg id="goalMark" class="sign" viewBox="0 0 36 36" aria-hidden="true"><use href="#i-window"/></svg>
-      <div class="brief"><div id="goal" aria-live="polite">Reach the window</div><p id="instruction">Touch the glass to move the lamp.</p></div>
+      <div class="brief"><div id="goal" aria-live="polite">Reach the window</div><p id="instruction">Tap the lit window to start.</p></div>
     </footer>
     <section id="result" role="region" aria-labelledby="resultTitle">
       <div class="finished">
@@ -55,14 +55,18 @@
   </main>
   <section id="pause" class="sheet" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
     <div class="card">
-      <div class="small" id="pausedBed">Glasshouse</div>
-      <h2 id="pauseTitle">Tending paused</h2>
-      <p>Place the lamp where you want the vine to grow. Flick across a stem to prune everything beyond the cut.</p>
-      <button class="solid" id="resume">Resume tending</button>
-      <div class="pair"><button id="restart">Replant bed</button><button id="campaign">Choose a bed</button></div>
-      <div id="beds" hidden></div>
-      <button id="endless">Endless arbour <span aria-hidden="true">∞</span></button>
-      <p id="record"></p>
+      <div class="pause-help">
+        <div class="small" id="pausedBed">Glasshouse</div>
+        <h2 id="pauseTitle">Tending paused</h2>
+        <p>Place the lamp where you want the vine to grow. Flick across a stem to prune everything beyond the cut.</p>
+      </div>
+      <div class="pause-actions">
+        <button class="solid" id="resume">Resume tending</button>
+        <div class="pair"><button id="restart">Replant bed</button><button id="campaign">Choose a bed</button></div>
+        <div id="beds" hidden></div>
+        <button id="endless">Endless arbour <span aria-hidden="true">∞</span></button>
+        <p id="record"></p>
+      </div>
       <div class="pair settings"><button id="ink">Ink · Vesper</button><button id="sound">Sound on</button></div>
     </div>
   </section>

@@ -617,3 +617,30 @@ when the ticket's own answer was lost. A run on Today's river that ends after mi
 not sent; the card says so. A name the server would empty (only symbols or emoji) is refused at the yes, with "Use
 letters or numbers in the name." The two boards count their answers apart. Checked by the Worker tests (46 pass). Not
 checked on a phone.
+
+## 2026-11-24: Turkish
+
+Lantern now shows its text in Turkish when the browser asks for Turkish, and in English otherwise. `?lang=tr` or
+`?lang=en` picks one. A globe button with the language code sits at the top right of the menu and of the pause card. A
+tap switches the language at once, without a reload; a paused run stays paused where it was. The choice is saved in
+`kit:lang` by the shared kit (`../kit/i18n.js`). No Lantern save key or format changed.
+
+What changed: every text the player sees is in `words.js`, an `en` table and a `tr` table with the same 315 keys.
+Keys are whole sentences with `{placeholders}`, and the Turkish is phrased so no suffix sits on a number or a name.
+Player names, scores and saved data are not translated. The English names still written in `PACKS` are no longer shown
+(the words come from `item_<id>` keys); they stay only as labels in the code. The globe icon is inlined in the page,
+not taken from the kit.
+
+Checked: a script walked about forty screens (menu, shop, packs, abilities, every end card, pause in each mode, board,
+credits) in the old build and the new one, and every English text, label and title is the same, except the new
+language buttons and some text now wrapped in spans with the same textContent. The same walk in Turkish at 360x740 had
+no console errors, no English left, `<html lang="tr">`, and no button wrapping badly. Switching on the menu and twice
+on the pause card kept the run. `phone.mjs lantern` passes and now ends with a Turkish step: open with `?lang=tr`,
+check the menu, tap the globe, check English is back.
+
+Not checked: no native Turkish speaker has read the Turkish yet; not tried on a real phone; WebKit not run. A message
+already on screen (the night banner) stays in the old language until it fades, under three seconds.
+
+Found and left alone: when a tower level is cleared, the line that should say so is commented out by a `//` earlier on
+the same line, so the end card shows whatever `#line` held before (for example the pause text). This was so before the
+Turkish work and behaves the same now.

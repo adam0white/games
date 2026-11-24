@@ -18,19 +18,19 @@
   <div id="summary" hidden></div>
   <div id="goal" hidden></div>
   <div id="net"></div>
-  <button id="sprint" type="button">Sprint</button>
+  <button id="sprint" type="button" data-i18n="sprint">Sprint</button>
 </div>
 <div id="card">
-  <h1>Crumbwar · Feast</h1>
-  <nav aria-label="Game mode"><a data-mode-link="classic" href="/crumbwar/">Classic</a><a data-mode-link="feast" href="/crumbwar/feast/">Feast</a><a data-mode-link="rush" href="/crumbwar/rush/">Rush</a></nav>
+  <h1 id="title">Crumbwar · Feast</h1>
+  <div class="modes"><nav aria-label="Game mode" data-i18n-aria="gameMode"><a data-mode-link="classic" href="/crumbwar/" data-i18n="modeClassic">Classic</a><a data-mode-link="feast" href="/crumbwar/feast/" data-i18n="modeFeast">Feast</a><a data-mode-link="rush" href="/crumbwar/rush/" data-i18n="modeRush">Rush</a></nav><button id="language" class="language" type="button" hidden aria-label="Switch to Turkish" data-i18n-aria="language"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="10" cy="10" r="8"/><ellipse cx="10" cy="10" rx="3.5" ry="8"/><path d="M2 10h16"/></svg><span data-i18n="languageCode" aria-hidden="true">EN</span></button></div>
   <p id="you"></p>
-  <p>Food grows you while below size 22. Hunt smaller ants to keep growing; keep away from bigger ones. Sprint after a fleeing bot: it runs briefly, then tires. Eaten? You keep at least 60% of your size and are back in 2 seconds. Grass is safe. Rise from Egg to Queen in four-minute rounds.</p>
-  <p class="small"><b>+</b> you can eat it. <b>!</b> it can eat you. <b>=</b> too close in size. <b>◇</b> safe. Drag to steer on a phone, or point with the mouse. Hold Sprint, Space or the mouse button to run; it costs a little size. Ants marked <b>bot</b> grow more slowly. New and returning people get a size floor near the field’s middle.</p>
+  <p data-i18n="aboutFeast">Food grows you while below size 22. Hunt smaller ants to keep growing; keep away from bigger ones. Sprint after a fleeing bot: it runs briefly, then tires. Eaten? You keep at least 60% of your size and are back in 2 seconds. Grass is safe. Rise from Egg to Queen in four-minute rounds.</p>
+  <p class="small" data-i18n-rich="controlsFeast"><b>+</b> you can eat it. <b>!</b> it can eat you. <b>=</b> too close in size. <b>◇</b> safe. Drag to steer on a phone, or point with the mouse. Hold Sprint, Space or the mouse button to run; it costs a little size. Ants marked <b>bot</b> grow more slowly. New and returning people get a size floor near the field’s middle.</p>
   <p id="status" class="small"></p>
-  <button id="play" type="button">Play</button>
+  <button id="play" type="button" data-i18n="play">Play</button>
   <div id="lab"></div>
 </div>
 <script type="module" src="/crumbwar/client.js"></script>
-<script src="/notes/button.js" defer></script>
+<script id="notes-script" src="/notes/button.js" defer></script>
 </body>
 </html>

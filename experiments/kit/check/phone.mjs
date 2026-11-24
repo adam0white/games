@@ -62,8 +62,22 @@ async function shot(page, stage) {
   if (shots) await page.screenshot({ path: join(shots, `${page.context().checkName}-${stage}.png`) });
 }
 
+const hasTimedHint = g => g.timing || g.hint?.timing || g.hints?.some(hint => hint.timing);
+async function observeFrames(page, ms) {
+  const observed = await page.evaluate(ms => new Promise(resolve => {
+    const end = performance.now() + ms;
+    const timeout = setTimeout(() => resolve(false), ms + 2000);
+    function sample(now) {
+      if (now < end) requestAnimationFrame(sample);
+      else { clearTimeout(timeout); resolve(true); }
+    }
+    requestAnimationFrame(() => requestAnimationFrame(sample));
+  }), ms);
+  assert.ok(observed, 'animation frames across the observation interval');
+}
+
 async function readyRenderer(page, g) {
-  if (!g.hint?.timing && !g.timing) return;
+  if (!hasTimedHint(g)) return;
   if (process.platform !== 'darwin' || page.context().browser().browserType().name() !== 'webkit') return;
   await page.bringToFront();
   const viewport = page.viewportSize();
@@ -117,9 +131,10 @@ async function savedPhone(page, g) {
   if (g.startsOnBoard) assert.equal(await page.evaluate(() => window.audioLog.made), 1, 'first input starts one audio context');
   await shot(page, 'play');
   await pause();
-  await g.verifyPaused?.(page);
-  const t = (await state()).t; await sleep(300);
-  assert.equal((await state()).t, t, 'time stands still while paused'); await shot(page, 'paused');
+  const t = (await state()).t;
+  await g.verifyPaused?.(page, { finger });
+  if (hasTimedHint(g)) await observeFrames(page, 300); else await sleep(300);
+  assert.equal((await state()).t, t, 'play state stands still while paused'); await shot(page, 'paused');
   const toggleSound = async () => {
     await page.click(g.sound);
     if (g.saveKey) assert.equal(await page.evaluate(k => JSON.parse(localStorage.getItem(k)).sound, g.saveKey), false, 'sound off saved');
@@ -127,7 +142,8 @@ async function savedPhone(page, g) {
   };
   if (g.sound && !g.soundOnMenu) await toggleSound();
   await page.click(g.resume ?? '#resume'); await wait(s => s.screen === 'play' && !s.paused, 'resume');
-  await wait(s => s.screen === 'play' && !s.paused && s.t > t, 'time advances after resume');
+  if (g.resumeTouch) await g.touch(page, { finger, until, sleep });
+  await wait(s => s.screen === 'play' && !s.paused && s.t > t, 'play state advances after resume');
   await page.evaluate(() => dispatchEvent(new Event('blur'))); await wait(s => s.paused || s.screen === 'paused', 'losing focus pauses');
   await page.keyboard.press('P'); await wait(s => s.screen === 'play' && !s.paused, 'capital P resumes');
   await page.evaluate(() => dispatchEvent(new Event('pagehide'))); await wait(s => s.paused || s.screen === 'paused', 'putting the page away pauses');
@@ -236,10 +252,10 @@ async function noZoomed(page) {
   });
   assert.match(r.meta, /maximum-scale=1/); assert.deepEqual(r.loose, [], 'no visible element at touch-action auto'); assert.ok(r.cancelled, 'a double tap does not zoom');
 }
-function observeHintTiming({ board, start, result }) {
+function observeHintTiming({ board, start, result, selector = '.kit-hint' }) {
   let eligible, shown;
   const observer = new MutationObserver(() => {
-    const hint = document.querySelector('.kit-hint');
+    const hint = document.querySelector(selector);
     if ((board && hint) || (result && document.querySelector(result))) eligible ??= performance.now();
     if (hint?.classList.contains('on')) {
       shown = performance.now();
@@ -258,13 +274,17 @@ function observeHintTiming({ board, start, result }) {
 // press reach the game), alive (keep the run going while the check waits), legacy (a save in the game's existing format).
 async function hinted(page, g) {
   if (g.prepare) await g.prepare(page);
+  const selector = g.selector ?? '.kit-hint';
+  const visible = `${selector}.on`;
+  const timing = g.timing && { ...g.timing, selector };
   // These boards start counting at launch. Observe the mounted hint before navigation can finish.
-  if (g.timing?.board) await page.addInitScript(observeHintTiming, g.timing);
-  const on = () => page.evaluate(() => !!document.querySelector('.kit-hint.on'));
+  if (timing?.board) await page.addInitScript(observeHintTiming, timing);
+  const on = () => page.locator(visible).count().then(Boolean);
+  const waitOn = (what, ms) => until(page, sel => !!document.querySelector(sel), what, ms, visible);
   // Leave the game first: a game may save as its page goes away (Ant Promotion does), which would make this player a returning one.
   const fresh = async (seed = {}) => {
     await page.goto(`${base}/notes/button.js`);
-    await page.evaluate(seed => { localStorage.clear(); for (const [k, v] of Object.entries(seed)) localStorage.setItem(k, v); }, seed);
+    await page.evaluate(seed => { localStorage.clear(); for (const [k, v] of Object.entries(seed)) localStorage.setItem(k, v); }, { ...g.seed, ...seed });
     await page.goto(`${base}${g.path}`);
     await readyRenderer(page, g);
     await page.waitForSelector(g.play);
@@ -279,32 +299,34 @@ async function hinted(page, g) {
   if (!g.timing) await sleep(g.delay + 500);
   if (!g.timing?.board) {
     assert.equal(await on(), false, 'hint: hidden before the tutorial starts');
-    if (g.timing) await page.evaluate(observeHintTiming, g.timing);
+    if (timing) await page.evaluate(observeHintTiming, timing);
   }
   await play();
   if (!g.timing) { await sleep(g.delay / 2); assert.equal(await on(), false, 'hint: not before the delay'); }
-  await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown after the delay', g.delay + 8000); // CI's software WebGL draws lantern-3d at a few frames a second
+  await waitOn('hint: shown after the delay', g.delay + 8000); // CI's software WebGL draws lantern-3d at a few frames a second
   // The kit can count up to 250 ms from the frame just before the start action.
   if (g.timing) assert.ok(await page.evaluate(() => window.checkHintDelay()) >= g.delay - 250, 'hint: not before the delay');
-  if (shots && g.timing) await until(page, () => {
-    const hint = document.querySelector('.kit-hint.on');
+  if (shots && g.timing) await until(page, sel => {
+    const hint = document.querySelector(sel);
     return hint && getComputedStyle(hint).opacity === '1';
-  }, 'hint: entrance animation finished');
+  }, 'hint: entrance animation finished', 8000, visible);
   await shot(page, 'hint');
-  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.kit-hint .label')).display), 'none', 'hint: no words while it moves');
+  const label = page.locator(`${selector} .label`).first();
+  const knob = page.locator(`${selector} .knob`).first();
+  assert.equal(await label.evaluate(el => getComputedStyle(el).display), 'none', 'hint: no words while it moves');
   if (!g.timing?.result) {
     await page.evaluate(() => dispatchEvent(new Event('blur')));
-    if (g.waitHintState) await until(page, () => !document.querySelector('.kit-hint.on'), 'hint: hidden under the pause card');
+    if (g.waitHintState) await until(page, sel => !document.querySelector(sel), 'hint: hidden under the pause card', 8000, visible);
     else { await sleep(200); assert.equal(await on(), false, 'hint: hidden under the pause card'); }
-    await page.click(g.resume); await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: back after resume (a tap on a card is not play input)', 2000);
+    await page.click(g.resume); await waitOn('hint: back after resume (a tap on a card is not play input)', 2000);
   }
   if (g.alive) await page.evaluate(g.alive);
   if (g.input) {
-    assert.equal(await page.locator('.kit-hint .knob').evaluate(el => getComputedStyle(el).pointerEvents), 'none', 'hint: the overlay lets input through');
-    await g.input(page, { finger, until });
+    assert.equal(await knob.evaluate(el => getComputedStyle(el).pointerEvents), 'none', 'hint: the overlay lets input through');
+    await g.input(page, { finger, until, knob });
   } else {
     // A real press where the knob is: the page's own hit test says the game is under it, and the game moves.
-    const { x, y, top } = await page.evaluate(() => { const r = document.querySelector('.kit-hint .knob').getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2; return { x, y, top: document.elementFromPoint(x, y)?.id }; });
+    const { x, y, top } = await knob.evaluate(el => { const r = el.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2; return { x, y, top: document.elementFromPoint(x, y)?.id }; });
     assert.equal(top, (g.canvas ?? '#c').slice(1), 'hint: the game canvas is what a finger on the hint touches');
     const before = await page.evaluate(g.before ?? (() => null));
     await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + 40, y, { steps: 4 });
@@ -313,22 +335,23 @@ async function hinted(page, g) {
     else assert.ok(await page.evaluate(g.moved, before), 'hint: a press on the hint reaches the game');
     if (!g.releaseInput) await page.mouse.up();
   }
-  assert.equal(await page.evaluate(() => document.querySelector('.kit-hint')), null, 'hint: gone on the first input');
+  assert.equal(await page.locator(selector).count(), 0, 'hint: gone on the first input');
   assert.equal(await page.evaluate(k => localStorage.getItem(k), g.key), '1', 'hint: the player is remembered');
   if (!g.timing) { await idle(g.delay + 500); assert.equal(await on(), false, 'hint: does not come back'); }
   // Returning players.
   for (const [seed, what] of [[g.legacy, 'a save in the game\'s existing format'], [{ [g.key]: '1' }, 'the hint\'s own key']]) {
     if (!seed) continue;
     await fresh(seed); await play();
-    if (g.timing) assert.equal(await page.locator('.kit-hint').count(), 0, `hint: not installed for a returning player (${what})`);
+    if (g.timing) assert.equal(await page.locator(selector).count(), 0, `hint: not installed for a returning player (${what})`);
     else { await idle(g.delay + 1000); assert.equal(await on(), false, `hint: never shown to a returning player (${what})`); }
   }
   // Reduced motion: a still copy with words.
   await page.emulateMedia({ reducedMotion: 'reduce' }); await fresh(); await play();
-  await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown with reduced motion', g.delay + 8000);
-  const pose = () => page.evaluate(() => document.querySelector('.kit-hint .knob').style.transform);
-  const p0 = await pose(); await sleep(400);
-  assert.equal(await pose(), p0, 'hint: still with reduced motion'); assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.kit-hint .label')).display), 'block', 'hint: words with reduced motion');
+  await waitOn('hint: shown with reduced motion', g.delay + 8000);
+  const pose = () => knob.evaluate(el => getComputedStyle(el).transform);
+  const p0 = await pose();
+  if (timing) await observeFrames(page, 400); else await sleep(400);
+  assert.equal(await pose(), p0, 'hint: still with reduced motion'); assert.equal(await label.evaluate(el => getComputedStyle(el).display), 'block', 'hint: words with reduced motion');
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 }
 // A game that follows the house layout: #play on the menu, #pause in play, a state hook with `screen`, and a save blob.
@@ -688,6 +711,15 @@ const GAMES = {
     const fresh = await saved(); assert.deepEqual(Object.keys(fresh), ['lantern-start'], 'every lantern- key is gone; a new player gets a first ability');
     assert.ok(ABILITY.includes(fresh['lantern-start'])); assert.ok((await state()).owned.includes(fresh['lantern-start']), 'a new player owns the first ability'); assert.equal(await page.evaluate(() => localStorage.getItem('notes.k')), 'check', 'the tester link stays');
     st = await state(); assert.equal(st.bank, 0); assert.equal(st.opened, 1);
+    // Turkish: ?lang=tr draws the menu in Turkish; the globe button brings English back without a reload.
+    await page.goto(`${base}/lantern/?lang=tr`);
+    await until(page, () => document.querySelector('#menu h1').textContent === 'Fener', 'the Turkish menu');
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'tr');
+    assert.equal(await page.textContent('#toShop'), 'Mağaza'); assert.equal(await page.textContent('#toBoard'), 'Sıralama');
+    await page.click('#menuLanguage');
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
+    assert.equal(await page.textContent('#menu h1'), 'Lantern'); assert.equal(await page.textContent('#toShop'), 'Shop');
+    await page.evaluate(() => localStorage.removeItem('kit:lang'));
   },
   async 'ant-promotion'(page) {
     const KEY = 'ant-promotion:v1';
@@ -966,14 +998,17 @@ const GAMES = {
 for (const [slug, g] of Object.entries({ ...pages, ...labPages })) {
   const path = `/${slug}/${g.query ? `?${g.query}` : ''}`;
   GAMES[slug] = page => savedPhone(page, { ...g, path });
-  if (g.hint) GAMES[`hint ${slug}`] = page => hinted(page, { path, play: g.play ?? '#play', resume: g.resume ?? '#resume', prepare: g.prepare, start: g.start, waitInput: true, waitHintState: true, ...g.hint });
+  for (const hint of g.hints ?? (g.hint ? [g.hint] : [])) {
+    const name = hint.name ? `hint ${slug} ${hint.name}` : `hint ${slug}`;
+    GAMES[name] = page => hinted(page, { path, play: g.play ?? '#play', resume: g.resume ?? '#resume', prepare: g.prepare, start: g.start, waitInput: true, waitHintState: true, ...hint });
+  }
 }
 
 const [onlyGame, onlyPhone] = process.argv.slice(2);
 // The first argument is 'all' or a comma list of experiments. An experiment's name picks its own check, its
 // first-time help check, and for Lantern the three checks below that play Lantern.
 const WITH = { lantern: ['old links', 'lab down', 'leaving mid-run'] };
-const picked = game => !onlyGame || onlyGame === 'all' || onlyGame.split(',').some(only => game === only || game === `hint ${only}` || WITH[only]?.includes(game));
+const picked = game => !onlyGame || onlyGame === 'all' || onlyGame.split(',').some(only => game === only || game === `hint ${only}` || game.startsWith(`hint ${only} `) || WITH[only]?.includes(game));
 // A check that never answers becomes a FAIL line naming it, not a job that runs until its time limit.
 const within = (p, ms, what) => { let t; return Promise.race([p, new Promise((_, no) => { t = setTimeout(() => no(new Error(`no answer in ${ms / 1000}s: ${what}`)), ms); })]).finally(() => clearTimeout(t)); };
 let failed = 0;
@@ -981,7 +1016,8 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   if (onlyPhone && onlyPhone !== phone) continue;
   // Headless macOS WebKit still needs a display link to schedule animation frames.
   const awake = phone === 'webkit' && process.platform === 'darwin'
-    && Object.entries(labPages).some(([slug, g]) => g.hint?.timing && (picked(slug) || picked(`hint ${slug}`)))
+    && Object.entries(labPages).some(([slug, g]) => hasTimedHint(g) && (picked(slug)
+      || (g.hints ? g.hints.some(hint => picked(`hint ${slug} ${hint.name}`)) : picked(`hint ${slug}`))))
     ? spawn('/usr/bin/caffeinate', ['-diu', '-w', String(process.pid)], { stdio: 'ignore' })
     : null;
   awake?.unref();

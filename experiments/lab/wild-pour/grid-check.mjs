@@ -8,13 +8,12 @@ const REFERENCE_BLOB = '5d5ab9cf68b7d4e0bf2364bf59a940c01a7944a8';
 const original = execFileSync('git', ['show', REFERENCE_BLOB], {
   cwd: fileURLToPath(new URL('./', import.meta.url)), encoding: 'utf8',
 });
-const oldLevel6 = '[76, 10, 42, 4, 8, 0.9, 17, 11]';
-const frozenLevel6 = '[76, 10, 42, 6, 8, 0.9, 18, 11]';
-if (original.split(oldLevel6).length !== 2) throw Error('original level 6 row was not found exactly once');
-// The only reference-code delta is the frozen difficulty adjustment; the original grid stays untouched.
-const source = original.replace(oldLevel6, frozenLevel6);
+const oldLevel = /^export function level\(n\) \{[\s\S]*?^\}/gm;
+if ([...original.matchAll(oldLevel)].length !== 1) throw Error('reference level table was not found exactly once');
+// Compare both grids under the current level settings with the original physics.
+const source = original.replace(oldLevel, () => `export ${current.level.toString()}`);
 const reference = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
-console.log(`Reference simulation blob: ${REFERENCE_BLOB}; level 6 band 4->6, spill 17->18 only.`);
+console.log(`Reference simulation blob: ${REFERENCE_BLOB}, using current level settings.`);
 let steps = 0, episodes = 0;
 const eq = (a, b, path = '') => {
   if (a === null || typeof a !== 'object') { if (!Object.is(a, b)) throw Error(`state mismatch ${path}: ${a} !== ${b}`); return; }

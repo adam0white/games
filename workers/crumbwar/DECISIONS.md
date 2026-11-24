@@ -514,3 +514,28 @@ Exploratory ten-Hz crowded Feast variants exceeded the sixty-person byte budget 
 `node --test test/` passes 88/88 tests, including new food/meal factors, food ceilings, separate sprint costs, excess bot shrink, exact flee and recovery boundaries, prey choice, catchup, its size-500 boundary and reset recovery, controller inputs and negative acceptance cases. The retained output is `loadtest/results/feast-fairness-tests-2026-11-24.txt`.
 
 Unverified: human enjoyment, real touch play, browser appearance of the new rules and crowded interpolation, actual socket/send overhead, Cloudflare timing and live traffic. No deployment occurred. The earlier live lab and same-room observations above were supplied evidence, not repeated here. The median catchup and safest-position rules address the wall of dangerous ants; no visual spawn census was run.
+
+## Languages, 2026-11-24
+
+The three pages speak English and Turkish through the shared kit (`/kit/i18n.js`, `words({ en, tr })`). The choice is the kit's one key for every game (`kit:lang`); `?lang=tr` sets it. A globe button with the language code sits at the end of the mode-link row on the start card, so it adds no height; it switches between the two languages, redraws the card at once, and keeps a `?lang=` on the address in step. It is 46 px tall.
+
+Where the words live: `public/crumbwar/words.js`, one table per language, imported by `client.js`. The page starts with an English `t` over that table and swaps in the kit's when the dynamic import resolves. If `/kit/i18n.js` does not load (it is not served under `wrangler dev`) the page plays in English and the globe stays hidden.
+
+Translated: the three cards (title, mode links, description, controls, Play, recording notice, Privacy, the switch label), the page title, Sprint, status, reconnect and refusal messages, the round clock (KLASİK, ZİYAFET, HÜCUM, ÇILGIN ×2, next round), feed and centre messages, goal lines, the results panels and award names, rank names, colony names, the hill and grass labels, the edge-arrow labels, the bot tag and crowd counts, the promotion bar's label, the reduced-motion hint label, and the generated ant names. Names, colonies and ranks are sent as indexes, so the page translates them by index; `config.js` and `modes.js` keep their English lists and the protocol fingerprint is unchanged. Turkish sentences never put a case ending on a filled-in name (`{name} seni yedi`, not `{name}'i yedin`), so any name reads right.
+
+Changed on the way: the Classic tab title is now "Crumbwar · Classic" (was "Crumbwar"), like the other two. The recording notice is the page's own text in both languages and no longer follows the kit's `NOTICE` by string replacement; the Turkish is the wording other lab games use, with the pause-menu clause replaced by the switch below.
+
+Not translated: "Crumbwar" (the game's name), the debug `agent` tag, the `kB/s` unit in the counts line that phones do not show (its decimal follows the language), and the notes button, which another worker serves (only its label is set).
+
+Tests: `test/words.test.mjs` checks that the tables have the same keys and the same `{blanks}`, that no Turkish value is empty, that the name lists match the shared lists, that every key the page and the three cards ask for exists, and that every key in the table is asked for. Renaming one key in `client.js` makes it fail; it found one dead key, which was removed. `node --test test/`: 91 tests, 91 pass.
+
+Seen, headless Chromium through `wrangler dev`, phone emulation, kit files routed from `experiments/kit/`, lab host answered locally:
+
+- All three cards in Turkish at 360×640 and 390×844: no scrolling, the recording notice inside the card. Feast at 360×640 is 587 px tall in Turkish against 591 in English.
+- The switch to English and back on each card.
+- About 30 seconds of play in each version at both sizes, with no English left on screen.
+- Real play (no injected text): Rush to the results panel with awards, the frenzy message and clock, and death by the nest guards with the back-in line; Feast death with the back-in line, rank and size.
+- The longest Turkish lines put into their boxes by script at 360 px (Feast results, the Queen promotion, the goal line with both seeds): none clipped. The goal-done line wraps to two centred lines.
+- Without the kit: the page plays in English and the globe is hidden.
+
+Unverified: a native Turkish speaker's read of the wording; the Feast results panel, promotion, cake, golden-crumb and seed lines and the hill label in real play (the key test covers them, and the Feast results were seen only with injected text); real phones and WebKit; the live site, where `/kit/i18n.js` comes from the games-static site.

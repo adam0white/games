@@ -1,6 +1,7 @@
 // Pour: bots that prove the rules and measure difficulty.
 //   node bots.mjs            all checks; exits 1 on a failure
 //   node bots.mjs --mutate   the same checks with a broken rule (the glass has no floor); must exit 1
+//   node bots.mjs --sweep    held-out checks, 64 planner and 256 careless seeds per level
 //   node bots.mjs --planner-only --from=100 --count=21   all levels on held-out seeds; same 5/6 win-rate check
 //   node bots.mjs --level=6 --from=1 --count=12   one level, with each result and the same win-rate check
 import { create, step, band, LEVELS, digest, rng, glassX, clone } from './sim.js';
@@ -57,6 +58,15 @@ export function clumsy(seed) {
   };
 }
 
+// Adjust tilt as the jug empties, but aim at the glass now instead of where the drops will land.
+export function sloppyAim() {
+  return s => {
+    if (s.inGlass + s.flying >= s.L.target - 1) return 0;
+    const need = 1.28 + (1 - s.inJug / s.L.drops) * 0.85;
+    return Math.abs(s.glass.x - AIM) < s.glass.w * 0.6 ? need + 0.15 : need - 0.15;
+  };
+}
+
 export function play(n, seed, policy, opts = {}) {
   const s = create(n, seed, { mutate: MUTATE, ...opts });
   for (let i = 0; i < 60 * 40 && !s.over; i++) step(s, policy(s));
@@ -72,16 +82,42 @@ const integerArg = (name, fallback) => {
   if (!Number.isSafeInteger(value) || value < 1) throw new Error(`--${name} must be a positive integer`);
   return value;
 };
-const firstSeed = integerArg('from', Number(process.env.FROM || 1));
-const plannerSeeds = integerArg('count', PSEEDS);
+const sweep = process.argv.includes('--sweep');
+const firstSeed = integerArg('from', Number(process.env.FROM || (sweep ? 4201 : 1)));
+const plannerSeeds = integerArg('count', sweep ? 64 : PSEEDS);
+const carelessSeeds = sweep ? integerArg('count', 256) : SEEDS;
 
 // 1. careful bot finishes every level; 2. clumsy bot finishes level 1 often and less as levels rise
 const careRate = [], clumRate = [], stars = [];
 const only = process.argv.find(a => a.startsWith('--level='));
-if (only || process.argv.includes('--planner-only')) {
+if (sweep || only || process.argv.includes('--planner-only')) {
   const levels = only ? [integerArg('level', 1)] : Array.from({ length: LEVELS }, (_, i) => i + 1);
   if (levels.some(n => n > LEVELS)) throw new Error(`--level must be at most ${LEVELS}`);
   for (const n of levels) {
+    if (sweep) {
+      const policies = [
+        ['planner', planner, plannerSeeds],
+        ['clumsy', seed => clumsy(seed * 100 + n), carelessSeeds],
+        ['sloppy aim', sloppyAim, carelessSeeds],
+      ];
+      for (const [name, makePolicy, count] of policies) {
+        let wins = 0, deadlines = 0;
+        const losses = { spill: 0, over: 0, under: 0 };
+        for (let seed = firstSeed; seed < firstSeed + count; seed++) {
+          const s = play(n, seed, makePolicy(seed));
+          if (s.won) wins++;
+          else {
+            losses[s.why]++;
+            if (s.t > s.L.time) deadlines++;
+          }
+        }
+        const result = `level ${n}: ${name} ${wins}/${count}, seeds ${firstSeed}–${firstSeed + count - 1}; losses ${JSON.stringify(losses)}, ${deadlines} at deadline`;
+        if (name === 'planner') ok(wins / count >= 0.9, result);
+        else if (n >= 5) ok(wins / count < 0.5, result);
+        else console.log(result);
+      }
+      continue;
+    }
     let wins = 0;
     for (let seed = firstSeed; seed < firstSeed + plannerSeeds; seed++) {
       const a = play(n, seed, planner());

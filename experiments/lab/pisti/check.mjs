@@ -9,11 +9,13 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { deal, play, score, view, rank, isJack, capturesWith, dailySeed } from './sim.js';
 import { choose } from './brain.js';
+import { tables } from './words.js';
 import { TABLE, tableName, tableMessage, freshTable, sit, move, again, shown } from '../../../workers/lab-ai/src/table.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const SHOTS = process.env.SHOTS || '/private/tmp/claude-504/-Users-abdul-code/e727a231-6be3-4081-a695-31f6b5ca1a96/scratchpad/pisti-shots';
 const TABLE_SHOTS = join(dirname(SHOTS), 'pisti-table-shots');
+const LANG_SHOTS = process.env.LANG_SHOTS || join(dirname(SHOTS), 'i18n-shots', 'pisti');
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
   const pathname = new URL(req.url, 'http://localhost').pathname;
@@ -36,7 +38,7 @@ await new Promise((done, fail) => {
 const base = `http://127.0.0.1:${server.address().port}`;
 const require = createRequire(import.meta.url);
 const { webkit, chromium, devices } = require(process.env.PLAYWRIGHT ? join(resolve(process.env.PLAYWRIGHT), 'playwright') : 'playwright');
-await Promise.all([mkdir(SHOTS, { recursive: true }), mkdir(TABLE_SHOTS, { recursive: true })]);
+await Promise.all([mkdir(SHOTS, { recursive: true }), mkdir(TABLE_SHOTS, { recursive: true }), mkdir(LANG_SHOTS, { recursive: true })]);
 const PHONES = { webkit: [webkit, devices['iPhone 13']], chromium: [chromium, devices['Pixel 7']] };
 const DATE = '2026-11-24';
 const sleep = ms => new Promise(done => setTimeout(done, ms));
@@ -210,7 +212,7 @@ function tableWire() {
 async function playFriend(browser, device, phone) {
   const wire = tableWire();
   const tests = [];
-  const url = `${base}/lab/pisti/?speed=20&date=${DATE}`;
+  const url = `${base}/lab/pisti/?lang=en&speed=20&date=${DATE}`;
   const oldSave = { v: 1, level: 2, losses: 1, hands: 2, len: '51', four: false, sound: false, daily: { [DATE]: { started: true } } };
   async function friendPage() {
     const test = await open(browser, device);
@@ -427,7 +429,7 @@ async function playHand(page, phone, { shots = false, pistiShot = false, last = 
 
 async function run(test, phone, seed) {
   const { page } = test;
-  await page.goto(`${base}/lab/pisti/?date=${DATE}&speed=4&seed=${seed}`);
+  await page.goto(`${base}/lab/pisti/?lang=en&date=${DATE}&speed=4&seed=${seed}`);
   await until(page, () => window.__pisti?.ready, 'page ready');
   await page.evaluate(() => localStorage.clear());
   await page.reload();
@@ -552,7 +554,7 @@ async function run(test, phone, seed) {
 async function pace(browser) {
   const test = await open(browser, devices['Pixel 7']), { page } = test;
   try {
-    await page.goto(`${base}/lab/pisti/?seed=7`);
+    await page.goto(`${base}/lab/pisti/?lang=en&seed=7`);
     await until(page, () => window.__pisti?.screen === 'menu', 'menu');
     await page.locator('#play').tap();
     await until(page, () => window.__pisti.canPlay, 'turn');
@@ -571,7 +573,7 @@ async function extras(browser) {
   const test = await open(browser, devices['Pixel 7']), { page } = test;
   const DAY = '2026-11-25';
   try {
-    await page.goto(`${base}/lab/pisti/?seed=11&speed=4&date=${DAY}`);
+    await page.goto(`${base}/lab/pisti/?lang=en&seed=11&speed=4&date=${DAY}`);
     await until(page, () => window.__pisti?.screen === 'menu', 'menu');
     await page.locator('#today').tap();
     await until(page, () => window.__pisti.canPlay, 'daily first turn');
@@ -625,7 +627,7 @@ async function small(browser, seed) {
   const device = { viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 };
   const test = await open(browser, device), { page } = test;
   try {
-    await page.goto(`${base}/lab/pisti/?seed=${seed}&speed=4&date=${DATE}`);
+    await page.goto(`${base}/lab/pisti/?lang=en&seed=${seed}&speed=4&date=${DATE}`);
     await until(page, () => window.__pisti?.screen === 'menu', 'menu');
     const play = await page.locator('#play').boundingBox(), two = await page.locator('#two').boundingBox();
     assert.ok(play.y >= 0 && two.y + two.height <= 640, '360x640: menu buttons visible');
@@ -657,7 +659,166 @@ async function small(browser, seed) {
   } finally { await test.context.close(); }
 }
 
+// Languages. The key tables agree in Node; then the page in Turkish, on each phone and at 360x640.
+function tablesAgree() {
+  const en = Object.keys(tables.en).sort(), tr = Object.keys(tables.tr).sort();
+  assert.deepEqual(tr, en, 'every key in tables.en exists in tables.tr and the other way round');
+  const vars = text => [...text.matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort().join(',');
+  for (const key of en) {
+    assert.ok(tables.tr[key].trim() && tables.en[key].trim(), `${key} is not empty`);
+    assert.equal(vars(tables.tr[key]), vars(tables.en[key]), `${key}: same {variables} in both languages`);
+  }
+  console.log(`ok   pisti words: ${en.length} keys in English and Turkish, same variables`);
+}
+const visibleTexts = page => page.evaluate(() => [...document.body.querySelectorAll('*')]
+  .filter(el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden' && getComputedStyle(el).opacity !== '0')
+  .flatMap(el => [...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent.trim()).filter(Boolean)));
+async function noRawKeys(page, what) {
+  const keys = new Set(Object.keys(tables.en));
+  for (const text of await visibleTexts(page)) {
+    assert.ok(!keys.has(text), `${what}: visible text "${text}" is a raw key`);
+    assert.ok(!/[{}]/.test(text), `${what}: visible text "${text}" has an unfilled variable`);
+  }
+}
+const SUIT_TR = ['sinek', 'karo', 'kupa', 'maça'], SUIT_EN = ['clubs', 'diamonds', 'hearts', 'spades'];
+const RANK_TR = ['', 'as', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'vale', 'kız', 'papaz'];
+const RANK_EN = ['', 'ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'jack', 'queen', 'king'];
+const nameTr = c => `${SUIT_TR[(c / 13) | 0]} ${RANK_TR[c % 13 + 1]}`;
+const nameEn = c => `${RANK_EN[c % 13 + 1]} of ${SUIT_EN[(c / 13) | 0]}`;
+const labels = page => page.locator('#hand [data-card]').evaluateAll(els => els.map(el => [Number(el.dataset.card), el.getAttribute('aria-label')]));
+const text = (page, selector) => page.locator(selector).first().textContent().then(x => x.trim());
+const langShot = (page, phone, name) => page.screenshot({ path: join(LANG_SHOTS, `${phone}-tr-${name}.png`) });
+
+async function turkish(browser, device, phone, seed, small = false) {
+  const test = await open(browser, device), { page } = test;
+  const wire = tableWire();
+  try {
+    await wire.attach(page);
+    const home = `${base}/lab/pisti/?date=${DATE}&speed=4&seed=${seed}`;
+    await page.goto(`${home}&lang=tr`);
+    await until(page, () => window.__pisti?.screen === 'menu', 'menu');
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'tr', 'the page language is Turkish');
+    assert.equal(await text(page, '#play'), 'Oyna');
+    assert.equal(await text(page, '#today'), 'Günün eli' + await text(page, '#todayNote'));
+    assert.equal(await text(page, '#friend'), 'Arkadaşla oyna');
+    assert.equal(await text(page, '#two'), 'İki kişi, tek telefon');
+    assert.equal(await text(page, '#length button[data-len="one"]'), 'Tek el');
+    assert.match(await text(page, '#todayNote'), /herkese aynı kartlar/);
+    assert.equal(await text(page, '#langMenu'), 'English');
+    assert.equal(await page.locator('#levelDots').getAttribute('aria-label'), 'Botun gücü: kolay');
+    assert.ok(await noOverflow(page), 'Turkish menu has no overflow');
+    const sw = await page.locator('#langMenu').boundingBox(), vp = page.viewportSize();
+    assert.ok(sw.height >= 44 && sw.width >= 44 && sw.x >= 0 && sw.x + sw.width <= vp.width && sw.y >= 0, `language button is at least 44 px and on screen ${JSON.stringify(sw)}`);
+    await noRawKeys(page, 'Turkish menu');
+    await langShot(page, small ? 'small' : phone, '1-menu');
+
+    // Friend card: entry, then a table waiting for a friend.
+    await page.locator('#friend').tap();
+    assert.equal(await text(page, '#friendTitle'), 'Arkadaşla oyna');
+    assert.equal(await text(page, '#friendEntry .field span'), 'Adın (isteğe bağlı)');
+    assert.equal(await text(page, '#newTable'), 'Yeni masa');
+    assert.equal(await text(page, '#joinTable'), 'Katıl');
+    assert.equal(await page.locator('#joinCode').evaluate(el => el.lang), 'en', 'the code field uppercases as Latin A-Z, not Turkish İ');
+    assert.ok(await noOverflow(page), 'Turkish friend entry has no overflow');
+    await noRawKeys(page, 'Turkish friend entry');
+    await page.locator('#newTable').tap();
+    await until(page, () => document.querySelector('#lobbyStatus').textContent === 'Arkadaşın bekleniyor', 'Turkish waiting line');
+    assert.equal(await text(page, '#shareLink'), 'Bağlantıyı paylaş');
+    assert.equal(await page.locator('#roomCode').getAttribute('aria-label'), 'Masa kodu');
+    assert.ok(await noOverflow(page), 'Turkish invite card has no overflow');
+    await noRawKeys(page, 'Turkish invite');
+    await langShot(page, small ? 'small' : phone, '3-friend');
+    await page.locator('#roomLeave').tap();
+
+    // Play screen: hint, card names, pause and the switch.
+    await page.locator('#play').tap();
+    await until(page, () => window.__pisti.canPlay, 'turn');
+    assert.equal(await page.locator('.kit-hint .label').textContent(), 'Oynamak için bir karta dokun');
+    assert.equal(await page.locator('#hand').getAttribute('aria-label'), 'Kartların');
+    assert.equal(await page.locator('#pause').getAttribute('aria-label'), 'Duraklat');
+    for (const [card, label] of await labels(page)) assert.equal(label, nameTr(card), 'Turkish card name');
+    assert.ok(await noOverflow(page), 'Turkish play screen has no overflow');
+    await langShot(page, small ? 'small' : phone, '2-play');
+    await page.locator('#pause').tap();
+    assert.equal(await text(page, '#pauseTitle'), 'Duraklatıldı');
+    assert.equal(await text(page, '#resume'), 'Devam et');
+    assert.equal(await text(page, '#sound'), 'Ses: açık');
+    assert.equal(await text(page, '#colours'), 'Dört renk: kapalı');
+    assert.ok(await noOverflow(page), 'Turkish pause screen has no overflow');
+    const sw2 = await page.locator('#langPause').boundingBox();
+    assert.ok(sw2.height >= 44 && sw2.y + sw2.height <= vp.height, 'pause language button is at least 44 px and on screen');
+    await langShot(page, small ? 'small' : phone, '5-paused');
+    // The switch redraws the open pause card and the cards on screen, with no reload.
+    await page.locator('#langPause').tap();
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
+    assert.equal(await text(page, '#pauseTitle'), 'Paused');
+    assert.equal(await text(page, '#langPause'), 'Türkçe');
+    for (const [card, label] of await labels(page)) assert.equal(label, nameEn(card), 'English card name after the switch');
+    assert.equal(await page.locator('.kit-hint .label').textContent(), 'Tap a card to play it');
+    assert.equal(await page.locator('#hand').getAttribute('aria-label'), 'Your cards');
+    await page.locator('#langPause').tap();
+    assert.equal(await text(page, '#pauseTitle'), 'Duraklatıldı');
+    await page.locator('#resume').tap();
+
+    // A whole hand in Turkish, then the score card.
+    await playHand(page, phone);
+    assert.equal(await text(page, '#scoreT .head th:nth-child(2)'), 'Sen');
+    assert.equal(await text(page, '#scoreT .head th:nth-child(3)'), 'Bot');
+    const rows = await page.locator('#scoreT tr[data-k] td:first-child').allTextContents();
+    assert.deepEqual(rows.map(x => x.replace(/ \(\d+–\d+\)/, '').replace(/[︎]/g, '')), ['Vale · her biri 1', 'As · her biri 1', 'Sinek ikili · 2', 'Karo onlu · 3', 'Kart çoğunluğu · 3', 'Pişti · 10 (vale/vale · 20)']);
+    assert.match(rows[4], /\(\d+–\d+\)$/, 'the card count shows beside the most-cards row');
+    assert.equal(await text(page, '#scoreT .total td:first-child'), 'Toplam');
+    assert.equal(await text(page, '#scoreTitle'), 'Sen kazandın');
+    assert.equal(await text(page, '#again'), 'Tekrar oyna');
+    assert.equal(await text(page, '#scoreMenu'), 'Menü');
+    assert.ok(await noOverflow(page), 'Turkish score card has no overflow');
+    const cells = await page.locator('#scoreT td, #scoreT th').evaluateAll(els => els.every(el => el.scrollWidth <= el.clientWidth + 1));
+    assert.ok(cells, 'no score card cell is clipped');
+    await noRawKeys(page, 'Turkish score card');
+    await langShot(page, small ? 'small' : phone, '4-score');
+    if (small) {
+      await page.locator('#scoreMenu').tap();
+      await page.locator('#today').tap();
+      await playHand(page, phone);
+      assert.match(await text(page, '#dailyNote'), /^Günün eli .*2026.* · puanlandı$/);
+      assert.match(await text(page, '#matchLine'), /^Fark [+−]?\d+$/);
+      assert.equal(await text(page, '#savePic'), 'Resmi kaydet');
+      assert.ok(await noOverflow(page), 'Turkish daily result has no overflow');
+      const back = await page.locator('#scoreMenu').boundingBox(), save = await page.locator('#savePic').boundingBox();
+      assert.ok(back.y + back.height <= 640 && save.y + save.height <= 640, 'Turkish daily result keeps Menu and Save picture in view');
+      await langShot(page, 'small', '6-daily');
+      const pic = await page.evaluate(() => window.__pisti.picture());
+      assert.ok(pic.bytes > 10000, 'the Turkish picture draws');
+    }
+
+    // The score card redraws in place: open, switch is not on this card, so use the pause path on a fresh hand.
+    await page.locator('#scoreMenu').tap();
+    await page.reload();
+    await until(page, () => window.__pisti?.screen === 'menu', 'menu after reload');
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'tr', 'Turkish survives a reload');
+    assert.equal(await text(page, '#play'), 'Oyna');
+    // The switch on the menu, no reload; the choice survives a reload with no ?lang= on the address.
+    await page.locator('#langMenu').tap();
+    assert.equal(await text(page, '#play'), 'Play');
+    assert.equal(await text(page, '#langMenu'), 'Türkçe');
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
+    assert.match(await text(page, '#todayNote'), /^[A-Z][a-z]{2} \d+, 2026 · /, 'the date follows the language');
+    await page.goto(`${base}/lab/pisti/?date=${DATE}&speed=4&seed=${seed}`);
+    await until(page, () => window.__pisti?.screen === 'menu', 'menu, no ?lang=');
+    assert.equal(await text(page, '#play'), 'Play', 'the choice is remembered');
+    await page.locator('#langMenu').tap();
+    assert.equal(await text(page, '#play'), 'Oyna');
+    await page.goto(`${base}/lab/pisti/?date=${DATE}&speed=4&seed=${seed}`);
+    await until(page, () => window.__pisti?.screen === 'menu', 'menu, no ?lang= again');
+    assert.equal(await text(page, '#play'), 'Oyna', 'Turkish is remembered too');
+    assert.deepEqual(test.external, [], 'no outside requests');
+    assert.deepEqual(test.errors, [], 'Turkish run: no console, page or network errors');
+    console.log(`ok   pisti in Turkish on ${phone}${small ? ' (360x640)' : ''}`);
+  } finally { await test.context.close(); }
+}
+
 let failed = 0;
+tablesAgree();
 const seed = pistiSeed();
 console.log(`pişti seed ${seed}`);
 try {
@@ -669,8 +830,9 @@ try {
     try {
       await run(test, phone, seed);
       await playFriend(browser, device, phone);
+      await turkish(browser, device, phone, seed);
       console.log(`ok   pisti on ${phone}`);
-      if (phone === 'chromium') { await pace(browser); await small(browser, seed + 1); await extras(browser); console.log('ok   pisti extras on chromium'); }
+      if (phone === 'chromium') { await pace(browser); await small(browser, seed + 1); await turkish(browser, { viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, 'small', seed, true); await extras(browser); console.log('ok   pisti extras on chromium'); }
     } catch (e) { failed++; console.error(`FAIL pisti on ${phone}: ${e.stack}`); if (test.errors.length) console.error(test.errors.join('\n')); await shot(test.page, phone, 'failure').catch(() => {}); }
     finally { await test.context.close(); await browser.close(); }
   }

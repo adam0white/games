@@ -5,6 +5,7 @@ import { onLeave, isPauseKey } from '../../kit/pause.js';
 import { noZoom } from '../../kit/zoom.js';
 import { screens } from '../../kit/screens.js';
 import { hint } from '../../kit/hint.js';
+import { t, lang, apply, setLang, num, dateLabel } from './words.js';
 
 noZoom();
 const $ = id => document.getElementById(id);
@@ -21,7 +22,6 @@ const snd = sound({ on: () => save.sound });
 
 const COLOR = ['#ffa443', '#5fe3b0', '#ff7fc0', '#fff07a'];
 const CORE = ['#fff1d6', '#eafff6', '#ffeaf6', '#ffffff'];
-const TIPS = ['Draw a ring around the fireflies', 'One colour to a ring', 'Moths snap the thread', 'The bat eats what it chases', 'Three colours now', 'Gusts push everything', 'Ring the golden one', 'All of it, until dawn'];
 
 // Layout: a band at the top for jars, wicks and pause; the field below, scaled to fit.
 let VW = 0, VH = 0, dpr = 1, sc = 1, ox = 0, oy = 0, safeTop = 0, safeBottom = 0, band = 64;
@@ -104,8 +104,11 @@ function trimDaily() { const keys = Object.keys(save.daily).sort(); while (keys.
 function pauseGame() {
   if (mode !== 'play') return;
   mode = 'paused'; finger.down = false; finger.lift = false; dropThread(s); snd.hold();
-  $('pauseLine').textContent = kind === 'endless' ? `Endless · ${s.score}` : kind === 'practice' ? `Practice · level ${s.level + 1}` : `Level ${s.level + 1} of ${NIGHT} · ${s.score}`;
+  pauseText();
   show('paused');
+}
+function pauseText() {
+  $('pauseLine').textContent = kind === 'endless' ? t('pauseEndless', { score: num(s.score) }) : kind === 'practice' ? t('pausePractice', { n: num(s.level + 1) }) : t('pauseNight', { n: num(s.level + 1), total: num(NIGHT), score: num(s.score) });
 }
 function resume() { if (mode !== 'paused') return; snd.release(); mode = 'play'; last = performance.now(); acc = 0; show('play'); }
 function toMenu() { snd.release(); mode = 'menu'; menuText(); show('menu'); }
@@ -121,17 +124,28 @@ $('play').addEventListener('click', () => begin(practiceLevel ? 'practice' : 'ni
 $('daily').addEventListener('click', () => begin('daily'));
 $('endless').addEventListener('click', () => { if (save.endless) begin('endless'); });
 for (const id of ['sound', 'sound2']) $(id).addEventListener('click', () => { save.sound = !save.sound; persist(); soundText(); if (save.sound) snd.unlock(); });
-function soundText() { for (const id of ['sound', 'sound2']) $(id).textContent = `Sound: ${save.sound ? 'on' : 'off'}`; }
+function soundText() { for (const id of ['sound', 'sound2']) $(id).textContent = t(save.sound ? 'soundOn' : 'soundOff'); }
+// Switching language redraws every piece of text the page owns, including the card in view and the words on the canvas.
+function allText() {
+  apply();
+  document.title = t('title');
+  for (const id of ['lang', 'lang2']) { $(id).textContent = t('otherLang'); $(id).lang = lang() === 'en' ? 'tr' : 'en'; }
+  const words = document.querySelector('.kit-hint .label');
+  if (words) words.textContent = t('hintLabel');
+  menuText();
+  if (mode === 'paused') pauseText();
+}
+for (const id of ['lang', 'lang2']) $(id).addEventListener('click', () => { setLang(lang() === 'en' ? 'tr' : 'en'); lastScore = -1; allText(); });
 function menuText() {
   soundText();
   const d = save.daily[today];
-  $('dailyNote').textContent = d ? `Today's scored run: ${d.score}. Later runs are practice.` : 'Same meadow for everyone today. One scored run.';
+  $('dailyNote').textContent = d ? t('dailyDone', { n: num(d.score) }) : t('dailyNew');
   $('endless').disabled = !save.endless;
-  $('endlessNote').textContent = save.endless ? (save.endlessBest ? `Best ${save.endlessBest}` : 'Open: play until dawn wins') : 'Opens after your first dawn';
-  $('best').textContent = save.best ? `Best night ${save.best} · biggest ring ${save.bestRing}` : '';
-  $('play').textContent = practiceLevel ? `Practise level ${practiceLevel}` : 'Play the night';
+  $('endlessNote').textContent = save.endless ? (save.endlessBest ? t('endlessBest', { n: num(save.endlessBest) }) : t('endlessOpen')) : t('endlessLocked');
+  $('best').textContent = save.best ? t('best', { n: num(save.best), ring: num(save.bestRing) }) : '';
+  $('play').textContent = practiceLevel ? t('practise', { n: num(practiceLevel) }) : t('play');
 }
-menuText();
+allText();
 
 // Input: one finger. The head is sampled once per sim step; a lift waits until a step has seen the last position.
 const toFieldX = x => (x - ox) / sc, toFieldY = y => (y - oy) / sc;
@@ -147,12 +161,13 @@ const up = e => { if (e.pointerId === finger.id && finger.down) { finger.x = e.c
 canvas.addEventListener('pointerup', up);
 canvas.addEventListener('pointercancel', e => { if (e.pointerId === finger.id) { finger.down = false; finger.lift = false; finger.id = -1; dropThread(s); } });
 
-hint(canvas, { kind: 'hold-and-move', key: 'ring:hint', when: () => mode === 'play' && s.phase === 'play', played });
+hint(canvas, { kind: 'hold-and-move', key: 'ring:hint', when: () => mode === 'play' && s.phase === 'play', played, label: t('hintLabel') });
+allText();
 
 // Effects: rare objects for rings, a fixed pool for particles.
 const effects = [], pops = [];
 const NP = 260, px = new Float32Array(NP), py = new Float32Array(NP), pvx = new Float32Array(NP), pvy = new Float32Array(NP), pl = new Float32Array(NP), pm = new Float32Array(NP), pc = new Uint8Array(NP);
-let pNext = 0, banner = 0, bannerTitle = '', bannerTip = '', flare = 0, shake = 0, lastScore = -1, scoreText = '0';
+let pNext = 0, banner = 0, bannerTitle = null, bannerTip = null, flare = 0, shake = 0, lastScore = -1, scoreText = '0';
 function burst(x, y, n, col, speed, life) {
   if (calm) n = Math.ceil(n / 3);
   for (let k = 0; k < n; k++) {
@@ -172,11 +187,11 @@ function handle() {
   for (const e of s.ev) {
     if (e.type === 'level') {
       banner = calm ? 1.6 : 2.2;
-      bannerTitle = kind === 'endless' ? (e.round ? `Round ${e.round + 1}` : 'Endless meadow') : `Level ${e.level + 1}`;
-      bannerTip = kind === 'endless' && e.round ? 'Fresh jars, a shorter dawn' : TIPS[e.level];
+      bannerTitle = kind === 'endless' ? (e.round ? ['round', { n: e.round + 1 }] : ['endless']) : ['level', { n: e.level + 1 }];
+      bannerTip = kind === 'endless' && e.round ? ['freshJars'] : ['tip' + e.level];
     } else if (e.type === 'ring') {
       effects.push({ type: 'ring', poly: e.poly, caught: e.caught, n: e.n, col: e.color, x: e.x, y: e.y, t: 0, dur: calm ? 0.55 : 0.95 });
-      pops.push({ x: e.x, y: e.y, t: 0, text: `+${e.points}` });
+      pops.push({ x: e.x, y: e.y, t: 0, text: `+${num(e.points)}` });
       chime(e.n);
       if (e.n > save.bestRing) { save.bestRing = e.n; persist(); }
       if (e.gold) { setTimeout(() => chime(9), 200); }
@@ -186,7 +201,7 @@ function handle() {
       if (!calm) shake = Math.max(shake, 5);
     } else if (e.type === 'moths') {
       effects.push({ type: 'moths', poly: e.poly, x: e.x, y: e.y, t: 0, dur: 0.6 });
-      pops.push({ x: e.x, y: e.y, t: 0, text: `+${e.points}` });
+      pops.push({ x: e.x, y: e.y, t: 0, text: `+${num(e.points)}` });
       snd.tone(330, 0.25, 0.05, 'sine', 80);
     } else if (e.type === 'empty') {
       effects.push({ type: 'empty', poly: e.poly, x: e.x, y: e.y, t: 0, dur: 0.4 });
@@ -206,7 +221,7 @@ function handle() {
     else if (e.type === 'end' || e.type === 'full') {
       if (e.full !== false) { for (let k = 0; k < 3; k++) setTimeout(() => snd.tone(1318.5 + k * 260, 0.35, 0.04, 'triangle'), k * 90); }
       else snd.tone(196, 0.5, 0.06, 'sine', -40);
-      if (e.bonus) pops.push({ x: LX, y: 70, t: -0.3, text: `dawn +${e.bonus}` });
+      if (e.bonus) pops.push({ x: LX, y: 70, t: -0.3, text: t('dawnBonus', { n: num(e.bonus) }) });
     } else if (e.type === 'over') { mode = 'ending'; endAt = performance.now() + 1400; show('ending'); }
   }
 }
@@ -245,30 +260,30 @@ function jarRow(c, x, y, width, fills, count) {
 }
 function finish() {
   mode = 'end';
-  const st = stars(s), fills = Array.from(s.results);
-  let line = '', top = 'Dawn', title = s.reason === 'wicks' ? 'The wicks went out' : ['First light', 'First light', 'A fine night', 'A perfect night'][st];
-  if (s.reason === 'wicks') top = 'The wicks are out';
+  const st = stars(s), fills = Array.from(s.results), lines = [], wicks = s.reason === 'wicks';
+  let top = t('endDawn'), title = wicks ? t('endWicksTitle') : t(['titleFirst', 'titleFirst', 'titleFine', 'titlePerfect'][st]);
+  if (wicks) top = t('endWicksTop');
   if (kind === 'endless') {
-    top = 'Endless meadow'; title = s.round ? `${s.round} ${s.round === 1 ? 'round' : 'rounds'} of jars` : 'Dawn came';
+    top = t('endless'); title = s.round ? t(s.round === 1 ? 'rounds1' : 'roundsN', { n: num(s.round) }) : t('dawnCame');
     const better = s.score > save.endlessBest; if (better) save.endlessBest = s.score;
-    line = better ? 'A new best for this device.' : `Best on this device: ${save.endlessBest}`;
+    lines.push(better ? t('newBestDevice') : t('bestDevice', { n: num(save.endlessBest) }));
   } else if (kind === 'practice') {
-    top = `Practice · level ${s.level + 1}`; title = s.cleared ? 'Jars full' : 'Dawn came first';
-    line = 'Practice runs are not saved as scores.';
+    top = t('pausePractice', { n: num(s.level + 1) }); title = t(s.cleared ? 'jarsFull' : 'dawnFirst');
+    lines.push(t('practiceNote'));
   } else {
-    line = `${s.cleared} of ${NIGHT} levels with full jars.`;
+    lines.push(t('levelsFull', { n: num(s.cleared), total: num(NIGHT) }));
     save.nights++;
-    if (s.reason !== 'wicks') { save.dawns++; if (!save.endless) { save.endless = true; line += ' Endless meadow is open.'; } }
+    if (!wicks) { save.dawns++; if (!save.endless) { save.endless = true; lines.push(t('endlessOpened')); } }
     if (kind === 'daily') {
-      top = `Today's meadow · ${today}`;
-      if (scored) { save.daily[today] = { score: s.score, fills: fills.map(f => Math.round(f * 100) / 100), stars: st, ring: s.bestRing }; line += ' This is your scored run for today.'; }
-      else line += ` Practice: today's scored run was ${save.daily[today]?.score ?? 0}.`;
-    } else if (s.score > save.best) { save.best = s.score; line += ' A new best night.'; }
+      top = t('dailyTop', { date: dateLabel(today) });
+      if (scored) { save.daily[today] = { score: s.score, fills: fills.map(f => Math.round(f * 100) / 100), stars: st, ring: s.bestRing }; lines.push(t('scoredRun')); }
+      else lines.push(t('practiceDaily', { n: num(save.daily[today]?.score ?? 0) }));
+    } else if (s.score > save.best) { save.best = s.score; lines.push(t('newBestNight')); }
   }
   if (s.bestRing > save.bestRing) save.bestRing = s.bestRing;
   persist();
-  $('endTop').textContent = top; $('endTitle').textContent = title; $('endLine').textContent = line;
-  $('total').textContent = s.score; $('bestRing').textContent = s.bestRing;
+  $('endTop').textContent = top; $('endTitle').textContent = title; $('endLine').textContent = lines.join(' ');
+  $('total').textContent = num(s.score); $('bestRing').textContent = num(s.bestRing);
   const showJars = kind !== 'endless';
   $('jarRow').style.display = showJars ? 'block' : 'none'; $('stars').style.display = kind === 'night' || kind === 'daily' ? 'block' : 'none';
   $('stars').textContent = '★'.repeat(st) + '☆'.repeat(3 - st);
@@ -286,26 +301,26 @@ function makePicture(top, title, fills, st) {
   const x = c.getContext('2d'), bg = x.createLinearGradient(0, 0, 0, 420);
   bg.addColorStop(0, '#05070f'); bg.addColorStop(1, '#0d2219'); x.fillStyle = bg; x.fillRect(0, 0, 720, 420);
   x.drawImage(glowSprite, 260, -40, 200, 200);
-  x.textAlign = 'center'; x.fillStyle = '#ffd9a0'; x.font = '44px Georgia, serif'; x.fillText('Firefly Ring', 360, 70);
+  x.textAlign = 'center'; x.fillStyle = '#ffd9a0'; x.font = '44px Georgia, serif'; x.fillText(t('title'), 360, 70);
   x.fillStyle = '#f3e6cfbb'; x.font = '22px Georgia, serif'; x.fillText(top, 360, 108);
   if (kind === 'endless') { x.font = '30px Georgia, serif'; x.fillStyle = '#f3e6cf'; x.fillText(title, 360, 210); }
   else jarRow(x, 40, 140, 640, kind === 'practice' ? fills.slice(s.level, s.level + 1) : fills, kind === 'practice' ? 1 : NIGHT);
   x.fillStyle = '#ffd27a'; x.font = '40px Georgia, serif';
   if (kind === 'night' || kind === 'daily') x.fillText('★'.repeat(st) + '☆'.repeat(3 - st), 360, 300);
-  x.fillStyle = '#f3e6cf'; x.font = '26px Georgia, serif'; x.fillText(`${s.score} · biggest ring ${s.bestRing}`, 360, 360);
+  x.fillStyle = '#f3e6cf'; x.font = '26px Georgia, serif'; x.fillText(t('picScore', { score: num(s.score), ring: num(s.bestRing) }), 360, 360);
   try { c.toBlob(b => { picture = b; }, 'image/png'); } catch {}
 }
 $('savePic').addEventListener('click', async () => {
-  if (!picture) { $('saveNote').textContent = 'The picture is not ready yet.'; return; }
-  const name = `firefly-ring-${kind === 'daily' ? today : 'night'}.png`;
+  if (!picture) { $('saveNote').textContent = t('picNotReady'); return; }
+  const name = t('imageName', { name: kind === 'daily' ? today : 'night' });
   try {
     const file = new File([picture], name, { type: 'image/png' });
-    if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: 'Firefly Ring' }); $('saveNote').textContent = 'Shared.'; return; }
+    if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: t('title') }); $('saveNote').textContent = t('shared'); return; }
   } catch (err) { if (err?.name === 'AbortError') return; }
   const url = URL.createObjectURL(picture), a = document.createElement('a');
   a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
-  $('saveNote').textContent = 'Picture saved.';
+  $('saveNote').textContent = t('saved');
 });
 
 // Drawing.
@@ -491,7 +506,7 @@ function drawParticles(dt) {
   g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
 }
 function drawHud(t) {
-  if (s.score !== lastScore) { lastScore = s.score; scoreText = String(s.score); }
+  if (s.score !== lastScore) { lastScore = s.score; scoreText = num(s.score); }
   const cy = safeTop + 10;
   for (let k = 0; k < 3; k++) {
     const x = 16 + k * 16, y = cy + 4, lit = k < s.wicks;
@@ -521,8 +536,8 @@ function drawBanner(dt) {
   banner -= dt;
   const a = Math.min(1, banner / 0.5, (2.2 - banner) / 0.3 + (calm ? 1 : 0));
   g.globalAlpha = Math.max(0, a); g.textAlign = 'center';
-  g.fillStyle = '#ffd9a0'; g.font = '34px Georgia, serif'; g.fillText(bannerTitle, VW / 2, Y(150));
-  g.fillStyle = '#f3e6cf'; g.font = '18px Georgia, serif'; g.fillText(bannerTip, VW / 2, Y(150) + 32);
+  g.fillStyle = '#ffd9a0'; g.font = '34px Georgia, serif'; g.fillText(t(...bannerTitle), VW / 2, Y(150));
+  g.fillStyle = '#f3e6cf'; g.font = '18px Georgia, serif'; g.fillText(t(...bannerTip), VW / 2, Y(150) + 32);
   g.globalAlpha = 1;
 }
 function render(t, dt) {

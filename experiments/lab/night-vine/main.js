@@ -56,16 +56,16 @@ function setText(id, value) {
 function objective() {
   const shadow = s.flowers.some(f => f.shade > .38);
   const ripe = s.arms.filter(a => a.ripe).length;
-  let glyph = 'window', title = 'Reach the window', help = 'Touch the glass to move the lamp.';
+  let glyph = 'window', title = 'Reach the window', help = 'Move the lamp to the lit window.';
   if (shadow) {
     glyph = 'flower'; title = 'Clear the shade'; help = 'Flick across the stem casting shade.';
   } else if (ripe < s.arms.length) {
     glyph = 'grapes';
     title = s.arms.length === 1 ? 'Ripen a bunch' : 'Ripen the grapes · ' + ripe + '/' + s.arms.length;
     help = s.arms.some(a => a.grip >= 0 && !a.ripe)
-      ? 'Keep light on the bunch while it ripens.' : 'Lead a shoot to a marked trellis arm.';
-  } else if (s.flowers.length) help = 'Keep the flowers below in the light.';
-  else if (started) help = 'The tender shoots follow your lamp.';
+      ? 'Keep light on the bunch while it ripens.' : 'Tap a marked trellis arm and let a shoot reach it.';
+  } else if (s.flowers.length) help = 'Move the lamp to the window. Keep the flowers in the light.';
+  else if (!started && !s.endless && s.level === 1) help = 'Tap the lit window to start.';
   setText('goal', title);
   setText('instruction', help);
   const icon = el('goalMark').firstElementChild;
@@ -177,9 +177,20 @@ el('next').onclick = () => {
 el('replay').onclick = () => { if (s.endless) endless(); else begin(s.level); };
 onLeave(pause);
 
-function point(e) {
-  const r = field.getBoundingClientRect();
+function point(e, r) {
   return { x: (e.clientX - r.left) * 360/r.width, y: (e.clientY - r.top) * 480/r.height };
+}
+function dragPoint(e) {
+  const r = field.getBoundingClientRect();
+  const before = gesture.bounds;
+  if (Math.abs(r.left - before.left) > 1 || Math.abs(r.top - before.top) > 1 ||
+      Math.abs(r.width - before.width) > 1 || Math.abs(r.height - before.height) > 1) {
+    // Moving or resizing the glass can turn a stationary finger into a flick.
+    gesture = null;
+    pad.drop();
+    return null;
+  }
+  return point(e, r);
 }
 function place(p) {
   const w = s.window;
@@ -188,13 +199,16 @@ function place(p) {
 }
 field.addEventListener('pointerdown', e => {
   if (screen !== 'play' || s.status !== 'growing' || pad.touch?.id !== e.pointerId) return;
-  const p = point(e);
-  gesture = { id:e.pointerId, p, at:e.timeStamp, lamp:{...s.lamp} };
+  const r = field.getBoundingClientRect();
+  const p = point(e, r);
+  gesture = { id:e.pointerId, p, at:e.timeStamp, lamp:{...s.lamp}, bounds:r };
   if (!started) audio.tone(440,.14,.035,'sine');
   started = true; place(p);
 });
 field.addEventListener('pointermove', e => {
-  if (gesture?.id === e.pointerId && screen === 'play' && s.status === 'growing') place(point(e));
+  if (gesture?.id !== e.pointerId || screen !== 'play' || s.status !== 'growing') return;
+  const p = dragPoint(e);
+  if (p) place(p);
 });
 function cut(a, b) {
   if (!prune(s,a.x,a.y,b.x,b.y)) return false;
@@ -204,9 +218,9 @@ function cut(a, b) {
 }
 field.addEventListener('pointerup', e => {
   if (gesture?.id !== e.pointerId) return;
-  const {p,at,lamp} = gesture, end = point(e);
+  const {p,at,lamp} = gesture, end = dragPoint(e);
   gesture = null;
-  if (screen !== 'play' || s.status !== 'growing') return;
+  if (!end || screen !== 'play' || s.status !== 'growing') return;
   if (e.timeStamp-at <= 320 && Math.hypot(end.x-p.x,end.y-p.y) >= 30 && cut(p,end)) {
     aim(s,lamp.x,lamp.y);
   } else place(end);

@@ -40,3 +40,21 @@ box-shadow:1px 2px 1px #dac8a6,3px 6px #bbb294,3px 7px 0 #6d745e,6px 14px 15px #
 @media(prefers-reduced-motion:reduce){.unused .tool{animation:none}}
 .status-row{height:46px;flex:none}.result.on{margin:0}#next{width:auto;padding:0 14px}
 .tool:not(.drawing){max-width:90px;left:66%;top:85%}.unused .tool:not(.drawing){left:56%;top:53%}
+.paper .kit-hint{position:absolute;top:54%;bottom:auto}
+@media (orientation:landscape) and (max-height:500px){
+  #cabinet{
+    width:min(100%,840px);min-height:0;
+    padding:max(7px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(7px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
+    display:grid;grid-template-columns:minmax(0,1fr) minmax(266px,.9fr);
+    grid-template-rows:minmax(0,1fr) auto auto auto auto minmax(0,1fr);column-gap:clamp(12px,3vw,24px);
+  }
+  .sheet-space{grid-area:1/1/-1/2}
+  header{grid-area:2/2}
+  h1{font-size:clamp(32px,6vw,47px)}
+  .status-row{grid-area:3/2}
+  .meter{grid-area:4/2}
+  #collection{grid-area:5/2}
+  .veil{align-items:safe center;overflow:auto}
+  .card{padding:clamp(12px,4vh,24px)}
+  .card p{margin:8px 0}
+}

@@ -11,12 +11,12 @@ const b = await (await cr.newContext({ ...devices['Pixel 7'] })).newPage();
 const errors = []; for (const p of [a, b]) p.on('pageerror', e => errors.push(String(e)));
 const snap = p => p.evaluate(() => JSON.stringify({ turn: __pisti.turn, top: __pisti.pileTop, size: __pisti.pileSize, scores: __pisti.scores, done: __pisti.done, moves: __pisti.room.moves }));
 try {
-  await a.goto(site + '?labRunSource=agent'); await until(a, () => window.__pisti?.ready, 'A ready');
+  await a.goto(site + '?lang=en&labRunSource=agent'); await until(a, () => window.__pisti?.ready, 'A ready');
   await a.locator('#friend').tap(); await a.locator('#friendName').fill('Ada'); await a.locator('#newTable').tap();
   await until(a, () => window.__pisti.room?.status === 'live', 'A at a live table');
   const code = await a.evaluate(() => window.__pisti.room.code);
   console.log('table', code);
-  await b.goto(`${site}?room=${code}&labRunSource=agent`);
+  await b.goto(`${site}?room=${code}&lang=en&labRunSource=agent`);
   for (const p of [a, b]) await until(p, () => window.__pisti?.room?.status === 'live' && window.__pisti.screen === 'play', 'seated and playing');
   const pages = (await a.evaluate(() => window.__pisti.room.seat)) === 0 ? [a, b] : [b, a];
   let n = 0;
@@ -46,7 +46,7 @@ try {
   n = 0; for (let i = 0; i < 4; i++) await step();
   console.log('deal again: one vote waits, two start a new hand; 4 cards, states equal');
   const c = await (await cr.newContext({ ...devices['Pixel 7'] })).newPage();
-  await c.goto(`${site}?room=${code}&labRunSource=agent`);
+  await c.goto(`${site}?room=${code}&lang=en&labRunSource=agent`);
   await until(c, () => /full/i.test(document.body.innerText), 'third page told the table is full');
   console.log('third page: full');
   if (errors.length) throw new Error('page errors: ' + errors.join(' | '));

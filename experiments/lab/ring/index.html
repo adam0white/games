@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#05080f">
-<title>Firefly Ring</title>
+<title data-i18n="title">Firefly Ring</title>
 <link rel="icon" href="data:,">
 <style>
   html, body { margin: 0; height: 100%; background: #05080f; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
@@ -40,35 +40,35 @@
 </style>
 </head>
 <body>
-<canvas id="c" aria-label="Draw a ring around fireflies of one colour"></canvas>
-<button id="pause" aria-label="Pause"></button>
+<canvas id="c" role="img" aria-label="Draw a ring around fireflies of one colour" data-i18n-aria="canvasAria"></canvas>
+<button id="pause" aria-label="Pause" data-i18n-aria="pause"></button>
 <div id="menu" class="screen veil on"><div>
-  <h1>Firefly Ring</h1>
-  <p>Draw a ring with your finger around fireflies of <b>one colour</b><span class="dot"></span><span class="dot b"></span><span class="dot c"></span>. Bigger rings pay much more.</p>
-  <p class="quiet">Mixed colours<span class="dot"></span><span class="dot b"></span> scatter. Moths snap the thread.</p>
+  <h1 data-i18n="title">Firefly Ring</h1>
+  <p><span data-i18n="introA">Draw a ring with your finger around fireflies of </span><b data-i18n="introB">one colour</b><span class="dot"></span><span class="dot b"></span><span class="dot c"></span><span data-i18n="introC">. Bigger rings pay much more.</span></p>
+  <p class="quiet"><span data-i18n="mixA">Mixed colours</span><span class="dot"></span><span class="dot b"></span><span data-i18n="mixB"> scatter. Moths snap the thread.</span></p>
   <p><button id="play" class="main">Play the night</button></p>
-  <p><button id="daily">Today's meadow</button><br><span id="dailyNote" class="quiet"></span></p>
-  <p><button id="endless">Endless meadow</button><br><span id="endlessNote" class="quiet"></span></p>
+  <p><button id="daily" data-i18n="daily">Today's meadow</button><br><span id="dailyNote" class="quiet"></span></p>
+  <p><button id="endless" data-i18n="endless">Endless meadow</button><br><span id="endlessNote" class="quiet"></span></p>
   <p id="best" class="quiet"></p>
-  <p><button id="sound" class="line">Sound: on</button></p>
+  <p><button id="sound" class="line">Sound: on</button><button id="lang" class="line langbtn"></button></p>
 </div></div>
 <div id="paused" class="screen veil"><div>
-  <h2>Paused</h2>
+  <h2 data-i18n="paused">Paused</h2>
   <p id="pauseLine" class="quiet"></p>
-  <p><button id="resume" class="main">Resume</button></p>
-  <p><button id="restart">Restart</button></p>
-  <p><button id="toMenu">Menu</button></p>
-  <p><button id="sound2" class="line">Sound: on</button></p>
+  <p><button id="resume" class="main" data-i18n="resume">Resume</button></p>
+  <p><button id="restart" data-i18n="restart">Restart</button></p>
+  <p><button id="toMenu" data-i18n="menu">Menu</button></p>
+  <p><button id="sound2" class="line">Sound: on</button><button id="lang2" class="line langbtn"></button></p>
 </div></div>
 <div id="end" class="screen veil"><div>
   <div id="endTop" class="eyebrow">Dawn</div>
   <h2 id="endTitle">First light</h2>
-  <canvas id="jarRow" width="640" height="120" aria-label="How full each level's jars were"></canvas>
+  <canvas id="jarRow" width="640" height="120" role="img" aria-label="How full each level's jars were" data-i18n-aria="jarsAria"></canvas>
   <div id="stars"></div>
-  <div class="stats"><div><b id="total">0</b><span>total</span></div><div><b id="bestRing">0</b><span>best ring</span></div></div>
+  <div class="stats"><div><b id="total">0</b><span data-i18n="total">total</span></div><div><b id="bestRing">0</b><span data-i18n="bestRing">best ring</span></div></div>
   <p id="endLine" class="quiet"></p>
-  <p><button id="again" class="main">Play again</button></p>
-  <p><button id="savePic">Save picture</button><button id="endMenu">Menu</button></p>
+  <p><button id="again" class="main" data-i18n="again">Play again</button></p>
+  <p><button id="savePic" data-i18n="savePic">Save picture</button><button id="endMenu" data-i18n="menu">Menu</button></p>
   <p id="saveNote" role="status"></p>
 </div></div>
 <script type="module" src="./main.js"></script>

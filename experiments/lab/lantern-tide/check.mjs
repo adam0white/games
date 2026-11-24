@@ -1,21 +1,22 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { dirname, extname, join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { ride, steer } from './bots.mjs';
-import { SECOND_SEED } from './sim.js';
+import { DT, SECOND_SEED } from './sim.js';
 
 const delayed = ride(SECOND_SEED, true, 2, 1);
 assert.equal(delayed.over, 'dawn', 'the last night tolerates a 100 ms steering delay');
 console.log('Night 2 with 100 ms steering delay:', +delayed.t.toFixed(2), 's');
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const shots = '/private/tmp/night-r5-review/lantern-tide';
+const shots = await mkdtemp(join(tmpdir(), 'lantern-tide-check-'));
+console.log('Screenshots:', shots);
 const prefix = '/lab/lantern-tide/';
 const fallback = join(homedir(), 'code/human-framework/node_modules');
 const requirePlaywright = createRequire(join(resolve(process.env.PLAYWRIGHT || fallback), 'check.cjs'));
@@ -40,7 +41,6 @@ const server = createServer(async (request, response) => {
     response.writeHead(404).end();
   }
 });
-await mkdir(shots, { recursive: true });
 await new Promise((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done); });
 const url = `http://127.0.0.1:${server.address().port}${prefix}`;
 const state = page => page.evaluate(() => window.tideState());
@@ -61,10 +61,12 @@ async function touchDriver(page, browser) {
         await this.release();
       }
       if (!held) {
+        await page.evaluate(() => { window.checkTouchAnchor = null; });
         await event('touchStart', page.viewportSize().width / 2, y);
-        const anchor = await page.evaluate(() => window.checkTouchAnchor);
-        ({ x: startX, boat: startBoat, hearts } = anchor);
         held = true;
+        const anchor = await page.waitForFunction(() => window.checkTouchAnchor, null, { polling: 10, timeout: 2000 });
+        ({ x: startX, boat: startBoat, hearts } = await anchor.jsonValue());
+        await anchor.dispose();
       }
       const next = startX + (target - startBoat) * view.scale / 1.3;
       await event('touchMove', next, y);
@@ -75,16 +77,41 @@ async function touchDriver(page, browser) {
   };
 }
 
-async function crossing(page, input, night, browserName) {
-  // Feed the normal pointer handlers at 10 Hz. Mouse steering on the longer
-  // course leaves more room around rocks when browser input arrives late.
+function advanceAfterSteering(page, desired, tolerance) {
+  return page.evaluate(async ({ desired, tolerance }) => {
+    const aimed = () => Math.abs(window.tideState().target - desired) <= tolerance;
+    if (!aimed()) {
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          window.removeEventListener('pointermove', received);
+          reject(new Error(`canvas did not receive steering target ${desired}`));
+        }, 2000);
+        function received(event) {
+          if (!event.isTrusted || event.target.id !== 'river' || !aimed()) return;
+          clearTimeout(timeout);
+          window.removeEventListener('pointermove', received);
+          resolve();
+        }
+        window.addEventListener('pointermove', received);
+      });
+    }
+    window.checkClock.advance(1);
+    return window.tideState();
+  }, { desired, tolerance });
+}
+
+async function crossing(page, input, night, browserName, launch) {
   const started = Date.now();
-  const touch = browserName === 'chromium';
-  const margin = !touch && night === 2 ? { bankMargin: .038, rockMargin: .055, samples: 15 } : undefined;
-  let moves = 0, next = 0;
+  const margin = night === 2 ? { bankMargin: .038, rockMargin: .055, samples: 15 } : undefined;
+  let moves = 0, batches = 0;
+  // Hold frames until the normal pointer handler has received the command.
+  await page.evaluate(() => window.checkClock.hold());
   try {
+    await launch();
+    let lastFrame = Date.now();
+    let view = await state(page);
     while (Date.now() - started < 60000) {
-      const view = await state(page);
+      assert.equal(view.night, night, 'the pointer crossing starts on the requested night');
       const { game, screen: showing } = view;
       const s = game.river;
       if (s.over) {
@@ -92,6 +119,8 @@ async function crossing(page, input, night, browserName) {
           assert.equal(await page.evaluate(() => localStorage.getItem('lantern-tide:night')), '2',
             'the unlock is saved at dawn, before the result card');
         }
+        if (night === 1) await sleep(650);
+        await page.evaluate(() => window.checkClock.advance(7));
         await screen(page, 'end');
         assert.equal(s.over, 'dawn', `night ${night} through pointer input (reached ${s.y.toFixed(2)})`);
         assert.ok(s.t < 60, `night ${night} finishes in under a simulated minute`);
@@ -101,16 +130,28 @@ async function crossing(page, input, night, browserName) {
           embers: s.taken, lives: s.hearts, relit: +game.rested.toFixed(3) };
       }
       assert.equal(showing, 'play');
-      if (s.t >= next) {
-        await input.drag(view, steer(game, true, margin));
-        next = touch ? (Math.floor((s.t + .003) * 10) + 1) / 10 - .003 : s.t + .097;
+      assert.equal(Math.round(s.t / DT), batches * 6, 'steering samples are six ticks apart');
+      const desired = steer(game, true, margin);
+      // Below one CSS pixel of input travel, keep the previous target.
+      const tolerance = (browserName === 'chromium' ? 1.3 : 1) / view.scale;
+      if (Math.abs(view.target - desired) > tolerance) {
+        await input.drag(view, desired);
         moves++;
       }
-      await sleep(10);
+      // Keep the opening at real-time pace while allowing slow input to arrive.
+      const wait = lastFrame + 100 - Date.now();
+      if (night === 1 && wait > 0) await sleep(wait);
+      lastFrame = Date.now();
+      view = await advanceAfterSteering(page, desired, tolerance);
+      batches++;
     }
     assert.fail(`night ${night} did not end within one minute`);
   } finally {
-    await input.release();
+    try {
+      await input.release();
+    } finally {
+      await page.evaluate(() => window.checkClock.resume());
+    }
   }
 }
 
@@ -124,7 +165,11 @@ async function wakeDisplay(page) {
 
 async function paint(page, browserName) {
   const nextFrame = async () => {
-    const frame = await page.evaluate(() => window.checkFrames);
+    const frame = await page.evaluate(() => {
+      const count = window.checkFrames;
+      if (window.checkClock.held()) window.checkClock.advance(2);
+      return count;
+    });
     await page.waitForFunction(n => window.checkFrames >= n + 2, frame, { polling: 40, timeout: 4000 });
   };
   try {
@@ -175,7 +220,37 @@ async function check(engine, browserName, device) {
     const context = await browser.newContext(devices[device]);
     const page = await context.newPage();
     page.setDefaultTimeout(15000);
-    await page.addInitScript(() => {
+    await page.addInitScript(frameMs => {
+      const nativeFrame = window.requestAnimationFrame.bind(window);
+      let time, previous, held = false, nextId = 0;
+      const callbacks = new Map();
+      window.requestAnimationFrame = callback => {
+        callbacks.set(++nextId, callback);
+        return nextId;
+      };
+      window.cancelAnimationFrame = id => { callbacks.delete(id); };
+      function frame(at) {
+        time = at;
+        for (const id of [...callbacks.keys()]) {
+          const callback = callbacks.get(id);
+          callbacks.delete(id);
+          callback?.(at);
+        }
+      }
+      nativeFrame(function pump(now) {
+        nativeFrame(pump);
+        if (!held) frame(time === undefined ? now : time + (now - previous));
+        previous = now;
+      });
+      window.checkClock = {
+        held() { return held; },
+        hold() { held = true; },
+        advance(count) {
+          for (let i = 0; i < count; i++) frame(time + frameMs);
+        },
+        resume() { held = false; },
+      };
+
       window.checkFrames = 0;
       requestAnimationFrame(function count() { window.checkFrames++; requestAnimationFrame(count); });
       window.checkRiverPaints = null;
@@ -193,7 +268,7 @@ async function check(engine, browserName, device) {
         const { x, hearts } = window.tideState().game.river;
         window.checkTouchAnchor = { x: event.clientX, boat: x, hearts };
       }, true);
-    });
+    }, DT * 6000 + .000001); // Hit the game's 100 ms frame cap despite timestamp rounding.
     const bad = [], outside = [];
     page.on('pageerror', error => bad.push(error.message));
     page.on('response', response => { if (response.status() >= 400) bad.push(response.status() + ' ' + response.url()); });
@@ -227,10 +302,13 @@ async function check(engine, browserName, device) {
     await page.setViewportSize(viewport);
     await paint(page, browserName);
 
+    // Keep the live scene from drifting while capturing the hint and drag.
+    await page.evaluate(() => window.checkClock.hold());
     await page.locator('#start').tap();
     await page.touchscreen.tap(viewport.width / 2, viewport.height * .8);
     assert.equal(await page.evaluate(() => localStorage.getItem('lantern-tide:hint')), null,
       'a stationary tap does not count as steering');
+    await page.evaluate(() => window.checkClock.advance(16));
     await page.locator('.kit-hint.on .knob').waitFor({ state: 'visible' });
     await shot('steering-hint');
     const input = await touchDriver(page, browserName);
@@ -254,6 +332,7 @@ async function check(engine, browserName, device) {
     assert.equal(await page.evaluate(() => localStorage.getItem('lantern-tide:hint')), '1');
     await page.keyboard.press('Escape');
     await screen(page, 'paused');
+    await page.evaluate(() => window.checkClock.resume());
     const paused = (await state(page)).game.river;
     const pausedPaints = await page.evaluate(() => (window.checkRiverPaints = 0));
     await sleep(240);
@@ -281,8 +360,7 @@ async function check(engine, browserName, device) {
     if ((await state(page)).screen === 'ready') await page.locator('#start').tap();
     else await page.locator('#resume').tap();
     await page.locator('#pause').tap();
-    await page.locator('#restart').tap();
-    const result = await crossing(page, input, 1, browserName);
+    const result = await crossing(page, input, 1, browserName, () => page.locator('#restart').tap());
     assert.equal(await page.locator('#result').textContent(), 'Dawn');
     await shot('dawn');
     await page.locator('#next').tap();
@@ -300,9 +378,7 @@ async function check(engine, browserName, device) {
     assert.equal((await state(page)).night, 1, 'the opening remains playable after unlocking night 2');
     assert.equal(await page.evaluate(() => localStorage.getItem('lantern-tide:night')), '2', 'replaying preserves the unlock');
     await page.locator('#pause').tap();
-    await page.getByRole('button', { name: 'Sail second night' }).tap();
-    assert.equal((await state(page)).night, 2, 'replaying does not strand the player on the first night');
-    const second = await crossing(page, input, 2, browserName);
+    const second = await crossing(page, input, 2, browserName, () => page.getByRole('button', { name: 'Sail second night' }).tap());
     assert.equal(await page.locator('#result').textContent(), 'Dawn');
     assert.ok(await page.locator('#next').isHidden(), 'the last night has no further level');
     await shot('last-dawn');
