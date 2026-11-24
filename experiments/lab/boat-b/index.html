@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#123b42">
+<link rel="icon" href="data:,">
+<title>Paper Boat</title>
+<style>
+:root { color-scheme:dark; font-family: 'Trebuchet MS',system-ui,sans-serif; color:#fff4d9; background:#123b42; }
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body { margin:0; width:100%; height:100%; overflow:hidden; overscroll-behavior:none; touch-action:none; user-select:none; -webkit-user-select:none; }
+#c { width:100%; height:100dvh; display:block; touch-action:none; }
+#insets { position:fixed; visibility:hidden; padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom); }
+button { min-width:48px; min-height:48px; border:0; border-radius:18px; font:700 16px/1.2 inherit; font-family:inherit; font-size:16px; color:#fff4d9; background:#ffffff12; padding:13px 20px; cursor:pointer; touch-action:manipulation; transition:transform .12s, background .12s; }
+button:active { transform:scale(.95); }
+button:focus-visible { outline:3px solid #ffc577; outline-offset:4px; }
+.primary { background:#f4bf77; color:#203c40; min-height:60px; width:100%; font-size:20px; box-shadow:0 5px 0 #b88048,0 14px 30px #082b3744; }
+.screen { position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:calc(20px + env(safe-area-inset-top)) 24px calc(20px + env(safe-area-inset-bottom)); background:#102e3655; overflow:auto; touch-action:pan-y; }
+.screen.on { display:flex; }
+.card { width:100%; max-width:340px; text-align:center; }
+#menu { background:linear-gradient(#143d43aa,#123d42cc); }
+#menu .card { max-width:300px; }
+h1 { font-family:Georgia,serif; font-size:64px; line-height:.96; font-weight:400; letter-spacing:-3px; margin:12px 0 22px; }
+h1 span { display:block; }
+h2 { font:400 42px/1.04 Georgia,serif; margin:10px 0 14px; letter-spacing:-1px; }
+p { font-size:16px; line-height:1.45; margin:12px 0 24px; color:#b9d9d5; }
+.eyebrow { font-size:14px; text-transform:uppercase; letter-spacing:3px; color:#9bc7c6; }
+.hero { width:190px; height:130px; overflow:visible; margin:0 auto 10px; animation:bob 4s ease-in-out infinite; }
+@keyframes bob { 50% { transform:translateY(-9px) rotate(-3deg); } }
+#paused .card,#end .card { padding:28px 24px 20px; border:1px solid #8fcac44a; border-radius:28px; background:#173e45f5; box-shadow:0 24px 90px #051f3088; }
+.row { display:flex; gap:8px; justify-content:center; margin-top:12px; }
+.row button { flex:1; }
+#pause { position:fixed; top:calc(14px + env(safe-area-inset-top)); right:max(16px,calc((100vw - 540px)/2 + 16px)); width:48px; height:48px; border:1px solid #a7d2c93b; background:#193b40cf; display:none; padding:0; font-size:22px; }
+#hud { position:fixed; pointer-events:none; top:calc(18px + env(safe-area-inset-top)); left:max(24px,calc((100vw - 540px)/2 + 24px)); display:none; }
+#street { font-size:14px; letter-spacing:2px; color:#bee1d7; text-transform:uppercase; }
+#streetName { font:26px Georgia,serif; margin-top:4px; }
+#bottom { display:none; position:fixed; pointer-events:none; bottom:calc(24px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); width:min(82%,400px); }
+.meterLabel { display:flex; justify-content:space-between; align-items:center; font-size:14px; color:#cce2d5; margin-bottom:9px; }
+.meter { height:7px; background:#0b2937aa; overflow:hidden; border-radius:6px; }
+#dry { height:100%; width:100%; background:#f3cf93; border-radius:6px; transition:width .15s; }
+#progress { display:flex; justify-content:center; gap:9px; margin-top:16px; }
+#progress i { width:7px; height:7px; border-radius:50%; background:#64978e; }
+#progress i.on { background:#ffe2a8; box-shadow:0 0 10px #ffdd9a66; }
+#stars { color:#f7ca82; font-size:42px; letter-spacing:6px; margin:12px 0; }
+#endStat { font-size:16px; margin-bottom:16px; }
+#best { font-size:14px; color:#9fc9c0; margin:10px 0 20px; }
+#sound { width:100%; margin-top:8px; }
+#toast { position:fixed; top:calc(92px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); color:#fff4d9; font-size:16px; text-align:center; pointer-events:none; opacity:0; transition:opacity .3s; white-space:nowrap; text-shadow:0 2px 8px #123b42; }
+@media(max-height:680px) { h1 {font-size:54px;margin-bottom:16px;} .hero {height:100px;width:160px;} #menu p {margin:10px 0 20px;} #end .card {padding:20px;} h2 {font-size:36px;} }
+@media(prefers-reduced-motion:reduce) { .hero {animation:none;} button {transition:none;} }
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Rain gutter. Swipe the water to bend the current. Tap to drop a pebble."></canvas>
+<div id="insets"></div>
+<div id="hud"><div id="street">Street 1 / 6</div><div id="streetName">First rain</div></div>
+<button id="pause" aria-label="Pause">Ⅱ</button>
+<div id="bottom"><div class="meterLabel"><span>Dry paper</span><span id="passengers">0 aboard</span></div><div class="meter"><div id="dry"></div></div><div id="progress"></div></div>
+<div id="toast" role="status"></div>
+<div id="menu" class="screen on"><div class="card">
+<svg class="hero" viewBox="0 0 220 150" aria-hidden="true"><ellipse cx="110" cy="124" rx="90" ry="18" fill="none" stroke="#8fccc0" opacity=".3"/><ellipse cx="110" cy="125" rx="64" ry="10" fill="#092f3b" opacity=".5"/><path d="M30 87 110 20 190 87 155 118 65 118Z" fill="#f3e3bd"/><path d="m30 87 80 7 80-7-35 31H65Z" fill="#dfb97c"/><path d="m110 20 0 74-80-7Z" fill="#fff5d9"/><path d="m110 20 80 67-80 7Z" fill="#e6d3ab"/><path d="m110 94 0 24" stroke="#b48d61"/><circle cx="135" cy="91" r="10" fill="#df7156"/><path d="m135 81 0 20" stroke="#3d4c45" stroke-width="2"/><circle cx="130" cy="89" r="2" fill="#3d4c45"/><circle cx="140" cy="94" r="2" fill="#3d4c45"/></svg>
+<h1>Paper<span>Boat</span></h1>
+<p>A little rain. A long way home.</p>
+<button id="play" class="primary">Play</button>
+</div></div>
+<div id="paused" class="screen"><div class="card"><div class="eyebrow">A quiet moment</div><h2>Rain can wait.</h2><button id="resume" class="primary">Resume</button><div class="row"><button id="restart">Restart</button><button id="home">Menu</button></div><button id="sound">Sound on</button><p style="margin-bottom:0;font-size:14px">Swipe water · tap a pebble<br>Arrows make ripples · Space drops a pebble</p></div></div>
+<div id="end" class="screen"><div class="card"><div class="eyebrow" id="endLabel">Street 1 complete</div><h2 id="endTitle">A safe landing.</h2><div id="stars" aria-label="Stars"></div><p id="endStat"></p><div id="best"></div><button id="next" class="primary">Next street</button><div class="row"><button id="again">Retry street</button><button id="endHome">Menu</button></div></div></div>
+<script type="module" src="./main.js"></script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>
