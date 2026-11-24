@@ -640,7 +640,7 @@ Compared on one frozen moment (the same seed and placements; `__ant.look(n)` swi
 | --- | --- |
 | numbers, faster ">>" marks, "zzz" | shared, seen; raised over a body in the air |
 | "!" on a stronger animal that has seen you | shared, not caught in a screenshot |
-| red edge arrows, green food arrow | shared, edge arrows seen; food arrow not caught |
+| red edge arrows, green food arrow | shared, not caught in a screenshot |
 | rival: ring, crown, name tag, bubble | shared, seen |
 | rival: scars | drawn on the body by the rig's own marks, seen |
 | hunt (chase) lines, sight wedges, dimmed ground | shared, seen |
