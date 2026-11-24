@@ -97,6 +97,8 @@ Recorded only. Crumbwar's page and server are in `workers/crumbwar/`, outside `e
 
 What the lab saw on the live page the same evening (Chromium, Pixel 7 size, about ten seconds): one person in the room and 23 bots, a plain brown field with no food in view of the nest, and nothing on screen to aim for until the player walks out. That fits "boring", but which part bored the tester is unknown. One question went back to the tester asking what was missing.
 
+**Follow-up, notes #146 and #147 (answers to the lab's "what made it boring?").** The tester tapped two answers: "Alan boş, pek bir şey olmuyor" (the field is empty, not much happens) and "Sadece botlar var, gerçek insan yok" (only bots, no real people). Recorded only, for the same reason as above. The second needs players, which waits on publishing; the friends room (note #90) is the part of it the lab could build.
+
 ### Left as a proposal (2026-11-23, notes #135 and #136)
-- Ask the tester's answer to the "what was missing" question before building anything on Crumbwar.
+- The answer is in (#146, #147). The first Crumbwar change the lab would make is a fuller field: food in sight of every nest, food that drifts in, and events every minute or so, such as a sugar spill in the middle that all four colonies race to.
 - With note #90 ("play in a room with friends"), the tester's wish list for Crumbwar is a friends room and more to do. Both need work in `workers/crumbwar/`, so both wait for a lab session that the owner sends there.

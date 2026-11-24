@@ -395,3 +395,28 @@ The owner: Wild "adds a good difficulty, but makes things impossible", and asked
 ## 2026-11-23: first-time help (the owner's request for beginners)
 
 After 3 s of play with no input, a see-through joystick near the bottom of the screen, the size of the real one, with a finger pressing the knob and taking it once round (`experiments/kit/hint.js`, kind `stick`). It goes on the first touch or key in play and never shows again on that device. New key `ant-promotion:hint`, `'1'` once the player has given input in play. A player with an `ant-promotion:v1` save never sees it. `?hint=hand` or `?hint=ring` shows it anyway, in the two looks for the owner to pick from. Checks: `hint ant-promotion` in the phone check. Not verified on a real phone.
+
+## 2026-11-23: an ending that is not an end, a power for every animal, and speed again (tester t1, notes #148 and #149)
+
+The notes, in short:
+- **#148.** The game feels finished once you have every animal; it should not. Every animal should have its own ability, tied to its species. Animals should see differently: a snake narrow and far, a bird almost all the way round, and other shapes for others. Add more species, and make sure each has a unique ability.
+- **#149.** The speed is annoying and makes the game boring: you outrun every animal in the game. Fix it.
+
+Nothing in the game changed in this run. #148 changes what every one of the 55 animals does, and #149 runs against the owner's own change of the same day ("hunters tire"). Both are recorded here, and a question about #149 went to the tester.
+
+### Left as a proposal (2026-11-23, notes #148 and #149)
+- **Speed (#149): which lever.** The speed history is: fast picks grew to 2.5× (note #46); stronger animals were made to keep up with a boosted player (note #101); then the owner made a hunter slow down after 4 s and give up at 10 s, because Wild was "impossible". With tiring, running away always works, which matches "you outrun every mob". The candidates are:
+  1. A lower cap on fast picks (`FAST_CAP` 2.5 → about 1.6).
+  2. Tiring only in Wild, not Classic.
+  3. Tiring later (`TIRE.fresh` 4 → 7 s, `spent` 10 → 16 s).
+  4. Hunters that cut the corner (aim where you will be), so straight-line running stops working.
+
+  Option 4 makes chases harder without making any animal faster, so it keeps both the owner's "not impossible" and the tester's "not boring". Measure it with `bots.mjs` before choosing. Option 2 contradicts the owner's ruling for Classic and needs the owner.
+- **Ways of seeing (#148).** The player already sees a wedge (`range`). Give each body kind its own shape: snakes a narrow wedge about 1.6× longer, birds about 330° and shorter, bugs a wide short fan, quads the present one. Then each species adjusts it by ±20%. Draw it as the lit area of the meadow, so the difference is visible at a glance.
+- **An ability per animal (#148).** Group the 51 promoted animals into about 12 ability families, each with a key and a cooldown, for example: Wasp and Scorpion sting (stun), Frog and Kangaroo leap, Mole digs (hide underground), Skunk sprays (hunters flee), Chameleon blends in, Eagle and Owl dive, Porcupine spikes (an attacker bounces off), Bat echolocates (see through grass). The species then sets the strength and cooldown. One button on the right of the screen. This is a large change, and bots need a policy for each family.
+- **After every animal (#148).** Two candidates:
+  - a New Game+ meadow where the top animals of the last run are the hunters;
+  - a collection screen of every animal you have been, with the rare ones only reachable through particular picks.
+
+  Ask the tester which one before building.
+- **More species (#148).** Add one extra choice at some promotions, so the tree branches more. It costs art time (each animal is drawn in code in `art.js`, in all four looks).
