@@ -3,6 +3,9 @@ import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { handleBoard, validateScore, tidyName, rudeName, shownName, boardTop, boardPut, boardRemove, boardStart, BOARD, RUN } from '../src/board.mjs';
 
+// The shipped setting refuses Lantern scores without a ticket. The older tests below post without one, so they run with
+// the list empty; the ticket tests put a game back in to show the refusal.
+const NEED = [...RUN.need]; RUN.need.length = 0;
 const ID = n => `player-${String(n).padStart(4, '0')}-0123456789abcdef`;
 // A stand-in for ctx.storage.sql (exec returning a cursor with toArray) over a real SQLite database.
 function fakeSql() {
@@ -149,7 +152,7 @@ test('run tickets, storage: a score needs the time it claims; a ticket works onc
   assert.equal(boardPut(sql, { id: ID(2), n: 'Bo', s: 1, r: R(9) }, t0).why, 'run', 'an unknown ticket');
   boardStart(sql, R(2), t0); assert.equal(boardPut(sql, { id: ID(2), n: 'Bo', s: 1, r: R(2) }, t0 - 5).why, 'run', 'a clock that ran backwards');
   // Without a ticket: accepted for a game outside RUN.need, refused for one inside it.
-  assert.deepEqual(RUN.need, []);
+  assert.deepEqual(NEED, ['lantern', 'lantern-daily'], 'the shipped setting');
   assert.equal(boardPut(sql, { id: ID(3), n: 'Cy', s: 77 }, t0).ok, true);
   assert.equal(boardPut(sql, { id: ID(4), n: 'Di', s: 77 }, t0, BOARD.dailyNew, true).why, 'run');
   // The first start after six hours removes the old tickets.
