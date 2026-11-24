@@ -199,7 +199,7 @@ export function levelDef(n) {
   return {
     n, intro, pool, goal, seed: 1000 + n * 7919,
     stars: tune.stars ?? [goal.time ? goal.time * 0.6 : 60, goal.time ? goal.time * 0.8 : 90],
-    shape, ...pace(n),
+    shape, rival: n >= 8 && !!(shape.fix && shape.time && !shape.coinJobs), ...pace(n),
   };
 }
 export const MAP = Array.from({ length: COUNT }, (_, i) => levelDef(i + 1));
@@ -227,6 +227,10 @@ export function levelReward(coins, stars, previousStars) {
 export function resultSeconds(secs) {
   return Math.ceil((secs - 1e-9) * 10) / 10;
 }
+
+// A rival stall (tester t1, note #205): on these levels the deadline is the rival's. It fixes at a steady pace and reaches the
+// goal as the clock runs out, so beating the clock is beating the rival; the rules and limits are as before.
+export const rivalCount = (def, clock, deadline) => def.rival && deadline ? Math.min(def.goal.fix, Math.floor(def.goal.fix * clock / deadline + 1e-9)) : null;
 
 export function starsFor(def, secs) {
   return secs <= def.stars[0] + 1e-9 ? 3 : secs <= def.stars[1] + 1e-9 ? 2 : 1;

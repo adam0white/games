@@ -254,6 +254,13 @@ Asked (#154) what should clear a level, the tester chose "Mix: each level has it
 ### Left as a proposal (2026-11-23, note #157), built 2026-11-24 (see below)
 - The levels proposal under note #150 now has its rule. A goal per level, one of: fix N before time runs out; fix a set list without losing a customer; earn N coins. A first table: levels 1 to 11 introduce one job each and cycle the three goals; later levels combine two goals. Each goal shows as one line and an icon before the level and on the counter during it. Bots must show each level clearable before it ships. The daily stall stays as it is.
 
+## 2026-11-24: a rival stall (tester t1, note #205, answering #179)
+
+Asked what would make the levels better, the tester chose a rival stall to race against. First slice (it replaces the rival-stall proposal at the end of this file): levels 8, 11, 14, 16, 23 and 28 (fix n in a time) are races. The rival's face rides the clock bar with its own count, red when it is ahead; the goal card says so; losing says the rival won. The rival reaches the goal as the clock runs out, so no limit, star time or other rule changed (`rivalCount` in `levels.js`). Checked: the bots, and screenshots at 360 px. Not verified: a person or a phone.
+
+### Left as a proposal (2026-11-24, note #205)
+- A rival with moods: it speeds up when it falls behind and fumbles now and then, as its own drawn stall at the top of the screen. That changes difficulty and needs new bot runs.
+
 ## 2026-11-24: levels built (note #157)
 
 Built: the levels from notes #150 and #157, with the goal rule the tester chose in #157 ("Mix: each level has its own goal"), and four new jobs for "only three types" (#150).

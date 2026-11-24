@@ -1,6 +1,6 @@
 // Fix-It Stall: the page. View, input, sound, save, cards. The rules are in sim.js.
 import { create, step, input, guide, hint, multiplier, goalState, stars, selectLane, chooseTicket, lampAt, DAY, RAMP, DT, KINDS, TUTOR, OBJECT, HIT, zipStuck, WORKS, LEAVE, LEVELS } from './sim.js';
-import { COUNT, ORDER, OPEN_ORDER, INTRO, BUSY_END, CHAPTERS, ASSIST_RATE, STAR_BONUS, canAssist, levelDef, goalLine, levelReward, resultSeconds } from './levels.js';
+import { COUNT, ORDER, OPEN_ORDER, INTRO, BUSY_END, CHAPTERS, ASSIST_RATE, STAR_BONUS, canAssist, levelDef, goalLine, levelReward, resultSeconds, rivalCount } from './levels.js';
 import { plan, SKILLS } from './moves.js';
 import { drawJob, drawGhost, stepIcon, person, looks, REGULAR, cat, heart, coin, sillyList, drawSilly, goalIcon, symbol, starShape, C, circle, rrect, star, wage } from './art.js';
 import { readJson, writeJson } from '../kit/save.js';
@@ -166,6 +166,7 @@ function goalShape(def, deadline = def.goal.time) {
   const parts = goalState({ lv: def, served: 0, goalCoins: 0 }).parts;
   const labels = parts.map(({ kind, need }) => translate(`${kind === 'coins' ? 'base' : kind}Goal`, { n: num(need) }));
   if (deadline) labels.push(translate('timeGoal', { n: num(deadline) }));
+  if (def.rival) labels.push(translate('rivalGoal'));
   if (goal.safe || goal.list) labels.push(translate('safeGoal'));
   return { parts, deadline, safe: !!(goal.safe || goal.list), label: labels.join(' ') };
 }
@@ -440,7 +441,7 @@ function finishLevel() {
     [523, 659, 784, 1047].slice(0, 1 + st).forEach((f, i) => setTimeout(() => tone(f, 0.4, 0.09, 'triangle'), 300 + i * 160));
   } else {
     const gs = goalState(s);
-    endCard({ title: translate(why === 'time' ? 'outOfTime' : why === 'hearts' ? 'outOfHearts' : 'walkOff'), stars: 0, coins: 0,
+    endCard({ title: translate(why === 'time' ? (s.lv.rival ? 'rivalWon' : 'outOfTime') : why === 'hearts' ? 'outOfHearts' : 'walkOff'), stars: 0, coins: 0,
       stats: gs.parts.map(p => [goalKind[p.kind], count(Math.min(p.have, p.need), p.need)]).concat([['time', seconds(secs)]]),
       line: gs.safe ? [translate('safeGoal')] : [],
       note: [], again: 'retry', next: false, offer: canAssist(save.attempts[n]) });
@@ -1435,12 +1436,17 @@ function goalBar(t) {
     starShape(g, tx, ly + 14, k === 3 ? 7 : 5.5, gone ? 'rgba(255,255,255,.3)' : k === 3 ? '#ffd860' : '#f3ead8'); // gold: three stars; pale: two
   }
   if (gs.time) { const left = Math.max(0, Math.ceil(gs.time - now)); ink(seconds(left), x1, ly - 13, 14, late ? '#ffb0a0' : '#fff6e4', 'right'); }
-  circle(g, x0 + (x1 - x0) * f, ly, 6, '#ffd860', 1.6);
+  if (lv.rival && gs.time) { // the rival rides the clock: its face, and how many it has fixed
+    const n = rivalCount(lv, s.cleared ? s.clearT : now, gs.time), rx = x0 + (x1 - x0) * f, ahead = n > s.served;
+    person(g, rx, ly + 8, 9, RIVAL, ahead ? 'happy' : 'cross', t);
+    ink(num(n), rx + 16, ly + 3, 14, ahead ? '#ffb0a0' : '#9ff0b0');
+  } else circle(g, x0 + (x1 - x0) * f, ly, 6, '#ffd860', 1.6);
 }
+const RIVAL = { ...looks(4321), hat: 9, shirt: '#b5302a', tache: true };
 // The goal card uses the same symbols as the live counter. The run waits for a tap or Space.
 function briefLayout() {
   const cw = Math.min(W - 32, 340), intro = cleared(lvN) ? null : s.lv.intro;
-  const ch = (intro ? 211 : 147) + (s.lv.goal.safe || s.lv.goal.list ? 21 : 0) + (s.lv.goal.coins ? 21 : 0);
+  const ch = (intro ? 211 : 147) + (s.lv.goal.safe || s.lv.goal.list ? 21 : 0) + (s.lv.goal.coins ? 21 : 0) + (s.lv.rival ? 26 : 0);
   const y = Math.max(top + 65, Math.min(H - bottomInset - ch - 12, boxY + S / 2 - ch / 2 - 20));
   return { x: (W - cw) / 2, y, cw, ch, intro };
 }
@@ -1488,6 +1494,11 @@ function goalCard(t) {
     symbol(g, 'lost', x + 23, yy, 9);
     cardText(translate('safeGoal'), x + 38, yy, 14, cw - 51, 'left');
     yy += 21;
+  }
+  if (lv.rival) {
+    person(g, x + 25, yy + 12, 8, RIVAL, 'ok', t);
+    cardText(translate('rivalGoal'), x + 42, yy + 1, 14, cw - 55, 'left');
+    yy += 26;
   }
   if (lv.goal.coins) { // gold bonus coins, crossed out: only the green tokens count
     coin(g, x + 23, yy, 8);
