@@ -69,9 +69,18 @@ The kit's `check/phone.mjs` has two entries for this page, `lab/pitch` (an old s
 - Hard's speed on a phone. It was measured in Node only (max 3.5 ms; the budget is 150 ms).
 - Daily puzzles are measured for 60 days only. Most have a shortest chain of 3, so they may feel easy.
 
+## Play a friend
+
+Create a table from the menu and share its four-letter code or link. A friend can enter the code or open the link directly. A name is optional and saved on the device. The table seats the first player as Blue and the second as Red. Each phone puts its own goal at the bottom and shows which seats are connected.
+
+Both phones apply each segment when it comes back from the table. The server seed picks the first kick-off, then kick-offs alternate. The same move log rebuilds the sheet and score after a reload or drop. Either player can take their turn while their friend is disconnected. The next sheet opens automatically after a point, and the first player to two points wins. A rematch starts when both players vote.
+
+The shared room client keeps the seat key in browser storage. Reopening the same link in that browser reclaims the seat while the table exists. Friend matches leave the bot, daily and shared-board records alone.
+
+The phone check targets Playwright's iPhone 13 and Pixel 7 profiles and uses the Worker's table protocol functions in Node. It covers joining, replay after reload and disconnect, full tables, move validation and rematch. The room flow passed in a Node DOM harness. This session denied the local HTTP listener and browser startup, leaving the phone profiles, rendered screenshots and 360 × 640 layout unverified. The deployed Worker, physical phones and native share sheets also remain unverified.
+
 ## Open ideas
 
-- Friend rooms by code, with live play.
 - A shared board for the daily: how many tries each player needed.
 - Harder dailies: prefer chains of 4 to 7, or require the shortest chain to start away from the goal.
 - A softer Medium (sampled rather than greedy) to smooth the steps between levels.
