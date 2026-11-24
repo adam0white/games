@@ -12,7 +12,7 @@ export const BOARD = { games: ['lantern', 'sling', 'breath', 'matchmaker', 'lant
 // Daily boards: every player gets the same river for one UTC day, and the board starts empty each day. The first read or
 // post of a new day removes the day before's rows.
 export const DAILY = ['lantern-daily'];
-export const RUN = { perSecond: 18, slack: 50, hours: 6, keep: 20000, need: [] };
+export const RUN = { perSecond: 18, slack: 50, hours: 6, keep: 20000, need: ['lantern', 'lantern-daily'] };
 
 // Stricter than the game's own name field: letters, digits, space and _ . - only, at most 16 characters. Markup characters never reach another player's screen as typed.
 export const tidyName = v => (typeof v === 'string' ? v.normalize('NFKC').replace(/[^\p{L}\p{N} _.-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, BOARD.name).trim() : '');

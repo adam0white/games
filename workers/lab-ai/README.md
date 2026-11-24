@@ -288,8 +288,8 @@ hour's worth of points without playing. It does not prove a run.
 Stored for a ticket: the run id and a time. Nothing about the player. No ticket is asked for before the player has
 chosen to share.
 
-`RUN.need` lists the games whose scores are refused without a ticket. It starts empty, so pages loaded before tickets
-existed can still post. Add `'lantern'` and deploy once the page with tickets is live. Other games on the board are not
+`RUN.need` lists the games whose scores are refused without a ticket: `lantern` and `lantern-daily` since 2026-11-24,
+once the page with tickets was live. A Lantern page left open from before that has its scores refused until it reloads. Other games on the board are not
 affected: the 18 points a second is Lantern's rule and applies only to a post that carries a ticket.
 
 ### Daily boards (2026-11-24)
