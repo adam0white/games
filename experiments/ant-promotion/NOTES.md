@@ -634,26 +634,27 @@ A real phone; whether the hunts are more exciting; the skills at high levels by 
 - Far and small bodies (under 6 pixels of radius) are drawn plain: no outline, eyes, shadow or marks.
 
 ### Overlay checklist
-Compared on one frozen moment (the same seed and placements; `__ant.look(n)` switches the look without moving anything) at levels 6, 12 and 17 in Chromium and level 12 in WebKit, looks 0 to 4, and in motion (a meal, a leap, a death) at level 8. "Shared" means the code that draws it runs after the body is drawn and is the same in every look; the Living branch replaces only the call that draws a body. "Seen" means I saw it in a Living screenshot.
+Compared on one frozen moment (the same seed and placements; `__ant.look(n)` switches the look without moving anything; the states are set after the freeze, so the sim cannot clear them): Chromium level 12 in looks 0 to 4, levels 6 and 17 in looks 1 and 4, WebKit level 12 in look 4, a variant with food off screen, and in motion (a meal, a leap, a death) at level 8. "Shared" means the code that draws it runs after the body is drawn and is the same in every look; the Living branch replaces only the call that draws a body. "Seen" means I saw it in a Living screenshot.
 
 | Overlay | Living |
 | --- | --- |
 | numbers, faster ">>" marks, "zzz" | shared, seen; raised over a body in the air |
-| "!" on a stronger animal that has seen you | shared, not caught in a screenshot |
-| red edge arrows, green food arrow | shared, not caught in a screenshot |
+| "!" on a stronger animal that has seen you | shared, seen |
+| green food arrow | shared, seen |
+| red edge arrows (danger off screen) | shared; the test scene drew none in any look, so not compared |
 | rival: ring, crown, name tag, bubble | shared, seen |
 | rival: scars | drawn on the body by the rig's own marks, seen |
 | hunt (chase) lines, sight wedges, dimmed ground | shared, seen |
 | skill effects: "Pounce!", leap dust, shell | shared, seen; the shell is also a dome on the body |
 | skill effects: roar ring, sting | shared, not caught |
 | hide state (HUD "hide ready", dashed ring) | shared, seen |
-| old animals: purple ring | shared, seen; the red aim while winding up is shared, not caught |
+| old animals: purple ring, red aim while winding up | shared, seen; the wind-up crouch shows on the body |
 | "+n" floats, eat pieces | shared, seen |
 | death pieces, death card | shared, seen |
 | the promotion beam, flashes, cards | shared; cards seen, beam not caught |
 
 ### Numbers
-- `rig-bots.mjs` (run first by `bots.mjs`): 55 species walk 10,000 steps each at up to the game's top speed with every pose; no NaN, spine and chain error under 1e-10 %, no foot past its leg (worst 98.0 %), the gait alternates 100.0 % of 66,345 waves, feet drag 0.08 % at a walk and 0.39 % at a run. A fleeing Dog steps 92 times in 10 s against 75 calm. 240 s of a real run with the look stepping ends in the same sim state as without it, with up to 63 rigs. 11 sim states each give the pose they should, a calm animal none. Every species in 11 poses draws on a context that rejects NaN (164,034 calls).
+- `rig-bots.mjs` (run first by `bots.mjs`): 55 species walk 10,000 steps each at up to 360, above the game's top speed, with every pose; no NaN, spine and chain error under 1e-10 %, no foot past its leg (worst 98.0 %), the gait alternates 100.0 % of 66,345 waves, feet drag 0.08 % at a walk and 0.39 % at a run. A fleeing Dog steps 92 times in 10 s against 75 calm. 240 s of a real run with the look stepping ends in the same sim state as without it, with up to 63 rigs. Three more runs (seeds 3, 17, 29; 200 to 300 s) with a brute rival, three old animals and a fast player end in the same state too, and in them animals leave the ground in a pounce (49 rig-ticks), crouch and are bigger as the rival; making the look nudge the rival's heading by 1e-9 fails this check on all three runs. 11 sim states each give the pose they should, a calm animal none. Every species in 11 poses draws on a context that rejects NaN (164,034 calls).
 - `--mutate=gait`, `clamp` and `spine` each fail 3 or 4 of those checks; `node bots.mjs --mutate` exits 1.
 - Rules parity: `node bots.mjs 6 12` prints the same 67 lines after the rig checks as main's `bots.mjs` on main's `sim.js` (`sim.js` is unchanged).
 - Page work per frame (the sim steps, the rigs and the drawing; `__ant.work`), headless at 390x844, median / 95th percentile in ms:

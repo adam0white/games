@@ -22,7 +22,7 @@ const claim = (ok, text) => { console.log(`${ok ? 'ok  ' : 'FAIL'} ${text}`); if
 function rng(seed) { let a = seed >>> 0 || 1; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const DT = 1 / 60, TAU = Math.PI * 2;
 const wrap = a => { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; };
-const TOP_SPEED = Math.max(...FORMS.map(F => F.speed)) * Math.max(FAST_CAP, ...Object.values(POWER).map(P => P.speed || 0)); // the fastest anything moves (FAST_CAP and power speeds multiply a form's speed)
+const TOP_SPEED = Math.max(360, Math.max(...FORMS.map(F => F.speed)) * Math.max(FAST_CAP, ...Object.values(POWER).map(P => P.speed || 0))); // the lab's 360, or the fastest anything moves (FAST_CAP and power speeds multiply a form's speed)
 
 // What the rig promises, measured from the outside on its points.
 function measure(c, m) {
@@ -141,8 +141,10 @@ function careful(s) { // from bots.mjs: hunt what it can catch, keep out of stro
   }
   return { x: vx, y: vy, power: (s.t % 7) < DT * 2 };
 }
-function ride(seed, secs, L) { // a run as the page plays it (death drops a form, the run goes on); L steps after every tick
-  const s = create(seed, [ANT], 0, SPAWN_WEIGHTS, true), m = { seg: 0, chain: 0, stretch: 0, spineFoot: 0, knee: 0, nan: 0 }, seen = {};
+// the whole sim state as text: non-finite numbers spelled out, and a hunt or a flight (an animal pointing at another) written as that animal's id
+const strip = s => JSON.stringify(s, (k, v) => (typeof v === 'number' && !Number.isFinite(v) ? String(v) : (k === 'chase' || k === 'fear') && v && typeof v === 'object' ? `->${v.id ?? 'player'}` : v));
+function ride(seed, secs, L, stack = [ANT], nem = null, old = []) { // a run as the page plays it (death drops a form, the run goes on); L steps after every tick
+  const s = create(seed, stack, 0, SPAWN_WEIGHTS, true, nem, old), m = { seg: 0, chain: 0, stretch: 0, spineFoot: 0, knee: 0, nan: 0 }, seen = {};
   let most = 0;
   for (let i = 0; i < secs * 60; i++) {
     step(s, careful(s));
@@ -161,12 +163,27 @@ function ride(seed, secs, L) { // a run as the page plays it (death drops a form
 }
 {
   const secs = 240, L = living(), t1 = Date.now(), a = ride(42, secs, L), took = (Date.now() - t1) / 1000, b = ride(42, secs, null);
-  const strip = s => JSON.stringify(s, (k, v) => (typeof v === 'number' && !Number.isFinite(v) ? String(v) : v));
   claim(strip(a.s) === strip(b.s), `the look does not touch the rules: ${secs} s on seed 42 with living.js stepping end in the same state as without it (level ${level(a.s)}, ${a.s.deaths} deaths, ${a.s.mobs.length} animals)`);
   claim(a.m.nan === 0 && a.m.seg < 1e-6 && a.m.chain < 1e-6 && a.m.stretch <= 0.98 + 1e-9, `on the real sim: up to ${a.most} rigs at once near the player, ${took.toFixed(1)} s for ${secs * 60} ticks; no NaN, worst segment error ${(a.m.seg * 100).toExponential(1)}%, worst foot ${(a.m.stretch * 100).toFixed(1)}% of leg`);
   const count = k => a.seen[k] || 0;
   console.log(`     body language seen (rig-ticks): ${Object.entries(a.seen).sort().map(([k, v]) => `${k} ${v}`).join(', ')}`);
   claim(count('crouch') > 0 && count('quick') > 0 && count('stretch') > 0 && count('pant') > 0, `in a real run animals crouch (${count('crouch')}), stretch out (${count('stretch')}), take quick steps (${count('quick')}) and pant (${count('pant')})`);
+}
+{ // the same with a rival and old animals: pounces, wind-ups, skills and a temperament on rigs against the real sim, rules unchanged
+  const at = (level, role) => FORMS.find(f => f.level === level && f.role === role).id; // a fast animal is what gets pounced on
+  const stack = [ANT, 2, 3, 4, 5, 6, 7].map((l, i) => (i ? at(l, 'runner') : l)), old = [16, 17, 18].map(l => at(l, 'brute'));
+  const nem = { f: at(9, 'brute'), bonus: 1, kills: 3, escapes: 0, kin: 0, knobs: { temperament: 'brute', persistence: 2, territory: 2 } };
+  let same = 0, runs = 0; const seen = {}, worst = { nan: 0, seg: 0, stretch: 0 };
+  for (const [seed, secs] of [[3, 300], [17, 200], [29, 240]]) {
+    const a = ride(seed, secs, living(), stack, nem, old), b = ride(seed, secs, null, stack, nem, old); runs++;
+    if (strip(a.s) === strip(b.s)) same++;
+    for (const [k, v] of Object.entries(a.seen)) seen[k] = (seen[k] || 0) + v;
+    worst.nan += a.m.nan; worst.seg = Math.max(worst.seg, a.m.seg); worst.stretch = Math.max(worst.stretch, a.m.stretch);
+  }
+  const n = k => seen[k] || 0;
+  console.log(`     with a rival and old animals (rig-ticks): ${Object.entries(seen).sort().map(([k, v]) => `${k} ${v}`).join(', ')}`);
+  claim(same === runs && worst.nan === 0 && worst.seg < 1e-6 && worst.stretch <= 0.98 + 1e-9, `with a rival and old animals: ${same}/${runs} runs end in the same state as without the look; no NaN, worst foot ${(worst.stretch * 100).toFixed(1)}% of leg`);
+  claim(n('lift') > 0 && n('crouch') > n('sleep') && n('size') > 0, `and the body shows it: off the ground ${n('lift')}, crouched ${n('crouch')} (stunned ${n('sleep')}), the brute rival bigger ${n('size')} rig-ticks`);
 }
 { // the body follows the rules: set one piece of sim state on an animal next to the player and read the pose living.js gives it
   const s = create(9, [ANT], 0, SPAWN_WEIGHTS, true), p = s.player, m = s.mobs[0], fresh = () => { for (const k of ['pounce', 'wind', 'burst', 'puff', 'winded', 'stun']) m[k] = 0; m.fear = m.chase = null; m.alert = false; m.nem = false; m.old = false; };
