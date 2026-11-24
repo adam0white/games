@@ -1,7 +1,8 @@
 // Fix-It Stall: every picture, drawn in code. Objects are drawn in object-local units (the bench box is 100 x 100);
 // people, the stall and the cat in CSS pixels. Nothing here changes game state.
 import { ghost } from './moves.js';
-import { SEAM_POINTS, seamAt, OIL_OPEN } from './sim.js';
+import { SEAM_POINTS, seamAt, OIL_OPEN, THREAD_SIDE, THREAD_UP } from './sim.js';
+import { crankPoint, SCALE_BAND, TRACE_OFFSET, WIND_STOPS } from './repairs.js';
 
 export const C = {
   ink: '#3a2216', cream: '#fff1d6', paper: '#fbe6c2',
@@ -27,6 +28,17 @@ function star(g, x, y, r, fill, a = 1) {
   g.save(); g.globalAlpha *= a; g.fillStyle = fill; g.beginPath();
   for (let i = 0; i < 8; i++) { const rr = i % 2 ? r * 0.35 : r, an = i * Math.PI / 4; g.lineTo(x + rr * Math.cos(an), y + rr * Math.sin(an)); }
   g.closePath(); g.fill(); g.restore();
+}
+function strokePath(g, points, color, width) {
+  g.strokeStyle = color; g.lineWidth = width; g.lineCap = 'round'; g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(...points[0]);
+  for (const p of points.slice(1)) g.lineTo(...p);
+  g.stroke();
+}
+function arrow(g, x, y, a, size, fill) {
+  g.save(); g.translate(x, y); g.rotate(a);
+  g.beginPath(); g.moveTo(size, 0); g.lineTo(-size, -size); g.lineTo(-size, size); g.closePath();
+  shape(g, fill, 0); g.restore();
 }
 
 // ---------- shared repair parts
@@ -376,8 +388,7 @@ const OBJ = {
     g.restore();
     if (r.kind === 'spring' && !r.done && !r.grab) { circle(g, x - 8, y, 7 + Math.sin(t * 6) * 0.8, 'rgba(255,255,255,0)', 1.6); } // grab here
   },
-  // A needle on a pincushion, its eye up top; a thread from a spool. Hold the thread low down (its stiff tip stands
-  // above the thumb), steer the tip into the eye and hold still while it goes through.
+  // A needle on a pincushion. The stiff thread tip sits above and to the right of the thumb.
   thread(g, r, t, w) {
     const ex = r.kind === 'thread' ? r.ex : 64, ey = r.kind === 'thread' ? r.ey : 28, tx = r.kind === 'thread' ? r.tx : ex, ty = r.kind === 'thread' ? r.ty : ey;
     const inEye = r.kind === 'thread' ? r.inEye : 1;
@@ -390,16 +401,125 @@ const OBJ = {
     g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 1.6; g.beginPath(); g.arc(ex, ey, 8, 0, TAU); g.stroke();
     if (inEye > 0) { g.strokeStyle = '#7fe0a0'; g.lineWidth = 3; g.beginPath(); g.arc(ex, ey, 8, -Math.PI / 2, -Math.PI / 2 + TAU * inEye); g.stroke(); }
     // the spool, bottom left, and the thread from it to the tip
-    rrect(g, 6, 78, 16, 16, 2, C.woodLt, 1.6); rrect(g, 8, 81, 12, 10, 1, '#4f7fd0', 1.2);
-    g.strokeStyle = '#4f7fd0'; g.lineWidth = 2; g.lineCap = 'round'; g.beginPath(); g.moveTo(16, 82);
-    if (r.kind === 'thread' && !r.done) { const fx = tx, fy = ty + 16; g.quadraticCurveTo(fx - 12, fy + 22, fx, fy); g.lineTo(tx, ty); }
+    rrect(g, 15, 78, 16, 17, 3, C.woodLt, 1.6);
+    rrect(g, 16, 81, 14, 11, 2, '#4f7fd0', 1.2);
+    for (const y of [84, 87, 90]) strokePath(g, [[17, y], [29, y - 1]], '#9cc5f9', 0.8);
+    g.strokeStyle = '#6a9be4'; g.lineWidth = 2.2; g.lineCap = 'round'; g.beginPath(); g.moveTo(16, 85);
+    if (r.kind === 'thread' && !r.done) {
+      const fx = tx - THREAD_SIDE, fy = ty + THREAD_UP;
+      g.bezierCurveTo(7, 88, Math.max(7, fx - 8), fy + 7, fx, fy); g.lineTo(tx, ty);
+    }
     else { g.quadraticCurveTo(40, 70, ex - 4, ey + 4); g.lineTo(ex + 8, ey - 2); g.quadraticCurveTo(ex + 18, ey + 10, ex + 14, ey + 30); }
     g.stroke();
     if (r.kind === 'thread' && !r.done) {
-      circle(g, tx, ty, 2, '#4f7fd0', 1); // the stiff tip
-      if (!r.grab) circle(g, tx, ty + 16, 7 + Math.sin(t * 6) * 0.8, 'rgba(255,255,255,0)', 1.6); // hold here
+      circle(g, tx, ty, 2.6, '#bbdcff', 1.2);
+      if (!r.grab) circle(g, tx - THREAD_SIDE, ty + THREAD_UP, 6.5, '#4f7fd0', 1.8);
     }
     if (w) star(g, ex, ey, 10 * (1 - w), '#fff', 1 - w);
+  },
+  // A spring behind glass. The lower track gives the crank its two end stops.
+  wind(g, r, t, w) {
+    rrect(g, 12, 79, 76, 12, 4, '#b55b3b');
+    rrect(g, 17, 30, 66, 48, 12, '#cf7448');
+    rrect(g, 22, 22, 56, 47, 12, '#f3b374');
+    for (const x of [27, 73]) circle(g, x, 59, 2, C.brassLt, 1.1);
+    circle(g, 50, 44, 20, '#203e45');
+    circle(g, 50, 44, 16.8, '#154b50', 1.4);
+    const angle = rad(r.a) + w * TAU * 2;
+    const spring = Array.from({ length: 80 }, (_, i) => {
+      const v = i / 79, a = v * TAU * 3.5 + angle, R = 2 + 13 * v;
+      return [50 + Math.cos(a) * R, 44 + Math.sin(a) * R];
+    });
+    strokePath(g, spring, C.brassLt, 1.8);
+    g.strokeStyle = 'rgba(217,254,248,.4)'; g.lineWidth = 2.1; g.beginPath();
+    g.arc(50, 44, 15.2, rad(181), rad(263)); g.stroke();
+    for (let i = 0; i < 4; i++) circle(g, 38 + i * 8, 16, 2.5, i < r.leg ? C.glow : C.woodDk, 1);
+    const target = WIND_STOPS[1 - r.leg % 2], next = crankPoint(r, target);
+    if (!r.done) {
+      for (const a of WIND_STOPS) circle(g, ...crankPoint(r, a), a === target ? 7 : 5.2, a === target ? C.tealLt : C.steelDk, 1.8);
+      g.strokeStyle = '#ffebc4'; g.lineWidth = 2.2; g.setLineDash([2, 3]); g.beginPath();
+      g.arc(r.cx, r.cy, r.radius, rad(Math.min(r.a, target)), rad(Math.max(r.a, target))); g.stroke(); g.setLineDash([]);
+      // The chevron is just before the far stop, clear of the handle itself.
+      const approach = target + (target > r.a ? -16 : 16);
+      arrow(g, ...crankPoint(r, approach), rad(approach + (target > r.a ? 90 : -90)), 3.4, '#fff6dc');
+      if (!r.grab) star(g, ...next, 3, C.cream);
+    }
+    const [x, y] = crankPoint(r);
+    strokePath(g, [[r.cx, r.cy], [x, y]], C.ink, 6.5);
+    strokePath(g, [[r.cx, r.cy], [x, y]], C.steel, 3.6);
+    circle(g, r.cx, r.cy, 4, C.brassLt, 1.5);
+    circle(g, x, y, 7, r.done ? C.glow : C.red);
+    shine(g, x - 1, y - 1.5, 2.8, 0.5);
+    if (w) star(g, 50, 18, 9 * (1 - w), '#fff');
+  },
+  // A balance with a sliding counterweight under the base. Its pans remain visible above the thumb.
+  balance(g, r, t, w) {
+    const load = r.loads[r.stage] ?? r.handle, tilt = r.tilt;
+    rrect(g, 43, 32, 14, 41, 4, C.brass);
+    rrect(g, 14, 67, 72, 22, 7, '#633d62');
+    rrect(g, 17, r.y - 5, 66, 10, 5, '#302732', 1.5);
+    if (!r.done) {
+      rrect(g, load - SCALE_BAND, r.y - 5, SCALE_BAND * 2, 10, 3, C.tealLt, 0);
+      arrow(g, load, r.y - 13, Math.PI / 2, 3, C.tealLt);
+    }
+    rrect(g, r.handle - 7, r.y - 7, 14, 14, 4, r.done ? C.glow : C.brassLt, 1.8);
+    strokePath(g, [[r.handle - 2, r.y - 3], [r.handle - 2, r.y + 3]], C.copperDk, 1.2);
+    strokePath(g, [[r.handle + 2, r.y - 3], [r.handle + 2, r.y + 3]], C.copperDk, 1.2);
+    const h = 29;
+    const ends = [-1, 1].map(sign => [50 + sign * 29 * Math.cos(tilt), h + sign * 29 * Math.sin(tilt)]);
+    strokePath(g, ends, C.ink, 6); strokePath(g, ends, C.brassLt, 3);
+    for (const [i, [x, y]] of ends.entries()) {
+      const bottom = y + 23;
+      strokePath(g, [[x - 12, bottom], [x, y], [x + 12, bottom]], C.ink, 1.7);
+      if ((i === 0) === (load > 50)) {
+        rrect(g, x - 7, bottom - 11, 14, 10, 2, C.steel, 1.5);
+        circle(g, x, bottom - 12, 2.7, C.steelLt, 1.2);
+      } else {
+        circle(g, x, bottom - 4, 3.8, C.brassLt, 1.5);
+      }
+      g.beginPath(); g.moveTo(x - 15, bottom); g.quadraticCurveTo(x, bottom + 15, x + 15, bottom); g.closePath();
+      shape(g, '#c87e62', 1.8);
+    }
+    circle(g, 50, h, 8, '#392c45');
+    g.strokeStyle = r.dwell > 0 || r.done ? C.tealLt : C.cream; g.lineWidth = 1.9;
+    g.beginPath(); g.moveTo(45, h); g.lineTo(55, h); g.stroke();
+    circle(g, 50 + 5 * Math.sin(tilt * 2.5), h - 2, 2.25, r.dwell > 0 || r.done ? C.tealLt : C.brassLt, 0);
+    for (let i = 0; i < 3; i++) circle(g, 42 + 8 * i, 14, 2.5, i < r.stage ? C.tealLt : C.steelDk, 1.1);
+    if (w) for (const [x, y] of ends) star(g, x, y + 20, 9 * (1 - w), C.glow);
+  },
+  // A ceramic tile. Gold sealer replaces each completed section of the crack.
+  trace(g, r, t, w) {
+    rrect(g, 5, 24, 90, 46, 7, '#ab7158');
+    rrect(g, 5, 20, 90, 46, 7, '#c3ded7');
+    rrect(g, 10, 24, 80, 38, 4, '#357579', 1.5);
+    for (const x of [20, 40, 60, 80]) for (const y of [29, 56]) {
+      g.save(); g.translate(x, y); g.rotate(Math.PI / 4);
+      rrect(g, -3, -3, 6, 6, 1, '#85b4ad', 0); g.restore();
+    }
+    strokePath(g, r.pts, '#193a43', 5);
+    if (!r.done) {
+      const [sx, sy] = r.samples[r.next - 1], [ex, ey] = r.pts.at(-1);
+      g.setLineDash([0.5, 4]);
+      strokePath(g, r.samples.slice(r.next - 1), '#bde6db', 1.35);
+      g.setLineDash([]);
+      if (!r.grab) circle(g, sx, sy, 5.2, '#e2f5ed', 1.3);
+      star(g, ex, ey, 4.7, C.cream);
+    }
+    if (r.next > 1) {
+      const sealed = r.samples.slice(0, r.next);
+      strokePath(g, sealed, '#a36624', 5);
+      strokePath(g, sealed, C.brassLt, 2.8);
+    }
+    if (!r.done) {
+      const [sx, sy] = r.samples[r.next - 1];
+      const tx = r.grab ? r.tx : sx, ty = r.grab ? r.ty : sy;
+      const fy = ty + TRACE_OFFSET;
+      strokePath(g, [[tx, ty], [tx, fy - 6]], C.ink, 3.5);
+      strokePath(g, [[tx, ty], [tx, fy - 6]], C.brassLt, 2.1);
+      rrect(g, tx - 5.5, fy - 7, 11, 15, 4, '#bf6655', 1.6);
+      circle(g, tx, ty, 2.4, C.glow, 1.05);
+    }
+    if (w) for (const [i, [x, y]] of r.pts.entries()) star(g, x, y, (7 - i / 2) * (1 - w), '#fff7d5');
   },
 };
 function gear(g, x, y, R, teeth, a) {
@@ -455,7 +575,8 @@ export function drawGhost(g, gd, t, alpha) {
   else if (gd.type === 'arc') g.arc(gd.cx, gd.cy, gd.r, rad(gd.from), rad(gd.to));
   else if (gd.type === 'drag' || gd.type === 'swipe') { g.moveTo(gd.from[0], gd.from[1]); g.lineTo(gd.to[0], gd.to[1]); }
   else if (gd.type === 'rub') { g.moveTo(gd.cx - gd.w / 2, gd.cy); g.lineTo(gd.cx + gd.w / 2, gd.cy); }
-  else if (gd.type === 'path') { g.moveTo(...gd.pts[0]); for (const q of gd.pts.slice(1)) g.lineTo(...q); }
+  else if (gd.type === 'path' && !gd.trace) { g.moveTo(...gd.pts[0]); for (const q of gd.pts.slice(1)) g.lineTo(...q); }
+  else if (gd.type === 'balance') { g.moveTo(...gd.from); g.lineTo(gd.targets[0], gd.from[1]); }
   else if (gd.type === 'pump') { g.moveTo(gd.x - 9, gd.top + 6); g.lineTo(gd.x - 9, gd.bottom + 6); }
   else if (gd.type === 'zip') { g.moveTo(gd.at[0] + 14, gd.at[1]); g.lineTo(gd.at[0] + 14, gd.top); }
   else if (gd.type === 'timing') g.arc(gd.at[0], gd.at[1], 16, 0, TAU);
@@ -464,17 +585,23 @@ export function drawGhost(g, gd, t, alpha) {
   const end = gd.type === 'circle' ? null : gd.type === 'arc' ? [gd.cx + Math.cos(rad(gd.to)) * gd.r, gd.cy + Math.sin(rad(gd.to)) * gd.r, rad(gd.to + 90)]
     : gd.type === 'flick' ? [gd.cx + Math.cos(rad(350)) * gd.r, gd.cy + Math.sin(rad(350)) * gd.r, rad(80)]
     : gd.type === 'drag' || gd.type === 'swipe' ? [gd.to[0], gd.to[1], Math.atan2(gd.to[1] - gd.from[1], gd.to[0] - gd.from[0])]
-    : gd.type === 'path' && gd.pts.length > 1 ? [...gd.pts.at(-1), Math.atan2(gd.pts.at(-1)[1] - gd.pts.at(-2)[1], gd.pts.at(-1)[0] - gd.pts.at(-2)[0])]
+    : gd.type === 'path' && !gd.trace && gd.pts.length > 1 ? [...gd.pts.at(-1), Math.atan2(gd.pts.at(-1)[1] - gd.pts.at(-2)[1], gd.pts.at(-1)[0] - gd.pts.at(-2)[0])]
     : gd.type === 'pump' ? [gd.x - 9, gd.bottom + 6, Math.PI / 2]
     : gd.type === 'zip' ? [gd.at[0] + 14, gd.top, -Math.PI / 2] : null;
   if (end) { g.fillStyle = 'rgba(255,255,255,.8)'; g.save(); g.translate(end[0], end[1]); g.rotate(end[2]); g.beginPath(); g.moveTo(5, 0); g.lineTo(-4, -5); g.lineTo(-4, 5); g.closePath(); g.fill(); g.restore(); }
   if (tap && gd.all) for (const a of gd.all) { g.strokeStyle = `rgba(255,255,255,${0.5 + 0.4 * Math.sin(t * 8)})`; g.lineWidth = 2.5; g.beginPath(); g.arc(a[0], a[1], 13 + 2 * Math.sin(t * 8), 0, TAU); g.stroke(); }
   // the fingertip itself
   const [x, y] = p;
+  if (gd.trace && press) {
+    strokePath(g, [[x, y - TRACE_OFFSET], [x, y - 5]], 'rgba(255,243,168,.8)', 1.7);
+    star(g, x, y - TRACE_OFFSET, 4, '#fff3a8');
+  }
   if (press) { g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(x, y, 12 + (tap ? 6 * ((t * 4) % 1) : 0), 0, TAU); g.fill(); }
   g.fillStyle = 'rgba(255,248,235,.92)'; g.strokeStyle = 'rgba(58,34,22,.8)'; g.lineWidth = 1.8;
   g.beginPath(); g.ellipse(x + 2, y + 8, 6.5, 9, -0.25, 0, TAU); g.fill(); g.stroke(); // finger pad
-  g.beginPath(); g.roundRect(x - 2, y + 12, 11, 18, 5); g.fill(); g.stroke(); // the rest of the finger, below and out of the way
+  // Near the bottom of the bench, only show the first segment of the finger.
+  const stem = clamp(96 - y - 12, 7, 18);
+  g.beginPath(); g.roundRect(x - 2, y + 12, 11, stem, Math.min(5, stem / 2)); g.fill(); g.stroke();
   g.fillStyle = 'rgba(230,190,170,.9)'; g.beginPath(); g.ellipse(x + 2, y + 3, 3.5, 3, -0.25, 0, TAU); g.fill(); // nail
   g.restore();
 }

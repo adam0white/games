@@ -7,6 +7,9 @@
 //   s.events                                             what happened since the page last emptied it
 // Every repair is a small state machine driven by those three input types. Its progress p runs 0..1.
 
+import { ASSIST_RATE, starsFor } from './levels.js';
+import { REPAIRS, REPAIR_META } from './repairs.js';
+
 export const DT = 1 / 60;
 export const DAY = 90; // seconds in a shift; the tutorial customers do not use up the day
 export const RAMP = 15; // seconds of shift per ramp level
@@ -14,11 +17,11 @@ export const LEVELS = 6; // levels 0..5
 export const HINT_AFTER = 1.5; // seconds with no progress before the faint hint
 export const WORKS = 0.6; // the "it works" moment
 export const LEAVE = 0.7; // a grumpy customer walking off
-export const KINDS = ['screw', 'pin', 'dent', 'wheel', 'rub', 'clock', 'chain', 'glue', 'sharpen', 'sew', 'pump', 'oil', 'zip', 'spring', 'thread'];
+export const KINDS = ['screw', 'pin', 'dent', 'wheel', 'rub', 'clock', 'chain', 'glue', 'sharpen', 'sew', 'pump', 'oil', 'zip', 'spring', 'thread', ...Object.keys(REPAIRS)];
 export const TUTOR = ['screw', 'pin', 'dent']; // the first three jobs ever, one each, very patient
-export const WORD = { screw: 'Turn!', pin: 'Pull!', dent: 'Tap!', wheel: 'Flick!', rub: 'Rub!', clock: 'Set it!', chain: 'Hook it!', glue: 'Push & hold!', sharpen: 'Swipe!', sew: 'Sew!', pump: 'Pump!', oil: 'Tap when open!', zip: 'Zip it up!', spring: 'Pull back!', thread: 'Thread it!' };
-export const OBJECT = { screw: 'bell', pin: 'music box', dent: 'kettle', wheel: 'wheel', rub: 'lamp', clock: 'clock', chain: 'bike', glue: 'vase', sharpen: 'knife', sew: 'teddy', pump: 'ball', oil: 'door', zip: 'jacket', spring: 'toy car', thread: 'needle' };
-export const COIN = { screw: 2, pin: 2, dent: 2, wheel: 3, rub: 3, clock: 2, chain: 2, glue: 3, sharpen: 3, sew: 3, pump: 3, oil: 3, zip: 3, spring: 2, thread: 3 };
+export const WORD = { screw: 'Turn!', pin: 'Pull!', dent: 'Tap!', wheel: 'Flick!', rub: 'Rub!', clock: 'Set it!', chain: 'Hook it!', glue: 'Push & hold!', sharpen: 'Swipe!', sew: 'Sew!', pump: 'Pump!', oil: 'Tap when open!', zip: 'Zip it up!', spring: 'Pull back!', thread: 'Thread it!', ...repairMeta('word') };
+export const OBJECT = { screw: 'bell', pin: 'music box', dent: 'kettle', wheel: 'wheel', rub: 'lamp', clock: 'clock', chain: 'bike', glue: 'vase', sharpen: 'knife', sew: 'teddy', pump: 'ball', oil: 'door', zip: 'jacket', spring: 'toy car', thread: 'needle', ...repairMeta('object') };
+export const COIN = { screw: 2, pin: 2, dent: 2, wheel: 3, rub: 3, clock: 2, chain: 2, glue: 3, sharpen: 3, sew: 3, pump: 3, oil: 3, zip: 3, spring: 2, thread: 3, ...repairMeta('coin') };
 export const QUICK_BONUS = 1; // coins for a repair done with at least half the patience left
 export const PATIENCE = [13, 12, 10.5, 9.5, 8.5, 7.5]; // seconds for one repair, by ramp level
 export const TWO_PATIENCE = 1.6; // a two-repair job gets this many times the patience
@@ -33,11 +36,15 @@ export const GOLDEN_PATIENCE = 1.45; // times the level's patience (an ordinary 
 export const GOLDEN_PAY = 4;
 export const GOLDEN_FROM = 6; // no golden customer among the first six of a shift
 // Touch radii in local units. index.html scales 100 units to at least 300 px, so the smallest (dent, 17) is 51 px.
-export const HIT = { screw: 60, pin: 32, dent: 17, wheel: 52, rub: 38, clock: 54, chain: 26, glue: 30, sharpen: 36, sew: 26, pump: 26, oil: 30, zip: 22, spring: 26, thread: 22 };
+export const HIT = { screw: 60, pin: 32, dent: 17, wheel: 52, rub: 38, clock: 54, chain: 26, glue: 30, sharpen: 36, sew: 26, pump: 26, oil: 30, zip: 22, spring: 26, thread: 22, ...repairMeta('hit') };
+
+function repairMeta(field) {
+  return Object.fromEntries(Object.entries(REPAIR_META).map(([kind, meta]) => [kind, meta[field]]));
+}
 
 const DENTS = [[28, 54], [50, 42], [72, 54], [38, 76], [62, 76]];
 // Where a second-job screw sits on each object (all at least 28 units from the box edge, so a thumb can circle it).
-const SCREW_SPOT = { pin: [72, 80], dent: [50, 20], wheel: [50, 54], rub: [50, 40], clock: [50, 52], chain: [68, 36], glue: [50, 60], sharpen: [32, 52], sew: [76, 50], pump: [74, 80], oil: [58, 46], zip: [32, 44], spring: [50, 72], thread: [32, 46] };
+const SCREW_SPOT = { pin: [72, 80], dent: [50, 20], wheel: [50, 54], rub: [50, 40], clock: [50, 52], chain: [68, 36], glue: [50, 60], sharpen: [32, 52], sew: [76, 50], pump: [74, 80], oil: [58, 46], zip: [32, 44], spring: [50, 72], thread: [32, 46], wind: [50, 42], balance: [50, 41], trace: [50, 47] };
 
 // ---------- random numbers: mulberry32 on s.r, so a run is fixed by its seed
 export function rand(s) {
@@ -56,6 +63,7 @@ const wrap = d => ((d + 540) % 360) - 180;
 // ---------- the repairs
 // Each has make(s, spot), down(r, x, y) -> touched something, move(r, x, y, s), up(r), tick(r, dt, s), guide(r) for hints and bots.
 const K = {
+  ...REPAIRS,
   // Loose screw: circle a finger round it. Three turns either way drive it home; a click every quarter turn.
   screw: {
     make: (s, spot = [50, 56]) => ({ cx: spot[0], cy: spot[1], turned: 0, need: 1080, last: null, quarter: 0, slot: rand(s) * 180 }),
@@ -459,11 +467,12 @@ K.spring = {
 // Needle: hold the thread's end (its tip stands up above the finger) and steer the tip into the needle's eye, then hold
 // still while it goes through. Moving while it is in the eye pulls it back out.
 export const THREAD_HOLD = 1.0; // seconds of holding still in the eye
-const THREAD_UP = 16; // the tip stands this far above the finger
+export const THREAD_UP = 16;
+export const THREAD_SIDE = 26; // the tip stays to the right of the thumb and clear of the shaft
 K.thread = {
-  make: s => ({ tx: 26, ty: 56, fx: 26, fy: 72, ex: 64, ey: 28, ph: rand(s), jit: 0, inEye: 0, lx: 0, ly: 0, was: false, d0: Math.hypot(38, 28) - 4, held: false }),
+  make: s => ({ tx: 38, ty: 56, fx: 12, fy: 72, ex: 64, ey: 28, ph: rand(s), jit: 0, inEye: 0, lx: 0, ly: 0, was: false, d0: Math.hypot(26, 28) - 4, held: false }),
   down(r, x, y) {
-    if (dist(x, y, r.tx, r.ty + THREAD_UP) > HIT.thread) return false;
+    if (dist(x, y, r.tx - THREAD_SIDE, r.ty + THREAD_UP) > HIT.thread) return false;
     r.grab = true; r.held = true; r.fx = r.lx = x; r.fy = r.ly = y;
     return true;
   },
@@ -476,7 +485,7 @@ K.thread = {
     r.ph += dt / 2.4; r.ex = 64 + 2 * Math.sin(r.ph * 2 * Math.PI); // the needle sways a little
     r.jit *= Math.exp(-dt / 0.1);
     if (r.grab) { // the thread is floppy: its tip follows the finger at its own pace
-      const tx = r.fx, ty = r.fy - THREAD_UP, d = dist(tx, ty, r.tx, r.ty), v = 110 * dt;
+      const tx = r.fx + THREAD_SIDE, ty = r.fy - THREAD_UP, d = dist(tx, ty, r.tx, r.ty), v = 110 * dt;
       if (d > 0) { const k = Math.min(1, v / d); r.tx += (tx - r.tx) * k; r.ty += (ty - r.ty) * k; }
     }
     const d = dist(r.tx, r.ty, r.ex, r.ey), near = d <= 6;
@@ -488,7 +497,7 @@ K.thread = {
     if (Math.floor(r.inEye * 5) > before) s.events.push({ e: 'through', n: Math.floor(r.inEye * 5) });
     r.p = r.inEye >= 1 ? 1 : r.held ? 0.4 * clamp(1 - (d - 6) / r.d0, 0, 1) + 0.6 * r.inEye : 0;
   },
-  guide: r => ({ type: 'drag', from: [r.tx, r.ty + THREAD_UP], to: [r.ex, r.ey + THREAD_UP], hold: dist(r.tx, r.ty, r.ex, r.ey) / 110 + (1 - r.inEye) * THREAD_HOLD + 0.35, eye: [r.ex, r.ey] }),
+  guide: r => ({ type: 'drag', from: [r.tx - THREAD_SIDE, r.ty + THREAD_UP], to: [r.ex - THREAD_SIDE, r.ey + THREAD_UP], hold: dist(r.tx, r.ty, r.ex, r.ey) / 110 + (1 - r.inEye) * THREAD_HOLD + 0.35, eye: [r.ex, r.ey] }),
 };
 
 function makeRepair(s, kind, spot) {
@@ -501,18 +510,20 @@ export const level = s => s.lv ? s.lv.ramp : Math.min(LEVELS - 1, Math.floor(s.c
 export const multiplier = s => 1 + Math.min(2, Math.floor(s.streak / 4)); // x2 after four quick jobs in a row, x3 after eight
 
 // ---------- the shift: the open stall (a day of random customers) or a map level (levels.js) when `lv` is given
-export function create({ seed = 1, unlocked = TUTOR, tutorial = false, hearts = 3, newJob = null, only = null, regular = -1, two = true, day = DAY, startLevel = 0, golden = GOLDEN_CHANCE, goldenFrom = GOLDEN_FROM, lv = null } = {}) {
+export function create({ seed = 1, unlocked = TUTOR, tutorial = false, hearts = 3, newJob = null, only = null, regular = -1, two = true, day = DAY, startLevel = 0, golden = GOLDEN_CHANCE, goldenFrom = GOLDEN_FROM, lv = null, assisted = false } = {}) {
   if (lv) { // a map level brings its own seed, jobs, pace and goal
     seed = lv.seed; unlocked = lv.pool; tutorial = false; newJob = lv.intro; two = lv.two; day = Infinity; startLevel = 0;
     golden = lv.golden; goldenFrom = 4; regular = lv.regular && !lv.goal.list ? 0 : -1;
   }
   const s = {
     seed, r: seed | 0, t: 0, clock: startLevel * RAMP, day, over: null, events: [],
-    hearts, maxHearts: hearts, coins: 0, served: 0, lost: 0, streak: 0, bestStreak: 0, log: [],
+    hearts, maxHearts: hearts, coins: 0, goalCoins: 0, served: 0, lost: 0, streak: 0, bestStreak: 0, log: [],
     unlocked: unlocked.filter(k => KINDS.includes(k)), tutorial, newJob, only, regular, two, golden, goldenFrom, made: 0, lastKind: null,
     queue: [], cust: null, reps: [], rep: null, stepN: 0, phase: 'work', phaseT: 0,
     finger: { down: false, blocked: false, x: 0, y: 0 },
     lv, cleared: false, clearT: null,
+    assisted: !!(lv && assisted), lanes: [], station: null, choosing: false,
+    deadline: lv?.goal.time ? lv.goal.time / (assisted ? ASSIST_RATE : 1) : null,
   };
   if (!s.unlocked.length) s.unlocked = TUTOR.slice();
   for (let i = 0; i < 4; i++) { const c = customer(s); if (c) s.queue.push(c); }
@@ -521,8 +532,8 @@ export function create({ seed = 1, unlocked = TUTOR, tutorial = false, hearts = 
 }
 
 function customer(s) {
-  const lv = s.lv, list = lv?.goal.list;
-  if (list && s.made >= list.length) return null; // a set list has no more customers after its last
+  const lv = s.lv, list = lv?.goal.list, tickets = lv?.tickets;
+  if ((list || tickets) && s.made >= (list ?? tickets).length) return null; // a set list has no more customers after its last
   const n = s.made++;
   const c = { n, look: Math.floor(rand(s) * 2 ** 30), tutor: false, fresh: false, regular: false, golden: false, kinds: null };
   const g = rand(s); // drawn for every customer, so the golden chance never shifts the rest of the queue
@@ -530,6 +541,7 @@ function customer(s) {
   // with the same repairs, however fast they play: the two-repair roll and the repairs' own layout come with them.
   c.roll = rand(s); c.rs = Math.floor(rand(s) * 2 ** 31);
   if (s.only) c.kinds = [s.only];
+  else if (tickets) { c.kinds = tickets[n]; c.fresh = n === 0 && tickets[0][0] === lv.intro; }
   else if (list) { c.kinds = [list[n]]; c.fresh = n === 0 && list[0] === lv.intro; }
   else if (lv?.intro && (n % 2 === 0 || s.unlocked.length === 1)) { c.kinds = [lv.intro]; c.fresh = n === 0; } // a new job: every other customer
   else if (s.tutorial && n < TUTOR.length) { c.kinds = [TUTOR[n]]; c.tutor = true; }
@@ -545,25 +557,76 @@ function customer(s) {
   return c;
 }
 
-function nextCustomer(s) {
+function takeCustomer(s) {
   const c = s.queue.shift();
   const more = customer(s);
   if (more) s.queue.push(more);
   const L = level(s), lv = s.lv;
-  // A second job is decided when the customer steps up; in the open stall it follows the ramp, in a level it is fixed.
   const chance = lv ? lv.two : typeof s.two === 'number' ? s.two : s.two ? TWO_CHANCE[L] : 0;
   if ((!c.tutor && !c.fresh && c.roll < chance) || c.golden) c.kinds = [c.kinds[0], c.kinds[0] === 'screw' ? 'dent' : 'screw'];
   const base = lv ? lv.patience : PATIENCE[L];
-  c.patience = c.tutor ? TUTOR_PATIENCE : c.fresh ? NEW_PATIENCE : c.golden ? base * GOLDEN_PATIENCE : base * (c.kinds.length > 1 ? TWO_PATIENCE : 1) * (c.regular ? 1.4 : 1);
+  const factor = lv?.tickets && c.kinds.length > 1 ? 1 + 0.75 * (c.kinds.length - 1) : c.kinds.length > 1 ? TWO_PATIENCE : 1;
+  c.patience = c.tutor ? TUTOR_PATIENCE : c.fresh ? NEW_PATIENCE : c.golden ? base * GOLDEN_PATIENCE : base * factor * (c.regular ? 1.4 : 1);
+  // In the rush, the second customer has the tighter deadline.
+  if (lv?.rule === 'rush' && c.n % 2) c.patience *= 0.75;
   c.left = c.patience;
+  const queueR = s.r, current = s.cust;
+  s.r = c.rs; s.cust = c; // repairs draw from the customer's own numbers
+  c.reps = c.kinds.map((k, i) => makeRepair(s, k, i > 0 && k === 'screw' && !lv?.tickets ? SCREW_SPOT[c.kinds[0]] : undefined));
+  s.r = queueR; s.cust = current;
+  c.stepN = 0; c.done = false; c.elapsed = 0;
+  return c;
+}
+
+function activate(s, c) {
   s.cust = c;
-  const queueR = s.r; s.r = c.rs; // the repairs draw from the customer's own numbers
-  s.reps = c.kinds.map((k, i) => makeRepair(s, k, i === 0 ? undefined : k === 'screw' ? SCREW_SPOT[c.kinds[0]] : undefined));
-  s.r = queueR;
-  s.stepN = 0; s.rep = s.reps[0];
+  s.reps = c.reps;
+  s.stepN = c.stepN;
+  s.rep = s.reps[s.stepN];
   s.phase = 'work'; s.phaseT = 0;
-  s.finger.blocked = s.finger.down; // a finger still down from the last job must lift before it touches this one
+  s.choosing = s.lv?.rule === 'order';
+  s.finger.blocked = s.finger.down; // a finger still down must lift before touching the new job
+}
+
+function announce(s, c) {
   s.events.push({ e: 'next', kinds: c.kinds, regular: c.regular, fresh: c.fresh, tutor: c.tutor, golden: c.golden });
+}
+
+function nextCustomer(s) {
+  const c = takeCustomer(s);
+  activate(s, c);
+  if (s.lv?.rule === 'rush') {
+    s.lanes = s.queue.length ? [c, takeCustomer(s)] : [c];
+    s.station = 0;
+  }
+  announce(s, c);
+}
+
+// A rush ticket changes the active bench while preserving each repair and both running clocks.
+export function selectLane(s, i) {
+  const c = s.lanes[i];
+  if (s.over || s.phase !== 'work' || !c || c.done || i === s.station) return false;
+  if (s.finger.down) input(s, { type: 'cancel', x: s.finger.x, y: s.finger.y });
+  s.station = i;
+  activate(s, c);
+  s.events.push({ e: 'switch', lane: i });
+  return true;
+}
+
+export function chooseTicket(s, i) {
+  if (s.over || !s.choosing || s.phase !== 'work' || !s.reps[i] || i < s.stepN) return false;
+  if (i !== s.stepN) {
+    s.cust.left = Math.max(0, s.cust.left - 0.75);
+    s.events.push({ e: 'wrongTicket', ticket: i });
+    return false;
+  }
+  s.choosing = false;
+  s.events.push({ e: 'ticket', ticket: i });
+  return true;
+}
+
+export function lampAt(s) {
+  return 50 + 29 * Math.sin(s.t * Math.PI / 1.9);
 }
 
 // A map level's goal: how far along each part is, and whether it is met.
@@ -573,14 +636,14 @@ export function goalState(s) {
   const parts = [];
   if (g.list) parts.push({ kind: 'list', have: s.served, need: g.list.length });
   if (g.fix) parts.push({ kind: 'fix', have: s.served, need: g.fix });
-  if (g.coins) parts.push({ kind: 'coins', have: s.coins, need: g.coins });
-  return { parts, met: parts.every(p => p.have >= p.need), time: g.time ?? null, safe: !!(g.safe || g.list) };
+  if (g.coins) parts.push({ kind: 'coins', have: s.goalCoins, need: g.coins });
+  if (s.lv.rule) parts.push({ kind: s.lv.rule, have: s.served, need: g[s.lv.rule] });
+  return { parts, met: parts.every(p => p.have >= p.need), time: s.deadline, safe: !!(g.safe || g.list) };
 }
 // Stars for a cleared level: 3 at or under the first star time, 2 at or under the second, else 1. 0 when not cleared.
 export function stars(s) {
   if (!s.lv || !s.cleared) return 0;
-  const [t3, t2] = s.lv.stars;
-  return s.clearT <= t3 + 1e-9 ? 3 : s.clearT <= t2 + 1e-9 ? 2 : 1;
+  return Math.min(s.assisted ? 2 : 3, starsFor(s.lv, s.clearT));
 }
 
 export function input(s, ev) {
@@ -593,7 +656,7 @@ export function input(s, ev) {
     if (was) return;
   } else if (!f.down || f.blocked) return; // a mouse moving with no button pressed, or a finger left over from the last job
   f.x = x; f.y = y;
-  if (s.phase !== 'work' || !s.rep) return;
+  if (s.phase !== 'work' || !s.rep || s.choosing) return;
   const r = s.rep, k = K[r.kind];
   if (type === 'down') {
     const hit = k.down(r, x, y, s);
@@ -613,7 +676,8 @@ function settle(s) {
     r.done = true;
     s.events.push({ e: 'fixed', kind: r.kind, step: s.stepN });
     if (s.stepN + 1 < s.reps.length) {
-      s.stepN++; s.rep = s.reps[s.stepN];
+      s.stepN++; s.cust.stepN = s.stepN; s.rep = s.reps[s.stepN];
+      s.choosing = s.lv?.rule === 'order';
       s.finger.blocked = s.finger.down;
       s.events.push({ e: 'step', kind: s.rep.kind });
     } else pay(s);
@@ -623,12 +687,14 @@ function settle(s) {
 function pay(s) {
   const c = s.cust;
   let base = c.kinds.reduce((a, k) => a + COIN[k], 0);
-  const quick = c.left / c.patience >= 0.5;
+  s.goalCoins += base;
+  c.done = true;
+  const quick = s.assisted ? c.elapsed <= c.patience * 0.5 : c.left / c.patience >= 0.5;
   if (quick) { s.streak++; base += QUICK_BONUS; } else s.streak = 0;
   s.bestStreak = Math.max(s.bestStreak, s.streak);
   const coins = base * multiplier(s) * (c.regular ? 2 : 1) * (c.golden ? GOLDEN_PAY : 1);
   s.coins += coins; s.served++;
-  s.log.push({ kind: c.kinds.join('+'), ms: Math.round((c.patience - c.left) * 1000), ok: true, ...(c.golden ? { golden: true } : {}) });
+  s.log.push({ kind: c.kinds.join('+'), ms: Math.round(c.elapsed * 1000), ok: true, ...(c.golden ? { golden: true } : {}) });
   s.phase = 'works'; s.phaseT = WORKS;
   s.events.push({ e: 'paid', coins, quick, kinds: c.kinds, mult: multiplier(s), regular: c.regular, golden: c.golden, streak: s.streak });
   if (s.lv && !s.cleared && goalState(s).met) { // the level's clock stops the moment the goal is met
@@ -637,36 +703,61 @@ function pay(s) {
   }
 }
 
+function tickPatience(s, c) {
+  c.elapsed += DT;
+  c.left = Math.max(0, c.left - DT * (s.assisted ? ASSIST_RATE : 1));
+}
+
+function lose(s, c) {
+  s.hearts--; s.lost++; s.streak = 0;
+  s.log.push({ kind: c.kinds.join('+'), ms: Math.round(c.patience * 1000), ok: false, ...(c.golden ? { golden: true } : {}) });
+  if (c !== s.cust) {
+    if (s.finger.down) input(s, { type: 'cancel', x: s.finger.x, y: s.finger.y });
+    s.station = s.lanes.indexOf(c);
+    activate(s, c);
+  }
+  s.choosing = false;
+  s.phase = 'leave'; s.phaseT = LEAVE;
+  s.events.push({ e: 'lost', hearts: s.hearts });
+}
+
 export function step(s) {
   if (s.over) return;
   s.t += DT;
   const c = s.cust;
   if (!c.tutor && !s.cleared) s.clock += DT;
   if (s.clock >= s.day && s.phase === 'work') { end(s, 'time'); return; }
-  const limit = s.lv?.goal.time;
-  if (limit && !s.cleared && s.clock >= limit) { end(s, 'time'); return; }
+  if (s.deadline && !s.cleared && s.clock >= s.deadline) { end(s, 'time'); return; }
+
+  if (s.phase !== 'leave') {
+    for (const lane of s.lanes) {
+      if (lane === c || lane.done) continue;
+      tickPatience(s, lane);
+      if (lane.left <= 0) { lose(s, lane); return; }
+    }
+  }
   if (s.phase === 'work') {
     const r = s.rep;
-    K[r.kind].tick(r, DT, s);
+    if (!s.choosing) K[r.kind].tick(r, DT, s);
     r.idle += DT;
-    c.left -= DT;
+    tickPatience(s, c);
     settle(s);
-    if (s.phase === 'work' && c.left <= 0) {
-      c.left = 0; s.hearts--; s.lost++; s.streak = 0;
-      s.log.push({ kind: c.kinds.join('+'), ms: Math.round(c.patience * 1000), ok: false, ...(c.golden ? { golden: true } : {}) });
-      s.phase = 'leave'; s.phaseT = LEAVE;
-      s.events.push({ e: 'lost', hearts: s.hearts });
-    }
+    if (s.phase === 'work' && c.left <= 0) lose(s, c);
     return;
   }
   s.phaseT -= DT;
   if (s.phaseT > 0) return;
   if (s.cleared) { end(s, 'clear'); return; }
   if (s.hearts <= 0) { end(s, 'hearts'); return; }
-  if (s.lv && s.lost > 0 && goalState(s).safe) { end(s, 'lost'); return; } // a set list, or "nobody walks off"
+  if (s.lv && s.lost > 0 && goalState(s).safe) { end(s, 'lost'); return; }
   if (s.clock >= s.day) { end(s, 'time'); return; }
-  if (!s.queue.length) { end(s, 'lost'); return; } // a set list ran out with someone not fixed
-  nextCustomer(s);
+  const i = s.lanes.findIndex(lane => !lane.done);
+  if (i >= 0) {
+    s.station = i;
+    activate(s, s.lanes[i]);
+    announce(s, s.cust);
+  } else if (s.queue.length) nextCustomer(s);
+  else end(s, 'lost');
 }
 
 function end(s, why) {
@@ -677,7 +768,7 @@ function end(s, why) {
 // For the page: whether a hint should show, and how strongly. `seen` is how many times this kind was shown before.
 export function hint(s, seen) {
   const r = s.rep;
-  if (!r || s.phase !== 'work') return 0;
+  if (!r || s.phase !== 'work' || s.choosing) return 0;
   if (seen < 2 && r.best < 0.05) return 1; // the first two times: the ghost finger until the job starts moving
   if (seen < 2 && r.idle > 0.6) return 1;
   return r.idle > HINT_AFTER ? 0.5 : 0;

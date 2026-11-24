@@ -2,6 +2,8 @@
 
 ## Status
 
+Round 4, 2026-11-24: Night market adds levels 33–44 and raises the job count to 18. A slower-clock retry is available after two failures on a level. See “Round 4: Night market and assist” for the current rules and checks.
+
 Round 3, 2026-11-24: levels. Play now goes to a map of 32 levels, each with one goal, one to three stars, and the next level unlocked by clearing it (tester t1, notes #150 and #157). Four new jobs (oil a squeaky door, unstick a zip, wind a toy car, thread a needle) bring the total to 15. The random shift stays as the "open stall", opened by level 8. See "Round 3: levels" below.
 
 Round 2, 2026-11-23. tester t1 picked Fix-It Stall as the game to work on more, out of the three (note #103, answering #100: "Fix-It Stall"). This round fixed the round-1 weaknesses (interpolation, overlapping customers, keyboard), added depth (daily stall, golden customer, two new jobs, streak feedback), and did a play-feel pass on fresh screenshots.
@@ -387,3 +389,74 @@ Changes after looking at the screenshots: the locked tiles first showed a padloc
 - **The shared phone check.** `experiments/kit/check/phone.mjs` (the `fixit` entry uses `started()`) passes unchanged: `#play` still leaves the menu at once (to the goal card, with `playing` true), the pause button pauses, `#quit` returns to the menu with one `left` run. It needs no change.
 
 Last result (round 3, final code): `ok` on WebKit (iPhone 13), 166 s, and on Chromium (Pixel 7, plus the 360 × 640 and desktop runs), 338 s, with several other browser checks running on the same machine. The shared phone check, `phone.mjs fixit`, gave `ok` on WebKit and Chromium; a full `phone.mjs` run failed only on `lab/lantern-3d` (another game, under work in another session at the time). `bots.mjs`: all claims hold.
+
+## Round 4: Night market and assist
+
+Fix-It Stall is a portrait arcade game where customers bring broken objects to a street repair bench. Use one thumb to fix them, earn stars in a 44-level campaign, take an open shift or play the daily stall.
+
+### Progression and saves
+
+- **Coin goals.** Repair base pay counts toward the goal. Each completed repair contributes 2 or 3 before bonuses. The wallet still shows the full payout, including quick repairs, combos, regulars and golden customers. The goal has its own green ticket icon and “base pay” wording. Levels 17 and 22 also give a longer deadline. Three-star target times on levels 1–32 are retained.
+- **Level payouts.** Bank the full repair payout on the first clear only. Each new star adds 5 coins, including on replays. A failed or abandoned campaign attempt pays zero. Open and daily stall payouts still bank by the shift rules. Existing balances and stars carry over, and an old clear already counts as a clear for payout purposes.
+- **Help.** After two completed failures on a level, a snail and two stars offer a slower-clock retry. The ordinary retry remains available, and the menu offers help again after leaving or reloading. The level deadline and patience rings run at 45% speed. Gesture physics, repair order, quick-pay timing and elapsed clear time stay the same. The helper caps the run at two stars. Best times are recorded for unaided clears. Leaving by Menu does not add a failure, and clearing a level resets its failure count.
+- **Storage and lab.** `fixit-save` keeps its existing fields and adds `attempts` (consecutive closed failures by level, capped at 2) and `assists` (helper selections by level). The kit's one-time hint uses `fixit:hint`. On helper selection the lab records an `assist` event, and the run summary records `assisted`. The outcomes remain `closed` and `left`. Pause is unavailable once the goal is met so the final repair settles as a clear.
+
+### Night market
+
+| Levels | Rule | What changes at the bench |
+| --- | --- | --- |
+| 33, 37, 41 | Picky customer | Choose numbered tickets from a shuffled row. The correct ticket opens that stage. A wrong ticket costs 0.75 s of patience. |
+| 34, 38, 42 | Rush hour | Two customers arrive together. Tap their tickets to switch repairs. Both clocks run, and the second customer's budget is 75% of the first customer's base budget. Banks of 23, 16 and 12 s tighten across the three levels. A repair keeps its progress when you switch. |
+| 35, 39, 43 | Blackout | A swinging lamp sweeps the work surface. The inactive part of the bench stays dimly visible. Reduced motion uses a broad stationary beam. |
+| 36, 40, 44 | Boss | Big jobs require three repairs on one fixture under one patience ring. The ticket row previews each stage and marks completed stages. Big jobs use 2.5 times the one-repair patience. |
+
+New jobs debut on levels 33–35. The daily uses all 18 jobs, and an open stall can acquire them through clears or shift unlocks. The new jobs change seeded open and daily queues compared with round 3. The daily remains deterministic by UTC date within this version.
+
+| Job | Gesture | Completion |
+| --- | --- | --- |
+| Winding drum | Sweep the crank back and forth between the stops | Four alternating 124° sweeps |
+| Scale | Move the lower counterweight and hold it where the beam is level | Three loads, 0.45 s balanced per load |
+| Tile | Lay a bead along the crack with the nozzle above the thumb | Pass every sample in sequence within 5 local units |
+| Needle, revised | Steer the tip into the eye and hold still | The tip stands 26 local units right and 16 above the touch. The hold remains 1.0 s. |
+
+### Builder decisions
+
+- **Builder: stall growth.** The shelf, sign, lights and cat appear at 6, 20, 40 and 66 total stars. The shop still recognizes its existing purchases. Chapter tabs keep each part of the map within one short grid.
+- **Builder: feedback.** Patience gets a warning mark and a paid customer gets a reaction badge. Eight combo pips show the quick-repair streak toward the two payout multipliers. Daily results have a PNG share card with date, coins, repairs and best combo. The share button uses the system share sheet when file sharing is supported, with a PNG download available directly.
+- **Builder: short first visits.** The first four Night Market levels introduce one rule each, then later levels use longer tickets or tighter paired deadlines. Darkness changes what you can see while leaving input active throughout.
+
+### Bot results
+
+Seven profiles per level, one fixed profile and six deterministic reaction/speed variations. The slow bot chooses help on its third run only after two actual failures. The retry policy left competent and expert clear outcome, time, coins and stars unchanged.
+
+| Campaign levels | Slow unaided | Slow with retries | Average stars |
+| --- | ---: | ---: | ---: |
+| 1–15 | 103/105 | 105/105 | 1.87 |
+| 16–32 | 34/119 | 119/119 | 1.54 |
+| 33–44 | 70/84 | 84/84 | 1.93 |
+| Coin goals only | 42/70 | 70/70 | |
+| All levels | 207/308 | 308/308 | |
+
+The competent bot cleared 308/308. The expert earned three stars on 308/308. An explicitly assisted expert run that met the three-star time earned two. Idle and random pointer bots cleared zero levels. The checks also cover deterministic queues, the first-clear reward, paired timers, wrong order, wrong gestures and shortened deadlines. The last run took 2.3 s.
+
+| Open stall bot, 40 seeds each | Mean coins | Mean fixed | Mean hearts lost |
+| --- | ---: | ---: | ---: |
+| Idle | 0 | 0.0 | 3.0 |
+| Random | 2 | 0.6 | 3.0 |
+| Slow | 55 | 12.5 | 0.3 |
+| Average | 241 | 22.0 | 0.0 |
+| Competent | 344 | 28.1 | 0.0 |
+| Expert | 399 | 32.1 | 0.0 |
+
+### Checks
+
+`check.mjs` covers first-clear and replay rewards, help eligibility and persistence, lab outcomes, the helper cap, pause, all 18 touch repairs, all four Night Market rules, progress when switching rush customers, cosmetics, old saves, daily PNG sharing and downloads. Chromium additionally checks a 360 × 640 viewport and desktop mouse and keyboard. The final runs passed on WebKit (iPhone 13, 249 s) and Chromium (Pixel 7 plus small-screen and desktop checks, 411 s). Script syntax and diff checks passed. The 390 × 664 WebKit and 360 × 640 Chromium screenshots were inspected across three passes. The passes improved ticket contrast, map navigation, the boss fixture, needle clearance, lamp placement, the order cue and daily card spacing.
+
+The requested shared phone command passed on WebKit and Chromium before and after the edits. An intermediate run stopped at the global registry assertion for the sibling `nightshift` experiment. Its registry entry was present on the final rerun. Fix-It required no shared-check change.
+
+### Known weaknesses and verification limits
+
+- Four of the ten coin levels still require help for every sampled slow profile. They remain timed goals even after the streak dependency is removed.
+- The aim and timing bots know the guide. Their clear rates measure input feasibility, speed and patience. They do not measure how quickly someone discovers a gesture, reads the tickets in dim light or knows what the snail offers. The rush timing table follows the initially active customer and does not optimize switching.
+- Physical phone input and sound, live lab ingestion, the native share sheet and play by an outside tester remain unverified. Browser lab submissions and file sharing use local test stand-ins. PNG download is checked in emulation.
+- No new shared kit feature was needed. The Fix-It shared phone test uses the existing selectors and run outcomes.
