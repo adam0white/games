@@ -88,7 +88,7 @@
   <p><button id="toShop">Shop</button><button id="toBoard">Leaderboard</button></p>
   <p id="views"><button data-view="2d">2D</button><button data-view="3d">3D</button><button data-view="first">First person</button></p>
   <p class="hint" id="viewNote" hidden></p>
-  <p><button id="toCredits">Credits</button></p>
+  <p><button id="toCredits">Credits</button><button class="music"></button></p>
 </div></div>
 <div id="shop" class="screen veil"><div>
   <h2>Shop</h2>
@@ -116,11 +116,12 @@
 </div></div>
 <div id="card" class="screen"><div><h1 id="title"></h1><p id="line"></p><p id="sub"></p>
   <div id="ask" hidden><p>Show your endless scores to everyone on the leaderboard? After a yes, every run from the next one goes up by itself.</p><p><input id="askName" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="Type a name"></p><p class="hint" id="askNote">Your name and your score are sent, and a signal when a run starts. Nothing else.</p><p><button id="askYes">Yes, show them</button><button id="askNo">No</button></p></div>
-  <p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button></p><p><button id="viewNext" hidden></button></p></div></div>
+  <p><button id="go" class="main">Play again</button></p><p><button id="toMenu">Menu</button><button class="music"></button></p><p><button id="viewNext" hidden></button></p></div></div>
 <script type="module">
 import { create, step, centre, half, sight, fall, fog, wind, rain, dazzle, level, score, boat, progress, DT, GOAL, BOAT, NIGHTS, STATS, POWERS, LAST, FLOORS, LEVELS, SECTORS, towerStage, climbPace, FIELD, REBORN_PACE, GIFTS, ABILITIES, startAt } from './sim.js?v=14'; // raise v when sim.js changes its exports, so a cached copy cannot break the page
 import { read, readNumber, readJson, write } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
+import { music } from './music.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { drag } from '../kit/drag.js';
@@ -249,7 +250,7 @@ addEventListener('resize', () => { resize(); size3(); }); resize();
 
 let s = create(1, stage), playing = false, paused = false, target = 0.5, acc = 0, last = 0, shake = 0, glow = 0, sparks = [], ended = -1e9, screen = 'menu', lastLevel = 1, nearFall = false, sayTimer = 0, shown = '', weather = '';
 const sx = x => left + x * unit, sy = y => H * 0.74 - (y - s.y) * unit;
-window.lanternState = () => ({ daily, view, viewReady: !!R3, sharing, tab, asked, shared: shared ? shared.length : -1, x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, peek: peek && peek[0], field: s.field, crashOn, crash: crash && crash.how, winOn, win: victory && victory.how, name: playerName(), board, unit: unit / dpr, start, magnet: s.magnet, flare: s.flare, scene: scene && scene.kind }); // read by the browser checks
+window.lanternState = () => ({ music: musicOn, songStep: song ? song.step : -1, daily, view, viewReady: !!R3, sharing, tab, asked, shared: shared ? shared.length : -1, x: s.x, y: s.y, t: s.t, over: s.over, target, playing, paused, stage, opened, endless, tower, climb, screen, hearts: s.hearts, shield: s.shield, light: s.light, taken: s.taken, stats, on: s.on, busy, boost: s.boost, slow: s.slow, size: s.size, big: s.big, progress: progress(s), score: score(s), bank, owned: [...owned], worn, looking, towerAt: towerAt(), reborn, peek: peek && peek[0], field: s.field, crashOn, crash: crash && crash.how, winOn, win: victory && victory.how, name: playerName(), board, unit: unit / dpr, start, magnet: s.magnet, flare: s.flare, scene: scene && scene.kind }); // read by the browser checks
 window.lanternSim = () => s; // the browser checks use this to reach late stretches quickly
 
 const cards = screens(['menu', 'shop', 'credits', 'card', 'board']);
@@ -511,7 +512,9 @@ function playScene() {
 function say(text, ms = 2200) { const el = $('say'); el.textContent = text; el.style.opacity = 1; clearTimeout(sayTimer); sayTimer = setTimeout(() => { el.style.opacity = 0; }, ms); }
 
 // Sound: all synthesized, started by the first touch.
-let water, waterGain, drone, droneGain, streak = 0;
+// Music (from the lab's Lantern Song, music.js): a score made as the run goes, a new tune for each river from its seed. It fills out
+// towards dawn, a low pulse comes in with danger, and embers chime inside the chord. lantern-music is '0' when the player turned it off.
+let water, waterGain, drone, droneGain, streak = 0, song = null, musicOn = localStorage.getItem('lantern-music') !== '0';
 const snd = sound({ setup: ac => { // the river and the low drone, built once
   const len = ac.sampleRate * 2, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
   for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -520,6 +523,7 @@ const snd = sound({ setup: ac => { // the river and the low drone, built once
   waterGain = ac.createGain(); waterGain.gain.value = 0.05; n.connect(water).connect(waterGain).connect(ac.destination); n.start();
   drone = ac.createOscillator(); drone.type = 'sine'; drone.frequency.value = 55;
   droneGain = ac.createGain(); droneGain.gain.value = 0; drone.connect(droneGain).connect(ac.destination); drone.start();
+  song = music(ac); song.volume(0.8);
 } });
 const audio = () => snd.unlock();
 const tone = (freq, dur, vol, type = 'sine', slide = 0) => { if (snd.ctx) snd.tone(freq, dur, vol, type, slide); }; // slide was dropped here before, so the crash sounds never slid
@@ -533,6 +537,7 @@ function begin() {
   const waiting = endless && Object.values(stats).some(v => v > 0);
   s = create(daily && endless && !tower ? daySeed(today()) : (Math.random() * 2 ** 31) | 0, tower ? towerStage(climb) : endless ? 1 : stage, tower ? 'tower' : endless, powersOwned(), runStats, climb, reborn); // after a rebirth the story nights run faster
   if (!tower) fromFloor = 0; else if (fromFloor) startAt(s, fromFloor); // part-way up the level (note #142)
+  song?.start(s.seed); // a new tune for each river; today's river has the same tune for everyone
   if (endless && !tower) boardTicket(); else ticket = null; // the shared board's run ticket, only for a player who shares
   const boosted = fresh && Object.values(runStats).some(v => v > 0);
   target = s.x; crash = null; victory = null; playing = true; paused = false; acc = 0; streak = 0; sparks = []; lastLevel = 1; size = 1; fire0 = flame(); nearFall = false; weather = ''; steer.reset(); pads.drop(); snap3 = true;
@@ -759,6 +764,8 @@ $('viewNext').addEventListener('click', () => setView(VIEWS[(VIEWS.indexOf(view)
 $('toShop').addEventListener('click', () => show('shop'));
 $('toCredits').addEventListener('click', () => show('credits'));
 $('toBoard').addEventListener('click', async () => { show('board'); const out = await boardCall(); shared = out ? out.rows : null; asked++; tab = shared ? 'all' : 'phone'; if (screen === 'board') boardShow(); });
+const musicShow = () => { for (const b of document.querySelectorAll('button.music')) b.textContent = musicOn ? 'Music: on' : 'Music: off'; }; musicShow();
+for (const b of document.querySelectorAll('button.music')) b.addEventListener('click', () => { musicOn = !musicOn; store.set('lantern-music', musicOn ? '1' : '0'); musicShow(); });
 $('tabPhone').addEventListener('click', () => { tab = 'phone'; boardShow(); });
 $('tabAll').addEventListener('click', () => { tab = 'all'; boardShow(); });
 $('tabDay').addEventListener('click', async () => { tab = 'day'; boardShow(); const out = await boardCall(null, DAY_URL); if (out) sharedDay = out.rows; else sharedDay = sharedDay || []; if (screen === 'board') boardShow(); });
@@ -807,7 +814,7 @@ addEventListener('keyup', e => keys.delete(e.key));
 
 // What each event of a run sounds and looks like; the shop's showings of an ability use it too.
 function react(e) {
-  if (e === 'ember') { tone(scale[Math.min(streak++, scale.length - 1)], 0.5, 0.12, 'triangle'); glow = 1; for (let i = 0; i < 8; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.4, vy: Math.random() * 0.5, life: 0.6 }); }
+  if (e === 'ember') { tone(song && musicOn ? song.chime(Math.min(streak++, 7)) : scale[Math.min(streak++, scale.length - 1)], 0.5, 0.12, 'triangle'); glow = 1; for (let i = 0; i < 8; i++) sparks.push({ x: s.x, y: s.y, vx: (Math.random() - 0.5) * 0.4, vy: Math.random() * 0.5, life: 0.6 }); }
   if (e === 'graze') { tone(1320, 0.12, 0.05); glow = Math.max(glow, 0.5); }
   if (e === 'shield') { tone(880, 0.5, 0.1); setTimeout(() => tone(1320, 0.7, 0.08), 110); glow = 1; say('Force field: rocks are pushed aside', 1700); }
   if (e === 'push') { tone(300, 0.15, 0.08, 'triangle', 220); snd.ctx && snd.noise(0.08, 0.1, 900); }
@@ -1093,7 +1100,9 @@ function frame(now) {
   if (!paused && !(s.over && s.over !== 'dawn')) burn(fire0, skin('flame')[0], dt, Math.max(-0.5, Math.min(0.5, (target - s.x) * 4)), s.light);
   shake = Math.max(0, shake - dt * 3); glow = Math.max(0, glow - dt * 2);
   for (const p of sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; } sparks = sparks.filter(p => p.life > 0);
-  if (snd.ctx) { water.frequency.value = 400 + 500 * Math.min(1.4, s.y / GOAL); waterGain.gain.value = 0.05 + (playing ? 0.14 * Math.max(fall(s, s.y), fall(s, s.y + 0.8)) : 0); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0; }
+  if (snd.ctx) { water.frequency.value = 400 + 500 * Math.min(1.4, s.y / GOAL); waterGain.gain.value = 0.05 + (playing ? 0.14 * Math.max(fall(s, s.y), fall(s, s.y + 0.8)) : 0); droneGain.gain.value = playing ? 0.05 * (1 - s.light) : 0;
+    // The endless river has no dawn, so its music fills out over two and a half minutes and stays in the night's key.
+    song.set({ on: musicOn && playing && !paused, progress: endless && !tower ? Math.min(0.8, s.t / 150) : Math.max(0, Math.min(1, progress(s))), light: s.light, danger: playing ? Math.min(1, Math.max(fall(s, s.y + 0.8), fall(s, s.y), 1 - s.light * 2.5)) : 0 }); }
   try { draw(now); } catch (e) { g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; throw e; } // a bad frame must not leave the next one drawn in a blend mode
 }
 views(); if (read('lantern-view', '2d') !== '2d') setView(read('lantern-view'), false);

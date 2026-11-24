@@ -597,3 +597,13 @@ everyone the same rocks and gifts until midnight UTC. It has its own shared boar
 `{ d, s }`, this phone's best of the day. Sharing follows the one yes; stopping sharing removes the row from both boards.
 Known gaps: a run that crosses midnight UTC counts for the new day; abilities a player owns still differ between players.
 
+## 2026-11-24: music, with a Music switch
+
+The score from the lab's Lantern Song is in the main game. `music.js` moved here from `experiments/lab/lantern-song/`
+(the lab page keeps a one-line file at the old path that re-exports it). Each river gets its own tune from its seed, so
+Today's river has the same tune for every player. On a night the music fills out towards dawn and turns to the major
+key near the end; on the endless river it fills out over two and a half minutes and stays in the night's key. Embers
+chime inside the chord while music is on. The switch is on the menu and on the card; `lantern-music` is `'0'` when off.
+It is on at first. Checked by machine: the song's clock advances during a run, and the switch is kept. Not checked: how
+it sounds on a phone, and how loud it is against the river and the crash sounds. Nobody has listened to it in this game.
+
