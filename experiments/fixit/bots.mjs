@@ -4,7 +4,7 @@
 import { create, step, input, guide, rand, stars, chooseTicket, selectLane, goalState, DT, KINDS, TUTOR, PATIENCE, LEVELS, HIT, RAMP, TWO_PATIENCE, THREAD_UP, THREAD_EYE, COIN } from './sim.js';
 import { ghost, plan, SKILLS, THUMB_MAX } from './moves.js';
 import { drawGhost } from './art.js';
-import { MAP, COUNT, INTRO, BUSY_END, OPEN_ORDER, levelDef, goalLine, canAssist, levelReward } from './levels.js';
+import { MAP, COUNT, INTRO, BUSY_END, OPEN_ORDER, levelDef, goalLine, canAssist, levelReward, RIVAL, makeRival, stepRival, raceText, raceFrom } from './levels.js';
 
 let failed = 0;
 function claim(ok, text) { console.log(`${ok ? 'ok  ' : 'FAIL'} ${text}`); if (!ok) failed++; }
@@ -515,6 +515,36 @@ function levels() {
 
   const timed = MAP.filter(d => d.goal.time);
   claim(timed.every(d => !level({ ...d, goal: { ...d.goal, time: rows[d.n - 1].c.secs * 0.8 } }, skilled(SKILLS.competent)).cleared), 'an ordinary timed level fails if its deadline is shortened to 80% of the competent time');
+  // The rival (notes #205, #233), on its own: the rules it plays by, for a player who is behind, level, or far ahead.
+  const races = MAP.filter(d => d.rival);
+  claim(races.length === 6, `six levels are races (${races.map(d => d.n).join(', ')})`);
+  const alone = (def, mine) => { // runs the rival to its goal against a player whose count is mine(clock)
+    const r = makeRival(def, def.goal.time), seen = {}; let clock = 0, rise = 0;
+    while (r.n < r.goal && clock < def.goal.time * 3) { clock += DT; const was = r.n, what = stepRival(r, DT, clock, mine(clock)); if (what) seen[what] = (seen[what] || 0) + 1; if (r.n > was + 1) rise++; }
+    return { secs: clock, seen, rise };
+  };
+  let hurried = 0, gags = {};
+  for (const def of races) {
+    const behind = alone(def, () => 0), far = alone(def, () => 99), lead = far.secs / behind.secs;
+    if (lead < 0.9) hurried++; for (const r of [behind, far]) for (const k of Object.keys(r.seen)) gags[k] = (gags[k] || 0) + r.seen[k];
+    claim(behind.secs > def.goal.time && far.secs < behind.secs && !behind.seen.hurry && far.seen.hurry > 0 && !behind.rise && !far.rise,
+      `level ${def.n}: the rival takes ${behind.secs.toFixed(0)} s against a player who is behind (limit ${def.goal.time}), ${far.secs.toFixed(0)} s against one far ahead`);
+  }
+  claim(hurried === races.length && ['drop', 'sneeze', 'nap'].every(k => gags[k] > 0), `it hurries on every race and makes every mistake (${JSON.stringify(gags)})`);
+  { // a player who races ahead and then stops loses to it; the limit alone would come later
+    const def = races[0], s = create({ lv: def }); s.served = def.goal.fix - 1; s.goalCoins = 0; let i = 0; s.hearts = 99; while (!s.over && i++ < 60 * 300) { s.cust.left = 99; step(s); }
+    claim(s.over === 'rival' || s.over === 'time', `a player who stops one short loses (${s.over} at ${s.clock.toFixed(0)} of ${def.goal.time} s)`);
+  }
+  // A friend's run in a link: the same seconds come out, the rival is as fast as the friend was, and a bad link is refused.
+  for (const def of races) {
+    const won = level(def, skilled(SKILLS.average)), times = won.s.times.slice(0, def.goal.fix), back = raceFrom(raceText(def.n, times));
+    claim(won.cleared && back?.n === def.n && times.every((v, i) => Math.abs(v - back.times[i]) < 0.11), `level ${def.n}: a won race survives the link`);
+    const faster = play({ lv: def, ghost: back.times }, skilled(SKILLS.expert)).s, slower = play({ lv: def, ghost: back.times }, idle).s;
+    claim(faster.over === 'clear' && slower.over !== 'clear', `level ${def.n}: an expert beats an average friend, a player who does nothing does not`);
+    const ex = level(def, skilled(SKILLS.expert)).s.times.slice(0, def.goal.fix), lost = play({ lv: def, ghost: raceFrom(raceText(def.n, ex)).times }, skilled(SKILLS.slow)).s;
+    claim(lost.over === 'rival' && Math.abs(lost.clock - ex.at(-1)) < 0.2, `level ${def.n}: a slow player loses to an expert friend at the friend's time`);
+  }
+  claim(['', null, '8', '8.', '7.1-2', '8.1-2', '8.' + Array(99).fill('1').join('-'), '99.1', '8.<script>', `8.${Array(races[0].goal.fix).fill('zzz').join('-')}`, `8.${Array(races[0].goal.fix).fill('0').join('-')}`].every(v => raceFrom(v) === null), 'a link that is not a race is refused');
   const same = () => level(MAP[20], noisy(SKILLS.average, 3));
   const a = same(), b = same();
   claim(a.secs === b.secs && a.coins === b.coins && a.stars === b.stars, 'a seeded level is deterministic with the same input profile');

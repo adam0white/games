@@ -1,9 +1,10 @@
 // Fix-It Stall: the page. View, input, sound, save, cards. The rules are in sim.js.
 import { create, step, input, guide, hint, multiplier, goalState, stars, selectLane, chooseTicket, lampAt, DAY, RAMP, DT, KINDS, TUTOR, OBJECT, HIT, zipStuck, WORKS, LEAVE, LEVELS } from './sim.js';
-import { COUNT, ORDER, OPEN_ORDER, INTRO, BUSY_END, CHAPTERS, ASSIST_RATE, STAR_BONUS, canAssist, levelDef, goalLine, levelReward, resultSeconds, rivalCount } from './levels.js';
+import { COUNT, ORDER, OPEN_ORDER, INTRO, BUSY_END, CHAPTERS, ASSIST_RATE, STAR_BONUS, canAssist, levelDef, goalLine, levelReward, resultSeconds, raceText, raceFrom } from './levels.js';
 import { plan, SKILLS } from './moves.js';
 import { drawJob, drawGhost, stepIcon, person, looks, REGULAR, cat, heart, coin, sillyList, drawSilly, goalIcon, symbol, starShape, C, circle, rrect, star, wage } from './art.js';
 import { readJson, writeJson } from '../kit/save.js';
+import { shareLink } from '../kit/room.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
@@ -136,6 +137,8 @@ const today = /^\d{4}-\d{2}-\d{2}$/.test(query.get('date') ?? '') ? query.get('d
 const dateSeed = d => { let h = 2166136261; for (const ch of 'fixit-daily-' + d) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
 let daily = false;
 // ---------- the map: levels.js holds the levels; the save holds the stars
+const friend = only ? null : raceFrom(query.get('race')); // ?race=: a friend's run to race against, carried in the link
+let racing = null; // the friend's times while that race is on
 let mode = 'level', lvN = 1, card = 0, cardFade = 0;
 const OPEN_AT = 8, DAILY_AT = 3; // the open stall opens after level 8, the daily stall after level 3 (or any old shift)
 const cleared = n => (save.levels[n] ?? 0) > 0;
@@ -209,6 +212,7 @@ function menu() {
     const [id, need] = next;
     $('growth').replaceChildren(metric(id, num(need) + ' ★', translate('milestone', { item: translate(id), n: num(need) })));
   }
+  $('raceFriend').hidden = !friend; if (friend) $('raceFriend').textContent = translate('raceFriend', { n: num(friend.n), time: seconds(resultSeconds(friend.times.at(-1))) });
   const n = only ? null : qLevel ?? nextLevel();
   $('play').textContent = n ? translate('playLevel', { n: num(n) }) : translate('play');
   updateRecording();
@@ -335,15 +339,15 @@ function icon(q, id) {
 }
 
 // ---------- a level, or a shift of the open stall or the daily stall
-const runMetadata = () => mode === 'level' ? { mode: 'level', level: lvN, goal: goalLine(s.lv.goal) } : daily ? { mode: 'daily', date: today } : { mode: 'day', unlocked: save.unlocked.length, shift: save.shifts + 1, only };
-function begin(how = 'level', n = null, assisted = false) {
-  snd.unlock();
+const runMetadata = () => mode === 'level' ? { mode: 'level', level: lvN, goal: goalLine(s.lv.goal), ...(racing ? { race: true } : {}) } : daily ? { mode: 'daily', date: today } : { mode: 'day', unlocked: save.unlocked.length, shift: save.shifts + 1, only };
+function begin(how = 'level', n = null, assisted = false, ghost = null) {
+  snd.unlock(); racing = how === 'level' && !only ? ghost : null; rivalSays = null;
   mode = only ? 'open' : how; daily = mode === 'daily';
   const hearts = daily ? 3 : 3 + (has('charm') ? 1 : 0);
   card = 0; cardFade = 0;
   if (mode === 'level') {
     lvN = n ?? nextLevel();
-    s = create({ lv: levelDef(lvN), hearts, assisted: assisted && canAssist(save.attempts[lvN]) });
+    s = create({ lv: levelDef(lvN), hearts, assisted: assisted && canAssist(save.attempts[lvN]), ghost: racing });
     card = 1;
     newJob = null;
   } else {
@@ -410,6 +414,7 @@ function finish() {
 // A level pays its repair coins on the first clear, plus a bonus for every new star.
 function finishLevel() {
   const why = s.over, n = lvN, def = s.lv, st = stars(s), was = save.levels[n] ?? 0, secs = resultSeconds(s.clearT ?? s.clock);
+  if (racing && !reachable(n)) return finishPractice(); // a friend's link to a level not opened yet: the race is played, nothing is saved
   const bonus = Math.max(0, st - was) * STAR_BONUS, bestWas = save.times[n];
   const reward = levelReward(s.coins, st, was), beforeGrowth = stallGrowth();
   save.bank += reward; save.served += s.served; save.bestStreak = Math.max(save.bestStreak, s.bestStreak);
@@ -419,7 +424,7 @@ function finishLevel() {
     save.levels[n] = Math.max(was, st);
     if (!s.assisted) save.times[n] = Math.min(bestWas ?? Infinity, secs);
     if (def.intro && !save.unlocked.includes(def.intro)) save.unlocked.push(def.intro); // the job a level taught is the open stall's too
-  } else {
+  } else if (!racing) { // losing to a fast friend is no reason to offer the slower clock
     save.attempts[n] = Math.min(2, (save.attempts[n] ?? 0) + 1);
   }
   store();
@@ -435,18 +440,33 @@ function finishLevel() {
       : opened || dailyNow ? [translate('unlockedMode', { mode: translate(opened ? 'open' : 'daily') })]
       : upNext?.intro && !cleared(upNext.n) ? [jobMetric(upNext.intro, translate('newRepair', { object: translate(upNext.intro) }))]
       : !upNext ? [translate('allCleared')] : nextMilestone();
-    endCard({ title: translate('cleared', { n: num(n) }), stars: st, coins: reward,
+    raceOffer();
+    endCard({ title: racing ? translate('beatFriend') : translate('cleared', { n: num(n) }), stars: st, coins: reward,
       stats: [['time', seconds(secs)], ...(save.times[n] ? [['best', seconds(resultSeconds(save.times[n]))]] : []), ['fixed', num(s.served)]],
       line, note, again: 'retry', next: !!upNext });
     [523, 659, 784, 1047].slice(0, 1 + st).forEach((f, i) => setTimeout(() => tone(f, 0.4, 0.09, 'triangle'), 300 + i * 160));
   } else {
     const gs = goalState(s);
-    endCard({ title: translate(why === 'time' ? (s.lv.rival ? 'rivalWon' : 'outOfTime') : why === 'hearts' ? 'outOfHearts' : 'walkOff'), stars: 0, coins: 0,
-      stats: gs.parts.map(p => [goalKind[p.kind], count(Math.min(p.have, p.need), p.need)]).concat([['time', seconds(secs)]]),
+    endCard({ title: translate(lostTitle(why)), stars: 0, coins: 0,
+      stats: gs.parts.map(p => [goalKind[p.kind], count(Math.min(p.have, p.need), p.need)]).concat(s.rival ? [[racing ? 'friendFixed' : 'rivalFixed', num(s.rival.n)]] : [], [['time', seconds(secs)]]),
       line: gs.safe ? [translate('safeGoal')] : [],
       note: [], again: 'retry', next: false, offer: canAssist(save.attempts[n]) });
     [523, 392].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.08, 'triangle'), i * 160));
   }
+  setTimeout(() => { if (!playing && screen === 'play') show('end'); }, 900);
+}
+// Losing to the rival needs the rival ahead at the end; a level that ran out with the rival behind is only out of time.
+const lostTitle = why => why === 'rival' ? (racing ? 'friendWon' : 'rivalWon') : why === 'time' ? (s.rival && s.rival.n > s.served ? (racing ? 'friendWon' : 'rivalWon') : 'outOfTime') : why === 'hearts' ? 'outOfHearts' : 'walkOff';
+let raceLink = '';
+function raceOffer() { // after a won race without the slower clock: a link that carries this run
+  raceLink = s.lv.rival && s.cleared && !s.assisted && s.times?.length >= s.lv.goal.fix ? `${location.origin}${location.pathname}?race=${raceText(lvN, s.times.slice(0, s.lv.goal.fix))}` : '';
+}
+function finishPractice() {
+  store(); rec.end('closed', { ...summary(), why: s.over, race: true });
+  const st = stars(s); if (st) raceOffer();
+  endCard({ title: translate(st ? 'beatFriend' : lostTitle(s.over)), stars: null, coins: 0,
+    stats: [['fixed', num(s.served)], ['friendFixed', num(s.rival?.n ?? 0)], ['time', seconds(resultSeconds(s.clearT ?? s.clock))]], line: [], note: [translate('racePractice')], again: 'retry', next: false });
+  (st ? [523, 659, 784] : [523, 392]).forEach((f, i) => setTimeout(() => tone(f, 0.35, 0.08, 'triangle'), i * 160));
   setTimeout(() => { if (!playing && screen === 'play') show('end'); }, 900);
 }
 // Between new repairs, the results card shows the next thing the stall is saving stars for.
@@ -487,7 +507,9 @@ function previewRepair(kind) {
 function endCard({ title, stars: st, coins, stats, line, note, again, next, offer = false }) {
   $('helpRow').hidden = !offer;
   $('dailyResult').hidden = true;
-  $('shareStatus').textContent = '';
+  $('shareStatus').textContent = ''; $('raceStatus').textContent = '';
+  if (!s.cleared) raceLink = '';
+  $('raceRow').hidden = !raceLink;
   $('earnedLine').hidden = coins === 0;
   $('endTitle').textContent = title;
   $('endStars').style.display = st === null ? 'none' : '';
@@ -719,6 +741,14 @@ function react(e) {
       else tone(300, 0.05, 0.05, 'triangle');
       break;
     }
+    case 'rival':
+      if (e.what === 'fixed') { tone(200, 0.05, 0.03, 'triangle'); break; }
+      rivalSays = { what: e.what, t: 0 };
+      if (e.what === 'hurry') { tone(520, 0.06, 0.05, 'square'); later(80, () => tone(620, 0.08, 0.05, 'square')); }
+      else if (e.what === 'drop') { tone(400, 0.25, 0.06, 'triangle', -250); later(160, () => noise(0.12, 0.12, 1500)); }
+      else if (e.what === 'sneeze') { noise(0.16, 0.12, 3200); tone(700, 0.12, 0.05, 'triangle', -300); }
+      else tone(150, 0.5, 0.05, 'triangle', -50);
+      break;
     case 'over': finish(); break;
   }
 }
@@ -820,7 +850,14 @@ assistLevel.id = 'assistLevel';
 $('menuAssist').prepend(assistLevel);
 $('menuAssist').addEventListener('click', () => { if (screen === 'menu' && menuHelp) begin('level', menuHelp, true); });
 $('assist').addEventListener('click', () => { if (screen === 'end' && mode === 'level' && !s.cleared && canAssist(save.attempts[lvN])) begin('level', lvN, true); });
-$('again').addEventListener('click', () => { if (performance.now() - ended > 500) begin(mode, lvN); });
+$('again').addEventListener('click', () => { if (performance.now() - ended > 500) begin(mode, lvN, false, racing); });
+$('raceFriend').addEventListener('click', () => { if (screen === 'menu' && friend) begin('level', friend.n, false, friend.times); });
+$('challenge').addEventListener('click', async () => {
+  if (!raceLink) return;
+  const how = await shareLink(raceLink, translate('raceWords', { n: num(lvN), time: seconds(resultSeconds(s.clearT)) }));
+  const said = $('raceStatus');
+  if (how === 'shown') { said.textContent = raceLink; said.classList.add('link'); } else { said.textContent = translate(how === 'copied' ? 'raceCopied' : 'raceShared'); said.classList.remove('link'); }
+});
 $('next').addEventListener('click', () => { if (performance.now() - ended > 500) begin('level', Math.min(COUNT, lvN + 1)); });
 $('open').addEventListener('click', () => begin('open'));
 $('daily').addEventListener('click', () => begin('daily'));
@@ -895,6 +932,7 @@ function updateBenchLabel() {
 }
 
 // The state the browser check reads.
+window.fixitSim = () => s; // the browser checks use this to reach the end of a race quickly
 window.fixitState = () => ({
   screen, playing, paused, t: s?.t ?? 0, clock: s?.clock ?? 0, day: s?.day ?? 0, over: s?.over ?? null,
   coins: s?.coins ?? 0, hearts: s?.hearts ?? 0, served: s?.served ?? 0, lost: s?.lost ?? 0, streak: s?.streak ?? 0, phase: s?.phase ?? null,
@@ -1436,13 +1474,23 @@ function goalBar(t) {
     starShape(g, tx, ly + 14, k === 3 ? 7 : 5.5, gone ? 'rgba(255,255,255,.3)' : k === 3 ? '#ffd860' : '#f3ead8'); // gold: three stars; pale: two
   }
   if (gs.time) { const left = Math.max(0, Math.ceil(gs.time - now)); ink(seconds(left), x1, ly - 13, 14, late ? '#ffb0a0' : '#fff6e4', 'right'); }
-  if (lv.rival && gs.time) { // the rival rides the clock: its face, and how many it has fixed
-    const n = rivalCount(lv, s.cleared ? s.clearT : now, gs.time), rx = x0 + (x1 - x0) * f, ahead = n > s.served;
-    person(g, rx, ly + 8, 9, RIVAL, ahead ? 'happy' : 'cross', t);
-    ink(num(n), rx + 16, ly + 3, 14, ahead ? '#ffb0a0' : '#9ff0b0');
-  } else circle(g, x0 + (x1 - x0) * f, ly, 6, '#ffd860', 1.6);
+  circle(g, x0 + (x1 - x0) * f, ly, lv.rival ? 4 : 6, '#ffd860', 1.6);
+  if (s.rival) { // the rival runs along the bar by how far through its own goal it is, with how many it has fixed
+    const r = s.rival, look = racing ? FRIEND : RIVAL_LOOK, ahead = r.n > s.served, rx = x0 + (x1 - x0) * Math.min(1, r.p / r.goal), hop = r.hurry && !calm ? Math.abs(Math.sin(t * 14)) * 3 : 0;
+    if (r.gag === 'nap' || r.gag === 'sneeze') { g.save(); g.translate(rx, ly + 8); g.rotate(r.gag === 'nap' ? 0.5 : calm ? 0 : Math.sin(t * 30) * 0.15); person(g, 0, 0, 9, look, 'cross', t); g.restore(); }
+    else person(g, rx, ly + 8 - hop, 9, look, ahead && !r.gag ? 'happy' : 'cross', t);
+    ink(num(r.n), rx + 16, ly + 3, 14, ahead ? '#ffb0a0' : '#9ff0b0');
+    if (rivalSays) { // what it is up to, in words, under its face
+      const a = Math.min(1, (1.9 - rivalSays.t) * 4), text = translate('rival_' + rivalSays.what);
+      g.save(); g.globalAlpha = Math.max(0, a); g.font = 'bold 13px ui-rounded, sans-serif';
+      const w2 = g.measureText(text).width + 18, bx = Math.max(8, Math.min(W - 8 - w2, rx - w2 / 2)), by = ly + 25;
+      rrect(g, bx, by, w2, 23, 11, rivalSays.what === 'hurry' ? '#ffd0c0' : '#fff6e4', 1.8);
+      g.fillStyle = C.ink; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(text, bx + 9, by + 12); g.restore();
+    }
+  }
 }
-const RIVAL = { ...looks(4321), hat: 9, shirt: '#b5302a', tache: true };
+let rivalSays = null; // { what, t }: the last thing the rival did that is worth words
+const RIVAL_LOOK = { ...looks(4321), hat: 9, shirt: '#b5302a', tache: true }, FRIEND = { ...looks(77), hat: 2, shirt: '#2f6fb5' };
 // The goal card uses the same symbols as the live counter. The run waits for a tap or Space.
 function briefLayout() {
   const cw = Math.min(W - 32, 340), intro = cleared(lvN) ? null : s.lv.intro;
@@ -1496,8 +1544,8 @@ function goalCard(t) {
     yy += 21;
   }
   if (lv.rival) {
-    person(g, x + 25, yy + 12, 8, RIVAL, 'ok', t);
-    cardText(translate('rivalGoal'), x + 42, yy + 1, 14, cw - 55, 'left');
+    person(g, x + 25, yy + 12, 8, racing ? FRIEND : RIVAL_LOOK, 'ok', t);
+    cardText(translate(racing ? 'friendGoal' : 'rivalGoal'), x + 42, yy + 1, 14, cw - 55, 'left');
     yy += 26;
   }
   if (lv.goal.coins) { // gold bonus coins, crossed out: only the green tokens count
@@ -1542,6 +1590,7 @@ function frame(now) {
     if (s && !flying.length) shownCoins = s.coins;
     if (feedback) { feedback.t += dt; if (feedback.t > 0.9) feedback = null; }
     if (stepBeat) { stepBeat.t += dt; if (stepBeat.t > STEP_BEAT) stepBeat = null; }
+    if (rivalSays && (rivalSays.t += dt) > 1.9) rivalSays = null;
     if (banner) { banner.t += dt; if (banner.t > 1.6) banner = null; }
     shake = Math.max(0, shake - dt * 4); squash = Math.max(0, squash - dt * 8); wobble = Math.max(0, wobble - dt * 4); heartFlash = Math.max(0, heartFlash - dt * 1.5); catHappy = Math.max(0, catHappy - dt);
   }
@@ -1594,7 +1643,7 @@ function restoreAfterReload() {
   if (!KINDS.includes(state.rep?.kind)) return false;
   if (state.lv) state.day = Infinity;
   ({ mode, lvN, card, seenBase, jobKey } = checkpoint);
-  s = state;
+  s = state; racing = s.rival?.ghost ?? null;
   daily = mode === 'daily';
   playing = true;
   paused = !s.cleared;
