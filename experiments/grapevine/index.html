@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#241a46" id="theme">
-<title>Grapevine</title>
+<title data-i18n="title"></title>
 <style>
   html, body { margin: 0; height: 100%; background: #241a46; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   body { font: 17px/1.4 ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', sans-serif; color: #fff4dc; }
@@ -18,7 +18,7 @@
   h1 { font-size: 2.7em; line-height: 1; margin: .1em 0 .1em; color: #ffd98a; letter-spacing: .02em; text-shadow: 0 3px 0 #7a3b5e, 0 0 24px #ff9a5a88; }
   h2 { font-size: 2em; line-height: 1.1; margin: 0 0 .25em; color: #ffd98a; text-shadow: 0 3px 0 #7a3b5e; }
   p { margin: .35em 0; }
-  .sub { opacity: .85; margin-bottom: .6em; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   button { font: inherit; font-weight: 600; color: #fff4dc; background: #ffffff14; border: 2px solid #ffd98a88; border-radius: 999px; padding: .45em 1.2em; margin: .25em; min-width: 8em; min-height: 46px; touch-action: manipulation; cursor: pointer; }
   button.main { background: #ffb347; color: #3a1a10; border-color: #ffb347; font-size: 1.25em; min-width: 9em; box-shadow: 0 4px 0 #b8642a; }
   button.main:active { transform: translateY(2px); box-shadow: 0 2px 0 #b8642a; }
@@ -36,10 +36,7 @@
   #strip { display: block; width: 100%; height: 104px; margin: .3em 0; }
   #pause { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); width: 46px; height: 46px; min-width: 0; min-height: 0; margin: 0; padding: 0;
     border: 2px solid #ffd98a66; border-radius: 50%; background: #1a1233e6; display: none; place-items: center; touch-action: none; }
-  #boardCue { position: fixed; top: calc(78px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
-    box-sizing: border-box; width: max-content; max-width: calc(100% - 12px); margin: 0; padding: 2px 10px;
-    pointer-events: none; border-radius: 8px; background: #271c39; color: #fff4dc; font-size: 15px; font-weight: 650; text-align: center; }
-  #boardCue:empty { display: none; }
+  #boardCue, #unlockStatus { top: 0; left: 0; margin: 0; }
   #pause::before { content: ''; width: 4px; height: 16px; border: solid #ffd98a; border-width: 0 5px; }
   #hint { position: fixed; left: calc(60px + env(safe-area-inset-left)); top: calc(9px + env(safe-area-inset-top)); display: none; width: 46px; height: 46px; min-width: 0; min-height: 0; margin: 0; padding: 0;
     font-size: 24px; line-height: 1; background: #ffd24a; border: 2px solid #2b1830; border-radius: 50%; box-shadow: 0 3px 0 #b8862a; animation: nudge 1.2s ease-in-out infinite; }
@@ -52,22 +49,39 @@
   #tabs button.on { background: #ffb34733; border-color: #ffb347; }
   #tabs button.locked { border-style: dashed; color: #fff4dc66; }
   #grid.five { grid-template-columns: repeat(5, 1fr); }
-  #payoff { display: none; font-weight: 700; color: #ffd98a; }
+  #done > div { padding-block: calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-bottom)); }
+  #done p { margin: .18em 0; }
+  #doneLine, #payoff { color: #ffd98a; }
+  #doneLine { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+  #doneLine > span { background: #211733; border-radius: 99px; padding: 2px 8px; font-size: 15px; white-space: nowrap; }
+  .result-check { display: grid; place-items: center; width: 32px; height: 32px; margin: 0 auto; border: 2px solid #7fe07a;
+    border-radius: 50%; color: #a4ec9d; background: #213523; font-size: 22px; line-height: 1; }
   #share { min-width: 9em; }
   #postcardDialog { box-sizing: border-box; width: min(95vw, 480px); max-height: 92dvh; overflow-y: auto; touch-action: pan-y; padding: 14px; text-align: center; color: #fff4dc; background: #281e3d; border: 2px solid #ffd98a; border-radius: 18px; }
   #postcardDialog::backdrop { background: #130d24dc; }
   #cardPreview canvas { display: block; width: 100%; height: auto; border-radius: 10px; }
+  #postcardDialog:has(#manualShare:not([hidden])) #cardPreview canvas {
+    width: auto; max-width: 100%; max-height: min(242px, 37.5dvh); margin-inline: auto;
+  }
   #shareStatus:empty { display: none; }
   #manualShare { box-sizing: border-box; width: 100%; font: inherit; color: inherit; background: #21172f; -webkit-user-select: text; user-select: text; touch-action: auto; }
 
   .start-actions { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 8px 0; }
   .start-actions button { min-width: 0; margin: 0; padding-inline: .7em; }
-  .start-actions #play { flex: 1; }
+  .start-actions #play { flex: 1; font-size: clamp(18px, 5.4vw, 21px); }
+  .settings { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 6px 0; }
+  .settings button { margin: 0; }
+  button.language { display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    min-width: 44px; min-height: 46px; padding-inline: 9px; font-size: 14px; }
+  .language > span:first-child { font-size: 17px; }
+  #unlockCue { min-height: 0; margin: 2px 0; color: #ffd98a; font-size: 15px; font-weight: 800; }
+  #unlockCue:empty { display: none; }
+  #grid button.prerequisite { border-color: #ffd98a; box-shadow: inset 0 0 0 2px #ffd98a; }
+  #grid button.locked small { font-size: 11px; letter-spacing: 0; }
+  #menu h1 { font-size: clamp(32px, 9.5vw, 43px); }
   #menu .lab-notice a { display: inline-grid; place-items: center; min-height: 44px; min-width: 52px; }
   @media (max-height: 720px) {
     #menu > div { padding-block: calc(4px + env(safe-area-inset-top)) calc(4px + env(safe-area-inset-bottom)); }
-    #menu h1 { font-size: 2.25em; }
-    #menu .sub { margin: 2px 0; }
     #grid { gap: 4px; margin: 6px 0; }
     #grid button { height: 44px; }
   }
@@ -75,55 +89,73 @@
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<p id="boardCue" role="status"></p>
-<button id="pause" aria-label="Pause"></button>
-<button id="hint" aria-label="Hint">💡</button>
+<canvas id="c" role="img" data-i18n-aria="board"></canvas>
+<p id="boardCue" class="sr-only" role="status"></p>
+<button id="pause" data-i18n-aria="pause"></button>
+<button id="hint" data-i18n-aria="hint"><span aria-hidden="true">💡</span></button>
 <div id="menu" class="screen veil on"><div>
-  <h1>Grapevine</h1>
-  <p class="sub" id="menuHelp" role="status">Match the listener’s news.</p>
-  <div class="start-actions"><button id="play" class="main">Play</button><button id="daily">Daily village <small></small></button></div>
+  <h1 data-i18n="title"></h1>
+  <div class="start-actions"><button id="play" class="main"></button><button id="daily"><span aria-hidden="true">☀</span> <span data-i18n="daily"></span> <small aria-hidden="true"></small></button></div>
   <div id="tabs"></div>
   <div id="grid"></div>
-  <p><button id="sound">Sound: on</button></p>
+  <p id="unlockCue" aria-hidden="true"></p>
+  <p id="unlockStatus" class="sr-only" role="status"></p>
+  <div class="settings">
+    <button id="sound"></button>
+    <button id="language-menu" class="language" data-i18n-aria="switchLanguage"><span aria-hidden="true">🌐</span><span class="language-code" data-i18n="languageCode"></span></button>
+  </div>
 </div></div>
 <div id="paused" class="screen veil"><div>
-  <h2>Paused</h2>
-  <p><button id="resume" class="main">Resume</button></p>
-  <p><button id="restart">Start over</button><button id="toMenu">Menu</button></p>
-  <p><button id="sound2">Sound: on</button></p>
+  <h2 data-i18n="paused"></h2>
+  <p><button id="resume" class="main" data-i18n="resume"></button></p>
+  <p><button id="restart" data-i18n="restart"></button><button id="toMenu" data-i18n="menu"></button></p>
+  <div class="settings">
+    <button id="sound2"></button>
+    <button id="language-pause" class="language" data-i18n-aria="switchLanguage"><span aria-hidden="true">🌐</span><span class="language-code" data-i18n="languageCode"></span></button>
+  </div>
 </div></div>
 <div id="done" class="screen veil"><div>
-  <h2 id="doneTitle">Heard it!</h2>
-  <div class="stars" id="stars"><span>★</span><span>★</span><span>★</span></div>
+  <h2 id="doneTitle" class="sr-only"></h2>
+  <div class="result-check" aria-hidden="true">✓</div>
+  <div class="stars" id="stars" role="img"><span aria-hidden="true">★</span><span aria-hidden="true">★</span><span aria-hidden="true">★</span></div>
   <p id="doneLine"></p>
-  <p id="payoff"></p>
-  <canvas id="strip" aria-label="What they heard"></canvas>
-  <p><button id="share">View share card</button></p>
-  <p><button id="next" class="main">Next</button></p>
-  <p><button id="again">Again</button><button id="doneMenu">Menu</button></p>
+  <p id="payoff" hidden></p>
+  <canvas id="strip" role="img" data-i18n-aria="strip"></canvas>
+  <p><button id="share" data-i18n="viewCard"></button></p>
+  <p><button id="next" class="main"></button></p>
+  <p><button id="again" data-i18n="again"></button><button id="doneMenu" data-i18n="menu"></button></p>
 </div></div>
 <dialog id="postcardDialog" aria-labelledby="postcardHeading">
-  <h2 id="postcardHeading">Your postcard</h2>
+  <h2 id="postcardHeading" data-i18n="postcard"></h2>
   <div id="cardPreview"></div>
   <p id="shareStatus" role="status"></p>
-  <textarea id="manualShare" readonly hidden rows="4" aria-label="Result to copy"></textarea>
-  <button id="sendCard">Share card</button><button id="backToResult">Back</button>
+  <textarea id="manualShare" readonly hidden rows="4" data-i18n-aria="resultToCopy"></textarea>
+  <button id="sendCard" data-i18n="shareCard"></button><button id="backToResult" data-i18n="back"></button>
 </dialog>
 <script type="module">
 import { LEVELS, CHAPTERS } from './levels.js';
 import { MAX_HOPS, walk, refuse, hint as hintRoute, stars as starsFor, same, daily, dailySeed, ONEWAY, isGate, gateOpen, lane, tierFor, fromKey, SHAPES, COLOURS } from './sim.js';
-import { token, villager, badge, bubble, backdrop, lanterns, barrier, look, emblem, WIDE, BOARD_HALF, COLOUR, INK, CREAM, roundRect } from './art.js';
+import { token, villager, badge, bubble, backdrop, lanterns, barrier, look, emblem, sun, change, shape, tapHand, WIDE, BOARD_HALF, COLOUR, INK, CREAM, roundRect } from './art.js';
 import { readJson, writeJson } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
 import { lab } from '../kit/lab.js';
 import { hint as firstHint } from '../kit/hint.js';
+import { i18n } from './words.js';
 
 const $ = id => document.getElementById(id);
 const query = new URLSearchParams(location.search);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const { t: word, lang, apply: applyWords, setLang } = i18n;
+let numbers, dates;
+function formats() {
+  numbers = new Intl.NumberFormat(lang());
+  dates = new Intl.DateTimeFormat(lang(), { dateStyle: 'medium' });
+}
+formats();
+const number = n => numbers.format(n);
+const date = key => dates.format(new Date(`${key}T12:00:00`));
 
 // ---------------------------------------------------------------- save (one JSON blob)
 const KEY = 'grapevine-save';
@@ -147,7 +179,7 @@ const urlTier = query.has('tier') ? Math.max(0, Math.min(3, Math.floor(Number(qu
 // ---------------------------------------------------------------- chapters
 // Each chapter is a time of year in the same village (art.js LOOKS). The daily village wears the look of the newest
 // villager it uses.
-const CHAPTER_NAMES = ['Evening', 'Winter', 'Autumn'];
+const CHAPTER_NAMES = ['evening', 'winter', 'autumn'];
 const chapterOf = i => Math.max(1, CHAPTERS.findIndex(([a, b]) => i + 1 >= a && i + 1 <= b) + 1); // of a 0-based level
 const DAILY_LOOK = [1, 2, 2, 3]; // by daily tier
 // What a chapter's first levels bring in: drawn with a pulsing ring until the player touches the board.
@@ -172,8 +204,19 @@ const voice = kind => { // each kind of villager says something as they pass it 
 
 // ---------------------------------------------------------------- lab recording
 const rec = lab('grapevine');
-rec.notice($('menu').firstElementChild);
-rec.toggle($('paused').firstElementChild);
+const notice = rec.notice($('menu').firstElementChild);
+const recording = rec.toggle($('paused').firstElementChild);
+const noticeText = document.createElement('span');
+if (notice) {
+  const link = notice.querySelector('a');
+  link.dataset.i18n = 'privacy';
+  notice.replaceChildren(noticeText, ' ', link);
+}
+if (recording) {
+  const text = document.createElement('span');
+  text.dataset.i18n = 'recordPlay';
+  recording.lastChild.replaceWith(text);
+}
 
 // ---------------------------------------------------------------- canvas and layout
 const canvas = $('c'), g = canvas.getContext('2d');
@@ -590,13 +633,12 @@ function intro(time) {
 // The first level of a chapter: the chapter's name under the top bar for a few seconds.
 function banner() {
   if (!bannerT || mode !== 'level') return;
-  const c = chapterOf(index), text = `Chapter ${c}: ${CHAPTER_NAMES[c - 1]}`;
+  const c = chapterOf(index), x = W / 2, y = safe.t + 103;
   g.save(); g.globalAlpha = Math.min(1, bannerT * 2);
   g.font = '800 15px ui-rounded, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  const w = g.measureText(text).width + 50, x = W / 2, y = safe.t + 72;
-  g.beginPath(); roundRect(g, x - w / 2, y - 15, w, 30, 15); g.fillStyle = 'rgba(20,12,36,.8)'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#ffd98a'; g.stroke();
-  emblem(g, c, x - w / 2 + 19, y, 8);
-  g.fillStyle = '#ffd98a'; g.fillText(text, x + 12, y + 1);
+  g.beginPath(); roundRect(g, x - 29, y - 15, 58, 30, 15); g.fillStyle = 'rgba(20,12,36,.8)'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#ffd98a'; g.stroke();
+  emblem(g, c, x - 12, y, 9);
+  g.fillStyle = '#ffd98a'; g.fillText(word('number', { n: number(c) }), x + 12, y + 1);
   g.restore();
 }
 // The route as a growing grapevine, with leaves and a grape at each villager.
@@ -703,6 +745,11 @@ function listenerBubble(time) {
   const by = p.y - R * 1.25;
   const pulse = touched ? 1 : 1 + 0.06 * Math.sin(time * 5);
   g.save(); g.translate(bx, by); g.scale(pulse, pulse); g.translate(-bx, -by);
+  if (goalCue()) {
+    const pad = 5 + (reduced ? 0 : 2 * Math.sin(time * 5));
+    g.beginPath(); roundRect(g, bx - w / 2 - pad, by - h / 2 - pad, w + pad * 2, h + pad * 2, R * 0.85);
+    g.lineWidth = 3; g.strokeStyle = '#ffe07a'; g.stroke();
+  }
   bubble(g, bx, by, w, h, p.x + (toRight ? R * 0.6 : -R * 0.6), p.y - R * 0.7);
   if (wrong) {
     const gx = toRight ? bx - w * 0.22 : bx + w * 0.22, wx = toRight ? bx + w * 0.24 : bx - w * 0.24;
@@ -723,7 +770,8 @@ function hud(time) {
   const lx = safe.l + 30, ly = top + 22;
   g.beginPath(); g.arc(lx, ly, 19, 0, Math.PI * 2); g.fillStyle = '#ffb347'; g.fill(); g.lineWidth = 2.5; g.strokeStyle = INK; g.stroke();
   g.fillStyle = '#3a1a10'; g.textAlign = 'center'; g.font = '800 17px ui-rounded, system-ui, sans-serif';
-  g.fillText(mode === 'daily' ? '☀' : String(index + 1), lx, ly + 1);
+  if (mode === 'daily') sun(g, lx, ly, 10);
+  else g.fillText(word('number', { n: number(index + 1) }), lx, ly + 1);
   // now -> wanted
   const now = trail.msgs.at(-1);
   const ok = same(now, level.want);
@@ -732,6 +780,10 @@ function hud(time) {
   g.strokeStyle = ok ? '#7fe07a' : 'rgba(255,217,138,.5)'; g.lineWidth = 2; g.stroke();
   token(g, now, cx - 34, top + th / 2, 17);
   token(g, level.want, cx + 34, top + th / 2, 17);
+  if (goalCue()) {
+    g.beginPath(); g.arc(cx + 34, top + th / 2, 19 + (reduced ? 0 : Math.sin(time * 5)), 0, Math.PI * 2);
+    g.strokeStyle = '#ffe07a'; g.lineWidth = 2.5; g.stroke();
+  }
   g.strokeStyle = CREAM; g.lineWidth = 3; g.lineCap = 'round';
   if (ok) { g.beginPath(); g.moveTo(cx - 8, top + th / 2); g.lineTo(cx - 2, top + th / 2 + 6); g.lineTo(cx + 9, top + th / 2 - 7); g.strokeStyle = '#7fe07a'; g.stroke(); }
   else { g.beginPath(); g.moveTo(cx - 8, top + th / 2); g.lineTo(cx + 7, top + th / 2); g.moveTo(cx + 2, top + th / 2 - 6); g.lineTo(cx + 8, top + th / 2); g.lineTo(cx + 2, top + th / 2 + 6); g.stroke(); }
@@ -746,34 +798,74 @@ function hud(time) {
     g.fill();
   }
 }
+const goalCue = () => screen === 'play' && !sending && !result && mode === 'level'
+  && (index === 1 || index === 2) && route.length === 1;
 function updateBoardCue() {
   let text = '';
   if (screen === 'play' && !sending && result !== 'won') {
     const node = level.nodes[route.at(-1)];
-    if (result === 'wrong') text = 'Tap the orange teller to try again.';
+    if (result === 'wrong') text = word('retry');
     else if (mode === 'level' && index === 0) {
-      text = route.length === 1 ? 'Tap the villager in the red hat.' : 'It turned red! Tap the listener at the top.';
-    } else if (mode === 'level' && route.length === 1 && index === 1) text = 'Which hat will paint the square yellow?';
-    else if (mode === 'level' && route.length === 1 && index === 2) text = 'Find a path that turns the triangle green.';
+      text = word(route.length === 1 ? 'firstTap' : 'firstChanged');
+    } else if (goalCue()) text = word(index === 1 ? 'yellowGoal' : 'greenGoal');
     else if (node.kind === 'swap') {
-      const pair = node.arg === 0 ? 'circles and squares' : 'triangles and stars';
-      const before = trail.msgs.at(-2), after = trail.msgs.at(-1);
-      text = before.s === after.s ? `Only ${pair} swap here.` : `Swaps ${pair}.`;
+      const pair = word(node.arg === 0 ? 'roundPair' : 'pointedPair');
+      text = word(same(trail.msgs.at(-2), trail.msgs.at(-1)) ? 'onlySwaps' : 'swapped', { pair });
     }
   }
-  $('boardCue').textContent = text;
+  if ($('boardCue').textContent !== text) $('boardCue').textContent = text;
 }
 
-// Mark the next head. Tapping the teller or empty ground keeps the first instruction available.
+function cuePlate(x, y, w, h) {
+  g.beginPath(); roundRect(g, x - w / 2, y - h / 2, w, h, h / 2);
+  g.fillStyle = '#453350'; g.fill(); g.strokeStyle = '#ffe07a'; g.lineWidth = 2; g.stroke();
+}
+function messagePair(before, after, x, y, size = 13) {
+  token(g, before, x - 24, y, size);
+  token(g, after, x + 24, y, size);
+  g.strokeStyle = CREAM; g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = 2;
+  g.beginPath();
+  if (same(before, after)) {
+    g.moveTo(x - 5, y - 3); g.lineTo(x + 5, y - 3);
+    g.moveTo(x - 5, y + 3); g.lineTo(x + 5, y + 3);
+  } else {
+    g.moveTo(x - 6, y); g.lineTo(x + 6, y);
+    g.moveTo(x + 2, y - 4); g.lineTo(x + 6, y); g.lineTo(x + 2, y + 4);
+  }
+  g.stroke();
+}
+
+// Mark the next real villager. Tapping the teller or empty ground keeps the first cue available.
 function tutorial(time) {
-  if (screen !== 'play' || sending || result === 'won' || help.shown) return;
-  let target;
-  if (result === 'wrong') target = level.from;
-  else if (mode === 'level' && index === 0) target = route.length === 1 ? level.nodes.findIndex(n => n.kind === 'paint') : level.to;
-  else return;
+  if (screen !== 'play' || sending || result === 'won') return;
+  const first = mode === 'level' && index === 0;
+  const retry = result === 'wrong', head = route.at(-1);
+  const x = W / 2, y = safe.t + 103;
+  if (!retry && level.nodes[head].kind === 'swap') {
+    cuePlate(x, y, 186, 34);
+    g.beginPath(); roundRect(g, x - 84, y - 12, 66, 24, 12); g.fillStyle = CREAM; g.fill();
+    change(g, 7 + level.nodes[head].arg, x - 51, y, 59, 21);
+    messagePair(trail.msgs.at(-2), trail.msgs.at(-1), x + 38, y);
+  }
+  if (!(retry || first)) return;
+  const target = retry ? level.from : route.length === 1 ? level.nodes.findIndex(n => n.kind === 'paint') : level.to;
   const p = pos[target], radius = R + 7 + (reduced ? 0 : 2 * Math.sin(time * 5));
   g.beginPath(); g.arc(p.x, p.y, radius, 0, Math.PI * 2);
   g.strokeStyle = '#ffe07a'; g.lineWidth = 3; g.setLineDash([5, 5]); g.stroke(); g.setLineDash([]);
+  const side = p.x > W * 0.66 ? -1 : 1;
+  const press = reduced ? 1 : 0.5 + 0.5 * Math.cos(time * 5);
+  if (!help.shown) tapHand(g, p.x + side * R * 0.67, p.y + 1, side, press);
+  if (retry) {
+    // The same reset symbol as the restart action, directly beside the teller.
+    const rx = p.x - side * (R + 23), ry = p.y + R * 0.45;
+    cuePlate(rx, ry, 34, 34);
+    g.strokeStyle = CREAM; g.lineWidth = 2.5; g.lineCap = 'round'; g.lineJoin = 'round';
+    g.beginPath(); g.arc(rx, ry, 8, -2.6, 2.6); g.stroke();
+    g.beginPath(); g.moveTo(rx - 11, ry - 8); g.lineTo(rx - 8, ry - 3); g.lineTo(rx - 3, ry - 6); g.stroke();
+  } else if (route.length > 1) {
+    cuePlate(x, y, 94, 34);
+    messagePair(level.start, trail.msgs.at(-1), x, y);
+  }
 }
 function menuScene(time) {
   // a few villagers chatting in the square below the menu, when there is room for them
@@ -795,21 +887,19 @@ function menuScene(time) {
 // ---------------------------------------------------------------- the end card and its comic strip
 const strip = $('strip'), sg = strip.getContext('2d');
 let shareText = '', shareBlob = null, shared = 0, cardWhere = '';
-const NUM = ['one', 'two', 'three'];
-const words = m => `${NUM[m.n - 1]} ${COLOURS[m.c]} ${SHAPES[m.s]}${m.n > 1 ? 's' : ''}`;
-// What each villager says as they pass the news on, from what they did to it.
-function says(k, msgs, changes) {
+const PLURAL_SHAPES = ['circles', 'squares', 'triangles', 'pluralStars'];
+const messageText = m => word('token', {
+  n: number(m.n), colour: word(COLOURS[m.c]), shape: word(m.n === 1 ? SHAPES[m.s] : PLURAL_SHAPES[m.s]),
+});
+// Text alternative for the receipt when the picture cannot be sent or seen.
+function receiptKey(k, msgs, changes) {
   const v = sentRoute[k], node = level.nodes[v];
-  if (k === 0) return 'Psst!';
-  if (v === level.to) return 'Heard it!';
-  if (node.kind === 'bell') return 'Ding dong!';
-  if (node.kind === 'keeper') return 'Old news!';
-  if (node.kind === 'timid') return 'Phew, not red';
-  const c = changes[k];
-  if (c && same(msgs[k], msgs[k - 1])) return 'No change';
-  if (node.kind === 'parrot') return c ? 'Same again!' : 'Er... same?';
-  if (!c) return 'Word for word';
-  return { paint: 'Splash!', more: 'And more!', less: 'Less!', swap: 'Swapsies!', carve: 'Snip!', flip: 'Opposite day!' }[kindOfChange(c)] ?? 'Hmm';
+  if (k === 0) return 'tell';
+  if (v === level.to) return 'heard';
+  if (node.kind === 'bell') return 'ringBell';
+  if (node.kind === 'keeper' || node.kind === 'timid') return node.kind;
+  if (same(msgs[k], msgs[k - 1])) return 'noChange';
+  return node.kind === 'parrot' ? 'parrot' : kindOfChange(changes[k]);
 }
 // Cells for a route of n villagers in w px: one row, or two when one row would squash them.
 function stripCells(n, w) {
@@ -821,35 +911,56 @@ const ROW_H = 100;
 function showEnd() {
   show('done');
   stripT = 0;
-  const hops = sentRoute.length - 1;
-  $('doneTitle').textContent = payoff ? 'Chapter done!' : ['Heard it!', 'Spot on!', 'Just right!'][lastStars - 1] ?? 'Heard it!';
   [...$('stars').children].forEach((s, k) => { s.className = ''; setTimeout(() => { s.className = k < lastStars ? 'on' : 'off'; if (k < lastStars) tone(SCALE[6 + k * 2], 0.25, 0.06, 'triangle'); }, 250 + k * 260); });
-  const best = mode === 'daily' ? save.daily[dailyKey] : save.best[index + 1];
-  $('doneLine').textContent = hops === level.min ? `${hops} hops. The best way!` : `${hops} hops. It can be done in ${level.min}.`;
-  if (best > lastStars) $('doneLine').textContent += ` Best: ${'★'.repeat(best)}`;
-  if (mode === 'daily') {
-    const n = streak();
-    $('doneLine').textContent += ` Fewest today: ${save.dailyHops[dailyKey]}. ${n > 1 ? `${n} days in a row!` : 'Come back tomorrow for a streak.'}`;
-  }
-  const pay = $('payoff');
-  if (payoff) {
-    const [a, b] = CHAPTERS[payoff - 1]; let got = 0;
-    for (let k = a; k <= b; k++) got += save.best[k] || 0;
-    pay.textContent = `${CHAPTER_NAMES[payoff - 1]} is over: ${got} of ${3 * (b - a + 1)} ★` + (payoff < CHAPTERS.length ? `. ${CHAPTER_NAMES[payoff]} is next.` : '. The whole village heard!');
-    pay.style.display = 'block';
-  } else pay.style.display = 'none';
-  const last = mode === 'level' && index + 1 >= LEVELS.length;
-  $('next').textContent = mode === 'daily' ? 'New village tomorrow' : last ? 'All done!' : payoff ? 'Next chapter' : 'Next';
-  $('next').disabled = mode === 'daily' || last;
-  const { rows } = stripCells(sentRoute.length, strip.getBoundingClientRect().width || W - 52); // the width drawStrip lays out in
+  resultWords();
+  const { rows } = stripCells(sentRoute.length, strip.getBoundingClientRect().width || W - 52);
   strip.style.height = `${rows * ROW_H + 6}px`;
   const r = strip.getBoundingClientRect();
   strip.width = Math.round(r.width * dpr); strip.height = Math.round(r.height * dpr);
-  // The share card is drawn now, so the Share tap can hand it over at once.
+}
+function score(got, total) { return word('progress', { got: number(got), total: number(total) }); }
+function labelledPicture(text, label) {
+  const pic = document.createElement('span');
+  pic.setAttribute('role', 'img'); pic.setAttribute('aria-label', label);
+  pic.textContent = text;
+  return pic;
+}
+function resultWords() {
+  const hops = sentRoute.length - 1, n = number(hops), min = number(level.min);
+  const last = mode === 'level' && index + 1 >= LEVELS.length;
+  $('doneTitle').textContent = word(payoff ? 'chapterDone' : ['heard', 'spotOn', 'justRight'][lastStars - 1]);
+  $('stars').setAttribute('aria-label', word('stars', { n: number(lastStars), total: number(3) }));
+  const best = mode === 'daily' ? save.daily[dailyKey] : save.best[index + 1];
+  const hopScore = hops === level.min ? `${n} ✓` : `${n} / ${min}`;
+  const lines = [labelledPicture(`👣 ${hopScore}`, word(hops === level.min ? 'shortest' : 'hops', { n, min }))];
+  if (best > lastStars) lines.push(labelledPicture(`🏅 ${'★'.repeat(best)}`, word('bestStars', { stars: '★'.repeat(best) })));
+  if (mode === 'daily') {
+    const fewest = number(save.dailyHops[dailyKey]), days = number(streak());
+    lines.push(labelledPicture(`🏅 ${fewest}`, word('fewestToday', { n: fewest })));
+    lines.push(labelledPicture(`🔥 ${days}`, word(streak() === 1 ? 'streakOne' : 'streak', { n: days })));
+  }
+  $('doneLine').replaceChildren(...lines);
+  const pay = $('payoff');
+  pay.hidden = !payoff;
+  if (payoff) {
+    const [a, b] = CHAPTERS[payoff - 1]; let got = 0;
+    for (let k = a; k <= b; k++) got += save.best[k] || 0;
+    const current = word(CHAPTER_NAMES[payoff - 1]), stars = score(got, 3 * (b - a + 1));
+    const nextName = last ? '🏘' : word(CHAPTER_NAMES[payoff]);
+    pay.replaceChildren(labelledPicture(`${current} · ${stars} → ${nextName}`,
+      `${word('chapterProgress', { name: current, score: stars })}. ${last ? word('wholeVillage') : word('chapterNext', { name: nextName })}`));
+  }
+  $('next').textContent = word(mode === 'daily' ? 'tomorrow' : last ? 'allDone' : payoff ? 'nextChapter' : 'next');
+  $('next').disabled = mode === 'daily' || last;
+
+  // Draw the picture before the Share tap. The plain-text copy includes the same route and result.
   const run = walk(level, sentRoute);
-  const where = mode === 'daily' ? `Daily village ${dailyKey}` : `Level ${index + 1}, ${level.name}`;
-  shareText = `Grapevine, ${where} ${'★'.repeat(lastStars)}\n${sentRoute.map((v, k) => says(k, run.msgs, run.changes)).join(' → ')}\n`
-    + `${words(run.msgs[0])[0].toUpperCase()}${words(run.msgs[0]).slice(1)} became ${words(run.msgs[run.msgs.length - 1])} in ${hops} hops.`;
+  const where = word(mode === 'daily' ? 'dailyDate' : 'level', { n: number(index + 1), date: dailyKey ? date(dailyKey) : '' });
+  const title = word('shareTitle', { title: word('title'), where, stars: '★'.repeat(lastStars) });
+  const comic = sentRoute.map((_, k) => word(receiptKey(k, run.msgs, run.changes))).join(' → ');
+  const ending = word('shareHops', { from: messageText(run.msgs[0]), to: messageText(run.msgs.at(-1)), n });
+  shareText = [title, comic, ending].join('\n');
+  strip.setAttribute('aria-label', `${word('strip')}. ${comic}. ${ending}`);
   shareBlob = null;
   cardWhere = where;
   const picture = postcard(where);
@@ -862,7 +973,7 @@ function showEnd() {
 }
 // "What they heard": each villager on the route, saying the news as they passed it on, in a speech bubble.
 function stripScene(ctx, w, shown, time, top = 0) {
-  const { msgs, changes } = walk(level, sentRoute);
+  const { msgs, changes, memos } = walk(level, sentRoute);
   const n = sentRoute.length, { cell, per } = stripCells(n, w);
   const r = Math.min(14, cell * 0.2);
   for (let k = 0; k < shown; k++) {
@@ -873,15 +984,24 @@ function stripScene(ctx, w, shown, time, top = 0) {
     const v = sentRoute[k], end = k === n - 1;
     ctx.save(); ctx.globalAlpha = age;
     ctx.beginPath(); roundRect(ctx, x - cell / 2 + 2, y0 + 2, cell - 4, ROW_H - 4, 10); ctx.fillStyle = end ? '#584023' : '#393044'; ctx.fill();
-    const vy = y0 + ROW_H - r * 2.6;
-    villager(ctx, level.nodes[v], x, vy, r, { t: time, react: age < 1 ? 1 - age : 0, happy: end ? 0.7 : 0, look: col % 2 ? -0.6 : 0.6 });
+    const vy = y0 + 58, node = level.nodes[v];
+    villager(ctx, node, x, vy, r, { t: time, react: age < 1 ? 1 - age : 0, happy: end ? 0.7 : 0, look: col % 2 ? -0.6 : 0.6 });
     // the speech bubble, tail down to the mouth
     const bw = Math.min(cell - 8, r * 3.2), bh = r * 2.3, by = y0 + 6 + bh / 2;
     bubble(ctx, x, by, bw, bh, x + (col % 2 ? -r * 0.4 : r * 0.4), vy - r * 0.9);
     token(ctx, msgs[k], x, by, r * 0.95 * pop, { sx: pop, sy: 2 - pop, plate: false });
-    ctx.font = '700 12px ui-rounded, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-    ctx.fillStyle = end ? '#ffe3a8' : CREAM;
-    ctx.fillText(says(k, msgs, changes), x, y0 + ROW_H - 5, cell - 4);
+    const markY = y0 + 86, markW = Math.min(44, cell - 9);
+    if (k === 0 || end) {
+      ctx.beginPath();
+      if (end) { ctx.moveTo(x - 6, markY); ctx.lineTo(x - 1, markY + 5); ctx.lineTo(x + 7, markY - 5); }
+      else { ctx.moveTo(x - 6, markY); ctx.lineTo(x + 6, markY); ctx.moveTo(x + 2, markY - 4); ctx.lineTo(x + 6, markY); ctx.lineTo(x + 2, markY + 4); }
+      ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = end ? '#a4ec9d' : CREAM; ctx.stroke();
+    } else if (receiptKey(k, msgs, changes) === 'noChange') {
+      ctx.beginPath(); ctx.moveTo(x - 5, markY - 3); ctx.lineTo(x + 5, markY - 3); ctx.moveTo(x - 5, markY + 3); ctx.lineTo(x + 5, markY + 3);
+      ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = CREAM; ctx.stroke();
+    } else {
+      badge(ctx, node, x, markY, markW, 17, { copy: changes[k], memo: fromKey(memos[k][keepers.indexOf(v)]) });
+    }
     ctx.restore();
     if (col > 0) { ctx.fillStyle = 'rgba(255,244,220,.5)'; ctx.beginPath(); const ax = x - cell / 2, ay = by; ctx.moveTo(ax - 3, ay - 5); ctx.lineTo(ax + 3, ay); ctx.lineTo(ax - 3, ay + 5); ctx.fill(); }
   }
@@ -895,25 +1015,32 @@ function drawStrip() {
 // The picture that Share hands over: the chapter's sky, the name, the strip with every bubble shown, the stars.
 function postcard(where) {
   // Lay out at phone reading size, then rasterize at sharing resolution.
-  const w = 312, { rows } = stripCells(sentRoute.length, w - 24), h = 150 + rows * ROW_H + 60, s = 3;
+  const w = 312, { rows } = stripCells(sentRoute.length, w - 24), h = 176 + rows * ROW_H, s = 3;
   const c = document.createElement('canvas'); c.width = w * s; c.height = h * s;
   const x = c.getContext('2d'); x.scale(s, s);
   backdrop(x, w, h, 70, chapter);
   x.fillStyle = 'rgba(20,12,36,.55)'; x.fillRect(0, 0, w, h);
-  emblem(x, chapter, 34, 38, 14);
+  emblem(x, chapter, 31, 73, 12);
   x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#ffd98a';
-  x.font = '800 34px ui-rounded, system-ui, sans-serif'; x.fillText('Grapevine', w / 2, 40);
-  x.font = '600 16px ui-rounded, system-ui, sans-serif'; x.fillStyle = CREAM; x.fillText(where, w / 2, 76, w - 30);
-  x.font = '800 26px ui-rounded, system-ui, sans-serif'; x.fillStyle = '#ffd24a'; x.fillText('★'.repeat(lastStars) + '☆'.repeat(3 - lastStars), w / 2, 110);
+  x.font = '800 31px ui-rounded, system-ui, sans-serif'; x.fillText(word('title'), w / 2, 37, w - 28);
+  x.font = '600 16px ui-rounded, system-ui, sans-serif'; x.fillStyle = CREAM; x.fillText(where, w / 2 + 11, 73, w - 82);
+  x.fillStyle = x.strokeStyle = '#ffd24a'; x.lineWidth = 1.5;
+  for (let k = 0; k < 3; k++) {
+    shape(x, 3, w / 2 + (k - 1) * 25, 109, 10);
+    if (k < lastStars) x.fill(); else x.stroke();
+  }
   x.save(); x.translate(12, 0); stripScene(x, w - 24, sentRoute.length, 9, 134); x.restore();
-  x.font = '600 14px ui-rounded, system-ui, sans-serif'; x.fillStyle = CREAM; x.textAlign = 'center';
-  x.fillText(shareText.split('\n')[2], w / 2, h - 30, w - 30);
+  x.font = '600 17px ui-rounded, system-ui, sans-serif'; x.fillStyle = CREAM;
+  x.fillText(word('number', { n: number(sentRoute.length - 1) }), w / 2 + 10, h - 21);
+  for (const [dx, dy] of [[-11, -22], [-3, -17]]) {
+    x.beginPath(); x.ellipse(w / 2 + dx, h + dy, 3, 6, 0.35, 0, Math.PI * 2); x.fill();
+  }
   return c;
 }
 $('share').addEventListener('click', () => {
   $('shareStatus').textContent = '';
   $('manualShare').hidden = true;
-  $('sendCard').textContent = navigator.share ? 'Share card' : 'Copy result';
+  $('sendCard').textContent = word(navigator.share ? 'shareCard' : 'copyResult');
   $('postcardDialog').showModal();
 });
 $('backToResult').addEventListener('click', () => $('postcardDialog').close());
@@ -925,20 +1052,20 @@ $('sendCard').addEventListener('click', async () => {
   $('manualShare').hidden = true;
   try {
     if (navigator.share) {
-      const file = shareBlob && new File([shareBlob], 'grapevine.png', { type: 'image/png' });
+      const file = shareBlob && new File([shareBlob], word('imageFilename'), { type: 'image/png' });
       const payload = file && navigator.canShare?.({ files: [file] }) ? { files: [file], text: shareText } : { text: shareText };
       try {
         await navigator.share(payload);
-        status.textContent = payload.files ? 'Card shared.' : 'Result shared.';
+        status.textContent = word(payload.files ? 'cardShared' : 'resultShared');
         return;
       } catch (error) {
-        if (error.name === 'AbortError') { status.textContent = 'Sharing cancelled.'; return; }
+        if (error.name === 'AbortError') { status.textContent = word('shareCancelled'); return; }
       }
     }
     await navigator.clipboard.writeText(shareText);
-    status.textContent = 'Result copied.';
+    status.textContent = word('resultCopied');
   } catch {
-    status.textContent = 'Select the result below to copy it.';
+    status.textContent = word('selectResult');
     const field = $('manualShare');
     field.value = shareText;
     field.hidden = false;
@@ -959,34 +1086,60 @@ function show(name) {
   else if (fails >= 3) $('hint').style.display = 'block';
   if (name === 'menu') { menu(); checkpoint(); }
 }
-let tab = 0; // the chapter (0-based) whose levels the menu shows
+let tab = 0, prerequisite = null; // the chapter (0-based) whose levels the menu shows
 function menu() {
   level = null; finger = null;
   const n = Number.isFinite(urlLevel) && urlLevel >= 1 ? Math.min(LEVELS.length, urlLevel) : next();
-  const ds = save.daily[today()] || 0, run = streak();
-  $('daily').querySelector('small').textContent = (ds ? '★'.repeat(ds) + '☆'.repeat(3 - ds) : 'new') + (run > 1 ? ` · ${run} days` : '');
   tab = chapterOf(n - 1) - 1;
+  prerequisite = null;
+  dailyLabel();
   levelGrid();
   soundLabel();
 }
+function dailyLabel() {
+  const button = $('daily'), ds = save.daily[today()] || 0, run = streak();
+  const stars = ds ? '★'.repeat(ds) + '☆'.repeat(3 - ds) : '';
+  const icon = run > 1 ? `🔥 ${number(run)}` : '';
+  button.querySelector('small').textContent = [stars, icon].filter(Boolean).join(' · ');
+  const score = ds ? word('stars', { n: number(ds), total: number(3) }) : '';
+  const days = run > 1 ? word('days', { n: number(run) }) : '';
+  button.setAttribute('aria-label', [word('daily'), score, days].filter(Boolean).join(' · '));
+}
 const openTo = i => i + 1 <= save.opened || i + 1 === urlLevel; // can the player start 0-based level i?
-const nope = (b, prerequisite) => { $('menuHelp').textContent = `Finish village ${prerequisite} to unlock this.`; tone(150, 0.1, 0.05, 'square'); b.animate?.([{ transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], 200); };
+function showPrerequisite() {
+  $('unlockCue').textContent = prerequisite === null ? '' : `${number(prerequisite)} ✓ → 🔓`;
+  $('unlockStatus').textContent = prerequisite === null ? '' : word('unlock', { n: number(prerequisite) });
+  $('grid').querySelector('.prerequisite')?.classList.remove('prerequisite');
+  $('grid').querySelector(`[data-level="${prerequisite}"]`)?.classList.add('prerequisite');
+}
+function nope(button, before) {
+  prerequisite = before; showPrerequisite();
+  tone(150, 0.1, 0.05, 'square');
+  if (!reduced) button.animate?.([{ transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], 200);
+}
+function gridLabel(button, text, mark) {
+  const sub = document.createElement('small');
+  sub.setAttribute('aria-hidden', 'true');
+  sub.textContent = mark;
+  button.append(text, sub);
+}
 function levelGrid() {
-  $('menuHelp').textContent = 'Match the listener’s news.';
   setChapter(tab + 1);
   const [a, b] = CHAPTERS[tab];
   const preferred = urlLevel > 0 ? Math.min(LEVELS.length, urlLevel) : save.opened;
   const n = preferred >= a && preferred <= b ? preferred : a;
   $('play').dataset.level = n;
-  $('play').textContent = `Play ${n}`;
+  $('play').textContent = word('play', { n: number(n) });
   const tabs = $('tabs'); tabs.textContent = '';
   CHAPTERS.forEach(([a, b], c) => {
     const btn = document.createElement('button'), open = openTo(a - 1);
     let got = 0; for (let k = a; k <= b; k++) got += save.best[k] || 0;
     btn.className = c === tab ? 'on' : open ? '' : 'locked';
-    btn.innerHTML = `${CHAPTER_NAMES[c]}<small>${open ? `${got}/${3 * (b - a + 1)} ★` : '🔒'}</small>`;
+    const name = word(CHAPTER_NAMES[c]), progress = score(got, 3 * (b - a + 1));
+    gridLabel(btn, name, open ? progress : '🔒');
+    btn.setAttribute('aria-label', word(open ? 'chapterScore' : 'chapterLocked', { name, score: progress }));
     btn.setAttribute('aria-pressed', c === tab ? 'true' : 'false');
-    btn.addEventListener('click', () => { if (!open) return nope(btn, a - 1); tab = c; levelGrid(); });
+    btn.addEventListener('click', () => { if (!open) return nope(btn, a - 1); prerequisite = null; tab = c; levelGrid(); });
     tabs.append(btn);
   });
   const grid = $('grid'); grid.textContent = '';
@@ -995,13 +1148,15 @@ function levelGrid() {
     const btn = document.createElement('button'), stars = save.best[i + 1] || 0, open = openTo(i);
     btn.dataset.level = i + 1;
     btn.className = open ? (i + 1 === n && !stars ? 'next' : '') : 'locked';
-    btn.innerHTML = open ? `${i + 1}<small>${stars ? '★'.repeat(stars) : ''}</small>` : '🔒';
-    btn.setAttribute('aria-label', open ? `Level ${i + 1}` : `Level ${i + 1}, locked`);
+    gridLabel(btn, word('number', { n: number(i + 1) }), open ? '★'.repeat(stars) : '🔒');
+    const title = word(open ? 'level' : 'levelLocked', { n: number(i + 1) });
+    btn.setAttribute('aria-label', stars ? `${title} · ${word('stars', { n: number(stars), total: number(3) })}` : title);
     btn.addEventListener('click', () => { if (!open) return nope(btn, i); begin(i); });
     grid.append(btn);
   }
+  showPrerequisite();
 }
-const soundLabel = () => { $('sound').textContent = $('sound2').textContent = `Sound: ${save.sound ? 'on' : 'off'}`; };
+const soundLabel = () => { $('sound').textContent = $('sound2').textContent = word(save.sound ? 'soundOn' : 'soundOff'); };
 const toggleSound = () => { save.sound = !save.sound; store(); soundLabel(); if (save.sound) { snd.unlock(); snd.release(); tone(660, 0.1, 0.06); } else snd.hold(); };
 $('sound').addEventListener('click', toggleSound);
 $('sound2').addEventListener('click', toggleSound);
@@ -1088,12 +1243,43 @@ let hintClear = null;
 const help = firstHint(canvas, {
   kind: 'path',
   key: 'grapevine:hint',
-  label: 'Drag up through the villagers',
+  label: word('drag'),
   reach: 40,
   bottom: hintBottom,
   when: () => screen === 'play' && !paused && !sending && result !== 'won',
   played: readJson(KEY) !== null,
 });
+const hintLabel = document.querySelector('.kit-hint .label');
+if (hintLabel) hintLabel.dataset.i18n = 'drag';
+
+function notesLabel() {
+  $('notes-button')?.setAttribute('aria-label', word('notes'));
+}
+function staticWords() {
+  applyWords();
+  noticeText.textContent = word('privacyNotice', { days: number(180) });
+  notesLabel();
+}
+function localize() {
+  staticWords();
+  soundLabel();
+  if (screen === 'menu') { dailyLabel(); levelGrid(); }
+  updateBoardCue();
+}
+function switchLanguage() {
+  setLang(lang() === 'en' ? 'tr' : 'en');
+  // Keep an explicit override in sync with the choice so a reload cannot undo it.
+  const url = new URL(location.href);
+  if (url.searchParams.has('lang')) {
+    url.searchParams.set('lang', lang());
+    history.replaceState(history.state, '', url);
+  }
+  formats();
+  localize();
+}
+$('language-menu').addEventListener('click', switchLanguage);
+$('language-pause').addEventListener('click', switchLanguage);
+$('notes-script').addEventListener('load', notesLabel);
 
 // Keep an unfinished route with this tab's history entry. A fresh visit still opens the menu.
 function checkpoint() {
@@ -1117,10 +1303,11 @@ function resumeReload() {
 }
 
 resize();
+staticWords();
 menu();
 resumeReload();
 requestAnimationFrame(frame);
 </script>
-<script src="/notes/button.js" defer></script>
+<script id="notes-script" src="/notes/button.js" defer></script>
 </body>
 </html>

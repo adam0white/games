@@ -447,3 +447,24 @@ The menu and reload checks failed before the fixes on clipped disclosure, unexpl
 | Shared `phone.mjs grapevine` | Grapevine and its shared hint passed on both WebKit and Chromium before and after the changes. |
 
 The final browser run exited successfully. Its screenshots are under `audit-grapevine/final-checks/`. One earlier concurrent WebKit run timed out clicking Play. The timeout did not recur in the final run; its cause is unresolved.
+
+## 2026-11-24 — Words and pictures
+
+| Audit copy | Picture that teaches the rule |
+| --- | --- |
+| “Match the listener’s news.” and the level 2 and 3 goal captions | The wanted token in the top bar and the listener’s matching thought bubble are both outlined while the route is empty. The two branches stay available for the player to figure out. |
+| “Tap the villager in the red hat.” | A finger taps the ringed painter on the actual board. The ring stays after an empty tap or a tap on the teller. It also stays when the shared idle hint appears. |
+| “It turned red! Tap the listener at the top.” | The blue and red tokens show the change side by side. The red token appears beside the painter and matches the listener’s bubble. The next tap is marked beside the listener. |
+| “Tap the orange teller to try again.” | The rejected token keeps its red cross. The teller gains a tap ring and a reset arrow. Editing the route clears the rejection and the retry cue together. |
+| “Swaps …” and “Only … swap here.” | An enlarged two-way arrow between the eligible shapes sits beside the actual input and output. The actual tokens have an arrow if the shape changed and an equals sign if it stayed the same. |
+| Comic and postcard captions | Each speech bubble retains its actual token. The portraits carry operation badges, an equals sign for an unchanged token, a start arrow and a delivery check. The exported picture uses the same cells as the result screen. |
+| Result praise, route length, best, daily streak and chapter wrap-up | A check and stars mark the win. Footprints, a medal and a flame pair with counts. Chapter totals use a star fraction, and the next chapter is named beside an arrow. The daily and chapter have different icons. |
+| Locked chapter and village instructions | The prerequisite number appears before a check and an arrow to an open lock. The matching tile is outlined when it is in the current chapter. |
+
+The buttons and headings keep short labels for navigation, sound, language, dates, daily availability and sharing. The recording notice and privacy link retain the retention period, the device link and the pause-menu control. Share cancellation, clipboard failure and copying have short statuses so the player can tell what happened. The board descriptions and receipt remain available as screen-reader labels and as a plain-text share alternative. The shared hint uses a localized instruction when reduced motion is requested.
+
+Both menus use the kit language preference. The game formats dates and displayed numbers in that language. Turkish calls the game “Kulaktan Kulağa.” Numbered villages identify campaign postcards, and the daily postcard names the date. The language choice preserves the paused route. Game saves, levels, shared kit code and lab outcome identifiers keep their existing formats.
+
+The browser checks compare both tables and their placeholders, inspect visible and accessible text and canvas text, and exercise switching, reload, the short and long share cards, and the viewport. English and Turkish passed on WebKit at the iPhone 13 size and on Chromium at 360×640. The real notes button script is served locally with a test key to check its label. The bot solver earned three stars on all 60 villages. The shared phone check passed on WebKit and Chromium.
+
+No Turkish speaker has reviewed this copy, and a new player has yet to try these picture-only cues. The screenshots and local browser checks do not establish physical-phone layout, screen-reader output, native sharing or production lab receipt.
