@@ -143,7 +143,7 @@ What is stored: only the current round (seed, start), connected peers (slot id a
 participant/done flags and each socket's last-second message timestamps. This state lives in memory
 and socket attachments, never in SQLite. Attachments preserve it through hibernation, then disappear
 with the sockets. Names are not saved beyond the connection. There is no address in an attachment,
-no history, no account and no logging. An empty room loses its round. A restart can disconnect clients;
+no history and no account, and the code logs nothing from a room. An empty room loses its round. A restart can disconnect clients;
 the page must reconnect and accept the current round or ask for a new one.
 
 | Client text frame | Server action |
@@ -191,7 +191,7 @@ are not subject to the model daily cap.
   and before every model call; cache hits are not counted. Over `DAILY_CAP` (a var, default 2000) the
   answer is 503 and no model call is made. If the counter cannot be reached, the answer is also 503.
   A call that reaches the model counts even if the model then fails.
-- No logging of requests or addresses. `observability` is off. No D1, R2, KV or secrets.
+- Cloudflare logs, traces and Issues are on (owner decision, 2026-11-24; `workers/OBSERVABILITY.md`). A request log holds the address, user agent, location and URL path for seven days. The code logs no names or prompt text. No D1, R2, KV or secrets.
 - The page calls at most once per rival event that needs text (the rise, and each repeat kill),
   never in the first 8 seconds of a run, with a 4 second timeout, and never waits for the answer.
 
