@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-  # Every game, every night, as a backstop for the after-merge runs on main.
+  # Every game and every phone check, every night. The run on main after a merge checks neither (scripts/affected.mjs).
   schedule:
     - cron: '17 9 * * *'
   workflow_dispatch:
@@ -18,42 +18,26 @@ concurrency:
 permissions:
   contents: read
 jobs:
-  tools:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .node-version
-      - run: npm test
-  workers:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
-        with:
-          run_install: false
-          cache: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .node-version
-      - run: pnpm install --frozen-lockfile --filter games-wai-daily
-      - run: pnpm --filter games-wai-daily run check
-      - run: node --test workers/crumbwar/test/
+  # One job for everything quick: which games changed, the root tests, the standalone Workers and the whole build.
+  # These were four jobs. Each job waits for its own runner, and on a busy night that wait was most of a run:
+  # 2 minutes of work took 20 minutes or more. Together they take about a minute and a half on one runner.
   changes:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       games: ${{ steps.affected.outputs.games }}
       count: ${{ steps.affected.outputs.count }}
       total: ${{ steps.affected.outputs.total }}
       phone: ${{ steps.affected.outputs.phone }}
+      phoneOnly: ${{ steps.affected.outputs.phoneOnly }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+        with:
+          run_install: false
+          cache: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .node-version
@@ -64,8 +48,20 @@ jobs:
         run: |
           if [ -z "$BASE" ] || [ "$BASE" = 0000000000000000000000000000000000000000 ]; then BASE=$(git hash-object -t tree /dev/null); fi
           node scripts/affected.mjs "$BASE"
+      - name: Root tests
+        run: npm test
+      - run: pnpm install --frozen-lockfile
+      - name: Standalone Workers
+        run: |
+          pnpm --filter games-wai-daily run check
+          node --test workers/crumbwar/test/
+      - run: node scripts/build.mjs
+      - name: Bundle the Worker and validate the exact upload without credentials
+        env:
+          CF_SEND_TELEMETRY: 'false'
+        run: pnpm run deploy:check
   games:
-    timeout-minutes: ${{ matrix.game == 'neighbours' && 45 || 360 }}
+    timeout-minutes: 45
     needs: changes
     if: needs.changes.outputs.count != '0'
     strategy:
@@ -140,27 +136,6 @@ jobs:
             games/neighbours/neighbours/playwright-report/
             games/neighbours/neighbours/test-results/
           retention-days: 7
-  build:
-    needs: changes
-    if: needs.changes.outputs.total != '0'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
-        with:
-          run_install: false
-          cache: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .node-version
-      - run: pnpm install --frozen-lockfile
-      - run: node scripts/build.mjs
-      - name: Bundle the Worker and validate the exact upload without credentials
-        env:
-          CF_SEND_TELEMETRY: 'false'
-        run: pnpm run deploy:check
   lefthand-browser:
     needs: changes
     if: contains(needs.changes.outputs.games, '"lefthand"')
@@ -225,18 +200,19 @@ jobs:
         env:
           PLAYWRIGHT: ${{ runner.temp }}/playwright
       # Both browsers gate: WebKit passed on Linux on 2026-11-23 (13 of 13).
-      - run: node experiments/kit/check/phone.mjs all "$BROWSER"
+      # Only the experiments the change touched; all of them when shared code changed, nightly and by hand.
+      - run: node experiments/kit/check/phone.mjs "$ONLY" "$BROWSER"
         env:
+          ONLY: ${{ needs.changes.outputs.phoneOnly }}
           PLAYWRIGHT: ${{ runner.temp }}/playwright
           BROWSER: ${{ matrix.browser }}
   ci:
     if: always()
-    needs: [tools, changes, workers, games, build, neighbours-browser, lefthand-browser, phone]
+    needs: [changes, games, neighbours-browser, lefthand-browser, phone]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: .node-version
@@ -244,11 +220,12 @@ jobs:
           node scripts/aggregate.mjs
           node -e "if (process.env.NEIGHBOURS_BROWSER !== (process.env.NEIGHBOURS_AFFECTED === 'true' ? 'success' : 'skipped')) throw Error('Neighbours browser gate did not pass')"
         env:
-          TOOLS: ${{ needs.tools.result }}
+          # The root tests, the Workers and the build are steps of the changes job.
+          TOOLS: ${{ needs.changes.result }}
           CHANGES: ${{ needs.changes.result }}
-          WORKERS: ${{ needs.workers.result }}
+          WORKERS: ${{ needs.changes.result }}
           GAMES: ${{ needs.games.result }}
-          BUILD: ${{ needs.build.result }}
+          BUILD: ${{ needs.changes.result }}
           COUNT: ${{ needs.changes.outputs.count }}
           TOTAL: ${{ needs.changes.outputs.total }}
           NEIGHBOURS_AFFECTED: ${{ contains(fromJSON(needs.changes.outputs.games), 'neighbours') }}

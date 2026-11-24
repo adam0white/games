@@ -4,7 +4,8 @@ version: 2
 # Mirrors human-framework's policy so both repos move together.
 # Note: pnpm-workspace.yaml pins vite and other packages in `overrides`, and `allowBuilds` pins esbuild and workerd
 # by exact version. A bump of any of those needs its entry updated after review, or the install fails.
-# pip has no entry here: Dependabot security updates for games/neighbours keep arriving without one.
+# pip: no version updates (limit 0). Security updates for games/neighbours still arrive, as one grouped pull
+# request instead of one per package: each pull request runs the Neighbours suite, five jobs of up to ten minutes.
 updates:
   - package-ecosystem: npm
     directory: /
@@ -31,4 +32,15 @@ updates:
       default-days: 7
     groups:
       actions:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /games/neighbours
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 0
+    groups:
+      pip-security:
+        applies-to: security-updates
         patterns: ["*"]
