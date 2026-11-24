@@ -7,11 +7,12 @@ import { hint } from '../kit/hint.js';
 import { noZoom } from '../kit/zoom.js';
 import { t, lang, setLang, apply } from './words.js';
 import {
-  CASES, CHAPTER_TWO_END, CLOCK_START, CLOCK_STEP, createCase, dailyCase, dailyWin, dayKey, offsetDay, dossiers, freshRun, accuse, observe,
+  CASES, CHAPTER_TWO_END, CLOCK_START, CLOCK_STEP, aids, claims, createCase, dailyCase, dailyWin, dayKey, offsetDay, dossiers,
+  floorOf, freshRun, accuse, observe,
 } from './sim.js';
 import {
   W, H, INK, CREAM, GOLD, rect, text, star, clock, place, animal, costume, signature,
-  sky, roomLayout, roomPoint, house, trace, eventIcon, heldItem, stamp, hand,
+  sky, roomLayout, roomPoint, house, trace, eventIcon, heldItem, stamp, hand, SIGN,
 } from './art.js';
 
 const $ = id => document.getElementById(id);
@@ -107,6 +108,8 @@ let notes = [];
 let notebook = false;
 let noteFlash = null;
 let stampArmed = false;
+let loupe = null;
+let trailBack = false;
 let wrongNotice = false;
 let activeSince = 0;
 let playedMs = 0;
@@ -128,15 +131,45 @@ const formatTime = beat => clockLabel(minute(beat));
 const dailyProfile = () => hard ? profile.hardDaily : profile.daily;
 const hardUnlocked = () => profile.level > CHAPTER_TWO_END;
 const activeStreak = (summary, today) => summary.last >= offsetDay(today, -1) ? summary.streak : 0;
-// Training aids retire once their rule is taught. The scene circle on the
-// chosen suspect stays through the first chapter and for a new player's Daily.
-// The sound bracket stays for the blackout lesson only.
-const sceneGuide = () => daily ? !hard && profile.level <= 7 : c.spec.chapter === 1;
-// The mask lesson shows who is under each mask when masks go on and when two
-// are exchanged. Later cases leave that tracking to the player.
-const maskGuide = () => daily ? !hard && profile.level < 15 : c.spec.tutorial === 'masks';
-const soundGuide = () => !daily && c.spec.tutorial === 'blackout';
+// Training aids retire once their rule is taught (sim.js `aids`, which the
+// bots read too). The scene circle and the claimed-room outline stay through
+// chapter I and for a new player's Daily; case 7 shrinks the outline onto the
+// room sign once and then leaves the comparison to the player. The mask tags
+// stay for the mask lesson, the sound bracket for the two blackout lessons and
+// the carrier trail for its lesson and a Hard Daily before it.
+const guide = () => aids(c, { daily, hard, progress: profile.level });
+const sceneGuide = () => guide().circle;
+const maskGuide = () => guide().maskTags;
+const soundGuide = () => guide().soundBracket;
+// The outline lesson: the first comparison shows the outline, which shrinks
+// onto the room sign. Later comparisons in that case show neither.
+const OUTLINE_SHRINK = 1.3;
+let outlineLesson = null;
+function outlineState(frame) {
+  const mode = guide().outline;
+  const person = cast[selected];
+  if (!mode || !person || notebook || !claims(person).some(claim => claim.beat === frame.beat)) return null;
+  if (mode === 'full') return { shrink: 0 };
+  outlineLesson ??= { id: selected, at: phase };
+  if (outlineLesson.id !== selected) return null;
+  return { shrink: calm.matches ? 1 : Math.min(1, (phase - outlineLesson.at) / OUTLINE_SHRINK) };
+}
+// The mark of the selected alibi that the replay shows now, if any.
+const claimHere = (person, beat) => claims(person).find(claim => claim.beat === beat) ?? null;
 const tickX = beat => replay.x + (replay.endX - replay.x) * beat / (c.beatCount - 1);
+// Long timelines put marks closer than a thumb. A tap there opens a strip of
+// five large marks around the tapped one, so a near miss is fixed with one tap.
+const LOUPE = { y: 491, w: 58, h: 46, gap: 4, idle: 8 };
+const needsLoupe = () => tickX(1) - tickX(0) < 32;
+function loupeMarks() {
+  if (!loupe) return [];
+  const first = Math.max(0, Math.min(c.beatCount - 5, loupe.center - 2));
+  return Array.from({ length: Math.min(5, c.beatCount) }, (_, k) => ({
+    beat: first + k, x: 180 + (k - 2) * (LOUPE.w + LOUPE.gap), y: LOUPE.y,
+  }));
+}
+const loupeHit = p => loupeMarks().find(mark => Math.abs(p.x - mark.x) <= (LOUPE.w + LOUPE.gap) / 2
+  && Math.abs(p.y - mark.y) <= LOUPE.h / 2 + 2) ?? null;
 function syncProfile() {
   const latest = readProfile(save.readJson(KEY));
   profile.level = Math.max(profile.level, latest.level);
@@ -304,6 +337,9 @@ function start(isDaily, level = profile.level, isHard = false, dailyDate = dayKe
   notebook = false;
   noteFlash = null;
   wrongNotice = false;
+  outlineLesson = null;
+  loupe = null;
+  trailBack = false;
   activeSince = performance.now();
   playedMs = 0;
   solvedSeconds = 0;
@@ -496,6 +532,7 @@ function scrub(value, snap = false) {
   const old = beatNow();
   time = Math.max(0, Math.min(c.beatCount - 1, snap ? Math.round(value) : value));
   const beat = beatNow();
+  if (c.trail && beat === c.trail.beat && scrolled.has(c.carryBeat)) trailBack = true;
   scrolled.add(beat);
   if (old === beat) return;
   hintReady = phase;
@@ -602,7 +639,7 @@ function markNote(id, actorRoom = null) {
     ?? frame.sounds.find(item => item.sound === person.sound);
   const room = actorRoom ?? visible?.room;
   const note = room === undefined || room === null
-    ? { id, ...person.claim, claim: true }
+    ? { id, ...(claimHere(person, frame.beat) ?? person.claim), claim: true }
     : { id, room, beat: frame.beat, claim: false };
   const same = entry => entry.id === note.id && entry.beat === note.beat
     && entry.room === note.room && entry.claim === note.claim;
@@ -642,13 +679,24 @@ function notebookInput(p) {
 function begin(e) {
   if (!playing() || pointer || e.button > 0) return;
   const p = point(e);
+  if (loupe) {
+    const mark = loupeHit(p);
+    if (mark) {
+      stampArmed = false;
+      scrub(mark.beat, true);
+      loupe.at = phase;
+      e.preventDefault();
+      return;
+    }
+    loupe = null;
+  }
   if (notebookInput(p)) { e.preventDefault(); return; }
   if (Math.abs(p.y - homeStamp.y) <= 25 && Math.abs(p.x - homeStamp.x) < 61) {
     pointer = { ...p, id: e.pointerId, type: 'stamp', start: p, moved: false };
     snd.tone(375, .06, .065, 'triangle', 60);
   } else if (Math.abs(p.y - replay.y) <= 24 && p.x > 13 && p.x < 347) {
     stampArmed = false;
-    pointer = { ...p, id: e.pointerId, type: 'clock' };
+    pointer = { ...p, id: e.pointerId, type: 'clock', start: p, moved: false };
     scrubAt(p.x);
   } else {
     const id = nearestId(p);
@@ -657,7 +705,8 @@ function begin(e) {
       snd.tone(442 + id * 15, .045, .04, 'triangle');
     } else if (!notebook && selected !== null && p.x >= 80 && p.x <= 280 && p.y >= 62 && p.y <= 115) {
       stampArmed = false;
-      scrub(cast[selected].claim.beat, true);
+      const person = cast[selected];
+      scrub((person.claim2 && p.x >= 196 ? person.claim2 : person.claim).beat, true);
       pointer = { ...p, id: e.pointerId, type: 'tap' };
     } else return;
   }
@@ -668,7 +717,10 @@ function begin(e) {
 function move(e) {
   if (pointer?.id !== e.pointerId) return;
   const p = point(e);
-  if (pointer.type === 'clock') scrubAt(p.x);
+  if (pointer.type === 'clock') {
+    if (Math.abs(p.x - pointer.start.x) > 8) pointer.moved = true;
+    scrubAt(p.x);
+  }
   if ((pointer.type === 'suspect' || pointer.type === 'accusation') && Math.hypot(p.x - pointer.x, p.y - pointer.y) > 13) pointer.type = 'tap';
   if (pointer.type === 'stamp') {
     const id = nearestId(p, true);
@@ -683,7 +735,10 @@ function release(e) {
   pointer = null;
   if (e.type !== 'pointerup') return;
   const p = point(e);
-  if (type === 'clock') scrubAt(p.x, true);
+  if (type === 'clock') {
+    scrubAt(p.x, true);
+    if (!moved && needsLoupe()) loupe = { center: beatNow(), at: phase };
+  }
   if (type === 'suspect') { notebook = false; inspect(suspect); }
   if (type === 'accusation' && nearestId(p) === suspect) {
     stampArmed = false;
@@ -783,12 +838,32 @@ function drawClaim(frame) {
     rect(g, 99, 97, 22, 9, 4, '#5a4256');
     signature(g, 110, 101.5, 18, sign);
   }
-  place(g, 150, 85, 30, claim.room, c.spec.site);
-  clock(g, 190, 85, 14, minute(claim.beat));
-  text(g, formatTime(claim.beat), 224, 85, 18, INK, 'Georgia');
-  if (frame.beat !== claim.beat) {
-    line([[262, 81], [266, 85], [262, 89]], '#a67469', 1.7);
+  const person = cast[selected];
+  if (!person.claim2) {
+    place(g, 150, 85, 34, claim.room, c.spec.site);
+    clock(g, 190, 85, 14, minute(claim.beat));
+    text(g, formatTime(claim.beat), 224, 85, 18, INK, 'Georgia');
+    if (frame.beat !== claim.beat) line([[262, 81], [266, 85], [262, 89]], '#a67469', 1.7);
+    return;
   }
+  // Two marks: a room and a time for each, side by side.
+  line([[196, 68], [196, 104]], '#c9a08c', 1);
+  for (const [index, mark] of claims(person).entries()) {
+    const { icon, clockX, chevron } = claimSlots[index];
+    place(g, icon, 80, 28, mark.room, c.spec.site);
+    clock(g, clockX, 80, 10, minute(mark.beat));
+    text(g, formatTime(mark.beat), (icon + clockX) / 2, 100, 12, INK, 'Georgia');
+    if (frame.beat !== mark.beat) line([[chevron - 2, 76], [chevron + 2, 80], [chevron - 2, 84]], '#a67469', 1.7);
+  }
+}
+// Where each mark of a two-mark alibi sits on the claim card.
+const claimSlots = [{ icon: 141, clockX: 170, chevron: 188 }, { icon: 216, clockX: 245, chevron: 263 }];
+const claimPoint = (person, mark) => person.claim2
+  ? { x: claimSlots[claims(person).indexOf(mark)].chevron + 3, y: 87 } : { x: 266, y: 87 };
+// The mark an alibi tap or the jump hint goes to: an unvisited one first.
+function jumpMark(person, beat) {
+  const away = claims(person).filter(mark => mark.beat !== beat);
+  return away.find(mark => !scrolled.has(mark.beat)) ?? away[0] ?? person.claim;
 }
 
 function drawReplay(frame) {
@@ -796,7 +871,7 @@ function drawReplay(frame) {
   rect(g, 22, 535, 316, 48, 10, '#34283e');
   line([[replay.x, replay.y], [replay.endX, replay.y]], '#95687b', 3);
   line([[replay.x, replay.y], [tickX(time), replay.y]], '#edbd80', 3);
-  const claim = cast[selected]?.claim;
+  const claimBeats = selected === null ? [] : claims(cast[selected]).map(mark => mark.beat);
   for (let i = 0; i < c.beatCount; i++) {
     const x = tickX(i);
     line([[x, replay.y - 11], [x, replay.y + 11]], '#896678', 1);
@@ -805,7 +880,7 @@ function drawReplay(frame) {
       rect(g, x - 3.8, replay.y + 10, 7.6, 5.6, 1.2, null, '#dcb58d', 1.1);
       dot(x, replay.y + 12.8, 1.2, '#dcb58d');
     }
-    if (claim?.beat === i) {
+    if (claimBeats.includes(i)) {
       g.beginPath();
       g.moveTo(x - 5, replay.y - 17);
       g.lineTo(x + 5, replay.y - 17);
@@ -926,8 +1001,10 @@ function drawExchange(frame, actors) {
 }
 
 function drawScene(frame, staticScene = false) {
-  const claim = cast[selected]?.claim;
-  house(g, rooms, frame, c.crime, !staticScene && claim?.beat === frame.beat ? claim.room : null, c.spec.site);
+  const outline = staticScene ? null : outlineState(frame);
+  const claim = outline && claimHere(cast[selected], frame.beat);
+  house(g, rooms, frame, c.crime, outline?.shrink === 0 ? claim.room : null, c.spec.site);
+  if (outline?.shrink > 0) drawShrinkingOutline(rooms[claim.room], outline.shrink);
   if (frame.shutter) {
     drawShutter();
     return;
@@ -938,6 +1015,7 @@ function drawScene(frame, staticScene = false) {
       rect(g, x - 13, y - 11, 26, 22, 7, '#4f3c58', '#b193a5');
       signature(g, x, y, 24, item.sound);
     }
+    drawFloorSounds(frame);
     return;
   }
   for (const item of frame.evidence) trace(g, rooms[item.room], item.kind);
@@ -966,7 +1044,50 @@ function drawScene(frame, staticScene = false) {
     // Tags go on top: on the exchange mark they matter more than the bubble.
     drawExchange(frame, actors);
     drawMaskTags(frame, actors);
+    drawTrail(frame, actors);
   }
+}
+
+// The outline lesson: the claimed-room outline closes onto the room sign,
+// then the sign alone stays marked for this first comparison.
+function drawShrinkingOutline(room, shrink) {
+  const ease = shrink * shrink * (3 - 2 * shrink);
+  const sign = { x: room.x + SIGN.x - SIGN.size / 2 - 3, y: room.y + SIGN.y - SIGN.size / 2 - 3, w: SIGN.size + 6, h: SIGN.size + 6 };
+  const from = { x: room.x + 3.5, y: room.y + 4, w: room.w - 7, h: room.h - 8 };
+  const mix = key => from[key] + (sign[key] - from[key]) * ease;
+  rect(g, mix('x'), mix('y'), mix('w'), mix('h'), 4 + 6 * ease, null, '#fff5cb', 3.1);
+}
+
+// A floor case hears each suspect only on a floor. The symbols sit on a band
+// across the whole floor, ordered by symbol, so their place names no room.
+function floorBands() {
+  const rows = [...new Set(rooms.map(room => room.y))];
+  return rows.map(y => ({ x: 26, y: y + 64, w: 308, h: 34 }));
+}
+function drawFloorSounds(frame) {
+  if (!frame.heard.length) return;
+  for (const [floor, band] of floorBands().entries()) {
+    const heard = frame.heard.filter(item => item.floor === floor);
+    rect(g, band.x, band.y, band.w, band.h, 12, '#3d2f4dd8', '#c39fb0', 1.6);
+    line([[band.x + 10, band.y - 6], [band.x + 2, band.y + band.h / 2], [band.x + 10, band.y + band.h + 6]], '#c39fb0', 1.6);
+    line([[band.x + band.w - 10, band.y - 6], [band.x + band.w - 2, band.y + band.h / 2], [band.x + band.w - 10, band.y + band.h + 6]], '#c39fb0', 1.6);
+    const step = Math.min(34, (band.w - 30) / Math.max(1, heard.length));
+    heard.forEach((item, i) => {
+      const x = band.x + band.w / 2 + (i - (heard.length - 1) / 2) * step;
+      rect(g, x - 13, band.y + 6, 26, 22, 7, '#4f3c58', '#b193a5');
+      signature(g, x, band.y + 17, 24, item.sound);
+    });
+  }
+}
+// Where a floor sound symbol is drawn, for the lesson bracket.
+function floorSoundPoint(frame, sound) {
+  const band = floorBands();
+  const item = frame.heard.find(entry => entry.sound === sound);
+  if (!item) return null;
+  const heard = frame.heard.filter(entry => entry.floor === item.floor);
+  const b = band[item.floor];
+  const step = Math.min(34, (b.w - 30) / Math.max(1, heard.length));
+  return { x: b.x + b.w / 2 + (heard.indexOf(item) - (heard.length - 1) / 2) * step, y: b.y + 17 };
 }
 
 const TAG = '#fff4e0';
@@ -1003,14 +1124,20 @@ function teachingCue(frame) {
   }
   if (wrongNotice) return 'wrong';
   if (frame.shutter) return 'shutter';
-  if (frame.blackout) return selected !== null && frame.beat !== cast[selected].claim.beat ? 'blackoutJump' : 'blackout';
-  if (selected === null) return 'inspect';
-  return frame.beat === cast[selected].claim.beat ? 'compare' : 'jump';
+  if (frame.blackout) {
+    if (selected !== null && !claimHere(cast[selected], frame.beat)) return 'blackoutJump';
+    return c.spec.floors ? 'floors' : 'blackout';
+  }
+  if (selected === null) return guide().trail && c.trail && !trailBack && scrolled.has(c.carryBeat) ? 'trail' : 'inspect';
+  const person = cast[selected];
+  if (!claimHere(person, frame.beat)) return 'jump';
+  if (person.claim2 && claims(person).some(mark => !scrolled.has(mark.beat))) return 'secondMark';
+  return outlineState(frame) ? 'compare' : 'compareSign';
 }
 
 function updateGuide(cue) {
   const key = cue === 'wrong' ? (run.stars === 1 ? 'wrongOneCue' : 'wrongManyCue') : `${cue}Cue`;
-  const vars = cue === 'jump' ? { time: formatTime(cast[selected].claim.beat) } : { n: number(run.stars) };
+  const vars = cue === 'jump' ? { time: formatTime(jumpMark(cast[selected], beatNow()).beat) } : { n: number(run.stars) };
   const message = t(key, vars);
   const guide = $('playGuide');
   if (guide.textContent !== message) guide.textContent = message;
@@ -1064,8 +1191,11 @@ function drawNotebookHint(cue, pulse) {
   if (cue === 'full' || pulse > .6 || calm.matches) corners(254, noteRowY(0), 15, 15, '#7b4d56');
 }
 
+// The mark that decides an alibi: the false one for the liar, else the first.
+const decidingMark = id => claims(cast[id]).find(mark => c.frames[mark.beat][id].room !== mark.room) ?? cast[id].claim;
+
 function drawEvidencePair(context, x, y, id) {
-  const { claim } = cast[id];
+  const claim = decidingMark(id);
   animal(context, x - 63, y, 23, cast[id].species, { head: true });
   rect(context, x - 47, y - 13, 25, 26, 5, '#fff0d2', '#ac7680');
   place(context, x - 34, y, 22, claim.room, c.spec.site);
@@ -1123,9 +1253,11 @@ function drawTeaching(frame, cue) {
     return;
   }
   const person = cast[selected];
+  const target = jumpMark(person, frame.beat);
   if (cue === 'jump' || cue === 'shutter') {
-    ghostTap(266, 87, pulse);
-    markTick(person.claim.beat);
+    const point = claimPoint(person, target);
+    ghostTap(point.x, point.y, pulse);
+    markTick(target.beat);
     if (cue === 'jump' && !help.shown) drawTimelineLesson();
     return;
   }
@@ -1134,19 +1266,34 @@ function drawTeaching(frame, cue) {
     corners(p.x, p.y + 14, 15, 8);
     corners(110, 102, 14, 7, '#8e5562');
     const match = soundGuide() && frame.sounds.find(item => item.sound === person.sound);
+    const heard = soundGuide() && floorSoundPoint(frame, person.sound);
     if (match) {
       const { x, y } = roomPoint(rooms[match.room], match.slot);
       corners(x, y, 16 + pulse * 2, 13 + pulse * 2);
-    }
+    } else if (heard) corners(heard.x, heard.y, 16 + pulse * 2, 13 + pulse * 2);
     if (cue === 'blackoutJump') {
-      ghostTap(266, 87, pulse);
-      markTick(person.claim.beat);
+      const point = claimPoint(person, target);
+      ghostTap(point.x, point.y, pulse);
+      markTick(target.beat);
       return;
     }
   } else {
-    corners(150, 85, 18, 18, '#8e5562');
-    const room = rooms[person.claim.room];
-    corners(room.x + 17, room.y + 17, 13 + pulse * 2, 13 + pulse * 2);
+    const here = claimHere(person, frame.beat);
+    const slot = person.claim2 ? claimSlots[claims(person).indexOf(here)] : null;
+    if (slot) corners(slot.icon, 80, 16, 16, '#8e5562');
+    else corners(150, 85, 20, 20, '#8e5562');
+    // The room sign is marked only while the outline is taught.
+    const outline = outlineState(frame);
+    if (outline && (outline.shrink === 0 || outline.shrink >= 1)) {
+      const room = rooms[here.room];
+      corners(room.x + SIGN.x, room.y + SIGN.y, SIGN.size / 2 + 1 + pulse * 2, SIGN.size / 2 + 1 + pulse * 2);
+    }
+    if (cue === 'secondMark') {
+      const other = claims(person).find(mark => mark !== here);
+      const point = claimPoint(person, other);
+      ghostTap(point.x, point.y, pulse);
+      markTick(other.beat);
+    }
     if (!help.shown) drawTimelineLesson();
   }
   // A general rule beside the comparison. It does not mark any suspect as guilty.
@@ -1158,20 +1305,65 @@ function drawTeaching(frame, cue) {
   stamp(g, 219, 132, .54);
 }
 
+function drawLoupe() {
+  if (!loupe) return;
+  if (!playing() || notebook || phase - loupe.at > LOUPE.idle) { loupe = null; return; }
+  const marks = loupeMarks();
+  const left = marks[0].x - LOUPE.w / 2 - 6;
+  const right = marks.at(-1).x + LOUPE.w / 2 + 6;
+  rect(g, left, LOUPE.y - LOUPE.h / 2 - 6, right - left, LOUPE.h + 12, 12, '#2c2337', '#c69496', 1.5);
+  for (const mark of marks) {
+    const now = mark.beat === beatNow();
+    rect(g, mark.x - LOUPE.w / 2, mark.y - LOUPE.h / 2, LOUPE.w, LOUPE.h, 9, now ? '#6d4a58' : '#403047', now ? GOLD : '#987184', now ? 2 : 1.2);
+    clock(g, mark.x, mark.y - 7, 11, minute(mark.beat));
+    text(g, formatTime(mark.beat), mark.x, mark.y + 14, 11, CREAM, 'Georgia');
+    if (mark.beat === c.shutterBeat || board[mark.beat].blackout) dot(mark.x + 20, mark.y - 15, 3, '#dcb58d');
+  }
+  // A thin line ties the strip to the tapped mark on the timeline.
+  const at = marks.find(mark => mark.beat === beatNow()) ?? marks[2];
+  line([[at.x, LOUPE.y + LOUPE.h / 2 + 6], [tickX(beatNow()), replay.y - 18]], '#c69496', 1.2);
+}
+
+// The carrier lesson: ring the carrier on the hand-off mark, then point one
+// mark back, where the item's last room is framed and everyone who stood with
+// the carrier gets an item badge. The badge marks who could have handed it.
+function drawTrail(frame, actors) {
+  if (!guide().trail || !c.trail || run.rejected.length) return;
+  const pulse = calm.matches ? .55 : .5 - .5 * Math.cos(phase * 5);
+  if (frame.beat === c.carryBeat) {
+    const carrier = actors.find(actor => actor.carry);
+    if (carrier) corners(carrier.x, carrier.y - 4, 21 + pulse * 2, 23 + pulse * 2, GOLD);
+  } else if (frame.beat === c.trail.beat && scrolled.has(c.carryBeat)) {
+    const room = rooms[c.trail.room];
+    corners(room.x + room.w / 2, room.y + room.h / 2 + 2, room.w / 2 - 3, room.h / 2 - 4, GOLD);
+    const seat = c.frames[c.trail.beat][c.carrier];
+    for (const actor of actors) {
+      if (actor.room !== c.trail.room || actor.slot === seat.slot) continue;
+      dot(actor.x + 13, actor.y - 27, 9, '#fff1d3', '#90586c');
+      heldItem(g, actor.x + 13, actor.y - 27, 14, c.crime);
+    }
+  }
+}
+
 function drawTimelineLesson() {
   const lesson = c.spec.tutorial;
-  if (daily || run.rejected.length) return false;
+  if (run.rejected.length) return false;
   const age = Math.max(0, phase - hintReady);
   if (age < .45) return false;
   const wave = calm.matches ? .62 : .5 - .5 * Math.cos(age * 3.6);
   const tickHand = (from, to) => hand(g, tickX(from + (to - from) * wave), replay.y + 4, -.19);
+  if (guide().trail && c.trail && !trailBack) {
+    if (scrolled.has(c.carryBeat)) tickHand(c.carryBeat, c.trail.beat);
+    else tickHand(c.carryBeat, c.carryBeat);
+    return true;
+  }
+  if (daily) return false;
   if (lesson === 'masks' && !scrolled.has(c.exchangeBeat)) {
     if (scrolled.has(2) && scrolled.has(3)) tickHand(c.exchangeBeat - 1, c.exchangeBeat);
     else tickHand(2, 3);
   } else if (lesson === 'blackout' && !scrolled.has(c.blackoutBeat)) {
     tickHand(c.blackoutBeat, c.blackoutBeat);
-  } else if (lesson === 'carrier' && !scrolled.has(c.carryBeat)) tickHand(c.carryBeat, c.carryBeat);
-  else return false;
+  } else return false;
   return true;
 }
 
@@ -1303,6 +1495,7 @@ function draw() {
   drawReplay(frame);
   drawNotebook(cue);
   drawTeaching(frame, cue);
+  drawLoupe();
   drawShot();
   if (pointer?.type === 'stamp') {
     g.save();
@@ -1323,10 +1516,11 @@ function drawResult() {
     rect(context, 17, 22, 62, 65, 12, '#e6b59f', '#aa7181', 2);
     animal(context, 48, 54, 56, person.species, { head: true });
     star(context, 74, 24, 8, GOLD, '#aa7181');
-    place(context, 107, 47, 27, person.claim.room, c.spec.site);
+    const lie = decidingMark(person.id);
+    place(context, 107, 47, 27, lie.room, c.spec.site);
     text(context, '≠', 132, 47, 19, CREAM);
-    place(context, 157, 47, 27, c.frames[person.claim.beat][person.id].room, c.spec.site);
-    clock(context, 201, 47, 13, minute(person.claim.beat));
+    place(context, 157, 47, 27, c.frames[lie.beat][person.id].room, c.spec.site);
+    clock(context, 201, 47, 13, minute(lie.beat));
   } else {
     for (const [i, id] of run.rejected.entries()) {
       const x = 82 + i * 38;
@@ -1426,7 +1620,11 @@ window.alibiState = () => ({
       remove: cssPoint({ x: 256, y: noteRowY(index) }) })),
     suspects: portraitPoints().map(cssPoint),
     actors: actorPositions().filter(a => a.portrait !== null).map(a => ({ id: a.portrait, ...cssPoint(a) })),
+    loupe: loupe ? loupeMarks().map(mark => ({ beat: mark.beat, ...cssPoint(mark), w: LOUPE.w * scale, h: LOUPE.h * scale })) : null,
+    claim: selected === null ? [] : claims(cast[selected]).map(mark => ({ beat: mark.beat, room: mark.room, ...cssPoint(claimPoint(cast[selected], mark)) })),
+    signs: rooms.map(room => ({ ...cssPoint({ x: room.x + SIGN.x, y: room.y + SIGN.y }), size: SIGN.size * scale })),
   },
+  loupeOpen: Boolean(loupe), trailBack,
 });
 
 let last = performance.now();

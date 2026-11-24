@@ -329,3 +329,110 @@ Screenshots are under `p3-webkit/` (iPhone 13, tr-TR) and `p3-chromium/` (360×6
 - Chromium was played by touch for cases 1–12, 15, 17, 21, 22 and 34–36, plus the Dailies listed. The cases between were cleared only in WebKit.
 - After the changes, cases 18–20, 24–27 and 29–35 were not replayed by touch in either browser. Their liar changes are covered by the bots only.
 - Physical phones, audio and screen readers were not tested. No Turkish speaker has reviewed the text.
+
+## Open items from the middle and late game audit — 2026-11-24
+
+This section handles the six items the audit above left open.
+
+### What changed, and why
+
+- **The claimed-room outline is now a teaching aid that is taken away.**
+  - Where it shows: cases 1–6, and a new player's Daily while progress is case 7 or earlier.
+  - Case 7 is the lesson. On the first comparison the outline shrinks onto the room sign, the picture the player must now compare by eye. Later comparisons show no outline.
+  - Where it is gone: case 8 onward, returning players' Dailies and the Hard Daily. The blackout no longer lights the claimed room, and the room sign no longer gets corner marks.
+  - The scene circle of chapter I is kept.
+  - Why: matching a suspect against the outline solved cases without comparing anything.
+- **The liar is masked only about half the time.**
+  - In mask cases, a coin from a salted stream (`culpritDraw`) picks the masked or the unmasked side. The main `draw` stream does not shift, so the public replay and the saved stars are unchanged.
+  - Why: the old rule "the liar is always masked" let a player ignore every unmasked suspect.
+- **The chapter V carrier now matters.**
+  - At the mark before the hand-off, the carrier's room holds four people. One of the three who are not the carrier gave the item. The carrier never lies, and the liar is one of the three givers.
+  - Case 29 is the lesson. Gold corners mark the carrier at the hand-off. A hand moves the timeline back one mark. There, the room gets gold corners and each giver gets an item badge.
+  - The Hard Daily shows this aid while progress is case 29 or earlier.
+  - Why: the carrier was an untaught decoy.
+- **Cases are read in more ways.**
+  - Three new items with their own houses and rooms: honey (bakery, room 4), a spyglass (ship, room 1) and a pumpkin (greenhouse, room 3). Each has its own reveal icon, held item and trace (`EVIDENCE`). Crimes 6–8 are used in cases 10, 13, 17, 20, 24, 26, 31, 34 and 36.
+  - Two time marks: cases 12, 14 and 30. The claim card shows two clocks. Tapping either one jumps to its mark. The liar may lie at either mark.
+  - Floor sounds: case 23 (lesson) and case 26. In these blackouts a sound places a suspect on a floor, not in a room, so the player must narrow the room from another mark.
+  - Why: cases shared one rhythm, and each house lost the same item.
+- **Ticks and room signs are easier to tap and read.**
+  - Timelines with ticks under 32 logical px apart (10 or more marks) get a loupe. A tap on the clock opens a strip of 5 marks, 58×46 px each, 62 px apart. A tap on a strip mark scrubs to that mark. The strip closes after 8 s idle or on any other touch.
+  - Room signs grew from 24 to 34 px.
+  - Rooms 1, 3 and 4 got new glyphs: a sofa, a palette and books.
+  - Rejected tick layouts:
+    - Two rows: 26 px tall targets, and there was not enough vertical space.
+    - Staggered lanes: a small gain.
+    - Fisheye: no gain for quick taps.
+
+### Assertions
+
+**Changed.**
+- `bots.mjs`: "mask cases hide the liar under a mask" became a balance assertion. The rule it checked was removed on purpose.
+- `check.mjs`: the sound bracket comparison uses cases 22 and 24, not 22 and 23. Case 23 is now the floors lesson and shows the bracket too.
+
+**Added to `bots.mjs`.**
+
+| Bot | Result |
+| --- | --- |
+| Check masked suspects only | 49.10% of campaign mask cases |
+| Check unmasked suspects only | 50.90% of campaign mask cases |
+| Outline matcher, cases 3–6 | 100% |
+| Outline matcher, case 8 onward and Dailies | 14.53% (chance is 14.06%) |
+| Compare the trail suspects, carrier cases | 100% |
+| Accuse the carrier | 0% |
+| Liar lies at the second mark, two-mark cases | 47.92% |
+| Floor-sound cases | No room-level sounds; every suspect heard on a floor; the lie crosses floors |
+
+Every case and Daily is still solved uniquely by comparison. Every suspect assignment keeps the replay the same.
+
+**Added to `check.mjs` (`checkOpenItems`).**
+- Outline: drawn in case 4; absent in cases 8 and 20, in the later comparisons of case 7, and in the Hard Daily.
+- No gold claimed room in the blackout.
+- Two-mark card: mark taps and cues.
+- Floor band: drawn in cases 23 and 26, not in 22.
+- Trail: drawn in case 29 and not in case 30.
+- Loupe: opens with 5 marks of at least 44×44 px, at least 48 px apart. A tap on the neighbour mark corrects the beat.
+- Room signs: at least 28 px.
+- Glyph silhouettes: studio and lounge differ by at least 25, and the closest pair differs by at least 15.
+
+**Shown failing on old code.**
+- The new `check.mjs` assertions were run against an unchanged copy of the game. Every section failed or threw.
+- The old glyph silhouette distances: studio and lounge 19.4–21.7, closest pair 13.7–14.6.
+- Six sim mutations each failed `bots.mjs`: old mask rule, outline kept, carrier as decoy, one lie mark, floor sounds equal to room sounds, free liar choice.
+
+### Played by touch (Playwright touchscreen, locale tr-TR)
+
+**WebKit, iPhone 13. All won:**
+- Case 7, outline lesson: 3 stars.
+- Case 23, floors lesson: 3 stars.
+- Case 29, carrier lesson, with the loupe used: won.
+- Case 26, late floors case: 3 stars.
+- The standard Daily of 2026-11-24: won by tracking a mask exchange to a masked liar.
+
+**Chromium 360×640. All won:**
+- Case 12, two marks: won.
+- Case 30, late, carrier with two marks: won. The liar lied at the second mark.
+- Hard Daily 2026-11-24 (12 marks): 3 stars. The loupe corrected two taps. The liar was a giver who swapped masks at 7:25 and was not in the claimed room at 7:40.
+
+### Still open
+
+- The Hard Daily still puts a mask on everyone.
+- Floor sounds appear in only two campaign cases.
+- An open loupe covers the second row of portraits. Any touch outside it closes it.
+- The solved card in a floors case shows the exact true room. This is fine after the case, but it gives no picture of the floor-only reasoning.
+- The scene ghost finger still shows in chapter IV.
+
+### Not verified
+
+- Whether a new player understands the picture lessons (outline shrink, trail hand, floor band, loupe). No human has tried them.
+- The new Turkish strings, by a native speaker.
+- Physical phones.
+- The reveal animation details for crimes 6–8 were seen only in passing.
+
+### Verification after the changes
+
+| Check | Result |
+| --- | --- |
+| `bots.mjs` | Passed: 36 defaults, 6,912 seeded campaign cases and 732 Dailies all uniquely solvable; replay independent of the liar in 272 case/seed pairs |
+| `check.mjs`, iphone, pixel and 360 | Passed: all three groups on each profile, including `checkOpenItems` |
+| `kit/check/phone.mjs alibi` | ok on WebKit and Chromium |

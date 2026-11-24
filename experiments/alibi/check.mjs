@@ -737,15 +737,164 @@ async function checkGuides(page, url) {
     await scrub(page, 3);
     assert.equal(await draws(page, tag) > 0, shown, `Daily mask tags for a player at case ${level}`);
   }
+  // Case 23 became the floor-sound lesson, which brackets the floor sound, so
+  // the case without the bracket is now case 24.
   const bracket = {};
-  for (const level of [22, 23]) {
+  for (const level of [22, 24]) {
     await open(level);
     await scrub(page, createCase({ level }).blackoutBeat);
     const before = await draws(page, cream);
     await choose(0);
     bracket[level] = await draws(page, cream) - before;
   }
-  assert.equal(bracket[22] - bracket[23], 4, `the sound bracket shows in the blackout lesson only: ${JSON.stringify(bracket)}`);
+  assert.equal(bracket[22] - bracket[24], 4, `the sound bracket shows in the blackout lesson only: ${JSON.stringify(bracket)}`);
+}
+
+// The items left open by the middle and late game audit: the claimed-room
+// outline retires after case 7, two-mark alibis, floor sounds, the carrier
+// trail, a loupe for close timeline marks and larger, distinct room signs.
+// Runs after checkGuides on the same page, so canvas draws are counted.
+async function checkOpenItems(page, url) {
+  const outline = ['stroke', '#fff5cb', 3.1];
+  const goldRoom = ['fill', '#382b43'];
+  const gold = ['stroke', '#f7be69', 2.1];
+  const band = ['fill', '#3d2f4dd8'];
+  const open = async (level, save) => {
+    if (save) await page.evaluate(level => localStorage.setItem('alibi-save', JSON.stringify({ level, campaignVersion: 2, stars: {} })), save);
+    await page.goto(level ? url.replace('level=1', `level=${level}`) : url.replace('level=1', 'level=0'));
+    await see(page, 'menu');
+    return page;
+  };
+  const play = async selector => {
+    await page.locator(selector).evaluate(button => button.click());
+    await see(page, 'play');
+  };
+  const choose = async id => tap(page, (await state(page)).points.suspects[id]);
+  // Choose a suspect and go to the time of their alibi.
+  const compareAt = async (c, id) => {
+    await choose(id);
+    await scrub(page, c.cast[id].claim.beat);
+    return draws(page, outline);
+  };
+
+  // 1. The outline is a teaching aid in chapter I only. Case 7 shows it for
+  // the first comparison and shrinks it onto the room sign; then it is gone.
+  for (const [level, shown] of [[4, true], [8, false], [20, false]]) {
+    await open(level);
+    await play('#play');
+    const count = await compareAt(createCase({ seed, level }), 0);
+    assert.equal(count > 0, shown, `case ${level} draws the claimed-room outline: ${count}`);
+  }
+  await open(7);
+  await play('#play');
+  const lesson = createCase({ seed, level: 7 });
+  assert.ok(await compareAt(lesson, 0) > 0, 'case 7 shows the outline on the first comparison');
+  await choose(0);
+  const other = lesson.cast.findIndex(person => person.id !== 0 && person.claim.beat === lesson.cast[0].claim.beat);
+  assert.equal(await compareAt(lesson, other < 0 ? 1 : other), 0, 'case 7 shows no outline on later comparisons');
+  await open(0, 20);
+  await play('#hardDaily');
+  let st = await state(page);
+  assert.equal(await compareAt(dailyCase(st.day, true), 0), 0, 'Hard Daily draws no claimed-room outline');
+  await open(22);
+  await play('#play');
+  const blackout = createCase({ seed, level: 22 });
+  await scrub(page, blackout.blackoutBeat);
+  await choose(blackout.cast.findIndex(person => person.claim.beat === blackout.blackoutBeat));
+  assert.equal(await draws(page, goldRoom), 0, 'the blackout no longer lights the claimed room');
+
+  // 4. Two-mark alibis: both marks are on the card and each one jumps.
+  await open(12);
+  await play('#play');
+  await choose(0);
+  st = await state(page);
+  assert.equal(st.points.claim.length, 2, 'case 12 alibi names two times');
+  for (const mark of [...st.points.claim].reverse()) {
+    await tap(page, mark);
+    await pauseForRender(page);
+    assert.equal((await state(page)).frame, mark.beat, `tapping the alibi mark at ${mark.beat} jumps there`);
+  }
+  assert.equal(await page.locator('#playGuide').getAttribute('data-cue'), 'compareSign', 'both marks visited');
+  await open(12);
+  await play('#play');
+  await choose(0);
+  await tap(page, (await state(page)).points.claim[0]);
+  await pauseForRender(page);
+  assert.equal(await page.locator('#playGuide').getAttribute('data-cue'), 'secondMark', 'one mark visited asks for the other');
+
+  // 4. Floor sounds: the floors lesson shows sound bands per floor.
+  for (const [level, shown] of [[22, false], [23, true], [26, true]]) {
+    await open(level);
+    await play('#play');
+    await scrub(page, createCase({ seed, level }).blackoutBeat);
+    assert.equal(await draws(page, band) > 0, shown, `case ${level} sorts blackout sounds by floor`);
+  }
+
+  // 3. The carrier trail: in the lesson and in a Hard Daily before it, the
+  // mark before the hand-off frames the carrier's room.
+  const trail = async () => {
+    const c = createCase({ seed, level: 29 });
+    await scrub(page, c.carryBeat);
+    await scrub(page, c.trail.beat);
+    return draws(page, gold);
+  };
+  await open(29);
+  await play('#play');
+  const lessonTrail = await trail();
+  await open(30);
+  await play('#play');
+  const laterTrail = await trail();
+  assert.ok(lessonTrail > laterTrail, `case 29 marks the carrier trail: ${lessonTrail} vs ${laterTrail}`);
+  assert.ok((await state(page)).trailBack, 'going back from the hand-off is recorded');
+
+  // 5. Close timeline marks: a tap opens a strip of large marks; one tap on
+  // the neighbour fixes a near miss.
+  await open(0, 20);
+  await play('#hardDaily');
+  st = await state(page);
+  const ticks = st.points.clock.ticks;
+  assert.ok(ticks[1].x - ticks[0].x < 30, 'Hard Daily marks are closer than a thumb');
+  await tap(page, ticks[5]);
+  await pauseForRender(page);
+  st = await state(page);
+  assert.equal(st.frame, 5);
+  assert.ok(st.points.loupe?.length === 5, 'a tap on close marks opens the loupe');
+  for (const mark of st.points.loupe) assert.ok(mark.w >= 44 && mark.h >= 44, `loupe mark ${mark.beat} is ${mark.w}×${mark.h}`);
+  const gaps = st.points.loupe.slice(1).map((mark, i) => mark.x - st.points.loupe[i].x);
+  assert.ok(Math.min(...gaps) >= 48, `loupe marks are ${Math.min(...gaps)} px apart`);
+  await tap(page, st.points.loupe.find(mark => mark.beat === 6));
+  await pauseForRender(page);
+  st = await state(page);
+  assert.equal(st.frame, 6, 'the loupe corrects a tap to the neighbouring mark');
+  assert.ok(st.loupeOpen, 'the loupe stays open for another correction');
+
+  // 5. Room signs are large enough and the studio and lounge signs differ.
+  for (const sign of st.points.signs) assert.ok(sign.size >= 28, `room sign is ${sign.size} px`);
+  const glyphs = await page.evaluate(async () => {
+    const { place } = await import('./art.js');
+    const grid = (room, site) => {
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 12;
+      const g = cv.getContext('2d');
+      place(g, 6, 6, 12, room, site);
+      const d = g.getImageData(0, 0, 12, 12).data;
+      const v = [];
+      for (let i = 0; i < d.length; i += 4) v.push(.2126 * d[i] + .7152 * d[i + 1] + .0722 * d[i + 2]);
+      return v;
+    };
+    // Mean grey difference of 12 px silhouettes, which is what a glance keeps.
+    return [0, 1, 2, 3].map(site => {
+      const s = [0, 1, 2, 3, 4, 5].map(room => grid(room, site));
+      const dist = (a, b) => s[a].reduce((sum, v, i) => sum + Math.abs(v - s[b][i]), 0) / s[a].length;
+      let closest = Infinity;
+      for (let a = 0; a < 6; a++) for (let b = a + 1; b < 6; b++) closest = Math.min(closest, dist(a, b));
+      return { studioLounge: dist(1, 3), closest };
+    });
+  });
+  for (const [site, { studioLounge, closest }] of glyphs.entries()) {
+    assert.ok(studioLounge >= 25, `site ${site}: studio and lounge signs differ by ${studioLounge.toFixed(1)}`);
+    assert.ok(closest >= 15, `site ${site}: the closest two room signs differ by ${closest.toFixed(1)}`);
+  }
 }
 
 // WCAG relative-luminance contrast of two computed CSS colors.
@@ -1037,6 +1186,7 @@ async function runProfile(profile, engine, device, origin) {
         const page = await guideContext.newPage();
         page.on('pageerror', error => errors.push(error.message));
         await checkGuides(page, url);
+        await checkOpenItems(page, url);
         assert.deepEqual(errors, [], 'guide browser errors');
         await checkProgress(page, profile, url);
         console.log(`PASS ${profile} training marks retire after their lessons; star totals, chapter ends and finale show`);
