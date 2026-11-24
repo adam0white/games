@@ -36,7 +36,7 @@ test('the Wrangler rollback config matches the cf config', async () => {
   assert.deepEqual([legacy.assets.run_worker_first, legacy.assets.not_found_handling], [settings.assets.runWorkerFirst, settings.assets.notFoundHandling]);
   // cloudflare.config.ts must take these values from worker-settings.mjs, not restate them.
   const config = readFileSync('cloudflare.config.ts', 'utf8');
-  assert.match(config, /import \{ archivedRoutes, assets, compatibilityDate, domains, legacyRoutes, name, zone \} from "\.\/worker-settings\.mjs";/);
+  assert.match(config, /import \{ archivedRoutes, assets, compatibilityDate, domains, legacyRoutes, name, observability, zone \} from "\.\/worker-settings\.mjs";/);
   assert.match(config, new RegExp(`previewUrls: ${legacy.preview_urls},`));
   assert.match(config, new RegExp(`workersDev: ${legacy.workers_dev},`));
   assert.match(config, /triggers: \[\.\.\.legacyRoutes, \.\.\.archivedRoutes\]\.map\(\(pattern\) => triggers\.fetch\(\{ pattern, zone \}\)\),/);

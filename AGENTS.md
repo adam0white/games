@@ -22,6 +22,10 @@ Owner, 2026-11-23: Fable and Astra sessions plan, review and decide; gameplay bu
 
 **Experiments (owner, 2026-11-23).** Call these small no-build games "experiments", not "prototypes". New ones go in `experiments/<slug>/`. The build also still reads `prototypes/<slug>/` (a slug in both is a build error). Each is served at `/<slug>/`; lab items at `/lab/<name>/` and shared code at `/kit/`. Old `/proto/...` links get a 301 to the same path without `/proto`, query kept; `/proto/` goes to `/lab/`. A slug may not match a game, an archived name or a reserved path (`reservedPaths` in `worker-settings.mjs`). When several PRs merge within a few minutes, only the last merge's Deploy run succeeds; the earlier ones fail with "Latest main CI is not green". Confirm a change is live by fetching the live file, not by your commit's Deploy run.
 
+## Worker observability (owner direction, 2026-11-24)
+
+Every Worker that runs code has logs, traces and Cloudflare Issues on. Start a new Worker from `workers/observability/template.wrangler.jsonc`; `scripts/observability.test.mjs` fails `npm test` when the block is missing. Report a handled failure with `console.error(error)`. Never log note text, tokens, tester ids or player ids. A watcher on the lab's Mac starts a Claude run for each new issue. The rule, what is stored, the exceptions and the watcher are in `workers/OBSERVABILITY.md`. Turning logs, traces or Issues off for a Worker, or on for one in the exceptions table, is an owner decision.
+
 ## Current goal (owner, 2026-11-13 and 2026-11-14)
 
 Owner words are in [HF owner directions](https://github.com/adam0white/human-framework/blob/main/docs/owner-directions-2026-10-18.md). The reasoning is in [the direction document](docs/game-lab-direction-2026-11-13.md).
