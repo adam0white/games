@@ -1,5 +1,5 @@
 // Thumb Duel: the page. Input, drawing, sound, save, cards. The rules are in sim.js and the bot in brain.js.
-import { createMatch, step, blank, DT, KINDS, CONTROL, WIN, PADS, MEMORY, HOCKEY, SUMO, BALANCE, TUG, CATCH, DRAW } from './sim.js';
+import { createMatch, step, blank, DT, KINDS, CONTROL, WIN, PADS, MEMORY, HOCKEY, SUMO, BALANCE, TUG, CATCH, DRAW, SWIPE, LAUNCH } from './sim.js';
 import { makeBot, STRENGTHS } from './brain.js';
 import { C, side as cols, TAU, rrect, circle, shadow, noShadow, star, critter, beetle, lantern, firefly, seed, paddle, drop, finger } from './art.js';
 import { readJson, writeJson } from '../kit/save.js';
@@ -13,6 +13,7 @@ import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoo
 const $ = id => document.getElementById(id);
 const query = new URLSearchParams(location.search);
 const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const finePointer = matchMedia('(pointer: fine)');
 const ONLY = KINDS.includes(query.get('only')) ? query.get('only') : null;
 const FAST = query.get('fast') === '1'; // tests only: short intros
 
@@ -88,7 +89,8 @@ const voice = {
 let screen = 'menu', paused = false, s = null, solo = null, bot = null, matchNo = 0, acc = 0, ready = [false, false], lastBeep = -1;
 const pointers = new Map(); // pointerId -> { side, x, y, at }: a finger belongs to the half it went down in, for as long as it is down
 const pending = [[], []];   // taps waiting for the next tick
-const kb = { held: false, tap: 0, px: 0.5, py: 0.75, keys: new Set(), pads: [] }; // the keyboard is side 0's thumb
+const releases = [[], []];  // completed gestures waiting for the next tick
+const kb = { held: false, chargeAt: null, tap: 0, px: 0.5, py: 0.75, keys: new Set(), pads: [] }; // the keyboard is side 0's thumb
 let fx = [], texts = [], shake = 0, flash = [0, 0], confetti = 0, seedNo = 0;
 const show = screens(['menu', 'solo', 'paused', 'end'], name => { $('pause').style.display = name === 'play' ? 'grid' : 'none'; });
 
@@ -99,34 +101,52 @@ rec.toggle($('paused').firstElementChild);
 
 // ---------------------------------------------------------------- input: every pointer is owned by the half it went down in
 function sideAt(y) { return y < cy ? 1 : 0; }
+const inPlay = () => screen === 'play' && !paused && s?.phase === 'play';
+const gesturePlay = () => inPlay() && (s.kind === 'swipe' || s.kind === 'launch');
 cv.addEventListener('pointerdown', e => {
   e.preventDefault();
   snd.unlock();
   const side = sideAt(e.clientY), [x, y] = toBoard(e.clientX, e.clientY);
-  pointers.set(e.pointerId, { side, x, y, at: performance.now() });
+  const at = performance.now();
+  const gesture = gesturePlay() && !(solo && side === 1)
+    && ![...pointers.values()].some(p => p.side === side && p.duel === s.d);
+  pointers.set(e.pointerId, { side, x, y, x0: x, y0: y, at, duel: gesture ? s.d : null });
   try { cv.setPointerCapture(e.pointerId); } catch {} // synthetic ids in tests have no capture; never let that throw
   if (screen !== 'play' || paused) return;
   if (solo && side === 1) return; // the bot plays the top half
+  if (hintFor(side)) for (const copy of help) copy.done();
   pending[side].push({ x, y });
   ring(e.clientX, e.clientY, side);
   voice.tap(side);
 });
 const moved = e => { const p = pointers.get(e.pointerId); if (!p) return; [p.x, p.y] = toBoard(e.clientX, e.clientY); };
 cv.addEventListener('pointermove', moved);
-const lifted = e => { pointers.delete(e.pointerId); };
-cv.addEventListener('pointerup', lifted);
-cv.addEventListener('pointercancel', lifted);
-cv.addEventListener('lostpointercapture', e => { if (e.pointerType === 'mouse') pointers.delete(e.pointerId); });
+cv.addEventListener('pointerup', e => {
+  const p = pointers.get(e.pointerId);
+  pointers.delete(e.pointerId);
+  if (!p?.duel || !gesturePlay() || p.duel !== s.d) return;
+  const [x, y] = toBoard(e.clientX, e.clientY);
+  releases[p.side].push({ x0: p.x0, y0: p.y0, x, y, seconds: (performance.now() - p.at) / 1000 });
+});
+const forgetPointer = e => { pointers.delete(e.pointerId); };
+cv.addEventListener('pointercancel', forgetPointer);
+cv.addEventListener('lostpointercapture', forgetPointer);
 cv.addEventListener('contextmenu', e => e.preventDefault());
 
 function inputFor(i) {
   const inp = blank();
   let latest = null;
-  for (const p of pointers.values()) if (p.side === i) { inp.held = true; if (!latest || p.at > latest.at) latest = p; }
+  for (const p of pointers.values()) if (p.side === i) {
+    inp.held = true;
+    if (!latest || p.at > latest.at) latest = p;
+    if (p.duel && p.duel === s.d) inp.heldFor = (performance.now() - p.at) / 1000;
+  }
   if (latest) { inp.px = latest.x; inp.py = latest.y; }
   inp.taps = pending[i].splice(0);
+  inp.releases = releases[i].splice(0);
   if (i === 0) { // the keyboard
     if (kb.held) inp.held = true;
+    if (kb.chargeAt !== null && inp.heldFor === 0) inp.heldFor = (performance.now() - kb.chargeAt) / 1000;
     for (; kb.tap > 0; kb.tap--) inp.taps.push({ x: 0.5, y: 0.5 });
     for (const pad of kb.pads.splice(0)) inp.taps.push({ x: PADS[pad].x, y: PADS[pad].y });
     if (kb.keys.size && !latest) { inp.px = kb.px; inp.py = kb.py; }
@@ -137,16 +157,40 @@ function inputFor(i) {
 addEventListener('keydown', e => {
   if (isPauseKey(e)) { if (screen === 'play') { paused ? resume() : pause(); } e.preventDefault(); return; }
   if (screen !== 'play' || paused) return;
-  if (e.key === ' ') { e.preventDefault(); if (!e.repeat) { kb.tap++; voice.tap(0); } kb.held = true; }
+  if (e.key === ' ') {
+    e.preventDefault();
+    if (!e.repeat) {
+      kb.tap++; voice.tap(0);
+      if (inPlay() && s.kind === 'launch') kb.chargeAt = performance.now();
+    }
+    kb.held = true;
+  }
   if (/^[1-4]$/.test(e.key) && !e.repeat) { kb.pads.push(Number(e.key) - 1); voice.tap(0); }
-  if (e.key.startsWith('Arrow')) { kb.keys.add(e.key); e.preventDefault(); }
+  if (e.key.startsWith('Arrow')) {
+    kb.keys.add(e.key); e.preventDefault();
+    if (e.key === 'ArrowUp' && !e.repeat && inPlay() && s.kind === 'swipe') {
+      releases[0].push({ x0: 0.5, y0: 0.76, x: 0.5, y: 0.34, seconds: 0.18 });
+    }
+  }
 });
-addEventListener('keyup', e => { if (e.key === ' ') kb.held = false; kb.keys.delete(e.key); });
+addEventListener('keyup', e => {
+  if (e.key === ' ') {
+    if (kb.chargeAt !== null && inPlay() && s.kind === 'launch') releases[0].push({ seconds: (performance.now() - kb.chargeAt) / 1000 });
+    kb.held = false; kb.chargeAt = null;
+  }
+  kb.keys.delete(e.key);
+});
 function moveKeys() {
   const v = 1.6 * DT;
   if (kb.keys.has('ArrowLeft')) kb.px -= v; if (kb.keys.has('ArrowRight')) kb.px += v;
   if (kb.keys.has('ArrowUp')) kb.py -= v; if (kb.keys.has('ArrowDown')) kb.py += v;
   kb.px = Math.max(0.1, Math.min(0.9, kb.px)); kb.py = Math.max(0.06, Math.min(0.9, kb.py));
+}
+
+function clearInput() {
+  pointers.clear();
+  for (const list of [...pending, ...releases, kb.pads]) list.length = 0;
+  kb.held = false; kb.chargeAt = null; kb.tap = 0; kb.keys.clear();
 }
 
 // ---------------------------------------------------------------- matches
@@ -155,7 +199,7 @@ function start(strength) {
   const seedValue = query.has('seed') ? (Number(query.get('seed')) >>> 0) + seedNo++ : (crypto.getRandomValues(new Uint32Array(1))[0] || 1);
   s = createMatch({ seed: seedValue, only: ONLY, first: save.matches === 0 ? 'tug' : null, intro: FAST ? 1 : undefined });
   bot = solo ? makeBot(solo, seedValue ^ 0x5bd1e995) : null;
-  pointers.clear(); pending[0].length = pending[1].length = 0; kb.held = false; kb.tap = 0; kb.pads.length = 0;
+  clearInput();
   ready = [false, false]; fx = []; texts = []; confetti = 0; acc = 0; paused = false; lastBeep = -1;
   screen = 'play'; show('play');
   snd.unlock(); snd.release();
@@ -201,7 +245,7 @@ function toMenu() {
 }
 function pause() {
   if (screen !== 'play' || paused) return;
-  paused = true; pointers.clear(); kb.held = false; kb.keys.clear(); show('paused'); snd.hold();
+  paused = true; clearInput(); show('paused'); snd.hold();
 }
 function resume() { if (!paused) return; paused = false; screen = 'play'; show('play'); snd.release(); }
 onLeave(pause);
@@ -274,7 +318,10 @@ function handle(e) {
     case 'round': voice.round(); if (e.side >= 0) { say(e.side, 'Got it!', C.gold, 0.2, 28); flash[e.side] = 0.5; } else for (const i of [0, 1]) say(i, 'Again!', C.cream, 0.2, 26); break;
     case 'fall': voice.fall(); { const [x, y] = e.side === 0 ? P(0.5 + e.dir * 0.42, 0.6) : P(0.5 - e.dir * 0.42, -0.6); sparks(x, y, '#bfefff', 14, 240); } break;
     case 'back': voice.back(); break;
+    case 'stroke': voice.tap(e.side); break;
+    case 'launch': e.points ? voice.back() : voice.miss(); break;
     case 'point':
+      kb.chargeAt = null;
       if (e.winner >= 0) { voice.point(); flash[e.winner] = 1; sparks(...pipAt(e.winner, s.score[e.winner] - 1), C.gold, 26, 320); hitShake(6); }
       else voice.draw();
       rec.event('duel', { kind: e.kind, winner: e.winner, ms: Math.round(e.t * 1000), solo: !!solo });
@@ -451,6 +498,8 @@ function pictogram(kind, t, i) {
   if (kind === 'hockey') { paddle(g, ix, cyy + r * 0.5, r * 0.5, c); seed(g, ix + Math.sin(t * 3) * r * 0.5, cyy - r * 0.6, r * 0.28, t * 2); }
   if (kind === 'memory') { const lit = Math.floor(t * 2.5) % 4; [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b], j) => { circle(g, ix + a * r * 0.55, cyy + b * r * 0.55, r * 0.42); g.fillStyle = j === lit ? C.pads[j] : C.pads[j] + '55'; g.fill(); g.lineWidth = 2.5; g.strokeStyle = C.ink; g.stroke(); }); }
   if (kind === 'balance') { const tilt = Math.sin(t * 2.5) * 0.18; g.save(); g.translate(ix, cyy + r * 0.4); g.rotate(tilt); leafShape(0, 0, r * 2.4, r * 0.5); g.restore(); drop(g, ix + Math.sin(t * 2.5) * r * 0.4, cyy + r * 0.3, r * 0.3); }
+  if (kind === 'swipe') beetle(g, ix, cyy + r * (0.55 - (calm ? 0.5 : beat)), r * 0.53, c, { t: 0 });
+  if (kind === 'launch') seed(g, ix, cyy + r * (0.55 - (calm ? 0.5 : beat)), r * 0.5, -Math.PI / 2);
   // the thumb
   if (ctl === 'tap') {
     const press = beat < 0.2 ? Math.sin(beat / 0.2 * Math.PI) : 0;
@@ -460,6 +509,15 @@ function pictogram(kind, t, i) {
     const fill = (t % 1.6) / 1.6;
     g.strokeStyle = c[0]; g.lineWidth = 6; g.lineCap = 'round'; g.beginPath(); g.arc(fx2, cyy + r * 0.2, r * 0.7, -Math.PI / 2, -Math.PI / 2 + fill * TAU); g.stroke();
     finger(g, fx2, cyy + r * 0.2, r * 1.3, 1);
+  } else if (ctl === 'swipe') {
+    g.strokeStyle = c[2]; g.lineWidth = 4;
+    chevron(fx2, cyy - r * 0.55, r * 0.4);
+    const up = calm ? 0.65 : Math.min(1, beat * 1.65);
+    finger(g, fx2, cyy + r * (0.56 - 1.02 * up), r * 1.12, up < 1 ? 1 : 0);
+  } else if (ctl === 'release') {
+    const press = calm ? 1 : beat < 0.77 ? 1 : 0;
+    circle(g, fx2, cyy + r * 0.1, r * 0.65); g.strokeStyle = c[2]; g.lineWidth = 4; g.stroke();
+    finger(g, fx2, cyy + r * (0.05 + (1 - press) * 0.38), r * 1.1, press);
   } else {
     const dx = Math.sin(t * 3) * r * 0.9;
     g.strokeStyle = c[2]; g.lineWidth = 4; g.lineCap = 'round';
@@ -479,6 +537,9 @@ function field(color = '#2a3d36', edge = '#e9dcc0') {
   const [x0, y0] = P(0.02, -0.98);
   shadow(g, 18, 6); rrect(g, x0, y0, k * 0.96, k * 1.96, k * 0.08); g.fillStyle = color; g.fill(); noShadow(g);
   g.lineWidth = 4; g.strokeStyle = edge; g.stroke();
+}
+function chevron(x, y, r) {
+  g.beginPath(); g.moveTo(x - r, y + r * 0.45); g.lineTo(x, y - r * 0.45); g.lineTo(x + r, y + r * 0.45); g.stroke();
 }
 const DRAW_KIND = {
   tug(d, t) {
@@ -608,14 +669,55 @@ const DRAW_KIND = {
       text(String(Math.ceil(left)), tx, ty, 22, C.cream);
     });
   },
+  swipe(d) {
+    field('#273d44');
+    for (const i of [0, 1]) withSide(i, () => {
+      const [x, y] = P(0.5, 0.23), [, end] = P(0.5, 0.76), width = 0.32 * k;
+      rrect(g, x - width / 2, y, width, end - y, 16); g.fillStyle = '#10252b'; g.fill();
+      g.lineWidth = 2; g.strokeStyle = '#bbcab766'; g.stroke();
+      g.setLineDash([7, 5]); g.lineWidth = 4; g.strokeStyle = C.cream;
+      g.beginPath(); g.moveTo(x - width / 2, y + 12); g.lineTo(x + width / 2, y + 12); g.stroke(); g.setLineDash([]);
+      g.strokeStyle = cols(i)[0] + '88'; g.lineWidth = 3;
+      for (let n = 1; n <= 4; n++) chevron(x, y + (end - y) * n / 5, width * 0.12);
+      const progress = d.strokes[i] / SWIPE.need;
+      const [, by] = P(0.5, 0.7 - 0.43 * progress);
+      beetle(g, x, by, k * 0.06, cols(i), { glow: 1 });
+      text(`${d.strokes[i]}/${SWIPE.need}`, ...P(0.5, 0.14), Math.min(25, k * 0.073), cols(i)[1]);
+      const prompt = i === 0 && finePointer.matches ? 'Flick toward center or press ↑' : 'Flick toward center';
+      text(prompt, ...P(0.5, 0.87), Math.min(23, k * 0.065), C.cream);
+    });
+  },
+  launch(d) {
+    field('#3f3049');
+    for (const i of [0, 1]) withSide(i, () => {
+      const [x, y] = P(0.22, 0.51), w = k * 0.56, h = k * 0.105;
+      const shot = d.shots[i], target = d.targets[shot], last = d.last[i];
+      rrect(g, x, y, w, h, 12); g.fillStyle = '#1b1328'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#f7e6c480'; g.stroke();
+      if (target !== undefined) {
+        const meter = Math.min(1, d.charge[i] / LAUNCH.scale);
+        g.save(); rrect(g, x + 2, y + 2, w - 4, h - 4, 10); g.clip();
+        g.fillStyle = cols(i)[0]; g.fillRect(x, y, w * meter, h); g.restore();
+        const mark = x + w * target / LAUNCH.scale;
+        g.strokeStyle = C.gold; g.lineWidth = 4; g.beginPath(); g.moveTo(mark, y - 5); g.lineTo(mark, y + h + 5); g.stroke();
+        star(g, mark, y - 14, 8, C.gold);
+      }
+      const flight = !calm && last ? Math.max(0, 1 - (d.t - last.at) / 0.45) : 0;
+      const rise = Math.sin(Math.PI * flight) * (last?.points ? 0.15 : 0.045);
+      seed(g, ...P(0.5, 0.25 - rise), k * 0.055, -Math.PI / 2 - flight * TAU);
+      text(`${d.scores[i]} pts`, ...P(0.5, 0.39), Math.min(31, k * 0.08), cols(i)[1]);
+      text(`${shot}/${LAUNCH.shots} shots${last ? ` · +${last.points}` : ''}`, ...P(0.5, 0.72), Math.min(20, k * 0.06), C.cream);
+      text(target === undefined ? 'Shots complete' : 'Hold, release at the mark', ...P(0.5, 0.86), Math.min(22, k * 0.065), C.cream);
+    });
+  },
 };
 
-// ---------------------------------------------------------------- first-time help: a finger tapping, on the first duel only
-const help = hint(cv, {
+// ---------------------------------------------------------------- first-time help: one copy facing each local player
+const hintFor = side => inPlay() && s.kind === 'tug' && s.duels.length === 0 && matchNo === 1 && (!solo || side === 0);
+const help = ['bottom', 'top'].map((seat, side) => hint($(`hint-${seat}`).firstElementChild, {
   kind: 'tap', key: 'duel:hint', label: 'Tap!',
-  when: () => screen === 'play' && !paused && !!s && s.phase === 'play' && s.duels.length === 0 && matchNo === 1,
+  when: () => hintFor(side),
   played: save.matches > 0,
-});
+}));
 
 // ---------------------------------------------------------------- test hook (read-only)
 window.duelState = () => {
@@ -626,7 +728,7 @@ window.duelState = () => {
     over: !!s?.over, winner: s?.winner ?? null, timer: s?.timer ?? null, t: s?.t ?? 0, ready: ready.slice(),
     held: [0, 1].map(i => [...pointers.values()].some(p => p.side === i)), pointers: [...pointers.entries()].map(([id, p]) => ({ id, side: p.side })),
     board: { bx, cy, k, W, H }, d: d ? JSON.parse(JSON.stringify({ ...d, box: undefined })) : null,
-    save: JSON.parse(JSON.stringify(save)), hint: help.shown, sound: save.sound, fx: fx.length,
+    save: JSON.parse(JSON.stringify(save)), hint: help[0].shown, sound: save.sound, fx: fx.length,
     minTouchPx: Math.min(...sizes, s?.kind === 'memory' ? k * MEMORY.r * 2 : Infinity, s?.kind === 'hockey' ? k * HOCKEY.pad * 2 : Infinity),
   };
 };

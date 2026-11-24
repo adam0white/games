@@ -115,3 +115,35 @@ Screenshots: `/private/tmp/night-ant-draft/{webkit,chromium}-{1-menu,2-hint,3-fi
 - A fourth, rare gold card that costs queen health.
 - Let the player place the guard ring with a second gesture, or keep the game to one gesture and make Guard follow the flag at level 3.
 - Carry the Ant Promotion skin onto the soldiers.
+
+## 2026-11-24 independent review
+
+Acceptance: retain normal bots exit 0, mutation exit nonzero, and both phone-profile checks. Exercise additional input and transition failures without setting game state. Only this folder and the four other assigned lab folders may change. No shared kit edit, commit, or deployment.
+
+Fixed first-pointer ownership: a second finger no longer moves the flag or ends the first finger's drag. Lost capture now ends only its owning pointer. Pause, blur, draft, and restart clear held keyboard input and transient input. Restart clears old shake/flash and scheduled callbacks. Leaving during the 300 ms card-pick animation pauses the next wave. Invalid negative wave counts and infinite health from query options now fall back to 8 waves and 100 health.
+
+`review.mjs chromium` passes both drafts: first pointer x=130, second pointer leaves x=130, first pointer can move to x=180, and lost capture leaves x=180. It also checks blur, restart, reload, and finite query options. `review.mjs chromium --mutate-input` exits 1 for both builds: restoring pointer takeover changes this build's position from (130,386) to (310,566). This independently proves the new regression rejects the old behavior.
+
+Full normal bots: 120 seeds per policy, 600 runs, 93.3% careful wins, 10.0% clumsy, 0% idle, 0% parked, 0% with cards disabled; careful median 196 s; 120 distinct hands; zero timeouts. Wall time 695.3 s under shared-host load. No rule or balance thresholds changed.
+
+The old browser assertion compared the rally with the next selected enemy after the original target died. It now measures the response immediately after each dispatched pointer move: error must be under 0.01 px, replacing the unrelated 30 px target comparison. The final Chromium run recorded 301 frames in 5015 ms, zero frames above 50 ms, and zero page/console errors. The test adds leaving during the card animation. Foregrounding the test page and waiting two animation frames prevents capturing an unpainted first frame; this does not bypass input or error checks.
+
+Screenshots in `review-shots/` cover first menu, hint, fight, draft, win, loss, input, and resumed play. Rendered Chromium stages have readable text and on-screen controls without overlap. The first WebKit attempts produced black screenshots and Play stability timeouts; final verification is recorded below.
+
+### Comparison of the two Ant Draft builds
+
+The first build plays better in this review. Its red soldiers, visible queen, rally flag, and 85-unit combat ring make the action easier to read. A new player can identify both what to protect and where the swarm is being sent. Its spiders attack at range, while wasps hunt workers, so enemies give different reasons to move. Its light draft cards separate icon, short name, effect, and stack count clearly.
+
+The second build has a more compact draft and a useful numeric nest-health display. Its dark soldiers merge into a single moving cluster, and the nest is a small hole on the bottom border. Its narrower 38-unit attack range makes interception more exacting. The first build's explicit queen and larger rally marker communicate that task better. Neither first screen requires a paragraph of instructions; both need the delayed finger hint. Both still depend on short card text to explain upgrades.
+
+This is a judgment from emulated play and inspected screenshots, not a human play verdict. The bots differ between builds; 93.3% versus 99% careful wins and 10% versus 45% clumsy wins are not a controlled comparison of difficulty. No balance or artwork was changed to impose this preference.
+
+A full unaccelerated Chromium run now also passes (`full-run.mjs chromium`): seed 11, all 8 waves, 7 drafts, 137 kills, queen health 100, score 1037, simulation time 161.733333 s, zero page/console errors. Inspected all full-run captures in `full-run-shots/contact.png`; the final five distinct cards with seven total picks fit with Retry/Menu. The earlier full-browser-run gap is closed for Chromium only.
+
+The default 120-seed bot mutation exits 1 with 3 failed checks: clumsy wins 73.3% versus careful 93.3%, late clumsy clear rate 91.8%, and 40 timeouts across careful/clumsy runs. Wall time 1026.3 s.
+
+Final WebKit iPhone 13 check exits 0: 360 frames in 5007 ms, zero frames above 50 ms, zero page/console errors. Menu, hint, win, draft, loss with its held card, retry, pause/resume, and leaving during the pick animation pass. Inspected all six WebKit stage screenshots: the menu art and field render, text is readable, and cards/buttons stay inside the viewport without overlap. Physical notch insets remain unverified by device emulation.
+
+The independent WebKit input/reload review also exits 0 for both drafts. This build retains first-pointer x=130 through the second touch, moves to x=180 with the owner, and remains x=180 after capture loss. Blur clears keyboard movement; menu/restart/reload and invalid query options pass.
+
+Shared-kit validation: the full before-run had seven failures in unrelated Lantern/Ant Promotion/lab-down cases (`kit-before.log`), including navigation timeouts and unavailable WebGL2. The after-run of the kit smoke case passes on both phone profiles (`kit-after-chromium.log`, `kit-after-webkit.log`). The full shared suite is not claimed green. No shared files changed. Local browser servers stub the hosted notes button; its live service, physical-phone sound/haptics/performance, and human play acceptance remain unverified.

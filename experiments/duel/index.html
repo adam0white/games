@@ -10,6 +10,9 @@
   body { font: 17px/1.35 ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif; color: #1b1328; }
   canvas#c { display: block; width: 100vw; height: 100dvh; touch-action: none; }
   #probe { position: fixed; top: 0; left: 0; width: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); visibility: hidden; pointer-events: none; }
+  .hint-side { position: fixed; inset: 0; pointer-events: none; }
+  #hint-top { transform: rotate(180deg); }
+  .hint-side .kit-hint { bottom: calc(var(--kit-hint-bottom, 120px) + max(env(safe-area-inset-top), env(safe-area-inset-bottom))); }
   .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: #160f24aa; overflow-y: auto; touch-action: pan-y; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-sizing: border-box; }
   .screen.on { display: grid; }
   .card { max-width: 21em; width: calc(100% - 32px); box-sizing: border-box; padding: 18px 18px 14px; margin: 12px 0; background: #fff4dc; border: 3px solid #1b1328; border-radius: 24px; box-shadow: 0 8px 0 #1b132866, 0 18px 40px #0007; }
@@ -53,6 +56,8 @@
 </head>
 <body>
 <canvas id="c"></canvas>
+<div class="hint-side" id="hint-bottom"><span></span></div>
+<div class="hint-side" id="hint-top"><span></span></div>
 <div id="probe"></div>
 <button id="pause" aria-label="Pause"></button>
 

@@ -2,7 +2,7 @@
 
 Built 2026-11-24. A folded paper boat rides a rain gutter to the pond. The player never steers the boat. They move the water.
 
-## Rules (all in `sim.js`, fixed step 1/60 s, seeded)
+## Initial rules (before the revision below; fixed step 1/60 s, seeded)
 
 - The gutter is 1 wide. The current runs at 0.3 widths/s, faster mid-stream, with a slow seeded meander. The boat's velocity relaxes to the local current (rate 5/s).
 - **Swipe = ripple.** A ripple starts where the finger started, travels 0.5 widths/s the way it was drawn, lives 1.6 s and pushes water near it. Longer swipe, stronger push (full strength at a third of the gutter). At most 4 at once. One full ripple moves the boat 0.43 widths sideways.
@@ -25,7 +25,7 @@ Built 2026-11-24. A folded paper boat rides a rain gutter to the pond. The playe
 - Passengers bail water, so the daily stream has a reason to take risks.
 - The streamlines are 95 particles carried by the same `flow()` the boat feels, so what the player sees bending is the rule itself.
 
-## Bot results (`node bots.mjs`, 2026-11-24, exit 0)
+## Initial bot results (`node bots.mjs`, 2026-11-24, exit 0)
 
 - Untouched: street 1 wins (22.5 s, 37% soak, 0 passengers); street 2 is lost to the drain; the daily stream ends (drain, 23 points).
 - Determinism: same seed and inputs give a byte-identical state; another seed differs; a daily piece is fixed by its date.
@@ -34,11 +34,11 @@ Built 2026-11-24. A folded paper boat rides a rain gutter to the pond. The playe
 - Daily stream, 3 dates: careful 602, 1499, 1386 points (124 to 204 s, all ended by soak); clumsy mean 142 over 20 runs per date.
 - **Mutation** (`node bots.mjs --mutate`: `flow()` ignores ripples and pebbles; policies unchanged): exit 1. Careful finishes 2/10 (quick run, 1 seed), clumsy street 2 falls to 0%, daily careful 23 points; 5 checks fail including both touch checks.
 
-## Phone check (`check.mjs`, 2026-11-24, both PASS)
+## Initial phone check (`check.mjs`, 2026-11-24, both PASS)
 
 WebKit iPhone 13: street 1 won in 12.5 s, 2 passengers, 3 stars, 15 swipes and 1 tap. Chromium Pixel 7: 14.0 s, 2 passengers, 3 stars, 10 swipes, 3 taps. Input is real mouse gestures on the canvas, chosen by the careful policy in the page. Also checked: a swipe makes a ripple and moves the boat; a tap drops a pebble; pause freezes; blur pauses; P resumes; street 2 untouched ends in the drain with Retry in one tap; save survives reload; daily seed and best; sound setting persists; one lab `run` record with a `pickup` event marked `agent`; 48 px targets, no text under 14 px, no overflow at 390, 412, 360x640 and 1280x800; arrow keys and space on desktop; zero page, console, request and HTTP errors. Screenshots: `/private/tmp/night-boat/`.
 
-## Not verified
+## Initial verification gaps
 
 - Sound on a real phone. No person has played it; "a stranger finishes street 1 in under a minute with no words read" rests on the untouched boat winning in 22.5 s and on the cue, not on a person.
 - The shared finger hint is wired but the check does not assert that it appears.
@@ -46,7 +46,7 @@ WebKit iPhone 13: street 1 won in 12.5 s, 2 passengers, 3 stars, 15 swipes and 1
 - `kit/check/phone.mjs` has no `boat` section and no `boat-save` / `boat:hint` seed yet (outside this folder).
 - Frame rate on a slow phone (95 flow samples per frame plus the boat).
 
-## Known gaps and ideas left open
+## Initial gaps and ideas
 
 - Clumsy success is not monotone street by street (street 7, Downpipe Row, 42%, is harder for it than street 8, 70%). Either swap them or soften the first gush.
 - The careful bot arrives very dry (5 to 18% typical) because pushing downstream is cheap. Soak only bites slow players; the third star may be too easy for a fast one. A cost per ripple, or a soak splash on a ripple that hits the boat head-on, would make it a real trade.
@@ -54,3 +54,58 @@ WebKit iPhone 13: street 1 won in 12.5 s, 2 passengers, 3 stars, 15 swipes and 1
 - The snail is only a second look. It could make the boat heavier (slower to turn).
 - Daily board shared between players (as Seed Sling does) is not built; best is device-only as asked.
 - No haptics, no colour-blind check of the paw warning (it also grows and pulses).
+
+
+## 2026-11-24 — Street order, pebble lesson, and dry-paper decisions
+
+Changes:
+
+- Streets now run Mill Lane, Grate Street, Split Grate, Snail Corner, Cat Alley, Leaf Fall, Steep Hill, Downpipe Row, Market Slalom, Pond Road. Rapids precede cross-current. The late Pond Road drain moved from x=0.60 to x=0.50, and another side drain was added at (0.86, 15.1). The first Leaf Fall passenger moved from y=3.8 to y=4.4 so the boat can clear the leaves before turning for it.
+- Street 3 replaces its first ordinary drain with a broad grate at (0.50, 2.80). Before a pebble parts it, the intake spans the gutter. The ghost finger appears within 1.3 widths and taps (0.42, 2.58). A stone within 0.13 horizontally and 0.14 vertically of that target reduces suction from 0.42 to 0.08 and opens two paths. The center retains its 0.065 capture radius. The stone lasts the existing 7 seconds. Expiry closes the paths. Water particles use the same flow as the boat. This is a game rule for the grate, not a fluid simulation.
+- The clumsy policy can copy that visible ghost once, with x error up to 0.03 widths. Otherwise it remains the same late, inaccurate, passenger-indifferent policy. Its rates therefore include this new hint response. The check now requires a strict drop across all 9 adjacent street pairs, in addition to the existing grouped and final-street checks.
+- A nearby full ripple adds up to 2% soak, scaled by amplitude and exp(-distance² / 0.06). Distant ripples do not wet the boat. Passive soak and pickup bailing are unchanged. A carried snail halves passive soak; leaf soak, paw splashes, bank bumps and ripple splash remain unchanged. Ladybirds retain the pickup bail without that ongoing shelter. Snails do not stack their benefit. A shell arc around the HUD rain drop shows when shelter is active.
+- Third star now needs every passenger and **under 53% soak**, strengthened from under 62%. The old limit left too much margin after the splash change. The bot requirement of at least 80% three-star runs remains unchanged. The HUD marks the same limit at 47% dry paper. No check threshold was loosened.
+- The phone check asserts the shared hold-and-move hint, visible hand, pointer transparency, real-input dismissal, and persisted boat:hint. It also plays the grate with a real ghost-target tap and waits for passage before resuming policy input. Captures use CSS-pixel scale to reduce capture overhead; viewport, device profile, all gameplay limits and UI checks remain unchanged. The moving target is read again after restarting the screenshot run, so capture time cannot make the click stale.
+
+Independent references:
+
+- One full ripple at the boat adds exactly 2.000% soak. The distant comparison adds zero.
+- Identical one-second runs: ladybird 1.656% passive soak; snail 0.828%; movement states identical.
+- Same street-1 two-passenger route, then different finishing strokes: spaced strokes 10.93 s / 28.81% soak / 3 stars; rapid strokes 9.53 s / 75.03% soak / 2 stars; continuous strokes sink at 100%. The rapid finishing case is a deliberately excessive-input reference, not a claim about typical phone input frequency.
+- Untouched and ripple-only boats fail at the broad grate. Copying its ghost tap alone passes it; seed 5 finishes the whole street without further input. The expiry check proves the paths close again.
+
+Verification commands use `fnm exec --using=26.12.0 node` and the supplied Playwright installation.
+
+- The rule references above pass. The careful bot finishes 30/30, with 27/30 three-star runs (90%); arrival soak spans 24–68%. The 6 retests of the two final tuning changes all finish with 3 stars.
+- `bots.mjs --mutate` exits 1 with 9 failed checks. Careful finishes 8/30 and gets 3 stars on 1/30. Daily careful scores 23, 67, 344 (mean 145 versus clumsy 98); the unchanged flow-control checks, grate passage, third-star trade and daily performance checks detect the mutation.
+- Reviewed the phone screenshots of the shared hint, grate ghost, parted water, play and ending in `/private/tmp/night-boat/`. Screenshots are observations of the emulated browsers, not real phones.
+
+Remaining gaps:
+
+- The separate `experiments/kit/check/phone.mjs boat` run passes its ordinary Boat cases on both engines, but its hint cases fail on both. Its generic gesture moves 40 px, waits for a ripple, then releases. Boat previews that short stroke and creates the ripple on release; live repeated ripples start only after a third-gutter drag. The Boat-local check releases and verifies actual ripples plus hint dismissal. No kit files were changed in this folder-only task. Follow-up dated 2026-11-25: make the kit Boat gesture release before asserting the ripple, or use a full-length drag.
+- No real phone, sound, slow-device frame-rate, human wordless-learning, or live lab-Worker delivery verification. Lab requests in the local check are intercepted. No deployment was requested.
+
+Final phone checks, each exit 0:
+
+- `check.mjs webkit` (iPhone 13): street 1 16.8 s, 2 passengers, 3 stars, 9 policy swipes and 1 policy tap, in addition to the initial input probes.
+- `check.mjs chromium` (Pixel 7): street 1 17.5 s, 2 passengers, 3 stars, 6 policy swipes and 1 policy tap, in addition to the initial input probes.
+- Both: shared hint assertions, one-tap grate passage before policy input, street-3 finish, untouched street-2 drain loss/retry, pause/blur/P, save/reload, daily/best, sound persistence, desktop keyboard, 48 px targets, 14 px minimum DOM text, 360 px width, desktop layout, zero page/console/request/HTTP errors. Phone recording requests are intercepted; the tests do not verify server storage.
+
+Full-sample clumsy difficulty (200 seeds per street):
+
+| Street | Wins / 200 | Success |
+| --- | ---: | ---: |
+| 1 — Mill Lane | 200 | 100.0% |
+| 2 — Grate Street | 187 | 93.5% |
+| 3 — Split Grate | 172 | 86.0% |
+| 4 — Snail Corner | 171 | 85.5% |
+| 5 — Cat Alley | 168 | 84.0% |
+| 6 — Leaf Fall | 166 | 83.0% |
+| 7 — Steep Hill | 139 | 69.5% |
+| 8 — Downpipe Row | 103 | 51.5% |
+| 9 — Market Slalom | 53 | 26.5% |
+| 10 — Pond Road | 36 | 18.0% |
+
+All 9 strict adjacent comparisons pass. Group means: streets 1–3 93.17%, 4–7 80.50%, 8–10 32.00%. These are reproducible measurements of the defined bot and seed set, not a claim about people or every possible seed sample.
+
+Final `bots.mjs` exits 0: all checks pass, including all 9 adjacent difficulty comparisons, 30/30 careful finishes, and 27/30 three-star finishes. Daily streams 20261124 / 20261125 / 20261126 score 397 / 784 / 968, carry 6 / 12 / 16 passengers, and end by soak at 69 / 128 / 150 s (times rounded by the runner). Mean careful score 716 versus clumsy 116 (runner-rounded), above both unchanged performance thresholds. Generated pieces 1–59 pass the paired-drain gap check. `git diff --check -- experiments/boat/` also passes. No commits or deployment.

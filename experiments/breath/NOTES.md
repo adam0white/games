@@ -6,7 +6,7 @@ Built 2026-11-23. An experiment at `/breath/`. All new files are inside `experim
 
 The requested result is one playable phone game with twelve levels, a daily tower, deterministic pure rules, bot evidence, and two phone checks. The owner accepts the play verdict. Automated checks establish rules and browser behavior; no human play verdict has been obtained.
 
-**Remaining acceptance gap:** the clumsy bot's completion rate is nonincreasing, but does not strictly fall at every individual level. Levels 1–3 all have 32/32 wins; levels 9–12 all have 0/32. The three-level blocks fall strictly. The checks label that narrower claim literally. They do not establish a strict twelve-step decline. This remains unresolved. I kept the forgiving introductory smoke instead of raising its damage solely to force a bot curve.
+The initial build had flat clumsy completion rates at levels 1–3 and 9–12. See the 2026-11-24 entry for the revised rules and results.
 
 ## Rules and controls
 
@@ -26,7 +26,7 @@ The daily tower repeats five-floor rescues with increasingly dense smoke. It is 
 
 `index.html` contains the cards and CSS. `main.js` draws every asset in canvas, handles input and effects, and connects the kit. `sim.js` contains rules and the seeded RNG and can run in Node. It has no wall-clock or unseeded random calls. `bots.mjs` exercises it. No build step or runtime npm dependency is needed.
 
-Kit modules: save, audio, pause, zoom, screens, hint, lab. The hint is `hold-and-move`, uses the new `breath:hint` key, and counts idle time only in uncovered play. Its `played` value comes from completed saved runs. The recording notice is on the first card; the recording switch is on pause. `/notes/button.js` is loaded as in the reference experiments. Lab calls include start, hold/release, joins, turns, rescues, and the final outcome.
+Kit modules: save, audio, pause, zoom, screens, lab. The local hold-and-release hint retains the `breath:hint` key and counts idle time only in uncovered play. A completed saved run also suppresses the idle hint. The recording notice is on the first card; the recording switch is on pause. `/notes/button.js` is loaded as in the reference experiments. Lab calls include start, hold/release, joins, turns, rescues, and the final outcome.
 
 New device save contract: `breath-save`, JSON `{v:1, stars:{level:0..3}, opened:1..12, best:number, daily:{UTC-date:score}, runs:number, sound:boolean, look:'night'|'ember'|'paper'}`. Only the newest thirty daily scores are retained. Stored stars are restricted to numbered levels and clamped before rendering. The kit owns its existing shared recording keys; none were changed.
 
@@ -38,7 +38,7 @@ New device save contract: `breath-save`, JSON `{v:1, stars:{level:0..3}, opened:
 - The title card has one large Play button and one short control line before the required lab notice. The level picker and daily tower appear after a completed run. Controls are at least 48px; UI text is at least 14px. Safe-area insets are used for cards, pause, HUD and the bottom control.
 - No art, font, music, account, paid service, or external asset was added.
 
-## Bot evidence
+## Bot evidence from the initial build (2026-11-23)
 
 Run with pinned Node v26.12.0:
 
@@ -99,11 +99,11 @@ Two read-only review agents examined rules and UI/integration separately. Verifi
 - **Live lab storage.** The kit is wired, and the phone check captures compressed agent-marked records through a mocked endpoint. The new `breath` slug still needs registration in the human-framework `LAB_PROTOTYPES` list before live storage accepts it. That is outside this directory and was not changed. No live accepted recording is claimed.
 - **Notes host.** The production notes script tag is present. The local check stubs that script, as Fix-It does. The deployed feedback UI was not exercised.
 - **Deployment.** No git, gh, Wrangler, commits, publication, or root/shared file changes were performed. Only this directory is delivered. No production state is claimed.
-- **Strict per-level clumsy decline.** Unresolved as described at the top. Retune with owner play evidence; do not confuse a synthetic completion curve with a vote on fun.
+- **Human difficulty progression.** The bot curve measures the fixed test policy. Human difficulty progression remains unverified.
 - **Daily length.** The daily is endless, while numbered levels stay in the requested 1–4 minute range. A bounded three-minute daily would be a distinct design choice.
 - **Open visual choice.** Midnight is the default; Ember and Blueprint remain available for the owner to choose in pause.
 
-Final page runs after the review fixes:
+Initial page runs after the 2026-11-23 review fixes:
 
 | Profile | Level 1 time | Rescued | Stars | Holds / releases | Page / console errors |
 |---|---:|---:|---:|---:|---:|
@@ -111,3 +111,42 @@ Final page runs after the review fixes:
 | Chromium Pixel 7 | 63.3s | 1/1 | 3 | 18 / 18 | 0 / 0 |
 
 Operational lesson: on this shared machine, a fixed 900ms wait did not always advance enough animation frames. The input check now waits for observed forward movement with a 15-second timeout, then checks the same distance assertion. It still fails if holding never moves the player. An earlier stop assertion also needed to take its reference snapshot after dispatching release, rather than before release. Neither correction changed game rules. The final bot suite exits 0; the final mutation exits 1 as expected. The final screenshots on both engines were opened and inspected.
+
+## 2026-11-24 — Opening waves and landscape
+
+Level 1 starts a wave as the firefighter enters the first floor's middle shelter. Level 2 repeats it on the return with the group. Each wave gives 1.4 seconds of warning, then lasts 8.5 seconds. In strong smoke, running outside a shelter drops to 24% of normal speed. The mint strip shows the full safe width, and the in-world hand lifts while the player holds near the wave. Letting go crouches as before. Continuous hold drains breath on floor 1 and leads to the existing retry card.
+
+The local idle hint holds one contact point for 1.28 seconds before lifting straight up. Reduced motion shows both poses together. The notification row sits above the clipped building view. In short landscape the viewport fits two complete floors at the street and three at the roof on the two phone profiles. Rotation resets the camera to the player's current position. The compact result card puts the retry button beside the summary so the player can reach it without scrolling.
+
+Each opening-level policy ran on seeds 1–32, the shipped seed, and seed 1801, with first-press delays of 0, 3.4 and 12 seconds. Times are measured from the first press.
+
+| Level | Continuous-hold losses on floor 1 | Latest loss | Three-star wins releasing at warning | Three-star wins releasing when smoke starts |
+|---:|---:|---:|---:|---:|
+| 1 | 102/102 | 14.03 s | 102/102 by 64.97 s, one release | 102/102 by 63.53 s, one release |
+| 2 | 102/102 | 13.90 s | 102/102 by 75.53 s, two releases | 102/102 by 72.70 s, two releases |
+
+Levels 3–11 use revised smoke duty and drain values. The clumsy policy stays the same. The strict per-level check extends the previous nonincreasing check to catch any tie. The existing 75% floor for level 1, three-level block check, and timing and mutation checks still apply.
+
+| Level | Clumsy wins, seeds 1–32 | Clumsy wins, seeds 33–64 | Careful mean seconds, seeds 1–32 | Lowest careful breath, seeds 1–32 |
+|---:|---:|---:|---:|---:|
+| 1 | 30 | 28 | 68.9 | 72.9 |
+| 2 | 25 | 23 | 82.3 | 54.5 |
+| 3 | 23 | 21 | 80.3 | 26.3 |
+| 4 | 19 | 19 | 92.3 | 51.6 |
+| 5 | 16 | 15 | 99.0 | 47.9 |
+| 6 | 13 | 13 | 101.3 | 42.1 |
+| 7 | 10 | 11 | 104.4 | 42.1 |
+| 8 | 8 | 10 | 105.0 | 36.6 |
+| 9 | 6 | 8 | 140.1 | 29.7 |
+| 10 | 4 | 6 | 147.9 | 26.8 |
+| 11 | 2 | 3 | 161.1 | 25.9 |
+| 12 | 0 | 0 | 193.1 | 25.7 |
+
+Careful won 768/768 across both seed ranges. Daily rescued 10 floors in 420.0 seconds in the checked run. The normal suite exited 0. The doorway protection mutation failed its invariant and exited 1.
+
+| Profile | Level 1 time | Rescued | Stars | Holds / releases | Full landscape floors at entry / roof / 568×320 entry |
+|---|---:|---:|---:|---:|---:|
+| WebKit iPhone 13 | 72.8 s | 1/1 | 3 | 18 / 18 | 2 / 3 / 2 |
+| Chromium Pixel 7 | 72.8 s | 1/1 | 3 | 18 / 18 | 2 / 3 / 2 |
+
+Both browser runs recorded zero page, console, request and HTTP errors. Both kept the toast above the building and fit all result actions at 568×320. Separate continuous pointer holds reached the loss card at 14.07 and 14.03 seconds of simulation time respectively, and both retried from the visible primary action. The reduced-motion hint stayed still across samples 550 ms apart. The shared kit check passed on both engines. Screenshots of the hint, play, result and landscape states were inspected in `/private/tmp/night-breath/`. Physical-device play, whether a first-time player reads the cue without text, and live lab storage remain unverified.

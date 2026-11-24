@@ -78,3 +78,80 @@ Screenshots: `/private/tmp/night-wild/{webkit,chromium}-{1-menu,2-pouring,3-end-
 Proposed row for `experiments/lab/NOTES.md` (not added here; the lab owns that file):
 
 | 2026-11-24 | `wild-pour` | A particle liquid you pour from a jug to a line in a glass; finger slide or the phone's own tilt | see this file | Keep testing; needs a person and a real phone for the tilt |
+
+## 2026-11-24 — liquid surface, clock, daily pour, and independent seeds
+
+This section supersedes the earlier visual and missing-clock limitations. Only this folder changed.
+
+### Changes and decisions
+
+- Level 6 keeps 76 drops, half-width 10, target 42, sway 8 and speed 0.9. Its band changes from ±4 to ±6 and its spill allowance from 17 to 18. Planner training on seeds 1–12 wins 10/12: 5/6 on seeds 1–6 and 5/6 on seeds 7–12 (previously 2/6 on seeds 7–12). Clumsy remains 5/16. Parameters were frozen before examining seeds 100–120. No check threshold was weakened.
+- To make the independent seed sweep practical under heavy CPU contention, `sim.js` reuses a dense linked spatial grid instead of allocating maps and buckets per substep. It preserves snapshot bucket membership, ascending particle order, neighbor order and all correction arithmetic. Out-of-bounds or oversized states use the original map path. Independent reference comparison passed 130 episodes and 41,147 steps with every state field equal, including mutation, fallback cases, coordinates, prior coordinates, RNG and events. Alternating CPU measurements: original 255.617/263.376 ms; dense 98.315/86.341 ms, a 2.811× speedup. A separate 10-step nonfinite-state comparison also passed after explicitly routing nonfinite coordinates to the original fallback. The reusable checker now covers 131 episodes / 41,157 steps. A second read-only review found no substantive grid issue. The repeatable `grid-check.mjs` loads original simulation blob `5d5ab9cf68b7d4e0bf2364bf59a940c01a7944a8` with read-only `git show`; it substitutes only the frozen level 6 parameters before comparing.
+- `liquid.js` accumulates compact radial kernels into a scalar field, thresholds the field, and paints one offscreen canvas. The canvas is 336 × 612 pixels, at 3 samples per world unit, independent of device pixel ratio. The kernel radius is 4 world units. The threshold is 0.34, with a narrow antialias band. Highlights follow the surface boundary; particles no longer receive individual highlights. Separate airborne drops remain separate when the simulation places them far apart.
+- A 30-second draining ring with numerals shows the deadline without words. It freezes during pause and stops at the result. The layout reserves the complete jug rotation envelope below the dots and clock. The conservative minimum clearance is 15.82 CSS pixels on Pixel 7 and 13.92 CSS pixels on iPhone 13.
+- Daily pour uses level 1 and a UTC-date-derived seed. The choice keeps the daily accessible; precision is the challenge. Retry repeats the same date and seed, including across midnight. The menu refreshes the current date once a minute. Winning pours rank by absolute distance from the line, then fewer spills. Losses never replace a best.
+- The new `wild-pour:daily` key stores only `{ v: 1, day, off, spilled }` through kit save helpers. It retains the latest day's best on this device. Nothing is sent to a server. Existing campaign and hint keys and formats stay unchanged. Daily wins do not unlock campaign levels. A completed older-day tab cannot overwrite a newer-day best.
+- Independent review caught the older-tab overwrite and the initial stationary-only performance measurement. The overwrite now has a regression check. The phone check now measures a separate active pour without screenshot capture in that interval. It also closes its browser on assertion failures and checks daily retry, reload, score persistence, campaign isolation, clock pause and full-tilt clearance.
+
+### Verification commands
+
+Use Node 26.12.0 for every command:
+
+```sh
+fnm exec --using=26.12.0 node experiments/lab/wild-pour/bots.mjs
+fnm exec --using=26.12.0 node experiments/lab/wild-pour/bots.mjs --mutate
+fnm exec --using=26.12.0 node experiments/lab/wild-pour/bots.mjs --planner-only --from=100 --count=21
+fnm exec --using=26.12.0 node experiments/lab/wild-pour/daily.test.mjs
+fnm exec --using=26.12.0 node experiments/lab/wild-pour/grid-check.mjs
+PLAYWRIGHT=/Users/abdul/code/human-framework/node_modules fnm exec --using=26.12.0 node experiments/lab/wild-pour/check.mjs
+```
+
+`daily.test.mjs`: 11 assertions passed, covering UTC rollover, reproducible seeds, ranking and tie breaks, losses, stale/malformed records, and older-tab completion. Screenshots and raw results are local artifacts in ignored `screenshots/` and `verification/` directories.
+
+### Default rules checks
+
+`bots.mjs` exits 0 with 0 failed checks. Planner wins on seeds 1–6, levels 1–8: 6, 5, 5, 5, 5, 5, 5, 5 out of 6. Clumsy wins: 14, 6, 5, 5, 4, 5, 5, 2 out of 16. Determinism, seed variation, idle, conservation and the difficulty checks pass. Full dumping wins 0/70 on levels 2–8. Evidence: `verification/rules-standard.log`.
+
+`bots.mjs --mutate` exits 1 as required: 3 checks fail with the glass floor removed. Planner wins 0/6 and clumsy wins 0/16 on every level. The failures are planner success, introductory clumsy success and the clumsy difficulty gradient. Evidence: `verification/rules-mutation.log`. The combined verification exits 1 because four held-out levels fail, while the default exit is 0 and mutation exit is 1; see `verification/rules-exits.json`.
+
+### Independent seeds: 100–120
+
+All 168 planner runs completed after level 6 was frozen. Total wins: 138/168. The existing minimum rate of 5/6 requires at least 18/21 wins. Levels 1–4 pass; levels 5–8 fail. These are observed generalization failures, not waived checks. No level was retuned against this set.
+
+| Level | Wins / 21 | Failed seeds and reason |
+| --- | ---: | --- |
+| 1 | 20 | 107 overfill |
+| 2 | 20 | 114 overfill |
+| 3 | 20 | 100 overfill |
+| 4 | 19 | 103, 120 spill |
+| 5 | 15 | 103, 106, 107, 108, 113, 120 spill |
+| 6 | 16 | 100, 109, 112, 119, 120 spill |
+| 7 | 16 | 103, 109, 111, 117 spill; 105 overfill |
+| 8 | 12 | 102, 103, 113, 115, 117, 118, 120 spill; 108, 111 overfill |
+
+All five level 6 failures reached 19 spilled, one above its new allowance. Its original seeds 7–12 improve from 2/6 to 5/6, but independent success remains below the criterion. Levels 5, 7 and 8 keep their original parameters. Evidence: `verification/rules-heldout.log` and `verification/rules-heldout-summary.json`, including each failed run's glass and spill counts. The sweep validates exactly 21 unique seeds per level; the first 16 level 1 runs preceded the physics-equivalent grid optimization and the remaining runs used it.
+
+### Frame measurements
+
+Measured in desktop browsers using phone profiles, with the actual simulation, liquid renderer, sound-event handling and effects enabled. These are not physical-phone measurements. Work time measures the JavaScript animation callback; frame intervals also capture scheduling delays. Active-pour samples exclude screenshot capture. The checks require p95 work below 16.67 ms and mean frame interval below 18 ms.
+
+| Profile and phase | Frames | Mean interval ms | p95 interval ms | Mean work ms | p95 work ms | Max work ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Chromium Pixel 7, stationary | 309 | 16.666 | 16.800 | 1.418 | 1.900 | 5.000 |
+| Chromium Pixel 7, active pour | 257 | 16.666 | 16.700 | 1.367 | 2.000 | 2.600 |
+| WebKit iPhone 13, stationary | 355 | 14.124 | 19.000 | 1.349 | 2.000 | 2.000 |
+| WebKit iPhone 13, active pour | 270 | 14.919 | 25.000 | 1.493 | 2.000 | 15.000 |
+
+These final per-profile runs use the dense simulation grid. Chromium: campaign wins on attempt 1 with 39/34, 3 spilled, 1 star; daily 35/34, 6 spilled. WebKit: campaign wins on attempt 1 with 33/34, 7 spilled, 2 stars; daily 34/34, 5 spilled. Both profiles pass every gameplay/save/layout/frame assertion, with zero page or console errors. The combined run in `verification/phone-final.log` also exits 0. Final per-profile logs are `verification/phone-integrated.log` (Chromium portion) and `verification/phone-awake.log` (WebKit).
+
+Inspected menu, pouring, full-tilt and daily-result screenshots. Verified screenshots are collected in `screenshots/verified/`. The liquid forms a joined stream near the spout and a single settled surface; full-tilt handles clear the HUD. Some screenshots named `2-pouring` arrived after the pour; the full-tilt images supply active-stream evidence.
+
+Some WebKit starts produced black captures and zero animation frames despite a visible, focused document and no JavaScript errors. That startup problem occurred in both headless and visible launches under concurrent testing. Visible WebKit with an awake display produced successful runs. The check now uses visible WebKit on macOS, starts a bounded 180-second display-awake process, waits one second before browser creation, and kills that process in `finally`, including on failure. This changes test setup only; the underlying startup explanation remains unresolved. Chromium and other platforms retain headless defaults. No assertion or time threshold was weakened. The timer-start assertion was made exact inside the Play click event, avoiding scheduler delay between the click and a later automation read.
+
+Frame scheduling still has spikes (final active WebKit p95 25 ms, maximum 49 ms; Chromium maximum 16.8 ms), despite p95 callback work of 2 ms on both profiles. These measurements establish rendering budget and average cadence, not a guarantee of uninterrupted 60 fps under machine contention.
+
+The full shared kit phone suite was attempted before edits. Its first kit and Lantern WebKit checks passed, then unrelated pages timed out during concurrent browser testing; that broad run was stopped. Focused kit checks passed afterwards on Chromium and WebKit. No shared-kit files were edited.
+
+### Remaining physical verification
+
+Device orientation permission and mapping, audio by ear, sustained frame rate and thermal behavior on a physical phone, and whether a person understands the fill target remain unverified. Phone profiles do not establish those outcomes. No deployment was attempted.

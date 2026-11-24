@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { dailyPour, dailyBest, validBest } from './daily.js';
+const a = dailyPour(new Date('2026-11-24T00:00:00Z'));
+assert.deepEqual(a, dailyPour(new Date('2026-11-24T23:59:59Z')));
+assert.notEqual(a.seed, dailyPour(new Date('2026-11-25T00:00:00Z')).seed);
+const won = (off, spilled) => ({ won: true, inGlass: 34 + off, L: { target: 34 }, spilled });
+const best = dailyBest(null, a.day, won(2, 4));
+assert.equal(dailyBest(best, a.day, won(3, 0)), best);
+assert.equal(dailyBest(best, a.day, won(2, 5)), best);
+assert.equal(dailyBest(best, a.day, { ...won(0, 0), won: false }), best);
+assert.equal(dailyBest(best, a.day, won(2, 3)).spilled, 3);
+assert.equal(dailyBest(best, a.day, won(1, 8)).off, 1);
+assert.equal(validBest(best, '2026-11-25'), null);
+assert.equal(validBest({ ...best, off: NaN }, a.day), null);
+assert.equal(dailyBest(best, '2026-11-25', won(4, 5)).off, 4);
+assert.equal(dailyBest(best, '2026-11-23', won(0, 0)), best);
+console.log('daily: 11 checks passed (UTC rollover, seed, ranking, failure, stale and malformed saves)');

@@ -1,6 +1,6 @@
 // Thumb Duel: the bots. Pure, like sim.js: the page's solo opponent and the test bots in bots.mjs are the same code.
 // A bot sees the duel late (its reaction time), through the same view a person has, and answers with the same input
-// a finger gives: { held, taps, px, py }. Its own seeded stream decides its lapses and mistakes, apart from the rules' RNG.
+// a finger gives. Its own seeded stream decides its lapses and mistakes, apart from the rules' RNG.
 import { DT, rand, mirror, blank, PADS, HOCKEY } from './sim.js';
 
 // The fastest a thumb taps (per second) and the quickest reaction (s). No bot goes past these.
@@ -14,6 +14,7 @@ export const SKILLS = {
   medium:  { react: 0.45, jit: 0.18, rate: 5.05, early: 0.13, miss: 0.13, err: 0.07, speed: 2.65, lead: 0.22, smart: 0.36, lapse: 0.21 },
   hard:    { react: 0.33, jit: 0.12, rate: 6.3, early: 0.06, miss: 0.05, err: 0.035, speed: 3.9, lead: 0.31, smart: 0.7,  lapse: 0.08 },
   careful: { react: 0.21, jit: 0.07, rate: 8.0, early: 0.015, miss: 0.01, err: 0.012, speed: 5.6, lead: 0.38, smart: 0.95, lapse: 0.02 },
+  'slow-human': { react: 0.35, jit: 0.25, rate: 3.9, early: 0.22, miss: 0.25, err: 0.12, speed: 1.8, lead: 0.12, smart: 0.24, lapse: 0.35 },
 };
 export const STRENGTHS = ['easy', 'medium', 'hard']; // the page's three bots, in order: the solo levels
 
@@ -30,6 +31,8 @@ const VIEW = {
   },
   memory: (d) => ({ st: d.st, round: d.round, seq: d.seq }),
   balance: (d, side) => ({ x: d.x[side], v: d.v[side], fall: d.fall[side] > 0 }),
+  swipe: () => ({}),
+  launch: (d, side) => ({ shot: d.shots[side], target: d.targets[d.shots[side]] }),
 };
 
 export function makeBot(skill, seed = 1) {
@@ -143,6 +146,37 @@ export function makeBot(skill, seed = 1) {
       if (xp < -0.06) m.held = true; else if (xp > 0.06) m.held = false;
       if (rand(box) < (1 - skill.smart) * DT * 2) m.held = !m.held;
       return out(side, m.held ?? false, null);
+    },
+    swipe(s, side) {
+      const inp = blank();
+      if (m.next === undefined) m.next = react + rand(box) * skill.jit;
+      m.next -= DT;
+      if (m.stroke === undefined && m.next <= 0 && !lapsing()) {
+        m.stroke = 0; m.travel = 0.12 + rand(box) * 0.11;
+        m.flick = rand(box) >= skill.miss;
+      }
+      if (m.stroke === undefined) return inp;
+      m.stroke += DT;
+      const [x0, y0] = mirror(side, 0.5, 0.77);
+      const [x, y] = mirror(side, 0.5, 0.77 - (m.flick ? 0.4 : 0.13) * Math.min(1, m.stroke / m.travel));
+      if (m.stroke < m.travel) return { ...inp, held: true, px: x, py: y, heldFor: m.stroke };
+      inp.releases.push({ x0, y0, x, y, seconds: m.stroke });
+      m.stroke = undefined;
+      m.next = 0.18 + 1.35 / rate + react * 0.34 + rand(box) * skill.jit;
+      return inp;
+    },
+    launch(s, side) {
+      const inp = blank(), v = seen();
+      if (!v || v.target === undefined || v.shot === m.shot) return inp;
+      if (m.charge === undefined) {
+        m.charge = 0;
+        m.duration = v.target + (rand(box) * 2 - 1) * (0.055 + (1 - skill.smart) * 0.38);
+      }
+      m.charge += DT;
+      if (m.charge < m.duration) return { ...inp, held: true, heldFor: m.charge };
+      inp.releases.push({ seconds: m.charge });
+      m.charge = undefined; m.shot = v.shot;
+      return inp;
     },
   };
   return {

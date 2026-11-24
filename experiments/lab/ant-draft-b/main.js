@@ -8,6 +8,9 @@ import { hint } from '../../kit/hint.js';
 import { noZoom } from '../../kit/zoom.js'; noZoom();
 
 const $ = id => document.getElementById(id);
+const timers = new Set();
+function later(fn, ms) { const id = setTimeout(() => { timers.delete(id); fn(); }, ms); timers.add(id); return id; }
+function clearTimers() { for (const id of timers) clearTimeout(id); timers.clear(); }
 const cv = $('c'), g = cv.getContext('2d');
 const Q = new URLSearchParams(location.search);
 const SPEED = Math.max(1, Math.min(8, Number(Q.get('speed')) || 1)); // test hook: run the rules faster (check.mjs)
@@ -26,16 +29,16 @@ const sfx = {
   kill(kind) { snd.noise(kind === 'spider' ? 0.4 : 0.09, kind === 'beetle' || kind === 'spider' ? 0.18 : 0.1, kind === 'wasp' ? 3000 : 1400); blip(kind === 'spider' ? 160 : 520 + Math.random() * 120, 0.12, 'triangle', 0.08, kind === 'spider' ? -80 : 300); },
   die() { blip(300, 0.1, 'sine', 0.05, -150); },
   nest(h) { blip(110, 0.25, 'sawtooth', 0.09 + h * 0.02, -50); snd.noise(0.15, 0.12, 500); },
-  hatch() { blip(660, 0.06, 'sine', 0.07, 400); setTimeout(() => blip(990, 0.06, 'sine', 0.05), 50); },
+  hatch() { blip(660, 0.06, 'sine', 0.07, 400); later(() => blip(990, 0.06, 'sine', 0.05), 50); },
   pickup() { blip(1200, 0.03, 'triangle', 0.03); },
   deliver() { blip(880, 0.05, 'triangle', 0.04, 200); },
   split() { blip(500, 0.08, 'square', 0.04, 500); },
-  wave() { blip(330, 0.18, 'triangle', 0.08); setTimeout(() => blip(440, 0.25, 'triangle', 0.08), 140); },
-  cleared() { [523, 659, 784].forEach((f, i) => setTimeout(() => blip(f, 0.18, 'triangle', 0.09), i * 90)); },
-  deal(i) { setTimeout(() => { snd.noise(0.06, 0.05, 4000); blip(400 + i * 120, 0.06, 'sine', 0.05, 200); }, i * 110); },
-  pick() { [392, 523, 659, 1046].forEach((f, i) => setTimeout(() => blip(f, 0.3, 'triangle', 0.08), i * 60)); },
-  won() { [523, 659, 784, 1046, 784, 1046].forEach((f, i) => setTimeout(() => blip(f, 0.25, 'triangle', 0.1), i * 120)); },
-  lost() { [392, 330, 262, 196].forEach((f, i) => setTimeout(() => blip(f, 0.3, 'sawtooth', 0.06), i * 160)); },
+  wave() { blip(330, 0.18, 'triangle', 0.08); later(() => blip(440, 0.25, 'triangle', 0.08), 140); },
+  cleared() { [523, 659, 784].forEach((f, i) => later(() => blip(f, 0.18, 'triangle', 0.09), i * 90)); },
+  deal(i) { later(() => { snd.noise(0.06, 0.05, 4000); blip(400 + i * 120, 0.06, 'sine', 0.05, 200); }, i * 110); },
+  pick() { [392, 523, 659, 1046].forEach((f, i) => later(() => blip(f, 0.3, 'triangle', 0.08), i * 60)); },
+  won() { [523, 659, 784, 1046, 784, 1046].forEach((f, i) => later(() => blip(f, 0.25, 'triangle', 0.1), i * 120)); },
+  lost() { [392, 330, 262, 196].forEach((f, i) => later(() => blip(f, 0.3, 'sawtooth', 0.06), i * 160)); },
   tap() { blip(880, 0.04, 'sine', 0.05); },
 };
 const buzz = ms => { try { if (save.sound) navigator.vibrate?.(ms); } catch {} };
@@ -175,31 +178,34 @@ function foeIcon(kind) {
 // ---------- state
 let s = null, mode = 'menu', paused = false, daily = false, runSeed = 1, acc = 0, last = 0, now = 0;
 let finger = null, shake = 0, flash = 0, banner = null, parts = [], floats = [], antSquash = new Map();
+let pendingDraft = 0, pendingEnd = 0, pauseAfterPick = false;
 const show = screens(['menu', 'draft', 'paused', 'end'], name => { $('pause').style.display = name === 'play' ? 'grid' : 'none'; });
-function go(name) { mode = name; show(name); }
+function go(name) { if (name !== 'play') finger = null; mode = name; show(name); }
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
 const hash = t => { let h = 2166136261; for (const ch of t) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; };
 
 function menu() {
+  clearTimers(); finger = null; pendingDraft = pendingEnd = 0;
   $('best').textContent = save.best;
   $('dailyLine').innerHTML = save.daily && save.daily.day === today() ? `Today <b>${save.daily.score}</b>` : '';
   for (const id of ['sound1', 'sound2']) $(id).textContent = save.sound ? 'Sound: on' : 'Sound: off';
   go('menu');
 }
 function start(isDaily) {
+  clearTimers(); pauseAfterPick = false;
   snd.unlock(); sfx.tap();
   daily = isDaily; runSeed = isDaily ? hash('ant-draft-b' + today()) : (Q.get('seed') ? Number(Q.get('seed')) : (Date.now() ^ (Math.random() * 1e9)) >>> 0);
   if (!isDaily && Q.get('seed')) runSeed = Number(Q.get('seed')) + (start.n = (start.n || 0) + 1) - 1;
-  s = create(runSeed); parts = []; floats = []; finger = null; acc = 0; paused = false; shake = 0;
+  s = create(runSeed); parts = []; floats = []; finger = null; acc = 0; paused = false; shake = flash = 0; banner = null; pendingDraft = pendingEnd = 0;
   handle(s.fx); go('play');
 }
 
 // ---------- input: the rally point is a little above the finger, so the finger does not hide the swarm
 const LIFT = 46;
 function toArena(e) { return { x: (e.clientX - ox) / sc, y: (e.clientY - LIFT - oy) / sc }; }
-cv.addEventListener('pointerdown', e => { if (mode !== 'play' || paused) return; finger = { ...toArena(e), cx: e.clientX, cy: e.clientY, id: e.pointerId }; try { cv.setPointerCapture(e.pointerId); } catch {} });
+cv.addEventListener('pointerdown', e => { if (mode !== 'play' || paused || finger) return; finger = { ...toArena(e), cx: e.clientX, cy: e.clientY, id: e.pointerId }; try { cv.setPointerCapture(e.pointerId); } catch {} });
 cv.addEventListener('pointermove', e => { if (!finger || finger.id !== e.pointerId) return; Object.assign(finger, toArena(e), { cx: e.clientX, cy: e.clientY }); });
-for (const t of ['pointerup', 'pointercancel']) cv.addEventListener(t, e => { if (finger && finger.id === e.pointerId) finger = null; });
+for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) cv.addEventListener(t, e => { if (finger && finger.id === e.pointerId) finger = null; });
 addEventListener('keydown', e => {
   if (isPauseKey(e)) { if (mode === 'play') pause(); else if (mode === 'paused') resume(); return; }
   if (mode === 'draft' && ['1', '2', '3'].includes(e.key)) pick(Number(e.key) - 1);
@@ -209,7 +215,7 @@ hint(cv, { kind: 'hold-and-move', key: 'ant-draft-b:hint', when: () => mode === 
 function pause() { if (mode !== 'play') return; paused = true; finger = null; snd.hold(); fillHand($('pauseHand')); go('paused'); }
 function resume() { paused = false; snd.release(); last = performance.now(); go('play'); }
 $('pause').onclick = pause; $('resume').onclick = resume; $('quit').onclick = () => { paused = false; snd.release(); menu(); };
-onLeave(() => { if (mode === 'play') pause(); });
+onLeave(() => { if (mode === 'picking') pauseAfterPick = true; else if (mode === 'play') pause(); });
 $('play').onclick = () => start(false); $('daily').onclick = () => start(true);
 $('again').onclick = () => start(daily); $('toMenu').onclick = () => { sfx.tap(); menu(); };
 for (const id of ['sound1', 'sound2']) $(id).onclick = () => { save.sound = !save.sound; store(); snd.unlock(); sfx.tap(); for (const b of ['sound1', 'sound2']) $(b).textContent = save.sound ? 'Sound: on' : 'Sound: off'; };
@@ -233,7 +239,7 @@ function draft() {
     if (have) { const n = document.createElement('span'); n.className = 'n'; n.textContent = '+'.repeat(have + 1); b.append(n); }
     b.onclick = () => pick(i);
     box.append(b);
-    setTimeout(() => b.classList.add('in'), 60 + i * 110); sfx.deal(i);
+    later(() => b.classList.add('in'), 60 + i * 110); sfx.deal(i);
   });
   // the scout shows the bugs of the next wave
   const nx = $('next'); nx.innerHTML = '';
@@ -251,7 +257,7 @@ function pick(i) {
   sfx.pick(); buzz([15, 30, 40]);
   const id = s.offer[i];
   mode = 'picking';
-  setTimeout(() => { choose(s, i); burst(W / 2, LINE - 40, [CARD_COL[id], COL.gold, '#fff'], 30, 140, 3); handle(s.fx); go('play'); }, 280);
+  later(() => { choose(s, i); burst(W / 2, LINE - 40, [CARD_COL[id], COL.gold, '#fff'], 30, 140, 3); handle(s.fx); go('play'); if (pauseAfterPick) { pauseAfterPick = false; pause(); } }, 280);
 }
 
 // ---------- effects
@@ -269,10 +275,11 @@ function handle(fx) {
     else if (e.type === 'deliver') { burst(e.x, e.y, ['#f2c25a'], 4, 40, 1.4); sfx.deliver(); }
     else if (e.type === 'split') { burst(e.x, e.y, [CARD_COL.split, '#fff'], 10, 70, 1.8); sfx.split(); }
     else if (e.type === 'wave') { banner = { text: e.n === WAVES ? 'Last wave!' : `Wave ${e.n}`, age: 0 }; sfx.wave(); }
-    else if (e.type === 'cleared') { sfx.cleared(); burst(W / 2, 200, [COL.gold, '#fff', '#8dff8a'], 40, 180, 3); setTimeout(() => { if (s && s.phase === 'draft' && mode === 'play') draft(); }, 650); }
-    else if (e.type === 'won') { sfx.won(); for (let i = 0; i < 5; i++) setTimeout(() => burst(60 + Math.random() * 240, 120 + Math.random() * 200, [COL.gold, '#ff8a5a', '#5ad0ff', '#fff'], 40, 200, 3), i * 200); setTimeout(() => end(true), 1300); }
-    else if (e.type === 'lost') { sfx.lost(); shake = 18; flash = 0.5; buzz([60, 40, 120]); setTimeout(() => end(false), 1100); }
+    else if (e.type === 'cleared') { sfx.cleared(); burst(W / 2, 200, [COL.gold, '#fff', '#8dff8a'], 40, 180, 3); pendingDraft = 0.65; }
+    else if (e.type === 'won') { sfx.won(); burst(W / 2, 200, [COL.gold, '#ff8a5a', '#5ad0ff', '#fff'], 200, 200, 3); pendingEnd = 1.3; }
+    else if (e.type === 'lost') { sfx.lost(); shake = 18; flash = 0.5; buzz([60, 40, 120]); pendingEnd = 1.1; }
   }
+  fx.length = 0;
 }
 function end(won) {
   const better = s.score > save.best; if (better) save.best = s.score;
@@ -293,10 +300,14 @@ function end(won) {
 // ---------- frame
 function frame(t) {
   requestAnimationFrame(frame);
-  const dt = Math.min(0.05, (t - (last || t)) / 1000); last = t; now = t / 1000;
+  const dt = Math.max(0, Math.min(0.05, (t - (last || t)) / 1000)); last = t; now = t / 1000;
   if (mode === 'play' && !paused && s && s.phase === 'fight') {
     acc += dt * SPEED;
     while (acc >= DT) { acc -= DT; step(s, finger ? { x: finger.x, y: finger.y } : null); handle(s.fx); if (s.phase !== 'fight') { acc = 0; break; } }
+  }
+  if (mode === 'play' && !paused) {
+    if (pendingDraft > 0 && (pendingDraft -= dt) <= 0) draft();
+    if (pendingEnd > 0 && (pendingEnd -= dt) <= 0) end(s.phase === 'won');
   }
   for (const p of parts) { p.age += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy = p.vy * 0.92 + 120 * dt; }
   parts = parts.filter(p => p.age < p.life);

@@ -1,7 +1,7 @@
 // Race rooms: only protocol rules here. Sockets and their short-lived attachments live in index.mjs.
 import { shownName } from './board.mjs';
 
-export const ROOM = { games: ['lantern-race'], sockets: 8, bytes: 200, messages: 12, windowMs: 1000, roundMs: 150_000, countdownMs: 4000 };
+export const ROOM = { games: ['lantern-race'], sockets: 8, bytes: 200, messages: 12, windowMs: 1000, roundMs: 150_000, countdownMs: 4000, readyMs: 8000 };
 export function roomName(path) {
   const m = /^\/lab-api\/room\/([a-z-]+)\/(open|[A-Z]{4})$/.exec(path);
   return m && ROOM.games.includes(m[1]) ? `${m[1]}/${m[2]}` : null;
@@ -27,8 +27,7 @@ export function rateWindow(times, now) {
   const next = times.filter(t => t > now - ROOM.windowMs); next.push(now);
   return { ok: next.length <= ROOM.messages, times: next };
 }
-// The participants are the sockets present when the round was made. Late arrivals wait for the next round;
-// departures leave the participant set. An empty participant set can start again immediately.
+// Only the connected racers can keep a round open. Spectators and departed racers do not count.
 export const needsRound = (round, clients, now) => !round || now - round.start > ROOM.roundMs || clients.filter(c => c.inRound).every(c => c.done);
 export const freshRound = (seed, now) => ({ seed: seed >>> 0, start: now + ROOM.countdownMs });
 export const freeId = clients => Array.from({ length: ROOM.sockets }, (_, i) => i + 1).find(id => !clients.some(c => c.id === id)) ?? null;

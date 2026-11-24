@@ -18,12 +18,12 @@ Served at `/harvest/`. It rebuilds the archived "The Valley" idea as a fresh gam
 
 - Top-down golden field that sways. Hold and move: the farmer walks to the point under the finger. The touch target is 34 px above the finger, so the thumb does not hide the farmer.
 - Standing wheat near the scythe is cut and lies as a sheaf. Walking over sheaves picks them up, up to 3 (6 with Grandma hired). Walking to the cart in the lane below unloads.
-- The sky bar: a storm cloud crosses from left to right over the morning (90 to 140 s per field). When it arrives, rain sweeps the field left to right in 5 s. Anything still in the field, standing or lying, is lost.
+- The sky bar: a storm cloud crosses from left to right over the morning (50 to 115 s per field). When it arrives, rain sweeps the field left to right in 5 s. Anything still in the field, standing or lying, is lost.
 - Neighbours wait on the verge with a price bubble (grain icon and number) and a picture of what they want. Tap to hire. Tap again to send home. A second tap within 1 s is ignored.
   - Strong one (22, a bowl): carries 10 sheaves to the cart.
   - Child (6, a sweet): chases crows.
   - Grandma (10, a loaf): ties bundles, so you carry double.
-  - Fast one (8, a ring): cuts fast, ignores flattening, but tramples 12% of the cells he cuts.
+  - Fast one (8, a ring): cuts fast, ignores flattening, bundles up to 3 sheaves and carries them to the cart, but tramples 12% of the cells he cuts. Offered from field 7 alongside double bundles.
   - The fast one refuses (a crossed-out picture of the strong one) if the strong one was hired this morning.
 - Pay comes out of the cart at the end, pro rata for time worked: `ceil(price * min(1, worked / morning))`. "Stop here" on the pause card ends the morning now and pays what was earned. The score is grain kept.
 - Hazards:
@@ -31,10 +31,10 @@ Served at `/harvest/`. It rebuilds the archived "The Valley" idea as a fresh gam
   - a hidden stone blunts the scythe (cutting 0.3x) until you tap Sharpen (1 s, standing still);
   - wind flattens a patch (slower to cut);
   - a hare's nest pays +12 if all its cells are still standing at the end. It can be cut only from inside it, and crows ignore it.
-- 12 fields, each with a new shape and one new thing. Stars are set by grain kept: field 1 needs 15/21/25. A field opens when the one before has a star.
+- 12 fields. The early fields introduce hazards; the late fields give shorter mornings and more hiring choices. Stars are set by grain kept: field 1 needs 15/21/25. A field opens when the one before has a star.
 - Today's field: a seed from the UTC date (`sim.dateSeed`), the same on every device. The device keeps its best per day, and a device-only board holds the top 10 mornings. The shared board (`/lab-api/board/harvest`) is not available, so it is not used.
 
-## Bot results (`node experiments/harvest/bots.mjs`, 2026-11-24)
+## Baseline bot results (before the 2026-11-24 retune)
 
 The careful bot plays 12 seeds for every set of offered neighbours on each field. The clumsy bot plays 30 seeds with no hires, then 30 with the careful bot's best set.
 
@@ -82,7 +82,7 @@ Mutation run, `node experiments/harvest/bots.mjs --mutate`: helpers work for fre
 - "best beats everyone" on fields 7 to 12, where the two tie at 106.0, 105.0, 127.6, 130.0, 126.3 and 124.2;
 - "the new neighbour (old) is in the best choice" on field 7.
 
-## Phone check (`PLAYWRIGHT=/Users/abdul/code/human-framework/node_modules node experiments/harvest/check.mjs`)
+## Baseline phone check (`PLAYWRIGHT=/Users/abdul/code/human-framework/node_modules node experiments/harvest/check.mjs`)
 
 Both phones pass, with zero page errors, console errors, failed requests or HTTP errors: WebKit iPhone 13 in 97 s, Chromium Pixel 7 in 117 s.
 
@@ -122,7 +122,9 @@ Screenshots are in `/private/tmp/night-harvest/`:
 - for each phone: `<phone>-1-menu`, `-2-hint`, `-3-mid`, `-4-end`, `-5-hired`, `-6-stopped`, `-7-today`, `-8-today-end`;
 - also `small-360-menu`, `small-360-field12` and `desktop`.
 
-## Not verified
+## Baseline gaps (before the 2026-11-24 retune)
+
+Current results and remaining gaps are in the dated retune section below. This section records the starting evidence.
 
 - **No human has played it.** The difficulty curve is proven only for the two bots.
   - The need jumps from 46 (field 6) to 83 (field 7), and the clumsy bot is at 0% from field 7 even with the best hires (kept/need 0.53 to 0.64).
@@ -140,6 +142,62 @@ Screenshots are in `/private/tmp/night-harvest/`:
 ## Ideas left open
 
 - A shared daily board when `/lab-api/board/harvest` exists. The device board keeps the same shape (`{d, k}`).
-- Make the fast one pay off: a field where cutting is the bottleneck (a very short morning with a near cart), or let him tie his own sheaves.
-- Ease the step from field 6 to 7 after seeing human pass rates.
 - Neighbours who remember: a neighbour sent home early asks more next morning.
+
+## 2026-11-24 — difficulty and wheat retune
+
+### Acceptance and decisions
+
+The progression curve below measures the unchanged clumsy brain with a simple hiring policy: nobody on fields 1, 2 and 4; strong on 3; child on 5 and 6; fast on 7–12, hired at 4 s. Solo clumsy results remain separate. This interpretation preserves the existing requirement that even the careful brain must hire to earn its first star late. Lowering only the quotas would let the careful brain pass every late field alone. No bot aiming, reactions or movement changed.
+
+First-star quotas are now 15, 20, 34, 37, 39, 42, 56, 61, 66, 71, 73 and 75. The field 6→7 increase is 14 grain, formerly 37. Late morning limits are 50, 60, 60, 65, 70 and 75 s, formerly 120, 110, 115, 120, 130 and 140 s. Late two-star targets are 64, 68, 76, 79, 80 and 82; three-star targets are 68, 74, 80, 88, 88 and 90, retuned to the shorter mornings. The fast neighbour arrives on field 7, cuts and bundles his own load of 3, then delivers before cutting again. His price remains 8 and trample chance remains 12%. He avoids selecting nest cells and shares the player's nest swing protection.
+
+The hiring search now hires fast before strong when both are selected. “Everyone” therefore measures everyone actually working; it no longer silently omits the refusing neighbour. The refusal rule itself is unchanged and still tested in both orders.
+
+The clumsy curve assertion changed from solo failure on field 12 to the simple-policy progression above: every field must have nonzero success; the last must be 10–25%; each adjacent drop must be at most 25 percentage points and each rise at most 10. The old solo kept/quota trend assertion was removed because the new late hiring gate deliberately separates solo and hired play. The careful first-star assertions retain 90% minimum with the best hires and 20% maximum alone late; the solo gate now includes fields 7 and 8 as well as 9–12. Added checks require fast in the best roster on at least two fields, every quota increase at most 15, and independent fast deliveries within his carry limit. These changes define the new target rather than relax a failed delivery or phone check.
+
+Wheat now has a stem, leaf, 4 paired spikelet rows (8 pointed grains) and awns. The title, standing wheat and sheaves share that shape. Three cached 48×112 canvases draw dry, storm and wet wheat. This replaces detailed geometry work on every frame. Rain leaves blue-grey collapsed stalks, a 0.65 s collapse and splash ring, and a pale blue leading edge. Reduced motion skips collapse interpolation while keeping the colour boundary and stalks. The rain banner says “Uncut wheat is lost.” Fixed the cutting flag assignment that was accidentally inside a comment, so scythe animation reflects cutting again.
+
+### Verification
+
+Commands used the pinned runtime: `fnm exec --using=26.12.0 node`.
+
+`bots.mjs`: exit 0, 0 failures, 236.1 s. Careful: 12 seeds per hiring set. Clumsy: 30 seeds per field, both solo and with the fixed policy. Both brains are unchanged.
+
+| Field | Need | Morning limit (s) | Careful best hires | Best kept mean | Best passes | Solo careful passes | Solo clumsy passes | Clumsy with fixed hires |
+|---|---:|---:|---|---:|---:|---:|---:|---:|
+| 1 | 15 | 90 | nobody | 25.0 | 12/12 | 12/12 | 30/30 | 30/30 |
+| 2 | 20 | 95 | nobody | 30.4 | 12/12 | 12/12 | 30/30 | 30/30 |
+| 3 | 34 | 90 | strong | 61.9 | 12/12 | 12/12 | 25/30 | 24/30 |
+| 4 | 37 | 105 | nobody | 49.7 | 12/12 | 12/12 | 23/30 | 23/30 |
+| 5 | 39 | 110 | child | 64.7 | 12/12 | 12/12 | 25/30 | 21/30 |
+| 6 | 42 | 115 | child | 65.2 | 12/12 | 12/12 | 18/30 | 17/30 |
+| 7 | 56 | 50 | fast | 67.5 | 12/12 | 0/12 | 0/30 | 10/30 |
+| 8 | 61 | 60 | fast | 71.3 | 12/12 | 0/12 | 0/30 | 8/30 |
+| 9 | 66 | 60 | fast+old | 81.8 | 12/12 | 0/12 | 0/30 | 10/30 |
+| 10 | 71 | 65 | fast+strong | 80.4 | 12/12 | 0/12 | 0/30 | 7/30 |
+| 11 | 73 | 70 | fast | 80.4 | 12/12 | 0/12 | 0/30 | 6/30 |
+| 12 | 75 | 75 | fast | 81.6 | 12/12 | 0/12 | 0/30 | 6/30 |
+
+The progression percentages are 100, 100, 80, 76.7, 70, 56.7, 33.3, 26.7, 33.3, 23.3, 20 and 20. Largest adjacent drop: 23.3 percentage points. Largest rise: 6.7. Fast is in the best set on all 6 late fields. Late best sets beat hiring everyone by 11.0–19.5 grain and hiring nobody by 12.8–28.2 grain. Careful mornings take 24–115 s; solo clumsy mornings take 51–120 s. The fixed daily sample keeps 83 with fast+strong versus 75 alone.
+
+`bots.mjs --mutate`: exit 1, 17 failures, 229.0 s. Free wages break the direct half-morning wage assertion and the hiring/progression comparisons. No check was suppressed.
+
+`check.mjs webkit`: final exit 0 on the iPhone 13 profile, 100 s, zero page, console, failed-request or HTTP errors. Field 1 finished with 25 kept and 3 stars at 25 s. Rain showed 14 wet-standing cells and 10 cells still standing ahead of it. Viewed the final hint, mid-play and rain screenshots: dry ears and stems are present, the rain boundary is distinct.
+
+The new pixel assertion requires more than 50 golden wheat pixels in the untouched upper quarter-field; it excludes the HUD and cart. It caught an actual blank-crop screenshot during development. Sprite canvases now request CPU readback and flush once before caching. The page draws immediately after beginning a morning or resizing, so clearing the canvas does not wait for an animation frame.
+
+Chromium investigation exposed a defect in the new pixel check: a 3 s rain-test morning darkens wheat to about RGB(178, 143, 68), outside its initial dry-wheat limits. The zero-gold failures from that assertion, including an original-source reference and alternate browser modes, do not establish a rendering regression. Those alternate browser options were not retained. The main canvas keeps its original context options. The corrected classifier requires R>150, G>110, R>1.1G and R>2.3B, while retaining the count of more than 50 pixels. Independent controls accept dry RGB(240,194,79), storm (178,143,68) and darkest storm (160,131,67); they reject soil (176,136,80), stubble (216,182,114) and white (255,255,255). The sample waits for simulation time above 0.05 s and uses the upper quarter-field to avoid the banner. This corrects the new check's false negative rather than suppressing an existing failure.
+
+A prior full retry also failed the unchanged zero-console-error check with an AudioContext device/renderer error; a standalone tone/reload reference did not reproduce it. No error was suppressed. Host load averages reached 222.94, 247.05 and 227.45 during these runs, but the cause of that audio error remains unresolved. The final default Chromium run with the corrected assertion passed; no alternate launch flags remain. The exact final WebKit run also passed with the final foreground/first-frame helper and corrected pixel assertion.
+
+`check.mjs chromium`: exit 0 on the Pixel 7 profile, 148 s, zero page, console, failed-request or HTTP errors. Field 1 kept 25, earned 3 stars and cleared in 24 s. Both normal and reduced-motion rain views had 14 wet-standing cells and 10 still standing. The 360×640 layout and desktop mouse/keyboard/pause checks also passed. Viewed final screenshots from both phones, normal/reduced rain, field 12 at 360 px, and desktop; no missing-wheat artifact remains in those captures.
+
+The check now brings each new context forward and uses `startGame` to wait for a running first frame after each start/restart. Desktop holds last 0.9 and 0.7 simulation seconds with bounded 10 s waits, rather than sampling a fixed wall-clock delay before a loaded window has rendered; the movement thresholds remain more than 1 cell vertically and 0.8 horizontally. All existing input, accounting, save, lab and zero-error assertions remain.
+
+### Remaining gaps
+
+- No human playtest or real-phone audio test. Bot pass rates do not measure enjoyment. Frame timing on a real phone is unmeasured.
+- The target curve uses the fixed hires above. Solo clumsy play still fails fields 7–12; solo and hired results are not interchangeable.
+- The lab transport in the phone check is mocked. Live lab acceptance is unverified; this folder cannot register or deploy the slug in the external lab service.
+- The shared kit suite did not pass in this environment. The broad run failed unrelated kit/3D/hint cases with timeouts and WebGL context loss. The post-change `phone.mjs kit` run passed Chromium but timed out after 150 s on WebKit. No shared files or thresholds were changed to hide those failures.

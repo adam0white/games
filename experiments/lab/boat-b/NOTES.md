@@ -97,3 +97,40 @@ The first full-browser controller used seven pointer samples per swipe and a 110
 - Possible next variants: slower water with longer-lived drawn currents, or fewer but stronger pebble impulses. These are ideas, not accepted changes.
 - The shared phone-check registry was not edited because the build brief permits writes only inside this directory. The coordinator can add this lab page when collecting tonight's entries.
 - The brain-consult skill's decision log was absent at `~/code/brain/promoted/index.md`; no historical finding was substituted for current evidence.
+
+## Independent review — 2026-11-24
+
+Reviewed the rule engine, page state, input, pause, retry, save and rendering loops. The fixed-step accumulator is bounded by the 0.08-second frame cap. Current impulses expire and the simulation caps them at 70. Gesture trails cap at 18 points. Particles and visual rings expire. Page input supplies finite coordinates and rule input rejects non-finite values. No additional timer, unbounded-loop or reachable NaN defect was found.
+
+Fixed three related interrupted-input and retry defects:
+
+- A second touch's `lostpointercapture` cleared the first touch. The handler now checks the pointer id. The independent pre-fix Chromium regression failed with 1 ripple where 2 were expected.
+- Pause and Menu cleared the pointer but retained its drawn trail. Both now clear the trail. The regression asserts a null pointer and zero trail points while paused, then verifies that the old pointer cannot resume a drag.
+- Restart retained the previous rescue toast, shake, wobble and keyboard cadence. A new run now clears that feedback and resets the cadence. The regression starts a fresh run during visible rescue feedback and checks the new clock is exactly 0 and the old toast text is empty before another simulation step.
+
+`review.mjs` serves the actual experiments folder and performs a first-play pass without importing the reference controller. It captures menu, delayed gesture hint, play, pause, end, retry and reload. It checks two-finger interruption, pause/resume, retry and reload. Set `PLAYWRIGHT` to the installed test dependency directory. Commands use `fnm exec --using=26.12.0 node`.
+
+The screenshots in `review-shots/` and `check-shots/` stay inside this folder. The existing check's screenshot destination changed for that reason; no gameplay, pass threshold or assertion was relaxed. An early toast assertion was corrected to inspect restart synchronously: checking it after several browser round trips could already observe the new run's first passenger rescue.
+
+Current completed evidence:
+
+- `bots.mjs`: exit 0. All 1,440 careful runs won with 3 stars and 0 hits. Clumsy wins across the six streets remain 240, 209, 185, 95, 44 and 0 out of 240 each. Deterministic replay covers 900 frames.
+- `bots.mjs --mutate`: exit 1, with 17 failed assertions after ripple input is disabled. Rules and bot thresholds did not change.
+- `check.mjs chromium`: exit 0. Pixel 7 completed street 1 with best 519. Pixel 7, 360 × 640 and 1280 × 800 checks reported 0 errors. Layout, 48px targets, input, pause/blur, restart and reload assertions passed.
+- The initial successful independent Pixel 7 run reached street 1's end in 17.77 simulated seconds, with 296 points, 1 passenger and 1 hit. This used a few visible-water swipes and then waited; it did not use the builder's route heuristic.
+
+Visual inspection of the Pixel 7 menu, hint, play, pause, end, retry and reload images found no clipped text, overlapping controls or off-screen buttons. The entry screen has one Play button and one short subtitle. The moving gesture hint demonstrates a swipe before instruction text is needed. The passenger and hazard silhouettes differ clearly. Foreground text remains legible over the gutter. These observations are evidence about the inspected viewport, not a physical phone's notch or thumb coverage.
+
+The first WebKit attempt returned a completely black screenshot, then timed out while waiting for the visible Play button to become stable. It did not pass. Other concurrently tested pages showed the same symptom; the host-level explanation remains unconfirmed. The successful follow-up is recorded below. The hosted notes script is stubbed by both local checks. Physical multitouch, actual iPhone safe areas/audio, hosted notes and production deployment remain unverified.
+
+The final `review.mjs chromium` run exits 0. Its two-contact CDP sequence keeps the first finger down while the second finger lifts, then verifies the first finger still creates another ripple. The final first-play result is **446 points, 2 passengers, 1 hit, 17.77 simulated seconds**, with **0 page or console errors**. Synthetic capture-loss and pause-trail assertions also pass. The CDP probe initially used the wrong `touchEnd` contact list; its event trace showed it released the first touch. Correcting that probe established the second-finger result without any further game change. The scripted two-contact result is browser emulation, not physical multitouch validation.
+
+### WebKit follow-up — 2026-11-24
+
+`check.mjs webkit` exits **0**: iPhone 13 completes street 1 with **518 points** and **0 page, console, HTTP or request errors**. Its mid-play and end screenshots are rendered and inspected. Its immediate menu screenshot was black, so that image alone is not visual acceptance.
+
+The independent checker now foregrounds its page and requires **2 actual animation frames** before initial capture. Frame readiness has a **10,000 ms** assertion, and the independent check also bounds foregrounding at **10,000 ms**. These are readiness checks, not changes to game or gameplay thresholds. Two attempts stalled before their first new screenshot and were interrupted; their exact blocked browser operation was not established. During those attempts, host load averages were **189.13 / 243.35 / 219.79**, and other WebKit processes were active outside this review. Those observations do not establish the cause of the stall. Only this review's processes were interrupted.
+
+The final `review.mjs webkit` retry exits **0**. It records **296 points, 1 passenger, 1 hit and 17.93 simulated seconds**, with **0 page or console errors**. The menu, hint, play, pause, end, retry and reload screenshots in `review-shots/` all render correctly and were inspected. The menu requires no rules paragraph; the controls and cards fit, text is readable, and no overlapping controls were found. Synthetic second-finger capture-loss, pause/resume, cleared trails, retry feedback reset and reload assertions pass. WebKit's two-contact check uses synthetic pointer events; Chromium additionally passes its native CDP two-contact sequence.
+
+Both requested phone profiles now have successful functional checks and independently inspected first-play screenshots. No additional game changes were needed for WebKit. Physical phones, actual notch safe areas/audio, hosted notes and deployment remain unverified.

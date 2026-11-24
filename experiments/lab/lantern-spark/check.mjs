@@ -9,6 +9,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
 import assert from 'node:assert/strict';
+import { TIN } from './sim.js';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../..');
 const SHOTS = process.env.SHOTS || '/private/tmp/night-lantern-spark';
@@ -36,14 +37,15 @@ const SEED = 7, URL0 = `${base}/lab/lantern-spark/?seed=${SEED}&fast=3`;
 const touch = (page, type, id, x, y) => page.evaluate(([type, id, x, y]) => document.getElementById('c').dispatchEvent(new PointerEvent('pointer' + type, { pointerId: id, pointerType: 'touch', isPrimary: id === 1, clientX: x, clientY: y, pressure: type === 'up' ? 0 : 0.5, bubbles: true, cancelable: true })), [type, id, x, y]);
 
 // The pilot: a finger held on the river that slides to where a planner says, the way a thumb steers (kit drag.js: travel
-// times gain over the river's width), and a tap on the spark button every second. The planner reads the river (it is a
+// times gain over the river's width), and a tap on the spark button every three seconds. It seeks visible embers to refill the scarce tin. The planner reads the river (it is a
 // test of the page, not of skill): it holds each candidate x for 0.6 s at Lantern's own lateral limit and keeps the clearest.
 async function pilot(page) {
   await page.evaluate(async () => {
-    const L = await import('/lantern/sim.js');
+    const L = await import('/lantern/sim.js'), E = await import('/lab/lantern-spark/sim.js');
     const el = document.getElementById('c'), btn = document.getElementById('spark'), gain = 1.3;
     const send = (type, x, y) => el.dispatchEvent(new PointerEvent('pointer' + type, { pointerId: 5, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, pressure: type === 'up' ? 0 : 0.5, bubbles: true, cancelable: true }));
-    function plan(s) {
+    function plan(e) {
+      const s = e.s, embers = E.view(e).embers;
       const v = L.speed(s), lat = 0.95 * L.nightPace(s.stage), b = L.boat(s), c0 = L.centre(s, s.y + 0.2), h0 = L.half(s, s.y + 0.2) - b;
       const obs = s.rocks.filter(k => k.on).map(k => ({ lo: k.x0 - k.a - k.len, hi: k.x0 + k.a + k.len, y: k.y, rad: k.rad }));
       let best = s.x, top = -Infinity;
@@ -54,7 +56,8 @@ async function pilot(page) {
           clear = Math.min(clear, (L.half(s, by) - b - Math.abs(bx - c)) * 2 + 0.02);
           for (const o of obs) { const dy = Math.abs(o.y - by); if (dy > 0.15) continue; clear = Math.min(clear, (Math.hypot(Math.max(0, o.lo - bx, bx - o.hi), dy) - o.rad - b) * (1.5 - 0.5 * t / 0.6)); }
         }
-        const score = clear * 10 - Math.abs(x - s.x) * 0.3 - Math.abs(x - c0) * 0.2;
+        let score = clear * 10 - Math.abs(x - s.x) * 0.3 - Math.abs(x - c0) * 0.2;
+        for (const p of embers) { const dy = p.y - s.y; if (p.kind === 'ember' && dy > 0 && dy < 1) score += Math.max(0, 0.08 - Math.abs(p.x - x)) * 2 / (0.3 + dy); }
         if (score > top) { top = score; best = x; }
       }
       return best;
@@ -68,8 +71,8 @@ async function pilot(page) {
         if (!down) { x0 = fx = innerWidth / 2; send('down', x0, innerHeight * 0.85); down = true; } else x0 = fx;
         from = e.s.x; hearts = st.hearts;
       }
-      fx = x0 + (plan(e.s) - from) * st.unit / gain; send('move', fx, innerHeight * 0.85); window.__pilot.moves++;
-      if (e.s.t - lastSpark > 1 && e.tin > 2) { lastSpark = e.s.t; btn.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 9, pointerType: 'touch', bubbles: true, cancelable: true })); window.__pilot.sparks++; }
+      fx = x0 + (plan(e) - from) * st.unit / gain; send('move', fx, innerHeight * 0.85); window.__pilot.moves++;
+      if (e.s.t - lastSpark > 3 && e.tin > 0) { lastSpark = e.s.t; btn.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 9, pointerType: 'touch', bubbles: true, cancelable: true })); window.__pilot.sparks++; }
       requestAnimationFrame(f);
     };
     requestAnimationFrame(f);
@@ -77,6 +80,7 @@ async function pilot(page) {
 }
 
 async function run(page, phone) {
+  page.setDefaultTimeout(60000);
   await page.goto(URL0);
   await until(page, () => window.echoState && window.echoState().screen === 'menu', 'menu');
   await sleep(400);
@@ -86,10 +90,12 @@ async function run(page, phone) {
   const fonts = await page.evaluate(() => [...document.querySelectorAll('body *')].filter(n => n.offsetParent && n.childNodes.length && [...n.childNodes].some(c => c.nodeType === 3 && c.textContent.trim())).map(n => parseFloat(getComputedStyle(n).fontSize)));
   assert.ok(Math.min(...fonts) >= 14, `no text under 14 px on the menu (${Math.min(...fonts)})`);
 
+  // Capture startup within the real click task, before a loaded host can advance past the opening ring.
+  await page.evaluate(() => document.getElementById('play').addEventListener('click', () => { window.__opened = window.echoState(); window.echoGame().s.safe = 1e9; }, { once: true }));
   await page.tap('#play');
-  let st = await state(page);
+  let st = await page.evaluate(() => window.__opened);
   assert.ok(st.playing && st.screen === 'play' && st.night === 1, 'Play starts night 1');
-  assert.equal(st.tin, 12, 'the tin starts at 12');
+  assert.equal(st.tin, TIN, `the tin starts at ${TIN}`);
   assert.ok(st.rings >= 1, 'the night opens with a free spark');
   assert.ok(st.sparkHint, 'the spark button pulses before its first use');
   const btn = await page.evaluate(() => { const r = document.getElementById('spark').getBoundingClientRect(); return { w: r.width, h: r.height, right: innerWidth - r.right, bottom: innerHeight - r.bottom }; });
@@ -102,9 +108,9 @@ async function run(page, phone) {
   await touch(page, 'move', 1, cx + 20 * dir, cy); await touch(page, 'move', 1, cx + 40 * dir, cy);
   st = await state(page);
   assert.ok((st.target - tgt0) * dir > 0.05, `one finger steers (target ${tgt0.toFixed(3)} to ${st.target.toFixed(3)})`);
-  const tin0 = st.tin;
+  const used0 = st.used;
   await touch(page, 'down', 2, cx - 100 * dir, cy - 200);
-  await until(page, t => window.echoState().tin === t - 1, 'a second finger strikes a spark', 3000, tin0);
+  await until(page, used => window.echoState().used === used + 1, 'a second finger strikes a spark', 3000, used0);
   await touch(page, 'move', 2, cx - 160 * dir, cy - 200); // the second finger moving must not steer
   const afterTwo = await state(page);
   assert.equal(afterTwo.target, st.target, 'the second finger does not steer (the target stays where the first finger put it)');
@@ -116,9 +122,9 @@ async function run(page, phone) {
   assert.ok(!st.sparkHint, 'the pulse stops after the first spark');
 
   // A real tap on the spark button.
-  const tin1 = st.tin;
+  const used1 = st.used;
   await page.tap('#spark');
-  await until(page, t => window.echoState().tin === t - 1, 'the spark button strikes a spark', 3000, tin1);
+  await until(page, used => window.echoState().used === used + 1, 'the spark button strikes a spark', 3000, used1);
   await sleep(250);
   await page.screenshot({ path: join(SHOTS, `${phone}-2-spark.png`) });
 
@@ -130,10 +136,13 @@ async function run(page, phone) {
   await page.tap('#resume');
   await until(page, t => window.echoState().t > t, 'time moves after Go on', 3000, st.t);
 
-  // The pilot steers to dawn by pointer input.
+  // Input assertions run without collisions resetting the drag anchor between automation calls.
+  // Start a fresh river without that protection for the full pointer pilot and its dawn assertion.
+  await page.tap('#pause'); await page.tap('#quit'); await page.tap('#play');
+  assert.ok((await state(page)).hearts === 3 && (await page.evaluate(() => window.echoGame().s.safe)) < 2, 'the dawn pilot starts a fresh, unprotected river');
   await pilot(page);
   let mid = false;
-  for (let i = 0; i < 200; i++) {
+  for (let i = 0; i < 400; i++) {
     st = await state(page);
     if (st.over) break;
     if (!mid && st.reach > 0.45) { mid = true; await page.screenshot({ path: join(SHOTS, `${phone}-4-mid.png`) }); }
@@ -179,12 +188,14 @@ async function desktop(browser, errors) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } }), page = await context.newPage();
   listen(page, errors);
   await page.goto(URL0); await until(page, () => window.echoState && window.echoState().screen === 'menu', 'menu');
+  // Protect this input-only fixture from collisions between automation calls.
+  await page.evaluate(() => addEventListener('keydown', () => { window.echoGame().s.safe = 1e9; }, { once: true }));
   await page.keyboard.press('Enter');
   let st = await state(page); assert.ok(st.playing, 'Enter plays');
   await page.keyboard.press(' ');
-  await until(page, () => window.echoState().tin === 11, 'Space strikes a spark', 3000);
+  await until(page, () => window.echoState().used === 1, 'Space strikes a spark', 3000);
   await page.mouse.move(640, 500); await page.mouse.down(); await page.mouse.up();
-  await until(page, () => window.echoState().tin === 10, 'a mouse click strikes a spark', 3000);
+  await until(page, () => window.echoState().used === 2, 'a mouse click strikes a spark', 3000);
   await sleep(300);
   await page.screenshot({ path: join(SHOTS, 'desktop.png') });
   await page.evaluate(() => dispatchEvent(new Event('blur')));
@@ -198,7 +209,17 @@ async function small(browser, errors) {
   listen(page, errors);
   await page.goto(URL0); await until(page, () => window.echoState && window.echoState().screen === 'menu', 'menu');
   await page.screenshot({ path: join(SHOTS, 'small-360-menu.png') });
-  await page.tap('#play'); await sleep(900);
+  await page.tap('#play');
+  await until(page, () => document.querySelector('.kit-hint.on'), 'the first-run drag hint at 360 px');
+  await sleep(650);
+  const hintGap = await page.evaluate(() => {
+    const hint = document.querySelector('.kit-hint.on'), spark = document.getElementById('spark').getBoundingClientRect();
+    const parts = [...hint.querySelectorAll('.track, .knob, .hand, .label')].filter(el => getComputedStyle(el).display !== 'none');
+    return spark.top - Math.max(...parts.map(el => el.getBoundingClientRect().bottom));
+  });
+  assert.ok(hintGap >= 16, `the first-run drag hint clears the spark button at 360 px (${hintGap.toFixed(1)} px)`);
+  console.log(`     360 px hint-to-spark gap: ${hintGap.toFixed(1)} px`);
+  await page.screenshot({ path: join(SHOTS, 'small-360-hint.png') });
   await page.tap('#spark'); await sleep(400);
   await page.screenshot({ path: join(SHOTS, 'small-360-play.png') });
   const over = await page.evaluate(() => { const a = document.getElementById('spark').getBoundingClientRect(), b = document.getElementById('hud').getBoundingClientRect(); return a.right <= innerWidth && a.bottom <= innerHeight && b.bottom < a.top; });

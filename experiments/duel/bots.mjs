@@ -1,5 +1,5 @@
 // Proves the rules of Thumb Duel: node experiments/duel/bots.mjs [--mutate] [--quick]
-// Bots play through the same input a finger gives ({ held, taps, px, py } per side per tick), with reaction times and
+// Bots play through the same input a finger gives each tick, with reaction times and
 // tap rates capped at what a thumb can do (brain.js THUMB). Exits non-zero when a claim fails.
 //
 // Levels: the solo mode's three bot strengths are the levels (easy, medium, hard). "A clumsy bot finishes level 1" means
@@ -8,7 +8,7 @@
 //
 // --mutate breaks one rule on purpose: in tug of war a tap from the top player pulls the rope toward the BOTTOM (as if
 // the top side's direction had been copied from the bottom's). The seat-fairness and careful-beats-idle claims must fail.
-import { createMatch, step, blank, mutate, KINDS, DT, WIN, DUELS, CONTROL } from './sim.js';
+import { createMatch, step, blank, mutate, KINDS, WIN, DUELS, CONTROL, LAUNCH, SWIPE } from './sim.js';
 import { makeBot, SKILLS, THUMB, STRENGTHS } from './brain.js';
 
 const MUTATE = process.argv.includes('--mutate'), QUICK = process.argv.includes('--quick');
@@ -51,9 +51,9 @@ const N = QUICK ? 30 : 100;
   }
 }
 
-// 2. The deck: at least 7 kinds; a match draws without repeats; a first-ever match opens with tug.
+// 2. The deck: at least 9 kinds; a match draws without repeats; a first-ever match opens with tug.
 {
-  claim(KINDS.length >= 7 && KINDS.every(k => DUELS[k] && CONTROL[k]), `${KINDS.length} duel kinds, each with a control: ${KINDS.map(k => `${k} (${CONTROL[k]})`).join(', ')}`);
+  claim(KINDS.length >= 9 && KINDS.every(k => DUELS[k] && CONTROL[k]), `${KINDS.length} duel kinds, each with a control: ${KINDS.map(k => `${k} (${CONTROL[k]})`).join(', ')}`);
   let repeats = 0, firstTug = 0, seenKinds = new Set(), lengths = [];
   for (let seed = 1; seed <= 200; seed++) {
     const s = play({ seed, first: seed % 2 ? 'tug' : null }, makeBot('medium', seed), makeBot('medium', seed + 999)).s;
@@ -94,6 +94,26 @@ const N = QUICK ? 30 : 100;
   const all = [pads(0), pads(1)];
   tick(m, { ...blank(), taps: all[0] }, { ...blank(), taps: all[1] });
   claim(m.d.last === -1 && m.d.wins.join() === '0,0', 'memory: both finishing on the same tick makes the round void');
+
+  const race = createMatch({ seed: 9, only: 'swipe', intro: 0 }); tick(race, blank(), blank());
+  const released = gesture => ({ ...blank(), releases: [gesture] });
+  const up = { x0: 0.5, y0: 0.75, x: 0.5, y: 0.35, seconds: 0.2 };
+  const down = { ...up, y0: -up.y0, y: -up.y };
+  tick(race, released({ ...up, x: 0.8 }), released({ ...down, seconds: 0.6 }));
+  tick(race, released({ ...up, y: up.y0 }), released({ ...down, y: -0.95 }));
+  claim(race.d.strokes.join() === '0,0', 'swipe: stationary, sideways, backward and slow releases do not score');
+  for (let n = 0; n < SWIPE.need; n++) {
+    tick(race, released(up), released(down));
+    for (let i = 0; i < 12 && race.phase === 'play'; i++) tick(race, blank(), blank());
+  }
+  claim(race.duels[0]?.winner === -1 && race.d.strokes.every(n => n === SWIPE.need), 'swipe: both reaching the finish on the same tick draws');
+
+  const l = createMatch({ seed: 9, only: 'launch', intro: 0 }); tick(l, blank(), blank());
+  const shot = seconds => released({ seconds });
+  tick(l, shot(0.05), { ...blank(), held: true, heldFor: 1 });
+  claim(l.d.shots.join() === '0,0' && l.d.charge[1] === 1, 'launch: a tap cannot fire, and holding only builds charge');
+  for (const target of l.d.targets) tick(l, shot(target + 0.6), shot(target));
+  claim(l.duels[0]?.winner === 1 && l.d.scores.join() === `0,${100 * LAUNCH.shots}`, 'launch: a release at the mark beats an overcharge');
 }
 
 // 4. Every duel kind: careful beats idle from either seat; careful beats clumsy from either seat; the same bot on both
@@ -121,13 +141,18 @@ for (const kind of KINDS) {
   }
   const sorted = [...tMed].sort((x, y) => x - y);
   durations[kind] = { med: median(tMed), mix: median(tMix), p90: sorted[Math.floor(0.9 * sorted.length)], max: sorted[sorted.length - 1] };
-  console.log(`${kind.padEnd(8)} ${String(idleWins).padStart(5)}/40      ${pct(cb, N).padStart(5)} / ${pct(ct, N).padEnd(5)}             ${pct(bottom, decided).padStart(4)} of ${decided}          ${median(tMed).toFixed(1).padStart(5)}                       ${median(tMix).toFixed(1).padStart(5)}`);
+  console.log(`${kind.padEnd(8)} ${String(idleWins).padStart(5)}/40      ${pct(cb, N).padStart(5)} / ${pct(ct, N).padEnd(5)}             ${pct(bottom, decided).padStart(4)} of ${decided}          ${median(tMed).toFixed(2).padStart(5)}                       ${median(tMix).toFixed(2).padStart(5)}`);
   claim(idleWins === 40, `${kind}: a careful bot beats a player who does nothing, from either seat (${idleWins}/40)`);
   claim(cb >= 0.7 * N && ct >= 0.7 * N, `${kind}: careful beats clumsy from either seat (${pct(cb, N)} bottom, ${pct(ct, N)} top)`);
   claim(decided >= N && bottom / decided >= 0.4 && bottom / decided <= 0.6, `${kind}: no seat advantage, the bottom seat wins ${pct(bottom, decided)} of ${decided} decided duels between equal bots`);
+  if (kind === 'hockey') {
+    const draws = 2 * N - decided, med = durations[kind].med;
+    claim(med >= 10 && med <= 14, `hockey: median ${med.toFixed(2)} s is in 10–14 s`);
+    claim(draws / (2 * N) < 0.05, `hockey: ${draws}/${2 * N} undecided (${(100 * draws / (2 * N)).toFixed(1)}%, target <5%)`);
+  }
 }
 {
-  console.log(`     medium v medium p90 / longest s: ${KINDS.map(k => `${k} ${durations[k].p90.toFixed(1)}/${durations[k].max.toFixed(1)}`).join(', ')}`);
+  console.log(`     medium v medium p90 / longest s: ${KINDS.map(k => `${k} ${durations[k].p90.toFixed(2)}/${durations[k].max.toFixed(2)}`).join(', ')}`);
   const all = Object.values(durations).map(d => d.med);
   claim(all.every(t => t >= 8 && t <= 20), `every duel lasts 8 to 20 s at the median between equal bots (${KINDS.map(k => `${k} ${durations[k].med.toFixed(1)}`).join(', ')})`);
   claim(KINDS.every(k => DUELS[k].limit <= 20) && KINDS.every(k => durations[k].max <= 20 + 1e-9), `every duel has a hard limit of at most 20 s, and none ran longer (longest ${Math.max(...KINDS.map(k => durations[k].max)).toFixed(1)} s)`);
@@ -146,7 +171,7 @@ for (const who of ['clumsy', 'careful']) {
       secs.push(s.t);
     }
     ladder[who][lvl] = won / N;
-    console.log(`  ${who.padEnd(8)} vs ${lvl.padEnd(7)} wins ${pct(won, N).padStart(4)}   match ${(median(secs) / 60).toFixed(1)} min (median, with the 3 s intros)`);
+    console.log(`  ${who.padEnd(8)} vs ${lvl.padEnd(7)} wins ${pct(won, N).padStart(4)}   match ${median(secs).toFixed(2)} s (median, with the 3 s intros)`);
   }
 }
 claim(ladder.clumsy.easy >= 0.65, `a clumsy player finishes level 1: beats the easy bot in ${pct(ladder.clumsy.easy * N, N)} of matches`);
@@ -154,7 +179,20 @@ claim(ladder.clumsy.easy > ladder.clumsy.medium && ladder.clumsy.medium > ladder
 claim(ladder.clumsy.hard <= 0.3, `the hard bot beats a clumsy player most of the time (clumsy wins ${pct(ladder.clumsy.hard * N, N)})`);
 claim(STRENGTHS.every(l => ladder.careful[l] >= 0.6), `a careful player finishes every level: ${STRENGTHS.map(l => `${l} ${pct(ladder.careful[l] * N, N)}`).join(', ')}`);
 
-// 6. Thumb limits: no bot taps faster than a thumb, across a spread of matches.
+// 6. Human-paced play head to head and in the first solo level, from countdown to the final result.
+for (const other of ['slow-human', 'easy']) {
+  const secs = [];
+  for (let seed = 1; seed <= N; seed++) {
+    const { s } = play({ seed: seed * 31 }, bot('slow-human', seed), bot(other, seed + 1000));
+    secs.push(s.t);
+  }
+  const med = median(secs);
+  const within = secs.filter(t => t >= 60 && t <= 180).length;
+  claim(SKILLS['slow-human'].react === 0.35 && med >= 60 && med <= 180,
+    `slow-human (0.35 s reaction) vs ${other}: median ${med.toFixed(2)} s, range ${Math.min(...secs).toFixed(2)}–${Math.max(...secs).toFixed(2)} s, ${within}/${N} in 60–180 s`);
+}
+
+// 7. Thumb limits: no bot taps faster than a thumb, across a spread of matches.
 {
   let fastest = 0;
   for (let seed = 1; seed <= 20; seed++) fastest = Math.max(fastest, play({ seed, only: 'tug' }, makeBot('careful', seed), makeBot('hard', seed)).fastest);

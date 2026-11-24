@@ -89,3 +89,29 @@ card; Retry starts a fresh run in one tap; the best score is saved. Screenshots:
 - Rare gold cards (one per run) that change a rule, such as ants that fly or a second nest entrance.
 - A shared daily board (the lab board endpoint), as Lantern has.
 
+
+## 2026-11-24 independent review
+
+Fixed first-pointer ownership and capture loss. Draft and end transitions now count active game time, so pausing during the 650 ms draft celebration cannot consume the only draft callback, and an old 1100/1300 ms end callback cannot replace a restarted run. Menu/restart clear delayed callbacks and transient effects. Each effects batch is consumed once. Leaving during the 280 ms card-pick animation pauses the next wave. Frame delta is bounded below by zero.
+
+The expanded phone check pauses in the exact draft-transition frame, waits 900 ms, resumes, and requires the draft. It also pauses at the terminal phase for 1500 ms, quits, starts again, waits 1500 ms, and requires the new run to remain playable. It then finishes a separate full run for the original end-card/save/retry assertions. Its overall test deadline increased from 150 to 240 s because the scenario now plays two runs; game-time and correctness thresholds did not change. Precise transition pauses call the visible button's handler from the observation frame; other pause/resume/menu/card controls still use browser taps.
+
+Chromium check exits 0: the final full run wins wave 8, takes 7 cards, scores 4520, and reports zero page/console errors. `check.mjs chromium --mutate-transitions` restores the original wall-clock draft callback and exits 1 at "draft after interrupted celebration". The ownership regression in `../ant-draft/review.mjs` passes: primary x=113.592233, secondary leaves it unchanged, primary then moves to x=157.281553, and lost capture stops it there. Its input mutation exits 1 after secondary takeover moves x to 270.873786.
+
+Normal bots exit 0: 120 seeds per policy, 360 runs; careful 99%, clumsy 45%, idle 0%; mean cleared waves 7.98/6.00/1.60; careful median winning play time 164 s; 77 distinct hands. Wall time 1112.0 s under shared-host load. No rule or balance thresholds changed.
+
+Inspected `review-shots/` menu, hint, play, paused transition, draft, later wave, and end captures. Chromium controls fit without overlap. First-screen text is one short line. The final card shows all seven held cards and its Retry button fits. WebKit verification is recorded below.
+
+### Comparison of the two Ant Draft builds
+
+The first build plays better in this review. Its red soldiers, visible queen, rally flag, and 85-unit combat ring make the action easier to read. A new player can identify both what to protect and where the swarm is being sent. Its spiders attack at range, while wasps hunt workers, so enemies give different reasons to move. Its light draft cards separate icon, short name, effect, and stack count clearly.
+
+The second build has a more compact draft and a useful numeric nest-health display. Its dark soldiers merge into a single moving cluster, and the nest is a small hole on the bottom border. Its narrower 38-unit attack range makes interception more exacting. The first build's explicit queen and larger rally marker communicate that task better. Neither first screen requires a paragraph of instructions; both need the delayed finger hint. Both still depend on short card text to explain upgrades.
+
+This is a judgment from emulated play and inspected screenshots, not a human play verdict. The bots differ between builds; 93.3% versus 99% careful wins and 10% versus 45% clumsy wins are not a controlled comparison of difficulty. No balance or artwork was changed to impose this preference.
+
+The default bot mutation also completed: 360 runs in 2078.3 s, exit 1, with all three policies winning 100%. The checks for fewer clumsy wins, increasing difficulty, and useful input fail as intended.
+
+Final WebKit iPhone 13 check exits 0: all 8 waves won, 7 drafts, score 4730, 110 bugs, zero page/console errors. Both interrupted transitions and blur during card selection recover. Inspected all seven stage screenshots plus the transition pause: menu art renders, all controls fit, all seven held cards fit on the end screen, and text has clear contrast. The independent WebKit review also exits 0: first-pointer x=115.215947 survives the second touch, the owner moves it to x=165.049834, and capture loss stops it there. Blur, restart, and reload pass. Physical notch insets remain unverified by device emulation.
+
+The shared-kit smoke passes after changes on both phone profiles; the full before-run had seven unrelated failures, recorded in `../ant-draft/kit-before.log`. No shared files changed. Local browser servers stub the hosted notes button. Its live service, physical-phone sound/haptics/performance, and human play acceptance remain unverified. Full browser wins here use the existing six-times-speed test hook; a complete normal-speed browser run remains unverified for this build.

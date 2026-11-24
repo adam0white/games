@@ -18,26 +18,26 @@ export const HELP = {
   strong: { price: 22, speed: 2.2, wade: 1.8, carry: 10 },             // carries sheaves to the cart; reason: a hungry baby
   child: { price: 6, speed: 3.9 },                                     // chases crows; reason: a sweet
   old: { price: 10 },                                                  // ties bundles at the cart: you carry double; reason: bread for winter
-  fast: { price: 8, speed: 3.3, wade: 2.8, cut: 4.2, trample: 0.12 }, // cuts fast but tramples some; reason: a wedding ring
+  fast: { price: 8, speed: 3.3, wade: 2.8, cut: 4.2, carry: 3, trample: 0.12 }, // cuts fast but tramples some; reason: a wedding ring
 };
 export const HELPERS = ['strong', 'child', 'old', 'fast'];
 export const RIVAL = { fast: 'strong' }; // the fast one will not work beside the strong one (and says so with a picture)
 
-// Twelve mornings. One new thing each. stars: grain kept for one, two and three stars; one star passes.
+// Twelve mornings. Introduce hazards first, then shorter mornings that reward hired help. stars: grain kept for one, two and three stars; one star passes.
 // crows: seconds between crows (0: none). wind: times a gust flattens a patch. stone: hidden stones. nest: a hare's nest.
 export const LEVELS = [
   { cols: 5, rows: 5, shape: 'rect', time: 90, cart: 2.5, crows: 0, wind: [], stone: 0, nest: false, help: [], stars: [15, 21, 25], learn: 'cut' },
   { cols: 6, rows: 6, shape: 'oval', time: 95, cart: 1.5, crows: 11, wind: [], stone: 0, nest: false, help: [], stars: [20, 26, 30], learn: 'crows' },
   { cols: 8, rows: 10, shape: 'rect', time: 90, cart: 0.6, crows: 11, wind: [], stone: 0, nest: false, help: ['strong'], stars: [34, 50, 61], learn: 'strong' },
-  { cols: 8, rows: 9, shape: 'oval', time: 105, cart: 1.5, crows: 10, wind: [], stone: 1, nest: false, help: ['strong'], stars: [40, 46, 51], learn: 'stone' },
-  { cols: 8, rows: 10, shape: 'rect', time: 110, cart: 6.5, crows: 5, wind: [], stone: 1, nest: false, help: ['strong', 'child'], stars: [42, 56, 64], learn: 'child' },
-  { cols: 9, rows: 10, shape: 'L', time: 115, cart: 2.5, crows: 6, wind: [30, 70], stone: 1, nest: false, help: ['strong', 'child'], stars: [46, 58, 65], learn: 'wind' },
-  { cols: 9, rows: 12, shape: 'rect', time: 120, cart: 4.5, crows: 6, wind: [40], stone: 1, nest: false, help: ['strong', 'child', 'old'], stars: [83, 86, 88], learn: 'old' },
-  { cols: 10, rows: 14, shape: 'diamond', time: 110, cart: 5, crows: 6, wind: [50], stone: 1, nest: true, help: ['strong', 'child', 'old'], stars: [81, 84, 86], learn: 'nest' },
-  { cols: 10, rows: 13, shape: 'rect', time: 115, cart: 5, crows: 5, wind: [20, 45], stone: 1, nest: false, help: ['strong', 'child', 'old', 'fast'], stars: [88, 95, 100], learn: 'fast' },
-  { cols: 10, rows: 14, shape: 'ring', time: 120, cart: 7.5, crows: 5, wind: [30, 80], stone: 2, nest: true, help: ['strong', 'child', 'old', 'fast'], stars: [94, 99, 103], learn: 'pond' },
-  { cols: 10, rows: 15, shape: 'two', time: 130, cart: 9, crows: 4.5, wind: [40, 90], stone: 2, nest: true, help: ['strong', 'child', 'old', 'fast'], stars: [92, 97, 101], learn: 'far' },
-  { cols: 10, rows: 16, shape: 'hourglass', time: 140, cart: 5, crows: 4, wind: [35, 75, 110], stone: 2, nest: true, help: ['strong', 'child', 'old', 'fast'], stars: [94, 98, 101], learn: 'all' },
+  { cols: 8, rows: 9, shape: 'oval', time: 105, cart: 1.5, crows: 10, wind: [], stone: 1, nest: false, help: ['strong'], stars: [37, 46, 51], learn: 'stone' },
+  { cols: 8, rows: 10, shape: 'rect', time: 110, cart: 6.5, crows: 5, wind: [], stone: 1, nest: false, help: ['strong', 'child'], stars: [39, 56, 64], learn: 'child' },
+  { cols: 9, rows: 10, shape: 'L', time: 115, cart: 2.5, crows: 6, wind: [30, 70], stone: 1, nest: false, help: ['strong', 'child'], stars: [42, 58, 65], learn: 'wind' },
+  { cols: 9, rows: 12, shape: 'rect', time: 50, cart: 4.5, crows: 6, wind: [20], stone: 1, nest: false, help: ['strong', 'child', 'old', 'fast'], stars: [56, 64, 68], learn: 'fast' },
+  { cols: 10, rows: 14, shape: 'diamond', time: 60, cart: 5, crows: 6, wind: [25], stone: 1, nest: true, help: ['strong', 'child', 'old', 'fast'], stars: [61, 68, 74], learn: 'nest' },
+  { cols: 10, rows: 13, shape: 'rect', time: 60, cart: 5, crows: 5, wind: [20, 45], stone: 1, nest: false, help: ['strong', 'child', 'old', 'fast'], stars: [66, 76, 80], learn: 'wind' },
+  { cols: 10, rows: 14, shape: 'ring', time: 65, cart: 7.5, crows: 5, wind: [30, 50], stone: 2, nest: true, help: ['strong', 'child', 'old', 'fast'], stars: [71, 79, 88], learn: 'pond' },
+  { cols: 10, rows: 15, shape: 'two', time: 70, cart: 9, crows: 4.5, wind: [30, 55], stone: 2, nest: true, help: ['strong', 'child', 'old', 'fast'], stars: [73, 80, 88], learn: 'far' },
+  { cols: 10, rows: 16, shape: 'hourglass', time: 75, cart: 5, crows: 4, wind: [25, 45, 60], stone: 2, nest: true, help: ['strong', 'child', 'old', 'fast'], stars: [75, 82, 90], learn: 'all' },
 ];
 export const SHAPES = ['rect', 'oval', 'L', 'diamond', 'ring', 'two', 'hourglass'];
 
@@ -145,8 +145,9 @@ function swing(s, a, rate, who) {
   for (let y = Math.floor(a.y - REACH); y <= Math.floor(a.y + REACH); y++) for (let x = Math.floor(a.x - REACH); x <= Math.floor(a.x + REACH); x++) {
     const i = idx(s, x, y); if (i < 0 || s.st[i] !== STAND) continue;
     if (Math.hypot(x + 0.5 - a.x, y + 0.5 - a.y) > REACH) continue;
-    if (who === 'me' && s.nestAlive && s.nest.includes(i) && !s.nest.includes(idx(s, a.x, a.y))) continue; // the nest is cut only by walking into it
-    s.prog[i] += rate * (s.flat[i] && who !== 'fast' ? FLAT : 1) * DT; // the fast one's swing goes through flattened wheat any = 1;
+    if ((who === 'me' || who === 'fast') && s.nestAlive && s.nest.includes(i) && !s.nest.includes(idx(s, a.x, a.y))) continue; // the nest is cut only by walking into it
+    s.prog[i] += rate * (s.flat[i] && who !== 'fast' ? FLAT : 1) * DT; // the fast one's swing goes through flattened wheat
+    any = 1;
     if (s.prog[i] >= 1) cutCell(s, i, who);
   }
   return any;
@@ -322,13 +323,23 @@ const ACT = {
   },
   fast(s, h) {
     const P = HELP.fast;
-    if ((h.think -= DT) <= 0 || h.tx === null || s.st[idx(s, h.tx, h.ty)] !== STAND) {
-      h.think = 0.5;
-      const i = nearest(s, h, j => s.st[j] === STAND);
-      if (i >= 0) { h.tx = cx(s, i); h.ty = cy(s, i); } else { const p = homeSpot(s, h, 1.4); h.tx = p.x; h.ty = p.y; }
+    // Cut and carry a small load. Cutting alone leaves grain for the crows, not the cart.
+    // Once returning, keep the cart as the goal until the load is delivered.
+    const returning = h.carryN >= P.carry || (h.carryN > 0 && h.tx === s.cart.x && h.ty === s.cart.y);
+    if (returning) { h.tx = s.cart.x; h.ty = s.cart.y; }
+    else if ((h.think -= DT) <= 0 || h.tx === null || s.st[idx(s, h.tx, h.ty)] === GONE) {
+      h.think = 0.3;
+      const safe = j => !(s.nestAlive && s.nest.includes(j));
+      let i = nearest(s, h, j => s.st[j] === LYING && safe(j));
+      if (i < 0) i = nearest(s, h, j => s.st[j] === STAND && safe(j));
+      if (i >= 0) { h.tx = cx(s, i); h.ty = cy(s, i); }
+      else if (h.carryN) { h.tx = s.cart.x; h.ty = s.cart.y; }
+      else { const p = homeSpot(s, h, 1.4); h.tx = p.x; h.ty = p.y; }
     }
     move(s, h, h.tx, h.ty, P.speed, P.wade);
-    h.cutting = swing(s, h, P.cut, 'fast');
+    h.cutting = returning ? 0 : swing(s, h, P.cut, 'fast');
+    gather(s, h, P.carry, 'fast');
+    const before = h.carryN; unload(s, h, 'fast'); if (before && !h.carryN) { h.think = 0; h.tx = null; }
   },
   child(s, h) {
     const P = HELP.child;

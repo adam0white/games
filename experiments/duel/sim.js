@@ -6,10 +6,11 @@
 //
 // Every tick takes one input per side: { held, taps: [{ x, y }], px, py }. held: a finger of that side is down.
 // taps: fingers that went down since the last tick, in board coordinates. px, py: where that side's newest finger
-// is (null when none). Both sides' inputs for a tick are resolved together; same-tick ties have a rule in each duel.
+// is (null when none). Gesture duels also receive heldFor (seconds) and completed releases with start and end coordinates.
+// Both sides' inputs for a tick are resolved together; same-tick ties have a rule in each duel.
 export const DT = 1 / 60;
-export const KINDS = ['tug', 'draw', 'sumo', 'catch', 'hockey', 'memory', 'balance'];
-export const CONTROL = { tug: 'tap', draw: 'tap', sumo: 'hold', catch: 'tap', hockey: 'drag', memory: 'tap', balance: 'hold' };
+export const KINDS = ['tug', 'draw', 'sumo', 'catch', 'hockey', 'memory', 'balance', 'swipe', 'launch'];
+export const CONTROL = { tug: 'tap', draw: 'tap', sumo: 'hold', catch: 'tap', hockey: 'drag', memory: 'tap', balance: 'hold', swipe: 'swipe', launch: 'release' };
 export const WIN = 3; // first to 3 duels: best of 5
 export const INTRO = 3, RESULT = 1.6, MAX_DUELS = 12;
 
@@ -25,7 +26,7 @@ export function rand(box) { // mulberry32 on a { r } state box
 const shuffle = (a, box) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rand(box) * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const mirror = (side, x, y) => side === 0 ? [x, y] : [1 - x, -y];
-export const blank = () => ({ held: false, taps: [], px: null, py: null });
+export const blank = () => ({ held: false, taps: [], px: null, py: null, heldFor: 0, releases: [] });
 const sideOfY = y => y > 0.04 ? 0 : y < -0.04 ? 1 : -1;
 
 // ---------------------------------------------------------------- the match
@@ -238,7 +239,7 @@ const catcher = {
 
 // Air hockey with a seed: each side drags its own paddle inside its own half. Goals are the gaps at each end.
 // First to 3 goals; at the limit, more goals wins.
-export const HOCKEY = { puck: 0.05, pad: 0.09, goal: 0.25, padSpeed: 7, max: 3.2, e: 0.9, fric: 0.35, serve: 0.6, wait: 0.8, need: 3, limit: 20, slow: 0.25, bowl: 0.5 };
+export const HOCKEY = { puck: 0.05, pad: 0.09, goal: 0.35, padSpeed: 7, max: 3.2, e: 0.9, fric: 0.35, serve: 0.6, wait: 0.8, need: 3, limit: 20, slow: 0.25, bowl: 0.5 };
 const resetPuck = (d, toward) => { d.puck = { x: 0.5, y: toward === 0 ? 0.12 : -0.12, vx: 0, vy: 0 }; d.wait = HOCKEY.wait; d.serve = toward; };
 const hockey = {
   limit: HOCKEY.limit,
@@ -378,4 +379,49 @@ const balance = {
   },
 };
 
-export const DUELS = { tug, draw: quick, sumo, catch: catcher, hockey, memory, balance };
+const compare = ([a, b]) => a > b ? 0 : b > a ? 1 : -1;
+
+// Swipe race: flick toward the center and lift. A tap, slow drag or sideways stroke does not move the racer.
+export const SWIPE = { start: 0.34, travel: 0.22, sideways: 0.22, maxTime: 0.45, gap: 0.18, need: 17, limit: 17 };
+const swipe = {
+  limit: SWIPE.limit,
+  init: () => ({ strokes: [0, 0], last: [-Infinity, -Infinity] }),
+  step(d, inp, ev) {
+    for (const i of [0, 1]) {
+      if (d.t - d.last[i] < SWIPE.gap) continue;
+      const valid = inp[i].releases.some(({ x0, y0, x, y, seconds }) => {
+        const [, from] = mirror(i, x0, y0), [, to] = mirror(i, x, y);
+        return x0 >= 0 && x0 <= 1 && from >= SWIPE.start && from <= 1 && from - to >= SWIPE.travel
+          && Math.abs(x - x0) <= SWIPE.sideways && seconds <= SWIPE.maxTime;
+      });
+      if (valid) { d.strokes[i]++; d.last[i] = d.t; ev.push({ e: 'stroke', side: i }); }
+    }
+    return Math.max(...d.strokes) >= SWIPE.need || d.t >= SWIPE.limit - 1e-9 ? compare(d.strokes) : null;
+  },
+};
+
+// Seed launch: build charge by holding, then lift when the meter reaches the mark. Each shot has the same
+// mark for both players, and a shot's score falls with distance from the mark. The higher total wins.
+export const LAUNCH = { shots: 6, low: 0.95, high: 1.55, scale: 2.15, minHold: 0.15, tolerance: 0.45, limit: 16 };
+const launch = {
+  limit: LAUNCH.limit,
+  init(box) {
+    const targets = Array.from({ length: LAUNCH.shots }, () => LAUNCH.low + rand(box) * (LAUNCH.high - LAUNCH.low));
+    return { targets, shots: [0, 0], scores: [0, 0], charge: [0, 0], last: [null, null] };
+  },
+  step(d, inp, ev) {
+    for (const i of [0, 1]) {
+      if (d.shots[i] >= LAUNCH.shots) { d.charge[i] = 0; continue; }
+      d.charge[i] = inp[i].heldFor;
+      const shot = inp[i].releases.find(release => release.seconds >= LAUNCH.minHold);
+      if (!shot) continue;
+      const error = Math.abs(shot.seconds - d.targets[d.shots[i]]);
+      const points = Math.max(0, Math.round(100 * (1 - error / LAUNCH.tolerance)));
+      d.shots[i]++; d.scores[i] += points; d.last[i] = { points, at: d.t };
+      ev.push({ e: 'launch', side: i, points });
+    }
+    return d.shots.every(n => n >= LAUNCH.shots) || d.t >= LAUNCH.limit - 1e-9 ? compare(d.scores) : null;
+  },
+};
+
+export const DUELS = { tug, draw: quick, sumo, catch: catcher, hockey, memory, balance, swipe, launch };

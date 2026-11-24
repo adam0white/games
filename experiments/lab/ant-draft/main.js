@@ -8,6 +8,9 @@ import { screens } from '../../kit/screens.js';
 import { hint } from '../../kit/hint.js';
 
 const $ = id => document.getElementById(id);
+const timers = new Set();
+function later(fn, ms) { const id = setTimeout(() => { timers.delete(id); fn(); }, ms); timers.add(id); return id; }
+function clearTimers() { for (const id of timers) clearTimeout(id); timers.clear(); }
 const canvas = $('c'), ctx = canvas.getContext('2d');
 const KEY = 'ant-draft:save';
 const save = Object.assign({ best: 0, wins: 0, runs: 0, sound: true, daily: null }, readJson(KEY, {}));
@@ -19,7 +22,7 @@ const LIFT = 44; // a touch puts the flag this many px above the finger, so the 
 noZoom();
 
 let s = null, mode = 'menu', paused = false, daily = false, acc = 0, last = performance.now(), time = 0, shake = 0, redFlash = 0;
-let parts = [], rings = [], banner = null, finger = false, pendingEnd = 0, pendingDraft = 0, draftOpenAt = 0, lastBite = 0;
+let parts = [], rings = [], banner = null, finger = null, pendingEnd = 0, pendingDraft = 0, draftOpenAt = 0, lastBite = 0;
 let cw = 0, ch = 0, dpr = 1, scale = 1, ox = 0, oy = 0, ground = null;
 const keys = new Set();
 const show = screens(['menu', 'draft', 'paused', 'end'], name => { $('pause').style.display = name === 'play' ? 'grid' : 'none'; });
@@ -125,23 +128,24 @@ function onEvent(e) {
     case 'crumb': snd.tone(900, 0.03, 0.025, 'sine'); break;
     case 'deliver': burst(e.x, e.y, 3, '#fff0c2', 40, 0.4, 2); snd.tone(780, 0.07, 0.05, 'sine', 240); break;
     case 'heal': ring(e.x, e.y, 44, '#8dff8a', 0.6); burst(e.x, e.y, 12, '#8dff8a', 60, 0.7, 2.5); snd.tone(440, 0.25, 0.06, 'sine', 440); break;
-    case 'wave': banner = { text: e.n === s.waves && s.waves === 8 ? 'Final wave' : `Wave ${e.n}`, t: 0 }; snd.tone(392, 0.12, 0.08, 'triangle'); setTimeout(() => snd.tone(587, 0.2, 0.08, 'triangle'), 120); break;
-    case 'draft': pendingDraft = 0.55; [523, 659, 784].forEach((f, i) => setTimeout(() => snd.tone(f, 0.16, 0.07, 'triangle'), i * 80)); break;
-    case 'won': pendingEnd = 1.3; for (let i = 0; i < 6; i++) setTimeout(() => { burst(40 + Math.random() * 280, 120 + Math.random() * 300, 22, ['#ffe23a', '#ff7a6a', '#8dff8a', '#fff8e6'][i % 4], 150, 1, 3.4); snd.tone([523, 659, 784, 1047, 784, 1047][i], 0.22, 0.09, 'triangle'); }, i * 150); break;
-    case 'lost': pendingEnd = 1.1; shake = 20; burst(e.x, e.y, 40, '#b98552', 160, 1, 4); burst(e.x, e.y, 20, '#ff3a2a', 120, 0.8, 3); [330, 262, 196, 131].forEach((f, i) => setTimeout(() => snd.tone(f, 0.28, 0.11, 'sawtooth', -40), i * 150)); snd.noise(0.5, 0.2, 200); break;
+    case 'wave': banner = { text: e.n === s.waves && s.waves === 8 ? 'Final wave' : `Wave ${e.n}`, t: 0 }; snd.tone(392, 0.12, 0.08, 'triangle'); later(() => snd.tone(587, 0.2, 0.08, 'triangle'), 120); break;
+    case 'draft': pendingDraft = 0.55; [523, 659, 784].forEach((f, i) => later(() => snd.tone(f, 0.16, 0.07, 'triangle'), i * 80)); break;
+    case 'won': pendingEnd = 1.3; for (let i = 0; i < 6; i++) later(() => { burst(40 + Math.random() * 280, 120 + Math.random() * 300, 22, ['#ffe23a', '#ff7a6a', '#8dff8a', '#fff8e6'][i % 4], 150, 1, 3.4); snd.tone([523, 659, 784, 1047, 784, 1047][i], 0.22, 0.09, 'triangle'); }, i * 150); break;
+    case 'lost': pendingEnd = 1.1; shake = 20; burst(e.x, e.y, 40, '#b98552', 160, 1, 4); burst(e.x, e.y, 20, '#ff3a2a', 120, 0.8, 3); [330, 262, 196, 131].forEach((f, i) => later(() => snd.tone(f, 0.28, 0.11, 'sawtooth', -40), i * 150)); snd.noise(0.5, 0.2, 200); break;
   }
 }
 const drain = () => { for (const e of s.events) onEvent(e); s.events.length = 0; };
 
 // ---------- flow ----------
 function start(isDaily = daily) {
-  daily = isDaily; snd.unlock();
+  clearTimers(); choosing = false; pauseAfterPick = false; daily = isDaily; snd.unlock();
   const d = new Date(), seed = params.has('seed') ? Number(params.get('seed')) : daily ? d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate() : (Math.random() * 2 ** 31) | 0;
-  s = create(seed, { waves: Number(params.get('waves')) || 0, hp: Number(params.get('hp')) || 0 });
-  parts = []; rings = []; acc = 0; paused = false; pendingEnd = pendingDraft = 0; mode = 'play'; show('play'); drain();
+  const waves = Number(params.get('waves')), hp = Number(params.get('hp'));
+  s = create(seed, { waves: Number.isFinite(waves) && waves >= 1 ? Math.min(8, Math.floor(waves)) : 8, hp: Number.isFinite(hp) && hp > 0 ? Math.min(QUEEN.hp, hp) : QUEEN.hp });
+  parts = []; rings = []; finger = null; keys.clear(); shake = redFlash = 0; banner = null; acc = 0; paused = false; pendingEnd = pendingDraft = 0; mode = 'play'; show('play'); drain();
 }
 function openDraft() {
-  mode = 'draft'; draftOpenAt = performance.now(); finger = false;
+  mode = 'draft'; draftOpenAt = performance.now(); finger = null; keys.clear();
   const box = $('offers'); box.textContent = '';
   s.offers.forEach((id, i) => {
     const b = document.createElement('button'), have = s.cards[id] | 0; b.className = 'offer' + (have ? ' held' : ''); b.dataset.card = id;
@@ -155,12 +159,12 @@ function openDraft() {
   $('draftTitle').textContent = `Wave ${s.wave + 1} cleared`;
   show('draft');
 }
-let choosing = false;
+let choosing = false, pauseAfterPick = false;
 function choose(i, b) {
   if (mode !== 'draft' || choosing || performance.now() - draftOpenAt < 350) return;
-  choosing = true; snd.unlock(); snd.tone(660, 0.1, 0.09, 'triangle'); setTimeout(() => snd.tone(990, 0.22, 0.09, 'triangle'), 90);
+  choosing = true; snd.unlock(); snd.tone(660, 0.1, 0.09, 'triangle'); later(() => snd.tone(990, 0.22, 0.09, 'triangle'), 90);
   for (const el of $('offers').children) el.classList.add(el === b ? 'chosen' : 'passed');
-  setTimeout(() => { choosing = false; pick(s, i); mode = 'play'; show('play'); drain(); last = performance.now(); }, 300);
+  later(() => { choosing = false; pick(s, i); mode = 'play'; show('play'); drain(); last = performance.now(); if (pauseAfterPick) { pauseAfterPick = false; pause(); } }, 300);
 }
 function endRun() {
   const won = s.phase === 'won', sc = score(s); save.runs++; if (won) save.wins++;
@@ -179,20 +183,20 @@ function menuNumbers() {
   for (const id of ['sound1', 'sound2']) $(id).textContent = `Sound: ${save.sound ? 'on' : 'off'}`;
   $('dailyLine').textContent = save.daily && save.daily.day === new Date().toDateString() ? `Today: ${save.daily.score}` : '';
 }
-function pause() { if (mode !== 'play' || paused) return; paused = true; finger = false; snd.hold(); show('paused'); }
+function pause() { keys.clear(); if (mode !== 'play' || paused) return; paused = true; finger = null; snd.hold(); show('paused'); }
 function resume() { paused = false; snd.release(); last = performance.now(); show('play'); }
 $('play').onclick = () => start(false); $('daily').onclick = () => start(true); $('again').onclick = () => start(daily);
-$('toMenu').onclick = $('quit').onclick = () => { paused = false; snd.release(); mode = 'menu'; show('menu'); menuNumbers(); };
+$('toMenu').onclick = $('quit').onclick = () => { paused = false; snd.release(); clearTimers(); finger = null; keys.clear(); mode = 'menu'; show('menu'); menuNumbers(); };
 $('pause').onclick = pause; $('resume').onclick = resume;
 $('sound1').onclick = $('sound2').onclick = () => { save.sound = !save.sound; persist(); menuNumbers(); if (save.sound) snd.tone(660, 0.1, 0.08, 'triangle'); };
-onLeave(pause);
+onLeave(() => { if (choosing) { keys.clear(); pauseAfterPick = true; } else pause(); });
 
 // ---------- input: the rally point follows the thumb ----------
 const fighting = () => mode === 'play' && !paused && s && s.phase === 'fight';
 function aim(e) { const lift = e.pointerType === 'mouse' ? 0 : LIFT; setRally(s, (e.clientX - ox) / scale, (e.clientY - lift - oy) / scale); }
-canvas.addEventListener('pointerdown', e => { if (!fighting()) return; e.preventDefault(); finger = true; snd.unlock(); aim(e); try { canvas.setPointerCapture(e.pointerId); } catch {} });
-canvas.addEventListener('pointermove', e => { if (!fighting()) return; if (finger || e.pointerType === 'mouse') aim(e); });
-for (const t of ['pointerup', 'pointercancel']) canvas.addEventListener(t, () => { finger = false; });
+canvas.addEventListener('pointerdown', e => { if (!fighting() || finger !== null) return; e.preventDefault(); finger = e.pointerId; snd.unlock(); aim(e); try { canvas.setPointerCapture(e.pointerId); } catch {} });
+canvas.addEventListener('pointermove', e => { if (!fighting()) return; if (finger === e.pointerId || (finger === null && e.pointerType === 'mouse')) aim(e); });
+for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(t, e => { if (finger === e.pointerId) finger = null; });
 addEventListener('keydown', e => {
   if (isPauseKey(e)) { if (paused) resume(); else pause(); return; }
   if (mode === 'draft' && ['1', '2', '3'].includes(e.key)) { const b = $('offers').children[Number(e.key) - 1]; if (b) choose(Number(e.key) - 1, b); return; }

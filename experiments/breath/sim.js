@@ -1,18 +1,19 @@
 // Hold Your Breath. Fixed-step, deterministic rules; no browser or wall clock.
 export const DT = 1 / 30;
 export const ALCOVES = [0, 0.5, 1];
+export const ALCOVE_RADIUS = 0.105;
 export const LEVELS = [
   [3, 1, 12, 0.2, 16],
   [3, 2, 11.8, 0.23, 24],
-  [3, 2, 11.6, 0.26, 28],
-  [4, 2, 11.4, 0.28, 30],
-  [4, 3, 11.2, 0.3, 32],
-  [4, 3, 11, 0.32, 34],
-  [4, 3, 10.8, 0.34, 36],
-  [4, 3, 10.6, 0.36, 38],
-  [5, 4, 10.4, 0.38, 40],
-  [5, 4, 10.2, 0.4, 42],
-  [5, 4, 10, 0.42, 44],
+  [3, 2, 11.6, 0.42, 38],
+  [4, 2, 11.4, 0.26, 24],
+  [4, 3, 11.2, 0.26, 26],
+  [4, 3, 11, 0.31, 28],
+  [4, 3, 10.8, 0.34, 28],
+  [4, 3, 10.6, 0.24, 34],
+  [5, 4, 10.4, 0.26, 36],
+  [5, 4, 10.2, 0.3, 38],
+  [5, 4, 10, 0.34, 42],
   [5, 5, 9.8, 0.44, 46],
 ].map(([floors, count, period, duty, drain], i) => ({
   level: i + 1,
@@ -28,6 +29,10 @@ export const LEVELS = [
   cat: i >= 10,
   limit: 240,
   alcoves: ALCOVES,
+  gust: [
+    { duration: 8.5, drain: 13.5, repeat: false },
+    { duration: 8.5, drain: 13.75, repeat: true },
+  ][i],
 }));
 export function rng(seed) {
   let r = seed | 0;
@@ -42,6 +47,11 @@ export function rng(seed) {
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const mod = (x, n) => ((x % n) + n) % n;
 export const GAP = { neighbour: 0.045, elder: 0.1, child: 0.085, cat: 0.035 };
+const OPENING_DOOR = 0.8;
+const OPENING_APPROACH = 0.1;
+const GUST_WARNING = 1.4;
+const GUST_SPEED = 0.24;
+
 export function create({ level = 1, seed = 1, daily = false } = {}) {
   const config = { ...LEVELS[clamp(level - 1, 0, 11)] };
   if (daily)
@@ -109,6 +119,8 @@ export function create({ level = 1, seed = 1, daily = false } = {}) {
     totalRescued: 0,
     score: 0,
     round: 1,
+    gustStarted: null,
+    nextGust: !daily && config.gust ? OPENING_DOOR - OPENING_APPROACH : Infinity,
     phases: Array.from({ length: 16 }, () => random() * 0.35),
   };
 }
@@ -136,6 +148,19 @@ export function position(s, progress = s.progress) {
 }
 export function wave(s, floor, t = s.t) {
   if (!floor) return { smoke: 0, phase: 0, warning: false };
+  if (floor === 1 && s.gustStarted !== null) {
+    const age = t - s.gustStarted;
+    const { duration } = s.config.gust;
+    if (age < GUST_WARNING + duration + 1) {
+      const gust = age - GUST_WARNING;
+      return {
+        smoke: clamp(Math.min(gust / 0.6, (duration - gust) / 0.6), 0, 1),
+        phase: mod(gust / (GUST_WARNING + duration), 1),
+        warning: age >= 0 && gust < 0,
+        gust: gust < duration,
+      };
+    }
+  }
   const period = s.config.period,
     phase = mod(
       t / period + s.phases[floor % s.phases.length] + floor * 0.19,
@@ -159,17 +184,17 @@ export function safe(s, progress = s.progress) {
   const p = position(s, progress);
   return (
     !s.mutateAlcoves &&
-    (p.stair || ALCOVES.some((a) => Math.abs(p.corridor - a) < 0.105))
+    (p.stair || ALCOVES.some((a) => Math.abs(p.corridor - a) < ALCOVE_RADIUS))
   );
 }
 function breathe(s, entity, progress, held) {
-  const air = safe(s, progress)
-    ? 0
-    : wave(s, position(s, progress).floor).smoke;
+  const w = safe(s, progress) ? null : wave(s, position(s, progress).floor);
+  const air = w?.smoke ?? 0;
+  const drain = w?.gust ? s.config.gust.drain : s.config.drain;
   if (air > 0.08)
     entity.breath = Math.max(
       0,
-      entity.breath - air * s.config.drain * (held ? 1 : 0.46) * DT,
+      entity.breath - air * drain * (held ? 1 : 0.46) * DT,
     );
   else entity.breath = Math.min(100, entity.breath + 18 * DT);
   return air;
@@ -221,8 +246,18 @@ export function step(s, held = false) {
       }
     }
   s.blocked = blocked;
-  if (held && !blocked)
-    s.progress = Math.min(s.length, s.progress + s.config.speed * DT);
+  if (held && !blocked) {
+    const w = wave(s, position(s).floor);
+    const speed = w.gust && w.smoke > 0.45 && !safe(s) ? GUST_SPEED : 1;
+    s.progress = Math.min(s.length, s.progress + s.config.speed * speed * DT);
+    if (s.progress >= s.nextGust) {
+      s.gustStarted = s.t;
+      s.nextGust =
+        s.config.gust.repeat && !s.returning
+          ? s.length - OPENING_DOOR - OPENING_APPROACH
+          : Infinity;
+    }
+  }
   if (s.progress > s.length - 0.01) s.progress = s.length;
   if (!s.returning && s.progress >= s.turn) {
     s.returning = true;
@@ -294,8 +329,7 @@ export function careful(s, { refill = 98, maxCost = 72, rest = 0.24 } = {}) {
     s.people.some((p) => p.waiting && wave(s, p.floor).smoke > 0.2)
   )
     return false;
-  const pos = position(s),
-    moving = s.aiTarget !== undefined && s.progress < s.aiTarget - 0.002;
+  const moving = s.aiTarget !== undefined && s.progress < s.aiTarget - 0.002;
   if (moving) return true;
   if (s.aiTarget !== undefined) {
     s.aiTarget = undefined;
@@ -304,6 +338,8 @@ export function careful(s, { refill = 98, maxCost = 72, rest = 0.24 } = {}) {
   if (s.progress >= s.length - 0.002) return false;
   if (s.aiRest > s.t) return false;
   if (s.aiRetry > s.t) return false;
+  const current = wave(s, position(s).floor);
+  if (current.gust) return false;
   const group = s.people.filter((p) => p.joined && !p.rescued);
   if (
     group.some((p) => s.progress - p.progress > 0.085) ||

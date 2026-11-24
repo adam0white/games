@@ -206,6 +206,13 @@
         visibility: hidden;
         padding-top: env(safe-area-inset-top);
         padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+      }
+      @media (orientation: landscape) and (max-height: 549px) {
+        #pause {
+          right: calc(12px + env(safe-area-inset-right));
+        }
       }
       #stars {
         font-size: 45px;
@@ -321,6 +328,33 @@
           font-size: 36px;
         }
       }
+      @media (orientation: landscape) and (max-height: 549px) {
+        #end .card {
+          max-width: 540px;
+          display: grid;
+          grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+          align-items: center;
+          gap: 16px;
+          padding: 12px;
+        }
+        #end h2 {
+          font-size: 26px;
+        }
+        #end .stat {
+          padding: 3px 0;
+        }
+        #endTip,
+        #end .row {
+          margin: 4px 0 0;
+        }
+        #end .primary {
+          margin: 4px 0 !important;
+          font-size: 18px;
+        }
+        #end .row button {
+          padding-inline: 8px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -372,19 +406,23 @@
     </div>
     <div id="end" class="screen">
       <div class="card">
-        <p class="eyebrow" id="endLabel">Street reached</p>
-        <h2 id="endTitle">Everyone out!</h2>
-        <canvas id="resultArt" aria-hidden="true"></canvas>
-        <div id="stars">★ ★ ★</div>
-        <div class="stat"><span>Rescued</span><b id="rescued">1 / 1</b></div>
-        <div class="stat">
-          <span>Lowest breath</span><b id="breathLeft">100%</b>
+        <div>
+          <p class="eyebrow" id="endLabel">Street reached</p>
+          <h2 id="endTitle">Everyone out!</h2>
+          <canvas id="resultArt" aria-hidden="true"></canvas>
+          <div id="stars">★ ★ ★</div>
         </div>
-        <div class="stat"><span>Time</span><b id="time">60s</b></div>
-        <p id="endTip" class="small"></p>
-        <button id="next" class="primary">Next level</button>
-        <div class="row">
-          <button id="again">Retry</button><button id="endMenu">Menu</button>
+        <div>
+          <div class="stat"><span>Rescued</span><b id="rescued">1 / 1</b></div>
+          <div class="stat">
+            <span>Lowest breath</span><b id="breathLeft">100%</b>
+          </div>
+          <div class="stat"><span>Time</span><b id="time">60s</b></div>
+          <p id="endTip" class="small"></p>
+          <button id="next" class="primary">Next level</button>
+          <div class="row">
+            <button id="again">Retry</button><button id="endMenu">Menu</button>
+          </div>
         </div>
       </div>
     </div>

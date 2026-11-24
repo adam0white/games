@@ -36,19 +36,20 @@ async function until(page, fn, what, ms = 15000, arg) { try { await page.waitFor
 // With `corner`, hold the finger in the top left corner instead (a player who is not defending).
 function steer(page, { ms, corner = false, untilPhase = true }) {
   return page.evaluate(async ({ ms, corner, untilPhase }) => {
-    const el = document.getElementById('c'), t0 = performance.now(); let down = false, last = { x: 60, y: 120 }, frames = 0, slow = 0, prev = t0;
+    const el = document.getElementById('c'), t0 = performance.now(); let down = false, last = { x: 60, y: 120 }, frames = 0, slow = 0, prev = t0, maxAimError = 0;
     const send = (type, p) => el.dispatchEvent(new PointerEvent('pointer' + type, { pointerId: 5, pointerType: 'touch', isPrimary: true, clientX: p.x, clientY: p.y, pressure: type === 'up' ? 0 : 0.5, bubbles: true, cancelable: true }));
     while (performance.now() - t0 < ms) {
       const st = window.antDraftState();
       if (untilPhase && (st.mode !== 'play' || st.phase !== 'fight')) break;
       const p = corner || !st.aim ? { x: 40, y: 90 + st.lift } : { x: st.aim.x, y: st.aim.y + st.lift };
       if (!down) { send('down', p); down = true; } else if (frames % 4 === 0) send('move', p);
+      if (!corner && st.aim && frames % 4 === 0) maxAimError = Math.max(maxAimError, Math.abs(window.antDraftState().rally.x - p.x));
       last = p; frames++;
       await new Promise(r => requestAnimationFrame(r));
       const now = performance.now(); if (now - prev > 50) slow++; prev = now;
     }
     if (down) send('up', last);
-    return { frames, slow, ms: performance.now() - t0 };
+    return { frames, slow, maxAimError, ms: performance.now() - t0 };
   }, { ms, corner, untilPhase });
 }
 
@@ -56,7 +57,7 @@ async function runPhone(name) {
   const [type, device] = PHONES[name], browser = await type.launch(), errors = [], out = {};
   try {
     const context = await browser.newContext({ ...device });
-    const open = async query => { const page = await context.newPage(); page.on('pageerror', e => errors.push(`pageerror: ${e.message}`)); page.on('console', m => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); }); await page.goto(`${base}/lab/ant-draft/${query}`); await until(page, () => !!window.antDraftState, 'the page to load'); return page; };
+    const open = async query => { const page = await context.newPage(); page.on('pageerror', e => errors.push(`pageerror: ${e.message}`)); page.on('console', m => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); }); await page.goto(`${base}/lab/ant-draft/${query}`); await until(page, () => !!window.antDraftState, 'the page to load'); await page.bringToFront(); await page.evaluate(() => { window.__reviewPainted = false; requestAnimationFrame(() => requestAnimationFrame(() => { window.__reviewPainted = true; })); }); await page.waitForFunction(() => window.__reviewPainted, null, { timeout: 10000 }); return page; };
 
     // ---- Run A: menu, hint, a won run ----
     let page = await open('?waves=1&seed=11');
@@ -71,7 +72,7 @@ async function runPhone(name) {
     const s1 = await steer(page, { ms: 5000, untilPhase: false });
     const mid = await state(page);
     assert.equal(mid.hint, false, 'the hint leaves on the first touch');
-    assert.ok(Math.abs(mid.rally.x - (mid.aim?.x ?? mid.rally.x)) < 30, 'the flag follows the finger');
+    assert.ok(s1.maxAimError < 0.01, `flag follows each dispatched finger position: error ${s1.maxAimError}`);
     out.frames = `${s1.frames} frames in ${Math.round(s1.ms)} ms, ${s1.slow} over 50 ms`;
     assert.ok(s1.frames / (s1.ms / 1000) > 25, `frame rate while fighting: ${out.frames}`);
     await page.screenshot({ path: join(SHOTS, `${name}-3-fight.png`) });
@@ -96,6 +97,9 @@ async function runPhone(name) {
     for (const d of draft) { assert.ok(d.words <= 5, `${d.id}: at most five words`); assert.ok(d.font >= 14, `${d.id}: text at least 14 px`); assert.ok(d.w >= 48 && d.h >= 48, `${d.id}: big target`); assert.ok(d.iconFirst && d.icon >= 56, `${d.id}: icon first`); assert.ok(d.left >= 0 && d.right <= device.viewport.width + 0.5, `${d.id}: inside the screen`); }
     await page.screenshot({ path: join(SHOTS, `${name}-5-draft.png`) });
     await page.tap('.offer:nth-child(2)');
+    await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+    await sleep(500); assert.equal((await state(page)).paused, true, 'leaving during card animation pauses the next wave');
+    await page.tap('#resume');
     await until(page, () => window.antDraftState().mode === 'play' && window.antDraftState().wave === 1, 'wave 2 after the pick');
     const picked = await state(page);
     assert.deepEqual(picked.picks, [draft[1].id]); assert.equal(picked.cards[draft[1].id], 1);

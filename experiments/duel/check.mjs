@@ -59,6 +59,13 @@ async function fingers(page, engine) {
 }
 // Board point (x across 0..1, y from -1 top to 1 bottom) to screen pixels.
 const at = (st, x, y) => [st.board.bx + x * st.board.k, st.board.cy + y * st.board.k];
+async function swipeByThumb(f, st, side, id) {
+  const dir = side === 0 ? 1 : -1;
+  await f.down(id, ...at(st, 0.5, dir * 0.77));
+  await sleep(75);
+  await f.move(id, ...at(st, 0.5, dir * 0.34));
+  await f.up(id);
+}
 
 async function open(browser, options) {
   const context = await browser.newContext(options), page = await context.newPage(), errors = [];
@@ -85,7 +92,7 @@ const localSend = page => page.evaluate(() => localStorage.setItem('hf-lab-send-
 // hold and let go to keep the drop in the middle, chase the seed with the paddle. Returns the final state.
 const PADXY = [[0.29, 0.36], [0.71, 0.36], [0.29, 0.72], [0.71, 0.72]];
 async function soloByThumb(page, f, label, shot) {
-  let st = await state(), taps = 0, mid = false, down = false, kind = null, tapped = -1;
+  let st = await state(), taps = 0, mid = false, down = false, kind = null, tapped = -1, lastSwipe = 0;
   const t0 = Date.now();
   const hold = async (want, x, y) => { if (want && !down) { await f.down(1, x, y); down = true; } else if (!want && down) { await f.up(1); down = false; } };
   while (st.screen === 'play' && Date.now() - t0 < 150000) {
@@ -98,6 +105,12 @@ async function soloByThumb(page, f, label, shot) {
       else if (kind === 'memory') { if (d.st === 'answer' && !d.out[0] && d.idx[0] < d.seq.length) { const [x, y] = PADXY[d.seq[d.idx[0]]]; await f.tap(2, ...at(st, x, y)); } }
       else if (kind === 'sumo') await hold(true, cx, cy);
       else if (kind === 'balance') await hold(d.x[0] + d.v[0] * 0.35 < 0, cx, cy);
+      else if (kind === 'swipe' && Date.now() - lastSwipe >= 230) {
+        await swipeByThumb(f, st, 0, 1); lastSwipe = Date.now();
+      } else if (kind === 'launch') {
+        const target = d.targets[d.shots[0]];
+        if (target !== undefined) await hold(d.charge[0] < target, cx, cy);
+      }
       else if (kind === 'hockey') {
         const pk = d.puck, tx = pk.x + (pk.x < 0.5 ? 0.03 : -0.03), ty = pk.y > -0.05 ? pk.y + 0.12 : 0.75;
         const [x, y] = at(st, tx, Math.max(0.1, ty));
@@ -139,6 +152,8 @@ async function run(page, phone, engine) {
   await page.screenshot({ path: join(SHOTS, `${phone}-2-countdown.png`) });
   await until(page, () => window.duelState().phase === 'play', 'the first duel starts');
   assert.equal(await page.evaluate(() => localStorage.getItem('duel:hint')), null, 'no hint key before any input');
+  await until(page, () => document.querySelector('#hint-bottom .kit-hint.on'), 'the first duel shows the solo hint');
+  assert.equal(await page.locator('#hint-top .kit-hint.on').count(), 0, 'the bot seat does not show a hint');
   st = await soloByThumb(page, f, 'solo vs easy', `${phone}-3-mid-tug.png`);
   assert.equal(await page.evaluate(() => localStorage.getItem('duel:hint')), '1', 'the first tap in play retires the hint');
   assert.equal(st.winner, 0, `the thumb beats the easy bot (${st.score.join('-')}, duels ${st.duels.map(d => d.kind).join(' ')})`);
@@ -169,9 +184,23 @@ async function run(page, phone, engine) {
   await page.click('#solo .back');
 
   // 3. Two players, two thumbs at once: tug of war, both tapping together; the bottom taps twice as often.
-  await page.goto(`${base}/duel/?seed=11&only=tug&fast=1`);
+  await page.goto(`${base}/duel/?seed=11&only=tug&fast=1&hint=hand`);
   await page.click('#play');
   await until(page, () => window.duelState().phase === 'play', 'friend tug starts');
+  await until(page, () => document.querySelectorAll('.hint-side .kit-hint.on').length === 2, 'both players see the tap hint');
+  const mirror = await page.evaluate(() => {
+    const bottom = document.querySelector('#hint-bottom .kit-hint').getBoundingClientRect();
+    const top = document.querySelector('#hint-top .kit-hint').getBoundingClientRect();
+    const rotate = new DOMMatrix(getComputedStyle(document.getElementById('hint-top')).transform);
+    return { centered: Math.abs(top.x - bottom.x) < 1, mirrored: Math.abs(top.y + bottom.y - innerHeight) < 2, above: top.y < innerHeight / 2, flipped: rotate.a === -1 && rotate.d === -1 };
+  });
+  assert.deepEqual(mirror, { centered: true, mirrored: true, above: true, flipped: true }, 'the top hint mirrors position and orientation');
+  await sleep(600);
+  await page.screenshot({ path: join(SHOTS, `${phone}-two-tap-hints.png`) });
+  st = await state();
+  await f.tap(10, ...at(st, 0.5, 0.6));
+  assert.equal(await page.locator('.hint-side .kit-hint').count(), 0, 'the first tap retires both copies of the shared hint');
+  await f.tap(20, ...at(st, 0.5, -0.6));
   let n = 0, shot = false;
   for (let guard = 0; guard < 400; guard++) {
     st = await state();
@@ -263,23 +292,64 @@ async function run(page, phone, engine) {
   for (const kind of KINDS) {
     await page.goto(`${base}/duel/?seed=21&only=${kind}&fast=1`);
     await page.click('#play');
-    if (phone === 'webkit') { await sleep(500); await page.screenshot({ path: join(SHOTS, `${phone}-intro-${kind}.png`) }); }
+    if (phone === 'webkit' || kind === 'swipe' || kind === 'launch') { await sleep(500); await page.screenshot({ path: join(SHOTS, `${phone}-intro-${kind}.png`) }); }
     await until(page, () => window.duelState().phase === 'play', `${kind} starts`);
     st = await state();
     assert.ok(st.minTouchPx >= 48, `${kind}: touch targets at least 48 px (${st.minTouchPx.toFixed(0)})`);
-    const t0 = Date.now();
-    let i = 0;
-    while (Date.now() - t0 < 3500) {
-      st = await state(); if (st.phase !== 'play') break;
-      if (kind === 'memory' && st.d.st === 'answer') {
-        const P0 = [[0.29, 0.36], [0.71, 0.36], [0.29, 0.72], [0.71, 0.72]];
-        const want = st.d.seq[st.d.idx[0]];
-        if (want !== undefined && !st.d.out[0]) await f.tap(50, ...at(st, P0[want][0], P0[want][1]));
-      } else if (kind === 'sumo' || kind === 'balance') { if (i % 6 === 0) await f.down(51, ...at(st, 0.5, 0.6)); if (i % 6 === 3) await f.up(51); }
-      else if (kind === 'hockey') { const pk = st.d.puck; await f.down(52, ...at(st, pk.x, Math.max(0.15, pk.y + 0.1))); }
-      else await f.tap(53, ...at(st, 0.5, 0.6));
-      if (i === 8) await page.screenshot({ path: join(SHOTS, `${phone}-play-${kind}.png`) });
-      i++; await sleep(90);
+    if (kind === 'swipe') {
+      await f.tap(64, ...at(st, 0.5, 0.77));
+      await f.down(65, ...at(st, 0.5, -0.77));
+      await sleep(550);
+      await f.move(65, ...at(st, 0.5, -0.34));
+      await f.up(65);
+      await until(page, t => window.duelState().t > t + 0.05, 'swipe inputs reach the simulation', 3000, (await state()).t);
+      assert.deepEqual((await state()).d.strokes, [0, 0], 'the race rejects a tap and a slow drag');
+      await swipeByThumb(f, st, 0, 64);
+      await swipeByThumb(f, st, 1, 65);
+      await until(page, () => window.duelState().d.strokes.every(n => n === 1), 'a flick toward center scores for each seat');
+      await sleep(200);
+      await swipeByThumb(f, st, 0, 64);
+      await until(page, () => window.duelState().d.strokes[0] === 2, 'a second bottom flick advances only its racer');
+      assert.deepEqual((await state()).d.strokes, [2, 1]);
+      await page.screenshot({ path: join(SHOTS, `${phone}-play-swipe.png`) });
+    } else if (kind === 'launch') {
+      await f.tap(66, ...at(st, 0.22, 0.73));
+      await f.down(66, ...at(st, 0.22, 0.73));
+      await sleep(220);
+      await f.down(67, ...at(st, 0.78, -0.73));
+      await until(page, () => window.duelState().d.charge[0] >= 0.6, 'the meter fills under a held thumb');
+      assert.deepEqual((await state()).d.shots, [0, 0], 'tapping and holding do not score before release');
+      await page.screenshot({ path: join(SHOTS, `${phone}-play-launch.png`) });
+      await until(page, () => { const d = window.duelState().d; return d.charge[0] >= d.targets[0] - 0.05; }, 'bottom reaches the target mark');
+      await f.up(66);
+      await until(page, () => window.duelState().d.shots[0] === 1, 'bottom releases one shot');
+      assert.equal((await state()).d.shots[1], 0, 'top keeps holding while bottom releases');
+      await until(page, () => { const d = window.duelState().d; return d.charge[1] >= d.targets[0] - 0.05; }, 'top reaches the target mark');
+      await f.up(67);
+      await until(page, () => window.duelState().d.shots[1] === 1, 'top releases one shot');
+      assert.ok((await state()).d.scores.every(points => points >= 60), 'each thumb scores by releasing near the mark');
+      await page.screenshot({ path: join(SHOTS, `${phone}-scored-launch.png`) });
+      await f.down(66, ...at(st, 0.5, 0.75));
+      await until(page, () => window.duelState().d.charge[0] >= 0.2, 'bottom starts another hold');
+      await page.click('#pause'); await page.click('#resume');
+      await f.up(66);
+      await until(page, () => window.duelState().d.charge[0] === 0, 'pause clears the unfinished hold');
+      assert.deepEqual((await state()).d.shots, [1, 1], 'lifting after a pause cannot fire the interrupted shot');
+    } else {
+      const t0 = Date.now();
+      let i = 0;
+      while (Date.now() - t0 < 3500) {
+        st = await state(); if (st.phase !== 'play') break;
+        if (kind === 'memory' && st.d.st === 'answer') {
+          const P0 = [[0.29, 0.36], [0.71, 0.36], [0.29, 0.72], [0.71, 0.72]];
+          const want = st.d.seq[st.d.idx[0]];
+          if (want !== undefined && !st.d.out[0]) await f.tap(50, ...at(st, P0[want][0], P0[want][1]));
+        } else if (kind === 'sumo' || kind === 'balance') { if (i % 6 === 0) await f.down(51, ...at(st, 0.5, 0.6)); if (i % 6 === 3) await f.up(51); }
+        else if (kind === 'hockey') { const pk = st.d.puck; await f.down(52, ...at(st, pk.x, Math.max(0.15, pk.y + 0.1))); }
+        else await f.tap(53, ...at(st, 0.5, 0.6));
+        if (i === 8) await page.screenshot({ path: join(SHOTS, `${phone}-play-${kind}.png`) });
+        i++; await sleep(90);
+      }
     }
     await f.clear();
     await page.click('#pause'); await page.click('#quit');
@@ -340,6 +410,18 @@ async function desktop(browser) {
   assert.ok(Math.hypot(s1.d.pads[0].x - 0.3, s1.d.pads[0].y - 0.5) < 0.05, 'the mouse drags the bottom paddle');
   await page.screenshot({ path: join(SHOTS, 'desktop-hockey.png') });
   await page.mouse.up();
+  await page.goto(`${base}/duel/?seed=3&only=swipe&fast=1`);
+  await page.click('#play');
+  await until(page, () => window.duelState().phase === 'play', 'desktop swipe');
+  await page.keyboard.press('ArrowUp');
+  await until(page, () => window.duelState().d.strokes[0] === 1, 'ArrowUp scores a swipe');
+  await page.goto(`${base}/duel/?seed=3&only=launch&fast=1`);
+  await page.click('#play');
+  await until(page, () => window.duelState().phase === 'play', 'desktop launch');
+  await page.keyboard.down('Space');
+  await until(page, () => { const d = window.duelState().d; return d.charge[0] >= d.targets[0] - 0.05; }, 'Space charges the launch');
+  await page.keyboard.up('Space');
+  await until(page, () => window.duelState().d.scores[0] >= 60, 'releasing Space scores the launch');
   assert.deepEqual(errors, [], 'page errors on desktop');
   await context.close();
 }

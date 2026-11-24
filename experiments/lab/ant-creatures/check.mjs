@@ -1,5 +1,6 @@
 // Real-input check on two phones: WebKit iPhone 13 and Chromium Pixel 7. It serves experiments/ itself and plays by
-// Playwright's mouse, which sends real pointer events to the page's stick; it never steps the sim or sets its state.
+// Playwright's mouse sends real pointer events to the page's stick. The separate regression section injects
+// one level-18 win fixture and synthetic pointer IDs; the normal play route never steps or sets the sim.
 //   PLAYWRIGHT=/Users/abdul/code/human-framework/node_modules node experiments/lab/ant-creatures/check.mjs [webkit|chromium]
 // Screenshots go to /private/tmp/night-ant-creatures/ (SHOTS to change it).
 import { createServer } from 'node:http';
@@ -86,10 +87,72 @@ async function steer(page, how, stop, ms, onTick) {
   return { mode: await mode(page), secs: (Date.now() - t0) / 1000, maxSquash };
 }
 
+// Fault-injection regressions supplement the real-input run below. Synthetic pointer IDs exercise
+// a second finger in both engines; the win fixture covers a level the playing bot cannot reach.
+async function regressions(page, name) {
+  await page.goto(PAGE + '?seed=11');
+  await page.evaluate(() => localStorage.removeItem('ant-creatures:v1')); await page.reload();
+  await frames(page); await page.screenshot({ path: join(SHOTS, `${name}-review-menu-reload.png`) });
+  await page.click('#play');
+  const pointer = (target, type, id, x, y) => page.dispatchEvent(target, type, { pointerId: id, pointerType: 'touch', isPrimary: id === 41, clientX: x, clientY: y, bubbles: true });
+  await pointer('#c', 'pointerdown', 41, 120, 500);
+  await pointer('#c', 'pointermove', 41, 160, 500);
+  const first = await page.evaluate(() => window.__ant.input);
+  assert.ok(first.x > 0.5, 'first finger steers');
+  await pointer('#c', 'pointerdown', 42, 260, 500);
+  await pointer('#c', 'pointermove', 42, 220, 500);
+  assert.deepEqual(await page.evaluate(() => window.__ant.input), first, 'second finger must not take the stick');
+  await pointer('#c', 'pointerup', 42, 220, 500);
+  assert.deepEqual(await page.evaluate(() => window.__ant.input), first, 'lifting second finger preserves first finger');
+  await page.click('#pause'); await page.screenshot({ path: join(SHOTS, `${name}-review-pause.png`) });
+  await page.click('#resume');
+  assert.deepEqual(await page.evaluate(() => window.__ant.input), { x: 0, y: 0 }, 'resume drops held input');
+  await pointer('#c', 'pointerup', 41, 160, 500);
+  await pointer('#c', 'pointerdown', 41, 120, 500); await pointer('#c', 'pointermove', 41, 160, 500);
+  await pointer('#c', 'lostpointercapture', 41, 160, 500);
+  assert.deepEqual(await page.evaluate(() => window.__ant.input), { x: 0, y: 0 }, 'lost capture releases the stick');
+  await page.reload(); assert.equal(await mode(page), 'menu', 'reload returns to menu');
+  await page.click('#play');
+  assert.equal(await page.evaluate(() => [window.__ant.lives, window.__ant.level(window.__ant.s), window.__ant.s.eaten].join()), '3,1,0', 'reload starts a fresh run');
+  assert.deepEqual(await page.evaluate(() => [window.__ant.save.best, window.__ant.save.dayBest]), [1, 1], 'an unpromoted run records level one');
+  await page.click('#pause'); await page.click('#paused .toMenu'); await page.click('#toZoo'); await sleep(300);
+  const xy = await page.evaluate(() => [0, 1].map(i => { const b = window.__ant.penBox(i); return { x: b.x + 8, y: b.y + 40 }; }));
+  await pointer('#zoo', 'pointerdown', 41, xy[0].x, xy[0].y);
+  assert.ok(await page.evaluate(() => window.__ant.pens[0].follow), 'first finger leads Zoo animal');
+  await pointer('#zoo', 'pointerdown', 42, xy[1].x, xy[1].y);
+  await pointer('#zoo', 'pointerup', 42, xy[1].x, xy[1].y);
+  await pointer('#zoo', 'pointerup', 41, xy[0].x, xy[0].y);
+  assert.equal(await page.evaluate(() => window.__ant.pens.filter(p => p.follow).length), 0, 'both lifted fingers leave no Zoo follow state');
+  await pointer('#zoo', 'pointerdown', 41, xy[0].x, xy[0].y);
+  await page.click('#zooBack'); await page.click('#toZoo');
+  assert.equal(await page.evaluate(() => window.__ant.pens.filter(p => p.follow).length), 0, 'leaving Zoo clears held input');
+  await page.click('#zooBack'); await page.click('#play');
+  await page.evaluate(() => { const A = window.__ant, F = A.FORMS.find(f => f.level === 18); A.s.player.stack = Array(18).fill(F.id); A.s.player.xp = A.needFor(18); A.s.mobs.length = 0; });
+  await until(page, () => window.__ant.s.won, 'win fixture');
+  assert.equal(await mode(page), 'win', 'a completed win stops play immediately');
+  await page.screenshot({ path: join(SHOTS, `${name}-review-win.png`) });
+  await page.click('#winNew');
+  await sleep(1400);
+  assert.equal(await mode(page), 'play', 'old win timeout cannot replace a new run');
+  assert.equal(await page.evaluate(() => window.__ant.level(window.__ant.s)), 1, 'new run remains level one');
+  for (const query of ['Infinity', '-2', 'NaN', '1000000']) {
+    await page.goto(PAGE + '?bench=' + query);
+    await until(page, () => !!window.__ant, 'bounded benchmark query', 3000);
+    const n = await page.evaluate(() => window.__ant.bench.n);
+    assert.ok(Number.isInteger(n) && n >= 0 && n <= 200, `bench=${query} is bounded (${n})`);
+  }
+  await page.goto(PAGE + '?bench=40');
+  await page.evaluate(() => { window.__ant.bench.gaps = Array(600).fill(16); window.__ant.bench.cpu = Array(600).fill(1); });
+  await frames(page);
+  assert.deepEqual(await page.evaluate(() => [window.__ant.bench.gaps.length, window.__ant.bench.cpu.length]), [600, 600], 'benchmark sample storage stays bounded');
+  note(`${name}: second finger, held-input pause, reload, Zoo release/exit, stale win timeout and four benchmark inputs pass`);
+}
+
 async function phone(name) {
   const [type, device] = PHONES[name], browser = await type.launch();
   const { context, page, errors } = await open(browser, device);
   try {
+    if (process.env.REGRESS_ONLY) { await regressions(page, name); return; }
     await page.goto(PAGE + '?seed=11');
     await until(page, () => window.__ant?.mode === 'menu', 'menu');
     await sleep(600); await layout(page, `${name} menu`);
@@ -98,6 +161,7 @@ async function phone(name) {
     await until(page, () => window.__ant.mode === 'play', 'play');
     await until(page, () => !!document.querySelector('.kit-hint.on, [class*="hint"].on'), 'the stick hint for a new player', 6000).then(() => note(`${name}: the stick hint shows to a new player who does not touch`), () => note(`${name}: hint element not found by class (unverified)`));
     await layout(page, `${name} play`);
+    await page.screenshot({ path: join(SHOTS, `${name}-review-first-play.png`) });
     // pause freezes the run
     await page.click('#pause'); assert.equal(await mode(page), 'paused', 'the pause button pauses');
     const t1 = await page.evaluate(() => window.__ant.s.t); await sleep(400); assert.equal(await page.evaluate(() => window.__ant.s.t), t1, 'paused time stands still');
@@ -128,6 +192,8 @@ async function phone(name) {
     assert.equal(r2.mode, 'over', `${name}: three deaths end the run (ended in ${r2.mode})`);
     await sleep(300); await layout(page, `${name} end card`);
     await page.screenshot({ path: join(SHOTS, `${name}-6-end.png`) });
+    const elapsed = await page.evaluate(() => { const seconds = Math.round(window.__ant.s.t); return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`; });
+    assert.ok((await page.textContent('#overSay')).includes(`in ${elapsed}.`), 'run duration includes simulation time only');
     const best = await page.evaluate(() => JSON.parse(localStorage.getItem('ant-creatures:v1')));
     assert.ok(best.best >= 2 && best.dayBest >= 2, `best level saved on the device (${best.best})`);
     note(`${name}: reckless play ended the run in ${r2.secs.toFixed(0)} s; saved best level ${best.best}`);
@@ -139,8 +205,10 @@ async function phone(name) {
     await sleep(800); await layout(page, `${name} zoo`);
     await page.screenshot({ path: join(SHOTS, `${name}-7-zoo.png`) });
     const at = await page.evaluate(() => { const A = window.__ant, p = A.pens[0], b = A.penBox(0); return { x: b.x + b.w / 2 + p.x * p.k, y: b.y + 26 + b.h / 2 + p.y * p.k }; });
+    // Capture the immediate response in the event turn; browser automation may return after squash decays.
+    await page.evaluate(() => document.getElementById('zoo').addEventListener('pointerdown', () => { const p = window.__ant.pens[0]; window.__pokeEvidence = { n: p.poked, sq: p.c.squash }; }, { once: true }));
     await page.mouse.click(at.x, at.y);
-    const poked = await page.evaluate(() => ({ n: window.__ant.pens[0].poked, sq: window.__ant.pens[0].c.squash }));
+    const poked = await page.evaluate(() => window.__pokeEvidence);
     assert.ok(poked.n === 1 && poked.sq > 0.5, `a tap on the animal pokes it (${JSON.stringify(poked)})`);
     // lead the animal in pen 1: hold a finger on the far side of its pen from it
     const px = () => page.evaluate(() => { const A = window.__ant, p = A.pens[1], b = A.penBox(1), ox = b.x + b.w / 2, oy = b.y + 26 + b.h / 2, g = p.goal || { x: p.x, y: p.y }; return { ax: ox + p.x * p.k, ay: oy + p.y * p.k, gx: ox + g.x * p.k, gy: oy + g.y * p.k, b }; });
@@ -157,6 +225,7 @@ async function phone(name) {
     await page.click('#zooSize'); await sleep(600);
     await page.screenshot({ path: join(SHOTS, `${name}-9-zoo-gamesize.png`) });
     await page.click('#zooSize'); await page.click('#zooBack'); assert.equal(await mode(page), 'menu', 'back from the zoo');
+    await regressions(page, name);
     // 40 animals: frame interval and the page's own work per frame
     await page.goto(PAGE + '?bench=40'); await sleep(1500);
     await page.evaluate(() => { window.__ant.bench.gaps.length = 0; window.__ant.bench.cpu.length = 0; }); await sleep(4000);
@@ -205,7 +274,7 @@ let failed = 0;
 for (const name of only ? [only] : ['webkit', 'chromium']) {
   try { await phone(name); console.log(`ok   ${name}`); } catch (e) { failed++; console.log(`FAIL ${name}: ${e.message}`); }
 }
-if (!only) { try { await small(); console.log('ok   small phone and desktop'); } catch (e) { failed++; console.log(`FAIL small/desktop: ${e.message}`); } }
+if (!only && !process.env.REGRESS_ONLY) { try { await small(); console.log('ok   small phone and desktop'); } catch (e) { failed++; console.log(`FAIL small/desktop: ${e.message}`); } }
 server.close();
 console.log(failed ? `${failed} part(s) FAILED; screenshots in ${SHOTS}` : `all parts pass; screenshots in ${SHOTS}`);
 process.exit(failed ? 1 : 0);

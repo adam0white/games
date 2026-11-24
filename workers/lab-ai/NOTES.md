@@ -1,0 +1,18 @@
+# Lab AI worker notes
+
+## 2026-11-24 · Race readiness and quest retry
+
+- A room starts its 4,000 ms countdown when every connected lobby socket is ready, or when the 8,000 ms alarm fires. If the alarm fires first, only ready sockets race. Sockets that join an active race or miss the deadline spectate until the next lobby. The deadline survives hibernation in socket attachments. The last racer to finish or disconnect clears the round from every remaining attachment. The 150,000 ms race expiry still applies.
+- Ready racers receive `{t:"roster",ids:[...]}` before the original `{t:"round",seed,start}` frame. The welcome frame retains its existing shape. The current Lantern Race decoder ignores the roster frame and the racer UI lists the whole room. The client needs to use the roster for results, opponent counts and bot replacement. The current client retries Ready every 2,000 ms while waiting in the lobby.
+- The reported quest baseline was 2 model errors in 10 live calls. Quest now retries once after a failed call or unusable output. The first inference wait is capped at 6,000 ms and the retry at 3,000 ms, totaling 9,000 ms of inference wait. Counter requests are outside the inference timers. Each model invocation needs its own daily admission. If a failed first call uses the final allowance, the request returns its model error and makes no second call.
+- Quest names must contain the giver species as a whole word, ignoring case. `ant` is the species word for `ant-queen`. An otherwise valid quest with an unrelated nickname keeps its dialogue and receives the built-in species name. The quest cache moved to version 2 so previously cached nicknames expire without serving as current answers.
+
+### Verification
+
+- Node 26.12.0 passed 53 of 53 worker tests, up from 44. Tests cover readiness and disconnects, alarm replay and reconstruction, the 7,999/8,000 ms boundary, legacy frames, the 9,000 ms inference budget, quota on each attempt and all 8 giver names.
+- The local Workers runtime announced a round 8,010 ms after Ready with 1 racer and 1 spectator. The next arrival got a null round after the racer finished. All 3 connected sockets then readied and raced. A quest with a stubbed inference binding returned 200 and the name `Beetle` after unparseable output on attempt 1. The local SQLite counter recorded 2 quest calls.
+- Lantern Race passed 9 of 9 bot checks. Its mutation failed 1 of 9 and exited 1. Both WebKit iPhone 13 and Chromium Pixel 7 passed the full browser check with 2 dawn finishes per engine. The room mock recorded 6 rounds, 2,025 position frames, 8 finishes, a maximum incoming frame of 36 bytes and a maximum of 7 messages per second.
+- Ant Quests bots won 40 of 40 careful runs and 0 of 40 clumsy runs. Its mutation failed on seed 1 and exited 1.
+- Ant Quests passed both full scenarios and 7 fallback cases per phone profile. Each full scenario completed 12 of 12 quests with 8 requests and zero page or console errors. WebKit finished in 122.53 s and 122.62 s. Chromium finished in 122.62 s and 122.68 s. The timeout scenario recorded 8 fetch aborts on each engine. Menu, play and results screenshots were inspected on both profiles for both experiments.
+- The repository observability check passed 3 of 3 tests. The worker configuration matches its starting version.
+- The phone checks use test doubles for the remote endpoints. Production alarms, hibernation on the edge and the live quest error rate after retry remain unverified. The quest client still aborts its fetch at 4,000 ms, so later retry responses may arrive after it has stopped waiting.

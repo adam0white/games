@@ -17,7 +17,7 @@ export function rng(seed) {
   return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 
-// Levels: n from 1. The glass gets narrower, the band thinner, the glass starts to move, and the jug holds less spare.
+// Levels: n from 1. Glass width, target band, motion and spare juice set the difficulty.
 export const LEVELS = 8;
 export function level(n) {
   const k = Math.max(1, Math.min(LEVELS, n | 0));
@@ -28,7 +28,7 @@ export function level(n) {
     [78, 12, 34, 5, 4, 0.6, 20, 11],
     [78, 11, 40, 5, 6, 0.7, 19, 11],
     [76, 11, 40, 4, 7, 0.8, 20, 11],
-    [76, 10, 42, 4, 8, 0.9, 17, 11],
+    [76, 10, 42, 6, 8, 0.9, 18, 11],
     [74, 10, 36, 3, 9, 1.0, 16, 11],
     [74, 10, 44, 3, 10, 1.1, 18, 11],
   ][k - 1];
@@ -99,8 +99,50 @@ export function step(s, tilt) {
   return s;
 }
 
-// push overlapping drops apart, using a spatial grid
+// Keep the snapshot grid and ascending particle order, without per-step bucket allocation.
+// Grid cells cover x [-46.4, 139.2), y [-69.6, 208.8); unusual states use the unbounded grid.
+const GRID_W = 64, GRID_H = 96, GRID_X = 16, GRID_Y = 24;
+const gridHeads = new Int16Array(GRID_W * GRID_H).fill(-1);
+const gridNext = new Int16Array(128), gridTouched = new Uint16Array(128);
+let gridUsed = 0;
 function relax(s) {
+  const P = s.p, cell = 2 * R, D = 2 * R, D2 = D * D;
+  if (P.length > gridNext.length) return relaxUnbounded(s);
+  for (const q of P) {
+    if (q.st === 2) continue;
+    const cx = Math.floor(q.x / cell) + GRID_X, cy = Math.floor(q.y / cell) + GRID_Y;
+    // Include one cell of padding for every neighbor query after pair correction.
+    if (!(cx >= 2 && cx < GRID_W - 2 && cy >= 2 && cy < GRID_H - 2)) return relaxUnbounded(s);
+  }
+  for (let i = 0; i < gridUsed; i++) gridHeads[gridTouched[i]] = -1;
+  gridUsed = 0;
+  // Prepend in reverse order so each bucket visits j in the original ascending order.
+  for (let i = P.length - 1; i >= 0; i--) {
+    const q = P[i]; if (q.st === 2) continue;
+    const key = (Math.floor(q.x / cell) + GRID_X) * GRID_H + Math.floor(q.y / cell) + GRID_Y;
+    if (gridHeads[key] === -1) gridTouched[gridUsed++] = key;
+    gridNext[i] = gridHeads[key]; gridHeads[key] = i;
+  }
+  for (let i = 0; i < P.length; i++) {
+    const q = P[i]; if (q.st === 2) continue;
+    const cx = Math.floor(q.x / cell) + GRID_X, cy = Math.floor(q.y / cell) + GRID_Y;
+    const edge = cx < 1 || cx >= GRID_W - 1 || cy < 1 || cy >= GRID_H - 1;
+    for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
+      if (edge && (cx + ox < 0 || cx + ox >= GRID_W || cy + oy < 0 || cy + oy >= GRID_H)) continue;
+      let j = gridHeads[(cx + ox) * GRID_H + cy + oy];
+      for (; j !== -1; j = gridNext[j]) {
+        if (j <= i) continue;
+        const o = P[j], dx = o.x - q.x, dy = o.y - q.y, d2 = dx * dx + dy * dy;
+        if (d2 >= D2 || d2 < 1e-9) continue;
+        const d = Math.sqrt(d2), push = (D - d) * 0.5 * 0.5 / d;
+        q.x -= dx * push; q.y -= dy * push; o.x += dx * push; o.y += dy * push;
+      }
+    }
+  }
+}
+
+// push overlapping drops apart, using a spatial grid
+function relaxUnbounded(s) {
   const P = s.p, cell = 2 * R, grid = new Map(), D = 2 * R, D2 = D * D;
   for (let i = 0; i < P.length; i++) {
     const q = P[i]; if (q.st === 2) continue;
