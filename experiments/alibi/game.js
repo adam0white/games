@@ -213,7 +213,7 @@ const starTotal = () => t('starTotal', {
 
 function updateMenu() {
   const current = validLevel(forceLevel) ? forceLevel : profile.level;
-  $('progress').textContent = `${number(current)} /${number(CASES.length)}`;
+  $('progress').textContent = `${number(current)}/${number(CASES.length)}`;
   $('caseStars').textContent = starTotal();
   if (screen === 'done') updateGoal();
   const today = dayKey();
@@ -1094,7 +1094,8 @@ const TAG = '#fff4e0';
 function drawMaskTags(frame, actors) {
   const firstMasks = frame.beat > 0 && frame.actors.some(actor => actor.mask !== null)
     && !board[frame.beat - 1].actors.some(actor => actor.mask !== null);
-  if (!maskGuide() || !(firstMasks || frame.exchange)) return;
+  const tags = maskGuide();
+  if (!tags || !(firstMasks || (tags === 'all' && frame.exchange))) return;
   const wearers = c.frames[frame.beat];
   for (const actor of actors) {
     if (actor.mask === null) continue;
@@ -1230,10 +1231,13 @@ function drawTeaching(frame, cue) {
   if (cue === 'wrong') {
     drawWrongCue();
     if (phase - lastShot.at > .65 || calm.matches) {
-      const others = cast.filter(person => !run.rejected.includes(person.id));
-      const next = others.find(person => !seen.has(person.id)) ?? others[0];
-      const p = portraitPoints()[next.id];
-      ghostTap(p.x, p.y, pulse);
+      // Point only at a suspect not yet inspected. Once every face has been
+      // seen, a hand on a portrait reads as "stamp this one", so none is drawn.
+      const next = cast.find(person => !run.rejected.includes(person.id) && !seen.has(person.id));
+      if (next) {
+        const p = portraitPoints()[next.id];
+        ghostTap(p.x, p.y, pulse);
+      }
     }
     return;
   }
@@ -1248,8 +1252,14 @@ function drawTeaching(frame, cue) {
   if (selected === null) {
     if (help.shown || drawTimelineLesson()) return;
     const id = c.spec.tutorial === 'cast' && !seen.size ? cast.length - 1 : cast.findIndex(person => !seen.has(person.id) && !run.rejected.includes(person.id));
-    const p = portraitPoints()[id < 0 ? 0 : id];
-    ghostTap(p.x + (cue === 'blackout' ? 4 : 0), p.y + (cue === 'blackout' ? 12 : 0), pulse);
+    if (id < 0) return;
+    const p = portraitPoints()[id];
+    if (cue === 'blackout' || cue === 'floors') {
+      // Ring the portrait's sound symbol and point at it from the left, so the
+      // finger does not cover the symbol it teaches.
+      dot(p.x, p.y + 14.5, 9 + pulse * 5, '#fff1ce18', '#fff1ce', 1.6);
+      hand(g, p.x - 16 - pulse * 4, p.y + 15.5, Math.PI / 2);
+    } else ghostTap(p.x, p.y, pulse);
     return;
   }
   const person = cast[selected];

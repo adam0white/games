@@ -327,7 +327,11 @@ export function aids(c, { daily = false, hard = false, progress = 1 } = {}) {
     outline: daily ? fresh && progress <= OUTLINE_LESSON && 'full'
       : lesson === 'outline' ? 'lesson' : c.spec.chapter === 1 && 'full',
     circle: daily ? fresh && progress <= OUTLINE_LESSON : c.spec.chapter === 1,
-    maskTags: daily ? fresh && progress < 15 : lesson === 'masks',
+    // 'all': head tags where masks go on and on the exchange (the lesson, and a
+    // new player's Daily). 'on': tags only where masks go on. Nobody moves on
+    // that mark, so the tags save bookkeeping; the exchange stays a puzzle.
+    maskTags: !c.spec.masks ? false
+      : (daily ? fresh && progress < 15 : lesson === 'masks') ? 'all' : 'on',
     soundBracket: lesson === 'blackout' || lesson === 'floors',
     trail: daily ? hard && progress <= CARRIER_LESSON : lesson === 'carrier',
   };

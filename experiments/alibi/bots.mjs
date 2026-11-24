@@ -325,6 +325,26 @@ assert.ok(aids(dailyCase('2026-11-24', true), { daily: true, hard: true, progres
   && !aids(dailyCase('2026-11-24', true), { daily: true, hard: true, progress: CARRIER_LESSON + 1 }).trail,
 'Hard Daily shows the trail lesson until the campaign teaches it');
 
+// Mask tags: the lesson and a new player's Daily tag the mask-on mark and the
+// exchange; every other mask case tags the mask-on mark only, where nobody
+// moves. Cases without masks never tag.
+for (const [label, c, view, want] of [
+  ['case 15', createCase({ level: 15 }), {}, 'all'],
+  ['case 16', createCase({ level: 16 }), {}, 'on'],
+  ['case 34', createCase({ level: 34 }), {}, 'on'],
+  ['case 8', createCase({ level: 8 }), {}, false],
+  ['new player Daily', dailies[0], { daily: true, progress: 5 }, 'all'],
+  ['returning Daily', dailies[0], { daily: true, progress: 20 }, 'on'],
+  ['Hard Daily', dailyCase('2026-11-24', true), { daily: true, hard: true, progress: 20 }, 'on'],
+]) assert.equal(aids(c, view).maskTags, want, `${label} mask tags`);
+// The mask-on tags are honest only if nobody moves on that mark.
+for (const c of [...CASES.map((_, i) => createCase({ level: i + 1 })), ...dailies.slice(0, 60), dailyCase('2026-11-24', true)]) {
+  if (!c.spec.masks) continue;
+  const on = c.frames.findIndex(frame => frame.some(actor => actor.mask !== null));
+  assert.ok(on > 0 && c.frames[on].every((actor, id) => actor.room === c.frames[on - 1][id].room
+    && actor.slot === c.frames[on - 1][id].slot), `case ${c.level}: nobody moves where masks go on`);
+}
+
 // Two-mark cases: every suspect names two marks and the lie can sit at either,
 // so checking only the first mark misses some liars.
 const twoMark = CASES.flatMap((spec, i) => spec.twoMarks ? [i + 1] : []);

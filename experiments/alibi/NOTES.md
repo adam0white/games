@@ -436,3 +436,117 @@ Every case and Daily is still solved uniquely by comparison. Every suspect assig
 | `bots.mjs` | Passed: 36 defaults, 6,912 seeded campaign cases and 732 Dailies all uniquely solvable; replay independent of the liar in 272 case/seed pairs |
 | `check.mjs`, iphone, pixel and 360 | Passed: all three groups on each profile, including `checkOpenItems` |
 | `kit/check/phone.mjs alibi` | ok on WebKit and Chromium |
+
+## Second cold play — 2026-11-24
+
+A first-time player who reads no English played in Turkish (tr-TR) by touch only. Coordinates were picked from screenshots, and the player looked at a screenshot after every action. The player did not read the source, `words.js`, these notes or the state hook before Phase 1 ended. Paths below are relative to the requested `shots/cold2-alibi/` directory.
+
+**What was played.**
+- **WebKit, iPhone 13 profile (390×664).** From an empty save, cases 1–29 by touch: 84 of 87 stars. That includes the extra lessons: case 7 (outline retires), 23 and 26 (floor sounds) and 29 (carrier).
+  - The 2026-11-24 Daily: 3 stars, then the share card.
+  - The Hard Daily: lost after three wrong accusations.
+  - Case 6: lost on purpose, then a reload in the middle of the retry.
+  - Also visited: the case picker, Takvim, the language button and the sound toggle.
+- **Chromium (360×640, touch).** From an empty save: case 1, a reload in the middle of case 2, the pause card and the sound toggle.
+
+### Findings, ranked by harm to a first-time player
+
+1. **After a miss, the ghost finger points at a portrait the player has already checked.**
+   - **What happens.** Once every suspect has been inspected, the post-miss finger fell back to the first suspect not yet rejected. A player who cannot read reads a finger on a portrait as "accuse this one."
+   - **Case 6.** I followed it twice and lost: the yellow-white "cat" (the owl), then the mouse, then the hedgehog. See `mE.png`.
+   - **Hard Daily.** After the frog, the finger moved to the rabbit, then to the owl. See `w469-hacc.png`, `w470-hacc2.png` and the loss, `w471-hloss.png`.
+   - The plain inspect cue had the same fallback. With nobody left unseen, it pointed at portrait 0, even when that suspect had already been rejected.
+2. **After the mask lesson, nothing shows who put on which mask.** Case 15 tags the mask-on mark; cases 16 onward do not.
+   - The sim keeps every suspect in place on the mask-on mark, but no picture says so.
+   - **Case 20.** I matched masks to animals by guesswork and lost a star (`m-c20u.png`).
+   - **Case 18.** The answer rested on a guess about positions (`m-c18t.png`).
+   - **Case 28.** My mask tracking made both the blue cat and the rabbit look like liars. The sim confirms only the blue cat lies, so this was my tracking error (`m-c28t.png`).
+   - **Hard Daily.** It masks all eight suspects in similar colours and was effectively a guess (`m-hardt.png`). This adds to the known open item "the Hard Daily still puts a mask on everyone."
+3. **The loss card never shows who lied.** It shows the three crossed-out portraits and the last wrong comparison, then Yeniden or Menü (`w471-hloss.png`). A player who loses learns nothing about the answer.
+4. **In the sound lessons the finger covers the symbol it teaches.** In cases 22 and 23 the fingertip sat on the first portrait's sound symbol (`z22.png`).
+5. **The pictures were misread.** I called the owl a "yellow cat" for all 29 cases. Portraits are compared by picture, so it cost nothing, but players will name it "the other cat."
+6. **Repetition.** Cases 1–11 each turn on one plain contradiction. In cases 15–17, 19, 21 and 29, I solved without the mask or the carrier. The repeated rhythm is a known item.
+7. **Carrier lesson, case 29.** At the hand-off the item badge sat between the bear and the mouse, so I could not tell who held it (`z29.png`). The lesson did not cost a case.
+8. **The sound label wraps.** In Turkish at 360 px, "Ses kapalı" wraps to two lines and moves the menu panel up about 16 px under the thumb (`c007-sndoff.png`). "Sound off" wraps the same way in English at 390 px (`m-lang.png`).
+9. **A stray space.** Play read "30 /36" (`m-menu-takvim.png`).
+10. **Minor.**
+    - "Ses açık" can read as a state or as an action.
+    - The result card's clock shows the theft time, not the time of the lie.
+    - The broken-glass card over the curtained rooms is never explained, but it is harmless.
+11. **Seen again, already known.** The loupe covers the second portrait row (`w480-c30b3.png`), and the sound symbols are small.
+
+No English appeared on any Turkish screen visited. Nothing else was clipped. The calendar, the case picker, pause, both reloads and the share card all worked.
+
+**Was each new rule taught before it cost a case?**
+
+| Rule | Answer |
+| --- | --- |
+| Case 7, the outline retires | Yes. The room sign matches the bubble icon. No miss. |
+| Case 12, two marks | Yes. The finger on the second half taught it. No miss. |
+| Case 15, masks | The swap picture taught the exchange. Who sits under each mask after case 15 was not taught, and that cost a star in case 20. |
+| Case 22, room sounds | Yes, though the finger covered the symbol. |
+| Cases 23 and 26, floor sounds | Yes. The floor band with brackets read clearly. No miss. |
+| Case 29, carrier | Only partly; the badge was ambiguous. It was not needed to solve the case. |
+| Hard Daily | No. Eight masks with no identity cue, and it was lost. |
+
+### What was fixed, with the assertion for each
+
+1. **The post-miss and inspect finger points only at a suspect not yet inspected.** With nobody left, no portrait finger is drawn (`game.js`, `drawTeaching`).
+   - **Assertion.** `check.mjs` `checkGuides`: in case 16, a miss after inspecting one suspect draws the finger ring. A miss after inspecting all six draws none.
+   - **Failure on old code.** A copy with the `?? others[0]` fallback restored failed: "after a miss with every suspect inspected, a portrait hand is not drawn".
+2. **Builder: mask-on tags in every mask case.**
+   - **Change.** `aids().maskTags` is now `'all'`, `'on'` or `false`.
+     - `'all'`: the lesson and a new player's Daily tag the mask-on mark and the exchange, as before.
+     - `'on'`: every later mask case, every returning player's Daily and the Hard Daily tag the mask-on mark only.
+   - **Why.** Nobody moves on that mark, so the tags save only bookkeeping. Following the exchange and the later moves is still the puzzle.
+   - **What did not change.** The sim's cases are unchanged, so the bot tables do not move (see below).
+   - **Assertions.**
+     - `bots.mjs` checks the tag mode for cases 15, 16, 34 and 8, both kinds of Daily, and the Hard Daily. It also checks that nobody moves on the mask-on mark in every mask case, 60 Dailies and the Hard Daily. With the old `aids()` it failed: "case 15 mask tags".
+     - `check.mjs` `checkGuides` gained exchange-mark checks for the Daily.
+   - **Changed assertions, and why.**
+     - "case 16 shows no tags at mark 4" became "case 16 shows tags at mark 4 and none at mark 6".
+     - "a player at case 20 sees no Daily tags at mark 4" became "tags at mark 4, no exchange tags at mark 6".
+     - Both old assertions encoded the retirement this change reverses on purpose.
+   - **Failure on old code.** A copy with both halves of the old mask code failed: "case 16 mask tags at mark 4".
+3. **In the blackout and floor lessons the finger points at the sound symbol from the left.** A ring sits on the symbol, which stays visible.
+   - **Assertion.** `checkGuides` now records the fingertip of every ghost hand drawn (`window.alibiHands`). In cases 22 and 23 at the blackout, no tip may fall on any portrait's sound strip.
+   - **Failure on old code.** The old placement failed: "case 22: the ghost finger covers a sound symbol at 97,458".
+4. **Play reads "30/36".**
+   - **Assertion.** `checkProgress` requires `#progress` to read "36/36".
+   - **Failure on old code.** The old string failed it.
+
+No new player-facing strings were added.
+
+### Confirmed by touch after the fixes (Phase 3)
+
+| Fix | Chromium 360×640 | WebKit iPhone 13 |
+| --- | --- | --- |
+| No portrait finger after a miss once every suspect was inspected | `c014-miss-all.png`, case 16 | `w481-w-miss-all.png`, case 30 |
+| Mask-on tags; none on the exchange | `p3-c16-tags.png` and `c013-b4ex.png`, case 16 | `p3-w-daily-tags.png`, returning player's Daily |
+| The finger beside the sound symbol | `p3-c22-hand-zoom.png` (case 22) and `c018-c23bo.png` (case 23) | `w486-w22bo.png`, case 22 |
+| Play count without the stray space | `c008-p3menu.png` | `w478-wmenu.png` |
+
+Phase 3 used the `level` URL parameter to open cases 16, 22 and 23, as `check.mjs` does. All play inside the cases was by touch.
+
+### Left, and why
+
+- **The loss card does not reveal the liar.** Revealing it would make Yeniden a free 3-star solve and would spoil a Daily retry. A fairer version needs a fresh variant of the case after a loss, which is a change to the generator.
+- **The repeated early rhythm and the carrier badge placement.** These are design work beyond this pass. Both are already listed as known.
+- **The owl portrait reads as a cat.** It needs an art change: a beak and ear tufts that do not look like cat ears.
+- **The sound button wrapping and the "Ses açık" wording.** Both are minor. A fixed two-line height would make the menu taller for every player.
+- **Known open items that were seen again:** the loupe over the portrait row, and the small sound symbols.
+
+### Not verified
+
+- Whether the mask-on tags make cases 16–36 and the Hard Daily too easy for a human player. The bots measure solvability, not effort.
+- The Hard Daily with the new tags was not replayed to a win by touch.
+- Chromium was played cold for case 1 and part of case 2 only. The WebKit run covers the rest of Phase 1.
+- Physical phones, audio and a native Turkish speaker.
+
+### Verification after the changes
+
+| Check | Result |
+| --- | --- |
+| `bots.mjs` | Passed. Every table is identical to the run before the changes; the sim's cases did not change. |
+| `check.mjs`, iphone, pixel and 360 | Passed: all three groups on each profile |
+| `kit/check/phone.mjs alibi` | ok on WebKit and Chromium |
