@@ -633,6 +633,18 @@ const GAMES = {
     const picture = await page.evaluate(() => window.__thankful.picture());
     assert.equal(picture.width, 1080); assert.equal(picture.height, 1350); assert.ok(picture.bytes > 20000, 'picture has PNG image data');
   },
+  async 'lab/pitch'(page) {
+    // Paper Pitch: an old save survives, a tap on a pulsing point draws a line, leaving the page pauses.
+    await page.goto(`${base}/notes/button.js`); await page.evaluate(() => { localStorage.clear(); localStorage.setItem('pitch:v1', '{"played":1,"level":1,"lossStreak":0,"wins":1,"sound":true,"daily":{}}'); localStorage.setItem('pitch:hint', '1'); });
+    await page.goto(`${base}/lab/pitch/`); await until(page, () => window.__pitch?.ready, 'game script');
+    const kept = await page.evaluate(() => window.__pitch.save());
+    assert.equal(kept.played, 1, 'old save: games played survive'); assert.equal(kept.wins, 1, 'old save: wins survive'); assert.equal(kept.level, 1, 'old save: level survives');
+    await page.click('#play'); await until(page, () => window.__pitch.canTap, 'the player may move');
+    const at = await page.evaluate(() => window.__pitch.legal[0]);
+    await page.mouse.click(at.sx, at.sy); await until(page, () => window.__pitch.segments > 0, 'a tap on a legal point draws a line');
+    await page.evaluate(() => dispatchEvent(new Event('blur'))); await until(page, () => window.__pitch.paused, 'leaving the page pauses');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'no sideways scroll');
+  },
   async 'lab/ant-nest'(page) {
     const KEY = 'ant-nest:v1', nest = () => page.evaluate(() => { const n = window.__nest; return { mode: n.mode, t: n.s?.t, marks: n.s ? n.s.mark.reduce((a, b) => a + b, 0) : 0 }; });
     await page.goto(`${base}/lab/ant-nest/`); await until(page, () => window.__nest, 'game script');
@@ -709,6 +721,20 @@ const GAMES = {
   'hint borrowed': page => hinted(page, { path: '/borrowed/', play: '#play', resume: '#resume', key: 'borrowed:hint', delay: 3000, moved: () => window.borrowedState().touched, legacy: { 'borrowed-save': '{"v":1,"sound":true,"best":530,"runs":4,"gallery":{"busker":1},"daily":{},"taught":1}' } }),
   'hint ducklings': page => hinted(page, { path: '/ducklings/', play: '#play', resume: '#resume', key: 'ducklings:hint', delay: 3000, before: () => window.ducklingsState().rollCalls, moved: n => window.ducklingsState().rollCalls > n, legacy: { 'ducklings-save': '{"v":1,"sound":true,"opened":2,"stars":{"1":2},"best":{"1":140},"endless":0,"home":2,"album":{},"taught":true}' } }),
   'hint grapevine': page => hinted(page, { path: '/grapevine/', play: '#play', resume: '#resume', key: 'grapevine:hint', delay: 3000, moved: () => window.grapevineState().touched, legacy: { 'grapevine-save': '{"v":1,"sound":true,"best":{"1":3},"opened":2,"daily":{}}' } }),
+  // Paper Pitch acts when the finger lifts (a press may become a drag from the ball), so it has its own first-time help check: `hinted` asserts before the lift.
+  async 'hint lab/pitch'(page) {
+    const on = () => page.evaluate(() => !!document.querySelector('.kit-hint.on'));
+    await page.goto(`${base}/notes/button.js`); await page.evaluate(() => localStorage.clear());
+    await page.goto(`${base}/lab/pitch/`); await page.waitForSelector('#play'); await sleep(3500); assert.equal(await on(), false, 'hint: not on the menu');
+    await page.click('#play'); await until(page, () => !!document.querySelector('.kit-hint.on'), 'hint: shown after the delay', 11000);
+    const { x, y, top } = await page.evaluate(() => { const r = document.querySelector('.kit-hint .knob').getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2; return { x, y, top: document.elementFromPoint(x, y)?.id }; });
+    assert.equal(top, 'c', 'hint: the game canvas is what a finger on the hint touches');
+    await page.mouse.click(x, y); await until(page, () => window.__pitch.segments > 0, 'hint: a tap where the hint points draws a line', 3000);
+    assert.equal(await page.evaluate(() => document.querySelector('.kit-hint')), null, 'hint: gone on the first input');
+    assert.equal(await page.evaluate(() => localStorage.getItem('pitch:hint')), '1', 'hint: the player is remembered');
+    await page.goto(`${base}/notes/button.js`); await page.evaluate(() => { localStorage.clear(); localStorage.setItem('pitch:v1', '{"played":1,"level":1,"lossStreak":0,"wins":1,"sound":true,"daily":{}}'); });
+    await page.goto(`${base}/lab/pitch/`); await page.click('#play'); await sleep(4500); assert.equal(await on(), false, 'hint: never shown to a returning player');
+  },
   'hint lab/lantern-3d': page => hinted(page, { path: '/lab/lantern-3d/', play: '#play', resume: '#go', key: 'lantern-3d:hint', delay: 1500, before: () => window.lanternState().target, moved: t => window.lanternState().target !== t, alive: () => { const s = window.lanternSim(); s.safe = 60; s.light = 1; } }),
   // Old /proto/ links move to the top level with their query; the new URL plays to its first frame.
   async 'old links'(page) {
