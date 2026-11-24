@@ -123,11 +123,27 @@ The owner went through the lab and decided each page that came from a live game.
 | `lantern-ripples` | Accepted "but improve it and only into 3d version" | Stays until the fold lands |
 | `ant-hide` | Accepted "but less prevalent": sparse rocks and grass in the main meadow (the lab's reading) | Stays until the fold lands |
 | Lantern's `music.js` | Accepted: move to the kit for Night Flock, Night Vine, Paper Boat, Harvest Morning | |
-| Friend play by link (`kit/room.js`, from `pitch` and `pisti`) | Accepted for Thumb Duel | `pitch` and `pisti` stay |
+| Friend play by link (`kit/room.js`, from `pitch` and `pisti`) | Accepted for Thumb Duel | `pitch` stays; `pisti` was rejected later |
 
-Landed: `lantern-spark` is a mode inside Lantern (2026-11-24, branch `fold-lantern-spark`). It is chosen on Lantern's "More modes" card or at `/lantern/?mode=spark`; its code is `experiments/lantern/modes/`. The page is in `archive/lab/lantern-spark/`; its old address needs `'lantern-spark': '/lantern/?mode=spark'` in `labMoved`.
+Landed: `lantern-spark` is a mode inside Lantern (2026-11-24, branch `fold-lantern-spark`). It is chosen in Lantern's "Game mode" group or at `/lantern/?mode=spark`; its code is `experiments/lantern/modes/`. The page is in `archive/lab/lantern-spark/`; its old address needs `'lantern-spark': '/lantern/?mode=spark'` in `labMoved`.
 
-Still in the lab for a promote-or-reject decision: `thankful`, `pitch`, `pisti`, `ring`, `night-bells`, `night-lamp-keeper`, `night-channels`, `night-kite`, `night-loaves`, `night-podwire`, `night-rubbing`, `night-saltplate`, `night-sand`, `night-splitlight`, `wild-pour`, `wild2-face-shift`.
+Owner's decision on the small pages (2026-11-24, after playing them): "Good but improve: Thankful Garden, Paper pitch, channels, ring, sand needs a lot of improvements, bells, podwire good but improve/extend, pour but improve sim and it's too difficult right now, face shift but improve as it needs more variety and gameplay, saltplate but improve and extend, splitlight. Reject: pisti, keeper, kite, loaves. We should collect small games into 1-2 URLs, maybe split by single/multi player, or open to other ideas."
+
+| Page | Decision | State |
+|---|---|---|
+| `thankful`, `pitch`, `night-channels`, `ring`, `night-bells`, `night-splitlight` | Keep and improve | Improved in place at `/lab/<name>/` |
+| `night-sand` | Keep; "needs a lot of improvements" | Improved in place |
+| `night-podwire`, `night-saltplate` | Keep; improve and extend | Improved in place |
+| `wild-pour` | Keep; "improve sim and it's too difficult right now" | Improved in place |
+| `wild2-face-shift` | Keep; "needs more variety and gameplay" | Improved in place |
+| `pisti`, `night-lamp-keeper`, `night-kite`, `night-loaves` | Rejected | `archive/lab/`; old addresses go to `/lab/` |
+| `night-rubbing` | Undecided: the owner could not find it (the index calls it "Carbon Cabinet") | Stays |
+
+The kept pages do not move to a top-level address or into `kit/games.json` until the owner picks a home for the small games (variants at `/lab/hub-a/`, `hub-b/`, `hub-c/` are being built for that pick), so no address changes twice. Their recording names stay equal to the folder names through any move.
 
 Play records: the lab accepted no records from any lab page up to this date (no lab page name is in human-framework `LAB_PROTOTYPES`; five pages import `kit/lab.js` and are refused). The site Worker's request log shows two real phones opening lab pages on 2026-11-24. Opens are the only evidence of play for these pages.
 
+
+## 2026-11-24: Ant Draft, bigger explosions (tester t1, note #237)
+
+The note answers #232 (what should come next in Ant Draft): bigger explosions. They were built the same day (the blast reaches further with each level, with a fireball, a shockwave, smoke and a deeper sound; bots and phone check passed) before the cleanup above moved Ant Draft to `archive/lab/`. Archived code is not polished, so this is not merged. The signed commit is 20ef0ea2 on the branch `ant-draft-blast`. Left as a proposal: apply it if Ant Draft comes back.

@@ -692,9 +692,33 @@ Checked: the phone check's line for the modes card; the card and Echo opened at 
 ### Left as a proposal (2026-11-24, note #234)
 - Echo in Turkish, and tuned past night 1. The wish to have the modes inside Lantern proper (one boat, skins and bank) is recorded above and still stands.
 
+## 2026-11-24: groups on the menu, a tutorial, slide steering (tester t1, notes #239 and #236)
+
+The note #239: the menu is messy; put it in groups called Game mode, Shop and Perspective; leave Play night alone; endless, tower, spark, echo and the rest go in Game mode; Shop opens the whole shop with its stats; Perspective holds 2D, 3D and first person, says what each does, and offers tilt or slide. The note #236 answers #230: the first-time tutorial, which may be skipped, was meant for Lantern.
+
+| Part | What changed |
+| --- | --- |
+| Menu | Title, embers and the Play night row are as they were. Under them: Game mode, Shop, Perspective. Under those, smaller: Leaderboard, How to play, Music, Credits. |
+| Game mode | Endless, Today's river, Tower climb (with New climb), Race and Spark, each with one line about it. The card that was "More modes". |
+| Shop | Opens as before: stats first, then the packs. |
+| Perspective | 2D, 3D and first person with one line each, then Steering. 2D and 3D steer by sliding a finger; the tilt and press buttons are off there. First person offers tilt, slide and press. |
+| Slide in first person (new) | The drag of 2D and 3D. The target stays inside the banks, so a slide alone does not cost a heart on the bank, as with tilt and press. `lantern-steer` gains the value `'slide'`; `'tilt'`, `'press'` and absent mean what they meant. The pause card's button goes tilt, press, slide. |
+| Tutorial | Offered once when Play is tapped on a save with no bank and no night; Skip plays at once. Always under How to play. Six steps on an empty slow river: steer, take two embers, the lantern fades, a heart, three rocks, the force field. Nobody can lose; it banks, scores and unlocks nothing, uses no stats, and is recorded as mode `tutorial`. New key `lantern-tutorial`, `'1'` once played or skipped. |
+| My own small experiment | Each group button says in small words what is inside, and Perspective names the view in use. |
+
+Decisions. #239 names Echo; it left the lab in the cleanup of 2026-11-24, before this change landed, so it is not in the group and the tester is told. #214 closed tilt in 2D and 3D ("leave it as it is"), and #239 can be read as tilt in every view. It is built for first person only; the tester is asked.
+
+Checks: `phone.mjs lantern` opens each group, steers first person by a slide, and shows that the tutorial cannot be lost, changes no bank, night, best or stats key, is offered once and can be skipped. A scripted player finished all six steps in 36 s in Chromium at phone size.
+
+Not verified: tilt, slide and the tutorial on a real phone; whether a new player understands the six steps; the Turkish wording by a native reader.
+
+### Left as a proposal (2026-11-24, note #239)
+
+- Tilt in 2D and 3D, if the tester wants it.
+
 ## How a mode plugs in
 
-A mode is a way to play Lantern's river with other rules on top, chosen on the "More modes" card and played inside `/lantern/`.
+A mode is a way to play Lantern's river with other rules on top, chosen in the "Game mode" group and played inside `/lantern/`.
 Spark is the first. Tide, Duet and Race will follow the same pattern.
 
 **Files.** A mode is `modes/<id>.js`, plus any rules of its own (`modes/<id>-sim.js`) and bots (`modes/<id>-bots.mjs`).
@@ -702,7 +726,7 @@ A mode's rules wrap Lantern's `sim.js` state. They never edit `sim.js`.
 
 **How index.html finds it.** Three places:
 - `MODES` maps an id to a loader: `{ spark: () => import('./modes/spark.js') }`. The module loads only when chosen.
-- A button on the modes card: `<button class="mode" data-mode="<id>">`.
+- A button in the Game mode group (`#modes`): `<button class="mode" data-mode="<id>">`.
 - `/lantern/?mode=<id>` chooses it at load.
 
 **The interface.** The module exports `mode(page)`. It returns an object that index.html calls; `mod` is that object, or `null` when no mode is chosen.
@@ -740,14 +764,16 @@ With `mod === null`, every line of index.html runs as it did before modes. `bots
 
 ## 2026-11-24: Spark is a mode inside Lantern (owner, lab cleanup: "modes inside Lantern, not links")
 
-**What the player sees.** "More modes", then "Lantern Spark", opens Spark's card: six nights with their stars, Play, Back.
+**What the player sees.** "Game mode", then "Lantern Spark", opens Spark's card: six nights with their stars, Play, Back.
 The lantern goes out as the night starts (its light shrinks away over a second, with a puff), and one free spark shows the river.
 A round button with a star and the sparks left in the tin strikes a spark; so do a second finger, a mouse click and Space.
 The boat, water and flame are the player's own; the rings, lit rocks and banks take the flame's colour. Embers go to the bank.
 Owned abilities lie in Spark's river too; a ring or thunder lights them. Flare lights everything near the boat while it lasts.
 
 **Files.** `modes/spark.js` (page: drawing, sound, input, save), `modes/spark-sim.js` (the lab's layer, plus abilities and Flare),
-`modes/spark-bots.mjs` (the lab's 13 claims). index.html gained the seam above (`mod`, `pct()`, `boatAt()`, the `#mode` screen); 47 lines added and 26 changed in place.
+`modes/spark-bots.mjs` (the lab's 13 claims). index.html gained the seam above (`mod`, `pct()`, `boatAt()`, the `#mode` screen); about 50 lines added and 25 changed in place.
+
+**Spark and the tutorial.** Choosing a mode clears the tutorial, endless, tower and daily flags. A mode's Play starts the run directly, so the first-time tutorial is never offered on the way into Spark (by the Game mode group or by `?mode=spark`); it is still offered on Play night. Spark has its own first-run help (below). Reason: Spark teaches a different control, and the tutorial's steps assume a lit lantern.
 
 **Saves.** `lantern-mode-spark:save` is `{ v: 1, best, stars: { night: 0..3 }, played }`. `lantern-mode-spark:spark` is `'1'` after the first spark ever.
 `lantern-mode-spark:tips` holds the one-time tips shown (`f` fireflies, `h` holes in the stars).
