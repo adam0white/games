@@ -79,6 +79,23 @@ The tester's main ask. It changes what the game is, so it is recorded for the ne
 - **Contradictions.** Two memories disagree; a third tells which one lied. Deduction replaces lookup.
 - **Years stay the cost.** Solving is free; a hint, or skipping a puzzle, burns years, so the candle still matters.
 
+## 2026-11-23: the tester picks the puzzle (tester t1, notes #137 and #140)
+
+- **Note #137, answering #126 ("is Borrowed Time what you imagined?"):** "Every time you see and pick up one of the memories, I want there to be a puzzle to actually acquire those memories."
+- **Note #140, answering #132 ("which kind of puzzle should unlock a piece of your life?"):** "Two memories disagree, find which one lies."
+
+Together: every memory is won by solving a contradiction puzzle, not just by walking to it. This changes the core loop, so it was not built in this run. A half-built version would change every chapter's balance without the bot measurements this game relies on (`bots.mjs`). It goes to the next working session on Borrowed Time as the plan below.
+
+### Left as a proposal (2026-11-23, notes #137 and #140): memories that lie
+
+- **The puzzle.** Opening a memory shows two fragments that disagree about the kind the memory holds. Example: "My cat slept by the sea" and "My frog slept in the forest". One fragment also names a kind the player already knows, or will learn elsewhere. The fragment whose second detail clashes with a known fact is the lie. Tapping the true fragment takes the memory.
+- **Where the anchor comes from.** Chapters 1 and 2 have the free memory, which is never a puzzle and so anchors the first deduction. Chapter 3 has no free memory. There, one fragment pair cross-checks another memory's pair, so the player must open two memories before either settles. That is the harder chapter, as intended.
+- **Cost.** A wrong pick costs years (start at 8, half of `WRONG`) and keeps the memory locked for a second try. A "Remember for me" button reveals the answer for the memory's ability price again, so the candle still decides how much thinking you buy.
+- **Abilities stay.** Push, Leap, Light and Rewind still decide which memories you can reach. The mirror (Rewind) shows a pair about two kinds, a two-step puzzle.
+- **What must be measured before shipping.** Rebalance `bots.mjs` with a puzzle-solving bot that only uses known facts. Check that every chapter can be solved without a forced guess, and that the instant guesser stays near chance. Measure the time per memory on a 360 × 640 screen with the six portraits.
+- **Smallest testable slice.** Chapter 2 only, every memory but the free one a two-fragment puzzle, with a `?lies=0` switch to compare. About a day's work.
+- **Open question for the tester, after the slice:** is a lie found from one known fact enough, or should some puzzles chain (a lie that only shows once two other memories are open)?
+
 ## Rules
 
 - **Who you were.** A person has four kinds of feature:
