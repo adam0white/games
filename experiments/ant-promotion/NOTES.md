@@ -402,17 +402,17 @@ The notes, in short:
 - **#148.** The game feels finished once you have every animal; it should not. Every animal should have its own ability, tied to its species. Animals should see differently: a snake narrow and far, a bird almost all the way round, and other shapes for others. Add more species, and make sure each has a unique ability.
 - **#149.** The speed is annoying and makes the game boring: you outrun every animal in the game. Fix it.
 
-Nothing in the game changed in this run. #148 changes what every one of the 55 animals does, and #149 runs against the owner's own change of the same day ("hunters tire"). Both are recorded here, and a question about #149 went to the tester.
+Nothing in the game changed in this run. #148 changes what every one of the 55 animals does, and #149 runs against the owner's own change of the same day ("hunters tire"). Both are recorded here.
 
 ### Left as a proposal (2026-11-23, notes #148 and #149)
 - **Speed (#149): which lever.** The speed history is: fast picks grew to 2.5× (note #46); stronger animals were made to keep up with a boosted player (note #101); then the owner made a hunter slow down after 4 s and give up at 10 s, because Wild was "impossible". With tiring, running away always works, which matches "you outrun every mob". The candidates are:
   1. A lower cap on fast picks (`FAST_CAP` 2.5 → about 1.6).
   2. Tiring only in Wild, not Classic.
   3. Tiring later (`TIRE.fresh` 4 → 7 s, `spent` 10 → 16 s).
-  4. Hunters that cut the corner (aim where you will be), so straight-line running stops working.
+  4. Hunters that cut the corner (aim where you will be). This alone does not answer #149: against a player who runs straight away, aiming ahead gives the same heading.
 
-  Option 4 makes chases harder without making any animal faster, so it keeps both the owner's "not impossible" and the tester's "not boring". Measure it with `bots.mjs` before choosing. Option 2 contradicts the owner's ruling for Classic and needs the owner.
-- **Ways of seeing (#148).** The player already sees a wedge (`range`). Give each body kind its own shape: snakes a narrow wedge about 1.6× longer, birds about 330° and shorter, bugs a wide short fan, quads the present one. Then each species adjusts it by ±20%. Draw it as the lit area of the meadow, so the difference is visible at a glance.
+  Measure with `bots.mjs` before choosing. Option 2 contradicts the owner's ruling for Classic and needs the owner.
+- **Ways of seeing (#148).** Today only the other animals have a sight wedge, and every kind has the same shape; the player's own view has none. Give each body kind its own shape: snakes a narrow wedge about 1.6× longer, birds about 330° and shorter, bugs a wide short fan, quads the present one. Then each species adjusts it by ±20%. Draw it as the lit area of the meadow, so the difference is visible at a glance.
 - **An ability per animal (#148).** Group the 51 promoted animals into about 12 ability families, each with a key and a cooldown, for example: Wasp and Scorpion sting (stun), Frog and Kangaroo leap, Mole digs (hide underground), Skunk sprays (hunters flee), Chameleon blends in, Eagle and Owl dive, Porcupine spikes (an attacker bounces off), Bat echolocates (see through grass). The species then sets the strength and cooldown. One button on the right of the screen. This is a large change, and bots need a policy for each family.
 - **After every animal (#148).** Two candidates:
   - a New Game+ meadow where the top animals of the last run are the hunters;
