@@ -161,3 +161,32 @@ The full bot check exited 0 in 6.2 s. The tug mutation exited 1 with four failed
 The final screenshot-enabled `check.mjs` exited 0 on WebKit iPhone 13 (127 s, 33 captures) and Chromium Pixel 7 (188 s, 26 phone captures plus four small-screen and desktop captures). Both passed with zero browser errors. The final landscape Seed Launch replay ended 550–550 on WebKit and 569–569 on Chromium after six shots per seat. The registered shared Duel play and hint checks passed on both profiles. Screenshots are under `/private/tmp/night-r3-review/thumb-duel/verified/`. Reviewed first play, layout, pause, rematch, both new duels and landscape results.
 
 Still unverified: first-time human comprehension, two contacts and safe-area insets on physical phones, audio by ear, and live lab delivery.
+
+## 2026-11-24 — Play a friend by link
+
+**What the player sees.** "Play a friend" on the menu makes a four-letter code and a "Send the link" button (the phone's share sheet, else the clipboard). The friend opens the link, or types the code, on their own phone, and the duel starts on both. Each player sees their own side at the bottom, the right way up (the guest's whole canvas is turned half round). If the friend's inputs are late the duel holds still and says "Waiting for your friend…"; after 10 s it also offers the bot and the menu. If the friend leaves (Menu, or gone for 20 s), or the room cannot be reached, a card says so and offers the bot. The pause button opens the pause card, but the duel goes on: it cannot stop for one phone. New words are in English and Turkish (`words.js`); the older words of the game are unchanged.
+
+**How.** Lockstep: each phone samples its thumb once a tick and stamps it 6-15 ticks ahead (`kit/lockstep.js`); a tick is stepped only when both inputs are there. The host (who made the code) is side 0, picks the seed and sets the delay from four pings (`net.js delayFor`: half the round trip plus 75 ms, 6 to 15 ticks); the guest is side 1. Both apply the decoded (quantized) input, their own included. Every 30 ticks and at the end both compare a state hash; if they ever differ the match ends for both with "Your phones fell out of step. This match does not count." While linked, the sim uses `kit/samemath.js` for exp, sin and hypot (`useMath` in sim.js), because those differ between WebKit, Chromium and Node; one-phone and bot play keep `Math`. The relay is the lab-ai `Room` class with a `duel` entry in `RELAY` (see that README). Messages: `friend.js`.
+
+**Friend deck: no hockey.** A careful bot beats a clumsy one at hockey in 98% of duels with 1 tick of delay and about 53% with 6 (the smallest delay a link uses), and about 48% at 14 ticks (150 ms one way). The skill is gone, so hockey is unplayable by link even at good latency. The other eight duels keep their order within a few points (bots.mjs section 8). `FRIEND_KINDS` in net.js is the one place to change this.
+
+**Saves.** A linked match counts in `duel-save.matches` and nothing else; the one-phone streak (`friend`) and the bot levels are untouched. The only new key is sessionStorage `kit-relay:duel:<CODE>` (the seat key). Nothing goes to a shared board. Lab recording marks the match `link: true`.
+
+**Latency (bots.mjs section 8, 20 matches per row, one way is phone to phone).**
+
+| One way | Delay | Felt input delay (median) | Speed |
+| --- | --- | --- | --- |
+| 20 ms | 6 ticks (100 ms) | 102 ms | 1.00 |
+| 75 ms | 9 ticks (150 ms) | 153 ms | 1.00 |
+| 150 ms | 14 ticks (233 ms) | 238 ms | 1.00 |
+| 400 ms | 15 ticks (250 ms, the cap) | 476 ms (p90 578) | 0.55 |
+
+Tug and hockey give the same numbers; the table is the wire, not the duel. At 400 ms one way the duel runs at about half speed with stalls. The delay cap of 15 ticks keeps the thumb's lag at 250 ms where the line allows it; raising the cap would trade lag for smoothness.
+
+**Checked.**
+- `node bots.mjs --friend`: 160/160 matches identical to the last tick between two sims through a pretend network (one way 10-400 ms, jitter to 150 ms, up to 15% of frames lost and resent, 52 cuts with reconnect, a phone at 30-120 fps); 160/160 replays equal; the longest frame 187 bytes, at most 20 frames a second; one-phone rules parity hash equal to main's (3675900658 over 1364242 ticks). `--mutate=late` (one phone files the friend's inputs a tick early) fails three claims; the detector flags it at tick 390.
+- `link-check.mjs`: two pages, an iPhone 13 (WebKit) against a Pixel 7 (Chromium), each way round, through the real `Room` class with 40-70 ms each way to the room: the code and link, a full match identical on both, the guest's line cut for 2.5 s mid-duel (the host shows the banner and steps no tick), rematch, the host leaving mid-duel (the guest is told, in Turkish, and plays the bot), a phone that vanishes (bot offered at 10 s, "Your friend left" at 20 s), and the relay not deployed (a 404: "Could not reach your friend" and the bot) on both engines.
+- `phone.mjs duel`: the shared duel checks, plus "duel friend" (code, unreachable room, bot, Turkish, saves untouched).
+- Cross-engine maths: with `sameMath`, 0 of 20,000 values and 0 of 190 replayed matches differ between WebKit or Chromium and Node.
+
+**Not verified.** Two real phones on a real network; the deployed relay (not deployed yet); how 100-250 ms of input lag feels to a thumb in each duel; whether players find the code card; the browser match plays tug only (a full deck by tapping bots would take minutes), so the cross-engine evidence for the other duels is the maths probe and the bot runs, not a browser match. A phone on a flaky line can trip the per-address limit of 6 upgrades a minute while reconnecting; it then sees "could not reach".

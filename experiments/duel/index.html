@@ -59,6 +59,14 @@
   .desk { display: none; font-size: .9em; }
   @media (pointer: fine) { .desk { display: block; } #tagline { display: none; } }
   #deskLine[hidden] { display: none; }
+  /* Playing a friend by link (each on their own phone) */
+  .code { font-size: 2.4em; font-weight: bold; letter-spacing: .15em; margin: 0; color: #1b1328; }
+  .status { font-weight: bold; min-height: 1.35em; }
+  .note { word-break: break-all; min-height: 1.2em; }
+  input#fJoin { font: inherit; font-weight: bold; font-size: 1.25em; width: 5.2em; min-height: 48px; box-sizing: border-box; text-align: center; text-transform: uppercase; letter-spacing: .2em; border: 2.5px solid #1b1328; border-radius: 14px; padding: .2em; background: #fff; color: #1b1328; -webkit-user-select: text; user-select: text; vertical-align: middle; }
+  #friend form { margin: .6em 0 0; padding-top: .4em; border-top: 2px dashed #1b132833; }
+  #wait { position: fixed; left: 50%; top: 27%; transform: translate(-50%, -50%); z-index: 3; max-width: calc(100% - 32px); box-sizing: border-box; padding: 10px 16px; text-align: center; font-weight: bold; background: #fff4dc; border: 3px solid #1b1328; border-radius: 18px; box-shadow: 0 6px 0 #1b132866; }
+  #wait[hidden], #waitButtons[hidden], #fFallback[hidden], #fHost[hidden], #linkPauseLine[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -75,6 +83,7 @@
   <p id="streakLine" class="sub" hidden></p>
   <p><button id="play" class="main">Play</button></p>
   <p><button id="toSolo" class="cool">Play the bot</button></p>
+  <p><button id="toFriend" class="cool" data-i18n="friend">Play a friend</button></p>
   <p><button id="sound1" class="small">Sound: on</button></p>
 </div></div>
 
@@ -89,8 +98,36 @@
   <p><button class="back">Back</button></p>
 </div></div>
 
+<div id="friend" class="screen"><div class="card">
+  <h2 data-i18n="friend">Play a friend</h2>
+  <p class="sub" data-i18n="friendHow"></p>
+  <div id="fHost">
+    <p class="sub" data-i18n="yourCode"></p>
+    <p id="fCode" class="code"></p>
+    <p><button id="fShare" class="main" data-i18n="shareLink"></button></p>
+    <p id="fNote" class="sub note"></p>
+  </div>
+  <p id="fStatus" class="status" role="status"></p>
+  <p id="fFallback" hidden><button id="fBot" class="cool" data-i18n="playBot"></button><button id="fRetry" data-i18n="retry"></button></p>
+  <form id="fJoinForm">
+    <p class="sub"><label for="fJoin" data-i18n="haveCode"></label></p>
+    <p><input id="fJoin" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" placeholder="ABCD" data-i18n-aria="codeLabel"><button id="fJoinGo" type="submit" data-i18n="join"></button></p>
+  </form>
+  <p><button id="fBack" data-i18n="back"></button></p>
+</div></div>
+
+<div id="gone" class="screen"><div class="card">
+  <h2 data-i18n="friend">Play a friend</h2>
+  <p id="goneLine" class="status"></p>
+  <p><button id="goneBot" class="main" data-i18n="playBot"></button></p>
+  <p><button id="goneMenu" data-i18n="menu"></button></p>
+</div></div>
+
+<div id="wait" role="status" hidden><p id="waitLine" style="margin:0"></p><p id="waitButtons" hidden><button id="waitBot" class="small" data-i18n="playBot"></button><button id="waitMenu" class="small" data-i18n="menu"></button></p></div>
+
 <div id="paused" class="screen"><div class="card">
   <h2>Paused</h2>
+  <p id="linkPauseLine" class="sub" data-i18n="linkPause" hidden></p>
   <p class="desk sub">Mouse works. Space is your thumb.</p>
   <p><button id="resume" class="main">Keep going</button></p>
   <p><button id="quit">Menu</button><button id="sound2" class="small">Sound: on</button></p>

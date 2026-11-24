@@ -1,5 +1,5 @@
 // Thumb Duel: the page. Input, drawing, sound, save, cards. The rules are in sim.js and the bot in brain.js.
-import { createMatch, step, blank, DT, KINDS, CONTROL, WIN, PADS, MEMORY, HOCKEY, SUMO, BALANCE, TUG, CATCH, DRAW, SWIPE, LAUNCH } from './sim.js';
+import { createMatch, step, blank, mirror, useMath, DT, KINDS, CONTROL, WIN, PADS, MEMORY, HOCKEY, SUMO, BALANCE, TUG, CATCH, DRAW, SWIPE, LAUNCH } from './sim.js';
 import { makeBot, STRENGTHS } from './brain.js';
 import { C, side as cols, TAU, rrect, circle, shadow, noShadow, star, critter, beetle, lantern, firefly, seed, paddle, drop, finger } from './art.js';
 import { readJson, writeJson } from '../kit/save.js';
@@ -9,6 +9,11 @@ import { screens } from '../kit/screens.js';
 import { lab } from '../kit/lab.js';
 import { hint } from '../kit/hint.js';
 import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
+import { newCode, cleanCode, codeFromLink, linkFor, share } from '../kit/room.js';
+import { sameMath } from '../kit/samemath.js';
+import { FRIEND_KINDS, drive, stateHash } from './net.js';
+import { friendLink } from './friend.js';
+import { t as tr, apply as applyWords } from './words.js';
 
 const $ = id => document.getElementById(id);
 const query = new URLSearchParams(location.search);
@@ -49,6 +54,10 @@ function layout() {
   bx = (W - k) / 2; cy = H / 2;
 }
 const P = (x, y) => [bx + x * k, cy + y * k];
+// Playing a friend by link, the guest is side 1 and sees the whole canvas turned half round, so its own side is at the
+// bottom the right way up. `view` takes a point on the glass to the canvas's own (unturned) frame.
+let flip = false;
+const view = (x, y) => flip ? [W - x, H - y] : [x, y];
 const toBoard = (sx, sy) => [(sx - bx) / k, (sy - cy) / k];
 // Draw in side `i`'s own frame: side 1's half is the board turned half round about its middle.
 function withSide(i, fn) { if (i === 0) return fn(); g.save(); g.translate(2 * (bx + k / 2), 2 * cy); g.scale(-1, -1); fn(); g.restore(); }
@@ -87,13 +96,14 @@ const voice = {
 };
 
 // ---------------------------------------------------------------- state
+let link = null; // playing a friend by link: { f (friend.js), me (my side), m (the match for net.js drive), acc, since, ... }
 let screen = 'menu', paused = false, s = null, solo = null, bot = null, matchNo = 0, acc = 0, ready = [false, false], lastBeep = -1;
 const pointers = new Map(); // pointerId -> { side, x, y, at }: a finger belongs to the half it went down in, for as long as it is down
 const pending = [[], []];   // taps waiting for the next tick
 const releases = [[], []];  // completed gestures waiting for the next tick
 const kb = { held: false, chargeAt: null, tap: 0, px: 0.5, py: 0.75, keys: new Set(), pads: [] }; // the keyboard is side 0's thumb
 let fx = [], texts = [], shake = 0, flash = [0, 0], confetti = 0, seedNo = 0;
-const show = screens(['menu', 'solo', 'paused', 'end'], name => { $('pause').style.display = name === 'play' ? 'grid' : 'none'; });
+const show = screens(['menu', 'solo', 'friend', 'gone', 'paused', 'end'], name => { $('pause').style.display = name === 'play' ? 'grid' : 'none'; });
 
 // ---------------------------------------------------------------- lab recording
 const rec = lab('duel');
@@ -102,31 +112,33 @@ rec.toggle($('paused').firstElementChild);
 
 // ---------------------------------------------------------------- input: every pointer is owned by the half it went down in
 function sideAt(y) { return y < cy ? 1 : 0; }
+const local = i => link ? i === link.me : solo ? i === 0 : true; // a side played on this phone
+const keySide = () => link ? link.me : 0;                        // the side the keyboard plays
 const inPlay = () => screen === 'play' && !paused && s?.phase === 'play';
 const gesturePlay = () => inPlay() && (s.kind === 'swipe' || s.kind === 'launch');
 cv.addEventListener('pointerdown', e => {
   e.preventDefault();
   snd.unlock();
-  const side = sideAt(e.clientY), [x, y] = toBoard(e.clientX, e.clientY);
+  const [vx, vy] = view(e.clientX, e.clientY), side = sideAt(vy), [x, y] = toBoard(vx, vy);
   const at = performance.now();
-  const gesture = gesturePlay() && !(solo && side === 1)
+  const gesture = gesturePlay() && local(side)
     && ![...pointers.values()].some(p => p.side === side && p.duel === s.d);
   pointers.set(e.pointerId, { side, x, y, x0: x, y0: y, at, duel: gesture ? s.d : null });
   try { cv.setPointerCapture(e.pointerId); } catch {} // synthetic ids in tests have no capture; never let that throw
   if (screen !== 'play' || paused) return;
-  if (solo && side === 1) return; // the bot plays the top half
+  if (!local(side)) return; // the bot or the friend plays the top half
   if (hintFor(side)) for (const copy of help) copy.done();
   pending[side].push({ x, y });
-  ring(e.clientX, e.clientY, side);
+  ring(vx, vy, side);
   voice.tap(side);
 });
-const moved = e => { const p = pointers.get(e.pointerId); if (!p) return; [p.x, p.y] = toBoard(e.clientX, e.clientY); };
+const moved = e => { const p = pointers.get(e.pointerId); if (!p) return; [p.x, p.y] = toBoard(...view(e.clientX, e.clientY)); };
 cv.addEventListener('pointermove', moved);
 cv.addEventListener('pointerup', e => {
   const p = pointers.get(e.pointerId);
   pointers.delete(e.pointerId);
   if (!p?.duel || !gesturePlay() || p.duel !== s.d) return;
-  const [x, y] = toBoard(e.clientX, e.clientY);
+  const [x, y] = toBoard(...view(e.clientX, e.clientY));
   releases[p.side].push({ x0: p.x0, y0: p.y0, x, y, seconds: (performance.now() - p.at) / 1000 });
 });
 const forgetPointer = e => { pointers.delete(e.pointerId); };
@@ -145,12 +157,12 @@ function inputFor(i) {
   if (latest) { inp.px = latest.x; inp.py = latest.y; }
   inp.taps = pending[i].splice(0);
   inp.releases = releases[i].splice(0);
-  if (i === 0) { // the keyboard
+  if (i === keySide()) { // the keyboard, in this side's own frame
     if (kb.held) inp.held = true;
     if (kb.chargeAt !== null && inp.heldFor === 0) inp.heldFor = (performance.now() - kb.chargeAt) / 1000;
-    for (; kb.tap > 0; kb.tap--) inp.taps.push({ x: 0.5, y: 0.5 });
-    for (const pad of kb.pads.splice(0)) inp.taps.push({ x: PADS[pad].x, y: PADS[pad].y });
-    if (kb.keys.size && !latest) { inp.px = kb.px; inp.py = kb.py; }
+    for (; kb.tap > 0; kb.tap--) { const [x, y] = mirror(i, 0.5, 0.5); inp.taps.push({ x, y }); }
+    for (const pad of kb.pads.splice(0)) { const [x, y] = mirror(i, PADS[pad].x, PADS[pad].y); inp.taps.push({ x, y }); }
+    if (kb.keys.size && !latest) [inp.px, inp.py] = mirror(i, kb.px, kb.py);
   }
   return inp;
 }
@@ -165,22 +177,23 @@ addEventListener('keydown', e => {
   if (e.key === ' ') {
     e.preventDefault();
     if (!e.repeat) {
-      kb.tap++; voice.tap(0);
+      kb.tap++; voice.tap(keySide());
       if (inPlay() && s.kind === 'launch') kb.chargeAt = performance.now();
     }
     kb.held = true;
   }
-  if (/^[1-4]$/.test(e.key) && !e.repeat) { kb.pads.push(Number(e.key) - 1); voice.tap(0); }
+  if (/^[1-4]$/.test(e.key) && !e.repeat) { kb.pads.push(Number(e.key) - 1); voice.tap(keySide()); }
   if (e.key.startsWith('Arrow')) {
     kb.keys.add(e.key); e.preventDefault();
     if (e.key === 'ArrowUp' && !e.repeat && inPlay() && s.kind === 'swipe') {
-      releases[0].push({ x0: 0.5, y0: 0.76, x: 0.5, y: 0.34, seconds: 0.18 });
+      const i = keySide(), [x0, y0] = mirror(i, 0.5, 0.76), [x, y] = mirror(i, 0.5, 0.34);
+      releases[i].push({ x0, y0, x, y, seconds: 0.18 });
     }
   }
 });
 addEventListener('keyup', e => {
   if (e.key === ' ') {
-    if (kb.chargeAt !== null && inPlay() && s.kind === 'launch') releases[0].push({ seconds: (performance.now() - kb.chargeAt) / 1000 });
+    if (kb.chargeAt !== null && inPlay() && s.kind === 'launch') releases[keySide()].push({ seconds: (performance.now() - kb.chargeAt) / 1000 });
     kb.held = false; kb.chargeAt = null;
   }
   kb.keys.delete(e.key);
@@ -202,6 +215,7 @@ layout();
 
 // ---------------------------------------------------------------- matches
 function start(strength) {
+  closeLink();
   solo = strength; matchNo++;
   const seedValue = query.has('seed') ? (Number(query.get('seed')) >>> 0) + seedNo++ : (crypto.getRandomValues(new Uint32Array(1))[0] || 1);
   s = createMatch({ seed: seedValue, only: ONLY, first: save.matches === 0 ? 'tug' : null, intro: FAST ? 1 : undefined });
@@ -215,6 +229,7 @@ function start(strength) {
 function endMatch() {
   const w = s.winner;
   save.matches++;
+  if (link) return endLinkMatch(w);
   let line = ['', ''];
   if (solo) {
     const r = save.solo[solo];
@@ -242,20 +257,142 @@ function endMatch() {
 }
 function rematch(i) {
   if (screen !== 'end') return;
+  if (link) { // my vote goes to the friend; the host starts the next match when both have voted
+    if (i !== 0 || !['match', 'meeting'].includes(link.f.state)) return;
+    link.f.again(); $('re0').classList.add('ready'); $('re0').textContent = 'Ready!'; voice.ready();
+    return;
+  }
   ready[i] = true; $(`re${i}`).classList.add('ready'); $(`re${i}`).textContent = 'Ready!';
   voice.ready();
   if (ready[0] && ready[1]) setTimeout(() => { if (screen === 'end') start(solo); }, 250);
 }
 function toMenu() {
-  if (s && !s.over) rec.end('left', { score: s.score.slice(), solo: !!solo, strength: solo, duels: s.duels.length });
+  if (s && !s.over) rec.end('left', { score: s.score.slice(), solo: !!solo, strength: solo, duels: s.duels.length, ...(link ? { link: true } : {}) });
+  closeLink();
   s = null; screen = 'menu'; paused = false; snd.release(); pointers.clear(); menu(); show('menu');
 }
 function pause() {
   if (screen !== 'play' || paused) return;
+  // By link the duel cannot stop for one phone: the card opens, this thumb lets go, and the match goes on.
+  $('linkPauseLine').hidden = !link;
   paused = true; clearInput(); show('paused'); snd.hold();
 }
 function resume() { if (!paused) return; paused = false; screen = 'play'; show('play'); snd.release(); }
 onLeave(pause);
+
+// ---------------------------------------------------------------- playing a friend by link (friend.js, net.js, kit lockstep)
+// Each phone runs the same seeded match; a tick is stepped once both thumbs' inputs for it are here. Portable maths
+// (kit/samemath.js) while linked, so an iPhone and an Android compute the same duel; the plain Math otherwise, as before.
+const WAIT_SHOW = 300, WAIT_HIDE = 500, WAIT_OFFER = 10000, GUEST_OFFER = 15000;
+function openFriend(code, role) {
+  closeLink(); s = null; solo = null;
+  const seedFor = query.has('seed') ? () => (Number(query.get('seed')) >>> 0) + seedNo++ : undefined;
+  link = { me: role === 'host' ? 0 : 1, m: null, acc: 0, since: performance.now(), stalledAt: null, clearAt: 0, wait: false, stalls: 0, matches: 0 };
+  link.f = friendLink({ role, onGo: startLink, onAgain: friendReady, onLeft: () => endLink('friendLeft'), onState: friendState,
+    only: ONLY, intro: FAST ? 1 : 0, ...(seedFor ? { newSeed: seedFor } : {}) });
+  $('fHost').hidden = role !== 'host'; $('fCode').textContent = code; $('fNote').textContent = '';
+  $('fJoin').value = role === 'host' ? '' : code; $('fFallback').hidden = true;
+  screen = 'friend'; show('friend');
+  link.f.open(code);
+  friendState(link.f.state);
+}
+function closeLink() {
+  if (link) { link.f.leave(); link = null; }
+  flip = false; useMath(Math); $('wait').hidden = true;
+}
+const STATUS = { off: 'connecting', connecting: 'connecting', alone: 'waitingFriend', meeting: 'friendHere', match: 'friendHere', lost: 'connecting',
+  failed: 'unreachable', full: 'full', closed: 'elsewhere', version: 'version', left: 'friendLeft' };
+const STUCK = ['failed', 'full', 'closed', 'version'];
+function friendState(state) {
+  if (!link) return;
+  if (link.m && STUCK.includes(state)) return endLink('unreachable');
+  $('fStatus').textContent = tr(STATUS[state] ?? 'connecting');
+  if (STUCK.includes(state)) $('fFallback').hidden = false;
+}
+function startLink(go, ls) {
+  if (!link) return;
+  useMath(sameMath); flip = link.me === 1; matchNo++; link.matches++;
+  s = createMatch({ seed: go.seed, only: go.only, first: go.first, intro: go.intro || undefined, kinds: FRIEND_KINDS });
+  solo = null; bot = null;
+  link.m = { ls, s, me: link.me, onTick };
+  link.acc = 0; link.stalledAt = null; link.wait = false;
+  clearInput();
+  ready = [false, false]; fx = []; texts = []; confetti = 0; acc = 0; paused = false; lastBeep = -1;
+  $('wait').hidden = true;
+  screen = 'play'; show('play');
+  snd.unlock(); snd.release();
+  rec.start({ solo: false, link: true, only: go.only, first: s.first });
+}
+function onTick() { // after each stepped tick, on both phones alike
+  for (const e of s.events) handle(e);
+  s.events.length = 0;
+  if (s.phase === 'intro') { const n = Math.ceil(s.timer); if (n !== lastBeep && n >= 1 && n <= 3) { lastBeep = n; voice.beep(n); } }
+  else lastBeep = -1;
+  if (s.over) link.m.ls.check(link.m.ls.tick, stateHash(s)); // the last word: both phones compare the finished match
+}
+function endLinkMatch(w) { // my half of the end card only; the friend sees theirs on their own phone
+  store(); paused = false;
+  rec.end('played', { score: s.score.slice(), winner: w, solo: false, link: true, duels: s.duels.length });
+  const me = link.me;
+  $('endT0').textContent = w < 0 ? 'Draw!' : w === me ? 'You win!' : 'So close!';
+  $('endL0').textContent = link.f.peerReady ? tr('friendReady') : '';
+  $('re0').classList.remove('ready'); $('re0').textContent = 'Rematch';
+  $('half1').classList.add('ghost');
+  ready = [false, false]; $('wait').hidden = true;
+  screen = 'end'; show('end');
+  confetti = calm ? 40 : 160; burst(w);
+  voice.win();
+}
+function friendReady() { if (screen === 'end' && link) $('endL0').textContent = tr('friendReady'); }
+function endLink(key) { // the link is over: the friend left, could not be reached, or the phones disagreed
+  if (!link) return;
+  if (s && !s.over) rec.end('left', { score: s.score.slice(), solo: false, link: true, duels: s.duels.length, why: key });
+  closeLink(); s = null; paused = false; snd.release();
+  $('goneLine').textContent = tr(key);
+  screen = 'gone'; show('gone');
+}
+function linkFrame(now, dt) {
+  const L = link;
+  L.f.pump(now);
+  if (link !== L) return;
+  if (L.m && s && !s.over && screen === 'play') {
+    const r = drive(L.m, Math.min(0.1, L.acc + dt), () => { moveKeys(); return inputFor(L.me); });
+    if (link !== L) return;
+    L.acc = r.acc;
+    const waited = L.m.ls.waited(now, r.stalled);
+    if (r.stalled) { if (L.stalledAt === null) { L.stalledAt = now; L.stalls++; } L.clearAt = now; }
+    else L.stalledAt = null;
+    if (r.stalled && waited >= WAIT_SHOW) L.wait = true;
+    else if (!r.stalled && now - L.clearAt >= WAIT_HIDE) L.wait = false;
+    $('wait').hidden = !L.wait;
+    if (L.wait) {
+      $('waitLine').textContent = tr(L.f.state === 'lost' ? 'slow' : 'waitBanner');
+      $('waitButtons').hidden = waited < WAIT_OFFER;
+    }
+  }
+  if (L.m?.ls.mismatch !== null && L.m?.ls.mismatch !== undefined) return endLink('outOfStep');
+  if (L.m && s?.over && screen === 'play') endMatch();
+  // A guest whose host has not turned up: keep waiting, and offer the bot.
+  if (!L.m && screen === 'friend' && L.f.role === 'guest' && now - L.since >= GUEST_OFFER) $('fFallback').hidden = false;
+}
+function toBot() { closeLink(); s = null; paused = false; menu(); screen = 'solo'; show('solo'); }
+$('toFriend').addEventListener('click', () => { snd.unlock(); openFriend(newCode(), 'host'); });
+$('fShare').addEventListener('click', async () => {
+  if (!link) return;
+  const code = link.f.code, how = await share(code, tr('shareText'));
+  $('fNote').textContent = how === 'copied' ? tr('linkCopied') : how === 'shown' ? `${tr('linkShown')} ${linkFor(code)}` : '';
+});
+$('fJoinForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const code = cleanCode($('fJoin').value);
+  if (code) { $('fJoin').blur(); openFriend(code, 'guest'); }
+});
+$('fJoin').addEventListener('input', () => { const v = $('fJoin').value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4); if (v !== $('fJoin').value) $('fJoin').value = v; });
+$('fRetry').addEventListener('click', () => { if (link) openFriend(link.f.code, link.f.role); });
+for (const id of ['fBot', 'goneBot', 'waitBot']) $(id).addEventListener('click', toBot);
+$('fBack').addEventListener('click', () => { closeLink(); menu(); screen = 'menu'; show('menu'); });
+$('goneMenu').addEventListener('click', toMenu);
+$('waitMenu').addEventListener('click', toMenu);
 
 // ---------------------------------------------------------------- cards
 function menu() {
@@ -340,7 +477,8 @@ function handle(e) {
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
-  if (screen === 'play' && !paused && s) {
+  if (link) linkFrame(now, dt);
+  else if (screen === 'play' && !paused && s) {
     acc += dt;
     while (acc >= DT && !s.over) {
       moveKeys();
@@ -376,6 +514,7 @@ function tick(dt) {
 // ---------------------------------------------------------------- drawing
 function draw(t) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (flip) { g.translate(W, H); g.scale(-1, -1); }
   const sx = shake ? (Math.random() - 0.5) * shake : 0, sy = shake ? (Math.random() - 0.5) * shake : 0;
   background(t);
   g.save(); g.translate(sx, sy);
@@ -458,7 +597,7 @@ function strip(t) {
 // Where every finger is: a soft ring in its owner's colour.
 function touches() {
   for (const p of pointers.values()) {
-    if (solo && p.side === 1) continue;
+    if (!local(p.side)) continue;
     const [x, y] = P(p.x, p.y), c = cols(p.side);
     g.fillStyle = c[1] + '30'; circle(g, x, y, 34); g.fill();
     g.strokeStyle = c[1] + 'aa'; g.lineWidth = 3; circle(g, x, y, 30); g.stroke();
@@ -470,7 +609,7 @@ function intro(t) {
   const left = s.timer, n = Math.ceil(left), frac = left - Math.floor(left);
   g.fillStyle = '#160f2499'; g.fillRect(0, 0, W, H);
   for (const i of [0, 1]) withSide(i, () => {
-    if (solo && i === 1) return;
+    if (!local(i)) return;
     const [x, y] = P(0.5, 0.2);
     const sc = 1 + 0.5 * Math.max(0, frac - 0.75) / 0.25;
     if (n >= 1 && n <= 3) text(String(n), x, y, 52 * sc, cols(i)[0]);
@@ -480,7 +619,7 @@ function intro(t) {
 function result(t) {
   const w = s.duels.at(-1)?.winner ?? -1, age = s.result - s.timer;
   for (const i of [0, 1]) withSide(i, () => {
-    if (solo && i === 1) return;
+    if (!local(i)) return;
     const [x, y] = P(0.5, 0.42), pop = Math.min(1, age * 5), bob = Math.sin(age * 6) * 4;
     g.save(); g.translate(x, y + bob); g.scale(0.6 + 0.4 * pop, 0.6 + 0.4 * pop);
     if (w === i) { star(g, 0, -10, 46, C.gold, C.ink, 3); text('+1', 0, -6, 26, C.ink, C.cream); text('Point!', 0, 62, 30, cols(i)[1]); }
@@ -694,7 +833,7 @@ const DRAW_KIND = {
       const [, by] = P(0.5, 0.7 - 0.43 * progress);
       beetle(g, x, by, k * 0.06, cols(i), { glow: 1 });
       text(`${d.strokes[i]}/${SWIPE.need}`, ...P(0.5, 0.14), Math.min(25, k * 0.073), cols(i)[1]);
-      const prompt = i === 0 && finePointer.matches ? 'Flick toward center or press ↑' : 'Flick toward center';
+      const prompt = i === keySide() && finePointer.matches ? 'Flick toward center or press ↑' : 'Flick toward center';
       text(prompt, ...P(0.5, 0.87), Math.min(23, k * 0.065), C.cream);
     });
   },
@@ -725,10 +864,10 @@ const DRAW_KIND = {
 };
 
 // ---------------------------------------------------------------- first-time help: one copy facing each local player
-const hintFor = side => inPlay() && s.kind === 'tug' && s.duels.length === 0 && (!solo || side === 0);
-const help = ['bottom', 'top'].map((seat, side) => hint($(`hint-${seat}`).firstElementChild, {
+const hintFor = side => inPlay() && s.kind === 'tug' && s.duels.length === 0 && local(side);
+const help = ['bottom', 'top'].map((seat, at) => hint($(`hint-${seat}`).firstElementChild, {
   kind: 'tap', key: 'duel:hint', label: 'Tap!',
-  when: () => hintFor(side),
+  when: () => hintFor(flip ? 1 - at : at), // the copy at the bottom of the glass is for whoever plays there
   played: save.matches > 0,
 }));
 
@@ -742,9 +881,14 @@ window.duelState = () => {
     held: [0, 1].map(i => [...pointers.values()].some(p => p.side === i)), pointers: [...pointers.entries()].map(([id, p]) => ({ id, side: p.side })),
     board: { bx, cy, k, W, H }, d: d ? JSON.parse(JSON.stringify({ ...d, box: undefined })) : null,
     save: JSON.parse(JSON.stringify(save)), hint: help[0].shown, sound: save.sound, fx: fx.length,
+    flip, link: link ? { state: link.f.state, role: link.f.role, me: link.me, code: link.f.code, id: link.f.go?.id ?? 0, delay: link.f.go?.delay ?? null, rtt: link.f.rtt,
+      tick: link.m?.ls.tick ?? 0, mismatch: link.m?.ls.mismatch ?? null, wait: link.wait, stalls: link.stalls, peer: link.f.peer, peerReady: link.f.peerReady,
+      hash: s && link.m ? stateHash(s) : null } : null,
     minTouchPx: Math.min(...sizes, s?.kind === 'memory' ? k * MEMORY.r * 2 : Infinity, s?.kind === 'hockey' ? k * HOCKEY.pad * 2 : Infinity),
   };
 };
 
+applyWords();
 menu();
+{ const code = codeFromLink(); if (code) openFriend(code, 'guest'); } // a friend's link joins their room
 requestAnimationFrame(frame);
