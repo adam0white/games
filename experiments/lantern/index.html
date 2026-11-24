@@ -761,7 +761,7 @@ const pads = sides(canvas, { on: () => view === 'first', playing: () => playing,
 // Both set how fast the boat slides, and the boat stops when the player does. lantern-steer: 'press' or 'tilt'; absent means tilt.
 const tilt = tiltSteer(); let pressing = read('lantern-steer') === 'press', slide = 0;
 const tilting = () => view === 'first' && !pressing && tilt.live();
-const PRESS = 0.55, TILT = 0.8, REST = 2.5, FULL = 18; // top sideways speeds (the rules allow 0.95); degrees ignored, degrees for top speed
+const PRESS = 0.55, TILT = 0.5, REST = 3, FULL = 26; // top sideways speeds (the rules allow 0.95); degrees ignored, degrees for top speed
 function steerShow() { for (const p of document.querySelectorAll('.steerRow')) p.hidden = view !== 'first'; for (const b of document.querySelectorAll('button.steer')) b.textContent = t(pressing ? 'steerPress' : 'steerTilt'); }
 for (const b of document.querySelectorAll('button.steer')) b.addEventListener('click', () => { pressing = !pressing; store.set('lantern-steer', pressing ? 'press' : 'tilt'); if (!pressing) tilt.ask(); steerShow(); if (paused) pauseText(); });
 // Asked inside the click that picks first person or starts a run in it: an iPhone shows its prompt only from a click.
@@ -944,7 +944,7 @@ function wreck(now) {
 const rgb = t => t.split(',').map(v => v / 255), hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
 function draw3(now, dt, dawn, day) {
   const first = view === 'first', e = crash ? Math.max(0, Math.min(1, (now - crash.t0) / 900)) : 0;
-  R3.draw(s, { now, dt, target: first ? s.x + slide * 0.2 : target, shake, glow, sparks, dawn, day, playing, snap: snap3, cam: view, fire: rgb(skin('flame')[2]), wet: hex(skin('water')[2]).map(v => 0.02 + 0.5 * v), tint: skin('boat')[0] === 'oak' ? null : hex(skin('boat')[2]), hideBoat: !!crash && !first, sink: first ? e : 0 });
+  R3.draw(s, { now, dt, target: first ? s.x + slide * 0.12 : target, shake, glow, sparks, dawn, day, playing, snap: snap3, cam: view, fire: rgb(skin('flame')[2]), wet: hex(skin('water')[2]).map(v => 0.02 + 0.5 * v), tint: skin('boat')[0] === 'oak' ? null : hex(skin('boat')[2]), hideBoat: !!crash && !first, sink: first ? e : 0 });
   snap3 = false;
   const k = W / canvas3.width, at = (x, y, h = 0) => R3.project(x, -(y - s.y), h).map(v => v * k), row = R3.boatRow().unit * k;
   g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, W, H);
