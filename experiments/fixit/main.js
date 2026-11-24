@@ -1,29 +1,32 @@
 // Fix-It Stall: the page. View, input, sound, save, cards. The rules are in sim.js.
-import { create, step, input, guide, hint, multiplier, goalState, stars, DT, KINDS, TUTOR, WORD, OBJECT, HIT, WORKS, LEAVE, LEVELS } from './sim.js';
-import { MAP, COUNT, ORDER, INTRO, levelDef, goalLine, starsFor } from './levels.js';
+import { create, step, input, guide, hint, multiplier, goalState, stars, selectLane, chooseTicket, lampAt, DT, KINDS, TUTOR, WORD, OBJECT, HIT, WORKS, LEAVE, LEVELS } from './sim.js';
+import { COUNT, ORDER, OPEN_ORDER, INTRO, BUSY_END, CHAPTERS, ASSIST_RATE, STAR_BONUS, canAssist, levelDef, goalLine, levelReward } from './levels.js';
 import { plan, SKILLS } from './moves.js';
 import { drawJob, drawGhost, person, looks, REGULAR, cat, heart, coin, sillyList, drawSilly, goalIcon, starShape, C, circle, rrect, star } from './art.js';
 import { readJson, writeJson } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
 import { screens } from '../kit/screens.js';
+import { hint as kitHint } from '../kit/hint.js';
+import { noZoom } from '../kit/zoom.js';
 import { lab } from '../kit/lab.js';
 
 const $ = id => document.getElementById(id);
 const query = new URLSearchParams(location.search);
 // ORDER (levels.js) is the order new jobs come: one per level on the map, and the open stall's unlock order.
+noZoom();
 const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ---------- the save: one JSON blob. Fields are listed in NOTES.md and only ever grow.
 const KEY = 'fixit-save';
-const save = { v: 1, bank: 0, best: 0, shifts: 0, unlocked: TUTOR.slice(), seen: {}, owned: ['teal'], awning: 'teal', sound: true, regular: 0, pending: null, bestStreak: 0, served: 0, days: {}, levels: {}, times: {} };
+const save = { v: 1, bank: 0, best: 0, shifts: 0, unlocked: TUTOR.slice(), seen: {}, owned: ['teal'], awning: 'teal', sound: true, regular: 0, pending: null, bestStreak: 0, served: 0, days: {}, levels: {}, times: {}, attempts: {}, assists: {} };
 let migrated = 0; // levels given to an old save this load (shown once on the menu)
 {
   const old = readJson(KEY, null);
   if (old && typeof old === 'object') for (const k of Object.keys(save)) if (k in old && typeof old[k] === typeof save[k]) save[k] = old[k];
   if (old && typeof old.pending === 'string') save.pending = old.pending; // pending starts as null, so the type test above skips it
   for (const k of ['bank', 'best', 'shifts', 'regular', 'bestStreak', 'served']) if (!Number.isFinite(save[k]) || save[k] < 0) save[k] = 0;
-  save.unlocked = ORDER.filter(k => Array.isArray(save.unlocked) && save.unlocked.includes(k));
+  save.unlocked = OPEN_ORDER.filter(k => Array.isArray(save.unlocked) && save.unlocked.includes(k));
   for (const k of TUTOR) if (!save.unlocked.includes(k)) save.unlocked.push(k);
   if (!Array.isArray(save.owned)) save.owned = ['teal'];
   if (!save.owned.includes('teal')) save.owned.push('teal');
@@ -36,11 +39,18 @@ let migrated = 0; // levels given to an old save this load (shown once on the me
   const plain = o => o && typeof o === 'object' && !Array.isArray(o) ? o : {};
   save.levels = Object.fromEntries(Object.entries(plain(save.levels)).filter(([n, v]) => levelDef(+n) && [1, 2, 3].includes(v)));
   save.times = Object.fromEntries(Object.entries(plain(save.times)).filter(([n, v]) => save.levels[n] && Number.isFinite(v) && v > 0));
+  for (const key of ['attempts', 'assists']) {
+    save[key] = Object.fromEntries(Object.entries(plain(save[key])).filter(([n, v]) => levelDef(+n) && Number.isSafeInteger(v) && v > 0));
+  }
   // A save from before the map (it has no levels field) that shows play starts past the levels that only teach jobs it
   // already has: the longest run of levels from 1 whose new job is in its unlocked list, each with one star. Once.
   if (old && typeof old === 'object' && !('levels' in old) && (old.shifts > 0 || old.served > 0 || (Array.isArray(old.unlocked) && old.unlocked.length > TUTOR.length))) {
     for (let n = 1; n <= INTRO && save.unlocked.includes(ORDER[n - 1]); n++) { save.levels[n] = 1; migrated = n; }
     writeJson(KEY, save);
+  }
+  for (const n of Object.keys(save.levels)) {
+    const kind = levelDef(+n).intro;
+    if (kind && !save.unlocked.includes(kind)) save.unlocked.push(kind);
   }
 }
 const store = () => writeJson(KEY, save);
@@ -61,6 +71,7 @@ const has = id => save.owned.includes(id);
 
 // ---------- canvas and layout (CSS pixels)
 const cv = $('c'), g = cv.getContext('2d');
+let benchControls = false;
 let W = 0, H = 0, dpr = 1, top = 0, bottomInset = 0, benchTop = 0, S = 300, boxX = 0, boxY = 0, unit = 3;
 function layout() {
   dpr = Math.min(2, devicePixelRatio || 1);
@@ -69,7 +80,8 @@ function layout() {
   const cs = getComputedStyle($('probe'));
   top = parseFloat(cs.paddingTop) || 0; bottomInset = parseFloat(cs.paddingBottom) || 0;
   benchTop = top + Math.min(200, Math.max(160, H * 0.3));
-  const avail = H - benchTop - 12 - bottomInset, word = 40;
+  const avail = H - benchTop - 36 - bottomInset, word = benchControls ? 88 : 40;
+  $('tickets').style.top = `${benchTop + 4}px`;
   S = Math.max(200, Math.min(W - 20, avail - word, 560));
   boxX = (W - S) / 2; boxY = benchTop + word + Math.max(0, (avail - word - S) / 2); unit = S / 100;
 }
@@ -120,14 +132,15 @@ const today = /^\d{4}-\d{2}-\d{2}$/.test(query.get('date') ?? '') ? query.get('d
 const dateSeed = d => { let h = 2166136261; for (const ch of 'fixit-daily-' + d) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
 let daily = false;
 // ---------- the map: levels.js holds the levels; the save holds the stars
-let mode = 'level', lvN = 1, card = 0, cardFade = 0, lastEnd = null;
+let mode = 'level', lvN = 1, card = 0, cardFade = 0;
 const CARD = 2.6; // seconds the goal card shows before the level starts by itself (a tap starts it sooner)
-const STAR_BONUS = 5; // coins for each new star earned
 const OPEN_AT = 8, DAILY_AT = 3; // the open stall opens after level 8, the daily stall after level 3 (or any old shift)
 const cleared = n => (save.levels[n] ?? 0) > 0;
 const reachable = n => n === 1 || cleared(n) || cleared(n - 1);
 const nextLevel = () => { for (let n = 1; n <= COUNT; n++) if (!cleared(n)) return n; for (let n = 1; n <= COUNT; n++) if (save.levels[n] < 3) return n; return COUNT; };
 const starTotal = () => Object.values(save.levels).reduce((a, b) => a + b, 0);
+const MILESTONES = [['shelf', 6, 'Shelf'], ['sign', 20, 'Sign'], ['lights', 40, 'Lights'], ['cat', 66, 'Cat']];
+const stallGrowth = (total = starTotal()) => MILESTONES.filter(([, need]) => total >= need).map(([id]) => id);
 const openStall = () => cleared(OPEN_AT) || save.shifts >= 1;
 const dailyOpen = () => cleared(DAILY_AT) || save.shifts >= 1;
 
@@ -135,15 +148,29 @@ const show = screens(['menu', 'shop', 'paused', 'end'], name => {
   screen = name;
   $('pause').style.display = name === 'play' ? 'grid' : 'none';
   if (name === 'menu') menu();
+  $('tickets').hidden = name !== 'play' || !benchControls || !!card;
   if (name === 'shop') shop();
   for (const id of ['sound1', 'sound2']) $(id).textContent = `Sound: ${save.sound ? 'on' : 'off'}`;
 });
+let menuHelp = null;
 function menu() {
   $('bank').textContent = save.bank; $('starsAll').textContent = starTotal(); $('starsMax').textContent = COUNT * 3;
-  $('jobs').textContent = new Set([...save.unlocked, ...ORDER.filter((k, i) => cleared(i + 1))]).size; $('jobsAll').textContent = KINDS.length;
+  $('jobs').textContent = save.unlocked.length; $('jobsAll').textContent = KINDS.length;
+  const earned = stallGrowth();
+  const next = MILESTONES.find(([id]) => !earned.includes(id));
+  $('growth').textContent = next ? `${next[2]} at ${next[1]} ★` : 'Stall fully fitted';
   const n = only ? null : qLevel ?? nextLevel();
   $('play').textContent = n ? `Play level ${n}` : 'Play';
   $('playLine').textContent = n ? goalLine(levelDef(n).goal) : '';
+  menuHelp = n && (canAssist(save.attempts[n]) ? n
+    : Object.keys(save.attempts).map(Number).find(i => reachable(i) && canAssist(save.attempts[i])));
+  $('menuAssist').hidden = !menuHelp;
+  if (menuHelp) {
+    const label = `Level ${menuHelp} with slower clocks, up to two stars`;
+    $('menuAssist').setAttribute('aria-label', label);
+    $('menuAssist').title = label;
+    $('menuAssist').lastElementChild.textContent = menuHelp === n ? '★ ★' : menuHelp;
+  }
   map(n);
   $('migrated').textContent = migrated ? `Your stall's old jobs count: levels 1 to ${migrated} are done.` : '';
   $('open').style.display = openStall() ? '' : 'none';
@@ -151,12 +178,21 @@ function menu() {
   $('openLine').textContent = openStall() ? `Open stall: all day, as long as you last. Best ${save.best}.` : `Clear level ${OPEN_AT} to open the stall all day.`;
   $('dailyLine').textContent = dailyOpen() ? (today in save.days ? `Today's stall: best ${save.days[today]}` : 'Daily stall: the same for everyone today.') : `Clear level ${DAILY_AT} for the daily stall.`;
 }
-// The map: a numbered tile per level, its stars, locked ones greyed, the next one marked. Two chapters.
+// The map opens to the next chapter and keeps the three chapters one tap away.
 function map(next) {
-  const box = $('map'); box.textContent = '';
-  for (const [a, b, title] of [[1, INTRO, 'Learning the trade: a new job each level'], [INTRO + 1, COUNT, 'Busy street: mixed jobs, faster']]) {
-    const h = document.createElement('div'); h.className = 'chap'; h.textContent = title; box.append(h);
-    const grid = document.createElement('div'); grid.className = 'grid' + (a > 1 ? ' late' : '');
+  const box = $('map'), tabs = $('chapterTabs'), grids = [], buttons = [];
+  box.replaceChildren(); tabs.replaceChildren();
+  const showChapter = current => {
+    grids.forEach((grid, i) => { grid.hidden = i !== current; });
+    buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(i === current)));
+  };
+  for (const [i, [a, b, title]] of CHAPTERS.entries()) {
+    const tab = document.createElement('button');
+    tab.textContent = title;
+    tab.addEventListener('click', () => showChapter(i));
+    tabs.append(tab);
+    buttons.push(tab);
+    const grid = document.createElement('div'); grid.className = 'grid' + (a > BUSY_END ? ' night' : a > 1 ? ' late' : '');
     for (let n = a; n <= b; n++) {
       const t = document.createElement('button'), st = save.levels[n] ?? 0, open = reachable(n);
       t.className = 'lv' + (n === next ? ' next' : '') + (st ? ' done' : '');
@@ -169,7 +205,9 @@ function map(next) {
       grid.append(t);
     }
     box.append(grid);
+    grids.push(grid);
   }
+  showChapter(Math.max(0, CHAPTERS.findIndex(([a, b]) => next >= a && next <= b)));
 }
 
 function shop() {
@@ -206,14 +244,14 @@ function icon(q, id) {
 }
 
 // ---------- a level, or a shift of the open stall or the daily stall
-function begin(how = 'level', n = null) {
+function begin(how = 'level', n = null, assisted = false) {
   snd.unlock();
   mode = only ? 'open' : how; daily = mode === 'daily';
   const hearts = daily ? 3 : 3 + (has('charm') ? 1 : 0);
   card = 0; cardFade = 0;
   if (mode === 'level') {
     lvN = n ?? nextLevel();
-    s = create({ lv: levelDef(lvN), hearts });
+    s = create({ lv: levelDef(lvN), hearts, assisted: assisted && canAssist(save.attempts[lvN]) });
     card = CARD;
     newJob = null;
   } else {
@@ -226,21 +264,29 @@ function begin(how = 'level', n = null) {
       : create({ seed, unlocked: save.unlocked, tutorial: false, hearts, newJob, only, regular: !only ? save.regular : -1, two: twoQ !== null ? twoQ : !only, day: dayLen, startLevel, ...gold });
     if (newJob) { save.pending = null; store(); }
   }
+  benchControls = ['order', 'rush', 'boss'].includes(s.lv?.rule);
+  ticketKey = '';
+  layout();
   playing = true; paused = false; acc = 0; last = performance.now(); clock = 0; ended = 0;
   ripples = []; bits = []; flying = []; confetti = []; shownCoins = 0; leaving = []; spots = new Map(); word = null; banner = null; recCount = 0; multWas = 1; multPop = 0; finger = null; kb = null; jobKey = null; prev = null; counterReset();
   show('play');
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); // so Space drives the bench, not the last button
   rec.start(mode === 'level' ? { mode: 'level', level: lvN, goal: goalLine(s.lv.goal) } : daily ? { mode: 'daily', date: today } : { mode: 'day', unlocked: save.unlocked.length, shift: save.shifts + 1, only });
+  if (s.assisted) {
+    save.assists[lvN] = (save.assists[lvN] ?? 0) + 1;
+    store();
+    rec.event('assist', { level: lvN, kind: 'slowClock' });
+  }
   drain();
 }
 // In the open stall, four fixed in a shift earns the next job, whether the shift ends or the player leaves it (note #150).
 function earnJob() {
   if (mode !== 'open' || only || s.served < 4) return null;
-  const job = ORDER.find(k => !save.unlocked.includes(k)) ?? null;
+  const job = OPEN_ORDER.find(k => !save.unlocked.includes(k)) ?? null;
   if (job) { save.unlocked.push(job); save.pending = job; }
   return job;
 }
-const summary = () => ({ coins: s.coins, served: s.served, lost: s.lost, bestStreak: s.bestStreak, ...(mode === 'level' ? { mode: 'level', level: lvN, cleared: s.cleared, stars: stars(s), secs: Math.round(s.clock * 10) / 10 } : {}) });
+const summary = () => ({ coins: s.coins, served: s.served, lost: s.lost, bestStreak: s.bestStreak, ...(mode === 'level' ? { mode: 'level', level: lvN, cleared: s.cleared, stars: stars(s), secs: Math.round(s.clock * 10) / 10, assisted: s.assisted } : {}) });
 function finish() {
   playing = false; ended = performance.now();
   if (mode === 'level') return finishLevel();
@@ -253,51 +299,59 @@ function finish() {
   unlocked = earnJob();
   store();
   rec.end('closed', { ...summary(), why, ...(daily ? { daily: today } : {}) });
-  endCard({ title: daily ? (why === 'hearts' ? 'Daily stall: out of hearts' : 'Daily stall closed!') : why === 'hearts' ? 'Out of hearts' : 'Closed!', stars: null, coins: s.coins,
-    stats: [['Fixed', s.served], ['Best streak', s.bestStreak], ['Best', daily ? save.days[today] ?? s.coins : save.best]],
-    line: daily ? (dayBest && s.coins > 0 ? `Best today! ${s.coins} coins.` : `Today's best: ${save.days[today]}.`) : newBest && s.coins > 0 ? 'New best!' : why === 'hearts' ? `${s.lost} customers walked off.` : `You have ${save.bank} coins.`,
-    note: daily ? `Daily stall ${today}. Come back tomorrow for a new one.` : unlocked ? `Next shift: a new job! (${OBJECT[unlocked]})` : save.unlocked.length < KINDS.length && s.served < 4 ? 'Fix 4 in a shift to get a new job.' : '',
+  endCard({ title: daily ? (why === 'hearts' ? 'Daily stall: out of hearts' : 'Daily stall closed!') : why === 'hearts' ? 'Out of hearts' : 'Closed!', stars: null, coins: daily ? 0 : s.coins,
+    stats: daily ? [] : [['Fixed', s.served], ['Best streak', s.bestStreak], ['Best', save.best]],
+    line: daily ? (dayBest && s.coins > 0 ? 'New daily best!' : `Daily best: ${save.days[today]}.`) : newBest && s.coins > 0 ? 'New best!' : why === 'hearts' ? `${s.lost} customers walked off.` : `You have ${save.bank} coins.`,
+    note: daily ? '' : unlocked ? `Next shift: a new job! (${OBJECT[unlocked]})` : save.unlocked.length < KINDS.length && s.served < 4 ? 'Fix 4 in a shift to get a new job.' : '',
     again: daily ? 'Daily again' : 'Play again', next: false });
   if (newBest && s.coins > 0) [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 0.4, 0.09, 'triangle'), i * 120));
   else [523, 392].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.08, 'triangle'), i * 160));
+  if (daily) dailyCard();
   setTimeout(() => { if (!playing && screen === 'play') show('end'); }, 700);
 }
-// A level's end: bank the coins either way, the stars and a bonus for new ones if it was cleared.
+// A level pays its repair coins on the first clear, plus a bonus for every new star.
 function finishLevel() {
   const why = s.over, n = lvN, def = s.lv, st = stars(s), was = save.levels[n] ?? 0, secs = Math.round(s.clearT ?? s.clock);
   const bonus = Math.max(0, st - was) * STAR_BONUS, bestWas = save.times[n];
-  save.bank += s.coins + bonus; save.served += s.served; save.bestStreak = Math.max(save.bestStreak, s.bestStreak);
+  const reward = levelReward(s.coins, st, was), beforeGrowth = stallGrowth();
+  save.bank += reward; save.served += s.served; save.bestStreak = Math.max(save.bestStreak, s.bestStreak);
   const opened = st && !was && n === OPEN_AT, dailyNow = st && !was && n === DAILY_AT && save.shifts < 1;
   if (st) {
+    delete save.attempts[n];
     save.levels[n] = Math.max(was, st);
-    save.times[n] = Math.min(bestWas ?? Infinity, Math.round(s.clearT * 10) / 10);
+    if (!s.assisted) save.times[n] = Math.min(bestWas ?? Infinity, Math.round(s.clearT * 10) / 10);
     if (def.intro && !save.unlocked.includes(def.intro)) save.unlocked.push(def.intro); // the job a level taught is the open stall's too
+  } else {
+    save.attempts[n] = Math.min(2, (save.attempts[n] ?? 0) + 1);
   }
   store();
-  rec.end('closed', { ...summary(), why, bonus });
-  lastEnd = { n, st, why };
+  rec.end('closed', { ...summary(), why, bonus, reward });
+  const added = MILESTONES.filter(([id]) => !beforeGrowth.includes(id) && stallGrowth().includes(id)).map(([, , label]) => label);
   const upNext = levelDef(n + 1);
   if (st) {
-    const tip = st < 3 ? `Three stars: clear it in ${def.stars[0]} s.` : bestWas && s.clearT < bestWas ? `New best time!` : 'Three stars!';
-    endCard({ title: `Level ${n} cleared!`, stars: st, coins: s.coins + bonus,
-      stats: [['Time', `${secs} s`], ['Best', `${Math.round(save.times[n])} s`], ['Fixed', s.served]],
+    const tip = s.assisted ? 'Two stars available with help.' : st < 3 ? `Three stars: clear it in ${def.stars[0]} s.` : bestWas && s.clearT < bestWas ? `New best time!` : 'Three stars!';
+    endCard({ title: `Level ${n} cleared!`, stars: st, coins: reward,
+      stats: [['Time', `${secs} s`], ...(save.times[n] ? [['Best', `${Math.round(save.times[n])} s`]] : []), ['Fixed', s.served]],
       line: (bonus ? `+${bonus} coins for ${st - was === 1 ? 'a new star' : 'new stars'}. ` : '') + tip,
-      note: opened ? 'The open stall is open: play all day from the menu.' : dailyNow ? 'The daily stall is open on the menu.' : upNext ? (upNext.intro ? `Next: a new job, the ${OBJECT[upNext.intro]}.` : `Next: ${goalLine(upNext.goal)}`) : 'That was the last level. Can you three-star them all?',
+      note: added.length ? `New at the stall: ${added.join(', ')}!` : opened ? 'The open stall is open: play all day from the menu.' : dailyNow ? 'The daily stall is open on the menu.' : upNext ? (upNext.intro ? `Next: a new job, the ${OBJECT[upNext.intro]}.` : `Next: ${goalLine(upNext.goal)}`) : 'That was the last level. Can you three-star them all?',
       again: 'Try again', next: !!upNext });
     [523, 659, 784, 1047].slice(0, 1 + st).forEach((f, i) => setTimeout(() => tone(f, 0.4, 0.09, 'triangle'), 300 + i * 160));
   } else {
-    const gs = goalState(s), left = gs.parts.filter(p => p.have < p.need).map(p => p.kind === 'coins' ? `${p.need - p.have} more coins` : `${p.need - p.have} more to fix`);
+    const gs = goalState(s), left = gs.parts.filter(p => p.have < p.need).map(p => p.kind === 'coins' ? `${p.need - p.have} more base pay` : `${p.need - p.have} more to fix`);
     const close = gs.parts.every(p => p.have >= p.need * 0.75);
-    endCard({ title: why === 'time' ? 'Out of time' : why === 'hearts' ? 'Out of hearts' : 'Someone walked off', stars: 0, coins: s.coins,
-      stats: gs.parts.map(p => [p.kind === 'coins' ? 'Coins' : 'Fixed', `${Math.min(p.have, p.need)}/${p.need}`]).concat([['Time', `${secs} s`]]),
+    endCard({ title: why === 'time' ? 'Out of time' : why === 'hearts' ? 'Out of hearts' : 'Someone walked off', stars: 0, coins: 0,
+      stats: gs.parts.map(p => [p.kind === 'coins' ? 'Base pay' : 'Fixed', `${Math.min(p.have, p.need)}/${p.need}`]).concat([['Time', `${secs} s`]]),
       line: why === 'lost' && !left.length ? 'In this level nobody may walk off.' : `${close ? 'So close! ' : ''}${left.join(' and ') || 'Nearly there'}.`,
-      note: goalLine(def.goal), again: 'Try again', next: false });
+      note: goalLine(def.goal), again: 'Try again', next: false, offer: canAssist(save.attempts[n]) });
     [523, 392].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.08, 'triangle'), i * 160));
   }
   setTimeout(() => { if (!playing && screen === 'play') show('end'); }, 900);
 }
 // The end card, for a level or a shift.
-function endCard({ title, stars: st, coins, stats, line, note, again, next }) {
+function endCard({ title, stars: st, coins, stats, line, note, again, next, offer = false }) {
+  $('helpRow').hidden = !offer;
+  $('dailyResult').hidden = true;
+  $('earnedLine').hidden = coins === 0;
   $('endTitle').textContent = title;
   $('endStars').style.display = st === null ? 'none' : '';
   $('endStars').textContent = st === null ? '' : '★'.repeat(st) + '☆'.repeat(3 - st);
@@ -312,9 +366,100 @@ function endCard({ title, stars: st, coins, stats, line, note, again, next }) {
 function quit() {
   if (!s || !playing) { show('menu'); return; }
   rec.end('left', { ...summary(), why: 'menu' });
-  save.bank += s.coins; save.served += s.served; earnJob(); store(); // a level or shift left early keeps its coins, and in the open stall its new job if 4 were fixed (tester t1, note #150); it does not count as a shift, a best or a clear
+  if (mode !== 'level') save.bank += s.coins;
+  save.served += s.served; earnJob(); store();
   playing = false; paused = false; card = 0; snd.release(); show('menu');
 }
+
+// Each ticket shows the object itself. Picky customers request numbered tickets; rush tickets show both deadlines.
+let ticketKey = '';
+function renderTickets() {
+  if (!benchControls) return;
+  const box = $('tickets'), rule = s.lv.rule;
+  const key = `${s.lanes.map(c => c.n).join('/')}:${s.cust.n}:${s.stepN}:${s.phase}:${s.choosing}`;
+  if (key === ticketKey) return;
+  ticketKey = key;
+  box.replaceChildren();
+  const rush = rule === 'rush';
+  const reps = rush ? s.lanes.map(c => c.reps[c.stepN]) : s.reps;
+  // Show the stack out of order. The stamped numbers show which physically distinct ticket to pull first.
+  const indices = reps.map((_, i) => i);
+  if (rule === 'order' && indices.length > 1) indices.push(indices.shift());
+  for (const i of indices) {
+    const active = rush ? s.station === i : s.stepN === i;
+    const done = rush ? s.lanes[i].done : i < s.stepN || s.cust.done;
+    const el = document.createElement(rule === 'boss' ? 'span' : 'button');
+    el.className = (rush ? 'lane' : 'ticket') + (active && !s.choosing ? ' current' : '') + (done ? ' done' : '');
+    el.dataset[rush ? 'lane' : 'ticket'] = i;
+    if (rule === 'order' && active) el.dataset.next = '';
+    if (rule !== 'boss') {
+      el.disabled = done || s.phase !== 'work' || (rush ? active : !s.choosing);
+      el.setAttribute('aria-label', `${rush ? 'Customer' : 'Repair'} ${i + 1}, ${OBJECT[reps[i].kind]}`);
+      el.addEventListener('click', () => {
+        if (!playing || paused || card) return;
+        if (rush) selectLane(s, i);
+        else chooseTicket(s, i);
+        drain();
+      });
+    }
+    const label = document.createElement('b');
+    label.textContent = done ? '✓' : i + 1;
+    const pic = document.createElement('canvas');
+    pic.width = pic.height = 100;
+    drawJob(pic.getContext('2d'), [reps[i]], 0, 0, 0);
+    el.append(label, pic);
+    if (rush) el.append(document.createElement('i'));
+    box.append(el);
+  }
+}
+
+let dailyImage = '';
+function dailyCard() {
+  const canvas = $('dailyShare'), ctx = canvas.getContext('2d');
+  $('dailyResult').hidden = false;
+  canvas.setAttribute('aria-label', `Fix-It Stall daily result for ${today}, ${s.coins} coins and ${s.served} fixed`);
+  ctx.clearRect(0, 0, 600, 340);
+  rrect(ctx, 0, 0, 600, 340, 0, '#123f3d', 0);
+  ctx.fillStyle = '#fbc583';
+  ctx.fillRect(0, 0, 600, 16);
+  for (let i = 0; i < 12; i++) {
+    ctx.fillStyle = i % 2 ? '#ffa86b' : '#fbc583';
+    ctx.fillRect(i * 50, 0, 50, 22);
+    circle(ctx, 25 + i * 50, 22, 25, ctx.fillStyle, 0);
+  }
+  const type = (text, x, y, size, color = '#fff1d6') => {
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.font = `bold ${size}px ui-rounded, system-ui, sans-serif`;
+    ctx.fillStyle = color; ctx.fillText(text, x, y);
+  };
+  type('FIX-IT STALL', 34, 86, 44);
+  type(`DAILY STALL  /  ${today}`, 36, 137, 22, '#c2e9d7');
+  coin(ctx, 63, 211, 25);
+  type(String(s.coins), 103, 213, 62, '#ffd98d');
+  type('COINS', 105, 260, 19, '#c2e9d7');
+  type(`${s.served} fixed`, 38, 304, 23);
+  type(`Best combo ${s.bestStreak}`, 204, 304, 23);
+  cat(ctx, 501, 306, 3.4, 0, true);
+  dailyImage = canvas.toDataURL('image/png');
+}
+function downloadDaily() {
+  if (!dailyImage) return;
+  const a = document.createElement('a');
+  a.download = `fixit-stall-${today}.png`; a.href = dailyImage; a.click();
+}
+$('downloadDaily').addEventListener('click', downloadDaily);
+$('shareDaily').addEventListener('click', async () => {
+  if (!dailyImage) return;
+  const bytes = Uint8Array.from(atob(dailyImage.split(',')[1]), c => c.charCodeAt(0));
+  const file = new File([bytes], `fixit-stall-${today}.png`, { type: 'image/png' });
+  const data = { files: [file], title: 'Fix-It Stall daily', text: `${today} · ${s.coins} coins · ${s.served} fixed` };
+  try {
+    if (navigator.share && navigator.canShare?.(data)) { await navigator.share(data); return; }
+  } catch (error) {
+    if (error.name === 'AbortError') return;
+  }
+  downloadDaily();
+});
 
 // Everything the sim reported: sound, words, sparks. Called after each input and each tick, so a touch is answered in the same frame.
 function drain() {
@@ -322,6 +467,7 @@ function drain() {
   for (const e of s.events) react(e);
   s.events.length = 0;
   while (recCount < s.log.length && recCount < 120) { const l = s.log[recCount++]; rec.event('repair', l); }
+  renderTickets();
   const key = s.cust && `${s.cust.n}:${s.stepN}`;
   if (key !== jobKey) { // a new job on the bench: note how often this kind was seen before, for the hint
     jobKey = key;
@@ -358,7 +504,15 @@ function react(e) {
     case 'unwind': tone(400, 0.3, 0.07, 'triangle', -250); word = { text: 'Hold till it glows!', t: 0, kind: 'bad' }; break;
     case 'eye': tone(1250, 0.06, 0.06, 'triangle'); break;
     case 'through': tone(700 + e.n * 140, 0.07, 0.07, 'triangle'); break;
-    case 'goal': banner = { text: 'Goal!', t: 0, gold: true }; [784, 988, 1175, 1568].forEach((f, i) => later(250 + i * 90, () => tone(f, 0.3, 0.07, 'triangle'))); party(24, true); break;
+    case 'goal': $('pause').style.display = 'none'; banner = { text: 'Goal!', t: 0, gold: true }; [784, 988, 1175, 1568].forEach((f, i) => later(250 + i * 90, () => tone(f, 0.3, 0.07, 'triangle'))); party(24, true); break;
+    case 'wrongTicket': {
+      tone(160, 0.16, 0.10, 'triangle', -90);
+      const ticket = $('tickets').querySelector(`[data-ticket="${e.ticket}"]`);
+      ticket?.animate([{ backgroundColor: '#f0927c' }, { backgroundColor: '#fff1d6' }], { duration: 350 });
+      break;
+    }
+    case 'switch':
+    case 'ticket': tone(530, 0.07, 0.06, 'triangle'); break;
     case 'fixed': tone(1047, 0.15, 0.08, 'triangle'); break;
     case 'step': word = { text: 'One more!', t: 0, kind: 'job', then: WORD[e.kind] }; break;
     case 'paid': {
@@ -410,9 +564,13 @@ cv.addEventListener('pointerdown', e => {
   e.preventDefault();
   finger = { id: e.pointerId };
   try { cv.setPointerCapture(e.pointerId); } catch {}
+  if (s.choosing) {
+    const { x, y } = toLocal(e);
+    ripple(x, y, C.amber); tone(280, 0.06, 0.05, 'triangle');
+  }
   input(s, { type: 'down', ...toLocal(e) }); drain();
 });
-function startNow() { card = 0; cardFade = 0.3; last = performance.now(); acc = 0; }
+function startNow() { $('tickets').hidden = !benchControls; card = 0; cardFade = 0.3; last = performance.now(); acc = 0; }
 cv.addEventListener('pointermove', e => {
   if (!playing || paused || !finger || e.pointerId !== finger.id) return;
   input(s, { type: 'move', ...toLocal(e) }); drain();
@@ -428,6 +586,9 @@ const rec = lab('fixit');
 rec.notice($('menu').firstElementChild);
 rec.toggle($('paused').firstElementChild);
 $('play').addEventListener('click', () => begin(only ? 'open' : 'level', qLevel ?? nextLevel()));
+for (const id of ['menuAssist', 'assist']) $(id).append($('helpIcon').content.cloneNode(true));
+$('menuAssist').addEventListener('click', () => { if (screen === 'menu' && menuHelp) begin('level', menuHelp, true); });
+$('assist').addEventListener('click', () => { if (screen === 'end' && mode === 'level' && !s.cleared && canAssist(save.attempts[lvN])) begin('level', lvN, true); });
 $('again').addEventListener('click', () => { if (performance.now() - ended > 500) begin(mode, lvN); });
 $('next').addEventListener('click', () => { if (performance.now() - ended > 500) begin('level', Math.min(COUNT, lvN + 1)); });
 $('open').addEventListener('click', () => begin('open'));
@@ -447,6 +608,7 @@ for (const id of ['sound1', 'sound2']) $(id).addEventListener('click', () => {
 function kbStep() {
   const lift = () => { if (kb.down) { input(s, { type: 'up', x: kb.x, y: kb.y }); kb.down = false; } };
   if (s.phase !== 'work') { lift(); kb.plan = []; kb.i = 0; return; }
+  if (s.choosing) { lift(); chooseTicket(s, s.stepN); return; }
   const key = `${s.cust.n}:${s.stepN}`;
   if (key !== kb.key || kb.i >= kb.plan.length) {
     lift();
@@ -461,7 +623,7 @@ const isSpace = e => e.key === ' ' || e.code === 'Space';
 addEventListener('keyup', e => { if (isSpace(e)) kbRelease(); });
 addEventListener('blur', kbRelease);
 function pause() {
-  if (!playing || paused) return;
+  if (!playing || paused || s.cleared) return;
   kbRelease(); // lift the keyboard's finger while the sim still takes input
   paused = true;
   if (finger) { input(s, { type: 'cancel', x: 0, y: 0 }); drain(); finger = null; } // the sim lets go of whatever was held
@@ -478,8 +640,8 @@ onLeave(pause);
 addEventListener('keydown', e => {
   if (isPauseKey(e)) { if (paused) resume(); else pause(); return; }
   if (isSpace(e) && playing && !paused && card > 0) { e.preventDefault(); if (!e.repeat) startNow(); return; }
-  if (isSpace(e) && playing && !paused) { e.preventDefault(); if (!kb && !finger && !e.repeat) kb = { plan: [], i: 0, key: null, x: 50, y: 110, down: false }; return; }
-  if ((e.key === 'Enter' || e.key === ' ') && !e.repeat && !playing && screen !== 'play') { const b = screen === 'menu' ? $('play') : screen === 'end' ? ($('next').style.display !== 'none' ? $('next') : $('again')) : null; if (b) { e.preventDefault(); b.click(); } }
+  if (isSpace(e) && playing && !paused && !e.target.closest?.('button')) { e.preventDefault(); if (!kb && !finger && !e.repeat) kb = { plan: [], i: 0, key: null, x: 50, y: 110, down: false }; return; }
+  if ((e.key === 'Enter' || e.key === ' ') && !e.repeat && !playing && screen !== 'play' && !e.target.closest?.('button, a, input')) { const b = screen === 'menu' ? $('play') : screen === 'end' ? ($('next').style.display !== 'none' ? $('next') : $('again')) : null; if (b) { e.preventDefault(); b.click(); } }
 });
 
 // The state the browser check reads.
@@ -487,13 +649,17 @@ window.fixitState = () => ({
   screen, playing, paused, t: s?.t ?? 0, clock: s?.clock ?? 0, day: s?.day ?? 0, over: s?.over ?? null,
   coins: s?.coins ?? 0, hearts: s?.hearts ?? 0, served: s?.served ?? 0, lost: s?.lost ?? 0, streak: s?.streak ?? 0, phase: s?.phase ?? null,
   kind: s?.rep?.kind ?? null, step: s?.stepN ?? 0, steps: s?.reps?.length ?? 0, p: s?.rep?.p ?? 0, job: s?.cust?.n ?? -1,
-  guide: s?.rep && s.phase === 'work' ? guide(s.rep) : null, hint: hintNow,
+  guide: s?.rep && s.phase === 'work' && !s.choosing ? guide(s.rep) : null, hint: hintNow,
   box: { x: boxX, y: boxY, unit }, minTouchPx: Math.min(...Object.values(HIT)) * 2 * unit,
   bank: save.bank, best: save.best, shifts: save.shifts, unlocked: [...save.unlocked], owned: [...save.owned], awning: save.awning, sound: save.sound, pending: save.pending,
   customer: s?.cust ? { n: s.cust.n, kinds: s.cust.kinds, regular: s.cust.regular, golden: s.cust.golden, left: s.cust.left, patience: s.cust.patience } : null,
   word: word?.text ?? null, confetti: confetti.length, golden: !!s?.cust?.golden, queue: s ? s.queue.map(c => c.kinds[0]) : [], daily, today, days: { ...save.days }, keyboard: !!kb, alpha: Math.min(1, acc / DT),
   people: drawn.map(p => ({ x: Math.round(p.x * 10) / 10, R: Math.round(p.R * 10) / 10, who: p.who })),
   mode, level: mode === 'level' ? lvN : null, card, goal: s ? goalState(s) : null, cleared: !!s?.cleared, stars: s ? stars(s) : 0, clearT: s?.clearT ?? null,
+  assisted: !!s?.assisted, attempts: { ...save.attempts }, assists: { ...save.assists }, growth: stallGrowth(),
+  rule: s?.lv?.rule ?? null, order: s?.lv?.tickets ? s.cust.kinds : [], choosing: !!s?.choosing,
+  station: s?.station ?? null, lanes: s?.lanes.map(c => ({ id: c.n, kind: c.kinds[c.stepN], left: c.left, done: c.done, p: c.reps[c.stepN].p })) ?? [],
+  lamp: s?.lv?.rule === 'blackout' ? calm ? 50 : lampAt(s) : null,
   levels: { ...save.levels }, times: { ...save.times }, next: nextLevel(), migrated, openStall: openStall(), dailyOpen: dailyOpen(),
 });
 
@@ -519,34 +685,56 @@ function draw(now, dt) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   const sx = shake * (Math.random() - 0.5) * 10, sy = shake * (Math.random() - 0.5) * 10;
   g.translate(sx, sy);
+  const growth = stallGrowth();
   street(t);
+  furnishings(growth);
+  if (s?.lv?.rule === 'blackout' && (playing || screen === 'end' || paused)) lampHanger();
   people(t, dt);
-  awning(t);
+  awning(t, growth);
   bench(t);
-  if (s && (playing || screen === 'end' || screen === 'paused')) job(t, dt); else idleJob(t);
+  if (s && (playing || screen === 'end' || screen === 'paused')) job(t, dt);
+  else idleJob(t);
   for (const b of bits) { const [x, y] = local(b.x, b.y); g.globalAlpha = Math.max(0, 1 - b.t / b.life); star(g, x, y, 4, b.col); g.globalAlpha = 1; }
   hud(t, dt);
-  if (has('cat')) cat(g, 38, benchTop + 8, 1.05, t, catHappy > 0);
+  if (has('cat') || growth.includes('cat')) cat(g, 38, benchTop + 8, 0.88, t, catHappy > 0);
   if (s?.lv && (playing || screen === 'paused')) goalCard(t);
 }
 function street(t) {
   // the sky moves on through the day as the map goes on: afternoon for the first chapter, sunset, then dusk
-  const sky = g.createLinearGradient(0, 0, 0, benchTop), late = s?.lv && mode === 'level' && (playing || screen !== 'menu') ? (lvN > 24 ? 2 : lvN > INTRO ? 1 : 0) : 0;
-  const SKY = [['#f7cf93', '#ee9f6a'], ['#f2a37a', '#d9705a'], ['#8a6aa0', '#e08a6a']][late];
+  const sky = g.createLinearGradient(0, 0, 0, benchTop), late = s?.lv && mode === 'level' && (playing || screen !== 'menu') ? (lvN > BUSY_END ? 3 : lvN > 24 ? 2 : lvN > INTRO ? 1 : 0) : 0;
+  const SKY = [['#f7cf93', '#ee9f6a'], ['#f2a37a', '#d9705a'], ['#8a6aa0', '#e08a6a'], ['#233048', '#655577']][late];
   sky.addColorStop(0, SKY[0]); sky.addColorStop(1, SKY[1]);
   g.fillStyle = sky; g.fillRect(-20, -20, W + 40, benchTop + 40);
-  const sun = g.createRadialGradient(W * 0.82, top + 70, 4, W * 0.82, top + 70, 120); sun.addColorStop(0, 'rgba(255,248,200,.9)'); sun.addColorStop(1, 'rgba(255,248,200,0)');
+  if (late === 3) {
+    for (let i = 0; i < 14; i++) circle(g, (37 + i * 71) % W, top + 64 + (i * 31) % 60, 1.1 + i % 2, '#f8e5b3', 0);
+  }
+  const sun = g.createRadialGradient(W * 0.82, top + 70, 4, W * 0.82, top + 70, 120); sun.addColorStop(0, late === 3 ? 'rgba(235,221,250,.20)' : 'rgba(255,248,200,.9)'); sun.addColorStop(1, 'rgba(255,248,200,0)');
   g.fillStyle = sun; g.fillRect(0, 0, W, benchTop);
   // the street behind: rooftops and windows, a little darker
   const base = benchTop - 20;
   for (let i = 0, x = -10; x < W + 20; i++) {
     const w = 60 + ((i * 37) % 40), h = 70 + ((i * 53) % 60);
-    g.fillStyle = i % 2 ? '#d98a5c' : '#cf7d52'; g.fillRect(x, base - h, w, h + 30);
+    g.fillStyle = late === 3 ? (i % 2 ? '#534364' : '#473b5a') : (i % 2 ? '#d98a5c' : '#cf7d52'); g.fillRect(x, base - h, w, h + 30);
     g.fillStyle = 'rgba(255,240,200,.45)'; for (let wy = base - h + 14; wy < base - 18; wy += 26) for (let wx = x + 10; wx < x + w - 14; wx += 22) g.fillRect(wx, wy, 10, 14);
-    g.fillStyle = '#b7643f'; g.fillRect(x - 3, base - h - 6, w + 6, 8);
+    g.fillStyle = late === 3 ? '#372e4b' : '#b7643f'; g.fillRect(x - 3, base - h - 6, w + 6, 8);
     x += w + 6;
   }
-  g.fillStyle = '#c98a62'; g.fillRect(0, base, W, benchTop - base + 2);
+  g.fillStyle = late === 3 ? '#45354d' : '#c98a62'; g.fillRect(0, base, W, benchTop - base + 2);
+}
+function furnishings(growth) {
+  if (growth.includes('shelf')) {
+    const x = W - 96, y = benchTop - 24;
+    rrect(g, x, y, 83, 9, 2, '#75432b', 2);
+    rrect(g, x + 7, y - 17, 17, 17, 3, '#cc935f', 2);
+    rrect(g, x + 29, y - 20, 12, 20, 2, '#9dc6b2', 2);
+    rrect(g, x + 49, y - 13, 24, 13, 2, '#d8ac64', 2);
+    g.fillStyle = '#fff1d6';
+    g.fillRect(x + 32, y - 14, 6, 3);
+  }
+  if (growth.includes('sign')) {
+    rrect(g, 12, benchTop - 88, 67, 35, 7, '#184b49', 2);
+    ink('FIX-IT', 45, benchTop - 69, 13, '#ffe5a0', 'center');
+  }
 }
 const QUEUE_GAP = () => Math.min(92, W * 0.22);
 function custTarget(i) { return { x: W / 2 - QUEUE_GAP() * (i + 0.95) - 10, R: Math.max(13, 23 - i * 3), base: benchTop - 26 - i * 3 }; }
@@ -555,7 +743,12 @@ function people(t, dt) {
     person(g, W / 2, benchTop + 6, 32, looks(12345), 'happy', t, { cheer: 0.5 + 0.5 * Math.sin(t * 3), bob: Math.sin(t * 2) * 2 });
     return;
   }
-  const R = Math.min(34, (benchTop - top - 70) / 3.4);
+  if (s.lv?.rule === 'rush') {
+    rushPeople(t);
+    return;
+  }
+  const boss = s.lv?.rule === 'boss' && s.reps.length === 3;
+  const R = Math.min(boss ? 37 : 34, (benchTop - top - 70) / 3.4);
   const ease = k => 1 - Math.exp(-dt * k);
   // where everybody wants to be this frame: the customer at the counter, then the queue
   const c = s.cust, csp = spots.get(c.n) ?? { x: custTarget(0).x, R: custTarget(0).R, base: custTarget(0).base };
@@ -592,7 +785,8 @@ function people(t, dt) {
   const sp = csp;
   if (spots.size > 12) for (const k of [...spots.keys()]) if (k < c.n - 2) spots.delete(k);
   const frac = V.left / c.patience, mood = s.phase === 'works' ? 'happy' : s.phase === 'leave' ? 'cross' : frac > 0.5 ? 'ok' : frac > 0.25 ? 'wait' : 'cross';
-  const L = c.regular ? REGULAR : looks(c.look);
+  const L = boss ? { ...looks(c.look), shirt: '#684a88', hat: 9, glasses: true }
+    : c.regular ? REGULAR : looks(c.look);
   const cheer = s.phase === 'works' ? Math.sin((1 - V.phaseT / WORKS) * Math.PI) : 0;
   if (c.golden) aura(sp.x, sp.base - sp.R * 1.3, sp.R * 2.4, t);
   drawn.push({ x: sp.x, R: sp.R, who: 'counter' });
@@ -603,11 +797,47 @@ function people(t, dt) {
     g.lineCap = 'round';
     g.strokeStyle = 'rgba(58,34,22,.25)'; g.lineWidth = 7; g.beginPath(); g.arc(hx, hy, rr * pulse, 0, Math.PI * 2); g.stroke();
     g.strokeStyle = col; g.lineWidth = 6; g.beginPath(); g.arc(hx, hy, rr * pulse, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac); g.stroke();
-    // a notch at the half-way mark: fixed before the ring runs down to it counts as quick
-    g.strokeStyle = C.ink; g.lineWidth = 2.5; g.beginPath(); g.moveTo(hx, hy + rr * pulse - 6); g.lineTo(hx, hy + rr * pulse + 6); g.stroke();
+    // The quick-pay notch marks the same elapsed time even when the ring drains slower.
+    const notch = -Math.PI / 2 + 2 * Math.PI * (1 - 0.5 * (s.assisted ? ASSIST_RATE : 1));
+    const nx = Math.cos(notch), ny = Math.sin(notch);
+    g.strokeStyle = C.ink; g.lineWidth = 2.5; g.beginPath();
+    g.moveTo(hx + nx * (rr * pulse - 6), hy + ny * (rr * pulse - 6));
+    g.lineTo(hx + nx * (rr * pulse + 6), hy + ny * (rr * pulse + 6)); g.stroke();
   }
+  if (s.phase === 'works') reactionMark(hx + sp.R * 1.56, hy - sp.R * 0.67, cheer, true);
+  else if (s.phase === 'leave' || frac < 0.2) reactionMark(hx + sp.R * 1.54, hy - sp.R * 0.67, 0.8, false);
   counter = { n: c.n, x: sp.x, base: sp.base, R: sp.R, L, happy: s.phase === 'works' || (counter?.n === c.n && counter.happy) };
 }
+function rushPeople(t) {
+  const R = Math.min(27, (benchTop - top - 90) / 3.35);
+  const meters = $('tickets').querySelectorAll('.lane i');
+  s.lanes.forEach((c, i) => {
+    const x = W / 2 + (i - 0.5) * Math.min(W * 0.44, 180);
+    const frac = c.left / c.patience;
+    const cheer = c.done ? 0.9 : 0;
+    const { hx, hy } = person(g, x, benchTop + 2, R, looks(c.look),
+      c.done ? 'happy' : frac < 0.25 ? 'cross' : frac < 0.5 ? 'wait' : 'ok', t,
+      { cheer, blinkSeed: c.n, bob: calm ? 0 : Math.sin(t * 3 + i) * 2 });
+    circle(g, hx, hy, R * 1.38, 'transparent', 2);
+    if (!c.done) {
+      g.strokeStyle = frac < 0.3 ? '#ea8c7a' : '#9ee1c0';
+      g.lineWidth = i === s.station ? 5 : 3;
+      g.beginPath(); g.arc(hx, hy, R * 1.38, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac); g.stroke();
+    }
+    if (c.done || frac < 0.2) reactionMark(hx + R * 1.6, hy - R * 0.7, 0.9, c.done);
+    if (meters[i]) {
+      meters[i].style.transform = `scaleX(${c.done ? 1 : frac})`;
+      meters[i].style.backgroundColor = frac < 0.3 && !c.done ? '#a0342f' : '#247963';
+    }
+    drawn.push({ x, R, who: 'counter' });
+  });
+}
+function reactionMark(x, y, strength, happy) {
+  circle(g, x, y, 10 + strength * 2, happy ? '#f8d481' : '#f5aa93', 1.7);
+  if (happy) starShape(g, x, y, 6, '#fff3bf');
+  else ink('!', x, y + 1, 13, '#fff1d6', 'center');
+}
+
 // A golden customer glows and sparkles, in the queue and at the counter.
 function aura(x, y, r, t) {
   const gl = g.createRadialGradient(x, y, r * 0.2, x, y, r);
@@ -617,7 +847,7 @@ function aura(x, y, r, t) {
 }
 let counter = null; // the customer last drawn at the counter; they walk off when the next one steps up
 function walkOff() { if (counter && s.cust && counter.n !== s.cust.n && !leaving.some(l => l.n === counter.n)) leaving.push({ ...counter, t: 0 }); }
-function awning(t) {
+function awning(t, growth) {
   const [a, b] = AWNING[save.awning] ?? AWNING.teal, y0 = top + 50, h = 26, w = 30;
   g.fillStyle = '#6a3a1f'; g.fillRect(0, y0 - 6, W, 6);
   for (let i = 0, x = 0; x < W; i++, x += w) {
@@ -625,9 +855,14 @@ function awning(t) {
     g.beginPath(); g.arc(x + w / 2, y0 + h, w / 2, 0, Math.PI); g.fill();
   }
   g.strokeStyle = C.ink; g.lineWidth = 2; g.beginPath(); g.moveTo(0, y0); g.lineTo(W, y0); g.stroke();
-  if (has('lights')) for (let x = 15, i = 0; x < W; x += 30, i++) { const on = Math.sin(t * 3 + i) > -0.3; g.fillStyle = on ? ['#fff3a8', '#ffb46a', '#9ff0e0'][i % 3] : '#9a8a70'; if (on) { g.shadowColor = '#ffe08a'; g.shadowBlur = 10; } g.beginPath(); g.arc(x, y0 + h + 18, 5, 0, Math.PI * 2); g.fill(); g.shadowBlur = 0; }
+  if (has('lights') || growth.includes('lights')) for (let x = 15, i = 0; x < W; x += 30, i++) { const on = Math.sin(t * 3 + i) > -0.3; g.fillStyle = on ? ['#fff3a8', '#ffb46a', '#9ff0e0'][i % 3] : '#9a8a70'; if (on) { g.shadowColor = '#ffe08a'; g.shadowBlur = 10; } g.beginPath(); g.arc(x, y0 + h + 18, 5, 0, Math.PI * 2); g.fill(); g.shadowBlur = 0; }
   if (has('charm')) { g.strokeStyle = C.ink; g.lineWidth = 1.5; g.beginPath(); g.moveTo(W - 34, y0 + h + 10); g.lineTo(W - 34, y0 + h + 22); g.stroke(); g.lineWidth = 8; g.lineCap = 'round'; g.beginPath(); g.arc(W - 34, y0 + h + 34, 10, Math.PI * 0.85, Math.PI * 2.15, true); g.stroke(); g.strokeStyle = C.steelLt; g.lineWidth = 4.5; g.stroke(); }
-  if (has('radio')) { rrect(g, W - 64, benchTop - 22, 40, 26, 5, C.copper, 2); circle(g, W - 52, benchTop - 9, 7, C.cream, 1.6); g.fillStyle = C.ink; g.fillRect(W - 40, benchTop - 16, 10, 3); g.fillRect(W - 40, benchTop - 9, 10, 3); }
+  if (has('radio')) {
+    const x = W - 64, y = benchTop - (growth.includes('shelf') ? 48 : 22);
+    rrect(g, x, y, 40, 26, 5, C.copper, 2);
+    circle(g, x + 12, y + 13, 7, C.cream, 1.6);
+    g.fillStyle = C.ink; g.fillRect(x + 24, y + 6, 10, 3); g.fillRect(x + 24, y + 13, 10, 3);
+  }
 }
 function bench(t) {
   const wood = g.createLinearGradient(0, benchTop, 0, H);
@@ -640,6 +875,23 @@ function bench(t) {
   const cx = boxX + S / 2, cy = boxY + S / 2, glow = g.createRadialGradient(cx, cy, S * 0.1, cx, cy, S * 0.62);
   glow.addColorStop(0, 'rgba(255,230,180,.55)'); glow.addColorStop(1, 'rgba(255,230,180,0)');
   g.fillStyle = glow; g.fillRect(cx - S, cy - S, 2 * S, 2 * S);
+}
+const beamX = () => boxX + S * (calm ? 0.5 : lampAt(s) / 100);
+const shadeX = () => W / 2 + (beamX() - W / 2) * 0.55;
+function lampHanger() {
+  g.strokeStyle = '#262238'; g.lineWidth = 3;
+  g.beginPath(); g.moveTo(W / 2, top + 84); g.lineTo(shadeX(), benchTop + 13); g.stroke();
+}
+function blackout() {
+  const x = beamX(), y = boxY + S * 0.42;
+  const glow = g.createRadialGradient(x, y, S * 0.1, x, y, S * (calm ? 0.72 : 0.58));
+  glow.addColorStop(0, 'rgba(23,24,45,0)');
+  glow.addColorStop(0.52, 'rgba(23,24,45,0.09)');
+  glow.addColorStop(1, 'rgba(16,18,41,0.76)');
+  g.fillStyle = glow; g.fillRect(-12, benchTop + 12, W + 24, H - benchTop);
+  const lampY = benchTop + 13, lampX = shadeX();
+  rrect(g, lampX - 14, lampY - 7, 28, 14, 7, '#d38749', 2);
+  rrect(g, lampX - 10, lampY + 3, 20, 6, 3, '#fff1ba', 0);
 }
 function job(t, dt) {
   const r = s.rep, cx = boxX + S / 2, cy = boxY + S / 2;
@@ -658,7 +910,18 @@ function job(t, dt) {
   g.scale(k * (1 + 0.02 * squash), k);
   g.globalAlpha = 1 - gone;
   g.translate(-S / 2, -S / 2); g.scale(unit, unit);
-  drawJob(g, V.reps, s.stepN, t, works);
+  if (s.lv?.rule === 'boss' && s.reps.length === 3) {
+    rrect(g, 3, 8, 94, 86, 13, '#5d5664', 1.3);
+    rrect(g, 7, 12, 86, 78, 10, '#c9b49a', 1.1);
+    for (const x of [11, 89]) for (const y of [16, 86]) circle(g, x, y, 2, '#f0cf9f', 0.8);
+  }
+  if (s.choosing) {
+    rrect(g, 19, 24, 62, 51, 7, '#c38e5c', 1.4);
+    rrect(g, 24, 29, 52, 41, 5, '#d6a374', 1.1);
+    goalIcon(g, 'list', 50, 50, 12);
+  } else if (s.lv?.tickets) drawJob(g, [V.reps[s.stepN]], 0, t, works);
+  else drawJob(g, V.reps, s.stepN, t, works);
+  $('tickets').classList.toggle('prompt', s.choosing && s.rep.idle >= 1.5);
   if (s.cust.regular) drawSilly(g, sillyList(save.regular), t);
   // the hint: a ghost finger doing the gesture on the thing
   hintNow = playing && !paused ? hint(s, seenBase) : 0;
@@ -670,19 +933,22 @@ function job(t, dt) {
   for (const p of ripples) { g.strokeStyle = p.col; g.globalAlpha = Math.max(0, 1 - p.t * 3); g.lineWidth = 2; g.beginPath(); g.arc(p.x, p.y, 6 + p.t * 60, 0, Math.PI * 2); g.stroke(); }
   g.restore();
   g.globalAlpha = 1;
+  if (s.lv?.rule === 'blackout') blackout();
   // the word: what to do, or how it went. Above the object, never under the finger.
-  if (word) {
-    const a = word.t < 0.15 ? word.t / 0.15 : 1, big = word.kind === 'job' ? 30 : 34;
+  if (word || s.choosing) {
+    const sequence = ['①', '②', '③'].slice(0, s.reps.length).map((n, i) => i < s.stepN ? '✓' : n);
+    const current = s.choosing ? { text: sequence.join(' → '), t: 1, kind: 'job' } : word;
+    const a = current.t < 0.15 ? current.t / 0.15 : 1, big = current.kind === 'job' ? 30 : 34;
     g.save(); g.translate(W / 2, boxY - 18); g.scale(0.8 + 0.2 * a, 0.8 + 0.2 * a);
     g.font = `bold ${big}px ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.lineWidth = 6; g.strokeStyle = C.ink; g.lineJoin = 'round'; g.strokeText(word.text, 0, 0);
-    g.fillStyle = word.kind === 'good' ? '#9ff0b0' : word.kind === 'gold' ? '#ffd860' : word.kind === 'bad' ? '#ffb0a0' : '#fff6e4';
-    if (word.streak >= 2 && !calm) g.rotate(Math.sin(word.t * 30) * 0.06 * Math.max(0, 1 - word.t * 2));
-    g.fillText(word.text, 0, 0);
+    g.lineWidth = 6; g.strokeStyle = C.ink; g.lineJoin = 'round'; g.strokeText(current.text, 0, 0);
+    g.fillStyle = current.kind === 'good' ? '#9ff0b0' : current.kind === 'gold' ? '#ffd860' : current.kind === 'bad' ? '#ffb0a0' : '#fff6e4';
+    if (current.streak >= 2 && !calm) g.rotate(Math.sin(current.t * 30) * 0.06 * Math.max(0, 1 - current.t * 2));
+    g.fillText(current.text, 0, 0);
     g.restore();
-    if (s.reps.length > 1 && s.phase === 'work') for (let i = 0; i < s.reps.length; i++) circle(g, W / 2 - 10 + i * 20, boxY + 6, 6, i < s.stepN ? '#7fe0a0' : i === s.stepN ? C.cream : 'rgba(255,255,255,.3)', 2);
+    if (s.reps.length > 1 && s.phase === 'work' && !benchControls) for (let i = 0; i < s.reps.length; i++) circle(g, W / 2 - 10 + i * 20, boxY + 6, 6, i < s.stepN ? '#7fe0a0' : i === s.stepN ? C.cream : 'rgba(255,255,255,.3)', 2);
   }
-  if (banner) {
+  if (banner && !benchControls && s.lv?.rule !== 'blackout') {
     const a = Math.min(1, banner.t * 6) * Math.min(1, (1.6 - banner.t) * 4);
     if (a > 0) { g.save(); g.globalAlpha = a; g.translate(W / 2, benchTop - 8); g.rotate(-0.04); rrect(g, -78, -20, 156, 40, 14, banner.gold ? '#ffd860' : C.amber, 3); g.font = 'bold 22px ui-rounded, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = C.ink; g.fillText(banner.text, 0, 1); g.restore(); }
   }
@@ -707,6 +973,13 @@ function hud(t, dt) {
     const bx = W / 2 - 16 + g.measureText(String(shownCoins)).width + 10, k = 1 + 0.5 * multPop * (calm ? 0.3 : 1);
     g.save(); g.translate(bx + 17, y + 16); g.scale(k, k); rrect(g, -17, -12, 34, 24, 10, multPop > 0.01 ? C.amber : C.teal, 2); g.fillStyle = '#fff6e4'; g.font = 'bold 16px ui-rounded, sans-serif'; g.textAlign = 'center'; g.fillText(`x${m}`, 0, 1); g.restore();
   }
+  // Eight clean fixes build the pay multiplier. The bar resets when a fix is late.
+  const bx = W - 106, by = Math.max(benchTop + 16, boxY + S + 8);
+  rrect(g, bx - 38, by - 9, 136, 28, 11, 'rgba(45,27,21,.86)', 1.5);
+  ink('COMBO', bx - 31, by + 5, 10, '#f9ddae');
+  for (let i = 0; i < 8; i++) {
+    rrect(g, bx + 13 + i * 10, by, 7, 10, 2, i < s.streak ? (i < 4 ? '#93ddba' : '#ffd27d') : '#765943', 0);
+  }
   if (s.lv) goalBar(t);
   else { // the day: a sun travelling along a line from open to close
     const x0 = 14, x1 = W - 66, ly = top + 44, f = s.cust?.tutor ? 0 : Math.min(1, (V?.clock ?? s.clock) / s.day);
@@ -727,6 +1000,21 @@ function hud(t, dt) {
 // The goal, live: a pill with each part's icon and count, then the level clock as a bar with the star times marked on
 // it. A timed level's bar runs out at the limit; an untimed one shows how long the stars stay in reach.
 const ink = (text, x, y, size, col = '#fff6e4', align = 'left') => { g.font = `bold ${size}px ui-rounded, 'Arial Rounded MT Bold', sans-serif`; g.textAlign = align; g.textBaseline = 'middle'; g.lineWidth = Math.max(3, size / 5); g.strokeStyle = C.ink; g.lineJoin = 'round'; g.strokeText(text, x, y); g.fillStyle = col; g.fillText(text, x, y); return g.measureText(text).width; };
+function objectiveIcon(kind, x, y, r, t) {
+  if (kind === 'coins') {
+    rrect(g, x - r * 0.83, y - r, r * 1.66, r * 2, 3, '#cae9cc', 1.6);
+    ink('¢', x, y + 1, r * 1.45, '#fff1d6', 'center');
+  } else if (kind === 'rush') {
+    for (const side of [-1, 1]) circle(g, x + side * r * 0.43, y, r * 0.57, '#ffdb9e', 1.5);
+  } else if (kind === 'blackout') {
+    rrect(g, x - r * 0.76, y - r * 0.65, r * 1.52, r * 0.94, 4, '#ffd783', 1.6);
+    g.fillStyle = '#ffe3a9';
+    g.beginPath(); g.moveTo(x - r * 0.35, y + r * 0.36); g.lineTo(x + r * 0.35, y + r * 0.36);
+    g.lineTo(x + r * 0.8, y + r); g.lineTo(x - r * 0.8, y + r); g.fill();
+  } else if (kind === 'boss') {
+    for (let i = 0; i < 3; i++) rrect(g, x + (i - 1.5) * r * 0.67, y - r * 0.45, r * 0.58, r * 0.9, 2, '#e4c8f5', 1.3);
+  } else goalIcon(g, kind === 'order' ? 'list' : kind, x, y, r, t);
+}
 function goalBar(t) {
   const gs = goalState(s), ly = top + 47, lv = s.lv;
   let x = 10;
@@ -736,7 +1024,7 @@ function goalBar(t) {
   rrect(g, x, ly - 15, w, 30, 15, gs.met ? '#3f9e6a' : 'rgba(58,34,22,.72)', 2);
   x += 8;
   for (const p of parts) {
-    goalIcon(g, p.kind, x + 10, ly, 10, t);
+    objectiveIcon(p.kind, x + 10, ly, 10, t);
     x += 24 + ink(p.text, x + 24, ly + 1, 17, p.have >= p.need ? '#9ff0b0' : '#fff6e4') + 8;
   }
   if (gs.safe) { heart(g, x + 8, ly - 10, 18, s.lost === 0); x += 22; }
@@ -747,7 +1035,7 @@ function goalBar(t) {
   g.strokeStyle = 'rgba(58,34,22,.4)'; g.lineWidth = 8; g.beginPath(); g.moveTo(x0, ly); g.lineTo(x1, ly); g.stroke();
   const late = gs.time && gs.time - now < 10 && !s.cleared;
   g.strokeStyle = late ? (Math.sin(t * 12) > 0 ? C.red : '#ffb0a0') : '#fff6e4'; g.lineWidth = 5; g.beginPath(); g.moveTo(x0, ly); g.lineTo(x0 + (x1 - x0) * f, ly); g.stroke();
-  for (const [i, k] of [[0, 3], [1, 2]]) { // star marks under the bar: bright while still in reach
+  for (const [i, k] of (s.assisted ? [[1, 2]] : [[0, 3], [1, 2]])) { // star marks under the bar: bright while still in reach
     const tx = x0 + (x1 - x0) * Math.min(1, lv.stars[i] / span), gone = (s.cleared ? s.clearT : now) > lv.stars[i];
     g.strokeStyle = C.ink; g.lineWidth = 2; g.beginPath(); g.moveTo(tx, ly - 6); g.lineTo(tx, ly + 6); g.stroke();
     starShape(g, tx, ly + 14, k === 3 ? 7 : 5.5, gone ? 'rgba(255,255,255,.3)' : k === 3 ? '#ffd860' : '#f3ead8'); // gold: three stars; pale: two
@@ -769,15 +1057,16 @@ function goalCard(t) {
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = C.copper;
   ink(`Level ${lv.n}`, W / 2, yy, 28, C.copperLt, 'center'); yy += 34;
   if (lv.intro) { g.font = 'bold 17px ui-rounded, sans-serif'; g.fillStyle = C.tealDk; g.fillText(`New job: the ${OBJECT[lv.intro]}`, W / 2, yy); yy += 30; }
-  const icons = [lv.goal.list ? 'list' : lv.goal.fix ? 'fix' : null, lv.goal.coins ? 'coins' : null, lv.goal.time ? 'time' : null, lv.goal.safe || lv.goal.list ? 'safe' : null].filter(Boolean);
-  icons.forEach((k, i) => goalIcon(g, k, W / 2 + (i - (icons.length - 1) / 2) * 44, yy + 4, 15, t));
+  const icons = [lv.rule, lv.goal.list ? 'list' : lv.goal.fix ? 'fix' : null, lv.goal.coins ? 'coins' : null, lv.goal.time ? 'time' : null, lv.goal.safe || lv.goal.list ? 'safe' : null].filter(Boolean);
+  icons.forEach((k, i) => objectiveIcon(k, W / 2 + (i - (icons.length - 1) / 2) * 44, yy + 4, 15, t));
   yy += 34;
   g.font = 'bold 20px ui-rounded, sans-serif'; g.fillStyle = C.ink;
   for (const l of lines) { g.fillText(l, W / 2, yy); yy += 26; }
   g.font = 'bold 16px ui-rounded, sans-serif';
-  const sw = g.measureText(`in ${lv.stars[0]} s or less`).width + 46;
-  for (let j = 0; j < 3; j++) starShape(g, W / 2 - sw / 2 + 6 + j * 13, yy + 1, 7, '#ffd860');
-  g.fillStyle = 'rgba(58,34,22,.85)'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(`in ${lv.stars[0]} s or less`, W / 2 - sw / 2 + 46, yy + 2); g.textAlign = 'center';
+  const target = s.assisted ? 2 : 3, label = `in ${lv.stars[3 - target]} s or less`, gap = 7 + target * 13;
+  const sw = g.measureText(label).width + gap;
+  for (let j = 0; j < target; j++) starShape(g, W / 2 - sw / 2 + 6 + j * 13, yy + 1, 7, '#ffd860');
+  g.fillStyle = 'rgba(58,34,22,.85)'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(label, W / 2 - sw / 2 + gap, yy + 2); g.textAlign = 'center';
   yy += 26;
   if (card > 0) { g.globalAlpha = a * (0.75 + 0.25 * Math.sin(t * 5)); g.font = 'bold 17px ui-rounded, sans-serif'; g.fillStyle = C.tealDk; g.fillText('Tap to start', W / 2, yy); }
   g.restore();
@@ -822,5 +1111,10 @@ const TUNE = [523, 659, 784, 659, 587, 698, 880, 698, 523, 659, 784, 1047, 988, 
 let radioN = 0;
 function radio() { const f = TUNE[radioN % TUNE.length]; if (f) tone(f, 0.22, 0.025, 'triangle'); if (radioN % 4 === 0) tone([131, 175, 196, 131][(radioN >> 2) % 4], 0.5, 0.03, 'sine'); radioN++; }
 
+kitHint(cv, {
+  kind: 'hold-and-move', key: 'fixit:hint', played: save.served > 0,
+  when: () => playing && !paused && !card && s.lv?.n === 1 && s.cust.n === 0,
+  delay: 3500, reach: 30, bottom: 64, label: 'Circle the screw',
+});
 show('menu');
 requestAnimationFrame(frame);

@@ -72,6 +72,28 @@ export function plan(g, skill, from = [50, 110], lead = 0) {
       const p0 = onArc(g.cx, g.cy, g.r, g.from);
       return [...air(p0), at('down', p0), ...arc(g.cx, g.cy, g.r, g.from, g.to + 15, v), ...wait(0.6).map(() => at('move', onArc(g.cx, g.cy, g.r, g.to + 15))), at('up', onArc(g.cx, g.cy, g.r, g.to + 15))];
     }
+    case 'wind': {
+      const start = onArc(g.cx, g.cy, g.r, g.from), out = [...air(start), at('down', start)];
+      let a = g.from;
+      for (const target of g.targets) {
+        out.push(...arc(g.cx, g.cy, g.r, a, target, v));
+        a = target;
+      }
+      out.push(at('up', onArc(g.cx, g.cy, g.r, a)));
+      return out;
+    }
+    case 'balance': {
+      const out = [...air(g.from), at('down', g.from)];
+      let p = g.from;
+      for (const x of g.targets) {
+        const q = [x, p[1]], travel = line(p, q, v);
+        const settle = Math.max(0, Math.abs(x - p[0]) / g.rate - travel.length * DT) + 0.22;
+        out.push(...travel, ...wait(g.hold + settle));
+        p = q;
+      }
+      out.push(at('up', p));
+      return out;
+    }
     case 'path': { // follow a polyline, then keep the finger at its end while the part catches up
       const out = [...air(g.pts[0]), at('down', g.pts[0])];
       for (let i = 1; i < g.pts.length; i++) out.push(...line(g.pts[i - 1], g.pts[i], v));
@@ -130,6 +152,14 @@ export function ghost(g, t) {
     case 'flick': { const m = ease(Math.min(1, (k % 0.5) / 0.3)); return { p: onArc(g.cx, g.cy, g.r, 200 + 150 * m), press: (k % 0.5) < 0.3 }; }
     case 'rub': { const m = Math.sin(k * Math.PI * 6); return { p: [g.cx + m * g.w / 2, g.cy], press: k < 0.92 }; }
     case 'arc': { const m = ease(Math.min(1, k / 0.75)); return { p: onArc(g.cx, g.cy, g.r, g.from + (g.to - g.from) * m), press: k < 0.85 }; }
+    case 'wind': {
+      const target = g.targets[0] ?? g.from, m = ease(Math.min(1, k / 0.7));
+      return { p: onArc(g.cx, g.cy, g.r, g.from + (target - g.from) * m), press: k < 0.9 };
+    }
+    case 'balance': {
+      const target = g.targets[0] ?? g.from[0], m = ease(Math.min(1, k / 0.5));
+      return { p: [g.from[0] + (target - g.from[0]) * m, g.from[1]], press: k < 0.9 };
+    }
     case 'path': { // along the polyline at an even pace
       const L = []; let tot = 0; for (let i = 1; i < g.pts.length; i++) { L.push(Math.hypot(g.pts[i][0] - g.pts[i - 1][0], g.pts[i][1] - g.pts[i - 1][1])); tot += L.at(-1); }
       let d = Math.min(1, k / 0.8) * tot, i = 0; while (i < L.length - 1 && d > L[i]) { d -= L[i]; i++; }

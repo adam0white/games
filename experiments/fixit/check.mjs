@@ -12,6 +12,7 @@ import { gunzipSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import { plan, SKILLS } from './moves.js';
 import { KINDS } from './sim.js';
+import { COUNT } from './levels.js';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '..');
 const SHOTS = process.env.SHOTS || join(tmpdir(), 'fixit-shots'); // the build brief sets SHOTS to a scratch folder
@@ -39,12 +40,13 @@ const SKILL = { ...SKILLS.competent, react: 0 };
 
 // Do the job on the bench with real touch pointer events, one step per animation frame, the way a thumb would.
 // The path comes from moves.js, built from the job's own guide; if the job is not done when the path ends, plan again.
-async function doJob(page, label, pointerType = 'touch') {
-  const st0 = await state();
+async function doJob(page, label, pointerType = 'touch', singleStage = false) {
+  const st0 = await state(page);
   const job = st0.job;
   for (let tries = 0; tries < 15; tries++) {
-    const st = await state();
+    const st = await state(page);
     if (st.job !== job || st.over || st.phase !== 'work' || !st.guide) break;
+    if (singleStage && st.step !== st0.step) break;
     const steps = plan(st.guide, SKILL, [50, 110]).map(p => p && { type: p.type, x: st.box.x + p.x * st.box.unit, y: st.box.y + p.y * st.box.unit });
     await page.evaluate(async ([steps, job, stepN, pointerType]) => {
       const el = document.getElementById('c'); let last = null;
@@ -58,7 +60,7 @@ async function doJob(page, label, pointerType = 'touch') {
       if (last && last.type !== 'up') send('up', last.x, last.y);
     }, [steps, job, st.step, pointerType]);
   }
-  const done = await state();
+  const done = await state(page);
   return done;
 }
 // Do the job with the keyboard: hold Space until the job is done, then let go.
@@ -89,6 +91,24 @@ async function startLevel(page) {
   await page.evaluate(([x, y]) => { const el = document.getElementById('c'); for (const t of ['down', 'up']) el.dispatchEvent(new PointerEvent('pointer' + t, { pointerId: 2, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, bubbles: true, cancelable: true })); }, [st.box.x + 50 * st.box.unit, st.box.y + 50 * st.box.unit]);
   await until(page, () => window.fixitState().card === 0, 'the goal card to go');
 }
+async function startAt(page, level) {
+  await page.goto(`${base}/fixit/?level=${level}`);
+  await page.click('#play');
+  await startLevel(page);
+  return state(page);
+}
+async function touch(page, points) {
+  const { box } = await state(page);
+  await page.evaluate(({ box, points }) => {
+    const canvas = document.getElementById('c');
+    for (const [type, x, y] of points) {
+      canvas.dispatchEvent(new PointerEvent(`pointer${type}`, {
+        pointerId: 17, pointerType: 'touch', isPrimary: true, bubbles: true, cancelable: true,
+        clientX: box.x + x * box.unit, clientY: box.y + y * box.unit,
+      }));
+    }
+  }, { box, points });
+}
 // Play every customer until the level or shift ends.
 async function playOut(page, label, shot) {
   for (let i = 0; i < 60; i++) {
@@ -104,6 +124,79 @@ async function playOut(page, label, shot) {
 }
 const runs = (ctx, outcome) => ctx.labSent.filter(r => r.game === 'fixit' && r.kind === 'run' && (!outcome || r.data.outcome === outcome));
 const levelsUpTo = n => Object.fromEntries(Array.from({ length: n }, (_, i) => [i + 1, 1]));
+const threeStarsUpTo = n => Object.fromEntries(Array.from({ length: n }, (_, i) => [i + 1, 3]));
+
+async function chapter(page, phone) {
+  await setSave(page, { bank: 20, sound: false, levels: threeStarsUpTo(32) });
+  await page.goto(`${base}/fixit/`);
+  assert.deepEqual((await state(page)).growth, ['shelf', 'sign', 'lights', 'cat'], 'stars finish growing the stall');
+  assert.ok(!(await page.locator('.lv[data-level="33"]').isDisabled()), 'clearing chapter two opens chapter three');
+  assert.ok(await page.locator('.lv[data-level="34"]').isDisabled(), 'chapter three still unlocks in order');
+
+  let st = await startAt(page, 33);
+  assert.ok(st.rule === 'order' && st.choosing && st.order.length > 1, 'picky order is shown before the first repair');
+  await page.screenshot({ path: join(SHOTS, `${phone}-chapter-order.png`) });
+  const wrong = (st.step + 1) % st.order.length;
+  await page.locator(`.ticket[data-ticket="${wrong}"]`).click();
+  const rejected = await state(page);
+  assert.ok(rejected.choosing && rejected.step === st.step, 'a wrong ticket leaves the correct repair pending');
+  assert.ok(rejected.customer.left <= st.customer.left - 0.5, 'a wrong ticket costs patience');
+  const first = st.step;
+  await page.locator(`.ticket[data-ticket="${first}"]`).click();
+  st = await state(page);
+  assert.ok(!st.choosing && st.kind === st.order[first], 'the first shown ticket opens its repair');
+  st = await doJob(page, 'ordered repair', 'touch', true);
+  assert.ok(st.choosing && st.step === first + 1, 'completing one repair reveals the next ticket choice');
+  await leave(page);
+
+  st = await startAt(page, 34);
+  assert.ok(st.rule === 'rush' && st.lanes.length === 2 && st.lanes.every(l => !l.done), 'rush opens two customers at once');
+  await page.screenshot({ path: join(SHOTS, `${phone}-chapter-rush.png`) });
+  const from = st.station, to = 1 - from;
+  const waited = st.lanes.map(l => l.left);
+  await sleep(250);
+  st = await state(page);
+  assert.ok(st.lanes.every((l, i) => l.left < waited[i]), 'both rush customers lose patience during play');
+  await page.locator(`.lane[data-lane="${to}"]`).click();
+  st = await state(page);
+  assert.equal(st.station, to, 'the other ticket takes over the repair bench');
+  assert.equal(st.kind, st.lanes[to].kind, 'switching shows the other job');
+  assert.equal(st.kind, 'dent', 'the other customer brings a kettle');
+  const [x, y] = st.guide.at;
+  await touch(page, [['down', x, y], ['up', x, y]]);
+  const partial = (await state(page)).p;
+  assert.ok(partial > 0 && partial < 1, 'one touch fixes only one dent');
+  await page.locator(`.lane[data-lane="${from}"]`).click();
+  assert.equal((await state(page)).station, from, 'the first customer remains selectable');
+  await page.locator(`.lane[data-lane="${to}"]`).click();
+  assert.equal((await state(page)).p, partial, 'switching back preserves an unfinished repair');
+  await playJob(page, 'second rush customer');
+  await leave(page);
+
+  st = await startAt(page, 35);
+  assert.equal(st.rule, 'blackout');
+  assert.ok(Number.isFinite(st.lamp), 'blackout has a moving light');
+  await until(page, x => Math.abs(window.fixitState().lamp - x) > 4, 'the lamp to swing', 4000, st.lamp);
+  await page.screenshot({ path: join(SHOTS, `${phone}-chapter-blackout.png`) });
+  await page.click('#pause');
+  const stopped = (await state(page)).lamp;
+  await sleep(250);
+  assert.equal((await state(page)).lamp, stopped, 'the lamp freezes on pause');
+  await page.click('#resume');
+  await playJob(page, 'a blackout repair');
+  await leave(page);
+
+  st = await startAt(page, 36);
+  for (let i = 0; i < 2; i++) st = await playJob(page, `boss lead-in customer ${i + 1}`);
+  assert.ok(st.rule === 'boss' && st.steps === 3, 'the boss brings three repair stages');
+  await page.screenshot({ path: join(SHOTS, `${phone}-chapter-boss.png`) });
+  const stage = await doJob(page, 'first boss stage', 'touch', true);
+  assert.ok(stage.job === st.job && stage.step === 1 && stage.served === st.served, 'the boss keeps the same customer after stage one');
+  const done = await playJob(page, 'remaining boss stages');
+  assert.equal(done.served, st.served + 1, 'the boss pays after all three stages');
+  if (done.playing) await leave(page);
+  else await until(page, () => window.fixitState().screen === 'end', 'boss end card');
+}
 
 async function run(page, phone) {
   cur = page;
@@ -113,8 +206,15 @@ async function run(page, phone) {
   await page.reload();
   await until(page, () => window.fixitState && window.fixitState().screen === 'menu', 'menu');
   assert.match(await page.textContent('#menu'), /The game lab records play/, 'lab notice on the menu');
-  // The map: 32 numbered levels, level 1 marked next, the rest locked; no open or daily stall yet.
-  assert.equal(await page.locator('.lv').count(), 32, 'the map shows 32 levels');
+  // The map: three chapters, level 1 marked next, the rest locked; no open or daily stall yet.
+  assert.ok(COUNT >= 44, 'the campaign has at least 44 levels');
+  assert.equal(await page.locator('.lv').count(), COUNT, 'the map shows every level');
+  const chapters = page.locator('#chapterTabs button');
+  assert.equal(await chapters.count(), 3, 'the map has three chapters');
+  await chapters.nth(2).click();
+  const night = page.locator('.lv[data-level="33"]');
+  assert.ok(await night.isVisible() && await night.isDisabled(), 'the third tab shows the locked third chapter');
+  await chapters.nth(0).click();
   assert.ok(await page.locator('.lv.next[data-level="1"]').count() === 1 && await page.locator('.lv[data-level="2"]').isDisabled(), 'level 1 next, level 2 locked');
   assert.ok(!(await page.isVisible('#open')) && !(await page.isVisible('#daily')), 'no open or daily stall on a new save');
   assert.match(await page.textContent('#play'), /level 1/, 'Play names the next level');
@@ -150,12 +250,17 @@ async function run(page, phone) {
   // Play it out, watching every frame that no two people overlap and the goal counts up.
   await page.evaluate(() => {
     window.__gap = Infinity; window.__alpha = []; window.__words = []; window.__have = [];
+    window.__settlementPaused = null;
     const f = () => {
       const st = window.fixitState(), p = st.people;
       for (let i = 0; i < p.length; i++) for (let j = i + 1; j < p.length; j++) window.__gap = Math.min(window.__gap, Math.abs(p[i].x - p[j].x) - 1.5 * (p[i].R + p[j].R));
       if (st.playing && window.__alpha.length < 400) window.__alpha.push(st.alpha);
       if (st.word && !window.__words.includes(st.word)) window.__words.push(st.word);
       const h = st.goal?.parts[0]?.have; if (h !== undefined && h !== window.__have.at(-1)) window.__have.push(h);
+      if (st.cleared && st.playing && window.__settlementPaused === null) {
+        document.getElementById('pause').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+        window.__settlementPaused = window.fixitState().paused;
+      }
       if (st.screen !== 'end') requestAnimationFrame(f);
     };
     requestAnimationFrame(f);
@@ -166,6 +271,7 @@ async function run(page, phone) {
   assert.ok(gap >= 0, `people never overlap (closest bodies ${gap.toFixed(1)} px apart)`);
   assert.ok(alphas.length > 50 && alphas.every(a => a >= 0 && a <= 1), 'drawing blends between ticks by a fraction in 0..1');
   assert.deepEqual(have, [0, 1, 2, 3, 4, 5, 6], 'the goal counter counts each fix');
+  assert.equal(await page.evaluate(() => window.__settlementPaused), false, 'pause during the win animation cannot interrupt settlement');
   assert.match(await page.textContent('#endTitle'), /Level 1 cleared/, 'the cleared card');
   assert.ok(await page.isVisible('#next'), 'Next level on the cleared card');
   assert.equal(st.levels[1], st.stars, 'stars saved');
@@ -177,7 +283,7 @@ async function run(page, phone) {
   assert.ok(r1[0].data.summary.level === 1 && r1[0].data.summary.cleared === true && r1[0].data.summary.stars === st.stars, 'the run summary names the level, the clear and the stars');
   assert.ok(r1[0].data.events.filter(e => e.type === 'repair').length >= 6, 'repairs recorded');
 
-  // Next: level 2 with its goal card; then pause and Menu keeps the coins and sends 'left'.
+  // Next: level 2 with its goal card; then pause and Menu sends 'left' without banking its coins.
   await page.click('#next');
   st = await state();
   assert.ok(st.level === 2 && st.card > 0 && st.kind === 'pin', 'Next starts level 2, which teaches the pin');
@@ -187,9 +293,9 @@ async function run(page, phone) {
   await page.click('#pause'); await page.click('#quit');
   st = await state();
   assert.equal(st.screen, 'menu', 'Menu from the pause card');
-  assert.equal(st.bank, before.bank + before.coins, 'Menu keeps the coins of the level (note #150)');
+  assert.equal(st.bank, before.bank, 'leaving a campaign level does not bank its repair coins');
   assert.ok(!st.levels[2], 'a level left early is not cleared');
-  assert.equal(await page.textContent('#bank'), String(st.bank), 'the menu shows the kept coins');
+  assert.equal(await page.textContent('#bank'), String(st.bank), 'the menu shows the bank balance');
   await sleep(300);
   assert.equal(runs(ctx).at(-1).data.outcome, 'left', 'quitting is sent as left');
   assert.equal(await page.locator('.lv.next[data-level="2"]').count(), 1, 'level 2 is next on the map');
@@ -200,16 +306,34 @@ async function run(page, phone) {
   assert.equal(await page.evaluate(() => localStorage.getItem('fixit-save')), blob, 'save blob unchanged by a reload');
   assert.ok((await state()).levels[1] >= 1, 'stars kept across a reload');
 
-  // A failed level: level 19 asks that nobody walks off; with hands off the first customer does. One tap restarts it.
-  await setSave(page, { levels: levelsUpTo(18), bank: 0 });
+  // Replaying level 1 can earn an improved star bonus once. Neither clear banks any repair pay.
+  await setSave(page, { levels: { 1: 1 }, bank: 70, sound: false });
+  await page.reload();
+  await page.click('.lv[data-level="1"]');
+  await startLevel(page);
+  st = await playOut(page, 'level 1 star improvement');
+  assert.ok(st.cleared && st.coins > 0 && st.stars > 1, 'level 1 replay improves on one star');
+  const improved = st.stars;
+  assert.equal(st.bank, 70 + (improved - 1) * 5, 'a replay banks only improved stars');
+  await page.click('#again');
+  await startLevel(page);
+  st = await playOut(page, 'level 1 repeated clear');
+  assert.ok(st.cleared && st.coins > 0, 'the repeated clear earns repair pay in the level');
+  assert.equal(st.bank, 70 + (Math.max(improved, st.stars) - 1) * 5, 'repeated clears cannot farm level 1');
+
+  // One paid repair then hands off: level 19 fails as soon as someone walks off.
+  await setSave(page, { levels: levelsUpTo(18), bank: 30, sound: false });
   await page.reload();
   await page.click('.lv[data-level="19"]');
   st = await state(); assert.equal(st.level, 19, 'a map tile starts its level');
   await startLevel(page);
+  await playJob(page, 'first repair before a failed level');
   await until(page, () => window.fixitState().screen === 'end', 'level 19 to fail', 20000);
   await sleep(300);
   st = await state();
   assert.ok(!st.cleared && st.over === 'lost' && !st.levels[19], 'level 19 failed');
+  assert.ok(st.coins > 0 && st.bank === 30 && st.attempts[19] === 1, 'a failed run records one attempt and banks no repair coins');
+  assert.ok(!(await page.isVisible('#assist')), 'the helper does not appear after one failure');
   assert.equal(await page.textContent('#endTitle'), 'Someone walked off', 'the failed card says why');
   assert.ok(!(await page.isVisible('#next')) && (await page.getAttribute('#again', 'class')) === 'main', 'Try again is the main button, no Next');
   await page.screenshot({ path: join(SHOTS, `${phone}-5-failed.png`) });
@@ -219,7 +343,39 @@ async function run(page, phone) {
   await sleep(200);
   const fail = runs(ctx, 'closed').at(-1);
   assert.ok(fail.data.summary.level === 19 && fail.data.summary.cleared === false && fail.data.summary.why === 'lost', 'the failed level is sent as closed, not cleared');
+  assert.ok(!st.assisted, 'regular Retry starts without help');
   await leave(page);
+  st = await state();
+  assert.equal(st.attempts[19], 1, 'leaving a retry does not count as another failed attempt');
+  assert.ok(!(await page.isVisible('#menuAssist')), 'the menu has no helper after one failure');
+  await page.click('#play');
+  await startLevel(page);
+  await until(page, () => window.fixitState().screen === 'end', 'second level 19 failure', 20000);
+  st = await state();
+  assert.equal(st.attempts[19], 2, 'two failed runs unlock help for this level');
+  assert.ok(await page.isVisible('#assist'), 'help is offered on the second failed card');
+  assert.ok(await page.getAttribute('#assist', 'aria-label'), 'the wordless helper has an accessible name');
+  await page.screenshot({ path: join(SHOTS, `${phone}-assist-offer.png`) });
+  await page.reload();
+  assert.equal((await state()).attempts[19], 2, 'the offer survives reload');
+  assert.ok(await page.isVisible('#menuAssist'), 'eligible players can choose help from the reloaded menu');
+  await page.click('#play');
+  assert.ok(!(await state()).assisted, 'eligible map play still starts without help');
+  await leave(page);
+  await page.click('#menuAssist');
+  st = await state();
+  assert.ok(st.assisted && st.card > 0 && st.assists[19] === 1, 'the icon opts in and records one use');
+  await startLevel(page);
+  await sleep(300);
+  st = await state();
+  assert.ok(st.clock > 0 && st.customer.patience - st.customer.left < st.t * 0.9, 'assistance slows the patience clock');
+  st = await playOut(page, 'assisted level 19');
+  assert.ok(st.cleared && st.stars >= 1 && st.stars <= 2, 'the assisted clear awards at most two stars');
+  const helped = runs(ctx, 'closed').at(-1);
+  assert.equal(helped.data.summary.assisted, true, 'the closed lab summary identifies the helper');
+  assert.ok(helped.data.events.some(e => e.type === 'assist'), 'the lab run records choosing the helper');
+  await page.reload();
+  assert.equal((await state()).assists[19], 1, 'helper use survives reload');
 
   // Every job, forced with ?only= (the open stall with one job), done once with real pointer events.
   for (const kind of KINDS) {
@@ -227,7 +383,11 @@ async function run(page, phone) {
     await page.click('#play');
     st = await state();
     assert.ok(st.kind === kind && st.mode === 'open' && st.card === 0, `only=${kind}`);
-    if (['oil', 'zip', 'spring', 'thread'].includes(kind)) { await sleep(400); await page.screenshot({ path: join(SHOTS, `${phone}-job-${kind}.png`) }); }
+    if (kind === 'thread') {
+      const { to, eye } = st.guide;
+      assert.ok(Math.abs(to[0] - eye[0]) * st.box.unit >= 55, 'steering keeps the thumb at least 55 px to the side of the needle eye');
+    }
+    if (['oil', 'zip', 'spring', 'thread', 'wind', 'balance', 'trace'].includes(kind)) { await sleep(400); await page.screenshot({ path: join(SHOTS, `${phone}-job-${kind}.png`) }); }
     await playJob(page, kind);
     await leave(page);
   }
@@ -294,6 +454,8 @@ async function run(page, phone) {
   assert.equal((await state()).sound, false);
   await page.reload();
   assert.equal(await page.textContent('#sound1'), 'Sound: off', 'sound setting kept');
+
+  await chapter(page, phone);
 }
 
 // A browser context that captures lab records and collects every page error, console error and failed request.
@@ -440,7 +602,7 @@ async function desktop(browser) {
 }
 
 // The daily stall: the same queue for everyone on a date, all jobs, and the day's best kept.
-async function dailyStall(browser, device) {
+async function dailyStall(browser, device, phone) {
   const { context, page, errors } = await open(browser, { ...device });
   await page.goto(`${base}/fixit/?date=2026-11-20&day=12`);
   await setSave(page, { shifts: 0 });
@@ -461,7 +623,7 @@ async function dailyStall(browser, device) {
   const b = await state();
   assert.deepEqual([b.customer.kinds, b.queue], [a.customer.kinds, a.queue], 'the same date gives the same queue');
   await sleep(400);
-  await page.screenshot({ path: join(SHOTS, 'daily.png') });
+  await page.screenshot({ path: join(SHOTS, `${phone}-daily.png`) });
   for (let i = 0; i < 20; i++) {
     const st = await state();
     if (st.over || st.screen === 'end') break;
@@ -473,7 +635,27 @@ async function dailyStall(browser, device) {
   assert.equal(end.days['2026-11-20'], end.coins, 'the day\'s best is saved');
   assert.equal(end.bank, 10 + end.coins, 'daily coins are banked');
   assert.match(await page.textContent('#end'), /Daily stall/, 'the end card names the daily stall');
-  await page.screenshot({ path: join(SHOTS, 'daily-end.png') });
+  const card = page.locator('canvas#dailyShare, #dailyShare canvas');
+  assert.ok(await card.isVisible(), 'the result has a share card');
+  assert.equal(await card.getAttribute('aria-label'), `Fix-It Stall daily result for ${end.today}, ${end.coins} coins and ${end.served} fixed`, 'the share card names this result');
+  const png = await card.evaluate(canvas => canvas.toDataURL('image/png'));
+  assert.ok(png.startsWith('data:image/png;base64,') && png.length > 5000, 'the share card generates PNG art');
+  await page.evaluate(() => {
+    Object.defineProperties(navigator, {
+      canShare: { configurable: true, value: ({ files }) => files?.[0]?.type === 'image/png' },
+      share: { configurable: true, value: async ({ files }) => {
+        const [file] = files;
+        window.__shared = { type: file.type, size: file.size, name: file.name };
+      } },
+    });
+  });
+  await page.click('#shareDaily');
+  await until(page, () => !!window.__shared, 'the daily PNG to reach the share call');
+  const shared = await page.evaluate(() => window.__shared);
+  assert.ok(shared.type === 'image/png' && shared.size > 1000 && shared.name.endsWith('.png'), 'the share call receives the generated PNG');
+  const [download] = await Promise.all([page.waitForEvent('download'), page.click('#downloadDaily')]);
+  assert.equal(download.suggestedFilename(), `fixit-stall-${end.today}.png`, 'the direct download receives the dated PNG');
+  await page.screenshot({ path: join(SHOTS, `${phone}-daily-end.png`) });
   await sleep(300);
   const run = context.labSent.filter(r => r.game === 'fixit' && r.kind === 'run' && r.data.outcome === 'closed').at(-1);
   assert.equal(run?.data.summary.daily, '2026-11-20', 'the lab run names the day');
@@ -488,8 +670,65 @@ async function dailyStall(browser, device) {
   await context.close();
 }
 
-const only = process.argv[2];
+// Fast screenshot loop at the two requested portrait sizes. Run the assertions separately.
+async function visual(browser, device, width, height) {
+  const { context, page, errors } = await open(browser, { ...device, viewport: { width, height }, deviceScaleFactor: 1 });
+  const shot = label => page.screenshot({ path: join(SHOTS, `${width}-${label}.png`) });
+  await page.goto(`${base}/fixit/`);
+  await setSave(page, { sound: false });
+  await page.reload();
+  await sleep(200);
+  await shot('new-map');
+  await startAt(page, 33);
+  await sleep(320);
+  await shot('order');
+  await leave(page);
+
+  await setSave(page, { sound: false, levels: threeStarsUpTo(32) });
+  await page.reload();
+  await sleep(200);
+  const next = page.locator('.lv[data-level="33"]');
+  await next.scrollIntoViewIfNeeded();
+  await shot('chapter-map');
+  await startAt(page, 33);
+  await sleep(320);
+  await shot('order-grown');
+  await leave(page);
+  for (const [n, label] of [[34, 'rush'], [35, 'blackout'], [36, 'boss']]) {
+    await startAt(page, n);
+    if (label === 'boss') for (let i = 0; i < 2; i++) await playJob(page, `boss lead-in customer ${i + 1}`);
+    await sleep(320);
+    await shot(label);
+    await leave(page);
+  }
+  for (const kind of ['thread', 'wind', 'balance', 'trace']) {
+    await page.goto(`${base}/fixit/?seed=3&only=${kind}`);
+    await page.click('#play');
+    await sleep(600);
+    await shot(kind);
+    await leave(page);
+  }
+  await page.goto(`${base}/fixit/?date=2026-11-24&day=6`);
+  await page.click('#daily');
+  await playOut(page, 'short daily for screenshots');
+  await shot('daily-card');
+  assert.deepEqual(errors, [], `${width} × ${height} screenshot page errors`);
+  await context.close();
+}
+
+const args = process.argv.slice(2);
+const only = args.find(a => Object.hasOwn(PHONES, a));
 let failed = 0;
+if (args.includes('--shots')) {
+  for (const [engine, device, width, height] of [[webkit, devices['iPhone 13'], 390, 664], [chromium, devices['Pixel 7'], 360, 640]]) {
+    const browser = await engine.launch();
+    try { await visual(browser, device, width, height); }
+    finally { await browser.close(); }
+  }
+  server.close();
+  console.log(`screenshots in ${SHOTS}`);
+  process.exit(0);
+}
 for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   if (only && only !== phone) continue;
   const browser = await engine.launch();
@@ -500,7 +739,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     assert.deepEqual(errors, [], 'page errors');
     await context.close();
     await lateShift(browser, device);
-    await dailyStall(browser, device);
+    await dailyStall(browser, device, phone);
     if (phone === 'chromium') { await small(browser); await desktop(browser); }
     console.log(`ok   fixit on ${phone} (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
   } catch (e) {

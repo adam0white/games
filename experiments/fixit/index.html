@@ -6,9 +6,9 @@
 <meta name="theme-color" content="#f2b37a">
 <title>Fix-It Stall</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #6a3a1f; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: #6a3a1f; overflow: hidden; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   body { font: 17px/1.4 ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif; color: #3a2216; }
-  canvas#c { display: block; width: 100vw; height: 100dvh; }
+  canvas#c { display: block; touch-action: none; width: 100vw; height: 100dvh; }
   #probe { position: fixed; top: 0; left: 0; width: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); visibility: hidden; pointer-events: none; }
   .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: #3a221688; overflow-y: auto; touch-action: pan-y; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-sizing: border-box; }
   .screen.on { display: grid; }
@@ -43,7 +43,32 @@
   .chap { font-size: .8em; font-weight: bold; color: #8a4a22; margin: .5em 2px .25em; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
   .lv { min-width: 0; min-height: 48px; margin: 0; padding: 2px 0 0; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; font-size: 1.05em; box-shadow: 0 3px 0 #3a2216; background: #fbe6c2; }
-  .grid.late .lv { background: #f6cfb0; }
+  .grid.late .lv:not(:disabled, .done, .next) { background: #f6cfb0; }
+  .grid.night .lv:not(:disabled, .done, .next) { background: #e8dcfc; }
+  .grid.night .lv:disabled { background: #ddd1df; }
+  #map { padding: 3px 1px 6px; }
+  #chapterTabs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; padding-top: 6px; }
+  #chapterTabs button { min-width: 0; min-height: 44px; margin: 0 0 5px; padding: 3px 2px; font-size: .72em; border-radius: 9px; box-shadow: 0 2px 0 #3a2216; }
+  #chapterTabs button[aria-pressed="true"] { background: #bde2ca; color: #234636; }
+  #chapterTabs button:last-child[aria-pressed="true"] { background: #ded2ef; color: #412e55; }
+  #growth { font-size: .8em; color: #28605c; font-weight: 700; }
+  .tickets { position: fixed; z-index: 1; left: 50%; transform: translateX(-50%); width: min(calc(100% - 30px), 420px); display: flex; gap: 6px; justify-content: center; }
+  [hidden] { display: none !important; }
+  .ticket, .lane { position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 66px; height: 48px; margin: 0; padding: 0 7px; border-radius: 11px; background: #fff1d6; overflow: hidden; }
+  .lane { width: 42%; justify-content: center; }
+  .ticket canvas, .lane canvas { width: 36px; height: 36px; flex: none; pointer-events: none; }
+  .ticket b { font-size: 15px; color: #50331f; }
+  .tickets .current { opacity: 1; background: #c2e9d7; box-shadow: 0 3px 0 #3a2216, 0 0 0 2px #3a9d85; }
+  .tickets span.ticket { box-sizing: border-box; border: 2.5px solid #3a2216; }
+  .tickets button:disabled:not(.done) { cursor: default; }
+  .tickets button.done { background: #d6e7c0; opacity: .68; }
+  .lane i { position: absolute; left: 0; bottom: 0; width: 100%; height: 4px; background: #247963; transform-origin: left; }
+  #assist, #menuAssist { min-width: 80px; color: #203828; background: #d8edbc; }
+  .help-icon svg { width: 32px; height: 26px; vertical-align: middle; }
+  .tickets.prompt .ticket[data-next] { outline: 3px solid #78c7ab; outline-offset: 1px; }
+  #dailyShare { display: block; width: min(100%, 272px); height: auto; margin: 8px auto 4px; border: 2px solid #3a2216; border-radius: 12px; }
+  #dailyResult button { min-height: 44px; min-width: 0; padding-inline: .68em; font-size: .85em; }
+  #end .card:has(#dailyResult:not([hidden])) { padding-top: 16px; }
   .lv .ss { font-size: .62em; letter-spacing: -.5px; color: #c99a2e; margin-top: 3px; min-height: 1em; }
   .lv.done { background: #e9f3dc; }
   .lv.next { background: #2f8f8a; color: #fff6e4; animation: nudge 1.6s ease-in-out infinite; }
@@ -61,14 +86,17 @@
 <canvas id="c"></canvas>
 <div id="probe"></div>
 <button id="pause" aria-label="Pause"></button>
+<div id="tickets" class="tickets" hidden></div>
 
 <div id="menu" class="screen on"><div class="card">
   <h1>Fix-It Stall</h1>
-  <div class="stats"><span><span class="coin"></span><b id="bank">0</b></span><span><span class="st">★</span> <b id="starsAll">0</b>/<span id="starsMax">96</span></span><span>Jobs <b id="jobs">3</b>/<span id="jobsAll">15</span></span></div>
-  <p><button id="play" class="main">Play</button></p>
+  <div class="stats"><span><span class="coin"></span><b id="bank">0</b></span><span><span class="st">★</span> <b id="starsAll">0</b>/<span id="starsMax">132</span></span><span>Jobs <b id="jobs">3</b>/<span id="jobsAll">18</span></span></div>
+  <p><button id="play" class="main">Play</button><button id="menuAssist" class="help-icon" hidden></button></p>
   <p id="playLine" class="sub"></p>
   <p id="migrated" class="sub"></p>
+  <div id="chapterTabs" aria-label="Chapters"></div>
   <div id="map" class="map"></div>
+  <p id="growth"></p>
   <p><button id="open">Open stall</button><button id="daily">Daily stall</button></p>
   <p id="openLine" class="sub"></p>
   <p id="dailyLine" class="sub"></p>
@@ -92,10 +120,24 @@
 <div id="end" class="screen"><div class="card">
   <h2 id="endTitle">Closed!</h2>
   <p id="endStars" class="stars"></p>
-  <p class="big"><span class="coin"></span><span id="earned">0</span></p>
+  <p class="big" id="earnedLine"><span class="coin"></span><span id="earned">0</span></p>
   <div id="endStats" class="stats"></div>
   <p id="endLine" class="sub"></p>
   <p id="newjob"></p>
+  <div id="helpRow" hidden>
+    <button id="assist" class="help-icon" aria-label="Retry with slower clocks, up to two stars" title="Slower clocks"></button>
+    <template id="helpIcon">
+      <svg viewBox="0 0 42 32" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 24h29c5 0 7-4 6-7l-1-5m-5 6 1-7M7 23a12 12 0 1 1 24 0M15 18a4 4 0 1 1 4 4"/>
+        <circle cx="33" cy="10" r="1.5" fill="currentColor"/><circle cx="37" cy="10" r="1.5" fill="currentColor"/>
+      </svg>
+      <span aria-hidden="true">★ ★</span>
+    </template>
+  </div>
+  <div id="dailyResult" hidden>
+    <canvas id="dailyShare" width="600" height="340" role="img" aria-label="Daily stall result"></canvas>
+    <div><button id="shareDaily">Share card</button><button id="downloadDaily">Save image</button></div>
+  </div>
   <p><button id="next" class="main">Next level</button></p>
   <p><button id="again" class="main">Play again</button><button id="toMenu">Menu</button></p>
 </div></div>
