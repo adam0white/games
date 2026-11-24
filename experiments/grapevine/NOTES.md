@@ -468,3 +468,98 @@ Both menus use the kit language preference. The game formats dates and displayed
 The browser checks compare both tables and their placeholders, inspect visible and accessible text and canvas text, and exercise switching, reload, the short and long share cards, and the viewport. English and Turkish passed on WebKit at the iPhone 13 size and on Chromium at 360×640. The real notes button script is served locally with a test key to check its label. The bot solver earned three stars on all 60 villages. The shared phone check passed on WebKit and Chromium.
 
 No Turkish speaker has reviewed this copy, and a new player has yet to try these picture-only cues. The screenshots and local browser checks do not establish physical-phone layout, screen-reader output, native sharing or production lab receipt.
+
+## 2026-11-24 — Middle and late game audit
+
+A returning player played villages 9 to 60 and the daily village by touch, in Turkish, then fixed what was most likely to make a player stop. Screenshot paths are relative to the audit's `shots/deep-grapevine/` folder. That folder is outside the repo, in the session's temporary folder.
+
+### How it was played
+
+| Browser | By touch | Skipped with a save the game wrote (progress raised only) |
+| --- | --- | --- |
+| WebKit, iPhone 13, tr-TR (`play-webkit/`) | Villages 1–60 in order (`0002`–`0476`). The daily village three times (`0478`–`0501`). | Nothing. |
+| Chromium, 360×640, tr-TR (`play-chromium/`) | Villages 1–9 (`0001`–`0042`), 31 (`0044`–`0048`), 46 (`0050`–`0053`), 60 (`0055`–`0069`). The daily village three times (`0071`–`0103`). | 10–30, 32–45 and 47–59. WebKit had cleared them by touch. |
+
+A tap was a touchscreen tap at coordinates read from the last screenshot. The state hook and game functions were not used to choose moves. Some screenshots were looked at only in contact sheets of 4 to 16. The three daily "runs" in each browser are one village replayed with "Tekrar oyna". The game has one daily village per date and no endless mode. All 60 villages and every daily run were won. Two villages got 2 stars in WebKit, 45 and 59 (8 hops where 7 was possible).
+
+### Findings, most likely to make a player quit first
+
+| Rank | Finding | Screenshots (`play-webkit/` unless named) |
+| --- | --- | --- |
+| 1 | **Hidden count limits decide puzzles.** The count stays between one and three: a grump at one and an exaggerator at three change nothing. Villages 11, 32 and 43 need the first limit, and 17 and 41 need the second. Nothing on the board said so. The comic showed an "=" afterwards. At village 17 the player found no route until guessing the limit. | `0049`–`0053`, `0088`–`0094`, `0251`, `0309`, `0324` |
+| 2 | **The parrot's teaching village (25) never shows what a parrot does.** The only route puts it right after the teller, so it repeats nothing. A parrot also repeats nothing after the teller in 43 and after a keeper in 58. | `0170`–`0174`, `0324`, `0449` |
+| 3 | **The end of the game is flat.** Village 60's card has a dimmed "Hepsi bitti!" button that does nothing. Back on the menu, the big button says "46. köye git", although every village is open and two lack stars. Nothing points at the stars still missing. | `0474`–`0477`, `play-chromium/0069`, `0070` |
+| 4 | **The first keeper villages are the same level three times.** In 47, 48 and 51 a keeper already holds the listener's news, so the level is "walk to her and deliver". Every hop before her is wasted. 46 is the teaching village and may be like that. | `0349`–`0364`, `0386`–`0395` |
+| 5 | **New villagers after the opening appear with no lesson.** The shape swapper has a picture plate, but the hard-hat shaper (13), the colour swapper (16), the bow who refuses red (19, a 200 ms red X) and the sleepy villager (22) do not. They were learnt by trial and error. | `0060`–`0064`, `0083`–`0087`, `0109`–`0119`, `0139`–`0153` |
+| 6 | **Refused taps are easy to miss.** A lane flashes red, or the route's end frowns, for well under a second. In WebKit, screenshots 300 ms after the tap often showed nothing. In Chromium the flash was caught. Chevrons are hard to read at phone size. The player misread a lane's direction 5 times. | `0244`, `0303`, `0322`, `0341`, `0387`–`0390`, `play-chromium/0046`, `0051` |
+| 7 | **A green HUD tick when the listener cannot be reached.** The tick means "this news is right". In 49, 58 and 59 it showed while no legal hop led to the listener. | `0366`–`0371`, `0447`, `0459`–`0460` |
+| 8 | **Easy late villages.** Village 20, 24, 31, 36 and 37 are solved in a few obvious hops. Gates and bells do nothing for the best route in 37, 40, 42, 44 and 57. | `0120`–`0127`, `0162`–`0169`, `0275`–`0279` |
+| 9 | **The chapter marker is a number.** A snowflake "2" or leaf "3" appears under the top bar at a chapter's first village and leaves on the first tap. It reads like a counter. | `0242`, `0346`, `play-chromium/0050` |
+| 10 | **The Next button moves.** It is at y≈452 when the comic is one row and y≈502 when it wraps. One mistap started a replay instead (village 20). | `0120`–`0122` |
+| 11 | **The daily village gives nothing new on replay.** The same route wins again. The streak flame stays at 1. | `0486`–`0501` |
+| 12 | Text: no English was seen. Turkish read naturally. The menu's recording notice breaks with a blank line in the middle of a sentence ("Kaydı" / blank / "duraklatma menüsünden"). | `0477`, `play-chromium/0001` |
+
+Good villages, for keeping: 18, 28, 30, 34, 39, 40, 44, 50, 52, 55, 58, 60.
+
+### What was fixed
+
+| Finding | Change | Assertion that failed before and passes now |
+| --- | --- | --- |
+| 1, 2 Hidden count limits; the parrot with nothing to repeat | When the villager at the end of the route changed nothing because of a limit, the board shows the same plate as the swap: their picture, then the news before and after with "=". The screen-reader cue says why: "One is the least.", "Three is the most.", "Nothing to repeat: the one before changed nothing." (Turkish: "En az bir olur.", "En fazla üç olur.", "Tekrarlanacak bir şey yok …"). Levels 1–30 are frozen by the save, so the lesson is on the board, not in a new level. | `check.mjs` `lateGame`: levels 11, 17 and 25, cue text and plate ink |
+| 5 Untaught shaper, colour swapper and bow | The hard-hat shaper and the colour swapper get the swap's plate (their badge, then before and after) and a cue sentence. A bow refusing red news sets the cue "Will not pass on red news." / "Kırmızı haberi iletmez." | `lateGame`: levels 13 and 16 cue and plate, level 19 cue |
+| 3 Flat ending, menu pointing at 46 | After the last village, the menu's play button and the last card's button go to the first village still short of three stars: "Village 45 ★★★" / "45. köyde ★★★". On the menu that label uses a smaller font and does not wrap; the first wording ("45. köyde ★★★ al") wrapped onto two lines in the replay (`after-webkit/0087`). The last card's button was dimmed and dead; it is live while any village lacks stars, and says "Hepsi bitti!" only when none does. No save field was added: the goal is read from `best` and `opened`. | `lateGame`: with every village open and 45 and 59 at two stars, `#play` says 45 and starts 45; the card after 60 has a live button that starts 45; the save keeps its stars; the menu label is one line in Turkish and English (failed with 2 lines for both the first and the shorter wording before the font rule) |
+| 4 Keeper levels 47, 48, 51 | `make-levels.mjs` skips a candidate village where a keeper starts out holding the listener's news (levels after 46), and searches 48 seeds for 47, 48 and 51. Level 47 aims at a 47% wanderer win rate, down from 55%, so it sits on the ramp. Only levels 47, 48 and 51 changed; saves keep stars by level number, so old stars for them still show. New shortest routes: 47 is 5 hops (was 4), 48 is 5, 51 is 5 (was 6), and each needs work after the keeper. | `bots.mjs` section 8: "no keeper starts with the listener's news" failed for 47, 48 and 51 |
+| 9 Chapter marker | The banner at a chapter's first village shows the emblem and the chapter's name ("Kış", "Sonbahar") instead of a number. | None (a drawing change, checked on screen in the replay) |
+
+The failing runs: `bots.mjs` printed `FAIL level 47/48/51: no keeper starts with the listener's news` before the generator change. For `check.mjs`, the new checks were run against the committed game in a scratch copy of `experiments/` (the repo was not touched by git) and failed with 15 misses; they pass on the changed game.
+
+### Replay of the changed parts by touch
+
+WebKit, iPhone 13, tr-TR, a fresh profile (`after-webkit/`). Progress was raised only on a save the game wrote after village 1 was won by touch.
+
+| What changed | Seen on screen |
+| --- | --- |
+| Floor rule (village 11) | `0013`: after a −1 at one, the plate shows "−1", then red = red. Also seen in village 60 (`0077`, `0080`). |
+| Cap rule (village 17) | `0019`: "+1", then three red squares = three red squares. Village won (`0021`). |
+| Parrot with nothing to repeat (village 25) | `0024`: the parrot's badge, then yellow = yellow. Village won (`0027`). |
+| Shaper (village 13) | `0032`: the hard-hat badge, then two stars → two squares. Won (`0033`). |
+| Colour swapper (village 16) | `0036`: the swapper's badge, then blue stars → yellow stars. Won (`0045`) after one wrong delivery of my own (`0040`). |
+| Chapter banners | `0048` "Kış" (village 31), `0051` "Sonbahar" (village 46). |
+| Keeper villages 47, 48, 51 | 47 won in 5 hops (`0054`–`0060`): the keeper's blue star still needs the yellow painter. 48 won in 5 (`0061`–`0066`): a chain through both keepers, then the colour swapper and −1. 51 won in 5 (`0068`–`0073`). |
+| End of the game | Village 60 won in 8 hops (`0075`–`0084`). The card's button reads "2. köyde ★★★ al" and is live (`0084`); it started village 2 (`0085`). The menu then pointed at village 2, but the label wrapped onto two lines (`0087`). That led to the shorter wording and the font rule above; after the fix, a fresh profile won village 1 and 60 by touch again: the card reads "2. köyde ★★★" (`0101`) and the menu label is one line (`0102`). |
+
+What the replay showed was still weak:
+- In 47 the two hops before the keeper are forced and do nothing that matters.
+- In 51 the HUD tick turns green after −1 (`0071`), but the lane from −1 to the listener runs the other way, and the last hop through the yellow painter changes nothing ("=" on already-yellow news). Finding 7 is still present there.
+- The bow's red-news cue is a screen-reader line only; the bow has no visible plate. It was not replayed by touch (the check covers the cue text).
+
+### What was left, and why
+
+| Finding | Why it was left |
+| --- | --- |
+| 6 Brief refusal feedback, hard-to-read lane chevrons | Feedback exists (flash, frown, shake). Making it longer or redrawing lanes needs a design choice across the whole game and the kit hint's placement rules; not attempted. |
+| 7 Green tick while the listener is unreachable | The tick states a true fact (the news matches). Changing its meaning, or adding a reachability mark, is a design decision. Still seen in 51 after the retune. |
+| 8 Easy late villages, decoy gates and bells | Levels 1–30 are frozen by a hash in `bots.mjs` and saves keep stars by level number. Of the later ones, 31, 36 and 37 teach a new villager and are meant to be easy. Decoys in 40–57 were not retuned. |
+| 10 The Next button moves with the comic's height | Not changed. A fixed slot would change the result card layout that `check.mjs` already measures on three screens. |
+| 11 The daily gives nothing new on replay | Design: one village per date. |
+| 12 Blank line in the recording notice | Not investigated; likely the notice's layout, which is shared with other games. |
+| Sleepy villager (22) has no plate | Not added: its rule (works once, then fades) needs a different picture from a before/after pair. |
+| Keeper 47's wasted opening hops | The generator now rejects a keeper that already holds the answer, but not forced filler before her. |
+
+### Not verified
+
+- No Turkish speaker read the new strings ("En fazla üç olur.", "Her şekli bu şekle çevirir.", "45. köyde ★★★" and the rest).
+- No person new to the game has seen the new plates. Whether a picture plate after the fact teaches the limit before a player is stuck is unknown.
+- Chromium was played by touch only for villages 1–9, 31, 46 and 60 and the daily; 10–30, 32–45 and 47–59 there were skipped with raised progress. The replay of the changes was WebKit only.
+- Many play screenshots were looked at in contact sheets, not one by one.
+- The three daily runs per browser are one village replayed.
+- No physical phone, sound, haptics or screen reader.
+- The retuned 47, 48 and 51 were each played once, by the same player who had just read their source.
+
+### Checks after all changes
+
+| Check | Result |
+| --- | --- |
+| `bots.mjs` | All passed: 60/60 villages, 180/180 stars, chapter 3 ramp 45% / 30% / 17%. |
+| `check.mjs` | ok on webkit, chromium, chromium 360x640, colour cues, chromium desktop 1280x800; English and Turkish screens ok on webkit-iphone13 and chromium-360x640. |
+| `kit/check/phone.mjs grapevine` | grapevine and hint grapevine ok on webkit and chromium (before and after the changes). |

@@ -68,6 +68,10 @@
   #skipReveal { position: absolute; bottom: 24px; left: 50%; translate: -50%; pointer-events: auto; min-width: 70px; font-size: 22px; }
   #caseGrid button { padding: 0; min-height: 44px; font-size: 14px; }
   #caseGrid button span { display: block; font-size: 8px; color: #f7be69; min-height: 10px; }
+  #caseGrid button.primary span { color: #7b3d24; }
+  #goal, #caseStars { margin: 0 0 10px; font: 700 15px Georgia, serif; color: #f9d6a1; }
+  #goal span { display: block; margin-bottom: 3px; color: #fff1ce; font-size: 17px; }
+  #caseStars { margin: 6px 0 0; }
   #caseGrid button:disabled { opacity: .5; cursor: default; }
 </style>
 </head>
@@ -97,6 +101,7 @@
     <section id="cases" class="screen">
       <div class="panel">
         <h2 data-i18n="cases"></h2>
+        <p id="caseStars"></p>
         <div id="chapterTabs" role="group" data-i18n-aria="chapters"></div>
         <div id="caseGrid"></div>
         <button id="caseMenu" data-i18n="menu"></button>
@@ -116,6 +121,7 @@
       <div class="panel">
         <h2 id="result" class="sr-only"></h2>
         <canvas id="resultArt" role="img" width="480" height="214" data-i18n-aria="result"></canvas>
+        <p id="goal" hidden></p>
         <div class="row"><button id="again" class="primary" data-i18n="again"></button><button id="next" data-i18n="next"></button><button id="endMenu" data-i18n="menu"></button></div>
         <button id="share" data-i18n="share" hidden></button>
       </div>

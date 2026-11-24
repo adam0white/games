@@ -105,7 +105,7 @@ const SPECS = {
   45: { name: 'Midwinter', ...base, rows: [5, 5], villagers: [9, 9], kinds: ALL1, oneway: [2, 3], gates: [1, 2], put: { bell: [1, 1] }, must: 'bell', also: ['oneway'], hops: [7, 9], sleepy: [0, 1] },
 
   // Chapter 3, autumn. 46 teaches the keeper (hand-made); 47 to 50 use them.
-  47: { name: 'Last week', ...base, villagers: [6, 7], kinds: k(['paint', 2], 'more', 'less', 'honest'), put: { keeper: [1, 1] }, must: 'keeper', hops: [3, 4] },
+  47: { name: 'Last week', ...base, villagers: [6, 7], kinds: k(['paint', 2], 'more', 'less', 'honest'), put: { keeper: [1, 1] }, must: 'keeper', hops: [4, 5] },
   48: { name: 'Two keepers', ...base, rows: [4, 5], villagers: [7, 8], kinds: k(['paint', 2], 'more', 'less', 'flip'), put: { keeper: [2, 2] }, must: 'keeper', hops: [5, 6] },
   49: { name: 'Tea and cake', ...base, rows: [4, 5], villagers: [7, 8], kinds: k(['paint', 2], 'more', 'less', 'swap', 'carve'), put: { keeper: [1, 1] }, must: 'keeper', hops: [4, 6] },
   50: { name: 'Swap shop', ...base, rows: [4, 5], villagers: [6, 8], kinds: k(['paint', 2], 'more', 'less', 'honest'), put: { keeper: [1, 1] }, must: 'keeper', revisit: true, hops: [4, 7], drop: 0.2 },
@@ -128,7 +128,12 @@ const LAST = 60;
 const PICK = {};
 // Levels that search more seeds. Follow-up of 2026-11-23: levels 16, 23, 25 and 26 sat off the ramp with eight seeds.
 // The first eight seeds are the same as before, so every other level is unchanged.
-const MORE_SEEDS = { 16: 48, 23: 48, 25: 48, 26: 48 };
+const MORE_SEEDS = { 16: 48, 23: 48, 25: 48, 26: 48, 47: 48, 48: 48, 51: 48 };
+// Middle and late game audit, 2026-11-24: after the keeper's teaching level, a keeper who starts out holding the
+// listener's news makes the level "walk to the keeper, deliver" and wastes every hop before her (levels 47, 48
+// and 51 were like that). Such villages are skipped; levels where no candidate was like that are unchanged.
+const handsOver = (lv, n) => n > 46 && lv.nodes.some(v => v.kind === 'keeper'
+  && v.memo.s === lv.want.s && v.memo.c === lv.want.c && v.memo.n === lv.want.n);
 
 // The ramp: how often a player with no plan (wanderRate in sim.js) should still win, by level.
 // Eight villages that meet each spec are made; the one closest to the target is kept.
@@ -137,6 +142,10 @@ const MORE_SEEDS = { 16: 48, 23: 48, 25: 48, 26: 48 };
 const target = n => n <= 30 ? 0.75 - 0.6 * (n - 4) / 26
   : n <= 45 ? 0.6 - 0.48 * (n - 32) / 13
   : 0.55 - 0.47 * (n - 47) / 13;
+// Level 47 after the audit: the old target picked a village a wanderer wins as often as the teaching level,
+// out of line with its neighbours; it aims a little lower.
+const TARGET = { 47: 0.47 };
+const aim = n => TARGET[n] ?? target(n);
 const out = [];
 for (let n = 1; n <= LAST; n++) {
   if (HAND[n]) { out.push({ ...HAND[n], min: solve(HAND[n]).min }); continue; }
@@ -146,14 +155,14 @@ for (let n = 1; n <= LAST; n++) {
   let best = null;
   for (const seed of seeds) {
     const lv = generate(seed, spec, 3000);
-    if (!lv) continue;
+    if (!lv || handsOver(lv, n)) continue;
     const rate = wanderRate(lv, n);
-    if (!best || Math.abs(rate - target(n)) < Math.abs(best.rate - target(n))) best = { lv, rate };
+    if (!best || Math.abs(rate - aim(n)) < Math.abs(best.rate - aim(n))) best = { lv, rate };
   }
   if (!best) { console.error(`level ${n} (${spec.name}): no seed met the spec`); process.exitCode = 1; continue; }
   const { lv, rate } = best;
   out.push({ name: spec.name, must: spec.must ?? null, ...(spec.also ? { also: spec.also } : {}), ...lv });
-  console.log(`level ${n} ${spec.name}: seed ${lv.seed}, ${lv.nodes.length} villagers, shortest ${lv.min}, wanderer wins ${(rate * 100).toFixed(0)}% (target ${(target(n) * 100).toFixed(0)}%)`);
+  console.log(`level ${n} ${spec.name}: seed ${lv.seed}, ${lv.nodes.length} villagers, shortest ${lv.min}, wanderer wins ${(rate * 100).toFixed(0)}% (target ${(aim(n) * 100).toFixed(0)}%)`);
 }
 const text = '// Made by make-levels.mjs from the specs there; verified by bots.mjs. Do not edit by hand.\n' +
   `export const CHAPTERS = ${JSON.stringify(CHAPTERS)};\n` +

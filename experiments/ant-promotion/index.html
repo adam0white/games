@@ -54,47 +54,60 @@
   #power small { display: block; font-size: 11px; font-weight: normal; }
   #say { position: fixed; left: 0; right: 0; top: 22%; text-align: center; font-size: 22px; font-weight: bold; pointer-events: none; opacity: 0; transition: opacity .3s; text-shadow: 0 2px 6px #000; padding: 0 1em; }
   #say.on { opacity: 1; }
+  /* the language switch: a globe and the code of the language in use (as in Fix-It Stall). On the menu it sits beside Rules, so the
+     title keeps its width; on the pause card it is in the top right corner. */
+  #paused > div { position: relative; }
+  .language { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; vertical-align: top; padding: .55em .8em; font-weight: bold; }
+  .language svg { width: 18px; height: 18px; }
+  #langPause { position: absolute; top: 4px; right: 4px; min-height: 44px; margin: 0; padding: 0 8px; border-radius: 12px; font-size: .8em; }
+  #paused h2 { margin-inline: 48px; }
 </style>
 </head>
 <body>
 <canvas id="gl"></canvas>
 <canvas id="c"></canvas>
 <div id="hud"><div id="row"><div id="bar"><div id="fill"></div></div><b id="pct"></b></div><div id="who"></div><div id="rival"></div></div>
-<button id="pause" aria-label="Pause">II</button>
+<button id="pause" aria-label="Pause" data-i18n-aria="pause">II</button>
 <button id="power"><span id="powerName"></span><small id="powerWait"></small></button>
 <div id="say"></div>
+<template id="languageIcon">
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+    <circle cx="10" cy="10" r="8"/><ellipse cx="10" cy="10" rx="3.5" ry="8"/><path d="M2 10h16"/>
+  </svg>
+  <span aria-hidden="true"></span>
+</template>
 
 <div id="menu" class="screen on"><div>
-  <h1>Ant Promotion</h1>
-  <p>Eat. Grow. Get promoted.</p>
+  <h1 data-i18n="title">Ant Promotion</h1>
+  <p data-i18n="tagline">Eat. Grow. Get promoted.</p>
   <canvas id="hero" width="240" height="150" style="width:160px;height:100px"></canvas>
   <div id="menuRival" class="small"></div>
   <div id="trophies" class="small"></div>
   <p><button id="continue" class="main"></button></p>
   <p><button id="fresh"></button></p>
-  <p><button id="toSkins">Ant skins</button><button id="toHow">How to play</button></p>
+  <p><button id="toSkins" data-i18n="toSkins">Ant skins</button><button id="toHow" data-i18n="howToPlay">How to play</button></p>
   <p><button id="toBook"></button></p>
   <p><button id="look" style="min-width:0"></button><button id="sound" style="min-width:0"></button></p>
-  <p><button id="rules" style="min-width:0"></button></p>
+  <p><button id="rules" style="min-width:0"></button><button id="langMenu" class="language" data-i18n-aria="switchLanguage"></button></p>
 </div></div>
 
 <div id="skins" class="screen"><div>
-  <h2>Your ant</h2>
+  <h2 data-i18n="yourAnt">Your ant</h2>
   <canvas id="skinView" width="300" height="180" style="width:200px;height:120px"></canvas>
   <div id="colours"></div>
   <div id="patterns"></div>
-  <p><button class="main back">Done</button></p>
+  <p><button class="main back" data-i18n="done">Done</button></p>
 </div></div>
 
 <div id="book" class="screen"><div>
-  <h2>Animal book</h2>
+  <h2 data-i18n="animalBook">Animal book</h2>
   <p id="bookSay"></p>
   <div id="pages"></div>
-  <p><button class="main back">Done</button></p>
+  <p><button class="main back" data-i18n="done">Done</button></p>
 </div></div>
 
 <div id="how" class="screen"><div>
-  <h2>How to play</h2>
+  <h2 data-i18n="howToPlay">How to play</h2>
   <ul>
     <li>Drag anywhere to walk. On a keyboard use the arrow keys or WASD.</li>
     <li>Every animal has a power number over its head. So do you.</li>
@@ -115,11 +128,11 @@
     <li>When your number is bigger than your rival's, eat it for a big bonus. The next animal that kills you becomes your new rival.</li>
     <li>If you die you go back one animal, or you can start again as an ant.</li>
   </ul>
-  <p><button class="main back">Got it</button></p>
+  <p><button class="main back" data-i18n="gotIt">Got it</button></p>
 </div></div>
 
 <div id="evolve" class="screen"><div>
-  <h2>Promotion!</h2>
+  <h2 data-i18n="promotion">Promotion!</h2>
   <p id="evolveSay"></p>
   <div class="opts" id="opts"></div>
 </div></div>
@@ -129,21 +142,21 @@
   <p id="deadMore"></p>
   <div id="deadRival" class="rivalCard" style="display:none"></div>
   <p><button id="goOn" class="main"></button></p>
-  <p><button id="restart">Start again as an Ant</button></p>
-  <p><button class="toMenu" style="min-width:0">Menu</button></p>
+  <p><button id="restart" data-i18n="startAgainAnt">Start again as an Ant</button></p>
+  <p><button class="toMenu" style="min-width:0" data-i18n="menu">Menu</button></p>
 </div></div>
 
 <div id="paused" class="screen"><div>
-  <h2>Paused</h2>
-  <p><button id="resume" class="main">Keep playing</button></p>
-  <p><button class="toMenu">Menu</button></p>
+  <h2 data-i18n="paused">Paused</h2><button id="langPause" class="language" data-i18n-aria="switchLanguage"></button>
+  <p><button id="resume" class="main" data-i18n="keepPlaying">Keep playing</button></p>
+  <p><button class="toMenu" data-i18n="menu">Menu</button></p>
 </div></div>
 
 <div id="win" class="screen"><div>
-  <h2>Top of the food chain!</h2>
+  <h2 data-i18n="topOfChain">Top of the food chain!</h2>
   <p id="winSay"></p>
-  <p><button id="winOn" class="main">Keep roaming</button></p>
-  <p><button id="winNew">Start again as an Ant</button></p>
+  <p><button id="winOn" class="main" data-i18n="keepRoaming">Keep roaming</button></p>
+  <p><button id="winNew" data-i18n="startAgainAnt">Start again as an Ant</button></p>
 </div></div>
 
 <script type="module">
@@ -159,6 +172,7 @@ import { stick } from '../kit/stick.js';
 import { hint } from '../kit/hint.js';
 import { lab } from '../kit/lab.js'; // lab recording: the rec lines below
 import { noZoom } from '../kit/zoom.js'; noZoom(); // no double-tap or pinch zoom (note #74)
+import { t, lang, setLang, apply, animal, skill, trait, line, title as titleOf, sight as sightText, tx, rivalName, tables, EPITHETS, TITLES, LINES, FEAR, KIN } from './words.js'; // English and Turkish
 
 const $ = id => document.getElementById(id), cv = $('c'), g = cv.getContext('2d');
 const KEY = 'ant-promotion:v1', query = new URLSearchParams(location.search);
@@ -188,46 +202,9 @@ const floats = [], bits = [], keys = new Set(); let flash = 0, dying = 0, streak
 
 // ---------- the rival: the animal that killed you, with a name, a temperament and things to say. All of it comes from the
 // tables below; nothing is fetched. The rules are in sim.js; this part is the name, the words and the save.
-const EPITHETS = ['Old Scar', 'Grim Pincers', 'Iron Jaw', 'Snaggle', 'Gloomtooth', 'Thornback', 'Crookleg', 'One Eye', 'Rumble', 'Nightfang', 'Mudclaw', 'Grizzle', 'Bristle', 'Gnash'];
+// The English names, titles and lines (EPITHETS, TITLES, LINES, FEAR, KIN) are in words.js; the save keeps the English text
+// and the Turkish is looked up when it is drawn.
 const RIVAL_COLOURS = ['#ff4fd8', '#b45cff', '#3ad0ff', '#ff8a1c', '#2ef2a0'];
-const TITLES = {
-  ambusher: ['Who Waits in the Grass', 'The Still Shadow', 'Watcher of the Path'],
-  stalker: ['Who Follows Quietly', 'The Patient Hunter', 'Shadow at Your Back'],
-  brute: ['The Unstoppable', 'Crusher of Small Things', 'Who Never Gives Up'],
-  coward: ['Bully of the Meadow', 'Brave Against the Small', 'Picker of Easy Fights'],
-};
-const LINES = {
-  ambusher: {
-    rise: ['I waited, and you walked right in, {you}.', 'Sit still long enough and dinner comes to you.', 'Remember me, {you}. I will be waiting.'],
-    notice: ['There you are, {you}.', 'Come a little closer...', 'I see you, {you}.'],
-    escape: ['Next time, sit still for me.', 'Run, then. I have time.'],
-    kill: ['Patience wins again.', 'Again, {you}? Too easy.'],
-    beaten: ['I waited too long...', 'You were worth the wait.'],
-  },
-  stalker: {
-    rise: ['I will be right behind you, {you}.', 'Every time you stop to eat, think of me.', 'I followed you once. I will again.'],
-    notice: ['Hello again, {you}.', 'Keep eating. I will wait.', 'Still here, {you}.'],
-    escape: ['You cannot hide for ever, {you}.', 'I know where you will go.'],
-    kill: ['Told you I was right behind you.', 'You stopped to eat. Big mistake.'],
-    beaten: ['I should have kept my distance...', 'You grew up so fast...'],
-  },
-  brute: {
-    rise: ['Crunch! Run all you like, {you}.', 'I never stop chasing. Remember that.', 'You are my snack now, {you}.'],
-    notice: ['Found you!', 'Here I come, {you}!', 'No running this time!'],
-    escape: ['Lucky! Next time I win.', 'Grr! Come back here, {you}!'],
-    kill: ['Crunch! That makes {n}.', 'Nobody outruns me twice.'],
-    beaten: ['How did you get so big?', 'I chased you one time too many.'],
-  },
-  coward: {
-    rise: ['Ha! Too small to fight back, {you}!', 'I only pick fights I can win. Like this one.', 'Stay small, {you}. Stay tasty.'],
-    notice: ['Still small, {you}?', 'Lunch time!', 'Oh good, it is you.'],
-    escape: ['I let you go. This time.', 'Fine, I was not hungry anyway.'],
-    kill: ['Picking on you never gets old.', 'Ha! Still too small, {you}.'],
-    beaten: ['Wait, wait, we can be friends!', 'No fair! You got big!'],
-  },
-};
-const FEAR = ['Uh oh. You got big, {you}.', 'Stay back! I mean it!', 'We can talk about this...'];
-const KIN = ['Hey! That was my cousin!', 'You ate one of my kind, {you}!'];
 const SPEAKS = ['rise', 'notice', 'escape', 'kill', 'beaten'];
 function newPersona(f, gen) {
   const knobs = cleanKnobs({ temperament: pick(TEMPERAMENT_NAMES), persistence: 1 + Math.floor(Math.random() * 3), territory: 1 + Math.floor(Math.random() * 3) });
@@ -242,13 +219,18 @@ function goodNem(n) {
 }
 if (!goodNem(save.nem)) save.nem = null; // an old or broken save starts without a rival
 const P = () => save.nem?.persona;
-const fill = (line, kills) => line.replaceAll('{you}', s ? me(s).name : 'little one').replaceAll('{n}', String(kills ?? 2));
+const fill = (text, kills) => line(text).replaceAll('{you}', s ? animal(me(s).name) : t('littleOne')).replaceAll('{n}', String(kills ?? 2)); // text: the English line from the save
+const an = name => (lang() === 'en' ? article(name) : animal(name)); // "a Wolf" in English; the bare name where a language has no article
+const nameVars = name => ({ a: an(name), A: an(name).replace(/^a/, 'A'), name: animal(name) });
+const rivalTag = () => rivalName(P()?.name); // the rival's name as drawn
 function remember(k) { if (!save.nem || !s) return; save.nem.history.push({ k, as: me(s).name }); save.nem.history = save.nem.history.slice(-12); }
 function keepNem() { if (save.nem && s?.nemesis) save.nem.sim = nemesisSave(s); }
 // What the rival says. at: a fixed world spot (after it is eaten); otherwise the bubble follows the rival.
 let bubble = null, noticeAt = -99, riseNow = false, glow = 0, glowColour = null, offerAt = 0, pendingOffer = false;
 let beam = 0, beamColour = '#fff2b0'; // the light that shoots up into the sky at a promotion (note #101); 1 at the pick, fades to 0
-function speak(text, kind, ms = 3800, at = null, colour = null) { if (!text) return; bubble = { text, kind, until: performance.now() + ms, at, colour }; }
+// say: what makes the text, so a language switch while it shows redraws it in the new language.
+function speak(text, kind, ms = 3800, at = null, colour = null, say = null) { if (!text) return; bubble = { text, kind, until: performance.now() + ms, at, colour, say }; }
+const speakLine = (english, kind, ms, kills, at = null, colour = null) => speak(fill(english, kills), kind, ms, at, colour, () => fill(english, kills));
 
 // ---------- sound
 const snd = sound({ on: () => save.sound, floor: 0.001 });
@@ -276,16 +258,17 @@ function show(name) {
 }
 function menu() {
   const F = FORMS[save.stack.at(-1)], going = save.stack.length > 1;
-  $('continue').textContent = going ? `Continue as ${article(F.name)}` : 'Play';
-  $('fresh').style.display = going ? '' : 'none'; $('fresh').textContent = 'New game as an Ant';
-  $('sound').textContent = save.sound ? 'Sound: on' : 'Sound: off';
-  $('look').textContent = 'Look: ' + LOOKS[save.look];
-  $('rules').textContent = save.wild ? 'Rules: Wild' : 'Rules: Classic';
-  $('toBook').textContent = `Animal book ${save.seen.length}/${PLAYABLE.length}`;
+  $('continue').textContent = going ? t('continueAs', nameVars(F.name)) : t('play');
+  $('fresh').style.display = going ? '' : 'none'; $('fresh').textContent = t('newGame');
+  $('sound').textContent = t(save.sound ? 'soundOn' : 'soundOff');
+  $('look').textContent = t('look', { look: tx('look.', LOOKS[save.look]) });
+  $('rules').textContent = t(save.wild ? 'rulesWild' : 'rulesClassic');
+  $('toBook').textContent = t('bookButton', { n: save.seen.length, m: PLAYABLE.length });
   const r = $('menuRival'), n = save.nem, won = save.trophies;
-  r.textContent = n ? `Your rival: ${n.persona.name}, ${n.persona.title}. It has beaten you ${n.sim.kills} ${n.sim.kills === 1 ? 'time' : 'times'}.` : '';
+  r.textContent = n ? t('menuRival', { name: rivalName(n.persona.name), title: titleOf(n.persona.title), k: n.sim.kills, times: t(n.sim.kills === 1 ? 'time' : 'times') }) : '';
   r.style.color = n ? n.persona.colour : '';
-  $('trophies').textContent = won.length ? 'Rivals beaten: ' + (won.length > 4 ? `${won.length} (latest: ${won.slice(-4).map(x => x.name).join(', ')})` : won.map(x => x.name).join(', ')) : '';
+  const names = list => list.map(x => rivalName(x.name)).join(', ');
+  $('trophies').textContent = won.length ? t('trophies', { list: won.length > 4 ? t('trophiesMany', { n: won.length, list: names(won.slice(-4)) }) : names(won) }) : '';
   portrait($('hero'), F, 30);
 }
 function portrait(canvas, F, r, t = 0, skin = save.skin) {
@@ -296,13 +279,13 @@ function portrait(canvas, F, r, t = 0, skin = save.skin) {
   drawForm(x, F, fit, t, skin, -0.25); setLook(save.look);
 }
 function book() {
-  $('bookSay').textContent = save.seen.length < PLAYABLE.length ? `You have been ${save.seen.length} of ${PLAYABLE.length} animals. Pick a different one at each promotion to find the rest.` : 'You have been every animal.';
+  $('bookSay').textContent = save.seen.length < PLAYABLE.length ? t('bookSay', { n: save.seen.length, m: PLAYABLE.length }) : t('bookAll');
   const box = $('pages'); box.textContent = '';
   for (const F of PLAYABLE) {
     const known = save.seen.includes(F.id), d = document.createElement('div'), pic = document.createElement('canvas'); pic.width = pic.height = 144;
     portrait(pic, F, 28, 0, known ? save.skin : null);
     if (!known) { const x = pic.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#0b1808'; x.fillRect(0, 0, 144, 144); x.globalCompositeOperation = 'source-over'; d.className = 'no'; }
-    d.append(pic, known ? F.name : `Level ${F.level}`); if (known) d.append(Object.assign(document.createElement('div'), { textContent: 'Sees: ' + sightWords(F), style: 'background:none;opacity:.8;padding:0' })); box.append(d);
+    d.append(pic, known ? animal(F.name) : t('levelN', { n: F.level })); if (known) d.append(Object.assign(document.createElement('div'), { textContent: t('sees', { s: sightText(sightWords(F)) }), style: 'background:none;opacity:.8;padding:0' })); box.append(d);
   }
 }
 function start(fresh) {
@@ -310,70 +293,74 @@ function start(fresh) {
   s = create(Number(query.get('seed')) || (Math.random() * 1e9 | 0), save.stack, save.xp, SPAWN_WEIGHTS, !!save.wild, save.nem?.sim);
   if (save.nem && !s.nemesis) { save.nem = null; store(); }
   floats.length = 0; bits.length = 0; flash = 0; glow = 0; beam = 0; bubble = null; noticeAt = -99; riseNow = false; pendingOffer = false; offerAt = 0; hud(); show('play');
-  say(level(s) === 1 ? 'Eat the little bugs with green numbers' : `You are ${article(me(s).name)}`);
-  if (save.nem) speak(fill(save.nem.persona.lines.notice), 'notice', 3000); // it remembers you
+  say(level(s) === 1 ? t('firstSay') : t('youAre', nameVars(me(s).name)));
+  if (save.nem) speakLine(save.nem.persona.lines.notice, 'notice', 3000); // it remembers you
 }
 function hud() {
   const F = me(s), need = needFor(level(s));
   const pct = Math.min(100, Math.floor(s.player.xp / need * 100));
   $('fill').style.width = pct + '%'; $('pct').textContent = pct + '%';
-  $('who').textContent = `Level ${level(s)} · ${F.name}` + (F.again > 1 && F.role === 'runner' ? ` · speed +${Math.round((F.speed / FORMS[F.id].speed - 1) * 100)}%` : F.again > 1 && F.role === 'sneak' ? ` · ${Math.round((1 - F.stealth / FORMS[F.id].stealth) * 100)}% harder to see` : '') + (s.wild && F.role === 'brute' ? (hideReady(s) ? ' · hide ready' : ' · hide growing') : '');
+  $('who').textContent = t('hudWho', { n: level(s), name: animal(F.name) }) + (F.again > 1 && F.role === 'runner' ? t('hudSpeed', { n: Math.round((F.speed / FORMS[F.id].speed - 1) * 100) }) : F.again > 1 && F.role === 'sneak' ? t('hudSneak', { n: Math.round((1 - F.stealth / FORMS[F.id].stealth) * 100) }) : '') + (s.wild && F.role === 'brute' ? t(hideReady(s) ? 'hideReady' : 'hideGrowing') : '');
   const m = nemesisMob(s), r = $('rival');
-  r.textContent = m && save.nem ? `Rival: ${save.nem.persona.name} · ${powerOf(m)}` : '';
+  r.textContent = m && save.nem ? t('hudRival', { name: rivalName(save.nem.persona.name), p: powerOf(m) }) : '';
   r.style.color = save.nem ? save.nem.persona.colour : '';
 }
 function say(text) { $('say').textContent = text; $('say').classList.add('on'); sayTimer = 2.6; }
 
 function offer() {
-  $('evolveSay').textContent = `You were ${article(me(s).name)}. Pick what you become.`;
+  $('evolveSay').textContent = t('evolveSay', nameVars(me(s).name));
   const box = $('opts'); box.textContent = '';
   s.choosing.forEach((F, i) => {
     const b = document.createElement('button'); b.className = 'opt';
     const pic = document.createElement('canvas'); pic.width = pic.height = 168; portrait(pic, F, 34);
-    const pace = { slow: 'Slow', medium: 'Medium', fast: 'Fast' }[F.pace];
-    b.append(pic, Object.assign(document.createElement('b'), { textContent: F.name }), Object.assign(document.createElement('small'), { textContent: `Power ${F.power} · ${pace}` }), Object.assign(document.createElement('small'), { textContent: F.trait }), Object.assign(document.createElement('small'), { textContent: powerFor(F) ? `Skill: ${powerFor(F).label}` : '', style: 'color:#ffd23a' }));
+    const pace = t('pace.' + F.pace);
+    b.append(pic, Object.assign(document.createElement('b'), { textContent: animal(F.name) }), Object.assign(document.createElement('small'), { textContent: t('powerPace', { p: F.power, pace }) }), Object.assign(document.createElement('small'), { textContent: trait(F.trait) }), Object.assign(document.createElement('small'), { textContent: powerFor(F) ? t('skillIs', { label: skill(powerFor(F).label) }) : '', style: 'color:#ffd23a' }));
     const k = s.player.stack.filter(id => FORMS[id].role === F.role).length; // earlier picks of this kind make this one better
-    if (k && F.role === 'runner') b.append(Object.assign(document.createElement('small'), { textContent: `Fast again: +${Math.round((fastBoost(k + 1) - 1) * 100)}% speed`, style: 'color:#8dff8a' }));
-    if (k && F.role === 'sneak') b.append(Object.assign(document.createElement('small'), { textContent: `Sneaky again: ${Math.round((1 - SAME_SNEAK ** k) * 100)}% harder to see`, style: 'color:#8dff8a' }));
-    b.onclick = () => { if (!s.choosing) return; choose(s, i); skillTip = powerFor(F) ? 3 : 0; save.stack = s.player.stack.slice(); save.xp = 0; keepNem(); const fresh = !save.seen.includes(F.id); saw(save.stack); store(); blip(520, 0.3, 'triangle', 0.14, 500); blip(660, 0.9, 'sine', 0.1, 1400); beam = 1; beamColour = bright(F.e) ? F.e : bright(F.c) ? F.c : '#ffe27a'; buzz([20, 30, 60]); hud(); show('play'); say(fresh ? `New in your book: ${F.name}` : `You are ${article(F.name)} now`); };
+    if (k && F.role === 'runner') b.append(Object.assign(document.createElement('small'), { textContent: t('fastAgain', { n: Math.round((fastBoost(k + 1) - 1) * 100) }), style: 'color:#8dff8a' }));
+    if (k && F.role === 'sneak') b.append(Object.assign(document.createElement('small'), { textContent: t('sneakyAgain', { n: Math.round((1 - SAME_SNEAK ** k) * 100) }), style: 'color:#8dff8a' }));
+    b.onclick = () => { if (!s.choosing) return; choose(s, i); skillTip = powerFor(F) ? 3 : 0; save.stack = s.player.stack.slice(); save.xp = 0; keepNem(); const fresh = !save.seen.includes(F.id); saw(save.stack); store(); blip(520, 0.3, 'triangle', 0.14, 500); blip(660, 0.9, 'sine', 0.1, 1400); beam = 1; beamColour = bright(F.e) ? F.e : bright(F.c) ? F.c : '#ffe27a'; buzz([20, 30, 60]); hud(); show('play'); say(fresh ? t('newInBook', { name: animal(F.name) }) : t('youAreNow', nameVars(F.name))); };
     box.append(b);
   });
   show('evolve');
 }
-const HISTORY = { rise: 'Ate you as', kill: 'Ate you again as', escape: 'You got away as', kin: 'You ate its kin as' };
+const HISTORY = { rise: 1, kill: 1, escape: 1, kin: 1 }; // the kinds of history line that have words: 'hist.rise' and so on
 function rivalCard() { // on the death card: the new rival, or the old one that won again
   const box = $('deadRival'), n = save.nem, d = s?.dead;
   box.textContent = '';
   if (!n || !d || !(d.nem || riseNow)) { box.style.display = 'none'; return; }
   box.style.display = ''; box.style.borderColor = n.persona.colour;
-  const name = Object.assign(document.createElement('b'), { textContent: n.persona.name }); name.style.color = n.persona.colour;
-  box.append(document.createTextNode(riseNow ? 'A new rival: ' : 'Your rival: '), name, Object.assign(document.createElement('div'), { className: 'small', textContent: n.persona.title }));
+  const name = Object.assign(document.createElement('b'), { textContent: rivalName(n.persona.name) }); name.style.color = n.persona.colour;
+  box.append(document.createTextNode(t(riseNow ? 'newRival' : 'yourRival')), name, Object.assign(document.createElement('div'), { className: 'small', textContent: titleOf(n.persona.title) }));
   box.append(Object.assign(document.createElement('div'), { className: 'quote', textContent: '"' + fill(n.persona.lines[riseNow ? 'rise' : 'kill'], n.sim.kills) + '"' }));
-  const m = nemesisMob(s);
-  box.append(Object.assign(document.createElement('div'), { className: 'small', textContent: `Power ${m ? powerOf(m) : '?'} · Ate you ${n.sim.kills} ${n.sim.kills === 1 ? 'time' : 'times'} · You got away ${n.sim.escapes} ${n.sim.escapes === 1 ? 'time' : 'times'}` }));
-  const past = n.history.slice(-4).map(h => `${HISTORY[h.k] || h.k} ${article(h.as)}`).join(' · ');
+  const m = nemesisMob(s), times = k => t(k === 1 ? 'time' : 'times');
+  box.append(Object.assign(document.createElement('div'), { className: 'small', textContent: t('rivalStats', { p: m ? powerOf(m) : '?', k: n.sim.kills, kt: times(n.sim.kills), e: n.sim.escapes, et: times(n.sim.escapes) }) }));
+  const past = n.history.slice(-4).map(h => HISTORY[h.k] ? t('hist.' + h.k, nameVars(h.as)) : `${h.k} ${an(h.as)}`).join(' · ');
   if (past) box.append(Object.assign(document.createElement('div'), { className: 'small', textContent: past }));
-  box.append(Object.assign(document.createElement('div'), { className: 'small', textContent: riseNow ? 'It will remember you. Get stronger than it, then eat it.' : 'Each win makes it stronger. Get bigger and eat it.' }));
+  box.append(Object.assign(document.createElement('div'), { className: 'small', textContent: t(riseNow ? 'rivalNew' : 'rivalOld') }));
 }
+let deadText = null; // redraws the death card's words after a language switch
 function died() {
   const d = s.dead, prev = s.player.stack.length > 1 ? FORMS[s.player.stack.at(-2)] : FORMS[ANT];
-  $('deadSay').textContent = d.nem && save.nem ? `${save.nem.persona.name} ate you again` : `Died to ${article(d.to)} as ${article(d.as)}`;
-  rivalCard();
-  $('deadMore').textContent = d.level > 1 ? `You drop from level ${d.level} to level ${d.level - 1}.` : 'An ant cannot drop any lower. Try again.';
-  $('goOn').textContent = d.level > 1 ? `Keep going as ${article(prev.name)}` : 'Try again as an Ant';
+  deadText = () => {
+    $('deadSay').textContent = d.nem && save.nem ? t('nemAteAgain', { name: rivalName(save.nem.persona.name) }) : t('diedTo', { a: an(d.to), b: an(d.as), to: animal(d.to), as: animal(d.as) });
+    rivalCard();
+    $('deadMore').textContent = d.level > 1 ? t('dropLevel', { a: d.level, b: d.level - 1 }) : t('antFloor');
+    $('goOn').textContent = d.level > 1 ? t('keepGoingAs', nameVars(prev.name)) : t('tryAgainAnt');
+  };
+  deadText();
   $('restart').style.display = d.level > 2 ? '' : 'none'; // at level 2 both buttons would mean the same
   save.stack = s.player.stack.slice(0, Math.max(1, s.player.stack.length - 1)); save.xp = 0; store(); // closing the tab on this card still costs the level
   show('dead');
 }
 function back(restart) {
-  revive(s, restart); save.stack = s.player.stack.slice(); save.xp = 0; keepNem(); store(); hud(); show('play'); say(`You are ${article(me(s).name)}`);
-  if (riseNow && save.nem) speak(fill(save.nem.persona.lines.rise), 'rise', 4500);
+  revive(s, restart); save.stack = s.player.stack.slice(); save.xp = 0; keepNem(); store(); hud(); show('play'); say(t('youAre', nameVars(me(s).name)));
+  if (riseNow && save.nem) speakLine(save.nem.persona.lines.rise, 'rise', 4500);
   riseNow = false;
 }
 
 $('continue').onclick = () => { unlock(); start(false); }; $('fresh').onclick = () => { unlock(); start(true); };
 $('toSkins').onclick = () => { skins(); show('skins'); }; $('toHow').onclick = () => show('how'); $('toBook').onclick = () => { book(); show('book'); };
-$('rules').onclick = () => { save.wild = !save.wild; store(); menu(); say(save.wild ? 'Wild: strong animals get a thick hide, and you get hunted' : 'Classic rules'); };
+$('rules').onclick = () => { save.wild = !save.wild; store(); menu(); say(t(save.wild ? 'rulesSayWild' : 'rulesSayClassic')); };
 $('look').onclick = () => { save.look = (save.look + 1) % LOOKS.length; setLook(save.look); store(); menu(); };
 $('sound').onclick = () => { save.sound = !save.sound; store(); menu(); blip(660); };
 for (const b of document.querySelectorAll('.back')) b.onclick = () => show('menu');
@@ -382,7 +369,7 @@ $('goOn').onclick = () => back(false); $('restart').onclick = () => back(true);
 $('pause').onclick = () => show('paused'); $('resume').onclick = () => show('play');
 $('winOn').onclick = () => show('play'); $('winNew').onclick = () => start(true);
 // Lab recording (experiments/kit/lab.js): the notice on the menu, the switch on the pause card, each life, promotions and skins.
-const rec = lab('ant-promotion'); rec.notice($('menu').firstElementChild); rec.toggle($('paused').firstElementChild);
+const rec = lab('ant-promotion'), notice = rec.notice($('menu').firstElementChild), recToggle = rec.toggle($('paused').firstElementChild);
 const life = () => s ? { level: level(s), form: me(s).name, xp: s.player.xp } : null;
 for (const id of ['continue', 'fresh', 'goOn', 'restart', 'winNew']) $(id).addEventListener('click', () => rec.start({ how: id, ...life() }));
 document.addEventListener('click', e => { if (e.target.closest?.('.toMenu')) rec.end('menu', life()); }, true);
@@ -391,14 +378,14 @@ $('skins').addEventListener('click', e => { if (e.target.closest('button:not(.ba
 
 function skins() {
   const cs = $('colours'), ps = $('patterns'); cs.textContent = ps.textContent = '';
-  for (const c of COLOURS) { const b = document.createElement('button'); b.className = 'sw' + (save.skin.c === c ? ' on2' : ''); b.style.background = c; b.setAttribute('aria-label', 'Colour ' + c); b.onclick = () => { save.skin.c = c; store(); skins(); }; cs.append(b); }
-  for (const [p, label] of PATTERNS) { const b = document.createElement('button'); b.className = 'pat' + (save.skin.p === p ? ' on2' : ''); b.textContent = label; b.onclick = () => { save.skin.p = p; store(); skins(); }; ps.append(b); }
+  for (const c of COLOURS) { const b = document.createElement('button'); b.className = 'sw' + (save.skin.c === c ? ' on2' : ''); b.style.background = c; b.setAttribute('aria-label', t('colour', { c })); b.onclick = () => { save.skin.c = c; store(); skins(); }; cs.append(b); }
+  for (const [p, label] of PATTERNS) { const b = document.createElement('button'); b.className = 'pat' + (save.skin.p === p ? ' on2' : ''); b.textContent = tx('pattern.', label); b.onclick = () => { save.skin.p = p; store(); skins(); }; ps.append(b); }
   portrait($('skinView'), FORMS[ANT], 40);
 }
 
 // ---------- input: drag from where the finger lands; the distance dragged sets the speed
 const pad = stick(cv, { when: () => mode === 'play', reach: 55, leash: 70, dead: 0.15 }); // experiments/kit/stick.js
-hint(cv, { kind: 'stick', key: 'ant-promotion:hint', when: () => mode === 'play', played: readJson(KEY) !== null }); // a first-time player who does not touch sees how (experiments/kit/hint.js)
+hint(cv, { kind: 'stick', key: 'ant-promotion:hint', when: () => mode === 'play', played: readJson(KEY) !== null, label: t('hint') }); // a first-time player who does not touch sees how (experiments/kit/hint.js)
 addEventListener('keydown', e => { if (isPauseKey(e)) { if (mode === 'play') show('paused'); else if (mode === 'paused') show('play'); return; } keys.add(e.key.toLowerCase()); if (e.key.startsWith('Arrow')) e.preventDefault(); });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => keys.clear());
@@ -411,7 +398,7 @@ $('power').addEventListener('pointerdown', e => { e.preventDefault(); e.stopProp
 $('power').addEventListener('click', () => { if (mode === 'play' && performance.now() - powerTap > 700) wantPower = true; }); // Enter, or a screen reader's activate
 addEventListener('keydown', e => { if (e.key === ' ' && mode === 'play') { wantPower = true; e.preventDefault(); } });
 // What each kind of skill does, said once after a promotion. The button pulses when the skill would help right now.
-const SKILL_DOES = { sting: 'stops the nearest animal', leap: 'a long jump that pins the prey you land by', shell: 'a bite does nothing, and dazes the biter', roar: 'stops weaker animals near you', dive: 'fast, and nothing sees you', sprint: 'a burst of speed that catches faster prey' };
+// The words are 'does.sting' and so on in words.js.
 let skillTip = 0;
 function powerHelps(W) {
   const p = s.player, F = me(s); let prey = 0;
@@ -423,10 +410,19 @@ function powerButton() { // once a frame while playing
   if (!W || mode !== 'play') { b.style.display = 'none'; powerShown = ''; return; }
   const cd = Math.max(0, s.player.cd || 0), key = W.label + (cd > 0 ? Math.ceil(cd) : '');
   b.style.background = cd > 0 ? `conic-gradient(#ffd23a ${(1 - cd / W.cd) * 360}deg, #00000088 0)` : '#ffd23a';
-  b.classList.toggle('now', cd <= 0 && powerHelps(W)); if (skillTip > 0 && (skillTip -= 1 / 60) <= 0) say(`${W.label}: ${SKILL_DOES[W.kind]}`);
+  b.classList.toggle('now', cd <= 0 && powerHelps(W)); if (skillTip > 0 && (skillTip -= 1 / 60) <= 0) say(t('skillSay', { label: skill(W.label), does: t('does.' + W.kind) }));
   b.style.display = 'block'; // every frame: a pause hides the button and the text below may not have changed
   if (key === powerShown) return; powerShown = key;
-  b.classList.toggle('wait', cd > 0); $('powerName').textContent = W.label; $('powerWait').textContent = cd > 0 ? Math.ceil(cd) + ' s' : 'ready';
+  b.classList.toggle('wait', cd > 0); $('powerName').textContent = skill(W.label); $('powerWait').textContent = cd > 0 ? t('secs', { n: Math.ceil(cd) }) : t('ready');
+  fitPower(b);
+}
+// A long label gets a smaller font, not a clipped word or a third line. Every English label fits at 14px, so English never shrinks.
+function fitPower(b) {
+  b.style.fontSize = '';
+  for (const px of [13, 12, 11]) {
+    if (b.scrollWidth <= b.clientWidth && b.scrollHeight <= b.clientHeight && $('powerName').getClientRects().length <= 2) return;
+    b.style.fontSize = px + 'px';
+  }
 }
 function input() {
   let { x, y } = pad.vector();
@@ -510,7 +506,7 @@ function speech(text, ax, ay, colour, avoid, top) {
 // view comes from whichever look is drawing: me and rival are { x, y, r, top } on screen (centre, radius, top of the
 // number above it), rival.on says whether it is on the screen, and at(x, y) turns a world spot into a screen spot.
 function rivalOverlay(p, view) {
-  const persona = P(), nm = s && nemesisMob(s), b = view.me;
+  const persona = P(), nm = s && nemesisMob(s), b = view.me, tag = persona ? rivalName(persona.name) : ''; // the name as drawn and measured
   const avoid = [{ x0: b.x - b.r - 6, x1: b.x + b.r + 6, y0: b.top - 6, y1: b.y + b.r + 6 }];
   if (sayTimer > 0) { const r = $('say').getBoundingClientRect(); avoid.push({ x0: 0, x1: W, y0: r.top - 4, y1: r.bottom + 4 }); } // the message line near the top
   const top = Math.max(16, $('hud').getBoundingClientRect().bottom + 8);
@@ -518,18 +514,18 @@ function rivalOverlay(p, view) {
   if (nm && persona && view.rival) {
     const v = view.rival;
     if (v.on) { // the name under it; over it if that would cover the player
-      g.font = FONT(15); const tw = g.measureText(persona.name).width, tx = clamp(v.x, tw / 2 + 12, W - tw / 2 - 12), mine = avoid[0];
+      g.font = FONT(15); const tw = g.measureText(tag).width, tx = clamp(v.x, tw / 2 + 12, W - tw / 2 - 12), mine = avoid[0];
       const over = ty => tx - tw / 2 < mine.x1 && tx + tw / 2 > mine.x0 && ty - 16 < mine.y1 && ty + 4 > mine.y0;
       let ty = clamp(v.y + v.r + 18, top + 18, H - 10), ay = v.top;
       if (over(ty)) { ty = ay - 4; ay = ty - 18; }
-      label(tx, ty, persona.name, persona.colour, 15);
+      label(tx, ty, tag, persona.colour, 15);
       avoid.push({ x0: tx - tw / 2 - 4, x1: tx + tw / 2 + 4, y0: ty - 17, y1: ty + 5 }); // the bubble must not hide the name
       anchor = { x: v.x, y: ay };
     } else { // an arrow in its colour, bigger than the red ones, with the name beside it
       const a = Math.atan2(nm.y - p.y, nm.x - p.x), at = edgeArrow(a, persona.colour, 1.4);
-      g.font = FONT(14); const tw = g.measureText(persona.name).width;
+      g.font = FONT(14); const tw = g.measureText(tag).width;
       const lx = clamp(at.x - Math.cos(a) * 34, tw / 2 + 10, W - tw / 2 - 10), ly = clamp(at.y - Math.sin(a) * 30 + 5 - (Math.abs(Math.cos(a)) > 0.6 ? 26 : 0), top + 14, H - 10); // beside a sideways arrow the name goes above it
-      label(lx, ly, persona.name, persona.colour, 14);
+      label(lx, ly, tag, persona.colour, 14);
       avoid.push({ x0: lx - tw / 2 - 4, x1: lx + tw / 2 + 4, y0: ly - 16, y1: ly + 5 });
       anchor = { x: lx, y: ly - 18 }; // the bubble sits over the name, next to the arrow
     }
@@ -678,7 +674,7 @@ function use3d() {
     R3 = create3D($('gl'), WORLD) || false;
     $('gl').addEventListener('webglcontextlost', e => { e.preventDefault(); R3 = false; }); // a phone may drop the context when the tab is in the background
   }
-  if (!R3) { save.look = 1; setLook(1); store(); say('3D is not available here. Using Cartoon.'); }
+  if (!R3) { save.look = 1; setLook(1); store(); say(t('no3d')); }
   return !!R3;
 }
 const pose = (M, ph) => M.kind === 'bird' ? { flat: M.r * (0.9 + Math.sin(ph * 2) * 0.08) } : { lift: Math.abs(Math.sin(ph * 3)) * M.r * 0.07, squash: M.kind === 'bug' ? 0.62 : M.kind === 'snake' ? 0.8 : 0.72 };
@@ -747,42 +743,42 @@ function frame(now) {
         if (e.t === 'eat') {
           const M = FORMS.find(f => f.name === e.name);
           streak = now - streakAt < 4000 ? streak + 1 : 1; streakAt = now; buzz(12);
-          floats.push({ x: e.x, y: e.y, text: '+' + e.gain + (streak > 2 ? `  ${streak} in a row` : ''), age: 0, ...(e.nem ? { c: glowColour, big: 1.8 } : {}) }); burst(e.x, e.y, [M.c, M.d, M.e, '#ffffff'], 16, 110 + M.r * 6, Math.max(3.5, M.r * 0.32));
+          floats.push({ x: e.x, y: e.y, text: '+' + e.gain + (streak > 2 ? t('inARow', { n: streak }) : ''), age: 0, ...(e.nem ? { c: glowColour, big: 1.8 } : {}) }); burst(e.x, e.y, [M.c, M.d, M.e, '#ffffff'], 16, 110 + M.r * 6, Math.max(3.5, M.r * 0.32));
           bits.push({ ring: 1, x: e.x, y: e.y, r: Math.max(8, M.r), c: '#ffe23a', age: 0, life: 0.35 });
           crunch(0.1, 0.22, 1400 + Math.random() * 900); blip((300 + e.gain * 90) * 2 ** (Math.min(streak - 1, 12) / 12), 0.09, 'square', 0.06, 200); save.xp = s.player.xp; hud();
         }
-        if (e.t === 'mobeat' && Math.abs(e.x - s.player.x) < W / zoom && Math.abs(e.y - s.player.y) < H / zoom) { const M = FORMS.find(f => f.name === e.name); burst(e.x, e.y, [M.c, M.d, '#ffffff'], 10, 90 + M.r * 5, Math.max(3, M.r * 0.28)); floats.push({ x: e.x, y: e.y, text: `${e.by} ate ${article(e.name)}`, age: 0 }); crunch(0.08, 0.1, 900); }
+        if (e.t === 'mobeat' && Math.abs(e.x - s.player.x) < W / zoom && Math.abs(e.y - s.player.y) < H / zoom) { const M = FORMS.find(f => f.name === e.name); burst(e.x, e.y, [M.c, M.d, '#ffffff'], 10, 90 + M.r * 5, Math.max(3, M.r * 0.28)); floats.push({ x: e.x, y: e.y, text: t('mobAte', { by: animal(e.by), ...nameVars(e.name) }), age: 0 }); crunch(0.08, 0.1, 900); }
         if (e.t === 'power') {
-          const F = me(s); floats.push({ x: e.x, y: e.y - F.r - 26, text: e.label + '!', age: 0, c: '#ffd23a', big: 1.3 }); buzz(25);
-          if (e.kind === 'roar') { bits.push({ x: e.x, y: e.y, r: e.reach / 2.6, c: '#ffd23a', age: 0, life: 0.6, ring: true }); blip(110, 0.5, 'sawtooth', 0.14, 70); shake = 0.35; if (!e.hit) say('No weaker animal was close enough'); }
+          const F = me(s); floats.push({ x: e.x, y: e.y - F.r - 26, text: skill(e.label) + '!', age: 0, c: '#ffd23a', big: 1.3 }); buzz(25);
+          if (e.kind === 'roar') { bits.push({ x: e.x, y: e.y, r: e.reach / 2.6, c: '#ffd23a', age: 0, life: 0.6, ring: true }); blip(110, 0.5, 'sawtooth', 0.14, 70); shake = 0.35; if (!e.hit) say(t('noWeaker')); }
           else if (e.kind === 'sting') blip(900, 0.15, 'square', 0.08, 300);
           else if (e.kind === 'leap') { burst(e.x, e.y, ['#ffffff', '#d8f0c0'], 10, 120, 4); blip(300, 0.25, 'sine', 0.1, 900); }
           else if (e.kind === 'shell') blip(200, 0.3, 'triangle', 0.12, 150);
           else blip(400, 0.35, 'sine', 0.09, 1200);
         }
-        if (e.t === 'powerMiss') { say('Nothing is close enough'); blip(160, 0.12, 'sine', 0.06); }
-        if (e.t === 'stun') { if (e.shell) { floats.push({ x: e.x, y: e.y - 24, text: 'ouch!', age: 0, c: '#cfe8ff' }); blip(180, 0.15, 'square', 0.08, 90); } bits.push({ x: e.x, y: e.y, r: 14, c: '#cfe8ff', age: 0, life: 0.5, ring: true }); }
-        if (e.t === 'tired') { floats.push({ x: e.x, y: e.y - 20, text: 'phew...', age: 0, c: '#cfe8ff', big: 1.1 }); say(`${article(e.name).replace(/^a/, 'A')} got tired and gave up`); blip(520, 0.25, 'sine', 0.08, 780); }
-        if (e.t === 'pounce') { floats.push({ x: e.x, y: e.y - 18, text: 'Pounce!', age: 0, c: '#ff8a3a', big: 1.3 }); burst(e.x, e.y, ['#e8d8a8', '#c8b070'], 8, 120, 4); blip(240, 0.18, 'sawtooth', 0.1, 420); buzz(30); }
+        if (e.t === 'powerMiss') { say(t('nothingClose')); blip(160, 0.12, 'sine', 0.06); }
+        if (e.t === 'stun') { if (e.shell) { floats.push({ x: e.x, y: e.y - 24, text: t('ouch'), age: 0, c: '#cfe8ff' }); blip(180, 0.15, 'square', 0.08, 90); } bits.push({ x: e.x, y: e.y, r: 14, c: '#cfe8ff', age: 0, life: 0.5, ring: true }); }
+        if (e.t === 'tired') { floats.push({ x: e.x, y: e.y - 20, text: t('phew'), age: 0, c: '#cfe8ff', big: 1.1 }); say(t('gotTired', nameVars(e.name))); blip(520, 0.25, 'sine', 0.08, 780); }
+        if (e.t === 'pounce') { floats.push({ x: e.x, y: e.y - 18, text: t('pounce'), age: 0, c: '#ff8a3a', big: 1.3 }); burst(e.x, e.y, ['#e8d8a8', '#c8b070'], 8, 120, 4); blip(240, 0.18, 'sawtooth', 0.1, 420); buzz(30); }
         if (e.t === 'notice') {
           blip(e.strong ? 180 : 700, 0.12, e.strong ? 'sawtooth' : 'sine', 0.06);
-          if (e.nem && save.nem && s.t - noticeAt > 10) { noticeAt = s.t; speak(fill(e.strong ? save.nem.persona.lines.notice : pick(FEAR)), 'notice', 3000); }
+          if (e.nem && save.nem && s.t - noticeAt > 10) { noticeAt = s.t; speakLine(e.strong ? save.nem.persona.lines.notice : pick(FEAR), 'notice', 3000); }
         }
-        if (e.t === 'nemEscape' && save.nem) { remember('escape'); keepNem(); store(); speak(fill(save.nem.persona.lines.escape), 'escape', 3200); blip(880, 0.25, 'triangle', 0.1, 300); }
-        if (e.t === 'kin' && save.nem) { remember('kin'); keepNem(); store(); speak(fill(pick(KIN)), 'kin', 2600); }
+        if (e.t === 'nemEscape' && save.nem) { remember('escape'); keepNem(); store(); speakLine(save.nem.persona.lines.escape, 'escape', 3200); blip(880, 0.25, 'triangle', 0.1, 300); }
+        if (e.t === 'kin' && save.nem) { remember('kin'); keepNem(); store(); speakLine(pick(KIN), 'kin', 2600); }
         if (e.t === 'nemEaten' && save.nem) { // the payoff. This event comes before the 'eat' for the same bite.
           const n = save.nem, M = FORMS[e.f];
-          speak(fill(n.persona.lines.beaten), 'beaten', 4200, { x: e.x, y: e.y }, n.persona.colour);
+          speakLine(n.persona.lines.beaten, 'beaten', 4200, undefined, { x: e.x, y: e.y }, n.persona.colour);
           burst(e.x, e.y, [n.persona.colour, '#ffd23a', '#ffffff', M.c], 80, 260 + M.r * 6, Math.max(5, M.r * 0.4));
           for (let k = 0; k < 3; k++) bits.push({ ring: 1, x: e.x, y: e.y, r: Math.max(14, M.r) * (1 + k * 0.6), c: k === 1 ? '#ffd23a' : n.persona.colour, age: -k * 0.12, life: 0.7 });
           shake = 0.7; glow = 1; glowColour = n.persona.colour; offerAt = now + 1800;
           crunch(0.3, 0.3, 900); blip(440, 0.5, 'triangle', 0.14, 660); setTimeout(() => blip(880, 0.5, 'triangle', 0.12, 440), 180);
           save.trophies.push({ name: n.persona.name, form: M.name, kills: e.kills }); save.trophies = save.trophies.slice(-50);
           save.nem = null; store();
-          say(`You ate ${n.persona.name}!`);
+          say(t('ateRival', { name: rivalName(n.persona.name) }));
         }
-        if (e.t === 'hunt') { say(`${e.id === s.nemesis?.id && save.nem ? save.nem.persona.name : article(e.name).replace(/^a/, 'A')} is hunting you`); blip(140, 0.5, 'sawtooth', 0.1, 120); buzz(60); }
-        if (e.t === 'hide') { say(`Your thick hide took the bite from ${article(e.name)}`); shake = 0.4; flash = 0.6; crunch(0.18, 0.28, 500); buzz([30, 40, 30]); bits.push({ ring: 1, x: e.x, y: e.y, r: me(s).r * 1.6, c: '#9ad8ff', age: 0, life: 0.6 }); hud(); }
+        if (e.t === 'hunt') { say(t('hunting', { who: e.id === s.nemesis?.id && save.nem ? rivalName(save.nem.persona.name) : nameVars(e.name).A })); blip(140, 0.5, 'sawtooth', 0.1, 120); buzz(60); }
+        if (e.t === 'hide') { say(t('hideTook', nameVars(e.name))); shake = 0.4; flash = 0.6; crunch(0.18, 0.28, 500); buzz([30, 40, 30]); bits.push({ ring: 1, x: e.x, y: e.y, r: me(s).r * 1.6, c: '#9ad8ff', age: 0, life: 0.6 }); hud(); }
         if (e.t === 'full') { if (now < offerAt) pendingOffer = true; else offer(); } // after the rival is eaten the card waits for the celebration
         if (e.t === 'die') rec.end('died', { ...life(), by: s.dead?.to ?? null });
         if (e.t === 'win') rec.event('win', life());
@@ -799,8 +795,8 @@ function frame(now) {
           dying = performance.now() + 900; mode = 'dying'; $('pause').style.display = 'none'; pad.drop(); keys.clear();
         }
         if (e.t === 'nemRise' && save.nem) { riseNow = true; remember('rise'); keepNem(); store(); hud(); }
-        if (e.t === 'nemKill' && save.nem) { remember('kill'); keepNem(); store(); speak(fill(save.nem.persona.lines.kill, e.kills), 'kill', 2500); hud(); }
-        if (e.t === 'win') { store(); $('winSay').textContent = `You climbed all ${TOP} levels and became ${article(me(s).name)}. You are at the top.`; blip(660, 0.6, 'triangle', 0.14, 600); show('win'); }
+        if (e.t === 'nemKill' && save.nem) { remember('kill'); keepNem(); store(); speakLine(save.nem.persona.lines.kill, 'kill', 2500, e.kills); hud(); }
+        if (e.t === 'win') { store(); $('winSay').textContent = t('winSay', { top: TOP, ...nameVars(me(s).name) }); blip(660, 0.6, 'triangle', 0.14, 600); show('win'); }
       }
     }
     if (s.wild && hideReady(s) !== hideWas) { hideWas = hideReady(s); hud(); }
@@ -821,6 +817,43 @@ function frame(now) {
   if (bubble && now > bubble.until) bubble = null;
   draw(now);
 }
+// ---------- language: English, or Turkish by ?lang=tr, the globe button or the browser (experiments/kit/i18n.js, words.js)
+// The How to play list, the recording notice and its switch keep the English the page and the kit wrote; only other languages replace them.
+const howItems = [...document.querySelectorAll('#how li')], howEn = howItems.map(li => li.innerHTML);
+const noticeText = notice?.firstChild, noticeEn = noticeText?.data, toggleText = recToggle?.lastChild, toggleEn = toggleText?.data;
+function translatePage() {
+  const en = lang() === 'en';
+  document.title = t('title');
+  apply();
+  howItems.forEach((li, i) => { li.innerHTML = en ? howEn[i] : tables[lang()]?.how?.[i] ?? howEn[i]; });
+  if (noticeText) noticeText.data = en ? noticeEn : t('labNotice') + ' ';
+  const privacy = notice?.querySelector('a'); if (privacy) privacy.textContent = t('privacy');
+  if (toggleText) toggleText.data = en ? toggleEn : t('labToggle');
+  syncNotes();
+  for (const b of document.querySelectorAll('.language')) b.lastElementChild.textContent = t(en ? 'enCode' : 'trCode');
+  const hintLabel = document.querySelector('.kit-hint .label'); if (hintLabel) hintLabel.textContent = t('hint');
+  menu();
+  if (mode === 'skins') skins();
+  if (mode === 'book') book();
+  if (s) hud();
+  if (mode === 'dead' && deadText) deadText();
+  powerShown = ''; // the skill button redraws its words on the next frame
+  if (bubble?.say) bubble.text = bubble.say();
+}
+function syncNotes() { document.getElementById('notes-button')?.setAttribute('aria-label', t('notes')); }
+document.addEventListener('DOMContentLoaded', syncNotes, { once: true });
+for (const id of ['langMenu', 'langPause']) {
+  const button = $(id);
+  button.append($('languageIcon').content.cloneNode(true));
+  button.addEventListener('click', () => {
+    setLang(lang() === 'en' ? 'tr' : 'en');
+    const url = new URL(location.href); // keep an explicit ?lang= in the address in step with the choice
+    if (url.searchParams.has('lang')) { url.searchParams.set('lang', lang()); history.replaceState(history.state, '', url); }
+    translatePage();
+  });
+}
+translatePage();
+
 addEventListener('pagehide', () => { if (s && !s.dead) { save.stack = s.player.stack.slice(); save.xp = s.player.xp; keepNem(); store(); } });
 window.__ant = { get s() { return s; }, get mode() { return mode; }, get input() { return input(); }, get arrowTo() { return arrowTo; }, get save() { return save; }, get bubble() { return bubble; }, get beam() { return beam; }, FORMS, me, level, step, powerOf, nemesisMob };
 show('menu'); requestAnimationFrame(frame);

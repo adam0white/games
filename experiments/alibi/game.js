@@ -128,6 +128,14 @@ const formatTime = beat => clockLabel(minute(beat));
 const dailyProfile = () => hard ? profile.hardDaily : profile.daily;
 const hardUnlocked = () => profile.level > CHAPTER_TWO_END;
 const activeStreak = (summary, today) => summary.last >= offsetDay(today, -1) ? summary.streak : 0;
+// Training aids retire once their rule is taught. The scene circle on the
+// chosen suspect stays through the first chapter and for a new player's Daily.
+// The sound bracket stays for the blackout lesson only.
+const sceneGuide = () => daily ? !hard && profile.level <= 7 : c.spec.chapter === 1;
+// The mask lesson shows who is under each mask when masks go on and when two
+// are exchanged. Later cases leave that tracking to the player.
+const maskGuide = () => daily ? !hard && profile.level < 15 : c.spec.tutorial === 'masks';
+const soundGuide = () => !daily && c.spec.tutorial === 'blackout';
 const tickX = beat => replay.x + (replay.endX - replay.x) * beat / (c.beatCount - 1);
 function syncProfile() {
   const latest = readProfile(save.readJson(KEY));
@@ -164,9 +172,17 @@ const setScreen = next => {
   $('skipReveal').hidden = next !== 'reveal';
 };
 
+// The campaign's long goal: every star in every case.
+const starTotal = () => t('starTotal', {
+  n: number(CASES.reduce((sum, _, i) => sum + (profile.stars[i + 1] ?? 0), 0)),
+  total: number(CASES.length * 3),
+});
+
 function updateMenu() {
   const current = validLevel(forceLevel) ? forceLevel : profile.level;
   $('progress').textContent = `${number(current)} /${number(CASES.length)}`;
+  $('caseStars').textContent = starTotal();
+  if (screen === 'done') updateGoal();
   const today = dayKey();
   const streak = activeStreak(profile.daily, today);
   $('streak').textContent = streak ? `✦${number(streak)}` : '';
@@ -216,6 +232,7 @@ function openCases(chapter = CASES[profile.level - 1].chapter) {
     return button;
   });
   $('chapterTabs').replaceChildren(...tabs);
+  $('caseStars').textContent = starTotal();
   const choices = CASES.flatMap((spec, i) => {
     if (spec.chapter !== chapter) return [];
     const button = document.createElement('button');
@@ -506,8 +523,24 @@ function finishReveal() {
   showResult(true);
 }
 
+// A solved campaign case names what it completed and the star total.
+function updateGoal() {
+  const goal = $('goal');
+  goal.hidden = daily || run.outcome !== 'solved';
+  if (goal.hidden) return;
+  const last = c.level === CASES.length;
+  const chapterEnd = last || CASES[c.level].chapter !== c.spec.chapter;
+  const done = last ? t('allSolved', { n: number(CASES.length) })
+    : chapterEnd ? [t('chapterSolved', { n: number(c.spec.chapter) }), c.level === CHAPTER_TWO_END ? t('hardOpen') : ''].join(' ').trim()
+      : '';
+  const head = document.createElement('span');
+  head.textContent = done;
+  goal.replaceChildren(...(done ? [head] : []), starTotal());
+}
+
 function showResult(solved) {
   $('result').textContent = t(solved ? 'caught' : 'retry');
+  updateGoal();
   $('next').hidden = daily || !solved || c.level >= CASES.length;
   $('share').hidden = !daily || !solved;
   $('next').classList.toggle('primary', !$('next').hidden);
@@ -752,9 +785,9 @@ function drawClaim(frame) {
   }
   place(g, 150, 85, 30, claim.room, c.spec.site);
   clock(g, 190, 85, 14, minute(claim.beat));
-  text(g, formatTime(claim.beat), 228, 85, 18, INK, 'Georgia');
+  text(g, formatTime(claim.beat), 224, 85, 18, INK, 'Georgia');
   if (frame.beat !== claim.beat) {
-    line([[257, 81], [261, 85], [257, 89]], '#a67469', 1.7);
+    line([[262, 81], [266, 85], [262, 89]], '#a67469', 1.7);
   }
 }
 
@@ -910,13 +943,13 @@ function drawScene(frame, staticScene = false) {
   for (const item of frame.evidence) trace(g, rooms[item.room], item.kind);
   const actors = staticScene ? frame.actors.map(actor => ({ ...actor, ...roomPoint(rooms[actor.room], actor.slot), walk: 0 })) : actorPositions();
   for (const actor of [...actors].sort((a, b) => a.y - b.y)) {
-    if (!staticScene && actor.portrait !== null && (actor.portrait === selected || actor.portrait === pointer?.target)) {
+    if (!staticScene && actor.portrait !== null && ((sceneGuide() && actor.portrait === selected) || actor.portrait === pointer?.target)) {
       dot(actor.x, actor.y - 2, 19, '#fff0bb50', '#fff0ce', 1.5);
     }
     const species = actor.portrait === null ? null : cast[actor.portrait].species;
     const hurt = actor.portrait !== null && lastShot?.id === actor.portrait && !lastShot.solved
       && phase - lastShot.at < .75;
-    if (pointer?.type === 'suspect' && pointer.suspect === actor.portrait) {
+    if (sceneGuide() && pointer?.type === 'suspect' && pointer.suspect === actor.portrait) {
       dot(actor.x, actor.y - 3, 21, '#fff0bb50', '#fff0ce', 2);
     }
     animal(g, actor.x, actor.y, staticScene ? 36 : 34, species, {
@@ -929,7 +962,34 @@ function drawScene(frame, staticScene = false) {
       heldItem(g, actor.x + 12, actor.y - 12, 19, c.crime);
     }
   }
-  if (!staticScene) drawExchange(frame, actors);
+  if (!staticScene) {
+    // Tags go on top: on the exchange mark they matter more than the bubble.
+    drawExchange(frame, actors);
+    drawMaskTags(frame, actors);
+  }
+}
+
+const TAG = '#fff4e0';
+function drawMaskTags(frame, actors) {
+  const firstMasks = frame.beat > 0 && frame.actors.some(actor => actor.mask !== null)
+    && !board[frame.beat - 1].actors.some(actor => actor.mask !== null);
+  if (!maskGuide() || !(firstMasks || frame.exchange)) return;
+  const wearers = c.frames[frame.beat];
+  for (const actor of actors) {
+    if (actor.mask === null) continue;
+    const id = wearers.findIndex(entry => entry.mask === actor.mask);
+    if (id < 0) continue;
+    const x = actor.x;
+    const y = actor.y - 33;
+    g.beginPath();
+    g.moveTo(x - 4, y + 9);
+    g.lineTo(x, y + 14);
+    g.lineTo(x + 4, y + 9);
+    g.fillStyle = TAG;
+    g.fill();
+    dot(x, y, 11, TAG, '#945b6f', 1.4);
+    animal(g, x, y, 19, cast[id].species, { head: true });
+  }
 }
 
 function teachingCue(frame) {
@@ -1064,7 +1124,7 @@ function drawTeaching(frame, cue) {
   }
   const person = cast[selected];
   if (cue === 'jump' || cue === 'shutter') {
-    ghostTap(259, 87, pulse);
+    ghostTap(266, 87, pulse);
     markTick(person.claim.beat);
     if (cue === 'jump' && !help.shown) drawTimelineLesson();
     return;
@@ -1073,13 +1133,13 @@ function drawTeaching(frame, cue) {
     const p = portraitPoints()[selected];
     corners(p.x, p.y + 14, 15, 8);
     corners(110, 102, 14, 7, '#8e5562');
-    const match = frame.sounds.find(item => item.sound === person.sound);
+    const match = soundGuide() && frame.sounds.find(item => item.sound === person.sound);
     if (match) {
       const { x, y } = roomPoint(rooms[match.room], match.slot);
       corners(x, y, 16 + pulse * 2, 13 + pulse * 2);
     }
     if (cue === 'blackoutJump') {
-      ghostTap(259, 87, pulse);
+      ghostTap(266, 87, pulse);
       markTick(person.claim.beat);
       return;
     }
@@ -1420,7 +1480,9 @@ function reopenInvestigation() {
   const suspect = id => index(id, next.cast.length);
   const mark = beat => index(beat, next.beatCount);
   if (!mark(saved.frame) || (saved.selected !== null && !suspect(saved.selected))
+    // A checkpoint from an older build may have rejected the current liar.
     || !Array.isArray(saved.rejected) || saved.rejected.length >= 3 || !saved.rejected.every(suspect)
+    || saved.rejected.includes(next.culprit)
     || !Array.isArray(saved.notes) || saved.notes.length > 3 || !saved.notes.every(note =>
       note && suspect(note.id) && mark(note.beat) && index(note.room, next.spec.rooms))
     || !Array.isArray(saved.seen) || !saved.seen.every(suspect)

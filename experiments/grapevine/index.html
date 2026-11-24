@@ -69,6 +69,7 @@
   .start-actions { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 8px 0; }
   .start-actions button { min-width: 0; margin: 0; padding-inline: .7em; }
   .start-actions #play { flex: 1; font-size: clamp(18px, 5.4vw, 21px); }
+  .start-actions #play.chase { font-size: clamp(15px, 4.4vw, 17px); white-space: nowrap; }
   .settings { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 6px 0; }
   .settings button { margin: 0; }
   button.language { display: inline-flex; align-items: center; justify-content: center; gap: 5px;
@@ -292,6 +293,8 @@ let react = [], refuseT = [], happyT = 0, puzzledT = 0, particles = [], shake = 
 let endTimer = -1, stripT = 0, sentRoute = null;
 let keepers = [], gateT = [], laneFlash = null, introT = 0, bannerT = 0, payoff = 0, tier = 0;
 const next = () => Math.min(LEVELS.length, Math.max(1, save.opened));
+// After the last village: the first village still short of three stars (0 before then, or when every village has them).
+const chase = () => save.opened > LEVELS.length ? LEVELS.findIndex((_, i) => (save.best[i + 1] || 0) < 3) + 1 : 0;
 // The bell parity and the keepers' news right now: after the villager the message is leaving, while it travels.
 const nowPhase = () => sending ? sending.phases[sending.i] : trail.state.phase;
 const nowMemo = () => sending ? sending.memos[sending.i] : trail.state.memo;
@@ -367,6 +370,7 @@ function refused(v, why) {
     if (!reduced) shake = Math.max(shake, 2);
   } else {
     refuseT[v] = 1; // a timid villager refusing red news, a sleepy one who went home, a U-turn
+    if (why === 'red') $('boardCue').textContent = word('noRed');
     tone(150, 0.16, 0.07, 'square', -40);
     if (!reduced) shake = Math.max(shake, 3);
   }
@@ -636,9 +640,10 @@ function banner() {
   const c = chapterOf(index), x = W / 2, y = safe.t + 103;
   g.save(); g.globalAlpha = Math.min(1, bannerT * 2);
   g.font = '800 15px ui-rounded, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.beginPath(); roundRect(g, x - 29, y - 15, 58, 30, 15); g.fillStyle = 'rgba(20,12,36,.8)'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#ffd98a'; g.stroke();
-  emblem(g, c, x - 12, y, 9);
-  g.fillStyle = '#ffd98a'; g.fillText(word('number', { n: number(c) }), x + 12, y + 1);
+  const name = word(CHAPTER_NAMES[c - 1]), w = g.measureText(name).width + 50;
+  g.beginPath(); roundRect(g, x - w / 2, y - 15, w, 30, 15); g.fillStyle = 'rgba(20,12,36,.8)'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#ffd98a'; g.stroke();
+  emblem(g, c, x - w / 2 + 19, y, 9);
+  g.fillStyle = '#ffd98a'; g.fillText(name, x + 12, y + 1);
   g.restore();
 }
 // The route as a growing grapevine, with leaves and a grape at each villager.
@@ -800,6 +805,12 @@ function hud(time) {
 }
 const goalCue = () => screen === 'play' && !sending && !result && mode === 'level'
   && (index === 1 || index === 2) && route.length === 1;
+// The villager at the end of the route changed nothing because of a hidden limit: the count stays between one
+// and three, and a parrot with nothing before it to copy repeats nothing.
+function idle() {
+  const node = level.nodes[route.at(-1)];
+  return route.length > 1 && ['more', 'less', 'parrot'].includes(node.kind) && same(trail.msgs.at(-2), trail.msgs.at(-1));
+}
 function updateBoardCue() {
   let text = '';
   if (screen === 'play' && !sending && result !== 'won') {
@@ -811,7 +822,9 @@ function updateBoardCue() {
     else if (node.kind === 'swap') {
       const pair = word(node.arg === 0 ? 'roundPair' : 'pointedPair');
       text = word(same(trail.msgs.at(-2), trail.msgs.at(-1)) ? 'onlySwaps' : 'swapped', { pair });
-    }
+    } else if (node.kind === 'carve') text = word('carved');
+    else if (node.kind === 'flip') text = word('flipped');
+    else if (idle()) text = word({ more: 'mostThree', less: 'leastOne', parrot: 'nothingToRepeat' }[node.kind]);
   }
   if ($('boardCue').textContent !== text) $('boardCue').textContent = text;
 }
@@ -845,6 +858,19 @@ function tutorial(time) {
     cuePlate(x, y, 186, 34);
     g.beginPath(); roundRect(g, x - 84, y - 12, 66, 24, 12); g.fillStyle = CREAM; g.fill();
     change(g, 7 + level.nodes[head].arg, x - 51, y, 59, 21);
+    messagePair(trail.msgs.at(-2), trail.msgs.at(-1), x + 38, y);
+  } else if (!retry && ['carve', 'flip'].includes(level.nodes[head].kind)) {
+    // The hard-hat shaper and the colour swapper: what they do, then the actual before and after.
+    cuePlate(x, y, 186, 34);
+    g.beginPath(); roundRect(g, x - 84, y - 12, 66, 24, 12); g.fillStyle = CREAM; g.fill();
+    change(g, trail.changes.at(-1), x - 51, y, 59, 21);
+    messagePair(trail.msgs.at(-2), trail.msgs.at(-1), x + 38, y);
+  } else if (!retry && idle()) {
+    // A grump at one, an exaggerator at three, a parrot with nothing to repeat: their picture, then "x = x".
+    const node = level.nodes[head];
+    cuePlate(x, y, 186, 34);
+    if (node.kind === 'parrot') badge(g, node, x - 51, y, 66, 24);
+    else { g.beginPath(); roundRect(g, x - 84, y - 12, 66, 24, 12); g.fillStyle = CREAM; g.fill(); change(g, node.kind === 'more' ? 5 : 6, x - 51, y, 59, 21); }
     messagePair(trail.msgs.at(-2), trail.msgs.at(-1), x + 38, y);
   }
   if (!(retry || first)) return;
@@ -950,8 +976,10 @@ function resultWords() {
     pay.replaceChildren(labelledPicture(`${current} · ${stars} → ${nextName}`,
       `${word('chapterProgress', { name: current, score: stars })}. ${last ? word('wholeVillage') : word('chapterNext', { name: nextName })}`));
   }
-  $('next').textContent = word(mode === 'daily' ? 'tomorrow' : last ? 'allDone' : payoff ? 'nextChapter' : 'next');
-  $('next').disabled = mode === 'daily' || last;
+  // The last village: the button goes on to the first village still short of three stars, if there is one.
+  const more = last ? chase() : 0;
+  $('next').textContent = word(mode === 'daily' ? 'tomorrow' : more ? 'chase' : last ? 'allDone' : payoff ? 'nextChapter' : 'next', { n: number(more) });
+  $('next').disabled = mode === 'daily' || (last && !more);
 
   // Draw the picture before the Share tap. The plain-text copy includes the same route and result.
   const run = walk(level, sentRoute);
@@ -1089,7 +1117,7 @@ function show(name) {
 let tab = 0, prerequisite = null; // the chapter (0-based) whose levels the menu shows
 function menu() {
   level = null; finger = null;
-  const n = Number.isFinite(urlLevel) && urlLevel >= 1 ? Math.min(LEVELS.length, urlLevel) : next();
+  const n = Number.isFinite(urlLevel) && urlLevel >= 1 ? Math.min(LEVELS.length, urlLevel) : chase() || next();
   tab = chapterOf(n - 1) - 1;
   prerequisite = null;
   dailyLabel();
@@ -1126,10 +1154,11 @@ function gridLabel(button, text, mark) {
 function levelGrid() {
   setChapter(tab + 1);
   const [a, b] = CHAPTERS[tab];
-  const preferred = urlLevel > 0 ? Math.min(LEVELS.length, urlLevel) : save.opened;
+  const preferred = urlLevel > 0 ? Math.min(LEVELS.length, urlLevel) : chase() || save.opened;
   const n = preferred >= a && preferred <= b ? preferred : a;
   $('play').dataset.level = n;
-  $('play').textContent = word('play', { n: number(n) });
+  $('play').textContent = word(n === chase() ? 'chase' : 'play', { n: number(n) });
+  $('play').classList.toggle('chase', n === chase());
   const tabs = $('tabs'); tabs.textContent = '';
   CHAPTERS.forEach(([a, b], c) => {
     const btn = document.createElement('button'), open = openTo(a - 1);
@@ -1183,7 +1212,11 @@ $('toMenu').addEventListener('click', () => {
   rec.end('left', { level: mode === 'daily' ? `daily-${dailyKey}` : index + 1, stars: 0, sends, hints });
   paused = false; snd.release(); show('menu');
 });
-$('next').addEventListener('click', () => { if (mode === 'level' && index + 1 < LEVELS.length) begin(index + 1); });
+$('next').addEventListener('click', () => {
+  if (mode !== 'level') return;
+  if (index + 1 < LEVELS.length) begin(index + 1);
+  else if (chase()) begin(chase() - 1);
+});
 $('again').addEventListener('click', () => begin(index, mode));
 $('doneMenu').addEventListener('click', () => show('menu'));
 onLeave(pause);
