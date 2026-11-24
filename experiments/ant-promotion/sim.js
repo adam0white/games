@@ -129,8 +129,38 @@ function callOld(s) { // the next one in turn that is still stronger comes looki
     const a = a0 + i * 0.52, x = p.x + Math.cos(a) * 560, y = p.y + Math.sin(a) * 560;
     if (x > 60 && y > 60 && x < WORLD - 60 && y < WORLD - 60) { m.x = x; m.y = y; m.a = a + Math.PI; break; }
   }
-  m.hunt = OLD_HUNT; m.tire = 0; s.oldHunts = (s.oldHunts || 0) + 1; s.oldAt = s.t + OLD_EVERY;
+  m.hunt = OLD_HUNT; m.tire = 0; m.skillCd = OLD_SKILL.first; s.oldHunts = (s.oldHunts || 0) + 1; s.oldAt = s.t + OLD_EVERY;
   s.events.push({ t: 'oldHunt', id: m.id, name: FORMS[m.f].name });
+}
+
+// A hunting old animal uses its own skill (tester t1, note #225, 2026-11-24). It stops and shows what is coming for `wind` seconds, uses it, and is
+// then out of breath (`puff`, an idea of the lab's: the moment to get away), so a player who keeps running straight is still never caught.
+//   sting, roar: the player within reach when it lands is slowed, never stopped. A shell, a dive or safe time blocks it.
+//   leap, dive: a dash along the line it aimed at the start, so a step aside makes it miss.   sprint: a shorter burst that can turn.
+//   shell: for a while it does not tire and cannot be stung.
+export const OLD_SKILL = { wind: 0.7, rest: 3.4, first: 1.2, puff: 0.9, near: 260, close: 55,
+  sting: { reach: 130, slow: 0.7, secs: 1.2 }, roar: { reach: 190, slow: 0.75, secs: 1 }, leap: { up: 2.2, secs: 0.4 }, dive: { up: 1.6, secs: 0.8 }, sprint: { up: 1.35, secs: 1.1 }, shell: { up: 0.95, secs: 2.5 } };
+const oldCalm = m => { m.wind = m.burst = m.guard = m.puff = 0; };
+export const oldAims = m => { const W = m.wind > 0 && powerFor(FORMS[m.f]); return W ? { kind: W.kind, reach: OLD_SKILL[W.kind].reach || 0, a: m.aim, k: 1 - m.wind / OLD_SKILL.wind } : null; };
+function oldSkill(s, m, M, F, d, to, speed, dt) { // one tick of it, while it hunts; returns its speed
+  const W = powerFor(M), p = s.player; if (!W) return speed;
+  const K = OLD_SKILL[W.kind], open = p.safe <= 0 && !(p.veil > 0) && !(p.shell > 0), line = W.kind === 'leap' || W.kind === 'dive';
+  if (m.skillCd > 0) m.skillCd -= dt;
+  if (m.puff > 0) { m.puff -= dt; return speed * 0.5; }
+  if (m.burst > 0) { m.burst -= dt; if (line) m.want = m.aim; if (m.burst <= 0) { m.guard = 0; m.puff = OLD_SKILL.puff; } return W.kind === 'shell' ? Math.max(speed, Math.min(chasePace(M, F), F.speed * K.up)) : F.speed * K.up; }
+  if (m.wind > 0) {
+    m.want = line ? m.aim : to; if ((m.wind -= dt) > 0) return 0;
+    const hit = !!K.reach && open && d < K.reach + M.r + F.r;
+    if (K.reach) { if (hit) { p.slow = K.secs; p.slowK = K.slow; } m.puff = OLD_SKILL.puff; } else { m.burst = K.secs; if (W.kind === 'shell') { m.guard = K.secs; m.tire = 0; } }
+    s.events.push({ t: 'oldSkill', id: m.id, kind: W.kind, label: W.label, hit, x: m.x, y: m.y, reach: K.reach || 0 });
+    return 0;
+  }
+  const gap = d - M.r - F.r;
+  if (m.hunt > 0 && !(m.skillCd > 0) && open && gap > OLD_SKILL.close && gap < (K.reach ? K.reach * 0.9 : OLD_SKILL.near)) {
+    m.wind = OLD_SKILL.wind; m.aim = to; m.skillCd = OLD_SKILL.rest; s.oldSkills = (s.oldSkills || 0) + 1; s.events.push({ t: 'oldWind', id: m.id, kind: W.kind, label: W.label, x: m.x, y: m.y });
+    return 0;
+  }
+  return speed;
 }
 
 // nemesis: what nemesisSave() returned on an earlier visit, or null for a world with no rival.
@@ -229,12 +259,12 @@ export function step(s, input) {
   s.t += dt; s.tick++;
   if (p.safe > 0) p.safe -= dt;
   if (p.busy > 0) p.busy -= dt;
-  if (p.cd > 0) p.cd -= dt; if (p.boost > 0) p.boost -= dt; if (p.veil > 0) p.veil -= dt; if (p.shell > 0) p.shell -= dt;
+  if (p.cd > 0) p.cd -= dt; if (p.boost > 0) p.boost -= dt; if (p.veil > 0) p.veil -= dt; if (p.shell > 0) p.shell -= dt; if (p.slow > 0) p.slow -= dt;
   let ix = input?.x || 0, iy = input?.y || 0; const il = Math.hypot(ix, iy);
   if (il > 1) { ix /= il; iy /= il; }
   if (il > 0.01) { p.a = Math.atan2(iy, ix); p.ph += Math.min(1, il) * dt * 10; }
   if (input?.power && !s.choosing) usePower(s); // after the heading: a leap goes the way the stick points now
-  const pv = F.speed * (p.boost > 0 ? p.boostK : 1);
+  const pv = F.speed * (p.boost > 0 ? p.boostK : 1) * (p.slow > 0 ? p.slowK : 1);
   p.x = clamp(p.x + ix * pv * dt, F.r, WORLD - F.r); p.y = clamp(p.y + iy * pv * dt, F.r, WORLD - F.r);
 
   if (s.oldAt && s.t >= s.oldAt) callOld(s);
@@ -294,7 +324,8 @@ export function step(s, input) {
           speed = pace * tirePace(m);
           if (m.pounce > 0) speed = Math.max(speed, F.speed * POUNCE.up);
           else if (!m.old && !(m.spring > 0) && pounces(M, F) && tirePace(m) === 1 && p.safe <= 0 && d < (range * F.stealth + F.r) * POUNCE.near) { m.pounce = POUNCE.secs; m.spring = POUNCE.rest; s.pounced = (s.pounced || 0) + 1; s.events.push({ t: 'pounce', id: m.id, name: M.name, x: m.x, y: m.y }); }
-          m.tire = (m.tire || 0) + dt;
+          if (m.old) speed = oldSkill(s, m, M, F, d, to, speed, dt);
+          if (!(m.guard > 0)) m.tire = (m.tire || 0) + dt;
           if (m.tire >= TIRE.spent) { m.alert = false; m.hunt = 0; m.winded = TIRE.rest; m.tire = TIRE.fresh; s.tired++; s.events.push({ t: 'tired', id: m.id, name: M.name, x: m.x, y: m.y }); }
         }
         if (T) {
@@ -334,6 +365,7 @@ export function step(s, input) {
       }
     }
     if (!m.alert) m.pounce = 0;
+    if (m.old && (!hunting || m.stun > 0)) oldCalm(m);
     if (T && wasAlert && !m.alert) { // the player got away
       if (N.chase > 1.5 && power > F.power && !s.dead) { N.escapes++; s.events.push({ t: 'nemEscape', escapes: N.escapes }); }
       N.chase = 0; N.stalk = 0; N.commit = false;
@@ -426,7 +458,7 @@ function usePower(s) {
   const calm = m => { m.alert = false; m.hunt = 0; if (m.nem && s.nemesis) { s.nemesis.chase = 0; s.nemesis.stalk = 0; s.nemesis.commit = false; } }; // the rival starts its hunt again from nothing
   if (W.kind === 'sting') {
     let best = null, bd = reach + F.r;
-    for (const m of s.mobs) { const d = Math.hypot(m.x - p.x, m.y - p.y) - FORMS[m.f].r; if (d < bd) { bd = d; best = m; } }
+    for (const m of s.mobs) { if (m.guard > 0) continue; const d = Math.hypot(m.x - p.x, m.y - p.y) - FORMS[m.f].r; if (d < bd) { bd = d; best = m; } }
     if (!best) { s.events.push({ t: 'powerMiss', label: W.label }); p.cd = 1; return; } // nothing in reach: try again in a second
     best.stun = W.stun; calm(best); hit = 1; s.events.push({ t: 'stun', x: best.x, y: best.y });
   } else if (W.kind === 'roar') {
@@ -442,7 +474,7 @@ function usePower(s) {
 
 export function choose(s, i) {
   if (!s.choosing) return;
-  const f = s.choosing[i]; s.player.stack.push(f.id); s.player.xp = 0; s.player.safe = 1.5; s.player.cd = 0; s.player.boost = 0; s.player.veil = 0; s.player.shell = 0; s.choosing = null;
+  const f = s.choosing[i]; s.player.stack.push(f.id); s.player.xp = 0; s.player.safe = 1.5; s.player.cd = 0; s.player.boost = 0; s.player.veil = 0; s.player.shell = 0; s.player.slow = 0; s.choosing = null;
   s.events.push({ t: 'evolve', name: f.name });
 }
 
@@ -451,7 +483,7 @@ export function revive(s, restart) {
   if (!s.dead) return;
   const p = s.player;
   if (restart) { p.stack = [ANT]; s.won = false; } else if (p.stack.length > 1) p.stack.pop();
-  p.xp = 0; p.safe = 2.5; p.busy = 0; p.cd = 0; p.boost = 0; p.veil = 0; p.shell = 0; p.x = WORLD / 2; p.y = WORLD / 2; s.dead = null;
+  p.xp = 0; p.safe = 2.5; p.busy = 0; p.cd = 0; p.boost = 0; p.veil = 0; p.shell = 0; p.slow = 0; p.x = WORLD / 2; p.y = WORLD / 2; s.dead = null;
   const F = me(s);
   s.mobs = s.mobs.filter(m => m.nem || m.old || powerOf(m) <= F.power || Math.hypot(m.x - p.x, m.y - p.y) > 520);
   for (const m of s.mobs) if (m.old && powerOf(m) > F.power) { m.alert = false; m.hunt = 0; if (Math.hypot(m.x - p.x, m.y - p.y) < 650) Object.assign(m, farSpot(s)); }

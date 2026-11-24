@@ -583,3 +583,31 @@ A real phone; whether the hunts are exciting or only a nuisance; whether the dim
 
 ### Left as a proposal (2026-11-24, note #201)
 - Keep roaming at the top is unchanged: the old animals come only after starting again. A harder meadow each time round (more than three, or stronger old animals on the third climb) needs the tester's word first.
+
+## 2026-11-24: old hunters use their skills (tester t1, note #225, answering #218)
+
+Asked what the climb after that should bring, the tester chose "Old hunters use their skills".
+
+### Done
+- A hunting old animal uses its own skill (`OLD_SKILL` in `sim.js`), the same one the player had as that animal. It stops for 0.7 s and shows what is coming in red, with the skill's name: a circle for a roar or a sting, a line for a leap or a dive, a filling ring for a sprint or a shell.
+- A roar or sting slows the player in reach (to 0.75 or 0.7 for about a second) and never stops them; a shell, a dive or safe time blocks it. A leap or dive follows the line it showed, so a step aside makes it miss. A shell keeps it from tiring and from being stung for 2.5 s.
+- **Own idea:** after the skill it is out of breath for 0.9 s (half speed), the moment to get away. Easy to remove: `puff`.
+- The first skill of a visit is explained once, in English and Turkish. No save key changed.
+
+### Numbers
+Section 6 of `bots.mjs`, 6 seeds, 12 minutes, median top level / median deaths:
+
+| | without old animals | with, before (#201) | with skills |
+|---|---|---|---|
+| classic strong | 9 / 1 | 7 / 2 | 7 / 2 |
+| classic fast | 13 / 4 | 12 / 5 | 12 / 5 |
+| classic sneaky | 18 / 0 | 18 / 0 | 16 / 0 |
+| Wild strong | 6 / 2 | 5 / 3 | 7 / 3 |
+| Wild fast | 11 / 10 | 10 / 9 | 9 / 9 |
+| Wild sneaky | 12 / 4 | 12 / 4 | 12 / 4 |
+
+### Checks
+`bots.mjs`: each species with a skill, against each kind of player, at five distances: shown for 0.6 s or more, never catches a player who keeps running straight (tightest gap 62), all six kinds used; what blocks a slow; a dive keeps to its line and catches a player who stays in it; a stun stops it; a revive ends a slow. Five known-bad changes to the rules each fail (a faster dive, a short warning, a slow through a shell, a dive that steers, a skill that survives a stun). Without old animals the world ends identical to main's under the same steering (24 runs). Screenshots of Howl, Pounce and Sprint in Cartoon and 3D looked at (WebKit iPhone 13).
+
+### Not verified
+A real phone; whether the hunts are more exciting; the skills at high levels by hand. The straight runner is never caught by design, so the skills bite mostly on a player who stops or turns.
