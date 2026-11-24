@@ -3,7 +3,7 @@
 // 5. the rival: a death makes one, it persists and gains power, no animal eats it, temperaments differ, it can be eaten
 import assert from 'node:assert/strict';
 import { SPAWN_WEIGHTS, HIDE_S, hideReady, SAME_FAST, FAST_CAP, crown, powerOf, nemesisMob, nemesisSave, cleanKnobs, TEMPERAMENT_NAMES, NEM_STEP, NEM_MAX_BONUS, NEM_PRIZE, MOBS,
-  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY, TIRE } from './sim.js';
+  FORMS, ANT, TOP, CONE, encounter, create, step, choose, revive, me, level, catchable, optionsFor, article, chasePace, PACE_UP, PREY, TIRE, POUNCE, pounces } from './sim.js';
 const seeds = Number(process.argv[2] ?? 20), minutes = Number(process.argv[3] ?? 12);
 
 // 1. Rule table. Player: power 50, speed 124.
@@ -165,6 +165,24 @@ console.log('wild rules: hide and hunt checks pass; hunters tire');
     assert.ok(moved >= FORMS[hunter.f].speed - 1, `a hunter runs at full speed (${moved.toFixed(0)} against ${FORMS[hunter.f].speed})`);
   }
   console.log(`stronger animals keep up with a boosted runner (fast ones ${Math.round((PACE_UP - 1) * 100)}% faster); hunters run at full speed`);
+}
+
+{ // a hunter pounces on a fast animal (note #149). A hunter sees the player at a share of its sight; the player runs straight away.
+  const run = (pick, H, share) => {
+    const st = [ANT]; for (let l = 1; l < 8; l++) st.push(optionsFor(l)[pick].id);
+    const s = create(1, st), p = s.player, F = me(s); p.safe = 0; p.x = 400; p.y = 1000;
+    s.mobs = [{ id: 1, f: H.id, x: p.x - (H.range * F.stealth + F.r) * share, y: 1000, a: 0, alert: false, lost: 0, timer: 99, want: 0, walk: false, ph: 0 }]; const m = s.mobs[0];
+    for (let i = 0; i < 660 && !s.dead && p.x < 1900; i++) { s.mobs = [m]; step(s, { x: 1, y: 0 }); }
+    return { caught: !!s.dead, pounced: s.pounced || 0 };
+  };
+  const [slow, fast, medium] = optionsFor(8);
+  assert.deepEqual([slow.pace, fast.pace, medium.pace], ['slow', 'fast', 'medium']);
+  assert.ok(run(1, medium, 0.4).caught, 'a medium hunter that is close catches a fast player'); assert.ok(run(1, fast, 0.6).caught, 'a fast one from farther');
+  assert.ok(!run(1, medium, 0.8).caught && !run(1, fast, 0.95).caught, 'seen from far, a fast player still gets away');
+  for (const share of [0.35, 0.6, 0.8]) assert.deepEqual(run(1, slow, share), { caught: false, pounced: 0 }, 'a slow hunter never pounces');
+  for (const pick of [0, 2]) for (const H of [slow, fast, medium]) assert.equal(run(pick, H, 0.5).pounced, 0, 'no pounce on a strong or sneaky animal');
+  assert.ok(POUNCE.secs < TIRE.fresh); assert.equal(pounces(slow, { role: 'runner' }), false);
+  console.log('pounce: a close medium or fast hunter catches a fast player; a far or a slow one does not');
 }
 
 // 5. The rival. With none passed to create() and nobody crowned, every line above is a world without a rival.

@@ -111,12 +111,17 @@ export function create(seed = 1, stack = [ANT], xp = 0, weights = SPAWN_WEIGHTS,
 // each earlier sneaky pick shrinks the distance a sneaky animal is seen from by 5%. `again` counts the picks of this kind.
 // Fast again (revised 2026-11-23, note #46): 5% a pick showed as about 2% on screen, because the view zooms out each level.
 // Now SAME_FAST a pick, capped at FAST_CAP times the plain fast speed. fastBoost(k) is the factor after k fast picks.
-export const SAME_FAST = 1.12, FAST_CAP = 2.5, SAME_SNEAK = 0.95;
+export const SAME_FAST = 1.12, FAST_CAP = 1.8, SAME_SNEAK = 0.95;
 export const fastBoost = k => Math.min(FAST_CAP, SAME_FAST ** Math.max(0, k - 1));
 // Stronger animals keep up (tester t1, note #101, 2026-11-23): once repeat fast picks made the player faster than every animal,
 // nothing could catch them. A stronger animal now runs with the player's fast boost, and a fast one runs PACE_UP faster than that.
 // A player without a fast boost (every brute or sneak, and a first fast pick) meets exactly the speeds it met before.
-export const PACE_UP = 1.06;
+export const PACE_UP = 1.12;
+// A hunter pounces on a fast animal (tester t1, note #149, 2026-11-23: "you just outrun every mob"). A medium or fast stronger animal that
+// is fresh and within `near` of its sight distance dashes at `up` times the player's speed for `secs`, then needs `rest` seconds.
+// Only a player whose current animal is a fast pick meets it; slow hunters never pounce, so what is marked slow can still be outrun.
+export const POUNCE = { near: 0.62, up: 1.3, secs: 1, rest: 6 };
+export const pounces = (M, F) => F.role === 'runner' && M.pace !== 'slow';
 // Animals hunting each other try harder (note #106, 2026-11-23: "the animals don't strive and try enough to kill each other").
 // Before: chase at 0.8 of plain speed, see prey within 0.85 of sight range, give up after 6 s, full for 15 s after a kill;
 // prey flees at full speed, so only a faster hunter ever caught anything. Now a hunter runs at full speed, lunges when close,
@@ -215,6 +220,7 @@ export function step(s, input) {
     const T = m.nem ? TEMPERAMENTS[N.knobs.temperament] : null, power = powerOf(m);
     const range = M.range * (T ? T.sight : 1), cone = CONE * (T ? T.cone : 1);
     if (m.winded > 0) m.winded -= dt;
+    if (m.spring > 0) m.spring -= dt; if (m.pounce > 0) m.pounce -= dt;
     const sees = p.safe <= 0 && !(m.winded > 0) && (m.hunt > 0 || d < range * F.stealth + F.r && Math.abs(wrap(to - m.a)) < cone);
     const wasAlert = m.alert;
     if (sees) { if (!m.alert && power !== F.power) s.events.push({ t: 'notice', strong: power > F.power, id: m.id, nem: !!m.nem }); m.alert = true; m.lost = 0; }
@@ -245,7 +251,10 @@ export function step(s, input) {
       if (!flees) {
         m.want = to; const pace = chasePace(M, F); speed = pace; hunting = true;
         if (!T) {
-          speed = pace * tirePace(m); m.tire = (m.tire || 0) + dt;
+          speed = pace * tirePace(m);
+          if (m.pounce > 0) speed = Math.max(speed, F.speed * POUNCE.up);
+          else if (!(m.spring > 0) && pounces(M, F) && tirePace(m) === 1 && p.safe <= 0 && d < (range * F.stealth + F.r) * POUNCE.near) { m.pounce = POUNCE.secs; m.spring = POUNCE.rest; s.pounced = (s.pounced || 0) + 1; s.events.push({ t: 'pounce', id: m.id, name: M.name, x: m.x, y: m.y }); }
+          m.tire = (m.tire || 0) + dt;
           if (m.tire >= TIRE.spent) { m.alert = false; m.hunt = 0; m.winded = TIRE.rest; m.tire = TIRE.fresh; s.tired++; s.events.push({ t: 'tired', id: m.id, name: M.name, x: m.x, y: m.y }); }
         }
         if (T) {
@@ -283,6 +292,7 @@ export function step(s, input) {
         if (Math.hypot(hx, hy) > RADIUS[N.knobs.territory]) { m.want = Math.atan2(hy, hx); speed = M.speed * 0.6; turn = 4; }
       }
     }
+    if (!m.alert) m.pounce = 0;
     if (T && wasAlert && !m.alert) { // the player got away
       if (N.chase > 1.5 && power > F.power && !s.dead) { N.escapes++; s.events.push({ t: 'nemEscape', escapes: N.escapes }); }
       N.chase = 0; N.stalk = 0; N.commit = false;
