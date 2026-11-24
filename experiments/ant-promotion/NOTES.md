@@ -514,3 +514,27 @@ Wild, careful bot with skills, 6 seeds, 12 minutes, median top level / median de
 | every wait three times as long | 14 / 2 | | 10 / 7 |
 
 No single kind carries it, and longer waits barely move it: the bot uses a skill only about 10 times a run, each at the exact moment it is noticed, and each use is a death avoided. Seeds differ a lot (top level 10 to 18 in one row). The numbers were left as they are until a person has played: a bot's reactions are not a person's, and six seeds cannot separate these rows.
+
+## 2026-11-24: skills that hunt, and a second reviewer's bug hunt
+
+### Hunting uses
+Before this only the roar and the sting helped a hunt. Now:
+- **Leap:** weaker animals within 40 units of where you land are pinned for 0.9 s.
+- **Sprint and dive:** while they last, the catch rule uses your boosted speed, so you can catch prey that is faster than you and has noticed you.
+- **Shell:** a stronger animal that bites the shell is dazed for 2 s ("ouch!").
+
+### Bugs found by a second model reading main, and fixed
+1. The skill button could stay hidden after a pause (the button text had not changed, so the code that shows it again was skipped).
+2. A dive did not hide you from the rival, though the page says nothing sees you. A sting, roar, leap or dive now also resets the rival's stalk, so it starts its hunt again instead of resuming a committed charge.
+3. A second finger on the play area took the steering stick from the first (`kit/stick.js`). The first finger now owns the stick until it lifts. The lab ant pages use the same stick.
+4. A sprint overtook prey but could not eat it (the catch rule used the plain speed). Same change as "sprint and dive" above.
+5. Enter on the focused skill button, or a screen reader's activate, did nothing.
+6. A leap pressed together with a new direction went the old way.
+7. A promotion kept the old animal's sprint or dive running.
+8. A stunned hunter could still eat the animal it was chasing.
+9. The winning card said "Nothing here can eat you". A Dragon (184) eats a Hydra (180). It now says "You are at the top."
+
+Not fixed: in the 3D look the green food arrow decides "off screen" with the flat view's rectangle, so near the edges it can show for visible food or hide for food just off screen.
+
+### Checks
+`bots.mjs`: a direct check for each hunting use and for 6, 7 and 8. Main's rules and these, fed the same steering without the button, still end identical (24 runs). WebKit iPhone 13: pause and resume shows the button again; a second finger leaves the steering vector unchanged and the first finger still steers after it lifts; a click on the button uses the skill; a real promotion shows the skill line. Not verified: a real phone, and the rival fix (2) has no direct check.
