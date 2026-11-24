@@ -193,6 +193,7 @@ function finish() {
 function quit() {
   if (!s || !playing) { show('menu'); return; }
   rec.end('left', { coins: s.coins, served: s.served, lost: s.lost, bestStreak: s.bestStreak, why: 'menu' });
+  save.bank += s.coins; save.served += s.served; store(); // a shift left early keeps its coins (tester t1, note #150); it does not count as a shift, a best or an unlock
   playing = false; paused = false; snd.release(); show('menu');
 }
 

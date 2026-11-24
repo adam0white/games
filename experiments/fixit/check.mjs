@@ -184,8 +184,12 @@ async function run(page, phone) {
   await sleep(500);
   await page.screenshot({ path: join(SHOTS, `${phone}-5-new-job.png`) });
   await playJob(page, 'new wheel');
+  const before = await state(); assert.ok(before.coins > 0, 'coins earned before leaving');
   await page.click('#pause'); await page.click('#quit');
   assert.equal((await state()).screen, 'menu', 'Menu from the pause card');
+  st = await state(); assert.equal(st.bank, before.bank + before.coins, 'Menu keeps the coins of the shift (note #150)'); assert.equal(st.shifts, before.shifts, 'a shift left early is not counted');
+  assert.equal(await page.textContent('#bank'), String(st.bank), 'the menu shows the kept coins');
+  assert.equal(JSON.parse(await page.evaluate(() => localStorage.getItem('fixit-save'))).bank, st.bank, 'the kept coins are saved');
   await sleep(300);
   assert.equal(labSent.filter(r => r.game === 'fixit' && r.kind === 'run').at(-1).data.outcome, 'left', 'quitting is sent as left');
 
