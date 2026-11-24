@@ -96,13 +96,13 @@ test('a round ends, names a winner, rests, and starts clean', () => {
 test('bots fill the room, keep the colonies even, and leave as people join', () => {
   const w = createWorld(6); balance(w);
   const count = () => { const n = [0, 0, 0, 0], p = [0, 0, 0, 0]; for (const a of w.ants) if (a) { n[a.colony]++; if (!a.bot) p[a.colony]++; } return [n, p]; };
-  assert.deepEqual(count()[0], [6, 6, 6, 6]);
+  assert.deepEqual(count()[0], [8, 8, 8, 8]);
   assert.equal(w.count, MIN_ANTS);
   const people = [];
   for (let i = 0; i < 30; i++) { people.push(addAnt(w, pickColony(w), false, 0, 0)); balance(w); }
   let [n, p] = count();
   assert.ok(Math.max(...p) - Math.min(...p) <= 1, 'people are spread evenly');
-  assert.ok(new Set(n).size === 1 && n[0] === Math.max(...p), 'every colony has the same number of ants');
+  assert.ok(new Set(n).size === 1 && n[0] === Math.max(MIN_ANTS / C.COLONIES, ...p), 'every colony has the same number of ants');
   for (const a of people.filter(a => a.colony === 0)) removeAnt(w, a);
   balance(w); [n, p] = count();
   assert.deepEqual([p[0], new Set(n).size], [0, 1], 'bots stand in for a colony whose people left');
@@ -192,4 +192,99 @@ test('the directory packs the fullest room with space and replaces a full one', 
   assert.equal(assign(rooms, 'weur', 4, ['weur-0'], 30000), 'weur-2', 'a room that refused is skipped');
   assert.equal(assign(rooms, 'weur', 4, [], 30000 + 50000), 'weur-0', 'rooms that stop reporting are forgotten');
   assert.equal(rooms.size, 1);
+});
+
+test('one to five people share thirty-two ants, with every bot marked', () => {
+  for (let people = 1; people <= 5; people++) {
+    const w = createWorld(42);
+    for (let i = 0; i < people; i++) { addAnt(w, pickColony(w), false, 0, 0); balance(w); }
+    assert.equal(w.count, 32);
+    assert.equal(w.ants.filter(a => a?.bot).length, 32 - people);
+    const me = w.ants.find(a => a && !a.bot), ants = new Map();
+    step(w);
+    const r = new P.Reader(net.snapshot(w, me, net.newView(), 0)); r.u8();
+    P.readSnap(r, ants, new Map(), C.POS_Q, C.OWN_Q);
+    for (const a of ants.values()) assert.equal(a.bot, w.ants[a.id].bot);
+  }
+});
+
+test('food replenishes in the shared middle, including after a round reset', () => {
+  const w = createWorld(42); balance(w);
+  const check = () => {
+    assert.ok(w.foodCount >= 150);
+    for (let id = 0; id < C.MAX_FOOD; id++) if (w.fkind[id]) {
+      assert.ok(Math.abs(w.fx[id] - C.WORLD / 2) <= 250);
+      assert.ok(Math.abs(w.fy[id] - C.WORLD / 2) <= 250);
+    }
+  };
+  for (let i = 0; i < 100; i++) step(w);
+  check();
+  w.tick = w.roundEnd - 1; step(w);
+  w.tick = w.breakUntil - 1; step(w);
+  for (let i = 0; i < 100; i++) step(w);
+  check();
+});
+
+test('a bot with no visible target heads toward the public food patch', () => {
+  const w = createWorld(42), a = addAnt(w, 0, true, 0, 0);
+  think(w, a);
+  const toward = Math.atan2(C.WORLD / 2 - a.y, C.WORLD / 2 - a.x);
+  assert.ok(Math.abs(angleOf(a.angle) - toward) < 0.2);
+  assert.ok(a.move);
+});
+
+// People follow the marker, then wait in the patch. This measures traffic, not fun.
+test('small rooms meet enemies before twenty seconds and keep traffic in the patch', t => {
+  let latestEnemy = 0, worstEmpty = 0, worstGap = 0;
+  for (const seed of [1, 7, 42]) for (const people of [1, 2, 3, 4, 5]) {
+    const w = createWorld(seed), humans = [];
+    for (let i = 0; i < people; i++) { humans.push(addAnt(w, pickColony(w), false, 0, 0)); balance(w); }
+    let firstEnemy = Infinity, empty = 0, samples = 0, longest = 0, gap = 0;
+    for (let t = 0; t < 120 * C.TICK_HZ; t++) {
+      for (const a of w.ants) if (a?.bot) think(w, a);
+      for (const a of humans) {
+        const dx = C.WORLD / 2 - a.x, dy = C.WORLD / 2 - a.y;
+        setInput(w, a, byteOf(Math.atan2(dy, dx)), Math.hypot(dx, dy) > 50, false);
+      }
+      step(w);
+      const me = humans[0];
+      let others = 0;
+      for (const a of w.ants) if (a && a !== me && a.alive && Math.abs(a.x - me.x) <= 550 * 390 / 844 && Math.abs(a.y - me.y) <= 550) {
+        others++;
+        if (a.colony !== me.colony) firstEnemy = Math.min(firstEnemy, w.tick);
+      }
+      if (w.tick > 20 * C.TICK_HZ) {
+        samples++; if (!others) empty++;
+        gap = others ? 0 : gap + 1; longest = Math.max(longest, gap);
+      }
+    }
+    latestEnemy = Math.max(latestEnemy, firstEnemy / C.TICK_HZ);
+    worstEmpty = Math.max(worstEmpty, empty / samples); worstGap = Math.max(worstGap, longest / C.TICK_HZ);
+    const label = `seed ${seed}, people ${people}`;
+    assert.ok(firstEnemy < 20 * C.TICK_HZ, label);
+    assert.ok(empty / samples < 0.15, `${label}: empty fraction ${empty / samples}`);
+    assert.ok(longest < 6 * C.TICK_HZ, `${label}: empty ticks ${longest}`);
+    assert.ok(w.ants.some(a => a && a.deaths > 0), `${label}: bots fight`);
+  }
+  t.diagnostic(`Latest first enemy ${latestEnemy}s; worst empty fraction ${worstEmpty.toFixed(3)}; longest empty stretch ${worstGap}s`);
+});
+
+
+test('a room that shrinks clears distant food and replenishes the middle', () => {
+  const w = createWorld(42), people = [];
+  for (let i = 0; i < 240; i++) people.push(addAnt(w, i % C.COLONIES, false, 0, 0));
+  for (let t = 0; t < 100; t++) step(w);
+  assert.ok(w.fx.some((x, id) => w.fkind[id] && Math.abs(x - C.WORLD / 2) > 250));
+  const me = people[0], view = net.newView(), food = new Map(), ants = new Map();
+  // A client that already knows the far food must receive its removal too.
+  me.x = 1600; me.y = 1600;
+  let r = new P.Reader(net.snapshot(w, me, view, 0)); r.u8(); P.readSnap(r, ants, food, C.POS_Q, C.OWN_Q);
+  for (const a of people.slice(1)) removeAnt(w, a);
+  balance(w); step(w);
+  assert.equal(w.count, 32);
+  for (let id = 0; id < C.MAX_FOOD; id++) if (w.fkind[id]) assert.ok(Math.abs(w.fx[id] - 1600) <= 250 && Math.abs(w.fy[id] - 1600) <= 250);
+  r = new P.Reader(net.snapshot(w, me, view, 0)); r.u8(); P.readSnap(r, ants, food, C.POS_Q, C.OWN_Q);
+  for (const id of food.keys()) assert.ok(w.fkind[id], 'removed food leaves the client view');
+  for (let t = 0; t < 100; t++) step(w);
+  assert.ok(w.foodCount >= 150);
 });

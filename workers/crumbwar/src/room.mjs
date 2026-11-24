@@ -10,18 +10,48 @@ import * as net from './net.mjs';
 
 const TICK_MS = 1000 / C.TICK_HZ;
 const PER_IP = 4, MSG_RATE = 1.5, MSG_BURST = 60; // messages: 30 a second sustained, per connection
+const MARK_TICKS = 60 * C.TICK_HZ, WINDOW_MS = 2000, SLOW_MS = 200, SLOW_EVERY_MS = 60_000;
 const IDLE_TICKS = 90 * C.TICK_HZ, LAG_TICKS = 8 * C.TICK_HZ, GHOST_TICKS = 30 * C.TICK_HZ, EMPTY_TICKS = 5 * C.TICK_HZ;
 
 export class Room extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.world = null; this.clients = new Map(); this.ghosts = new Map(); this.timer = null; this.name = ''; this.cap = 0; this.burn = 0;
-    this.stat = { wakes: 0, late10: 0, late50: 0, maxLate: 0, dropped: 0, bytesOut: 0, msgsOut: 0, msgsIn: 0, kicks: 0, joins: 0 };
+    this.stat = { wakes: 0, late10: 0, late50: 0, maxLate: 0, dropped: 0, bytesOut: 0, msgsOut: 0, msgsIn: 0, kicks: 0, joins: 0, quietMax: 0, stallMax: 0, slowWindows: 0 };
+    // A running room leaves a mark in storage and removes it when it stops by itself. A mark found here means the
+    // memory was lost while the room ran: Cloudflare reset it for using too much CPU, moved it, or new code was
+    // deployed. The mark names the code version, so a deploy is told apart from a reset. See DECISIONS.md, "Alerts".
+    this.version = env.VERSION?.id || 'dev';
+    try {
+      ctx.storage.sql.exec('CREATE TABLE IF NOT EXISTS mark (k TEXT PRIMARY KEY, v TEXT)');
+      const row = ctx.storage.sql.exec("SELECT v FROM mark WHERE k = 'run'").toArray()[0];
+      if (row) {
+        ctx.storage.sql.exec('DELETE FROM mark');
+        const m = JSON.parse(row.v), deploy = m.version !== this.version;
+        this.alert(deploy ? 'room_redeployed' : 'room_lost', m.name, { people: m.people, ticksPerSecond: m.rate, markAgeSeconds: Math.round((Date.now() - m.at) / 1000) });
+      }
+    } catch {}
     // A socket that outlived the memory it belonged to has no ant. Close it; the page joins again.
     for (const ws of ctx.getWebSockets()) try { ws.close(4002, 'restart'); } catch {}
   }
 
   people() { return this.clients.size; }
+
+  // One line in Workers Logs, one point in Analytics Engine and, for the kinds a person should hear about, one row
+  // in the alerts list that the watch job reads. Nothing here names a player or an address.
+  alert(kind, room, detail) {
+    const test = String(room || '').startsWith('lt-');
+    try { console[kind === 'room_redeployed' ? 'log' : 'error'](JSON.stringify({ event: kind, room, test, ...detail })); } catch {}
+    try { this.env.METRICS?.writeDataPoint({ indexes: [kind], blobs: [kind, room || '', this.version], doubles: [detail.people || 0, detail.ticksPerSecond || 0] }); } catch {}
+    if (kind !== 'room_redeployed') this.ctx.waitUntil(this.env.DIRECTORY.getByName('alerts').alert(kind, room || '', test, JSON.stringify(detail)).catch(() => {}));
+  }
+  mark() {
+    const w = this.world;
+    try {
+      if (w) this.ctx.storage.sql.exec("INSERT OR REPLACE INTO mark VALUES ('run', ?)", JSON.stringify({ name: this.name, version: this.version, at: Date.now(), people: this.people(), rate: this.rate ?? C.TICK_HZ }));
+      else this.ctx.storage.sql.exec('DELETE FROM mark');
+    } catch {}
+  }
 
   async fetch(request) {
     const q = new URL(request.url).searchParams, trusted = q.get('trusted') === '1', ip = q.get('ip') || '?';
@@ -74,6 +104,25 @@ export class Room extends DurableObject {
     const client = this.clients.get(ws), w = this.world;
     if (!client || !w) return;
     this.stat.msgsIn++;
+    // An incoming message carries a fresh clock, which a timer on Cloudflare does not. Two measures come from it:
+    // the longest silence between messages, and how far the ticks fell behind real time in a two second window. Two slow windows in a row raise an alert; one
+    // alone does not, because a room's first second is always slow.
+    const now = Date.now(), s = this.stat;
+    if (this.heardAt && now - this.heardAt > s.quietMax) s.quietMax = now - this.heardAt;
+    this.heardAt = now;
+    if (!this.winAt) { this.winAt = now; this.winTick = w.tick; }
+    else if (now - this.winAt >= WINDOW_MS) {
+      const behind = now - this.winAt - (w.tick - this.winTick) * TICK_MS;
+      this.rate = Math.round((w.tick - this.winTick) / (now - this.winAt) * 10000) / 10;
+      if (behind > s.stallMax) s.stallMax = Math.round(behind);
+      const slow = behind > SLOW_MS, again = slow && this.wasSlow;
+      this.wasSlow = slow;
+      if (slow) {
+        s.slowWindows++;
+        if (again && now - (this.slowAt || 0) > SLOW_EVERY_MS) { this.slowAt = now; this.alert('room_slow', this.name, { people: this.people(), ticksPerSecond: this.rate, behindMs: Math.round(behind) }); }
+      }
+      this.winAt = now; this.winTick = w.tick;
+    }
     client.tokens = Math.min(MSG_BURST, client.tokens + (w.tick - client.tokenTick) * MSG_RATE) - 1; client.tokenTick = w.tick;
     if (typeof data === 'string' || data.byteLength > 8 || client.tokens < 0) return this.kick(client, 1008, 'bad message');
     const b = new Uint8Array(data);
@@ -94,6 +143,7 @@ export class Room extends DurableObject {
     if (this.timer !== null) return;
     this.next = Date.now() + TICK_MS;
     this.t0 = Date.now(); this.tick0 = this.world.tick; // start() runs inside a join, where the clock is real
+    this.winAt = 0; this.heardAt = 0; this.wasSlow = false;
     const wake = () => {
       const now = Date.now(), late = now - this.next, s = this.stat;
       s.wakes++; if (late > 10) s.late10++; if (late > 50) s.late50++; if (late > s.maxLate) s.maxLate = late;
@@ -129,11 +179,17 @@ export class Room extends DurableObject {
       }
       for (const [token, g] of this.ghosts) if (tick > g.until) this.ghosts.delete(token);
       if (tick % (15 * C.TICK_HZ) === 0) this.report();
-      if (!this.people() && tick - this.emptyAt > EMPTY_TICKS) { this.world = null; this.ghosts.clear(); } // the loop ends; the room costs nothing
+      if (tick % MARK_TICKS === 0) {
+        const s = this.stat, last = this.sampled || { bytesOut: 0, msgsIn: 0 };
+        try { this.env.METRICS?.writeDataPoint({ indexes: ['room'], blobs: ['room', this.name, this.version], doubles: [people, w.count, this.rate ?? C.TICK_HZ, s.bytesOut - last.bytesOut, s.msgsIn - last.msgsIn, s.stallMax, s.quietMax] }); } catch {}
+        this.sampled = { bytesOut: s.bytesOut, msgsIn: s.msgsIn };
+      }
+      if (!this.people() && tick - this.emptyAt > EMPTY_TICKS) { this.world = null; this.ghosts.clear(); this.mark(); } // the loop ends; the room costs nothing
     }
   }
 
   report() {
+    this.mark(); // on every join and leave and every 15 seconds, so an alert about a lost room says how many people it held
     if (!this.name || this.name.startsWith('lt-')) return;
     const dir = this.env.DIRECTORY.getByName('dir:' + this.name.split('-')[0]);
     this.ctx.waitUntil(dir.report(this.name, this.people()).catch(() => {}));
@@ -141,7 +197,7 @@ export class Room extends DurableObject {
 
   stats() {
     const w = this.world;
-    return { room: this.name, running: !!w, tick: w?.tick ?? 0, people: this.people(), ants: w?.count ?? 0, food: w?.foodCount ?? 0, cap: this.cap, ...this.stat,
+    return { room: this.name, version: this.version, running: !!w, windowTicksPerSecond: this.rate ?? null, tick: w?.tick ?? 0, people: this.people(), ants: w?.count ?? 0, food: w?.foodCount ?? 0, cap: this.cap, ...this.stat,
       // The clock inside a timer does not show lateness on Cloudflare (the late counters stay 0 there), so the honest
       // measure of an overloaded room is ticks per real second, taken at this call, which carries a fresh clock.
       ticksPerSecond: w && this.t0 ? Math.round((w.tick - this.tick0) / Math.max(1, Date.now() - this.t0) * 10000) / 10 : 0 };

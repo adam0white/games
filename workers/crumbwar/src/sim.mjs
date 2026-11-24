@@ -23,7 +23,7 @@ export function createWorld(seed) {
     tick: 0, rand: rng(seed), ants: new Array(MAX_ANTS).fill(null), count: 0,
     colonyScore: [0, 0, 0, 0], roundEnd: ROUND_TICKS, breakUntil: 0, lastWinner: -1, round: 1,
     fx: new Float32Array(C.MAX_FOOD), fy: new Float32Array(C.MAX_FOOD), fkind: new Uint8Array(C.MAX_FOOD),
-    fgen: new Uint16Array(C.MAX_FOOD), foodCount: 0, freeFood: [],
+    fgen: new Uint16Array(C.MAX_FOOD), foodCount: 0, freeFood: [], foodSpread: 360,
     fgrid: Array.from({ length: FGRID * FGRID }, () => []), grid: Array.from({ length: GRID * GRID }, () => []),
     events: [], // [type, a, b] for this tick only: 1 kill (killer, victim), 2 round over (winner), 3 round start
   };
@@ -107,10 +107,16 @@ function hurt(w, a, by, killer) {
 }
 
 function spawnFood(w) {
+  // Small rooms share one patch. Crowded rooms forage farther out.
+  const spread = Math.min(C.WORLD - 300, Math.max(360, (w.count - 32) * 24));
+  if (spread < w.foodSpread) {
+    const half = spread / 2 + 70;
+    for (let id = 0; id < C.MAX_FOOD; id++) if (w.fkind[id] && (Math.abs(w.fx[id] - C.WORLD / 2) > half || Math.abs(w.fy[id] - C.WORLD / 2) > half)) takeFood(w, id);
+  }
+  w.foodSpread = spread;
   const target = Math.min(C.MAX_FOOD - 40, Math.max(150, w.count * 7));
   if (w.foodCount >= target) return;
-  // Two draws averaged pull clusters toward the middle, where all four colonies meet.
-  const x = (w.rand() + w.rand()) / 2 * (C.WORLD - 300) + 150, y = (w.rand() + w.rand()) / 2 * (C.WORLD - 300) + 150;
+  const x = C.WORLD / 2 + (w.rand() - 0.5) * spread, y = C.WORLD / 2 + (w.rand() - 0.5) * spread;
   for (const [nx, ny] of C.NESTS) if (Math.hypot(x - nx, y - ny) < C.NEST_R + 120) return; // none on a doorstep
   const n = 7 + (w.rand() * 8 | 0);
   for (let i = 0; i < n; i++) { const r = 70 * Math.sqrt(w.rand()), t = w.rand() * Math.PI * 2; addFood(w, x + Math.cos(t) * r, y + Math.sin(t) * r, 1); }

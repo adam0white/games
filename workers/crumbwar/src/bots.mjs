@@ -6,12 +6,12 @@ import * as C from '../public/crumbwar/shared/config.js';
 import { byteOf } from '../public/crumbwar/shared/move.js';
 import { addAnt, removeAnt, setInput, antsNear, foodNear } from './sim.mjs';
 
-export const MIN_ANTS = 24; // a room never feels empty: bots make up the difference
+export const MIN_ANTS = 32; // eight ants per colony; bots make up the difference
 const THINK = 5;
 
 export function think(w, a) {
   if (!a.alive || (w.tick + a.id) % THINK) return;
-  const b = a.brain ??= { tx: C.WORLD / 2, ty: C.WORLD / 2, until: 0, bold: 0.3 + w.rand() * 0.6 };
+  const b = a.brain ??= { bold: 0.3 + w.rand() * 0.6 };
   const [nx, ny] = C.NESTS[a.colony];
   let tx, ty, sprint = false, foe = null, fd = 1e9, threat = null, td = 1e9;
   antsNear(w, a.x, a.y, C.VIEW, o => {
@@ -30,10 +30,8 @@ export function think(w, a) {
     foodNear(w, a.x, a.y, C.VIEW, id => { const d = (w.fx[id] - a.x) ** 2 + (w.fy[id] - a.y) ** 2 - (w.fkind[id] === 2 ? 40000 : 0); if (d < bd) { bd = d; best = id; } });
     if (best >= 0) { tx = w.fx[best]; ty = w.fy[best]; }
     else {
-      if (w.tick >= b.until || Math.hypot(b.tx - a.x, b.ty - a.y) < 80) {
-        b.tx = (w.rand() + w.rand()) / 2 * (C.WORLD - 400) + 200; b.ty = (w.rand() + w.rand()) / 2 * (C.WORLD - 400) + 200; b.until = w.tick + 12 * C.TICK_HZ;
-      }
-      tx = b.tx; ty = b.ty;
+      // The middle is public. Search there when nothing is in sight.
+      tx = C.WORLD / 2; ty = C.WORLD / 2;
     }
   }
   // An enemy nest hurts. Walk away from one that is close, whatever the plan was.

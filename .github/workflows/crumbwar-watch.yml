@@ -1,0 +1,41 @@
+# Tells the owner when a Crumbwar room was lost or ran slow. The game keeps a short list of such alerts
+# (workers/crumbwar/DECISIONS.md, "Alerts"). This job reads the list twice an hour and writes each new alert into
+# one open issue labelled crumbwar-alert, so GitHub's own notifications carry it. An alert names a room, a count
+# of people and a tick rate; it never names a player. If the game cannot be reached, the job fails.
+name: Crumbwar watch
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+concurrency:
+  group: crumbwar-watch
+permissions:
+  issues: write
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read alerts and report new ones
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # The list holds the last six hours. A scheduled run can start late; ids keep an alert from being reported twice.
+          health=$(curl -fsS --max-time 20 "https://play.adamwhite.work/crumbwar/api/health")
+          count=$(jq '.alerts | length' <<<"$health")
+          echo "alerts in the last six hours: $count"
+          [ "$count" -gt 0 ] || exit 0
+          gh label create crumbwar-alert --color B60205 --description "A Crumbwar room was lost or ran slow" --force >/dev/null
+          issue=$(gh issue list --label crumbwar-alert --state open --limit 1 --json number --jq '.[0].number // empty')
+          seen=""
+          if [ -n "$issue" ]; then seen=$(gh issue view "$issue" --json body,comments --jq '[.body, .comments[].body] | join("\n")'); fi
+          lines=""
+          while IFS=$'\t' read -r id at kind room detail; do
+            if grep -q "alert-id:$id;" <<<"$seen"; then continue; fi
+            lines+="- \`$kind\` in room \`$room\` at $at UTC: \`$detail\` <!-- alert-id:$id; -->"$'\n'
+          done < <(jq -r '.alerts | reverse | .[] | [.id, (.at / 1000 | todate), .kind, .room, .detail] | @tsv' <<<"$health")
+          [ -n "$lines" ] || { echo "nothing new"; exit 0; }
+          text="$lines"$'\n'"What the kinds mean and what to do: workers/crumbwar/DECISIONS.md, section Alerts. Close this issue when read; the next alert opens a new one."
+          if [ -n "$issue" ]; then gh issue comment "$issue" --body "$text"; else gh issue create --title "Crumbwar: a room was lost or ran slow" --label crumbwar-alert --body "$text"; fi
