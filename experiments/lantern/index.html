@@ -549,8 +549,8 @@ function finish() {
     if (won && climb >= TOP) { $('title').textContent = t('top'); $('line').textContent = t('topLine', { n: TOP }); $('go').textContent = t('climbAgain'); }
     else if (won && climb === LEVELS) { $('title').textContent = t('sector1'); $('line').textContent = t('sector1Line', { n: LEVELS }); $('go').textContent = t('toSector2'); $('toMenu').textContent = t('stop'); }
     else if (won) {
-      const faster = Math.round((climbPace(climb + 1) / climbPace(1) - 1) * 100), joins = towerStage(climb + 1) > towerStage(climb) ? ` New: ${ahead(towerStage(climb + 1))}` : '';
-      $('title').textContent = t('levelCleared', { n: climb > LEVELS ? climb - LEVELS : climb }); // the card's title stays on one line; the line under it names the sector $('line').textContent = `${Tag(climb + 1)} is harder: ${faster >= 5 ? `${faster}% faster than level 1` : 'faster'}, closer rocks, a narrower river.${joins} Climb on, or stop here and go on from ${tag(climb + 1)} later.`;
+      const faster = Math.round((climbPace(climb + 1) / climbPace(1) - 1) * 100), joins = towerStage(climb + 1) > towerStage(climb) ? t('towerNew', { what: ahead(towerStage(climb + 1)) }) : '';
+      $('title').textContent = t('levelCleared', { n: climb > LEVELS ? climb - LEVELS : climb }); $('line').textContent = t(faster >= 5 ? 'towerHarderPct' : 'towerHarder', { Tag: Tag(climb + 1), tag: tag(climb + 1), pct: faster, joins }); // the card's title stays on one line; the line under it names the sector
       $('go').textContent = t('climbOn', { tag: tag(climb + 1) }); $('toMenu').textContent = t('stop');
     } else { $('title').textContent = head(climb); $('line').textContent = t(back ? 'towerLostFloor' : 'towerLost', { why, best: best > LEVELS ? tag(best) : t('nOf', { n: best, of: LEVELS }), tag: tag(climb), back, at }); $('go').textContent = back ? t('tryFloor', { n: back }) : t('tryLevel', { tag: tag(climb) }); }
   } else if (endless && daily) {
