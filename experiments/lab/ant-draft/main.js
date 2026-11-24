@@ -20,7 +20,7 @@ const playedBefore = save.runs > 0;
 const LV = 'ant-draft:levels', prog = Object.assign({ open: 1, stars: {} }, readJson(LV, {}));
 prog.open = Math.max(1, Math.min(LEVELS, Math.floor(prog.open) || 1)); if (!prog.stars || typeof prog.stars !== 'object') prog.stars = {};
 let cur = null; // what is being played: a level number, 0 for the tutorial, null for the 8-wave long run
-let floats = [], lost = null, booms = [], boomed = 0, hitsShown = 0, peak = 0, tipText = '', afterTutorial = null; // numbers that rise, the health the swarm just lost, explosions
+let lastBoom = 0, floats = [], lost = null, booms = [], boomed = 0, hitsShown = 0, peak = 0, tipText = '', afterTutorial = null; // numbers that rise, the health the swarm just lost, explosions
 const persist = () => writeJson(KEY, save);
 const snd = sound({ on: () => save.sound });
 const params = new URLSearchParams(location.search);
@@ -130,9 +130,9 @@ function onEvent(e) {
     case 'chomp': floats.push({ id: 0, n: e.n, x: e.x, y: e.y - 8, age: 0, col: '#ff8a7a' }); burst(e.x, e.y, 2, '#ff7a6a', 40, 0.3, 1.8); break;
     case 'kill': { const big = e.foe === 'stag' ? 3 : e.foe === 'beetle' || e.foe === 'spider' ? 1.6 : 1; burst(e.x, e.y, 10 * big, FOECOL[e.foe], 90 * big, 0.6, 3); burst(e.x, e.y, 4 * big, '#fff8e6', 60, 0.4, 2); ring(e.x, e.y, 16 * big, '#fff8e6'); shake = Math.max(shake, big > 2 ? 16 : big > 1 ? 5 : 2); snd.tone(300 / big + 180, 0.12, 0.09, 'triangle', -160); if (big > 1) snd.noise(0.12 * big, 0.14, 700); break; }
     case 'antdie': booms.push({ x: e.x, y: e.y, t: 0, r: 12, puff: 1 }); burst(e.x, e.y, 7, '#8a1f1a', 60, 0.5, 2.2); snd.tone(190, 0.06, 0.04, 'sawtooth', -60); break;
-    case 'boom': boomed++; booms.push({ x: e.x, y: e.y, t: 0, r: 30 + 6 * (s.cards.fire | 0) }); ring(e.x, e.y, 44, '#fff8e6', 0.3); burst(e.x, e.y, 12, '#ff7a1f', 140, 0.5, 3.4); burst(e.x, e.y, 7, '#ffe23a', 90, 0.35, 2.6); burst(e.x, e.y, 5, '#4a3a30', 40, 0.9, 4);
+    case 'boom': boomed++; booms.push({ x: e.x, y: e.y, t: 0, r: e.r, spin: Math.random() * 6.28 }); if (booms.length > 60) booms.splice(0, booms.length - 60); ring(e.x, e.y, e.r, '#fff8e6', 0.35); burst(e.x, e.y, 18, '#ff7a1f', 240, 0.6, 4.2); burst(e.x, e.y, 10, '#ffe23a', 170, 0.45, 3.2); burst(e.x, e.y, 7, '#4a3a30', 110, 1, 5);
       if (e.hits) floats.push({ id: 0, n: e.n * e.hits, x: e.x, y: e.y - 22, age: 0, col: '#ff7a1f', big: 1 });
-      shake = Math.max(shake, 5); snd.noise(0.22, 0.16, 420); snd.tone(95, 0.2, 0.1, 'sine', -50); break;
+      shake = Math.max(shake, 9); if (now - lastBoom > 90) { lastBoom = now; snd.noise(0.42, 0.26, 300); snd.noise(0.1, 0.14, 2200); snd.tone(85, 0.42, 0.16, 'sine', -55); } break;
     case 'split': ring(e.x, e.y, 14, '#ff7a3a', 0.3); snd.tone(640, 0.07, 0.05, 'sine', 320); break;
     case 'spit': snd.tone(880, 0.08, 0.03, 'sine', -500); break;
     case 'queenhit': shake = Math.max(shake, 8); redFlash = 0.25; burst(e.x, e.y - 8, 8, '#ff3a2a', 90, 0.5, 3); snd.tone(110, 0.22, 0.16, 'sawtooth', -50); snd.noise(0.1, 0.12, 300); break;
@@ -270,6 +270,7 @@ function draw() {
   ctx.setTransform(dpr * scale, 0, 0, dpr * scale, (ox + sx) * dpr, (oy + sy) * dpr);
   if (!s) { ant(ctx, QUEEN.x, QUEEN.y, -1.57 + Math.sin(time * 1.5) * 0.08, 17, '#a3261c', time * 0.1, { head: '#7a1a14', crown: 1 }); return; }
   const t = time;
+  for (const b of booms) if (!b.puff) { ctx.globalAlpha = 0.35 * Math.min(1, b.t * 8) * Math.max(0, 1 - b.t / 1.4); ctx.fillStyle = '#1a0f0a'; ell(ctx, b.x, b.y, b.r * 0.6, b.r * 0.48); } ctx.globalAlpha = 1; // the burnt ground
   for (const p of s.acid) { const a = Math.min(1, p.life / 0.8); ctx.fillStyle = `rgba(170,245,70,${0.32 * a})`; ell(ctx, p.x, p.y, 17, 13); ctx.fillStyle = `rgba(225,255,150,${0.5 * a})`; ell(ctx, p.x + Math.sin(p.id + t * 3) * 6, p.y + Math.cos(p.id * 2 + t * 2) * 4, 2.2, 2.2); }
   for (const k of s.crumbs) { ctx.fillStyle = '#0b140840'; ell(ctx, k.x + 1, k.y + 2, 4, 2.6); ctx.fillStyle = '#fff0c2'; ctx.beginPath(); ctx.moveTo(k.x - 3.5, k.y + 2); ctx.lineTo(k.x - 1, k.y - 3.4); ctx.lineTo(k.x + 3.4, k.y - 2); ctx.lineTo(k.x + 3, k.y + 2.6); ctx.closePath(); ctx.fill(); }
   // The flag: where the swarm gathers.
@@ -339,9 +340,17 @@ function swarmBar() {
 function boomDraw(b) {
   const k = Math.min(1, b.t / (b.puff ? 0.35 : 0.5));
   if (b.puff) { ctx.strokeStyle = `rgba(255,120,100,${1 - k})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (0.3 + k), 0, 6.3); ctx.stroke(); return; }
-  const R = b.r * (0.45 + 0.65 * Math.sqrt(k)), g = ctx.createRadialGradient(b.x, b.y, R * 0.1 * k, b.x, b.y, R);
-  g.addColorStop(0, `rgba(255,255,230,${1 - k})`); g.addColorStop(0.4, `rgba(255,200,60,${0.95 * (1 - k)})`); g.addColorStop(0.75, `rgba(255,90,20,${0.8 * (1 - k)})`); g.addColorStop(1, 'rgba(60,30,20,0)');
-  ctx.fillStyle = g; ell(ctx, b.x, b.y, R, R);
+  // A flash, a lumpy fireball that fills the reach of the blast, its edge running outward, then smoke that rises and thins.
+  const f = Math.min(1, b.t / 0.5), n = 6;
+  if (b.t > 0.12) for (let i = 0; i < n; i++) { const q = Math.min(1, (b.t - 0.12) / 1.28), a = b.spin + i / n * 6.28, d = b.r * (0.25 + 0.4 * q); ctx.fillStyle = `rgba(58,46,40,${0.42 * (1 - q)})`; ell(ctx, b.x + Math.cos(a) * d, b.y + Math.sin(a) * d * 0.7 - b.r * 0.55 * q, b.r * (0.2 + 0.2 * q), b.r * (0.18 + 0.18 * q)); }
+  if (f >= 1) return;
+  const R = b.r * (0.55 + 0.5 * Math.sqrt(f)), fade = 1 - f * f;
+  for (let i = 0; i <= n; i++) { // the last lump is the middle
+    const mid = i === n, a = b.spin + i / n * 6.28, d = mid ? 0 : R * 0.48, r = mid ? R * 0.8 : R * 0.5, x = b.x + Math.cos(a) * d, y = b.y + Math.sin(a) * d, g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(255,${mid ? 250 : 190},${mid ? 210 : 60},${fade})`); g.addColorStop(0.5, `rgba(255,150,30,${0.9 * fade})`); g.addColorStop(1, 'rgba(200,40,10,0)'); ctx.fillStyle = g; ell(ctx, x, y, r, r);
+  }
+  if (b.t < 0.09) { ctx.fillStyle = `rgba(255,255,240,${0.9 - b.t * 8})`; ell(ctx, b.x, b.y, b.r * 0.9, b.r * 0.9); }
+  ctx.strokeStyle = `rgba(255,240,200,${1 - f})`; ctx.lineWidth = 5 * (1 - f) + 0.5; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (0.4 + 0.7 * f), 0, 6.3); ctx.stroke();
 }
 // The tutorial shows one line at a time, for what is on the field now.
 function tutorialTip() {
@@ -365,7 +374,7 @@ function frame(now) {
   }
   if (!paused) {
     for (const p of parts) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy *= 0.92; }
-    for (const f of floats) f.age += dt; for (const b of booms) b.t += dt; floats = floats.filter(f => f.age < 0.9); booms = booms.filter(b => b.t < 0.5);
+    for (const f of floats) f.age += dt; for (const b of booms) b.t += dt; floats = floats.filter(f => f.age < 0.9); booms = booms.filter(b => b.t < (b.puff ? 0.35 : 1.4));
     for (const r of rings) r.life -= dt;
     parts = parts.filter(p => p.life > 0); rings = rings.filter(r => r.life > 0);
     if (banner && (banner.t += dt) > 1.6) banner = null;

@@ -165,3 +165,17 @@ Not verified: a person, a real phone, frame rate on a phone, levels 1 to 50 in a
 
 ### Left as a proposal (2026-11-24)
 - The tester's answer also says The Swarm, Living Animals and Ant Draft B could be dropped. Recorded only; dropping is the owner's decision.
+
+## 2026-11-24: bigger explosions (tester t1, note #237, answering #232)
+
+Asked what Ant Draft should have next, the tester chose "Bigger explosions".
+
+- **The reach is bigger, not only the drawing.** The Fire card's explosion reaches 44, 52 and 60 units at levels 1 to 3 (`blast` in `sim.js`); it was 30 at every level. Damage is unchanged. The drawing fills exactly the reach.
+- A white flash, a lumpy fireball, an edge that runs outward, burnt ground and smoke for 1.4 s, more sparks, a stronger shake, and a lower, longer sound. The sound plays at most once in 90 ms, because many ants die together.
+
+Checks: `bots.mjs 40` (careful 92.5%, clumsy 10%, idle 0%) and `bots-levels.mjs 8` pass. One blast looked at on a Chromium iPhone 13 profile. The one that fired was near the top edge, partly under the ants bar.
+
+Not verified: a real phone, its frame rate with many blasts at once, the sound.
+
+### Left as a proposal (2026-11-24)
+- The other choices on that question were not picked: enemies with tricks, and choosing which ants fight.

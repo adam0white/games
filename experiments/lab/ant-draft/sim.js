@@ -43,6 +43,8 @@ export const WAVE = [
 
 function rnd(s) { let t = (s.rng = (s.rng + 0x6d2b79f5) | 0); t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }
 const lvl = (s, id) => s.cards[id] | 0;
+// How far the Fire card's explosion reaches (tester t1, note #237, "Bigger explosions"; it was 30 at every level).
+export const blast = level => 36 + 8 * level;
 const ev = (s, type, x, y, data) => s.events.push({ type, x, y, ...data });
 
 // opts.level: a level from levels.js ({ waves: [...WAVE rows], tough, swift, start }); without it the run is the 8-wave long run, unchanged.
@@ -117,7 +119,7 @@ function killAnt(s, a) {
   a.hp = 0; s.lost++; ev(s, 'antdie', a.x, a.y, { kind: a.kind });
   if (a.carry) s.crumbs.push({ id: s.id++, x: a.x, y: a.y, taken: 0 });
   const fire = lvl(s, 'fire');
-  if (fire) { const n = (a.kind === 'mini' ? 3 : 6) * fire; let hits = 0; for (const f of s.foes) if (f.hp > 0 && Math.hypot(f.x - a.x, f.y - a.y) < 30 + f.r) { hurtFoe(s, f, n); hits++; } ev(s, 'boom', a.x, a.y, { n, hits }); }
+  if (fire) { const R = blast(fire), n = (a.kind === 'mini' ? 3 : 6) * fire; let hits = 0; for (const f of s.foes) if (f.hp > 0 && Math.hypot(f.x - a.x, f.y - a.y) < R + f.r) { hurtFoe(s, f, n); hits++; } ev(s, 'boom', a.x, a.y, { n, hits, r: R }); }
   const split = lvl(s, 'split');
   if (split && a.kind === 'soldier') { for (let i = 0; i <= split; i++) addAnt(s, 'mini', a.x + (rnd(s) - 0.5) * 14, a.y + (rnd(s) - 0.5) * 14); ev(s, 'split', a.x, a.y); }
 }
