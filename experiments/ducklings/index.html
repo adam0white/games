@@ -36,10 +36,27 @@
     background: conic-gradient(#ffb43a calc(var(--ready, 1) * 360deg), #f3e2c2 0); box-shadow: 0 3px 0 #d9801a; touch-action: none; }
   #quack[hidden] { display: none !important; }
   #quack.wait { color: #9a7a50; box-shadow: none; }
+  #quack small { display: block; font-size: 12px; line-height: 1.2; }
+  #quack.wait { color: #614a2d; }
+  #flockHud { position: fixed; top: calc(6px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+    width: max-content; max-width: calc(100% - 156px); padding: 4px 9px; box-sizing: border-box; border-radius: 14px;
+    background: #fff9df; color: #234d46; text-align: center; font-size: 14px; line-height: 1.3; pointer-events: none; }
+  #flockHud strong, #flockGoal { display: block; }
+  #flockGoal { font-size: 13px; }
+  #peep { position: fixed; transform: translate(-50%, -100%); padding: 1px 7px; border-radius: 9px;
+    background: #fff5c8; color: #764400; border: 1px solid #d99635; font-size: 14px; font-weight: 700; pointer-events: none; }
+  #nestDirection { position: fixed; top: calc(79px + env(safe-area-inset-top)); transform: translateX(-50%); border-radius: 12px;
+    padding: 2px 9px; background: #fff9df; color: #38594c; font-size: 14px; font-weight: 700; pointer-events: none; }
+  #flockHud.low { background: #ffe1ae; color: #70320a; }
+  #starTip { color: #38594c; font-size: 15px; }
+  #starTip:empty { display: none; }
   #quack svg { display: block; margin: 0 auto 2px; }
   #say { position: fixed; left: 0; right: 0; top: 70%; text-align: center; font-size: 26px; font-weight: bold; color: #fff; text-shadow: 0 2px 0 #2f6b5e, 0 0 12px #2f6b5e88; pointer-events: none; opacity: 0; transition: opacity .25s, transform .25s; transform: scale(.9); padding: 0 1em; }
+  #steerHelp { position: fixed; bottom: calc(22px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); width: max-content; max-width: 90vw; box-sizing: border-box; padding: 9px 16px; border-radius: 18px; background: #fff9e3; color: #244b4b; text-align: center; font-size: 16px; font-weight: 700; pointer-events: none; }
+  #steerHelp.crossing { bottom: calc(96px + env(safe-area-inset-bottom)); }
   #say.on { opacity: 1; transform: scale(1); }
-  .lab-notice { color: #4f7a6f; }
+  #menu .lab-notice { color: #345c52; font-size: 13px !important; opacity: 1 !important; }
+  #menu .lab-notice a { display: grid; place-items: center; width: fit-content; min-width: 60px; min-height: 44px; margin: 0 auto; }
   #album { font-size: .95em; color: #4f7a6f; }
   #menuArt { width: 286px; height: 110px; display: block; margin: 0 auto; }
   #menu > div { width: min(340px, calc(100% - 28px)); }
@@ -61,6 +78,8 @@
   #nodes button:nth-child(5) { grid-column: 2; grid-row: 2; }
   #nodes button:nth-child(6) { grid-column: 1; grid-row: 2; }
   #nodes button:nth-child(n+7) { grid-row: 3; }
+  #nodes:has(> :nth-child(4):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  #nodes > :nth-child(4):last-child { grid-column: auto; }
   #menu #play { display: block; width: 100%; margin: 8px 0 6px; border-radius: 16px; font-size: 18px; }
   #menu .extras { display: grid; grid-template-columns: 1.5fr 1fr; gap: 6px; }
   #menu .extras button { margin: 0; min-width: 0; min-height: 44px; font-size: 13px; padding: 4px; border-width: 1px; }
@@ -74,7 +93,7 @@
   #endActions button { min-width: 80px; margin: 0; font-size: 15px; }
   #endActions button.main { min-width: 130px; }
   #end #postcard { filter: drop-shadow(0 2px 0 #6eac9566); }
-  #end #next { width: 100%; border-radius: 16px; }
+  #end #next { margin-inline: 0; width: 100%; border-radius: 16px; }
   #names:empty { display: none; }
   #endStars { font-size: 2.65em; letter-spacing: .06em; }
   @media (max-height: 690px) {
@@ -90,9 +109,13 @@
 <body>
 <canvas id="c"></canvas>
 <div id="safe"></div>
+<div id="peep" hidden>Peep!</div>
+<div id="nestDirection" hidden>Nest ↑</div>
+<div id="flockHud" hidden><strong id="flockCount"></strong><span id="flockGoal"></span></div>
 <button id="pause" aria-label="Pause"></button>
-<button id="quack" aria-label="Quack: the ducklings hurry up"><svg width="34" height="22" viewBox="0 0 34 22"><circle cx="10" cy="11" r="8" fill="#7a4a1c"/><path d="M16 8 L27 10 L16 14 Z" fill="#4a2a06"/><circle cx="8" cy="9" r="1.6" fill="#fff"/><path d="M28 4 q4 7 0 14 M31 1 q6 10 0 20" stroke="#4a2a06" stroke-width="2" fill="none" stroke-linecap="round"/></svg><span id="quackLabel">Quack</span></button>
+<button id="quack" aria-label="Quack to call the flock closer"><svg width="34" height="22" viewBox="0 0 34 22"><circle cx="10" cy="11" r="8" fill="#7a4a1c"/><path d="M16 8 L27 10 L16 14 Z" fill="#4a2a06"/><circle cx="8" cy="9" r="1.6" fill="#fff"/><path d="M28 4 q4 7 0 14 M31 1 q6 10 0 20" stroke="#4a2a06" stroke-width="2" fill="none" stroke-linecap="round"/></svg><span id="quackLabel">Quack</span><small>Call closer</small></button>
 <div id="say"></div>
+<div id="steerHelp" hidden></div>
 
 <div id="menu" class="screen on"><div>
   <canvas id="menuArt" width="600" height="230" aria-hidden="true"></canvas>
@@ -109,7 +132,7 @@
   <h2>Paused</h2>
   <p id="pausedLine"></p>
   <p><button id="resume" class="main">Go on</button></p>
-  <p><button id="pauseMenu">Menu</button></p>
+  <p><button id="pauseMenu">Leave swim</button></p>
   <p><button id="sound2">Sound: on</button></p>
   <div id="labSwitch"></div>
 </div></div>
@@ -119,6 +142,7 @@
   <h2 id="endTitle"></h2>
   <div id="endStars"><span>★</span><span>★</span><span>★</span></div>
   <p id="endLine"></p>
+  <p id="starTip"></p>
   <p id="names"></p>
   <p class="score" id="endScore"></p>
   <p><button id="next" class="main">Next</button></p>
@@ -127,6 +151,7 @@
 
 <script type="module">
 import { create, step, stars, timeLeft, pathAt, view, DT, SPEED, LAST_STAGE, ENDLESS_AFTER, ENDLESS_TIME, TRAITS, QUACK_COOL, HEARTS, duskRate } from './sim.js?v=3';
+import { starFeedback, warningOnScreen } from './feedback.js';
 import { CHAPTERS, LEVELS, chapterOf } from './levels.js';
 import * as art from './art.js?v=3';
 import * as save from '../kit/save.js';
@@ -200,20 +225,25 @@ const sx = x => left + x * u;
 const sy = y => anchor - (y - cam) * u;
 const wx = px => (px - left) / u;
 const wy = py => cam + (anchor - py) / u;
-const OFFSET = 70; // CSS px: she heads for a point this far above the finger, so the finger never covers her
 
 // ---------------------------------------------------------------- game state
 let s = create({ stage, seed: SEED }), mode = 'stage', playing = false, paused = false, screen = 'menu';
 let cam = s.mom.y, camShown = cam, acc = 0, last = performance.now(), shake = 0, flash = 0;
 let prevMom = { x: s.mom.x, y: s.mom.y }, momA = 0, quackShow = 0, hurtT = 0, homeGlow = 0;
-let finger = null, keys = new Set(), wantQuack = false, waitTouch = false, trailT = 0, trailShows = 0, turnLog = [];
+let finger = null, destination = null, keys = new Set(), wantQuack = false, waitTouch = false, trailT = 0, trailShows = 0, turnLog = [];
 let parts = [], ripples = [], disp = new Map(), heads = new Map(), hops = new Map(), runners = [], nestDucks = [], recCount = 0, sayTimer = 0, peepT = 0;
+let caller = null, peepUntil = 0;
 const rec = lab('ducklings');
 const cards = screens(['menu', 'paused', 'end']);
 
 function show(name) {
   screen = name; cards(name);
   const play = name === 'play';
+  $('flockHud').hidden = !play;
+  $('nestDirection').hidden = true;
+  $('peep').hidden = true;
+  const curb = !s.endless && s.stage === 5 && s.mom.y < s.hazards[0].y1;
+  $('steerHelp').hidden = !play || !(curb || (waitTouch && !s.endless && s.stage <= 2));
   $('pause').style.display = play ? 'grid' : 'none'; $('quack').style.display = play ? 'block' : 'none';
   if (name === 'menu') menu();
 }
@@ -224,7 +254,7 @@ function menu() {
   $('play').textContent = `Play ${stage} · ${LEVELS[stage].name}`;
   $('endless').disabled = data.opened <= ENDLESS_AFTER;
   $('endless').textContent = data.opened <= ENDLESS_AFTER ? `Endless · after ${ENDLESS_AFTER}` : data.endless ? `Endless · ${data.endless}` : 'Endless pond';
-  $('album').textContent = data.home ? `${data.home} ducklings home` : '';
+  $('album').textContent = data.home ? `${data.home} duckling${data.home === 1 ? '' : 's'} home` : '';
   drawMap();
   soundLabels(); drawMenuArt();
 }
@@ -245,7 +275,7 @@ function drawMap() {
       const candidate = Math.min(data.opened, c.last);
       if (candidate >= c.first && chapterOf(stage) !== i) stage = candidate;
       drawMap();
-      $('play').textContent = chapterOf(stage) === tab ? `Play ${stage} · ${LEVELS[stage].name}` : `Continue · ${stage}`;
+      $('play').textContent = chapterOf(stage) === tab ? `Play ${stage} · ${LEVELS[stage].name}` : `Play ${CHAPTERS[chapterOf(stage)].name} · ${stage}`;
       $('chapters').children[i].focus({ preventScroll: true });
     });
     $('chapters').append(button);
@@ -295,8 +325,12 @@ function begin(endless = false) {
   s = create(endless ? { endless: true, seed: SEED ?? ((Math.random() * 2 ** 31) | 0) } : { stage, seed: SEED });
   cam = camShown = s.mom.y + (s.endless ? .20 : s.stage === 1 ? .32 : .27) * H / u; acc = 0; last = performance.now(); prevMom = { x: s.mom.x, y: s.mom.y }; momA = 0;
   parts = []; ripples = []; disp = new Map(); heads = new Map(); hops = new Map(); runners = []; nestDucks = []; turnLog = [];
-  finger = null; keys.clear(); wantQuack = false; roll = new Map(); rolled = false; trailT = 0; trailShows = 0; shake = 0; flash = 0; recCount = 0; homeGlow = 0; quackShow = 0; hurtT = 0;
+  finger = destination = null; keys.clear(); wantQuack = false; roll = new Map(); trailT = 0; trailShows = 0; shake = 0; flash = 0; recCount = 0; homeGlow = 0; quackShow = 0; hurtT = 0;
   waitTouch = true;
+  caller = null; peepT = 0;
+  $('steerHelp').classList.remove('crossing');
+  $('steerHelp').textContent = s.stage === 5 ? 'Tap the ring to wait at the curb.' :
+    s.stage === 1 ? 'Tap the nest. Drag to steer.' : 'Tap the calling duckling, then the nest.';
   $('quack').hidden = true;
   lastTap = touchRing = null;
   clearTimeout(sayTimer); $('say').classList.remove('on');
@@ -314,7 +348,8 @@ function finish() {
   if (s.endless) {
     best = Math.max(data.endless, s.score); const fresh = s.score > data.endless; data.endless = best;
     title = s.why === 'hearts' ? 'Mama needs a rest' : 'The sun went down';
-    line = `${Math.floor(s.best)} m up the pond with ${s.line.length} duckling${s.line.length === 1 ? '' : 's'}.`;
+    const crossed = s.checkpoints.filter(pad => pad.got).length;
+    line = `${crossed} sun pad${crossed === 1 ? '' : 's'} crossed · ${s.line.length} following`;
     scoreLine = `${s.score} points${fresh && s.score > 0 ? ' · new best!' : ` · best ${best}`}`;
   } else {
     const key = s.stage; best = Math.max(data.best[key] || 0, s.score); const fresh = won && s.score > (data.best[key] || 0);
@@ -326,6 +361,7 @@ function finish() {
     scoreLine = won ? `${s.score} points${fresh ? ' · new best!' : ` · best ${best}`}` : '';
   }
   data.taught = true; store();
+  $('starTip').textContent = won ? starFeedback(s) : '';
   $('endTitle').textContent = title; $('endLine').textContent = line; $('endScore').textContent = scoreLine;
   // the ducklings by name: who came home, who hid in the reeds
   const names = $('names'); names.textContent = '';
@@ -353,31 +389,39 @@ function finish() {
 }
 
 // ---------------------------------------------------------------- input
-// Hold or drag anywhere: she swims for a point a little above the finger. A second finger quacks.
-// The target is worked out again every tick from where the finger is on the screen, so a still finger
-// keeps her swimming while the pond scrolls.
-function screenTarget() {
-  if (!finger) return null;
-  return { x: wx(finger.x * dpr), y: wy((finger.y - OFFSET) * dpr) };
+// Keep the chosen spot in pond coordinates while the camera follows the flock.
+function aimAt(e) {
+  destination = { x: wx(e.clientX * dpr), y: wy(e.clientY * dpr) };
+}
+function setOff() {
+  if (!waitTouch) return;
+  waitTouch = false;
+  $('quack').hidden = false;
+  if (!s.endless && s.stage === 5) {
+    $('steerHelp').textContent = 'After a car passes, tap the far bank. Allow time for the last duckling.';
+    $('steerHelp').classList.add('crossing');
+  } else {
+    $('steerHelp').hidden = true;
+  }
+  rollCall(350, true);
 }
 canvas.addEventListener('pointerdown', e => {
   if (!playing) return;
   if (paused) { resume(); return; }
-  if (finger && e.pointerId !== finger.id) { wantQuack = true; return; } // a second finger
+  if (finger !== null && e.pointerId !== finger) { wantQuack = true; return; } // a second finger
   const now = performance.now();
   if (finger === null && lastTap && now - lastTap.t < 300 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 40) wantQuack = true; // double tap
   lastTap = { t: now, x: e.clientX, y: e.clientY };
-  finger = { id: e.pointerId, x: e.clientX, y: e.clientY, t: now };
+  finger = e.pointerId;
+  aimAt(e);
   try { canvas.setPointerCapture(e.pointerId); } catch {}
-  waitTouch = false;
-  $('quack').hidden = false;
-  if (!rolled) { rolled = true; rollCall(350, true); }
+  setOff();
   sfx.touch(); touchRing = { x: e.clientX, y: e.clientY, t: now };
 });
 let lastTap = null, touchRing = null;
 // Roll call: when she first sets off, each duckling peeps and hops in turn and its name floats up; a quack is
 // answered the same way down the line, a little echo of what she did.
-let nameTags = [], roll = new Map(), rolled = false, hudPeeks = 0, rollCalls = 0;
+let nameTags = [], roll = new Map(), hudPeeks = 0, rollCalls = 0;
 function rollCall(delay0, names) {
   const now = performance.now(); rollCalls++;
   s.line.forEach((f, i) => {
@@ -386,8 +430,11 @@ function rollCall(delay0, names) {
     later(delay0 + i * 170, () => { if (playing && !paused) peep(note(i + 3) * 1.6, 0.035); });
   });
 }
-canvas.addEventListener('pointermove', e => { if (finger && e.pointerId === finger.id) { finger.x = e.clientX; finger.y = e.clientY; } });
-for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(type, e => { if (finger && e.pointerId === finger.id) finger = null; });
+canvas.addEventListener('pointermove', e => { if (e.pointerId === finger) aimAt(e); });
+canvas.addEventListener('pointerup', e => { if (e.pointerId === finger) finger = null; });
+for (const type of ['pointercancel', 'lostpointercapture']) canvas.addEventListener(type, e => {
+  if (e.pointerId === finger) finger = destination = null;
+});
 $('quack').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (playing && !paused && !waitTouch) wantQuack = true; });
 $('pause').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); pause(); });
 $('pause').addEventListener('click', pause);
@@ -401,7 +448,7 @@ addEventListener('keydown', e => {
     return;
   }
   if (!waitTouch && (e.key === ' ' || e.key === 'q' || e.key === 'Q')) { e.preventDefault(); wantQuack = true; }
-  if (e.key.startsWith('Arrow')) { e.preventDefault(); keys.add(e.key); if (waitTouch) { waitTouch = false; $('quack').hidden = false; } if (!rolled) { rolled = true; rollCall(350, true); } }
+  if (e.key.startsWith('Arrow')) { e.preventDefault(); destination = null; keys.add(e.key); setOff(); }
 });
 addEventListener('keyup', e => keys.delete(e.key));
 function keyTarget() {
@@ -413,7 +460,7 @@ function keyTarget() {
 // ---------------------------------------------------------------- pause
 function pause() {
   if (!playing || paused) return;
-  paused = true; finger = null; keys.clear();
+  paused = true; finger = destination = null; keys.clear();
   $('pausedLine').textContent = s.endless ? `Score ${s.score}.` : `Stage ${s.stage}. ${s.line.length} following, ${s.arrived.length} home.`;
   show('paused'); snd.hold();
 }
@@ -442,8 +489,9 @@ rec.toggle($('labSwitch'));
 // ---------------------------------------------------------------- one tick
 function tick() {
   prevMom = { x: s.mom.x, y: s.mom.y };
-  const target = screenTarget() ?? keyTarget();
+  const target = destination ?? keyTarget();
   step(s, target, wantQuack); wantQuack = false;
+  if (!s.endless && s.stage === 5 && s.mom.y >= s.hazards[0].y1 && !$('steerHelp').hidden) $('steerHelp').hidden = true;
   for (const e of s.events) {
     if (e.type === 'join') {
       sfx.join(s.line.length); say(e.again ? 'Back together!' : '+1 duckling', 850);
@@ -464,7 +512,7 @@ function tick() {
       note2('lost', { by: e.by, gone: true });
     }
     if (e.type === 'hit') { sfx.hit(); shake = Math.max(shake, 0.7); hurtT = 0.6; if (!still) flash = 0.35; burst(e.x, e.y, 'drop', 12); say(s.hearts > 0 ? 'Ouch!' : '', 900); note2('hit', { by: e.by }); }
-    if (e.type === 'warn') {
+    if (e.type === 'warn' && warningOnScreen(sy(e.y), H)) {
       if (e.kind === 'bike' || e.kind === 'car') sfx.bell(); else if (e.kind === 'cat' || e.kind === 'bridge') sfx.bubbles(); else if (e.kind === 'turtle') sfx.bubbles(); else if (e.kind === 'heron') sfx.heron(); else if (e.kind === 'gust') sfx.gust();
     }
     if (e.type === 'quack') { sfx.quack(); quackShow = 0.5; trailT = Math.max(trailT, 1.4); ripples.push({ x: s.mom.x, y: s.mom.y, t0: performance.now(), s: 2 }); rollCall(180, false); }
@@ -735,13 +783,12 @@ function drawMother(now, alpha) {
 }
 
 function drawGuide(now) {
-  // where she is heading: a soft ring above the finger, and a ring under the finger
-  if (finger) {
-    const tx = finger.x * dpr, ty = (finger.y - OFFSET) * dpr;
-    g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 2 * dpr; g.setLineDash([5 * dpr, 5 * dpr]);
-    g.beginPath(); g.moveTo(finger.x * dpr, finger.y * dpr - 26 * dpr); g.lineTo(tx, ty + 10 * dpr); g.stroke(); g.setLineDash([]);
-    g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(tx, ty, 9 * dpr, 0, 7); g.fill();
-    g.strokeStyle = 'rgba(255,255,255,.9)'; g.beginPath(); g.arc(tx, ty, 9 * dpr, 0, 7); g.stroke();
+  // The ripple stays on the chosen spot as the water scrolls.
+  if (destination && Math.hypot(destination.x - s.mom.x, destination.y - s.mom.y) > .035) {
+    const tx = sx(destination.x), ty = sy(destination.y);
+    g.beginPath(); g.arc(tx, ty, 11 * dpr, 0, 7);
+    g.strokeStyle = '#32665c'; g.lineWidth = 4 * dpr; g.stroke();
+    g.strokeStyle = '#fff9df'; g.lineWidth = 2 * dpr; g.stroke();
   }
   if (touchRing) {
     const k = (now - touchRing.t) / 400;
@@ -772,14 +819,11 @@ function drawGuide(now) {
   const t = still ? .4 : now / 1000;
   const f = still ? 1 : .55 + .45 * Math.min(1, (t % 1.8) / .8);
   const startX = sx(from[0]), startY = sy(from[1]);
-  art.ghostFinger(g, startX + (tx - startX) * f, startY + (ty - startY) * f + OFFSET * dpr, u, t);
+  art.ghostFinger(g, startX + (tx - startX) * f, startY + (ty - startY) * f, u, t);
 }
 function drawHud(now) {
   const top = (inset.top + 12) * dpr, pad = 14 * dpr, r = 9 * dpr;
-  // a soft strip behind the HUD, so what drifts in at the top still shows through but the HUD reads
-  const hudBottom = top + 72 * dpr, strip = g.createLinearGradient(0, 0, 0, hudBottom + 18 * dpr);
-  strip.addColorStop(0, 'rgba(226,246,240,.9)'); strip.addColorStop(hudBottom / (hudBottom + 18 * dpr), 'rgba(226,246,240,.55)'); strip.addColorStop(1, 'rgba(226,246,240,0)');
-  g.fillStyle = strip; g.fillRect(0, 0, W, hudBottom + 18 * dpr);
+  const hudBottom = top + 72 * dpr;
   // a hazard warning hidden under the HUD is repeated just below it, at the same x
   for (const w of warningsAt(s.t)) { const y = sy(w.y); if (y < hudBottom && y > hudBottom - 0.9 * u) { art.alert(g, sx(w.x), hudBottom + 0.07 * u + 16 * dpr, u * 0.8, now / 1000 + w.x, '#d94f3d'); hudPeeks++; } }
   // hearts
@@ -789,16 +833,22 @@ function drawHud(now) {
     g.beginPath(); g.moveTo(x, y + r * 0.9); g.bezierCurveTo(x - r * 1.6, y - r * 0.2, x - r * 0.6, y - r * 1.3, x, y - r * 0.4); g.bezierCurveTo(x + r * 0.6, y - r * 1.3, x + r * 1.6, y - r * 0.2, x, y + r * 0.9); g.fill(); g.stroke();
   }
   const cx = W / 2, cy = top + 16 * dpr;
-  g.fillStyle = '#fff9df'; g.beginPath(); g.roundRect(cx - 59 * dpr, cy - 17 * dpr, 118 * dpr, 36 * dpr, 18 * dpr); g.fill();
-  art.duckling(g, cx - 37 * dpr, cy + 1 * dpr, .28, 340 * dpr, now / 1000, 0, { moving: .3, trait: 'eager' });
-  g.fillStyle = '#234d46'; g.font = `800 ${Math.round(17 * dpr)}px ui-rounded, system-ui`; g.textAlign = 'center'; g.textBaseline = 'middle';
-  if (s.endless) g.fillText(`×${s.line.length}`, cx + 6 * dpr, cy + 1 * dpr);
-  else {
-    const goal = LEVELS[s.stage];
-    g.fillText(`${s.line.length + s.arrived.length} / ${goal.need}`, cx + 1 * dpr, cy + 1 * dpr);
-    art.nest(g, cx + 41 * dpr, cy + 1 * dpr, 46 * dpr, 0, 0);
-  }
-  g.font = `800 ${Math.round(13 * dpr)}px ui-rounded, system-ui`;
+  const following = s.line.length, waiting = s.lost.length;
+  let count = `${following} following`;
+  if (s.home) count = `${s.arrived.length} home · ${following} arriving`;
+  else if (!s.endless && waiting) count += ` · ${waiting} waiting`;
+  const low = s.endless && timeLeft(s) <= 10;
+  const goal = s.endless ? (low ? 'Low light! Cross a pad' : 'Cross sun pads for light')
+    : `Bring ${LEVELS[s.stage].need}${s.total > LEVELS[s.stage].need ? ' of ' + s.total : ''} home`;
+  if ($('flockCount').textContent !== count) $('flockCount').textContent = count;
+  if ($('flockGoal').textContent !== goal) $('flockGoal').textContent = goal;
+  $('flockHud').classList.toggle('low', low);
+  const nestAhead = !s.endless && !s.home && following >= LEVELS[s.stage].need && sy(s.nest.y) < 0;
+  const marker = $('nestDirection');
+  marker.hidden = !nestAhead;
+  if (nestAhead) marker.style.left = `${Math.max(36, Math.min(W / dpr - 36, sx(s.nest.x) / dpr))}px`;
+  g.fillStyle = '#234d46'; g.font = `800 ${Math.round(13 * dpr)}px ui-rounded, system-ui`;
+  g.textAlign = 'center'; g.textBaseline = 'middle';
   if (s.endless || Number.isFinite(s.time)) {
     const left0 = timeLeft(s), frac = Math.max(0, Math.min(1, left0 / (s.endless ? ENDLESS_TIME : s.time)));
     const bw = Math.min(W - 100 * dpr, 260 * dpr), bx = (W - bw) / 2, by = cy + 26 * dpr;
@@ -807,11 +857,14 @@ function drawHud(now) {
     g.beginPath(); g.roundRect(bx, by, Math.max(1, bw * frac), 8 * dpr, 4 * dpr); g.fill();
     g.fillStyle = '#234d46';
     const txt = s.endless ? `${s.score} pts  ·  ☀ ${Math.ceil(left0)}${duskRate(s.t) > 1 ? ' ↓' : ''}` : `◷ ${Math.ceil(left0)}s`;
+    g.lineWidth = 3 * dpr; g.strokeStyle = '#fff9df'; g.strokeText(txt, cx, by + 21 * dpr);
     g.fillText(txt, cx, by + 21 * dpr);
   } else {
     const chapter = CHAPTERS[chapterOf(s.stage)];
     g.fillStyle = '#234d46';
-    g.fillText(`${chapter.name}  ·  ${s.stage}`, cx, cy + 34 * dpr);
+    const label = `${chapter.name} · ${s.stage}`;
+    g.lineWidth = 3 * dpr; g.strokeStyle = '#fff9df'; g.strokeText(label, cx, cy + 34 * dpr);
+    g.fillText(label, cx, cy + 34 * dpr);
   }
 }
 
@@ -875,7 +928,22 @@ function frame(now) {
     if (!waitTouch) { acc += dt * FAST; while (acc >= DT && playing) { tick(); acc -= DT; } alpha = Math.min(1, acc / DT); }
     trailT = Math.max(0, trailT - dt); quackShow = Math.max(0, quackShow - dt); hurtT = Math.max(0, hurtT - dt); homeGlow = Math.max(0, homeGlow - dt * 0.3);
     peepT -= dt;
-    if (peepT <= 0) { peepT = 2.2 + Math.random() * 1.5; if (s.lost.some(l => Math.abs(l.y - s.mom.y) < 1)) peep(2600 + Math.random() * 500, 0.025); }
+    if (peepT <= 0) {
+      peepT = 2.2 + Math.random() * 1.5;
+      caller = s.lost.find(duck => Math.abs(duck.y - s.mom.y) < 1);
+      if (caller) {
+        peepUntil = now + 900;
+        peep(2600 + Math.random() * 500, 0.025);
+      }
+    }
+    const caption = $('peep');
+    caption.hidden = !(caller && now < peepUntil && s.lost.includes(caller));
+    if (!caption.hidden) {
+      const y = sy(caller.y) / dpr, top = inset.top + 112, bottom = H / dpr - inset.bottom - 78;
+      caption.textContent = y < 0 ? '↑ Peep!' : y > H / dpr ? 'Peep! ↓' : 'Peep!';
+      caption.style.left = `${Math.max(30, Math.min(W / dpr - 30, sx(caller.x) / dpr))}px`;
+      caption.style.top = `${Math.max(top, Math.min(bottom, y - 42))}px`;
+    }
     const q = $('quack'); const ready = 1 - s.quackCool / QUACK_COOL; q.style.setProperty('--ready', ready.toFixed(3)); q.classList.toggle('wait', ready < 1);
     $('quackLabel').textContent = ready < 1 ? `${Math.ceil(s.quackCool)}s` : 'Quack';
     if (water) water.gain.value = 0.18;

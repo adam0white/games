@@ -29,7 +29,7 @@ export const LEVELS = [
   level('Round the stone', 2, 2, .69, 1.59,
     { lesson: 'bend', guide: [[.19, .83], [.23, 1.26]], rocks: [rock(.55, .94, .21)] }),
   level('Reed pockets', 1, 3, .47, 2.32,
-    { lost: [[.22, .86], [.76, 1.53], [.30, 1.91]], rocks: [rock(.51, 1.09, .16), rock(.54, 1.65, .11)] }),
+    { guide: [[.22, .86]], lost: [[.22, .86], [.76, 1.53], [.30, 1.91]], rocks: [rock(.51, 1.09, .16), rock(.54, 1.65, .11)] }),
   level('Look both ways', 2, 2, .55, 1.78,
     { lesson: 'car', guide: [[.50, .83]], hazards: [road(1.04, 1, -.25)] }),
   level('The middle island', 3, 2, .28, 2.55,

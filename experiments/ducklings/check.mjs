@@ -39,28 +39,29 @@ const finger = (page, steps) => page.evaluate(steps => {
 }, steps);
 const tap = (page, sel) => page.evaluate(sel => { const el = document.querySelector(sel); el.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 9, pointerType: 'touch', bubbles: true, cancelable: true })); el.click(); }, sel);
 
-// Steer like a player: hold the finger a little below where she should go. Waiting ducklings first, then the nest.
-async function drive(page, ms, shotAt) {
-  const vp = page.viewportSize(), t0 = Date.now(); let down = false, shot = false;
+// Drag toward visible points in the pond. Waiting ducklings first, then the nest.
+async function drive(page, ms) {
+  const vp = page.viewportSize(), t0 = Date.now(); let down = false;
   while (Date.now() - t0 < ms) {
     const st = await state(page);
     if (st.screen !== 'play' || !st.playing) break;
     const goal = st.waitingDucks.filter(d => d.y > st.mom.y - 0.3).sort((a, b) => Math.hypot(a.sx - st.mom.sx, a.sy - st.mom.sy) - Math.hypot(b.sx - st.mom.sx, b.sy - st.mom.sy))[0] ?? st.nest ?? { sx: st.mom.sx, sy: st.mom.sy - 200 };
-    // aim from her toward the goal, at most 120 px ahead, and put the finger 70 px under that point
+    // Aim at most 120 px ahead so the path can follow the scrolling pond.
     const dx = goal.sx - st.mom.sx, dy = goal.sy - st.mom.sy, d = Math.hypot(dx, dy) || 1, k = Math.min(1, 120 / d);
-    const x = Math.max(10, Math.min(vp.width - 10, st.mom.sx + dx * k)), y = Math.max(80, Math.min(vp.height - 10, st.mom.sy + dy * k + 70));
+    const x = Math.max(10, Math.min(vp.width - 10, st.mom.sx + dx * k)), y = Math.max(80, Math.min(vp.height - 10, st.mom.sy + dy * k));
     await finger(page, [[down ? 'pointermove' : 'pointerdown', x, y]]); down = true;
-    if (shotAt && !shot && st.t >= shotAt.t) { shot = true; await page.screenshot({ path: shotAt.path, scale: 'css' }); }
     await sleep(60);
   }
   if (down) await finger(page, [['pointerup', 0, 0]]);
 }
 
 async function assertTargets(page) {
-  for (const b of await page.locator('button:visible').all()) {
-    const box = await b.boundingBox();
-    assert.ok(box.width >= 40 && box.height >= 40, `${await b.getAttribute('id')}: tap target is at least 40 px`);
-    assert.ok(box.x >= 0 && box.x + box.width <= page.viewportSize().width, 'button fits the phone width');
+  const targets = await page.locator('button:visible, .lab-notice a:visible, #labSwitch label:visible').evaluateAll(elements =>
+    elements.map(el => ({ label: el.textContent, box: el.getBoundingClientRect().toJSON() })));
+  assert.ok(targets.length, 'the screen has interactive controls');
+  for (const { label, box } of targets) {
+    assert.ok(box.width >= 44 && box.height >= 44, `${label}: ${box.width} × ${box.height}, expected at least 44 px`);
+    assert.ok(box.left >= 0 && box.right <= page.viewportSize().width, 'control fits the phone width');
   }
 }
 
@@ -106,9 +107,13 @@ async function run(name, engine, device) {
     assert.match(await page.textContent('#menu'), /The game lab records play/);
     assert.equal(await page.evaluate(() => window.audioMade), 0);
     await assertTargets(page);
+    const firstNode = await page.locator('[data-level="1"]').boundingBox();
+    const fourthNode = await page.locator('[data-level="4"]').boundingBox();
+    assert.equal(fourthNode.y, firstNode.y, 'the four pond stages form one continuous row');
     await shot('map');
     await page.locator('#chapters button').nth(3).click();
     assert.equal(await page.locator('#nodes button:disabled').count(), 9);
+    assert.match(await page.textContent('#play'), /Pond.*1/, 'locked chapter names the actual destination');
     await assertTargets(page);
     await shot('river-map');
     await page.locator('#chapters button').first().click();
@@ -120,19 +125,29 @@ async function run(name, engine, device) {
     assert.equal(await page.evaluate(() => window.audioMade), 1);
     await shot('first-swim');
     assert.ok(await page.locator('#c').evaluate(canvas => {
+      // This patch is open water away from the hearts, the nest and the flock.
+      const g = canvas.getContext('2d');
+      const pixel = g.getImageData(Math.floor(canvas.width * .22), Math.floor(canvas.height * .01), 1, 1).data;
+      return pixel[1] - pixel[0] > 35;
+    }), 'water at the top keeps its colour outside HUD badges');
+    assert.ok(await page.locator('#c').evaluate(canvas => {
       const pixel = canvas.getContext('2d').getImageData(Math.floor(canvas.width * .58), Math.floor(canvas.height * .35), 1, 1).data;
       return pixel[1] > pixel[0];
     }), 'the opening pond is rendered without a hit flash');
+    assert.match(await page.locator('#steerHelp:visible').innerText(), /Tap the nest.*Drag to steer/s);
     const y0 = st.mom.y;
-    await finger(page, [['pointerdown', st.mom.sx, st.mom.sy - 20]]);
+    await finger(page, [['pointerdown', st.mom.sx, st.mom.sy - 45]]);
     await until(page, y => window.ducklingsState().mom.y > y + .048, 'thumb steers', 5000, y0);
     st = await state(page);
     assert.ok(st.rollCalls >= 1);
+    assert.match(await page.innerText('#quack'), /Call closer/);
     await finger(page, [['pointerdown', 40, 300, 8], ['pointerup', 40, 300, 8], ['pointerup', 0, 0]]);
     await until(page, () => window.ducklingsState().quackCool > 0, 'second finger quacks');
     await tap(page, '#pause');
     st = await state(page);
     assert.ok(st.paused && st.screen === 'paused');
+    await assertTargets(page);
+    assert.match(await page.textContent('#pauseMenu'), /leave/i, 'leaving the swim is explicit');
     await sleep(260);
     assert.equal((await state(page)).t, st.t, 'pause freezes simulation');
     await page.click('#resume');
@@ -149,11 +164,29 @@ async function run(name, engine, device) {
     await shot('home');
     await assertTargets(page);
     assert.equal((await save()).opened, 2);
+    const nextBox = await page.locator('#next').boundingBox();
+    assert.ok(Math.abs(nextBox.x + nextBox.width / 2 - page.viewportSize().width / 2) <= 1, 'Next is centered in the postcard');
+    const mapPage = await context.newPage();
+    await mapPage.goto(base + '/ducklings/');
+    assert.equal(await mapPage.textContent('#album'), '1 duckling home');
+    await mapPage.close();
 
     await page.click('#next');
     assert.equal((await state(page)).stage, 2);
+    await until(page, () => document.querySelector('#peep:not([hidden])')?.textContent === 'Peep!', 'the waiting duck shows its peep');
     await shot('rescue');
-    await drive(page, 14000, { t: .85, path: join(SHOTS, `${name}-mid-swim.png`) });
+    st = await state(page);
+    const duck = st.waitingDucks[0];
+    await page.touchscreen.tap(Math.round(duck.sx), Math.round(duck.sy));
+    await until(page, () => window.ducklingsState().line === 2, 'tap directly on the waiting duckling to rescue it', 6000);
+    await until(page, () => window.ducklingsState().t > 3, 'camera has scrolled after rescue');
+    st = await state(page);
+    assert.ok(Math.abs(st.mom.y - duck.y) < .025, 'camera scroll keeps a single tap aimed at the same pond location');
+    if (st.nest.sy < 0) {
+      assert.deepEqual(await page.locator('#nestDirection:visible').allTextContents(), ['Nest ↑'], 'show the route once the nest is above the screen');
+    }
+    await shot('mid-swim');
+    await drive(page, 14000);
     await end();
     st = await state(page);
     assert.equal(st.stars, 3);
@@ -176,10 +209,46 @@ async function run(name, engine, device) {
       assert.ok(runs.some(e => e.data.outcome === 'left'));
     }
 
+    // A campaign minimum can differ from both the whole flock and the number following.
+    for (const [level, flock, goal] of [
+      [4, '1 following · 3 waiting', 'Bring 3 of 4 home'],
+      [6, '3 following', 'Bring 2 of 3 home'],
+    ]) {
+      await goto(`?level=${level}`);
+      await tap(page, '#play');
+      assert.equal(await page.locator('#flockCount:visible').allTextContents().then(items => items[0]), flock);
+      assert.equal(await page.innerText('#flockGoal'), goal);
+      await shot(`goal-${level}`);
+      await leave();
+    }
+
+    await goto('?level=4');
+    await tap(page, '#play');
+    await shot('reed-pockets');
+    // Sample the middle of the expected dotted guide, away from the duck and the hand.
+    const pathLeadsToDuck = await page.evaluate(() => {
+      const st = window.ducklingsState(), duck = st.waitingDucks[0];
+      const canvas = document.querySelector('#c'), ctx = canvas.getContext('2d');
+      const scale = canvas.width / innerWidth;
+      for (let t = .22; t < .45; t += .005) {
+        const x = Math.round((st.mom.sx + (duck.sx - st.mom.sx) * t) * scale);
+        const y = Math.round((st.mom.sy + (duck.sy - st.mom.sy) * t) * scale);
+        const [r, g, b] = ctx.getImageData(x, y, 1, 1).data;
+        if (r > 245 && g > 235 && b < 230) return true;
+      }
+      return false;
+    });
+    assert.ok(pathLeadsToDuck, 'the opening guide leads to the first calling duckling in Reed pockets');
+    await leave();
     await goto('?level=5');
     await tap(page, '#play');
     assert.equal((await state(page)).lesson, 'car');
+    assert.match(await page.locator('#steerHelp:visible').innerText(), /ring.*curb/);
     await shot('road');
+    st = await state(page);
+    await page.touchscreen.tap(Math.round(st.mom.sx), Math.round(st.mom.sy - 100));
+    assert.match(await page.locator('#steerHelp:visible').innerText(), /car passes.*far bank.*last duckling/s);
+    await shot('road-crossing');
     await leave();
     await goto('?level=9');
     await tap(page, '#play');
@@ -213,14 +282,23 @@ async function run(name, engine, device) {
       assert.equal(await page.locator('.kit-hint').count(), 0);
       await finger(page, [['pointerup', 0, 0]]);
       await leave();
+      await goto('?fast=4');
       await tap(page, '#endless');
       st = await state(page);
       assert.equal(st.mode, 'endless');
       await finger(page, [['pointerdown', st.mom.sx, st.mom.sy - 90]]);
       await until(page, () => window.ducklingsState().t > 1, 'endless advances from touch');
+      assert.match(await page.innerText('#flockGoal'), /Cross sun pads for light/);
       await shot('endless');
       await finger(page, [['pointerup', 0, 0]]);
-      await leave();
+      const lowLightHeight = await page.waitForFunction(() => {
+        if (!document.querySelector('#flockGoal').textContent.includes('Low light')) return false;
+        return document.querySelector('#flockHud').getBoundingClientRect().height;
+      }, null, { timeout: 30000 });
+      assert.ok(await lowLightHeight.jsonValue() + 6 < 54, 'low-light HUD clears the sunlight meter');
+      await shot('low-light');
+      await end();
+      assert.match(await page.innerText('#endLine'), /0 sun pads crossed/);
       await goto('?level=20&fast=5');
       await tap(page, '#play');
       st = await state(page);
@@ -234,7 +312,7 @@ async function run(name, engine, device) {
   } catch (e) {
     console.log(`FAIL ${name}: ${e.stack}`);
     if (errors.length) console.log(errors.join('\n'));
-    await shot('fail').catch(() => {});
+    await page.screenshot({ path: join(SHOTS, name + '-fail.png'), scale: 'css', timeout: 5000 }).catch(() => {});
     return false;
   } finally { await browser.close(); }
 }
