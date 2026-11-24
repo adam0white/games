@@ -611,3 +611,22 @@ Section 6 of `bots.mjs`, 6 seeds, 12 minutes, median top level / median deaths:
 
 ### Not verified
 A real phone; whether the hunts are more exciting; the skills at high levels by hand. The straight runner is never caught by design, so the skills bite mostly on a player who stops or turns.
+
+## 2026-11-24: a skill of its own for every animal (tester t1, note #238)
+
+The note: every ability feels the same, they all make you faster, freeze things or teleport you; no ability may repeat; every animal should have its own, from the traits of its species. It names "draft" and was tagged Lantern. The lab reads it as this game, where 51 promoted animals shared six kinds of skill; the reply says so.
+
+- **51 animals, 51 skills** in `skills.js`, none with another's rule. One animal each keeps an old kind: Turtle (shell), Rabbit (leap), Lion (the only freeze), Eagle (dive), Cheetah (sprint). The other 46 are new: a Frog's tongue, a Mole under the ground, a Wolf's pack, a Panther's silent kill, a Dragon's fire that leaves meals, and so on. `skills.js` lists them by level; the button says what one does after a promotion, in English and Turkish.
+- A skill with a target is not spent when nothing is in reach. A promotion, a death and a revive end every effect. A rival or an old hunter that is stronger can be pushed, lured or escaped, never eaten by a skill.
+- **Nothing runs until the button is pressed.** 24 bot runs of four minutes without a press (12 seeds, classic and wild) are identical to main's, position and all.
+- Old hunters keep the six kinds they had (`powerFor`), so note #225's checks hold.
+- My own small experiment: a ring of colour under an animal shows what a skill did to it (green weakened, white running, purple lured or blinded, orange marked), and a yellow arc round you shows how long yours lasts.
+
+Checks: `bots.mjs` section 4c has a stage for each of the 46 new skills; switching off any one skill fails its stage (46 of 46 caught). In Chromium at phone size the button of every animal was pressed on a stage in English, Turkish and the 3D look: no page error, no label cut off.
+
+Not verified: how they feel on a real phone; whether 51 skills are fair against each other (bots press them, people choose them); the Turkish wording by a native reader.
+
+### Left as a proposal (2026-11-24, note #238)
+
+- Old hunters that use these skills against you.
+- Skills with a picture of their own in the 3D look (a pack, a decoy and a meal are simple shapes there).
