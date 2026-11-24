@@ -29,6 +29,58 @@ These are synthetic traffic and local CPU/byte measurements. They do not establi
 
 Seen in headless Chromium against `wrangler dev` (2026-11-23) at 390×844, 360×640 and 1280×800, 40 s each, with a script that walks to the middle and carries food home: food and ants of several colonies were on screen within 4 s of joining; the scripted player delivered food (2 points by 36 s at 360×640). Page fixes made then: on narrow screens the top five and the human and bot counts sat on the colony scores, so they moved below the clock; the rank line no longer wraps; names are 11 screen pixels high at every zoom (they were about 6 px on a 360×640 phone); crowded names are thinned nearest first, and a kept label adds the hidden count and how many are bots (seen: "Tawny Sentry · bot +1 bot"); the arrow hides while the middle is on screen, and its label reads "Food in the middle · N", outlined; the map's middle marker scales with the map; the camera no longer starts one frame from a stale position. Seen and not changed (sim): bots of several colonies stack on one spot in fights, about ten at once.
 
+## Bots, 2026-11-24
+
+The first separation change removed the pile but also removed decisive combat. This retune keeps 100-unit ally separation and 75-unit separation from enemies other than the current target. Bots admit a small group by visible distance: yield behind two healthy allies for a healthy enemy, three for a carrier or wounded enemy. A 12-unit tolerance prevents switching on tiny distance changes; this is approximate admission, not a hard reservation. Protected or badly wounded allies do not suppress a pursuit. No bot reads another ant's private plan or distinguishes human enemies from bot enemies.
+
+Each four ids have two foragers, one raider and one guard. Healthy-target pursuit ranges are 85/200/150/85 units; vulnerable-target ranges are 150/330/180/150. Guards answer enemies within 360 units of their nest from up to 300 units away. Visible carriers and wounded enemies have priority; a modest preference for the current target maintains pursuit. Targets outside pursuit range cannot suppress a reachable fight. Bots approach a rear quarter with a 12-unit offset, then face the target within 55 units. Raiders retreat at one HP; guards at 30% of maximum HP (rounded down), foragers at 40%. All keep retreating until fully healed. Carriers return home and sprint near enemies. Vision, client input calls, decision cadence and aim error remain unchanged. No simulation rule changed.
+
+**Acceptance.** Six simulated minutes in 1- and 12-person rooms, seeds 1/7/42. Deaths must average 40–80. Each colony must lose at least four ants in every seed. Each colony's food must reach the original BEFORE mean floor below in every seed. Every seed must have score CV at most 0.15, cluster max at most five and crowded share below 2%. The 1-person scripted human must take bites on at least six ticks and die to bites 1–4 times in each seed. Bot-only mean decision cost must be below 0.15 ms per tick, taking the lowest of three runs. This is local simulation acceptance; owner play acceptance remains separate.
+
+Measured with Node 26.12.0 and `node loadtest/bots.mjs`. People are independent scripted foragers: nearest visible food, home when carrying, center when searching, 4 Hz input with the same aim error. No combat or retreat policy is added to the people. Room joins balance after each person arrives. Every second checks the exact maximum occupancy of any radius-40 disk among living ants, starting at second one, with 360 samples per seed. **The cluster maximum is a one-second sampled maximum, not a bound on intervening ticks.** Median/max cover 1080 samples per room size; food, bites, deaths and CV below are seed means. Colony order is Red/Blue/Green/Gold. CV is population standard deviation divided by mean.
+
+| People | Brain | Cluster median / max | Samples with at least 6 | Food points per colony | Bites | Deaths | Score CV |
+|---|---|---|---|---|---|---|---|
+| 1 | Original BEFORE | 3 / 9 | 3.52% | 102.3 / 73.7 / 68.0 / 73.0 | 1907.3 | 97.7 | 0.172 |
+| 1 | Before this retune | 2 / 4 | 0% | 225.7 / 242.0 / 225.3 / 220.0 | 391.7 | 9.7 | 0.055 |
+| 1 | After this retune | 3 / 5 | 0% | 156.3 / 159.0 / 144.3 / 160.3 | 1337.0 | 68.3 | 0.062 |
+| 12 | Original BEFORE | 3 / 8 | 2.59% | 170.7 / 154.3 / 133.7 / 157.7 | 1468.3 | 73.3 | 0.110 |
+| 12 | Before this retune | 2 / 4 | 0% | 244.7 / 256.0 / 240.0 / 243.3 | 390.7 | 14.7 | 0.049 |
+| 12 | After this retune | 3 / 5 | 0% | 200.7 / 195.0 / 217.0 / 210.7 | 975.0 | 47.3 | 0.059 |
+
+Per-seed after results (all pass):
+
+| People | Seed | Food points | Deaths | Colony deaths | Score CV | Cluster max |
+|---|---|---|---|---|---|---|
+| 1 | 1 | 160/152/136/142 | 74 | 16/16/20/22 | 0.062 | 5 |
+| 1 | 7 | 157/152/138/168 | 68 | 20/15/20/13 | 0.070 | 4 |
+| 1 | 42 | 152/173/159/171 | 63 | 19/13/17/14 | 0.053 | 4 |
+| 12 | 1 | 209/210/219/204 | 50 | 10/11/18/11 | 0.026 | 5 |
+| 12 | 7 | 206/174/217/231 | 42 | 13/12/12/5 | 0.102 | 5 |
+| 12 | 42 | 187/201/215/197 | 50 | 16/8/15/11 | 0.050 | 5 |
+
+The original BEFORE is `src/bots.mjs` at `10052b05fb33b3ed3e1a7fd6ec9d7b095a9d1f31`; its previously recorded numbers remain the food floor. Before this retune is the uncommitted brain received at the start of this task, SHA-256 `4d9e369c0e314ea619482739022d9939d5191c5dd874abfe37b2f43672f9aa26`. Both before/after use the same updated harness. A temporary copy of that starting brain remains at `/tmp/crumbwar-bots-before-2026-11-24.mjs`; copy it into `src/.bots-before.mjs` to run `node loadtest/bots.mjs --bots ./src/.bots-before.mjs`, then remove the temporary source file. Changed random consumption changes later food history.
+
+**Human threat, one person.** Bitten counts applied-damage ticks, including lethal bites; simultaneous bites count once, so this conservatively undercounts individual bites. Killed counts simulation kill events attributed to an ant; nest-guard deaths are counted separately and are zero in every before/after run. Bites for all ants in the table above count selected attacks, which can exceed damage applications.
+
+| Brain | Bitten ticks, seeds 1/7/42 | Mean bitten ticks / minute | Killed, seeds 1/7/42 | Mean killed |
+|---|---|---|---|---|
+| Before this retune | 11/24/7 | 2.33 | 1/4/0 | 1.67 |
+| After this retune | 25/34/26 | 4.72 | 2/2/2 | 2.00 |
+
+**Bot decision cost.** `loadtest/bots.mjs` times only the complete bot decision pass in a 1-person room (31 bots), including staggered no-op calls. Human input, simulation, cluster sampling and snapshots are outside the interval. Each timing starts a fresh seed-42 world, warms 200 ticks, then averages the remaining 7000 ticks. `--timing-only` runs the three timing trials without the metrics suite. The room's 240-person benchmark cannot isolate this cost because that room has no filler bots.
+
+| Brain | Mean ms/tick, three runs | Lowest ms/tick |
+|---|---|---|
+| Before this retune | 0.10510 / 0.06950 / 0.03270 | 0.03270 |
+| After this retune | 0.02964 / 0.02493 / 0.02106 | 0.02106 |
+
+Both lowest means pass 0.15 ms. The machine was busy; these local timings establish the budget check, not a controlled speedup.
+
+**Verification.** `node --test test/` passes 33 tests. Requirement-derived six-minute regression checks cover all six cases, including each seed's colony losses, CV, crowd samples and human threat. Focused tests cover small-group admission, healthy even fights, wounded allies, nest defence and identical human/bot targeting. The old brain's 8/13/8 deaths (mean 9.67) fail the new 40–80 death gate. Review found and fixed unreachable targets masking reachable fights, unhealthy/protected allies suppressing pursuit, and nest deaths being counted as human kills. An intermediate candidate killed the human six times in one seed; the final gate checks each seed rather than allowing a passing mean to hide that miss.
+
+Nobody has looked at this retune in a browser. Real players, phones, deployed CPU and game feel remain unverified. Live rooms warm bots for ten seconds; this measurement starts cold. No server, commit, push or deployment was made. Protected room, routing, client and simulation-configuration files were unchanged.
+
 ## Telemetry, 2026-11-23
 
 The page records play through the shared kit recorder (`/kit/lab.js`). The import is dynamic. Where the file is not served (under `wrangler dev`), the game plays and records nothing.
