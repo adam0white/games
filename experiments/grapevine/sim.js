@@ -299,13 +299,63 @@ export function essential(level, kind) {
   return !without.solvable;
 }
 
+// Does every special thing on the board earn its place? A bell, keeper, parrot or timid villager, a sleepy flag and
+// a gate each either shape the best route or spoil a route that would otherwise be good. The test: make that one
+// thing ordinary (the villager honest, the sleepy one awake, the gate a plain path) and solve again. If the shortest
+// length, the number of shortest routes and the number of routes up to two hops longer are all the same, nothing on
+// the way to three or two stars depends on it: it is a decoy. Returns the decoys' names, such as 'bell 5' or 'gate 2-7'.
+export function decoys(level) {
+  const plain = (nodes, edges) => ({ ...level, nodes, edges });
+  const sig = lv => { const s = solve(lv); return s.solvable ? `${s.min}/${s.countMin}/${s.countUpTo}` : 'none'; };
+  const base = sig(level), out = [];
+  level.nodes.forEach((n, v) => {
+    const swap = node => level.nodes.map((m, u) => (u === v ? node : m));
+    if (['bell', 'keeper', 'parrot', 'timid'].includes(n.kind)) {
+      const honest = { x: n.x, y: n.y, kind: 'honest', ...(n.once ? { once: true } : {}) };
+      if (sig(plain(swap(honest), level.edges)) === base) out.push(`${n.kind} ${v}`);
+    }
+    if (n.once) {
+      const awake = { ...n }; delete awake.once;
+      if (sig(plain(swap(awake), level.edges)) === base) out.push(`sleepy ${v}`);
+    }
+  });
+  level.edges.forEach((e, i) => {
+    if (!isGate(e[2])) return;
+    if (sig(plain(level.nodes, level.edges.map((f, j) => (j === i ? [e[0], e[1]] : f)))) === base) out.push(`gate ${e[0]}-${e[1]}`);
+  });
+  return out;
+}
+// Forced filler at the start: the first hops have no choice (one legal step each), and the villagers on them do
+// nothing that reaches the listener: made honest one at a time, the best route still delivers the same news (a keeper
+// right after them swallows it, say). Returns how many of the forced hops are filler when that is two or more, else 0.
+export function filler(level) {
+  const { best } = solve(level, { extra: 0 });
+  if (!best) return 0;
+  const adj = adjacency(level);
+  let st = startState(level), forced = 0;
+  for (;;) {
+    const next = adj[st.node].map(([b]) => step(level, st, b)).filter(s => typeof s !== 'string');
+    if (next.length !== 1 || next[0].node === level.to) break;
+    st = next[0]; forced++;
+  }
+  const heard = walk(level, best).msgs.at(-1);
+  let idle = 0;
+  for (const v of best.slice(1, forced + 1)) {
+    const n = level.nodes[v], lv = { ...level, nodes: level.nodes.map((m, u) => (u === v ? { x: n.x, y: n.y, kind: 'honest' } : m)) };
+    const run = walk(lv, best);
+    if (run.valid && same(run.msgs.at(-1), heard)) idle++;
+  }
+  return idle >= 2 ? idle : 0;
+}
+
 // Build one village from a seed and a spec. Returns null when this seed does not meet the spec.
 //   spec = { rows: [lo, hi], villagers: [lo, hi] (teller and listener included), kinds: [[kind, weight]...],
 //            must: kind or 'timid', 'once', 'oneway', hops: [lo, hi], straight: true to reject levels that a
 //            shortest-by-distance path solves, revisit: true to need a villager twice, sleepy: [lo, hi],
 //            maxMin: most shortest routes allowed,
 //            oneway: [lo, hi] paths made one-way lanes, gates: [lo, hi] paths given a gate (at least one shut),
-//            put: { kind: [lo, hi] } villagers turned into that kind (bell, keeper) after the kinds are drawn }
+//            put: { kind: [lo, hi] } villagers turned into that kind (bell, keeper) after the kinds are drawn,
+//            keep: a last test on the finished village, such as no decoys (see decoys) }
 // The draws for oneway, gates and put happen after all the others and only when the spec asks for them, so the
 // specs of levels 4 to 30 make the same villages as before these were added.
 export function build(seed, spec) {
@@ -388,6 +438,7 @@ export function build(seed, spec) {
     if (spec.also && !spec.also.every(kind => essential(lv, kind))) continue;
     if (spec.straight && straightPaths(lv).some(p => walk(lv, p).correct)) continue;
     if (spec.revisit && solve(lv, { simple: true, extra: 0, maxHops: sol.min }).solvable) continue;
+    if (spec.keep && !spec.keep(lv)) continue;
     return { ...lv, seed, min: sol.min };
   }
   return null;

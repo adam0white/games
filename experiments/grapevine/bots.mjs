@@ -10,11 +10,13 @@
 //  5. bots: the solver bot wins every level with 3 stars; a do-nothing bot never wins; a random bot that
 //     wanders along paths (three sends a level, like a player before the hint) wins clearly less;
 //  6. daily villages: each one generates, is solvable, and is the same on a second run, for every tier;
-//  7. the ramp, chapter by chapter.
+//  7. the ramp, chapter by chapter;
+//  8. after the keeper's teaching level, no keeper starts with the listener's news;
+//  9. from chapter 2 on, no decoy bells, keepers, parrots, timid or sleepy villagers or gates, and no forced filler.
 import { createHash } from 'node:crypto';
 import { LEVELS, CHAPTERS } from './levels.js';
 import { walk, solve, straightPaths, essential, generate, daily, dailySeed, wander, stars, rng, step, startState,
-  DAILY_SPEC, DAILY_TIERS, KINDS, ONEWAY, GATE_OPEN, GATE_SHUT, tierFor } from './sim.js';
+  DAILY_SPEC, DAILY_TIERS, KINDS, ONEWAY, GATE_OPEN, GATE_SHUT, tierFor, decoys, filler } from './sim.js';
 
 const t0 = Date.now();
 let failures = 0;
@@ -206,6 +208,15 @@ GROUPS.forEach((groups, c) => {
 for (let n = 47; n <= LEVELS.length; n++) {
   const lv = LEVELS[n - 1], k = lv.nodes.find(v => v.kind === 'keeper' && v.memo.s === lv.want.s && v.memo.c === lv.want.c && v.memo.n === lv.want.n);
   check(!k, `level ${n}: no keeper starts with the listener's news`);
+}
+// 9. Open items after the audits: from chapter 2 on, every bell, keeper, parrot, timid or sleepy villager and every
+//    gate matters to the best route or spoils a route that would otherwise be good (no decoys), and no route opens
+//    with two or more forced hops that do nothing (sim.js decoys and filler). Levels 37, 40, 42, 44 and 57 had
+//    decoy bells or gates, and 47 opened with two forced hops into a keeper who swallowed their news.
+for (let n = 31; n <= LEVELS.length; n++) {
+  const lv = LEVELS[n - 1], d = decoys(lv), f = filler(lv);
+  check(!d.length, `level ${n}: no decoys (${d.join(', ')})`);
+  check(!f, `level ${n}: no forced filler at the start (${f} hops)`);
 }
 for (const n of HANDMADE) check(rates[n] >= 0.5, `teaching level ${n} is easy for a wanderer (${(100 * rates[n]).toFixed(0)}%)`);
 check(randomWins / randomTrials < 0.6 && randomStars / randomTrials < 1.5, 'the random bot does clearly worse than the solver bot');
