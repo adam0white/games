@@ -2,11 +2,13 @@
 
 ## Status
 
+Round 3, 2026-11-24: levels. Play now goes to a map of 32 levels, each with one goal, one to three stars, and the next level unlocked by clearing it (tester t1, notes #150 and #157). Four new jobs (oil a squeaky door, unstick a zip, wind a toy car, thread a needle) bring the total to 15. The random shift stays as the "open stall", opened by level 8. See "Round 3: levels" below.
+
 Round 2, 2026-11-23. tester t1 picked Fix-It Stall as the game to work on more, out of the three (note #103, answering #100: "Fix-It Stall"). This round fixed the round-1 weaknesses (interpolation, overlapping customers, keyboard), added depth (daily stall, golden customer, two new jobs, streak feedback), and did a play-feel pass on fresh screenshots.
 
 ## What it is
 
-Fix-It Stall is a phone arcade game about a street repair stall. Customers queue with broken things; you fix each one with a single hands-on gesture (turn, pull, tap, flick, rub, set, hook, push and hold, swipe, sew, pump) before their patience runs out, and the thing works for a moment while they cheer and pay.
+Fix-It Stall is a phone arcade game about a street repair stall. Customers queue with broken things; you fix each one with a single hands-on gesture (turn, pull, tap, flick, rub, set, hook, push and hold, swipe, sew, pump, tap in time, wiggle up, pull back and let go, steer and hold still) before their patience runs out, and the thing works for a moment while they cheer and pay. Since round 3 you play a map of numbered levels, each with its own goal.
 
 ## The idea it rebuilds
 
@@ -30,16 +32,17 @@ Nothing was copied or ported from `archive/`. Code, art, jobs, rules and tuning 
 - **Bench.** One customer is served at a time; up to four more wait in a visible queue. Each customer brings one object with one repair, or (from shift 2) sometimes two repairs on the same object, done in order. Dots under the verb show how many.
 - **Patience.** A ring round the customer's head drains. Their face goes from smiling to flat to frowning. If it runs out they walk off and you lose a heart. Three hearts; the Lucky horseshoe from the shop adds a fourth.
 - **Pay.** Coins = (job price + 1 if fixed with at least half the patience left) × streak multiplier × 2 for the regular. The multiplier is 1 + floor(streak / 4), capped at ×3. Losing a customer resets the streak.
+- **Levels.** See "Round 3: levels". The rules below for shifts, the tutorial and unlocks now apply to the open stall.
 - **Shift.** A day lasts 90 s of customer time. It ends early if the hearts run out. The level rises every 15 s (6 levels), which shortens patience and makes two-repair jobs more common.
-- **First shift (tutorial).** The first three customers bring the bell, the music box and the kettle, one each, and wait 45 s. The day clock does not run while they are served. There is no text beyond the verb.
+- **First shift (tutorial; rounds 1 and 2 only).** Since round 3 the open stall starts without it, because levels 1 to 3 teach these jobs; `sim.js` keeps it behind `tutorial: true`. The first three customers bring the bell, the music box and the kettle, one each, and wait 45 s. The day clock does not run while they are served. There is no text beyond the verb.
 - **Unlocks.** A shift with 4 or more fixed unlocks the next job (wheel, lamp, clock, bike, vase, knife, teddy, ball, in that order). It is saved at once and comes first in the next shift with a "New job!" banner and 30 s patience.
-- **Golden customer.** Rarely (2.5% of eligible customers, never among the first six of a shift, never the regular, a tutorial or a new-job customer) a customer glows gold in the queue. At the counter a "Golden job!" banner and a shimmer sound announce them. They always bring two repairs and wait 1.45 × the one-repair patience (a plain two-repair job gets 1.6 ×), and pay 4 × the coins. An average bot meets one in 16 of 40 shifts.
+- **Golden customer.** Rarely (2.5% of eligible customers, never among the first six of a shift, never the regular, a tutorial or a new-job customer) a customer glows gold in the queue. At the counter a "Golden job!" banner and a shimmer sound announce them. They always bring two repairs and wait 1.45 × the one-repair patience (a plain two-repair job gets 1.6 ×), and pay 4 × the coins. An average bot meets one in 15 of 40 open-stall shifts (round 3).
 - **Streak feedback.** On a quick fix with a streak of 2 or more: a rising run of up to five notes pitched by the streak, a word ("Nice!", "Great!", "Hot!", "On fire!", or "x2!" / "x3!" when the multiplier goes up), confetti that grows with the streak, and the multiplier badge pops. A golden fix says "Golden fix!" with gold confetti.
-- **Daily stall.** After the first shift the menu offers "Daily stall": one seed for everyone on the same UTC date, all 11 jobs, three hearts (no horseshoe), no regular, no new job, two-repair jobs on. Coins are banked as usual, but the daily never unlocks a job and does not change the all-time best. The best coins for each date are kept (newest 30 dates) and shown on the menu and the end card.
+- **Daily stall.** After level 3 (or any shift of the old game) the menu offers "Daily stall": one seed for everyone on the same UTC date, all 15 jobs, three hearts (no horseshoe), no regular, no new job, two-repair jobs on. Coins are banked as usual, but the daily never unlocks a job and does not change the all-time best. The best coins for each date are kept (newest 30 dates) and shown on the menu and the end card.
 - **Keyboard and mouse.** The mouse drags like a finger. Holding Space does the job in front of you at the average bot's pace along the same finger paths the bots use; letting go lifts the finger. A line on the menu says so on devices whose main pointer is fine.
 - **Shop.** Coins are banked between shifts. Teal awning (owned), Copper awning 50, Berry awning 90, String lights 140, Radio 180 (a synthesized tune during the shift), Sunny awning 220, Stall cat 280 (sits on the counter and looks pleased after a fix), Lucky horseshoe 400 (+1 heart).
 
-### The eleven jobs
+### The fifteen jobs
 
 All positions are in the object's own 100 × 100 box.
 
@@ -56,6 +59,10 @@ All positions are in the object's own 100 × 100 box.
 | sharpen (Swipe!) | knife | long swipes along the blade | 6 strokes of 48 units each | 36 |
 | sew (Sew!) | teddy | grab the needle and drag along the zigzag tear | the needle follows the finger at most 40 units/s if the finger is within 18 units of the seam; done at the seam's end (about 99 units) | 26 |
 | pump (Pump!) | ball | push the pump handle down and pull it up | 6 full strokes; the handle goes down at most 140 units/s, up at 400 | 26 |
+| oil (Tap when open!) | squeaky door | tap the oil can while the door swings wide open | 3 drops; one per swing; the door swings once a second and takes a drop while at least 0.6 open (60% of each swing); a tap while it is shut splashes and does no harm | 30 |
+| zip (Zip it up!) | jacket | hold the pull tab under the slider and drag it up; at a snag wiggle side to side | the slider climbs at most 150 units/s and only up; each of 2 snags needs 4 changes of direction, each after at least 4 units | 22 |
+| spring (Pull back!) | toy car | hold the back of the car, pull it left, let go when the key glows | pulled back 34 units (at most 75 units/s); let go before that and it rolls back unwound | 26 |
+| thread (Thread it!) | needle | hold the thread low down, steer its tip (16 units above the finger) into the eye, hold still | the tip follows at 110 units/s; 1.0 s inside 6 units of the swaying eye with the finger nearly still | 22 |
 
 ### Tuning (`sim.js`)
 
@@ -74,12 +81,16 @@ All positions are in the object's own 100 × 100 box.
 | `GOLDEN_CHANCE`, `GOLDEN_FROM` | 0.025, 6 | chance a customer is golden; none before this many customers |
 | `GOLDEN_PATIENCE`, `GOLDEN_PAY` | × 1.45, × 4 | a golden job's patience (on the one-repair patience) and pay |
 | `PUMP_RATE` | 140 units/s | how fast the pump handle can go down |
+| `OIL_PERIOD`, `OIL_OPEN` | 1.0 s, 0.6 | one door swing; how open it must be for a drop |
+| `ZIP_RATE` | 150 units/s | how fast the zip slider can climb |
+| `SPRING_RATE` | 75 units/s | how fast the toy car can be pulled back |
+| `THREAD_HOLD` | 1.0 s | how long to hold the thread still in the eye |
 
 Round 2 changed every seeded queue. Each customer now draws its golden chance, its two-repair roll and a seed for its repairs' layout when it joins the queue, and the queue's numbers are drawn nowhere else. So a seed gives the same customers to everyone however fast they play, and a change to the golden chance does not shift the rest of the queue. Old `?seed=` links give different queues than in round 1. (The objects already came in the same order regardless of speed before this; the change stops a future job whose layout draws a varying count of numbers from shifting later customers.)
 
 ## Bots (`bots.mjs`)
 
-`fnm exec --using=26.12.0 node experiments/fixit/bots.mjs` runs in about 0.5 s and is deterministic. The bots play the real `sim.js` through the same finger paths the check uses (`moves.js`). Their speed is capped at what a thumb can do: no finger moves faster than 820 units/s, and the fastest one measured was 779.
+`fnm exec --using=26.12.0 node experiments/fixit/bots.mjs` is deterministic and took 8 s in its last run (1.3 s to 56 s depending on what else the machine was doing; see Round 3). The bots play the real `sim.js` through the same finger paths the check uses (`moves.js`). Their speed is capped at what a thumb can do: no finger moves faster than 820 units/s, and the fastest one measured was 779.
 
 One repair at the hardest level (patience 7.5 s). Median seconds from the job appearing to fixed, over 20 seeds:
 
@@ -96,21 +107,27 @@ One repair at the hardest level (patience 7.5 s). Median seconds from the job ap
 | sharpen | 1.87 | 2.95 | 6.48 |
 | sew | 2.90 | 3.32 | 4.52 |
 | pump | 2.80 | 3.65 | 6.85 |
+| oil | 3.38 | 3.38 | 4.38 |
+| zip | 1.88 | 2.20 | 3.85 |
+| spring | 1.47 | 1.90 | 3.28 |
+| thread | 2.02 | 2.43 | 3.73 |
 
-A competent bot loses no two-repair job at the top level (worst: teddy plus screw in 5.07 s of 12.0 s). With every eligible customer golden, a competent bot at the top level fixes all 80 golden jobs over 10 seeds (worst 5.07 s of 10.9 s), and each pays at least 8 coins a repair.
+The door takes the same time for every bot that taps in the window, since it waits for the swing.
 
-The pump first needed 7 strokes with the handle going down at 110 units/s; a competent bot's worst time was then too close to the limit (median 3.92 s), so it is now 6 strokes at 140 units/s. The golden chance was first 5%; an average bot met one in 25 of 40 shifts, which is not rare, so it is now 2.5% (16 of 40 after the last change to the random draws).
+A competent bot loses no two-repair job at the top level (round 3, 15 jobs: worst oil plus screw in 5.65 s of 12.0 s). With every eligible customer golden, a competent bot at the top level fixes all 78 golden jobs over 10 seeds (worst 5.58 s), and each pays at least 8 coins a repair.
 
-Whole shifts, all 11 jobs unlocked, 40 seeds each:
+The pump first needed 7 strokes with the handle going down at 110 units/s; a competent bot's worst time was then too close to the limit (median 3.92 s), so it is now 6 strokes at 140 units/s. The golden chance was first 5%; an average bot met one in 25 of 40 shifts, which is not rare, so it is now 2.5% (15 of 40 in round 3, with 15 jobs).
+
+Whole open-stall shifts, all 15 jobs unlocked, 40 seeds each (round 3):
 
 | Bot | Coins | Fixed | Hearts lost | Ended by hearts | First heart lost at |
 | --- | --- | --- | --- | --- | --- |
-| idle | 0 | 0 | 3 | 40/40 | 13 s (shift ends at 41 s on average) |
-| scribbler (random taps) | 3 | 1.1 | 3 | 40/40 | 13 s |
-| slow | 48 | 12.3 | 0.5 | 0/40 | 77 s (median; a heart is lost in 19 of 40 shifts) |
-| average | 242 | 22.5 | 0 | 0/40 | none |
-| competent | 344 | 29.1 | 0 | 0/40 | none |
-| expert | 403 | 33.5 | 0 | 0/40 | none |
+| idle | 0 | 0 | 3 | 40/40 | 13 s |
+| scribbler (random taps) | 3 | 1.0 | 3 | 40/40 | 13 s |
+| slow | 51 | 12.3 | 0.4 | 0/40 | 82 s (median) |
+| average | 241 | 22.2 | 0 | 0/40 | none |
+| competent | 340 | 28.3 | 0 | 0/40 | none |
+| expert | 396 | 32.4 | 0 | 0/40 | none |
 
 Other claims it checks: with the same seed an expert and a slow bot meet the same objects in the same order (the daily stall's promise; whether a customer also brings a second repair still follows the level when they step up, which depends on time); taps that are not the job make no progress on any job; golden customers are rare (4 to 20 of 40 shifts for an average bot); a slow player's first two shifts earn a median 96 coins and an average player's 440 to 640, against a cheapest item of 50; the tutorial waits for a slow player.
 
@@ -118,7 +135,7 @@ Other claims it checks: with the same seed an expert and a slow bot meet the sam
 
 `fnm exec --using=26.12.0 node experiments/fixit/check.mjs [webkit|chromium]`. It serves `experiments/` on a free port, answers `/notes/button.js` with an empty script, captures lab records sent to the lab endpoint, and fails on any page error, console error, failed request or HTTP status of 400 or more. It runs WebKit as iPhone 13 and Chromium as Pixel 7. Every touch is a real touch `PointerEvent` on the canvas, one step per animation frame, along the path `moves.js` makes from the job's own guide. Screenshots go to `$SHOTS` (default: a folder in the OS temp directory).
 
-It covers:
+It covered in round 2 (round 3 rewrote it for levels; see "Browser check, round 3" below):
 
 - the menu and its lab notice;
 - a streak felt during the first full shift: at least one streak word ("Nice!", "Great!", "Hot!", "On fire!", "x2!" or "x3!") shown and confetti on screen;
@@ -139,19 +156,19 @@ It covers:
 
 A known bad case fails: with the no-overlap clamp in `people()` switched off, a 12 s run of chain jobs on Chromium measured bodies 50.7 px inside each other; with it on, the closest pair was 1.8 px apart.
 
-Last result (round 2, final code): `ok` on WebKit (iPhone 13), 126 s, and on Chromium (Pixel 7, plus the 360 × 640 and desktop runs), 198 s. The repo's shared phone check (`experiments/kit/check/phone.mjs`) passed before and after this round's changes.
+Last result (round 2, final code): `ok` on WebKit (iPhone 13), 126 s, and on Chromium (Pixel 7, plus the 360 × 640 and desktop runs), 198 s. The repo's shared phone check (`experiments/kit/check/phone.mjs`) passed before and after this round's changes. Round 3's result is under "Browser check, round 3".
 
 ## Debug queries
 
-`?seed=N` fixes the customer queue (shift k uses N + k). `?golden=1` makes every customer golden from the first. `?date=YYYY-MM-DD` picks the daily stall's date (default: today, UTC). `?level=N` starts at level N (0 to 5). `?only=<job>` serves only that job. `?two=1` or `?two=0` forces two-repair jobs on or off. `?day=S` sets the shift length in seconds.
+`?level=N` makes Play start map level N (round 3; it used to set the ramp). `?ramp=N` starts the open stall at ramp step N (0 to 5; this was `?level=` before round 3). `?seed=N` fixes the open stall's customer queue (shift k uses N + k); levels always use their own seed. `?golden=1` makes every open-stall customer golden from the first. `?date=YYYY-MM-DD` picks the daily stall's date (default: today, UTC). `?only=<job>` makes Play start the open stall serving only that job, with no goal card. `?two=1` or `?two=0` forces two-repair jobs on or off in the open stall. `?day=S` sets the open stall's shift length in seconds.
 
 ## Save
 
-One key, `fixit-save`, holding one JSON object: `v`, `bank`, `best`, `shifts`, `unlocked`, `seen` (times each job was shown, for the ghost finger), `owned`, `awning`, `sound`, `regular` (visits by the regular), `pending` (the new job for the next shift), `bestStreak`, `served`, and from round 2 `days` (`{ "YYYY-MM-DD": best coins }`, newest 30 dates; entries with a bad date or value are dropped on load). Fields only grow; a round-1 save loads with `days` empty. Unknown or wrong-typed fields are dropped on load.
+One key, `fixit-save`, holding one JSON object: `v`, `bank`, `best`, `shifts`, `unlocked`, `seen` (times each job was shown, for the ghost finger), `owned`, `awning`, `sound`, `regular` (visits by the regular), `pending` (the new job for the next shift), `bestStreak`, `served`, and from round 2 `days` (`{ "YYYY-MM-DD": best coins }`, newest 30 dates; entries with a bad date or value are dropped on load), and from round 3 `levels` (`{ "<n>": best stars 1..3 }`, cleared levels only) and `times` (`{ "<n>": best clear seconds }`). Fields only grow; a round-1 save loads with `days` empty, a round-2 save with `levels` carried over as below. Unknown or wrong-typed fields are dropped on load; `levels` keeps only real level numbers with 1, 2 or 3, and `times` only entries for cleared levels with a positive number.
 
 ## Lab recording
 
-`rec.start({ mode: 'day', unlocked, shift, tutorial, only })`, or `rec.start({ mode: 'daily', date })` for the daily stall; `rec.event('repair', { kind, ms, ok })` for each fixed or lost job, at most 120 per run; `rec.event('buy', { item })`; `rec.end('closed', { coins, served, lost, bestStreak, why })` when the shift ends, with `why` `'time'` or `'hearts'` (and `daily: date` for the daily stall); repair events carry `golden: true` for a golden customer; `rec.end('left', { ..., why: 'menu' })` when the player quits from the pause card.
+`rec.start({ mode: 'level', level, goal })` for a map level (goal is the goal line), `rec.start({ mode: 'day', unlocked, shift, only })` for the open stall, or `rec.start({ mode: 'daily', date })` for the daily stall; a level's end is `rec.end('closed', { coins, served, lost, bestStreak, mode: 'level', level, cleared, stars, secs, why, bonus })` with `why` `'clear'`, `'time'`, `'hearts'` or `'lost'` (someone walked off in a level that forbids it, or a set list ran out); a level left from the pause card is `rec.end('left', { ...same, why: 'menu' })`. No new outcome names. `rec.event('repair', { kind, ms, ok })` for each fixed or lost job, at most 120 per run; `rec.event('buy', { item })`; `rec.end('closed', { coins, served, lost, bestStreak, why })` when the shift ends, with `why` `'time'` or `'hearts'` (and `daily: date` for the daily stall); repair events carry `golden: true` for a golden customer; `rec.end('left', { ..., why: 'menu' })` when the player quits from the pause card.
 
 ## Not verified
 
@@ -230,5 +247,143 @@ Not checked: closing the tab mid-shift still loses that shift's coins, as before
 
 Asked (#154) what should clear a level, the tester chose "Mix: each level has its own goal". Nothing is built yet.
 
-### Left as a proposal (2026-11-23, note #157)
+### Left as a proposal (2026-11-23, note #157), built 2026-11-24 (see below)
 - The levels proposal under note #150 now has its rule. A goal per level, one of: fix N before time runs out; fix a set list without losing a customer; earn N coins. A first table: levels 1 to 11 introduce one job each and cycle the three goals; later levels combine two goals. Each goal shows as one line and an icon before the level and on the counter during it. Bots must show each level clearable before it ships. The daily stall stays as it is.
+
+## 2026-11-24: levels built (note #157)
+
+Built: the levels from notes #150 and #157, with the goal rule the tester chose in #157 ("Mix: each level has its own goal"), and four new jobs for "only three types" (#150).
+
+### Round 3: levels
+
+- **The map.** The menu shows 32 numbered tiles in two chapters: "Learning the trade" (levels 1 to 15, a new job each) and "Busy street" (16 to 32, mixed jobs, faster). Each tile shows its best stars. A level is open when the one before it is cleared; locked tiles are greyed. The next level is teal and pulses. **Play** names it ("Play level 5") with its goal line under it, and starts it at once. The next level is the lowest one not cleared; when all are cleared, the lowest one without three stars. Any open tile starts its level.
+- **The goal card.** A level opens on a card over the bench: "Level N", "New job: the door" when it brings one, the goal's icons, the goal line, and the three-star time. The sim waits behind it. A tap (or Space) starts the level, or it starts by itself after 2.6 s. The pause button works during it.
+- **Goals.** One per level, of three kinds, and two combined later: fix N before the time runs out (wrench and clock icons); fix a set list of customers, in order, with nobody walking off (ticket and heart); earn N coins before the time runs out (coin and clock). Levels 19, 25 and 30 are "fix N, nobody walks off"; 20, 26 and 32 combine fix and coins under a time limit; 18, 24, 27 and 31 put a time limit on a set list. Hearts still end a level when they run out.
+- **During a level.** Under the hearts, a pill shows each part of the goal with its icon and its count ("4/12", "35/130"), green when met, and a heart when nobody may walk off. Beside it the level clock runs along a bar with a gold star mark at the three-star time and a pale one at the two-star time; a mark dims once its time has passed. A timed level shows the seconds left, and the bar flashes red in the last 10 s. When the goal is met the clock stops, "Goal!" shows with gold confetti, and the level ends as that customer leaves.
+- **Stars.** From the clear time: 3 at or under the three-star time, 2 at or under the two-star time, else 1. They are measured by the bots (below).
+- **Ends.** Cleared: "Level N cleared!", the stars, the coins, time and best time, a line on new stars or what three stars needs, and a teaser for the next level ("Next: a new job, the music box."). Buttons: Next level (main), Try again, Menu. Failed: "Out of time", "Out of hearts" or "Someone walked off", empty stars, how far it got ("Fixed 9/12"), what was missing ("So close! 2 more to fix."), the goal again; Try again is the main button and restarts the level in one tap.
+- **Coins.** A level's coins are banked whether it is cleared, failed or left from the pause card. Each new star pays 5 coins more.
+- **Levels 1 to 15** bring one job each, in the order screw, pin, dent, wheel, oil, rub, clock, zip, chain, glue, spring, sharpen, sew, thread, pump. The first customer brings the new job with 30 s patience and a "New job!" banner; every other customer after brings it again; the rest come from the jobs already taught, never the same kind twice in a row. Levels 2 to 15 have 12 to 19 customers. Patience is 16 s on levels 2 to 5, 14 s on 6 to 10 and 12 s on 11 to 15; no two-repair jobs; the regular comes from level 6 (not on set-list levels).
+- **Levels 16 to 32** each use 6 of the 15 jobs (a fixed shuffle per level). Patience falls from 11 s to 7.5 s, the two-repair chance rises from 10% to 45%, golden customers come from level 18 (6%), and the regular comes on levels without a set list.
+- **Fixed seeds.** Every level has its own seed (1000 + 7919 n), so a level is the same for everyone, and a level's customers do not depend on how fast it is played.
+- **Sky.** Levels 16 to 24 are played under a sunset sky and 25 to 32 at dusk.
+
+### The open stall and the daily stall
+
+The old random shift stays as the **open stall**: a 90 s day of random customers from the player's jobs, with the ramp, the regular, golden customers and job unlocks (4 fixed earns the next job) as before. It opens after level 8 is cleared, or at once for any save that played a shift of the old game. It has no tutorial now (levels 1 to 3 teach those jobs). A level cleared adds its new job to the open stall's jobs too. The **daily stall** is unchanged but now opens after level 3, or for any save with a shift. The **shop** is unchanged.
+
+### Old saves (the rule)
+
+A save from before round 3 has no `levels` field. If it shows play (`shifts` > 0, `served` > 0, or more than the first three jobs unlocked), the longest run of levels from level 1 whose new job is already in its unlocked list is marked cleared with one star, once, and saved at once. The menu says so on that load ("Your stall's old jobs count: levels 1 to 4 are done."). Coins, best, shop items, awning, sound, seen jobs, regular visits and the daily bests are kept as they are. Because level 5 teaches the door, a job no old save has, an old save never starts past level 5; a save that unlocked all eleven old jobs starts at level 5 with levels 1 to 4 done, its open stall and daily stall already open, and every star still to earn. A save with no play starts at level 1. The check proves both and that the carry-over happens once.
+
+Adding the four jobs to the job list changed every seeded open-stall and daily queue: a `?seed=` link or a date gives a different queue from round 2. The daily for one date is still the same for everyone.
+
+### The four new jobs
+
+Each is a gesture the first eleven do not use, and each keeps the thing being fixed out from under the thumb:
+
+- **Squeaky door (oil): timing.** The door swings by itself once a second; tap the oil can (low on the right) while the door is wide open and a drop lands on the hinge (up on the left), which glows while a drop will take. One drop per swing, three drops. The can shows three dots for the drops. A tap at the wrong moment splashes and costs nothing but the swing.
+- **Jacket (zip): drag with a wiggle.** Hold the pull tab, which hangs under the slider, and drag up. At each of two red snags the slider sticks and shakes, with side arrows; wiggle side to side four times to free it. The open teeth above the slider stay in sight.
+- **Toy car (spring): pull back and let go.** Hold the back of the car and pull it left against the spring (it comes back at its own pace). A meter on top fills; when the key glows, let go and the car zooms off. Let go early and it rolls back unwound ("Hold till it glows!"). The car stays to the right of the thumb.
+- **Needle (thread): steer and hold still.** Hold the thread low down; its stiff tip stands above the thumb and follows at its own pace. Steer the tip into the swaying needle's eye and hold still: a ring round the eye fills in 1 s; moving pulls it back out.
+
+### Bots for levels
+
+`node bots.mjs` plays every level with the slow, average, competent and expert bots on the level's own seed, and each wobbly bot 6 more ways (each job's reaction time × 0.75 to 1.25 and speed × 0.9 to 1.1). The whole run took 1.3 s on a quiet machine and 56 s at a load average of 78 (several browser checks running at once), under the 60 s limit both times. `node bots.mjs --calibrate` measures the time limits, coin targets and star times and prints them as `TUNE` for `levels.js`:
+
+- a coin target is 90% of what the competent bot holds after fixing the level's customer count;
+- a time limit runs from 1.15 × the slow bot's time on level 2 to 1.25 × the competent bot's time on level 32 (the slow time counts at most 1.6 × the average's), rounded up to 5 s, and is at least 4 s past the two-star time;
+- three stars need the expert's time plus 10%; two stars the average bot's time plus 5%, capped at the competent bot's plus 30%.
+
+Last run:
+
+| Level | New job | Goal | Patience (s) | Competent (s) | Expert (s) | 3★ / 2★ / limit (s) | Average bot stars | Average bot length (s) | Slow bot clears |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | screw | Fix these 6. Nobody walks off. | 30 | 15.6 | 12.5 | 14/21/- | 1.0 | 23 | 6/6 |
+| 2 | pin | Fix 14 in 85 seconds. | 16 | 34.0 | 29.0 | 32/45/85 | 1.3 | 46 | 6/6 |
+| 3 | dent | Fix these 17. Nobody walks off. | 16 | 34.7 | 29.4 | 33/46/- | 1.8 | 46 | 6/6 |
+| 4 | wheel | Earn 130 coins in 85 seconds. | 16 | 37.0 | 32.4 | 36/49/85 | 2.0 | 47 | 5/6 |
+| 5 | oil | Fix 14 in 75 seconds. | 16 | 43.3 | 40.4 | 45/50/75 | 2.0 | 48 | 6/6 |
+| 6 | rub | Fix these 12. Nobody walks off. | 14 | 38.9 | 32.1 | 36/51/- | 2.0 | 50 | 6/6 |
+| 7 | clock | Earn 116 coins in 80 seconds. | 14 | 35.8 | 31.6 | 35/47/80 | 2.0 | 45 | 0/6 |
+| 8 | zip | Fix 17 in 85 seconds. | 14 | 41.2 | 36.8 | 41/51/85 | 2.0 | 49 | 6/6 |
+| 9 | chain | Fix these 19. Nobody walks off. | 14 | 39.3 | 34.4 | 38/52/- | 2.0 | 50 | 6/6 |
+| 10 | glue | Earn 149 coins in 85 seconds. | 14 | 41.2 | 36.6 | 41/53/85 | 2.0 | 51 | 0/6 |
+| 11 | spring | Fix 17 in 80 seconds. | 12 | 39.9 | 35.3 | 39/51/80 | 2.0 | 50 | 4/6 |
+| 12 | sharpen | Fix these 16. Nobody walks off. | 12 | 39.1 | 34.6 | 39/51/- | 1.8 | 51 | 6/6 |
+| 13 | sew | Earn 131 coins in 70 seconds. | 12 | 42.3 | 39.2 | 44/52/70 | 2.0 | 49 | 6/6 |
+| 14 | thread | Fix 17 in 75 seconds. | 12 | 42.5 | 39.4 | 44/52/75 | 2.0 | 50 | 6/6 |
+| 15 | pump | Fix these 14. Nobody walks off. | 12 | 40.9 | 37.4 | 42/54/- | 2.0 | 52 | 6/6 |
+| 16 | - | Fix 13 in 70 seconds. | 11 | 36.3 | 32.7 | 36/48/70 | 2.0 | 46 | 0/6 |
+| 17 | - | Earn 122 coins in 70 seconds. | 10.8 | 37.8 | 33.5 | 37/50/70 | 2.0 | 48 | 0/6 |
+| 18 | - | Fix these 13 in 65 seconds. Nobody walks off | 10.6 | 35.3 | 30.1 | 34/46/65 | 1.3 | 47 | 0/6 |
+| 19 | - | Fix 13. Nobody walks off. | 10.3 | 38.9 | 32.7 | 36/51/- | 1.0 | 53 | 6/6 |
+| 20 | - | Fix 13 and earn 162 coins in 65 seconds. | 10.1 | 37.3 | 31.2 | 35/49/65 | 0.3 | 60 | 0/6 |
+| 21 | - | Fix these 14. Nobody walks off. | 9.9 | 43.2 | 36.3 | 40/57/- | 1.0 | 59 | 6/6 |
+| 22 | - | Earn 157 coins in 75 seconds. | 9.7 | 43.4 | 37.4 | 42/57/75 | 1.0 | 59 | 0/6 |
+| 23 | - | Fix 15 in 85 seconds. | 9.5 | 52.4 | 44.7 | 50/69/85 | 2.0 | 68 | 0/6 |
+| 24 | - | Fix these 14 in 70 seconds. Nobody walks off | 9.3 | 42.9 | 38.6 | 43/56/70 | 2.0 | 54 | 0/6 |
+| 25 | - | Fix 15. Nobody walks off. | 9 | 54.8 | 48.2 | 54/72/- | 2.0 | 71 | 5/6 |
+| 26 | - | Fix 15 and earn 146 coins in 85 seconds. | 8.8 | 56.5 | 50.2 | 56/74/85 | 1.3 | 78 | 0/6 |
+| 27 | - | Fix these 15 in 75 seconds. Nobody walks off | 8.6 | 49.4 | 42.1 | 47/65/75 | 1.5 | 66 | 0/6 |
+| 28 | - | Fix 16 in 75 seconds. | 8.4 | 51.2 | 45.3 | 50/67/75 | 2.0 | 65 | 0/6 |
+| 29 | - | Earn 218 coins in 95 seconds. | 8.2 | 59.4 | 49.0 | 54/78/95 | 0.0 | 95 | 0/6 |
+| 30 | - | Fix 16. Nobody walks off. | 7.9 | 47.8 | 39.8 | 44/63/- | 1.3 | 64 | 0/6 |
+| 31 | - | Fix these 16 in 84 seconds. Nobody walks off | 7.7 | 61.0 | 52.2 | 58/80/84 | 1.0 | 82 | 0/6 |
+| 32 | - | Fix 18 and earn 183 coins in 90 seconds. | 7.5 | 65.8 | 57.9 | 64/86/90 | 0.0 | 90 | 0/6 |
+
+| Levels | Slow bot clears | Average bot stars | Average bot length (s) |
+| --- | --- | --- | --- |
+| 1-10 | 78% | 1.82 | 45 |
+| 11-20 | 57% | 1.65 | 51 |
+| 21-32 | 15% | 1.26 | 71 |
+
+It claims, and all hold: a competent bot clears every level, plain and all 6 wobbly ways; an expert bot three-stars every level; a wobbly expert three-stars at least 80% of plays (192 of 192); a competent bot three-stars at most a third of the mixed levels (1 of 17) and gets at least two stars on all 32; an idle bot and a scribbler clear none; the slow bot's clears and the average bot's stars fall band by band; an average bot spends 45 to 90 s in each of levels 2 to 15 and 45 to 100 s in the later ones; levels 1 to 15 each start with their new job, every job once; time limits bite (half the time on a mixed level, or 80% of the competent bot's own clear time on any timed level, and the competent bot fails); a level played twice the same way gives the same result.
+
+The first table had levels of 12 to 48 s for a competent bot, and a second one still had 8 of levels 5 to 15 under 45 s for an average bot; the request asked for 45 to 90 s, so the customer counts went up (14 to 19 customers on levels 2 to 14) until every level from 2 on takes an average bot 45 s or more. Level 1 stays short on purpose (23 s for an average bot, 6 customers with 30 s patience): it is the game's first minute. An earlier calibration set time limits from the competent bot alone; a slow bot then failed most early timed levels, so the limits now start from the slow bot's time.
+
+### Browser check, round 3
+
+`check.mjs` was rewritten for levels. On each phone (WebKit as iPhone 13, Chromium as Pixel 7) it covers: the map (32 tiles, level 1 next, level 2 locked, no open or daily stall on a new save, Play naming level 1); Play starting level 1 directly with the sim waiting behind the goal card, then a tap starting it; the ghost finger on the first job; a stray tap; pause, Keep going, blur, P; level 1 played out by real touch events with no overlapping people, the blend fraction in 0..1, the goal counter counting 0 to 6; the cleared card, its Next button, the stars and the star bonus banked; one lab run `closed` with `level`, `cleared` and `stars` and the repairs; Next starting level 2 (the pin); Menu from the pause card keeping the coins, not clearing the level, sent as `left`; the save unchanged by a reload; level 19 failed with hands off ("Someone walked off", Try again as main button, no Next), one tap restarting it, and the failed run sent as `closed` with `cleared: false`; every one of the 15 jobs through `?only=` with real pointer events; the open stall behind its gate with the leave-early unlock rule; a two-repair job; a golden customer; the old-save carry-over (levels 1 to 4 with one star each, coins and awning kept, the open and daily stalls open, the menu line, once only) and an unplayed old save starting at level 1; the shop and the sound setting. Then a later open-stall shift with reduced motion, the radio and the regular, run to "Out of hearts"; the daily stall (hidden on a new save, shown after level 3 or a shift). Chromium also runs a 360 × 640 screen (the map with stars, the level 14 goal card, the needle, the door, the zip and the car, a cleared and a failed card) and the 1280 × 800 desktop run (every job by mouse and by holding Space).
+
+Screenshots for review, in `$SHOTS`: `<phone>-1-map.png`, `<phone>-2-goal-card.png`, `<phone>-3-level-hud.png`, `<phone>-4-cleared.png`, `<phone>-5-failed.png`, `<phone>-6-old-save.png`, `<phone>-job-oil.png` (and `zip`, `spring`, `thread`), `small-1-map.png` to `small-5-failed.png`, `small-job-*.png`.
+
+Changes after looking at the screenshots: the locked tiles first showed a padlock drawn in CSS that read as a box; they now show their number greyed. The pulsing next tile moved by a few pixels, which made Playwright wait for it to settle; it now pulses a teal ring instead. The goal card's star line drew its text in the star colour; it is now dark text after gold stars. The star marks above the clock bar ran into the coin count; they moved under the bar as one gold star (three stars) and one pale star (two stars). At 360 wide two marks of three small stars each overlapped.
+
+### Not verified (round 3)
+
+- Nobody has played a level. Every star time, time limit and coin target comes from bots whose speeds are estimates of thumb speed.
+- The four new gestures under a real thumb, in particular whether the door's timing window and the needle's hold-still read without words, and whether the toy car's "let go when it glows" is found without the ghost finger.
+- Whether the goal card's 2.6 s is long enough to read and short enough not to annoy on a replay; whether people tap it or wait.
+- Whether a player understands the star marks on the clock bar without a legend.
+- The old-save carry-over was checked with saves written by the check, not with a real tester's save.
+
+### Known weaknesses (round 3)
+
+- The late levels are hard for an average player: the average bot fails levels 29 and 32 every time and gets under one star on 20; the slow bot clears none of 26 to 32. The competent bot clears all of them. That may be the right end of a map or too steep; it is a lead decision.
+- Coin goals depend on streaks (the multiplier), so a slow bot clears none of the coin levels 7, 10 and 17 to 29 even with the time it gets; slow players will meet coin goals as walls.
+- Level 1 takes an average bot 23 s, under the 45 to 90 s asked for; on purpose, as the first minute of the game.
+- `goalLine` has two branches for "Nobody walks off" that give the same text; harmless.
+- The map is taller than a 640 px screen; the Play button and the next level are at the top, the late chapter needs a scroll.
+- In the needle job the thumb ends up over the needle's lower shaft once the tip is in the eye; the eye and the ring stay in sight, but the ghost finger's last pose sits on the needle.
+- The keyboard (hold Space) plays at the average bot's pace, so a keyboard player gets about an average bot's stars.
+
+### Ideas of the builder (round 3)
+
+- **Builder: star bonus coins.** Each new star pays 5 coins, so replaying for three stars also buys shop items.
+- **Builder: next-job teaser.** The cleared card names the next level's new job ("Next: a new job, the door."), so the next tap has a reason.
+- **Builder: how close.** The failed card says what was missing ("So close! 2 more to fix."), so a near miss reads as a near miss.
+- **Builder: best time.** Each level keeps its best clear time, shown on the cleared card with "New best time!".
+- **Builder: chapters and sky.** The map has two named chapters, and the sky turns to sunset and then dusk as the levels go on.
+- **Builder: the clock stops at the goal.** Stars come from the moment the goal is met, not from when the last customer walks away.
+- **Builder: the open stall as an unlock.** The old endless shift comes back at level 8 as a reward, not as the default.
+
+### For the lead (round 3)
+
+- **Late difficulty.** Levels 26 to 32 are cleared by a competent bot and failed by a slow one; levels 29 and 32 are failed by the average bot too. Options: keep it (an endgame), or cap patience at 8.5 s instead of 7.5 s for the last chapter. I kept it.
+- **Old saves start at level 5 at most.** The alternative was to mark every level whose job the save knew, wherever it falls (for example the rub at level 6), with gaps in the map. I took the unbroken run from level 1, so the map never has holes.
+- **The open stall gate is level 8.** It could be level 15 (after every job is taught). Level 8 gives a player who likes the old mode a way back sooner: levels 1 to 8 take an average bot about 6 minutes of play in all.
+- **Coins from levels can be farmed.** Replaying level 1 pays about 25 coins each time (the competent bot's first run there earned 27 before the star bonus). Shop prices (50 to 400) were set for 90 s shifts; they are still reachable, maybe faster than before.
+- **The shared phone check.** `experiments/kit/check/phone.mjs` (the `fixit` entry uses `started()`) passes unchanged: `#play` still leaves the menu at once (to the goal card, with `playing` true), the pause button pauses, `#quit` returns to the menu with one `left` run. It needs no change.
+
+Last result (round 3, final code): `ok` on WebKit (iPhone 13), 166 s, and on Chromium (Pixel 7, plus the 360 × 640 and desktop runs), 338 s, with several other browser checks running on the same machine. The shared phone check, `phone.mjs fixit`, gave `ok` on WebKit and Chromium; a full `phone.mjs` run failed only on `lab/lantern-3d` (another game, under work in another session at the time). `bots.mjs`: all claims hold.

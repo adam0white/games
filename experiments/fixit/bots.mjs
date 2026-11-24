@@ -2,8 +2,9 @@
 // Bots play through the same input interface the page uses (down/move/up in object-local units), one step per tick,
 // with finger speeds capped at what a thumb can do (moves.js SKILLS). Exits non-zero when a claim fails.
 import assert from 'node:assert/strict';
-import { create, step, input, guide, rand, DT, KINDS, TUTOR, PATIENCE, LEVELS, HIT, RAMP, TWO_PATIENCE } from './sim.js';
+import { create, step, input, guide, rand, stars, DT, KINDS, TUTOR, PATIENCE, LEVELS, HIT, RAMP, TWO_PATIENCE } from './sim.js';
 import { plan, SKILLS, THUMB_MAX } from './moves.js';
+import { MAP, COUNT, INTRO, ORDER, levelDef, goalLine } from './levels.js';
 
 let failed = 0;
 function claim(ok, text) { console.log(`${ok ? 'ok  ' : 'FAIL'} ${text}`); if (!ok) failed++; }
@@ -12,8 +13,17 @@ function claim(ok, text) { console.log(`${ok ? 'ok  ' : 'FAIL'} ${text}`); if (!
 // plan runs out before the job is done, pause briefly and plan again from the job's current state.
 function skilled(skill) {
   return s => {
-    const steps = [...Array(Math.round(skill.react / DT)).fill(null), ...plan(guide(s.rep), skill, [50, 110])];
-    return { steps, again: () => [...Array(Math.round(0.15 / DT)).fill(null), ...plan(guide(s.rep), skill, [50, 50])] };
+    const steps = [...Array(Math.round(skill.react / DT)).fill(null), ...plan(guide(s.rep), skill, [50, 110], Math.round(skill.react / DT) * DT)];
+    return { steps, again: () => [...Array(Math.round(0.15 / DT)).fill(null), ...plan(guide(s.rep), skill, [50, 50], Math.round(0.15 / DT) * DT)] };
+  };
+}
+// A skilled bot with a human wobble: each job its reaction time and finger speed vary (react x0.75..1.25, speed
+// x0.9..1.1), drawn from its own seed, so a level can be played many slightly different ways.
+function noisy(skill, seed) {
+  const box = { r: seed * 7 + 3 };
+  return s => {
+    const k = { ...skill, react: skill.react * (0.75 + 0.5 * rand(box)), speed: skill.speed * (0.9 + 0.2 * rand(box)) };
+    return skilled(k)(s);
   };
 }
 // A bot that never touches anything.
@@ -68,6 +78,7 @@ const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
 const median = a => { const b = [...a].sort((x, y) => x - y); return b.length ? b[Math.floor(b.length / 2)] : NaN; };
 
 const t0 = Date.now();
+if (process.argv.includes('--calibrate')) { calibrate(); process.exit(0); }
 const TOP = (LEVELS - 1) * RAMP; // the shift clock where the hardest level begins
 
 // 1. Determinism: the same seed and the same inputs give the same shift, for a skilled bot and a scribbler.
@@ -142,6 +153,9 @@ for (const kind of KINDS) {
         if (kind === 'dent') { // keep clear of every dent
           if (s.rep.dents.some(d => Math.hypot(d.x - x, d.y - y) < HIT.dent + 1)) continue;
         }
+        // a tap on the oil can or on the thread's end is the job itself, so keep clear of those too
+        const g = guide(s.rep), spot = kind === 'oil' ? g.at : kind === 'thread' ? g.from : null;
+        if (spot && Math.hypot(spot[0] - x, spot[1] - y) < HIT[kind] + 1) continue;
         input(s, { type: 'down', x, y }); input(s, { type: 'up', x, y });
       }
       step(s); s.events.length = 0;
@@ -193,5 +207,97 @@ claim(fastest <= THUMB_MAX + 1, `no bot finger moved faster than ${THUMB_MAX} un
   claim(slowFirst.lost === 0 || slowFirst.served >= 3, `the tutorial customers wait for a slow player (slow bot served ${slowFirst.served} on its first shift)`);
 }
 
+levels();
+
 console.log(`\n${failed ? failed + ' claim(s) FAILED' : 'all claims hold'} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 process.exit(failed ? 1 : 0);
+
+// ---------- the map levels (levels.js)
+// Plays one level to its end; returns what a player would see: cleared, stars, the seconds the goal took, the whole length.
+function level(def, policy, hearts = 3) {
+  const { s } = play({ lv: def, hearts }, policy, 400);
+  return { cleared: s.over === 'clear', why: s.over, stars: stars(s), secs: s.clearT, len: s.t, coins: s.coins, served: s.served, lost: s.lost, s };
+}
+// Measures the time limits, coin targets and star times for every level and prints them as TUNE for levels.js.
+// A level's goal is played without a time limit by the slow, average, competent and expert bots (no wobble). Coin
+// targets are 90% of what the competent bot holds when it has fixed the shape's number of customers. A time limit runs
+// from 1.15 x the slow bot's time (level 2) to 1.25 x the competent bot's time (the last level), so early levels wait
+// for a slow player and late ones need a quick one. Three stars need the expert's time plus 10%; two stars the
+// average bot's time plus 5%, capped at the competent bot's time plus 30%. The slow time counts at most 1.6 x average.
+function calibrate() {
+  const out = {};
+  for (let n = 1; n <= COUNT; n++) {
+    const base = levelDef(n), shape = base.shape, free = { ...base, goal: { ...base.goal } };
+    delete free.goal.time;
+    if (shape.coins) {
+      const probe = { ...free, goal: { fix: shape.coins } };
+      free.goal.coins = Math.round(level(probe, skilled(SKILLS.competent)).coins * 0.9);
+    }
+    const [sl, av, c, e] = ['slow', 'average', 'competent', 'expert'].map(k => level(free, skilled(SKILLS[k])));
+    if (!c.cleared || !e.cleared || !av.cleared) { console.log(`level ${n}: average ${av.why}, competent ${c.why}, expert ${e.why}`); continue; }
+    const k = Math.max(0, n - 2) / (COUNT - 2), slowT = Math.min(sl.cleared ? sl.secs : Infinity, av.secs * 1.6);
+    const t = { stars: [Math.ceil(e.secs * 1.1), Math.max(Math.ceil(e.secs * 1.1) + 2, Math.min(Math.ceil(av.secs * 1.05), Math.ceil(c.secs * 1.3)))] };
+    if (shape.time) t.time = Math.max(t.stars[1] + 4, Math.ceil(((1 - k) * slowT * 1.15 + k * c.secs * 1.25) / 5) * 5);
+    if (shape.coins) t.coins = free.goal.coins;
+    out[n] = t;
+    console.log(`level ${String(n).padStart(2)}: slow ${sl.cleared ? sl.secs.toFixed(1) : sl.why}, average ${av.secs.toFixed(1)}, competent ${c.secs.toFixed(1)}, expert ${e.secs.toFixed(1)} s -> ${JSON.stringify(t)}`);
+  }
+  console.log('export const TUNE = {\n' + Object.entries(out).map(([n, t]) => `  ${n}: ${JSON.stringify(t).replace(/"/g, '').replace(/,/g, ', ').replace(/:/g, ': ')},`).join('\n') + '\n};');
+}
+
+function levels() {
+  console.log(`\nMap levels, ${COUNT} of them. Each level is played by bots on its own fixed seed; the wobbly bots play it 6 ways.`);
+  console.log('lvl new      goal                                          patience  competent  expert  t3/t2/limit   avg stars  avg len  slow clears');
+  const NOISE = 6, rows = [];
+  let compFails = 0, expertMiss = 0, expertNoisy = 0, expertNoisyAll = 0, idleClears = 0, scribClears = 0;
+  for (const def of MAP) {
+    const c = level(def, skilled(SKILLS.competent)), e = level(def, skilled(SKILLS.expert)), a = level(def, skilled(SKILLS.average));
+    let cNoisy = 0, eNoisy = 0, avgStars = 0, slowClears = 0, avgLen = 0;
+    for (let k = 1; k <= NOISE; k++) {
+      if (level(def, noisy(SKILLS.competent, k)).cleared) cNoisy++;
+      if (level(def, noisy(SKILLS.expert, k)).stars === 3) eNoisy++;
+      const av = level(def, noisy(SKILLS.average, k)); avgStars += av.stars; avgLen += av.len;
+      if (level(def, noisy(SKILLS.slow, k)).cleared) slowClears++;
+    }
+    if (level(def, idle).cleared) idleClears++;
+    if (level(def, scribbler(def.n)).cleared) scribClears++;
+    if (!c.cleared || cNoisy < NOISE) compFails++;
+    if (e.stars !== 3) expertMiss++;
+    expertNoisy += eNoisy; expertNoisyAll += NOISE;
+    const row = { n: def.n, c, e, a, cNoisy, eNoisy, avgStars: avgStars / NOISE, avgLen: avgLen / NOISE, slowClears, def };
+    rows.push(row);
+    const goal = goalLine(def.goal).slice(0, 44).padEnd(45);
+    console.log(`${String(def.n).padStart(3)} ${(def.intro ?? '-').padEnd(8)} ${goal} ${String(def.patience).padStart(6)}   ${c.cleared ? c.secs.toFixed(1).padStart(6) : ' fail '}   ${e.cleared ? e.secs.toFixed(1).padStart(5) : 'fail '}   ${`${def.stars[0]}/${def.stars[1]}/${def.goal.time ?? '-'}`.padEnd(12)}  ${row.avgStars.toFixed(1).padStart(5)}      ${row.avgLen.toFixed(0).padStart(4)}     ${slowClears}/${NOISE}`);
+  }
+  claim(compFails === 0, `a competent bot clears every level, plain and all ${NOISE} wobbly ways (${compFails} levels missed)`);
+  claim(expertMiss === 0, `an expert bot gets three stars on every level (${expertMiss} missed)`);
+  claim(expertNoisy >= expertNoisyAll * 0.8, `a wobbly expert still three-stars ${expertNoisy} of ${expertNoisyAll} level plays`);
+  const lateComp3 = rows.filter(r => r.n > INTRO && r.c.stars === 3).length, late = rows.filter(r => r.n > INTRO).length;
+  claim(lateComp3 <= late / 3, `three stars take more than competence: a competent bot three-stars ${lateComp3} of the ${late} mixed levels`);
+  const comp2 = rows.filter(r => r.c.stars >= 2).length;
+  claim(comp2 === COUNT, `a competent bot gets at least two stars on every level (${comp2} of ${COUNT})`);
+  claim(idleClears === 0 && scribClears === 0, `a bot that does nothing or scribbles clears no level (${idleClears}, ${scribClears})`);
+  // The ramp, measured: the slow bot clears fewer levels and the average bot earns fewer stars band by band.
+  const bands = [[1, 10], [11, 20], [21, COUNT]].map(([a, b]) => {
+    const r = rows.filter(x => x.n >= a && x.n <= b);
+    return { a, b, slow: r.reduce((t, x) => t + x.slowClears, 0) / (r.length * NOISE), stars: r.reduce((t, x) => t + x.avgStars, 0) / r.length, len: r.reduce((t, x) => t + x.avgLen, 0) / r.length };
+  });
+  console.log('band      slow bot clears   average bot stars   average bot length (s)');
+  for (const b of bands) console.log(`${String(b.a).padStart(2)}-${String(b.b).padEnd(5)}  ${(b.slow * 100).toFixed(0).padStart(5)}%            ${b.stars.toFixed(2)}                ${b.len.toFixed(0)}`);
+  claim(bands[0].slow > bands[1].slow && bands[1].slow > bands[2].slow, `the ramp: a slow bot clears ${bands.map(b => (b.slow * 100).toFixed(0) + '%').join(', ')} of levels band by band`);
+  claim(bands[0].stars >= bands[1].stars && bands[1].stars >= bands[2].stars, `the ramp: an average bot's stars fall band by band (${bands.map(b => b.stars.toFixed(2)).join(', ')})`);
+  // The request: levels 1 to about 13 last 45 to 90 s. Level 1 is the first minute of the game and stays short on purpose.
+  const long = rows.filter(r => r.n >= 2 && (r.avgLen < 45 || r.avgLen > (r.n <= INTRO ? 90 : 100))).map(r => `${r.n}: ${r.avgLen.toFixed(0)} s`);
+  claim(long.length === 0, `an average bot spends 45 to 90 s in levels 2 to 15 and 45 to 100 s in later ones${long.length ? ' (outside: ' + long.join(', ') + ')' : ''}`);
+  // Levels 1 to 15 each bring one new job, first, and in order.
+  claim(MAP.slice(0, INTRO).every((d, i) => d.intro === ORDER[i] && create({ lv: d }).cust.kinds[0] === ORDER[i]) && new Set(ORDER).size === KINDS.length, 'levels 1 to 15 each start with a new job, every job once');
+  // A known bad case fails: halve a mixed level's limit and the competent bot cannot clear it. Early levels wait for a
+  // slow player, so for every timed level, a limit at 80% of the competent bot's own clear time must also fail.
+  const timed = MAP.filter(d => d.goal.time), cut = (d, t) => level({ ...d, goal: { ...d.goal, time: t } }, skilled(SKILLS.competent)).cleared;
+  const broken = timed.filter(d => d.n > INTRO && cut(d, d.goal.time / 2)).length;
+  const tight = timed.filter(d => cut(d, rows[d.n - 1].c.secs * 0.8)).length;
+  claim(broken === 0 && tight === 0, `time limits bite: half time on mixed levels and 80% of the competent time on any timed level are not cleared (${broken}, ${tight} still cleared of ${timed.length})`);
+  // Determinism: a level played twice the same way gives the same result.
+  const d1 = level(MAP[20], noisy(SKILLS.average, 3)), d2 = level(MAP[20], noisy(SKILLS.average, 3));
+  claim(d1.secs === d2.secs && d1.coins === d2.coins && d1.stars === d2.stars, 'a level is deterministic: same bot, same wobble, same result');
+}

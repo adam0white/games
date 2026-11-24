@@ -1,7 +1,7 @@
 // Fix-It Stall: every picture, drawn in code. Objects are drawn in object-local units (the bench box is 100 x 100);
 // people, the stall and the cat in CSS pixels. Nothing here changes game state.
 import { ghost } from './moves.js';
-import { SEAM_POINTS, seamAt } from './sim.js';
+import { SEAM_POINTS, seamAt, OIL_OPEN } from './sim.js';
 
 export const C = {
   ink: '#3a2216', cream: '#fff1d6', paper: '#fbe6c2',
@@ -289,6 +289,118 @@ const OBJ = {
       for (let i = 0; i < r.need; i++) circle(g, 86, 86 - i * 6, 1.8, i < r.strokes ? '#7fe0a0' : 'rgba(255,255,255,.55)', 0.8);
     }
   },
+  // A squeaky door swinging on its own in a frame, its hinge up on the left; the oil can sits low on the right, away
+  // from the hinge, so the tapping thumb never covers the swing. The hinge glows while the door is open enough.
+  oil(g, r, t, w) {
+    const ph = r.kind === 'oil' ? r.ph : t * 0.3, open = r.kind === 'oil' && !r.done ? 0.5 - 0.5 * Math.cos(2 * Math.PI * ph) : w ? 0.5 - 0.5 * Math.cos(w * Math.PI * 2) : 0.15;
+    const ready = r.kind === 'oil' && !r.done && open >= OIL_OPEN, drops = r.kind === 'oil' ? r.drops : 3;
+    rrect(g, 12, 6, 62, 74, 4, C.woodDk); rrect(g, 17, 11, 52, 69, 2, '#3a2a22', 1.4); // the frame and the dark room behind
+    g.fillStyle = 'rgba(255,230,160,.25)'; g.fillRect(17, 11, 52 * open, 69); // light through the open door
+    const dw = 52 * (1 - 0.78 * open), skew = 6 * open; // the door turns away on its hinge: narrower, its far edge taller
+    g.beginPath(); g.moveTo(17, 11); g.lineTo(17 + dw, 11 - skew); g.lineTo(17 + dw, 80 + skew); g.lineTo(17, 80); g.closePath(); shape(g, C.woodLt);
+    g.strokeStyle = C.wood; g.lineWidth = 1.4; for (const k of [0.33, 0.66]) { g.beginPath(); g.moveTo(17 + dw * k, 13 - skew * k); g.lineTo(17 + dw * k, 78 + skew * k); g.stroke(); }
+    circle(g, 17 + dw * 0.82, 46, 2.6, C.brass, 1.2); // the handle
+    // the hinges: the top one takes the oil
+    for (const hy of [24, 66]) { rrect(g, 13, hy - 6, 9, 12, 2, hy === 24 && ready ? C.glow : C.steel, 1.6); }
+    if (ready) { g.strokeStyle = `rgba(255,243,168,${0.6 + 0.4 * Math.sin(t * 20)})`; g.lineWidth = 2.5; g.beginPath(); g.arc(17, 24, 11, 0, TAU); g.stroke(); }
+    // the squeak: little lines off the hinge while it swings dry
+    if (r.kind === 'oil' && !r.done && drops < r.need && open > 0.2) { g.strokeStyle = `rgba(255,255,255,${0.4 + 0.4 * open})`; g.lineWidth = 1.6; for (let i = 0; i < 3 - drops; i++) { g.beginPath(); g.arc(17, 24, 15 + i * 5, rad(-150), rad(-110)); g.stroke(); } }
+    // oil on the hinge so far
+    for (let i = 0; i < drops; i++) { g.fillStyle = '#c9a43a'; g.beginPath(); g.ellipse(17, 29 + i * 3, 2.2, 1.6, 0, 0, TAU); g.fill(); }
+    // the oil can: body, spout pointing up-left at the hinge, and the drops still to go as dots on it
+    const cx = r.kind === 'oil' ? r.cx : 72, cy = r.kind === 'oil' ? r.cy : 80;
+    g.strokeStyle = C.ink; g.lineWidth = 5; g.lineCap = 'round'; g.beginPath(); g.moveTo(cx - 8, cy - 8); g.lineTo(cx - 20, cy - 24); g.stroke();
+    g.strokeStyle = C.brassDk; g.lineWidth = 2.6; g.stroke();
+    g.beginPath(); g.ellipse(cx, cy, 13, 11, 0, 0, TAU); shape(g, C.red); shine(g, cx - 5, cy - 5, 3.5, 0.5);
+    rrect(g, cx - 4, cy - 15, 8, 5, 2, C.steel, 1.4);
+    if (r.kind === 'oil' && !r.done) for (let i = 0; i < r.need; i++) circle(g, cx - 6 + i * 6, cy + 4, 1.9, i < r.drops ? '#ffd860' : 'rgba(255,255,255,.5)', 0.8);
+    if (w) for (let i = 0; i < 3; i++) note(g, 34 + i * 14, 30 - w * 20 - i * 5, 1 - w);
+  },
+  // A jacket with a stuck zip: the open teeth above the slider, closed below. The tab hangs under the slider, where the
+  // thumb holds it, so the teeth above stay in sight. Red threads mark the snags; stuck, the slider shakes.
+  zip(g, r, t, w) {
+    const y = r.kind === 'zip' ? r.y : 24, top = r.kind === 'zip' ? r.top : 24, y0 = r.kind === 'zip' ? r.y0 : 84;
+    const stuck = r.kind === 'zip' && !r.done && r.snags.length && y <= r.snags[0] + 0.5;
+    const gap = yy => yy < y ? Math.min(16, (y - yy) * 0.3) : 0; // how far apart the two sides are at height yy
+    const side = sgn => { // one half of the jacket, its zip edge following the gap
+      g.beginPath(); g.moveTo(50, 98); g.lineTo(50 + sgn * 44, 98); g.lineTo(50 + sgn * 46, 26); g.lineTo(50 + sgn * 30, 6); g.lineTo(50 + sgn * 12, 6);
+      for (let yy = 8; yy <= 98; yy += 6) g.lineTo(50 + sgn * (gap(yy) + 1), yy);
+      g.closePath(); shape(g, sgn < 0 ? C.teal : '#2a807b');
+    };
+    g.fillStyle = '#e8d0a8'; g.beginPath(); g.ellipse(50, 10, 14, 5, 0, 0, TAU); g.fill(); // the lining at the collar
+    side(-1); side(1);
+    // pockets and cuffs
+    for (const sgn of [-1, 1]) { g.strokeStyle = C.tealDk; g.lineWidth = 1.6; g.beginPath(); g.moveTo(50 + sgn * 24, 70); g.lineTo(50 + sgn * 36, 66); g.stroke(); }
+    // the teeth
+    for (let yy = 10; yy < 96; yy += 3.2) { const d = gap(yy); for (const sgn of [-1, 1]) { g.fillStyle = C.brassLt; g.fillRect(50 + sgn * (d + 1) - (sgn < 0 ? 3 : 0), yy, 3, 1.8); } }
+    // the snags: little red tangles in the teeth
+    if (r.kind === 'zip' && !r.done) for (const sy of r.snags) { g.strokeStyle = C.red; g.lineWidth = 2; g.beginPath(); g.moveTo(44, sy - 3); g.quadraticCurveTo(54, sy - 8, 50, sy - 2); g.quadraticCurveTo(44, sy + 2, 56, sy - 4); g.stroke(); }
+    // the slider and its tab
+    const sx = 50 + (stuck ? Math.sin(t * 40) * 1.2 : 0);
+    rrect(g, sx - 6, y - 5, 12, 10, 3, C.steelLt, 1.8);
+    g.strokeStyle = C.ink; g.lineWidth = 1.6; g.beginPath(); g.moveTo(sx, y + 4); g.lineTo(sx, y + 7); g.stroke();
+    rrect(g, sx - 4.5, y + 7, 9, 13, 3, stuck ? C.amber : C.steel, 1.8); circle(g, sx, y + 16, 1.6, C.ink, 0);
+    if (stuck && r.kind === 'zip') { // a side-to-side cue at the stuck slider
+      g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 2; g.lineCap = 'round';
+      for (const sgn of [-1, 1]) { g.beginPath(); g.moveTo(sx + sgn * 10, y); g.lineTo(sx + sgn * 16, y); g.moveTo(sx + sgn * 13, y - 3); g.lineTo(sx + sgn * 16, y); g.lineTo(sx + sgn * 13, y + 3); g.stroke(); }
+      for (let i = 0; i < 4; i++) circle(g, sx - 6 + i * 4, y - 9, 1.3, i < r.wig ? '#7fe0a0' : 'rgba(255,255,255,.55)', 0.6);
+    }
+    if (r.kind === 'zip' && !r.done) star(g, 50, top - 6, 4 + Math.sin(t * 6), C.glow); // where the slider goes
+    if (w) star(g, 50, 14, 12 * (1 - w), '#fff', 1 - w);
+    void y0;
+  },
+  // A wind-up toy car. Hold its back and pull it left; the key on its roof turns and a meter fills; when the key glows,
+  // let go and it zooms off to the right.
+  spring(g, r, t, w) {
+    const x = r.kind === 'spring' ? r.x : 64, y = r.kind === 'spring' ? r.y : 60, wind = r.kind === 'spring' ? r.w : 0, ready = r.kind === 'spring' && !r.done && wind >= 1;
+    const zoom = r.kind === 'spring' && r.zoom ? w * 70 : 0, cx = x + zoom;
+    g.fillStyle = 'rgba(58,34,22,.25)'; g.fillRect(4, y + 13, 92, 4); // the floor line
+    if (r.kind === 'spring' && !r.done) { // the wind meter along the top: fills as the car is pulled back
+      rrect(g, 14, 16, 72, 9, 4.5, 'rgba(255,255,255,.35)', 1.6);
+      if (wind > 0.01) rrect(g, 15, 17, 70 * wind, 7, 3.5, ready ? '#7fe0a0' : C.amber, 0);
+      for (let i = 1; i < 4; i++) { g.strokeStyle = 'rgba(58,34,22,.4)'; g.lineWidth = 1; g.beginPath(); g.moveTo(14 + 18 * i, 17); g.lineTo(14 + 18 * i, 24); g.stroke(); }
+      if (!r.grab && wind < 0.05) { g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 2.4; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(x - 20, y - 22); g.lineTo(r.x0 - r.need - 14, y - 22); g.stroke(); g.setLineDash([]); g.fillStyle = 'rgba(255,255,255,.8)'; g.beginPath(); g.moveTo(r.x0 - r.need - 18, y - 22); g.lineTo(r.x0 - r.need - 12, y - 26); g.lineTo(r.x0 - r.need - 12, y - 18); g.closePath(); g.fill(); }
+    }
+    if (zoom) { g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 2; for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(cx - 22 - i * 4, y - 6 + i * 6); g.lineTo(cx - 40 - i * 6, y - 6 + i * 6); g.stroke(); } }
+    g.save(); g.translate(cx, y);
+    // body, cab, windows, wheels
+    g.beginPath(); g.moveTo(-20, 8); g.lineTo(-20, -2); g.quadraticCurveTo(-18, -6, -12, -6); g.lineTo(-8, -15); g.lineTo(8, -15); g.lineTo(13, -6); g.quadraticCurveTo(20, -6, 21, 0); g.lineTo(21, 8); g.closePath(); shape(g, C.red);
+    rrect(g, -6, -13, 6, 6, 1.5, C.steelLt, 1.2); rrect(g, 2, -13, 6, 6, 1.5, C.steelLt, 1.2);
+    for (const wx of [-12, 12]) { circle(g, wx, 9, 5.5, '#333', 1.6); circle(g, wx, 9, 2, C.steel, 0); g.save(); g.translate(wx, 9); g.rotate(-wind * 12 - zoom * 0.3); g.strokeStyle = C.steelLt; g.lineWidth = 1.2; g.beginPath(); g.moveTo(-3.5, 0); g.lineTo(3.5, 0); g.stroke(); g.restore(); }
+    // the key on the roof, turning as it winds
+    g.save(); g.translate(0, -18); g.scale(Math.cos(wind * 10 + (zoom ? t * 20 : 0)), 1);
+    g.strokeStyle = C.ink; g.lineWidth = 2; g.beginPath(); g.moveTo(0, 3); g.lineTo(0, -1); g.stroke();
+    for (const sgn of [-1, 1]) { g.beginPath(); g.ellipse(sgn * 5, -4, 4.5, 3.5, 0, 0, TAU); shape(g, ready ? C.glow : C.brass, 1.6); }
+    g.restore();
+    if (ready) { g.strokeStyle = `rgba(255,243,168,${0.5 + 0.5 * Math.sin(t * 16)})`; g.lineWidth = 2.5; g.beginPath(); g.arc(0, -22, 11, 0, TAU); g.stroke(); }
+    g.restore();
+    if (r.kind === 'spring' && !r.done && !r.grab) { circle(g, x - 8, y, 7 + Math.sin(t * 6) * 0.8, 'rgba(255,255,255,0)', 1.6); } // grab here
+  },
+  // A needle on a pincushion, its eye up top; a thread from a spool. Hold the thread low down (its stiff tip stands
+  // above the thumb), steer the tip into the eye and hold still while it goes through.
+  thread(g, r, t, w) {
+    const ex = r.kind === 'thread' ? r.ex : 64, ey = r.kind === 'thread' ? r.ey : 28, tx = r.kind === 'thread' ? r.tx : ex, ty = r.kind === 'thread' ? r.ty : ey;
+    const inEye = r.kind === 'thread' ? r.inEye : 1;
+    // pincushion
+    g.beginPath(); g.ellipse(ex, 88, 22, 9, 0, 0, TAU); shape(g, C.red); circle(g, ex, 82, 2.4, C.green, 1);
+    // the needle
+    g.beginPath(); g.moveTo(ex - 2.5, ey - 12); g.quadraticCurveTo(ex, ey - 16, ex + 2.5, ey - 12); g.lineTo(ex + 1.6, 84); g.lineTo(ex, 88); g.lineTo(ex - 1.6, 84); g.closePath(); shape(g, C.steelLt, 1.6);
+    g.fillStyle = '#4a3a30'; g.beginPath(); g.ellipse(ex, ey, 1.4, 5, 0, 0, TAU); g.fill(); // the eye
+    // the target ring round the eye, filling as the thread goes through
+    g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 1.6; g.beginPath(); g.arc(ex, ey, 8, 0, TAU); g.stroke();
+    if (inEye > 0) { g.strokeStyle = '#7fe0a0'; g.lineWidth = 3; g.beginPath(); g.arc(ex, ey, 8, -Math.PI / 2, -Math.PI / 2 + TAU * inEye); g.stroke(); }
+    // the spool, bottom left, and the thread from it to the tip
+    rrect(g, 6, 78, 16, 16, 2, C.woodLt, 1.6); rrect(g, 8, 81, 12, 10, 1, '#4f7fd0', 1.2);
+    g.strokeStyle = '#4f7fd0'; g.lineWidth = 2; g.lineCap = 'round'; g.beginPath(); g.moveTo(16, 82);
+    if (r.kind === 'thread' && !r.done) { const fx = tx, fy = ty + 16; g.quadraticCurveTo(fx - 12, fy + 22, fx, fy); g.lineTo(tx, ty); }
+    else { g.quadraticCurveTo(40, 70, ex - 4, ey + 4); g.lineTo(ex + 8, ey - 2); g.quadraticCurveTo(ex + 18, ey + 10, ex + 14, ey + 30); }
+    g.stroke();
+    if (r.kind === 'thread' && !r.done) {
+      circle(g, tx, ty, 2, '#4f7fd0', 1); // the stiff tip
+      if (!r.grab) circle(g, tx, ty + 16, 7 + Math.sin(t * 6) * 0.8, 'rgba(255,255,255,0)', 1.6); // hold here
+    }
+    if (w) star(g, ex, ey, 10 * (1 - w), '#fff', 1 - w);
+  },
 };
 function gear(g, x, y, R, teeth, a) {
   g.save(); g.translate(x, y); g.rotate(a); g.beginPath();
@@ -345,13 +457,16 @@ export function drawGhost(g, gd, t, alpha) {
   else if (gd.type === 'rub') { g.moveTo(gd.cx - gd.w / 2, gd.cy); g.lineTo(gd.cx + gd.w / 2, gd.cy); }
   else if (gd.type === 'path') { g.moveTo(...gd.pts[0]); for (const q of gd.pts.slice(1)) g.lineTo(...q); }
   else if (gd.type === 'pump') { g.moveTo(gd.x - 9, gd.top + 6); g.lineTo(gd.x - 9, gd.bottom + 6); }
+  else if (gd.type === 'zip') { g.moveTo(gd.at[0] + 14, gd.at[1]); g.lineTo(gd.at[0] + 14, gd.top); }
+  else if (gd.type === 'timing') g.arc(gd.at[0], gd.at[1], 16, 0, TAU);
   g.stroke(); g.setLineDash([]);
   // arrowhead at the end of the path, so the way to go is plain
   const end = gd.type === 'circle' ? null : gd.type === 'arc' ? [gd.cx + Math.cos(rad(gd.to)) * gd.r, gd.cy + Math.sin(rad(gd.to)) * gd.r, rad(gd.to + 90)]
     : gd.type === 'flick' ? [gd.cx + Math.cos(rad(350)) * gd.r, gd.cy + Math.sin(rad(350)) * gd.r, rad(80)]
     : gd.type === 'drag' || gd.type === 'swipe' ? [gd.to[0], gd.to[1], Math.atan2(gd.to[1] - gd.from[1], gd.to[0] - gd.from[0])]
     : gd.type === 'path' && gd.pts.length > 1 ? [...gd.pts.at(-1), Math.atan2(gd.pts.at(-1)[1] - gd.pts.at(-2)[1], gd.pts.at(-1)[0] - gd.pts.at(-2)[0])]
-    : gd.type === 'pump' ? [gd.x - 9, gd.bottom + 6, Math.PI / 2] : null;
+    : gd.type === 'pump' ? [gd.x - 9, gd.bottom + 6, Math.PI / 2]
+    : gd.type === 'zip' ? [gd.at[0] + 14, gd.top, -Math.PI / 2] : null;
   if (end) { g.fillStyle = 'rgba(255,255,255,.8)'; g.save(); g.translate(end[0], end[1]); g.rotate(end[2]); g.beginPath(); g.moveTo(5, 0); g.lineTo(-4, -5); g.lineTo(-4, 5); g.closePath(); g.fill(); g.restore(); }
   if (tap && gd.all) for (const a of gd.all) { g.strokeStyle = `rgba(255,255,255,${0.5 + 0.4 * Math.sin(t * 8)})`; g.lineWidth = 2.5; g.beginPath(); g.arc(a[0], a[1], 13 + 2 * Math.sin(t * 8), 0, TAU); g.stroke(); }
   // the fingertip itself
@@ -451,6 +566,24 @@ export function heart(g, x, y, s, full) {
   g.bezierCurveTo(x, y + s * 0.8, x + s * 0.5, y + s * 0.6, x + s * 0.5, y + s * 0.3); g.bezierCurveTo(x + s * 0.5, y, x, y, x, y + s * 0.35);
   shape(g, full ? C.red : 'rgba(58,34,22,.25)', 2);
   if (full) shine(g, x - s * 0.24, y + s * 0.28, s * 0.1, 0.7);
+}
+// A five-pointed star for ratings.
+export function starShape(g, x, y, r, fill) {
+  g.beginPath();
+  for (let i = 0; i < 10; i++) { const rr = i % 2 ? r * 0.45 : r, an = -Math.PI / 2 + i * Math.PI / 5; g.lineTo(x + rr * Math.cos(an), y + rr * Math.sin(an)); }
+  g.closePath(); shape(g, fill, Math.max(1, r * 0.22));
+}
+// The goal icons: fix (a wrench), list (a ticket), coins, time (a clock face) and safe (a heart).
+export function goalIcon(g, kind, x, y, r, t = 0) {
+  if (kind === 'coins') return coin(g, x, y, r);
+  if (kind === 'safe') return heart(g, x, y - r, r * 1.8, true);
+  if (kind === 'time') { circle(g, x, y, r, C.cream, Math.max(1.4, r * 0.16)); g.strokeStyle = C.ink; g.lineWidth = Math.max(1.4, r * 0.15); g.lineCap = 'round'; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - r * 0.65); g.moveTo(x, y); g.lineTo(x + r * 0.5, y + r * 0.15); g.stroke(); return; }
+  if (kind === 'list') { rrect(g, x - r * 0.75, y - r, r * 1.5, r * 2, r * 0.2, C.cream, Math.max(1.4, r * 0.15)); g.strokeStyle = C.ink; g.lineWidth = Math.max(1, r * 0.12); for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(x - r * 0.4, y - r * 0.45 + i * r * 0.45); g.lineTo(x + r * 0.45, y - r * 0.45 + i * r * 0.45); g.stroke(); } return; }
+  // fix: a wrench
+  g.save(); g.translate(x, y); g.rotate(-Math.PI / 4);
+  g.beginPath(); g.roundRect(-r * 0.22, -r * 0.3, r * 0.44, r * 1.25, r * 0.2); shape(g, C.steelLt, Math.max(1.2, r * 0.14));
+  g.beginPath(); g.arc(0, -r * 0.55, r * 0.5, rad(-60), rad(240)); g.lineTo(-r * 0.12, -r * 0.75); g.lineTo(r * 0.12, -r * 0.75); g.closePath(); shape(g, C.steelLt, Math.max(1.2, r * 0.14));
+  g.restore();
 }
 export function coin(g, x, y, r) { circle(g, x, y, r, C.brass, Math.max(1.2, r * 0.18)); circle(g, x, y, r * 0.62, C.brassLt, 0); g.fillStyle = C.brassDk; g.font = `bold ${r * 1.1}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('c', x, y + r * 0.05); }
 export { circle, rrect, star, shape };

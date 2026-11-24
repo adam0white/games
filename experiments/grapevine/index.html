@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#241a46">
+<meta name="theme-color" content="#241a46" id="theme">
 <title>Grapevine</title>
 <style>
   html, body { margin: 0; height: 100%; background: #241a46; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
@@ -33,7 +33,7 @@
   .stars span { display: inline-block; color: #ffffff22; transform: scale(.4); transition: transform .35s cubic-bezier(.3,1.8,.5,1), color .2s; }
   .stars span.on { color: #ffd24a; text-shadow: 0 0 14px #ffb347; transform: scale(1); }
   .stars span.off { transform: scale(.85); }
-  #strip { display: block; width: 100%; height: 92px; margin: .3em 0; }
+  #strip { display: block; width: 100%; height: 104px; margin: .3em 0; }
   #pause { position: fixed; top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); width: 46px; height: 46px; min-width: 0; min-height: 0; margin: 0; padding: 0;
     border: 2px solid #ffd98a66; border-radius: 50%; background: #1a1233e6; display: none; place-items: center; touch-action: none; }
   #pause::before { content: ''; width: 4px; height: 16px; border: solid #ffd98a; border-width: 0 5px; }
@@ -42,6 +42,14 @@
   @keyframes nudge { 50% { transform: scale(1.08); } }
   .lab-notice { max-width: 26em; margin-left: auto !important; margin-right: auto !important; }
   @media (prefers-reduced-motion: reduce) { #hint { animation: none; } }
+  #tabs { display: flex; gap: 6px; margin: .4em 0 0; }
+  #tabs button { flex: 1; min-width: 0; min-height: 46px; margin: 0; padding: .2em .3em; border-radius: 14px; font-size: 15px; line-height: 1.15; }
+  #tabs button small { display: block; font-size: 11px; font-weight: 600; color: #ffd24a; }
+  #tabs button.on { background: #ffb34733; border-color: #ffb347; }
+  #tabs button.locked { border-style: dashed; color: #fff4dc66; }
+  #grid.five { grid-template-columns: repeat(5, 1fr); }
+  #payoff { display: none; font-weight: 700; color: #ffd98a; }
+  #share { min-width: 9em; }
   @media (max-height: 600px) { h1 { font-size: 2.1em; } #grid button { height: 40px; } }
 </style>
 </head>
@@ -54,6 +62,7 @@
   <p class="sub">Pass the news along. Everyone changes it a little.</p>
   <p><button id="play" class="main">Play</button></p>
   <p><button id="daily">Daily village <small></small></button></p>
+  <div id="tabs"></div>
   <div id="grid"></div>
   <p><button id="sound">Sound: on</button></p>
 </div></div>
@@ -67,14 +76,16 @@
   <h2 id="doneTitle">Heard it!</h2>
   <div class="stars" id="stars"><span>★</span><span>★</span><span>★</span></div>
   <p id="doneLine"></p>
-  <canvas id="strip"></canvas>
+  <p id="payoff"></p>
+  <canvas id="strip" aria-label="What they heard"></canvas>
+  <p><button id="share">Share this</button></p>
   <p><button id="next" class="main">Next</button></p>
   <p><button id="again">Again</button><button id="doneMenu">Menu</button></p>
 </div></div>
 <script type="module">
-import { LEVELS } from './levels.js';
-import { walk, refuse, solve, hint as hintRoute, stars as starsFor, same, daily, dailySeed, changeOf, MAX_HOPS } from './sim.js';
-import { token, villager, badge, bubble, hand, backdrop, lanterns, change, WIDE, BOARD_HALF, COLOUR, INK, CREAM, roundRect } from './art.js';
+import { LEVELS, CHAPTERS } from './levels.js';
+import { walk, refuse, solve, hint as hintRoute, stars as starsFor, same, daily, dailySeed, ONEWAY, isGate, gateOpen, lane, tierFor, fromKey, SHAPES, COLOURS } from './sim.js';
+import { token, villager, badge, bubble, hand, backdrop, lanterns, barrier, look, emblem, WIDE, BOARD_HALF, COLOUR, INK, CREAM, roundRect } from './art.js';
 import { readJson, writeJson } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
@@ -88,11 +99,31 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ---------------------------------------------------------------- save (one JSON blob)
 const KEY = 'grapevine-save';
-const save = { v: 1, sound: true, best: {}, opened: 1, daily: {}, ...readJson(KEY, {}) };
+// Fields added later (dailyHops: fewest hops per date, dailyTier: which daily village a date showed, bestStreak) default
+// here, so an old save loads as it was.
+const save = { v: 1, sound: true, best: {}, opened: 1, daily: {}, dailyHops: {}, dailyTier: {}, bestStreak: 0, ...readJson(KEY, {}) };
 const store = () => writeJson(KEY, save);
-const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const dateKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const today = () => dateKey(new Date());
+// Days in a row with a solved daily village, ending today (or yesterday, while today is still open).
+function streak() {
+  const d = new Date(); let n = 0;
+  if (!save.daily[dateKey(d)]) d.setDate(d.getDate() - 1);
+  while (save.daily[dateKey(d)]) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
 const urlLevel = Math.floor(Number(query.get('level')));
 const urlSeed = query.has('seed') ? Number(query.get('seed')) >>> 0 : null;
+const urlTier = query.has('tier') ? Math.max(0, Math.min(3, Math.floor(Number(query.get('tier'))) || 0)) : null;
+
+// ---------------------------------------------------------------- chapters
+// Each chapter is a time of year in the same village (art.js LOOKS). The daily village wears the look of the newest
+// villager it uses.
+const CHAPTER_NAMES = ['Evening', 'Winter', 'Autumn'];
+const chapterOf = i => Math.max(1, CHAPTERS.findIndex(([a, b]) => i + 1 >= a && i + 1 <= b) + 1); // of a 0-based level
+const DAILY_LOOK = [1, 2, 2, 3]; // by daily tier
+// What a chapter's first levels bring in: drawn with a pulsing ring until the player touches the board.
+const INTRO = { 31: 'lane', 36: 'bell', 46: 'keeper' };
 
 // ---------------------------------------------------------------- sound
 const snd = sound({ on: () => save.sound });
@@ -107,6 +138,8 @@ const voice = kind => { // each kind of villager says something as they pass it 
   else if (kind === 'swap') tone(500, 0.2, 0.05, 'sine', -250);
   else if (kind === 'carve') snd.noise(0.05, 0.2, 4000);
   else if (kind === 'flip') tone(600, 0.15, 0.05, 'square', -300);
+  else if (kind === 'bell') { tone(1318.5, 0.6, 0.05, 'sine'); setTimeout(() => tone(1046.5, 0.7, 0.05, 'sine'), 180); }
+  else if (kind === 'keeper') { tone(260, 0.12, 0.05, 'triangle', 120); setTimeout(() => tone(390, 0.14, 0.05, 'triangle', -120), 110); }
 };
 
 // ---------------------------------------------------------------- lab recording
@@ -120,17 +153,24 @@ let W = 0, H = 0, dpr = 1, safe = { t: 0, b: 0, l: 0, r: 0 };
 const probe = document.createElement('div');
 probe.style.cssText = 'position:fixed;top:env(safe-area-inset-top);bottom:env(safe-area-inset-bottom);left:env(safe-area-inset-left);right:env(safe-area-inset-right);pointer-events:none;visibility:hidden';
 document.body.append(probe);
-let back = null; // the village backdrop, drawn once per size
+let back = null, chapter = 1; // the village backdrop, drawn once per size and chapter
 function resize() {
   dpr = Math.min(2, devicePixelRatio || 1);
   W = innerWidth; H = innerHeight;
   canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
   const cs = getComputedStyle(probe);
   safe = { t: parseFloat(cs.top) || 0, b: parseFloat(cs.bottom) || 0, l: parseFloat(cs.left) || 0, r: parseFloat(cs.right) || 0 };
-  back = document.createElement('canvas'); back.width = canvas.width; back.height = canvas.height;
-  const bg = back.getContext('2d'); bg.scale(dpr, dpr); backdrop(bg, W, H, safe.t + 60);
+  paintBack();
   layout();
 }
+function paintBack() {
+  if (!W) return;
+  back = document.createElement('canvas'); back.width = canvas.width; back.height = canvas.height;
+  const bg = back.getContext('2d'); bg.scale(dpr, dpr); backdrop(bg, W, H, safe.t + 60, chapter);
+  const theme = look(chapter).theme;
+  $('theme').content = theme; document.documentElement.style.background = document.body.style.background = theme;
+}
+function setChapter(c) { if (c !== chapter) { chapter = c; paintBack(); } }
 addEventListener('resize', resize);
 
 // The board: villagers' screen positions from the level's 0..1 coordinates.
@@ -179,7 +219,18 @@ let route = [], trail = null, sends = 0, fails = 0, hints = 0, hintAt = 0, touch
 let sending = null, result = null, wrong = null, lastStars = 0;
 let react = [], refuseT = [], happyT = 0, puzzledT = 0, particles = [], shake = 0, ripples = [], grow = 0, gone = [];
 let endTimer = -1, stripT = 0, sentRoute = null;
+let keepers = [], gateT = [], laneFlash = null, introT = 0, bannerT = 0, payoff = 0, tier = 0;
 const next = () => Math.min(LEVELS.length, Math.max(1, save.opened));
+// The bell parity and the keepers' news right now: after the villager the message is leaving, while it travels.
+const nowPhase = () => sending ? sending.phases[sending.i] : trail.state.phase;
+const nowMemo = () => sending ? sending.memos[sending.i] : trail.state.memo;
+// The daily village a date shows depends on how far the player has come, so it is pinned the first time it opens.
+// A date already played before tiers existed stays on the first tier.
+function dailyTier(key) {
+  if (urlTier !== null) return urlTier;
+  if (save.dailyTier[key] === undefined) { save.dailyTier[key] = save.daily[key] ? 0 : tierFor(save.opened); store(); }
+  return save.dailyTier[key];
+}
 
 function begin(i, how = 'level') {
   snd.unlock();
@@ -187,8 +238,16 @@ function begin(i, how = 'level') {
   if (how === 'daily') {
     dailyKey = today();
     const d = new Date(), seed = urlSeed ?? dailySeed(d.getFullYear(), d.getMonth() + 1, d.getDate());
-    level = { ...daily(seed, LEVELS[20]), name: 'Daily village' };
-  } else { index = i; level = LEVELS[i]; }
+    tier = dailyTier(dailyKey);
+    const lv = daily(seed, LEVELS[20], tier);
+    level = { ...lv, name: 'Daily village' };
+    setChapter(DAILY_LOOK[lv.tier ?? tier] ?? 1);
+  } else { index = i; level = LEVELS[i]; setChapter(chapterOf(i)); }
+  keepers = level.nodes.map((n, v) => (n.kind === 'keeper' ? v : -1)).filter(v => v >= 0);
+  gateT = level.edges.map(([, , type]) => (isGate(type) && gateOpen(type, 0) ? 1 : 0));
+  laneFlash = null; payoff = 0;
+  introT = mode === 'level' && INTRO[i + 1] ? 1 : 0;
+  bannerT = mode === 'level' && CHAPTERS.some(([a]) => a === i + 1) && i > 0 ? 1 : 0;
   route = [level.from]; trail = walk(level, route);
   sends = 0; fails = 0; hints = 0; hintAt = 0; touched = false; startT = t;
   sending = null; result = null; wrong = null; endTimer = -1; sentRoute = null;
@@ -202,7 +261,7 @@ function begin(i, how = 'level') {
 // ---------------------------------------------------------------- route editing (shared by tap and drag)
 function setRoute(r) { route = r; trail = walk(level, route); if (result === 'wrong') result = null; }
 function extend(v) {
-  const why = refuse(level, route, trail.msgs, v);
+  const why = refuse(level, trail.state, v);
   if (why) { refused(v, why); return false; }
   setRoute([...route, v]); grow = 0;
   const node = level.nodes[v];
@@ -224,6 +283,11 @@ function refused(v, why) {
     // not next to the end of the route: point at where the route can go on
     refuseT[route[route.length - 1]] = 1;
     tone(220, 0.08, 0.05, 'sine');
+  } else if (why === 'oneway' || why === 'shut') {
+    // a lane that runs the other way, or a shut gate: the path itself flashes
+    laneFlash = { a: route[route.length - 1], b: v, t: 1, why };
+    tone(why === 'shut' ? 180 : 200, 0.14, 0.06, 'square', -30);
+    if (!reduced) shake = Math.max(shake, 2);
   } else {
     refuseT[v] = 1; // a timid villager refusing red news, a sleepy one who went home, a U-turn
     tone(150, 0.16, 0.07, 'square', -40);
@@ -259,6 +323,8 @@ canvas.addEventListener('pointerdown', e => {
   if (v < 0) { tone(660, 0.04, 0.03, 'sine'); return; }
   if (v === level.from) { if (route.length > 1) tone(300, 0.1, 0.05, 'sine'); setRoute([level.from]); react[v] = 0.6; return; }
   const at = route.lastIndexOf(v);
+  // A villager already on the route: if the route can go on to them (a loop back), it does; otherwise the route is cut there.
+  if (at >= 0 && at < route.length - 1 && !refuse(level, trail.state, v)) { enter(v); return; }
   if (at >= 0 && at < route.length - 1) { setRoute(route.slice(0, at + 1)); tone(SCALE[Math.max(0, at - 1)] / 2, 0.1, 0.05, 'sine'); return; }
   if (at === route.length - 1) { react[v] = 0.4; tone(SCALE[Math.min(SCALE.length - 1, at)], 0.06, 0.04); return; }
   enter(v);
@@ -286,7 +352,7 @@ canvas.addEventListener('pointercancel', e => { finger = null; });
 function send() {
   sends++;
   sentRoute = [...route];
-  sending = { route: sentRoute, msgs: trail.msgs, changes: trail.changes, i: 0, p: 0, ok: trail.correct, shown: trail.msgs[0], squash: 0 };
+  sending = { route: sentRoute, msgs: trail.msgs, changes: trail.changes, phases: trail.phases, memos: trail.memos, i: 0, p: 0, ok: trail.correct, shown: trail.msgs[0], squash: 0 };
   wrong = null; puzzledT = 0;
   rec.event('send', { route: sentRoute, ok: trail.correct });
   tone(SCALE[0], 0.2, 0.08, 'triangle');
@@ -317,8 +383,12 @@ function win() {
   for (let i = 0; i < 4; i++) burst(p.x, p.y - R, COLOUR[i], 14);
   [0, 4, 7, 12].forEach((k, i) => setTimeout(() => tone(SCALE[2] * 2 ** (k / 12), 0.6, 0.07, 'triangle'), i * 90));
   sentRoute.forEach(v => { react[v] = 1; });
-  if (mode === 'daily') save.daily[dailyKey] = Math.max(save.daily[dailyKey] || 0, lastStars);
-  else {
+  if (mode === 'daily') {
+    save.daily[dailyKey] = Math.max(save.daily[dailyKey] || 0, lastStars);
+    save.dailyHops[dailyKey] = Math.min(save.dailyHops[dailyKey] ?? Infinity, hops);
+    save.bestStreak = Math.max(save.bestStreak || 0, streak());
+  } else {
+    payoff = CHAPTERS.findIndex(([, b]) => b === index + 1) + 1; // the last level of a chapter
     save.best[index + 1] = Math.max(save.best[index + 1] || 0, lastStars);
     save.opened = Math.max(save.opened, Math.min(LEVELS.length, index + 2));
     if (index + 1 >= LEVELS.length) save.opened = LEVELS.length + 1;
@@ -372,6 +442,22 @@ function tick() {
   }
   if (endTimer > 0 && --endTimer === 0) { endTimer = -1; showEnd(); }
   if (screen === 'done') stripT++;
+  if (level) {
+    const phase = nowPhase();
+    level.edges.forEach(([, , type], e) => {
+      if (!isGate(type)) return;
+      const want = gateOpen(type, phase) ? 1 : 0;
+      gateT[e] = reduced ? want : gateT[e] + Math.sign(want - gateT[e]) * Math.min(Math.abs(want - gateT[e]), 1 / 10);
+    });
+  }
+  if (laneFlash && (laneFlash.t -= 1 / 30) <= 0) laneFlash = null;
+  if (bannerT > 0 && t - startT > 150) bannerT = Math.max(0, bannerT - 1 / 30);
+  // the end of a chapter: fireworks behind the card
+  if (screen === 'done' && payoff && t % (reduced ? 90 : 24) === 0) {
+    const x = W * (0.15 + 0.7 * Math.random()), y = safe.t + 80 + Math.random() * H * 0.35;
+    burst(x, y, COLOUR[Math.floor(Math.random() * 4)], 26);
+    if (stripT < 240) tone(SCALE[4 + Math.floor(Math.random() * 6)], 0.2, 0.03, 'sine'); // a few seconds of bangs, then quiet
+  }
 }
 function frame(now) {
   const dt = Math.min(0.25, (now - last) / 1000); last = now;
@@ -387,12 +473,14 @@ function draw(alpha) {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   if (back) g.drawImage(back, 0, 0, W, H);
   const time = (t + alpha) / 60;
-  lanterns(g, W, safe.t + 4, time, H, safe.t + 60);
+  lanterns(g, W, safe.t + 4, reduced ? 0 : time, H, safe.t + 60, chapter);
   if (!level) { menuScene(time); return; }
   g.save();
   if (shake) g.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
-  paths();
+  paths(time);
   vine(time);
+  gates();
+  intro(time);
   // villagers, back to front
   const order = level.nodes.map((_, i) => i).sort((a, b) => pos[a].y - pos[b].y);
   const onRoute = new Set(route);
@@ -407,16 +495,72 @@ function draw(alpha) {
   tutorial(time);
   g.restore();
   hud(time);
+  banner();
 }
-function paths() {
+// Paths in the chapter's colours. A one-way lane has no dashes; yellow arrows walk along it instead.
+function paths(time) {
+  const L = look(chapter).path;
   g.lineCap = 'round';
-  for (const [a, b] of level.edges) {
+  for (const [a, b, type] of level.edges) {
     const A = pos[a], B = pos[b];
     g.beginPath(); g.moveTo(A.x, A.y); g.lineTo(B.x, B.y);
-    g.strokeStyle = '#2a1d2e'; g.lineWidth = 18; g.stroke();
-    g.strokeStyle = '#8a6a52'; g.lineWidth = 13; g.stroke();
-    g.setLineDash([3, 11]); g.strokeStyle = '#b89474'; g.lineWidth = 5; g.stroke(); g.setLineDash([]);
+    g.strokeStyle = L[0]; g.lineWidth = 18; g.stroke();
+    g.strokeStyle = L[1]; g.lineWidth = 13; g.stroke();
+    if (type !== ONEWAY) { g.setLineDash([3, 11]); g.strokeStyle = L[2]; g.lineWidth = 5; g.stroke(); g.setLineDash([]); }
   }
+  for (const [a, b, type] of level.edges) if (type === ONEWAY) laneArrows(pos[a], pos[b], reduced ? 0 : time);
+  if (laneFlash) { // the lane or gate that just said no
+    const A = pos[laneFlash.a], B = pos[laneFlash.b];
+    g.beginPath(); g.moveTo(A.x, A.y); g.lineTo(B.x, B.y);
+    g.strokeStyle = `rgba(255,80,70,${0.55 * laneFlash.t})`; g.lineWidth = 22; g.stroke();
+  }
+}
+function laneArrows(A, B, time) {
+  const dx = B.x - A.x, dy = B.y - A.y, len = Math.hypot(dx, dy), ang = Math.atan2(dy, dx);
+  const gap = 34, clear = R * 1.25, s = 8.5, shift = (time * 14) % gap;
+  g.save(); g.lineJoin = 'round';
+  for (let d = clear + shift; d < len - clear; d += gap) {
+    g.save(); g.translate(A.x + dx * d / len, A.y + dy * d / len); g.rotate(ang);
+    g.beginPath(); g.moveTo(-s, -s); g.lineTo(s * 0.3, 0); g.lineTo(-s, s); g.lineTo(-s * 0.3, 0); g.closePath();
+    g.moveTo(s * 0.1, -s); g.lineTo(s * 1.4, 0); g.lineTo(s * 0.1, s); g.lineTo(s * 0.8, 0); g.closePath();
+    g.fillStyle = '#ffd84a'; g.fill(); g.lineWidth = 1.6; g.strokeStyle = INK; g.stroke();
+    g.restore();
+  }
+  g.restore();
+}
+// Gates: a striped barrier in the middle of the path. Across the path: shut. Swung aside along it: open.
+function gates() {
+  level.edges.forEach(([a, b, type], e) => {
+    if (!isGate(type)) return;
+    const A = pos[a], B = pos[b], x = (A.x + B.x) / 2, y = (A.y + B.y) / 2, o = gateT[e];
+    if (o < 0.5) { // a shut gate darkens its path
+      g.beginPath(); g.moveTo(A.x + (B.x - A.x) * 0.3, A.y + (B.y - A.y) * 0.3); g.lineTo(A.x + (B.x - A.x) * 0.7, A.y + (B.y - A.y) * 0.7);
+      g.strokeStyle = `rgba(20,10,25,${0.45 * (1 - 2 * o)})`; g.lineWidth = 13; g.lineCap = 'butt'; g.stroke(); g.lineCap = 'round';
+    }
+    barrier(g, x, y, R * 0.85, o, Math.atan2(B.y - A.y, B.x - A.x));
+  });
+}
+// A chapter's new villager or lane pulses until the player first touches the board.
+function intro(time) {
+  if (!introT || touched || sending) return;
+  const what = INTRO[index + 1], k = (time * 1.1) % 1;
+  let x, y;
+  if (what === 'lane') { const e = level.edges.find(([, , type]) => type === ONEWAY); x = (pos[e[0]].x + pos[e[1]].x) / 2; y = (pos[e[0]].y + pos[e[1]].y) / 2; }
+  else { const v = level.nodes.findIndex(n => n.kind === what); x = pos[v].x; y = pos[v].y + R * 0.6; }
+  g.beginPath(); g.arc(x, y, R * (1.5 + k * 0.7), 0, Math.PI * 2);
+  g.strokeStyle = `rgba(255,224,122,${0.8 * (1 - k)})`; g.lineWidth = 3; g.stroke();
+}
+// The first level of a chapter: the chapter's name under the top bar for a few seconds.
+function banner() {
+  if (!bannerT || mode !== 'level') return;
+  const c = chapterOf(index), text = `Chapter ${c}: ${CHAPTER_NAMES[c - 1]}`;
+  g.save(); g.globalAlpha = Math.min(1, bannerT * 2);
+  g.font = '800 15px ui-rounded, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const w = g.measureText(text).width + 50, x = W / 2, y = safe.t + 72;
+  g.beginPath(); roundRect(g, x - w / 2, y - 15, w, 30, 15); g.fillStyle = 'rgba(20,12,36,.8)'; g.fill(); g.lineWidth = 2; g.strokeStyle = '#ffd98a'; g.stroke();
+  emblem(g, c, x - w / 2 + 19, y, 8);
+  g.fillStyle = '#ffd98a'; g.fillText(text, x + 12, y + 1);
+  g.restore();
 }
 // The route as a growing grapevine, with leaves and a grape at each villager.
 function vine(time) {
@@ -439,7 +583,7 @@ function vine(time) {
       g.restore();
     }
     // a direction chevron in the middle of each hop
-    if (f === 1) {
+    if (f === 1 && !isGate(lane(level, route[i - 1], route[i]))) {
       g.save(); g.translate((A.x + B.x) / 2, (A.y + B.y) / 2); g.rotate(ang);
       g.beginPath(); g.moveTo(-4, -6); g.lineTo(4, 0); g.lineTo(-4, 6); g.strokeStyle = '#1d3a1c'; g.lineWidth = 3; g.stroke();
       g.restore();
@@ -466,7 +610,8 @@ function person(i, time, onRoute) {
   // the badge: what this villager does
   let copy = null;
   if (node.kind === 'parrot') { const k = route.lastIndexOf(i); if (k > 0) copy = trail.changes[k - 1] ?? null; }
-  badge(g, node, p.x, p.y + R * 1.42, R * 2.1, R * 0.86, { copy, dim: mood.gone > 0.5 });
+  const memo = node.kind === 'keeper' ? fromKey(nowMemo()[keepers.indexOf(i)]) : null;
+  badge(g, node, p.x, p.y + R * 1.42, R * 2.1, R * 0.86, { copy, dim: mood.gone > 0.5, memo, rung: node.kind === 'bell' ? react[i] : 0 });
   // timid refusing red: a red cross over them
   if (refuseT[i] > 0 && node.kind === 'timid') {
     g.save(); g.globalAlpha = refuseT[i]; g.strokeStyle = '#ff4040'; g.lineWidth = 5; g.lineCap = 'round';
@@ -605,40 +750,129 @@ function menuScene(time) {
 
 // ---------------------------------------------------------------- the end card and its comic strip
 const strip = $('strip'), sg = strip.getContext('2d');
+let shareText = '', shareBlob = null, shared = 0, cardWhere = '';
+const NUM = ['one', 'two', 'three'];
+const words = m => `${NUM[m.n - 1]} ${COLOURS[m.c]} ${SHAPES[m.s]}${m.n > 1 ? 's' : ''}`;
+// What each villager says as they pass the news on, from what they did to it.
+function says(k, msgs, changes) {
+  const v = sentRoute[k], node = level.nodes[v];
+  if (k === 0) return 'Psst!';
+  if (v === level.to) return 'Heard it!';
+  if (node.kind === 'bell') return 'Ding dong!';
+  if (node.kind === 'keeper') return 'Old news!';
+  if (node.kind === 'timid') return 'Phew, not red';
+  const c = changes[k];
+  if (node.kind === 'parrot') return c ? 'Same again!' : 'Er... same?';
+  if (!c) return 'Word for word';
+  return { paint: 'Splash!', more: 'And more!', less: 'Less!', swap: 'Swapsies!', carve: 'Snip!', flip: 'Opposite day!' }[kindOfChange(c)] ?? 'Hmm';
+}
+// Cells for a route of n villagers in w px: one row, or two when one row would squash them.
+function stripCells(n, w) {
+  let cell = Math.min(76, w / n), rows = 1;
+  if (cell < 54) { rows = 2; cell = Math.min(76, w / Math.ceil(n / 2)); }
+  return { cell, rows, per: rows === 1 ? n : Math.ceil(n / 2) };
+}
+const ROW_H = 100;
 function showEnd() {
   show('done');
   stripT = 0;
   const hops = sentRoute.length - 1;
-  $('doneTitle').textContent = ['Heard it!', 'Spot on!', 'Just right!'][lastStars - 1] ?? 'Heard it!';
+  $('doneTitle').textContent = payoff ? 'Chapter done!' : ['Heard it!', 'Spot on!', 'Just right!'][lastStars - 1] ?? 'Heard it!';
   [...$('stars').children].forEach((s, k) => { s.className = ''; setTimeout(() => { s.className = k < lastStars ? 'on' : 'off'; if (k < lastStars) tone(SCALE[6 + k * 2], 0.25, 0.06, 'triangle'); }, 250 + k * 260); });
   const best = mode === 'daily' ? save.daily[dailyKey] : save.best[index + 1];
   $('doneLine').textContent = hops === level.min ? `${hops} hops. The best way!` : `${hops} hops. It can be done in ${level.min}.`;
   if (best > lastStars) $('doneLine').textContent += ` Best: ${'★'.repeat(best)}`;
+  if (mode === 'daily') {
+    const n = streak();
+    $('doneLine').textContent += ` Fewest today: ${save.dailyHops[dailyKey]}. ${n > 1 ? `${n} days in a row!` : 'Come back tomorrow for a streak.'}`;
+  }
+  const pay = $('payoff');
+  if (payoff) {
+    const [a, b] = CHAPTERS[payoff - 1]; let got = 0;
+    for (let k = a; k <= b; k++) got += save.best[k] || 0;
+    pay.textContent = `${CHAPTER_NAMES[payoff - 1]} is over: ${got} of ${3 * (b - a + 1)} ★` + (payoff < CHAPTERS.length ? `. ${CHAPTER_NAMES[payoff]} is next.` : '. The whole village heard!');
+    pay.style.display = 'block';
+  } else pay.style.display = 'none';
   const last = mode === 'level' && index + 1 >= LEVELS.length;
-  $('next').textContent = mode === 'daily' ? 'New village tomorrow' : last ? 'All done!' : 'Next';
+  $('next').textContent = mode === 'daily' ? 'New village tomorrow' : last ? 'All done!' : payoff ? 'Next chapter' : 'Next';
   $('next').disabled = mode === 'daily' || last;
+  const { rows } = stripCells(sentRoute.length, strip.getBoundingClientRect().width || W - 52); // the width drawStrip lays out in
+  strip.style.height = `${rows * ROW_H + 6}px`;
   const r = strip.getBoundingClientRect();
   strip.width = Math.round(r.width * dpr); strip.height = Math.round(r.height * dpr);
+  // The share card is drawn now, so the Share tap can hand it over at once.
+  const run = walk(level, sentRoute);
+  const where = mode === 'daily' ? `Daily village ${dailyKey}` : `Level ${index + 1}, ${level.name}`;
+  shareText = `Grapevine, ${where} ${'★'.repeat(lastStars)}\n${sentRoute.map((v, k) => says(k, run.msgs, run.changes)).join(' → ')}\n`
+    + `${words(run.msgs[0])[0].toUpperCase()}${words(run.msgs[0]).slice(1)} became ${words(run.msgs[run.msgs.length - 1])} in ${hops} hops.`;
+  shareBlob = null; $('share').textContent = 'Share this';
+  cardWhere = where;
+  try { postcard(where).toBlob(b => { shareBlob = b; }, 'image/png'); } catch {}
 }
-// "What they heard": each villager on the route with the message as they passed it on.
+// "What they heard": each villager on the route, saying the news as they passed it on, in a speech bubble.
+function stripScene(ctx, w, shown, time, top = 0) {
+  const { msgs, changes } = walk(level, sentRoute);
+  const n = sentRoute.length, { cell, per } = stripCells(n, w);
+  const r = Math.min(14, cell * 0.2);
+  for (let k = 0; k < shown; k++) {
+    const row = Math.floor(k / per), col = k % per, inRow = Math.min(per, n - row * per);
+    const x = (w - cell * inRow) / 2 + cell * (col + 0.5), y0 = top + row * ROW_H;
+    const age = Math.min(1, (time * 60 - k * 9) / 9), pop = 1 + 0.3 * Math.sin(Math.max(0, age) * Math.PI);
+    if (age <= 0) continue;
+    const v = sentRoute[k], end = k === n - 1;
+    ctx.save(); ctx.globalAlpha = age;
+    ctx.beginPath(); roundRect(ctx, x - cell / 2 + 2, y0 + 2, cell - 4, ROW_H - 4, 10); ctx.fillStyle = end ? 'rgba(255,210,74,.22)' : 'rgba(255,244,220,.08)'; ctx.fill();
+    const vy = y0 + ROW_H - r * 2.6;
+    villager(ctx, level.nodes[v], x, vy, r, { t: time, react: age < 1 ? 1 - age : 0, happy: end ? 0.7 : 0, look: col % 2 ? -0.6 : 0.6 });
+    // the speech bubble, tail down to the mouth
+    const bw = Math.min(cell - 8, r * 3.2), bh = r * 2.3, by = y0 + 6 + bh / 2;
+    bubble(ctx, x, by, bw, bh, x + (col % 2 ? -r * 0.4 : r * 0.4), vy - r * 0.9);
+    token(ctx, msgs[k], x, by, r * 0.95 * pop, { sx: pop, sy: 2 - pop, plate: false });
+    ctx.font = `700 ${cell < 62 ? 9.5 : 10.5}px ui-rounded, system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = end ? '#ffd98a' : 'rgba(255,244,220,.9)';
+    ctx.fillText(says(k, msgs, changes), x, y0 + ROW_H - 5, cell - 4);
+    ctx.restore();
+    if (col > 0) { ctx.fillStyle = 'rgba(255,244,220,.5)'; ctx.beginPath(); const ax = x - cell / 2, ay = by; ctx.moveTo(ax - 3, ay - 5); ctx.lineTo(ax + 3, ay); ctx.lineTo(ax - 3, ay + 5); ctx.fill(); }
+  }
+}
 function drawStrip() {
   if (!sentRoute) return;
   const w = strip.width / dpr, h = strip.height / dpr;
   sg.setTransform(dpr, 0, 0, dpr, 0, 0); sg.clearRect(0, 0, w, h);
-  const n = sentRoute.length, cell = Math.min(64, w / n), r = Math.min(13, cell * 0.24), x0 = (w - cell * n) / 2 + cell / 2;
-  const msgs = walk(level, sentRoute).msgs;
-  const shown = Math.min(n, Math.floor(stripT / 9) + 1);
-  for (let k = 0; k < shown; k++) {
-    const v = sentRoute[k], x = x0 + k * cell, y = h - r * 1.6 - 4;
-    const age = Math.min(1, (stripT - k * 9) / 9), pop = 1 + 0.3 * Math.sin(age * Math.PI);
-    sg.save(); sg.globalAlpha = age;
-    sg.beginPath(); roundRect(sg, x - cell / 2 + 2, 2, cell - 4, h - 4, 10); sg.fillStyle = k === n - 1 ? 'rgba(255,210,74,.22)' : 'rgba(255,244,220,.08)'; sg.fill();
-    villager(sg, level.nodes[v], x, y, r, { t: stripT / 60, react: age < 1 ? 1 - age : 0, happy: k === n - 1 ? 0.6 : 0 });
-    token(sg, msgs[k], x, y - r * 2.4, r * 0.95 * pop, { sx: pop, sy: 2 - pop });
-    sg.restore();
-    if (k > 0) { sg.fillStyle = 'rgba(255,244,220,.5)'; sg.beginPath(); const ax = x - cell / 2; sg.moveTo(ax - 3, h * 0.35 - 5); sg.lineTo(ax + 3, h * 0.35); sg.lineTo(ax - 3, h * 0.35 + 5); sg.fill(); }
-  }
+  stripScene(sg, w, sentRoute.length, stripT / 60, 2);
 }
+// The picture that Share hands over: the chapter's sky, the name, the strip with every bubble shown, the stars.
+function postcard(where) {
+  const w = 480, { rows } = stripCells(sentRoute.length, w - 24), h = 150 + rows * ROW_H + 60, s = 2;
+  const c = document.createElement('canvas'); c.width = w * s; c.height = h * s;
+  const x = c.getContext('2d'); x.scale(s, s);
+  backdrop(x, w, h, 70, chapter);
+  x.fillStyle = 'rgba(20,12,36,.55)'; x.fillRect(0, 0, w, h);
+  emblem(x, chapter, 34, 38, 14);
+  x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#ffd98a';
+  x.font = '800 34px ui-rounded, system-ui, sans-serif'; x.fillText('Grapevine', w / 2, 40);
+  x.font = '600 16px ui-rounded, system-ui, sans-serif'; x.fillStyle = CREAM; x.fillText(where, w / 2, 76, w - 30);
+  x.font = '800 26px ui-rounded, system-ui, sans-serif'; x.fillStyle = '#ffd24a'; x.fillText('★'.repeat(lastStars) + '☆'.repeat(3 - lastStars), w / 2, 110);
+  x.save(); x.translate(12, 0); stripScene(x, w - 24, sentRoute.length, 9, 134); x.restore();
+  x.font = '600 14px ui-rounded, system-ui, sans-serif'; x.fillStyle = CREAM; x.textAlign = 'center';
+  x.fillText(shareText.split('\n')[2], w / 2, h - 30, w - 30);
+  return c;
+}
+$('share').addEventListener('click', async () => {
+  if (!shareText) return;
+  shared++;
+  const say = text => { $('share').textContent = text; };
+  let file = null;
+  try { if (shareBlob && typeof File === 'function') file = new File([shareBlob], 'grapevine.png', { type: 'image/png' }); } catch {}
+  try {
+    if (file && navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], text: shareText });
+    else if (navigator.share) await navigator.share({ text: shareText });
+    else { await navigator.clipboard.writeText(shareText); say('Copied!'); }
+  } catch (e) {
+    if (e?.name === 'AbortError') return;
+    try { await navigator.clipboard.writeText(shareText); say('Copied!'); } catch { say('Could not share'); }
+  }
+});
 
 // ---------------------------------------------------------------- menu, pause and cards
 const cards = screens(['menu', 'paused', 'done']);
@@ -649,24 +883,45 @@ function show(name) {
   else if (fails >= 3) $('hint').style.display = 'block';
   if (name === 'menu') menu();
 }
+let tab = 0; // the chapter (0-based) whose levels the menu shows
 function menu() {
   level = null; finger = null;
   const n = Number.isFinite(urlLevel) && urlLevel >= 1 ? Math.min(LEVELS.length, urlLevel) : next();
   $('play').textContent = save.opened > LEVELS.length && !urlLevel ? 'Play again' : `Play ${n}`;
   $('play').dataset.level = n;
-  const ds = save.daily[today()] || 0;
-  $('daily').querySelector('small').textContent = ds ? '★'.repeat(ds) + '☆'.repeat(3 - ds) : 'new';
-  const grid = $('grid'); grid.textContent = '';
-  LEVELS.forEach((_, i) => {
-    const b = document.createElement('button'), stars = save.best[i + 1] || 0, open = i + 1 <= save.opened || i + 1 === urlLevel;
-    b.dataset.level = i + 1;
-    b.className = open ? (i + 1 === n && !stars ? 'next' : '') : 'locked';
-    b.innerHTML = open ? `${i + 1}<small>${stars ? '★'.repeat(stars) : ''}</small>` : '🔒';
-    b.setAttribute('aria-label', open ? `Level ${i + 1}` : `Level ${i + 1}, locked`);
-    b.addEventListener('click', () => { if (!open) { tone(150, 0.1, 0.05, 'square'); b.animate?.([{ transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], 200); return; } begin(i); });
-    grid.append(b);
-  });
+  const ds = save.daily[today()] || 0, run = streak();
+  $('daily').querySelector('small').textContent = (ds ? '★'.repeat(ds) + '☆'.repeat(3 - ds) : 'new') + (run > 1 ? ` · ${run} days` : '');
+  tab = chapterOf(n - 1) - 1;
+  levelGrid();
   soundLabel();
+}
+const openTo = i => i + 1 <= save.opened || i + 1 === urlLevel; // can the player start 0-based level i?
+const nope = b => { tone(150, 0.1, 0.05, 'square'); b.animate?.([{ transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], 200); };
+function levelGrid() {
+  setChapter(tab + 1);
+  const n = Number($('play').dataset.level);
+  const tabs = $('tabs'); tabs.textContent = '';
+  CHAPTERS.forEach(([a, b], c) => {
+    const btn = document.createElement('button'), open = openTo(a - 1);
+    let got = 0; for (let k = a; k <= b; k++) got += save.best[k] || 0;
+    btn.className = c === tab ? 'on' : open ? '' : 'locked';
+    btn.innerHTML = `${CHAPTER_NAMES[c]}<small>${open ? `${got}/${3 * (b - a + 1)} ★` : '🔒'}</small>`;
+    btn.setAttribute('aria-pressed', c === tab ? 'true' : 'false');
+    btn.addEventListener('click', () => { if (!open) return nope(btn); tab = c; levelGrid(); });
+    tabs.append(btn);
+  });
+  const grid = $('grid'); grid.textContent = '';
+  const [a, b] = CHAPTERS[tab];
+  grid.className = b - a + 1 <= 15 ? 'five' : '';
+  for (let i = a - 1; i < b; i++) {
+    const btn = document.createElement('button'), stars = save.best[i + 1] || 0, open = openTo(i);
+    btn.dataset.level = i + 1;
+    btn.className = open ? (i + 1 === n && !stars ? 'next' : '') : 'locked';
+    btn.innerHTML = open ? `${i + 1}<small>${stars ? '★'.repeat(stars) : ''}</small>` : '🔒';
+    btn.setAttribute('aria-label', open ? `Level ${i + 1}` : `Level ${i + 1}, locked`);
+    btn.addEventListener('click', () => { if (!open) return nope(btn); begin(i); });
+    grid.append(btn);
+  }
 }
 const soundLabel = () => { $('sound').textContent = $('sound2').textContent = `Sound: ${save.sound ? 'on' : 'off'}`; };
 const toggleSound = () => { save.sound = !save.sound; store(); soundLabel(); if (save.sound) { snd.unlock(); snd.release(); tone(660, 0.1, 0.06); } else snd.hold(); };
@@ -714,18 +969,50 @@ window.grapevineState = () => ({
   now: level ? (sending ? sending.shown : trail.msgs[trail.msgs.length - 1]) : null, want: level?.want ?? null,
   nodes: level ? pos.map((p, i) => ({ x: Math.round(p.x), y: Math.round(p.y), kind: level.nodes[i].kind })) : [],
   from: level?.from ?? null, to: level?.to ?? null, hintShown: $('hint').style.display === 'block', touched,
+  R, chapter, tab, tier: mode === 'daily' ? tier : null, phase: level ? nowPhase() : null,
+  memo: level ? nowMemo().map(fromKey) : [], gates: [...gateT], streak: streak(), bestStreak: save.bestStreak,
+  dailyHops: save.dailyHops[today()] ?? null, shareText, shared, payoff, hintClear,
 });
 window.grapevineLevel = () => level; // the check solves the level in Node from this
+window.grapevineCard = () => (sentRoute && cardWhere ? postcard(cardWhere).toDataURL('image/png') : null); // the share picture, for checks
 
 // A first-time player who does not touch for 3 s in play sees a finger drag through a row of dots (experiments/kit/hint.js).
-// While it shows, the level's own ghost hand waits. It sits between the teller's row and the row above it on level 1
-// (rows run from 150 px below the top to 58 px above the bottom), so it covers neither the teller nor the painter.
+// While it shows, the level's own ghost hand waits. The kit centres the copy across the screen; hintBottom picks the
+// height where it covers least of the board: villagers with their hats and badges, the teller's news, the listener's
+// bubble and the top bar.
+function hintBottom() {
+  const fallback = Math.round((innerHeight + 24) / 4);
+  if (!level || !pos.length) return fallback;
+  const boxes = pos.map(p => [p.x - R * 1.2, p.y - R * 1.7, p.x + R * 1.2, p.y + R * 1.9]); // hat to badge
+  const tp = pos[level.from], o = ghostAt[level.from] ?? { x: R * 1.3, y: -R * 1.15 };
+  boxes.push([tp.x + o.x - R * 0.9, tp.y + o.y - R * 0.9, tp.x + o.x + R * 0.9, tp.y + o.y + R * 0.9]);
+  const lp = pos[level.to], toRight = lp.x < W / 2, bw = R * 2.5, bx = toRight ? lp.x + R * 1.3 + bw / 2 : lp.x - R * 1.3 - bw / 2;
+  boxes.push([bx - bw / 2, lp.y - R * 2.4, bx + bw / 2, lp.y - R * 0.1]);
+  boxes.push([0, 0, W, safe.t + 84]);
+  // The copy, centred at (W / 2, y): dots and hand (the finger lifts 26 px; the hand hangs 52 px below it), and the label
+  // above for reduced motion.
+  const copy = y => reduced ? [[W / 2 - 84, y - 52, W / 2 + 84, y + 70], [W / 2 - 128, y - 66, W / 2 + 128, y - 34]] : [[W / 2 - 82, y - 50, W / 2 + 84, y + 68]];
+  // Overlap area, in px squared, with a villager counted four times as much as with the rest: on a crowded board there
+  // may be no spot that is clear of everything, and covering a villager is the worst miss.
+  const area = (A, B) => Math.max(0, Math.min(A[2], B[2]) - Math.max(A[0], B[0])) * Math.max(0, Math.min(A[3], B[3]) - Math.max(A[1], B[1]));
+  const base = H - safe.b - fallback;
+  let best = base, bestScore = -Infinity;
+  for (let y = H - safe.b - 70; y >= safe.t + 130; y -= 4) {
+    let cover = 0;
+    for (const c of copy(y)) boxes.forEach((b, k) => { cover += area(c, b) * (k < pos.length ? 4 : 1); });
+    const score = -cover - Math.abs(y - base) * 0.5;
+    if (score > bestScore) { bestScore = score; best = y; }
+  }
+  hintClear = Math.round(bestScore);
+  return Math.round(H - safe.b - best);
+}
+let hintClear = null;
 const help = firstHint(canvas, {
   kind: 'path',
   key: 'grapevine:hint',
   label: 'Drag up through the villagers',
-  reach: 46,
-  bottom: Math.round((innerHeight + 24) / 4),
+  reach: 40,
+  bottom: hintBottom,
   when: () => screen === 'play' && !paused && !sending && result !== 'won',
   played: readJson(KEY) !== null,
 });
