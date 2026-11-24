@@ -3,7 +3,9 @@
 (() => {
   const KEY = 'notes.k';
   // Games offered for a new note. Older notes about a dropped game still show under their own name.
-  const GAMES = [['lantern', 'Lantern'], ['ant-promotion', 'Ant Promotion'], ['grapevine', 'Grapevine'], ['fixit', 'Fix-It Stall'], ['ducklings', 'Follow Me'], ['borrowed', 'Borrowed Time']];
+  const GAMES = [['lantern', 'Lantern'], ['ant-promotion', 'Ant Promotion'], ['grapevine', 'Grapevine'], ['fixit', 'Fix-It Stall'], ['ducklings', 'Follow Me'], ['borrowed', 'Borrowed Time'], ['crumbwar', 'Crumbwar']];
+  // Shown as a row of links above the thread until each has been opened once on this device.
+  const FRESH = ['crumbwar', 'borrowed', 'grapevine', 'fixit', 'ducklings'];
   const NAMES = { 'long-road': 'The Long Road', 'copper-afternoon': 'Copper Afternoon' };
   const MAX_SECONDS = 180;
   const STRINGS = {
@@ -11,7 +13,7 @@
       title: 'Oyun notları', lead: 'Aklına geleni yaz ya da sesli söyle. Cevaplar burada görünür.',
       game: 'Hangi oyun?', general: 'Genel / başka bir şey', placeholder: 'Notunu buraya yaz…',
       send: 'Gönder', mic: '🎤 Sesli not', stop: 'Bitir ve gönder', cancel: 'Vazgeç',
-      earlier: 'Önceki mesajlar', empty: 'Henüz not yok. İlk notunu gönder!', sending: 'Gönderiliyor…', working: 'Ses yazıya çevriliyor…',
+      earlier: 'Önceki mesajlar', fresh: 'Yeni oyunlar, bir dene:', empty: 'Henüz not yok. İlk notunu gönder!', sending: 'Gönderiliyor…', working: 'Ses yazıya çevriliyor…',
       voice: 'Sesli not', failedVoice: 'Sesli not alındı, ama yazıya çevrilemedi. Kaydın bizde, tekrar deneyeceğiz.',
       failedText: 'Not alındı.', retry: 'Tekrar dene', notSent: 'Gönderilemedi. İnternetini kontrol et.',
       noKey: 'Bu sayfa özel bir bağlantıyla açılır. Sana gönderilen bağlantıyı kullan.',
@@ -23,7 +25,7 @@
       title: 'Game notes', lead: 'Type or say whatever comes to mind. Replies show up here.',
       game: 'Which game?', general: 'General / something else', placeholder: 'Write your note here…',
       send: 'Send', mic: '🎤 Voice note', stop: 'Stop and send', cancel: 'Cancel',
-      earlier: 'Earlier messages', empty: 'No notes yet. Send the first one!', sending: 'Sending…', working: 'Turning speech into text…',
+      earlier: 'Earlier messages', fresh: 'New games to try:', empty: 'No notes yet. Send the first one!', sending: 'Sending…', working: 'Turning speech into text…',
       voice: 'Voice note', failedVoice: 'Voice note received, but we could not turn it into text. We kept the recording and will retry.',
       failedText: 'Note received.', retry: 'Try again', notSent: 'Could not send. Check your connection.',
       noKey: 'This page opens with a private link. Use the link that was sent to you.',
@@ -77,6 +79,23 @@
     for (const [slug, name] of [...list, ['', t.general]]) select.append(new Option(name, slug, false, slug === chosen));
     const empty = document.querySelector('.empty');
     if (empty) empty.textContent = t.empty;
+  }
+
+  function showFresh() {
+    if (!$('fresh')) return;
+    const tried = new Set((store.get('notes.tried') || '').split(',').filter(Boolean));
+    $('fresh-label').textContent = t.fresh;
+    $('fresh-list').replaceChildren(...FRESH.map(slug => {
+      const link = document.createElement('a');
+      link.href = `/${slug}/`;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.textContent = `${tried.has(slug) ? '✓ ' : ''}${GAMES.find(([s]) => s === slug)[1]}`;
+      if (tried.has(slug)) link.className = 'tried';
+      link.addEventListener('click', () => { tried.add(slug); store.set('notes.tried', [...tried].join(',')); setTimeout(showFresh, 500); });
+      return link;
+    }));
+    $('fresh').hidden = false;
   }
 
   function notice(text) {
@@ -237,6 +256,7 @@
       const data = await api(`thread?after=${waiting.size ? Math.min(...waiting) - 1 : lastId}`);
       if (data.lang && data.lang !== lang && STRINGS[data.lang]) { lang = data.lang; store.set('notes.lang', lang); applyLanguage(); }
       $('composer').hidden = false;
+      showFresh();
       show(data.messages);
     } catch { /* shown by api(), or a network blip: the next poll retries */ }
   }

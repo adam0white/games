@@ -40,3 +40,8 @@ button:disabled { opacity: .5; }
 #history { flex: 0 0 auto; }
 #history > summary { color: var(--soft); font-size: .9em; text-align: center; padding: .5em; cursor: pointer; }
 #history > div { display: flex; flex-direction: column; gap: .6em; padding-bottom: .6em; border-bottom: 1px dashed var(--line); }
+#fresh { flex: 0 0 auto; padding: .2em 1em .5em; border-bottom: 1px solid var(--line); }
+#fresh-label { display: block; color: var(--soft); font-size: .85em; margin-bottom: .35em; }
+#fresh-list { display: flex; flex-wrap: wrap; gap: .4em; }
+#fresh-list a { padding: .35em .7em; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); font-weight: 600; font-size: .9em; text-decoration: none; }
+#fresh-list a.tried { border-color: var(--line); color: var(--soft); font-weight: 400; }
