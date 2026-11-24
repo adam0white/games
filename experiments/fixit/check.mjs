@@ -203,6 +203,15 @@ async function run(page, phone) {
     await playJob(page, kind);
     await leave(page);
   }
+  // Leaving a shift after four repairs keeps the new job; leaving after fewer does not (note #150).
+  for (const [jobs, want] of [[1, 3], [4, 4]]) {
+    await page.goto(`${base}/fixit/?seed=7&day=200&two=0`); await setSave(page, { shifts: 1 }); await page.goto(`${base}/fixit/?seed=7&day=200&two=0`);
+    await page.click('#play');
+    for (let i = 0; i < 12; i++) { st = await state(); if (st.served >= jobs) break; if (st.phase !== 'work') { await sleep(100); continue; } await playJob(page, `leave-early ${st.kind}`); }
+    st = await state(); assert.ok(st.served >= jobs && st.playing, `${jobs} fixed and still in the shift`);
+    await leave(page); assert.equal((await state()).unlocked.length, want, `left after ${jobs}: ${want} jobs`);
+  }
+
   // A two-repair job.
   await page.goto(`${base}/fixit/?seed=4&two=1&level=3`);
   await page.click('#play');
