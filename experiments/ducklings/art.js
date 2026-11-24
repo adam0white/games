@@ -277,3 +277,130 @@ export function ghostFinger(g, x, y, u, t) {
   g.beginPath(); g.roundRect(-R * 0.55, R * 0.35, R * 1.25, R * 1.1, R * 0.4); g.fill(); g.stroke(); // the hand
   g.restore();
 }
+
+function oval(g, color, x, y, rx, ry, angle = 0) {
+  g.fillStyle = color;
+  g.beginPath();
+  g.ellipse(x, y, rx, ry, angle, 0, Math.PI * 2);
+  g.fill();
+}
+
+export function road(g, y, u, x0, x1) {
+  const h = .17 * u;
+  g.fillStyle = '#b8c499'; g.fillRect(x0, y - h * .63, x1 - x0, h * 1.26);
+  g.fillStyle = '#515d67'; g.fillRect(x0, y - h / 2, x1 - x0, h);
+  g.fillStyle = '#fff2b6';
+  for (const edge of [-1, 1]) g.fillRect(x0, y + edge * h * .43, x1 - x0, 2 * u / 390);
+  g.fillStyle = '#a5a99f';
+  for (let x = x0; x < x1; x += .11 * u) g.fillRect(x, y - .002 * u, .058 * u, .004 * u);
+}
+
+export function car(g, x, y, u, dir, warn = false) {
+  g.save(); g.translate(x, y); g.scale(dir, 1);
+  if (warn) {
+    g.fillStyle = '#ffdb73';
+    g.beginPath(); g.moveTo(0, -.023 * u); g.lineTo(.16 * u, -.046 * u); g.lineTo(.16 * u, .046 * u); g.lineTo(0, .023 * u); g.closePath(); g.fill();
+  }
+  const body = (color, x, y, w, h, r) => {
+    g.fillStyle = color; g.beginPath(); g.roundRect(x * u, y * u, w * u, h * u, r * u); g.fill();
+  };
+  body('#37434c', -.085, -.065, .16, .134, .025);
+  body(dir > 0 ? '#e37b5f' : '#f0bb54', -.09, -.054, .18, .108, .024);
+  body('#343e48', -.045, -.039, .088, .078, .016);
+  body('#afdeef', -.028, -.035, .062, .07, .010);
+  body(dir > 0 ? '#d48374' : '#dbad60', -.025, -.032, .039, .064, .007);
+  for (const d of [-1, 1]) oval(g, '#fff6c7', .077 * u, d * .033 * u, .009 * u, .012 * u);
+  g.restore();
+}
+
+export function sleepingCat(g, x, y, r, phase, t) {
+  g.save(); g.translate(x, y);
+  if (phase !== 'rest') {
+    g.fillStyle = phase === 'warn' ? '#ffe49666' : '#ca665b8a';
+    g.strokeStyle = phase === 'warn' ? '#916032' : '#853c44';
+    g.lineWidth = r * .034; g.setLineDash([r * .08, r * .06]);
+    g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill(); g.stroke(); g.setLineDash([]);
+  }
+  oval(g, '#e4c5a4', 0, r * .08, r * .52, r * .42, .18);
+  const p = r * (phase === 'act' ? .47 : .34);
+  g.strokeStyle = '#a4583b'; g.lineWidth = r * .1; g.lineCap = 'round';
+  g.beginPath(); g.arc(r * .09, r * .06, p, .17, Math.PI * 1.48); g.stroke();
+  oval(g, '#c77952', -r * .03, r * .06, r * .32, r * .25, -.25);
+  for (const side of [-1, 1]) {
+    g.fillStyle = '#9a533a';
+    g.beginPath(); g.moveTo((-.24 + side * .13) * r, -.20 * r);
+    g.lineTo((-.24 + side * .18) * r, -.43 * r);
+    g.lineTo((-.24 + side * .02) * r, -.28 * r); g.closePath(); g.fill();
+  }
+  oval(g, '#df9365', -.24 * r, -.19 * r, .18 * r, .145 * r);
+  for (const side of [-1, 1]) oval(g, '#472b2c', (-.24 + side * .068) * r, -.19 * r, .025 * r, (phase === 'rest' ? .009 : .028) * r);
+  g.fillStyle = '#61496b';
+  g.font = `800 ${r * .22}px system-ui`; g.textAlign = 'center';
+  if (phase === 'rest') g.fillText('z Z', r * .29, -r * (.29 + .03 * Math.sin(t * 3)));
+  else if (phase === 'warn') g.fillText('!', r * .27, -r * .32);
+  g.restore();
+}
+
+export function leaves(g, x, y, r, kind, phase, t) {
+  g.save(); g.translate(x, y);
+  const closed = phase === 'act';
+  const danger = kind === 'weed' || closed;
+  g.fillStyle = danger ? '#35596a6b' : '#e7e79870';
+  g.strokeStyle = danger ? '#412f588c' : '#fff1b6';
+  g.lineWidth = r * .032; g.setLineDash([r * .08, r * .055]);
+  g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill(); g.stroke(); g.setLineDash([]);
+  const count = kind === 'weed' ? 22 : 7;
+  for (let i = 0; i < count; i++) {
+    const a = i * 2.399, d = r * Math.sqrt(i / count) * .84;
+    const x = Math.cos(a) * d, y = Math.sin(a) * d;
+    if (kind === 'weed') {
+      oval(g, i % 3 ? '#67527d' : '#9c6a9c', x, y, r * .14, r * .035, a + .10 * Math.sin(t + i));
+      oval(g, '#bc9ac1', x + r * .06, y - r * .05, r * .025, r * .025);
+    } else {
+      lilyPad(g, x, y, r * (closed ? .14 : .27), a + (phase === 'warn' ? Math.sin(t * 18 + i) * .20 : 0), i === 2 && !closed);
+    }
+  }
+  g.restore();
+}
+
+export function current(g, x, y0, y1, w, u, dx, t) {
+  g.save();
+  const shade = g.createLinearGradient(x - w, 0, x + w, 0);
+  shade.addColorStop(0, '#2e8eaa00'); shade.addColorStop(.45, '#358eac8c');
+  shade.addColorStop(.6, '#358eac8c'); shade.addColorStop(1, '#2e8eaa00');
+  g.fillStyle = shade; g.fillRect(x - w, y0, 2 * w, y1 - y0);
+  g.strokeStyle = '#edfef0b8'; g.lineWidth = .006 * u; g.lineCap = 'round';
+  for (let i = 0; i < 3; i++) {
+    for (let y = y1 - (t * .24 + i * .10) % .22 * u; y > y0 + .05 * u; y -= .22 * u) {
+      const px = x + (i - 1) * w * .51;
+      g.save(); g.translate(px, y); g.rotate(Math.atan2(dx, .29));
+      g.beginPath(); g.moveTo(-.022 * u, 0); g.lineTo(0, -.026 * u); g.lineTo(.022 * u, 0); g.stroke();
+      g.restore();
+    }
+  }
+  g.restore();
+}
+
+export function chapterBadge(g, x, y, u, icon) {
+  if (icon === 'car') car(g, x, y, u * 1.8, 1);
+  else if (icon === 'cat') sleepingCat(g, x, y, u * .27, 'rest', 0);
+  else if (icon === 'current') {
+    oval(g, '#46899d', x, y, u * .20, u * .19);
+    g.strokeStyle = '#fff7d8'; g.lineWidth = u * .024; g.lineCap = 'round'; g.lineJoin = 'round';
+    g.beginPath();
+    for (const dy of [-.055, .055]) {
+      g.moveTo(x - .07 * u, y + dy * u);
+      g.lineTo(x, y + (dy - .055) * u);
+      g.lineTo(x + .07 * u, y + dy * u);
+    }
+    g.stroke();
+  }
+  else if (icon === 'weed' || icon === 'bridge') leaves(g, x, y, u * .15, icon, 'rest', 0);
+  else if (icon === 'bend') rock(g, x, y, u * .12, 5);
+  else if (icon === 'clock') {
+    oval(g, '#f4bc59', x, y, u * .13, u * .13);
+    g.strokeStyle = '#704638'; g.lineWidth = u * .022; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x, y - .075 * u); g.lineTo(x, y); g.lineTo(x + .055 * u, y + .035 * u); g.stroke();
+  } else if (icon === 'rescue') duckling(g, x, y, .45, u * 5, 0, 1, { trait: 'eager' });
+  else lilyPad(g, x, y, .14 * u, .25, true);
+}

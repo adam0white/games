@@ -11,7 +11,7 @@
   canvas#c { display: block; width: 100vw; height: 100dvh; }
   #safe { position: fixed; top: 0; left: 0; width: 0; height: 0; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); visibility: hidden; pointer-events: none; }
   .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: #e9f6efe0; overflow-y: auto; touch-action: pan-y; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-sizing: border-box; }
-  #menu.screen { background: linear-gradient(#fff4d6f5, #d8f1e7f5 55%, #bfe6dff5); }
+  #menu.screen { background: radial-gradient(ellipse at 50% 13%, #fffae5, #f0f4db 52%, #cee7d1); }
   .screen.on { display: grid; }
   .screen > div { max-width: 22em; width: calc(100% - 32px); padding: 12px 0; box-sizing: border-box; }
   h1 { font-size: 2.7em; line-height: 1; margin: .1em 0 .1em; color: #2f6b5e; letter-spacing: .01em; text-shadow: 0 3px 0 #fff; }
@@ -21,10 +21,7 @@
   button { font: inherit; font-weight: bold; color: #2f6b5e; background: #ffffffcc; border: 2px solid #7fbfa8; border-radius: 999px; padding: .5em 1.1em; margin: .25em; min-height: 48px; min-width: 9em; touch-action: manipulation; cursor: pointer; }
   button.main { background: #ffb43a; color: #4a2a06; border-color: #f29a1a; font-size: 1.25em; min-width: 8.5em; box-shadow: 0 4px 0 #d9801a; }
   button.main:active { transform: translateY(3px); box-shadow: 0 1px 0 #d9801a; }
-  button.small { min-width: 48px; padding: .3em .6em; }
   button:disabled { opacity: .4; }
-  .stars { font-size: 1.5em; letter-spacing: .1em; color: #c9d8d0; }
-  .stars b { color: #ffb41f; text-shadow: 0 2px 0 #c97a00; }
   #endStars { font-size: 3em; line-height: 1.1; min-height: 1.2em; }
   #endStars span { display: inline-block; color: #c9d8d0; transform: scale(.4); opacity: 0; transition: transform .35s cubic-bezier(.3,1.8,.5,1), opacity .2s; }
   #endStars span.in { transform: scale(1); opacity: 1; }
@@ -37,14 +34,57 @@
   #pause::before { content: ''; width: 4px; height: 16px; border: solid #2f6b5e; border-width: 0 5px; }
   #quack { position: fixed; left: calc(14px + env(safe-area-inset-left)); bottom: calc(14px + env(safe-area-inset-bottom)); width: 72px; height: 72px; min-width: 0; min-height: 0; padding: 0; margin: 0; border-radius: 50%; display: none; font-size: 14px; line-height: 1; color: #4a2a06; border: 3px solid #f29a1a;
     background: conic-gradient(#ffb43a calc(var(--ready, 1) * 360deg), #f3e2c2 0); box-shadow: 0 3px 0 #d9801a; touch-action: none; }
+  #quack[hidden] { display: none !important; }
   #quack.wait { color: #9a7a50; box-shadow: none; }
   #quack svg { display: block; margin: 0 auto 2px; }
   #say { position: fixed; left: 0; right: 0; top: 70%; text-align: center; font-size: 26px; font-weight: bold; color: #fff; text-shadow: 0 2px 0 #2f6b5e, 0 0 12px #2f6b5e88; pointer-events: none; opacity: 0; transition: opacity .25s, transform .25s; transform: scale(.9); padding: 0 1em; }
   #say.on { opacity: 1; transform: scale(1); }
   .lab-notice { color: #4f7a6f; }
-  .row { display: flex; align-items: center; justify-content: center; gap: 4px; }
   #album { font-size: .95em; color: #4f7a6f; }
-  #menuArt { width: 220px; height: 110px; display: block; margin: 0 auto; }
+  #menuArt { width: 286px; height: 110px; display: block; margin: 0 auto; }
+  #menu > div { width: min(340px, calc(100% - 28px)); }
+  #menu h1 { margin: -.06em 0 .08em; color: #214e46; letter-spacing: -.06em; }
+  #menu .sub { margin-bottom: .65em; font-size: 14px; }
+  #chapters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  #chapters button { min-width: 0; margin: 0; padding: 3px 0; border: 1px solid #b7cab3; border-radius: 14px; background: #fffdf5; font-size: 12px; line-height: 1.2; }
+  #chapters button[aria-pressed="true"] { background: var(--chapter); color: #fff; border-color: var(--chapter); }
+  #chapters canvas { display: block; width: 25px; height: 23px; margin: auto; }
+  #map { position: relative; isolation: isolate; margin: 8px 0 0; padding: 10px 12px; background: linear-gradient(145deg, #a6d4ca, #c5e4c8); border: 1px solid #80b5aa; border-radius: 18px; }
+  #mapPath { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; }
+  #nodes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 12px; }
+  #nodes button { min-width: 0; width: 100%; min-height: 46px; margin: 0; padding: 3px 0; background: #fffae6; border: 1px solid #719f90; border-radius: 13px; font-size: 16px; line-height: 1.05; }
+  #nodes button small { display: block; font-size: 10px; color: #6e786a; height: 12px; letter-spacing: .07em; }
+  #nodes button small b { color: #825119; }
+  #nodes button[aria-pressed="true"] { background: #ffd47d; border: 2px solid #926133; }
+  #nodes button:disabled { opacity: 1; color: #45645b; background: #e9f0dc; border-style: dashed; }
+  #nodes button:nth-child(4) { grid-column: 3; }
+  #nodes button:nth-child(5) { grid-column: 2; grid-row: 2; }
+  #nodes button:nth-child(6) { grid-column: 1; grid-row: 2; }
+  #nodes button:nth-child(n+7) { grid-row: 3; }
+  #menu #play { display: block; width: 100%; margin: 8px 0 6px; border-radius: 16px; font-size: 18px; }
+  #menu .extras { display: grid; grid-template-columns: 1.5fr 1fr; gap: 6px; }
+  #menu .extras button { margin: 0; min-width: 0; min-height: 44px; font-size: 13px; padding: 4px; border-width: 1px; }
+  #album { font-size: 12px; margin: .25em 0; }
+  #end.screen, #paused.screen { background: #173d3d9c; }
+  #end > div, #paused > div { background: #fff9df; padding: 20px 14px; border: 2px solid #fffef0; border-radius: 27px; box-shadow: 0 9px 0 #265f5888; }
+  #end #postcard { display: block; width: 100%; height: 106px; }
+  #end h2 { margin: 0; letter-spacing: -.03em; line-height: 1.05; }
+  #endLine { font-weight: 700; }
+  #endActions { display: flex; justify-content: center; flex-wrap: wrap; gap: 5px; }
+  #endActions button { min-width: 80px; margin: 0; font-size: 15px; }
+  #endActions button.main { min-width: 130px; }
+  #end #postcard { filter: drop-shadow(0 2px 0 #6eac9566); }
+  #end #next { width: 100%; border-radius: 16px; }
+  #names:empty { display: none; }
+  #endStars { font-size: 2.65em; letter-spacing: .06em; }
+  @media (max-height: 690px) {
+    #menuArt { height: 92px; width: 240px; }
+    #menu > div { padding: 7px 0; }
+    #menu .sub { margin-bottom: .45em; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #endStars span, #say { transition: none; }
+  }
 </style>
 </head>
 <body>
@@ -55,14 +95,14 @@
 <div id="say"></div>
 
 <div id="menu" class="screen on"><div>
-  <canvas id="menuArt" width="440" height="220"></canvas>
+  <canvas id="menuArt" width="600" height="230" aria-hidden="true"></canvas>
   <h1>Follow Me</h1>
   <p class="sub">Lead the ducklings home.</p>
-  <div class="row"><button id="less" class="small" aria-label="Earlier stage">&lsaquo;</button><button id="play" class="main">Play</button><button id="more" class="small" aria-label="Later stage">&rsaquo;</button></div>
-  <p class="stars" id="menuStars"></p>
-  <p><button id="endless">Endless pond</button></p>
+  <nav id="chapters" aria-label="Chapters"></nav>
+  <section id="map" aria-label="Level map"><canvas id="mapPath" aria-hidden="true"></canvas><div id="nodes"></div></section>
+  <button id="play" class="main">Play 1</button>
+  <div class="extras"><button id="endless">Endless pond</button><button id="sound">Sound: on</button></div>
   <p id="album"></p>
-  <p><button id="sound">Sound: on</button></p>
 </div></div>
 
 <div id="paused" class="screen"><div>
@@ -75,18 +115,20 @@
 </div></div>
 
 <div id="end" class="screen"><div>
+  <canvas id="postcard" width="640" height="210" aria-hidden="true"></canvas>
   <h2 id="endTitle"></h2>
   <div id="endStars"><span>★</span><span>★</span><span>★</span></div>
   <p id="endLine"></p>
   <p id="names"></p>
   <p class="score" id="endScore"></p>
   <p><button id="next" class="main">Next</button></p>
-  <p><button id="again">Play again</button><button id="endMenu">Menu</button></p>
+  <div id="endActions"><button id="again">Retry</button><button id="endMenu">Map</button></div>
 </div></div>
 
 <script type="module">
-import { create, step, stars, timeLeft, progress, pathAt, view, DT, SPEED, STAGES, LAST_STAGE, ENDLESS_AFTER, NEST_R, TRAITS, QUACK_COOL, HEARTS, LINE_MAX, duskRate } from './sim.js?v=2';
-import * as art from './art.js?v=1';
+import { create, step, stars, timeLeft, pathAt, view, DT, SPEED, LAST_STAGE, ENDLESS_AFTER, ENDLESS_TIME, TRAITS, QUACK_COOL, HEARTS, duskRate } from './sim.js?v=3';
+import { CHAPTERS, LEVELS, chapterOf } from './levels.js';
+import * as art from './art.js?v=3';
 import * as save from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
@@ -104,8 +146,10 @@ const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const KEY = 'ducklings-save';
 const data = { v: 1, sound: true, opened: 1, stars: {}, best: {}, endless: 0, home: 0, album: {}, taught: false, ...save.readJson(KEY, {}) };
 const store = () => save.writeJson(KEY, data);
-let stage = Math.max(1, Math.min(LAST_STAGE, Number(query.get('level')) || data.opened || 1));
-if (query.has('level')) data.opened = Math.max(data.opened, stage);
+const preview = Math.min(LAST_STAGE, Math.max(0, Math.trunc(Number(query.get('level'))) || 0));
+let stage = preview || Math.max(1, Math.min(LAST_STAGE, Number(data.opened) || 1));
+let tab = chapterOf(stage);
+const open = n => n <= data.opened || n === preview;
 
 // ---------------------------------------------------------------- sound, all made here
 let water = null;
@@ -163,7 +207,7 @@ let s = create({ stage, seed: SEED }), mode = 'stage', playing = false, paused =
 let cam = s.mom.y, camShown = cam, acc = 0, last = performance.now(), shake = 0, flash = 0;
 let prevMom = { x: s.mom.x, y: s.mom.y }, momA = 0, quackShow = 0, hurtT = 0, homeGlow = 0;
 let finger = null, keys = new Set(), wantQuack = false, waitTouch = false, trailT = 0, trailShows = 0, turnLog = [];
-let parts = [], ripples = [], disp = new Map(), heads = new Map(), hops = new Map(), runners = [], nestDucks = [], recCount = 0, sayTimer = 0, peepT = 0, endTimer = 0;
+let parts = [], ripples = [], disp = new Map(), heads = new Map(), hops = new Map(), runners = [], nestDucks = [], recCount = 0, sayTimer = 0, peepT = 0;
 const rec = lab('ducklings');
 const cards = screens(['menu', 'paused', 'end']);
 
@@ -174,18 +218,71 @@ function show(name) {
   if (name === 'menu') menu();
 }
 function say(text, ms = 1400) { const el = $('say'); el.textContent = text; el.classList.add('on'); clearTimeout(sayTimer); sayTimer = setTimeout(() => el.classList.remove('on'), ms); }
-const starText = n => '<b>★</b>'.repeat(n) + '★'.repeat(3 - n);
+const starText = n => '<b>★</b>'.repeat(n) + '☆'.repeat(3 - n);
 
 function menu() {
-  $('play').textContent = `Play stage ${stage}`;
-  $('less').disabled = stage <= 1; $('more').disabled = stage >= Math.min(LAST_STAGE, data.opened);
-  $('menuStars').innerHTML = starText(data.stars[stage] || 0) + (data.best[stage] ? ` <small>best ${data.best[stage]}</small>` : '');
-  const open = data.opened > ENDLESS_AFTER;
-  $('endless').disabled = !open;
-  $('endless').textContent = open ? (data.endless ? `Endless pond · best ${data.endless}` : 'Endless pond') : `Endless pond (finish stage ${ENDLESS_AFTER})`;
-  $('album').textContent = data.home ? `Ducklings brought home: ${data.home}` : '';
+  $('play').textContent = `Play ${stage} · ${LEVELS[stage].name}`;
+  $('endless').disabled = data.opened <= ENDLESS_AFTER;
+  $('endless').textContent = data.opened <= ENDLESS_AFTER ? `Endless · after ${ENDLESS_AFTER}` : data.endless ? `Endless · ${data.endless}` : 'Endless pond';
+  $('album').textContent = data.home ? `${data.home} ducklings home` : '';
+  drawMap();
   soundLabels(); drawMenuArt();
 }
+
+function drawMap() {
+  const chapter = CHAPTERS[tab];
+  $('chapters').replaceChildren();
+  CHAPTERS.forEach((c, i) => {
+    const button = document.createElement('button');
+    const badge = document.createElement('canvas');
+    badge.width = 52; badge.height = 46; badge.setAttribute('aria-hidden', 'true');
+    art.chapterBadge(badge.getContext('2d'), 26, 24, 91, c.icon);
+    button.append(badge, c.name);
+    button.style.setProperty('--chapter', c.color);
+    button.setAttribute('aria-pressed', String(i === tab));
+    button.addEventListener('click', () => {
+      tab = i;
+      const candidate = Math.min(data.opened, c.last);
+      if (candidate >= c.first && chapterOf(stage) !== i) stage = candidate;
+      drawMap();
+      $('play').textContent = chapterOf(stage) === tab ? `Play ${stage} · ${LEVELS[stage].name}` : `Continue · ${stage}`;
+      $('chapters').children[i].focus({ preventScroll: true });
+    });
+    $('chapters').append(button);
+  });
+  const grid = $('nodes');
+  grid.replaceChildren();
+  for (let n = chapter.first; n <= chapter.last; n++) {
+    const button = document.createElement('button');
+    const earned = Math.max(0, Math.min(3, Number(data.stars[n]) || 0));
+    button.disabled = !open(n);
+    button.dataset.level = n;
+    button.setAttribute('aria-pressed', String(n === stage));
+    button.setAttribute('aria-label', `Level ${n}, ${LEVELS[n].name}, ${open(n) ? earned + ' stars' : 'locked'}`);
+    button.innerHTML = `${n}<small>${open(n) ? starText(earned) : '🔒'}</small>`;
+    button.addEventListener('click', () => {
+      stage = n;
+      begin(false);
+    });
+    grid.append(button);
+  }
+  const map = $('mapPath');
+  const layout = $('map').getBoundingClientRect();
+  map.width = layout.width * 2;
+  map.height = layout.height * 2;
+  const q = map.getContext('2d');
+  if (!map.width || !map.height) return;
+  q.strokeStyle = '#fff5c6'; q.lineWidth = 5;
+  q.setLineDash([9, 9]); q.lineCap = 'round'; q.beginPath();
+  [...grid.children].forEach((button, i) => {
+    const box = button.getBoundingClientRect();
+    const x = (box.x - layout.x + box.width / 2) * 2;
+    const y = (box.y - layout.y + box.height / 2) * 2;
+    if (i) q.lineTo(x, y); else q.moveTo(x, y);
+  });
+  q.stroke();
+}
+addEventListener('resize', () => { if (screen === 'menu') drawMap(); });
 function soundLabels() { for (const id of ['sound', 'sound2']) $(id).textContent = `Sound: ${data.sound ? 'on' : 'off'}`; }
 for (const id of ['sound', 'sound2']) $(id).addEventListener('click', () => {
   data.sound = !data.sound; store(); soundLabels();
@@ -196,12 +293,14 @@ function begin(endless = false) {
   snd.unlock(); snd.release();
   mode = endless ? 'endless' : 'stage';
   s = create(endless ? { endless: true, seed: SEED ?? ((Math.random() * 2 ** 31) | 0) } : { stage, seed: SEED });
-  cam = camShown = s.mom.y + 0.2 * H / u; acc = 0; last = performance.now(); prevMom = { x: s.mom.x, y: s.mom.y }; momA = 0;
+  cam = camShown = s.mom.y + (s.endless ? .20 : s.stage === 1 ? .32 : .27) * H / u; acc = 0; last = performance.now(); prevMom = { x: s.mom.x, y: s.mom.y }; momA = 0;
   parts = []; ripples = []; disp = new Map(); heads = new Map(); hops = new Map(); runners = []; nestDucks = []; turnLog = [];
-  finger = null; keys.clear(); wantQuack = false; roll = new Map(); rolled = false; trailT = 0; trailShows = 0; shake = 0; flash = 0; recCount = 0; endTimer = 0; homeGlow = 0;
-  waitTouch = !endless && stage === 1 && !data.taught;
+  finger = null; keys.clear(); wantQuack = false; roll = new Map(); rolled = false; trailT = 0; trailShows = 0; shake = 0; flash = 0; recCount = 0; homeGlow = 0; quackShow = 0; hurtT = 0;
+  waitTouch = true;
+  $('quack').hidden = true;
+  lastTap = touchRing = null;
+  clearTimeout(sayTimer); $('say').classList.remove('on');
   playing = true; paused = false; show('play');
-  say(endless ? 'Lily pads refill sunlight' : waitTouch ? '' : `Stage ${stage}`, 1300);
   rec.start({ stage: s.stage, mode });
 }
 const note2 = (type, d) => { if (recCount < 150) { recCount++; rec.event(type, d); } };
@@ -220,10 +319,10 @@ function finish() {
   } else {
     const key = s.stage; best = Math.max(data.best[key] || 0, s.score); const fresh = won && s.score > (data.best[key] || 0);
     if (won) { data.best[key] = best; data.stars[key] = Math.max(data.stars[key] || 0, got); }
-    if (won && got > 0 && s.stage < LAST_STAGE) data.opened = Math.max(data.opened, s.stage + 1);
-    if (won && s.stage === LAST_STAGE) data.opened = Math.max(data.opened, LAST_STAGE);
-    title = won ? (n === s.total ? 'Everyone home!' : 'Home!') : s.why === 'hearts' ? 'Mama needs a rest' : 'The sun went down';
-    line = won ? `${n} of ${s.total} ducklings home.` : `Try again. Watch the path behind her.`;
+    if (won && s.stage === data.opened) data.opened = Math.min(LAST_STAGE, s.stage + 1);
+    const chapter = CHAPTERS[chapterOf(key)];
+    title = won ? (key === LAST_STAGE ? 'The whole trail!' : key === chapter.last ? `${chapter.name} cleared!` : n === s.total ? 'Everyone home!' : 'Home!') : s.why === 'hearts' ? 'Mama needs a rest' : s.why === 'short' ? 'Too few made it' : 'Time’s up';
+    line = won ? (s.total === 1 ? '1 duckling home' : `${n} of ${s.total} ducklings home`) : s.why === 'short' ? `${n} home · ${LEVELS[key].need} needed` : `${n} home`;
     scoreLine = won ? `${s.score} points${fresh ? ' · new best!' : ` · best ${best}`}` : '';
   }
   data.taught = true; store();
@@ -235,15 +334,22 @@ function finish() {
   const spans = [...$('endStars').children];
   $('endStars').style.display = s.endless ? 'none' : '';
   spans.forEach(sp => { sp.className = ''; });
-  const nextOk = !s.endless && won && got > 0 && s.stage < LAST_STAGE;
-  $('next').style.display = nextOk ? '' : 'none'; $('next').textContent = `Stage ${s.stage + 1}`;
+  const nextOk = !s.endless && won && s.stage < LAST_STAGE && open(s.stage + 1);
+  $('next').style.display = nextOk ? '' : 'none';
+  $('next').textContent = chapterOf(s.stage) === chapterOf(s.stage + 1) ? `Next · ${s.stage + 1}` : 'Next chapter';
   $('again').className = nextOk ? '' : 'main';
+  if (won) burst(s.nest.x, s.nest.y, 'spark', still ? 8 : 40);
+  drawPostcard(won);
   (won ? sfx.win : sfx.fail)();
-  endTimer = setTimeout(() => {
+  setTimeout(() => {
     if (playing) return;
     show('end');
-    spans.forEach((sp, i) => later(250 + i * 300, () => { sp.classList.add('in'); if (i < got) { sp.classList.add('got'); sfx.star(i); } }));
-  }, won ? 900 : 1100);
+    spans.forEach((sp, i) => later(still ? 0 : 100 + i * 170, () => {
+      if (screen !== 'end') return;
+      sp.classList.add('in');
+      if (i < got) { sp.classList.add('got'); sfx.star(i); }
+    }));
+  }, still ? 0 : won ? 520 : 310);
 }
 
 // ---------------------------------------------------------------- input
@@ -263,7 +369,8 @@ canvas.addEventListener('pointerdown', e => {
   lastTap = { t: now, x: e.clientX, y: e.clientY };
   finger = { id: e.pointerId, x: e.clientX, y: e.clientY, t: now };
   try { canvas.setPointerCapture(e.pointerId); } catch {}
-  if (waitTouch) { waitTouch = false; say('', 1); }
+  waitTouch = false;
+  $('quack').hidden = false;
   if (!rolled) { rolled = true; rollCall(350, true); }
   sfx.touch(); touchRing = { x: e.clientX, y: e.clientY, t: now };
 });
@@ -281,16 +388,20 @@ function rollCall(delay0, names) {
 }
 canvas.addEventListener('pointermove', e => { if (finger && e.pointerId === finger.id) { finger.x = e.clientX; finger.y = e.clientY; } });
 for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(type, e => { if (finger && e.pointerId === finger.id) finger = null; });
-$('quack').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (playing && !paused) wantQuack = true; });
+$('quack').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (playing && !paused && !waitTouch) wantQuack = true; });
 $('pause').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); pause(); });
 $('pause').addEventListener('click', pause);
-$('quack').addEventListener('click', () => { if (playing && !paused) wantQuack = true; });
+$('quack').addEventListener('click', () => { if (playing && !paused && !waitTouch) wantQuack = true; });
 addEventListener('keydown', e => {
   if (isPauseKey(e)) { if (playing) paused ? resume() : pause(); return; }
   if (!playing) return;
-  if (paused) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); resume(); } return; }
-  if (e.key === ' ' || e.key === 'q' || e.key === 'Q') { e.preventDefault(); wantQuack = true; }
-  if (e.key.startsWith('Arrow')) { e.preventDefault(); keys.add(e.key); if (waitTouch) waitTouch = false; if (!rolled) { rolled = true; rollCall(350, true); } }
+  if (paused) {
+    if (e.target instanceof HTMLElement && e.target.closest('button, input, a, select')) return;
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); resume(); }
+    return;
+  }
+  if (!waitTouch && (e.key === ' ' || e.key === 'q' || e.key === 'Q')) { e.preventDefault(); wantQuack = true; }
+  if (e.key.startsWith('Arrow')) { e.preventDefault(); keys.add(e.key); if (waitTouch) { waitTouch = false; $('quack').hidden = false; } if (!rolled) { rolled = true; rollCall(350, true); } }
 });
 addEventListener('keyup', e => keys.delete(e.key));
 function keyTarget() {
@@ -318,11 +429,13 @@ $('pauseMenu').addEventListener('click', () => {
 });
 $('play').addEventListener('click', () => begin(false));
 $('endless').addEventListener('click', () => begin(true));
-$('less').addEventListener('click', () => { stage = Math.max(1, stage - 1); s = create({ stage, seed: SEED }); menu(); });
-$('more').addEventListener('click', () => { stage = Math.min(data.opened, LAST_STAGE, stage + 1); s = create({ stage, seed: SEED }); menu(); });
 $('again').addEventListener('click', () => begin(mode === 'endless'));
-$('next').addEventListener('click', () => { stage = Math.min(LAST_STAGE, s.stage + 1); begin(false); });
-$('endMenu').addEventListener('click', () => { if (s.stage) stage = Math.min(data.opened, LAST_STAGE, s.over === 'nest' && stars(s) && s.stage < LAST_STAGE ? s.stage + 1 : s.stage); show('menu'); });
+$('next').addEventListener('click', () => { stage = Math.min(LAST_STAGE, s.stage + 1); tab = chapterOf(stage); begin(false); });
+$('endMenu').addEventListener('click', () => {
+  if (s.stage && open(s.stage + 1) && s.stage < LAST_STAGE && s.over === 'nest') stage = s.stage + 1;
+  tab = chapterOf(stage);
+  show('menu');
+});
 rec.notice($('menu').firstElementChild);
 rec.toggle($('labSwitch'));
 
@@ -333,7 +446,7 @@ function tick() {
   step(s, target, wantQuack); wantQuack = false;
   for (const e of s.events) {
     if (e.type === 'join') {
-      sfx.join(s.line.length); say(s.line.length > 1 ? `×${s.line.length}` : 'Got one!', 900);
+      sfx.join(s.line.length); say(e.again ? 'Back together!' : '+1 duckling', 850);
       s.line.forEach((f, i) => hops.set(f.id, performance.now() + i * 55)); roll.set(e.id, performance.now() + 150);
       burst(e.x, e.y, 'spark', 10);
       note2('join', { n: s.line.length });
@@ -352,12 +465,12 @@ function tick() {
     }
     if (e.type === 'hit') { sfx.hit(); shake = Math.max(shake, 0.7); hurtT = 0.6; if (!still) flash = 0.35; burst(e.x, e.y, 'drop', 12); say(s.hearts > 0 ? 'Ouch!' : '', 900); note2('hit', { by: e.by }); }
     if (e.type === 'warn') {
-      if (e.kind === 'bike') sfx.bell(); else if (e.kind === 'turtle') sfx.bubbles(); else if (e.kind === 'heron') sfx.heron(); else if (e.kind === 'gust') sfx.gust();
+      if (e.kind === 'bike' || e.kind === 'car') sfx.bell(); else if (e.kind === 'cat' || e.kind === 'bridge') sfx.bubbles(); else if (e.kind === 'turtle') sfx.bubbles(); else if (e.kind === 'heron') sfx.heron(); else if (e.kind === 'gust') sfx.gust();
     }
     if (e.type === 'quack') { sfx.quack(); quackShow = 0.5; trailT = Math.max(trailT, 1.4); ripples.push({ x: s.mom.x, y: s.mom.y, t0: performance.now(), s: 2 }); rollCall(180, false); }
     if (e.type === 'home') { sfx.home(); homeGlow = 1; }
     if (e.type === 'arrive') { sfx.arrive(e.k); nestDucks.push({ id: e.id, x: e.x, y: e.y, t0: performance.now(), k: e.k, trait: (s.arrived.find(f => f.id === e.id) || {}).trait }); disp.delete(e.id); burst(s.nest.x, s.nest.y, 'spark', 6); }
-    if (e.type === 'check') { sfx.check(); say(`+${e.add} sunlight  ×${e.n}`, 1400); burst(s.mom.x, s.mom.y, 'spark', 12); }
+    if (e.type === 'check') { sfx.check(); say(`+${e.add} sun${e.scares ? ' · scattered' : ''}`, 1400); burst(s.mom.x, s.mom.y, 'spark', 12); }
   }
   // the first curve the ducklings copy: show her path for a moment (stages 1 and 2)
   const sp = Math.hypot(s.mom.vx, s.mom.vy);
@@ -376,7 +489,9 @@ function burst(x, y, kind, n) {
 // ---------------------------------------------------------------- drawing
 function drawPond(now) {
   const t = now / 1000, top = wy(0), bottom = wy(H);
-  g.fillStyle = art.COL.bank; g.fillRect(0, 0, W, H);
+  const bank = g.createLinearGradient(0, 0, W, H);
+  bank.addColorStop(0, '#b7d799'); bank.addColorStop(1, art.COL.bank);
+  g.fillStyle = bank; g.fillRect(0, 0, W, H);
   // grass: tufts and flowers by world cell, so they scroll with the pond
   const cell = 0.12;
   for (let j = Math.floor(bottom / cell) - 1; j <= top / cell + 1; j++) for (let i = -8; i < 10; i++) {
@@ -394,7 +509,12 @@ function drawPond(now) {
   for (let y = top + 0.1; y >= bottom - 0.1; y -= 0.05) g.lineTo(sx(x1 + 0.008 * Math.sin(y * 7 + 2)), sy(y));
   g.closePath();
   const gr = g.createLinearGradient(sx(x0), 0, sx(x1), 0);
-  gr.addColorStop(0, '#7cc2bf'); gr.addColorStop(0.5, art.COL.water); gr.addColorStop(1, '#7cc2bf');
+  const waters = [
+    ['#6bb7b3', '#a1d6c9'], ['#78a9ac', '#acd4c7'],
+    ['#80a9ad', '#a7ccbf'], ['#5eafbf', '#9ed4cf'],
+  ];
+  const [edge, mid] = waters[s.endless ? 0 : chapterOf(s.stage)];
+  gr.addColorStop(0, edge); gr.addColorStop(.48, mid); gr.addColorStop(1, edge);
   g.fillStyle = gr; g.fill();
   g.strokeStyle = art.COL.bankEdge; g.lineWidth = Math.max(2, 0.008 * u); g.stroke();
   g.save(); g.clip();
@@ -430,6 +550,10 @@ const hash2 = (a, b) => art.hash(a, b);
 
 function drawHazards(now) {
   const t = s.t, top = wy(-60), bottom = wy(H + 60);
+  if (s.endless) for (const pad of s.checkpoints) {
+    if (pad.y < bottom || pad.y > top) continue;
+    drawCheckpoint(pad, now);
+  }
   const vis = h => !(h.y1 < bottom - 0.3 || h.y0 > top + 0.3);
   for (const r of s.reeds) if (r.y > bottom - 0.2 && r.y < top + 0.2) art.reeds(g, sx(r.x), sy(r.y), r.r * u, now / 1000, Math.round(r.x * 100 + r.y * 10));
   for (const h of s.hazards) if (h.kind === 'bike' && vis(h)) art.path(g, sy(h.y), u, sx(-0.6), sx(1.6));
@@ -449,6 +573,15 @@ function drawHazards(now) {
   for (const h of s.hazards) {
     if (!vis(h)) continue;
     const v = view(h, t);
+    if (h.kind === 'car') {
+      art.road(g, sy(h.y), u, 0, W);
+      if (v.warn) art.car(g, sx(h.dir > 0 ? 0.09 : 0.91), sy(h.y), u, h.dir, true);
+      else if (v.visible) art.car(g, sx(v.x), sy(h.y), u, h.dir);
+      else if (waitTouch && s.stage === 5) art.car(g, sx(h.dir > 0 ? .08 : .92), sy(h.y), u, h.dir);
+    }
+    if (h.kind === 'cat') art.sleepingCat(g, sx(h.x), sy(h.y), h.r * u, v.phase, now / 1000);
+    if (h.kind === 'bridge' || h.kind === 'weed') art.leaves(g, sx(h.x), sy(h.y), h.r * u, h.kind, v.phase, now / 1000);
+    if (h.kind === 'current') art.current(g, sx(h.x), sy(h.y1), sy(h.y0), h.w * u, u, h.dx, now / 1000);
     if (h.kind === 'log') for (const l of v.logs) {
       if (l.warn) { // ripples at the bank where a log is about to drift in
         const x = h.dir > 0 ? 0.04 : 0.96, k = 1 + l.age; // age runs from -warn to 0
@@ -614,24 +747,33 @@ function drawGuide(now) {
     const k = (now - touchRing.t) / 400;
     if (k < 1) { g.strokeStyle = `rgba(255,255,255,${0.8 * (1 - k)})`; g.lineWidth = 3 * dpr; g.beginPath(); g.arc(touchRing.x * dpr, touchRing.y * dpr, (20 + 30 * k) * dpr, 0, 7); g.stroke(); }
   }
-  if (waitTouch && !help.shown) { // while the shared first-time hint shows, this one waits
-    // the ghost finger: hold here, below and ahead of her
-    const gx = sx(0.5), gy = sy(s.mom.y + 0.42) + OFFSET * dpr;
-    const ty = gy - OFFSET * dpr;
-    g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = 3 * dpr; g.setLineDash([6 * dpr, 7 * dpr]); g.lineDashOffset = -now / 40;
-    g.beginPath(); g.moveTo(sx(s.mom.x), sy(s.mom.y) - 0.06 * u); g.lineTo(gx, ty + 0.02 * u); g.stroke(); g.setLineDash([]);
-    g.fillStyle = 'rgba(255,255,255,.5)'; g.beginPath(); g.arc(gx, ty, 10 * dpr, 0, 7); g.fill();
-    art.ghostFinger(g, gx, gy, u, now / 1000);
-    label('Hold here', gx, gy + 0.11 * u);
+  const spec = s.endless ? null : LEVELS[s.stage];
+  const teaching = spec?.guide && s.t < 5;
+  if ((!waitTouch && !teaching) || help.shown) return;
+  const points = spec?.guide ?? [[s.mom.x, s.mom.y + .30]];
+  const from = waitTouch ? [.50, .35] : [s.mom.x, s.mom.y];
+  const next = points.filter(([, y]) => waitTouch || y > s.mom.y + .06);
+  if (!next.length) return;
+  g.strokeStyle = waitTouch ? '#fff8d8' : '#fff8d8a6';
+  g.lineWidth = 3 * dpr;
+  g.setLineDash([5 * dpr, 7 * dpr]); g.lineDashOffset = still ? 0 : -now / 42;
+  g.beginPath(); g.moveTo(sx(from[0]), sy(from[1]));
+  for (const [x, y] of next) g.lineTo(sx(x), sy(y));
+  g.stroke(); g.setLineDash([]); g.lineDashOffset = 0;
+  const [x, y] = next[0], tx = sx(x), ty = sy(y);
+  g.strokeStyle = '#fff8d8'; g.beginPath(); g.arc(tx, ty, 8 * dpr, 0, 7); g.stroke();
+  if (!waitTouch) {
+    if (s.stage === 16 && s.hazards.some(h => h.kind === 'bridge' && view(h, s.t).phase === 'warn')) {
+      const button = $('quack').getBoundingClientRect();
+      art.ghostFinger(g, (button.right + 7) * dpr, (button.top + 9) * dpr, u * .7, still ? .4 : now / 1000);
+    }
+    return;
   }
+  const t = still ? .4 : now / 1000;
+  const f = still ? 1 : .55 + .45 * Math.min(1, (t % 1.8) / .8);
+  const startX = sx(from[0]), startY = sy(from[1]);
+  art.ghostFinger(g, startX + (tx - startX) * f, startY + (ty - startY) * f + OFFSET * dpr, u, t);
 }
-function label(text, x, y) {
-  g.font = `bold ${Math.round(20 * dpr)}px ui-rounded, system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-  const w = g.measureText(text).width + 24 * dpr;
-  g.fillStyle = 'rgba(47,107,94,.85)'; g.beginPath(); g.roundRect(x - w / 2, y - 18 * dpr, w, 36 * dpr, 18 * dpr); g.fill();
-  g.fillStyle = '#fff'; g.fillText(text, x, y + dpr);
-}
-
 function drawHud(now) {
   const top = (inset.top + 12) * dpr, pad = 14 * dpr, r = 9 * dpr;
   // a soft strip behind the HUD, so what drifts in at the top still shows through but the HUD reads
@@ -646,26 +788,42 @@ function drawHud(now) {
     g.fillStyle = full ? '#ff5a6e' : 'rgba(255,255,255,.55)'; g.strokeStyle = full ? '#c2304a' : 'rgba(47,107,94,.4)'; g.lineWidth = 2 * dpr;
     g.beginPath(); g.moveTo(x, y + r * 0.9); g.bezierCurveTo(x - r * 1.6, y - r * 0.2, x - r * 0.6, y - r * 1.3, x, y - r * 0.4); g.bezierCurveTo(x + r * 0.6, y - r * 1.3, x + r * 1.6, y - r * 0.2, x, y + r * 0.9); g.fill(); g.stroke();
   }
-  // the line: a duckling and a count; the count is the score multiplier
-  const cx = W / 2, cy = top + 14 * dpr;
-  g.fillStyle = 'rgba(255,255,255,.75)'; g.beginPath(); g.roundRect(cx - 52 * dpr, cy - 18 * dpr, 104 * dpr, 36 * dpr, 18 * dpr); g.fill();
-  art.duckling(g, cx - 28 * dpr, cy + 2 * dpr, 0, 26 * dpr / 0.06, now / 1000, 0, { moving: 0.3 });
-  g.fillStyle = '#2f6b5e'; g.font = `bold ${Math.round(20 * dpr)}px ui-rounded, system-ui, sans-serif`; g.textAlign = 'left'; g.textBaseline = 'middle';
-  g.fillText(`×${s.line.length}`, cx - 10 * dpr, cy + 1 * dpr);
-  // the sun: time left, as a bar that runs down
-  const left0 = timeLeft(s), frac = s.endless ? Math.min(1, left0 / 40) : left0 / s.time;
-  const bw = Math.min(W - 2 * pad - 70 * dpr, 300 * dpr), bx = (W - bw) / 2, by = cy + 26 * dpr;
-  g.fillStyle = 'rgba(255,255,255,.5)'; g.beginPath(); g.roundRect(bx, by, bw, 8 * dpr, 4 * dpr); g.fill();
-  const low = left0 < 12 && !s.home;
-  g.fillStyle = low ? (Math.floor(now / 250) % 2 ? '#ff7a3a' : '#ffb43a') : '#ffc94a'; g.beginPath(); g.roundRect(bx, by, Math.max(8 * dpr, bw * frac), 8 * dpr, 4 * dpr); g.fill();
-  g.fillStyle = '#ffde5a'; g.strokeStyle = '#f29a1a'; g.lineWidth = 2 * dpr; g.beginPath(); g.arc(bx + bw * frac, by + 4 * dpr, 8 * dpr, 0, 7); g.fill(); g.stroke();
-  // progress up the pond (stage) or the score (endless), under the bar
-  g.fillStyle = '#2f6b5e'; g.font = `bold ${Math.round(14 * dpr)}px ui-rounded, system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'top';
-  const txt = s.endless ? `${s.score} · ☀ ${Math.ceil(left0)}${duskRate(s.t) > 1 ? ' · fading faster' : ''}` : `${s.arrived.length ? s.arrived.length + ' home · ' : ''}${s.score}`;
-  g.lineWidth = 3 * dpr; g.strokeStyle = 'rgba(255,255,255,.8)'; g.strokeText(txt, W / 2, by + 13 * dpr); g.fillText(txt, W / 2, by + 13 * dpr);
-  if (low && left0 > 0) label('Hurry!', W / 2, by + 50 * dpr);
-  // stage 1 only: a word for what the trail means while it shows
-  if (trailT > 0 && s.stage <= 2 && trailShows <= 2) label('They follow your path', W / 2, H - (inset.bottom + 120) * dpr);
+  const cx = W / 2, cy = top + 16 * dpr;
+  g.fillStyle = '#fff9df'; g.beginPath(); g.roundRect(cx - 59 * dpr, cy - 17 * dpr, 118 * dpr, 36 * dpr, 18 * dpr); g.fill();
+  art.duckling(g, cx - 37 * dpr, cy + 1 * dpr, .28, 340 * dpr, now / 1000, 0, { moving: .3, trait: 'eager' });
+  g.fillStyle = '#234d46'; g.font = `800 ${Math.round(17 * dpr)}px ui-rounded, system-ui`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  if (s.endless) g.fillText(`×${s.line.length}`, cx + 6 * dpr, cy + 1 * dpr);
+  else {
+    const goal = LEVELS[s.stage];
+    g.fillText(`${s.line.length + s.arrived.length} / ${goal.need}`, cx + 1 * dpr, cy + 1 * dpr);
+    art.nest(g, cx + 41 * dpr, cy + 1 * dpr, 46 * dpr, 0, 0);
+  }
+  g.font = `800 ${Math.round(13 * dpr)}px ui-rounded, system-ui`;
+  if (s.endless || Number.isFinite(s.time)) {
+    const left0 = timeLeft(s), frac = Math.max(0, Math.min(1, left0 / (s.endless ? ENDLESS_TIME : s.time)));
+    const bw = Math.min(W - 100 * dpr, 260 * dpr), bx = (W - bw) / 2, by = cy + 26 * dpr;
+    g.fillStyle = '#fff9df'; g.beginPath(); g.roundRect(bx, by, bw, 8 * dpr, 4 * dpr); g.fill();
+    g.fillStyle = left0 < 3 ? '#ca5842' : '#e4a42d';
+    g.beginPath(); g.roundRect(bx, by, Math.max(1, bw * frac), 8 * dpr, 4 * dpr); g.fill();
+    g.fillStyle = '#234d46';
+    const txt = s.endless ? `${s.score} pts  ·  ☀ ${Math.ceil(left0)}${duskRate(s.t) > 1 ? ' ↓' : ''}` : `◷ ${Math.ceil(left0)}s`;
+    g.fillText(txt, cx, by + 21 * dpr);
+  } else {
+    const chapter = CHAPTERS[chapterOf(s.stage)];
+    g.fillStyle = '#234d46';
+    g.fillText(`${chapter.name}  ·  ${s.stage}`, cx, cy + 34 * dpr);
+  }
+}
+
+function drawCheckpoint(pad, now) {
+  const y = sy(pad.y), x = sx(.5);
+  g.strokeStyle = pad.got ? '#ffffff55' : '#fff3b6b8'; g.lineWidth = 2 * dpr; g.setLineDash([5 * dpr, 7 * dpr]);
+  g.beginPath(); g.moveTo(sx(.09), y); g.lineTo(sx(.91), y); g.stroke(); g.setLineDash([]);
+  art.lilyPad(g, x, y, 22 * dpr, now / 4000, !pad.got);
+  if (!pad.got) {
+    g.fillStyle = '#fff7bf'; g.font = `800 ${20 * dpr}px system-ui`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('☀', x, y + dpr);
+  }
 }
 
 // Where warnings are showing at time t: the side a log or bike comes from, or the hazard itself.
@@ -675,6 +833,7 @@ function warningsAt(t) {
     if (h.y0 > s.mom.y + 3 || h.y1 < s.mom.y) continue;
     const v = view(h, t);
     if (h.kind === 'log') { if (v.logs.some(l => l.warn)) out.push({ x: h.dir > 0 ? 0.06 : 0.94, y: h.y }); }
+    else if (h.kind === 'car' && v.warn) out.push({ x: h.dir > 0 ? 0.08 : 0.92, y: h.y });
     else if (h.kind === 'bike') { for (const b of v.bikes) if (b.warn) out.push({ x: b.dir > 0 ? 0.06 : 0.94, y: h.y }); }
     else if (v.phase === 'warn') out.push({ x: h.kind === 'heron' ? h.px + h.side * 0.06 : h.kind === 'gust' ? 0.5 : h.x, y: h.kind === 'heron' ? h.py : h.kind === 'gust' ? (h.y0 + h.y1) / 2 : h.y });
   }
@@ -697,14 +856,21 @@ function updateCamera(dt) {
   const hu = H / u, m = s.mom;
   let want = Math.min(Math.max(cam, m.y - 0.04 * hu), m.y + 0.22 * hu);
   if (s.line.length) { const tail = pathAt(s, s.line[s.line.length - 1].delay); want = Math.max(m.y - 0.15 * hu, Math.min(want, tail.y + 0.53 * hu)); }
-  if (s.nest) want = Math.min(want, s.nest.y - 0.15 * hu);
+  if (s.nest) want = Math.min(want, s.nest.y - 0.14 * hu);
   camShown += (want - camShown) * Math.min(1, dt * 6);
   cam = camShown;
 }
 
 function frame(now) {
-  const dt = Math.min(0.1, (now - last) / 1000 || 0); last = now;
+  // A frame timestamp can precede an input callback from the same frame.
+  const dt = Math.max(0, Math.min(.1, (now - last) / 1000));
+  last = Math.max(last, now);
   let alpha = 1;
+  if (screen !== 'play') {
+    if (water) water.gain.value = 0;
+    requestAnimationFrame(frame);
+    return;
+  }
   if (playing && !paused) {
     if (!waitTouch) { acc += dt * FAST; while (acc >= DT && playing) { tick(); acc -= DT; } alpha = Math.min(1, acc / DT); }
     trailT = Math.max(0, trailT - dt); quackShow = Math.max(0, quackShow - dt); hurtT = Math.max(0, hurtT - dt); homeGlow = Math.max(0, homeGlow - dt * 0.3);
@@ -714,7 +880,7 @@ function frame(now) {
     $('quackLabel').textContent = ready < 1 ? `${Math.ceil(s.quackCool)}s` : 'Quack';
     if (water) water.gain.value = 0.18;
   } else if (water) water.gain.value = 0;
-  if (playing && !paused || screen === 'play') updateCamera(dt);
+  if (!waitTouch) updateCamera(dt);
   shake = Math.max(0, shake - dt * 2.5); flash = Math.max(0, flash - dt * 2);
   const k = still ? 0 : shake * 10 * dpr;
   g.setTransform(1, 0, 0, 1, (Math.random() - 0.5) * k, (Math.random() - 0.5) * k);
@@ -729,20 +895,56 @@ function frame(now) {
 function drawMenuArt() {
   const c = $('menuArt'), q = c.getContext('2d'), now = performance.now() / 1000;
   q.clearRect(0, 0, c.width, c.height);
-  q.fillStyle = '#8fd0cc'; q.beginPath(); q.ellipse(220, 115, 210, 95, 0, 0, 7); q.fill();
-  q.strokeStyle = 'rgba(255,255,255,.35)'; q.lineWidth = 8; q.beginPath(); q.moveTo(330, 60); q.bezierCurveTo(260, 30, 120, 40, 90, 120); q.stroke();
-  const pts = [[330, 60], [280, 44], [225, 42], [172, 54], [130, 76], [102, 106], [92, 140]];
-  for (let i = pts.length - 1; i >= 1; i--) { const [x, y] = pts[i], [px, py] = pts[i - 1]; art.duckling(q, x, y, Math.atan2(px - x, -(py - y)), 560, now, i, { trait: ['eager', 'sleepy', 'brave', 'curious', 'tiny', 'loud'][i - 1] }); }
-  art.mother(q, 330, 60, Math.atan2(40, 10), 560, now, 1, false, false);
-  art.lilyPad(q, 70, 60, 22, 1, true); art.lilyPad(q, 370, 160, 18, 3, false);
+  q.save();
+  q.translate(62, 8);
+  q.scale(1.10, 1.04);
+  const paint = q.createLinearGradient(40, 20, 390, 200);
+  paint.addColorStop(0, '#aedcc6'); paint.addColorStop(1, '#6dafb1');
+  q.fillStyle = '#a3c98b'; q.beginPath(); q.ellipse(220, 115, 218, 96, -.02, 0, 7); q.fill();
+  q.fillStyle = paint; q.beginPath(); q.ellipse(220, 111, 206, 90, -.02, 0, 7); q.fill();
+  for (let i = 0; i < 15; i++) {
+    const x = 33 + 365 * hash2(i, 3), y = 52 + 116 * hash2(i, 6);
+    q.fillStyle = '#fffefa28'; q.beginPath(); q.ellipse(x, y, 11 + 10 * hash2(i, 2), 2.3, -.10, 0, 7); q.fill();
+  }
+  q.strokeStyle = '#fff6d6a3'; q.lineWidth = 4; q.lineCap = 'round'; q.setLineDash([5, 9]);
+  q.beginPath(); q.moveTo(348, 84); q.bezierCurveTo(233, 23, 127, 64, 103, 150); q.stroke(); q.setLineDash([]);
+  const pts = [[348, 84], [297, 66], [247, 62], [198, 71], [155, 87], [124, 113], [103, 150]];
+  const looks = Object.keys(TRAITS);
+  for (let i = pts.length - 1; i >= 1; i--) {
+    const [x, y] = pts[i], [px, py] = pts[i - 1];
+    art.duckling(q, x, y, Math.atan2(px - x, y - py), 690, now, i, { trait: looks[i - 1] });
+  }
+  art.mother(q, ...pts[0], 1.88, 770, now, .4, false, false);
+  art.lilyPad(q, 73, 68, 25, .5, true); art.lilyPad(q, 376, 147, 21, 3, false);
+  art.reeds(q, 174, 185, 20, now, 4);
+  q.restore();
+}
+
+function drawPostcard(won) {
+  const c = $('postcard'), q = c.getContext('2d');
+  const w = c.width, h = c.height;
+  q.clearRect(0, 0, w, h);
+  const water = q.createLinearGradient(0, 0, w, h);
+  water.addColorStop(0, '#d5ead1'); water.addColorStop(1, '#94cbc3');
+  q.fillStyle = water; q.beginPath(); q.roundRect(12, 12, w - 24, h - 24, 70); q.fill();
+  art.lilyPad(q, 57, 120, 24, .28, true);
+  art.lilyPad(q, w - 49, 70, 30, 1.2, true);
+  const group = s.endless ? s.line : s.arrived;
+  if (won) art.nest(q, w / 2, h * .54, 390, 0, 1);
+  art.mother(q, w / 2, h * .42, -.22, 610, 0, 0, false, !won && s.why === 'hearts');
+  group.forEach((f, i) => {
+    const dx = (i + .5 - group.length / 2) * Math.min(61, 475 / group.length);
+    art.duckling(q, w / 2 + dx, h * .75 + Math.cos(dx / 130) * 8, dx / 400, 590, 1, i, { trait: f.trait, open: won });
+  });
 }
 
 // ---------------------------------------------------------------- hooks for checks
 window.ducklingsState = () => ({
-  screen, mode, stage: s.stage, playing, paused, waiting: waitTouch, t: s.t, over: s.over, why: s.why, score: s.score, hearts: s.hearts,
+  screen, mode, chapter: tab + 1, stage: s.stage, need: s.endless ? null : LEVELS[s.stage].need, playing, paused, waiting: waitTouch, t: s.t, over: s.over, why: s.why, score: s.score, hearts: s.hearts,
   line: s.line.length, lost: s.lost.length, arrived: s.arrived.length, total: s.total, stars: stars(s), home: s.home, quackCool: s.quackCool,
   mom: { x: s.mom.x, y: s.mom.y, sx: sx(s.mom.x) / dpr, sy: sy(s.mom.y) / dpr },
   nest: s.nest ? { sx: sx(s.nest.x) / dpr, sy: sy(s.nest.y) / dpr } : null,
+  lesson: !s.endless ? LEVELS[s.stage].lesson ?? null : null,
   waitingDucks: s.lost.map(l => ({ sx: sx(l.x) / dpr, sy: sy(l.y) / dpr, y: l.y })),
   opened: data.opened, sound: data.sound, taught: data.taught, hudPeeks, rollCalls,
 });

@@ -16,10 +16,10 @@
 // It drives the same newRun / walkTo / use / step / pickLie / showMe / later / guess / nextChapter the page ticks.
 import {
   newRun, step, walkTo, use, ready, guess, nextChapter, consistent, tileOf, route, hamming, ABILITIES, COST, LOCK_ABILITY,
-  LIFE, BURN, SPEED, FACES, WRONG, PICK, SHOW, CHAPTERS, roleId, score, solveLie, liarFor, fits, pickLie, showMe, later, rng,
+  LIFE, BURN, SPEED, FACES, WRONG, PICK, SHOW, CHAPTERS, roleId, score, solvePuzzle, liarFor, fits, pickLie, showMe, later, rng,
 } from './sim.js';
 
-const t0 = Date.now();
+const t0 = Date.now(), cpu0 = process.cpuUsage();
 let failures = 0;
 const fail = text => { failures++; console.log('FAIL ' + text); };
 const check = (ok, text) => { if (!ok) fail(text); return ok; };
@@ -61,13 +61,16 @@ function walk(s, x, y, opts, until = () => false) {
 function answer(s, opts) {
   const p = s.open, z = p.puzzle, n = z.frags.length, policy = opts.puzzle || 'careful';
   const st = opts.stats;
-  if (st) { st.opened++; if (p === opts.want && solveLie(s.faces, s.known, z.frags, z.tried) < 0) st.stuck++; }
+  if (st) { st.opened++; if (p === opts.want && solvePuzzle(s.faces, s.known, z, s.exposed) < 0) st.stuck++; }
   const r = opts.r || (opts.r = rng(s.seed ^ 0x51ed));
   const tap = order => { for (const i of order) { if (s.open !== p || s.status !== 'play') return; if (!z.tried[i]) pickLie(s, i); } };
   if (policy === 'buyer') { showMe(s); return; }
   if (policy === 'random') { const o = [...Array(n).keys()]; for (let i = n - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; } tap(o); return; }
-  if (policy === 'first') { tap([...Array(n).keys()]); return; }
-  const l = solveLie(s.faces, s.known, z.frags, z.tried);
+  if (policy === 'first') {
+    tap(z.form === 'torn' ? [1, 0] : [0, 1]);
+    return;
+  }
+  const l = solvePuzzle(s.faces, s.known, z, s.exposed);
   if (l >= 0) { pickLie(s, l); return; }
   if (policy === 'spender') { showMe(s); return; }
   if (p !== opts.want) { later(s); return; }
@@ -129,20 +132,25 @@ function walkYears(s, spot) {
 }
 function plan(s, opts = {}) {
   const open = s.spots.filter(p => !p.taken && !(opts.noRewind && s.chapter === 2 && p.lock === 'rewind'));
-  const costOf = p => (LOCK_ABILITY[p.lock] && !p.open ? COST[LOCK_ABILITY[p.lock]] : 0) + walkYears(s, p);
+  const costs = new Map(open.map(p => {
+    const ability = LOCK_ABILITY[p.lock];
+    const unlocked = p.lock === 'push' ? !boulderNear(s, p)
+      : p.lock === 'leap' ? s.bridge : p.open;
+    return [p, (ability && !unlocked ? COST[ability] : 0) + walkYears(s, p)];
+  }));
   const memo = new Map();
-  function expect(known, left) {
+  function expect(known, left, choices = left) {
     const C = consistent(s.faces, known);
     if (C.length <= 1) return { cost: 0, spot: null };
     const key = known.join(',') + '|' + left.map(p => p.lock).join(',');
     if (memo.has(key)) return memo.get(key);
     let best = { cost: Infinity, spot: null };
-    for (const p of left) {
+    for (const p of choices) {
       if (p.dims.every(d => known[d] !== null)) continue;
       const counts = new Map();
       for (const i of C) { const key = p.dims.map(d => s.faces[i][d]).join(); counts.set(key, (counts.get(key) || 0) + 1); }
-      let cost = costOf(p);
-      if (p.puzzle && !opts.hasty && solveLie(s.faces, known, p.puzzle.frags, p.puzzle.tried) < 0) cost += SHOW;
+      let cost = costs.get(p);
+      if (p.puzzle && !opts.hasty && solvePuzzle(s.faces, known, p.puzzle, s.exposed) < 0) cost += SHOW;
       for (const [key, n] of counts) {
         const k = [...known], vals = key.split(',').map(Number);
         p.dims.forEach((d, j) => { k[d] = vals[j]; });
@@ -150,10 +158,13 @@ function plan(s, opts = {}) {
       }
       if (cost < best.cost) best = { cost, spot: p };
     }
-    memo.set(key, best);
+    if (choices === left) memo.set(key, best);
     return best;
   }
-  return expect([...s.known], open).spot;
+  if (opts.hasty || !s.lies) return expect([...s.known], open).spot;
+  const solved = open.filter(p => solvePuzzle(s.faces, s.known, p.puzzle, s.exposed) >= 0);
+  // Prefer a deduction first, while planning against all remaining memories.
+  return expect([...s.known], open, solved).spot ?? expect([...s.known], open).spot;
 }
 // Plays every chapter with the same rule, chapter after chapter.
 function chapters(s, one) {
@@ -217,7 +228,14 @@ const QUICK = {
   'most typical face': faces => faces.map((_, i) => i).sort((a, b) => typical(faces, b) - typical(faces, a) || a - b)[0],
   'least typical face': faces => faces.map((_, i) => i).sort((a, b) => typical(faces, a) - typical(faces, b) || a - b)[0],
 };
-function quick(seed, rule) { return chapters(newRun(seed), s => guess(s, QUICK[rule](s.faces))); }
+function quick(seed, rule) {
+  // The same-deal check covers building without puzzles, which this bot never opens.
+  return chapters(newRun(seed, { lies: false }), s => {
+    s.lies = true;
+    guess(s, QUICK[rule](s.faces));
+    s.lies = false;
+  });
+}
 // Takes the free memory by the start (when the chapter has one), then guesses among the faces that fit.
 function peek(seed) {
   return chapters(newRun(seed), s => {
@@ -273,6 +291,11 @@ const PERMS = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]]
 
 // Regression: a wrong name still leaves a reason to save years.
 {
+  for (const [lies, cost] of [[true, WRONG], [false, 15]]) {
+    const one = newRun(7, { lies });
+    guess(one, (one.answer + 1) % FACES);
+    check(one.life === LIFE - cost, `a wrong name costs ${cost} years with puzzles ${lies ? 'on' : 'off'}`);
+  }
   const s = newRun(7);
   guess(s, s.answer); nextChapter(s);
   guess(s, (s.answer + 1) % FACES); nextChapter(s);
@@ -298,19 +321,26 @@ const PERMS = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]]
 // so if the closure settles every memory, a careful player can settle each one in that order.
 function closure(s) {
   const a = s.faces[s.answer], known = [null, null, null, null], left = new Set(s.spots);
+  const exposed = [];
   let rounds = 0;
   while (left.size) {
-    const now = [...left].filter(p => solveLie(s.faces, known, p.puzzle.frags) === p.puzzle.liar);
+    const now = [...left].filter(p => solvePuzzle(s.faces, known, p.puzzle, exposed) === p.puzzle.liar);
     if (!now.length) return { ok: false, rounds, left: [...left].map(p => p.lock) };
     rounds++;
-    for (const p of now) { left.delete(p); for (const d of p.dims) known[d] = a[d]; }
+    for (const p of now) {
+      left.delete(p);
+      for (const d of p.dims) known[d] = a[d];
+      const seal = p.puzzle.frags[p.puzzle.liar].seal;
+      if (seal !== undefined) exposed.push(seal);
+    }
   }
   return { ok: consistent(s.faces, known).length === 1, rounds };
 }
-const FORM_NAMES = { nobody: 'fits no face', clue: 'needs a clue', pair: 'needs crossed-out faces', three: 'three pictures' };
+const FORM_NAMES = { lie: 'compare pictures', torn: 'match the tear', signed: 'compare seals' };
 const puzzleRows = {}, chainRows = CHAPTERS.map(() => ({})), needsRows = CHAPTERS.map(() => ({ n: 0, some: 0 }));
 {
-  let liarBad = 0, stuck = 0, chapters = 0, wrongWay = 0;
+  let liarBad = 0, stuck = 0, chapters = 0, wrongWay = 0, formBad = 0, repeatBad = 0;
+  const chapterForms = [['lie'], ['lie', 'torn'], ['lie', 'torn', 'signed']];
   for (let seed = 1; seed <= 400; seed++) for (let ans = 0; ans < FACES; ans++) {
     const s = newRun(seed, { answers: [ans, (ans + 1) % FACES, (ans + 3) % FACES] });
     for (let k = 0; k < CHAPTERS.length; k++) {
@@ -321,17 +351,34 @@ const puzzleRows = {}, chainRows = CHAPTERS.map(() => ({})), needsRows = CHAPTER
         const z = p.puzzle, lies = z.frags.map(f => !fits(a, f));
         if (lies.filter(Boolean).length !== 1 || !lies[z.liar]) liarBad++;
         // a settled puzzle is always settled the right way (solveLie never names a true picture)
-        const l = solveLie(s.faces, none, z.frags);
+        const l = solvePuzzle(s.faces, none, z);
         if (l >= 0 && l !== z.liar) wrongWay++;
         const row = puzzleRows[`${CHAPTERS[k].name} ${p.lock}`] ??= { form: z.form, pictures: z.frags.length, n: 0, cold: 0 };
         row.n++; if (l === z.liar) row.cold++;
       }
-      // A chain a player meets: a clue that the entry memory (free, or the old one's Push) and the faces cannot settle,
-      // so another memory has to be won first.
-      const entry = s.spots.find(p => p.lock === (s.spots.some(q => q.lock === 'free') ? 'free' : 'push'));
-      const k0 = [null, null, null, null]; for (const d of entry.dims) k0[d] = a[d];
-      needsRows[k].n++;
-      if (s.spots.some(p => p.puzzle.form === 'clue' && solveLie(s.faces, k0, p.puzzle.frags) !== p.puzzle.liar)) needsRows[k].some++;
+      const forms = new Set(s.spots.map(p => p.puzzle.form));
+      if (forms.size !== chapterForms[k].length || !chapterForms[k].every(form => forms.has(form))) formBad++;
+
+      const lock = id => s.spots.find(p => p.lock === id).puzzle;
+      if (k > 0) {
+        const entry = lock(k === 1 ? 'free' : 'push');
+        const parent = lock(k === 1 ? 'push' : 'leap');
+        const dependent = lock('dark');
+        const from = (known, puzzle) => solvePuzzle(s.faces, known, puzzle);
+        const k0 = none.map((v, d) => entry.dims.includes(d) ? a[d] : v);
+        const k1 = k0.map((v, d) => parent.dims.includes(d) ? a[d] : v);
+        needsRows[k].n++;
+        if (from(none, entry) === entry.liar && from(k0, parent) === parent.liar
+            && from(none, dependent) === -1 && from(k0, dependent) === -1
+            && from(k1, dependent) === dependent.liar
+            && dependent.dims.some(d => k1[d] === null)) needsRows[k].some++;
+        if (k === 2) {
+          const seal = parent.frags[parent.liar].seal;
+          if (seal === undefined || dependent.frags[dependent.liar].seal !== seal
+              || parent.frags[1 - parent.liar].seal === dependent.frags[1 - dependent.liar].seal
+              || from(k0, dependent) !== -1 || solvePuzzle(s.faces, k0, dependent, [seal]) !== dependent.liar) repeatBad++;
+        }
+      }
       const c = closure(s);
       if (!c.ok) stuck++;
       chainRows[k][c.rounds] = (chainRows[k][c.rounds] || 0) + 1;
@@ -340,6 +387,9 @@ const puzzleRows = {}, chainRows = CHAPTERS.map(() => ({})), needsRows = CHAPTER
   check(liarBad === 0, `exactly one picture of every puzzle lies about the answer (${liarBad} breaks)`);
   check(wrongWay === 0, `a puzzle settled from the faces is settled the right way (${wrongWay} breaks)`);
   check(stuck === 0, `every memory of every chapter can be decided without paying, 400 seeds x 6 answers (${stuck}/${chapters} chapters stuck)`);
+  check(formBad === 0, `one new form per chapter (${formBad} breaks)`);
+  check(repeatBad === 0, `the same false seal decides the second signed puzzle (${repeatBad} breaks)`);
+  check(needsRows.slice(1).every(row => row.n === 2400 && row.some === row.n), 'every later chapter has an entry → parent → dependent chain');
   // Mutation: make the lie of one puzzle fit a face still in the running alongside the answer's; the closure must notice.
   let caught = 0, tried = 0;
   for (let seed = 1; seed <= 200; seed++) {
@@ -350,10 +400,34 @@ const puzzleRows = {}, chainRows = CHAPTERS.map(() => ({})), needsRows = CHAPTER
     tried++;
     lie.vals = lie.dims.map(d => other[d]); // now the "lie" is a true picture of another face
     const c = closure(s);
-    if (!c.ok || solveLie(s.faces, [null, null, null, null], z.frags) !== z.liar) caught++;
+    if (!c.ok || solvePuzzle(s.faces, [null, null, null, null], z) !== z.liar) caught++;
   }
   check(tried > 100 && caught === tried, `a free-memory lie that fits another face is caught (${caught}/${tried})`);
 }
+
+// Exercise the actual walks and abilities in dependency order on every island order. Each
+// chapter starts with a full candle here, so visiting every lock is independent of run budget.
+let reached = 0;
+for (const [i, order] of PERMS.entries()) {
+  const s = newRun(i + 1, { order });
+  const orders = [
+    ['free', 'push', 'leap', 'dark'],
+    ['free', 'push', 'dark', 'leap', 'rewind'],
+    ['push', 'leap', 'dark', 'rewind'],
+  ];
+  for (const [k, locks] of orders.entries()) {
+    for (const lock of locks) {
+      const p = s.spots.find(spot => spot.lock === lock);
+      fetch(s, p, {});
+      if (p.taken) reached++;
+    }
+    check(s.puzzles.shown === 0 && s.puzzles.wrong === 0, `order ${order}, chapter ${k}: every reached memory solved by deduction`);
+    guess(s, consistent(s.faces, s.known)[0]);
+    s.life = LIFE;
+    if (k < 2) nextChapter(s);
+  }
+}
+check(reached === 78, `actual ability routes reach all 78 memories across the six island orders (${reached})`);
 
 // ---------------------------------------------------------------- 4. coverage: every face as an answer, every order
 const SEEDS = 180;
@@ -398,7 +472,7 @@ const puzzlesOf = s => s.puzzles.found + s.puzzles.shown;
 const hist = {}, phist = {};
 for (const s of runs) { hist[uses(s)] = (hist[uses(s)] || 0) + 1; phist[puzzlesOf(s)] = (phist[puzzlesOf(s)] || 0) + 1; }
 const usesMean = stats(runs, uses).mean, puzzlesMean = stats(runs, puzzlesOf).mean;
-check(usesMean >= 3 && usesMean <= 6, `careful bot makes 3 to 6 spending decisions a run on average (${usesMean.toFixed(2)})`);
+check(usesMean >= 4 && usesMean <= 6, `careful bot makes 4 to 6 spending decisions a run on average (${usesMean.toFixed(2)})`);
 check(puzzlesMean >= 5, `careful bot answers at least 5 puzzles a run on average (${puzzlesMean.toFixed(2)})`);
 const shownShare = stats(runs, s => s.puzzles.shown).mean;
 check(shownShare < 0.5, `careful bot pays to be shown less than once in two runs (${shownShare.toFixed(2)} a run)`);
@@ -464,10 +538,10 @@ check(spendFaded > 0.5 || spendScore < carefulScore * 0.6, `the spender dies or 
 
 // A wrong name costs years and the chapter; guessing between the last two must not beat paying for one more memory.
 const gamble = [];
-for (let seed = 1; seed <= SEEDS; seed++) for (let a = 0; a < FACES; a += 2) gamble.push(gambler(seed, { order: PERMS[seed % 6], answers: [a, (a + 2) % FACES, (a + 4) % FACES] }));
+for (let seed = 1; seed <= SEEDS; seed++) for (let a = 0; a < FACES; a++) gamble.push(gambler(seed, { order: PERMS[seed % 6], answers: [a, (a + 2) % FACES, (a + 4) % FACES] }));
 const gambleScore = stats(gamble, s => s.score).mean;
 const gambleAll = gamble.filter(s => s.status === 'remembered').length / gamble.length;
-check(gambleScore < carefulScore * 0.9 && gambleAll < 0.5, `guessing between the last two scores worse than paying and names all three less than half the time (${gambleScore.toFixed(0)} against ${carefulScore.toFixed(0)}, ${(100 * gambleAll).toFixed(0)}%)`);
+check(gambleScore < carefulScore * 0.8 && gambleAll < 0.5, `guessing between the last two scores worse than paying and names all three less than half the time (${gambleScore.toFixed(0)} against ${carefulScore.toFixed(0)}, ${(100 * gambleAll).toFixed(0)}%)`);
 
 // ---------------------------------------------------------------- 7. guessing at once
 const N = 4000, quickRows = {}, quickScore = {}, quickOutcome = {};
@@ -492,9 +566,9 @@ check(still.status === 'faded', 'a bot that does nothing fades');
 
 // ---------------------------------------------------------------- report
 console.table(rows);
-console.log('puzzles (400 seeds x 6 answers): the form of each memory, and how often the six faces alone settle it');
-console.table(Object.fromEntries(Object.entries(puzzleRows).map(([k, r]) => [k, { form: `${r.form} (${FORM_NAMES[r.form]})`, pictures: r.pictures, 'settled by the faces alone': `${(100 * r.cold / r.n).toFixed(0)}%` }])));
-console.log(`chapters with a clue that needs another clue first (not only the entry memory): ${CHAPTERS.map((c, k) => `${c.name} ${(100 * needsRows[k].some / needsRows[k].n).toFixed(0)}%`).join(', ')}`);
+console.log('puzzles (400 seeds x 6 answers): the form of each memory, and how often it is settled without a prior clue');
+console.table(Object.fromEntries(Object.entries(puzzleRows).map(([k, r]) => [k, { form: `${r.form} (${FORM_NAMES[r.form]})`, pictures: r.pictures, 'settled without prior clues': `${(100 * r.cold / r.n).toFixed(0)}%` }])));
+console.log(`chapters with a clue that needs another clue first (not only the entry memory): ${CHAPTERS.slice(1).map((c, i) => `${c.name} ${needsRows[i + 1].some}/${needsRows[i + 1].n}`).join(', ')}`);
 console.log(`rounds of the closure (memories settled in waves; more rounds = longer chains): ${CHAPTERS.map((c, k) => `${c.name} ${Object.entries(chainRows[k]).map(([r, n]) => `${r}: ${n}`).join(', ')}`).join('; ')}`);
 console.table(tapperRows);
 console.log(`hasty bot stuck at a memory: pays ${SHOW} -> ${hb.toFixed(1)} years left, score ${hbs.toFixed(0)}; taps a picture that could lie -> ${hg.toFixed(1)} years left, score ${hgs.toFixed(0)}`);
@@ -511,6 +585,8 @@ console.log(`gambler (names a face when two are left): score ${gambleScore.toFix
 console.log(`guess at once: ${Object.entries(quickRows).map(([k, v]) => `${k} ${(100 * v).toFixed(1)}% right, score ${quickScore[k].toFixed(0)}, ${JSON.stringify(quickOutcome[k])}`).join('; ')} (chance ${(100 / FACES).toFixed(1)}%)`);
 console.log(`free memory (if any), then guess among the faces that fit: right ${(100 * peekRight / peekNamed).toFixed(1)}% of names, score ${(peekScore / 2000).toFixed(0)}`);
 console.log(`do-nothing bot: ${still.status} after ${(still.t / 60).toFixed(0)} s`);
-check(Date.now() - t0 < 60000, 'bots finish in under 60 seconds');
-console.log(`${failures ? 'FAILED' : 'all checks passed'} in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+const cpu = process.cpuUsage(cpu0);
+const cpuSeconds = (cpu.user + cpu.system) / 1e6;
+check(cpuSeconds < 30, 'bots use less than 30 seconds of CPU time');
+console.log(`${failures ? 'FAILED' : 'all checks passed'} in ${((Date.now() - t0) / 1000).toFixed(1)} s wall, ${cpuSeconds.toFixed(1)} s CPU`);
 process.exit(failures ? 1 : 0);
