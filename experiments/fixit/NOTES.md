@@ -207,3 +207,21 @@ Labelled by origin. "Asked" means it was in the round-2 request; "builder" means
 ## 2026-11-23: the tester picked this one (note #103)
 
 Asked which of the three new games (Grapevine, Fix-It Stall, Follow Me) to work on more, tester t1 answered "Fix-It Stall" (note #103, answering #100). It is the one of the three to grow next. No change was made in this run; see `experiments/NOTES.md`.
+
+## 2026-11-23: "very bad right now" (tester t1, note #150)
+
+The lab asked (#128) how Fix-It Stall is with the daily stall, the golden customer, sewing and pumping. The tester's answer, in short: it is very bad right now. Going back to the menu loses all your money. There are only three kinds of puzzle, where there should be many more. There should be levels instead of entering a random shift. (The note is cut off at the end.)
+
+### Done: Menu keeps your coins
+Before this change, Menu on the pause card dropped every coin earned in that shift; coins were banked only when a shift ended. Now Menu banks the shift's coins and its served count. Leaving early does not count as a shift. It sets no best. If 4 or more were fixed it still earns the next job, the same price as a finished shift; before, leaving lost it.
+
+Fixed on the way: the best streak was never saved, because the line that saves it was behind a comment. No save field changed.
+
+Check: `check.mjs` now fixes a job, leaves through the pause card, and asserts the bank rose by the shift's coins, on the menu and in `fixit-save`. Without the fix it fails at "Menu keeps the coins of the shift (note #150)" (tried twice). Locally the check passes every assertion on Chromium and then fails on "page errors": the live lab server (`human.adamwhite.work`) refuses this Mac, which this change does not touch. One run on each engine failed earlier, on the timing line "a streak is felt", with and without this change. The shared phone check passes for Fix-It.
+
+Not checked: closing the tab mid-shift still loses that shift's coins, as before.
+
+### Left as a proposal (2026-11-23, note #150)
+- **"Only three types."** The game has eleven jobs, but a new player sees three (bell, music box, kettle), and each further job needs a whole shift with 4 or more fixed. So the tester saw three. Before this change, leaving through Menu also lost the unlock. Leaving after fixing 4 now keeps it.
+- **Levels.** Replace random shifts with numbered levels. Each level has a goal (for example "fix 6, lose at most 1"), introduces one new job and brings back the old ones. Stars come from coins or time. The eleven jobs give about 11 levels; levels 12 and up mix jobs at a rising pace. The daily stall stays as it is. This is a change of structure, so it goes to the next working session. Question #154 asks the tester what should clear a level.
+- **More kinds of puzzle.** Each new job is a new gesture and a new object. Candidates: thread a needle (hold steady), wind a watch (small circles), tighten a belt (pull and hook), unjam a zip (wiggle), oil a hinge (drip with timed taps).

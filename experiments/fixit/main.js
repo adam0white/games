@@ -170,14 +170,22 @@ function begin(isDaily = false) {
   rec.start(daily ? { mode: 'daily', date: today } : { mode: 'day', unlocked: save.unlocked.length, shift: save.shifts + 1, tutorial, only });
   drain();
 }
+// Four fixed in a shift earns the next job, whether the shift ends or the player leaves it (note #150).
+function earnJob() {
+  if (only || daily || s.served < 4) return null;
+  const job = ORDER.find(k => !save.unlocked.includes(k)) ?? null;
+  if (job) { save.unlocked.push(job); save.pending = job; }
+  return job;
+}
 function finish() {
   playing = false; ended = performance.now();
   const why = s.over;
   save.shifts++; save.bank += s.coins; save.served += s.served;
-  const newBest = !daily && s.coins > save.best; if (!daily) save.best = Math.max(save.best, s.coins); // the daily stall keeps its own best per day save.bestStreak = Math.max(save.bestStreak, s.bestStreak);
+  const newBest = !daily && s.coins > save.best; if (!daily) save.best = Math.max(save.best, s.coins); // the daily stall keeps its own best per day
+  save.bestStreak = Math.max(save.bestStreak, s.bestStreak);
   let unlocked = null, dayBest = false;
   if (daily) { dayBest = !(today in save.days) || s.coins > save.days[today]; save.days[today] = Math.max(save.days[today] ?? 0, s.coins); save.days = Object.fromEntries(Object.entries(save.days).sort().slice(-30)); }
-  if (!only && !daily && s.served >= 4) { unlocked = ORDER.find(k => !save.unlocked.includes(k)) ?? null; if (unlocked) { save.unlocked.push(unlocked); save.pending = unlocked; } }
+  unlocked = earnJob();
   store();
   rec.end('closed', { coins: s.coins, served: s.served, lost: s.lost, bestStreak: s.bestStreak, why, ...(daily ? { daily: today } : {}) });
   $('endTitle').textContent = daily ? (why === 'hearts' ? 'Daily stall: out of hearts' : 'Daily stall closed!') : why === 'hearts' ? 'Out of hearts' : 'Closed!';
@@ -193,6 +201,7 @@ function finish() {
 function quit() {
   if (!s || !playing) { show('menu'); return; }
   rec.end('left', { coins: s.coins, served: s.served, lost: s.lost, bestStreak: s.bestStreak, why: 'menu' });
+  save.bank += s.coins; save.served += s.served; earnJob(); store(); // a shift left early keeps its coins, and its new job if 4 were fixed (tester t1, note #150); it does not count as a shift or a best
   playing = false; paused = false; snd.release(); show('menu');
 }
 
