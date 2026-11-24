@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#292941">
+<title>Tiptoe Museum</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<main id="stage">
+  <canvas id="floor" aria-label="Museum floor"></canvas>
+  <div id="hud" hidden>
+    <div id="lives" role="img" aria-label="Three escapes left"><i></i><i></i><i></i></div>
+    <canvas id="clock" width="236" height="100" aria-label="Clock"></canvas>
+    <button id="pause" aria-label="Pause"><span></span><span></span></button>
+    <output id="longClock" hidden></output>
+  </div>
+
+  <section class="screen" id="menu" aria-label="Main menu">
+    <div class="panel">
+      <canvas id="poster" class="poster" width="680" height="364" aria-hidden="true"></canvas>
+      <h1>Tiptoe Museum</h1>
+      <div class="progress" id="progress" aria-label="Night progress"></div>
+      <button class="primary" id="play"><span>Play</span><small aria-hidden="true" id="nightNumber"></small></button>
+      <div class="row">
+        <button id="long"><span>Long Night</span><small id="best"></small></button>
+        <button id="daily"><span>Daily</span><small id="streak"></small></button>
+      </div>
+      <button class="quiet audio" id="menuSound"></button>
+    </div>
+  </section>
+
+  <section class="screen overlay" id="paused" aria-label="Pause menu">
+    <div class="panel compact">
+      <div class="motif" aria-hidden="true">Ⅱ</div>
+      <h2>Paused</h2>
+      <button class="primary" id="resume">Resume</button>
+      <div class="row">
+        <button id="toMenu">Menu</button>
+        <button class="audio" id="pauseSound"></button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen overlay" id="result" aria-label="Night result">
+    <div class="panel compact">
+      <canvas id="resultPoster" class="poster" width="680" height="364" aria-hidden="true"></canvas>
+      <h2 id="outcome"></h2>
+      <p id="medals" aria-live="polite"></p>
+      <button id="again" class="primary"></button>
+      <div class="row">
+        <button id="resultMenu">Menu</button>
+        <button id="share" hidden>Share</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen overlay" id="shareCard" aria-label="Daily share card">
+    <div class="panel compact">
+      <canvas id="dailyPoster" class="poster" width="680" height="364" role="img" aria-label="Daily result and streak"></canvas>
+      <div class="row shareActions">
+        <button id="closeShare">Back</button>
+        <button id="saveCard" class="primary">Save</button>
+      </div>
+    </div>
+  </section>
+</main>
+<script type="module" src="./game.js"></script>
+<script src="/notes/button.js" defer></script>
+</body>
+</html>

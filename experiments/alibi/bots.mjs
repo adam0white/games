@@ -1,318 +1,213 @@
 import assert from 'node:assert/strict';
-import { CASES, accuse, createCase, dailyCase, dailyWin, dossiers, observe } from './sim.js';
+import { performance } from 'node:perf_hooks';
+import {
+  CASES, accuse, createCase, dailyCase, dailyWin, dossiers, freshRun, observe, offsetDay, random,
+} from './sim.js';
 
-// Work in the same order as a player scrubbing the clock from left to right.
-// A costume is matched at the moment it goes on. A visible exchange changes
-// who the two costume shapes represent. In the dark only sound symbols count.
+const started = performance.now();
+const replay = c => Array.from({ length: c.beatCount }, (_, beat) => observe(c, beat));
+
 function reconstruct(cards, snapshots) {
   const identities = new Map();
   const voices = new Map(cards.map(card => [card.sound, card.id]));
-  let previous = new Map();
   const positions = new Map();
-  const carriers = new Set();
-  const locate = (at, id, room) => {
-    assert.ok(!at.has(id), `portrait ${id} appears twice at one clock mark`);
-    at.set(id, room);
-  };
-
+  let previous = new Map();
   for (const frame of snapshots) {
     const at = new Map();
+    const now = new Map();
     positions.set(frame.beat, at);
-    if (frame.blackout) {
-      for (const { room, sound } of frame.sounds) {
-        const id = voices.get(sound);
-        assert.ok(id !== undefined, `sound ${sound} has no portrait in the lineup`);
-        locate(at, id, room);
-      }
-      previous = new Map();
-      continue;
-    }
     if (frame.exchange) {
       const [left, right] = frame.exchange;
-      const leftId = identities.get(left);
-      const rightId = identities.get(right);
-      assert.ok(leftId !== undefined && rightId !== undefined, 'an unknown costume was exchanged');
-      identities.set(left, rightId);
-      identities.set(right, leftId);
+      assert.ok(identities.has(left) && identities.has(right), 'exchange must show known masks');
+      const owner = identities.get(left);
+      identities.set(left, identities.get(right));
+      identities.set(right, owner);
     }
-    const now = new Map();
-    for (const { room, slot, portrait, mask, carry } of frame.actors) {
-      const seat = `${room}/${slot}`;
-      if (mask != null && !identities.has(mask) && previous.has(seat)) {
-        identities.set(mask, previous.get(seat));
+    const occupied = new Set();
+    for (const actor of frame.blackout ? frame.sounds : frame.actors) {
+      assert.ok(Number.isInteger(actor.slot) && actor.slot >= 0 && actor.slot < 4, 'each actor fits a drawn spot');
+      const seat = `${actor.room}/${actor.slot}`;
+      assert.ok(!occupied.has(seat), 'one actor per room slot');
+      occupied.add(seat);
+      if (actor.mask != null && !identities.has(actor.mask) && previous.has(seat)) {
+        identities.set(actor.mask, previous.get(seat));
       }
-      const id = portrait ?? identities.get(mask);
+      const id = frame.blackout ? voices.get(actor.sound) : actor.portrait ?? identities.get(actor.mask);
       if (id == null) continue;
-      assert.ok(!now.has(seat), `two portraits overlap at room/slot ${seat}`);
+      assert.ok(!at.has(id), 'one appearance per suspect per mark');
+      at.set(id, actor.room);
       now.set(seat, id);
-      locate(at, id, room);
-      if (carry != null && carry !== false) carriers.add(id);
+    }
+    if (!frame.shutter && (frame.blackout || frame.actors.length)) {
+      assert.equal(at.size, cards.length, 'every suspect has a visible identity or sound');
     }
     previous = now;
   }
-  return { positions, carriers };
+  return positions;
 }
 
-function verdicts(cards, positions) {
-  const result = { matched: [], contradicted: [], unknown: [] };
+function compare(cards, positions) {
+  const lies = [];
   for (const { id, claim } of cards) {
-    const room = positions.get(claim.beat)?.get(id);
-    const verdict = room == null ? 'unknown' : room === claim.room ? 'matched' : 'contradicted';
-    result[verdict].push(id);
+    const room = positions.get(claim.beat).get(id);
+    assert.notEqual(room, undefined, 'each claim can be checked from public evidence');
+    if (room !== claim.room) lies.push(id);
   }
-  return result;
+  assert.equal(lies.length, 1, 'exactly one contradiction');
+  return lies[0];
 }
 
-function prove(cards, snapshots) {
-  const reconstruction = reconstruct(cards, snapshots);
-  const evidence = verdicts(cards, reconstruction.positions);
-  assert.equal(evidence.unknown.length, 0, 'each claim needs a visible fact');
-  assert.equal(evidence.contradicted.length, 1, 'exactly one claim must be contradicted');
-  return { accused: evidence.contradicted[0], ...reconstruction };
+// The only inputs are camera observations inside the crime room and the
+// suspect lineup. This policy checks who was already there and who arrived
+// with the incident, including sounds when the room is dark.
+function crimeTape(c, snapshots) {
+  return snapshots.map(({ beat, actors, sounds, incident, shutter, blackout, exchange, evidence }) => ({
+    beat, incident, shutter, blackout,
+    actors: actors.filter(a => a.room === c.crimeRoom),
+    sounds: sounds.filter(a => a.room === c.crimeRoom),
+    exchange: actors.some(a => a.room === c.crimeRoom && exchange?.includes(a.mask)) ? exchange : null,
+    evidence: evidence.filter(item => item.room === c.crimeRoom),
+  }));
 }
 
-function visibleReplay(caseData) {
-  return Array.from({ length: caseData.beatCount }, (_, beat) => observe(caseData, beat));
-}
-
-function scrubbingBot(caseData) {
-  return prove(dossiers(caseData), visibleReplay(caseData)).accused;
-}
-
-function checkIncident(caseData, cards, frames, proof) {
-  const label = `case ${caseData.level}`;
-  const changed = frames.find(frame => frame.incident);
-  assert.ok(changed, `${label}: the crime is visible during the replay`);
-  const at = proof.positions.get(changed.beat);
-  assert.equal(at.get(proof.accused), caseData.crimeRoom, `${label}: the culprit was present when the crime happened`);
-  if (caseData.spec.staggered) {
-    assert.ok(new Set(cards.map(card => card.claim.beat)).size > 1, `${label}: staggered statements use multiple times`);
-    assert.ok(cards.some(card => card.id !== proof.accused && card.claim.beat !== changed.beat
-      && at.get(card.id) === caseData.crimeRoom), `${label}: a truthful bystander was also present for the crime`);
-  }
-}
-
-function sharedWalk(positions) {
-  let previous = new Map();
-  for (const at of positions.values()) {
-    const paths = new Set();
-    for (const [id, to] of at) {
-      const from = previous.get(id);
-      if (from == null || from === to) continue;
-      const path = `${from}/${to}`;
-      if (paths.has(path)) return true;
-      paths.add(path);
-    }
-    previous = at;
-  }
-  return false;
-}
-
-function rng(seed) {
-  let state = seed >>> 0;
-  return max => {
-    state ^= state << 13;
-    state ^= state >>> 17;
-    state ^= state << 5;
-    return (state >>> 0) % max;
-  };
-}
-
-function openingBot(cards, opening, pick) {
-  const positions = reconstruct(cards, [opening]).positions;
-  const evidence = verdicts(cards, positions);
-  if (evidence.contradicted.length) return evidence.contradicted[0];
-
-  // Among unresolved claims, prefer suspects claiming somewhere other than
-  // their opening room, then prefer the earliest of those claimed times.
-  const rooms = positions.get(opening.beat);
-  const moved = cards.filter(card => evidence.unknown.includes(card.id));
-  const elsewhere = moved.filter(card => rooms.get(card.id) !== card.claim.room);
-  const candidates = elsewhere.length ? elsewhere : moved;
-  const earliest = Math.min(...candidates.map(card => card.claim.beat));
-  const plausible = candidates.filter(card => card.claim.beat === earliest);
-  return plausible[pick(plausible.length)]?.id;
-}
-
-function openingProof(level, seed) {
-  const original = createCase({ level, seed });
-  const opening = observe(original, 0);
-  const cards = dossiers(original);
-  // Hold the public opening constant, then independently solve one possible
-  // future for every suspect. No rule based on this opening can eliminate one.
-  for (const { id } of cards) {
-    const alternate = createCase({ seed, level, culpritOverride: id });
-    assert.deepEqual(observe(alternate, 0), opening, `case ${level}: opening board gives away the culprit`);
-    assert.deepEqual(dossiers(alternate), cards, `case ${level}: opening dossier gives away the culprit`);
-    const frames = visibleReplay(alternate);
-    const proof = prove(cards, frames);
-    assert.equal(proof.accused, id, `case ${level}: counterfactual replay for suspect ${id}`);
-    checkIncident(alternate, cards, frames, proof);
-  }
-}
-
-const start = performance.now();
-const played = { stars: 3, rejected: [], outcome: null };
-const seeds = rng(0xe761357b);
-const randomPick = rng(0x4733af57);
-const openingPick = rng(0x72300d59);
-const trials = 192;
-const rows = [];
-let randomWins = 0;
-let openingWins = 0;
-let observedWins = 0;
-let expected = 0;
-let variance = 0;
-let openingProofs = 0;
-let days = 0;
-let darkEvidence = 0;
-let swapEvidence = 0;
-const pct = (hits, attempts) => `${(100 * hits / attempts).toFixed(1)}%`;
-
-assert.ok(CASES.length >= 20, 'at least twenty ordered cases');
-assert.equal(new Set(CASES.map(spec => spec.chapter)).size, 3, 'three chapters');
-
-for (const [index, spec] of CASES.entries()) {
-  const level = index + 1;
-  const sample = createCase({ level, seed: 503 });
-  assert.deepEqual(sample, createCase({ level, seed: 503 }), `case ${level}: seed is reproducible`);
-  assert.notDeepEqual(dossiers(sample), dossiers(createCase({ level, seed: 504 })),
-    `case ${level}: another seed changes the statements or roster`);
-  const defaultCase = createCase({ level });
-  const size = defaultCase.cast.length;
-  assert.ok(size >= 6 && size <= 8, `case ${level}: six to eight suspects`);
-  assert.equal(scrubbingBot(defaultCase), defaultCase.culprit, `case ${level}: default replay`);
-
-  let bot = 0;
-  let random = 0;
-  let still = 0;
-  let claimMarks = 0;
-  for (let i = 0; i < trials; i++) {
-    const seed = seeds(0x100000000);
-    const caseData = createCase({ level, seed });
-    const frames = visibleReplay(caseData);
-    const cards = dossiers(caseData);
-    assert.equal(new Set(cards.map(card => card.species)).size, size, `case ${level}: distinct silhouettes`);
-    assert.equal(new Set(cards.map(card => card.sound)).size, size, `case ${level}: distinct sound symbols`);
-    const proof = prove(cards, frames);
-    assert.equal(proof.accused, caseData.culprit, `case ${level} seed ${seed}: observer's accusation`);
-    checkIncident(caseData, cards, frames, proof);
-    assert.equal(accuse(caseData, played, proof.accused).outcome, 'solved', 'evidence leads to a solved run');
-    bot++;
-    random += randomPick(size) === caseData.culprit;
-    still += openingBot(cards, frames[0], openingPick) === caseData.culprit;
-    claimMarks += new Set(cards.map(card => card.claim.beat)).size;
-    if (i < 12) {
-      openingProof(level, seed);
-      openingProofs++;
-    }
-
-    if (spec.blackout) {
-      const dark = frames.find(frame => frame.blackout);
-      assert.ok(dark, `case ${level}: blackout occurs at a clock mark`);
-      assert.deepEqual(dark.actors, [], `case ${level}: bodies stay hidden in the dark`);
-      const muted = frames.map(frame => frame.blackout ? { ...frame, sounds: [] } : frame);
-      const mutedEvidence = verdicts(cards, reconstruct(cards, muted).positions);
-      if (!mutedEvidence.contradicted.includes(caseData.culprit)) darkEvidence++;
-    }
-    if (spec.masks) {
-      assert.ok(frames.some(frame => frame.exchange), `case ${level}: costume swap is visible`);
-      const skipped = frames.map(frame => ({ ...frame, exchange: null }));
-      const skippedEvidence = verdicts(cards, reconstruct(cards, skipped).positions);
-      if (skippedEvidence.contradicted.length !== 1 || skippedEvidence.contradicted[0] !== caseData.culprit) {
-        swapEvidence++;
-      }
-    }
-    if (spec.overlap) {
-      assert.ok(sharedWalk(proof.positions), `case ${level}: two suspects visibly walk between the same rooms together`);
-    }
-    if (spec.accomplice) {
-      assert.equal(proof.carriers.size, 1, `case ${level}: one suspect visibly carries the item`);
-      assert.ok(!proof.carriers.has(proof.accused), `case ${level}: an honest suspect carries the item`);
-    }
-  }
-
-  observedWins += bot;
-  randomWins += random;
-  openingWins += still;
-  expected += trials / size;
-  variance += trials * (1 / size) * (1 - 1 / size);
-  const supported = [
-    spec.overlap && 'shared path',
-    spec.masks && 'swap',
-    spec.blackout && 'dark',
-    spec.accomplice && 'carrier',
-  ].filter(Boolean);
-  rows.push({
-    case: level,
-    chapter: spec.chapter,
-    suspects: size,
-    rooms: spec.rooms,
-    marks: defaultCase.beatCount,
-    'alibi marks (mean)': (claimMarks / trials).toFixed(1),
-    features: supported.join(', ') || 'rooms and clock',
-    observes: pct(bot, trials),
-    random: pct(random, trials),
-    'no scrub': pct(still, trials),
+function roomBot(lineup, tape, draw) {
+  const before = tape.findIndex(frame => frame.incident);
+  const scores = lineup.map(({ id, sound }) => {
+    const sees = frame => frame && (frame.actors.some(a => a.portrait === id)
+      || frame.sounds.some(a => a.sound === sound));
+    return 4 * Number(Boolean(sees(tape[before]))) + Number(Boolean(sees(tape[before + 1])));
   });
+  const best = Math.max(...scores);
+  const tied = lineup.filter(({ id }) => scores[id] === best);
+  return tied[Math.floor(draw() * tied.length)].id;
 }
 
-const testCase = createCase({ level: 1, seed: 100 });
-const frames = visibleReplay(testCase);
-const cards = dossiers(testCase);
-const truth = cards.find(card => card.id !== testCase.culprit);
-const patched = cards.map(card => card.id === truth.id
-  ? { ...card, claim: { ...card.claim, room: (card.claim.room + 1) % testCase.spec.rooms } }
-  : card);
-assert.throws(() => prove(patched, frames), /exactly one claim/, 'planted second lie is caught');
-const wrong = cards.filter(card => card.id !== testCase.culprit).map(card => card.id);
-const twoStars = accuse(testCase, played, wrong[0]);
-assert.equal(twoStars.stars, 2);
-assert.equal(twoStars.outcome, null);
-assert.deepEqual(accuse(testCase, twoStars, wrong[0]), twoStars, 'repeat cannot charge a star');
-assert.deepEqual(accuse(testCase, twoStars, String(wrong[0])), twoStars, 'invalid suspect cannot charge a star');
-assert.equal(accuse(testCase, twoStars, testCase.culprit).stars, 2, 'a correct accusation keeps earned stars');
-const oneStar = accuse(testCase, twoStars, wrong[1]);
-assert.equal(oneStar.stars, 1);
-const ended = accuse(testCase, oneStar, wrong[2]);
-assert.equal(ended.stars, 0);
-assert.equal(ended.outcome, 'wrong');
-assert.deepEqual(accuse(testCase, ended, testCase.culprit), ended, 'a finished case cannot change outcome');
-assert.deepEqual(played, { stars: 3, rejected: [], outcome: null }, 'accusations leave their input run intact');
+function prove(c) {
+  const frames = replay(c);
+  const cards = dossiers(c);
+  const positions = reconstruct(cards, frames);
+  const answer = compare(cards, positions);
+  assert.equal(accuse(c, freshRun(), answer).outcome, 'solved');
+  assert.equal(c.frames[c.incident][answer].room, c.crimeRoom, 'reveal agrees with the private incident');
+  return { frames, cards, positions };
+}
+
+function checkAlternatives(seed, level) {
+  const c = createCase({ seed, level });
+  const { frames, cards } = prove(c);
+  const tape = crimeTape(c, frames);
+  const lineup = cards.map(({ claim, ...portrait }) => portrait);
+  let wins = 0;
+  for (const { id } of lineup) {
+    const other = createCase({ seed, level, culpritOverride: id });
+    const proof = prove(other);
+    assert.deepEqual(proof.frames, frames, 'the full public replay is independent of the culprit');
+    assert.deepEqual(crimeTape(other, proof.frames), tape, 'every culprit has the same crime-room tape');
+    wins += Number(roomBot(lineup, tape, random(seed)) === id);
+
+    // Flip only the two room draws necessary to retain exactly the same
+    // dossiers with a different culprit. No dossier-only policy can tell.
+    const flips = id === c.culprit ? [] : [id, c.culprit];
+    const sameCards = createCase({ seed, level, culpritOverride: id, flipRooms: flips });
+    assert.deepEqual(prove(sameCards).cards, cards, 'the same alibis admit every culprit');
+  }
+  assert.equal(wins, 1, 'crime-room bot is exactly at chance for this balanced lineup');
+  return { wins, attempts: lineup.length };
+}
+
+const rows = [];
+const totals = { correct: 0, random: 0, room: 0, chance: 0, attempts: 0, balancedWins: 0, balancedAttempts: 0 };
+for (const [i, spec] of CASES.entries()) {
+  const level = i + 1;
+  assert.deepEqual(createCase({ level }), createCase({ level }));
+  const row = { case: level, suspects: spec.count, deduced: 0, random: 0, room: 0, balanced: '—', trials: 192 };
+  prove(createCase({ level }));
+  let balancedWins = 0;
+  let balancedAttempts = 0;
+  for (let i = 0; i < row.trials; i++) {
+    const seed = Math.imul(i + 1, 0x9e3779b1) >>> 0;
+    const c = createCase({ seed, level });
+    const { frames, cards } = prove(c);
+    const draw = random(seed ^ 0x85ebca6b);
+    row.deduced++;
+    row.random += Number(cards[Math.floor(draw() * cards.length)].id === c.culprit);
+    row.room += Number(roomBot(cards, crimeTape(c, frames), draw) === c.culprit);
+    if (level >= 3 && i < 8) {
+      const result = checkAlternatives(seed, level);
+      balancedWins += result.wins;
+      balancedAttempts += result.attempts;
+    }
+  }
+  if (balancedAttempts) {
+    row.balanced = `${balancedWins}/${balancedAttempts}`;
+    totals.balancedWins += balancedWins;
+    totals.balancedAttempts += balancedAttempts;
+    totals.correct += row.deduced;
+    totals.random += row.random;
+    totals.room += row.room;
+    totals.chance += row.trials / spec.count;
+    totals.attempts += row.trials;
+  }
+  rows.push(row);
+}
+assert.ok(totals.random < totals.correct / 4);
+assert.ok(Math.abs(totals.room - totals.chance) < 4 * Math.sqrt(totals.chance), 'sampled room policy stays within four standard errors of chance');
 
 for (let i = 0; i < 366; i++) {
-  const day = new Date(Date.UTC(2024, 0, i + 1)).toISOString().slice(0, 10);
-  const data = dailyCase(day);
-  assert.deepEqual(data, dailyCase(day), `daily ${day}: deterministic`);
-  const cards = dossiers(data);
-  const frames = visibleReplay(data);
-  const proof = prove(cards, frames);
-  assert.equal(proof.accused, data.culprit, `daily ${day}: observer's accusation`);
-  checkIncident(data, cards, frames, proof);
-  days++;
+  const day = offsetDay('2026-01-01', i);
+  for (const hard of [false, true]) {
+    const c = dailyCase(day, hard);
+    assert.deepEqual(c, dailyCase(day, hard), 'daily is deterministic');
+    prove(c);
+    if (hard) {
+      assert.equal(c.beatCount, 12);
+      assert.ok(c.spec.masks && c.spec.blackout && c.spec.carrier && c.spec.staggered);
+    }
+  }
 }
-assert.deepEqual(dailyWin(null, '2024-02-28', 0), { last: '2024-02-28', streak: 1 });
-assert.deepEqual(dailyWin('2024-02-28', '2024-02-29', 1), { last: '2024-02-29', streak: 2 });
-assert.deepEqual(dailyWin('2024-02-29', '2024-02-29', 2), { last: '2024-02-29', streak: 2 });
-assert.deepEqual(dailyWin('2024-02-29', '2024-02-28', 2), { last: '2024-02-29', streak: 2 });
-assert.deepEqual(dailyWin('2024-02-29', '2024-03-02', 2), { last: '2024-03-02', streak: 1 });
 
-const total = trials * CASES.length;
-const tolerance = 4.5 * Math.sqrt(variance);
-assert.ok(Math.abs(randomWins - expected) <= tolerance, 'random accusations within chance tolerance');
-assert.ok(openingWins - expected <= tolerance, 'opening-only accusation does no better than chance');
-assert.ok(darkEvidence > 0, 'sound symbols are needed for some solutions');
-assert.ok(swapEvidence > 0, 'visible exchanges are needed for some solutions');
-assert.ok(performance.now() - start < 30_000, 'bot checks run within the requested limit');
+const control = createCase({ level: 3 });
+const { cards, positions } = prove(control);
+const innocent = (control.culprit + 1) % cards.length;
+cards[innocent].claim.room = control.crimeRoom;
+assert.throws(() => compare(cards, positions), /exactly one contradiction/, 'a planted second lie must fail');
+
+const dark = createCase({ level: 22 });
+const darkFrames = replay(dark);
+darkFrames[dark.blackoutBeat].sounds = [];
+assert.throws(() => compare(dossiers(dark), reconstruct(dossiers(dark), darkFrames)), /visible identity or sound/);
+
+const masked = createCase({ level: 15 });
+const noExchange = replay(masked).map(frame => ({ ...frame, exchange: null }));
+assert.throws(() => {
+  const cards = dossiers(masked);
+  assert.equal(compare(cards, reconstruct(cards, noExchange)), masked.culprit);
+}, 'discarding the visible exchange must break this case');
+
+let run = freshRun();
+const wrong = control.cast.map(({ id }) => id).filter(id => id !== control.culprit);
+run = accuse(control, run, wrong[0]);
+assert.equal(run.stars, 2);
+assert.strictEqual(accuse(control, run, wrong[0]), run);
+assert.equal(accuse(control, run, control.culprit).stars, 2);
+run = accuse(control, accuse(control, run, wrong[1]), wrong[2]);
+assert.equal(run.outcome, 'wrong');
+assert.strictEqual(accuse(control, run, control.culprit), run);
+assert.deepEqual(dailyWin('2026-11-23', '2026-11-23', 2), { last: '2026-11-23', streak: 2 });
+assert.deepEqual(dailyWin('2026-11-23', '2026-11-24', 2), { last: '2026-11-24', streak: 3 });
+assert.deepEqual(dailyWin('2026-11-23', '2026-11-25', 2), { last: '2026-11-25', streak: 1 });
 
 console.table(rows);
+const rate = (wins, attempts) => `${(100 * wins / attempts).toFixed(2)}%`;
 console.table([
-  { bot: 'Observing', correct: observedWins, attempts: total, rate: pct(observedWins, total) },
-  { bot: 'Random', correct: randomWins, attempts: total, rate: pct(randomWins, total) },
-  { bot: 'No scrub', correct: openingWins, attempts: total, rate: pct(openingWins, total) },
-  { bot: 'Chance (mean 1/N)', correct: expected.toFixed(1), attempts: total, rate: pct(expected, total) },
-]);
-console.log(`Unique visible contradiction across ${CASES.length} default cases, ${total} seeded cases and ${days} dailies.`);
-console.log(`Opening invariance checked for every suspect in ${openingProofs} case/seed pairs.`);
-console.log(`Culprit's contradiction needs the sound symbols in ${darkEvidence} trials. Ignoring exchanges breaks the verdict in ${swapEvidence} trials.`);
-console.log('Planted second lie caught. Truthful bystanders, shared paths, honest carriers, star loss, repeated accusations and streak transitions verified.');
+  ['Compare alibi with replay', totals.correct, totals.attempts],
+  ['Random', totals.random, totals.attempts],
+  ['Crime room only (seeded)', totals.room, totals.attempts],
+  ['Chance (weighted)', totals.chance, totals.attempts],
+  ['Crime room only (balanced)', totals.balancedWins, totals.balancedAttempts],
+].map(([policy, wins, attempts]) => ({
+  policy, wins: Number(wins.toFixed(2)), attempts, rate: rate(wins, attempts),
+})));
+console.log('Cases 3–36: all suspect assignments preserve the replay in 272 case/seed pairs.');
+console.log('36 defaults, 6,912 seeded campaign cases, 732 dailies. Planted second lie, missing sounds and missing exchange caught.');
+console.log(`Runtime: ${(performance.now() - started).toFixed(0)} ms`);

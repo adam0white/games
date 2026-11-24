@@ -10,6 +10,7 @@
     { "slug": "breath", "name": "Hold Your Breath", "fresh": true },
     { "slug": "matchmaker", "name": "Good Match", "fresh": true },
     { "slug": "sling", "name": "Seed Sling", "fresh": true },
+    { "slug": "nightshift", "name": "Tiptoe Museum", "fresh": true },
     { "slug": "alibi", "name": "Alibi", "fresh": true },
     { "slug": "borrowed", "name": "Borrowed Time", "fresh": true },
     { "slug": "grapevine", "name": "Grapevine", "fresh": true },
