@@ -1,6 +1,6 @@
 // Phone smoke test for Grapevine: node experiments/grapevine/check.mjs [webkit|chromium]
-// Serves experiments/ on a free port, answers /notes/button.js with an empty script and the lab endpoint
-// itself, and plays real levels with touch pointer events on WebKit (iPhone 13) and Chromium (Pixel 7).
+// Serves experiments/ and the notes button on a free port, answers the lab endpoint locally,
+// and plays real levels with touch pointer events on WebKit (iPhone 13) and Chromium (Pixel 7).
 // Screenshots go to $SHOTS (default: a folder in the system temp directory, not the repo).
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
@@ -14,11 +14,15 @@ import { solve, walk, step, startState } from './sim.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = process.env.SHOTS || join(tmpdir(), 'grapevine-shots');
-await mkdir(SHOTS, { recursive: true });
+const WORD_SHOTS = process.env.WORD_SHOTS || join(SHOTS, 'words-grapevine');
+await Promise.all([mkdir(SHOTS, { recursive: true }), mkdir(WORD_SHOTS, { recursive: true })]);
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
-  if (url.pathname === '/notes/button.js') { res.writeHead(200, { 'content-type': 'text/javascript' }); return res.end(''); }
+  if (url.pathname === '/notes/button.js') {
+    const script = await readFile(join(root, '../workers/feedback/public/notes/button.js'));
+    res.writeHead(200, { 'content-type': 'text/javascript' }); return res.end(script);
+  }
   let file = join(root, normalize(decodeURIComponent(url.pathname)));
   if (url.pathname.endsWith('/')) file = join(file, 'index.html');
   try {
@@ -202,11 +206,11 @@ async function chapters(page, phone) {
   const picture = preview.locator('canvas');
   const bounds = await picture.boundingBox();
   assert.ok(bounds?.width >= 250 && bounds.height >= 140, 'share: preview large enough to read');
-  const captionSize = await picture.evaluate(c => {
+  const titleSize = await picture.evaluate(c => {
     const ctx = c.getContext('2d');
-    return 12 * c.getBoundingClientRect().width * ctx.getTransform().a / c.width;
+    return 16 * c.getBoundingClientRect().width * ctx.getTransform().a / c.width;
   });
-  assert.ok(captionSize >= 11, `postcard captions render at least 11 CSS pixels (${captionSize})`);
+  assert.ok(titleSize >= 14, `postcard date and village render at least 14 CSS pixels (${titleSize})`);
   await page.evaluate(() => {
     window.__shared = [];
     Object.defineProperty(navigator, 'canShare', { configurable: true, value: d => !!d.files });
@@ -251,7 +255,8 @@ async function chapters(page, phone) {
   await page.evaluate(([a, b, c]) => { const s = JSON.parse(localStorage.getItem('grapevine-save')); s.daily = { [a]: 3, [b]: 1, [c]: 2 }; localStorage.setItem('grapevine-save', JSON.stringify(s)); }, [day(1), day(2), day(4)]);
   await page.goto(`${base}/grapevine/`); await until(page, () => window.grapevineState, 'state hook');
   assert.equal((await state(page)).streak, 2, 'yesterday and the day before: a streak of 2');
-  assert.match(await page.textContent('#daily'), /2 days/);
+  assert.match(await page.locator('#daily').getAttribute('aria-label'), /2 days/);
+  assert.match(await page.textContent('#daily'), /🔥 2/);
   await page.evaluate(([a, c]) => { const s = JSON.parse(localStorage.getItem('grapevine-save')); s.daily = { [a]: 3, [c]: 2 }; localStorage.setItem('grapevine-save', JSON.stringify(s)); }, [day(1), day(3)]);
   await page.reload(); await until(page, () => window.grapevineState, 'state hook');
   assert.equal((await state(page)).streak, 1, 'a gap breaks the streak');
@@ -294,7 +299,8 @@ async function boardInk(page, region, rgb) {
   return page.evaluate(([region, rgb]) => {
     const canvas = document.querySelector('#c'), ctx = canvas.getContext('2d');
     const scale = canvas.width / canvas.clientWidth, middle = canvas.clientWidth / 2;
-    const box = region === 'check' ? [middle - 12, 20, 24, 25] : [0, 80, canvas.clientWidth, 90];
+    const box = Array.isArray(region) ? region :
+      region === 'check' ? [middle - 12, 20, 24, 25] : [0, 80, canvas.clientWidth, 90];
     const data = ctx.getImageData(...box.map(n => Math.round(n * scale))).data;
     for (let i = 0; i < data.length; i += 4) {
       if (rgb.every((c, k) => data[i + k] === c)) return true;
@@ -304,17 +310,28 @@ async function boardInk(page, region, rgb) {
 }
 
 async function boardFeedback(page) {
-  const visibleCopy = () => page.locator('#boardCue:visible').allTextContents().then(parts => parts.join(' '));
+  const accessibleCue = () => page.textContent('#boardCue');
+  const painted = () => page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
   const misses = [];
   const expect = (condition, message) => { if (!condition) misses.push(message); };
+  const gold = [255, 224, 122], plate = [69, 51, 80], cream = [255, 244, 220];
+  const near = ({ x, y }) => [x - 43, y - 43, 86, 86];
+  const center = page.viewportSize().width / 2;
   await page.goto(`${base}/grapevine/?level=1`);
   await page.click('#play');
   let st = await state(page);
-  expect(/Tap.*red hat/i.test(await visibleCopy()), 'first tap identifies the red hat');
+  const painter = st.nodes.find(n => n.kind === 'paint');
+  await painted();
+  expect(await boardInk(page, near(painter), gold), 'first tap rings the red hat on the board');
+  expect(/Tap.*red hat/i.test(await accessibleCue()), 'screen reader instruction identifies the red hat');
   await tap(page, st.nodes[st.from]); // a plausible first touch should not dismiss the instruction
-  expect(/Tap.*red hat/i.test(await visibleCopy()), 'instruction survives tapping the teller');
-  await tap(page, st.nodes.find(n => n.kind === 'paint'));
-  expect(/tap.*listener/i.test(await visibleCopy()), 'next instruction identifies the listener');
+  await painted();
+  expect(await boardInk(page, near(painter), gold), 'painter highlight survives tapping the teller');
+  await tap(page, painter);
+  await painted();
+  expect(await boardInk(page, near(st.nodes[st.to]), gold), 'next tap rings the listener');
+  expect(await boardInk(page, [center - 44, 88, 88, 31], plate), 'the colour change has a before-and-after plate');
+  expect(/tap.*listener/i.test(await accessibleCue()), 'screen reader instruction identifies the listener');
   await tap(page, st.nodes[st.to]);
   await until(page, () => window.grapevineState().hop > 0.05, 'sending has painted a frame');
   expect(await boardInk(page, 'check', [127, 224, 122]), 'the HUD keeps the match during delivery');
@@ -323,10 +340,15 @@ async function boardFeedback(page) {
   await page.click('#play');
   st = await state(page);
   const lv = await levelNow(page);
+  await painted();
+  expect(await boardInk(page, [center + 13, 11, 42, 43], gold), 'the second village highlights the wanted HUD token');
   const wrong = lv.nodes.findIndex(n => n.kind === 'paint' && n.arg !== lv.want.c);
   await tap(page, st.nodes[wrong]); await tap(page, st.nodes[lv.to]);
   await until(page, () => window.grapevineState().result === 'wrong', 'wrong delivery');
-  expect(/tap.*teller.*again/i.test(await visibleCopy()), 'wrong delivery explains a legal retry');
+  await painted();
+  expect(await boardInk(page, near(st.nodes[st.from]), gold), 'wrong delivery rings the teller for a legal retry');
+  expect(await boardInk(page, [st.nodes[st.from].x - 60, st.nodes[st.from].y - 4, 36, 38], plate), 'wrong delivery puts a reset icon by the teller');
+  expect(/tap.*teller.*again/i.test(await accessibleCue()), 'screen reader instruction explains the retry');
   const red = [232, 40, 59];
   expect(await boardInk(page, 'bubble', red), 'wrong delivery marks the rejected message');
   await tap(page, st.nodes[st.from]); await sleep(100);
@@ -336,10 +358,16 @@ async function boardFeedback(page) {
   st = await state(page);
   const swapRoute = solve(await levelNow(page)).best;
   await tap(page, st.nodes[swapRoute[1]]);
-  expect(/Swaps circles and squares/i.test(await visibleCopy()), 'active swap names its two shapes');
+  await painted();
+  expect(await boardInk(page, [center - 88, 88, 176, 31], plate), 'the swap shows an enlarged pair and a before-and-after');
+  expect(await boardInk(page, [center + 35, 102, 6, 2], cream), 'a changed token has an arrow between the two tokens');
+  expect(/Swaps circles and squares/i.test(await accessibleCue()), 'the accessible cue names the two shapes');
   await tap(page, st.nodes[swapRoute[2]]);
   await tap(page, st.nodes[swapRoute[3]]);
-  expect(/only triangles and stars swap/i.test(await visibleCopy()), 'unchanged shape explains the swap restriction');
+  await painted();
+  expect(!await boardInk(page, [center + 35, 102, 6, 2], cream)
+    && await boardInk(page, [center + 35, 99, 6, 2], cream), 'an unchanged token has an equals sign in place of the arrow');
+  expect(/only triangles and stars swap/i.test(await accessibleCue()), 'accessible cue explains the swap restriction');
   await tap(page, st.nodes[swapRoute[4]]);
   await until(page, () => window.grapevineState().screen === 'done', 'swap route solved');
   expect((await state(page)).shareText.includes('Swapsies! → Less! → No change → Heard it!'),
@@ -496,7 +524,8 @@ async function menuAndReload(page) {
   const footer = await page.locator('#menu .lab-notice').boundingBox();
   if (footer.y + footer.height > page.viewportSize().height) issues.push('recording notice is clipped');
   await page.locator('#tabs button').nth(1).tap();
-  if (!(await page.locator('#menu').innerText()).includes('Finish village 30')) issues.push('Winter unlock condition missing');
+  if (!/30 ✓ → 🔓/.test(await page.textContent('#unlockCue'))
+    || !/Finish village 30/.test(await page.textContent('#unlockStatus'))) issues.push('Winter unlock condition missing');
   await page.click('#play');
   const st = await state(page), lv = await levelNow(page), nextHop = solve(lv).best[1];
   await page.touchscreen.tap(st.nodes[nextHop].x, st.nodes[nextHop].y);
@@ -518,12 +547,252 @@ async function menuAndReload(page) {
   assert.deepEqual(issues, []);
 }
 
+// Read rendered text, accessible labels and text drawn on the visible canvases.
+async function localeSurface(page) {
+  return page.evaluate(() => {
+    const parts = [document.title], overflow = [];
+    const drawn = window.__grapevineDrawnText;
+    const roots = [document.body, ...document.body.querySelectorAll('*')];
+    const visible = el => el.getClientRects().length && getComputedStyle(el).visibility === 'visible';
+    for (const el of roots.filter(visible)) {
+      for (const attr of ['aria-label', 'title', 'alt', 'placeholder']) {
+        if (el.hasAttribute(attr)) parts.push(el.getAttribute(attr));
+      }
+      for (const node of el.childNodes) if (node.nodeType === Node.TEXT_NODE) parts.push(node.textContent);
+      if (el instanceof HTMLTextAreaElement) parts.push(el.value);
+      if (el instanceof HTMLCanvasElement) parts.push(...(drawn.get(el) ?? []));
+      if (el.namespaceURI !== 'http://www.w3.org/1999/xhtml' || el.closest('[hidden]')) continue;
+      const style = getComputedStyle(el);
+      if (style.clip !== 'auto' || style.clipPath === 'inset(50%)') continue;
+      const { left, right, top, bottom, width, height } = el.getBoundingClientRect();
+      if (!width || !height) continue;
+      const label = el.id ? `#${el.id}` : el.className || el.localName;
+      if (left < -2 || top < -2 || right > innerWidth + 2 || bottom > innerHeight + 2) {
+        overflow.push(`${label} [${[left, top, right, bottom].map(Math.round).join(', ')}]`);
+      }
+      if (el.matches('.screen > div, dialog') && (el.scrollWidth > el.clientWidth + 2 || el.scrollHeight > el.clientHeight + 2)) {
+        overflow.push(`${label} has clipped content`);
+      }
+    }
+    if (document.documentElement.scrollWidth > innerWidth + 2) overflow.push('horizontal page scroll');
+    return { parts: parts.map(part => part.replace(/\s+/gu, ' ').trim()).filter(Boolean), overflow };
+  });
+}
+
+function englishText(tables) {
+  const turkish = new Set(Object.values(tables.tr));
+  return Object.entries(tables.en).flatMap(([key, value]) => {
+    const template = value.replace(/\s+/gu, ' ').trim();
+    const literal = template.replace(/\{\w+\}/gu, '');
+    if (!/\p{L}/u.test(literal) || turkish.has(value)) return [];
+    const pattern = template.split(/(\{\w+\})/u).map(part => /^\{\w+\}$/u.test(part) ? '.+?' : RegExp.escape(part)).join('');
+    // Check full labels and sentences embedded in a longer aria-label or share result.
+    return [[key, new RegExp(literal.trim().includes(' ') ? `(?<![\\p{L}\\p{N}])${pattern}(?![\\p{L}\\p{N}])` : `^${pattern}$`, 'u')]];
+  });
+}
+
+async function localizedScreens(browser, device, phone) {
+  for (const lang of ['en', 'tr']) {
+    const context = await browser.newContext({ ...device, locale: 'en-US' });
+    const errors = [];
+    try {
+      await context.addInitScript(() => {
+        localStorage.setItem('notes.k', 'local-check');
+        const drawn = window.__grapevineDrawnText = new WeakMap();
+        for (const method of ['fillText', 'strokeText']) {
+          const original = CanvasRenderingContext2D.prototype[method];
+          CanvasRenderingContext2D.prototype[method] = function (...args) {
+            if (!drawn.has(this.canvas)) drawn.set(this.canvas, new Set());
+            drawn.get(this.canvas).add(String(args[0]));
+            return original.apply(this, args);
+          };
+        }
+      });
+      const page = await context.newPage();
+      page.on('pageerror', e => errors.push(String(e)));
+      page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+      const go = async (options = { hint: '0' }) => {
+        const query = new URLSearchParams({ lang, ...options });
+        await page.goto(`${base}/grapevine/?${query}`);
+        await until(page, () => window.grapevineState, 'localized state hook');
+      };
+      await go();
+      const tables = await page.evaluate(async () => (await import('./words.js')).tables);
+      assert.deepEqual(Object.keys(tables.en).sort(), Object.keys(tables.tr).sort(), 'English and Turkish keys match');
+      for (const key of Object.keys(tables.en)) {
+        for (const table of [tables.en, tables.tr]) assert.ok(table[key].trim(), `nonempty translation: ${key}`);
+        const fields = text => [...new Set(text.match(/\{\w+\}/gu) ?? [])].sort();
+        assert.deepEqual(fields(tables.en[key]), fields(tables.tr[key]), `translation keeps substitution fields: ${key}`);
+      }
+      const english = englishText(tables);
+      const take = async name => {
+        // Wait for the canvas and the browser compositor after switching screens.
+        await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+        await sleep(120);
+        assert.equal(await page.locator('html').getAttribute('lang'), lang, `${name}: document language`);
+        const path = join(lang === 'tr' ? WORD_SHOTS : SHOTS, `${phone}-${lang}-${name}.png`);
+        await page.screenshot({ path, animations: 'disabled' });
+        const { parts, overflow } = await localeSurface(page);
+        assert.deepEqual(overflow, [], `${phone} ${lang} ${name}: elements fit the viewport`);
+        if (lang === 'tr') {
+          const leftovers = parts.flatMap(part => english.filter(([, pattern]) => pattern.test(part)).map(([key]) => ({ key, part })));
+          assert.deepEqual(leftovers, [], `${name}: English text from the table`);
+        }
+      };
+      const globe = async (where, code) => {
+        const button = page.locator(`#language-${where}`), box = await button.boundingBox();
+        assert.ok(box?.width >= 44 && box?.height >= 44, `${where}: language control is at least 44 px`);
+        assert.equal(await button.locator('.language-code').textContent(), code);
+        return button;
+      };
+      const finish = async (route, st) => {
+        for (const v of route.slice(1)) await tap(page, st.nodes[v]);
+        await until(page, () => window.grapevineState().screen === 'done', 'localized end card');
+        await until(page, () => document.querySelectorAll('#stars .on').length === 3, 'stars finished appearing');
+      };
+
+      await take('menu');
+      assert.equal(await page.locator('#notes-button').getAttribute('aria-label'), tables[lang].notes);
+      const menuGlobe = await globe('menu', lang.toUpperCase());
+      if (lang === 'tr') {
+        await menuGlobe.tap();
+        assert.equal(await page.locator('html').getAttribute('lang'), 'en');
+        assert.equal(await page.locator('#notes-button').getAttribute('aria-label'), tables.en.notes);
+        await page.reload();
+        await until(page, () => window.grapevineState, 'reload with the changed language in the address');
+        await globe('menu', 'EN');
+        await page.evaluate(() => {
+          const url = new URL(location.href);
+          url.searchParams.delete('lang');
+          history.replaceState(history.state, '', url);
+        });
+        await menuGlobe.tap();
+        assert.equal(await page.locator('html').getAttribute('lang'), 'tr');
+        await page.reload();
+        await until(page, () => window.grapevineState, 'reload without a language query');
+        assert.equal(new URL(page.url()).searchParams.get('lang'), null);
+        assert.equal(await page.locator('html').getAttribute('lang'), 'tr', 'language choice remembered on reload');
+        await globe('menu', 'TR');
+      }
+      await page.locator('#tabs button').nth(1).tap();
+      await take('locked-chapter');
+
+      await page.locator('#play').tap();
+      let st = await state(page);
+      assert.equal(st.level, 1);
+      await sleep(450);
+      await take('level1-teaching');
+      await tap(page, st.nodes.find(node => node.kind === 'paint'));
+      await sleep(450);
+      await take('level1-after-painter');
+      await page.locator('#pause').tap();
+      await take('pause');
+      const pauseGlobe = await globe('pause', lang.toUpperCase());
+      if (lang === 'tr') {
+        const before = await state(page);
+        await pauseGlobe.tap();
+        assert.equal(await page.locator('html').getAttribute('lang'), 'en');
+        assert.deepEqual((await state(page)).route, before.route);
+        assert.ok((await state(page)).paused, 'language switch keeps the pause screen');
+        await pauseGlobe.tap();
+        assert.equal(await page.locator('html').getAttribute('lang'), 'tr');
+      }
+      await page.locator('#resume').tap();
+      await tap(page, st.nodes[st.to]);
+      await until(page, () => document.querySelectorAll('#done.on #stars .on').length === 3, 'first win finished appearing');
+      await take('win');
+      await page.evaluate(() => {
+        Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('denied'); } } });
+      });
+      await page.locator('#share').tap();
+      await take('postcard');
+      await page.locator('#sendCard').tap();
+      await until(page, () => !document.querySelector('#manualShare').hidden, 'manual share fallback');
+      await take('postcard-copy');
+      await page.locator('#backToResult').tap();
+
+      await page.locator('#next').tap();
+      st = await state(page);
+      await take('level2-goal');
+      const lv2 = await levelNow(page);
+      const wrong = lv2.nodes.findIndex(n => n.kind === 'paint' && n.arg !== lv2.want.c);
+      await tap(page, st.nodes[wrong]);
+      await tap(page, st.nodes[st.to]);
+      await until(page, () => window.grapevineState().result === 'wrong', 'localized loss');
+      await sleep(350);
+      await take('loss');
+      await go({ level: '3', hint: '0' });
+      await page.locator('#play').tap();
+      await take('level3-goal');
+
+      await go({ level: '10', hint: '0' });
+      await page.locator('#play').tap();
+      st = await state(page);
+      const swapRoute = solve(await levelNow(page)).best;
+      await tap(page, st.nodes[swapRoute[1]]);
+      await take('swap');
+      for (const v of swapRoute.slice(2, 4)) await tap(page, st.nodes[v]);
+      await take('swap-unchanged');
+
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await go({ hint: 'hand' });
+      await page.locator('#play').tap();
+      await until(page, () => !!document.querySelector('.kit-hint.on.still'), 'localized reduced-motion hint');
+      await take('still-hint');
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+
+      await page.evaluate(() => {
+        const save = JSON.parse(localStorage.getItem('grapevine-save'));
+        save.opened = 60;
+        localStorage.setItem('grapevine-save', JSON.stringify(save));
+      });
+      await go({ tier: '3', hint: '0' });
+      await take('unlocked-autumn');
+      await page.locator('#tabs button').nth(1).tap();
+      await take('unlocked-winter');
+      await page.locator('#daily').tap();
+      await take('daily-board');
+      await finish(solve(await levelNow(page)).best, await state(page));
+      await take('daily-win');
+      await page.locator('#share').tap();
+      const daily = await page.evaluate(() => {
+        const key = Object.keys(JSON.parse(localStorage.getItem('grapevine-save')).daily)[0];
+        const date = new Intl.DateTimeFormat(document.documentElement.lang, { dateStyle: 'medium' }).format(new Date(`${key}T12:00:00`));
+        const card = document.querySelector('#cardPreview canvas');
+        return { date, drawn: [...window.__grapevineDrawnText.get(card)], shareText: window.grapevineState().shareText };
+      });
+      const where = tables[lang].dailyDate.replace('{date}', daily.date);
+      assert.ok(daily.drawn.includes(where) && daily.shareText.includes(where), 'daily date follows the chosen language');
+      await take('daily-postcard');
+
+      for (const [level, name] of [['45', 'chapter-win'], ['60', 'campaign-win']]) {
+        await go({ level, hint: '0' });
+        await page.locator('#play').tap();
+        await finish(solve(await levelNow(page)).best, await state(page));
+        await take(name);
+      }
+      await page.evaluate(() => {
+        Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('denied'); } } });
+      });
+      await page.locator('#share').tap();
+      await page.locator('#sendCard').tap();
+      await until(page, () => !document.querySelector('#manualShare').hidden, 'manual copy from a long card');
+      await take('campaign-postcard-copy');
+      assert.deepEqual(errors, [], `${lang}: page errors`);
+    } finally {
+      await context.close();
+    }
+  }
+}
+
 const only = process.argv[2];
 let failed = 0;
 for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   if (only && only !== phone) continue;
   const browser = await engine.launch();
-  const context = await browser.newContext({ ...device }), page = await context.newPage(), errors = [];
+  const context = await browser.newContext({ ...device, locale: 'en-US' }), page = await context.newPage(), errors = [];
   context.labSent = [];
   await context.route('https://human.adamwhite.work/**', async route => {
     const req = route.request(), cors = { 'access-control-allow-origin': base, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'Content-Type' };
@@ -549,9 +818,15 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     await shot(page, phone, 'fail').catch(() => {});
   }
   await context.close();
+  const compact = { viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 };
+  const localePhone = phone === 'webkit' ? 'webkit-iphone13' : 'chromium-360x640';
+  try {
+    await localizedScreens(browser, phone === 'webkit' ? device : compact, localePhone);
+    console.log(`ok   English and Turkish screens on ${localePhone}`);
+  } catch (e) { failed++; console.log(`FAIL localized screens on ${localePhone}: ${e.message}`); }
   // The small phone: 360 x 640. The menu fits without sideways scroll; a nine-villager level fits on screen.
   if (phone === 'chromium') {
-    const small = await browser.newContext({ viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    const small = await browser.newContext({ ...compact, locale: 'en-US' });
     const p2 = await small.newPage(), errs = [];
     p2.on('pageerror', e => errs.push(String(e))); p2.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
     try {
@@ -577,7 +852,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     // Colour cues: every colour carries a mark, so the four stay apart for red-green colour blindness and in grey.
     // Draws tokens and painter badges with art.js, then simulates deuteranopia (the Machado 2009 matrix, full
     // severity, applied in linear RGB) and greyscale on the pixels, and compares every pair of colours.
-    const cb = await browser.newContext({ viewport: { width: 420, height: 560 }, deviceScaleFactor: 2 });
+    const cb = await browser.newContext({ viewport: { width: 420, height: 560 }, deviceScaleFactor: 2, locale: 'en-US' });
     const p4 = await cb.newPage(), errs4 = [];
     p4.on('pageerror', e => errs4.push(String(e))); p4.on('console', m => { if (m.type() === 'error') errs4.push(m.text()); });
     try {
@@ -654,7 +929,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     } catch (e) { failed++; console.log(`FAIL grapevine colour cues: ${e.message}`); }
     await cb.close();
     // Desktop: 1280 x 800 with a mouse. The menu fits, and level 1 is solved by a mouse drag.
-    const desk = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const desk = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'en-US' });
     const p3 = await desk.newPage(), errs3 = [];
     p3.on('pageerror', e => errs3.push(String(e))); p3.on('console', m => { if (m.type() === 'error') errs3.push(m.text()); });
     try {
@@ -687,4 +962,5 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
 server.close();
 if (colourReport && process.env.VERBOSE) console.log(JSON.stringify(colourReport));
 console.log(`screenshots in ${SHOTS}`);
+console.log(`Turkish screenshots in ${WORD_SHOTS}`);
 process.exit(failed ? 1 : 0);

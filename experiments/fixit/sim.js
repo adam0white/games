@@ -19,7 +19,6 @@ export const WORKS = 0.6; // the "it works" moment
 export const LEAVE = 0.7; // a grumpy customer walking off
 export const KINDS = ['screw', 'pin', 'dent', 'wheel', 'rub', 'clock', 'chain', 'glue', 'sharpen', 'sew', 'pump', 'oil', 'zip', 'spring', 'thread', ...Object.keys(REPAIRS)];
 export const TUTOR = ['screw', 'pin', 'dent']; // the first three jobs ever, one each, very patient
-export const WORD = { screw: 'Circle the screw', pin: 'Pull the pin up', dent: 'Tap!', wheel: 'Flick!', rub: 'Rub!', clock: 'Set it!', chain: 'Hook it!', glue: 'Push & hold!', sharpen: 'Swipe!', sew: 'Sew!', pump: 'Pump!', oil: 'Tap the glowing can', zip: 'Zip it up!', spring: 'Pull back!', thread: 'Thread it!', ...repairMeta('word') };
 export const OBJECT = { screw: 'bell', pin: 'music box', dent: 'kettle', wheel: 'wheel', rub: 'lamp', clock: 'clock', chain: 'bike', glue: 'vase', sharpen: 'knife', sew: 'teddy', pump: 'ball', oil: 'door', zip: 'jacket', spring: 'toy car', thread: 'needle', ...repairMeta('object') };
 export const COIN = { screw: 2, pin: 2, dent: 2, wheel: 3, rub: 3, clock: 2, chain: 2, glue: 3, sharpen: 3, sew: 3, pump: 3, oil: 3, zip: 3, spring: 2, thread: 3, ...repairMeta('coin') };
 export const QUICK_BONUS = 1; // coins for a repair done with at least half the patience left
@@ -510,11 +509,6 @@ function makeRepair(s, kind, spot) {
   const r = K[kind].make(s, spot);
   r.kind = kind; r.p = 0; r.idle = 0; r.best = 0; r.done = false; r.grab = false; r.spot = spot ?? null;
   return r;
-}
-export function repairWord(r) {
-  if (r.kind === 'zip' && zipStuck(r)) return 'Wiggle side to side';
-  if (r.kind === 'balance' && r.grab && r.dwell > 0) return 'Hold it there';
-  return WORD[r.kind];
 }
 export const guide = r => K[r.kind].guide(r);
 export const level = s => s.lv ? s.lv.ramp : Math.min(LEVELS - 1, Math.floor(s.clock / RAMP)); // a map level sets its own step

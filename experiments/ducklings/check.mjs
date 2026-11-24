@@ -1,5 +1,5 @@
 // Phone check for Follow Me: node experiments/ducklings/check.mjs
-// Serves experiments/ (so ../kit/ resolves), answers /notes/button.js with an empty script, and plays stage 1
+// Serves experiments/ (so ../kit/ resolves), serves the tester notes button, and plays stage 1
 // to the end card with touch pointer events on WebKit (iPhone 13), Chromium (Pixel 7), and Chromium 360x640. Screenshots go to $SHOTS (default: a folder in the system temp dir).
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
@@ -12,11 +12,15 @@ import assert from 'node:assert/strict';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '..');
 const SHOTS = process.env.SHOTS || join(tmpdir(), 'ducklings-shots');
-await mkdir(SHOTS, { recursive: true });
+const WORDS_SHOTS = process.env.WORDS_SHOTS || SHOTS;
+await Promise.all([mkdir(SHOTS, { recursive: true }), mkdir(WORDS_SHOTS, { recursive: true })]);
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript' };
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
-  if (url.pathname === '/notes/button.js') { res.writeHead(200, { 'content-type': 'text/javascript' }); return res.end(''); }
+  if (url.pathname === '/notes/button.js') {
+    const source = await readFile(resolve(root, '../workers/feedback/public/notes/button.js'));
+    res.writeHead(200, { 'content-type': 'text/javascript' }); return res.end(source);
+  }
   if (url.pathname === '/favicon.ico') { res.writeHead(204); return res.end(); }
   let file = normalize(join(root, decodeURIComponent(url.pathname)));
   if (url.pathname.endsWith('/')) file = join(file, 'index.html');
@@ -65,9 +69,160 @@ async function assertTargets(page) {
   }
 }
 
-async function run(name, engine, device) {
+async function localizedScreens(page, goto, shot) {
+  await page.evaluate(() => {
+    localStorage.removeItem('ducklings-save');
+    localStorage.removeItem('ducklings:hint');
+    localStorage.removeItem('hf-lab-send-localhost');
+  });
+  await goto('?fast=2', 'tr');
+  const tables = await page.evaluate(async () => (await import('/ducklings/words.js')).tables);
+  assert.deepEqual(Object.keys(tables.en).sort(), Object.keys(tables.tr).sort(), 'identical translation keys');
+  const slots = text => [...text.matchAll(/\{(\w+)\}/g)].map(match => match[1]).sort();
+  for (const key of Object.keys(tables.en)) {
+    assert.ok(tables.tr[key].trim(), `empty Turkish translation for ${key}`);
+    assert.deepEqual(slots(tables.tr[key]), slots(tables.en[key]), `template parameters match for ${key}`);
+  }
+
+  async function capture(lang, name) {
+    assert.equal(await page.locator('html').getAttribute('lang'), lang);
+    if (name === 'win' || name === 'loss') {
+      await page.locator('#endStars span').last().evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished)));
+    }
+    await shot(`${lang}-${name}`, lang === 'tr' && ['menu', 'first-lesson', 'pause', 'win', 'loss'].includes(name) ? WORDS_SHOTS : SHOTS);
+    const findings = await page.evaluate(({ en, tr, lang }) => {
+      const escapes = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const english = Object.values(en).filter(value => !Object.values(tr).includes(value)).map(value =>
+        new RegExp('^' + value.split(/(\{\w+\})/).map(part => part.startsWith('{') ? '.+?' : escapes(part)).join('') + '$', 'iu'));
+      const overflow = [], untranslated = [];
+      const visible = el => {
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) return false;
+        for (let n = el; n; n = n.parentElement) {
+          const style = getComputedStyle(n);
+          if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+        }
+        return true;
+      };
+      const text = value => {
+        value = value?.trim();
+        if (value && lang === 'tr' && english.some(re => re.test(value))) untranslated.push(value);
+      };
+      for (const el of document.body.querySelectorAll('*')) {
+        if (!visible(el) || (el instanceof SVGElement && el.ownerSVGElement)) continue;
+        const box = el.getBoundingClientRect();
+        const containsCopy = !el.closest('.kit-hint .knob, .kit-hint .hand, .screen-reader');
+        if (box.left < -.5 || box.top < -.5 || box.right > innerWidth + .5 || box.bottom > innerHeight + .5 ||
+          (containsCopy && el.clientWidth && el.scrollWidth > el.clientWidth + 1) ||
+          (containsCopy && el.clientHeight && el.scrollHeight > el.clientHeight + 1)) {
+          overflow.push(`${el.id || el.className || el.tagName} ${[box.x, box.y, box.width, box.height].map(Math.round).join(',')}`);
+        }
+        if (!el.closest('[aria-hidden=true]')) {
+          text(el.getAttribute('aria-label'));
+          text(el.getAttribute('title'));
+          for (const child of el.childNodes) if (child.nodeType === Node.TEXT_NODE) text(child.textContent);
+        }
+      }
+      text(document.title);
+      for (const line of window.ducklingsCanvasText) text(line);
+      return { untranslated, overflow };
+    }, { ...tables, lang });
+    assert.deepEqual(findings.untranslated, [], `English leaked into ${lang} ${name}`);
+    assert.deepEqual(findings.overflow, [], `${lang} ${name} fits the viewport`);
+    await assertTargets(page);
+  }
+
+  await capture('tr', 'menu');
+  for (const [index, chapter] of ['road', 'garden', 'river'].entries()) {
+    await page.locator('#chapters button').nth(index + 1).tap();
+    await capture('tr', `map-${chapter}`);
+  }
+  await page.locator('#chapters button').first().tap();
+  await page.locator('#menuLanguage').tap();
+  assert.equal(await page.locator('html').getAttribute('lang'), 'en', 'menu switches immediately');
+  assert.equal(new URL(page.url()).searchParams.get('fast'), '2');
+  assert.equal(new URL(page.url()).searchParams.has('lang'), false);
+  await page.reload();
+  await capture('en', 'menu');
+  for (const [index, chapter] of ['road', 'garden', 'river'].entries()) {
+    await page.locator('#chapters button').nth(index + 1).tap();
+    await capture('en', `map-${chapter}`);
+  }
+  await page.locator('#chapters button').first().tap();
+  for (const lang of ['en', 'tr']) {
+    await goto('?fast=2', lang);
+    await page.locator('#chapters button').first().tap();
+    await page.locator('#nodes button[data-level="1"]').tap();
+    await capture(lang, 'first-lesson');
+    await tap(page, '#pause');
+    await capture(lang, 'pause');
+    if (lang === 'en') {
+      await page.locator('#pauseLanguage').tap();
+      assert.equal(await page.locator('html').getAttribute('lang'), 'tr');
+      assert.equal(await page.textContent('#resume'), tables.tr.resume);
+      assert.ok((await state(page)).paused);
+      await page.reload();
+      assert.equal(await page.locator('html').getAttribute('lang'), 'tr', 'Turkish persists on reload');
+      await goto('?fast=2', 'en');
+      await page.locator('#nodes button[data-level="1"]').tap();
+    } else {
+      await page.locator('#resume').tap();
+    }
+    const { nest } = await state(page);
+    await page.touchscreen.tap(Math.round(nest.sx), Math.round(nest.sy));
+    await until(page, () => window.ducklingsState().screen === 'end', 'one nest tap clears the first level');
+    assert.equal((await state(page)).over, 'nest');
+    await until(page, () => document.querySelectorAll('#endStars .got').length === 3, 'star reveal');
+    await capture(lang, 'win');
+    await goto('?level=20&fast=4', lang);
+    await page.locator('#play').tap();
+    await capture(lang, 'timed');
+    const { mom } = await state(page);
+    await page.touchscreen.tap(Math.round(mom.sx), Math.round(mom.sy + 55));
+    await until(page, () => window.ducklingsState().screen === 'end', 'time loss');
+    await until(page, () => document.querySelectorAll('#endStars .in').length === 3, 'loss star reveal');
+    assert.equal((await state(page)).over, 'lost-all');
+    await capture(lang, 'loss');
+
+    await goto('?level=2', lang);
+    await page.locator('#play').tap();
+    await until(page, () => document.querySelector('#peep:not([hidden]) svg'), 'rescue call');
+    await capture(lang, 'rescue');
+
+    await goto('?level=5', lang);
+    await page.locator('#play').tap();
+    await capture(lang, 'road-curb');
+
+    await page.evaluate(() => {
+      const save = JSON.parse(localStorage.getItem('ducklings-save'));
+      localStorage.setItem('ducklings-save', JSON.stringify({ ...save, opened: 8, endless: 8210 }));
+    });
+    await goto('?seed=4242&fast=5', lang);
+    assert.match(await page.textContent('#endless'), lang === 'tr' ? /8\.210/ : /8,210/);
+    await page.locator('#endless').tap();
+    await capture(lang, 'endless-open');
+    const start = (await state(page)).mom;
+    await page.touchscreen.tap(Math.round(start.sx), Math.round(start.sy - 90));
+    await until(page, () => document.querySelector('#flockHud.low'), 'low sunlight');
+    await capture(lang, 'endless-low');
+    await until(page, () => window.ducklingsState().screen === 'end', 'Endless result');
+    await capture(lang, 'endless-result');
+  }
+
+  await page.evaluate(() => localStorage.setItem('notes.k', 'check'));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await goto('?hint=hand', 'tr');
+  assert.equal(await page.locator('#notes-button').getAttribute('aria-label'), tables.tr.notes);
+  await page.locator('#chapters button').first().tap();
+  await page.locator('#nodes button[data-level="1"]').tap();
+  await until(page, () => document.querySelector('.kit-hint.on'), 'still shared hint');
+  assert.equal(await page.locator('.kit-hint .label').innerText(), tables.tr.hint);
+  await capture('tr', 'reduced-motion');
+}
+
+async function run(name, engine, device, localizationOnly = false) {
   const browser = await engine.launch();
-  const context = await browser.newContext({ ...device });
+  const context = await browser.newContext({ ...device, locale: 'en-US' });
   const page = await context.newPage();
   const errors = [], sent = [];
   page.setDefaultTimeout(12000);
@@ -79,6 +234,14 @@ async function run(name, engine, device) {
     return route.fulfill({ status: 200, headers: cors, contentType: 'application/json', body: '{"ok":true}' });
   });
   await page.addInitScript(() => {
+    window.ducklingsCanvasText = new Set();
+    for (const key of ['fillText', 'strokeText']) {
+      const draw = CanvasRenderingContext2D.prototype[key];
+      CanvasRenderingContext2D.prototype[key] = function (value, ...args) {
+        window.ducklingsCanvasText.add(String(value));
+        return draw.call(this, value, ...args);
+      };
+    }
     const Real = window.AudioContext || window.webkitAudioContext;
     window.audioMade = 0;
     if (Real) window.AudioContext = window.webkitAudioContext = class extends Real {
@@ -88,11 +251,15 @@ async function run(name, engine, device) {
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
-  const shot = async label => {
+  const shot = async (label, folder = SHOTS) => {
     await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
-    await page.screenshot({ path: join(SHOTS, `${name}-${label}.png`), scale: 'css' });
+    await page.screenshot({ path: join(folder, `${name}-${label}.png`), scale: 'css' });
   };
-  const goto = suffix => page.goto(`${base}/ducklings/${suffix}`);
+  const goto = (suffix = '', lang = 'en') => {
+    const url = new URL(`/ducklings/${suffix}`, base);
+    if (lang) url.searchParams.set('lang', lang);
+    return page.goto(url.href);
+  };
   const leave = async () => {
     await tap(page, '#pause');
     await tap(page, '#pauseMenu');
@@ -103,6 +270,12 @@ async function run(name, engine, device) {
   try {
     await goto('?fast=2');
     await until(page, () => window.ducklingsState?.().screen === 'menu', 'menu ready');
+    if (localizationOnly) {
+      await localizedScreens(page, goto, shot);
+      assert.deepEqual(errors, [], 'page errors');
+      console.log(`ok   ${name} (both languages and layouts)`);
+      return true;
+    }
     if (!process.env.VISUAL_ONLY) await page.evaluate(() => localStorage.setItem('hf-lab-send-localhost', '1'));
     assert.match(await page.textContent('#menu'), /The game lab records play/);
     assert.equal(await page.evaluate(() => window.audioMade), 0);
@@ -134,13 +307,22 @@ async function run(name, engine, device) {
       const pixel = canvas.getContext('2d').getImageData(Math.floor(canvas.width * .58), Math.floor(canvas.height * .35), 1, 1).data;
       return pixel[1] > pixel[0];
     }), 'the opening pond is rendered without a hit flash');
-    assert.match(await page.locator('#steerHelp:visible').innerText(), /Tap the nest.*Drag to steer/s);
+    assert.match(await page.textContent('#guideLabel'), /Tap the nest.*drag to steer/s);
+    assert.ok(await page.locator('#c').evaluate(canvas => {
+      const { nest } = window.ducklingsState(), scale = canvas.width / innerWidth;
+      const g = canvas.getContext('2d');
+      return [-13, 13].some(dx => {
+        const [r, green, b] = g.getImageData(Math.round((nest.sx + dx) * scale), Math.round(nest.sy * scale), 1, 1).data;
+        return r > 245 && green > 230 && b > 170;
+      });
+    }), 'the first tap ring is drawn on the real nest');
     const y0 = st.mom.y;
     await finger(page, [['pointerdown', st.mom.sx, st.mom.sy - 45]]);
     await until(page, y => window.ducklingsState().mom.y > y + .048, 'thumb steers', 5000, y0);
     st = await state(page);
     assert.ok(st.rollCalls >= 1);
-    assert.match(await page.innerText('#quack'), /Call closer/);
+    assert.match(await page.locator('#quack').getAttribute('aria-label'), /call the flock closer/);
+    assert.equal(await page.locator('#quackDemo .icon').count(), 3);
     await finger(page, [['pointerdown', 40, 300, 8], ['pointerup', 40, 300, 8], ['pointerup', 0, 0]]);
     await until(page, () => window.ducklingsState().quackCool > 0, 'second finger quacks');
     await tap(page, '#pause');
@@ -148,6 +330,7 @@ async function run(name, engine, device) {
     assert.ok(st.paused && st.screen === 'paused');
     await assertTargets(page);
     assert.match(await page.textContent('#pauseMenu'), /leave/i, 'leaving the swim is explicit');
+    await shot('paused');
     await sleep(260);
     assert.equal((await state(page)).t, st.t, 'pause freezes simulation');
     await page.click('#resume');
@@ -167,13 +350,13 @@ async function run(name, engine, device) {
     const nextBox = await page.locator('#next').boundingBox();
     assert.ok(Math.abs(nextBox.x + nextBox.width / 2 - page.viewportSize().width / 2) <= 1, 'Next is centered in the postcard');
     const mapPage = await context.newPage();
-    await mapPage.goto(base + '/ducklings/');
-    assert.equal(await mapPage.textContent('#album'), '1 duckling home');
+    await mapPage.goto(base + '/ducklings/?lang=en');
+    assert.equal(await mapPage.locator('#album').getAttribute('aria-label'), '1 duckling home');
     await mapPage.close();
 
     await page.click('#next');
     assert.equal((await state(page)).stage, 2);
-    await until(page, () => document.querySelector('#peep:not([hidden])')?.textContent === 'Peep!', 'the waiting duck shows its peep');
+    await until(page, () => document.querySelector('#peep:not([hidden]) svg'), 'the waiting duck shows a sound wave');
     await shot('rescue');
     st = await state(page);
     const duck = st.waitingDucks[0];
@@ -183,7 +366,7 @@ async function run(name, engine, device) {
     st = await state(page);
     assert.ok(Math.abs(st.mom.y - duck.y) < .025, 'camera scroll keeps a single tap aimed at the same pond location');
     if (st.nest.sy < 0) {
-      assert.deepEqual(await page.locator('#nestDirection:visible').allTextContents(), ['Nest ↑'], 'show the route once the nest is above the screen');
+      assert.equal(await page.locator('#nestDirection:visible').getAttribute('aria-label'), 'Nest ahead', 'show the route once the nest is above the screen');
     }
     await shot('mid-swim');
     await drive(page, 14000);
@@ -211,14 +394,16 @@ async function run(name, engine, device) {
 
     // A campaign minimum can differ from both the whole flock and the number following.
     for (const [level, flock, goal] of [
-      [4, '1 following · 3 waiting', 'Bring 3 of 4 home'],
-      [6, '3 following', 'Bring 2 of 3 home'],
+      [4, ['1 following', '3 waiting'], 'Bring 3 of 4 home'],
+      [6, ['3 following'], 'Bring 2 of 3 home'],
     ]) {
       await goto(`?level=${level}`);
       await tap(page, '#play');
-      assert.equal(await page.locator('#flockCount:visible').allTextContents().then(items => items[0]), flock);
-      assert.equal(await page.innerText('#flockGoal'), goal);
       await shot(`goal-${level}`);
+      assert.deepEqual(await page.locator('#flockCount .stat:not(.goal)').evaluateAll(els => els.map(el => el.getAttribute('aria-label'))), flock);
+      assert.equal(await page.locator('#flockCount .goal').getAttribute('aria-label'), goal);
+      assert.match(await page.locator('#flockCount .goal').innerText(), /^≥[23]$/);
+      assert.equal(await page.locator('#flockCount .goal.met').count(), 0, 'following birds are not counted as home');
       await leave();
     }
 
@@ -243,12 +428,33 @@ async function run(name, engine, device) {
     await goto('?level=5');
     await tap(page, '#play');
     assert.equal((await state(page)).lesson, 'car');
-    assert.match(await page.locator('#steerHelp:visible').innerText(), /ring.*curb/);
     await shot('road');
+    assert.match(await page.textContent('#guideLabel'), /ring.*curb/);
     st = await state(page);
-    await page.touchscreen.tap(Math.round(st.mom.sx), Math.round(st.mom.sy - 100));
-    assert.match(await page.locator('#steerHelp:visible').innerText(), /car passes.*far bank.*last duckling/s);
+    const curbY = st.mom.sy - .48 * page.viewportSize().width;
+    await page.touchscreen.tap(Math.round(st.mom.sx), Math.round(curbY));
+    await until(page, () => document.querySelector('#guideLabel').textContent.includes('Wait for the car'), 'car wait cue');
+    await shot('road-wait');
+    await until(page, () => document.querySelector('#guideLabel').textContent.includes('far bank'), 'car passed and the whole flock has time to cross');
     await shot('road-crossing');
+    st = await state(page);
+    const bankY = st.mom.sy - (1.26 - st.mom.y) * page.viewportSize().width;
+    await page.touchscreen.tap(Math.round(st.mom.sx), Math.round(bankY));
+    await until(page, () => document.querySelector('#guideLabel').textContent.includes('last duckling'), 'tail cue during the crossing');
+    await until(page, () => window.ducklingsState().mom.y > 1.25 &&
+      document.querySelector('#guideLabel').hidden, 'tail clears the road');
+    const crossed = await state(page);
+    assert.equal(crossed.line, 2);
+    assert.equal(crossed.hearts, 3);
+    await leave();
+    await goto('?level=5&fast=4');
+    await tap(page, '#play');
+    st = await state(page);
+    await page.touchscreen.tap(Math.round(st.mom.sx), Math.round(st.mom.sy - .48 * page.viewportSize().width));
+    await until(page, () => {
+      const st = window.ducklingsState();
+      return st.t > 5.8 && st.t < 6.05 && document.querySelector('#guideLabel').textContent.includes('Wait for the car');
+    }, 'late gap does not advertise a crossing');
     await leave();
     await goto('?level=9');
     await tap(page, '#play');
@@ -272,7 +478,7 @@ async function run(name, engine, device) {
       await goto('?hint=hand');
       assert.deepEqual(await save(), legacy);
       assert.equal((await state(page)).opened, 8);
-      assert.match(await page.textContent('#endless'), /8210/);
+      assert.match(await page.textContent('#endless'), /8,210/);
       assert.match(await page.textContent('#sound'), /off/);
       await page.click('#sound');
       await tap(page, '#play');
@@ -288,23 +494,30 @@ async function run(name, engine, device) {
       assert.equal(st.mode, 'endless');
       await finger(page, [['pointerdown', st.mom.sx, st.mom.sy - 90]]);
       await until(page, () => window.ducklingsState().t > 1, 'endless advances from touch');
-      assert.match(await page.innerText('#flockGoal'), /Cross sun pads for light/);
+      assert.match(await page.locator('#sunRule:visible').getAttribute('aria-label'), /Cross sun pads for light/);
       await shot('endless');
       await finger(page, [['pointerup', 0, 0]]);
       const lowLightHeight = await page.waitForFunction(() => {
-        if (!document.querySelector('#flockGoal').textContent.includes('Low light')) return false;
-        return document.querySelector('#flockHud').getBoundingClientRect().height;
+        if (!document.querySelector('#flockHud').classList.contains('low')) return false;
+        const meter = document.querySelector('#lightMeter').getBoundingClientRect();
+        const cue = document.querySelector('#sunRule').getBoundingClientRect();
+        return cue.top >= meter.bottom && meter.width > 0;
       }, null, { timeout: 30000 });
-      assert.ok(await lowLightHeight.jsonValue() + 6 < 54, 'low-light HUD clears the sunlight meter');
+      assert.ok(await lowLightHeight.jsonValue(), 'low-light HUD clears the sunlight meter');
       await shot('low-light');
       await end();
-      assert.match(await page.innerText('#endLine'), /0 sun pads crossed/);
+      assert.match(await page.locator('#endLine [role=img]').first().getAttribute('aria-label'), /Sun pads crossed: 0/);
       await goto('?level=20&fast=5');
       await tap(page, '#play');
       st = await state(page);
       await finger(page, [['pointerdown', st.mom.sx, st.mom.sy + 70], ['pointerup', 0, 0]]);
       await end();
       assert.equal((await state(page)).over, 'lost-all');
+      await shot('loss');
+    }
+
+    if (name === 'webkit-iphone13' || name === 'chromium-360x640') {
+      await localizedScreens(page, goto, shot);
     }
     assert.deepEqual(errors, [], 'page errors');
     console.log(`ok   ${name}`);
@@ -327,9 +540,12 @@ const runs = [
   ].map(([name, width, height]) => [name, chromium, {
     ...devices['Pixel 7'], viewport: { width, height }, screen: { width, height },
   }]),
+  ['webkit-390x844', webkit, { ...devices['iPhone 13'], viewport: { width: 390, height: 844 } }, true],
 ];
 let ok = true;
-for (const [name, engine, device] of runs) if (!only || name.includes(only)) ok = (await run(name, engine, device)) && ok;
+for (const [name, engine, device, localizationOnly] of runs) {
+  if (!only || name.includes(only)) ok = (await run(name, engine, device, localizationOnly)) && ok;
+}
 server.close();
 console.log(ok ? `all passed; screenshots in ${SHOTS}` : 'FAILED');
 process.exitCode = ok ? 0 : 1;

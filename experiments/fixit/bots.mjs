@@ -1,7 +1,7 @@
 // Proves the rules of Fix-It Stall: node experiments/fixit/bots.mjs
 // Bots play through the same input interface the page uses (down/move/up in object-local units), one step per tick,
 // with finger speeds capped at what a thumb can do (moves.js SKILLS). Exits non-zero when a claim fails.
-import { create, step, input, guide, repairWord, rand, stars, chooseTicket, selectLane, goalState, DT, KINDS, TUTOR, PATIENCE, LEVELS, HIT, RAMP, TWO_PATIENCE } from './sim.js';
+import { create, step, input, guide, rand, stars, chooseTicket, selectLane, goalState, DT, KINDS, TUTOR, PATIENCE, LEVELS, HIT, RAMP, TWO_PATIENCE } from './sim.js';
 import { ghost, plan, SKILLS, THUMB_MAX } from './moves.js';
 import { drawGhost } from './art.js';
 import { MAP, COUNT, INTRO, BUSY_END, OPEN_ORDER, levelDef, goalLine, canAssist, levelReward } from './levels.js';
@@ -127,7 +127,7 @@ claim(goalLine(opening[2].goal).includes('One walk-off ends the level'),
   const afterDrop = guide(door.rep);
   claim(ghost(oilGuide, 0).press && !ghost(afterDrop, 0).press,
     'the oil-can cue turns off as soon as its drop lands, including while the door remains wide open');
-  claim(/can/i.test(repairWord(door.rep)) && /glow/i.test(repairWord(door.rep)), 'the door instruction names the lit tap target');
+  claim(oilGuide.ready && oilGuide.at[0] === door.rep.cx && oilGuide.at[1] === door.rep.cy, 'the timing demonstration lands on the ready oil can');
 
   const jacket = create({ only: 'zip' });
   input(jacket, { type: 'down', x: 50, y: 95 });
@@ -137,16 +137,22 @@ claim(goalLine(opening[2].goal).includes('One walk-off ends the level'),
   const lines = [];
   const pen = new Proxy({ lineTo: (x, y) => lines.push([x, y]) }, { get: (obj, key) => obj[key] ?? (() => {}) });
   drawGhost(pen, snag, 0.5, 1);
-  claim(snag.stuck && /side|wiggle/i.test(repairWord(jacket.rep)), 'a blocked zipper asks for lateral movement');
+  const left = ghost(snag, 0.3375).p, right = ghost(snag, 0.1125).p;
+  claim(snag.stuck && left[1] === right[1] && right[0] - left[0] >= 10, 'a blocked zipper shows a lateral wiggle');
   claim(!lines.some(([, y]) => y === snag.top), 'a blocked zipper no longer draws the upward trail to the collar');
 
   const scale = create({ only: 'balance' }), g = guide(scale.rep);
-  const approach = repairWord(scale.rep);
+  const approach = ghost(g, 0.25), holding = ghost(g, 1.2), stillHolding = ghost(g, 1.5);
   input(scale, { type: 'down', x: g.from[0], y: g.from[1] });
   input(scale, { type: 'move', x: g.targets[0], y: g.from[1] });
   for (let i = 0; i < 22; i++) step(scale);
-  claim(/slide/i.test(approach) && /hold/i.test(repairWord(scale.rep)), 'the scale teaches sliding, then holding on the mark');
-  claim(/circle/i.test(repairWord(create({ only: 'screw' }).rep)), 'the bell instruction specifies a circular gesture');
+  claim(approach.p[0] !== holding.p[0] && holding.p[0] === g.targets[0] && holding.press && stillHolding.press &&
+    holding.p[0] === stillHolding.p[0] && scale.rep.grab && scale.rep.dwell > 0, 'the scale shows sliding and then staying pressed on the mark');
+  const bell = create({ only: 'screw' }).rep, circle = guide(bell);
+  const sweep = [0, 0.225, 0.45, 0.675].map(t => ghost(circle, t).p);
+  claim(circle.type === 'circle' && sweep.every(([x, y]) => Math.abs(Math.hypot(x - bell.cx, y - bell.cy) - circle.r) < 1e-8) &&
+    sweep[0][0] > bell.cx && sweep[2][0] < bell.cx && sweep[1][1] > bell.cy && sweep[3][1] < bell.cy,
+  'the bell demonstrates a circle centered on the screw');
 }
 
 const setList = create({ lv: opening[2], hearts: 4 });

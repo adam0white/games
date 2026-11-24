@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#9ccf7a">
-<title>Follow Me</title>
+<title data-i18n="title"></title>
 <style>
   html, body { margin: 0; height: 100%; background: #9ccf7a; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
   body { font: 17px/1.4 ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif; color: #24464a; }
@@ -14,10 +14,9 @@
   #menu.screen { background: radial-gradient(ellipse at 50% 13%, #fffae5, #f0f4db 52%, #cee7d1); }
   .screen.on { display: grid; }
   .screen > div { max-width: 22em; width: calc(100% - 32px); padding: 12px 0; box-sizing: border-box; }
-  h1 { font-size: 2.7em; line-height: 1; margin: .1em 0 .1em; color: #2f6b5e; letter-spacing: .01em; text-shadow: 0 3px 0 #fff; }
+  h1 { font-size: 2.7em; line-height: 1.12; margin: .1em 0 .1em; color: #2f6b5e; letter-spacing: .01em; text-shadow: 0 3px 0 #fff; }
   h2 { font-size: 2em; margin: .1em 0 .2em; color: #2f6b5e; }
   p { margin: .45em 0; }
-  .sub { color: #4f7a6f; margin-top: 0; }
   button { font: inherit; font-weight: bold; color: #2f6b5e; background: #ffffffcc; border: 2px solid #7fbfa8; border-radius: 999px; padding: .5em 1.1em; margin: .25em; min-height: 48px; min-width: 9em; touch-action: manipulation; cursor: pointer; }
   button.main { background: #ffb43a; color: #4a2a06; border-color: #f29a1a; font-size: 1.25em; min-width: 8.5em; box-shadow: 0 4px 0 #d9801a; }
   button.main:active { transform: translateY(3px); box-shadow: 0 1px 0 #d9801a; }
@@ -26,9 +25,6 @@
   #endStars span { display: inline-block; color: #c9d8d0; transform: scale(.4); opacity: 0; transition: transform .35s cubic-bezier(.3,1.8,.5,1), opacity .2s; }
   #endStars span.in { transform: scale(1); opacity: 1; }
   #endStars span.got { color: #ffb41f; text-shadow: 0 3px 0 #c97a00; }
-  #names { font-size: .92em; color: #3d6a60; }
-  #names i { font-style: normal; display: inline-block; background: #fff6c8; border: 1.5px solid #f0cf5a; border-radius: 1em; padding: .05em .55em; margin: .15em; }
-  #names i.gone { background: #e7eeea; border-color: #c1d1c8; color: #7a948b; }
   .score { font-size: 1.3em; font-weight: bold; color: #2f6b5e; }
   #pause { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); width: 48px; height: 48px; min-width: 0; min-height: 0; margin: 0; padding: 0; border-radius: 50%; display: none; place-items: center; background: #ffffffb3; border: 2px solid #7fbfa8; touch-action: none; }
   #pause::before { content: ''; width: 4px; height: 16px; border: solid #2f6b5e; border-width: 0 5px; }
@@ -36,32 +32,65 @@
     background: conic-gradient(#ffb43a calc(var(--ready, 1) * 360deg), #f3e2c2 0); box-shadow: 0 3px 0 #d9801a; touch-action: none; }
   #quack[hidden] { display: none !important; }
   #quack.wait { color: #9a7a50; box-shadow: none; }
-  #quack small { display: block; font-size: 12px; line-height: 1.2; }
-  #quack.wait { color: #614a2d; }
+  .icon { width: 23px; height: 23px; flex: none; vertical-align: middle; }
+  .language { position: absolute; top: 8px; right: 0; margin: 0; min-width: 57px; min-height: 44px;
+    padding: 0 5px; display: flex; align-items: center; justify-content: center; gap: 2px; font-size: 12px; }
+  .language .icon { width: 20px; height: 20px; }
+  #menu > div, #paused > div { position: relative; }
+  #paused .language { top: 12px; right: 12px; }
+  #paused h2 { margin-inline: 55px; font-size: 1.7em; line-height: 1.1; }
+  #quackDemo { position: relative; display: grid; place-items: center; margin: 0 auto; width: 60px; height: 29px; }
+  #quackDemo .icon { position: absolute; }
+  #quackDemo .icon:nth-child(2) { width: 17px; height: 17px; left: 2px; top: 12px; animation: group-left 2.4s ease-in-out infinite; }
+  #quackDemo .icon:nth-child(3) { width: 17px; height: 17px; right: 2px; top: 12px; animation: group-right 2.4s ease-in-out infinite; }
+  #quackDemo .icon:first-child { top: 0; }
+  @keyframes group-left { 0%, 18%, 100% { transform: translateX(0); } 48%, 76% { transform: translateX(9px); } }
+  @keyframes group-right { 0%, 18%, 100% { transform: translateX(0); } 48%, 76% { transform: translateX(-9px); } }
+  #quack.wait #quackDemo .icon { animation-play-state: paused; }
+  #quackDemo + span { display: grid; place-items: center; height: 20px; font-size: 12px; }
+  #quackDemo + span .icon { width: 18px; height: 18px; }
   #flockHud { position: fixed; top: calc(6px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
-    width: max-content; max-width: calc(100% - 156px); padding: 4px 9px; box-sizing: border-box; border-radius: 14px;
-    background: #fff9df; color: #234d46; text-align: center; font-size: 14px; line-height: 1.3; pointer-events: none; }
-  #flockHud strong, #flockGoal { display: block; }
-  #flockGoal { font-size: 13px; }
-  #peep { position: fixed; transform: translate(-50%, -100%); padding: 1px 7px; border-radius: 9px;
-    background: #fff5c8; color: #764400; border: 1px solid #d99635; font-size: 14px; font-weight: 700; pointer-events: none; }
-  #nestDirection { position: fixed; top: calc(79px + env(safe-area-inset-top)); transform: translateX(-50%); border-radius: 12px;
-    padding: 2px 9px; background: #fff9df; color: #38594c; font-size: 14px; font-weight: 700; pointer-events: none; }
+    width: max-content; max-width: calc(100% - 158px); border-radius: 14px; background: #fff9df; color: #234d46;
+    padding: 4px 7px; box-sizing: border-box; text-align: center; font-size: 13px; font-weight: 800; line-height: 1.25; pointer-events: none; }
+  #flockCount, #runStats, #starTip, #endLine { display: flex; justify-content: center; align-items: center; gap: 5px; }
+  #runStats { margin-top: 2px; }
+  .stat { display: inline-flex; align-items: center; justify-content: center; gap: 2px; white-space: nowrap; }
+  #flockCount .icon { width: 18px; height: 18px; }
+  #runStats .icon { width: 16px; height: 16px; }
+  .goal { border: 1px dashed #9f7951; border-radius: 7px; padding: 0 4px; }
+  .goal.met { border-style: solid; border-color: #72a78a; background: #e1eed6; }
+  #peep, #nestDirection, #padDirection { position: fixed; transform: translateX(-50%); display: flex; align-items: center;
+    padding: 2px 4px; border-radius: 10px; background: #fff5c8; color: #76501e; border: 1px solid #d99635; pointer-events: none; }
+  #nestDirection { top: calc(79px + env(safe-area-inset-top)); }
+  #padDirection { top: calc(120px + env(safe-area-inset-top)); }
+  [hidden] { display: none !important; }
   #flockHud.low { background: #ffe1ae; color: #70320a; }
-  #starTip { color: #38594c; font-size: 15px; }
+  #lightMeter { display: block; overflow: hidden; border-radius: 6px; background: #e6d9b9; margin-top: 4px; height: 6px; }
+  #lightFill { display: block; height: 100%; background: #bb7316; border-radius: inherit; }
+  #flockHud.low #lightFill { background: #a93e2d; }
+  #sunRule { display: flex; align-items: center; justify-content: center; gap: 1px; padding-top: 2px; }
+  #sunRule .icon { width: 17px; height: 17px; }
+  #padReward { position: absolute; top: calc(100% + 3px); left: 50%; transform: translateX(-50%);
+    justify-content: center; align-items: center; gap: 3px; display: flex; padding: 0 4px; white-space: nowrap;
+    border-radius: 7px; background: #fff9df; border: 1px solid #b98230; }
+  #padReward .icon { width: 16px; height: 16px; }
+  #flockHud.low #sunRule { outline: 1px dashed #a93e2d; border-radius: 5px; }
+  #heartState { position: fixed; top: calc(17px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); pointer-events: none; }
+  #heartState .icon { width: 19px; height: 19px; margin-right: 2px; }
+  #album .icon { width: 18px; height: 18px; }
   #starTip:empty { display: none; }
-  #quack svg { display: block; margin: 0 auto 2px; }
-  #say { position: fixed; left: 0; right: 0; top: 70%; text-align: center; font-size: 26px; font-weight: bold; color: #fff; text-shadow: 0 2px 0 #2f6b5e, 0 0 12px #2f6b5e88; pointer-events: none; opacity: 0; transition: opacity .25s, transform .25s; transform: scale(.9); padding: 0 1em; }
-  #steerHelp { position: fixed; bottom: calc(22px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); width: max-content; max-width: 90vw; box-sizing: border-box; padding: 9px 16px; border-radius: 18px; background: #fff9e3; color: #244b4b; text-align: center; font-size: 16px; font-weight: 700; pointer-events: none; }
-  #steerHelp.crossing { bottom: calc(96px + env(safe-area-inset-bottom)); }
-  #say.on { opacity: 1; transform: scale(1); }
+  #starTip { margin: .25em 0; font-weight: 700; flex-wrap: wrap; }
+  .condition { background: #fffdf1; border: 1px solid #e3cf9c; border-radius: 9px; padding: 0 5px; }
+  .condition .icon { width: 20px; height: 20px; }
+  #postcard + h2 { margin-bottom: 5px; }
+  .screen-reader { position: absolute; top: 0; left: 0; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   #menu .lab-notice { color: #345c52; font-size: 13px !important; opacity: 1 !important; }
   #menu .lab-notice a { display: grid; place-items: center; width: fit-content; min-width: 60px; min-height: 44px; margin: 0 auto; }
   #album { font-size: .95em; color: #4f7a6f; }
   #menuArt { width: 286px; height: 110px; display: block; margin: 0 auto; }
   #menu > div { width: min(340px, calc(100% - 28px)); }
   #menu h1 { margin: -.06em 0 .08em; color: #214e46; letter-spacing: -.06em; }
-  #menu .sub { margin-bottom: .65em; font-size: 14px; }
+  #menu h1 + nav { margin-top: 10px; }
   #chapters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
   #chapters button { min-width: 0; margin: 0; padding: 3px 0; border: 1px solid #b7cab3; border-radius: 14px; background: #fffdf5; font-size: 12px; line-height: 1.2; }
   #chapters button[aria-pressed="true"] { background: var(--chapter); color: #fff; border-color: var(--chapter); }
@@ -94,66 +123,75 @@
   #endActions button.main { min-width: 130px; }
   #end #postcard { filter: drop-shadow(0 2px 0 #6eac9566); }
   #end #next { margin-inline: 0; width: 100%; border-radius: 16px; }
-  #names:empty { display: none; }
   #endStars { font-size: 2.65em; letter-spacing: .06em; }
   @media (max-height: 690px) {
     #menuArt { height: 92px; width: 240px; }
     #menu > div { padding: 7px 0; }
-    #menu .sub { margin-bottom: .45em; }
   }
   @media (prefers-reduced-motion: reduce) {
-    #endStars span, #say { transition: none; }
+    #endStars span { transition: none; }
+    #quackDemo .icon:nth-child(2) { animation: none; transform: translateX(6px); }
+    #quackDemo .icon:nth-child(3) { animation: none; transform: translateX(-6px); }
   }
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
+<canvas id="c" aria-hidden="true"></canvas>
 <div id="safe"></div>
-<div id="peep" hidden>Peep!</div>
-<div id="nestDirection" hidden>Nest ↑</div>
-<div id="flockHud" hidden><strong id="flockCount"></strong><span id="flockGoal"></span></div>
-<button id="pause" aria-label="Pause"></button>
-<button id="quack" aria-label="Quack to call the flock closer"><svg width="34" height="22" viewBox="0 0 34 22"><circle cx="10" cy="11" r="8" fill="#7a4a1c"/><path d="M16 8 L27 10 L16 14 Z" fill="#4a2a06"/><circle cx="8" cy="9" r="1.6" fill="#fff"/><path d="M28 4 q4 7 0 14 M31 1 q6 10 0 20" stroke="#4a2a06" stroke-width="2" fill="none" stroke-linecap="round"/></svg><span id="quackLabel">Quack</span><small>Call closer</small></button>
-<div id="say"></div>
-<div id="steerHelp" hidden></div>
+<div id="peep" role="img" hidden></div>
+<div id="nestDirection" role="img" data-i18n-aria="nestAhead" hidden></div>
+<div id="padDirection" role="img" data-i18n-aria="padsRefill" hidden></div>
+<div id="heartState" role="img" hidden></div>
+<div id="flockHud" hidden>
+  <div id="flockCount"></div>
+  <div id="runStats"></div>
+  <div id="lightMeter" aria-hidden="true" hidden><div id="lightFill"></div></div>
+  <div id="sunRule" role="img" hidden></div>
+  <div id="padReward" hidden></div>
+</div>
+<div id="guideLabel" class="screen-reader" hidden></div>
+<button id="pause" data-i18n-aria="pause"></button>
+<button id="quack"><span id="quackDemo" aria-hidden="true"></span><span id="quackLabel" aria-hidden="true"></span></button>
 
 <div id="menu" class="screen on"><div>
-  <canvas id="menuArt" width="600" height="230" aria-hidden="true"></canvas>
-  <h1>Follow Me</h1>
-  <p class="sub">Lead the ducklings home.</p>
-  <nav id="chapters" aria-label="Chapters"></nav>
-  <section id="map" aria-label="Level map"><canvas id="mapPath" aria-hidden="true"></canvas><div id="nodes"></div></section>
-  <button id="play" class="main">Play 1</button>
-  <div class="extras"><button id="endless">Endless pond</button><button id="sound">Sound: on</button></div>
-  <p id="album"></p>
+  <button id="menuLanguage" class="language"></button>
+  <canvas id="menuArt" width="600" height="230" role="img" data-i18n-aria="menuArt"></canvas>
+  <h1 data-i18n="title"></h1>
+  <nav id="chapters" data-i18n-aria="chapters"></nav>
+  <section id="map" data-i18n-aria="levelMap"><canvas id="mapPath" aria-hidden="true"></canvas><div id="nodes"></div></section>
+  <button id="play" class="main"></button>
+  <div class="extras"><button id="endless"></button><button id="sound"></button></div>
+  <p id="album" role="img" hidden></p>
 </div></div>
 
 <div id="paused" class="screen"><div>
-  <h2>Paused</h2>
+  <button id="pauseLanguage" class="language"></button>
+  <h2 data-i18n="paused"></h2>
   <p id="pausedLine"></p>
-  <p><button id="resume" class="main">Go on</button></p>
-  <p><button id="pauseMenu">Leave swim</button></p>
-  <p><button id="sound2">Sound: on</button></p>
+  <p><button id="resume" class="main" data-i18n="resume"></button></p>
+  <p><button id="pauseMenu" data-i18n="leave"></button></p>
+  <p><button id="sound2"></button></p>
   <div id="labSwitch"></div>
 </div></div>
 
 <div id="end" class="screen"><div>
   <canvas id="postcard" width="640" height="210" aria-hidden="true"></canvas>
   <h2 id="endTitle"></h2>
-  <div id="endStars"><span>★</span><span>★</span><span>★</span></div>
-  <p id="endLine"></p>
-  <p id="starTip"></p>
-  <p id="names"></p>
+  <div id="endStars" role="img"><span aria-hidden="true">★</span><span aria-hidden="true">★</span><span aria-hidden="true">★</span></div>
+  <div id="endLine"></div>
+  <div id="starTip"></div>
   <p class="score" id="endScore"></p>
-  <p><button id="next" class="main">Next</button></p>
-  <div id="endActions"><button id="again">Retry</button><button id="endMenu">Map</button></div>
+  <p><button id="next" class="main"></button></p>
+  <div id="endActions"><button id="again" data-i18n="retry"></button><button id="endMenu" data-i18n="map"></button></div>
 </div></div>
 
 <script type="module">
-import { create, step, stars, timeLeft, pathAt, view, DT, SPEED, LAST_STAGE, ENDLESS_AFTER, ENDLESS_TIME, TRAITS, QUACK_COOL, HEARTS, duskRate } from './sim.js?v=3';
+import { create, step, stars, timeLeft, pathAt, view, DT, SPEED, R_MOM, hits, LAST_STAGE, ENDLESS_AFTER, ENDLESS_TIME, TRAITS, QUACK_COOL, HEARTS, duskRate } from './sim.js?v=3';
 import { starFeedback, warningOnScreen } from './feedback.js';
 import { CHAPTERS, LEVELS, chapterOf } from './levels.js';
-import * as art from './art.js?v=3';
+import * as art from './art.js?v=4';
+import { icon } from './icons.js';
+import { t, lang, setLang, apply, langs, number } from './words.js';
 import * as save from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
@@ -231,7 +269,9 @@ let s = create({ stage, seed: SEED }), mode = 'stage', playing = false, paused =
 let cam = s.mom.y, camShown = cam, acc = 0, last = performance.now(), shake = 0, flash = 0;
 let prevMom = { x: s.mom.x, y: s.mom.y }, momA = 0, quackShow = 0, hurtT = 0, homeGlow = 0;
 let finger = null, destination = null, keys = new Set(), wantQuack = false, waitTouch = false, trailT = 0, trailShows = 0, turnLog = [];
-let parts = [], ripples = [], disp = new Map(), heads = new Map(), hops = new Map(), runners = [], nestDucks = [], recCount = 0, sayTimer = 0, peepT = 0;
+let parts = [], ripples = [], disp = new Map(), heads = new Map(), hops = new Map(), runners = [], nestDucks = [], recCount = 0, peepT = 0;
+let padGain = null;
+let sawCar = false;
 let caller = null, peepUntil = 0;
 const rec = lab('ducklings');
 const cards = screens(['menu', 'paused', 'end']);
@@ -239,22 +279,42 @@ const cards = screens(['menu', 'paused', 'end']);
 function show(name) {
   screen = name; cards(name);
   const play = name === 'play';
-  $('flockHud').hidden = !play;
-  $('nestDirection').hidden = true;
-  $('peep').hidden = true;
-  const curb = !s.endless && s.stage === 5 && s.mom.y < s.hazards[0].y1;
-  $('steerHelp').hidden = !play || !(curb || (waitTouch && !s.endless && s.stage <= 2));
+  $('flockHud').hidden = $('heartState').hidden = !play;
+  for (const id of ['nestDirection', 'peep', 'padDirection', 'guideLabel']) $(id).hidden = true;
   $('pause').style.display = play ? 'grid' : 'none'; $('quack').style.display = play ? 'block' : 'none';
   if (name === 'menu') menu();
 }
-function say(text, ms = 1400) { const el = $('say'); el.textContent = text; el.classList.add('on'); clearTimeout(sayTimer); sayTimer = setTimeout(() => el.classList.remove('on'), ms); }
 const starText = n => '<b>★</b>'.repeat(n) + '☆'.repeat(3 - n);
+const chapterName = i => t(CHAPTERS[i].name.toLowerCase());
+const levelName = n => t('level' + n);
+const countText = (key, n) => t(key, { n: number(n) });
+const starCount = n => countText(n === 1 ? 'oneStar' : 'stars', n);
+
+function setPlayLabel() {
+  const chapter = chapterOf(stage);
+  $('play').textContent = chapter === tab
+    ? t('play', { n: number(stage), level: levelName(stage) })
+    : t('playChapter', { n: number(stage), chapter: chapterName(chapter) });
+}
+
+function graphic(label, content, classes = 'stat') {
+  const el = document.createElement('span');
+  el.className = classes;
+  el.setAttribute('role', 'img');
+  el.setAttribute('aria-label', label);
+  el.innerHTML = content;
+  return el;
+}
 
 function menu() {
-  $('play').textContent = `Play ${stage} · ${LEVELS[stage].name}`;
+  setPlayLabel();
   $('endless').disabled = data.opened <= ENDLESS_AFTER;
-  $('endless').textContent = data.opened <= ENDLESS_AFTER ? `Endless · after ${ENDLESS_AFTER}` : data.endless ? `Endless · ${data.endless}` : 'Endless pond';
-  $('album').textContent = data.home ? `${data.home} duckling${data.home === 1 ? '' : 's'} home` : '';
+  $('endless').textContent = data.opened <= ENDLESS_AFTER ? countText('endlessLocked', ENDLESS_AFTER)
+    : data.endless ? countText('endlessBest', data.endless) : t('endless');
+  const album = $('album');
+  album.hidden = !data.home;
+  album.setAttribute('aria-label', countText(data.home === 1 ? 'oneHome' : 'ducksHome', data.home));
+  album.innerHTML = icon('nest') + number(data.home);
   drawMap();
   soundLabels(); drawMenuArt();
 }
@@ -267,7 +327,7 @@ function drawMap() {
     const badge = document.createElement('canvas');
     badge.width = 52; badge.height = 46; badge.setAttribute('aria-hidden', 'true');
     art.chapterBadge(badge.getContext('2d'), 26, 24, 91, c.icon);
-    button.append(badge, c.name);
+    button.append(badge, chapterName(i));
     button.style.setProperty('--chapter', c.color);
     button.setAttribute('aria-pressed', String(i === tab));
     button.addEventListener('click', () => {
@@ -275,7 +335,7 @@ function drawMap() {
       const candidate = Math.min(data.opened, c.last);
       if (candidate >= c.first && chapterOf(stage) !== i) stage = candidate;
       drawMap();
-      $('play').textContent = chapterOf(stage) === tab ? `Play ${stage} · ${LEVELS[stage].name}` : `Play ${CHAPTERS[chapterOf(stage)].name} · ${stage}`;
+      setPlayLabel();
       $('chapters').children[i].focus({ preventScroll: true });
     });
     $('chapters').append(button);
@@ -288,8 +348,8 @@ function drawMap() {
     button.disabled = !open(n);
     button.dataset.level = n;
     button.setAttribute('aria-pressed', String(n === stage));
-    button.setAttribute('aria-label', `Level ${n}, ${LEVELS[n].name}, ${open(n) ? earned + ' stars' : 'locked'}`);
-    button.innerHTML = `${n}<small>${open(n) ? starText(earned) : '🔒'}</small>`;
+    button.setAttribute('aria-label', t('levelNode', { n: number(n), level: levelName(n), status: open(n) ? starCount(earned) : t('locked') }));
+    button.innerHTML = `${number(n)}<small aria-hidden="true">${open(n) ? starText(earned) : '🔒'}</small>`;
     button.addEventListener('click', () => {
       stage = n;
       begin(false);
@@ -313,7 +373,7 @@ function drawMap() {
   q.stroke();
 }
 addEventListener('resize', () => { if (screen === 'menu') drawMap(); });
-function soundLabels() { for (const id of ['sound', 'sound2']) $(id).textContent = `Sound: ${data.sound ? 'on' : 'off'}`; }
+function soundLabels() { for (const id of ['sound', 'sound2']) $(id).textContent = t(data.sound ? 'soundOn' : 'soundOff'); }
 for (const id of ['sound', 'sound2']) $(id).addEventListener('click', () => {
   data.sound = !data.sound; store(); soundLabels();
   if (data.sound) { snd.unlock(); if (!paused) snd.release(); sfx.touch(); } else snd.hold();
@@ -325,15 +385,12 @@ function begin(endless = false) {
   s = create(endless ? { endless: true, seed: SEED ?? ((Math.random() * 2 ** 31) | 0) } : { stage, seed: SEED });
   cam = camShown = s.mom.y + (s.endless ? .20 : s.stage === 1 ? .32 : .27) * H / u; acc = 0; last = performance.now(); prevMom = { x: s.mom.x, y: s.mom.y }; momA = 0;
   parts = []; ripples = []; disp = new Map(); heads = new Map(); hops = new Map(); runners = []; nestDucks = []; turnLog = [];
-  finger = destination = null; keys.clear(); wantQuack = false; roll = new Map(); trailT = 0; trailShows = 0; shake = 0; flash = 0; recCount = 0; homeGlow = 0; quackShow = 0; hurtT = 0;
+  finger = destination = null; keys.clear(); wantQuack = false; trailT = 0; trailShows = 0; shake = 0; flash = 0; recCount = 0; homeGlow = 0; quackShow = 0; hurtT = 0;
   waitTouch = true;
   caller = null; peepT = 0;
-  $('steerHelp').classList.remove('crossing');
-  $('steerHelp').textContent = s.stage === 5 ? 'Tap the ring to wait at the curb.' :
-    s.stage === 1 ? 'Tap the nest. Drag to steer.' : 'Tap the calling duckling, then the nest.';
   $('quack').hidden = true;
-  lastTap = touchRing = null;
-  clearTimeout(sayTimer); $('say').classList.remove('on');
+  lastTap = touchRing = padGain = null;
+  sawCar = false;
   playing = true; paused = false; show('play');
   rec.start({ stage: s.stage, mode });
 }
@@ -344,35 +401,54 @@ function finish() {
   const won = s.over === 'nest', got = stars(s), n = s.arrived.length;
   rec.end(won ? 'nest' : 'lost-all', { stage: s.stage, arrived: n, collected: s.joins, stars: got, score: s.score, why: s.why, mode });
   data.home += n; for (const f of s.arrived) data.album[f.name] = (data.album[f.name] || 0) + 1;
-  let title, line, scoreLine, best;
+  const chapter = chapterOf(s.stage), need = LEVELS[s.stage]?.need;
+  const endLine = $('endLine');
+  endLine.replaceChildren();
+  $('endScore').hidden = !won && !s.endless;
+  let title, best, fresh;
   if (s.endless) {
-    best = Math.max(data.endless, s.score); const fresh = s.score > data.endless; data.endless = best;
-    title = s.why === 'hearts' ? 'Mama needs a rest' : 'The sun went down';
+    best = Math.max(data.endless, s.score); fresh = s.score > data.endless; data.endless = best;
+    title = s.why === 'hearts' ? 'heartsLost' : 'sundown';
     const crossed = s.checkpoints.filter(pad => pad.got).length;
-    line = `${crossed} sun pad${crossed === 1 ? '' : 's'} crossed · ${s.line.length} following`;
-    scoreLine = `${s.score} points${fresh && s.score > 0 ? ' · new best!' : ` · best ${best}`}`;
+    endLine.append(graphic(countText('padsCrossed', crossed), icon('pad') + number(crossed)),
+      graphic(countText('following', s.line.length), icon('duck') + number(s.line.length)));
   } else {
-    const key = s.stage; best = Math.max(data.best[key] || 0, s.score); const fresh = won && s.score > (data.best[key] || 0);
+    const key = s.stage; best = Math.max(data.best[key] || 0, s.score); fresh = won && s.score > (data.best[key] || 0);
     if (won) { data.best[key] = best; data.stars[key] = Math.max(data.stars[key] || 0, got); }
     if (won && s.stage === data.opened) data.opened = Math.min(LAST_STAGE, s.stage + 1);
-    const chapter = CHAPTERS[chapterOf(key)];
-    title = won ? (key === LAST_STAGE ? 'The whole trail!' : key === chapter.last ? `${chapter.name} cleared!` : n === s.total ? 'Everyone home!' : 'Home!') : s.why === 'hearts' ? 'Mama needs a rest' : s.why === 'short' ? 'Too few made it' : 'Time’s up';
-    line = won ? (s.total === 1 ? '1 duckling home' : `${n} of ${s.total} ducklings home`) : s.why === 'short' ? `${n} home · ${LEVELS[key].need} needed` : `${n} home`;
-    scoreLine = won ? `${s.score} points${fresh ? ' · new best!' : ` · best ${best}`}` : '';
+    title = won ? (key === LAST_STAGE ? 'campaignDone' : key === CHAPTERS[chapter].last ? 'chapterDone' : n === s.total ? 'everyoneHome' : 'home')
+      : s.why === 'hearts' ? 'heartsLost' : s.why === 'short' ? 'short' : 'timeout';
+    const label = s.why === 'short' ? t('shortOf', { n: number(n), need: number(need) })
+      : t('homeOf', { n: number(n), total: number(s.total) });
+    endLine.append(graphic(label, icon('nest') + number(n) + '/' + number(s.total)));
+    if (s.why === 'short') endLine.append(graphic(t('goal', { n: number(need), total: number(s.total) }),
+      icon('goal') + number(need) + icon('cross'), 'stat goal'));
   }
   data.taught = true; store();
-  $('starTip').textContent = won ? starFeedback(s) : '';
-  $('endTitle').textContent = title; $('endLine').textContent = line; $('endScore').textContent = scoreLine;
-  // the ducklings by name: who came home, who hid in the reeds
-  const names = $('names'); names.textContent = '';
-  for (const f of s.arrived) { const i = document.createElement('i'); i.textContent = `${f.name}, ${TRAITS[f.trait].word}`; names.append(i); }
-  for (const f of s.gone) { const i = document.createElement('i'); i.className = 'gone'; i.textContent = `${f.name} hid in the reeds`; names.append(i); }
+  if (s.gone.length) endLine.append(graphic(countText('hiddenDucks', s.gone.length), icon('reeds') + number(s.gone.length)));
+  const tip = $('starTip');
+  tip.replaceChildren();
+  const needs = won ? starFeedback(s) : [];
+  if (needs.length) {
+    const lead = document.createElement('span');
+    lead.setAttribute('aria-hidden', 'true');
+    lead.textContent = number(3) + '★ =';
+    tip.append(lead);
+    for (const kind of needs) {
+      const label = kind === 'nest' ? countText('starMissing', s.total) : t(kind === 'heart' ? 'starHits' : 'starScares');
+      const condition = kind === 'nest' ? icon(kind) + number(s.total) + '/' + number(s.total) : icon(kind) + icon('cross');
+      tip.append(graphic(label, condition, 'stat condition'));
+    }
+  }
+  $('endTitle').textContent = title === 'chapterDone' ? t(title, { chapter: chapterName(chapter) }) : t(title);
+  $('endScore').textContent = t(fresh ? 'scoreNew' : 'scoreBest', { score: number(s.score), best: number(best) });
+  $('endStars').setAttribute('aria-label', starCount(got));
   const spans = [...$('endStars').children];
   $('endStars').style.display = s.endless ? 'none' : '';
   spans.forEach(sp => { sp.className = ''; });
   const nextOk = !s.endless && won && s.stage < LAST_STAGE && open(s.stage + 1);
   $('next').style.display = nextOk ? '' : 'none';
-  $('next').textContent = chapterOf(s.stage) === chapterOf(s.stage + 1) ? `Next · ${s.stage + 1}` : 'Next chapter';
+  $('next').textContent = chapter === chapterOf(s.stage + 1) ? countText('next', s.stage + 1) : t('nextChapter');
   $('again').className = nextOk ? '' : 'main';
   if (won) burst(s.nest.x, s.nest.y, 'spark', still ? 8 : 40);
   drawPostcard(won);
@@ -397,13 +473,7 @@ function setOff() {
   if (!waitTouch) return;
   waitTouch = false;
   $('quack').hidden = false;
-  if (!s.endless && s.stage === 5) {
-    $('steerHelp').textContent = 'After a car passes, tap the far bank. Allow time for the last duckling.';
-    $('steerHelp').classList.add('crossing');
-  } else {
-    $('steerHelp').hidden = true;
-  }
-  rollCall(350, true);
+  rollCall(350);
 }
 canvas.addEventListener('pointerdown', e => {
   if (!playing) return;
@@ -419,14 +489,13 @@ canvas.addEventListener('pointerdown', e => {
   sfx.touch(); touchRing = { x: e.clientX, y: e.clientY, t: now };
 });
 let lastTap = null, touchRing = null;
-// Roll call: when she first sets off, each duckling peeps and hops in turn and its name floats up; a quack is
-// answered the same way down the line, a little echo of what she did.
-let nameTags = [], roll = new Map(), hudPeeks = 0, rollCalls = 0;
-function rollCall(delay0, names) {
+// Each duckling hops and answers in order, both at the start and after a quack.
+let hudPeeks = 0, rollCalls = 0;
+function rollCall(delay0) {
   const now = performance.now(); rollCalls++;
   s.line.forEach((f, i) => {
     const at = now + delay0 + i * 170;
-    hops.set(f.id, at); if (names) roll.set(f.id, at);
+    hops.set(f.id, at);
     later(delay0 + i * 170, () => { if (playing && !paused) peep(note(i + 3) * 1.6, 0.035); });
   });
 }
@@ -461,7 +530,7 @@ function keyTarget() {
 function pause() {
   if (!playing || paused) return;
   paused = true; finger = destination = null; keys.clear();
-  $('pausedLine').textContent = s.endless ? `Score ${s.score}.` : `Stage ${s.stage}. ${s.line.length} following, ${s.arrived.length} home.`;
+  pauseLabel();
   show('paused'); snd.hold();
 }
 function resume() {
@@ -483,42 +552,89 @@ $('endMenu').addEventListener('click', () => {
   tab = chapterOf(stage);
   show('menu');
 });
-rec.notice($('menu').firstElementChild);
-rec.toggle($('labSwitch'));
+// Localize the labels around the kit's original link and checkbox.
+const notice = rec.notice($('menu').firstElementChild);
+if (notice) {
+  const link = notice.querySelector('a'), copy = document.createElement('span');
+  copy.dataset.i18n = 'notice'; link.dataset.i18n = 'privacy'; notice.replaceChildren(copy, link);
+}
+const recording = rec.toggle($('labSwitch'));
+if (recording) {
+  const input = recording.querySelector('input'), copy = document.createElement('span');
+  copy.dataset.i18n = 'record'; recording.replaceChildren(input, copy);
+}
+
+function pauseLabel() {
+  $('pausedLine').textContent = s.endless ? countText('points', s.score) : countText('stage', s.stage);
+}
+
+function localizeNotes() {
+  $('notes-button')?.setAttribute('aria-label', t('notes'));
+}
+const notesButtonScript = $('notesScript');
+notesButtonScript.addEventListener('load', localizeNotes);
+
+function refreshLanguage() {
+  apply();
+  localizeNotes();
+  soundLabels();
+  for (const id of ['menuLanguage', 'pauseLanguage']) {
+    $(id).innerHTML = icon('globe') + '<span aria-hidden="true">' + t('langCode') + '</span>';
+    $(id).setAttribute('aria-label', t('switchLanguage'));
+  }
+  const hintLabel = document.querySelector('.kit-hint .label');
+  if (hintLabel) hintLabel.textContent = t('hint');
+  if (screen === 'menu') menu();
+  if (screen === 'paused') pauseLabel();
+}
+for (const id of ['menuLanguage', 'pauseLanguage']) $(id).addEventListener('click', () => {
+  setLang(langs[(langs.indexOf(lang()) + 1) % langs.length]);
+  // The explicit address chooses the initial language. A later tap becomes the saved choice.
+  const url = new URL(location.href);
+  if (url.searchParams.has('lang')) {
+    url.searchParams.delete('lang');
+    history.replaceState(history.state, '', url);
+  }
+  refreshLanguage();
+});
+
+$('nestDirection').innerHTML = icon('nest') + icon('up');
+$('padDirection').innerHTML = icon('pad') + icon('up');
+$('sunRule').innerHTML = icon('pad') + icon('right') + icon('sun');
+$('quackDemo').innerHTML = icon('duck') + icon('duck') + icon('duck');
 
 // ---------------------------------------------------------------- one tick
 function tick() {
   prevMom = { x: s.mom.x, y: s.mom.y };
   const target = destination ?? keyTarget();
   step(s, target, wantQuack); wantQuack = false;
-  if (!s.endless && s.stage === 5 && s.mom.y >= s.hazards[0].y1 && !$('steerHelp').hidden) $('steerHelp').hidden = true;
   for (const e of s.events) {
     if (e.type === 'join') {
-      sfx.join(s.line.length); say(e.again ? 'Back together!' : '+1 duckling', 850);
-      s.line.forEach((f, i) => hops.set(f.id, performance.now() + i * 55)); roll.set(e.id, performance.now() + 150);
+      sfx.join(s.line.length);
+      s.line.forEach((f, i) => hops.set(f.id, performance.now() + i * 55));
       burst(e.x, e.y, 'spark', 10);
       note2('join', { n: s.line.length });
     }
     if (e.type === 'scatter') {
       sfx.scatter(); shake = Math.max(shake, 0.35); burst(e.x, e.y, 'feather', 9);
       runners.push({ id: e.id, x0: e.x, y0: e.y, x1: e.tx, y1: e.ty, t0: performance.now(), dur: 800 });
-      disp.delete(e.id); say('Oh no!', 900);
+      disp.delete(e.id);
       note2('lost', { by: e.by });
     }
     if (e.type === 'gone') {
       sfx.gone(); burst(e.x, e.y, 'feather', 12);
       runners.push({ id: e.id, x0: e.x, y0: e.y, x1: e.x < 0.5 ? -0.05 : 1.05, y1: e.y - 0.1, t0: performance.now(), dur: 1400, gone: true });
-      disp.delete(e.id); say('Hiding in the reeds…', 1200);
+      disp.delete(e.id);
       note2('lost', { by: e.by, gone: true });
     }
-    if (e.type === 'hit') { sfx.hit(); shake = Math.max(shake, 0.7); hurtT = 0.6; if (!still) flash = 0.35; burst(e.x, e.y, 'drop', 12); say(s.hearts > 0 ? 'Ouch!' : '', 900); note2('hit', { by: e.by }); }
+    if (e.type === 'hit') { sfx.hit(); shake = Math.max(shake, 0.7); hurtT = 0.6; if (!still) flash = 0.35; burst(e.x, e.y, 'drop', 12); note2('hit', { by: e.by }); }
     if (e.type === 'warn' && warningOnScreen(sy(e.y), H)) {
       if (e.kind === 'bike' || e.kind === 'car') sfx.bell(); else if (e.kind === 'cat' || e.kind === 'bridge') sfx.bubbles(); else if (e.kind === 'turtle') sfx.bubbles(); else if (e.kind === 'heron') sfx.heron(); else if (e.kind === 'gust') sfx.gust();
     }
-    if (e.type === 'quack') { sfx.quack(); quackShow = 0.5; trailT = Math.max(trailT, 1.4); ripples.push({ x: s.mom.x, y: s.mom.y, t0: performance.now(), s: 2 }); rollCall(180, false); }
+    if (e.type === 'quack') { sfx.quack(); quackShow = 0.5; trailT = Math.max(trailT, 1.4); ripples.push({ x: s.mom.x, y: s.mom.y, t0: performance.now(), s: 2 }); rollCall(180); }
     if (e.type === 'home') { sfx.home(); homeGlow = 1; }
     if (e.type === 'arrive') { sfx.arrive(e.k); nestDucks.push({ id: e.id, x: e.x, y: e.y, t0: performance.now(), k: e.k, trait: (s.arrived.find(f => f.id === e.id) || {}).trait }); disp.delete(e.id); burst(s.nest.x, s.nest.y, 'spark', 6); }
-    if (e.type === 'check') { sfx.check(); say(`+${e.add} sun${e.scares ? ' · scattered' : ''}`, 1400); burst(s.mom.x, s.mom.y, 'spark', 12); }
+    if (e.type === 'check') { sfx.check(); padGain = { ...e, t0: performance.now() }; burst(s.mom.x, s.mom.y, 'spark', 12); }
   }
   // the first curve the ducklings copy: show her path for a moment (stages 1 and 2)
   const sp = Math.hypot(s.mom.vx, s.mom.vy);
@@ -615,7 +731,9 @@ function drawHazards(now) {
       g.beginPath(); g.moveTo(sx(x), sy(y)); g.lineTo(sx(x) - dir * len, sy(y)); g.stroke();
       if (i % 3 === 0) { g.fillStyle = i % 2 ? '#e0b04a' : '#9bc25a'; g.beginPath(); g.ellipse(sx(x), sy(y + 0.02), 0.012 * u, 0.006 * u, now / 200 + i, 0, 7); g.fill(); }
     }
-    if (c.phase === 'warn') { g.fillStyle = 'rgba(255,255,255,.85)'; g.font = `bold ${Math.round(0.07 * u)}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(dir > 0 ? '»' : '«', sx(dir > 0 ? 0.1 : 0.9), sy((h.y0 + h.y1) / 2)); }
+    if (c.phase === 'warn') {
+      for (let i = 0; i < 2; i++) art.chevron(g, sx(dir > 0 ? .08 + i * .035 : .92 - i * .035), sy((h.y0 + h.y1) / 2), .012 * u, dir * Math.PI / 2);
+    }
   }
   for (const r of s.rocks) if (r.y > bottom - 0.2 && r.y < top + 0.2) art.rock(g, sx(r.x), sy(r.y), r.r * u, Math.round(r.x * 1000 + r.y * 100));
   for (const h of s.hazards) {
@@ -646,7 +764,7 @@ function drawHazards(now) {
     }
     if (h.kind === 'turtle') art.turtle(g, sx(h.x), sy(h.y), h.r, u, v.phase, v.f, now / 1000);
     if (h.kind === 'bike') for (const b of v.bikes) {
-      if (b.warn) { art.bell(g, sx(b.dir > 0 ? 0.08 : 0.92), sy(h.y), u, now / 1000); g.fillStyle = '#d94f3d'; g.font = `bold ${Math.round(0.06 * u)}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('!', sx(b.dir > 0 ? 0.16 : 0.84), sy(h.y)); }
+      if (b.warn) art.bell(g, sx(b.dir > 0 ? 0.08 : 0.92), sy(h.y), u, now / 1000);
       else art.bike(g, sx(b.x), sy(h.y), b.dir, u, now / 1000);
     }
     if (h.kind === 'heron') {
@@ -703,7 +821,6 @@ function drawLine(now, alpha) {
       }
     }
   }
-  const names = [];
   for (let i = pos.length - 1; i >= 0; i--) {
     const { f, p, d } = pos[i];
     d.x += (p.x - d.x) * 0.25; d.y += (p.y - d.y) * 0.25; // and drift back onto her path
@@ -715,17 +832,7 @@ function drawLine(now, alpha) {
     const hop = hops.get(f.id), hk = hop ? (now - hop) / 260 : 2, lift = hk > 0 && hk < 1 ? Math.sin(hk * Math.PI) * 0.018 * u : 0;
     if (mv > 0.004 && Math.random() < 0.03) ripples.push({ x: d.x, y: d.y, t0: now, s: 0.7 });
     art.duckling(g, sx(d.x), sy(d.y) - lift, a, u, t, f.id * 1.7, { trait: f.trait, moving: mv > 0.004 ? 1 : 0.2, open: hk > 0 && hk < 1, blink: (t + f.id) % 4 < 0.12 });
-    const rc = roll.get(f.id), rk = rc ? (now - rc) / 1600 : -1;
-    if (rk > 0 && rk < 1) names.push({ text: f.name, x: sx(d.x) + (i % 2 ? 1 : -1) * 0.1 * u, y: sy(d.y) - 0.02 * u - rk * 0.06 * u, a: Math.min(1, 4 * (1 - rk), rk * 8) });
-    else if (rk >= 1) roll.delete(f.id);
   }
-  nameTags = names;
-}
-// The roll-call names, over every bird.
-function drawNames() {
-  g.font = `bold ${Math.round(14 * dpr)}px ui-rounded, system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-  for (const n of nameTags) { g.globalAlpha = n.a; g.lineWidth = 4 * dpr; g.strokeStyle = '#fffdf3'; g.strokeText(n.text, n.x, n.y); g.fillStyle = '#7a4a1c'; g.fillText(n.text, n.x, n.y); }
-  g.globalAlpha = 1;
 }
 function lerpMom(alpha) { return { x: prevMom.x + (s.mom.x - prevMom.x) * alpha, y: prevMom.y + (s.mom.y - prevMom.y) * alpha }; }
 
@@ -763,7 +870,7 @@ function drawNest(now) {
     const a = i / Math.max(6, nestDucks.length) * Math.PI * 2 - Math.PI / 2, tx = s.nest.x + Math.cos(a) * 0.075, ty = s.nest.y + Math.sin(a) * 0.065;
     const k = Math.min(1, (now - d.t0) / 450), x = d.x + (tx - d.x) * k, y = d.y + (ty - d.y) * k, lift = Math.sin(k * Math.PI) * 0.05 * u;
     art.duckling(g, sx(x), sy(y) - lift, Math.atan2(s.nest.x - x, s.nest.y - y) + Math.PI, u, now / 1000, d.id, { trait: d.trait, moving: 0.2, blink: k >= 1 && (now / 1000 + d.id) % 3 < 0.2 });
-    if (k < 1) { g.fillStyle = `rgba(47,107,94,${1 - k})`; g.font = `bold ${Math.round(0.07 * u)}px system-ui, sans-serif`; g.textAlign = 'center'; g.fillText(String(d.k), sx(tx), sy(ty) - 0.07 * u - k * 0.05 * u); }
+    if (k < 1) { g.fillStyle = `rgba(47,107,94,${1 - k})`; g.font = `bold ${Math.round(0.07 * u)}px system-ui, sans-serif`; g.textAlign = 'center'; g.fillText(number(d.k), sx(tx), sy(ty) - 0.07 * u - k * 0.05 * u); }
   });
 }
 
@@ -775,10 +882,9 @@ function drawMother(now, alpha) {
   art.mother(g, sx(m.x), sy(m.y), momA, u, now / 1000, Math.min(1, sp / SPEED), (now / 1000) % 3.5 < 0.12, hurtT > 0);
   g.globalAlpha = 1;
   if (sp > 0.05 && Math.random() < 0.06) ripples.push({ x: m.x, y: m.y, t0: now, s: 1.3 });
-  if (quackShow > 0) { // a speech bubble
-    const bx = sx(m.x) + 0.06 * u, by = sy(m.y) - 0.08 * u;
-    g.fillStyle = '#fffdf3'; g.beginPath(); g.roundRect(bx - 0.06 * u, by - 0.03 * u, 0.13 * u, 0.055 * u, 0.025 * u); g.fill();
-    g.fillStyle = '#c96a10'; g.font = `bold ${Math.round(0.035 * u)}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('Quack!', bx + 0.005 * u, by - 0.002 * u);
+  if (quackShow > 0) {
+    // Sound waves leave her bill while the followers visibly bunch up.
+    art.soundWaves(g, sx(m.x), sy(m.y), momA, u, 1 - quackShow / .5);
   }
 }
 
@@ -795,77 +901,191 @@ function drawGuide(now) {
     if (k < 1) { g.strokeStyle = `rgba(255,255,255,${0.8 * (1 - k)})`; g.lineWidth = 3 * dpr; g.beginPath(); g.arc(touchRing.x * dpr, touchRing.y * dpr, (20 + 30 * k) * dpr, 0, 7); g.stroke(); }
   }
   const spec = s.endless ? null : LEVELS[s.stage];
-  const teaching = spec?.guide && s.t < 5;
-  if ((!waitTouch && !teaching) || help.shown) return;
-  const points = spec?.guide ?? [[s.mom.x, s.mom.y + .30]];
-  const from = waitTouch ? [.50, .35] : [s.mom.x, s.mom.y];
-  const next = points.filter(([, y]) => waitTouch || y > s.mom.y + .06);
-  if (!next.length) return;
-  g.strokeStyle = waitTouch ? '#fff8d8' : '#fff8d8a6';
-  g.lineWidth = 3 * dpr;
-  g.setLineDash([5 * dpr, 7 * dpr]); g.lineDashOffset = still ? 0 : -now / 42;
-  g.beginPath(); g.moveTo(sx(from[0]), sy(from[1]));
-  for (const [x, y] of next) g.lineTo(sx(x), sy(y));
-  g.stroke(); g.setLineDash([]); g.lineDashOffset = 0;
-  const [x, y] = next[0], tx = sx(x), ty = sy(y);
-  g.strokeStyle = '#fff8d8'; g.beginPath(); g.arc(tx, ty, 8 * dpr, 0, 7); g.stroke();
-  if (!waitTouch) {
-    if (s.stage === 16 && s.hazards.some(h => h.kind === 'bridge' && view(h, s.t).phase === 'warn')) {
-      const button = $('quack').getBoundingClientRect();
-      art.ghostFinger(g, (button.right + 7) * dpr, (button.top + 9) * dpr, u * .7, still ? .4 : now / 1000);
+  if (s.endless) {
+    const pad = s.checkpoints.find(p => !p.got);
+    if (pad && (waitTouch || timeLeft(s) <= 10)) {
+      const edge = sy(pad.y) < (inset.top + 113) * dpr;
+      const marker = $('padDirection');
+      marker.hidden = !edge;
+      if (edge) marker.style.left = `${sx(.5) / dpr}px`;
+      else {
+        drawRing(sx(.5), sy(pad.y), 25, '#df9a32');
+        if (!help.shown) art.chevron(g, sx(.5), sy(pad.y) + 34 * dpr, 8 * dpr, 0);
+      }
+    } else $('padDirection').hidden = true;
+    return;
+  }
+  if (s.stage === 5) {
+    drawRoadGuide(now);
+    return;
+  }
+  if (s.stage === 1 && waitTouch) {
+    showGuideLabel('firstTap');
+    const target = [s.nest.x, s.nest.y];
+    const phase = still ? 0 : (now / 1000) % 3.2;
+    const start = [s.mom.x + .05, s.mom.y + .34];
+    const press = phase < 1.5 ? target : mixPoint(start, target, Math.min(1, (phase - 1.5) / 1.1));
+    drawRoute([s.mom.x, s.mom.y], [target], now);
+    if (!help.shown) art.ghostFinger(g, sx(press[0]), sy(press[1]), u, still ? .4 : now / 1000);
+    return;
+  }
+  if (s.stage === 2 && !s.home) {
+    const duck = s.lost.find(d => d.born);
+    const idle = !destination || Math.hypot(destination.x - s.mom.x, destination.y - s.mom.y) < .045;
+    showGuideLabel(waitTouch ? 'rescueTap' : !duck && idle ? 'rescueNest' : null);
+    const target = duck ?? s.nest;
+    const tx = sx(target.x), ty = sy(target.y);
+    if (ty >= (inset.top + 95) * dpr && (idle || waitTouch)) {
+      drawRoute([s.mom.x, s.mom.y], [[target.x, target.y]], now);
+      if (!help.shown && (waitTouch || !duck)) art.ghostFinger(g, tx, ty, u, still ? .4 : now / 1000);
     }
     return;
   }
-  const t = still ? .4 : now / 1000;
-  const f = still ? 1 : .55 + .45 * Math.min(1, (t % 1.8) / .8);
-  const startX = sx(from[0]), startY = sy(from[1]);
-  art.ghostFinger(g, startX + (tx - startX) * f, startY + (ty - startY) * f, u, t);
-}
-function drawHud(now) {
-  const top = (inset.top + 12) * dpr, pad = 14 * dpr, r = 9 * dpr;
-  const hudBottom = top + 72 * dpr;
-  // a hazard warning hidden under the HUD is repeated just below it, at the same x
-  for (const w of warningsAt(s.t)) { const y = sy(w.y); if (y < hudBottom && y > hudBottom - 0.9 * u) { art.alert(g, sx(w.x), hudBottom + 0.07 * u + 16 * dpr, u * 0.8, now / 1000 + w.x, '#d94f3d'); hudPeeks++; } }
-  // hearts
-  for (let i = 0; i < HEARTS; i++) {
-    const x = pad + r + i * 2.4 * r, y = top + 14 * dpr, full = i < s.hearts;
-    g.fillStyle = full ? '#ff5a6e' : 'rgba(255,255,255,.55)'; g.strokeStyle = full ? '#c2304a' : 'rgba(47,107,94,.4)'; g.lineWidth = 2 * dpr;
-    g.beginPath(); g.moveTo(x, y + r * 0.9); g.bezierCurveTo(x - r * 1.6, y - r * 0.2, x - r * 0.6, y - r * 1.3, x, y - r * 0.4); g.bezierCurveTo(x + r * 0.6, y - r * 1.3, x + r * 1.6, y - r * 0.2, x, y + r * 0.9); g.fill(); g.stroke();
+  showGuideLabel(null);
+  const teaching = spec.guide && s.t < 5;
+  if ((!waitTouch && !teaching) || help.shown) return;
+  const points = spec.guide ?? [[s.mom.x, s.mom.y + .30]];
+  const next = points.filter(([, y]) => waitTouch || y > s.mom.y + .06);
+  if (!next.length) return;
+  drawRoute([s.mom.x, s.mom.y], next, now);
+  if (waitTouch) {
+    art.ghostFinger(g, sx(next[0][0]), sy(next[0][1]), u, still ? .4 : now / 1000);
+  } else if (s.stage === 16 && s.hazards.some(h => h.kind === 'bridge' && view(h, s.t).phase === 'warn')) {
+    const button = $('quack').getBoundingClientRect();
+    art.ghostFinger(g, (button.right + 7) * dpr, (button.top + 9) * dpr, u * .7, still ? .4 : now / 1000);
   }
-  const cx = W / 2, cy = top + 16 * dpr;
-  const following = s.line.length, waiting = s.lost.length;
-  let count = `${following} following`;
-  if (s.home) count = `${s.arrived.length} home · ${following} arriving`;
-  else if (!s.endless && waiting) count += ` · ${waiting} waiting`;
-  const low = s.endless && timeLeft(s) <= 10;
-  const goal = s.endless ? (low ? 'Low light! Cross a pad' : 'Cross sun pads for light')
-    : `Bring ${LEVELS[s.stage].need}${s.total > LEVELS[s.stage].need ? ' of ' + s.total : ''} home`;
-  if ($('flockCount').textContent !== count) $('flockCount').textContent = count;
-  if ($('flockGoal').textContent !== goal) $('flockGoal').textContent = goal;
-  $('flockHud').classList.toggle('low', low);
-  const nestAhead = !s.endless && !s.home && following >= LEVELS[s.stage].need && sy(s.nest.y) < 0;
+}
+
+function showGuideLabel(key) {
+  const el = $('guideLabel');
+  el.hidden = !key;
+  if (key && el.textContent !== t(key)) el.textContent = t(key);
+}
+
+function mixPoint([x0, y0], [x1, y1], k) {
+  return [x0 + (x1 - x0) * k, y0 + (y1 - y0) * k];
+}
+
+function drawRing(x, y, radius, color = '#356d5a') {
+  g.beginPath(); g.arc(x, y, radius * dpr, 0, 7);
+  g.strokeStyle = color; g.lineWidth = 5 * dpr; g.stroke();
+  g.strokeStyle = '#fff8d8'; g.lineWidth = 2.5 * dpr; g.stroke();
+}
+
+function drawRoute(from, points, now) {
+  g.strokeStyle = '#fff8d8'; g.lineWidth = 3 * dpr;
+  g.setLineDash([5 * dpr, 7 * dpr]); g.lineDashOffset = still ? 0 : -now / 42;
+  g.beginPath(); g.moveTo(sx(from[0]), sy(from[1]));
+  for (const [x, y] of points) g.lineTo(sx(x), sy(y));
+  g.stroke(); g.setLineDash([]); g.lineDashOffset = 0;
+  const [x, y] = points[points.length - 1];
+  drawRing(sx(x), sy(y), 13);
+}
+
+function drawRoadGuide(now) {
+  const road = s.hazards[0], v = view(road, s.t);
+  const last = s.line.at(-1);
+  const tail = last ? pathAt(s, last.delay) : s.mom;
+  const time = still ? .4 : now / 1000;
+  const bank = [s.mom.x, road.y1 + .13];
+  const [curb] = LEVELS[5].guide;
+  const carClear = !v.warn && (road.dir > 0 ? v.x > 1.12 : v.x < -.12);
+  if (!waitTouch && (v.warn || v.visible)) sawCar = true;
+  const readyToCross = sawCar && carClear && tailCanCross(road, last?.delay ?? 0);
+  if (waitTouch || s.mom.y < curb[1] - .11) {
+    showGuideLabel('roadCurb');
+    drawRoute([s.mom.x, s.mom.y], [curb], now);
+    if (!help.shown) art.ghostFinger(g, sx(curb[0]), sy(curb[1]), u, time);
+  } else if (s.mom.y >= road.y1 + .10) {
+    showGuideLabel(tail.y <= road.y1 ? 'roadTail' : null);
+    if (tail.y <= road.y1) drawRing(sx(tail.x), sy(tail.y), 18, '#bf8734');
+  } else if (s.mom.y > road.y0) {
+    showGuideLabel('roadCross');
+    drawRoute([s.mom.x, s.mom.y], [bank], now);
+    if (last && tail.y <= road.y1) drawRing(sx(tail.x), sy(tail.y), 18, '#bf8734');
+  } else if (readyToCross) {
+    showGuideLabel('roadCross');
+    drawRoute([s.mom.x, s.mom.y], [bank], now);
+    art.chevron(g, sx(bank[0]), sy(road.y) + 4 * dpr, 10 * dpr, 0);
+    if (!help.shown) art.ghostFinger(g, sx(bank[0]), sy(bank[1]), u, time);
+  } else {
+    showGuideLabel('roadWait');
+    const x = sx(s.mom.x), y = sy(road.y0 - .035);
+    drawRing(x, y, 12, '#a95238');
+    g.strokeStyle = '#a95238'; g.lineWidth = 3 * dpr; g.lineCap = 'round'; g.beginPath();
+    for (const offset of [-3, 3]) { g.moveTo(x + offset * dpr, y - 5 * dpr); g.lineTo(x + offset * dpr, y + 5 * dpr); }
+    g.stroke();
+    if (v.warn || v.visible) {
+      const carX = Math.max(28 * dpr, Math.min(W - 28 * dpr, sx(v.x)));
+      art.chevron(g, carX, sy(road.y) - .11 * u, 8 * dpr, road.dir * Math.PI / 2);
+    }
+  }
+}
+
+function tailCanCross(road, delay) {
+  // Include the bird delayed at the end of the line and room to react to the cue.
+  const clearIn = (road.y1 + .025 - s.mom.y) / SPEED + delay + .25;
+  for (let dt = .08; dt <= clearIn + .08; dt += .08) {
+    if (hits(road, s.t + dt, s.mom.x, road.y, R_MOM)) return false;
+  }
+  return true;
+}
+
+let hudKey = '';
+function drawHud(now) {
+  const top = (inset.top + 12) * dpr, hudBottom = top + 72 * dpr;
+  // Repeat a covered hazard warning below the HUD, at the same x.
+  for (const w of warningsAt(s.t)) { const y = sy(w.y); if (y < hudBottom && y > hudBottom - 0.9 * u) { art.alert(g, sx(w.x), hudBottom + 0.07 * u + 16 * dpr, u * 0.8, now / 1000 + w.x, '#d94f3d'); hudPeeks++; } }
+
+  const following = s.line.length, waiting = s.lost.length, home = s.arrived.length;
+  const leftTime = timeLeft(s), timed = Number.isFinite(leftTime), remaining = Math.ceil(leftTime);
+  const low = s.endless && leftTime <= 10;
+  const faster = s.endless && duskRate(s.t) > 1;
+  const reward = s.endless && padGain && now - padGain.t0 < 1400 ? padGain : null;
+  const key = [lang(), s.stage, s.total, following, waiting, home, s.home, s.hearts, remaining, low, faster,
+    s.score, reward?.add, reward?.scares].join('|');
+  if (key !== hudKey) {
+    hudKey = key;
+    $('heartState').setAttribute('aria-label', countText('hearts', s.hearts));
+    $('heartState').innerHTML = icon('life').repeat(s.hearts) + icon('spent').repeat(HEARTS - s.hearts);
+    const flock = $('flockCount');
+    flock.replaceChildren(graphic(countText('following', following), icon('duck') + number(following)));
+    if (waiting && !s.endless) flock.append(graphic(countText('waiting', waiting), icon('waiting') + number(waiting)));
+    if (s.home) flock.append(graphic(countText('homeCount', home), icon('nest') + number(home)));
+    if (!s.endless) {
+      const need = LEVELS[s.stage].need, met = home >= need;
+      const label = t('goal', { n: number(need), total: number(s.total) });
+      flock.append(graphic(label, icon('goal') + '≥' + number(need) +
+        (met ? icon('check') : ''), `stat goal${met ? ' met' : ''}`));
+    }
+
+    const stats = $('runStats');
+    if (s.endless) {
+      stats.replaceChildren(graphic(countText('points', s.score), number(s.score)),
+        graphic(countText('sunlight', remaining), icon('sun') + number(remaining)),
+        ...(faster ? [graphic(t('lightDropsFaster'), icon('down'))] : []));
+    } else if (timed) {
+      stats.replaceChildren(graphic(countText('seconds', remaining), icon('clock') + number(remaining)));
+    } else {
+      stats.textContent = countText('stage', s.stage);
+    }
+    $('flockHud').classList.toggle('low', low);
+    $('sunRule').hidden = !s.endless;
+    $('sunRule').setAttribute('aria-label', t(low ? 'lowLight' : 'padsRefill'));
+    $('lightMeter').hidden = !timed;
+    $('padReward').hidden = !reward;
+    if (reward) $('padReward').replaceChildren(
+      graphic(t('sunlightAdded', { n: number(reward.add) }), icon('sun') + countText('padGain', reward.add)),
+      ...(reward.scares ? [graphic(t('padPenalty'), icon('scatter') + icon('down'))] : []));
+  }
+  if (timed) $('lightFill').style.width = `${Math.min(100, Math.max(0, leftTime / (s.endless ? ENDLESS_TIME : s.time) * 100))}%`;
+
+  const roadGuideActive = s.stage === 5 && pathAt(s, s.line.at(-1)?.delay ?? 0).y <= s.hazards[0].y1;
+  const nestAhead = !s.endless && !s.home && !roadGuideActive && following >= LEVELS[s.stage].need &&
+    sy(s.nest.y) < (inset.top + 79) * dpr;
   const marker = $('nestDirection');
   marker.hidden = !nestAhead;
   if (nestAhead) marker.style.left = `${Math.max(36, Math.min(W / dpr - 36, sx(s.nest.x) / dpr))}px`;
-  g.fillStyle = '#234d46'; g.font = `800 ${Math.round(13 * dpr)}px ui-rounded, system-ui`;
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  if (s.endless || Number.isFinite(s.time)) {
-    const left0 = timeLeft(s), frac = Math.max(0, Math.min(1, left0 / (s.endless ? ENDLESS_TIME : s.time)));
-    const bw = Math.min(W - 100 * dpr, 260 * dpr), bx = (W - bw) / 2, by = cy + 26 * dpr;
-    g.fillStyle = '#fff9df'; g.beginPath(); g.roundRect(bx, by, bw, 8 * dpr, 4 * dpr); g.fill();
-    g.fillStyle = left0 < 3 ? '#ca5842' : '#e4a42d';
-    g.beginPath(); g.roundRect(bx, by, Math.max(1, bw * frac), 8 * dpr, 4 * dpr); g.fill();
-    g.fillStyle = '#234d46';
-    const txt = s.endless ? `${s.score} pts  ·  ☀ ${Math.ceil(left0)}${duskRate(s.t) > 1 ? ' ↓' : ''}` : `◷ ${Math.ceil(left0)}s`;
-    g.lineWidth = 3 * dpr; g.strokeStyle = '#fff9df'; g.strokeText(txt, cx, by + 21 * dpr);
-    g.fillText(txt, cx, by + 21 * dpr);
-  } else {
-    const chapter = CHAPTERS[chapterOf(s.stage)];
-    g.fillStyle = '#234d46';
-    const label = `${chapter.name} · ${s.stage}`;
-    g.lineWidth = 3 * dpr; g.strokeStyle = '#fff9df'; g.strokeText(label, cx, cy + 34 * dpr);
-    g.fillText(label, cx, cy + 34 * dpr);
-  }
 }
 
 function drawCheckpoint(pad, now) {
@@ -873,10 +1093,7 @@ function drawCheckpoint(pad, now) {
   g.strokeStyle = pad.got ? '#ffffff55' : '#fff3b6b8'; g.lineWidth = 2 * dpr; g.setLineDash([5 * dpr, 7 * dpr]);
   g.beginPath(); g.moveTo(sx(.09), y); g.lineTo(sx(.91), y); g.stroke(); g.setLineDash([]);
   art.lilyPad(g, x, y, 22 * dpr, now / 4000, !pad.got);
-  if (!pad.got) {
-    g.fillStyle = '#fff7bf'; g.font = `800 ${20 * dpr}px system-ui`; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText('☀', x, y + dpr);
-  }
+  if (!pad.got) art.sun(g, x, y, 9 * dpr);
 }
 
 // Where warnings are showing at time t: the side a log or bike comes from, or the hazard itself.
@@ -939,20 +1156,33 @@ function frame(now) {
     const caption = $('peep');
     caption.hidden = !(caller && now < peepUntil && s.lost.includes(caller));
     if (!caption.hidden) {
-      const y = sy(caller.y) / dpr, top = inset.top + 112, bottom = H / dpr - inset.bottom - 78;
-      caption.textContent = y < 0 ? '↑ Peep!' : y > H / dpr ? 'Peep! ↓' : 'Peep!';
-      caption.style.left = `${Math.max(30, Math.min(W / dpr - 30, sx(caller.x) / dpr))}px`;
-      caption.style.top = `${Math.max(top, Math.min(bottom, y - 42))}px`;
+      const y = sy(caller.y) / dpr, top = inset.top + 110, bottom = H / dpr - inset.bottom - 78;
+      const above = y < top, below = y > H / dpr - inset.bottom;
+      const key = above ? 'callingAbove' : below ? 'callingBelow' : 'calling';
+      if (caption.dataset.cue !== key || caption.lang !== lang()) {
+        caption.dataset.cue = key; caption.lang = lang();
+        caption.setAttribute('aria-label', t(key));
+        caption.innerHTML = icon('call') + (above ? icon('up') : below ? icon('down') : '');
+      }
+      caption.style.left = `${Math.max(32, Math.min(W / dpr - 32, sx(caller.x) / dpr))}px`;
+      const pos = y - 46 < top && !above ? y + 34 : y - 46;
+      caption.style.top = `${Math.max(top, Math.min(below ? H / dpr - 37 : bottom, pos))}px`;
     }
-    const q = $('quack'); const ready = 1 - s.quackCool / QUACK_COOL; q.style.setProperty('--ready', ready.toFixed(3)); q.classList.toggle('wait', ready < 1);
-    $('quackLabel').textContent = ready < 1 ? `${Math.ceil(s.quackCool)}s` : 'Quack';
+    const q = $('quack'), ready = 1 - s.quackCool / QUACK_COOL, cool = Math.ceil(s.quackCool);
+    q.style.setProperty('--ready', ready.toFixed(3)); q.classList.toggle('wait', cool > 0);
+    const quackKey = lang() + cool;
+    if (q.dataset.cue !== quackKey) {
+      q.dataset.cue = quackKey;
+      q.setAttribute('aria-label', cool ? t('quackWait', { n: countText('seconds', cool) }) : t('quack'));
+      $('quackLabel').innerHTML = cool ? countText('seconds', cool) : icon('close');
+    }
     if (water) water.gain.value = 0.18;
   } else if (water) water.gain.value = 0;
   if (!waitTouch) updateCamera(dt);
   shake = Math.max(0, shake - dt * 2.5); flash = Math.max(0, flash - dt * 2);
   const k = still ? 0 : shake * 10 * dpr;
   g.setTransform(1, 0, 0, 1, (Math.random() - 0.5) * k, (Math.random() - 0.5) * k);
-  drawPond(now); drawHazards(now); drawNest(now); drawLost(now); drawLine(now, alpha); drawMother(now, alpha); drawNames(); drawParts(paused ? 0 : dt);
+  drawPond(now); drawHazards(now); drawNest(now); drawLost(now); drawLine(now, alpha); drawMother(now, alpha); drawParts(paused ? 0 : dt);
   g.setTransform(1, 0, 0, 1, 0, 0);
   if (flash > 0) { g.fillStyle = `rgba(255,90,80,${flash * 0.4})`; g.fillRect(0, 0, W, H); }
   if (screen === 'play') { drawGuide(now); drawHud(now); }
@@ -1022,15 +1252,16 @@ window.ducklingsState = () => ({
 const help = hint(canvas, {
   kind: 'hold-and-move',
   key: 'ducklings:hint',
-  label: 'Hold and move your finger to lead her',
+  label: t('hint'),
   bottom: 130,
   when: () => playing && !paused && screen === 'play',
   played: save.readJson(KEY) !== null,
 });
 
+refreshLanguage();
 show('menu');
 requestAnimationFrame(frame);
 </script>
-<script src="/notes/button.js" defer></script>
+<script src="/notes/button.js" id="notesScript" defer></script>
 </body>
 </html>

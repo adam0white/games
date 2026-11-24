@@ -81,7 +81,7 @@ const NIGHT = [
 ];
 export const COUNT = BUSY_END + NIGHT.length;
 export const OPEN_ORDER = [...ORDER, ...NIGHT.map(d => d.intro).filter(Boolean)];
-export const CHAPTERS = [[1, INTRO, 'Learning the trade'], [INTRO + 1, BUSY_END, 'Busy street'], [BUSY_END + 1, COUNT, 'Night market']];
+export const CHAPTERS = [[1, INTRO, 'learning'], [INTRO + 1, BUSY_END, 'busy'], [BUSY_END + 1, COUNT, 'night']];
 const RULE_LINE = {
   order: 'Pick the repairs in order.',
   rush: 'Serve both customers before they leave.',
@@ -204,7 +204,7 @@ export function levelDef(n) {
 }
 export const MAP = Array.from({ length: COUNT }, (_, i) => levelDef(i + 1));
 
-// A short line for the goal card and the menu, in plain words.
+// Keep the English goal descriptor in existing lab records.
 export function goalLine(goal) {
   for (const [rule, line] of Object.entries(RULE_LINE)) if (goal[rule]) return line;
   const parts = [];

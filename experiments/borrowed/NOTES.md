@@ -1,5 +1,27 @@
 # Borrowed Time
 
+## 2026-11-24 · Words and pictures
+
+| Earlier wording | What the player sees |
+| --- | --- |
+| The menu premise and the instruction to tap a glowing memory | Three ages in sequence beside one candle. On the island, the existing hand and kit hint point at the first free memory. The kit's still hint uses a short localized instruction. |
+| The practice instructions for the cat, torn paper and seal | The cat clue connects to the matching photo with a check and to the lie with a cross. A translucent paper half moves into the matching tear. The crossed seal connects to the photo bearing that seal. Practice shows a candle with zero cost. |
+| Compare both photos with possible faces, match the edges, and find the seal that marked a lie | A live photo draws attention to the candidate portraits and the relevant journal slots. Matching edge profiles are outlined. A seal from an earlier lie stays crossed out above the pair. Live comparison cues draw on visible evidence. |
+| Practice complete, True, False, Try the other photo, Photo mended, You found the lie, and Keep the true photo as a clue | A check marks true evidence, a cross marks a lie or an incorrect tear, and the false print drops away. A successful tear joins its edge. The recovered details fly into the journal and incompatible portraits dim. |
+| Wrong photo feedback, Already checked · no cost, and Answer revealed | A wrong tap keeps its check or cross beside a candle debit. Tapping the same photo again outlines the existing mark and shows zero. Buying the answer shows a reveal icon beside the purchase price. |
+| Failed ability advice and the ability bar captions | An outline and arrow identify the cracked rock, leap stone, bridge, dark patch, mirror or open memory. Offscreen targets get a small picture at the playfield edge. A slashed mirror means there is no mirror. A check means the ability's job is done. The ability buttons use their existing symbols with a candle and price. The failed action also has a localized screen-reader label. |
+| Time stands still, correct and incorrect identity feedback, and the candle going out | Pause holds the view and candle still. The solved portrait gains a check, a wrong guess gains a cross and a candle debit, and exhaustion shows an extinguished candle with zero. |
+| Chapter transition instructions | The preview shows the fitted tear and the clue carried between photos, then the faster candle and matching crossed seals. In the older mode, nearly identical portraits and a mirror with a count of two preview the middle chapter. The last preview shows the two-clue Push and marks Rewind as optional. |
+| I remember, I knew that, No photos recovered, Unknown, and the new gallery announcement | A check or return arrow marks a new or repeated memory. An empty photo outline shows zero. Unknown ages have question marks, and a star next to the gallery count marks a new role. The star has a localized screen-reader label. |
+
+Short words remain for control labels, chapter and role names, the gallery and result counts, and the scoring equation. The live puzzle keeps its objective and a short wrong-tap label because a bare cross also marks the lie the player should choose. The identity screen keeps the chapter-ending warning beside a wrong-name candle debit. The recording disclosure, privacy link, and recording switch retain their meaning in both languages.
+
+The menu and pause controls use the kit's saved language. A manual switch takes precedence over the language in the opening link on reload. Checkpoint matching ignores only the language parameter. Existing save keys, chapter rules and lab outcomes remain the same. The share preview and PNG use the current language for the age captions, score, and Daily date.
+
+The language and layout tour passed in English and Turkish on Chromium at 360 × 640 and the WebKit iPhone 13 profile at 390 × 664 CSS pixels. It compares document and canvas text against the English table in Turkish, checks key and placeholder parity, verifies the language choice after reload, and measures DOM and canvas text bounds. Both sizes also cover the alternate chapter previews, wrong-name reveal and zero-name result. The screenshots are in `scratchpad/shots/words-borrowed/`, with English captures in `english/`. The bots passed all 1,080 careful runs. The full browser check passed on WebKit iPhone 13 and Chromium Pixel 7, 360 × 640, 390 × 844, and desktop 1280 × 800. The shared phone and hint checks passed in both browsers.
+
+A Turkish speaker has not reviewed the text. First-time comprehension of the picture cues, physical phone layout and audio, and screen-reader behavior remain unverified. Browser recording checks used a local stub. The share card was rendered and checked locally.
+
 ## 2026-11-24 · Cold play audit
 
 Each evidence filename below is relative to `scratchpad/shots/audit-borrowed/` in this audit's task directory. The cold passes used fresh local browser sessions, touch coordinates chosen from screenshots, and a screenshot inspected after each action. Source and state-hook inspection started after the cold observations. The game has three chapters. Eight chapter entries on each profile required multiple lives across story and Daily. Repeated entries are not eight distinct levels.

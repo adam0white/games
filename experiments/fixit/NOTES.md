@@ -501,3 +501,31 @@ The files below are relative to the requested scratchpad folder `shots/audit-fix
 | Cold campaign coverage | Levels 1–8 cleared with touch | Levels 1–8 cleared with touch |
 
 `bots.mjs` passed all claims with the pinned runtime. New regressions were run against the failing behavior before the fixes. They cover fast pull versus cancel, dynamic gesture prompts, the shorter opening, safe-level hearts, briefing dismissal, reload and settlement, mode access and deadlines, rounded results, sharing status, menu targets, earned stars, combo text and the muted radio. The rush check also reloads with a partially repaired second customer, switches tickets twice, and finishes that customer's repair. Browser checks use local lab capture. The production service was outside this audit.
+
+## 2026-11-24 — Words and pictures
+
+### Pictures
+
+- The repair captions became demonstrations on the bench. The bell shows the fingertip circling the real screw. The music box shows an upward drag from the pin and a lift. The oil can gets a ring and a tap only when it can take a drop. When the zipper catches, the trail turns sideways and returns to an upward drag when the snag clears. The scale shows a slide and a clock that fills while the player holds at the mark. The toy car shows a lift beside the glowing key.
+- The briefing pairs the goal icon with its count. A clock shows the actual deadline, stars sit next to their time target, and the tap icon waits for the player. A new repair shows its object and a sparkle. Numbered tickets, paired patience bars, the swinging lamp and three repair slots represent the night-market rules. The slow retry pairs a snail with two filled stars and one outline.
+- A check, a bolt, a gold star, a broken heart and a rewind arrow replace the repair, speed, gold, walk-off and early-release captions. Completed repair dots turn into checks. The pay badge and confetti carry the streak feedback. Shift clocks, coins, locks and level numbers show score goals and prerequisites. Item previews, a music note and a heart replace shop descriptions. Bonus coins and star targets use symbols and counts on the results card.
+
+### Words kept
+
+- Mode names, button labels and result reasons tell the player what will open or why play stopped. Short chapter prerequisites, the walk-off consequence, the base-pay rule and the shared daily queue state conditions that the icons leave ambiguous. Privacy and recording copy describes data handling and the pause setting. Share status states whether the browser accepted a share request, canceled it or started a download.
+- The keyboard line names the Space key. The quiet first-level hint uses a short screw instruction when reduced motion is enabled. Screen-reader descriptions name the pictured job, gesture, goal and progress. The full English and Turkish table is in `words.js`. The language button uses the kit preference. When the address already contains a language override, the button updates it so reload keeps the new choice. Displayed amounts, times and the daily date use the selected language's Intl formats.
+
+### Verification limits
+
+No Turkish speaker has reviewed the copy in play. The automated runs exercise the demonstrated inputs and verify layout at the two emulated sizes. How quickly a first-time player reads the pictures remains unverified. Physical-device input, assistive-technology announcements, the native share sheet and production lab receipt were outside these checks.
+
+### Checks
+
+| Check | Result |
+| --- | --- |
+| `bots.mjs` | Passed with the pinned runtime, including the circular path, sideways snag cue, oil timing and scale hold. |
+| `check.mjs` | Passed on WebKit with the iPhone 13 profile and on Chromium with the Pixel 7 profile, plus the small-screen and desktop checks. |
+| `check.mjs --words` | Passed at 390 × 664 in WebKit and at 360 × 640 in Chromium. The tables have the same keys and interpolation fields. Both language switches survive reload. The Turkish screens, canvas text and accessible labels passed the English-copy check. The viewport checks allow scrolling inside the shop inventory. |
+| `experiments/kit/check/phone.mjs fixit` | Passed on WebKit and Chromium before and after the edits. |
+
+The narrow-screen check caught the Turkish recording notice below the fold when both modes and assisted retry were available. The final layout keeps the two actions on one row, fits six level tiles across and puts the mode summaries side by side. The final screenshots include the Turkish menu, first repair, pause, win and loss at both sizes.

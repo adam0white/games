@@ -1,12 +1,10 @@
-// Show only the conditions that cost this flock its third star.
+// Each failed condition has its own picture on the three-star card.
 export function starFeedback({ total, arrived, hits, scatters }) {
   const goals = [];
-  if (arrived.length < total) goals.push(`bring all ${total} home`);
-  const hazards = [];
-  if (hits) hazards.push('hits');
-  if (scatters) hazards.push('scares');
-  if (hazards.length) goals.push(`avoid ${hazards.join(' and ')}`);
-  return goals.length ? `For three stars, ${goals.join(' and ')}.` : '';
+  if (arrived.length < total) goals.push('nest');
+  if (hits) goals.push('heart');
+  if (scatters) goals.push('scatter');
+  return goals;
 }
 
 export function warningOnScreen(y, height) { return y >= 0 && y < height; }

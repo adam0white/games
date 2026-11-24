@@ -1,8 +1,8 @@
 // Fix-It Stall: the page. View, input, sound, save, cards. The rules are in sim.js.
-import { create, step, input, guide, hint, repairWord, multiplier, goalState, stars, selectLane, chooseTicket, lampAt, DAY, RAMP, DT, KINDS, TUTOR, WORD, OBJECT, HIT, WORKS, LEAVE, LEVELS } from './sim.js';
+import { create, step, input, guide, hint, multiplier, goalState, stars, selectLane, chooseTicket, lampAt, DAY, RAMP, DT, KINDS, TUTOR, OBJECT, HIT, zipStuck, WORKS, LEAVE, LEVELS } from './sim.js';
 import { COUNT, ORDER, OPEN_ORDER, INTRO, BUSY_END, CHAPTERS, ASSIST_RATE, STAR_BONUS, canAssist, levelDef, goalLine, levelReward, resultSeconds } from './levels.js';
 import { plan, SKILLS } from './moves.js';
-import { drawJob, drawGhost, person, looks, REGULAR, cat, heart, coin, sillyList, drawSilly, goalIcon, starShape, C, circle, rrect, star } from './art.js';
+import { drawJob, drawGhost, person, looks, REGULAR, cat, heart, coin, sillyList, drawSilly, goalIcon, symbol, starShape, C, circle, rrect, star } from './art.js';
 import { readJson, writeJson } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
@@ -10,6 +10,7 @@ import { screens } from '../kit/screens.js';
 import { hint as kitHint } from '../kit/hint.js';
 import { noZoom } from '../kit/zoom.js';
 import { lab } from '../kit/lab.js';
+import { t as translate, lang, apply, setLang, num, seconds, starsLabel, dateLabel } from './words.js';
 
 const $ = id => document.getElementById(id);
 const query = new URLSearchParams(location.search);
@@ -58,14 +59,14 @@ const store = () => writeJson(KEY, save);
 // ---------- the shop
 const AWNING = { teal: ['#2f8f8a', '#fff1d6'], copper: ['#c8743a', '#fbe6c2'], berry: ['#a8325a', '#f7c9d6'], stripes: ['#e0a43a', '#2f8f8a'] };
 const ITEMS = [
-  { id: 'teal', name: 'Teal awning', what: 'The one you started with', cost: 0, awning: true },
-  { id: 'copper', name: 'Copper awning', what: 'Warm stripes', cost: 50, awning: true },
-  { id: 'berry', name: 'Berry awning', what: 'Pink and plum', cost: 90, awning: true },
-  { id: 'lights', name: 'String lights', what: 'Bulbs under the awning', cost: 140 },
-  { id: 'radio', name: 'Radio', what: 'Plays a little tune', cost: 180 },
-  { id: 'stripes', name: 'Sunny awning', what: 'Gold and teal', cost: 220, awning: true },
-  { id: 'cat', name: 'Stall cat', what: 'Sits on the counter', cost: 280 },
-  { id: 'charm', name: 'Lucky horseshoe', what: 'One more heart', cost: 400 },
+  { id: 'teal', cost: 0, awning: true },
+  { id: 'copper', cost: 50, awning: true },
+  { id: 'berry', cost: 90, awning: true },
+  { id: 'lights', cost: 140 },
+  { id: 'radio', cost: 180 },
+  { id: 'stripes', cost: 220, awning: true },
+  { id: 'cat', cost: 280 },
+  { id: 'charm', cost: 400 },
 ];
 const has = id => save.owned.includes(id);
 
@@ -80,10 +81,11 @@ function layout() {
   const cs = getComputedStyle($('probe'));
   top = parseFloat(cs.paddingTop) || 0; bottomInset = parseFloat(cs.paddingBottom) || 0;
   benchTop = top + Math.min(200, Math.max(160, H * 0.3));
-  const avail = H - benchTop - 36 - bottomInset, word = benchControls ? 88 : 40;
+  const avail = H - benchTop - 36 - bottomInset, cueSpace = benchControls ? 88 : 40;
   $('tickets').style.top = `${benchTop + 4}px`;
-  S = Math.max(200, Math.min(W - 20, avail - word, 560));
-  boxX = (W - S) / 2; boxY = benchTop + word + Math.max(0, (avail - word - S) / 2); unit = S / 100;
+  S = Math.max(200, Math.min(W - 20, avail - cueSpace, 560));
+  boxX = (W - S) / 2; boxY = benchTop + cueSpace + Math.max(0, (avail - cueSpace - S) / 2); unit = S / 100;
+  if (!$('startLevel').hidden) positionStart();
 }
 addEventListener('resize', layout); layout();
 
@@ -116,7 +118,7 @@ const buzz = ms => { if (save.sound && navigator.vibrate) try { navigator.vibrat
 // ---------- run state
 let s = null, playing = false, paused = false, screen = 'menu', acc = 0, last = performance.now(), clock = 0;
 let finger = null; // { id } of the pointer driving the bench
-let ripples = [], bits = [], flying = [], confetti = [], multPop = 0, kb = null, prev = null, drawn = [], shownCoins = 0, word = null, banner = null, shake = 0, squash = 0, wobble = 0, pop = 1;
+let ripples = [], bits = [], flying = [], confetti = [], multPop = 0, kb = null, prev = null, drawn = [], shownCoins = 0, feedback = null, banner = null, shake = 0, squash = 0, wobble = 0, pop = 1;
 let seenBase = 0, jobKey = null, leaving = [], spots = new Map(), heartFlash = 0, catHappy = 0, recCount = 0, multWas = 1, radioT = 0, newJob = null, hintNow = 0, ended = 0;
 let counterReset = () => { counter = null; };
 const seed0 = Number(query.get('seed'));
@@ -138,45 +140,106 @@ const cleared = n => (save.levels[n] ?? 0) > 0;
 const reachable = n => n === 1 || cleared(n) || cleared(n - 1);
 const nextLevel = () => { for (let n = 1; n <= COUNT; n++) if (!cleared(n)) return n; for (let n = 1; n <= COUNT; n++) if (save.levels[n] < 3) return n; return COUNT; };
 const starTotal = () => Object.values(save.levels).reduce((a, b) => a + b, 0);
-const MILESTONES = [['shelf', 6, 'Shelf'], ['sign', 20, 'Sign'], ['lights', 40, 'Lights'], ['cat', 66, 'Cat']];
+const MILESTONES = [['shelf', 6], ['sign', 20], ['lights', 40], ['cat', 66]];
 const stallGrowth = (total = starTotal()) => MILESTONES.filter(([, need]) => total >= need).map(([id]) => id);
 const openStall = () => cleared(OPEN_AT) || save.shifts >= 1;
 const dailyOpen = () => cleared(DAILY_AT) || save.shifts >= 1;
 
+const count = (have, need) => `${num(have)}/${num(need)}`;
+function metric(kind, value, label) {
+  const span = document.createElement('span');
+  span.className = 'metric';
+  const pic = document.createElement('canvas');
+  pic.width = pic.height = 46;
+  pic.setAttribute('aria-hidden', 'true');
+  objectiveIcon(kind, 23, 23, 17, 0, pic.getContext('2d'));
+  if (label) { span.setAttribute('role', 'img'); span.setAttribute('aria-label', label); }
+  const text = document.createElement('b');
+  text.textContent = value;
+  span.append(pic, text);
+  return span;
+}
+function goalShape(def, deadline = def.goal.time) {
+  const goal = def.goal;
+  const parts = goalState({ lv: def, served: 0, goalCoins: 0 }).parts;
+  const labels = parts.map(({ kind, need }) => translate(`${kind === 'coins' ? 'base' : kind}Goal`, { n: num(need) }));
+  if (deadline) labels.push(translate('timeGoal', { n: num(deadline) }));
+  if (goal.safe || goal.list) labels.push(translate('safeGoal'));
+  return { parts, deadline, safe: !!(goal.safe || goal.list), label: labels.join(' ') };
+}
+const goalKind = { coins: 'basePay', list: 'fixed', fix: 'fixed', order: 'fixed', rush: 'fixed', blackout: 'fixed', boss: 'fixed' };
+const startControl = () => {
+  const visible = screen === 'play' && playing && !!card;
+  $('startLevel').hidden = $('briefText').hidden = !visible;
+  if (visible) {
+    positionStart();
+    const target = s.assisted ? 2 : 3;
+    $('briefText').textContent = [
+      translate('level', { n: num(lvN) }),
+      s.assisted ? translate('assistLevel', { n: num(lvN) }) : '',
+      s.lv.intro && !cleared(lvN) ? translate('newRepair', { object: translate(s.lv.intro) }) : '',
+      goalShape(s.lv, s.deadline ? Math.ceil(s.deadline) : undefined).label,
+      translate('starTarget', { stars: starsLabel(target), time: seconds(s.lv.stars[3 - target]) }),
+    ].filter(Boolean).join(' ');
+  }
+};
 const show = screens(['menu', 'shop', 'paused', 'end'], name => {
   screen = name;
   $('pause').style.display = name === 'play' ? 'grid' : 'none';
-  if (name === 'menu') menu();
+  if (name === 'menu') { mapChapter = null; menu(); }
   $('tickets').hidden = name !== 'play' || !benchControls || !!card;
   if (name === 'shop') shop();
-  for (const id of ['sound1', 'sound2']) $(id).textContent = `Sound: ${save.sound ? 'on' : 'off'}`;
+  updateSound();
+  startControl();
+  updateBenchLabel();
 });
-let menuHelp = null;
+function updateSound() {
+  for (const id of ['sound1', 'sound2']) $(id).textContent = translate(save.sound ? 'soundOn' : 'soundOff');
+}
+let menuHelp = null, mapChapter = null;
 function menu() {
-  $('bank').textContent = save.bank; $('starsAll').textContent = starTotal(); $('starsMax').textContent = COUNT * 3;
-  $('jobs').textContent = save.unlocked.length; $('jobsAll').textContent = KINDS.length;
-  const earned = stallGrowth();
-  const next = MILESTONES.find(([id]) => !earned.includes(id));
-  $('growth').textContent = next ? `${next[2]} at ${next[1]} ★` : 'Stall fully fitted';
+  $('bank').textContent = num(save.bank); $('starsAll').textContent = num(starTotal()); $('starsMax').textContent = num(COUNT * 3);
+  $('jobs').textContent = num(save.unlocked.length); $('jobsAll').textContent = num(KINDS.length);
+  const next = MILESTONES.find(([, need]) => starTotal() < need);
+  $('growth').hidden = !next;
+  if (next) {
+    const [id, need] = next;
+    $('growth').replaceChildren(metric(id, num(need) + ' ★', translate('milestone', { item: translate(id), n: num(need) })));
+  }
   const n = only ? null : qLevel ?? nextLevel();
-  $('play').textContent = n ? `Play level ${n}` : 'Play';
-  noticeText.data = recordingChoice.checked ? recordingOnText : 'Game lab recording is off. You can turn it on in the pause menu. ';
+  $('play').textContent = n ? translate('playLevel', { n: num(n) }) : translate('play');
+  updateRecording();
   menuHelp = n && (canAssist(save.attempts[n]) ? n
     : Object.keys(save.attempts).map(Number).find(i => reachable(i) && canAssist(save.attempts[i])));
   $('menuAssist').hidden = !menuHelp;
   if (menuHelp) {
-    const label = `Level ${menuHelp} with slower clocks, up to two stars`;
+    const label = translate('assistLevel', { n: num(menuHelp) });
     $('menuAssist').setAttribute('aria-label', label);
     $('menuAssist').title = label;
-    $('menuAssist').lastElementChild.textContent = menuHelp === n ? 'Slower clocks · 2★ max' : `Level ${menuHelp} · slower clocks · 2★ max`;
+    $('assistLevel').textContent = menuHelp === n ? '' : translate('level', { n: num(menuHelp) });
   }
   map(n);
-  $('migrated').textContent = migrated ? `Your stall's old jobs count: levels 1 to ${migrated} are done.` : '';
-  $('open').style.display = openStall() ? '' : 'none';
-  $('daily').style.display = dailyOpen() ? '' : 'none';
+  $('migrated').hidden = !migrated;
+  $('migrated').textContent = migrated ? translate('migrated', { n: num(migrated) }) : '';
   const shiftSeconds = Math.max(0, (dayLen ?? DAY) - startLevel * RAMP);
-  $('openLine').textContent = openStall() ? `Open stall: ${shiftSeconds} s to earn coins. Best ${save.best}.` : `Clear level ${OPEN_AT} for the open stall.`;
-  $('dailyLine').textContent = dailyOpen() ? `Daily: ${shiftSeconds} s to earn coins. ${today in save.days ? `Today's best ${save.days[today]}.` : 'Same jobs for everyone.'}` : `Clear level ${DAILY_AT} for the daily stall.`;
+  shiftMenu('open', openStall(), OPEN_AT, save.best, shiftSeconds);
+  shiftMenu('daily', dailyOpen(), DAILY_AT, save.days[today], shiftSeconds);
+}
+function shiftMenu(id, unlocked, required, best, duration) {
+  $(id).hidden = !unlocked;
+  const line = $(id + 'Line'), modeName = translate(id), time = seconds(duration);
+  if (!unlocked) {
+    const lock = metric('lock', num(required) + ' ✓', translate('modeLocked', { mode: modeName, n: num(required) }));
+    line.replaceChildren(modeName, ' ', lock);
+    return;
+  }
+  const description = translate('shiftDetails', { mode: modeName, time });
+  line.replaceChildren(metric('time', time, description), ' → ', metric('coins', '', translate('coins')));
+  const summary = document.createElement('span');
+  summary.className = 'mode-summary';
+  if (best !== undefined) summary.textContent = translate('best') + ' ' + num(best);
+  else if (id === 'daily') summary.textContent = translate('sameJobs');
+  line.append(summary);
 }
 // The map opens to the next chapter and keeps the three chapters one tap away.
 function map(next) {
@@ -185,15 +248,25 @@ function map(next) {
   const showChapter = current => {
     grids.forEach((grid, i) => { grid.hidden = i !== current; });
     buttons.forEach((b, i) => b.setAttribute('aria-pressed', String(i === current)));
+    mapChapter = current;
     const [first, last, title] = CHAPTERS[current];
     const locked = !grids[current].querySelector('button:enabled');
-    if (locked) $('playLine').textContent = `Clear level ${first - 1} to unlock ${title}.`;
-    else if (next && (next < first || next > last)) $('playLine').textContent = 'Tap a level below to replay it.';
-    else $('playLine').textContent = next ? goalLine(levelDef(next).goal) : '';
+    const line = $('playLine');
+    line.replaceChildren();
+    if (locked) line.textContent = translate('chapterLocked', { n: num(first - 1), chapter: translate(title) });
+    else if (next >= first && next <= last) {
+      const { parts, deadline, label } = goalShape(levelDef(next));
+      const group = document.createElement('span');
+      group.setAttribute('role', 'img');
+      group.setAttribute('aria-label', label);
+      for (const { kind, need } of parts) group.append(metric(kind, num(need)));
+      if (deadline) group.append(metric('time', seconds(deadline)));
+      line.append(group);
+    }
   };
   for (const [i, [a, b, title]] of CHAPTERS.entries()) {
     const tab = document.createElement('button');
-    tab.textContent = title;
+    tab.textContent = translate(title);
     tab.addEventListener('click', () => showChapter(i));
     tabs.append(tab);
     buttons.push(tab);
@@ -202,30 +275,40 @@ function map(next) {
       const t = document.createElement('button'), st = save.levels[n] ?? 0, open = reachable(n);
       t.className = 'lv' + (n === next ? ' next' : '') + (st ? ' done' : '');
       t.dataset.level = n; t.disabled = !open;
-      t.setAttribute('aria-label', `Level ${n}${open ? `, ${st} stars` : ', locked'}`);
-      const num = document.createElement('span'); num.textContent = n;
+      t.setAttribute('aria-label', translateTile(n, open, st));
+      const number = document.createElement('span'); number.textContent = num(n);
       const ss = document.createElement('span'); ss.className = 'ss'; ss.textContent = '★'.repeat(st);
-      t.append(num, ss);
+      t.append(number, ss);
       t.addEventListener('click', () => begin('level', n));
       grid.append(t);
     }
     box.append(grid);
     grids.push(grid);
   }
-  showChapter(Math.max(0, CHAPTERS.findIndex(([a, b]) => next >= a && next <= b)));
+  showChapter(mapChapter ?? Math.max(0, CHAPTERS.findIndex(([a, b]) => next >= a && next <= b)));
+}
+
+function translateTile(n, open, st) {
+  return translate(open ? 'levelRated' : 'levelLocked', { n: num(n), stars: starsLabel(st) });
 }
 
 function shop() {
-  $('bank2').textContent = save.bank;
+  $('bank2').textContent = num(save.bank);
   const box = $('items'); box.textContent = '';
   for (const it of ITEMS) {
     const row = document.createElement('div'); row.className = 'item';
     const pic = document.createElement('canvas'); pic.width = pic.height = 96; icon(pic.getContext('2d'), it.id);
-    const txt = document.createElement('div'); txt.textContent = it.name; const sm = document.createElement('small'); sm.textContent = it.what; txt.append(sm);
+    const txt = document.createElement('div'); txt.textContent = translate(it.id);
+    if (it.id === 'radio' || it.id === 'charm') {
+      const sm = document.createElement('small');
+      const label = translate(it.id === 'charm' ? 'extraHeart' : 'radioTune');
+      sm.append(it.id === 'charm' ? metric('safe', '+ ' + num(1), label) : metric('music', '', label));
+      txt.append(sm);
+    }
     const b = document.createElement('button'); b.dataset.item = it.id;
-    if (!has(it.id)) { b.textContent = `Buy ${it.cost}`; b.disabled = save.bank < it.cost; }
-    else if (it.awning) { b.textContent = save.awning === it.id ? 'In use' : 'Use'; if (save.awning === it.id) b.classList.add('on'); }
-    else { b.textContent = 'Owned'; b.classList.add('on'); b.disabled = true; }
+    if (!has(it.id)) { b.textContent = translate('buy', { n: num(it.cost) }); b.disabled = save.bank < it.cost; }
+    else if (it.awning) { b.textContent = translate(save.awning === it.id ? 'inUse' : 'use'); if (save.awning === it.id) b.classList.add('on'); }
+    else { b.textContent = translate('owned'); b.classList.add('on'); b.disabled = true; }
     b.addEventListener('click', () => {
       snd.unlock();
       if (!has(it.id)) {
@@ -274,7 +357,7 @@ function begin(how = 'level', n = null, assisted = false) {
   ticketKey = '';
   layout();
   playing = true; paused = false; acc = 0; last = performance.now(); clock = 0; ended = 0;
-  ripples = []; bits = []; flying = []; confetti = []; shownCoins = 0; leaving = []; spots = new Map(); word = null; banner = null; recCount = 0; multWas = 1; multPop = 0; finger = null; kb = null; jobKey = null; prev = null; counterReset();
+  ripples = []; bits = []; flying = []; confetti = []; shownCoins = 0; leaving = []; spots = new Map(); feedback = null; banner = null; recCount = 0; multWas = 1; multPop = 0; finger = null; kb = null; jobKey = null; prev = null; counterReset();
   show('play');
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); // so Space drives the bench, not the last button
   rec.start(runMetadata());
@@ -307,11 +390,15 @@ function finish() {
   unlocked = earnJob();
   store();
   rec.end('closed', { ...summary(), why, ...(daily ? { daily: today } : {}) });
-  endCard({ title: daily ? (why === 'hearts' ? 'Daily stall: out of hearts' : 'Daily stall closed!') : why === 'hearts' ? 'Out of hearts' : 'Closed!', stars: null, coins: daily ? 0 : s.coins,
-    stats: daily ? [] : [['Fixed', s.served], ['Best streak', s.bestStreak], ['Best', save.best]],
-    line: daily ? (dayBest && s.coins > 0 ? 'New daily best!' : `Daily best: ${save.days[today]}.`) : newBest && s.coins > 0 ? 'New best!' : why === 'hearts' ? `${s.lost} customers walked off.` : `You have ${save.bank} coins.`,
-    note: daily ? '' : unlocked ? `Next shift: a new job! (${OBJECT[unlocked]})` : save.unlocked.length < KINDS.length && s.served < 4 ? 'Fix 4 in a shift to get a new job.' : '',
-    again: daily ? 'Daily again' : 'Play again', next: false });
+  const title = daily ? (why === 'hearts' ? 'dailyHearts' : 'dailyClosed') : why === 'hearts' ? 'outOfHearts' : 'closed';
+  const line = daily ? [translate('dailyBest') + ' ', metric('coins', num(save.days[today]))]
+    : [metric('coins', num(save.bank), translate('coinCount', { n: num(save.bank) }))];
+  const note = daily ? [] : unlocked ? [jobMetric(unlocked, translate('newJobNextShift', { object: translate(unlocked) }))]
+    : save.unlocked.length < KINDS.length && s.served < 4 ? [metric('fix', count(s.served, 4), translate('unlockJob')), ' → ', metric('new', '', translate('jobsUnlocked'))] : [];
+  endCard({ title: translate(title), stars: null, coins: daily ? 0 : s.coins,
+    stats: daily ? [] : [['fixed', num(s.served)], ['bestStreak', num(s.bestStreak)], ['best', num(save.best)]],
+    line, note: (daily ? dayBest : newBest) && s.coins > 0 ? [metric('trophy', '', translate('newBest')), ...note] : note,
+    again: daily ? 'dailyAgain' : 'again', next: false });
   if (newBest && s.coins > 0) [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 0.4, 0.09, 'triangle'), i * 120));
   else [523, 392].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.08, 'triangle'), i * 160));
   if (daily) dailyCard();
@@ -334,26 +421,56 @@ function finishLevel() {
   }
   store();
   rec.end('closed', { ...summary(), why, bonus, reward });
-  const added = MILESTONES.filter(([id]) => !beforeGrowth.includes(id) && stallGrowth().includes(id)).map(([, , label]) => label);
+  const added = MILESTONES.filter(([id]) => !beforeGrowth.includes(id) && stallGrowth().includes(id));
   const upNext = levelDef(n + 1);
   if (st) {
-    const tip = s.assisted ? 'Two stars available with help.' : st < 3 ? `Three stars: clear it in ${def.stars[0]} s.` : bestWas && secs < bestWas ? `New best time!` : 'Three stars!';
-    endCard({ title: `Level ${n} cleared!`, stars: st, coins: reward,
-      stats: [['Time', `${secs} s`], ...(save.times[n] ? [['Best', `${resultSeconds(save.times[n])} s`]] : []), ['Fixed', s.served]],
-      line: (bonus ? `+${bonus} coins for ${st - was === 1 ? 'a new star' : 'new stars'}. ` : '') + tip,
-      note: added.length ? `New at the stall: ${added.join(', ')}!` : opened ? 'Open stall unlocked. Choose it on the menu.' : dailyNow ? 'The daily stall is open on the menu.' : upNext ? (upNext.intro && !cleared(upNext.n) ? `Next: a new job, the ${OBJECT[upNext.intro]}.` : `Next: ${goalLine(upNext.goal)}`) : 'That was the last level. Can you three-star them all?',
-      again: 'Try again', next: !!upNext });
+    const line = [];
+    if (bonus) line.push(metric('star', '→ +' + num(bonus), translate('starBonus', { coins: translate('coinCount', { n: num(bonus) }) })));
+    if (s.assisted) line.push(starTarget(2, null, translate('starCap')));
+    else if (st < 3) line.push(starTarget(3, def.stars[0]));
+    const note = added.length ? added.map(([id]) => metric(id, '', translate('unlockedItem', { item: translate(id) })))
+      : opened || dailyNow ? [translate('unlockedMode', { mode: translate(opened ? 'open' : 'daily') })]
+      : upNext?.intro && !cleared(upNext.n) ? [jobMetric(upNext.intro, translate('newRepair', { object: translate(upNext.intro) }))] : [];
+    endCard({ title: translate('cleared', { n: num(n) }), stars: st, coins: reward,
+      stats: [['time', seconds(secs)], ...(save.times[n] ? [['best', seconds(resultSeconds(save.times[n]))]] : []), ['fixed', num(s.served)]],
+      line, note, again: 'retry', next: !!upNext });
     [523, 659, 784, 1047].slice(0, 1 + st).forEach((f, i) => setTimeout(() => tone(f, 0.4, 0.09, 'triangle'), 300 + i * 160));
   } else {
-    const gs = goalState(s), left = gs.parts.filter(p => p.have < p.need).map(p => p.kind === 'coins' ? `${p.need - p.have} more base pay` : `${p.need - p.have} more to fix`);
-    const close = gs.parts.every(p => p.have >= p.need * 0.75);
-    endCard({ title: why === 'time' ? 'Out of time' : why === 'hearts' ? 'Out of hearts' : 'Someone walked off', stars: 0, coins: 0,
-      stats: gs.parts.map(p => [p.kind === 'coins' ? 'Base pay' : 'Fixed', `${Math.min(p.have, p.need)}/${p.need}`]).concat([['Time', `${secs} s`]]),
-      line: why === 'lost' && !left.length ? 'In this level nobody may walk off.' : `${close ? 'So close! ' : ''}${left.join(' and ') || 'Nearly there'}.`,
-      note: activeGoalLine(), again: 'Try again', next: false, offer: canAssist(save.attempts[n]) });
+    const gs = goalState(s);
+    endCard({ title: translate(why === 'time' ? 'outOfTime' : why === 'hearts' ? 'outOfHearts' : 'walkOff'), stars: 0, coins: 0,
+      stats: gs.parts.map(p => [goalKind[p.kind], count(Math.min(p.have, p.need), p.need)]).concat([['time', seconds(secs)]]),
+      line: gs.safe ? [translate('safeGoal')] : [],
+      note: [], again: 'retry', next: false, offer: canAssist(save.attempts[n]) });
     [523, 392].forEach((f, i) => setTimeout(() => tone(f, 0.3, 0.08, 'triangle'), i * 160));
   }
   setTimeout(() => { if (!playing && screen === 'play') show('end'); }, 900);
+}
+function starTarget(target, time, label = translate('starTarget', { stars: starsLabel(target), time: seconds(time) })) {
+  const span = document.createElement('span');
+  span.className = 'metric';
+  span.setAttribute('role', 'img');
+  span.setAttribute('aria-label', label);
+  const rating = document.createElement('span');
+  rating.className = 'st';
+  rating.textContent = '★'.repeat(target);
+  span.append(rating, time === null ? '☆' : ' ≤ ' + seconds(time));
+  return span;
+}
+function jobMetric(kind, label) {
+  const span = document.createElement('span');
+  span.className = 'metric';
+  span.setAttribute('role', 'img');
+  span.setAttribute('aria-label', label);
+  const pic = document.createElement('canvas'); pic.className = 'job-icon';
+  pic.width = pic.height = 100;
+  drawJob(pic.getContext('2d'), [previewRepair(kind)], 0, 0, 0);
+  span.append(metric('new', ''), pic);
+  return span;
+}
+const previews = new Map();
+function previewRepair(kind) {
+  if (!previews.has(kind)) previews.set(kind, create({ only: kind, seed: 1 }).rep);
+  return previews.get(kind);
 }
 // The end card, for a level or a shift.
 function endCard({ title, stars: st, coins, stats, line, note, again, next, offer = false }) {
@@ -364,12 +481,14 @@ function endCard({ title, stars: st, coins, stats, line, note, again, next, offe
   $('endTitle').textContent = title;
   $('endStars').style.display = st === null ? 'none' : '';
   $('endStars').textContent = st === null ? '' : '★'.repeat(st) + '☆'.repeat(3 - st);
+  $('endStars').setAttribute('aria-label', starsLabel(st ?? 0));
   $('endStars').className = 'stars' + (st ? '' : ' none');
-  $('earned').textContent = coins;
+  $('earned').textContent = num(coins);
   const box = $('endStats'); box.textContent = '';
-  for (const [k, v] of stats) { const sp = document.createElement('span'); const b = document.createElement('b'); b.textContent = v; sp.append(`${k} `, b); box.append(sp); }
-  $('endLine').textContent = line; $('newjob').textContent = note;
-  $('again').textContent = again; $('next').style.display = next ? '' : 'none';
+  for (const [k, v] of stats) { const sp = document.createElement('span'); const b = document.createElement('b'); b.textContent = v; sp.append(translate(k), ' ', b); box.append(sp); }
+  $('endLine').replaceChildren(...line); $('endLine').hidden = !line.length;
+  $('newjob').replaceChildren(...note); $('newjob').hidden = !note.length;
+  $('again').textContent = translate(again); $('next').style.display = next ? '' : 'none';
   $('again').className = next ? '' : 'main';
 }
 function quit() {
@@ -403,7 +522,7 @@ function renderTickets() {
     if (rule === 'order' && active) el.dataset.next = '';
     if (rule !== 'boss') {
       el.disabled = done || s.phase !== 'work' || (rush ? active : !s.choosing);
-      el.setAttribute('aria-label', `${rush ? 'Customer' : 'Repair'} ${i + 1}, ${OBJECT[reps[i].kind]}`);
+      el.setAttribute('aria-label', translate(rush ? 'customerTicket' : 'repairTicket', { n: num(i + 1), object: translate(reps[i].kind) }));
       el.addEventListener('click', () => {
         if (!playing || paused || card) return;
         if (rush) selectLane(s, i);
@@ -412,7 +531,7 @@ function renderTickets() {
       });
     }
     const label = document.createElement('b');
-    label.textContent = done ? '✓' : i + 1;
+    label.textContent = done ? '✓' : num(i + 1);
     const pic = document.createElement('canvas');
     pic.width = pic.height = 100;
     drawJob(pic.getContext('2d'), [reps[i]], 0, 0, 0);
@@ -423,10 +542,13 @@ function renderTickets() {
 }
 
 let dailyImage = '';
+const dailyDetails = () => translate('shareDetails', {
+  date: dateLabel(today), coins: translate('coinCount', { n: num(s.coins) }), fixed: translate('fixedCount', { n: num(s.served) }),
+});
 function dailyCard() {
   const canvas = $('dailyShare'), ctx = canvas.getContext('2d');
   $('dailyResult').hidden = false;
-  canvas.setAttribute('aria-label', `Fix-It Stall daily result for ${today}, ${s.coins} coins and ${s.served} fixed`);
+  canvas.setAttribute('aria-label', translate('dailyResult') + ' · ' + dailyDetails());
   ctx.clearRect(0, 0, 600, 340);
   rrect(ctx, 0, 0, 600, 340, 0, '#123f3d', 0);
   ctx.fillStyle = '#fbc583';
@@ -439,46 +561,46 @@ function dailyCard() {
   const type = (text, x, y, size, color = '#fff1d6') => {
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.font = `bold ${size}px ui-rounded, system-ui, sans-serif`;
-    ctx.fillStyle = color; ctx.fillText(text, x, y);
+    ctx.fillStyle = color; ctx.fillText(text, x, y, 566 - x);
   };
-  type('FIX-IT STALL', 34, 86, 44);
-  type(`DAILY STALL  /  ${today}`, 36, 137, 22, '#c2e9d7');
+  type(translate('title'), 34, 86, 44);
+  type(translate('daily') + '  /  ' + dateLabel(today), 36, 137, 22, '#c2e9d7');
   coin(ctx, 63, 211, 25);
-  type(String(s.coins), 103, 213, 62, '#ffd98d');
-  type('COINS', 105, 260, 19, '#c2e9d7');
-  type(`${s.served} fixed`, 38, 304, 23);
-  type(`Best combo ${s.bestStreak}`, 204, 304, 23);
+  type(num(s.coins), 103, 213, 62, '#ffd98d');
+  type(translate('coins'), 105, 260, 19, '#c2e9d7');
+  type(translate('fixedCount', { n: num(s.served) }), 38, 304, 23);
+  type(translate('bestCombo', { n: num(s.bestStreak) }), 204, 304, 23);
   cat(ctx, 501, 306, 3.4, 0, true);
   dailyImage = canvas.toDataURL('image/png');
 }
-function downloadDaily(message = 'PNG download started.') {
+function downloadDaily(message = 'downloaded') {
   if (!dailyImage) return;
   const a = document.createElement('a');
-  a.download = `fixit-stall-${today}.png`; a.href = dailyImage; a.click();
-  $('shareStatus').textContent = message;
+  a.download = translate('imageName', { date: today }); a.href = dailyImage; a.click();
+  $('shareStatus').textContent = translate(message);
 }
 $('downloadDaily').addEventListener('click', () => downloadDaily());
 $('shareDaily').addEventListener('click', async () => {
   if (!dailyImage) return;
   const bytes = Uint8Array.from(atob(dailyImage.split(',')[1]), c => c.charCodeAt(0));
-  const file = new File([bytes], `fixit-stall-${today}.png`, { type: 'image/png' });
-  const data = { files: [file], title: 'Fix-It Stall daily', text: `${today} · ${s.coins} coins · ${s.served} fixed` };
+  const file = new File([bytes], translate('imageName', { date: today }), { type: 'image/png' });
+  const data = { files: [file], title: translate('dailyResult'), text: dailyDetails() };
   try {
     if (navigator.share && navigator.canShare?.(data)) {
       await navigator.share(data);
-      $('shareStatus').textContent = 'Card handed to the share sheet.';
+      $('shareStatus').textContent = translate('shared');
       return;
     }
   } catch (error) {
     if (error.name === 'AbortError') {
-      $('shareStatus').textContent = 'Sharing canceled.';
+      $('shareStatus').textContent = translate('canceled');
       return;
     }
   }
-  downloadDaily('File sharing unavailable. PNG download started.');
+  downloadDaily('downloadFallback');
 });
 
-// Everything the sim reported: sound, words, sparks. Called after each input and each tick, so a touch is answered in the same frame.
+// Everything the sim reported: sound, symbols, sparks. Called after each input and each tick, so a touch is answered in the same frame.
 function drain() {
   if (!s) return;
   for (const e of s.events) react(e);
@@ -489,9 +611,9 @@ function drain() {
   if (key !== jobKey) { // a new job on the bench: note how often this kind was seen before, for the hint
     jobKey = key;
     const k = s.rep.kind; seenBase = save.seen[k] ?? 0; save.seen[k] = seenBase + 1;
-    word = { text: WORD[k], t: 0, kind: 'job' };
     pop = 0;
   }
+  updateBenchLabel();
 }
 const local = (x, y) => [boxX + x * unit, boxY + y * unit];
 function react(e) {
@@ -518,10 +640,10 @@ function react(e) {
     case 'wind': tone(500 + e.n * 160, 0.05, 0.09, 'square'); noise(0.03, 0.06, 2000); break;
     case 'ready': tone(1320, 0.2, 0.1, 'triangle'); tone(1760, 0.25, 0.06); buzz(15); break;
     case 'zoom': tone(300, 0.5, 0.1, 'sawtooth', 1200); squash = 1; break;
-    case 'unwind': tone(400, 0.3, 0.07, 'triangle', -250); word = { text: 'Hold till it glows!', t: 0, kind: 'bad' }; break;
+    case 'unwind': tone(400, 0.3, 0.07, 'triangle', -250); feedback = { kind: 'rewind', t: 0 }; break;
     case 'eye': tone(1250, 0.06, 0.06, 'triangle'); break;
     case 'through': tone(700 + e.n * 140, 0.07, 0.07, 'triangle'); break;
-    case 'goal': $('pause').style.display = 'none'; banner = { text: 'Goal!', t: 0, gold: true }; [784, 988, 1175, 1568].forEach((f, i) => later(250 + i * 90, () => tone(f, 0.3, 0.07, 'triangle'))); party(24, true); break;
+    case 'goal': $('pause').style.display = 'none'; banner = { kind: 'goal', t: 0 }; [784, 988, 1175, 1568].forEach((f, i) => later(250 + i * 90, () => tone(f, 0.3, 0.07, 'triangle'))); party(24, true); break;
     case 'wrongTicket': {
       tone(160, 0.16, 0.10, 'triangle', -90);
       const ticket = $('tickets').querySelector(`[data-ticket="${e.ticket}"]`);
@@ -531,13 +653,11 @@ function react(e) {
     case 'switch':
     case 'ticket': tone(530, 0.07, 0.06, 'triangle'); break;
     case 'fixed': tone(1047, 0.15, 0.08, 'triangle'); break;
-    case 'step': word = { text: 'One more!', t: 0, kind: 'job', then: WORD[e.kind] }; break;
+    case 'step': feedback = { kind: 'step', t: 0 }; break;
     case 'paid': {
       (WORKS_SOUND[OBJECT[e.kinds[0]]] ?? (() => {}))();
       const m = multiplier(s), st = e.streak;
-      // the streak, felt: a rising run of notes, a word, and confetti that grows with it
-      const streakWord = m > multWas ? `x${m}!` : st >= 6 ? 'On fire!' : st >= 4 ? 'Hot!' : st === 3 ? 'Great!' : st === 2 ? 'Nice!' : null;
-      word = { text: e.golden ? 'Golden fix!' : streakWord ?? (e.quick ? 'Fixed! Quick!' : 'Fixed!'), t: 0, kind: e.golden ? 'gold' : 'good', streak: st };
+      feedback = { kind: e.golden ? 'gold' : e.quick ? 'quick' : 'fixed', t: 0 };
       if (st >= 2) { const base = 523 * 2 ** (Math.min(st, 12) / 12); [1, 1.25, 1.5, 2, 2.5].slice(0, Math.min(st, 5)).forEach((k, i) => later(120 + i * 65, () => tone(base * k, 0.16, 0.05, 'triangle'))); }
       party(e.golden ? 30 : st >= 2 ? 6 + st * 4 : 0, e.golden);
       buzz(e.golden ? [30, 40, 30, 40, 60] : [20, 30, 20]);
@@ -551,13 +671,13 @@ function react(e) {
       break;
     }
     case 'lost':
-      tone(220, 0.45, 0.14, 'sawtooth', -90); word = { text: 'Too slow!', t: 0, kind: 'bad' }; heartFlash = 1; if (!calm) shake = 1; multWas = 1; buzz(80);
+      tone(220, 0.45, 0.14, 'sawtooth', -90); feedback = { kind: 'lost', t: 0 }; heartFlash = 1; if (!calm) shake = 1; multWas = 1; buzz(80);
       break;
     case 'next': {
       walkOff();
-      if (e.golden) { banner = { text: 'Golden job!', t: 0, gold: true }; shimmer(); }
-      else if (e.fresh && (!s.lv || !cleared(s.lv.n))) { banner = { text: 'New job!', t: 0 }; [523, 784, 1047].forEach((f, i) => later(i * 110, () => tone(f, 0.25, 0.08, 'triangle'))); }
-      else if (e.regular) { banner = { text: 'Me again!', t: 0 }; tone(392, 0.15, 0.08, 'triangle'); later(130, () => tone(523, 0.2, 0.08, 'triangle')); save.regular++; }
+      if (e.golden) { banner = { kind: 'gold', t: 0 }; shimmer(); }
+      else if (e.fresh && (!s.lv || !cleared(s.lv.n))) { banner = { kind: 'new', t: 0 }; [523, 784, 1047].forEach((f, i) => later(i * 110, () => tone(f, 0.25, 0.08, 'triangle'))); }
+      else if (e.regular) { banner = { kind: 'regular', t: 0 }; tone(392, 0.15, 0.08, 'triangle'); later(130, () => tone(523, 0.2, 0.08, 'triangle')); save.regular++; }
       else tone(300, 0.05, 0.05, 'triangle');
       break;
     }
@@ -587,7 +707,14 @@ cv.addEventListener('pointerdown', e => {
   }
   input(s, { type: 'down', ...toLocal(e) }); drain();
 });
-function startNow() { $('tickets').hidden = !benchControls; card = 0; cardFade = 0.3; last = performance.now(); acc = 0; }
+function startNow() {
+  if (!playing || paused || !card) return;
+  $('tickets').hidden = !benchControls;
+  card = 0; cardFade = 0.3; last = performance.now(); acc = 0;
+  startControl();
+  updateBenchLabel();
+}
+$('startLevel').addEventListener('click', startNow);
 cv.addEventListener('pointermove', e => {
   if (!playing || paused || !finger || e.pointerId !== finger.id) return;
   input(s, { type: 'move', ...toLocal(e) }); drain();
@@ -600,13 +727,59 @@ for (const type of ['pointerup', 'pointercancel']) cv.addEventListener(type, e =
 
 // ---------- buttons, pause, keys
 const rec = lab('fixit');
-rec.notice($('menu').firstElementChild);
-rec.toggle($('paused').firstElementChild);
-const recordingChoice = document.querySelector('#paused .lab-toggle input');
-const noticeText = document.querySelector('#menu .lab-notice').firstChild;
-const recordingOnText = noticeText.data;
+const notice = rec.notice($('menu').firstElementChild);
+const recordingToggle = rec.toggle($('paused').firstElementChild);
+const recordingChoice = recordingToggle.querySelector('input');
+const noticeText = notice.firstChild;
+const recordingLabel = recordingToggle.lastChild;
+notice.querySelector('a').dataset.i18n = 'privacy';
+recordingChoice.addEventListener('change', updateRecording);
+addEventListener('storage', updateRecording);
+function updateRecording() {
+  noticeText.data = translate(recordingChoice.checked ? 'recordingOn' : 'recordingOff') + ' ';
+  recordingLabel.data = ' ' + translate('recordingToggle');
+}
+function syncNotes() {
+  document.getElementById('notes-button')?.setAttribute('aria-label', translate('notes'));
+}
+document.addEventListener('DOMContentLoaded', syncNotes, { once: true });
+function translatePage() {
+  document.title = translate('title');
+  apply();
+  updateSound();
+  updateRecording();
+  syncNotes();
+  for (const button of document.querySelectorAll('.language')) {
+    button.lastElementChild.textContent = translate(lang() === 'en' ? 'enCode' : 'trCode');
+  }
+  const hintLabel = document.querySelector('.kit-hint .label');
+  if (hintLabel) hintLabel.textContent = translate('screwMove');
+  if (screen === 'menu') menu();
+  ticketKey = '';
+  benchLabelKey = '';
+  if (s) renderTickets();
+  startControl();
+  updateBenchLabel();
+}
+for (const id of ['langMenu', 'langPause']) {
+  const button = $(id);
+  button.append($('languageIcon').content.cloneNode(true));
+  button.addEventListener('click', () => {
+    setLang(lang() === 'en' ? 'tr' : 'en');
+    // Keep an explicit link consistent with the new choice after refresh.
+    const url = new URL(location.href);
+    if (url.searchParams.has('lang')) {
+      url.searchParams.set('lang', lang());
+      history.replaceState(history.state, '', url);
+    }
+    translatePage();
+  });
+}
 $('play').addEventListener('click', () => begin(only ? 'open' : 'level', qLevel ?? nextLevel()));
 for (const id of ['menuAssist', 'assist']) $(id).append($('helpIcon').content.cloneNode(true));
+const assistLevel = document.createElement('span');
+assistLevel.id = 'assistLevel';
+$('menuAssist').prepend(assistLevel);
 $('menuAssist').addEventListener('click', () => { if (screen === 'menu' && menuHelp) begin('level', menuHelp, true); });
 $('assist').addEventListener('click', () => { if (screen === 'end' && mode === 'level' && !s.cleared && canAssist(save.attempts[lvN])) begin('level', lvN, true); });
 $('again').addEventListener('click', () => { if (performance.now() - ended > 500) begin(mode, lvN); });
@@ -621,7 +794,7 @@ $('quit').addEventListener('click', quit);
 for (const id of ['sound1', 'sound2']) $(id).addEventListener('click', () => {
   save.sound = !save.sound; store();
   if (save.sound) { snd.unlock(); tone(660, 0.1, 0.06, 'triangle'); }
-  for (const b of ['sound1', 'sound2']) $(b).textContent = `Sound: ${save.sound ? 'on' : 'off'}`;
+  updateSound();
 });
 // The keyboard: holding Space does the job in front of you at an everyday pace (moves.js, the same finger paths the
 // bots use), one step per sim tick. Letting go lifts the finger. Every repair can be done this way.
@@ -664,6 +837,25 @@ addEventListener('keydown', e => {
   if ((e.key === 'Enter' || e.key === ' ') && !e.repeat && !playing && screen !== 'play' && !e.target.closest?.('button, a, input')) { const b = screen === 'menu' ? $('play') : screen === 'end' ? ($('next').style.display !== 'none' ? $('next') : $('again')) : null; if (b) { e.preventDefault(); b.click(); } }
 });
 
+function repairCue(r) {
+  if (r.kind === 'zip' && zipStuck(r)) return 'zipStuck';
+  if (r.kind === 'balance' && r.grab && r.dwell > 0) return 'balanceHold';
+  return r.kind + 'Move';
+}
+let benchLabelKey = '';
+function updateBenchLabel() {
+  const visible = screen === 'play' && !card;
+  if (cv.getAttribute('aria-hidden') !== String(!visible)) cv.setAttribute('aria-hidden', String(!visible));
+  if (!visible || !s?.rep) return;
+  const move = repairCue(s.rep), key = `${lang()}:${jobKey}:${move}:${s.choosing}`;
+  if (benchLabelKey === key) return;
+  benchLabelKey = key;
+  const step = num(s.stepN + 1);
+  cv.setAttribute('aria-label', s.choosing ? translate('chooseTicket', { n: step }) : translate('benchProgress', {
+    object: translate(s.rep.kind), move: translate(move), step, total: num(s.reps.length),
+  }));
+}
+
 // The state the browser check reads.
 window.fixitState = () => ({
   screen, playing, paused, t: s?.t ?? 0, clock: s?.clock ?? 0, day: s?.day ?? 0, over: s?.over ?? null,
@@ -673,7 +865,8 @@ window.fixitState = () => ({
   box: { x: boxX, y: boxY, unit }, minTouchPx: Math.min(...Object.values(HIT)) * 2 * unit,
   bank: save.bank, best: save.best, shifts: save.shifts, unlocked: [...save.unlocked], owned: [...save.owned], awning: save.awning, sound: save.sound, pending: save.pending,
   customer: s?.cust ? { n: s.cust.n, kinds: s.cust.kinds, regular: s.cust.regular, golden: s.cust.golden, left: s.cust.left, patience: s.cust.patience } : null,
-  word: word?.text ?? null, confetti: confetti.length, golden: !!s?.cust?.golden, queue: s ? s.queue.map(c => c.kinds[0]) : [], daily, today, days: { ...save.days }, keyboard: !!kb, alpha: Math.min(1, acc / DT),
+  cue: s?.rep && s.phase === 'work' && !s.choosing ? (['zipStuck', 'balanceHold'].includes(repairCue(s.rep)) ? repairCue(s.rep) : guide(s.rep).type) : null,
+  introCue: !!(card && s?.lv?.intro && !cleared(s.lv.n) || banner?.kind === 'new'), confetti: confetti.length, golden: !!s?.cust?.golden, queue: s ? s.queue.map(c => c.kinds[0]) : [], daily, today, days: { ...save.days }, keyboard: !!kb, alpha: Math.min(1, acc / DT),
   people: drawn.map(p => ({ x: Math.round(p.x * 10) / 10, R: Math.round(p.R * 10) / 10, who: p.who })),
   mode, level: mode === 'level' ? lvN : null, card, goal: s ? goalState(s) : null, cleared: !!s?.cleared, stars: s ? stars(s) : 0, clearT: s?.clearT ?? null,
   assisted: !!s?.assisted, attempts: { ...save.attempts }, assists: { ...save.assists }, growth: stallGrowth(),
@@ -753,7 +946,7 @@ function furnishings(growth) {
   }
   if (growth.includes('sign')) {
     rrect(g, 12, benchTop - 88, 67, 35, 7, '#184b49', 2);
-    ink('FIX-IT', 45, benchTop - 69, 13, '#ffe5a0', 'center');
+    goalIcon(g, 'fix', 45, benchTop - 70, 12);
   }
 }
 const QUEUE_GAP = () => Math.min(92, W * 0.22);
@@ -950,8 +1143,9 @@ function job(t, dt) {
   $('tickets').classList.toggle('prompt', s.choosing && s.rep.idle >= 1.5);
   if (s.cust.regular) drawSilly(g, sillyList(save.regular), t);
   // the hint: a ghost finger doing the gesture on the thing
-  hintNow = playing && !paused ? hint(s, seenBase) : 0;
-  if (hintNow && s.phase === 'work') drawGhost(g, guide(r), t, hintNow * (0.75 + 0.25 * Math.sin(t * 5)));
+  const urgentCue = (r.kind === 'oil' || r.kind === 'zip' && zipStuck(r) && r.idle > 0.2) && !s.choosing;
+  hintNow = playing && !paused && !card ? Math.max(hint(s, seenBase), urgentCue ? 0.9 : 0) : 0;
+  if (hintNow && s.phase === 'work') drawGhost(g, guide(r), t, hintNow * (calm ? 1 : 0.82 + 0.18 * Math.sin(t * 5)), calm);
   if (kb && s.phase === 'work') { // the keyboard's finger: a fingertip that presses while Space is held
     g.fillStyle = kb.down ? 'rgba(255,255,255,.45)' : 'rgba(255,255,255,.2)'; g.beginPath(); g.arc(kb.x, kb.y, kb.down ? 7 : 5, 0, Math.PI * 2); g.fill();
     g.strokeStyle = C.ink; g.lineWidth = 1.2; g.stroke();
@@ -960,23 +1154,35 @@ function job(t, dt) {
   g.restore();
   g.globalAlpha = 1;
   if (s.lv?.rule === 'blackout') blackout();
-  // the word: what to do, or how it went. Above the object, never under the finger.
-  if (word || s.choosing) {
-    const sequence = ['①', '②', '③'].slice(0, s.reps.length).map((n, i) => i < s.stepN ? '✓' : n);
-    const current = s.choosing ? { text: sequence.join(' → '), t: 1, kind: 'job' } : word;
-    const a = current.t < 0.15 ? current.t / 0.15 : 1, big = current.kind === 'job' ? 30 : 34;
-    g.save(); g.translate(W / 2, boxY - 18); g.scale(0.8 + 0.2 * a, 0.8 + 0.2 * a);
-    g.font = `bold ${big}px ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.lineWidth = 6; g.strokeStyle = C.ink; g.lineJoin = 'round'; g.strokeText(current.text, 0, 0);
-    g.fillStyle = current.kind === 'good' ? '#9ff0b0' : current.kind === 'gold' ? '#ffd860' : current.kind === 'bad' ? '#ffb0a0' : '#fff6e4';
-    if (current.streak >= 2 && !calm) g.rotate(Math.sin(current.t * 30) * 0.06 * Math.max(0, 1 - current.t * 2));
-    g.fillText(current.text, 0, 0);
+  const y = boxY - 16;
+  if (s.choosing) {
+    const sequence = s.reps.map((_, i) => i < s.stepN ? '✓' : num(i + 1));
+    ink(sequence.join(' → '), W / 2, y, 24, '#fff6e4', 'center');
+  } else if (feedback) {
+    g.save();
+    g.globalAlpha = Math.min(1, (0.9 - feedback.t) * 5);
+    const x = W / 2;
+    circle(g, x, y, 14, feedback.kind === 'lost' ? '#ffb0a0' : '#fff1d6', 2);
+    symbol(g, feedback.kind, x, y, 11);
     g.restore();
-    if (s.reps.length > 1 && s.phase === 'work' && !benchControls) for (let i = 0; i < s.reps.length; i++) circle(g, W / 2 - 10 + i * 20, boxY + 6, 6, i < s.stepN ? '#7fe0a0' : i === s.stepN ? C.cream : 'rgba(255,255,255,.3)', 2);
+  }
+  if (s.reps.length > 1 && s.phase === 'work' && !benchControls) {
+    for (let i = 0; i < s.reps.length; i++) {
+      const x = W / 2 + (i - (s.reps.length - 1) / 2) * 21;
+      if (i < s.stepN) symbol(g, 'fixed', x, boxY + 6, 7);
+      else circle(g, x, boxY + 6, 5, i === s.stepN ? C.cream : 'rgba(255,255,255,.3)', 2);
+    }
   }
   if (banner && !benchControls && s.lv?.rule !== 'blackout') {
     const a = Math.min(1, banner.t * 6) * Math.min(1, (1.6 - banner.t) * 4);
-    if (a > 0) { g.save(); g.globalAlpha = a; g.translate(W / 2, benchTop - 8); g.rotate(-0.04); rrect(g, -78, -20, 156, 40, 14, banner.gold ? '#ffd860' : C.amber, 3); g.font = 'bold 22px ui-rounded, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = C.ink; g.fillText(banner.text, 0, 1); g.restore(); }
+    if (a > 0) {
+      g.save();
+      g.globalAlpha = a;
+      const x = W / 2, y = benchTop - 8;
+      circle(g, x, y, 18, '#fff1d6', 2);
+      symbol(g, banner.kind, x, y, 13);
+      g.restore();
+    }
   }
 }
 function idleJob(t) {
@@ -993,16 +1199,19 @@ function hud(t, dt) {
   // coins: the number counts up as the flying coins land
   coin(g, W / 2 - 34, y + 15, 13);
   g.font = 'bold 26px ui-rounded, sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.lineWidth = 5; g.strokeStyle = C.ink; g.lineJoin = 'round';
-  g.strokeText(String(shownCoins), W / 2 - 16, y + 16); g.fillStyle = '#fff6e4'; g.fillText(String(shownCoins), W / 2 - 16, y + 16);
+  const score = num(shownCoins);
+  g.strokeText(score, W / 2 - 16, y + 16); g.fillStyle = '#fff6e4'; g.fillText(score, W / 2 - 16, y + 16);
   const m = multiplier(s);
   if (m > 1) { // the multiplier badge pops when it goes up
-    const bx = W / 2 - 16 + g.measureText(String(shownCoins)).width + 10, k = 1 + 0.5 * multPop * (calm ? 0.3 : 1);
-    g.save(); g.translate(bx + 17, y + 16); g.scale(k, k); rrect(g, -17, -12, 34, 24, 10, multPop > 0.01 ? C.amber : C.teal, 2); g.fillStyle = '#fff6e4'; g.font = 'bold 16px ui-rounded, sans-serif'; g.textAlign = 'center'; g.fillText(`x${m}`, 0, 1); g.restore();
+    const bx = W / 2 - 16 + g.measureText(score).width + 10, k = 1 + 0.5 * multPop * (calm ? 0.3 : 1);
+    g.save(); g.translate(bx + 17, y + 16); g.scale(k, k); rrect(g, -17, -12, 34, 24, 10, multPop > 0.01 ? C.amber : C.teal, 2); g.fillStyle = '#fff6e4'; g.font = 'bold 16px ui-rounded, sans-serif'; g.textAlign = 'center'; g.fillText('×' + num(m), 0, 1); g.restore();
   }
   // Eight clean fixes build the pay multiplier. The bar resets when a fix is late.
-  const bx = W - 106, by = Math.max(benchTop + 16, boxY + S + 8);
-  rrect(g, bx - 49, by - 9, 147, 28, 11, 'rgba(45,27,21,.86)', 1.5);
-  ink('COMBO', bx - 42, by + 5, 13, '#f9ddae');
+  const label = translate('streak'), bx = W - 106, by = Math.max(benchTop + 16, boxY + S + 8);
+  g.font = 'bold 13px ui-rounded, sans-serif';
+  const labelWidth = g.measureText(label).width;
+  rrect(g, bx - labelWidth - 2, by - 9, labelWidth + 100, 28, 11, 'rgba(45,27,21,.86)', 1.5);
+  ink(label, bx - labelWidth + 6, by + 5, 13, '#f9ddae');
   for (let i = 0; i < 8; i++) {
     rrect(g, bx + 13 + i * 10, by, 7, 10, 2, i < s.streak ? (i < 4 ? '#93ddba' : '#ffd27d') : '#765943', 0);
   }
@@ -1010,7 +1219,7 @@ function hud(t, dt) {
   else { // the day: a sun travelling along a line from open to close
     const ly = top + 46;
     const secondsLeft = Math.max(0, Math.ceil(s.day - s.clock));
-    const labelWidth = ink(`${daily ? 'Daily' : 'Open'} · ${secondsLeft} s`, 10, ly, 15);
+    const labelWidth = ink(translate(daily ? 'daily' : 'open') + ' · ' + seconds(secondsLeft), 10, ly, 15);
     const x0 = 22 + labelWidth, x1 = W - 66, f = s.cust?.tutor ? 0 : Math.min(1, (V?.clock ?? s.clock) / s.day);
     g.strokeStyle = 'rgba(58,34,22,.35)'; g.lineWidth = 4; g.lineCap = 'round'; g.beginPath(); g.moveTo(x0, ly); g.lineTo(x1, ly); g.stroke();
     g.strokeStyle = '#fff6e4'; g.beginPath(); g.moveTo(x0, ly); g.lineTo(x0 + (x1 - x0) * f, ly); g.stroke();
@@ -1029,25 +1238,38 @@ function hud(t, dt) {
 // The goal, live: a pill with each part's icon and count, then the level clock as a bar with the star times marked on
 // it. A timed level's bar runs out at the limit; an untimed one shows how long the stars stay in reach.
 const ink = (text, x, y, size, col = '#fff6e4', align = 'left') => { g.font = `bold ${size}px ui-rounded, 'Arial Rounded MT Bold', sans-serif`; g.textAlign = align; g.textBaseline = 'middle'; g.lineWidth = Math.max(3, size / 5); g.strokeStyle = C.ink; g.lineJoin = 'round'; g.strokeText(text, x, y); g.fillStyle = col; g.fillText(text, x, y); return g.measureText(text).width; };
-function objectiveIcon(kind, x, y, r, t) {
-  if (kind === 'coins') {
-    rrect(g, x - r * 0.83, y - r, r * 1.66, r * 2, 3, '#cae9cc', 1.6);
-    ink('¢', x, y + 1, r * 1.45, '#fff1d6', 'center');
-  } else if (kind === 'rush') {
-    for (const side of [-1, 1]) circle(g, x + side * r * 0.43, y, r * 0.57, '#ffdb9e', 1.5);
+function objectiveIcon(kind, x, y, r, t, ctx = g) {
+  if (kind === 'rush') {
+    for (const side of [-1, 1]) {
+      const dx = x + side * r * 0.6;
+      circle(ctx, dx, y - r * 0.38, r * 0.33, '#ffdb9e', 1.5);
+      rrect(ctx, dx - r * 0.35, y + r * 0.06, r * 0.7, r * 0.57, r * 0.22, '#7fc8ac', 1.4);
+    }
   } else if (kind === 'blackout') {
-    rrect(g, x - r * 0.76, y - r * 0.65, r * 1.52, r * 0.94, 4, '#ffd783', 1.6);
-    g.fillStyle = '#ffe3a9';
-    g.beginPath(); g.moveTo(x - r * 0.35, y + r * 0.36); g.lineTo(x + r * 0.35, y + r * 0.36);
-    g.lineTo(x + r * 0.8, y + r); g.lineTo(x - r * 0.8, y + r); g.fill();
-  } else if (kind === 'boss') {
-    for (let i = 0; i < 3; i++) rrect(g, x + (i - 1.5) * r * 0.67, y - r * 0.45, r * 0.58, r * 0.9, 2, '#e4c8f5', 1.3);
-  } else goalIcon(g, kind === 'order' ? 'list' : kind, x, y, r, t);
+    ctx.save();
+    ctx.translate(x, y - r * 0.6);
+    ctx.rotate(calm ? 0 : Math.sin(t * 3) * 0.35);
+    rrect(ctx, -r * 0.6, 0, r * 1.2, r * 0.63, 4, '#d38749', 1.6);
+    ctx.fillStyle = '#ffe3a9';
+    ctx.beginPath(); ctx.moveTo(-r * 0.26, r * 0.58); ctx.lineTo(r * 0.26, r * 0.58);
+    ctx.lineTo(r * 0.76, r * 1.65); ctx.lineTo(-r * 0.76, r * 1.65); ctx.fill();
+    ctx.restore();
+  } else if (kind === 'boss' || kind === 'order') {
+    const steps = kind === 'boss' ? 3 : 2;
+    for (let i = 0; i < steps; i++) {
+      const dx = x + (i - (steps - 1) / 2) * r * 0.76;
+      rrect(ctx, dx - r * 0.32, y - r * 0.55, r * 0.64, r * 1.1, 2, i === Math.floor(t * 2) % steps ? '#9fe1c3' : '#fff1d6', 1.3);
+      ctx.font = `bold ${r * 0.65}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = C.ink;
+      ctx.fillText(num(i + 1), dx, y + 1);
+    }
+  } else if (['coins', 'time', 'list', 'fix', 'safe'].includes(kind)) goalIcon(ctx, kind, x, y, r, t);
+  else symbol(ctx, kind, x, y, r);
 }
 function goalBar(t) {
   const gs = goalState(s), ly = top + 47, lv = s.lv;
   let x = 10;
-  const parts = gs.parts.map(p => ({ ...p, text: `${Math.min(p.have, p.need)}/${p.need}` }));
+  const parts = gs.parts.map(p => ({ ...p, text: count(Math.min(p.have, p.need), p.need) }));
   g.font = `bold 17px ui-rounded, sans-serif`;
   const w = parts.reduce((a, p) => a + 26 + g.measureText(p.text).width + 8, 6) + (gs.safe ? 22 : 0);
   rrect(g, x, ly - 15, w, 30, 15, gs.met ? '#3f9e6a' : 'rgba(58,34,22,.72)', 2);
@@ -1069,48 +1291,75 @@ function goalBar(t) {
     g.strokeStyle = C.ink; g.lineWidth = 2; g.beginPath(); g.moveTo(tx, ly - 6); g.lineTo(tx, ly + 6); g.stroke();
     starShape(g, tx, ly + 14, k === 3 ? 7 : 5.5, gone ? 'rgba(255,255,255,.3)' : k === 3 ? '#ffd860' : '#f3ead8'); // gold: three stars; pale: two
   }
-  if (gs.time) { const left = Math.max(0, Math.ceil(gs.time - now)); ink(`${left} s`, x1, ly - 13, 14, late ? '#ffb0a0' : '#fff6e4', 'right'); }
+  if (gs.time) { const left = Math.max(0, Math.ceil(gs.time - now)); ink(seconds(left), x1, ly - 13, 14, late ? '#ffb0a0' : '#fff6e4', 'right'); }
   circle(g, x0 + (x1 - x0) * f, ly, 6, '#ffd860', 1.6);
 }
-// The goal card: what this level asks, shown before it starts (the sim waits), then fading as play begins.
-function activeGoalLine() {
-  const goal = s.lv.goal;
-  return goalLine(s.assisted && goal.time ? { ...goal, time: Math.ceil(s.deadline) } : goal);
+// The goal card uses the same symbols as the live counter. The run waits for a tap or Space.
+function briefLayout() {
+  const cw = Math.min(W - 32, 340), intro = cleared(lvN) ? null : s.lv.intro;
+  const ch = (intro ? 211 : 147) + (s.lv.goal.safe || s.lv.goal.list ? 21 : 0) + (s.lv.goal.coins ? 21 : 0);
+  const y = Math.max(top + 65, Math.min(H - bottomInset - ch - 12, boxY + S / 2 - ch / 2 - 20));
+  return { x: (W - cw) / 2, y, cw, ch, intro };
+}
+function positionStart() {
+  const { y, ch } = briefLayout();
+  $('startLevel').style.top = `${y + ch - 60}px`;
 }
 function goalCard(t) {
   const a = card > 0 ? 1 : cardFade / 0.3;
   if (a <= 0 || !s?.lv) return;
-  const lv = s.lv, intro = lv.intro && !cleared(lv.n);
-  const cw = Math.min(W - 32, 340), lines = wrap(activeGoalLine(), cw - 40, 20), ch = 150 + lines.length * 26 + (intro ? 30 : 0);
-  const x = (W - cw) / 2, y = Math.max(top + 70, boxY + S / 2 - ch / 2 - 20);
-  g.save(); g.globalAlpha = a;
+  const lv = s.lv, gs = goalState(s), { x, y, cw, ch, intro } = briefLayout();
+  g.save();
+  g.globalAlpha = a;
   g.fillStyle = 'rgba(58,34,22,.35)'; g.fillRect(-20, -20, W + 40, H + 40);
-  g.translate(0, card > 0 ? 0 : (1 - a) * -30);
+  g.translate(0, card > 0 ? 0 : (1 - a) * -20);
   rrect(g, x, y, cw, ch, 22, '#fff1d6', 3);
-  let yy = y + 30;
-  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = C.copper;
-  ink(`Level ${lv.n}${s.assisted ? ' · Slower clocks' : ''}`, W / 2, yy, 28, C.copperLt, 'center'); yy += 34;
-  if (intro) { g.font = 'bold 17px ui-rounded, sans-serif'; g.fillStyle = C.tealDk; g.fillText(`New job: the ${OBJECT[lv.intro]}`, W / 2, yy); yy += 30; }
-  const icons = [lv.rule, lv.goal.list ? 'list' : lv.goal.fix ? 'fix' : null, lv.goal.coins ? 'coins' : null, lv.goal.time ? 'time' : null, lv.goal.safe || lv.goal.list ? 'safe' : null].filter(Boolean);
-  icons.forEach((k, i) => objectiveIcon(k, W / 2 + (i - (icons.length - 1) / 2) * 44, yy + 4, 15, t));
-  yy += 34;
-  g.font = 'bold 20px ui-rounded, sans-serif'; g.fillStyle = C.ink;
-  for (const l of lines) { g.fillText(l, W / 2, yy); yy += 26; }
-  g.font = 'bold 16px ui-rounded, sans-serif';
-  const target = s.assisted ? 2 : 3, label = `in ${lv.stars[3 - target]} s or less`, gap = 7 + target * 13;
-  const sw = g.measureText(label).width + gap;
-  for (let j = 0; j < target; j++) starShape(g, W / 2 - sw / 2 + 6 + j * 13, yy + 1, 7, '#ffd860');
-  g.fillStyle = 'rgba(58,34,22,.85)'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(label, W / 2 - sw / 2 + gap, yy + 2); g.textAlign = 'center';
-  yy += 26;
-  if (card > 0) { g.globalAlpha = a * (0.75 + 0.25 * Math.sin(t * 5)); g.font = 'bold 17px ui-rounded, sans-serif'; g.fillStyle = C.tealDk; g.fillText('Tap to start', W / 2, yy); }
+  const cx = W / 2;
+  ink(translate('level', { n: num(lvN) }), cx, y + 22, 24, '#ffd29e', 'center');
+  if (s.assisted) symbol(g, 'slower', x + 28, y + 23, 14);
+  let yy = y + 47;
+  if (intro) {
+    g.save(); g.translate(cx - 33, yy - 10); g.scale(0.66, 0.66);
+    drawJob(g, [previewRepair(intro)], 0, t, 0);
+    g.restore();
+    symbol(g, 'new', cx + 36, yy + 3, 13);
+    yy += 64;
+  }
+  const items = gs.parts.map(({ kind, need }) => [kind, num(need)]);
+  if (gs.time) items.push(['time', seconds(Math.ceil(gs.time))]);
+  const spacing = Math.min(100, (cw - 29) / items.length);
+  items.forEach(([kind, value], i) => {
+    const xx = cx + (i - (items.length - 1) / 2) * spacing;
+    objectiveIcon(kind, xx - 15, yy, 13, t);
+    if (kind === 'rush') {
+      for (const [j, dx] of [-23, -7].entries()) {
+        const fill = calm ? 0.65 : 1 - ((t * (j ? 0.7 : 0.45)) % 1) * 0.85;
+        rrect(g, xx + dx - 5, yy + 11, 10, 3, 1, '#a37d5d', 0);
+        rrect(g, xx + dx - 5, yy + 11, 10 * fill, 3, 1, '#2f8f8a', 0);
+      }
+    }
+    cardText(value, xx + 2, yy, 18, spacing - 29, 'left');
+  });
+  yy += 22;
+  if (gs.safe) {
+    symbol(g, 'lost', x + 23, yy, 9);
+    cardText(translate('safeGoal'), x + 38, yy, 14, cw - 51, 'left');
+    yy += 21;
+  }
+  if (lv.goal.coins) {
+    coin(g, x + 23, yy, 8);
+    cardText(translate('baseRule'), x + 38, yy, 14, cw - 51, 'left');
+    yy += 21;
+  }
+  const target = s.assisted ? 2 : 3;
+  for (let i = 0; i < 3; i++) starShape(g, cx - 45 + 16 * i, yy + 1, 7, i < target ? '#ffd860' : '#e3cfae');
+  cardText('≤ ' + seconds(lv.stars[3 - target]), cx + 3, yy + 1, 15, cw / 2 - 12, 'left');
   g.restore();
 }
-function wrap(text, width, size) {
+function cardText(value, x, y, size, maxWidth, align) {
   g.font = `bold ${size}px ui-rounded, sans-serif`;
-  const out = []; let line = '';
-  for (const w of text.split(' ')) { const tryL = line ? line + ' ' + w : w; if (g.measureText(tryL).width > width && line) { out.push(line); line = w; } else line = tryL; }
-  if (line) out.push(line);
-  return out;
+  g.fillStyle = C.ink; g.textAlign = align; g.textBaseline = 'middle';
+  g.fillText(value, x, y, maxWidth);
 }
 
 // ---------- the loop: a fixed 60 Hz sim; a hidden tab or a pause never makes a catch-up burst
@@ -1132,12 +1381,8 @@ function frame(now) {
     for (const p of confetti) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 520 * dt; p.vx *= 1 - dt; p.r += p.vr * dt; } confetti = confetti.filter(p => p.t < p.life);
     multPop = Math.max(0, multPop - dt * 2.5); cardFade = Math.max(0, cardFade - dt);
     if (s && !flying.length) shownCoins = s.coins;
-    if (word) { word.t += dt; if (word.then && word.t > 0.7) word = { text: word.then, t: 0, kind: 'job' }; else if (word.kind !== 'job' && word.t > 0.9) word = null; }
+    if (feedback) { feedback.t += dt; if (feedback.t > 0.9) feedback = null; }
     if (banner) { banner.t += dt; if (banner.t > 1.6) banner = null; }
-    if (s && s.phase === 'work') {
-      if (!word) word = { text: '', t: 0.2, kind: 'job' };
-      if (word.kind === 'job' && !word.then) word.text = repairWord(s.rep);
-    }
     shake = Math.max(0, shake - dt * 4); squash = Math.max(0, squash - dt * 8); wobble = Math.max(0, wobble - dt * 4); heartFlash = Math.max(0, heartFlash - dt * 1.5); catHappy = Math.max(0, catHappy - dt);
   }
   draw(now, live ? dt : 0);
@@ -1157,7 +1402,7 @@ function radio() {
 kitHint(cv, {
   kind: 'hold-and-move', key: 'fixit:hint', played: save.served > 0,
   when: () => playing && !paused && !card && s.lv?.n === 1 && s.cust.n === 0,
-  delay: 3500, reach: 30, bottom: 64, label: 'Circle the screw',
+  delay: 3500, reach: 30, bottom: 64, label: translate('screwMove'),
 });
 // A reload can resume only this tab's game. The permanent wallet is written at settlement.
 const RELOAD_KEY = 'fixit:reload';
@@ -1197,11 +1442,11 @@ function restoreAfterReload() {
   layout();
   recCount = s.log.length;
   shownCoins = s.coins;
-  word = { text: WORD[s.rep.kind], t: 1, kind: 'job' };
   rec.start({ ...runMetadata(), resumed: true });
   renderTickets();
   show(paused ? 'paused' : 'play');
   return true;
 }
 if (!restoreAfterReload()) show('menu');
+translatePage();
 requestAnimationFrame(frame);

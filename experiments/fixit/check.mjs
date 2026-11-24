@@ -1,4 +1,4 @@
-// Phone smoke test for Fix-It Stall: node experiments/fixit/check.mjs [webkit|chromium]
+// Phone smoke test for Fix-It Stall: node experiments/fixit/check.mjs [webkit|chromium] [--words]
 // Serves experiments/ on a free port, plays with real touch pointer events on WebKit (iPhone 13) and Chromium (Pixel 7),
 // and fails on any page or console error. Screenshots go to $SHOTS (default: a folder in the OS temp directory).
 // Levels are played to their end; the open and daily stalls are shortened with ?day= where a whole shift is played.
@@ -16,11 +16,15 @@ import { COUNT, levelReward } from './levels.js';
 
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '..');
 const SHOTS = process.env.SHOTS || join(tmpdir(), 'fixit-shots'); // the build brief sets SHOTS to a scratch folder
+const WORD_SHOTS = process.env.WORD_SHOTS || join(SHOTS, 'words');
 await mkdir(SHOTS, { recursive: true });
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
-  if (url.pathname === '/notes/button.js') { res.writeHead(200, { 'content-type': 'text/javascript' }); return res.end(''); }
+  if (url.pathname === '/notes/button.js') {
+    const body = await readFile(join(root, '../workers/feedback/public/notes/button.js'));
+    res.writeHead(200, { 'content-type': 'text/javascript' }); return res.end(body);
+  }
   let file = normalize(join(root, decodeURIComponent(url.pathname)));
   if (url.pathname.endsWith('/')) file = join(file, 'index.html');
   try { if (!file.startsWith(root)) throw 0; const body = await readFile(file); res.writeHead(200, { 'content-type': types[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-store' }); res.end(body); }
@@ -85,10 +89,13 @@ async function playJob(page, label, pointerType) {
 // record still being compressed when the page goes away).
 async function leave(page) { await page.click('#pause'); await page.click('#quit'); await sleep(300); }
 // A level opens on its goal card with the sim waiting; a tap on the canvas starts it.
-async function startLevel(page) {
+async function startLevel(page, icon = false) {
   await until(page, () => window.fixitState().card > 0, 'the goal card');
-  const st = await state(page);
-  await page.evaluate(([x, y]) => { const el = document.getElementById('c'); for (const t of ['down', 'up']) el.dispatchEvent(new PointerEvent('pointer' + t, { pointerId: 2, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, bubbles: true, cancelable: true })); }, [st.box.x + 50 * st.box.unit, st.box.y + 50 * st.box.unit]);
+  if (icon) await page.locator('#startLevel').tap();
+  else {
+    const st = await state(page);
+    await page.evaluate(([x, y]) => { const el = document.getElementById('c'); for (const t of ['down', 'up']) el.dispatchEvent(new PointerEvent('pointer' + t, { pointerId: 2, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, bubbles: true, cancelable: true })); }, [st.box.x + 50 * st.box.unit, st.box.y + 50 * st.box.unit]);
+  }
   await until(page, () => window.fixitState().card === 0, 'the goal card to go');
 }
 async function startAt(page, level) {
@@ -210,7 +217,7 @@ async function openingAndReload(page) {
   await page.evaluate(() => {
     const paint = CanvasRenderingContext2D.prototype.fillText;
     CanvasRenderingContext2D.prototype.fillText = function (value, ...args) {
-      if (value === 'COMBO') window.comboFont = this.font;
+      if (value === 'Combo') window.comboFont = this.font;
       return paint.call(this, value, ...args);
     };
   });
@@ -219,8 +226,10 @@ async function openingAndReload(page) {
   const comboFont = await page.evaluate(() => window.comboFont);
   assert.ok(Number(comboFont?.match(/(\d+)px/)?.[1]) >= 13, 'the combo label uses at least 13 CSS pixels');
   const briefing = await state(page);
-  assert.ok(briefing.card > 0 && briefing.t === 0, 'Tap to start waits for the player to finish reading');
+  assert.ok(briefing.card > 0 && briefing.t === 0, 'the briefing waits for the player to start');
+  assert.ok(briefing.introCue, 'the fresh briefing has the new-repair picture');
   await startLevel(page);
+  await until(page, () => window.fixitState().cue === 'circle' && window.fixitState().hint > 0, 'the fresh repair draws the circular screw cue');
   const before = await playJob(page, 'first repair before reload');
   await page.click('#pause');
   await page.reload();
@@ -289,13 +298,12 @@ async function run(page, phone) {
   assert.ok(!(await state()).paused, 'P resumes');
   // Play it out, watching every frame that no two people overlap and the goal counts up.
   await page.evaluate(() => {
-    window.__gap = Infinity; window.__alpha = []; window.__words = []; window.__have = [];
+    window.__gap = Infinity; window.__alpha = []; window.__have = [];
     window.__settlementPaused = null;
     const f = () => {
       const st = window.fixitState(), p = st.people;
       for (let i = 0; i < p.length; i++) for (let j = i + 1; j < p.length; j++) window.__gap = Math.min(window.__gap, Math.abs(p[i].x - p[j].x) - 1.5 * (p[i].R + p[j].R));
       if (st.playing && window.__alpha.length < 400) window.__alpha.push(st.alpha);
-      if (st.word && !window.__words.includes(st.word)) window.__words.push(st.word);
       const h = st.goal?.parts[0]?.have; if (h !== undefined && h !== window.__have.at(-1)) window.__have.push(h);
       if (st.cleared && st.playing && window.__settlementPaused === null) {
         document.getElementById('pause').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
@@ -468,7 +476,7 @@ async function run(page, phone) {
   assert.deepEqual([st.bank, st.awning, st.migrated, st.next], [321, 'copper', 4, 5], 'old save: coins and awning kept, levels 1 to 4 done, level 5 next');
   assert.deepEqual(st.levels, { 1: 1, 2: 1, 3: 1, 4: 1 }, 'old save: one star each');
   assert.ok(st.openStall && st.dailyOpen && await page.isVisible('#open'), 'old save: the open and daily stalls stay open');
-  assert.match(await page.textContent('#migrated'), /levels 1 to 4/, 'the menu says what was carried over');
+  assert.match(await page.textContent('#migrated'), /levels 1 to 4/i, 'the menu says what was carried over');
   await page.screenshot({ path: join(SHOTS, `${phone}-6-old-save.png`) });
   await page.reload();
   st = await state();
@@ -502,7 +510,7 @@ async function run(page, phone) {
 
 // A browser context that captures lab records and collects every page error, console error and failed request.
 async function open(browser, options) {
-  const context = await browser.newContext(options), page = await context.newPage(), errors = [];
+  const context = await browser.newContext({ locale: 'en-US', ...options }), page = await context.newPage(), errors = [];
   context.labSent = [];
   await context.route('https://human.adamwhite.work/**', async route => {
     const req = route.request(), cors = { 'access-control-allow-origin': base, 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'Content-Type' };
@@ -510,9 +518,14 @@ async function open(browser, options) {
     const record = JSON.parse(gunzipSync(req.postDataBuffer()).toString()); context.labSent.push(record);
     return route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ ok: true, id: record.id }) });
   });
-  page.on('pageerror', e => errors.push(String(e)));
+  page.on('pageerror', e => errors.push(e.stack ?? String(e)));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('requestfailed', r => errors.push(`request failed: ${r.url()}`));
+  page.on('requestfailed', r => {
+    const why = r.failure()?.errorText ?? '';
+    // The notes button fetches the current page to hash its build. Reload can cancel that background GET.
+    const buildLookup = r.resourceType() === 'fetch' && r.method() === 'GET' && r.url() === `${base}/fixit/`;
+    if (!(buildLookup && /abort|cancel/i.test(why))) errors.push(`request failed: ${r.url()} (${why})`);
+  });
   page.on('response', r => { if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`); });
   cur = page;
   return { context, page, errors };
@@ -707,8 +720,13 @@ async function dailyStall(browser, device, phone) {
   await setSave(page, { shifts: 1, bank: 10, days: { '2026-11-19': 40, 'junk': 'x' } });
   await page.reload();
   assert.ok(await page.isVisible('#daily'), 'the daily stall shows after the first shift');
-  assert.match(await page.textContent('#dailyLine'), /12 s.*coins/i, 'daily menu gives the shift duration and score goal');
-  assert.match(await page.textContent('#openLine'), /12 s.*coins/i, 'open menu gives the shift duration and score goal');
+  for (const mode of ['daily', 'open']) {
+    const info = page.locator(`#${mode}Line`);
+    const labels = await info.locator('[aria-label]').evaluateAll(els => els.map(el => el.getAttribute('aria-label')));
+    const announcement = `${await info.textContent()} ${labels.join(' ')}`;
+    assert.match(announcement, /12 s/i, `${mode} menu gives the shift duration`);
+    assert.match(announcement, /coins/i, `${mode} menu gives the score goal`);
+  }
   await page.click('#daily');
   const a = await state();
   assert.ok(a.daily && a.today === '2026-11-20' && a.hearts === 3, 'daily stall starts');
@@ -732,7 +750,11 @@ async function dailyStall(browser, device, phone) {
   assert.match(await page.textContent('#end'), /Daily stall/, 'the end card names the daily stall');
   const card = page.locator('canvas#dailyShare, #dailyShare canvas');
   assert.ok(await card.isVisible(), 'the result has a share card');
-  assert.equal(await card.getAttribute('aria-label'), `Fix-It Stall daily result for ${end.today}, ${end.coins} coins and ${end.served} fixed`, 'the share card names this result');
+  const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(end.today));
+  const resultName = await card.getAttribute('aria-label');
+  for (const detail of ['Daily stall result', date, `${end.coins} coins`, `${end.served} fixed`]) {
+    assert.ok(resultName.includes(detail), `the share card names ${detail}`);
+  }
   const png = await card.evaluate(canvas => canvas.toDataURL('image/png'));
   assert.ok(png.startsWith('data:image/png;base64,') && png.length > 5000, 'the share card generates PNG art');
   await page.evaluate(() => {
@@ -760,7 +782,7 @@ async function dailyStall(browser, device, phone) {
   const run = context.labSent.filter(r => r.game === 'fixit' && r.kind === 'run' && r.data.outcome === 'closed').at(-1);
   assert.equal(run?.data.summary.daily, '2026-11-20', 'the lab run names the day');
   await page.click('#toMenu');
-  assert.match(await page.textContent('#dailyLine'), new RegExp(`best ${end.coins}`), 'the menu shows today\'s best');
+  assert.match(await page.textContent('#dailyLine'), new RegExp(`best[\\s:]+${end.coins}`, 'i'), 'the menu shows today\'s best');
   await page.goto(`${base}/fixit/?date=2026-11-21`);
   await page.click('#daily');
   const c = await state();
@@ -825,8 +847,8 @@ async function coldResults(browser, device) {
     await setSave(page, { levels: levelsUpTo(3), attempts: { 2: 2 } });
     await page.reload();
     const observed = {};
-    observed.menuHelp = /slow/i.test(await page.innerText('#menuAssist'));
-    observed.retryHelp = /slow/i.test(await page.textContent('#assist'));
+    observed.menuHelp = /Slower clocks.*★★☆/is.test(await page.innerText('#menuAssist'));
+    observed.retryHelp = /Slower clocks.*★★☆/is.test(await page.textContent('#assist'));
     await page.evaluate(() => {
       window.painted = new Set();
       const paint = CanvasRenderingContext2D.prototype.fillText;
@@ -836,13 +858,14 @@ async function coldResults(browser, device) {
       };
     });
     await page.click('#menuAssist');
-    await until(page, () => window.painted.has('Tap to start'), 'painted goal card');
+    await until(page, () => !!document.getElementById('startLevel')?.getClientRects().length, 'briefing start button');
     const deadline = Math.ceil((await state(page)).goal.time);
-    observed.brief = await page.evaluate(secs => [...window.painted].some(t => t.includes(String(secs)) && t.includes('seconds')), deadline);
-    observed.replayBrief = await page.evaluate(() => ![...window.painted].some(t => /^New job:/i.test(t)));
+    await until(page, secs => [...window.painted].includes(`${secs} s`), 'the assisted deadline painted in seconds', 3000, deadline);
+    observed.brief = (await page.textContent('#briefText')).includes(`Time limit: ${deadline} seconds.`);
+    observed.replayBrief = !(await state(page)).introCue && !/new repair/i.test(await page.textContent('#briefText'));
     await startLevel(page);
     await sleep(100);
-    observed.replayBanner = await page.evaluate(() => !window.painted.has('New job!'));
+    observed.replayBanner = !(await state(page)).introCue;
     await leave(page);
     await page.evaluate(() => {
       window.lostBench = false;
@@ -869,6 +892,207 @@ async function coldResults(browser, device) {
   } finally { await context.close(); }
 }
 
+const tidy = text => text.normalize('NFC').trim().replace(/\s+/gu, ' ');
+const escapePattern = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const copyPattern = copy => new RegExp(`^${tidy(copy).split(/\{\w+\}/).map(escapePattern).join('.+?')}$`, 'iu');
+
+function englishCopy(tables) {
+  assert.deepEqual(Object.keys(tables.en).sort(), Object.keys(tables.tr).sort(), 'English and Turkish have identical keys');
+  for (const [key, en] of Object.entries(tables.en)) {
+    const tr = tables.tr[key];
+    assert.ok(en.trim() && tr.trim(), `${key} has copy in both languages`);
+    const fields = copy => [...new Set(copy.match(/\{\w+\}/g))].sort();
+    assert.deepEqual(fields(en), fields(tr), `${key} interpolates the same fields`);
+  }
+  const en = Object.values(tables.en).filter(copy => /[a-z]{2,}/i.test(copy.replace(/\{\w+\}/g, ''))).map(copyPattern);
+  const tr = Object.values(tables.tr).map(copyPattern);
+  const untranslated = value => en.some(pattern => pattern.test(value)) && !tr.some(pattern => pattern.test(value));
+  const sentences = new Intl.Segmenter('en', { granularity: 'sentence' });
+  const pieces = text => [text, ...text.split(/\s+(?:·|\/)\s+/u), ...Array.from(sentences.segment(text), part => part.segment)];
+  return values => [...new Set(values.flatMap(pieces).map(tidy))].filter(untranslated);
+}
+
+async function screenCopy(page) {
+  return page.evaluate(() => {
+    const all = [document.title, ...window.paintedText];
+    for (const el of document.querySelectorAll('body *')) {
+      if (!el.getClientRects().length || getComputedStyle(el).visibility !== 'visible') continue;
+      for (const node of el.childNodes) if (node.nodeType === Node.TEXT_NODE) all.push(node.textContent);
+      for (const attr of ['aria-label', 'aria-description', 'alt', 'title', 'placeholder']) {
+        if (el.hasAttribute(attr)) all.push(el.getAttribute(attr));
+      }
+    }
+    window.paintedText.clear();
+    return all;
+  });
+}
+
+async function viewportOverflow(page) {
+  return page.evaluate(() => {
+    const failures = [], epsilon = 2;
+    const name = el => el.id ? `#${el.id}` : `${el.tagName.toLowerCase()}.${[...el.classList].join('.')}`;
+    const outside = (a, b, min, max) => a < min - epsilon || b > max + epsilon;
+    if (document.documentElement.scrollWidth > innerWidth + epsilon) failures.push('document scrolls horizontally');
+    for (const el of document.querySelectorAll('body *')) {
+      if (el instanceof SVGElement && el.ownerSVGElement || !el.getClientRects().length) continue;
+      const rect = el.getBoundingClientRect(), style = getComputedStyle(el);
+      if (style.visibility !== 'visible' || style.position === 'absolute' && (style.clip !== 'auto' || style.clipPath !== 'none')) continue;
+      if (outside(rect.left, rect.right, 0, innerWidth)) failures.push(`${name(el)} exceeds viewport width`);
+      // The shop inventory deliberately scrolls within the viewport.
+      const scroll = el.parentElement?.closest('#shop .items');
+      if (scroll) {
+        const port = scroll.getBoundingClientRect(), top = port.top - scroll.scrollTop;
+        if (outside(rect.top, rect.bottom, top, top + scroll.scrollHeight)) failures.push(`${name(el)} is outside scrollable content`);
+      } else if (outside(rect.top, rect.bottom, 0, innerHeight)) failures.push(`${name(el)} exceeds viewport height`);
+      if (el.clientWidth && el.scrollWidth > el.clientWidth + epsilon && /hidden|clip|auto|scroll/.test(style.overflowX)) {
+        failures.push(`${name(el)} clips content horizontally`);
+      }
+      if (el instanceof HTMLButtonElement) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        for (const childRect of range.getClientRects()) {
+          if (outside(childRect.left, childRect.right, rect.left, rect.right)) failures.push(`${name(el)} clips its label`);
+        }
+      }
+    }
+    return [...new Set(failures)];
+  });
+}
+
+async function checkWords(browser, device, phone) {
+  const viewport = phone === 'webkit' ? { width: 390, height: 664 } : { width: 360, height: 640 };
+  await mkdir(WORD_SHOTS, { recursive: true });
+  for (const lang of ['en', 'tr']) {
+    const { context, page, errors } = await open(browser, { ...device, viewport, deviceScaleFactor: 1 });
+    try {
+      await page.addInitScript(() => {
+        window.paintedText = new Set();
+        for (const method of ['fillText', 'strokeText']) {
+          const paint = CanvasRenderingContext2D.prototype[method];
+          CanvasRenderingContext2D.prototype[method] = function (value, ...args) {
+            if (this.globalAlpha > 0) window.paintedText.add(String(value));
+            return paint.call(this, value, ...args);
+          };
+        }
+        localStorage.setItem('notes.k', 'browser-check');
+      });
+      const address = (params = '') => `${base}/fixit/?lang=${lang}${params}`;
+      const current = () => page.locator('html').getAttribute('lang');
+      await page.goto(address());
+      const leaked = englishCopy(await page.evaluate(async () => (await import('/fixit/words.js')).tables));
+      const capture = async stage => {
+        await until(page, () => document.getElementById('c').getContext('2d').getImageData(20, 200, 1, 1).data[3] > 0, 'the painted bench');
+        await page.screenshot({ path: join(WORD_SHOTS, `${lang}-${viewport.width}x${viewport.height}-${stage}.png`) });
+        assert.equal(await current(), lang, `${stage}: document language`);
+        assert.deepEqual(await viewportOverflow(page), [], `${lang} ${viewport.width}×${viewport.height} ${stage}: content fits the viewport or scrollport`);
+        const copy = await screenCopy(page);
+        if (lang === 'tr') assert.deepEqual(leaked(copy), [], `${stage}: no English UI, accessible, or canvas copy`);
+      };
+      const checkLanguageButton = async selector => {
+        const rect = await page.locator(selector).boundingBox();
+        assert.ok(rect.width >= 44 && rect.height >= 44, `${selector} has a 44 px touch target`);
+        const notes = await page.locator('#notes-button').boundingBox();
+        assert.ok(notes && (notes.x + notes.width <= rect.x || rect.x + rect.width <= notes.x ||
+          notes.y + notes.height <= rect.y || rect.y + rect.height <= notes.y), `${selector} and the tester feedback button are separate`);
+      };
+      await capture('menu');
+      await checkLanguageButton('#langMenu');
+      const tabs = page.locator('#chapterTabs button');
+      await tabs.nth(1).tap(); await capture('busy-street');
+      await tabs.nth(2).tap(); await capture('night-market');
+      await tabs.nth(0).tap();
+      await page.locator('#toShop').tap(); await capture('shop');
+      await page.locator('#shop .items').evaluate(el => { el.scrollTop = el.scrollHeight; });
+      await capture('shop-bottom');
+      await page.locator('#shop .back').tap();
+      await page.locator('#langMenu').tap();
+      const alternate = lang === 'en' ? 'tr' : 'en';
+      assert.equal(await current(), alternate, 'the menu changes language immediately');
+      await page.reload();
+      assert.equal(await current(), alternate, 'language survives reloading the same URL');
+      await page.goto(`${base}/fixit/`);
+      assert.equal(await current(), alternate, 'the stored language is used without a query override');
+      await page.reload();
+      assert.equal(await current(), alternate, 'the stored language survives reload without a query override');
+      await page.goto(address());
+      assert.equal(await current(), lang, '?lang overrides the previously stored language and the English browser locale');
+
+      await page.locator('#play').tap();
+      await capture('briefing');
+      await startLevel(page, true);
+      await until(page, () => window.fixitState().cue === 'circle' && window.fixitState().t > 0.5, 'the first bell demo');
+      await capture('teaching');
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.locator('.kit-hint.on .label').waitFor({ state: 'visible' });
+      await capture('reduced-motion-hint');
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await page.locator('#pause').tap();
+      const pauseState = await state(page);
+      await capture('pause');
+      await checkLanguageButton('#langPause');
+      await page.locator('#langPause').tap();
+      assert.equal(await current(), alternate, 'the pause menu changes language immediately');
+      const switched = await state(page);
+      assert.deepEqual([switched.screen, switched.paused, switched.t], [pauseState.screen, pauseState.paused, pauseState.t], 'language switching keeps the run paused and the clock still');
+      await page.reload();
+      assert.equal(await current(), alternate, 'the pause language choice survives reload');
+      assert.ok((await state(page)).paused, 'reloading after the pause language change restores the run');
+      await page.locator('#langPause').tap();
+      await screenCopy(page); // clear the alternate language from the canvas capture
+      await page.locator('#resume').tap();
+      const win = await playOut(page, 'localized first level');
+      assert.equal(win.over, 'clear');
+      await capture('win');
+
+      await page.goto(address('&level=19'));
+      await page.evaluate(() => {
+        const saved = JSON.parse(localStorage.getItem('fixit-save'));
+        saved.attempts[19] = 1;
+        localStorage.setItem('fixit-save', JSON.stringify(saved));
+      });
+      await page.reload();
+      await page.locator('#play').tap();
+      await startLevel(page, true);
+      await until(page, () => window.fixitState().screen === 'end', 'a walk-off loss', 20000);
+      assert.equal((await state(page)).over, 'lost');
+      await capture('loss');
+      await page.locator('#assist').tap();
+      assert.ok((await state(page)).assisted, 'the helper starts an assisted retry');
+      await capture('assisted-briefing');
+      await leave(page);
+
+      for (const [level, rule] of [[33, 'order'], [34, 'rush'], [35, 'blackout'], [36, 'boss']]) {
+        await page.goto(address(`&level=${level}`));
+        await page.locator('#play').tap();
+        await capture(`${rule}-briefing`);
+        await startLevel(page, true);
+        await until(page, () => window.fixitState().t > 0.4, 'the briefing has faded');
+        await capture(`${rule}-play`);
+        await leave(page);
+      }
+
+      await page.goto(address('&day=3&date=2026-11-24'));
+      await setSave(page, { bank: 12345, levels: levelsUpTo(8), attempts: { 9: 2 }, sound: false });
+      await page.reload();
+      await capture('unlocked-menu');
+      assert.equal(await page.textContent('#bank'), new Intl.NumberFormat(lang).format(12345), 'the wallet uses the chosen language’s grouping');
+      await page.locator('#open').tap(); await capture('open-play');
+      await until(page, () => window.fixitState().screen === 'end', 'short open stall ends');
+      await capture('open-result');
+      await page.locator('#toMenu').tap();
+      await page.locator('#daily').tap(); await capture('daily-play');
+      await until(page, () => window.fixitState().screen === 'end', 'short daily stall ends');
+      await capture('daily-share');
+      const date = new Intl.DateTimeFormat(lang, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date('2026-11-24'));
+      assert.ok((await page.getAttribute('#dailyShare', 'aria-label')).includes(date), 'the daily card uses the chosen date format');
+      assert.deepEqual(errors, [], `${lang} ${phone}: no page errors`);
+    } catch (error) {
+      if (errors.length) console.log(errors.join('\n'));
+      throw error;
+    } finally { await context.close(); }
+  }
+}
+
 const args = process.argv.slice(2);
 const only = args.find(a => Object.hasOwn(PHONES, a));
 let failed = 0;
@@ -885,6 +1109,12 @@ if (args.includes('--shots')) {
 for (const [phone, [engine, device]] of Object.entries(PHONES)) {
   if (only && only !== phone) continue;
   const browser = await engine.launch();
+  if (args.includes('--words')) {
+    try { await checkWords(browser, device, phone); console.log(`ok   words on ${phone}`); }
+    catch (error) { failed++; console.log(error); }
+    finally { await browser.close(); }
+    continue;
+  }
   if (args.includes('--cold-results')) {
     try { await coldResults(browser, device); console.log(`ok   cold results on ${phone}`); }
     catch (e) { failed++; console.log(e); }
@@ -906,6 +1136,7 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
     await dailyStall(browser, device, phone);
     await coldResults(browser, device);
     if (phone === 'chromium') { await small(browser); await desktop(browser); }
+    await checkWords(browser, device, phone);
     console.log(`ok   fixit on ${phone} (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
   } catch (e) {
     failed++;
@@ -918,4 +1149,5 @@ for (const [phone, [engine, device]] of Object.entries(PHONES)) {
 }
 server.close();
 console.log(`screenshots in ${SHOTS}`);
+console.log(`English and Turkish screenshots in ${WORD_SHOTS}`);
 process.exit(failed ? 1 : 0);

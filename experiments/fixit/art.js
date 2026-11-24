@@ -2,7 +2,7 @@
 // people, the stall and the cat in CSS pixels. Nothing here changes game state.
 import { ghost } from './moves.js';
 import { SEAM_POINTS, seamAt, oilReady, zipStuck, THREAD_SIDE, THREAD_UP } from './sim.js';
-import { crankPoint, SCALE_BAND, TRACE_OFFSET, WIND_STOPS } from './repairs.js';
+import { crankPoint, SCALE_BAND, SCALE_HOLD, TRACE_OFFSET, WIND_STOPS } from './repairs.js';
 
 export const C = {
   ink: '#3a2216', cream: '#fff1d6', paper: '#fbe6c2',
@@ -191,7 +191,9 @@ const OBJ = {
       circle(g, lx, ly, 6, C.steel, 2); circle(g, lx, ly, 2.4, C.ink, 0);
       g.strokeStyle = `rgba(47,143,138,${0.45 + 0.3 * Math.sin(t * 6)})`; g.lineWidth = 3; g.setLineDash([4, 4]); g.beginPath(); g.arc(68, 34, 24, 0, TAU); g.stroke(); g.setLineDash([]);
     }
-    if (w) { g.fillStyle = `rgba(255,255,255,${1 - w})`; g.font = 'bold 12px sans-serif'; g.textAlign = 'center'; g.fillText('ding', 84, 16 - w * 10); }
+    if (w) {
+      for (let i = 0; i < 2; i++) note(g, 78 + i * 10, 24 - 12 * w - i * 6, 1 - w);
+    }
   },
   // A teal vase broken in two. Push the halves together, hold while the glue sets.
   glue(g, r, t, w) {
@@ -388,8 +390,18 @@ const OBJ = {
     g.strokeStyle = C.ink; g.lineWidth = 2; g.beginPath(); g.moveTo(0, 3); g.lineTo(0, -1); g.stroke();
     for (const sgn of [-1, 1]) { g.beginPath(); g.ellipse(sgn * 5, -4, 4.5, 3.5, 0, 0, TAU); shape(g, ready ? C.glow : C.brass, 1.6); }
     g.restore();
-    if (ready) { g.strokeStyle = `rgba(255,243,168,${0.5 + 0.5 * Math.sin(t * 16)})`; g.lineWidth = 2.5; g.beginPath(); g.arc(0, -22, 11, 0, TAU); g.stroke(); }
+    if (ready) {
+      g.strokeStyle = C.glow; g.lineWidth = 2.5; g.beginPath(); g.arc(0, -22, 11, 0, TAU); g.stroke();
+      star(g, 13, -31, 5, C.glow);
+    }
     g.restore();
+    if (ready && r.grab) {
+      const gap = 3 + 7 * (t % 0.8) / 0.8;
+      const hx = x + 33, hy = y - 30;
+      circle(g, hx, hy + 8, 5, C.cream, 1.3);
+      arrow(g, hx + 13, hy - 1, -Math.PI / 2, 7, C.glow);
+      ghostFinger(g, hx, hy - gap, 0.9);
+    }
     if (r.kind === 'spring' && !r.done && !r.grab) { circle(g, x - 8, y, 7 + Math.sin(t * 6) * 0.8, 'rgba(255,255,255,0)', 1.6); } // grab here
   },
   // A needle on a pincushion. The stiff thread tip sits above and to the right of the thumb.
@@ -488,6 +500,7 @@ const OBJ = {
     g.strokeStyle = r.dwell > 0 || r.done ? C.tealLt : C.cream; g.lineWidth = 1.9;
     g.beginPath(); g.moveTo(45, h); g.lineTo(55, h); g.stroke();
     circle(g, 50 + 5 * Math.sin(tilt * 2.5), h - 2, 2.25, r.dwell > 0 || r.done ? C.tealLt : C.brassLt, 0);
+    if (r.dwell > 0 && !r.done) holdMeter(g, load, r.y - 13, r.dwell / SCALE_HOLD);
     for (let i = 0; i < 3; i++) circle(g, 42 + 8 * i, 14, 2.5, i < r.stage ? C.tealLt : C.steelDk, 1.1);
     if (w) for (const [x, y] of ends) star(g, x, y + 20, 9 * (1 - w), C.glow);
   },
@@ -570,9 +583,12 @@ export function drawSilly(g, list, t) {
 }
 
 // The ghost finger: a fingertip that shows the gesture on the thing, with a faint trail of its path.
-export function drawGhost(g, gd, t, alpha) {
+export function drawGhost(g, gd, t, alpha, still = false) {
   if (!gd || alpha <= 0) return;
-  const { p, press, tap } = ghost(gd, t);
+  const timing = gd.type === 'timing';
+  const { p, press, tap } = ghost(gd, still && !timing ? 0.8 : t);
+  if (timing && !press) return;
+  const demonstration = (t % 1.8) / 1.8;
   g.save(); g.globalAlpha = alpha;
   g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 2.4; g.setLineDash([3, 4]); g.beginPath();
   if (gd.type === 'circle' || gd.type === 'flick') g.arc(gd.cx, gd.cy, gd.r, gd.type === 'flick' ? rad(200) : 0, gd.type === 'flick' ? rad(350) : TAU);
@@ -586,13 +602,16 @@ export function drawGhost(g, gd, t, alpha) {
   else if (gd.type === 'timing') g.arc(gd.at[0], gd.at[1], 16, 0, TAU);
   g.stroke(); g.setLineDash([]);
   // arrowhead at the end of the path, so the way to go is plain
-  const end = gd.type === 'circle' ? null : gd.type === 'arc' ? [gd.cx + Math.cos(rad(gd.to)) * gd.r, gd.cy + Math.sin(rad(gd.to)) * gd.r, rad(gd.to + 90)]
+  const end = gd.type === 'circle' ? [gd.cx + gd.r, gd.cy, Math.PI / 2] : gd.type === 'arc' ? [gd.cx + Math.cos(rad(gd.to)) * gd.r, gd.cy + Math.sin(rad(gd.to)) * gd.r, rad(gd.to + 90)]
     : gd.type === 'flick' ? [gd.cx + Math.cos(rad(350)) * gd.r, gd.cy + Math.sin(rad(350)) * gd.r, rad(80)]
     : gd.type === 'drag' || gd.type === 'swipe' ? [gd.to[0], gd.to[1], Math.atan2(gd.to[1] - gd.from[1], gd.to[0] - gd.from[0])]
     : gd.type === 'path' && !gd.trace && gd.pts.length > 1 ? [...gd.pts.at(-1), Math.atan2(gd.pts.at(-1)[1] - gd.pts.at(-2)[1], gd.pts.at(-1)[0] - gd.pts.at(-2)[0])]
     : gd.type === 'pump' ? [gd.x - 9, gd.bottom + 6, Math.PI / 2]
     : gd.type === 'zip' && !gd.stuck ? [gd.at[0] + 14, gd.top, -Math.PI / 2] : null;
   if (end) { g.fillStyle = 'rgba(255,255,255,.8)'; g.save(); g.translate(end[0], end[1]); g.rotate(end[2]); g.beginPath(); g.moveTo(5, 0); g.lineTo(-4, -5); g.lineTo(-4, 5); g.closePath(); g.fill(); g.restore(); }
+  if (gd.type === 'balance' && (still || demonstration >= 0.5 && demonstration < 0.9)) {
+    holdMeter(g, gd.targets[0], gd.from[1] - 16, still ? 0.75 : (demonstration - 0.5) / 0.4);
+  }
   if (tap && gd.all) for (const a of gd.all) { g.strokeStyle = `rgba(255,255,255,${0.5 + 0.4 * Math.sin(t * 8)})`; g.lineWidth = 2.5; g.beginPath(); g.arc(a[0], a[1], 13 + 2 * Math.sin(t * 8), 0, TAU); g.stroke(); }
   // the fingertip itself
   const [x, y] = p;
@@ -601,6 +620,12 @@ export function drawGhost(g, gd, t, alpha) {
     star(g, x, y - TRACE_OFFSET, 4, '#fff3a8');
   }
   if (press) { g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(x, y, 12 + (tap ? 6 * ((t * 4) % 1) : 0), 0, TAU); g.fill(); }
+  ghostFinger(g, x, press || still ? y : y - 6, press ? 1 : 0.74);
+  g.restore();
+}
+function ghostFinger(g, x, y, opacity) {
+  g.save();
+  g.globalAlpha *= opacity;
   g.fillStyle = 'rgba(255,248,235,.92)'; g.strokeStyle = 'rgba(58,34,22,.8)'; g.lineWidth = 1.8;
   g.beginPath(); g.ellipse(x + 2, y + 8, 6.5, 9, -0.25, 0, TAU); g.fill(); g.stroke(); // finger pad
   // Near the bottom of the bench, only show the first segment of the finger.
@@ -716,5 +741,73 @@ export function goalIcon(g, kind, x, y, r, t = 0) {
   g.beginPath(); g.arc(0, -r * 0.55, r * 0.5, rad(-60), rad(240)); g.lineTo(-r * 0.12, -r * 0.75); g.lineTo(r * 0.12, -r * 0.75); g.closePath(); shape(g, C.steelLt, Math.max(1.2, r * 0.14));
   g.restore();
 }
-export function coin(g, x, y, r) { circle(g, x, y, r, C.brass, Math.max(1.2, r * 0.18)); circle(g, x, y, r * 0.62, C.brassLt, 0); g.fillStyle = C.brassDk; g.font = `bold ${r * 1.1}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('c', x, y + r * 0.05); }
+export function coin(g, x, y, r) {
+  circle(g, x, y, r, C.brass, Math.max(1.2, r * 0.18));
+  circle(g, x, y, r * 0.62, C.brassLt, 0);
+  star(g, x, y, r * 0.37, C.brassDk);
+}
+function holdMeter(g, x, y, fraction) {
+  circle(g, x, y, 6, C.ink, 0);
+  g.lineWidth = 2; g.strokeStyle = C.glow; g.lineCap = 'round';
+  g.beginPath(); g.arc(x, y, 4.6, -Math.PI / 2, -Math.PI / 2 + TAU * fraction); g.stroke();
+  g.beginPath(); g.moveTo(x, y - 2); g.lineTo(x, y); g.lineTo(x + 2, y + 1); g.stroke();
+}
+// Small badges used on the bench, briefing and results.
+export function symbol(g, kind, x, y, r) {
+  g.save();
+  g.translate(x, y);
+  g.scale(r / 12, r / 12);
+  g.lineCap = g.lineJoin = 'round';
+  if (kind === 'fixed' || kind === 'goal') {
+    circle(g, 0, 0, 11, '#a9e7bc');
+    strokePath(g, [[-5, 0], [-1, 4], [6, -4]], C.tealDk, 2.5);
+  } else if (kind === 'lost') {
+    heart(g, 0, -10, 21, false);
+    strokePath(g, [[1, -8], [-3, 0], [2, 0], [-2, 7]], C.red, 2);
+  } else if (kind === 'lock') {
+    rrect(g, -8, -2, 16, 12, 2, C.brassLt, 1.7);
+    g.beginPath(); g.arc(0, -2, 4.3, Math.PI, TAU); g.strokeStyle = C.ink; g.lineWidth = 1.7; g.stroke();
+    circle(g, 0, 4, 1.6, C.ink, 0);
+  } else if (kind === 'quick') {
+    g.beginPath(); g.moveTo(2, -11); g.lineTo(-6, 1); g.lineTo(-1, 1); g.lineTo(-3, 11);
+    g.lineTo(7, -3); g.lineTo(1, -3); g.closePath(); shape(g, C.glow, 1.5);
+  } else if (kind === 'gold' || kind === 'star') {
+    starShape(g, 0, 0, 11, '#ffd860');
+  } else if (kind === 'trophy') {
+    strokePath(g, [[-6, -7], [-11, -7], [-10, -1], [-5, 2]], C.brassDk, 2);
+    strokePath(g, [[6, -7], [11, -7], [10, -1], [5, 2]], C.brassDk, 2);
+    g.beginPath(); g.moveTo(-7, -9); g.lineTo(7, -9); g.quadraticCurveTo(6, 3, 0, 4);
+    g.quadraticCurveTo(-6, 3, -7, -9); g.closePath(); shape(g, C.brassLt, 1.6);
+    strokePath(g, [[0, 4], [0, 8], [-5, 9], [5, 9]], C.brassDk, 2.4);
+  } else if (kind === 'slower') {
+    strokePath(g, [[-10, 6], [5, 6], [9, 4], [8, -2]], C.tealDk, 2);
+    circle(g, -3, 0, 5.5, C.tealLt, 1.5);
+    circle(g, -3, 0, 2.4, C.teal, 0);
+    circle(g, 8, -3, 1.2, C.tealDk, 0);
+  } else if (kind === 'new') {
+    star(g, -2, 1, 9, '#fff1a6');
+    star(g, 7, -6, 5, '#fff1a6');
+  } else if (kind === 'regular' || kind === 'rewind') {
+    g.beginPath(); g.arc(0, 0, 7, -2.6, 2.3); g.strokeStyle = C.tealDk; g.lineWidth = 3.2; g.stroke();
+    g.beginPath(); g.moveTo(-9, -10); g.lineTo(-11, -1); g.lineTo(-2, -3); g.closePath(); shape(g, C.tealDk, 0);
+  } else if (kind === 'step') {
+    strokePath(g, [[-8, 0], [8, 0], [3, -5], [8, 0], [3, 5]], C.tealDk, 2.5);
+  } else if (kind === 'music') {
+    note(g, -2, 6, 1);
+  } else if (kind === 'shelf') {
+    rrect(g, -8, -8, 6, 11, 1.5, C.tealLt, 1.5);
+    rrect(g, 1, -4, 7, 7, 1.5, C.brassLt, 1.5);
+    rrect(g, -11, 3, 22, 4, 1.5, C.copper, 1.5);
+  } else if (kind === 'sign') {
+    rrect(g, -10, -7, 20, 14, 3, C.tealDk, 1.5);
+    goalIcon(g, 'fix', 0, 0, 5.5);
+  } else if (kind === 'lights') {
+    g.beginPath(); g.moveTo(-11, -5); g.quadraticCurveTo(0, 5, 11, -5);
+    g.strokeStyle = C.ink; g.lineWidth = 1.5; g.stroke();
+    for (const [dx, dy] of [[-7, 1], [0, 3], [7, 1]]) circle(g, dx, dy, 2.8, C.glow, 1);
+  } else if (kind === 'cat') {
+    cat(g, 0, 9, 0.48, 0, false);
+  }
+  g.restore();
+}
 export { circle, rrect, star, shape };

@@ -95,10 +95,12 @@ export function change(g, id, x, y, w, h, node = null) {
     g.beginPath(); g.arc(R, y, u * 0.5, 0, Math.PI * 2); g.fillStyle = COLOUR[id - 1]; g.fill(); g.strokeStyle = INK; g.lineWidth = Math.max(1.2, u * 0.13); g.stroke();
     mark(g, id - 1, R, y, u * 0.5);
   } else if (id === 5 || id === 6) {
-    g.fillStyle = INK;
-    g.font = `bold ${Math.round(h * 0.96)}px system-ui, sans-serif`;
-    g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(id === 5 ? '+1' : '−1', x, y, w - 4);
+    g.strokeStyle = INK; g.lineWidth = Math.max(2, u * 0.24);
+    g.beginPath();
+    g.moveTo(x - u * 0.85, y); g.lineTo(x - u * 0.1, y);
+    if (id === 5) { g.moveTo(x - u * 0.475, y - u * 0.38); g.lineTo(x - u * 0.475, y + u * 0.38); }
+    g.moveTo(x + u * 0.2, y - u * 0.29); g.lineTo(x + u * 0.53, y - u * 0.61); g.lineTo(x + u * 0.53, y + u * 0.61);
+    g.moveTo(x + u * 0.25, y + u * 0.61); g.lineTo(x + u * 0.81, y + u * 0.61); g.stroke();
   } else if (id === 7 || id === 8) { const a = id === 7 ? 0 : 2; outline(L, a); arrow(x, true); outline(R, a + 1); }
   else if (id <= 12) { blank(L); arrow(x); outline(R, id - 9); }
   else if (id === 13) { // opposite colour: red and green trade, yellow and blue trade
@@ -239,13 +241,41 @@ export function villager(g, node, x, y, r, mood) {
   }
   if (happy > 0) hearts(g, r, happy);
   if (puzzled > 0) { // question marks spin around the head
-    g.fillStyle = '#fff'; g.font = `bold ${Math.round(r * 0.8)}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-    for (let i = 0; i < 3; i++) { const a = t * 3 + i * 2.1; g.globalAlpha = Math.min(1, puzzled * 2); g.fillText('?', Math.cos(a) * r * 1.4, -r * 1.3 + Math.sin(a) * r * 0.35); }
+    g.fillStyle = g.strokeStyle = '#fff'; g.lineWidth = 0.1; g.lineCap = 'round';
+    for (let i = 0; i < 3; i++) {
+      const a = t * 3 + i * 2.1;
+      g.save(); g.globalAlpha = Math.min(1, puzzled * 2);
+      g.translate(Math.cos(a) * r * 1.4, -r * 1.3 + Math.sin(a) * r * 0.35); g.scale(r, r);
+      g.beginPath(); g.moveTo(-0.13, -0.12); g.bezierCurveTo(-0.13, -0.3, 0.2, -0.3, 0.14, -0.11);
+      g.quadraticCurveTo(0.12, -0.04, 0.01, 0); g.lineTo(0.01, 0.06); g.stroke();
+      g.beginPath(); g.arc(0.01, 0.19, 0.05, 0, Math.PI * 2); g.fill(); g.restore();
+    }
   }
-  if (gone > 0) { // asleep at home: z z
-    g.globalAlpha = gone; g.fillStyle = '#e8e0ff'; g.font = `bold ${Math.round(r * 0.55)}px system-ui, sans-serif`; g.textAlign = 'left';
-    g.fillText('z', r * 0.7, -r * 0.9 - Math.sin(t * 2) * 3); g.fillText('z', r * 1.05, -r * 1.35 - Math.sin(t * 2 + 1) * 3);
+  if (gone > 0) { // a crescent above a villager asleep at home
+    g.globalAlpha = gone; g.fillStyle = '#e8e0ff';
+    const x = r * 1.03, y = -r * 1.16 - Math.sin(t * 2) * 3;
+    g.beginPath(); g.arc(x, y, r * 0.27, -1.2, 0.77, true);
+    g.quadraticCurveTo(x - r * 0.25, y + r * 0.04, x + r * 0.1, y - r * 0.25); g.fill();
   }
+  g.restore();
+}
+
+// A fingertip points into the marked face. A ring appears where it makes contact.
+export function tapHand(g, x, y, side, press) {
+  g.save();
+  g.translate(x, y); g.scale(side, 1);
+  if (press > 0.55) {
+    g.beginPath(); g.arc(0, 0, 8 + 4 * (1 - press), 0, Math.PI * 2);
+    g.lineWidth = 2.5; g.strokeStyle = CREAM; g.stroke();
+  }
+  g.translate(12 * (1 - press), 9 * (1 - press)); g.rotate(0.55);
+  g.beginPath(); g.moveTo(5, -4); g.lineTo(23, -4); g.lineTo(23, -7);
+  g.quadraticCurveTo(25, -11, 29, -7); g.lineTo(35, -2); g.lineTo(42, -2);
+  g.quadraticCurveTo(47, -2, 47, 3); g.lineTo(47, 15); g.quadraticCurveTo(47, 20, 42, 20);
+  g.lineTo(30, 20); g.quadraticCurveTo(26, 20, 21, 16); g.lineTo(15, 11);
+  g.quadraticCurveTo(12, 7, 17, 5); g.lineTo(5, 5); g.quadraticCurveTo(-4, 5, 0, -2);
+  g.quadraticCurveTo(2, -4, 5, -4); g.closePath();
+  g.fillStyle = CREAM; g.strokeStyle = INK; g.lineWidth = 2; g.fill(); g.stroke();
   g.restore();
 }
 function arms(g, k, r, react, body) {
@@ -577,6 +607,19 @@ export function weather(g, W, H, t, chapter) {
     }
   }
 }
+export function sun(g, x, y, r) {
+  g.save();
+  g.fillStyle = g.strokeStyle = '#3a1a10'; g.lineWidth = 1.6; g.lineCap = 'round';
+  g.beginPath(); g.arc(x, y, r * 0.5, 0, Math.PI * 2); g.fill();
+  g.translate(x, y);
+  g.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4, dx = Math.cos(a) * r, dy = Math.sin(a) * r;
+    g.moveTo(dx * 0.72, dy * 0.72); g.lineTo(dx, dy);
+  }
+  g.stroke(); g.restore();
+}
+
 // The chapter's sign: a moon for summer evenings, a snowflake for winter, a leaf for autumn. Drawn in r.
 export function emblem(g, chapter, x, y, r) {
   g.save(); g.translate(x, y); g.lineCap = 'round'; g.lineJoin = 'round';

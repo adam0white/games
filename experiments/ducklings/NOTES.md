@@ -115,3 +115,24 @@ Paths below are relative to the requested screenshot folder, `scratchpad/shots/a
 | Cold-style replay | Both requested browsers used touch and screenshots again. All screenshots came from the local game. No physical handset, independent human player or live lab endpoint was tested. Campaign stages 10–24 have bot coverage. Their complete routes were outside the cold playthrough. |
 
 The added regressions exercised the original failures before the fixes. Examples include a direct rescue tap that stopped 0.51 pond widths from the duckling, the 14 px privacy target, a missing road instruction, and a 3/2 flock display. The direct rescue ended within 0.004 pond widths of its target in both replay profiles. Positive sun-pad counts on a human-driven result card, enjoyment on repeat play, and production deployment remain unverified.
+
+## Words and pictures — 2026-11-24
+
+| Copy removed from the screen | What shows the rule now |
+| --- | --- |
+| “Lead the ducklings home.” “Tap the nest. Drag to steer.” | The menu shows the mother and her trail. The first swim puts the hand and tap ring on the actual nest, then shows a drag along the trail. The original kit hint still appears after its idle delay. |
+| “Tap the calling duckling, then the nest.” “Peep!” “+1 duckling” “Back together!” | The hand and trail mark the waiting duckling. A sound-wave badge appears with its call and points toward the bird if it is offscreen. Sparks and hops mark the rescue, the following count increases, and the trail or offscreen marker points to the nest. |
+| “Tap the ring to wait at the curb.” “After a car passes, tap the far bank. Allow time for the last duckling.” | The ring and hand mark the curb. Pause bars appear beside the moving car, then the hand and an arrow show the far bank while the remaining traffic gap fits the tail. A ring follows the last duckling until it clears the road. |
+| “Call closer” and the “Quack!” bubble | Small ducklings bunch together on the button. The mother's bill emits waves when the actual line bunches, and the ring and countdown show when the button is ready again. |
+| “Following,” “waiting,” “arriving,” “Bring … home,” and “Nest ↑” | The HUD shows duckling and nest counts, a flag and ≥ for the minimum, and a check once enough ducklings reach the nest. An offscreen nest gets a nest icon and an arrow once the flock is large enough. |
+| “Cross sun pads for light,” the low-light warning, and the refill caption | The HUD shows a pad pointing to the sun beside the light bar. It highlights the next pad or points up to it when light is low. A positive number and sun show the refill. A scattered duckling with a down arrow shows a reduced refill. |
+| “Oh no!” “Ouch!” “Hiding in the reeds…” and the name captions | Feathers and running ducklings show a scatter. A spent heart shows a hit. A duckling that hides runs off the bank and fades, and the postcard counts hidden ducklings beside reeds. Hops, peeps, and the drawn flock remain as the roll call and portrait. |
+| “For three stars …,” home and pad tallies on results | The result shows the nest fraction or pads crossed. Three-star conditions have separate pictures for all ducklings home, hits, and scares. The card shows only the conditions missed. |
+
+The title, map and level names, actions, result headings, and score labels remain in words so players can identify destinations and outcomes. The privacy notice, link, and recording toggle retain text because icons cannot convey recording scope, retention, or the off switch. The shared hint keeps a short reduced-motion label. Screen-reader equivalents come from the same English and Turkish table. The canvas uses locale-formatted arrival numbers. The postcard image contains no text, and the game has no share action.
+
+Language choice uses the kit's shared preference. A URL language applies on entry. Using the globe removes `lang` from that address so reloading follows the newer choice. Game save fields and lab outcome names retain their existing formats.
+
+All 24 campaign bot routes earned three stars. The standalone phone check passed WebKit iPhone 13 and Chromium Pixel 7, 390×664, and 360×640. Both-language screenshots and layout checks passed at 360×640 and the WebKit iPhone 13 profile, with a second WebKit pass at 390×844. Checks cover matching translation keys and placeholders, English leakage in Turkish, live language switching, persistence, viewport bounds, and the road cue's wait, cross, and tail phases. The shared game and hint checks passed on WebKit and Chromium.
+
+A keyboard run crossed the first sun pad in both browser engines and showed a positive refill in Turkish. A Turkish-speaking player has not reviewed the copy or played the new cues. Physical touch, safe-area behavior, audible feedback, and storage at the live lab endpoint remain unverified. The phone checks use emulated touch and a local lab stub.

@@ -6,6 +6,9 @@
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.symbols { position: absolute; width: 0; height: 0; }
+.icon { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 html, body {
   height: 100%;
   margin: 0;
@@ -192,26 +195,52 @@ button.quiet {
   margin-inline: auto;
   color: #ffdbac;
 }
-#paused label { min-height: 44px; }
-.premise, #rules { line-height: 1.35; margin: 6px 0 10px; }
-#rules { font-size: .9rem; }
 /* Leave room for the animated fingertip below its anchor. */
 body .kit-hint { bottom: calc(8.4dvh + 120px); }
 #shiftCaption {
   position: absolute;
   inset: auto 0 0;
-  min-height: 8.4%;
-  padding: 3px 10px 5px;
-  display: grid;
-  align-content: center;
-  text-align: center;
-  background: #29283f;
+  height: 8.4%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
   border-top: 1px solid #685875;
-  color: #fff1d9;
+  background: #29283f;
   pointer-events: none;
 }
-#shiftStatus { color: #ffd596; font-size: .79rem; }
-#shiftGuide { font-size: .88rem; line-height: 1.24; }
+.counter {
+  min-width: 64px;
+  padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #7a6581;
+  border-radius: 9px;
+  color: #ffd596;
+  font-size: .83rem;
+  font-variant-numeric: tabular-nums;
+}
+#escapeCounter { color: #ffb6ac; }
+#returnCounter { color: #a5eed2; }
+.counter.changed { background: #50455e; border-color: currentColor; }
+.settings { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; }
+button.language {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 54px;
+  min-height: 44px;
+  padding-inline: 6px;
+  font-size: .79rem;
+}
+.language .icon { width: 18px; height: 18px; }
+.lesson-art { display: block; max-width: 100%; height: auto; margin-inline: auto; }
+#goal { width: 144px; }
+#rules { width: 100%; margin-bottom: 14px; }
 #paused label {
   display: flex;
   justify-content: center;
@@ -220,8 +249,8 @@ body .kit-hint { bottom: calc(8.4dvh + 120px); }
   margin-top: 15px;
   font-size: .78rem;
 }
-.motif { margin-top: 3px; color: #eab68b; font: 700 2rem/1 Georgia, serif; }
-#paused h2 { margin: 8px 0 21px; }
+.motif { display: inline-block; width: 26px; height: 22px; margin-top: 7px; border-inline: 7px solid #eab68b; }
+#paused h2 { margin: 8px 0 11px; }
 #medals { margin: 4px 0 16px; min-height: 24px; color: #ffd397; font-size: 1.15rem; letter-spacing: .09em; }
 .shareActions button { min-height: 49px; }
 @media (min-width: 700px) {
@@ -230,6 +259,7 @@ body .kit-hint { bottom: calc(8.4dvh + 120px); }
 @media (max-height: 555px) {
   .screen { padding: 8px; }
   .poster { max-height: 132px; object-fit: contain; }
+  #goal { width: 120px; }
 }
 @media (prefers-reduced-motion: reduce) {
   button:active { transform: none; }
