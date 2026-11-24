@@ -292,6 +292,26 @@ async function lilySmoke(test, phone) {
   assert.deepEqual(test.errors, [], 'lily lesson has no page, console or network errors');
   console.log(`ok   sling lily lesson on ${phone}`);
 }
+// Review regressions: a pause during the win delay must not drop the win, and replaying an early
+// garden must not move the Play button back.
+async function reviewSmoke(test, phone) {
+  const { page } = test;
+  await page.goto(`${base}/sling/?hint=0&labRunSource=agent`);
+  await page.evaluate(() => localStorage.setItem('sling-save', JSON.stringify({ stars: [3, 3, 3, 3, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0], level: 8, runs: 9 })));
+  await page.reload();
+  await until(page, () => window.slingState?.().screen === 'menu', 'review menu');
+  await page.click('#gardens'); await page.click('#levelPicker button:nth-child(1)');
+  const shotOne = solve(level(0)).shots[0], st = await state(page);
+  await page.evaluate(([dx, dy]) => { const c = document.getElementById('c'), fire = (type, x, y) => c.dispatchEvent(new PointerEvent(type, { pointerId: 7, clientX: x, clientY: y, bubbles: true, cancelable: true, pointerType: 'touch' })); fire('pointerdown', 200, 300); fire('pointermove', 200 + dx, 300 + dy); fire('pointerup', 200 + dx, 300 + dy); }, [shotOne.dx * st.map.scale, shotOne.dy * st.map.scale]);
+  await until(page, () => window.slingState().state.status === 'won', 'review garden one won');
+  await page.evaluate(() => document.getElementById('pause').click());
+  assert.notEqual((await state(page)).screen, 'paused', 'pause during the win delay does not open the pause card');
+  await until(page, () => window.slingState().screen === 'done', 'review done card');
+  assert.equal((await state(page)).save.level, 8, 'replaying garden 1 keeps the saved next garden');
+  const sizes = await page.evaluate(() => { document.getElementById('doneMenu').click(); return ['daily', 'gardens'].map(id => document.getElementById(id).getBoundingClientRect().height); });
+  assert.equal(sizes[0], sizes[1], 'menu row buttons have one height');
+  console.log(`ok   sling review regressions on ${phone}`);
+}
 let failed = 0;
 try {
   for (const [phone, [engine, device]] of Object.entries(PHONES)) {
@@ -302,6 +322,7 @@ try {
     try {
       if (!process.argv.includes('--lily')) { await run(test, phone); console.log(`ok   sling on ${phone}`); if (phone === 'chromium') await extraSmoke(browser); }
       await lilySmoke(test, phone);
+      await reviewSmoke(test, phone);
     }
     catch (e) { failed++; console.error(`FAIL sling on ${phone}: ${e.stack}`); if (test.errors.length) console.error(test.errors.join('\n')); await shot(test.page, phone, 'failure').catch(() => {}); }
     finally { await test.context.close(); await browser.close(); }
