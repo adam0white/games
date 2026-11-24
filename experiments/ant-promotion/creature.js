@@ -95,11 +95,47 @@ function make(F) {
       look.arms = name !== 'Ostrich'; look.legW = 0.18;
     }
     look.body = 'quad'; look.eyeAt = [0.38, 0.5]; look.eye = 0.09;
+    shape(name, spec, look);
   }
   if (F.level === 0) spec.turn = 8;
   spec.breath = 1.6 + 3 / Math.sqrt(F.r);
   if (!spec.ahead) spec.ahead = spec.gaps.reduce((a, b) => a + b, 0) * 0.45;
   return { spec, look };
+}
+// Species that read alike at play size (dog, lynx and cat; bear, boar, gorilla and mole; hippo and mouse; the ostrich) get
+// their own proportions, gait and marks here, so the outline alone tells them apart.
+function shape(name, spec, look) {
+  const T = spec.chains.find(C => C.type), legs = (front, back = front) => { spec.legs[0].len = front; spec.legs[1].len = back; };
+  switch (name) {
+    case 'Cat': // slim and low, a long tail held up in a curl
+      spec.pts = spec.pts.map((v, i) => (i ? v * 0.8 : v * 0.92)); spec.gaps = spec.gaps.map(g => g * 1.05);
+      if (T) Object.assign(T, { n: 6, seg: 0.3, w: 0.08, curl: 0.32, ang: 0.3, wag: 0.35, rate: 3 });
+      look.legW = 0.15; break;
+    case 'Dog': // a muzzle, big floppy ears, a tail that wags fast
+      look.muzzle = 1; look.bigFlop = 1;
+      if (T) Object.assign(T, { n: 4, seg: 0.3, w: 0.11, wag: 0.9, rate: 14, wagMove: false, ang: -0.4 }); break;
+    case 'Lynx': // long legs, tufted ears, a ruff at the cheeks, a stub tail with a black tip
+      legs(1.2, 1.25); look.tufts = 1; look.ruff = 1; spec.pts = spec.pts.map((v, i) => (i ? v * 0.92 : v)); look.legW = 0.18; break;
+    case 'Sabertooth': // heavy at the front, two long fangs
+      spec.pts = [0.48, 0.44, 0.7, 0.62, 0.5]; look.fangs = 1; break;
+    case 'Bear': // a shoulder hump, short thick legs
+      spec.pts = [0.44, 0.44, 0.74, 0.66, 0.54]; legs(0.85); look.legW = 0.28; look.foot = 0.2; look.hump = 1; break;
+    case 'Gorilla': // knuckle-walks: long front legs, short back ones, a broad chest and a silver back, no tail
+      spec.pts = [0.38, 0.5, 0.74, 0.56, 0.44]; legs(1.35, 0.8); spec.legs[0].out = 0.75; look.legW = 0.26; look.foot = 0.17; look.ape = 1; look.noArms = 1; break;
+    case 'Boar': // a flat pink snout disc, a bristle ridge down the back
+      look.disc = 1; look.ridge = 1; legs(0.8); break;
+    case 'Mole': // a round velvet body, big pink digging hands, a pink star nose, tiny eyes
+      spec.pts = [0.4, 0.5, 0.66, 0.62, 0.46]; legs(0.6); look.eye = 0.035; look.pinkHands = 1; look.star = 1; break;
+    case 'Mouse': // small body, big round ears, a long pink tail, a pointed pink nose
+      spec.pts = [0.42, 0.34, 0.5, 0.52, 0.44]; look.mouseEars = 1; look.pinkTail = 1; look.nose = 1;
+      if (T) Object.assign(T, { n: 7, seg: 0.34, w: 0.055, wag: 0.6, curl: 0.12 }); break;
+    case 'Hippo': // a barrel body and a broad square muzzle with nostrils on top
+      spec.pts = [0.5, 0.52, 0.78, 0.8, 0.66]; legs(0.75); look.legW = 0.3; look.foot = 0.2; look.square = 1; look.smallEars = 1; break;
+    case 'Ostrich': // a fluffy black body with white plumes, a long pale neck, a small head with a beak
+      look.bird = 1; spec.pts = [0.22, 0.14, 0.14, 0.16, 0.62, 0.68, 0.5]; look.legW = 0.12; look.foot = 0; spec.legs[0].len = 1.25;
+      if (T) Object.assign(T, { type: 'plume', n: 3, seg: 0.28, w: 0.3 }); break;
+    case 'Lion': look.bigMane = 1; break;
+  }
 }
 const cache = new Map();
 export function speciesFor(F) { let s = cache.get(F.id); if (!s) cache.set(F.id, s = make(F)); return s; }
@@ -230,7 +266,7 @@ function drawLeg(g, c, l, lk, dark, ow, px, hx, hy) {
     limb(g, [l.hip, F], w, '#e8a23a', ow * 0.6);
     for (const s of [-0.5, 0, 0.5]) { const a = c.ha + s; limb(g, [F, { x: F.x + Math.cos(a) * r * 0.22, y: F.y + Math.sin(a) * r * 0.22 }], w * 0.6, '#e8a23a', 0); }
   } else {
-    limb(g, [l.hip, k, F], w, dark, ow);
+    limb(g, [l.hip, k, F], w, lk.bird ? '#d9a08a' : lk.pinkHands && l.L.at < 3 ? '#f0b0a8' : dark, ow);
     if (lk.foot) blob(g, F.x, F.y, lk.foot * r * (1 + lift * 0.25), lk.foot * r * 0.8 * (1 + lift * 0.25), c.ha, dark, ow, 0);
   }
 }
@@ -255,10 +291,11 @@ function drawChain(g, c, ch, lk, col, dark, acc, ow, px) {
   if (C.sting) { const R = p.map((_, i) => r * C.w * (1 - 0.35 * i / p.length)); tube(g, p, R, col, ow, 0.18); const a = ang(p.at(-1), p.at(-2)); blob(g, p.at(-1).x, p.at(-1).y, r * 0.17, r * 0.14, a, acc, ow, 0); limb(g, [p.at(-1), at(p.at(-1), a + 0.6, r * 0.28, 0)], Math.max(px, r * 0.06), INK, 0); return; }
   // tails
   const type = C.type || 'long', m = p.length;
-  if (type === 'stub') { blob(g, p[1].x, p[1].y, r * 0.18, r * 0.16, 0, dark, ow, 0.1); return; }
+  if (type === 'stub') { blob(g, p[1].x, p[1].y, r * 0.18, r * 0.16, 0, dark, ow, 0.1); if (lk.tufts) dot(g, p[1].x, p[1].y, r * 0.1, INK); return; }
+  if (type === 'plume') { for (let i = m - 1; i >= 0; i--) for (const s of [-1, 0, 1]) { const a = ang(p[Math.max(0, i - 1)], p[Math.min(m - 1, i + 1)]) + PI + s * 0.5; blob(g, ...xy(at(p[i], a, r * 0.18, 0)), r * C.w * (1.1 - i * 0.15), r * C.w * 0.6, a, '#f6f2ea', ow, 0.1); } return; }
   if (type === 'bushy') { const R = p.map((_, i) => r * (0.12 + 0.22 * Math.sin(PI * (i + 0.6) / (m + 0.4)))); tube(g, p, R, col, ow, 0.18); blob(g, p.at(-1).x, p.at(-1).y, r * 0.14, r * 0.12, 0, acc, 0, 0); return; }
   const R = p.map((_, i) => r * C.w * (1 - 0.7 * i / (m - 1)) + px * 0.4);
-  tube(g, p, R, type === 'thin' || type === 'tuft' ? lk.d : col, ow, 0.12);
+  tube(g, p, R, lk.pinkTail ? '#e3a2a0' : type === 'thin' || type === 'tuft' ? lk.d : col, ow, 0.12);
   if (type === 'tuft') blob(g, p.at(-1).x, p.at(-1).y, r * 0.15, r * 0.13, 0, acc, ow, 0.15);
   if (lk.kind === 'bird' && lk.f.longTail) { const a = ang(p.at(-1), p.at(-2)); blob(g, p.at(-1).x, p.at(-1).y, r * 0.24, r * 0.14, a, acc, ow, 0.2); }
 }
@@ -392,6 +429,19 @@ function drawWings(g, c, P, R, lk, col, dark, acc, ow, over) {
   }
 }
 
+// The ostrich: a big bird on two long legs. A fluffy black body with white wing plumes, a long bare neck, a small head with a beak.
+function drawOstrich(g, c, P, R, lk, col, dark, acc, ow, px, a0) {
+  const r = c.r, n = P.length, a = ang(P[3], P[n - 1]), m = P[5];
+  tube(g, P.slice(0, 5), R.slice(0, 5).map(v => v * 0.75), acc, ow, 0.15); // the neck, pale skin
+  blob(g, m.x, m.y, R[5] * 1.35, R[5] * 1.05, a, col, ow, 0.18);
+  for (const s of [-1, 1]) blob(g, ...xy(at(m, a, -R[5] * 0.35, s * R[5] * 0.62)), R[5] * 0.75, R[5] * 0.38, a - s * 0.25, '#f6f2ea', ow * 0.7, 0.1); // wing plumes
+  for (const k of [-0.4, 0.1, 0.5]) { const q = at(m, a, k * R[5], 0); g.beginPath(); g.arc(q.x, q.y, R[5] * 0.4, a + PI - 1, a + PI + 1); g.lineWidth = Math.max(px * 0.7, r * 0.04); g.strokeStyle = shade(col, 0.25); g.stroke(); }
+  const h = P[0], hr = R[0];
+  for (const s of [-1, 1]) { g.beginPath(); g.moveTo(...xy(at(h, a0, hr * 0.5, s * hr * 0.45))); g.lineTo(...xy(at(h, a0, hr * 1.9, s * c.squash * hr * 0.5))); g.lineTo(...xy(at(h, a0, hr * 0.6, 0))); g.closePath(); g.fillStyle = '#e8b06a'; g.fill(); if (ow) { g.lineWidth = ow * 0.8; g.strokeStyle = INK; g.stroke(); } }
+  blob(g, h.x, h.y, hr * 1.05, hr, a0, acc, ow, 0.2);
+  eyes(g, c, h, a0, hr, hr, { ...lk, eye: 0.11 }, px, 1.2);
+}
+
 function drawQuad(g, c, P, R, lk, col, dark, acc, ow, px, a0) {
   const r = c.r, f = lk.f, n = P.length, name = lk.name;
   const bodyStart = f.neck ? 1 : 1, body = P.slice(bodyStart), BR = R.slice(bodyStart);
@@ -399,8 +449,16 @@ function drawQuad(g, c, P, R, lk, col, dark, acc, ow, px, a0) {
     const m = P[3], a = ang(P[2], P[4]);
     for (let i = 0; i < 20; i++) { const t = PI * (0.42 + 1.16 * i / 19), len = r * (1.15 + (i % 3) * 0.12) * (1 + c.squash * 0.25); const b = at(m, a, Math.cos(t) * r * 0.3, Math.sin(t) * r * 0.25); limb(g, [b, at(m, a + 0, Math.cos(t) * len, Math.sin(t) * len * 0.85)], Math.max(px, r * 0.07), i % 2 ? acc : dark, ow * 0.5); }
   }
-  if (f.mane && !f.neck) { const m = P[1]; blob(g, m.x, m.y, R[0] * 1.55, R[0] * 1.6, ang(P[0], P[2]), f.mane === 2 ? acc : dark, ow, 0.15); }
+  if (f.mane && !f.neck) {
+    const m = P[1], a = ang(P[0], P[2]), k = lk.bigMane ? 1.25 : 1, mc = f.mane === 2 ? acc : dark;
+    if (lk.bigMane) { g.beginPath(); for (let i = 0; i < 18; i++) { const t = i / 18 * TAU, rr = R[0] * (i % 2 ? 1.55 : 2.15) * k * 0.85; g.lineTo(...xy(at(m, a, Math.cos(t) * rr, Math.sin(t) * rr))); } g.closePath(); g.fillStyle = shade(mc, -0.2); g.fill(); g.lineWidth = ow; g.strokeStyle = INK; if (ow) g.stroke(); }
+    blob(g, m.x, m.y, R[0] * 1.55 * k, R[0] * 1.6 * k, a, mc, ow, 0.15);
+  }
+  if (lk.bird) { drawOstrich(g, c, P, R, lk, col, dark, acc, ow, px, a0); return; }
   tube(g, body, BR, col, ow, 0.18);
+  if (lk.hump) { const a = ang(P[1], P[3]); blob(g, ...xy(at(P[2], a, -R[2] * 0.1, 0)), R[2] * 0.75, R[2] * 0.62, a, shade(col, -0.12), 0, 0.25); }
+  if (lk.ape) { const a = ang(P[2], P[4]); blob(g, ...xy(at(P[3], a, -R[3] * 0.1, 0)), R[3] * 0.95, R[3] * 0.7, a, '#9a9aa6', 0, 0.2); }
+  if (lk.ridge) for (let i = 1; i < 5; i++) { const a = ang(P[i - 1], P[i]); for (const u of [-0.3, 0.2]) limb(g, [at(P[i], a, u * R[i], 0), at(P[i], a, u * R[i] - R[i] * 0.35, 0)], Math.max(px, r * 0.09), INK, 0); }
   // fur pattern, inside the body
   for (let i = 2; i < n - (f.liz ? 3 : 0); i++) {
     const a = ang(P[i - 1], P[i]), w = R[i];
@@ -410,13 +468,13 @@ function drawQuad(g, c, P, R, lk, col, dark, acc, ow, px, a0) {
   }
   if (f.headStripe) limb(g, [P[0], P[Math.min(4, n - 1)]], R[0] * 0.38, acc, 0);
   if (f.shell) { const m = P[3], a = ang(P[2], P[4]); blob(g, m.x, m.y, R[3] * 1.35, R[3] * 1.2, a, dark, ow, 0.18); for (const [u, v] of [[0, 0], [0.5, 0.42], [0.5, -0.42], [-0.5, 0.42], [-0.5, -0.42]]) blob(g, ...xy(at(m, a, u * R[3], v * R[3])), R[3] * 0.32, R[3] * 0.28, a, acc, 0, 0.15); }
-  if (f.arms || lk.arms) { const a = ang(P[1], P[2]); for (const s of [-1, 1]) { const sh = at(P[2], a, 0, s * R[2] * 0.75), hand = at(sh, a + s * (0.4 + Math.sin(c.t * 2 + s) * 0.1), r * (lk.arms ? 0.45 : 0.6), 0); limb(g, [sh, hand], r * (lk.arms ? 0.1 : 0.2), dark, ow); if (!lk.arms) blob(g, hand.x, hand.y, r * 0.2, r * 0.17, a, dark, ow, 0.1); } }
+  if ((f.arms || lk.arms) && !lk.noArms) { const a = ang(P[1], P[2]); for (const s of [-1, 1]) { const sh = at(P[2], a, 0, s * R[2] * 0.75), hand = at(sh, a + s * (0.4 + Math.sin(c.t * 2 + s) * 0.1), r * (lk.arms ? 0.45 : 0.6), 0); limb(g, [sh, hand], r * (lk.arms ? 0.1 : 0.2), dark, ow); if (!lk.arms) blob(g, hand.x, hand.y, r * (lk.pinkHands ? 0.28 : 0.2), r * (lk.pinkHands ? 0.24 : 0.17), a, lk.pinkHands ? '#f0b0a8' : dark, ow, 0.1); } }
   // head
   const h = P[0], hr = R[0], a = a0;
   const ears = f.ears, open = c.squash;
   if (f.bigEars) for (const s of [-1, 1]) { const flap = 0.25 + Math.sin(c.t * 1.8 + s) * 0.18; blob(g, ...xy(at(h, a - s * flap, -hr * 0.35, s * hr * 1.0)), hr * 0.7, hr * 0.95, a + s * 0.2, dark, ow, 0.1); }
   if (ears === 'long') for (const s of [-1, 1]) blob(g, ...xy(at(h, a, -hr * 1.1, s * hr * 0.4)), hr * 1.05, hr * 0.28, a - s * 0.22 + Math.sin(c.t * 3 + s) * 0.08, col, ow, 0.2);
-  if (ears === 'flop') for (const s of [-1, 1]) blob(g, ...xy(at(h, a, -hr * 0.2, s * hr * 0.9)), hr * 0.42, hr * 0.62, a + s * 0.4, dark, ow, 0.1);
+  if (ears === 'flop') { const k = lk.bigFlop ? 1.45 : 1; for (const s of [-1, 1]) blob(g, ...xy(at(h, a, -hr * 0.3 * k, s * hr * 0.9)), hr * 0.42 * k, hr * 0.62 * k, a + s * 0.5 + Math.sin(c.t * 9 + s) * 0.06 * Math.min(1, c.speed / r), dark, ow, 0.1); }
   if (f.antlers) for (const s of [-1, 1]) { const b = at(h, a, -hr * 0.2, s * hr * 0.45), t = at(b, a + s * 1.3, r * 0.75, 0); limb(g, [b, t, at(t, a + s * 0.4, r * 0.4, 0)], Math.max(px, r * 0.08), acc, ow * 0.6); limb(g, [at(b, a + s * 1.3, r * 0.4, 0), at(b, a + s * 0.7, r * 0.75, 0)], Math.max(px, r * 0.07), acc, ow * 0.6); }
   if (f.mane && f.neck) for (let i = 1; i < 4; i++) dot(g, P[i].x, P[i].y, R[i] * 0.6, dark);
   // snout first, then the head over it
@@ -428,15 +486,23 @@ function drawQuad(g, c, P, R, lk, col, dark, acc, ow, px, a0) {
     if (!liz) dot(g, ...xy(at(h, a, hr * (0.55 + len * 1.15), 0)), hr * 0.16, INK);
     if (liz && name === 'Crocodile') for (let k = 0; k < 4; k++) for (const s of [-1, 1]) dot(g, ...xy(at(h, a, hr * (0.9 + k * 0.4), s * hr * 0.42)), Math.max(px * 0.6, hr * 0.06), '#fffbe6');
   }
-  if (f.tusks) for (const s of [-1, 1]) limb(g, [at(h, a, hr * 0.6, s * hr * 0.4), at(h, a, hr * 1.4, s * hr * 0.65), at(h, a, hr * 1.7, s * hr * 0.35)], Math.max(px, r * 0.09), '#fffbe6', ow * 0.6);
+  if (lk.nose) { g.beginPath(); for (const s of [-1, 1]) g.lineTo(...xy(at(h, a, hr * 0.5, s * hr * 0.45))); g.lineTo(...xy(at(h, a, hr * 1.55, 0))); g.closePath(); g.fillStyle = col; g.fill(); if (ow) { g.lineWidth = ow; g.strokeStyle = INK; g.stroke(); } dot(g, ...xy(at(h, a, hr * 1.5, 0)), hr * 0.16, '#e3a2a0'); }
+  if (lk.fangs) for (const s of [-1, 1]) { const b = at(h, a, hr * 0.75, s * hr * 0.3); g.beginPath(); g.moveTo(...xy(at(b, a, 0, -s * hr * 0.12))); g.quadraticCurveTo(...xy(at(b, a, hr * 0.7, s * hr * 0.2)), ...xy(at(b, a, hr * 1.25, s * hr * 0.05))); g.lineTo(...xy(at(b, a, 0, s * hr * 0.16))); g.closePath(); g.fillStyle = '#fffbe6'; g.fill(); if (ow) { g.lineWidth = ow * 0.7; g.strokeStyle = INK; g.stroke(); } }
+  if (f.tusks && !lk.fangs) for (const s of [-1, 1]) limb(g, [at(h, a, hr * 0.6, s * hr * 0.4), at(h, a, hr * 1.4, s * hr * 0.65), at(h, a, hr * 1.7, s * hr * 0.35)], Math.max(px, r * 0.09), '#fffbe6', ow * 0.6);
   blob(g, h.x, h.y, hr * (liz ? 1.1 : 1.0), hr * (liz ? 0.85 : 0.92), a, col, ow, 0.22);
   if (f.whiteHead) blob(g, h.x, h.y, hr * 0.7, hr * 0.6, a, acc, 0, 0);
-  if (ears === 'round') for (const s of [-1, 1]) { const e = at(h, a, -hr * 0.3, s * hr * 0.85); blob(g, e.x, e.y, hr * 0.36, hr * 0.36, a, dark, ow, 0); dot(g, e.x, e.y, hr * 0.18, '#e8a6a0'); }
-  if (ears === 'point') for (const s of [-1, 1]) { g.beginPath(); g.moveTo(...xy(at(h, a, -hr * 0.55, s * hr * 0.4))); g.lineTo(...xy(at(h, a, -hr * 0.55, s * hr * 1.25))); g.lineTo(...xy(at(h, a, hr * 0.1, s * hr * 0.75))); g.closePath(); g.fillStyle = dark; g.fill(); g.lineWidth = ow; g.strokeStyle = INK; g.stroke(); dot(g, ...xy(at(h, a, -hr * 0.35, s * hr * 0.8)), hr * 0.14, '#e8a6a0'); }
+  if (lk.muzzle) { blob(g, ...xy(at(h, a, hr * 1.0, 0)), hr * 0.55, hr * 0.42, a, acc, ow, 0.15); dot(g, ...xy(at(h, a, hr * 1.45, 0)), hr * 0.2, INK); }
+  if (lk.square) { const m = at(h, a, hr * 0.95, 0); g.save(); g.translate(m.x, m.y); g.rotate(a); g.beginPath(); if (g.roundRect) g.roundRect(-hr * 0.3, -hr * 0.8, hr * 0.95, hr * 1.6, hr * 0.4); else g.rect(-hr * 0.3, -hr * 0.8, hr * 0.95, hr * 1.6); if (ow) { g.lineWidth = ow * 2; g.strokeStyle = INK; g.stroke(); } g.fillStyle = shade(col, 0.08); g.fill(); g.restore(); for (const s of [-1, 1]) dot(g, ...xy(at(h, a, hr * 1.4, s * hr * 0.4)), hr * 0.12, INK); }
+  if (lk.ape) { blob(g, ...xy(at(h, a, hr * 0.35, 0)), hr * 0.6, hr * 0.62, a, '#5a5560', 0, 0.15); limb(g, [at(h, a, hr * 0.15, -hr * 0.6), at(h, a, hr * 0.3, 0), at(h, a, hr * 0.15, hr * 0.6)], Math.max(px, hr * 0.2), INK, 0); }
+  if (lk.ruff) for (const s of [-1, 1]) { g.beginPath(); g.moveTo(...xy(at(h, a, hr * 0.4, s * hr * 0.7))); g.lineTo(...xy(at(h, a, -hr * 0.1, s * hr * 1.35))); g.lineTo(...xy(at(h, a, -hr * 0.25, s * hr * 1.05))); g.lineTo(...xy(at(h, a, -hr * 0.55, s * hr * 1.25))); g.lineTo(...xy(at(h, a, -hr * 0.5, s * hr * 0.6))); g.closePath(); g.fillStyle = '#f2e6cc'; g.fill(); }
+  if (lk.disc) { blob(g, ...xy(at(h, a, hr * 0.95, 0)), hr * 0.28, hr * 0.42, a, '#e8a6a0', ow, 0.1); for (const s of [-1, 1]) dot(g, ...xy(at(h, a, hr * 1.02, s * hr * 0.15)), hr * 0.08, INK); }
+  if (lk.star) { const m = at(h, a, hr * 1.05, 0); for (let i = 0; i < 10; i++) { const t = a + (i / 10) * TAU; limb(g, [m, at(m, t, hr * 0.32, 0)], Math.max(px, hr * 0.13), '#ee8f9a', 0); } dot(g, m.x, m.y, hr * 0.18, '#f4a6b0'); }
+  if (ears === 'round') { const k = lk.mouseEars ? 1.75 : lk.smallEars ? 0.6 : 1; for (const s of [-1, 1]) { const e = at(h, a, -hr * 0.3, s * hr * (0.85 + (k - 1) * 0.3)); blob(g, e.x, e.y, hr * 0.36 * k, hr * 0.36 * k, a, dark, ow, 0); dot(g, e.x, e.y, hr * 0.18 * k, '#e8a6a0'); } }
+  if (ears === 'point') for (const s of [-1, 1]) { g.beginPath(); g.moveTo(...xy(at(h, a, -hr * 0.55, s * hr * 0.4))); g.lineTo(...xy(at(h, a, -hr * 0.55, s * hr * 1.25))); g.lineTo(...xy(at(h, a, hr * 0.1, s * hr * 0.75))); g.closePath(); g.fillStyle = dark; g.fill(); g.lineWidth = ow; g.strokeStyle = INK; g.stroke(); dot(g, ...xy(at(h, a, -hr * 0.35, s * hr * 0.8)), hr * 0.14, '#e8a6a0'); if (lk.tufts) limb(g, [at(h, a, -hr * 0.55, s * hr * 1.25), at(h, a, -hr * 0.7, s * hr * 1.65)], Math.max(px, hr * 0.12), INK, 0); }
   if (f.headStripe) limb(g, [at(h, a, hr * 0.9, 0), at(h, a, -hr * 0.9, 0)], hr * 0.35, acc, 0);
   if (f.horns) for (const s of [-1, 1]) limb(g, [at(h, a, 0, s * hr * 0.5), at(h, a, -hr * 1.2, s * hr * 1.1)], Math.max(px, r * 0.1), acc, ow);
   if (name === 'Mole') for (const s of [-1, 1]) for (const k of [-0.2, 0.2]) limb(g, [at(h, a, hr * 1.2, s * hr * 0.2), at(h, a, hr * 1.5, s * hr * (0.5 + k))], Math.max(px * 0.6, r * 0.02), '#fff8e6', 0);
   if (ears && !liz && !f.bigEars && ears !== 'long') for (const s of [-1, 1]) for (const k of [0.2, 0.5]) limb(g, [at(h, a, hr * (snout ? 1.1 : 0.75), s * hr * 0.25), at(h, a, hr * (snout ? 1.6 : 1.3), s * hr * (0.5 + k))], Math.max(px * 0.6, r * 0.022), '#fff8e6', 0);
-  if (!snout && !f.trunk) dot(g, ...xy(at(h, a, hr * 0.95, 0)), hr * 0.17, INK);
+  if (!snout && !f.trunk && !lk.muzzle && !lk.nose) dot(g, ...xy(at(h, a, hr * 0.95, 0)), hr * 0.17, INK);
   eyes(g, c, h, a, hr, hr, lk, px, f.bigHead ? 0.9 : 1);
 }
