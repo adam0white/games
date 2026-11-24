@@ -418,9 +418,9 @@ Careful bot, 6 seeds, 12 minutes, median top level / median deaths:
 | | main | pounce and cap | pounce, cap and sight (built) |
 |---|---|---|---|
 | classic strong | 11 / 1 | 11 / 1 | 9 / 1 |
-| classic fast | 17 / 5 | 15 / 5 | 13 / 4 |
+| classic fast | 17 / 5 | 15 / 5 | 13 / 3 |
 | classic sneaky | 18 / 0 | 18 / 0 | 18 / 0 |
-| Wild strong | 7 / 4 | 7 / 4 | 6 / 3 |
+| Wild strong | 7 / 4 | 7 / 4 | 6 / 2 |
 | Wild fast | 9 / 10 | 11 / 9 | 11 / 10 |
 | Wild sneaky | 13 / 4 | 13 / 4 | 12 / 4 |
 
@@ -443,7 +443,7 @@ The first sight table (birds 2.85, Rabbit, Deer and Zebra wider) took classic st
 
   Measure with `bots.mjs` before choosing. Option 2 contradicts the owner's ruling for Classic and needs the owner.
 - **Ways of seeing for the player (#148).** Light the meadow in the shape of the player's own species and dim the rest. It must stay fair: a hunter outside the light still needs its arrow.
-- **An ability per animal (#148).** Group the 51 promoted animals into about 12 ability families, each with a key and a cooldown, for example: Wasp and Scorpion sting (stun), Frog and Kangaroo leap, Mole digs (hide underground), Skunk sprays (hunters flee), Chameleon blends in, Eagle and Owl dive, Porcupine spikes (an attacker bounces off), Bat echolocates (see through grass). The species then sets the strength and cooldown. One button on the right of the screen. This is a large change, and bots need a policy for each family.
+- **An ability per animal (#148).** Group the 51 promoted animals into about 12 ability families, each with a key and a cooldown, for example: Wasp and Scorpion sting (stun), Frog and Rabbit leap, Mole digs (hide underground), Lizard blends in, Eagle and Owl dive, Porcupine spikes (an attacker bounces off), Bat echolocates (see through grass). The species then sets the strength and cooldown. One button on the right of the screen. This is a large change, and bots need a policy for each family.
 - **After every animal (#148).** Two candidates:
   - a New Game+ meadow where the top animals of the last run are the hunters;
   - a collection screen of every animal you have been, with the rare ones only reachable through particular picks.
