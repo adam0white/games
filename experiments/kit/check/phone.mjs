@@ -703,7 +703,7 @@ const GAMES = {
     const stack = await page.evaluate(() => { const F = window.__ant.FORMS; return [F.findIndex(f => f && f.level === 1), F.findIndex(f => f && f.level === 2)]; });
     await page.evaluate(([k, stack]) => { localStorage.setItem(k, JSON.stringify({ skin: { c: '#c0271f', p: 'stripes' }, stack, xp: 3, sound: true, look: 2 })); localStorage.setItem('ant-promotion:hint', '1'); localStorage.setItem('notes.k', 'check'); }, [KEY, stack]);
     await page.reload(); await until(page, () => window.__ant, 'game script');
-    assert.match(await page.textContent('#continue'), /^Continue as /, 'old save: continues'); assert.equal(await page.textContent('#rules'), 'Rules: Wild', 'Wild is the default (note #88)'); assert.match(await page.textContent('#look'), /^Look: /);
+    assert.match(await page.textContent('#continue'), /^Continue as /, 'old save: continues'); assert.equal(await page.textContent('#rules'), 'Rules: Wild', 'Wild is the default (note #88)'); assert.equal(await page.textContent('#look'), 'Look: Soft', 'old save: look 2 is still Soft');
     await until(page, () => document.getElementById('notes-button'), 'notes button');
     await noZoomed(page);
     assert.equal(await page.evaluate(() => window.audioLog.made), 0, 'no audio before the first tap');
@@ -774,6 +774,19 @@ const GAMES = {
     await page.evaluate(() => { const s = window.__ant.s, m = s.mobs.find(o => o.old); Object.assign(m, { x: s.player.x + 130, y: s.player.y, a: Math.PI, hunt: 6, alert: true, skillCd: 0, tire: 0 }); s.mobs = [m]; s.player.safe = 0; }); await until(page, () => (window.__ant.s.oldSkills || 0) > 0, 'it uses its skill');
     await page.click('#pause'); await page.click('#paused .toMenu'); await page.reload(); assert.equal(await page.evaluate(() => window.__ant.save.old.length), 3, 'they are kept in the save');
     await page.evaluate(([k, v]) => localStorage.setItem(k, v), [KEY, kept]); await page.reload(); await page.click('#continue');
+    // The Living look (look 4, from the lab page ant-creatures): chosen with the Look button, every animal on a rig; a death
+    // and going on in it; then the button goes round to the look the player had, and the save keeps it.
+    const lookWas = (await saved()).look, toMenu = async () => { if (await mode() === 'play') await page.click('#pause'); await page.click('.screen.on .toMenu'); assert.equal(await mode(), 'menu'); };
+    const lookTo = async want => { for (let i = 0; i < 6 && await page.textContent('#look') !== `Look: ${want}`; i++) await page.click('#look'); assert.equal(await page.textContent('#look'), `Look: ${want}`); };
+    await toMenu(); await lookTo('Living'); assert.equal((await saved()).look, 4, 'Living is saved as look 4');
+    await page.click('#continue'); assert.equal(await mode(), 'play');
+    await until(page, () => window.__ant.living && window.__ant.living.stat.drawn > 3 && window.__ant.living.rig(null), 'living bodies drawn');
+    await page.evaluate(() => { const { s, FORMS, me } = window.__ant, p = s.player, m = s.mobs.find(m => FORMS[m.f].power > me(s).power); p.safe = 0; p.hideAt = 1e9; p.x = m.x; p.y = m.y; });
+    await until(page, () => window.__ant.mode === 'dead', 'death card in Living');
+    await page.click('#goOn'); assert.equal(await mode(), 'play');
+    await until(page, () => window.__ant.living && window.__ant.living.stat.drawn > 3 && window.__ant.living.rig(null), 'living bodies after a death');
+    await toMenu(); await lookTo(['Flat', 'Cartoon', 'Soft', '3D', 'Living'][lookWas]); assert.equal((await saved()).look, lookWas, 'the look goes back round');
+    await page.click('#continue'); assert.equal(await page.evaluate(() => window.__ant.living), null, 'no rigs in the other looks');
   },
   // The three games of 2026-11-23. Each has its own full check (experiments/<slug>/check.mjs); this is the shared part:
   // the page loads through the kit with no error, a run starts from Play, pause holds it, and leaving for the menu
