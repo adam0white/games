@@ -508,3 +508,27 @@ Not asked for by a note; it closes a proposal recorded under note #112. The fram
 Check: a new line at the start of the Lantern phone check makes one `fillRect` throw, waits up to 5 s for that frame, then waits up to 5 s for one more frame. Headless WebKit in CI drew no frame in the first version's 0.2 s. It passes on Chromium Pixel 7 and WebKit iPhone 13. With the old loop it fails with 0 frames (tried). The thrown error is filtered out of that page's errors by its own text. Local Chromium runs on the fix failed 3 times in 10. Two were captured: both were "page errors" from a failed request to `human.adamwhite.work/lab/api/linked`, a live lab server the local check reaches, not this change. The first failure's text was not captured.
 
 Not checked: a real phone. No error has been seen in play that this would have caught; the change is a guard.
+
+## 2026-11-23: a lost tower level goes on three floors below where you fell (tester t1, note #142)
+
+The note, in short: in the tower, every death sends you back to the start. If you reached floor 10, you should start again on floor 7: always three floors back, so players know what a death costs.
+
+**How the lab read it.** Since note #73 a lost level is already tried again at the same level, and each level has ten floors that the game announces ("Floor 4"). So "the start" is read as the start of the level, and "floors" as those ten floors inside a level, not levels. The reply says so and asks the tester to confirm.
+
+### Done
+| Part | What changed |
+| --- | --- |
+| Where a retry starts | A loss on floor N of a level saves floor N − 3 (never below the level's start). The next try of that level, from the card or from the menu, starts just past that floor's ledge. A death on floors 0 to 3 starts the level from the bottom, as before. The highest start is floor 6 (a death on the last floor, 9). |
+| The river there | Rows behind the start are still drawn from the seed in order, then removed, so the river ahead is the one a run from the bottom would meet. The water just ahead is left empty for as long as at a level's start (2.2 units at the start's speed). A start on or just before the waterfall moves to just below it. |
+| What the player sees | The loss card: "Your climb goes on from level 3, floor 3: three floors below floor 6, where you fell." Its button: "Try again from floor 3". The menu: "Tower climb · go on at level 3, floor 4". The level opens with "Tower level 3 of 50, from floor 4". |
+| What clears it | Clearing a level, "New climb from level 1", a rebirth and "Erase everything" all go back to floor 0. Leaving a run through the pause menu keeps the saved floor, as it keeps the saved level. |
+| Lab record | A tower run's start event carries `floor`, the floor it started on. `reached` still counts from the bottom of the level. |
+
+New key `lantern-tower-floor`: a number, the floor the next try of `lantern-tower-at` starts on, 0 for the bottom. A save without it starts at the bottom.
+
+Checks:
+- Node, 300 seeds for each start floor 0 to 6 on levels 1, 15, 29, 50, 75 and 100: the start is always on the floor asked for, never on fast water, and no rock lies within 1.9 units ahead. A policy that steers down the middle and dodges nothing dies in the first 2.5 s about as often as from the level's bottom at levels 1 to 15, and more often higher up (level 50: 223 of 300 from floor 0, 280 from floor 6), because the river is faster and denser higher in a level. That is the level's own difficulty, not the start.
+- Phone check, new lines: a loss on floor 7 shows the card text and button and saves 4; the retry starts on floor 4 with open water ahead; Menu then Tower starts on floor 4 too; a new climb saves 0 and starts at the bottom; clearing a level saved at floor 5 saves 0. Passes on WebKit iPhone 13. On Chromium Pixel 7 every assertion passes, then the run fails on "page errors" from a failed request to the live lab server, as in the note-#112 frame-loop entry. With the `startAt` call removed, the check fails at "the try starts on floor 4 with open water ahead" (tried).
+- Phone-sized screenshots of the menu, a start from floor 4, and the loss card.
+
+Not checked: a real phone; whether three floors is the right cost at high levels, where a floor is about 9 seconds of fast river.
