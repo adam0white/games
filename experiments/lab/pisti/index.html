@@ -76,6 +76,9 @@
   #table.friends #turnName { padding-inline: 14px; overflow-wrap: anywhere; }
   #roomStatus { position: absolute; top: calc(98px + env(safe-area-inset-top)); inset-inline: 14px; margin: 0; text-align: center; color: #fbeedb; font-size: 14px; overflow-wrap: anywhere; }
 
+  .panel { position: relative; }
+  .lang { min-height: 44px; min-width: 44px; padding: 0 14px; border: 0; border-radius: 14px; background: #f1dfc2; color: #3a1d12; font-weight: 700; font-size: 15px; box-shadow: 0 3px 0 #0002; }
+  #menu .lang { position: absolute; top: 10px; right: 10px; z-index: 1; }
   #pause { position: absolute; right: calc(10px + env(safe-area-inset-right)); top: calc(10px + env(safe-area-inset-top)); width: 46px; height: 46px; border-radius: 50%; border: 0; background: #ffffff1a; display: grid; place-items: center; padding: 0; z-index: 3; }
   #pause::before { content: ''; width: 5px; height: 17px; border: solid #fbeedb; border-width: 0 5px; }
 
@@ -132,72 +135,74 @@
 </head>
 <body>
 <canvas id="fx" aria-hidden="true"></canvas>
-<div id="table" aria-label="Card table">
+<div id="table" data-i18n-aria="tableLabel">
   <div class="seat" id="oppPlayer"><span class="seat-light" aria-hidden="true"></span><span class="seat-name"></span></div>
   <div class="row" id="oppRow"><div class="who"><span class="dot them" id="oppDot"></span><div class="stack" id="oppStack"></div><div class="flames" id="oppFlames"></div></div><div id="oppHand"></div></div>
   <div id="stock"></div>
   <div id="pile"></div>
   <div class="row" id="myRow"><div class="who"><span class="dot" id="myDot"></span><div class="stack" id="myStack"></div><div class="flames" id="myFlames"></div></div><div class="seat" id="myPlayer"><span class="seat-light" aria-hidden="true"></span><span class="seat-name"></span></div></div>
-  <div id="hand" role="group" aria-label="Your cards"></div>
+  <div id="hand" role="group" data-i18n-aria="yourCards"></div>
   <div id="turnName"></div>
   <p id="roomStatus" role="status" hidden></p>
-  <button id="pause" aria-label="Pause"></button>
+  <button id="pause" data-i18n-aria="pause"></button>
 </div>
-<div id="practice">Practice</div>
-<div id="shout">Pişti!</div>
+<div id="practice" data-i18n="practice"></div>
+<div id="shout" data-i18n="shout"></div>
 
 <div class="screen on" id="menu"><div class="panel">
   <canvas id="hero" aria-hidden="true"></canvas>
-  <h1>Pişti</h1>
-  <p class="sub">Match the top card to take the pile.<br>Take a lone card: pişti!</p>
-  <button class="btn main" id="play">Play <span id="levelDots" aria-label="Bot strength"></span></button>
-  <div class="seg" id="length"><button data-len="one" class="on">One hand</button><button data-len="51">Match to 51</button></div>
-  <button class="btn" id="today">Today’s deal<small id="todayNote"></small></button>
-  <button class="btn" id="friend">Play a friend</button>
-  <button class="btn" id="two">Two players, one phone</button>
+  <button class="lang" id="langMenu" data-i18n="langButton" data-i18n-aria="langSwitch"</button>
+  <h1 data-i18n="title"></h1>
+  <p class="sub"><span data-i18n="tagline1"></span><br><span data-i18n="tagline2"></span></p>
+  <button class="btn main" id="play"><span data-i18n="play"></span> <span id="levelDots"></span></button>
+  <div class="seg" id="length"><button data-len="one" class="on" data-i18n="lenOne"></button><button data-len="51" data-i18n="len51"></button></div>
+  <button class="btn" id="today"><span data-i18n="today"></span><small id="todayNote"></small></button>
+  <button class="btn" id="friend" data-i18n="friend"></button>
+  <button class="btn" id="two" data-i18n="two"></button>
 </div></div>
 
 <section class="screen" id="friendCard" aria-labelledby="friendTitle"><div class="panel">
-  <h2 id="friendTitle">Play a friend</h2>
+  <h2 id="friendTitle" data-i18n="friend"></h2>
   <div id="friendEntry">
-    <label class="field">Your name (optional)<input id="friendName" maxlength="24" autocomplete="nickname"></label>
-    <button class="btn main" id="newTable">New table</button>
+    <label class="field"><span data-i18n="yourName"></span><input id="friendName" maxlength="24" autocomplete="nickname"></label>
+    <button class="btn main" id="newTable" data-i18n="newTable"></button>
     <form id="joinForm">
-      <label class="field">Table code<input id="joinCode" maxlength="4" autocapitalize="characters" autocomplete="off" spellcheck="false" pattern="[A-Za-z]{4}" required></label>
-      <button class="btn" id="joinTable">Join</button>
+      <label class="field"><span data-i18n="tableCode"></span><input id="joinCode" maxlength="4" lang="en" autocapitalize="characters" autocomplete="off" spellcheck="false" pattern="[A-Za-z]{4}" required></label>
+      <button class="btn" id="joinTable" data-i18n="join"></button>
     </form>
   </div>
   <div id="roomInvite" hidden>
-    <output id="roomCode" aria-label="Table code"></output>
-    <button class="btn main" id="shareLink">Share link</button>
-    <label class="field" id="roomLinkField" hidden>Table link<input id="roomLink" readonly></label>
+    <output id="roomCode" lang="en" data-i18n-aria="tableCode"></output>
+    <button class="btn main" id="shareLink" data-i18n="shareLink"></button>
+    <label class="field" id="roomLinkField" hidden><span data-i18n="tableLink"></span><input id="roomLink" readonly></label>
   </div>
   <p id="lobbyStatus" role="status" hidden></p>
-  <button class="btn" id="roomLeave">Menu</button>
+  <button class="btn" id="roomLeave" data-i18n="menu"></button>
 </div></section>
 
 <div class="screen" id="paused"><div class="panel">
-  <h2 id="pauseTitle">Paused</h2>
-  <button class="btn main" id="resume">Keep going</button>
-  <div class="pair"><button class="btn" id="sound">Sound: on</button><button class="btn" id="colours">Four colours: off</button></div>
-  <button class="btn" id="quit">Menu</button>
+  <h2 id="pauseTitle" data-i18n="paused"></h2>
+  <button class="btn main" id="resume" data-i18n="resume"></button>
+  <div class="pair"><button class="btn" id="sound"></button><button class="btn" id="colours"></button></div>
+  <button class="btn" id="quit" data-i18n="menu"></button>
+  <button class="btn lang" id="langPause" data-i18n="langButton" data-i18n-aria="langSwitch"</button>
 </div></div>
 
 <div class="screen" id="cover"><div class="panel">
-  <h2 id="coverWho">Player 2</h2>
+  <h2 id="coverWho"></h2>
   <p id="coverMove"></p>
-  <p>Pass the phone. Tap when only you can see.</p>
-  <button class="btn" id="reveal">Show my cards</button>
+  <p data-i18n="coverHint"></p>
+  <button class="btn" id="reveal" data-i18n="reveal"></button>
 </div></div>
 
 <div class="screen" id="score"><div class="panel">
-  <h2 id="scoreTitle">Hand over</h2>
+  <h2 id="scoreTitle" data-i18n="handOver"></h2>
   <table id="scoreT"><tbody></tbody></table>
   <p id="matchLine"></p>
   <p id="roomEndStatus" role="status" hidden></p>
-  <div id="daily"><canvas id="strip" aria-label="Your captures, in order"></canvas><p id="dailyNote"></p><button class="btn" id="savePic">Save picture</button></div>
-  <button class="btn main" id="again">Play again</button>
-  <button class="btn" id="scoreMenu">Menu</button>
+  <div id="daily"><canvas id="strip" data-i18n-aria="strip"></canvas><p id="dailyNote"></p><button class="btn" id="savePic" data-i18n="savePic"></button></div>
+  <button class="btn main" id="again" data-i18n="again"></button>
+  <button class="btn" id="scoreMenu" data-i18n="menu"></button>
 </div></div>
 
 <script type="module" src="./main.js"></script>

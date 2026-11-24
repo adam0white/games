@@ -79,6 +79,16 @@ The shared room client keeps the seat key in browser storage. Reopening the same
 
 The phone check targets Playwright's iPhone 13 and Pixel 7 profiles and uses the Worker's table protocol functions in Node. It covers joining, replay after reload and disconnect, full tables, move validation and rematch. The builder's sandbox could not start a browser, so the lab ran the check itself on 2026-11-24: it passes on both profiles, with a 22-segment match, and the lab looked at the six friend screenshots per browser. Not verified: two real phones, the share sheet, a slow or lossy network.
 
+## Languages
+
+The page plays in English and Turkish through `experiments/kit/i18n.js`. `words.js` holds both tables (98 keys each, same `{variables}`); `main.js` and `index.html` take every visible string, aria-label, the document title, the first-play hint label, the share text, the saved picture's title and the download name from it. Dates use `toLocaleDateString(lang())`. A small EN/TR button sits beside Sound on the menu and the pause card; it switches without a reload, redraws every text and remembers the choice in `kit:lang` (and updates `?lang=` if present). Save format, storage keys, rules and the friends' table protocol are unchanged. Table codes carry `lang="en"` so CSS uppercase does not turn `i` into `İ`.
+
+Title decision: Turkish uses "Kâğıt Futbolu", the traditional name of the pencil game, as the whole title (Paper Pitch is not kept as a subtitle). Names are never given suffixes: "Bekleniyor: {name}", "Bağlantı koptu: {name}." The three bot levels are Kolay, Orta, Zor.
+
+`check.mjs` opens everything with `?lang=en`, compares the two tables in Node (keys and variables), and on each phone profile and at 360x640 runs a Turkish pass: menu, hint, pause, between and end cards, daily date, friend card and table lines, the switch with a reload, raw-key and stray-English scans, overflow and console errors. Screenshots go to `WORD_SHOTS`.
+
+The Turkish was written by an AI and has not been read by a native speaker. Least sure: "Çıkmaz!" (Stuck!), "Rövanş", "Bu turda gol at", "Yol buradan geçiyordu".
+
 ## Open ideas
 
 - A shared board for the daily: how many tries each player needed.

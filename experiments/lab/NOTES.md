@@ -90,6 +90,8 @@ Two new pages and a tuning pass on the second batch, by Codex builders. For this
 
 ## Round of 2026-11-24 (ideas scan)
 
+Languages (same day): `pitch`, `pisti` and `ring` play in English and Turkish through `kit/i18n.js` (each has a `words.js`, a switch on the menu and pause card, and Turkish checks in its `check.mjs`). The Turkish was written by an AI and has not been read by a native speaker.
+
 From `docs/ideas/shortlist-2026-11-24.md`, a scan of forums and the web for game ideas and old games to revive. Each page was built by one builder from one brief; the lab reran its `bots.mjs`, its `--mutate` run and its `check.mjs` and looked at the screenshots. No person and no real phone yet.
 
 | Date | Experiment | Idea tested | Checked | Verdict |
