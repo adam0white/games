@@ -115,6 +115,18 @@ function checkAlternatives(seed, level) {
   return { wins, attempts: lineup.length };
 }
 
+// A new player sees the same default opening every time. Inspect the culprit
+// the observer actually deduces, including the portrait shown at the reveal.
+const opening = Array.from({ length: 8 }, (_, i) => {
+  const c = createCase({ level: i + 1 });
+  const cards = dossiers(c);
+  const id = compare(cards, reconstruct(cards, replay(c)));
+  return cards[id].species;
+});
+assert.ok(opening.every((species, i) => i === 0 || species !== opening[i - 1]),
+  `consecutive opening cases repeat a culprit portrait: ${opening.join(', ')}`);
+assert.ok(new Set(opening).size >= 6, 'the first eight reveals show at least six different culprits');
+
 const rows = [];
 const totals = { correct: 0, random: 0, room: 0, chance: 0, attempts: 0, balancedWins: 0, balancedAttempts: 0 };
 for (const [i, spec] of CASES.entries()) {
