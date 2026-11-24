@@ -140,3 +140,7 @@ Paper Boat (`/boat/`, same day): a paper boat rides a gutter stream; the player 
 
 `experiments/lab/night-flock-2/` moved to `experiments/flock/` (served at `/flock/`); `/lab/night-flock-2/` redirects there and keeps the query string, and the storage keys keep their `night-flock-2:` names. The page opens on a first card (Play, language, recording notice), teaches with pictures on the field and a moving finger instead of sentences, has Turkish (`?lang=tr` or the language button), and records play with `kit/lab.js` under slug `flock`. It is in `kit/games.json` as fresh and in `kit/check/pages.mjs`. Bots over 60 fresh seeds per evening: careful 98% or better on all 20 evenings, clumsy (150 ms late, 15% wrong inputs) 95% or better; a bot that knows only what the field pictures (a dotted line to the next opening or the fold, a ring, a hand, an arrow) clears all 20 evenings as dealt and 100% of 20 fresh seeds each; before the changes it won evening 1 only. The banks are forgiving from evening 2 for that reason; time limits are unchanged. Production recording needs `flock` added to the lab's accepted games in human-framework before sends are accepted. No person has played it. See `flock/NOTES.md` for numbers and what is not verified.
 
+
+## 2026-11-24: Night Flock and Night Vine (tester t1, note #208, answering #198)
+
+Asked which of Night Flock and Night Vine they would keep playing, the tester chose "None". Recorded only: dropping a game is the owner's decision.

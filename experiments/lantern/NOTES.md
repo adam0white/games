@@ -662,3 +662,11 @@ Not verified: a real phone's sensor, the iOS prompt, the screen staying on, and 
 
 ### Left as a proposal (2026-11-24, note #203)
 - Tilt in the 2D and 3D views, and a sensitivity setting, if the tester likes it.
+
+## 2026-11-24: gentler tilt, and answers (tester t1, notes #204, #213, #214)
+
+- **#213, answering #211 (how does tilting feel on your phone?):** it turns too much. Top speed went from 0.8 to 0.5 of the scale, reached at 26 degrees instead of 18; 3 degrees are ignored instead of 2.5; the view leans 40% less. At a 10-degree lean the boat slides at about 0.09 of the scale, was 0.31. This is the first sign that the sensor and the permission work on a real phone.
+- **#214, answering #212 (where should tilt go next?):** leave it as it is. The proposals under note #203 (tilt in 2D and 3D, a strength setting) are closed.
+- **#204, answering #168 (does the music made as you play fit the river?):** it fits. The music is already in the main game; no change.
+
+Not verified: whether the new numbers are right on a phone. The tester is asked.
