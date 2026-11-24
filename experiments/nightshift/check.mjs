@@ -44,6 +44,101 @@ async function open(page, query = '', language = 'en') {
   assert.equal((await state(page)).screen, 'menu');
 }
 
+// Long Night and Daily open after night 15. Checks of those modes start from a player who has met every rule.
+async function graduate(page) {
+  await page.evaluate(() => {
+    const old = JSON.parse(localStorage.getItem('nightshift-save') ?? '{}');
+    localStorage.setItem('nightshift-save', JSON.stringify({ ...old, unlocked: Math.max(old.unlocked ?? 1, 16), cleared: Math.max(old.cleared ?? 0, 15), played: true }));
+  });
+  await page.reload();
+  await page.waitForFunction(() => typeof window.nightshiftState === 'function');
+  assert.equal((await state(page)).screen, 'menu');
+}
+
+// A first-time player meets Long Night and Daily locked: a tap stays on the menu and points at Play.
+async function checkModeLock(page) {
+  await open(page);
+  await page.evaluate(() => localStorage.clear());
+  await open(page);
+  for (const id of ['long', 'daily']) {
+    assert.equal(await page.locator('#' + id).getAttribute('aria-disabled'), 'true', id + ' is locked on a fresh save');
+    assert.match(await page.locator('#' + id).getAttribute('aria-label'), /opens after night 15/);
+    assert.ok(await page.locator(`#${id} .lockStat`).isVisible(), id + ' shows its padlock');
+    const hit = await page.locator('#' + id).boundingBox();
+    assert.ok(hit.width >= 44 && hit.height >= 44);
+    // aria-disabled buttons still receive a finger; force skips Playwright's wait for an enabled control.
+    await page.tap('#' + id, { force: true });
+    assert.equal((await state(page)).screen, 'menu', 'a fresh save cannot start ' + id);
+    assert.ok(await page.locator('#play').evaluate(el => el.classList.contains('nudge')), 'a locked tap points at Play');
+  }
+  assert.equal(await save(page), null, 'a locked tap writes nothing');
+  await page.evaluate(() => localStorage.setItem('nightshift-save', JSON.stringify({ unlocked: 15, cleared: 14, played: true })));
+  await open(page);
+  await page.tap('#long', { force: true });
+  assert.equal((await state(page)).screen, 'menu', 'night 14 cleared is not enough');
+  await page.evaluate(() => localStorage.setItem('nightshift-save', JSON.stringify({ unlocked: 16, cleared: 15, played: true })));
+  await open(page);
+  assert.ok(!(await page.locator('#long .lockStat').isVisible()) && await page.locator('#long .modeStat').isVisible());
+  await page.tap('#long');
+  assert.equal((await state(page)).mode, 'long', 'clearing night 15 opens Long Night');
+  // Saves from before the lock that already ran a mode keep both modes.
+  for (const old of [{ best: 31 }, { daily: { date: '2026-11-20', streak: 1 } }]) {
+    await page.evaluate(old => localStorage.setItem('nightshift-save', JSON.stringify(old)), old);
+    await open(page);
+    await page.tap('#daily');
+    assert.equal((await state(page)).mode, 'daily', 'an earlier player keeps the modes: ' + JSON.stringify(old));
+  }
+  await page.evaluate(() => localStorage.clear());
+}
+
+// The lit mask marks each exhibit it frees, and the woken exhibit carries the cat's ring while it walks.
+async function checkRuleCues(page) {
+  await open(page);
+  const result = await page.evaluate(async () => {
+    const art = await import('./art.js');
+    const sim = await import('./sim.js');
+    const canvas = document.createElement('canvas');
+    canvas.width = sim.WIDTH * 2;
+    canvas.height = sim.HEIGHT * 2;
+    const pink = (cx, cy, r0, r1) => {
+      const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      let n = 0;
+      for (let y = Math.round((cy - r1) * 2); y < (cy + r1) * 2; y++) for (let x = Math.round((cx - r1) * 2); x < (cx + r1) * 2; x++) {
+        const d = Math.hypot(x / 2 - cx, y / 2 - cy);
+        if (d < r0 || d > r1) continue;
+        const i = (y * canvas.width + x) * 4;
+        if (data[i] > 235 && data[i + 1] > 160 && data[i + 1] < 205 && data[i + 2] > 150 && data[i + 2] < 195) n++;
+      }
+      return n;
+    };
+    const masked = on => {
+      const s = sim.create({ level: 8 });
+      const mask = s.actors.find(a => a.kind === 'shy');
+      const runner = s.actors.find(a => a.kind !== 'shy');
+      Object.assign(mask, { state: 'roam', x: 110, y: 300 });
+      Object.assign(runner, { state: 'roam', x: 195, y: 330, frozen: false, mirrored: false });
+      s.light = { x: 160, y: 310 };
+      s.oldLight = { ...s.light };
+      s.masked = on;
+      art.renderer(canvas).draw(s, 1, 0, [], true, {});
+      return pink(runner.x, runner.y - 66, 0, 14);
+    };
+    const woke = () => {
+      const s = sim.create({ level: 9 });
+      const runner = s.actors.find(a => a.kind !== 'shy');
+      Object.assign(runner, { state: 'roam', x: 300, y: 420 });
+      const now = 5000;
+      // The cat woke this exhibit on its plinth 1.6 s ago; it has walked since.
+      const effect = { type: 'wake', id: runner.id, x: 40, y: 399, tx: 120, ty: 200, at: now - 1600, life: art.WAKE_LIFE ?? 1100 };
+      art.renderer(canvas).draw(s, 1, now, [effect], true, {});
+      return pink(runner.x, runner.y - 24, 22, 33);
+    };
+    return { masked: masked(true), unmasked: masked(false), woke: woke() };
+  });
+  assert.ok(result.masked > 20 && result.unmasked < 3, 'a lit mask crosses out the beam on an exhibit inside the light ' + JSON.stringify(result));
+  assert.ok(result.woke > 40, 'the woken exhibit still wears the cat ring 1.6 s later, where it now stands ' + JSON.stringify(result));
+}
+
 async function finger(page, action, aim = REST, lift = LIFT) {
   await page.locator('#floor').evaluate((el, { action, aim, width, height, lift }) => {
     const bounds = el.getBoundingClientRect();
@@ -326,6 +421,7 @@ async function run(page, name, records) {
   assert.ok(!lostAgain.lossShown && !(await page.locator('#lossArt').isVisible()), 'a second loss on the same night hides the escape picture');
   await page.tap('#resultMenu');
 
+  await graduate(page);
   await page.tap('#daily');
   const daily = await state(page);
   assert.equal(daily.mode, 'daily');
@@ -432,6 +528,7 @@ async function checkLossWays(page) {
   // Daily shows the picture on every loss and leaves the story nights' first losses alone.
   await page.evaluate(() => localStorage.clear());
   await open(page);
+  await graduate(page);
   for (let round = 0; round < 2; round++) {
     await page.tap('#daily');
     const lost = await loseIdle();
@@ -553,6 +650,7 @@ async function checkLanguages(page, name, locale) {
     assert.equal((await state(page)).outcome, 'escaped');
     await shot('result', 'loss');
     await page.tap('#resultMenu');
+    await graduate(page);
     await page.tap('#long');
     await page.tap('#pause');
     await shot('paused', 'pause-long');
@@ -651,6 +749,8 @@ try {
         await run(page, name, records);
         await checkLessonCues(page);
         await checkNightPicker(page);
+        await checkModeLock(page);
+        await checkRuleCues(page);
         await checkLossWays(page);
       }
       await checkLanguages(page, name, locale);

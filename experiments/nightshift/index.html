@@ -18,6 +18,9 @@
   <symbol id="returnIcon" viewBox="0 0 24 24">
     <path d="M9 7l-5 5 5 5M4 12h10a5 5 0 0 0 0-10M13 18h6l2 4H11z"/>
   </symbol>
+  <symbol id="lockIcon" viewBox="0 0 24 24">
+    <rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3M12 15v2"/>
+  </symbol>
   <symbol id="escapeIcon" viewBox="0 0 24 24">
     <path d="M11 3H4v18h7M8 12h12m-5-5 5 5-5 5"/>
   </symbol>
@@ -46,8 +49,8 @@
       <button class="progress" id="progress"></button>
       <button class="primary" id="play"><span data-i18n="play"></span><small aria-hidden="true" id="nightNumber"></small></button>
       <div class="row">
-        <button id="long"><span data-i18n="long"></span><span class="modeStat"><span data-i18n="endlessMark" aria-hidden="true"></span> <small id="best"></small></span></button>
-        <button id="daily"><span data-i18n="daily"></span><span class="modeStat"><small id="streak"></small></span></button>
+        <button id="long"><span data-i18n="long"></span><span class="modeStat"><span data-i18n="endlessMark" aria-hidden="true"></span> <small id="best"></small></span><span class="lockStat" aria-hidden="true"><svg class="icon"><use href="#lockIcon"/></svg><b></b></span></button>
+        <button id="daily"><span data-i18n="daily"></span><span class="modeStat"><small id="streak"></small></span><span class="lockStat" aria-hidden="true"><svg class="icon"><use href="#lockIcon"/></svg><b></b></span></button>
       </div>
       <div class="settings">
         <button class="quiet audio" id="menuSound"></button>
