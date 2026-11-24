@@ -71,9 +71,9 @@
 <script type="module">
 import {
   newRun, step, walkTo, use, ready, guess, nextChapter, consistent, tileOf, dailySeed, roleId, roleName, ROLES,
-  ABILITIES, COST, LIFE, LEAP_TICKS, DT, FACES, WRONG, CHAPTERS, SELF_POINTS,
+  ABILITIES, COST, LIFE, LEAP_TICKS, DT, FACES, WRONG, CHAPTERS, SELF_POINTS, PICK, SHOW, pickLie, showMe, later, fits,
 } from './sim.js';
-import { person, pet, portrait, value, kindIcon, abilityIcon, hand, candle, flame, star, hat, tool, roundRect, INK, CREAM, GOLD, ABILITY_COLOUR } from './art.js';
+import { place, person, pet, portrait, value, kindIcon, abilityIcon, hand, candle, flame, star, hat, tool, roundRect, INK, CREAM, GOLD, ABILITY_COLOUR } from './art.js';
 import { readJson, writeJson } from '../kit/save.js';
 import { sound } from '../kit/audio.js';
 import { onLeave, isPauseKey } from '../kit/pause.js';
@@ -87,13 +87,19 @@ const query = new URLSearchParams(location.search);
 // A rainy night (tester t1, note #115: "more dark and gloomy ... a night raining with dead flowers around"). ?gloom=0 shows the old
 // look, so the two can be compared; remove GLOOM and its branches to go back for good.
 const GLOOM = query.get('gloom') !== '0';
+// Memories that lie (tester t1, notes #137 and #140): each memory is won by finding which of its pictures lies.
+// ?lies=0 plays the old way (a memory is yours when you reach it), on the same islands and faces.
+const LIES = query.get('lies') !== '0';
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TAU = Math.PI * 2;
 const ease = p => p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2;
 const back = p => 1 + 2.7 * (p - 1) ** 3 + 1.7 * (p - 1) ** 2; // ease out with a small overshoot
 
 // ---------------------------------------------------------------- save (one JSON blob)
+// taught is a set of bits in the same number (old saves hold 0 or 1): 1 the first memory was found (the hand on the
+// island stops), then one bit for each kind of puzzle taught by the ghost finger (TEACH).
 const KEY = 'borrowed-save';
+const TEACH = { nobody: 2, clue: 4, pair: 8, three: 16 };
 const save = { v: 1, sound: true, best: 0, runs: 0, gallery: {}, daily: {}, taught: 0, ...readJson(KEY, {}) };
 const store = () => writeJson(KEY, save);
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -164,6 +170,7 @@ let s = null, screen = 'menu', paused = false, clock = 0, acc = 0, last = perfor
 let mode = 'free', dayKey = null, seed = 0;
 let shownLife = LIFE, walkPhase = 0, petAt = null, squash = 0, touched = false;
 let wfx = [], sfx = [], rings = [], shake = 0, litT = null, mendT = 0, bridgeT = 0, breakT = {};
+let pz = null; // the open puzzle: { spot, t, teach, wrong: [{ i, t }], fx: { how, t } after it is solved, then: vignette waiting }
 let vignette = null, selected = -1, reveal = null, flash = null, nope = null, heartT = 0, newRoles = 0, chapterCard = { t: 0 }, nextBtn = null, chapterMenuBtn = null;
 const hints = { ability: {} };
 
@@ -173,7 +180,7 @@ function begin(daily = false) {
   const d = new Date();
   dayKey = today();
   seed = urlSeed ?? (daily ? dailySeed(d.getFullYear(), d.getMonth() + 1, d.getDate()) : (Date.now() ^ (Math.random() * 4294967296)) >>> 0);
-  s = newRun(seed);
+  s = newRun(seed, { lies: LIES });
   shownLife = LIFE; touched = false; newRoles = 0;
   hints.ability = {};
   paused = false; snd.release();
@@ -184,7 +191,7 @@ function begin(daily = false) {
 function enterChapter() {
   walkPhase = 0; petAt = null; squash = 0;
   wfx = []; sfx = []; rings = []; shake = 0; litT = new Float32Array(s.w * s.h); mendT = 0; bridgeT = 0; breakT = {};
-  vignette = null; selected = -1; reveal = null; flash = null; nope = null; heartT = 0;
+  vignette = null; selected = -1; reveal = null; flash = null; nope = null; heartT = 0; pz = null;
   cam = camGoal();
   show('play');
 }
@@ -206,6 +213,7 @@ canvas.addEventListener('pointerdown', e => {
   const x = e.clientX, y = e.clientY;
   rings.push({ x, y, t: 0, screen: true });
   if (screen === 'lineup') { lineupTap(x, y); return; }
+  if (screen === 'puzzle') { puzzleTap(x, y); return; }
   if (screen === 'chapter') { if (nextBtn && inRect(nextBtn, x, y)) goNext(); else if (chapterMenuBtn && chapterCard.t >= 0.5 && inRect(chapterMenuBtn, x, y)) leaveRun(); return; }
   if (screen !== 'play') return;
   if (vignette) { vignette.k = Math.max(vignette.k, VIG_SHOW); tone(660, 0.05, 0.03, 'sine'); return; }
@@ -240,6 +248,252 @@ function press(id) {
   }
 }
 
+// ---------------------------------------------------------------- the puzzle: which picture lies?
+// A memory shows two or three photographs of your life; one of them lies. Tap it. The clues you have (the top bar) and
+// the six faces (the strip below the photographs; faces already ruled out are crossed) are enough to tell. A wrong tap
+// costs PICK years and marks that photograph true; "Show me" pays SHOW years to see the lie; "Later" leaves the memory
+// on the island. The first puzzle of each kind is taught by a ghost finger, without words.
+let puzzleCards = [], puzzleButtons = { later: { x: 0, y: 0, w: 0, h: 0 }, show: { x: 0, y: 0, w: 0, h: 0 } }, puzzleFaces = null, puzzleTop = 0;
+const FX_TEAR = 1.0, FX_POINT = 0.55; // seconds the lie takes to tear; with Show me, the finger points first
+function openPuzzle(e) {
+  const spot = s.open;
+  if (!spot) return;
+  const form = spot.puzzle.form;
+  pz = { spot, t: -0.25, teach: !(save.taught & TEACH[form]), wrong: [], fx: null, then: null };
+  screen = 'puzzle'; finger = null; selected = -1;
+  tone(440, 0.25, 0.05, 'sine', 120); setTimeout(() => tone(330, 0.3, 0.04, 'sine', -60), 120);
+  rec.event('puzzle', { lock: spot.lock, form, life: Math.round(s.life) });
+}
+function closePuzzle() { screen = 'play'; pz = null; tone(330, 0.12, 0.05, 'sine', -100); }
+function puzzleAct(fn) {
+  if (screen !== 'puzzle' || !pz || pz.fx || pz.t < 0 || !s.open) return;
+  fn();
+  drain();
+  if (screen === 'puzzle' && pz && !pz.fx && !s.open) closePuzzle(); // Later
+}
+function puzzleTick() {
+  pz.t += 1 / 60;
+  for (const w of pz.wrong) w.t += 1 / 60;
+  if (pz.fx) {
+    pz.fx.t += 1 / 60;
+    if (pz.fx.t >= FX_TEAR + (pz.fx.how === 'shown' ? FX_POINT : 0)) { screen = 'play'; vignette = pz.then; pz = null; }
+  }
+}
+function puzzleTap(x, y) {
+  if (!pz) return;
+  if (inRect(puzzleButtons.later, x, y)) { puzzleAct(() => later(s)); return; }
+  if (inRect(puzzleButtons.show, x, y)) { puzzleAct(() => showMe(s)); return; }
+  const i = puzzleCards.findIndex(c => inRect(c, x, y));
+  if (i < 0) return;
+  if (pz.spot.puzzle.tried[i]) { tone(150, 0.1, 0.05, 'square'); return; } // already shown true
+  puzzleAct(() => pickLie(s, i));
+}
+function layoutPuzzle() {
+  const n = pz.spot.puzzle.frags.length, cw0 = Math.min(W, 460);
+  const top = viewTop + 2, bottom = H - safe.b - 8;
+  puzzleTop = top;
+  const bh = 52, by = bottom - bh, bw = Math.min(176, (cw0 - 36) / 2);
+  puzzleButtons = { later: { x: W / 2 - bw - 6, y: by, w: bw, h: bh }, show: { x: W / 2 + 6, y: by, w: bw, h: bh } };
+  // the photographs and the faces below them sit together, centred in the room between the question and the buttons
+  // the faces: one row on a short screen, else two rows of three, big enough to read every feature
+  const gap = 8, fgap = 22, a0 = top + 58, a1 = by - 12, cg = 12;
+  const pw1 = Math.min(54, (cw0 - 40 - gap * 5) / FACES), cw2 = Math.min((cw0 - 32 - cg) / 2, 210);
+  // two rows take what height the photographs leave, up to a face as wide as a third of the screen less its margins
+  const cardsH = n === 2 ? cw2 : 2 * cw2 * 0.85 + cg;
+  const pw3 = Math.min(100, (cw0 - 60 - gap * 2) / 3, (a1 - a0 - fgap - cardsH - gap - 24) / 2);
+  const cols = pw3 >= 64 ? 3 : FACES;
+  const pw = cols === 3 ? pw3 : pw1, fh = cols === 3 ? 2 * pw + gap : pw, room = a1 - a0 - fh - fgap;
+  let cw = cw2, ch, block;
+  if (n === 2) { ch = Math.min(room, cw * 1.08); cw = Math.min(cw, ch / 0.9); block = ch; }
+  else { ch = Math.min(cw * 0.95, (room - cg) / 2); cw = Math.min(cw, ch / 0.85); block = 2 * ch + cg; }
+  const y = a0 + Math.max(0, (room - block) / 2) * 0.6;
+  puzzleCards = n === 2
+    ? [0, 1].map(i => ({ x: W / 2 + (i ? cg / 2 : -cg / 2 - cw), y, w: cw, h: ch }))
+    : [{ x: W / 2 - cg / 2 - cw, y, w: cw, h: ch }, { x: W / 2 + cg / 2, y, w: cw, h: ch }, { x: W / 2 - cw / 2, y: y + ch + cg, w: cw, h: ch }];
+  puzzleFaces = { x0: (W - (pw * cols + gap * (cols - 1))) / 2, y: y + block + fgap, pw, gap, cols, w: pw * cols + gap * (cols - 1), h: fh };
+}
+// One thing of a person, drawn big: a hat on a head, a held thing, a pet.
+function thing(d, v, x, y, R, time) {
+  if (d === 0) {
+    g.beginPath(); g.arc(x, y + R * 0.5, R * 0.55, 0, TAU); g.fillStyle = '#f6c9a0'; g.fill(); g.strokeStyle = INK; g.lineWidth = Math.max(1.5, R * 0.06); g.stroke();
+    g.fillStyle = INK; for (const k of [-1, 1]) { g.beginPath(); g.arc(x + k * R * 0.18, y + R * 0.55, R * 0.06, 0, TAU); g.fill(); }
+    hat(g, v, x, y + R * 0.45, R * 0.62);
+  } else if (d === 1) tool(g, v, x, y + R * 0.15, R * 0.62, time);
+  else pet(g, v, x, y + R * 0.1, R * 0.55, time);
+}
+// A photograph of a memory: the place (when it shows one) fills it; the other things stand in it, each on a pale halo
+// so they read at a glance. Returns where each thing was drawn, for the teaching marks.
+function photo(fr, x, y, w, h, time, frame = '#efe4c8') {
+  const pad = Math.max(5, Math.round(w * 0.05)), ix = x + pad, iy = y + pad, iw = w - pad * 2, ih = h - pad * 2.8;
+  g.save();
+  g.shadowColor = 'rgba(0,0,0,.5)'; g.shadowBlur = 14; g.shadowOffsetY = 5;
+  g.beginPath(); roundRect(g, x, y, w, h, 7); g.fillStyle = frame; g.fill();
+  g.restore();
+  const feats = [];
+  g.save(); g.beginPath(); g.rect(ix, iy, iw, ih); g.clip();
+  const pi = fr.dims.indexOf(3);
+  if (pi >= 0) { place(g, fr.vals[pi], ix, iy, iw, ih, time); feats.push({ d: 3, rect: [ix, iy, iw, ih] }); }
+  else { // indoors, by a lamp
+    const bg = g.createRadialGradient(ix + iw * 0.5, iy + ih * 0.35, 4, ix + iw * 0.5, iy + ih * 0.5, iw * 0.8);
+    bg.addColorStop(0, '#8a76b8'); bg.addColorStop(1, '#2e2452');
+    g.fillStyle = bg; g.fillRect(ix, iy, iw, ih);
+    g.fillStyle = '#3a2a3e'; g.fillRect(ix, iy + ih * 0.78, iw, ih);
+    g.strokeStyle = 'rgba(255,233,168,.18)'; g.lineWidth = 1;
+    for (let k = 1; k < 6; k++) { g.beginPath(); g.moveTo(ix + k * iw / 6, iy + ih * 0.78); g.lineTo(ix + k * iw / 6 + (k - 3) * 6, iy + ih); g.stroke(); }
+  }
+  const objs = fr.dims.map((d, k) => [d, fr.vals[k]]).filter(([d]) => d !== 3);
+  const R = objs.length > 1 ? Math.min(iw * 0.22, ih * 0.34) : Math.min(iw * 0.3, ih * 0.4);
+  objs.forEach(([d, v], k) => {
+    const cx = ix + iw * (objs.length > 1 ? (k ? 0.73 : 0.27) : 0.5), cy = iy + ih * (pi >= 0 ? 0.58 : 0.5);
+    const halo = g.createRadialGradient(cx, cy, 0, cx, cy, R * 1.25);
+    halo.addColorStop(0, 'rgba(255,250,235,.95)'); halo.addColorStop(0.7, 'rgba(255,250,235,.8)'); halo.addColorStop(1, 'rgba(255,250,235,0)');
+    g.fillStyle = halo; g.beginPath(); g.arc(cx, cy, R * 1.25, 0, TAU); g.fill();
+    thing(d, v, cx, cy, R, time);
+    feats.push({ d, x: cx, y: cy, r: R * 1.1 });
+  });
+  g.fillStyle = 'rgba(255,190,110,.10)'; g.fillRect(ix, iy, iw, ih); // an old photograph's warmth
+  g.restore();
+  g.strokeStyle = 'rgba(27,20,48,.6)'; g.lineWidth = 1.5; g.strokeRect(ix, iy, iw, ih);
+  return feats;
+}
+function trueMark(x, y, r) {
+  g.beginPath(); g.arc(x, y, r, 0, TAU); g.fillStyle = GOLD; g.fill(); g.strokeStyle = INK; g.lineWidth = 2.5; g.stroke();
+  g.beginPath(); g.moveTo(x - r * 0.5, y); g.lineTo(x - r * 0.12, y + r * 0.42); g.lineTo(x + r * 0.5, y - r * 0.4); g.strokeStyle = INK; g.lineWidth = 3; g.lineCap = 'round'; g.stroke();
+}
+function cross(x, y, r, col = '#ff5a4a', wdt = 6) {
+  g.strokeStyle = col; g.lineWidth = wdt; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(x - r, y - r); g.lineTo(x + r, y + r); g.moveTo(x + r, y - r); g.lineTo(x - r, y + r); g.stroke();
+}
+function puzzleScene(time) {
+  layoutPuzzle();
+  const z = pz.spot.puzzle, n = z.frags.length, fx = pz.fx;
+  const fade = Math.min(1, (pz.t + 0.25) / 0.25);
+  g.save(); g.globalAlpha = fade;
+  // the dark: a veil under the top strip, with the rain still falling behind the photographs
+  g.fillStyle = '#0f0a22'; g.fillRect(0, puzzleTop - 2, W, H);
+  if (GLOOM && !reduced) {
+    g.strokeStyle = 'rgba(170,180,230,.16)'; g.lineWidth = 1;
+    for (let k = 0; k < 40; k++) {
+      const rx = (hash(k, 3) * W + time * 40) % W, ry = puzzleTop + ((hash(k, 7) * H + time * 520) % (H - puzzleTop));
+      g.beginPath(); g.moveTo(rx, ry); g.lineTo(rx - 3, ry + 14); g.stroke();
+    }
+  }
+  // the question, and what a wrong tap costs: a photograph crossed out, the years beside it
+  const cx = W / 2, ty = puzzleTop + 20;
+  g.font = '800 23px ui-rounded, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const lastWrong = pz.wrong[pz.wrong.length - 1];
+  const title = fx ? (fx.how === 'found' ? 'You found the lie!' : 'That one lied') : lastWrong && lastWrong.t < 1.4 ? 'That one is true!' : 'Which one lies?';
+  g.lineWidth = 5; g.strokeStyle = INK; g.strokeText(title, cx, ty); g.fillStyle = lastWrong && lastWrong.t < 1.4 && !fx ? '#ffb0a0' : '#ffd98a'; g.fillText(title, cx, ty);
+  if (!fx) {
+    const py = ty + 26;
+    g.save(); g.translate(cx - 30, py);
+    g.beginPath(); roundRect(g, -9, -11, 18, 22, 3); g.fillStyle = '#efe4c8'; g.fill(); g.strokeStyle = INK; g.lineWidth = 1.5; g.stroke();
+    cross(0, 0, 5, '#ff5a4a', 3);
+    g.restore();
+    g.font = '800 16px ui-rounded, system-ui, sans-serif'; g.textAlign = 'left'; g.fillStyle = '#ff9a86';
+    flame(g, cx - 8, py + 6, 4, time);
+    g.fillText(`−${PICK}`, cx + 2, py + 1);
+  }
+  // the photographs
+  const cycle = pz.teach && !fx ? Math.floor(Math.max(0, pz.t) / 1.3) % n : -1; // teaching: each photograph in turn, and who it fits
+  const C = consistent(s.faces, s.known);
+  const tearAt = fx ? Math.max(0, fx.t - (fx.how === 'shown' ? FX_POINT : 0)) / FX_TEAR : 0;
+  puzzleCards.forEach((c, i) => {
+    const fr = z.frags[i], isLie = fx && i === z.liar, proved = z.tried[i] || (fx && i !== z.liar);
+    const w = pz.wrong.find(q => q.i === i);
+    let dx = 0, dy = 0;
+    if (w && w.t < 0.5 && !reduced) dx = Math.sin(w.t * 55) * 9 * (1 - w.t / 0.5);
+    if (isLie && tearAt > 0) {
+      // the lie tears down the middle and falls away
+      const e = ease(Math.min(1, tearAt * 1.4));
+      for (const side of [-1, 1]) {
+        g.save();
+        g.globalAlpha = fade * (1 - Math.max(0, tearAt - 0.55) / 0.45);
+        g.translate(c.x + c.w / 2 + side * e * c.w * 0.18, c.y + c.h + e * c.h * 0.35);
+        g.rotate(side * e * 0.32);
+        g.translate(-(c.x + c.w / 2), -(c.y + c.h));
+        g.beginPath();
+        const mid = c.x + c.w / 2, teeth = 9;
+        g.moveTo(mid, c.y - 4);
+        for (let k = 1; k <= teeth; k++) g.lineTo(mid + (k % 2 ? 6 : -6), c.y + k * c.h / teeth);
+        g.lineTo(mid, c.y + c.h + 4);
+        g.lineTo(side < 0 ? c.x - 20 : c.x + c.w + 20, c.y + c.h + 4);
+        g.lineTo(side < 0 ? c.x - 20 : c.x + c.w + 20, c.y - 4);
+        g.closePath(); g.clip();
+        photo(fr, c.x, c.y, c.w, c.h, time, '#f0c8c0');
+        cross(c.x + c.w / 2, c.y + c.h * 0.45, c.w * 0.26, '#e8344e', 9);
+        g.restore();
+      }
+      return;
+    }
+    g.save(); g.translate(dx, dy);
+    const glow = proved ? 0.5 + 0.5 * Math.sin(time * 5) : 0;
+    if (proved) { g.save(); g.shadowColor = GOLD; g.shadowBlur = 10 + glow * 12; g.beginPath(); roundRect(g, c.x, c.y, c.w, c.h, 7); g.fillStyle = GOLD; g.fill(); g.restore(); }
+    const feats = photo(fr, c.x, c.y, c.w, c.h, time, proved ? '#ffe9a8' : isLie ? '#f0c8c0' : '#efe4c8');
+    if (isLie) cross(c.x + c.w / 2, c.y + c.h * 0.45, c.w * 0.26, '#e8344e', 9); // the stamp, before it tears
+    if (proved) trueMark(c.x + c.w - 14, c.y + 14, 13);
+    if (w && w.t < 1.2) { // the price of the wrong tap rises off the photograph
+      g.globalAlpha = fade * (1 - w.t / 1.2); g.font = '800 26px ui-rounded, system-ui, sans-serif'; g.textAlign = 'center';
+      g.lineWidth = 5; g.strokeStyle = INK; g.strokeText(`−${PICK}`, c.x + c.w / 2, c.y - 16 - w.t * 34);
+      g.fillStyle = '#ff6a5a'; g.fillText(`−${PICK}`, c.x + c.w / 2, c.y - 16 - w.t * 34); g.globalAlpha = fade;
+    }
+    if (cycle === i) { // teaching: this photograph, and what in it disagrees with a clue you hold
+      g.setLineDash([7, 5]); g.lineDashOffset = -time * 20; g.strokeStyle = '#fff3dc'; g.lineWidth = 3;
+      g.beginPath(); roundRect(g, c.x - 5, c.y - 5, c.w + 10, c.h + 10, 10); g.stroke(); g.setLineDash([]);
+      for (const f of feats) {
+        const k = fr.dims.indexOf(f.d), clue = s.known[f.d];
+        if (clue === null) continue;
+        const bad = clue !== fr.vals[k];
+        g.strokeStyle = bad ? '#ff5a4a' : GOLD; g.lineWidth = 4;
+        if (f.rect) { g.strokeRect(f.rect[0] + 2, f.rect[1] + 2, f.rect[2] - 4, f.rect[3] - 4); }
+        else { g.beginPath(); g.arc(f.x, f.y, f.r * (1 + 0.06 * Math.sin(time * 8)), 0, TAU); g.stroke(); }
+        // the clue in the top bar it is held against
+        const sl = slots[f.d];
+        g.beginPath(); g.arc(sl.x, sl.y, sl.r + 5 + 2 * Math.sin(time * 8), 0, TAU); g.stroke();
+      }
+    }
+    g.restore();
+  });
+  // the six faces: crossed out when a clue rules them out; while teaching, the faces the shown photograph fits glow
+  const F = puzzleFaces, fitsNone = cycle >= 0 && !C.some(i => fits(s.faces[i], z.frags[cycle]));
+  s.faces.forEach((face, i) => {
+    const x = F.x0 + (i % F.cols) * (F.pw + F.gap), y = F.y + Math.floor(i / F.cols) * (F.pw + F.gap), out = !C.includes(i);
+    const lit = cycle >= 0 && !out && fits(face, z.frags[cycle]);
+    g.save();
+    if (lit) { g.translate(0, -5); g.shadowColor = GOLD; g.shadowBlur = 14; g.beginPath(); roundRect(g, x - 2, y - 2, F.pw + 4, F.pw + 4, 8); g.fillStyle = GOLD; g.fill(); g.shadowBlur = 0; }
+    portrait(g, face, x, y, F.pw, F.pw, time + i, { age: s.chapter, dim: out });
+    if (out) { g.strokeStyle = '#ff5a4a'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(x + 4, y + F.pw - 4); g.lineTo(x + F.pw - 4, y + 4); g.stroke(); }
+    g.restore();
+  });
+  if (fitsNone) { // nobody still in the running could be in this photograph
+    const x0 = F.x0 - 6, x1 = F.x0 + F.w + 6;
+    g.strokeStyle = '#ff5a4a'; g.lineWidth = 3; g.beginPath(); roundRect(g, x0, F.y - 6, x1 - x0, F.h + 12, 10); g.stroke();
+    cross(x1 + 2, F.y - 6, 7, '#ff5a4a', 4);
+  }
+  // the buttons: leave it for later, or pay to be shown
+  if (!fx) {
+    const bl = puzzleButtons.later, bs = puzzleButtons.show, can = s.life > 0;
+    g.beginPath(); roundRect(g, bl.x, bl.y, bl.w, bl.h, 26); g.fillStyle = 'rgba(255,243,220,.1)'; g.fill(); g.strokeStyle = 'rgba(255,217,138,.6)'; g.lineWidth = 2; g.stroke();
+    g.beginPath(); roundRect(g, bs.x, bs.y, bs.w, bs.h, 26); g.fillStyle = 'rgba(195,155,255,.22)'; g.fill(); g.strokeStyle = '#c39bff'; g.lineWidth = 2; g.stroke();
+    g.font = '700 17px ui-rounded, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff3dc';
+    g.fillText('← Later', bl.x + bl.w / 2, bl.y + bl.h / 2);
+    const deadly = SHOW >= s.life;
+    const sw = g.measureText('Show me').width;
+    g.font = '800 15px ui-rounded, system-ui, sans-serif';
+    const cost = `−${SHOW}`, cwid = g.measureText(cost).width, total = sw + 22 + cwid, sx0 = bs.x + (bs.w - total) / 2;
+    g.textAlign = 'left'; g.font = '700 17px ui-rounded, system-ui, sans-serif'; g.fillStyle = '#fff3dc'; g.fillText('Show me', sx0, bs.y + bs.h / 2);
+    flame(g, sx0 + sw + 10, bs.y + bs.h / 2 + 5, 4, time);
+    g.font = '800 15px ui-rounded, system-ui, sans-serif'; g.fillStyle = deadly ? '#ff5a4a' : '#ffe9a8'; g.fillText(cost, sx0 + sw + 18, bs.y + bs.h / 2);
+    if (!can) { /* faded: the reveal takes over */ }
+  }
+  // the ghost finger: on the lie while teaching (after the first look), and when you paid to be shown
+  const showing = fx && fx.how === 'shown' && fx.t < FX_POINT + 0.2;
+  if ((pz.teach && !fx && pz.t > 0.6) || showing) {
+    const c = puzzleCards[z.liar];
+    hand(g, c.x + c.w * 0.62, c.y + c.h * 0.78, (time * 0.9) % 1);
+  }
+  g.restore();
+}
 // ---------------------------------------------------------------- the picture choice
 let cards = [], lineupButtons = {};
 function openLineup() {
@@ -306,18 +560,46 @@ function drain() {
       noise(0.08, 0.2, 500); tone(120, 0.12, 0.08, 'sine');
     } else if (e.type === 'bridge') {
       bridgeT = 0.001; tone(196, 0.4, 0.06, 'triangle', 100);
+    } else if (e.type === 'puzzle') {
+      openPuzzle(e);
+    } else if (e.type === 'wrong') {
+      if (pz) pz.wrong.push({ i: e.i, t: 0 });
+      tone(311, 0.25, 0.07, 'sawtooth', -30); setTimeout(() => tone(233, 0.4, 0.06, 'sawtooth', -40), 150);
+      if (!reduced) shake = 7;
+      dripYears(e.cost);
+      rec.event('pick', { right: false, lock: e.lock, life: Math.round(s.life) });
+    } else if (e.type === 'shown') {
+      dripYears(e.cost); voice.burn(e.cost);
+      rec.event('shown', { lock: e.lock, life: Math.round(s.life) });
+    } else if (e.type === 'later') {
+      rec.event('later', { lock: e.lock });
+    } else if (e.type === 'solved') {
+      if (pz) pz.fx = { how: e.how, t: 0 };
+      if (e.how === 'found') {
+        rec.event('pick', { right: true, lock: e.lock, life: Math.round(s.life) });
+        noise(0.35, 0.18, 2600); // paper tearing
+        [0, 3, 7].forEach((k, i) => setTimeout(() => tone(SCALE[4] * 2 ** (k / 12), 0.3, 0.05, 'triangle'), 120 + i * 70));
+      } else noise(0.3, 0.12, 2200);
+      const bit = TEACH[e.form];
+      if (bit && !(save.taught & bit)) { save.taught |= bit; store(); }
     } else if (e.type === 'memory') {
-      vignette = { dims: e.dims, values: e.values, k: 0, fresh: e.fresh, x: e.x + 0.5, y: e.y + 0.5 };
+      const v = { dims: e.dims, values: e.values, k: 0, fresh: e.fresh, x: e.x + 0.5, y: e.y + 0.5 };
+      if (pz && pz.fx) pz.then = v; else vignette = v; // after a puzzle: the memory shows once the lie has torn
       burst(e.x + 0.5, e.y + 0.3, GOLD, 26);
       const n = s.found;
       [0, 4, 7, 12].forEach((k, i) => setTimeout(() => tone(SCALE[Math.min(7, n)] * 2 ** (k / 12), 0.4, 0.06, 'triangle'), i * 80));
       rec.event('memory', { lock: e.lock, kinds: e.dims, fresh: e.fresh });
-      if (!save.taught) { save.taught = 1; store(); }
+      if (!(save.taught & 1)) { save.taught |= 1; store(); }
     } else if (e.type === 'faded') {
       startReveal('faded');
     }
   }
   s.events.length = 0;
+}
+// Years leave the candle as falling wax, and the price floats by it.
+function dripYears(cost) {
+  for (let k = 0; k < Math.min(14, cost); k++) sfx.push({ x: hudL + 30 + (Math.random() - 0.5) * 10, y: safe.t + 66 - 46 * (s.life + cost) / LIFE, vx: (Math.random() - 0.5) * 2.2, vy: -Math.random() * 2, life: 1, col: '#fff0cf', size: 2 + Math.random() * 3, g: 0.25 });
+  sfx.push({ word: `−${cost}`, x: hudL + 12, y: viewTop + 26, t: 0, col: '#ff8a6a' });
 }
 function burst(x, y, col, n) {
   if (reduced) n = Math.ceil(n / 4);
@@ -335,7 +617,7 @@ function puff(x, y, col, n) {
 // when the candle goes out; its outcome is s.status (remembered, mistaken or faded).
 const runOver = () => s.status === 'remembered' || s.status === 'mistaken' || s.status === 'faded';
 function startReveal(outcome) {
-  finger = null; vignette = null; // a lethal Rewind must show the fading scene, not its memory card
+  finger = null; vignette = null; pz = null; // a lethal Rewind must show the fading scene, not its memory card
   reveal = { outcome, t: 0 };
   screen = 'reveal'; $('pause').style.display = 'none';
   const c = s.chapters[s.chapters.length - 1];
@@ -360,6 +642,7 @@ function startReveal(outcome) {
   store();
   rec.end(s.status, {
     score: s.score, years: Math.round(s.life), right: s.right, reached: s.chapter + 1, found: s.found, used: { ...s.used }, seconds: Math.round(s.t / 60), daily: mode === 'daily',
+    ...(s.lies ? { lies: { ...s.puzzles } } : {}),
     chapters: s.chapters.map(c => ({ id: c.id, right: c.right, years: Math.round(c.yearsSpent), uses: c.uses, found: c.found, seconds: Math.round(c.seconds) })),
   });
 }
@@ -384,6 +667,8 @@ function showEnd() {
 function tick() {
   clock++;
   if (screen === 'play' && !vignette) { step(s); drain(); }
+  if (screen === 'puzzle' && pz) puzzleTick();
+  if (screen === 'puzzle' && s) shownLife += (s.life - shownLife) * 0.12;
   if (screen === 'play' && s) {
     // pointing hints and the candle shown
     shownLife += (s.life - shownLife) * 0.12;
@@ -471,6 +756,7 @@ function draw(alpha) {
     g.beginPath(); g.arc(r.x, r.y, 10 + r.t * 26, 0, TAU); g.strokeStyle = `rgba(255,243,220,${0.6 * (1 - r.t)})`; g.lineWidth = 3; g.stroke();
   }
   if (screen === 'lineup' || (screen === 'reveal' && reveal.outcome !== 'faded')) lineup(time);
+  if (screen === 'puzzle' && pz) puzzleScene(time);
   if (vignette) memoryScene(time);
   if (screen === 'reveal' && reveal.outcome === 'faded') fadedScene(time);
   if (screen === 'chapter') chapterScene(time);
@@ -694,7 +980,16 @@ function orb(p, time, alpha) {
   g.beginPath(); g.arc(X, Y, r, 0, TAU); g.fillStyle = 'rgba(60,40,110,.85)'; g.fill(); g.strokeStyle = '#ffe9a8'; g.lineWidth = 2.5; g.stroke();
   kinds(p.dims, X, Y, r * 0.95, time);
   g.beginPath(); g.arc(X - r * 0.35, Y - r * 0.4, r * 0.18, 0, TAU); g.fillStyle = 'rgba(255,255,255,.5)'; g.fill();
+  if (waiting(p)) unsolved(X + r * 0.85, Y - r * 0.8, time);
   g.restore();
+}
+// A memory whose puzzle you opened and left: a cracked question mark waits on it.
+const waiting = p => !!(p.puzzle && p.puzzle.seen && !p.taken);
+function unsolved(X, Y, time) {
+  const r = Math.max(9, T * 0.16) * (1 + 0.06 * Math.sin(time * 5));
+  g.beginPath(); g.arc(X, Y, r, 0, TAU); g.fillStyle = '#ff8a6a'; g.fill(); g.strokeStyle = INK; g.lineWidth = 2; g.stroke();
+  g.font = `800 ${Math.round(r * 1.4)}px ui-rounded, system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = INK; g.fillText('?', X, Y + 1);
+  g.beginPath(); g.moveTo(X - r * 0.9, Y - r * 0.2); g.lineTo(X - r * 0.45, Y + r * 0.05); g.lineTo(X - r * 0.6, Y + r * 0.5); g.strokeStyle = INK; g.lineWidth = 1.5; g.stroke();
 }
 // The kinds of memory a lock holds. A kind you already know shows its picture, dimmed: nothing new there.
 function kinds(dims, X, Y, r, time) {
@@ -724,10 +1019,11 @@ function mirror(p, time) {
   if (p.taken) { g.globalAlpha = k; kinds(p.dims, X, Y, rw * 0.95, time); g.globalAlpha = 1; }
   g.restore();
   if (!p.taken) {
-    const by = Y - rh - T * 0.3;
-    g.beginPath(); roundRect(g, X - T * 0.4, by - T * 0.19, T * 0.8, T * 0.38, T * 0.19); g.fillStyle = 'rgba(60,40,110,.92)'; g.fill(); g.strokeStyle = '#c39bff'; g.lineWidth = 2; g.stroke();
-    kinds(p.dims, X, by, T * 0.3, time);
-    badge('rewind', p.x + 0.85, p.y + 0.55, time);
+    const by = Y - rh - T * 0.3, n = p.dims.length, kr = n > 2 ? T * 0.26 : T * 0.3, bw = kr * 1.05 * (n - 1) + T * 0.5;
+    g.beginPath(); roundRect(g, X - bw / 2, by - T * 0.19, bw, T * 0.38, T * 0.19); g.fillStyle = 'rgba(60,40,110,.92)'; g.fill(); g.strokeStyle = '#c39bff'; g.lineWidth = 2; g.stroke();
+    kinds(p.dims, X, by, kr, time);
+    if (waiting(p)) unsolved(X + bw / 2, by - T * 0.15, time);
+    else badge('rewind', p.x + 0.85, p.y + 0.55, time);
   }
 }
 function player(time) {
@@ -850,7 +1146,7 @@ function abilityBar(time) {
 function tutorial(time) {
   if (screen !== 'play' || vignette || help.shown) return; // the shared first-time hint stands in while it shows
   const k = (time * 0.9) % 1;
-  if (!save.taught && s.found === 0 && !s.path.length) {
+  if (!(save.taught & 1) && s.found === 0 && !s.path.length) {
     const free = s.spots.find(p => p.lock === 'free');
     if (free) hand(g, sx(free.x + 0.5) + 6, sy(free.y + 0.5) + 4, k);
     return;
@@ -880,7 +1176,7 @@ function memoryScene(time) {
     g.setTransform(dpr, 0, 0, dpr, 0, 0); g.globalAlpha = 1;
   }
   v.dims.forEach((d, i) => {
-    const n = v.dims.length, r0 = n > 1 ? cw * 0.22 : cw * 0.3;
+    const n = v.dims.length, r0 = n > 2 ? cw * 0.15 : n > 1 ? cw * 0.22 : cw * 0.3;
     let x = cx + (i - (n - 1) / 2) * r0 * 2.3, y = cy - ch * 0.05, r = r0 * back(show);
     if (fly > 0) { const e = ease(fly), sl = slots[d]; x += (sl.x - x) * e; y += (sl.y - y) * e; r = r0 + (sl.r - r0) * e; }
     g.beginPath(); g.arc(x, y, r + 6, 0, TAU); g.fillStyle = '#ffe9a8'; g.fill();
@@ -966,7 +1262,9 @@ function fadedScene(time) {
 }
 
 // Between chapters: the selves named so far, what changes next, and a button to go on.
-const NEXT_LINE = ['', 'Faces are closer now: some differ in one thing only. A broken mirror holds two memories.', 'The candle burns faster. Push now holds two memories. You can solve this island without Rewind.'];
+const NEXT_LINE = LIES
+  ? ['', 'Faces are closer now: some differ in one thing only. A broken mirror holds two memories.', 'The candle burns faster. Push holds two memories. The mirror shows three pictures: one lies.']
+  : ['', 'Faces are closer now: some differ in one thing only. A broken mirror holds two memories.', 'The candle burns faster. Push now holds two memories. You can solve this island without Rewind.'];
 function chapterScene(time) {
   const k = ease(Math.min(1, chapterCard.t / 0.4)), next = s.chapter + 1;
   g.fillStyle = `rgba(14,8,30,${0.94 * k})`; g.fillRect(0, 0, W, H);
@@ -1108,7 +1406,7 @@ $('play').addEventListener('click', () => begin(false));
 $('daily').addEventListener('click', () => begin(true));
 let pausedFrom = 'play';
 function pause() {
-  if ((screen !== 'play' && screen !== 'lineup') || paused) return;
+  if ((screen !== 'play' && screen !== 'lineup' && screen !== 'puzzle') || paused) return;
   pausedFrom = screen; paused = true; finger = null;
   cardsOn('paused'); $('pause').style.display = 'none'; snd.hold();
 }
@@ -1139,6 +1437,13 @@ addEventListener('keydown', e => {
     return;
   }
   if (screen === 'chapter') { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goNext(); } return; }
+  if (screen === 'puzzle') {
+    const n = '123'.indexOf(e.key);
+    if (n >= 0) puzzleAct(() => pickLie(s, n));
+    else if (e.key === 'Backspace' || e.key === 'Escape') puzzleAct(() => later(s));
+    else if (e.key === 's' || e.key === '?') puzzleAct(() => showMe(s));
+    return;
+  }
   if (screen !== 'play') return;
   touched = true;
   if (vignette) { vignette.k = Math.max(vignette.k, VIG_SHOW); return; }
@@ -1169,6 +1474,15 @@ window.borrowedState = () => ({
   chapterMenu: screen === 'chapter' && chapterMenuBtn ? centre(chapterMenuBtn) : null,
   chapterControls: screen === 'chapter' ? [nextBtn, chapterMenuBtn].filter(Boolean) : [],
   candidates: s ? consistent(s.faces, s.known) : [],
+  lies: s ? s.lies : LIES, taught: save.taught,
+  // the open puzzle, without which picture lies (shown is set only once it is solved or bought)
+  puzzle: screen === 'puzzle' && pz ? {
+    form: pz.spot.puzzle.form, lock: pz.spot.lock, n: pz.spot.puzzle.frags.length, cards: puzzleCards.map(centre),
+    tried: [...pz.spot.puzzle.tried], later: centre(puzzleButtons.later), show: centre(puzzleButtons.show), teach: pz.teach,
+    solving: !!pz.fx, how: pz.fx ? pz.fx.how : null, wrong: pz.wrong.length,
+  } : null,
+  waiting: s ? s.spots.filter(p => p.puzzle && p.puzzle.seen && !p.taken).map(p => p.lock) : [],
+  liesWon: s?.puzzles ? { ...s.puzzles } : null,
   tile: T, viewTop, viewBottom, mapX, cam, touched,
 });
 window.borrowedSim = () => s; // checks may shorten a candle to reach the fading end quickly

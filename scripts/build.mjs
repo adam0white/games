@@ -10,7 +10,12 @@ if (!clean()) throw new Error('Build requires a clean checkout');
 // Cloudflare's own Git build of main clones without history, and the redirect preflight below needs all of it.
 // That build failed on every merge and showed a red check; GitHub Actions and local checkouts are never shallow.
 if (run('git', ['rev-parse', '--is-shallow-repository']) === 'true') run('git', ['fetch', '--unshallow', 'origin'], { stdio: 'inherit' });
-run('node', ['scripts/check-redirects.mjs'], { stdio: 'inherit' });
+// The redirect preflight compares this checkout with the live release, which must be one of its ancestors. A
+// branch that Cloudflare builds for a preview is behind live as soon as main deploys again, so every preview
+// build failed there. A preview deploys nothing to production; scripts/deploy.mjs runs the preflight itself.
+const preview = process.env.WORKERS_CI === '1' && process.env.WORKERS_CI_BRANCH !== 'main';
+if (preview) console.log('Preview build: redirect preflight skipped');
+else run('node', ['scripts/check-redirects.mjs'], { stdio: 'inherit' });
 // Checked before the long game builds, so a slug collision fails at once.
 const experiments = planExperiments('.', registry);
 rmSync('dist', { recursive: true, force: true });

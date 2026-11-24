@@ -67,3 +67,10 @@ Two new pages and a tuning pass on the second batch, by Codex builders. For this
 
 - 2026-11-24: Codex was upgraded on the build machine while builders ran, and three builders stopped with a missing helper binary. Rerunning them worked. Do not upgrade Codex mid-run.
 
+## Round of 2026-11-24 (ideas scan)
+
+From `docs/ideas/shortlist-2026-11-24.md`, a scan of forums and the web for game ideas and old games to revive. Each page was built by one builder from one brief; the lab reran its `bots.mjs`, its `--mutate` run and its `check.mjs` and looked at the screenshots. No person and no real phone yet.
+
+| Date | Experiment | Idea tested | Checked | Verdict |
+| --- | --- | --- | --- | --- |
+| 2026-11-24 | `pitch` | A traditional pencil game (paper soccer) brought back almost unchanged: the rules are old, the work is teaching without words (legal points pulse, a spring marks a bounce), a bot at three strengths, a daily "score in one turn" position, and the finished sheet as a picture to share | Bots: 2,000 random games against a rules oracle with its own geometry, Medium beat Easy 200 of 200, Hard beat Medium 200 of 200, 60 daily positions solved and distinct; the mutation run fails. Phone check: WebKit iPhone 13, Chromium Pixel 7, 360x640, 390x844. Known gaps: the bot levels are far apart; most dailies have a 3-line answer and may be easy | Keep testing; needs a person. Next: a friends' table by link (the idea of the lab's AI: the server keeps the move list, so a dropped player gets the game back) |
