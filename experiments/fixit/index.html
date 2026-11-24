@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#f2b37a">
-<title>Fix-It Stall</title>
+<title></title>
 <style>
   html, body { margin: 0; height: 100%; background: #6a3a1f; overflow: hidden; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   body { font: 17px/1.4 ui-rounded, 'Arial Rounded MT Bold', 'Trebuchet MS', system-ui, sans-serif; color: #3a2216; }
@@ -13,6 +13,12 @@
   .screen { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: #3a221688; overflow-y: auto; touch-action: pan-y; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); box-sizing: border-box; }
   .screen.on { display: grid; }
   .card { max-width: 22em; width: calc(100% - 32px); box-sizing: border-box; padding: 18px 18px 14px; margin: 12px 0; background: #fff1d6; border: 3px solid #3a2216; border-radius: 22px; box-shadow: 0 8px 0 #3a221655; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  #menu .card, #paused .card { position: relative; }
+  .language { position: absolute; top: 7px; right: 7px; display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: 44px; min-height: 44px; margin: 0; padding: 0 5px; border-radius: 11px; font-size: .67em; box-shadow: 0 2px 0 #3a2216; }
+  body:has(#menu.on) #notes-button { right: auto !important; left: calc(8px + env(safe-area-inset-left)); }
+  .language svg { width: 15px; height: 15px; }
+  #menu h1, #paused h2 { margin-inline: 44px; }
   h1 { font-size: 2.3em; line-height: 1.05; margin: 0 0 .15em; color: #c8743a; text-shadow: 0 3px 0 #3a2216; -webkit-text-stroke: 1.5px #3a2216; letter-spacing: .01em; }
   h2 { font-size: 1.7em; margin: 0 0 .2em; color: #c8743a; text-shadow: 0 2px 0 #3a2216; -webkit-text-stroke: 1px #3a2216; }
   p { margin: .35em 0; }
@@ -41,6 +47,36 @@
   #menu .lab-notice { display: flex; align-items: center; gap: 6px; text-align: left; }
   #menu .lab-notice a { display: grid; place-items: center; flex: none; min-width: 48px; min-height: 44px; }
   #newjob { color: #1d5e5b; font-weight: bold; }
+  #menu .stats { gap: 5px 12px; font-size: .81em; }
+  #modeInfo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 7px; margin: .2em 0; }
+  #modeInfo button { width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 3px 5px; font-size: .88em; }
+  #modeInfo .sub { line-height: 1.25; }
+  .mode-summary { display: block; }
+  #menu .sub, #growth { font-size: .8em; }
+  #playLine { min-height: 24px; }
+  #playActions { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin: .25em 0; }
+  #playActions:has(#menuAssist:not([hidden])) { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+  #playActions:has(#menuAssist:not([hidden])) #play { padding-inline: .3em; font-size: 1em; }
+  #play { min-width: 0; min-height: 44px; padding: .25em .6em; margin: 0; font-size: 1.12em; }
+  #menuAssist { min-height: 44px; max-width: 100%; padding: .15em .32em; margin: 0; font-size: .68em; }
+  #menuAssist svg { width: 19px; height: 19px; margin-right: 2px; }
+  #assistLevel:not(:empty) { display: block; }
+  #menu .grid { gap: 5px; }
+  .metric { display: inline-flex; align-items: center; justify-content: center; gap: 3px; margin-inline: 3px; white-space: nowrap; vertical-align: middle; }
+  .metric canvas { width: 23px; height: 23px; }
+  .metric .job-icon { width: 44px; height: 44px; }
+  .metric .empty-star { color: #665443; }
+  #startLevel { position: fixed; z-index: 1; left: 50%; translate: -50% 0; width: 68px; height: 48px; min-width: 0; margin: 0; padding: 0; border-radius: 16px; background: #2f8f8a; color: #fff6e4; }
+  #startLevel svg { width: 32px; height: 32px; vertical-align: middle; }
+  #startLevel .tap-wave { transform-origin: 13px 9px; animation: tap-wave 1.4s ease-out infinite; }
+  @keyframes tap-wave { 65%, 100% { opacity: 0; transform: scale(1.55); } }
+  @media (prefers-reduced-motion: reduce) { #startLevel .tap-wave { animation: none; } }
+  #openLine, #dailyLine { margin: .13em 0; }
+  #menu .utility { margin: .2em 0; }
+  #menu .utility button { margin-block: .1em; min-height: 44px; min-width: 0; padding: .18em .7em; font-size: .87em; }
+  #menu .lab-notice { line-height: 1.24 !important; margin: .2em 0 0 !important; }
+  #menu .lab-notice > span { min-width: 0; }
+  #end .stats { gap: 4px 7px; }
   .desk { display: none; font-size: .85em; }
   .st { color: #d9a93e; -webkit-text-stroke: .6px #3a2216; }
   .map { margin: .3em 0 .4em; text-align: left; }
@@ -83,69 +119,83 @@
   @media (prefers-reduced-motion: reduce) { .lv.next { animation: none; } }
   .stars { font-size: 2.6em; line-height: 1; margin: .1em 0 0; color: #f0b830; -webkit-text-stroke: 1.5px #3a2216; letter-spacing: .05em; }
   .stars.none { color: #e3cfae; }
-  @media (max-height: 700px) { h1 { font-size: 1.8em; } .card { padding: 12px 14px 10px; } }
+  @media (max-height: 700px) { h1 { font-size: 1.55em; } .card { padding: 12px 14px 10px; } #menu .lv { min-height: 44px; } }
   @media (pointer: fine) { .desk { display: block; } }
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
+<canvas id="c" role="img" data-i18n-aria="title"></canvas>
 <div id="probe"></div>
-<button id="pause" aria-label="Pause"></button>
+<button id="pause" data-i18n-aria="pause"></button>
 <div id="tickets" class="tickets" hidden></div>
+<p id="briefText" class="sr-only" hidden></p>
+<button id="startLevel" data-i18n-aria="start" aria-describedby="briefText" hidden>
+  <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path class="tap-wave" d="M5 9a8 8 0 0 1 16 0M8 9a5 5 0 0 1 10 0"/>
+    <path d="M11 21V9a2 2 0 0 1 4 0v8l7 1a4 4 0 0 1 3 5l-2 7H12l-6-9a2 2 0 0 1 3-2l2 2z" fill="#2f8f8a"/>
+  </svg>
+</button>
+<template id="languageIcon">
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+    <circle cx="10" cy="10" r="8"/><ellipse cx="10" cy="10" rx="3.5" ry="8"/><path d="M2 10h16"/>
+  </svg>
+  <span aria-hidden="true"></span>
+</template>
 
 <div id="menu" class="screen on"><div class="card">
-  <h1>Fix-It Stall</h1>
-  <div class="stats"><span><span class="coin"></span><b id="bank">0</b></span><span><span class="st">★</span> <b id="starsAll">0</b>/<span id="starsMax">132</span></span><span>Jobs unlocked <b id="jobs">3</b>/<span id="jobsAll">18</span></span></div>
-  <p><button id="play" class="main">Play</button><button id="menuAssist" class="help-icon" hidden></button></p>
+  <h1 data-i18n="title"></h1><button id="langMenu" class="language" data-i18n-aria="switchLanguage"></button>
+  <div class="stats"><span><span class="coin" role="img" data-i18n-aria="coins"></span><b id="bank"></b></span><span><span class="st">★</span> <b id="starsAll"></b>/<span id="starsMax"></span></span><span><span data-i18n="jobsUnlocked"></span> <b id="jobs"></b>/<span id="jobsAll"></span></span></div>
+  <p id="playActions"><button id="play" class="main"></button><button id="menuAssist" class="help-icon" hidden></button></p>
   <p id="playLine" class="sub"></p>
-  <p id="migrated" class="sub"></p>
-  <div id="chapterTabs" aria-label="Chapters"></div>
+  <p id="migrated" class="sub" hidden></p>
+  <div id="chapterTabs" data-i18n-aria="chapters"></div>
   <div id="map" class="map"></div>
-  <p id="growth"></p>
-  <p><button id="open">Open stall</button><button id="daily">Daily stall</button></p>
-  <p id="openLine" class="sub"></p>
-  <p id="dailyLine" class="sub"></p>
-  <p class="desk sub">On a computer: drag with the mouse, or hold Space.</p>
-  <p><button id="toShop">Stall shop</button><button id="sound1" class="small">Sound: on</button></p>
+  <p id="growth" hidden></p>
+  <div id="modeInfo">
+    <div><button id="open" data-i18n="open"></button><p id="openLine" class="sub"></p></div>
+    <div><button id="daily" data-i18n="daily"></button><p id="dailyLine" class="sub"></p></div>
+  </div>
+  <p class="desk sub" data-i18n="keyboard"></p>
+  <p class="utility"><button id="toShop" data-i18n="shop"></button><button id="sound1" class="small"></button></p>
 </div></div>
 
 <div id="shop" class="screen"><div class="card">
-  <h2>Stall shop</h2>
-  <p class="stats"><span><span class="coin"></span><b id="bank2">0</b></span></p>
+  <h2 data-i18n="shop"></h2>
+  <p class="stats"><span><span class="coin" role="img" data-i18n-aria="coins"></span><b id="bank2"></b></span></p>
   <div id="items" class="items"></div>
-  <p><button class="back">Back</button></p>
+  <p><button class="back" data-i18n="back"></button></p>
 </div></div>
 
 <div id="paused" class="screen"><div class="card">
-  <h2>Paused</h2>
-  <p><button id="resume" class="main">Keep going</button></p>
-  <p><button id="quit">Menu</button><button id="sound2" class="small">Sound: on</button></p>
+  <h2 data-i18n="paused"></h2><button id="langPause" class="language" data-i18n-aria="switchLanguage"></button>
+  <p><button id="resume" class="main" data-i18n="resume"></button></p>
+  <p><button id="quit" data-i18n="menu"></button><button id="sound2" class="small"></button></p>
 </div></div>
 
 <div id="end" class="screen"><div class="card">
-  <h2 id="endTitle">Closed!</h2>
-  <p id="endStars" class="stars"></p>
-  <p class="big" id="earnedLine"><span class="coin"></span><span id="earned">0</span></p>
+  <h2 id="endTitle"></h2>
+  <p id="endStars" class="stars" role="img"></p>
+  <p class="big" id="earnedLine"><span class="coin" role="img" data-i18n-aria="coins"></span><span id="earned"></span></p>
   <div id="endStats" class="stats"></div>
-  <p id="endLine" class="sub"></p>
-  <p id="newjob"></p>
+  <p id="endLine" class="sub" hidden></p>
+  <p id="newjob" hidden></p>
   <div id="helpRow" hidden>
-    <button id="assist" class="help-icon" aria-label="Retry with slower clocks, up to two stars" title="Slower clocks"></button>
+    <button id="assist" class="help-icon" data-i18n-aria="assistRetry" data-i18n-title="assistRetry"></button>
     <template id="helpIcon">
       <svg viewBox="0 0 42 32" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M3 24h29c5 0 7-4 6-7l-1-5m-5 6 1-7M7 23a12 12 0 1 1 24 0M15 18a4 4 0 1 1 4 4"/>
         <circle cx="33" cy="10" r="1.5" fill="currentColor"/><circle cx="37" cy="10" r="1.5" fill="currentColor"/>
       </svg>
-      <span>Slower clocks · 2★ max</span>
+      <span data-i18n="slower"></span> <span class="st" aria-hidden="true">★★☆</span>
     </template>
   </div>
   <div id="dailyResult" hidden>
-    <canvas id="dailyShare" width="600" height="340" role="img" aria-label="Daily stall result"></canvas>
+    <canvas id="dailyShare" width="600" height="340" role="img"></canvas>
     <p id="shareStatus" role="status" class="sub"></p>
-    <div><button id="shareDaily">Share card</button><button id="downloadDaily">Save image</button></div>
+    <div><button id="shareDaily" data-i18n="share"></button><button id="downloadDaily" data-i18n="download"></button></div>
   </div>
-  <p><button id="next" class="main">Next level</button></p>
-  <p><button id="again" class="main">Play again</button><button id="toMenu">Menu</button></p>
+  <p><button id="next" class="main" data-i18n="next"></button></p>
+  <p><button id="again" class="main"></button><button id="toMenu" data-i18n="menu"></button></p>
 </div></div>
 
 <script type="module" src="./main.js"></script>
