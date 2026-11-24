@@ -4396,9 +4396,9 @@ pyink==25.12.0 \
     --hash=sha256:3c9ed8c6f1f6f4a7f3a6a3a31bff5a7ab6b3c88954dc456273c8e71ce6ff0508 \
     --hash=sha256:930a913fed2824ffbbd3c10847fad1171c2b075dd709a13dc435caea851de7b8
     # via gdm-concordia (setup.py)
-pyjwt==2.14.0 \
-    --hash=sha256:77283c83fb56ecf566a886c757a714bc83668e38156de2cce8263302f42e0b86 \
-    --hash=sha256:ad0cef71c756a56e74863c2919cf0985f72decbcfcb550ee2f422e7c62b5eedc
+pyjwt==2.15.0 \
+    --hash=sha256:7a3742debf6b879e912dbb9819ceec1594be812452b78c5f2e2dfc56564954f8 \
+    --hash=sha256:b11c5f9791d7bf51c2b39a81ed669f6b2dbbd669df2942f6c60167e9e3d1abe4
     # via mcp
 pylint==4.0.6 \
     --hash=sha256:52f19191bee08bf103f9705ad1a0ece4aa5a0a4ef2bdcbd969375a1e6f6579d5 \
