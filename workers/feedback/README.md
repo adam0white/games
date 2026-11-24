@@ -79,7 +79,7 @@ node --test test/                                         # API tests with in-me
 
 Adding a tester: generate a key (`openssl rand -base64 33 | tr '+/' '-_' | tr -d '='`), add `{ "id": "t2", "token": "<key>", "lang": "tr" }` to the `TESTERS` secret with `wrangler secret put TESTERS`, and send them `https://play.adamwhite.work/notes/#k=<key>`. Supported page languages are `tr` and `en`. Removing an entry revokes that link at once. The tester `t0` is the lab's own test tester.
 
-Adding an experiment: add it to `GAMES` in `public/notes/app.js` and put `<script src="/notes/button.js" defer></script>` before `</body>` in its `index.html`.
+Adding an experiment: add it to `experiments/kit/games.json` (the notes page builds its games menu and game picker from that file, with `"fresh": true` for a game to point out as new; the phone check fails if an experiment is missing from it) and put `<script src="/notes/button.js" defer></script>` before `</body>` in its `index.html`.
 
 ## What was verified, and what was not
 

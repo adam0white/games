@@ -10,16 +10,14 @@
 <link rel="stylesheet" href="/notes/app.css">
 </head>
 <body>
-<header><h1 id="title"></h1><p id="lead"></p></header>
-<nav id="fresh" hidden><span id="fresh-label"></span><div id="fresh-list"></div></nav>
+<header><h1 id="title"></h1><details id="games" hidden><summary id="games-summary"></summary><div id="games-list"></div></details></header>
 <main id="thread" aria-live="polite"></main>
 <p id="notice" hidden></p>
 <footer id="composer" hidden>
   <p id="answering" hidden><span id="answering-text"></span><button id="answering-clear" type="button" aria-label="×">×</button></p>
-  <label id="game-label" for="game"></label>
-  <select id="game"></select>
-  <textarea id="text" rows="3" maxlength="6000"></textarea>
+  <textarea id="text" rows="1" maxlength="6000"></textarea>
   <div id="actions">
+    <select id="game"></select>
     <button id="mic" type="button"></button>
     <button id="send" type="button" class="main"></button>
   </div>

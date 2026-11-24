@@ -11,11 +11,19 @@ import { fileURLToPath } from 'node:url';
 import { dirname, extname, join, normalize, resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { gunzipSync } from 'node:zlib';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { experimentPath } from '../../../src/worker.mjs';
 import { experimentRoots } from '../../../scripts/experiments.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+// The notes page builds its games menu and game picker from kit/games.json, so every experiment has to be in it.
+{
+  const listed = new Set(JSON.parse(readFileSync(join(root, 'experiments/kit/games.json'), 'utf8')).games.map(game => game.slug));
+  const missing = readdirSync(join(root, 'experiments'), { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && !['kit', 'lab'].includes(entry.name) && existsSync(join(root, 'experiments', entry.name, 'index.html')) && !listed.has(entry.name))
+    .map(entry => entry.name);
+  assert.deepEqual(missing, [], `add these experiments to experiments/kit/games.json so testers can find them: ${missing.join(', ')}`);
+}
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x'), moved = experimentPath(url.pathname);
